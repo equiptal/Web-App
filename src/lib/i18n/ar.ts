@@ -198,11 +198,17 @@ export const ar: Dictionary = {
     },
   },
   preview: {
-    title: "راجع طلبك",
+    title: "المراجعة والإرسال",
+    subtitle: "هذا طلبك الكامل. أرسله مرة واحدة ويمكن لكل مورّد تقديم عرضه — وستحصل على عرض أسعار واحد يغطي كل العناصر.",
     post: "إرسال الطلب",
+    send: "إرسال الطلب",
+    edit: "تعديل",
+    confirmed: "مؤكَّد",
+    notSent: "{count} غير متوفر — مُستبعد من هذا الطلب.",
     export: "فتح في Excel",
     itemsTable: "جميع العناصر",
     projectSummary: "المشروع",
+    equipmentSummary: "المعدات",
     preferencesSummary: "التفضيلات",
     table: {
       equipment: "المعدة",

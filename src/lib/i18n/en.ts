@@ -197,11 +197,17 @@ export const en = {
     },
   },
   preview: {
-    title: "Review your request",
+    title: "Review and send",
+    subtitle: "Here's your full request. Send it once and every supplier can bid — you'll get one quotation covering all items.",
     post: "Post request",
+    send: "Send request",
+    edit: "Edit",
+    confirmed: "confirmed",
+    notSent: "{count} not available — left off this request.",
     export: "Open in Excel", // AC-52
     itemsTable: "All items",
     projectSummary: "Project",
+    equipmentSummary: "Equipment",
     preferencesSummary: "Preferences",
     table: {
       equipment: "Equipment",
