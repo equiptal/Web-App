@@ -41,6 +41,13 @@ export interface CreateRequestItem {
   dieselIncluded?: boolean;
   /** AC-24: from the operator "transfer" sub-field; only when an operator is included. */
   fatRequired?: boolean;
+  // §4.2 per-item fields (operator sub-fields + fanned project safety certs):
+  /** AC-24: per-item night-shift flag (operator sub-field). */
+  nightShiftRequired?: boolean;
+  /** AC-24: per-item operator nationality (≤100). */
+  operatorNationality?: string;
+  /** AC-50: project Safety certificates fanned onto each item. */
+  safetyCertifications?: string[];
 }
 
 export interface CreateRequestPayload {
@@ -58,6 +65,21 @@ export interface CreateRequestPayload {
   projectLng?: number;
   projectAddressLabel?: string;
   additionalNotes?: string;
+  // §4.2 header fields (AC-15 hours/days/overtime, AC-27 access, AC-36/37 terms, AC-39/40 filters):
+  workingHoursPerDay?: number; // int 1–24
+  workingDaysPerWeek?: number; // int 1–7
+  overtimeRate?: "0" | "1X" | "1.5X" | "2X"; // UI "without" → "0"
+  siteAccessRestrictions?: string; // single string ≤500 (NOT per-item) — UI array joined
+  paymentTerms?: string; // ≤100
+  paymentMethod?: string; // ≤100
+  maintenanceResponsibility?: string; // ≤50
+  breakdownResponseSla?: "FOUR_HR" | "EIGHT_HR" | "TWENTY_FOUR_HR" | "FORTY_EIGHT_HR" | "SEVENTY_TWO_HR";
+  budgetCeiling?: number; // > 0
+  verifiedSuppliersOnly?: boolean;
+  subletting?: boolean;
+  offerDuration?: string; // ≤10 — the bid window
+  requiredCerts?: string[]; // project "Other" certs (open string[])
+  localContent?: boolean; // the local-content flag, split out of "Other"
   equipmentItems: CreateRequestItem[];
 }
 

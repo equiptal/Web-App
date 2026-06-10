@@ -64,6 +64,20 @@ const RENTAL_MAP: Record<string, CreateRequestPayload["rentalType"]> = {
   monthly: "MONTHLY",
 };
 
+/** AC-15: UI overtime ("without"|"1.5x"|"2x") → §4.2 enum. */
+const OVERTIME_MAP: Record<string, CreateRequestPayload["overtimeRate"]> = {
+  without: "0",
+  "1.5x": "1.5X",
+  "2x": "2X",
+};
+
+/** AC-37: UI maintenance SLA → §4.2 enum. "custom" has no enum slot → omitted. */
+const SLA_MAP: Record<string, CreateRequestPayload["breakdownResponseSla"]> = {
+  "4h": "FOUR_HR",
+  "8h": "EIGHT_HR",
+  "24h": "TWENTY_FOUR_HR",
+};
+
 /**
  * Map the UI draft → the app's create_request payload (POST /agents/requests). Resolves the field
  * divergences logged in plan.md Q6: rental basis → rentalType, me/supplier → mob/demob booleans
@@ -77,10 +91,15 @@ const RENTAL_MAP: Record<string, CreateRequestPayload["rentalType"]> = {
  * `startDate` (mobile CR-017); any value would be ignored (rule 2).
  */
 export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): CreateRequestPayload {
-  const { project } = draft;
+  const { project, preferences } = draft;
   const items = postableItems(draft.items);
-  // Rule 4: project-level fields are stored per-item — compute once, fan out onto each item below.
+  // Rule 4 + §4.2: project-level fields are stored per-item — compute once, fan out onto each item.
   const manufactureYear = toManufactureYear(project.advanced.equipmentYear);
+  const safetyCerts = project.certificates.safety.length ? project.certificates.safety.slice() : undefined; // AC-50 fanned per-item
+  // AC-50: "Other" certs → requiredCerts; the local-content flag is split out into its own boolean.
+  const otherCerts = project.certificates.other;
+  const localContent = otherCerts.includes("local-content");
+  const requiredCerts = otherCerts.filter((c) => c !== "local-content");
 
   return {
     userId: Number(userId), // agents-backend requires an integer id
@@ -92,7 +111,24 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
     projectLat: project.location.lat,
     projectLng: project.location.lng,
     projectAddressLabel: project.location.label ?? undefined,
-    additionalNotes: draft.preferences.additionalNotes || undefined,
+    additionalNotes: preferences.additionalNotes || undefined,
+    // §4.2 header fields:
+    workingHoursPerDay: project.timing.hoursPerDay, // AC-14/15 (default 8)
+    workingDaysPerWeek: project.advanced.workingDaysPerWeek, // AC-15 (default 6)
+    overtimeRate: OVERTIME_MAP[project.advanced.overtimeRate], // AC-15
+    siteAccessRestrictions: project.advanced.siteAccessRestrictions.length // AC-27: UI array → single string
+      ? project.advanced.siteAccessRestrictions.join(", ")
+      : undefined,
+    paymentTerms: preferences.payment.terms ?? undefined, // AC-36
+    paymentMethod: preferences.payment.method ?? undefined, // AC-36
+    maintenanceResponsibility: preferences.maintenance.responsibility, // AC-37 (default supplier)
+    breakdownResponseSla: preferences.maintenance.sla ? SLA_MAP[preferences.maintenance.sla] : undefined, // AC-37
+    budgetCeiling: preferences.budgetSar && preferences.budgetSar > 0 ? preferences.budgetSar : undefined, // AC-39
+    verifiedSuppliersOnly: preferences.supplierFilters.verifiedOnly, // AC-40
+    subletting: preferences.supplierFilters.sublettingAllowed, // AC-40
+    offerDuration: preferences.supplierFilters.bidWindow ?? undefined, // AC-40 bid window
+    requiredCerts: requiredCerts.length ? requiredCerts : undefined, // AC-50
+    localContent: localContent || undefined, // AC-50 (omit when false)
     equipmentItems: items.map((i) => {
       const fuelParty = i.fuelResponsibilityOverride ?? project.fuelResponsibility; // AC-26 request-wide + per-item override
       const operatorIncluded = i.operatorNeeded === "yes";
@@ -109,6 +145,10 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
         maxEquipmentAge: manufactureYear, // AC-28 project-level year, fanned out (undefined ⇒ key dropped)
         dieselIncluded: toDieselIncluded(i.fuelType, fuelParty), // AC-26
         fatRequired: operatorIncluded ? i.operator.transfer : false, // AC-24 operator "transfer" sub-field
+        // §4.2 per-item operator sub-fields (only meaningful when an operator is included):
+        nightShiftRequired: operatorIncluded ? i.operator.nightShift : undefined, // AC-24
+        operatorNationality: operatorIncluded ? i.operator.nationality ?? undefined : undefined, // AC-24
+        safetyCertifications: safetyCerts, // AC-50 project safety certs fanned per-item
       };
     }),
   };
