@@ -32,7 +32,7 @@ export interface RfqState {
   draft: RfqDraft | null;
   // intake inputs (preserved across errors — AC-10)
   text: string;
-  files: { name: string; type: string }[];
+  files: { name: string; type: string; data?: string }[];
   simulateError: boolean;
   // status
   busy: boolean;
@@ -60,7 +60,7 @@ const initialState: RfqState = {
 type Action =
   | { t: "SET_TAXONOMY"; taxonomy: Taxonomy }
   | { t: "SET_TEXT"; text: string }
-  | { t: "ADD_FILES"; files: { name: string; type: string }[] }
+  | { t: "ADD_FILES"; files: { name: string; type: string; data?: string }[] }
   | { t: "REMOVE_FILE"; index: number }
   | { t: "SET_SIMULATE_ERROR"; value: boolean }
   | { t: "PROCESS_START" }
@@ -271,7 +271,7 @@ const RfqContext = createContext<RfqContextValue | null>(null);
 function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState) {
   return {
     setText: (text: string) => dispatch({ t: "SET_TEXT", text }),
-    addFiles: (files: { name: string; type: string }[]) => dispatch({ t: "ADD_FILES", files }),
+    addFiles: (files: { name: string; type: string; data?: string }[]) => dispatch({ t: "ADD_FILES", files }),
     removeFile: (index: number) => dispatch({ t: "REMOVE_FILE", index }),
     setSimulateError: (value: boolean) => dispatch({ t: "SET_SIMULATE_ERROR", value }),
 

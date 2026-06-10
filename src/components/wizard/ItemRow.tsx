@@ -107,6 +107,12 @@ export function ItemRow({ item, taxonomy }: { item: EquipmentItem; taxonomy: Tax
             })}
           </div>
         )}
+        {/* Agent's free-text capacity advisory (real Mansour output, AC-19/20) */}
+        {item.advisory && !item.suggestion?.unitConversion && (
+          <div className="mt-1.5 flex items-center gap-1.5 text-[11.5px] font-semibold text-warn">
+            <Icon name="swap_horiz" size={14} /> {item.advisory}
+          </div>
+        )}
         {!item.resolved && <p className="mt-1.5 text-[12.5px] text-muted">{item.suggestion ? fmt(t.step2.nearestSuggested, { measurement: measurement?.name ?? "" }) : t.step2.needsValidationPrompt}</p>}
 
         {/* Matched: qty + operator/fuel meta tags */}

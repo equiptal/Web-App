@@ -98,6 +98,8 @@ export interface EquipmentItem {
   verdict: Verdict; // from the agent
   /** AC-19: nearest-measurement suggestion when the RFQ measurement isn't in the taxonomy. */
   suggestion?: MeasurementSuggestion;
+  /** AC-19/20: free-text capacity advisory from the agent (unit mismatch / snap explanation). */
+  advisory?: string | null;
   /**
    * AC-18/19/29: whether a needs-validation match or measurement suggestion has been resolved
    * (Approved or Edited). Confident/no-match items are not gated by this.

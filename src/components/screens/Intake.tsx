@@ -29,14 +29,25 @@ export function Intake() {
 
   function onFiles(list: FileList | null) {
     if (!list) return;
-    const accepted: { name: string; type: string }[] = [];
     let anyRejected = false;
-    Array.from(list).forEach((f) => {
-      if (isAccepted(f)) accepted.push({ name: f.name, type: f.type || "application/octet-stream" });
-      else anyRejected = true;
-    });
-    setRejected(anyRejected); // AC-07
-    if (accepted.length) actions.addFiles(accepted);
+    const reads = Array.from(list)
+      .map((f) => {
+        if (!isAccepted(f)) {
+          anyRejected = true; // AC-07
+          return null;
+        }
+        // Read as base64 so real uploads can be forwarded to the agent.
+        return new Promise<{ name: string; type: string; data: string }>((resolve) => {
+          const r = new FileReader();
+          const type = f.type || "application/octet-stream";
+          r.onload = () => resolve({ name: f.name, type, data: String(r.result) });
+          r.onerror = () => resolve({ name: f.name, type, data: "" });
+          r.readAsDataURL(f);
+        });
+      })
+      .filter(Boolean) as Promise<{ name: string; type: string; data: string }>[];
+    setRejected(anyRejected);
+    if (reads.length) Promise.all(reads).then((files) => actions.addFiles(files));
     if (fileInput.current) fileInput.current.value = "";
   }
 

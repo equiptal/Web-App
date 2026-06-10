@@ -14,7 +14,7 @@ export class ApiError extends Error {
 
 export interface ProcessInput {
   text: string;
-  files: { name: string; type: string }[];
+  files: { name: string; type: string; data?: string }[];
   /** Dev affordance to exercise AC-10. */
   simulateError?: boolean;
 }
