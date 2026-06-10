@@ -33,24 +33,32 @@ export const en = {
     preview: "Preview",
   },
   intake: {
-    heading: "Request equipment",
-    subheading: "Paste your RFQ or upload a file, and we'll draft the request for you.",
+    heading: "New rental request",
+    subheading: "Already have an RFQ? Paste it or upload your files to start a request from it. You review everything before it's sent.",
     tabRfq: "RFQ", // AC-01 tentative
     tabManual: "Manual", // AC-01 tentative
-    manualNote: "The manual builder isn't part of this release.",
-    pasteLabel: "Paste RFQ text",
+    tabLater: "LATER",
+    manualNote: "Manual entry is coming in a later release.",
+    pasteLabel: "Paste your RFQ",
     pastePlaceholder: "Paste your equipment list, email, or RFQ here…",
-    uploadLabel: "Upload files",
-    uploadHint: "PDF, image, Word, or Excel.",
+    uploadLabel: "Attach files too",
+    uploadOptional: "optional — add as many as you like",
+    dropTitle: "Drop files here, or browse",
+    uploadHint: "PDF, image, Word or Excel",
     acceptedTypes: "Accepted file types: PDF, image, Word, Excel.", // AC-07 tentative
     fileRejected: "Only PDF, image, Word, or Excel files can be processed.", // AC-07 tentative
-    startProcessing: "Start processing",
+    startProcessing: "Continue",
     attachedFiles: "Attached files",
     emptyHint: "Paste text or attach at least one file to start.",
   },
   processing: {
     title: "Reading your RFQ…",
     note: "Project details and items will appear as they're parsed.",
+    sub: "This usually takes a few seconds — hang tight.",
+    stage1: "Reading your document",
+    stage2: "Extracting your project details",
+    stage3: "Matching equipment to our catalogue",
+    stage4: "Preparing your request",
     // AC-56 e.g. "24 items found · 3 need a quick check · 2 not available"
     summaryItems: "{count} items found",
     summaryNeedCheck: "{count} need a quick check",
