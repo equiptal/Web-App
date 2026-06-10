@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { useRealApp, serverEnv } from "@/lib/config/env";
-import { agentsPost } from "@/lib/api/agents-backend";
+import { agentsPost, AgentsBackendError } from "@/lib/api/agents-backend";
 import { draftToCreateRequest } from "@/lib/api/app-adapters";
 import type { RfqRequestPayload } from "@/lib/contract";
 import type { CreateRequestResult } from "@/lib/contract/app";
@@ -30,6 +30,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ requestId: data.shortCode ?? data.requestId ?? "RFQ" }, { status: 201 });
     } catch (err) {
       console.error("[requests] real submit failed:", err);
+      // Surface the real backend status + message instead of an opaque 503.
+      if (err instanceof AgentsBackendError) {
+        return NextResponse.json(
+          { code: "submit_failed", detail: err.message, backendCode: err.code, backendStatus: err.status },
+          { status: 502 },
+        );
+      }
       return NextResponse.json({ code: "network" }, { status: 503 });
     }
   }
