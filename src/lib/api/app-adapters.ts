@@ -88,6 +88,7 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
     rentalType: (project.timing.rentalBasis && RENTAL_MAP[project.timing.rentalBasis]) || "DAILY",
     startDate: toIsoDateTime(project.timing.startDate), // optional; omitted when unset → server defaults to now
     endDate: toIsoDateTime(project.timing.endDate),
+    extendable: project.timing.extendable, // AC-13 (rule 6: needs the deployed `extendable` column)
     projectLat: project.location.lat,
     projectLng: project.location.lng,
     projectAddressLabel: project.location.label ?? undefined,
@@ -104,6 +105,7 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
         fuelTypePreference: FUEL_MAP[i.fuelType],
         mobilizationByRentee: (i.deliveryOverride ?? project.deliveryToSite) === "me",
         demobilizationByRentee: (i.returnOverride ?? project.returnFromSite) === "me",
+        additionalNotes: i.additionalNotes || undefined, // AC-53 (rule 6: needs the deployed item column)
         maxEquipmentAge: manufactureYear, // AC-28 project-level year, fanned out (undefined ⇒ key dropped)
         dieselIncluded: toDieselIncluded(i.fuelType, fuelParty), // AC-26
         fatRequired: operatorIncluded ? i.operator.transfer : false, // AC-24 operator "transfer" sub-field

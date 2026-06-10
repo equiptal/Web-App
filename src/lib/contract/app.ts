@@ -32,6 +32,8 @@ export interface CreateRequestItem {
   fuelTypePreference?: "DIESEL" | "PETROL" | "ELECTRIC";
   mobilizationByRentee: boolean;
   demobilizationByRentee: boolean;
+  /** AC-53 per-item free-text qualifier. Requires the `additional_notes` item column (rule 6 migration). */
+  additionalNotes?: string;
   // Project-level fields fanned out onto every item (ALIGNMENT rule 4):
   /** AC-28: a minimum MANUFACTURE YEAR (a misnomer — NOT an age). e.g. 2024. Omitted for "any". */
   maxEquipmentAge?: number;
@@ -48,6 +50,8 @@ export interface CreateRequestPayload {
   /** Optional — omit and the server defaults to "now". Never invent one (ALIGNMENT rule 3). */
   startDate?: string;
   endDate?: string | null;
+  /** AC-13 rental extendable flag. Requires the `extendable` column (rule 6 migration). */
+  extendable?: boolean;
   // `urgency` intentionally absent: the server derives it from startDate (ALIGNMENT rule 2 / mobile
   // CR-017); any value sent is ignored, so the web never sends it.
   projectLat?: number;
