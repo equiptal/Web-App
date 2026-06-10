@@ -30,17 +30,27 @@ export function unwrapEnvelope(raw: unknown): Obj {
   return raw;
 }
 
-/** Extract the agent output from either the nested or flattened envelope. */
+/** Extract the agent output from the envelope, wherever the payload sits. */
 export function extractAgentOutput(raw: unknown): RFQAgentOutput {
   const a = unwrapEnvelope(raw);
-  const b = isObj(a.data) && ("rfq_header" in a.data || "line_items" in a.data) ? (a.data as Obj) : a;
+  // The agent output may live at the top, under `data` (flattened), or under `result` — the async
+  // job-poll wrapper is `{ data: { status, result: { rfq_header, line_items, ... } } }`, so after
+  // unwrapEnvelope the payload is one level deeper, under `result`. Pick the level that actually
+  // carries rfq_header / line_items.
+  const candidates: Obj[] = [a];
+  if (isObj(a.result)) candidates.push(a.result);
+  if (isObj(a.data)) {
+    candidates.push(a.data);
+    if (isObj(a.data.result)) candidates.push(a.data.result);
+  }
+  const b = candidates.find((c) => "rfq_header" in c || "line_items" in c) ?? a;
   return {
     rfq_header: (b.rfq_header ?? {}) as RFQHeader,
     line_items: (Array.isArray(b.line_items) ? b.line_items : []) as RFQLineItem[],
-    missing_required_fields: (Array.isArray(a.missing_required_fields)
-      ? a.missing_required_fields
-      : Array.isArray(b.missing_required_fields)
-        ? b.missing_required_fields
+    missing_required_fields: (Array.isArray(b.missing_required_fields)
+      ? b.missing_required_fields
+      : Array.isArray(a.missing_required_fields)
+        ? a.missing_required_fields
         : []) as MissingFieldEntry[],
   };
 }
@@ -58,6 +68,7 @@ export function jobStatus(raw: unknown): "pending" | "done" | "error" {
   const s = String(a.status ?? a.state ?? "").toLowerCase();
   if (["failed", "error", "errored"].includes(s)) return "error";
   if (["pending", "processing", "queued", "running", "in_progress"].includes(s)) return "pending";
+  if (["done", "completed", "succeeded", "success"].includes(s)) return "done";
   // No explicit status (or a done-ish one) → done iff a result is present.
   return extractAgentOutput(raw).line_items.length > 0 || a.extraction_empty === true || isObj(a.data) ? "done" : "pending";
 }
@@ -75,7 +86,12 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
   return {
     project: toProject(out.rfq_header ?? {}),
     items,
-    detectedLocations: [out.rfq_header?.project_address_label].filter(Boolean) as string[],
+    // Mansour now returns an explicit detected_locations list (AC-48); fall back to the single
+    // address label for older/flattened payloads that omit it.
+    detectedLocations: (Array.isArray(out.rfq_header?.detected_locations) && out.rfq_header.detected_locations.length
+      ? out.rfq_header.detected_locations
+      : [out.rfq_header?.project_address_label]
+    ).filter(Boolean) as string[],
     summary: computeSummary(items),
   };
 }

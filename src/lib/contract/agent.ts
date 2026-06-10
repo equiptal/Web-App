@@ -48,6 +48,7 @@ export interface RFQHeader {
   project_lat?: number | null;
   project_lng?: number | null;
   project_address_label?: string | null;
+  detected_locations?: string[] | null; // AC-48: every distinct site Mansour found
   working_hours_per_day?: number | null;
   working_days_per_week?: number | null;
   overtime_rate?: AgentOvertimeRate | null;
