@@ -90,3 +90,44 @@ scopes). Each lists the GitHub impl-ticket issue, the ACs, the files, and Given/
 > **NOT yet connected:** no real URLs/token configured; Mansour's contract is a dated snapshot
 > (`src/lib/contract/agent.ts`, 2026-06-10) pending its freeze. This ticket stays open until the
 > real connection is verified on staging.
+
+---
+
+## Testing
+
+> Added 2026-06-10 after the UAT re-audit (`uat-check.md`): every AC currently has **no test**. These
+> three tickets close that — backend contract, frontend behavior, and full integration. No test
+> runner is configured yet (package.json has only dev/build/lint/typecheck), so each frontend/E2E
+> ticket includes its tooling setup. Test names should mirror the Given/When/Then in `acceptance.md`.
+
+### T10 — Backend contract tests (agents-backend create_request + taxonomy) — `Web-App#10` (to file)
+**Covers:** the BFF↔agents-backend contract behind AC-25/26/28/43 + ALIGNMENT rules 1–6 + endpoints §4.2.
+**Files:** `tests/contract/agents-backend.*` (new); exercises `src/lib/api/{app-adapters,agents-backend}.ts` against staging (`AGENTS_API_URL`).
+**Description:** Assert the live staging endpoint accepts the exact payload `draftToCreateRequest` produces, and rejects malformed ones — guarding the contract from drift.
+**Given/When/Then:**
+- Given a full draft, When mapped and POSTed to `/agents/requests`, Then it is accepted (no urgency; `startDate` omitted → server-defaulted; `maxEquipmentAge` = year; `dieselIncluded` omitted for electric; `extendable` + per-item `additionalNotes`; all §4.2 fields).
+- Given `endDate: null` (or an invalid taxonomy id), Then a 422 with the offending field is returned (negative case).
+- Given `GET /agents/taxonomy`, Then the flat node list shape matches `nodesToTree`'s expectations and ids are UUIDs (id-parity with Mansour).
+- **Blocked:** the create path currently 500s on a minimal valid payload (backend, mid-deploy) — this ticket also serves as the regression guard once that's fixed.
+
+### T11 — Frontend unit/component tests (wizard, gates, adapters) — `Web-App#11` (to file)
+**Covers:** AC-01–AC-44, AC-50–AC-57 (renter/web-UI behavior).
+**Files:** `vitest.config.ts` + `tests/unit/**` (new). Tooling: Vitest + React Testing Library + jsdom; add `"test"` script.
+**Description:** Unit/component tests for the pure logic and key components.
+**Given/When/Then (samples):**
+- Given gate logic (`gates.ts`), Then `gateStep1` blocks on unconfirmed location / no rental basis (AC-12), `itemBlocksAdvance` blocks needs-validation/incomplete items (AC-18/19/29), `postableItems` excludes no-match (AC-33).
+- Given the store (`rfq-store`), Then changing category clears subcategory+measurement (AC-21) and a Safety cert sets each item's operator certificate (AC-50).
+- Given the adapters, Then `agentOutputToDraft` derives verdicts + reads `detected_locations` (AC-48/54/57) and `draftToCreateRequest` maps every field correctly (year, dieselIncluded omission, fatRequired) — table-driven.
+- Given `ItemRow`, Then no-match shows `Provide it for me?` / `Cancel` both removing the item (AC-30/31/32); details editable only once Matched (AC-54).
+
+### T12 — Integration / end-to-end tests (full RFQ flow) — `Web-App#12` (to file)
+**Covers:** AC-04–AC-10 (Mansour), AC-41–AC-43 (submit), end-to-end relay; the adapter sync to the flat `data.result` contract.
+**Files:** `playwright.config.ts` + `tests/e2e/**` (new), and/or a node relay harness hitting `/api/*` with `MANSOUR_URL`+`AGENTS_API_URL` set.
+**Description:** Drive the real path: paste RFQ → `POST /api/agent/process` → poll `/api/agent/jobs/:id` → wizard renders parsed items against the real catalogue → submit.
+**Given/When/Then:**
+- Given a multi-item RFQ and real `MANSOUR_URL`, When processed, Then items return with resolved taxonomy ids and `detectedLocations` (regression for the `data.result` envelope fix).
+- Given an empty/garbled input, Then the empty-error state shows and no request is created (AC-09).
+- Given a confirmed, fully-resolved draft, When posted, Then one broadcast is created on **staging** and the confirmation screen shows (AC-42/43) — enable once the backend create 500 is resolved.
+
+> **Sequencing:** T10 and the submit half of T12 depend on the backend create 500 being fixed. T11
+> and the parse half of T12 are runnable now (parse + catalogue are live).

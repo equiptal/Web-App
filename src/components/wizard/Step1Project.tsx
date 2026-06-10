@@ -159,14 +159,37 @@ export function Step1Project() {
                 options={opt(OVERTIME_RATES, t.options.overtime)}
               />
             </Field>
-            <Field label={t.step1.advanced.equipmentYear} optional>
-              <Select<string>
-                value={project.advanced.equipmentYear}
-                placeholder={t.step1.advanced.equipmentYear}
-                onChange={(v) => actions.patchAdvanced({ equipmentYear: v })}
-                options={[...EQUIPMENT_YEARS].map((y) => ({ value: y, label: y === "any" ? t.options.equipmentYear.any : y }))}
-              />
-            </Field>
+            {(() => {
+              // AC-28: Any + 2020–2026 + Customize…. A custom pick stores `custom:<year>`,
+              // which app-adapters.toManufactureYear maps to maxEquipmentAge.
+              const ey = project.advanced.equipmentYear;
+              const isCustom = !!ey && ey.startsWith("custom:");
+              return (
+                <Field label={t.step1.advanced.equipmentYear} optional>
+                  <Select<string>
+                    value={isCustom ? "customize" : ey}
+                    placeholder={t.step1.advanced.equipmentYear}
+                    onChange={(v) => actions.patchAdvanced({ equipmentYear: v === "customize" ? "custom:" : v })}
+                    options={[
+                      ...[...EQUIPMENT_YEARS].map((y) => ({ value: y, label: y === "any" ? t.options.equipmentYear.any : y })),
+                      { value: "customize", label: t.step1.advanced.customize },
+                    ]}
+                  />
+                  {isCustom && (
+                    <div className="mt-2">
+                      <TextInput
+                        type="number"
+                        min={1980}
+                        max={2026}
+                        placeholder="YYYY"
+                        value={ey.slice("custom:".length)}
+                        onChange={(e) => actions.patchAdvanced({ equipmentYear: e.target.value ? `custom:${e.target.value}` : "custom:" })}
+                      />
+                    </div>
+                  )}
+                </Field>
+              );
+            })()}
             <Field label={t.step1.advanced.siteAccess}>
               <MultiChips<SiteAccessRestriction>
                 values={project.advanced.siteAccessRestrictions}
@@ -211,7 +234,7 @@ function advancedSummary(a: { workingDaysPerWeek: number; overtimeRate: string; 
   const parts: string[] = [];
   parts.push(`${a.workingDaysPerWeek}d/wk`);
   if (a.overtimeRate !== "without") parts.push(`OT ${a.overtimeRate}`);
-  if (a.equipmentYear) parts.push(`${a.equipmentYear}`);
+  if (a.equipmentYear) parts.push(a.equipmentYear.replace("custom:", ""));
   if (a.siteAccessRestrictions.length) parts.push(`${a.siteAccessRestrictions.length} restrictions`);
   return parts.length ? parts.join(" · ") : t.step1.advanced.collapsedEmpty;
 }
