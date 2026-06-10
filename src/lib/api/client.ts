@@ -44,9 +44,29 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   return (await res.json()) as T;
 }
 
-/** Send the renter's input to the agent and get a drafted request (AC-04/05/06). */
-export function processRfq(input: ProcessInput): Promise<AgentDraft> {
-  return postJson<AgentDraft>("/api/agent/process", input);
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Send the renter's input to the agent and get a drafted request (AC-04/05/06).
+ * Starts an async job then polls — big RFQs take 30–60s, so a single request would time out.
+ */
+export async function processRfq(input: ProcessInput): Promise<AgentDraft> {
+  const { jobId } = await postJson<{ jobId: string }>("/api/agent/process", input); // throws ApiError on empty/network
+  const deadline = Date.now() + 120_000;
+  while (Date.now() < deadline) {
+    let res: Response;
+    try {
+      res = await fetch(`/api/agent/jobs/${encodeURIComponent(jobId)}`, { cache: "no-store" });
+    } catch {
+      throw new ApiError("network");
+    }
+    if (!res.ok) throw new ApiError("network");
+    const data = (await res.json()) as { status: string; draft?: AgentDraft; code?: ApiErrorKind };
+    if (data.status === "done" && data.draft) return data.draft;
+    if (data.status === "error") throw new ApiError(data.code ?? "network");
+    await sleep(2000);
+  }
+  throw new ApiError("network"); // timed out
 }
 
 /** Submit the assembled broadcast (AC-42/43). */

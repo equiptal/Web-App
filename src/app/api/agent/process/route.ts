@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
-import { buildMockDraft } from "@/lib/api/mock-draft";
 import { useRealAgent, serverEnv } from "@/lib/config/env";
-import { agentOutputToDraft } from "@/lib/api/agent-adapters";
-import type { RFQAgentOutput, NormalizeRequest } from "@/lib/contract/agent";
+import { unwrapEnvelope } from "@/lib/api/agent-adapters";
+import type { NormalizeRequest } from "@/lib/contract/agent";
 
 /**
- * POST /api/agent/process — the agent (Mansour) boundary.
- * Real (MANSOUR_URL set): POSTs to Mansour `POST /rfq` and adapts the output → UI view-model.
- *   Mansour needs no token (no auth on /rfq). Body: { message, attachments[], source }.
- * Otherwise: stand-in mock.
- * Body in: { text?, files?: {name,type,data?}[], simulateError? }
+ * POST /api/agent/process — START an RFQ parse job. Returns `{ jobId }`; the client then polls
+ * GET /api/agent/jobs/:id. Async because a 15–20-item RFQ is a 30–60s LLM call that would blow the
+ * gateway timeout on a sync request.
+ *  - Real (MANSOUR_URL set): POST {MANSOUR_URL}/rfq/jobs with source "web_rfq" → returns its job id.
+ *  - Mock: returns jobId "mock" (the poll route serves the fixture).
+ * Body: { text?, files?: {name,type,data?}[], simulateError? }
  */
 export async function POST(req: Request) {
   let body: { text?: string; files?: { name: string; type: string; data?: string }[]; simulateError?: boolean } = {};
@@ -23,42 +23,38 @@ export async function POST(req: Request) {
 
   const hasText = Boolean(body.text && body.text.trim().length > 0);
   const files = body.files ?? [];
-  const hasFiles = files.length > 0;
-  if (!hasText && !hasFiles) return NextResponse.json({ code: "empty" }, { status: 400 });
+  if (!hasText && files.length === 0) return NextResponse.json({ code: "empty" }, { status: 400 }); // AC-09
 
   if (useRealAgent && serverEnv.mansourUrl) {
     try {
       const payload: NormalizeRequest = {
         message: body.text || undefined,
         attachments: files.filter((f) => f.data).map((f) => ({ type: f.type, filename: f.name, data: stripDataUrl(f.data as string) })),
-        source: "api",
+        source: "web_rfq", // triggers the web policy (non-blocking optional fields, basis constrained)
       };
-      const res = await fetch(`${serverEnv.mansourUrl}/rfq`, {
+      const res = await fetch(`${serverEnv.mansourUrl}/rfq/jobs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
         cache: "no-store",
       });
       if (!res.ok) {
-        console.error("[agent] Mansour /rfq HTTP", res.status);
+        console.error("[agent] /rfq/jobs HTTP", res.status);
         return NextResponse.json({ code: "network" }, { status: 503 });
       }
-      const json: unknown = await res.json();
-      const out = (json && typeof json === "object" && "data" in json ? (json as { data: RFQAgentOutput }).data : (json as RFQAgentOutput));
-      if (!out?.line_items?.length) return NextResponse.json({ code: "empty" }, { status: 400 }); // AC-09
-      return NextResponse.json(agentOutputToDraft(out), { status: 200 });
+      const a = unwrapEnvelope(await res.json());
+      const jobId = a.job_id ?? a.jobId ?? a.id;
+      if (!jobId) return NextResponse.json({ code: "network" }, { status: 503 });
+      return NextResponse.json({ jobId: String(jobId) }, { status: 202 });
     } catch (err) {
-      console.error("[agent] Mansour call failed:", err);
+      console.error("[agent] start job failed:", err);
       return NextResponse.json({ code: "network" }, { status: 503 });
     }
   }
 
-  // Stand-in mock (Mansour in flux / not configured).
-  await new Promise((r) => setTimeout(r, 400));
-  return NextResponse.json(buildMockDraft(), { status: 200 });
+  return NextResponse.json({ jobId: "mock" }, { status: 200 });
 }
 
-/** Strip a `data:<mime>;base64,` prefix if present, leaving raw base64. */
 function stripDataUrl(s: string): string {
   const i = s.indexOf("base64,");
   return i >= 0 ? s.slice(i + "base64,".length) : s;

@@ -11,7 +11,56 @@ import {
   type OvertimeRate,
   type Verdict,
 } from "@/lib/contract";
-import type { RFQAgentOutput, RFQHeader, RFQLineItem } from "@/lib/contract/agent";
+import type { RFQAgentOutput, RFQHeader, RFQLineItem, MissingFieldEntry } from "@/lib/contract/agent";
+
+/**
+ * Mansour's `POST /rfq` envelope is double-nested and uses `ok` (not `success`):
+ *   { ok, data: { rfq_id, data: { rfq_header, line_items }, missing_required_fields,
+ *                 summary_counts, sender_contact, extraction_empty? } }
+ * It may also arrive flattened to { ok, data: { rfq_header, line_items, missing_required_fields } }.
+ * These helpers read BOTH shapes so Mansour needn't reshape while its contract is in flux.
+ */
+type Obj = Record<string, unknown>;
+const isObj = (v: unknown): v is Obj => !!v && typeof v === "object";
+
+/** Unwrap the `{ ok|success, data }` envelope → the inner "A" object. */
+export function unwrapEnvelope(raw: unknown): Obj {
+  if (!isObj(raw)) return {};
+  if (("ok" in raw || "success" in raw) && isObj(raw.data)) return raw.data;
+  return raw;
+}
+
+/** Extract the agent output from either the nested or flattened envelope. */
+export function extractAgentOutput(raw: unknown): RFQAgentOutput {
+  const a = unwrapEnvelope(raw);
+  const b = isObj(a.data) && ("rfq_header" in a.data || "line_items" in a.data) ? (a.data as Obj) : a;
+  return {
+    rfq_header: (b.rfq_header ?? {}) as RFQHeader,
+    line_items: (Array.isArray(b.line_items) ? b.line_items : []) as RFQLineItem[],
+    missing_required_fields: (Array.isArray(a.missing_required_fields)
+      ? a.missing_required_fields
+      : Array.isArray(b.missing_required_fields)
+        ? b.missing_required_fields
+        : []) as MissingFieldEntry[],
+  };
+}
+
+/** AC-09: did the agent extract nothing usable? */
+export function isExtractionEmpty(raw: unknown): boolean {
+  const a = unwrapEnvelope(raw);
+  if (a.extraction_empty === true) return true;
+  return extractAgentOutput(raw).line_items.length === 0;
+}
+
+/** Job status from a `GET /rfq/jobs/:id` body (best-effort across status vocabularies). */
+export function jobStatus(raw: unknown): "pending" | "done" | "error" {
+  const a = unwrapEnvelope(raw);
+  const s = String(a.status ?? a.state ?? "").toLowerCase();
+  if (["failed", "error", "errored"].includes(s)) return "error";
+  if (["pending", "processing", "queued", "running", "in_progress"].includes(s)) return "pending";
+  // No explicit status (or a done-ish one) → done iff a result is present.
+  return extractAgentOutput(raw).line_items.length > 0 || a.extraction_empty === true || isObj(a.data) ? "done" : "pending";
+}
 
 /**
  * Adapt Mansour's `RFQAgentOutput` → the UI view-model (`AgentDraft`).

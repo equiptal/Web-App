@@ -78,9 +78,11 @@ export interface RFQAgentOutput {
   missing_required_fields: MissingFieldEntry[];
 }
 
-/** Request body for `POST /rfq`. Attachments are base64 (no `data:` prefix). */
+/** Request body for `POST /rfq` and `POST /rfq/jobs`. Attachments are base64 (no `data:` prefix). */
 export interface NormalizeRequest {
   message?: string;
   attachments?: { type: string; filename?: string; data: string }[];
-  source?: "api";
+  /** "web_rfq" triggers the web policy (start_date/delivery/fulfillment → optional, rental_type
+   *  constrained to daily/weekly/monthly, extendable mapping). "api" = hard app policy. */
+  source?: "web_rfq" | "api";
 }
