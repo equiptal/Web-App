@@ -39,9 +39,8 @@ export function ItemRow({ item, taxonomy, sharedFuelResp }: { item: EquipmentIte
   const [confirmRemove, setConfirmRemove] = useState(false);
 
   const nationalityOpts = [
-    { value: "any", label: t.step2.perItem.nationalityAny },
-    { value: "non-arab", label: t.step2.perItem.nationalityNonArab },
     { value: "arab", label: t.step2.perItem.nationalityArab },
+    { value: "other", label: t.step2.perItem.nationalityOther },
   ];
 
   const { category, subcategory, measurement } = resolveRef(taxonomy, item.ref);
