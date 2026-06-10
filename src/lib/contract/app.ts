@@ -35,7 +35,7 @@ export interface CreateRequestItem {
 }
 
 export interface CreateRequestPayload {
-  userId: string;
+  userId: number; // agents-backend schema: z.number().int().positive()
   type: "BROADCAST" | "DIRECT";
   rentalType: "DAILY" | "WEEKLY" | "MONTHLY" | "PER_JOB" | "LONG_TERM";
   startDate: string;

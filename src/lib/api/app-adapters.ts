@@ -26,6 +26,13 @@ export function nodesToTree(nodes: TaxonomyNode[]): Taxonomy {
   }));
 }
 
+/** Date-only "YYYY-MM-DD" (or empty) → full ISO datetime with offset, as the backend requires. */
+function toIsoDateTime(d: string | null): string | undefined {
+  if (!d) return undefined;
+  const dt = new Date(d.length <= 10 ? `${d}T00:00:00Z` : d);
+  return isNaN(dt.getTime()) ? undefined : dt.toISOString();
+}
+
 const FUEL_MAP: Record<string, CreateRequestItem["fuelTypePreference"]> = {
   diesel: "DIESEL",
   petrol: "PETROL",
@@ -49,16 +56,16 @@ const RENTAL_MAP: Record<string, CreateRequestPayload["rentalType"]> = {
  * `todayIso` is passed in (callers stamp it) since the spec's start_date is optional but the backend
  * requires one.
  */
-export function draftToCreateRequest(draft: RfqRequestPayload, userId: string, todayIso: string): CreateRequestPayload {
+export function draftToCreateRequest(draft: RfqRequestPayload, userId: string, nowIso: string): CreateRequestPayload {
   const { project } = draft;
   const items = postableItems(draft.items);
 
   return {
-    userId,
+    userId: Number(userId), // agents-backend requires an integer id
     type: "BROADCAST", // web is broadcast-only (brief Non-goals)
     rentalType: (project.timing.rentalBasis && RENTAL_MAP[project.timing.rentalBasis]) || "DAILY",
-    startDate: project.timing.startDate || todayIso,
-    endDate: project.timing.endDate || undefined,
+    startDate: toIsoDateTime(project.timing.startDate) || nowIso, // schema needs full ISO datetime w/ offset
+    endDate: toIsoDateTime(project.timing.endDate),
     urgency: "SOON", // not collected on web; sensible default
     projectLat: project.location.lat,
     projectLng: project.location.lng,

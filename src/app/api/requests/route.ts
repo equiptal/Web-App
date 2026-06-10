@@ -25,8 +25,8 @@ export async function POST(req: Request) {
 
   if (useRealApp && serverEnv.agentsTestUserId && "items" in body) {
     try {
-      const todayIso = new Date().toISOString().slice(0, 10);
-      const payload = draftToCreateRequest(body as RfqRequestPayload, serverEnv.agentsTestUserId, todayIso);
+      const nowIso = new Date().toISOString(); // full ISO datetime w/ offset (schema requirement)
+      const payload = draftToCreateRequest(body as RfqRequestPayload, serverEnv.agentsTestUserId, nowIso);
       const data = await agentsPost<CreateRequestResult>("/agents/requests", payload);
       return NextResponse.json({ requestId: data.shortCode ?? data.requestId ?? "RFQ" }, { status: 201 });
     } catch (err) {
