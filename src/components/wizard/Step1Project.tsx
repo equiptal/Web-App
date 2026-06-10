@@ -1,8 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
+
+// Leaflet touches `window` at import, so the map picker is client-only.
+const MapLocationPicker = dynamic(() => import("@/components/shared/MapLocationPicker"), { ssr: false });
 import { Badge, Button, Card, Field, MultiChips, RadioGroup, Select, Stepper, TextInput, Toggle } from "@/components/ui";
 import {
   RENTAL_BASES,
@@ -78,16 +82,18 @@ export function Step1Project() {
         <Field label={t.step1.location.card}>
           <TextInput value={loc.label ?? ""} onChange={(e) => actions.patchLocation({ label: e.target.value, source: "manual" })} />
         </Field>
-        {loc.source === "agent" && <p className="mt-1 text-xs text-muted">{t.step1.location.extractedFrom}</p>}
+        {loc.source === "agent" && <p className="mt-1 mb-2 text-xs text-muted">{t.step1.location.extractedFrom}</p>}
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => actions.patchLocation({ label: "Current location (GPS)", source: "gps" })}>
-            {t.step1.location.useGps}
-          </Button>
-          <Button variant="secondary" onClick={() => actions.patchLocation({ source: "map" })}>
-            {t.step1.location.setViaMap}
-          </Button>
-          {/* AC-16: explicit confirm, always required (even when extracted), blocked while conflict unresolved. */}
+        {/* Real map/GPS picker (ported from Moedatech-App c-hub): search, click-to-pin, drag, use-my-location. */}
+        <div className="mt-3">
+          <MapLocationPicker
+            value={loc.lat != null && loc.lng != null ? { lat: loc.lat, lng: loc.lng } : null}
+            onChange={(lat, lng, city) => actions.patchLocation({ lat, lng, label: city || loc.label, source: "map" })}
+          />
+        </div>
+
+        {/* AC-16: explicit confirm, always required (even when extracted), blocked while conflict unresolved. */}
+        <div className="mt-3">
           <Button disabled={conflictUnresolved || loc.confirmed} onClick={() => actions.confirmLocation()}>
             {t.step1.location.confirmAction}
           </Button>

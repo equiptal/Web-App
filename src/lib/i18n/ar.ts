@@ -73,6 +73,11 @@ export const ar: Dictionary = {
       fromFile: "من الملف",
       multiLocationTitle: "يغطي هذا الطلب موقعًا واحدًا فقط.",
       multiLocationBody: "تحتاج المواقع الأخرى التي وجدناها إلى طلب منفصل.",
+      mapPicker: {
+        searchPlaceholder: "ابحث عن مكان، أو الصق رابط خرائط / إحداثيات",
+        search: "بحث",
+        useMyLocation: "استخدام موقعي",
+      },
     },
     timing: {
       card: "التوقيت والساعات",

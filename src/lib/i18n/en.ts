@@ -72,6 +72,11 @@ export const en = {
       fromFile: "From file", // AC-47 tentative
       multiLocationTitle: "This request covers a single location.", // AC-48
       multiLocationBody: "The other location(s) we found need a separate request.",
+      mapPicker: {
+        searchPlaceholder: "Search a place, or paste a Maps link / coordinates",
+        search: "Search",
+        useMyLocation: "Use my location",
+      },
     },
     timing: {
       card: "Timing & Hours",
