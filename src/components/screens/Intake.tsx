@@ -58,7 +58,7 @@ export function Intake() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div>
       {/* phead */}
       <h1 className="text-[23px] font-extrabold tracking-tight">{t.intake.heading}</h1>
       <p className="mt-1 max-w-xl text-sm text-muted">{t.intake.subheading}</p>

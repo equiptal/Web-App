@@ -159,7 +159,7 @@ export function ItemRow({ item, taxonomy, sharedFuelResp }: { item: EquipmentIte
         </div>
       </div>
 
-      {(editingMatch || !item.resolved) && taxonomyEditor}
+      {editingMatch && taxonomyEditor}
 
       {/* Per-item details — editable only once Matched (AC-54). Mirrors the prototype:
           operator card + fuel + notes. Delivery/return are request-wide only (Settings for all
@@ -242,13 +242,13 @@ function Avatar({ glyph, conf }: { glyph: string; conf: "high" | "mid" | "low" }
 function RfqMatch({ raw, matched }: { raw: string | null; matched: React.ReactNode }) {
   const t = useT();
   return (
-    <div className="flex items-end gap-3">
+    <div className="flex items-start gap-3">
       <span className="flex w-[200px] flex-none flex-col gap-0.5">
         <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted">{t.step2.fromRfq}</span>
-        <span className="text-[15px] font-bold leading-tight">{raw ? `“${raw}”` : "—"}</span>
+        <span className="text-[15px] font-bold leading-tight break-words">{raw ? `“${raw}”` : "—"}</span>
       </span>
-      <Icon name="arrow_forward" size={20} className="flex-none text-muted/60" />
-      <span className="min-w-0 flex-1 truncate text-[15px] font-extrabold leading-tight">{matched}</span>
+      <Icon name="arrow_forward" size={20} className="mt-3.5 flex-none text-muted/60" />
+      <span className="min-w-0 flex-1 break-words text-[15px] font-extrabold leading-tight">{matched}</span>
     </div>
   );
 }
