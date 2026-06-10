@@ -66,7 +66,9 @@ export const en = {
   },
   step1: {
     title: "Project details",
+    subtitle: "We read these from your RFQ — they apply to your whole request, across all items.",
     location: {
+      confirmPrompt: "Is this the right site? Please confirm it before you continue.",
       card: "Location",
       unconfirmed: "Location not confirmed",
       confirmed: "Location confirmed",

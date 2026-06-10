@@ -67,7 +67,9 @@ export const ar: Dictionary = {
   },
   step1: {
     title: "تفاصيل المشروع",
+    subtitle: "قرأناها من طلبك — وتنطبق على طلبك بالكامل، على كل العناصر.",
     location: {
+      confirmPrompt: "هل هذا هو الموقع الصحيح؟ يرجى تأكيده قبل المتابعة.",
       card: "الموقع",
       unconfirmed: "لم يتم تأكيد الموقع",
       confirmed: "تم تأكيد الموقع",
