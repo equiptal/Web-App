@@ -55,7 +55,7 @@ export const en = {
     title: "Reading your RFQ…",
     note: "Project details and items will appear as they're parsed.",
     sub: "This usually takes a few seconds — hang tight.",
-    stage1: "Reading your document",
+    stage1: "Reading your document/text",
     stage2: "Extracting your project details",
     stage3: "Matching equipment to our catalogue",
     stage4: "Preparing your request",

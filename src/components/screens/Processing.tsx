@@ -21,6 +21,14 @@ export function Processing() {
     return () => clearInterval(id);
   }, [busy, stages.length]);
 
+  // Auto-advance to the wizard once parsing completes — no manual "Next" (brief pause to show counts).
+  const done = !busy && !!draft && !error;
+  useEffect(() => {
+    if (!done) return;
+    const id = setTimeout(() => actions.enterWizard(), 1400);
+    return () => clearTimeout(id);
+  }, [done, actions]);
+
   /* ----------------------------- Error (AC-09 / AC-10) ----------------------------- */
   if (error) {
     const isEmpty = error === "empty";
@@ -40,7 +48,6 @@ export function Processing() {
     );
   }
 
-  const done = !busy && !!draft;
   // Once the result is in, mark everything complete.
   const effectiveStage = done ? stages.length : stage;
   const barPct = done ? 100 : Math.round(((stage + 1) / stages.length) * 100);
@@ -91,9 +98,6 @@ export function Processing() {
             <Badge tone="brand">{fmt(t.processing.summaryItems, { count: draft.summary.totalItems })}</Badge>
             {draft.summary.needsValidation > 0 && <Badge tone="warn">{fmt(t.processing.summaryNeedCheck, { count: draft.summary.needsValidation })}</Badge>}
             {draft.summary.notAvailable > 0 && <Badge tone="danger">{fmt(t.processing.summaryNotAvailable, { count: draft.summary.notAvailable })}</Badge>}
-          </div>
-          <div className="mt-5">
-            <Button onClick={() => actions.enterWizard()}>{t.common.next}</Button>
           </div>
         </div>
       )}
