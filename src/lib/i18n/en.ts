@@ -177,7 +177,8 @@ export const en = {
   },
   step3: {
     title: "Preferences",
-    coreTerms: "Core Terms", // AC-35 tentative
+    subtitle: "These apply to the whole request. Filled in from your RFQ — edit anything.",
+    coreTerms: "Core terms", // AC-35 tentative
     optionalExtras: "Optional Extras", // AC-35 tentative
     payment: { title: "Payment", terms: "Payment terms", method: "Payment method" },
     maintenance: {
@@ -218,10 +219,12 @@ export const en = {
     },
   },
   confirmation: {
-    title: "Request submitted",
-    // AC-42 tentative
-    message: "Your request was submitted and will reach suppliers.",
-    backHome: "Create another request",
+    title: "Your request is sent",
+    message: "Suppliers can now see it and send bids. You'll get one quotation covering all the items in your request.",
+    newRequest: "New request",
+    done: "Done",
+    laterNote: "Tracking bids and managing this request on the web is coming soon — for now you'll continue with bids in the Moedatech app as usual.",
+    itemsSummary: "{count} items",
   },
   guest: {
     blockTitle: "Create an account to continue", // AC-02
