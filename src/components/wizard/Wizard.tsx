@@ -43,7 +43,9 @@ export function Wizard() {
               <button
                 disabled={!done && !active}
                 onClick={() => done && actions.goStep(n)}
-                className={`flex items-center gap-2 font-semibold ${active ? "text-navy" : done ? "text-navy-mid" : "text-muted"}`}
+                className={`flex items-center gap-2 rounded-full px-2.5 py-1 font-semibold transition ${
+                  active ? "bg-brand-soft text-navy ring-1 ring-brand/40" : done ? "text-navy-mid hover:bg-surface2" : "text-muted"
+                }`}
               >
                 <span
                   className={`grid h-[25px] w-[25px] place-items-center rounded-full border text-xs ${

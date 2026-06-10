@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { Card, Field, Icon, MIcon, RadioGroup } from "@/components/ui";
@@ -31,11 +31,17 @@ export function Step2Equipment() {
   // matching the prototype's "Needs your OK" default. The renter switches via the nodes.
   const initialFilter = useMemo<Group>(() => {
     if (counts["needs-ok"]) return "needs-ok";
-    if (counts["not-available"]) return "not-available";
     if (counts.matched) return "matched";
+    if (counts["not-available"]) return "not-available";
     return "all";
   }, [counts]);
   const [filter, setFilter] = useState<Group | null>(null);
+
+  // After the renter clears Need-OK (approves all), surface Matched next — not Not-available.
+  useEffect(() => {
+    if ((filter ?? initialFilter) === "needs-ok" && counts["needs-ok"] === 0 && counts.matched > 0) setFilter("matched");
+  }, [filter, initialFilter, counts]);
+
   if (!draft) return null;
 
   const activeFilter: Group = filter ?? initialFilter;
@@ -43,6 +49,11 @@ export function Step2Equipment() {
   const gate = gateStep2(draft.items);
   const visible = items.filter((i) => activeFilter === "all" || groupOf(i) === activeFilter);
   const activeNode = { "needs-ok": t.step2.filterNeedsOk, matched: t.step2.filterMatched, "not-available": t.step2.filterNotAvailable, all: t.step2.filterAll }[activeFilter];
+
+  // In-process "back" through the triage groups (separate from the wizard's Back-to-Project).
+  const seq: Exclude<Group, "all">[] = ["needs-ok", "matched", "not-available"];
+  const seqIdx = seq.indexOf(activeFilter as Exclude<Group, "all">);
+  const prevGroup = seqIdx > 0 ? [...seq.slice(0, seqIdx)].reverse().find((g) => counts[g] > 0) : undefined;
 
   function approveAll() {
     items.filter((i) => groupOf(i) === "needs-ok").forEach((i) => actions.approveSuggestion(i.id));
@@ -59,9 +70,20 @@ export function Step2Equipment() {
 
   return (
     <div>
-      <div className="mb-5">
-        <h1 className="text-[23px] font-extrabold tracking-tight">{t.step2.title}</h1>
-        <p className="mt-1 max-w-xl text-sm text-muted">{t.step2.subtitle}</p>
+      <div className="mb-5 flex items-start gap-3">
+        {prevGroup && (
+          <button
+            onClick={() => setFilter(prevGroup)}
+            title={t.common.back}
+            className="mt-1 grid h-9 w-9 flex-none place-items-center rounded-full border border-border text-navy-mid transition hover:bg-surface2"
+          >
+            <Icon name="arrow_back" size={20} />
+          </button>
+        )}
+        <div>
+          <h1 className="text-[23px] font-extrabold tracking-tight">{t.step2.title}</h1>
+          <p className="mt-1 max-w-xl text-sm text-muted">{t.step2.subtitle}</p>
+        </div>
       </div>
 
       {/* Request-wide settings (AC-25/26) — apply to every item, per-item overridable. */}
