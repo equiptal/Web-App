@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useT, fmt } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
-import { Button, Field, Icon, RadioGroup, Select, Stepper, TextArea, TextInput, Toggle, Modal } from "@/components/ui";
+import { Button, Field, Icon, Pchips, Select, Stepper, TextArea, Toggle, Modal } from "@/components/ui";
 import {
   EquipmentItem,
   Taxonomy,
@@ -12,10 +12,8 @@ import {
   SAFETY_CERTIFICATES,
   PARTIES,
   type FuelType,
-  type OperatorNeeded,
   type OperatorCertificate,
   type Party,
-  type Accommodation,
 } from "@/lib/contract";
 
 function opt<T extends string>(values: readonly T[], dict: Record<string, string>) {
@@ -32,12 +30,18 @@ const CATEGORY_ICON: Record<string, string> = {
   concrete: "foundation",
 };
 
-export function ItemRow({ item, taxonomy }: { item: EquipmentItem; taxonomy: Taxonomy }) {
+export function ItemRow({ item, taxonomy, sharedFuelResp }: { item: EquipmentItem; taxonomy: Taxonomy; sharedFuelResp: Party }) {
   const t = useT();
   const { actions } = useRfq();
   const [editingMatch, setEditingMatch] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+
+  const nationalityOpts = [
+    { value: "any", label: t.step2.perItem.nationalityAny },
+    { value: "non-arab", label: t.step2.perItem.nationalityNonArab },
+    { value: "arab", label: t.step2.perItem.nationalityArab },
+  ];
 
   const { category, subcategory, measurement } = resolveRef(taxonomy, item.ref);
   const status = item.verdict === "no-match" ? "not-available" : item.resolved ? "matched" : "needs-ok";
@@ -157,40 +161,52 @@ export function ItemRow({ item, taxonomy }: { item: EquipmentItem; taxonomy: Tax
 
       {(editingMatch || !item.resolved) && taxonomyEditor}
 
-      {/* Per-item details — editable only once Matched (AC-54). */}
+      {/* Per-item details — editable only once Matched (AC-54). Mirrors the prototype:
+          operator card + fuel + notes. Delivery/return are request-wide only (Settings for all
+          items) — no per-item override here; values are just Me/Supplier. */}
       {status === "matched" && showDetails && (
-        <div className="col-span-full mt-3 grid grid-cols-1 gap-3 rounded-lg border border-border bg-surface2 p-4 sm:grid-cols-2">
-          <Field label={t.step2.perItem.fuelType}>
-            <Select<FuelType> value={item.fuelType} onChange={(v) => actions.patchItem(item.id, { fuelType: v })} options={opt(FUEL_TYPES, t.options.fuelType)} />
-          </Field>
-          <Field label={t.step2.perItem.operatorNeeded}>
-            <RadioGroup<OperatorNeeded> name={`op-${item.id}`} value={item.operatorNeeded} onChange={(v) => actions.patchItem(item.id, { operatorNeeded: v })} options={opt(["yes", "no"] as const, t.options.operatorNeeded)} />
-          </Field>
-
-          {item.operatorNeeded === "yes" && (
-            <div className="grid grid-cols-1 gap-3 rounded-lg bg-surface p-3 sm:col-span-2 sm:grid-cols-2">
-              <Toggle checked={item.operator.nightShift} onChange={(v) => actions.patchItemOperator(item.id, { nightShift: v })} label={t.step2.perItem.nightShift} />
-              <Field label={t.step2.perItem.nationality} optional>
-                <TextInput value={item.operator.nationality ?? ""} onChange={(e) => actions.patchItemOperator(item.id, { nationality: e.target.value || null })} />
-              </Field>
-              <Field label={t.step2.perItem.certificate} optional>
-                <Select<OperatorCertificate> value={item.operator.certificate} placeholder="—" onChange={(v) => actions.patchItemOperator(item.id, { certificate: v })} options={opt(SAFETY_CERTIFICATES, t.options.safetyCert)} />
-              </Field>
-              <Field label={t.step2.perItem.accommodation} optional>
-                <RadioGroup<Accommodation> name={`acc-${item.id}`} value={item.operator.accommodation} onChange={(v) => actions.patchItemOperator(item.id, { accommodation: v })} options={opt(PARTIES, t.options.accommodation)} />
-              </Field>
-              <Toggle checked={item.operator.transfer} onChange={(v) => actions.patchItemOperator(item.id, { transfer: v })} label={t.step2.perItem.transfer} />
+        <div className="col-span-full mt-3 space-y-4 rounded-lg border border-border bg-surface2 p-4">
+          {/* Operator (AC-24) */}
+          <div className="overflow-hidden rounded-lg border border-border bg-surface">
+            <div className="flex items-center justify-between bg-surface2 px-3 py-2.5">
+              <span className="flex items-center gap-2 text-[13.5px] font-extrabold">
+                <Icon name="person" size={18} className="text-navy-mid" /> {t.step2.perItem.operatorNeeded}
+              </span>
+              <Toggle checked={item.operatorNeeded === "yes"} onChange={(v) => actions.patchItem(item.id, { operatorNeeded: v ? "yes" : "no" })} />
             </div>
-          )}
-
-          <Field label={t.step2.perItem.additionalNotes} optional>
-            <TextArea rows={2} value={item.additionalNotes} onChange={(e) => actions.patchItem(item.id, { additionalNotes: e.target.value })} />
-          </Field>
-          <div className="grid grid-cols-1 gap-2">
-            <OverrideField label={t.step2.perItem.deliveryOverride} value={item.deliveryOverride} onChange={(v) => actions.patchItem(item.id, { deliveryOverride: v })} t={t} />
-            <OverrideField label={t.step2.perItem.returnOverride} value={item.returnOverride} onChange={(v) => actions.patchItem(item.id, { returnOverride: v })} t={t} />
-            <OverrideField label={t.step2.perItem.fuelRespOverride} value={item.fuelResponsibilityOverride} onChange={(v) => actions.patchItem(item.id, { fuelResponsibilityOverride: v })} t={t} />
+            {item.operatorNeeded === "yes" && (
+              <div className="space-y-3 px-3 py-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[13px] font-bold">{t.step2.perItem.nightShift}</span>
+                  <Toggle checked={item.operator.nightShift} onChange={(v) => actions.patchItemOperator(item.id, { nightShift: v })} />
+                </div>
+                <ChipField label={t.step2.perItem.nationality}>
+                  <Pchips value={item.operator.nationality} onChange={(v) => actions.patchItemOperator(item.id, { nationality: v })} options={nationalityOpts} />
+                </ChipField>
+                <ChipField label={t.step2.perItem.certificate}>
+                  <Pchips<OperatorCertificate> value={item.operator.certificate} onChange={(v) => actions.patchItemOperator(item.id, { certificate: v })} options={opt(SAFETY_CERTIFICATES, t.options.safetyCert)} />
+                </ChipField>
+                <ChipField label={t.step2.perItem.accommodation}>
+                  <Pchips<Party> value={item.operator.accommodation} onChange={(v) => actions.patchItemOperator(item.id, { accommodation: v })} options={opt(PARTIES, t.options.party)} />
+                </ChipField>
+              </div>
+            )}
           </div>
+
+          {/* Fuel (AC-26) */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <ChipField label={t.step2.perItem.fuelType}>
+              <Pchips<FuelType> value={item.fuelType} onChange={(v) => actions.patchItem(item.id, { fuelType: v })} options={opt(FUEL_TYPES, t.options.fuelType)} />
+            </ChipField>
+            <ChipField label={t.step1.requestWide.fuelResponsibility}>
+              <Pchips<Party> value={item.fuelResponsibilityOverride ?? sharedFuelResp} onChange={(v) => actions.patchItem(item.id, { fuelResponsibilityOverride: v })} options={opt(PARTIES, t.options.party)} />
+            </ChipField>
+          </div>
+
+          {/* Additional notes (AC-53) */}
+          <ChipField label={t.step2.perItem.additionalNotes}>
+            <TextArea rows={2} value={item.additionalNotes} onChange={(e) => actions.patchItem(item.id, { additionalNotes: e.target.value })} />
+          </ChipField>
         </div>
       )}
 
@@ -258,20 +274,11 @@ function MetaTag({ icon, label, value }: { icon: string; label: string; value: s
   );
 }
 
-function OverrideField({ label, value, onChange, t }: { label: string; value: Party | null; onChange: (v: Party | null) => void; t: ReturnType<typeof useT> }) {
+function ChipField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="text-sm">
-      <span className="mb-1 block text-xs font-medium text-muted">{label}</span>
-      <div className="flex flex-wrap gap-2">
-        <button onClick={() => onChange(null)} className={`rounded-lg border px-3 py-1 text-sm ${value === null ? "border-brand bg-brand-soft text-brand" : "border-border"}`}>
-          {t.step2.perItem.useRequestDefault}
-        </button>
-        {PARTIES.map((p) => (
-          <button key={p} onClick={() => onChange(p)} className={`rounded-lg border px-3 py-1 text-sm ${value === p ? "border-brand bg-brand-soft text-brand" : "border-border"}`}>
-            {t.options.party[p]}
-          </button>
-        ))}
-      </div>
+    <div>
+      <span className="mb-1.5 block text-[11.5px] font-bold text-navy-mid">{label}</span>
+      {children}
     </div>
   );
 }

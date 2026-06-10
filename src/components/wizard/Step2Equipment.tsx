@@ -129,7 +129,7 @@ export function Step2Equipment() {
         {visible.length === 0 ? (
           <li className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted">{t.step2.groupEmpty}</li>
         ) : (
-          visible.map((item) => <ItemRow key={item.id} item={item} taxonomy={taxonomy} />)
+          visible.map((item) => <ItemRow key={item.id} item={item} taxonomy={taxonomy} sharedFuelResp={project.fuelResponsibility} />)
         )}
       </ul>
 

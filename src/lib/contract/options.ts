@@ -46,7 +46,9 @@ export type OperatorCertificate = SafetyCertificate;
 export type Accommodation = "me" | "supplier"; // AC-24
 
 export type FuelType = "diesel" | "petrol" | "electric" | "hybrid"; // AC-26 default diesel
-export const FUEL_TYPES: FuelType[] = ["diesel", "petrol", "electric", "hybrid"];
+// Prototype + app schema expose only diesel/petrol/electric (no hybrid). Keep `hybrid` in the type
+// for safety but don't offer it in the UI.
+export const FUEL_TYPES: FuelType[] = ["diesel", "petrol", "electric"];
 
 export type PaymentTerm = "upfront" | "daily" | "net-30" | "net-60" | "end-of-job"; // AC-36
 export const PAYMENT_TERMS: PaymentTerm[] = ["upfront", "daily", "net-30", "net-60", "end-of-job"];

@@ -207,6 +207,39 @@ export function RadioGroup<T extends string>({
   );
 }
 
+/* ------------------------------------ Pchips (single-select) ------------------------------------ */
+
+/** Prototype `.pchips` — single-select rounded chips (e.g. Me/Supplier, fuel type). */
+export function Pchips<T extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T | null;
+  onChange: (v: T) => void;
+  options: { value: T; label: string }[];
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((o) => {
+        const on = value === o.value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onChange(o.value)}
+            className={`rounded-full border px-3.5 py-1.5 text-[12.5px] font-bold transition ${
+              on ? "border-brand bg-brand-soft text-brand" : "border-border bg-surface text-navy-mid hover:border-navy-mid"
+            }`}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ------------------------------------ MultiChips ------------------------------------ */
 
 export function MultiChips<T extends string>({
