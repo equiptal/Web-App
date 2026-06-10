@@ -1,0 +1,271 @@
+"use client";
+
+import { useState } from "react";
+import { useT, fmt } from "@/lib/i18n";
+import { useRfq } from "@/lib/store/rfq-store";
+import { Button, Field, Icon, RadioGroup, Select, Stepper, TextArea, TextInput, Toggle, Modal } from "@/components/ui";
+import {
+  EquipmentItem,
+  Taxonomy,
+  resolveRef,
+  FUEL_TYPES,
+  SAFETY_CERTIFICATES,
+  PARTIES,
+  type FuelType,
+  type OperatorNeeded,
+  type OperatorCertificate,
+  type Party,
+  type Accommodation,
+} from "@/lib/contract";
+
+function opt<T extends string>(values: readonly T[], dict: Record<string, string>) {
+  return values.map((v) => ({ value: v, label: dict[v] ?? v }));
+}
+
+/** Best-effort category → Material icon glyph for the row avatar. */
+const CATEGORY_ICON: Record<string, string> = {
+  earthmoving: "construction",
+  "cranes-lifting": "precision_manufacturing",
+  power: "bolt",
+  haulage: "local_shipping",
+  access: "forklift",
+  concrete: "foundation",
+};
+
+export function ItemRow({ item, taxonomy }: { item: EquipmentItem; taxonomy: Taxonomy }) {
+  const t = useT();
+  const { actions } = useRfq();
+  const [editingMatch, setEditingMatch] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+
+  const { category, subcategory, measurement } = resolveRef(taxonomy, item.ref);
+  const status = item.verdict === "no-match" ? "not-available" : item.resolved ? "matched" : "needs-ok";
+  const glyph = (item.ref.categoryId && CATEGORY_ICON[item.ref.categoryId]) || "construction";
+  const matchLabel = [category?.name, subcategory?.name, measurement?.name].filter(Boolean).join(" · ") || (item.rawLabel ?? "—");
+
+  const borderClass =
+    status === "needs-ok" ? "border-s-[3px] border-s-warn" : status === "not-available" ? "border-s-[3px] border-s-danger" : "border-s-[3px] border-s-ok";
+
+  /* ----------------------------- No-match (AC-30/31/32) ----------------------------- */
+  if (item.verdict === "no-match") {
+    return (
+      <li className="grid grid-cols-[38px_1fr_auto] items-center gap-3 rounded-xl border border-s-[3px] border-border border-s-danger bg-surface px-4 py-3">
+        <Avatar glyph={glyph} conf="low" />
+        <div className="min-w-0">
+          <RfqMatch raw={item.rawLabel} matched={<span className="text-danger">{t.step2.status.notAvailable}</span>} />
+          <p className="mt-1 text-xs text-muted">{t.step2.noMatch.explainer}</p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              window.open("https://wa.me/966500000000?text=" + encodeURIComponent(`Please source: ${item.rawLabel ?? ""}`), "_blank");
+              actions.removeItem(item.id);
+            }}
+          >
+            <Icon name="chat" size={15} /> {t.step2.noMatch.provide}
+          </Button>
+          <Button variant="ghost" onClick={() => actions.removeItem(item.id)}>
+            {t.step2.noMatch.cancel}
+          </Button>
+        </div>
+      </li>
+    );
+  }
+
+  const taxonomyEditor = (
+    <div className="col-span-full mt-3 grid grid-cols-1 gap-2 rounded-lg border border-border bg-surface2 p-3 sm:grid-cols-3">
+      <Field label={t.step2.category}>
+        <Select value={item.ref.categoryId} placeholder={t.step2.pickCategory} onChange={(v) => actions.setItemCategory(item.id, v)} options={taxonomy.map((c) => ({ value: c.id, label: c.name }))} />
+      </Field>
+      <Field label={t.step2.subcategory}>
+        <Select value={item.ref.subcategoryId} placeholder={t.step2.pickSubcategory} disabled={!category} onChange={(v) => actions.setItemSubcategory(item.id, v)} options={(category?.subcategories ?? []).map((s) => ({ value: s.id, label: s.name }))} />
+      </Field>
+      <Field label={t.step2.measurement}>
+        <Select value={item.ref.measurementId} placeholder={t.step2.pickMeasurement} disabled={!subcategory} onChange={(v) => actions.setItemMeasurement(item.id, v)} options={(subcategory?.measurements ?? []).map((m) => ({ value: m.id, label: m.name }))} />
+      </Field>
+    </div>
+  );
+
+  return (
+    <li className={`grid grid-cols-[38px_1fr_auto] items-start gap-3 rounded-xl border border-border bg-surface px-4 py-3 ${borderClass}`}>
+      <Avatar glyph={glyph} conf={status === "matched" ? "high" : "mid"} />
+
+      <div className="min-w-0">
+        <RfqMatch raw={item.rawLabel} matched={matchLabel} />
+
+        {/* Unit conversion / nearest-size advisory (AC-19/20) */}
+        {item.suggestion?.unitConversion && (
+          <div className="mt-1.5 flex items-center gap-1.5 text-[11.5px] font-semibold text-warn">
+            <Icon name="swap_horiz" size={14} />
+            {fmt(t.step2.unitConversion, {
+              fromValue: item.suggestion.unitConversion.fromValue,
+              fromUnit: item.suggestion.unitConversion.fromUnit,
+              toValue: item.suggestion.unitConversion.toValue,
+              toUnit: item.suggestion.unitConversion.toUnit,
+            })}
+          </div>
+        )}
+        {!item.resolved && <p className="mt-1.5 text-[12.5px] text-muted">{item.suggestion ? fmt(t.step2.nearestSuggested, { measurement: measurement?.name ?? "" }) : t.step2.needsValidationPrompt}</p>}
+
+        {/* Matched: qty + operator/fuel meta tags */}
+        {status === "matched" && (
+          <>
+            <div className="mt-2.5 flex items-center gap-2.5">
+              <span className="text-[10.5px] font-extrabold uppercase tracking-wide text-muted">{t.step2.perItem.quantity}</span>
+              <Stepper value={item.quantity} min={1} onChange={(v) => actions.patchItem(item.id, { quantity: v })} />
+            </div>
+            <div className="mt-2.5 flex flex-wrap gap-2">
+              <MetaTag icon="person" label={t.step2.perItem.operatorNeeded} value={t.options.operatorNeeded[item.operatorNeeded]} />
+              <MetaTag icon="local_gas_station" label={t.step2.perItem.fuelType} value={t.options.fuelType[item.fuelType]} />
+              {item.additionalNotes && <MetaTag icon="sticky_note_2" label={t.step2.perItem.additionalNotes} value={item.additionalNotes} />}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Right: status + actions */}
+      <div className="flex flex-col items-end gap-2">
+        <StatusLabel status={status} t={t} />
+        <div className="flex gap-1.5">
+          {status === "needs-ok" ? (
+            <>
+              <Button onClick={() => (item.suggestion ? actions.approveSuggestion(item.id) : actions.approveItem(item.id))}>
+                <Icon name="check" size={15} /> {t.common.approve}
+              </Button>
+              <Button variant="secondary" onClick={() => setEditingMatch((e) => !e)}>
+                <Icon name="swap_horiz" size={15} /> {t.common.change}
+              </Button>
+            </>
+          ) : (
+            <Button variant="secondary" onClick={() => setShowDetails((d) => !d)}>
+              <Icon name="tune" size={15} /> {t.common.edit}
+            </Button>
+          )}
+          <button className="grid h-8 w-8 place-items-center rounded-lg border border-border text-muted hover:border-danger hover:text-danger" title={t.common.remove} onClick={() => setConfirmRemove(true)}>
+            <Icon name="close" size={17} />
+          </button>
+        </div>
+      </div>
+
+      {(editingMatch || !item.resolved) && taxonomyEditor}
+
+      {/* Per-item details — editable only once Matched (AC-54). */}
+      {status === "matched" && showDetails && (
+        <div className="col-span-full mt-3 grid grid-cols-1 gap-3 rounded-lg border border-border bg-surface2 p-4 sm:grid-cols-2">
+          <Field label={t.step2.perItem.fuelType}>
+            <Select<FuelType> value={item.fuelType} onChange={(v) => actions.patchItem(item.id, { fuelType: v })} options={opt(FUEL_TYPES, t.options.fuelType)} />
+          </Field>
+          <Field label={t.step2.perItem.operatorNeeded}>
+            <RadioGroup<OperatorNeeded> name={`op-${item.id}`} value={item.operatorNeeded} onChange={(v) => actions.patchItem(item.id, { operatorNeeded: v })} options={opt(["yes", "no"] as const, t.options.operatorNeeded)} />
+          </Field>
+
+          {item.operatorNeeded === "yes" && (
+            <div className="grid grid-cols-1 gap-3 rounded-lg bg-surface p-3 sm:col-span-2 sm:grid-cols-2">
+              <Toggle checked={item.operator.nightShift} onChange={(v) => actions.patchItemOperator(item.id, { nightShift: v })} label={t.step2.perItem.nightShift} />
+              <Field label={t.step2.perItem.nationality} optional>
+                <TextInput value={item.operator.nationality ?? ""} onChange={(e) => actions.patchItemOperator(item.id, { nationality: e.target.value || null })} />
+              </Field>
+              <Field label={t.step2.perItem.certificate} optional>
+                <Select<OperatorCertificate> value={item.operator.certificate} placeholder="—" onChange={(v) => actions.patchItemOperator(item.id, { certificate: v })} options={opt(SAFETY_CERTIFICATES, t.options.safetyCert)} />
+              </Field>
+              <Field label={t.step2.perItem.accommodation} optional>
+                <RadioGroup<Accommodation> name={`acc-${item.id}`} value={item.operator.accommodation} onChange={(v) => actions.patchItemOperator(item.id, { accommodation: v })} options={opt(PARTIES, t.options.accommodation)} />
+              </Field>
+              <Toggle checked={item.operator.transfer} onChange={(v) => actions.patchItemOperator(item.id, { transfer: v })} label={t.step2.perItem.transfer} />
+            </div>
+          )}
+
+          <Field label={t.step2.perItem.additionalNotes} optional>
+            <TextArea rows={2} value={item.additionalNotes} onChange={(e) => actions.patchItem(item.id, { additionalNotes: e.target.value })} />
+          </Field>
+          <div className="grid grid-cols-1 gap-2">
+            <OverrideField label={t.step2.perItem.deliveryOverride} value={item.deliveryOverride} onChange={(v) => actions.patchItem(item.id, { deliveryOverride: v })} t={t} />
+            <OverrideField label={t.step2.perItem.returnOverride} value={item.returnOverride} onChange={(v) => actions.patchItem(item.id, { returnOverride: v })} t={t} />
+            <OverrideField label={t.step2.perItem.fuelRespOverride} value={item.fuelResponsibilityOverride} onChange={(v) => actions.patchItem(item.id, { fuelResponsibilityOverride: v })} t={t} />
+          </div>
+        </div>
+      )}
+
+      <Modal open={confirmRemove} onClose={() => setConfirmRemove(false)} title={t.step2.removeConfirm}>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setConfirmRemove(false)}>
+            {t.common.cancel}
+          </Button>
+          <Button variant="danger" onClick={() => { actions.removeItem(item.id); setConfirmRemove(false); }}>
+            {t.common.remove}
+          </Button>
+        </div>
+      </Modal>
+    </li>
+  );
+}
+
+/* ---------------------------------- bits ---------------------------------- */
+
+function Avatar({ glyph, conf }: { glyph: string; conf: "high" | "mid" | "low" }) {
+  const dot = { high: "bg-ok", mid: "bg-warn", low: "bg-danger" }[conf];
+  const dotIcon = { high: "check", mid: "pending", low: "block" }[conf];
+  return (
+    <div className="relative grid h-[38px] w-[38px] place-items-center self-start rounded-lg bg-surface2">
+      <Icon name={glyph} size={22} className="text-navy" />
+      <span className={`absolute -end-1.5 -bottom-1.5 grid h-5 w-5 place-items-center rounded-full border-2 border-surface ${dot}`}>
+        <Icon name={dotIcon} size={12} className="text-white" />
+      </span>
+    </div>
+  );
+}
+
+function RfqMatch({ raw, matched }: { raw: string | null; matched: React.ReactNode }) {
+  const t = useT();
+  return (
+    <div className="flex items-end gap-3">
+      <span className="flex w-[200px] flex-none flex-col gap-0.5">
+        <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted">{t.step2.fromRfq}</span>
+        <span className="text-[15px] font-bold leading-tight">{raw ? `“${raw}”` : "—"}</span>
+      </span>
+      <Icon name="arrow_forward" size={20} className="flex-none text-muted/60" />
+      <span className="min-w-0 flex-1 truncate text-[15px] font-extrabold leading-tight">{matched}</span>
+    </div>
+  );
+}
+
+function StatusLabel({ status, t }: { status: "matched" | "needs-ok" | "not-available"; t: ReturnType<typeof useT> }) {
+  const map = {
+    matched: { c: "text-ok", d: "bg-ok", l: t.step2.status.matched },
+    "needs-ok": { c: "text-warn", d: "bg-warn", l: t.step2.status.needsOk },
+    "not-available": { c: "text-danger", d: "bg-danger", l: t.step2.status.notAvailable },
+  }[status];
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${map.c}`}>
+      <span className={`h-[7px] w-[7px] rounded-full ${map.d}`} /> {map.l}
+    </span>
+  );
+}
+
+function MetaTag({ icon, label, value }: { icon: string; label: string; value: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface2 px-2.5 py-1 text-[11px] font-bold text-navy-mid">
+      <Icon name={icon} size={13} className="text-muted" /> {label}: <b className="text-navy">{value}</b>
+    </span>
+  );
+}
+
+function OverrideField({ label, value, onChange, t }: { label: string; value: Party | null; onChange: (v: Party | null) => void; t: ReturnType<typeof useT> }) {
+  return (
+    <div className="text-sm">
+      <span className="mb-1 block text-xs font-medium text-muted">{label}</span>
+      <div className="flex flex-wrap gap-2">
+        <button onClick={() => onChange(null)} className={`rounded-lg border px-3 py-1 text-sm ${value === null ? "border-brand bg-brand-soft text-brand" : "border-border"}`}>
+          {t.step2.perItem.useRequestDefault}
+        </button>
+        {PARTIES.map((p) => (
+          <button key={p} onClick={() => onChange(p)} className={`rounded-lg border px-3 py-1 text-sm ${value === p ? "border-brand bg-brand-soft text-brand" : "border-border"}`}>
+            {t.options.party[p]}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}

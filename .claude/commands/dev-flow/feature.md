@@ -9,7 +9,7 @@ You are running the **dev-flow feature pipeline** for the Moedatech roadmap (org
 The Kitchen view filter is:
 `-status:"Idea","Old issues" -card-type:"Ops request","Release tracker" -is:pr has:status`
 
-You will mirror that filter client-side, then narrow further to **Status = "Implementing"** and **assigned to the current dev (`Fadwahigga`)**.
+You will mirror that filter client-side, then narrow further to **Status = "Implementing"** and **assigned to the current dev (`yfa245`)**.
 
 The lifecycle is `Drafting → Specced → Implementing → UAT needed → … → Completed` (dev implementation interface §0). An epic reaches you **already at `Status: Implementing`** — the PM's spec-PR merge flips it there automatically and assigns it to you (interface §1). **You never move the epic tracker's Status by hand** — it is automation-driven (interface §7). You plan and build while it sits at `Implementing`.
 

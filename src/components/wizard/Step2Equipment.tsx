@@ -1,0 +1,113 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { useT } from "@/lib/i18n";
+import { useRfq } from "@/lib/store/rfq-store";
+import { Card, Field, Icon, MIcon, RadioGroup } from "@/components/ui";
+import { gateStep2, PARTIES, type EquipmentItem, type Party } from "@/lib/contract";
+import { ItemRow } from "@/components/wizard/ItemRow";
+
+type Group = "all" | "needs-ok" | "matched" | "not-available";
+
+function groupOf(i: EquipmentItem): Exclude<Group, "all"> {
+  if (i.verdict === "no-match") return "not-available";
+  if (i.resolved) return "matched";
+  return "needs-ok";
+}
+
+export function Step2Equipment() {
+  const t = useT();
+  const { state, actions } = useRfq();
+  const { draft, taxonomy } = state;
+
+  const items = useMemo(() => (draft ? draft.items.filter((i) => !i.removed) : []), [draft]);
+  const counts = useMemo(() => {
+    const c = { all: items.length, "needs-ok": 0, matched: 0, "not-available": 0 };
+    items.forEach((i) => (c[groupOf(i)] += 1));
+    return c;
+  }, [items]);
+
+  const [filter, setFilter] = useState<Group>("all");
+  if (!draft) return null;
+
+  const project = draft.project;
+  const gate = gateStep2(draft.items);
+  const visible = items.filter((i) => filter === "all" || groupOf(i) === filter);
+
+  const partyOpts = PARTIES.map((p) => ({ value: p, label: t.options.party[p] }));
+
+  const nodes: { key: Group; label: string; count: number; color: string; glyph: string }[] = [
+    { key: "needs-ok", label: t.step2.filterNeedsOk, count: counts["needs-ok"], color: "warn", glyph: "hourglass_top" },
+    { key: "matched", label: t.step2.filterMatched, count: counts.matched, color: "ok", glyph: "task_alt" },
+    { key: "not-available", label: t.step2.filterNotAvailable, count: counts["not-available"], color: "danger", glyph: "block" },
+    { key: "all", label: t.step2.filterAll, count: counts.all, color: "navy", glyph: "apps" },
+  ];
+
+  return (
+    <div>
+      <div className="mb-5">
+        <h1 className="text-[23px] font-extrabold tracking-tight">{t.step2.title}</h1>
+        <p className="mt-1 max-w-xl text-sm text-muted">{t.step2.subtitle}</p>
+      </div>
+
+      {/* Request-wide settings (AC-25/26) — apply to every item, per-item overridable. */}
+      <Card title={<><Icon name="tune" size={18} className="me-1.5 align-[-3px] text-navy-mid" />{t.step2.settingsForAll}</>}>
+        <p className="-mt-2 mb-4 text-[12.5px] text-muted">{t.step2.settingsForAllHint}</p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Field label={t.step1.requestWide.delivery}>
+            <RadioGroup<Party> name="delivery" value={project.deliveryToSite} onChange={(v) => actions.patchRequestWide({ deliveryToSite: v })} options={partyOpts} />
+          </Field>
+          <Field label={t.step1.requestWide.return}>
+            <RadioGroup<Party> name="return" value={project.returnFromSite} onChange={(v) => actions.patchRequestWide({ returnFromSite: v })} options={partyOpts} />
+          </Field>
+          <Field label={t.step1.requestWide.fuelResponsibility}>
+            <RadioGroup<Party> name="fuelResp" value={project.fuelResponsibility} onChange={(v) => actions.patchRequestWide({ fuelResponsibility: v })} options={partyOpts} />
+          </Field>
+        </div>
+      </Card>
+
+      {/* Triage filter nodes with counts. */}
+      <div className="my-5 flex items-start gap-1 px-2">
+        {nodes.map((n, idx) => {
+          const sel = filter === n.key;
+          const tone: Record<string, string> = {
+            warn: sel ? "bg-warn text-white" : "bg-warn-soft text-warn",
+            ok: sel ? "bg-ok text-white" : "bg-ok-soft text-ok",
+            danger: sel ? "bg-danger text-white" : "bg-danger-soft text-danger",
+            navy: sel ? "bg-navy text-white" : "bg-surface2 text-navy-mid",
+          };
+          return (
+            <div key={n.key} className="flex flex-1 items-start">
+              <button onClick={() => setFilter(n.key)} className="flex flex-1 flex-col items-center gap-2.5">
+                <span className={`grid h-[52px] w-[52px] place-items-center rounded-full border border-border transition ${tone[n.color]} ${sel ? "shadow-md" : ""}`}>
+                  <MIcon name={n.glyph} size={26} />
+                </span>
+                <span className={`text-[12.5px] font-bold ${sel ? "text-navy" : "text-muted"}`}>
+                  {n.label} <b className="text-navy">{n.count}</b>
+                </span>
+              </button>
+              {idx < nodes.length - 1 && <span className="mx-2 mt-[25px] h-[3px] flex-1 rounded bg-surface3" />}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mb-4 flex items-center gap-2 rounded-lg border border-info/20 bg-info-soft px-3.5 py-2.5 text-xs text-navy-mid">
+        <Icon name="lightbulb" size={17} className="flex-none text-info" />
+        <span>{t.step2.triageTip}</span>
+      </div>
+
+      {!gate.ok && <p className="mb-3 rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn">{t.step2.blockedNote}</p>}
+
+      <ul className="space-y-2">
+        {visible.map((item) => (
+          <ItemRow key={item.id} item={item} taxonomy={taxonomy} />
+        ))}
+      </ul>
+
+      <button className="mt-2 inline-flex items-center gap-2 py-2.5 text-sm font-bold text-navy-mid" onClick={() => actions.addItem()}>
+        <Icon name="add" size={18} className="text-brand" /> {t.step2.addItem}
+      </button>
+    </div>
+  );
+}

@@ -1,0 +1,257 @@
+/**
+ * English dictionary — the source-of-truth shape for all locales (`type Dictionary = typeof en`).
+ * Strings marked `// tentative` are `(tentative — PM-confirm)` in acceptance.md: the literal is
+ * asserted today and flips in place if the PM changes it. AC ids noted where a string is asserted.
+ */
+export const en = {
+  common: {
+    next: "Next",
+    back: "Back",
+    cancel: "Cancel",
+    confirm: "Confirm",
+    edit: "Edit",
+    approve: "Approve",
+    change: "Change",
+    remove: "Remove",
+    add: "Add",
+    save: "Save",
+    done: "Done",
+    close: "Close",
+    retry: "Retry",
+    optional: "optional",
+    required: "required",
+    yes: "Yes",
+    no: "No",
+    me: "Me",
+    supplier: "Supplier",
+    sar: "SAR",
+  },
+  nav: {
+    project: "Project",
+    equipment: "Equipment",
+    preferences: "Preferences",
+    preview: "Preview",
+  },
+  intake: {
+    heading: "Request equipment",
+    subheading: "Paste your RFQ or upload a file, and we'll draft the request for you.",
+    tabRfq: "RFQ", // AC-01 tentative
+    tabManual: "Manual", // AC-01 tentative
+    manualNote: "The manual builder isn't part of this release.",
+    pasteLabel: "Paste RFQ text",
+    pastePlaceholder: "Paste your equipment list, email, or RFQ here…",
+    uploadLabel: "Upload files",
+    uploadHint: "PDF, image, Word, or Excel.",
+    acceptedTypes: "Accepted file types: PDF, image, Word, Excel.", // AC-07 tentative
+    fileRejected: "Only PDF, image, Word, or Excel files can be processed.", // AC-07 tentative
+    startProcessing: "Start processing",
+    attachedFiles: "Attached files",
+    emptyHint: "Paste text or attach at least one file to start.",
+  },
+  processing: {
+    title: "Reading your RFQ…",
+    note: "Project details and items will appear as they're parsed.",
+    // AC-56 e.g. "24 items found · 3 need a quick check · 2 not available"
+    summaryItems: "{count} items found",
+    summaryNeedCheck: "{count} need a quick check",
+    summaryNotAvailable: "{count} not available",
+  },
+  step1: {
+    title: "Project details",
+    location: {
+      card: "Location",
+      unconfirmed: "Location not confirmed",
+      confirmed: "Location confirmed",
+      confirmAction: "Confirm location", // AC-16 tentative
+      setViaMap: "Set on map",
+      useGps: "Use my current location",
+      setManual: "Drop a pin manually",
+      extractedFrom: "From your RFQ",
+      conflictTitle: "Two different locations were found — pick one:",
+      fromText: "From text", // AC-47 tentative
+      fromFile: "From file", // AC-47 tentative
+      multiLocationTitle: "This request covers a single location.", // AC-48
+      multiLocationBody: "The other location(s) we found need a separate request.",
+    },
+    timing: {
+      card: "Timing & Hours",
+      rentalBasis: "Rental basis",
+      extendable: "Extendable",
+      extendableHint: "Can run beyond the chosen period.",
+      quoteNote: "You'll be quoted according to this frequency.", // AC-13 tentative
+      startDate: "Start date",
+      endDate: "End date",
+      hoursPerDay: "Hours per day",
+    },
+    advanced: {
+      card: "Advanced",
+      collapsedEmpty: "No advanced settings set",
+      workingDays: "Working days per week",
+      overtime: "Overtime rate",
+      equipmentYear: "Equipment year",
+      customize: "Customize…",
+      siteAccess: "Site access restrictions",
+    },
+    certificates: {
+      card: "Certificates",
+      safety: "Safety",
+      other: "Other certificates",
+      safetyAppliesNote: "Selecting a safety certificate sets it on every item's operator.",
+    },
+    requestWide: {
+      delivery: "Delivery to site",
+      return: "Return from site",
+      fuelResponsibility: "Fuel responsibility",
+    },
+  },
+  step2: {
+    title: "Your equipment",
+    subtitle: "Each line from your RFQ is matched to available equipment. Answer the quick questions, then continue. Nothing is sent until you review it.",
+    fromRfq: "From your RFQ",
+    settingsForAll: "Settings for all items",
+    settingsForAllHint: "These apply to every item — you can still override any of them per item.",
+    filterAll: "All items",
+    filterNeedsOk: "Needs your OK",
+    filterMatched: "Matched",
+    filterNotAvailable: "Not available",
+    triageTip: "Confirm each match. Once an item is matched, open Edit to set operator, fuel and other details.",
+    status: {
+      matched: "Matched", // AC-54 / AC-30
+      needsOk: "Needs your OK", // AC-54
+      notAvailable: "Not available", // AC-54 / AC-30 tentative
+    },
+    confidentReady: "Ready — no action needed.",
+    needsValidationPrompt: "We matched this — approve it or change it.",
+    nearestSuggested: "Nearest available size: {measurement}.", // AC-19
+    unitConversion: "{fromValue}{fromUnit} ≈ {toValue}{toUnit} in our sizes.", // AC-20
+    editTaxonomy: "Edit match",
+    category: "Category",
+    subcategory: "Subcategory",
+    measurement: "Size",
+    pickCategory: "Select category",
+    pickSubcategory: "Select subcategory",
+    pickMeasurement: "Select size",
+    addItem: "Add item",
+    removeConfirm: "Remove this item from the request?",
+    noMatch: {
+      provide: "Provide it for me?", // AC-30/31 tentative
+      cancel: "Cancel", // AC-30/32 tentative
+      explainer: "We couldn't find this in our catalogue.",
+    },
+    perItem: {
+      quantity: "Quantity",
+      operatorNeeded: "Operator needed",
+      nightShift: "Night shift",
+      nationality: "Nationality",
+      certificate: "Operator certificate",
+      transfer: "Transfer",
+      accommodation: "Accommodation",
+      fuelType: "Fuel type",
+      additionalNotes: "Additional notes",
+      deliveryOverride: "Delivery (override)",
+      returnOverride: "Return (override)",
+      fuelRespOverride: "Fuel responsibility (override)",
+      editableOnceMatched: "Confirm the match to edit item details.",
+      useRequestDefault: "Use request default",
+    },
+    blockedNote: "Resolve the flagged items before continuing.", // AC-29
+  },
+  step3: {
+    title: "Preferences",
+    coreTerms: "Core Terms", // AC-35 tentative
+    optionalExtras: "Optional Extras", // AC-35 tentative
+    payment: { title: "Payment", terms: "Payment terms", method: "Payment method" },
+    maintenance: {
+      title: "Maintenance",
+      responsibility: "Responsibility",
+      sla: "Response SLA",
+      customSla: "Custom SLA",
+    },
+    additionalNotes: "Additional notes",
+    budget: { title: "Budget", label: "Budget ceiling", hint: "Entered in SAR." },
+    supplierFilters: {
+      title: "Supplier filters",
+      verifiedOnly: "Verified suppliers only",
+      subletting: "Allow subletting / crosshire",
+      bidWindow: "Offer / bid window",
+    },
+  },
+  preview: {
+    title: "Review your request",
+    post: "Post request",
+    export: "Open in Excel", // AC-52
+    itemsTable: "All items",
+    projectSummary: "Project",
+    preferencesSummary: "Preferences",
+    table: {
+      equipment: "Equipment",
+      category: "Category",
+      size: "Size",
+      qty: "Qty",
+      year: "Year",
+      operator: "Operator",
+      fuel: "Fuel",
+      fuelResp: "Fuel resp.",
+      delivery: "Delivery",
+      return: "Return",
+      certificate: "Certificate",
+      notes: "Notes",
+    },
+  },
+  confirmation: {
+    title: "Request submitted",
+    // AC-42 tentative
+    message: "Your request was submitted and will reach suppliers.",
+    backHome: "Create another request",
+  },
+  guest: {
+    blockTitle: "Create an account to continue", // AC-02
+    blockBody: "RFQ creation is available to registered renters. Create an account to start a request.",
+    createAccount: "Create account",
+  },
+  gate: {
+    confirmLocation: "Confirm the location to continue.", // AC-12/16
+    chooseRentalBasis: "Choose a rental basis to continue.", // AC-12/13
+    resolveLocationConflict: "Resolve the location conflict to continue.", // AC-47
+    resolveItems: "Resolve the flagged equipment items to continue.", // AC-29
+  },
+  errors: {
+    emptyTitle: "We couldn't read a request from that", // AC-09 tentative
+    emptyBody: "Try again, or switch to the Manual tab.",
+    networkTitle: "Connection problem", // AC-10 tentative
+    networkBody: "Something went wrong. Your input is saved — try again.",
+    switchManual: "Switch to Manual",
+  },
+  options: {
+    rentalBasis: { daily: "Daily", weekly: "Weekly", monthly: "Monthly" },
+    overtime: { without: "Without", "1.5x": "1.5×", "2x": "2×" },
+    equipmentYear: { any: "Any" },
+    siteAccess: {
+      "weight-limit": "Weight limit",
+      "height-limit": "Height limit",
+      "security-permit": "Security permit",
+      "delivery-window": "Delivery window",
+      "no-overnight-storage": "No overnight storage",
+      "special-transport-permit": "Special transport permit",
+    },
+    safetyCert: { tuv: "TÜV", spsp: "SPSP", "saso-technical": "SASO technical inspection" },
+    otherCert: { "local-content": "Local content", "saso-registration": "SASO registration" },
+    party: { me: "Me", supplier: "Supplier" },
+    fuelType: { diesel: "Diesel", petrol: "Petrol", electric: "Electric", hybrid: "Hybrid" },
+    paymentTerm: {
+      upfront: "Upfront",
+      daily: "Daily",
+      "net-30": "Net 30",
+      "net-60": "Net 60",
+      "end-of-job": "End of job",
+    },
+    paymentMethod: { "bank-transfer": "Bank transfer", cash: "Cash" },
+    maintenanceResp: { supplier: "Supplier", renter: "Renter" },
+    maintenanceSla: { "4h": "4h", "8h": "8h", "24h": "24h", custom: "Custom" },
+    bidWindow: { "24h": "24h", "48h": "48h", "72h": "72h", "1-week": "1 week" },
+    accommodation: { me: "Me", supplier: "Supplier" },
+    operatorNeeded: { yes: "Yes", no: "No" },
+  },
+};
+
+export type Dictionary = typeof en;

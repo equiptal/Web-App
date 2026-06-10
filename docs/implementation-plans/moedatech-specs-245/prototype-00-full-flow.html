@@ -1,0 +1,1258 @@
+<!-- AI PREVIEW: branded prototype applying Moedatech Design System v3 during /epic-core-flows. Reference only — not design intent (PM canvas snapshots are). The spec wins. Replaceable by a PM canvas snapshot. -->
+<!-- COMBINED CLICK-THROUGH: all screens of web-app/002 in one file. The 9 standalone screens remain the per-screen reference; this is the walkable journey. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>New rental request — full flow · Moedatech</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,500,0,0">
+<style>
+  :root{
+    --navy:#1C3550;--navy-deep:#12263A;--navy-mid:#2A4F72;--gold:#B8860B;--gold-dim:#FFF8E5;
+    --action:#F79009;--action-dim:#FFF4E5;--rentee:#2563EB;--supplier:#0D8A6A;
+    --success:#1DAF58;--success-bg:#E7F7EE;--warning:#D4780A;--warning-bg:#FFF3E0;
+    --danger:#D9362A;--danger-bg:#FCEBEA;--info:#1A7EC8;--info-bg:#E6F2FB;--muted:#6B8FA8;
+    --background:#F5F8FC;--surface1:#FFFFFF;--surface2:#EFF4F9;--surface3:#E4EDF5;
+    --border:#D4E0EC;--line:#E4EDF5;--text-disabled:#9BB3C8;--shadow:rgba(28,53,80,.06);
+    --r-sm:8px;--r-md:10px;--r-lg:14px;--r-xl:20px;--r-full:100px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--surface2);color:var(--navy);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .mono{font-family:"IBM Plex Sans",monospace}
+  q{quotes:none}
+  a{color:var(--rentee)}
+  .ribbon{background:#11202F;color:#9fb6cc;font-size:11px;font-weight:600;text-align:center;padding:5px 12px;letter-spacing:.2px}
+
+  /* demo controls (meta, not product) */
+  .demobar{background:#0E1A26;color:#fff;display:flex;align-items:center;gap:12px;padding:7px 20px;font-size:11.5px}
+  .demobar .lbl{color:#6b8299;font-weight:600;letter-spacing:.3px;text-transform:uppercase;font-size:10px}
+  .demobar .seg{display:inline-flex;background:rgba(255,255,255,.07);border-radius:7px;padding:2px}
+  .demobar .seg button{border:0;background:transparent;color:#9fb6cc;padding:5px 11px;border-radius:5px;font:inherit;font-weight:600;font-size:11.5px;cursor:pointer}
+  .demobar .seg button.on{background:#fff;color:var(--navy)}
+  .demobar .spacer{flex:1}
+  .demobar .restart{border:1px solid rgba(255,255,255,.18);background:transparent;color:#cdddec;border-radius:7px;padding:5px 12px;font:inherit;font-weight:600;font-size:11.5px;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+  .demobar .restart .material-icons-outlined{font-size:15px}
+
+  /* app bar */
+  .appbar{background:var(--surface1);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:60px;position:sticky;top:0;z-index:30}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:800;font-size:17px;letter-spacing:-.2px}
+  .brand .mark{width:34px;height:34px;border-radius:9px;background:var(--navy);display:flex;align-items:center;justify-content:center}
+  .brand .mark .material-icons-outlined{color:#fff;font-size:19px}
+  .brand i{font-style:normal;color:var(--action)}
+  .acct{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:600;color:var(--navy-mid)}
+  .acct .av{width:30px;height:30px;border-radius:50%;background:var(--surface3);color:var(--navy);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+  .acct .tier{font-size:10px;font-weight:700;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:2px 7px}
+
+  .page{max-width:1080px;margin:0 auto;padding:28px 28px 90px}
+  .screen{display:none}
+  .screen.on{display:block;animation:fade .22s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+
+  /* refined stepper */
+  #stepper{display:flex;align-items:center;margin:0 0 26px;padding:0 4px}
+  #stepper.hide{display:none}
+  #stepper .s{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--muted);font-weight:600;white-space:nowrap}
+  #stepper .s .num{width:25px;height:25px;border-radius:50%;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:var(--surface1)}
+  #stepper .s .num .material-icons-outlined{font-size:15px}
+  #stepper .s.active{color:var(--navy)} #stepper .s.active .num{background:var(--navy);border-color:var(--navy);color:#fff}
+  #stepper .s.done{color:var(--navy-mid)} #stepper .s.done .num{background:var(--success);border-color:var(--success);color:#fff}
+  #stepper .bar{flex:1;height:1.5px;background:var(--border);margin:0 14px}
+
+  /* headings */
+  .phead{margin:0 0 20px}
+  .phead h1{margin:0 0 5px;font-size:23px;font-weight:800;letter-spacing:-.5px}
+  .phead p{margin:0;font-size:14px;color:var(--muted);max-width:560px}
+
+  /* generic card */
+  .card{background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-lg);padding:22px;margin-bottom:14px}
+  .card h3{margin:0 0 18px;font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;letter-spacing:-.2px}
+  .card h3 .material-icons-outlined{font-size:19px;color:var(--navy-mid)}
+
+  /* segmented tabs (intake) */
+  .modeline{display:flex;gap:0;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin-bottom:18px;background:var(--surface1);width:max-content}
+  .modeline .m{padding:10px 18px;font-size:13.5px;font-weight:700;color:var(--muted);display:flex;align-items:center;gap:8px;border-right:1px solid var(--border)}
+  .modeline .m:last-child{border-right:0}
+  .modeline .m.active{color:var(--navy);background:var(--surface2);box-shadow:inset 0 -2px 0 var(--action)}
+  .modeline .m .oos{font-size:9.5px;font-weight:800;color:var(--text-disabled);background:var(--surface3);border-radius:4px;padding:1px 6px}
+
+  .helper{font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.55}
+  .lbl{font-size:12.5px;font-weight:700;color:var(--navy-mid);margin-bottom:8px;display:block}
+  textarea{width:100%;min-height:130px;border:1px solid var(--border);border-radius:var(--r-md);padding:13px;font:inherit;font-size:13.5px;color:var(--navy);resize:vertical;outline:0}
+  textarea:focus{border-color:var(--action);box-shadow:0 0 0 3px rgba(247,144,9,.12)}
+  .or{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:11.5px;font-weight:700;margin:16px 0;text-transform:uppercase;letter-spacing:.4px}
+  .or::before,.or::after{content:'';flex:1;height:1px;background:var(--line)}
+  .dropzone{border:1.5px dashed var(--border);border-radius:var(--r-md);padding:26px;text-align:center;color:var(--navy-mid);background:var(--surface2)}
+  .dropzone .material-icons-outlined{font-size:28px;color:var(--navy-mid)}
+  .dropzone .t{font-weight:700;margin:6px 0 3px;font-size:13.5px}
+  .dropzone .types{font-size:12px;color:var(--muted)}
+  .files{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+  .file{display:flex;align-items:center;gap:8px;border:1px solid var(--border);background:var(--surface1);border-radius:var(--r-md);padding:7px 11px;font-size:12.5px;font-weight:600}
+  .file .material-icons-outlined{font-size:17px;color:var(--navy-mid)} .file .sz{color:var(--muted);font-size:11.5px} .file .x{color:var(--muted);cursor:pointer;font-size:16px}
+
+  /* form fields */
+  .fld{display:flex;flex-direction:column;gap:7px;margin-bottom:18px}
+  .fld .r{display:flex;align-items:center;justify-content:space-between}
+  .fld label{font-size:12.5px;font-weight:700;color:var(--navy-mid)}
+  .req{color:var(--danger);font-weight:700;font-size:11px}
+  .opt{color:var(--text-disabled);font-weight:600;font-size:11px}
+  .input,select{border:1px solid var(--border);border-radius:var(--r-md);padding:11px 13px;font:inherit;font-size:13.5px;color:var(--navy);background:var(--surface1)}
+  .input.flag{border-color:var(--danger);background:#fff;color:var(--danger);font-weight:700}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .map{border:1px solid var(--border);border-radius:var(--r-md);height:110px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;background:repeating-linear-gradient(0deg,transparent,transparent 19px,var(--surface2) 19px,var(--surface2) 20px),repeating-linear-gradient(90deg,transparent,transparent 19px,var(--surface2) 19px,var(--surface2) 20px),var(--surface1)}
+  .map .pin{color:var(--action)}
+  .map-opts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .chipbtn{font-size:12px;font-weight:600;color:var(--navy-mid);border:1px solid var(--border);background:var(--surface1);border-radius:7px;padding:6px 11px;display:inline-flex;align-items:center;gap:6px}
+  .chipbtn .material-icons-outlined{font-size:15px;color:var(--navy-mid)}
+  .seg2{display:inline-flex;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:3px}
+  .seg2 button{border:0;background:transparent;padding:8px 16px;border-radius:7px;font:inherit;font-weight:600;font-size:13px;color:var(--muted);cursor:pointer}
+  .seg2 button.on{background:var(--surface1);color:var(--navy);box-shadow:0 1px 2px var(--shadow)}
+
+  /* subtle tags / status */
+  .tag{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px}
+  .tag.auto{background:var(--surface2);color:var(--navy-mid);border:1px solid var(--border)}
+  .tag.need{background:var(--danger-bg);color:var(--danger)}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block;flex:0 0 auto}
+  .dot.g{background:var(--success)} .dot.a{background:var(--warning)} .dot.r{background:var(--danger)}
+  .statlbl{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700}
+  .statlbl.g{color:var(--success)} .statlbl.a{color:var(--warning)} .statlbl.r{color:var(--danger)}
+
+  /* loading / agent processing */
+  .loadwrap{max-width:460px;margin:36px auto 0;text-align:center}
+  .loadicon{width:84px;height:84px;margin:0 auto 22px;border-radius:50%;background:var(--surface1);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;position:relative;box-shadow:0 6px 20px var(--shadow)}
+  .loadicon .material-icons-outlined{font-size:34px;color:var(--navy)}
+  .loadicon .loadring{position:absolute;inset:-1px;border-radius:50%;border:3px solid transparent;border-top-color:var(--action);border-right-color:var(--action);animation:spin .9s linear infinite}
+  .loadwrap h2{margin:0 0 6px;font-size:21px;font-weight:800;letter-spacing:-.4px}
+  .loadwrap p{margin:0 0 26px;font-size:13.5px;color:var(--muted)}
+  .stages{text-align:left;max-width:330px;margin:0 auto 24px;display:flex;flex-direction:column;gap:13px}
+  .stage{display:flex;align-items:center;gap:11px;font-size:13.5px;font-weight:600;color:var(--text-disabled)}
+  .stage .sdot{width:22px;height:22px;border-radius:50%;border:2px solid var(--border);flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800}
+  .stage.active{color:var(--navy)} .stage.active .sdot{border-color:var(--action);border-top-color:transparent;animation:spin .8s linear infinite}
+  .stage.done{color:var(--navy-mid)} .stage.done .sdot{background:var(--success);border-color:var(--success);color:#fff} .stage.done .sdot::after{content:'✓'}
+  .loadbar{height:6px;background:var(--surface3);border-radius:999px;overflow:hidden;max-width:330px;margin:0 auto}
+  .loadbar-fill{height:100%;width:0;background:var(--action);border-radius:999px;transition:width .45s ease}
+  /* processing */
+  .reading{display:flex;align-items:center;gap:13px;background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 18px;margin-bottom:16px}
+  .reading .spin{width:22px;height:22px;border:2.5px solid var(--surface3);border-top-color:var(--action);border-radius:50%;animation:spin 0.8s linear infinite;flex:0 0 auto}
+  .reading.done .spin{border-color:var(--success);border-top-color:var(--success);animation:none}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .reading b{font-size:14px} .reading .sub{font-size:12.5px;color:var(--muted);margin-top:1px}
+  .skel{height:13px;border-radius:5px;background:linear-gradient(90deg,var(--surface2),var(--surface3),var(--surface2));background-size:200% 100%;animation:sh 1.3s linear infinite;margin:9px 0}
+  @keyframes sh{to{background-position:-200% 0}} .skel.w70{width:70%}.skel.w45{width:45%}
+  .pitem{display:flex;align-items:center;gap:13px;border-bottom:1px solid var(--line);padding:11px 2px;font-size:13.5px;font-weight:600}
+  .pitem:last-child{border-bottom:0}
+  .pitem .ic{width:36px;height:36px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .pitem .ic .material-icons-outlined{font-size:21px;color:var(--navy-mid)}
+  .pitem.pending{color:var(--text-disabled)} .pitem .tail{margin-left:auto;font-size:11.5px;font-weight:700}
+  .pitem.done .tail{color:var(--success)} .pitem.pending .tail{color:var(--text-disabled)}
+
+  /* EQUIPMENT — scalable triage */
+  .xwrap{overflow:auto;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface1)}
+  .xtable{width:100%;border-collapse:collapse;font-size:12.5px}
+  .xtable th{text-align:left;background:var(--surface2);color:var(--muted);font-weight:800;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;padding:10px 12px;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;top:0}
+  .xtable td{padding:10px 12px;border-bottom:1px solid var(--line);color:var(--navy);white-space:nowrap}
+  .xtable tbody tr:last-child td{border-bottom:none}
+  .xtable tbody tr:hover{background:var(--surface2)}
+  .xtable .eqname{font-weight:800} .xtable .rfqc{color:var(--muted)}
+  .xtable .st{display:inline-flex;align-items:center;gap:6px;font-weight:700}
+  .material-symbols-rounded{font-variation-settings:'opsz' 24,'wght' 500,'FILL' 0,'GRAD' 0;line-height:1}
+  .eqflow{display:flex;align-items:flex-start;margin-bottom:22px;padding:4px 12px 0}
+  .eqflow .line{flex:1;height:3px;border-radius:2px;background:var(--surface3);margin:25px 10px 0}
+  .eqnode{display:flex;flex-direction:column;align-items:center;gap:11px;background:none;border:0;cursor:pointer;font:inherit;padding:0;flex:0 0 auto}
+  .eqnode .nicon{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--surface2);color:var(--muted);border:1px solid var(--border);transition:.18s}
+  .eqnode .nicon .material-symbols-rounded{font-size:26px}
+  .eqnode .nlbl{font-size:12.5px;font-weight:700;color:var(--muted);white-space:nowrap} .eqnode .nlbl b{margin-left:4px;color:var(--navy)}
+  .eqnode.amber .nicon{background:var(--warning-bg);color:var(--warning);border-color:rgba(212,120,10,.25)}
+  .eqnode.green .nicon{background:var(--success-bg);color:var(--success);border-color:rgba(29,175,88,.25)}
+  .eqnode.red .nicon{background:var(--danger-bg);color:var(--danger);border-color:rgba(217,54,42,.25)}
+  .eqnode.all .nicon{background:var(--surface2);color:var(--navy-mid);border-color:var(--border)}
+  .eqnode:hover .nicon{transform:translateY(-2px)}
+  .eqnode.sel.amber .nicon{background:var(--warning);color:#fff;border-color:var(--warning);box-shadow:0 6px 16px rgba(212,120,10,.32);font-variation-settings:'FILL' 1}
+  .eqnode.sel.green .nicon{background:var(--success);color:#fff;border-color:var(--success);box-shadow:0 6px 16px rgba(29,175,88,.32)}
+  .eqnode.sel.red .nicon{background:var(--danger);color:#fff;border-color:var(--danger);box-shadow:0 6px 16px rgba(217,54,42,.32)}
+  .eqnode.sel.all .nicon{background:var(--navy);color:#fff;border-color:var(--navy);box-shadow:0 6px 16px rgba(28,53,80,.28)}
+  .eqnode.sel .nicon .material-symbols-rounded{font-variation-settings:'opsz' 24,'wght' 600,'FILL' 1,'GRAD' 0}
+  .eqnode.sel .nlbl{color:var(--navy)} .eqnode.sel .nlbl b{font-weight:800}
+  .eqtabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+  .eqtab{display:inline-flex;align-items:center;gap:8px;border:1.5px solid var(--border);background:var(--surface1);border-radius:var(--r-full);padding:9px 16px;font:inherit;font-size:13px;font-weight:700;color:var(--navy-mid);cursor:pointer}
+  .eqtab b{font-weight:800;color:var(--navy)}
+  .eqtab .tdot{width:9px;height:9px;border-radius:50%;display:inline-block;background:var(--muted)}
+  .eqtab.amber .tdot{background:var(--warning)} .eqtab.green .tdot{background:var(--success)} .eqtab.red .tdot{background:var(--danger)}
+  .eqtab:hover{border-color:var(--navy-mid)}
+  .eqtab.sel.amber{border-color:var(--warning);background:var(--warning-bg);color:var(--warning)} .eqtab.sel.amber b{color:var(--warning)}
+  .eqtab.sel.green{border-color:var(--success);background:var(--success-bg);color:var(--success)} .eqtab.sel.green b{color:var(--success)}
+  .eqtab.sel.red{border-color:var(--danger);background:var(--danger-bg);color:var(--danger)} .eqtab.sel.red b{color:var(--danger)}
+  .eqtab.sel.all{border-color:var(--navy);background:var(--surface2);color:var(--navy)}
+  .eqsummary{display:flex;align-items:stretch;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+  .stat{flex:1;min-width:150px;text-align:left;background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-md);padding:13px 15px;cursor:pointer;display:flex;flex-direction:column;gap:3px;font:inherit}
+  .stat .big{font-size:22px;font-weight:800;display:flex;align-items:center;gap:8px;letter-spacing:-.5px}
+  .stat .cap{font-size:12px;color:var(--muted);font-weight:600}
+  .stat.sel{border-color:var(--navy);box-shadow:0 0 0 1px var(--navy)}
+  .stat.attention.sel{border-color:var(--warning);box-shadow:0 0 0 1px var(--warning)}
+  .stat.unavail.sel{border-color:var(--danger);box-shadow:0 0 0 1px var(--danger)}
+  .stat .big .dot{width:9px;height:9px}
+
+  .listhead{display:flex;align-items:center;justify-content:space-between;margin:4px 2px 12px}
+  .listhead .h{font-size:13px;font-weight:700;color:var(--navy)}
+  .listhead .bulk{font-size:12.5px;font-weight:700;color:var(--rentee);cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+  .listhead .bulk .material-icons-outlined{font-size:16px}
+
+  .erow{display:grid;grid-template-columns:38px 1fr auto;gap:13px;align-items:center;background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 15px;margin-bottom:8px}
+  .erow.hide{display:none}
+  .erow.attention{border-left:3px solid var(--warning)}
+  .erow.unavail{border-left:3px solid var(--danger)}
+  .erow.resolved{border-left:3px solid var(--success)}
+  .erow.excluded{opacity:.5}
+  .erow .ic{width:38px;height:38px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center}
+  .erow .ic{position:relative} .erow .ic .material-icons-outlined{font-size:22px;color:var(--navy)}
+  .conf{position:absolute;right:-7px;bottom:-7px;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid var(--surface1);box-shadow:0 1px 3px rgba(0,0,0,.18)}
+  .conf .material-icons-outlined{font-size:12px;color:#fff}
+  .conf-high{background:var(--success)} .conf-mid{background:var(--warning)} .conf-low{background:var(--danger)}
+  .conflegend{display:flex;align-items:center;gap:14px;font-size:11.5px;color:var(--muted);margin:0 2px 14px;flex-wrap:wrap}
+  .conflegend .cl{display:inline-flex;align-items:center;gap:6px}
+  .cdot{width:10px;height:10px;border-radius:50%;display:inline-block} .cd-high{background:var(--success)} .cd-mid{background:var(--warning)} .cd-low{background:var(--danger)}
+  .erow.unavail .ic{background:var(--danger-bg)} .erow.unavail .ic .material-icons-outlined{color:var(--danger)}
+  .erow .main{min-width:0}
+  .erow .wrote{font-size:12px;color:var(--muted)}
+  .erow .wrote q{color:var(--navy-mid);font-style:normal}
+  .erow .asked{font-size:12px;color:var(--muted);margin-top:4px} .erow .asked q{color:var(--navy-mid);font-style:normal;font-weight:600}
+  .erow .qhint{font-size:12.5px;color:var(--muted);margin-top:7px}
+  .qtyrow{display:flex;align-items:center;gap:10px;margin-top:10px}
+  .qlbl{font-size:10.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
+  .qstep{display:inline-flex;align-items:center;gap:12px;border:1px solid var(--border);border-radius:8px;padding:3px 10px}
+  .qstep button{border:0;background:var(--surface2);width:24px;height:24px;border-radius:6px;font:inherit;font-size:15px;font-weight:800;cursor:pointer;color:var(--navy)}
+  .qstep b{font-weight:800;min-width:14px;text-align:center;font-family:"IBM Plex Sans",monospace}
+  .imeta{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .mtag{font-size:11px;font-weight:700;color:var(--navy-mid);background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:4px 9px;display:inline-flex;align-items:center;gap:5px}
+  .mtag .material-icons-outlined{font-size:13px;color:var(--muted)}
+  .mtag b{font-weight:800;color:var(--navy)}
+  .erow .question{font-size:13.5px;font-weight:600;color:var(--navy-mid);margin-top:7px}
+  .erow .matched{font-size:15.5px;font-weight:800;display:flex;align-items:center;gap:7px;flex-wrap:wrap;letter-spacing:-.2px}
+  .rfqmatch{display:flex;align-items:flex-end;gap:13px}
+  .rfqfrom{display:flex;flex-direction:column;gap:3px;width:210px;flex:0 0 auto}
+  .rfqlabel{font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
+  .rfqtxt{font-size:15px;font-weight:700;color:var(--navy);line-height:1.25}
+  .rfqmatch .arrow{color:var(--text-disabled);font-size:20px;flex:0 0 auto;line-height:1.25}
+  .rfqmatch .matched{flex:1;min-width:0;font-size:15px;font-weight:800;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rfqmatch .matched{margin:0}
+  .erow .matched .crumb{font-weight:600;color:var(--muted);font-size:12.5px}
+  .erow .right{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+  .erow .acts{display:flex;gap:7px}
+  .mini{border:1px solid var(--border);background:var(--surface1);border-radius:7px;padding:7px 13px;font:inherit;font-size:12px;font-weight:700;color:var(--navy);cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+  .mini .material-icons-outlined{font-size:15px}
+  .mini.go{background:var(--navy);border-color:var(--navy);color:#fff}
+  .mini.warn{background:var(--warning);border-color:var(--warning);color:#fff}
+  .mini.muted{color:var(--muted)}
+  .convert{font-size:11.5px;color:var(--warning);font-weight:600;margin-top:5px;display:flex;align-items:center;gap:5px}
+  .convert .material-icons-outlined{font-size:14px}
+  .erow.ready{padding:11px 15px}
+  .erow.ready .matched{font-weight:700;font-size:13.5px}
+  .showmore{text-align:center;padding:11px;font-size:13px;font-weight:700;color:var(--rentee);cursor:pointer;border:1px dashed var(--border);border-radius:var(--r-md);margin-bottom:8px;background:var(--surface1)}
+  .additem{font-size:13px;font-weight:700;color:var(--navy-mid);cursor:pointer;display:inline-flex;align-items:center;gap:7px;padding:11px 2px}
+  .additem .material-icons-outlined{font-size:18px;color:var(--action)}
+  .unavail-help{font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.5}
+  /* taxonomy picker dropdown */
+  .picker{margin-top:11px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface1);overflow:hidden;box-shadow:0 8px 24px rgba(28,53,80,.1)}
+  .picker .ph{font-size:11.5px;font-weight:700;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+  .picker .ph .catchip{display:inline-flex;align-items:center;gap:5px;color:var(--navy);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:11px}
+  .picker .ph .catchip .material-icons-outlined{font-size:14px;color:var(--navy-mid)}
+  .picker .ph .x{margin-left:auto;cursor:pointer;font-size:16px;color:var(--muted)}
+  .picker .opt{display:flex;align-items:center;gap:11px;padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--line);font-size:13.5px;font-weight:600}
+  .picker .opt:last-child{border-bottom:0}
+  .picker .opt:hover{background:var(--surface2)}
+  .picker .opt .oi{width:34px;height:34px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .picker .opt .oi .material-icons-outlined{font-size:20px;color:var(--navy)}
+  .picker .opt.sized .sz{font-family:"IBM Plex Sans",monospace;font-weight:700}
+  .picker .opt .sugg{margin-left:auto;font-size:10.5px;font-weight:800;color:var(--success);background:var(--success-bg);border-radius:5px;padding:1px 7px}
+
+  /* shared equipment settings (collapsible) */
+  .disc{background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-lg);margin:8px 0 16px;overflow:hidden}
+  .disc summary{list-style:none;cursor:pointer;padding:15px 18px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:9px}
+  .disc summary::-webkit-details-marker{display:none}
+  .disc summary .material-icons-outlined{font-size:19px;color:var(--navy-mid)}
+  .disc summary .chev{margin-left:auto;color:var(--muted);transition:.2s}
+  .disc[open] summary .chev{transform:rotate(180deg)}
+  .disc .inner{padding:18px;border-top:1px solid var(--line)}
+  .disc .inner .grid3{gap:22px;align-items:start}
+  .disc .inner .grid3 .fld{gap:9px}
+  .disc .inner .grid3 .fld label{min-height:16px}
+  .disc .inner .grid3 .stepper,.disc .inner .grid3 .seg2{height:44px;box-sizing:border-box}
+  .disc .inner .grid3 select.input{height:44px;width:100%}
+  .sgrid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:14px}
+  .sf{border:1px solid var(--border);border-radius:var(--r-md);padding:11px 13px}
+  .sf .k{font-size:11.5px;color:var(--muted);font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:7px}
+  .sf .v{font-size:13px;font-weight:700;color:var(--navy);display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .tagreq{font-size:9.5px;font-weight:800;color:var(--danger);background:var(--danger-bg);border-radius:4px;padding:1px 6px}
+  .tagopt{font-size:9.5px;font-weight:800;color:var(--muted);background:var(--surface2);border-radius:4px;padding:1px 6px}
+  .selv{border:1px solid var(--border);border-radius:6px;padding:5px 9px;font-size:12.5px;font-weight:700}
+  .ssel{border:1px solid var(--border);border-radius:6px;padding:6px 9px;font:inherit;font-size:12.5px;font-weight:700;color:var(--navy);background:var(--surface1)}
+  .sinp{width:100%;border:1px solid var(--border);border-radius:7px;padding:8px 11px;font:inherit;font-size:12.5px;color:var(--navy);background:var(--surface1)}
+  .chipbtn{cursor:pointer} .chipbtn.on{border-color:var(--navy);color:var(--navy);background:var(--surface2)}
+  #stepper .s{cursor:pointer}
+  .erow .change{font-size:11.5px;color:var(--rentee);font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;margin-top:6px}
+  .erow .change .material-icons-outlined{font-size:14px}
+  .hint2{font-size:11.5px;color:var(--muted);margin-top:7px}
+  .togrow{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)} .togrow .fl{font-size:13px;font-weight:700;color:var(--navy)}
+  .basisrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .itemfoot{display:flex;gap:16px;margin-top:9px}
+  .lk{font-size:12px;color:var(--rentee);font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+  .lk.del{color:var(--danger)} .lk .material-icons-outlined{font-size:15px}
+  .idetails{margin-top:14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:4px 16px 14px}
+  .erow > .idetails{grid-column:1 / -1;margin-top:12px}
+  .reqbox{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px;margin-top:16px}
+  .reqhead{font-size:12px;font-weight:800;color:var(--navy-mid);margin-bottom:6px}
+  .reqlist{margin:0 0 8px;padding-left:18px;font-size:12.5px;color:var(--muted);line-height:1.7}
+  .taxopick{margin-top:11px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface1);box-shadow:0 8px 24px rgba(28,53,80,.12)}
+  .dd{position:relative}
+  .dd-btn{width:100%;text-align:left;border:1.5px solid var(--border);background:var(--surface1);border-radius:var(--r-md);padding:11px 13px;font:inherit;font-size:13.5px;font-weight:700;color:var(--navy);cursor:pointer;display:flex;align-items:center;gap:9px}
+  .dd-btn .material-icons-outlined{font-size:18px;color:var(--navy-mid)}
+  .dd-btn .ph{color:var(--text-disabled);font-weight:600}
+  .dd-btn .car{margin-left:auto;color:var(--muted)}
+  .dd-btn:disabled{background:var(--surface2);color:var(--text-disabled);cursor:not-allowed}
+  .dd-menu{position:absolute;left:0;right:0;top:calc(100% + 5px);z-index:6;background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:0 12px 30px rgba(28,53,80,.18);max-height:240px;overflow:auto}
+  .dd-opt{display:flex;align-items:center;gap:9px;padding:11px 13px;font-size:13.5px;font-weight:700;color:var(--navy);cursor:pointer;border-bottom:1px solid var(--line)}
+  .dd-opt:last-child{border-bottom:none} .dd-opt:hover{background:var(--surface2)}
+  .dd-opt .material-icons-outlined{font-size:18px;color:var(--navy-mid)}
+  .dd-opt.sized{font-family:"IBM Plex Sans",monospace}
+  .tp-head{font-size:12px;font-weight:800;color:var(--navy);padding:11px 13px;border-bottom:1px solid var(--line);display:flex;align-items:center}
+  .tp-head .x{margin-left:auto;cursor:pointer;color:var(--muted);font-size:16px}
+  .tgrid{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:14px;padding:13px}
+  .tgrid .tlevel{padding:0;border-bottom:none}
+  .tlevel{padding:11px 13px;border-bottom:1px solid var(--line)}
+  .tl-label{font-size:10.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin-bottom:9px}
+  .tl-opts{display:flex;gap:8px;flex-wrap:wrap}
+  .tl-hint{font-size:12px;color:var(--text-disabled);font-style:italic}
+  .topt{border:1.5px solid var(--border);background:var(--surface1);color:var(--navy-mid);border-radius:var(--r-full);padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .topt .material-icons-outlined{font-size:16px;color:var(--navy-mid)}
+  .topt:hover{border-color:var(--navy-mid)}
+  .topt.on{border-color:var(--action);background:var(--action-dim);color:var(--action)} .topt.on .material-icons-outlined{color:var(--action)}
+  .topt.sized{font-family:"IBM Plex Sans",monospace}
+  .tp-foot{padding:11px 13px} .tp-foot .btn{width:100%;justify-content:center}
+  .dsec{padding:14px 0;border-bottom:1px solid var(--border)} .dsec:last-of-type{border-bottom:none}
+  .dseclabel{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:11px}
+  .idetails .ig{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .idetails .f{display:flex;flex-direction:column;gap:6px}
+  .idetails .f label{font-size:11.5px;font-weight:700;color:var(--navy-mid)}
+  .idetails .sublabel{font-size:11.5px;font-weight:700;color:var(--navy-mid)}
+  .idetails .opsub{background:var(--surface2);border-radius:var(--r-md);padding:12px}
+  .idetails .dhead{font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+  .editbtn{border:1px solid var(--border);background:var(--surface1);border-radius:8px;padding:7px 12px;font:inherit;font-size:12px;font-weight:700;color:var(--navy);cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+  .editbtn:hover{border-color:var(--navy-mid);background:var(--surface2)}
+  .editbtn .material-icons-outlined{font-size:15px} .editbtn .chev{transition:.15s} .editbtn.open .chev{transform:rotate(180deg)}
+  .rmbtn{border:1px solid var(--border);background:var(--surface1);border-radius:8px;width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;flex:0 0 auto}
+  .rmbtn:hover{border-color:var(--danger);color:var(--danger)} .rmbtn .material-icons-outlined{font-size:17px}
+  .eqtip{font-size:12px;color:var(--navy-mid);background:var(--info-bg);border:1px solid rgba(26,126,200,.2);border-radius:var(--r-md);padding:9px 13px;display:flex;align-items:center;gap:8px;margin:0 0 14px} .eqtip .material-icons-outlined{font-size:17px;color:var(--info);flex:0 0 auto}
+  .eqedit{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--surface2);border-radius:var(--r-md);padding:11px 13px}
+  .eqedit .ee-l{font-size:10.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+  .eqedit .ee-v{font-size:14px;font-weight:800;color:var(--navy);margin-top:2px}
+  .pchips{display:flex;gap:8px;flex-wrap:wrap}
+  .pchip{border:1.5px solid var(--border);background:var(--surface1);color:var(--navy-mid);border-radius:var(--r-full);padding:7px 14px;font-size:12.5px;font-weight:700;cursor:pointer}
+  .pchip.on{border-color:var(--action);color:var(--action);background:var(--action-dim)}
+  .tgl{width:42px;height:24px;border-radius:999px;background:var(--surface3);border:1px solid var(--border);position:relative;cursor:pointer;flex:0 0 auto;transition:.15s}
+  .tgl::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:.15s}
+  .tgl.on{background:var(--success);border-color:var(--success)} .tgl.on::after{left:20px}
+  .frow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)} .frow:last-child{border-bottom:none}
+  .frow .fl{font-size:13px;font-weight:700;color:var(--navy)}
+  .ffield{display:flex;flex-direction:column;gap:8px} .ffield label{font-size:12px;font-weight:700;color:var(--navy-mid)}
+  .opcard{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:14px 0}
+  .ophead{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;background:var(--surface2);font-weight:800;font-size:13.5px}
+  .ophead .lft{display:flex;align-items:center;gap:8px} .ophead .material-icons-outlined{font-size:18px;color:var(--navy-mid)}
+  .opbody{padding:2px 13px 10px}
+  .applyall{margin-top:14px;font-size:12px;font-weight:700;color:var(--rentee);cursor:pointer;display:inline-flex;align-items:center;gap:6px} .applyall .material-icons-outlined{font-size:16px}
+  .stepper{display:inline-flex;align-items:center;gap:16px;border:1px solid var(--border);border-radius:var(--r-md);padding:5px 12px;width:max-content}
+  .stepper button{border:0;background:var(--surface2);width:26px;height:26px;border-radius:6px;font:inherit;font-size:16px;font-weight:800;cursor:pointer;color:var(--navy)}
+  .stepper span{font-weight:800;min-width:14px;text-align:center}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .cardsub{font-size:12.5px;color:var(--muted);margin:0 0 16px}
+  .card h3 + .cardsub{margin-top:-12px}
+  .addr{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:700;margin-bottom:12px;flex-wrap:wrap}
+  .addr .pin{color:var(--action);font-size:20px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+  .conflict{background:var(--warning-bg);border:1px solid rgba(212,120,10,.3);border-radius:var(--r-md);padding:14px}
+  .conflict .ctitle{font-size:13.5px;font-weight:800;color:#8a5208;display:flex;align-items:center;gap:7px} .conflict .ctitle .material-icons-outlined{font-size:18px}
+  .conflict .cdesc{font-size:12px;color:#8a5208;margin:4px 0 12px}
+  .cands{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .cand{text-align:left;border:1.5px solid var(--border);background:var(--surface1);border-radius:var(--r-md);padding:12px;cursor:pointer;display:flex;flex-direction:column;gap:5px;font:inherit}
+  .cand:hover{border-color:var(--action);box-shadow:0 2px 8px var(--shadow)}
+  .cand .src{font-size:11px;font-weight:700;color:var(--muted);display:flex;align-items:center;gap:5px} .cand .src .material-icons-outlined{font-size:14px}
+  .cand .val{font-size:13.5px;font-weight:700;color:var(--navy)}
+  .confirmbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;background:var(--warning-bg);border:1px solid rgba(212,120,10,.28);border-radius:var(--r-md);padding:11px 14px;flex-wrap:wrap}
+  .confirm-note{font-size:12.5px;color:#8a5208;font-weight:600;display:flex;align-items:center;gap:7px} .confirm-note .material-icons-outlined{font-size:17px}
+  .confirmed{display:flex;align-items:center;gap:8px;margin-top:14px;background:var(--success-bg);border:1px solid rgba(29,175,88,.3);border-radius:var(--r-md);padding:12px 14px;font-size:13px;font-weight:700;color:var(--success)}
+  .confirmed .material-icons-outlined{font-size:19px} .confirmed .lk{color:var(--rentee);font-size:12px}
+  .onecallout{display:flex;align-items:center;gap:12px;margin-top:14px;background:var(--info-bg);border:1px solid rgba(26,126,200,.25);border-radius:var(--r-md);padding:13px 15px;flex-wrap:wrap}
+  .onecallout > .material-icons-outlined{font-size:22px;color:var(--info);flex:0 0 auto}
+  .onecallout .txt{flex:1;min-width:200px}
+  .onecallout .t{font-size:13px;font-weight:800;color:#0e4f7e}
+  .onecallout .d{font-size:12px;color:#0e4f7e;opacity:.85;margin-top:2px;line-height:1.45}
+  .onecallout .act{border:1.5px solid var(--info);background:var(--surface1);color:var(--info);border-radius:8px;padding:9px 14px;font:inherit;font-weight:700;font-size:12.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+  .onecallout .act:hover{background:var(--info);color:#fff}
+  .onecallout .act .material-icons-outlined{font-size:16px}
+  .selchip{border:1.5px solid var(--border);background:var(--surface1);color:var(--navy-mid);border-radius:var(--r-full);padding:8px 15px;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:.12s}
+  .selchip .material-icons-outlined{font-size:16px}
+  .selchip:hover{border-color:var(--navy-mid)}
+  .selchip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+  .selchip.on::before{content:'✓';font-weight:900;font-size:12px}
+  .langtog{display:inline-flex;border:1px solid var(--border);border-radius:7px;overflow:hidden}
+  .langtog button{border:0;background:var(--surface1);color:var(--muted);padding:5px 10px;font:inherit;font-weight:700;font-size:12px;cursor:pointer}
+  .langtog button.on{background:var(--navy);color:#fff}
+  [dir="rtl"] .page,[dir="rtl"] .phead,[dir="rtl"] .card{text-align:right}
+
+  /* review */
+  .rc{background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:14px;overflow:hidden}
+  .rc .ch{padding:13px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:14px}
+  .rc .ch .material-icons-outlined{font-size:18px;color:var(--navy-mid);vertical-align:-4px;margin-right:7px}
+  .edit{font-size:12px;font-weight:700;color:var(--rentee);display:inline-flex;align-items:center;gap:4px;cursor:pointer} .edit .material-icons-outlined{font-size:15px;color:var(--rentee)}
+  .kv{padding:14px 18px;display:grid;grid-template-columns:160px 1fr;row-gap:9px;font-size:13.5px} .kv .k{color:var(--muted);font-weight:600}
+  .rrow{padding:12px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:13px} .rrow:last-child{border-bottom:none}
+  .rrow .ic{width:36px;height:36px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .rrow .ic .material-icons-outlined{font-size:21px;color:var(--navy)} .rrow .nm{font-weight:700;font-size:13.5px} .rrow .nm small{color:var(--muted);font-weight:600}
+  .rrow .statlbl{margin-left:auto}
+  .excl{padding:11px 18px;background:var(--surface2);color:var(--navy-mid);font-size:12.5px;display:flex;gap:9px;align-items:flex-start;border-top:1px solid var(--line)} .excl .material-icons-outlined{font-size:17px;color:var(--muted);flex:0 0 auto}
+
+  /* confirmation */
+  .done-wrap{text-align:center;padding:40px 20px 10px}
+  .done-check{width:72px;height:72px;border-radius:50%;background:var(--success-bg);display:inline-flex;align-items:center;justify-content:center;margin-bottom:18px}
+  .done-check .material-icons-outlined{font-size:40px;color:var(--success)}
+  .done-wrap h2{margin:0 0 9px;font-size:24px;font-weight:800;letter-spacing:-.5px}
+  .done-wrap p{margin:0 auto 20px;font-size:14px;color:var(--muted);max-width:440px}
+  .done-card{display:inline-flex;align-items:center;gap:10px;background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-md);padding:11px 18px;font-size:13.5px;font-weight:700}
+  .done-card .material-icons-outlined{color:var(--navy-mid);font-size:19px}
+  .done-actions{margin-top:26px;display:flex;gap:10px;justify-content:center}
+  .laternote{margin:22px auto 0;max-width:520px;font-size:12px;color:var(--muted);background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-md);padding:11px 14px;display:flex;gap:9px;align-items:flex-start}
+  .laternote .material-icons-outlined{font-size:16px;color:var(--muted);flex:0 0 auto}
+
+  /* buttons */
+  .btn{border:1px solid var(--border);background:var(--surface1);border-radius:var(--r-md);padding:11px 18px;font:inherit;font-weight:700;font-size:13.5px;color:var(--navy);display:inline-flex;align-items:center;gap:7px;cursor:pointer}
+  .btn .material-icons-outlined{font-size:18px}
+  .btn.primary{background:var(--action);border-color:var(--action);color:#fff}
+  .btn.lg{font-size:14.5px;padding:12px 24px}
+  .btn:disabled{background:var(--surface2)!important;border-color:var(--border)!important;color:var(--text-disabled)!important;box-shadow:none!important;cursor:not-allowed}
+  .btn:disabled .material-icons-outlined{color:var(--text-disabled)!important}
+
+  /* sticky action footer */
+  .actionbar{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:24px}
+  .flash{animation:flashring .9s ease}
+  @keyframes flashring{0%{box-shadow:0 0 0 0 rgba(247,144,9,.45)}100%{box-shadow:0 0 0 10px rgba(247,144,9,0)}}
+  .actionbar .status{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:7px} .actionbar .status b{color:var(--navy)} .actionbar .status .material-icons-outlined{font-size:17px;color:var(--muted)}
+  .actionbar .status.block{color:var(--navy-mid);font-weight:600} .actionbar .status.block .material-icons-outlined{color:var(--muted)}
+  .actionbar .btns{display:flex;gap:10px}
+
+  /* guest overlay */
+  .gov{position:fixed;inset:0;z-index:50;background:rgba(28,53,80,.32);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center}
+  .gov.on{display:flex}
+  .modal{width:430px;max-width:90%;background:var(--surface1);border-radius:var(--r-xl);padding:30px;text-align:center;box-shadow:0 30px 70px rgba(28,53,80,.3)}
+  .modal .lock{width:60px;height:60px;border-radius:50%;background:var(--info-bg);display:inline-flex;align-items:center;justify-content:center;margin-bottom:15px}
+  .modal .lock .material-icons-outlined{font-size:31px;color:var(--info)}
+  .modal h3{margin:0 0 8px;font-size:18px;font-weight:800} .modal p{font-size:13.5px;color:var(--muted);line-height:1.55;margin:0 0 22px}
+  .modal .row{display:flex;gap:10px;justify-content:center}
+
+  /* toast */
+  #toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);z-index:60;background:var(--navy);color:#fff;padding:11px 18px;border-radius:var(--r-full);font-size:13px;font-weight:600;box-shadow:0 12px 32px rgba(28,53,80,.3);opacity:0;transition:.25s;display:flex;align-items:center;gap:8px;pointer-events:none}
+  #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  #toast .material-icons-outlined{font-size:17px;color:#7fe0a6}
+</style>
+</head>
+<body>
+<div class="ribbon">AI PREVIEW · reference, not design intent · the spec wins — combined click-through of web-app/002</div>
+
+<div class="demobar">
+  <span class="lbl">Demo controls</span>
+  <div class="seg" title="Switch account tier to preview the guest block">
+    <button id="asRenter" class="on" onclick="setView('renter')">Verified renter</button>
+    <button id="asGuest" onclick="setView('guest')">Guest</button>
+  </div>
+  <div class="spacer"></div>
+  <button class="restart" onclick="restart()"><span class="material-icons-outlined">restart_alt</span> Restart</button>
+</div>
+
+<div class="appbar">
+  <div class="brand"><span class="mark"><span class="material-icons-outlined">precision_manufacturing</span></span>MOEDA<i>TECH</i></div>
+  <div class="acct">
+    <span class="langtog"><button id="langEn" class="on" onclick="setLang('en')">EN</button><button id="langAr" onclick="setLang('ar')">ع</button></span>
+    <span id="acctTier" class="tier">VERIFIED</span> <span class="av" id="acctAv">AK</span> <span id="acctName">Al-Khaleej Contracting</span>
+  </div>
+</div>
+
+<div class="page">
+
+  <div id="stepper" class="hide">
+    <div class="s" data-step="1" onclick="stepGo(1)"><span class="num">1</span> Project</div><div class="bar"></div>
+    <div class="s" data-step="2" onclick="stepGo(2)"><span class="num">2</span> Equipment</div><div class="bar"></div>
+    <div class="s" data-step="3" onclick="stepGo(3)"><span class="num">3</span> Preferences</div><div class="bar"></div>
+    <div class="s" data-step="4" onclick="stepGo(4)"><span class="num">4</span> Review</div>
+  </div>
+
+  <!-- ============ INTAKE ============ -->
+  <section id="screen-intake" class="screen on">
+    <div class="phead">
+      <h1>New rental request</h1>
+      <p>Already have an RFQ? Paste it or upload your files to start a request from it. You review everything before it's sent.</p>
+    </div>
+    <div class="modeline">
+      <div class="m active"><span class="material-icons-outlined">upload_file</span> RFQ</div>
+      <div class="m" onclick="toast('Manual entry is coming in a later release')"><span class="material-icons-outlined">edit_note</span> Manual <span class="oos">LATER</span></div>
+    </div>
+    <div class="card">
+      <span class="lbl">Paste your RFQ</span>
+      <textarea>Subject: Equipment request — Riyadh site
+
+- 20 ton excavator x2, from 1 July for 2 weeks, 10 hrs/day
+- 50 t hydraulic crane
+- loader 30,000 lb
+- 60 m³/h concrete batching plant
+Payment net 30. Fuel on supplier.</textarea>
+      <span class="lbl" style="margin-top:18px">Attach files too <span class="opt">optional — add as many as you like</span></span>
+      <div class="dropzone" onclick="addFile()" title="Add a file">
+        <span class="material-icons-outlined">upload</span>
+        <div class="t">Drop files here, or browse</div>
+        <div class="types">PDF, image, Word or Excel</div>
+      </div>
+      <div class="files" id="fileList">
+        <span class="file"><span class="material-icons-outlined">picture_as_pdf</span> procurement-rfq.pdf <span class="sz mono">248 KB</span> <span class="x material-icons-outlined" onclick="this.closest('.file').remove()">close</span></span>
+        <span class="file"><span class="material-icons-outlined">table_chart</span> items.xlsx <span class="sz mono">62 KB</span> <span class="x material-icons-outlined" onclick="this.closest('.file').remove()">close</span></span>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end"><button class="btn primary lg" onclick="go('processing')">Continue <span class="material-icons-outlined">arrow_forward</span></button></div>
+  </section>
+
+  <!-- ============ PROCESSING ============ -->
+  <section id="screen-processing" class="screen">
+    <div class="loadwrap">
+      <div class="loadicon"><span class="loadring"></span><span class="material-icons-outlined">description</span></div>
+      <h2 id="loadTitle">Reading your RFQ…</h2>
+      <p id="loadSub">This usually takes a few seconds — hang tight.</p>
+      <div class="stages">
+        <div class="stage" id="stg1"><span class="sdot"></span> Reading your document</div>
+        <div class="stage" id="stg2"><span class="sdot"></span> Extracting your project details</div>
+        <div class="stage" id="stg3"><span class="sdot"></span> Matching equipment to our catalogue</div>
+        <div class="stage" id="stg4"><span class="sdot"></span> Preparing your request</div>
+      </div>
+      <div class="loadbar"><div class="loadbar-fill" id="loadFill"></div></div>
+    </div>
+  </section>
+
+  <!-- ============ STEP 1 PROJECT ============ -->
+  <section id="screen-project" class="screen">
+    <div class="phead"><h1>Project details</h1><p>We read these from your RFQ — they apply to your <b>whole request, across all items</b>.</p></div>
+
+    <!-- Location -->
+    <div class="card" id="locCard">
+      <h3><span class="material-icons-outlined">place</span> Location</h3>
+      <div class="cardsub">Where the equipment is needed.</div>
+
+      <!-- AC-47: pasted text and the file disagree → pick the right one -->
+      <div class="conflict" id="locConflict">
+        <div class="ctitle"><span class="material-icons-outlined">error_outline</span> Your text and your file show different locations</div>
+        <div class="cdesc">Which one is correct?</div>
+        <div class="cands">
+          <button class="cand" onclick="pickLoc('Riyadh — King Abdullah Rd','your pasted text')"><span class="src"><span class="material-icons-outlined">notes</span> From your text</span><span class="val">Riyadh — King Abdullah Rd</span></button>
+          <button class="cand" onclick="pickLoc('Dammam — 2nd Industrial City','your file (rfq.pdf)')"><span class="src"><span class="material-icons-outlined">picture_as_pdf</span> From your file</span><span class="val">Dammam — 2nd Industrial City</span></button>
+        </div>
+      </div>
+
+      <!-- shown once the conflict is resolved -->
+      <div id="locResolved" style="display:none">
+        <div class="addr"><span class="material-icons-outlined pin">location_on</span><span id="mapLabel">—</span><span class="tag auto" id="locSrc">from your RFQ</span></div>
+        <div class="map">map preview</div>
+        <div class="map-opts"><span class="chipbtn on" onclick="selectLoc(this,'Riyadh — King Abdullah Rd')"><span class="material-icons-outlined">push_pin</span> Pinned</span><span class="chipbtn" onclick="selectLoc(this,'Current location (GPS)')"><span class="material-icons-outlined">my_location</span> Use current location</span><span class="chipbtn" onclick="selectLoc(this,'Search address…')"><span class="material-icons-outlined">search</span> Search address</span></div>
+        <div class="confirmbar" id="locConfirmBar">
+          <span class="confirm-note"><span class="material-icons-outlined">help_outline</span> Is this the right site? Please confirm it before you continue.</span>
+          <button class="btn primary" id="locBtn" onclick="confirmLocation()"><span class="material-icons-outlined">check</span> Confirm location</button>
+        </div>
+        <div class="confirmed" id="locConfirmed" style="display:none"><span class="material-icons-outlined">check_circle</span> Location confirmed <span class="lk" onclick="unconfirmLocation()" style="margin-left:auto">Change</span></div>
+      </div>
+      <div class="onecallout">
+        <span class="material-icons-outlined">pin_drop</span>
+        <div class="txt"><div class="t">One location per request</div><div class="d">If your RFQ covers more than one site, each site needs its own request.</div></div>
+        <button class="act" onclick="openNewRequest()">Start a separate request <span class="material-icons-outlined">open_in_new</span></button>
+      </div>
+    </div>
+
+    <!-- Timing & Hours -->
+    <div class="card">
+      <h3><span class="material-icons-outlined">schedule</span> Timing &amp; hours</h3>
+      <div class="cardsub">When you need it, and for how long.</div>
+      <div class="fld">
+        <div class="r"><label>Rental basis <span class="req">Required</span></label><span class="tag auto">from your RFQ</span></div>
+        <div class="basisrow">
+          <div class="seg2"><button class="on" onclick="selBasis(this)">Daily</button><button onclick="selBasis(this)">Weekly</button><button onclick="selBasis(this)">Monthly</button></div>
+          <span class="selchip" onclick="toggleChip(this)">Extendable</span>
+        </div>
+        <div class="hint2">You'll be quoted according to this frequency. <b>Extendable</b> = it can run beyond this period.</div>
+      </div>
+      <div class="grid3">
+        <div class="fld"><label>Start date <span class="opt">Optional</span></label><input type="date" class="input mono"></div>
+        <div class="fld"><label>End date <span class="opt">Optional</span></label><input type="date" class="input mono"></div>
+        <div class="fld"><label>Hours per day <span class="opt">Optional</span></label><input class="input mono" value="8"></div>
+      </div>
+    </div>
+
+    <!-- Advanced (open by default) -->
+    <details class="disc" open>
+      <summary><span class="material-icons-outlined">tune</span> Advanced <span class="opt" style="font-weight:600">optional</span> <span class="chev material-icons-outlined">expand_more</span></summary>
+      <div class="inner">
+        <div class="grid3">
+          <div class="fld"><label>Working days / week</label><div class="stepper"><button onclick="stepDays(-1)">−</button><span id="wdays" class="mono">6</span><button onclick="stepDays(1)">+</button></div></div>
+          <div class="fld"><label>Overtime rate</label><div class="seg2"><button class="on">Without</button><button>1.5×</button><button>2×</button></div></div>
+          <div class="fld"><label>Equipment year <span class="opt">all items</span></label><select class="input"><option>Any year</option><option>2026</option><option>2025</option><option>2024</option><option>2023</option><option>2022</option><option>2021</option><option>2020</option><option>Customize…</option></select></div>
+        </div>
+        <div class="fld" style="margin-top:16px"><label>Site access restrictions <span class="opt">optional</span></label>
+          <div class="chips"><span class="selchip" onclick="toggleChip(this)">Weight limit</span><span class="selchip" onclick="toggleChip(this)">Height limit</span><span class="selchip" onclick="toggleChip(this)">Security permit</span><span class="selchip" onclick="toggleChip(this)">Delivery window</span><span class="selchip" onclick="toggleChip(this)">No overnight storage</span><span class="selchip" onclick="toggleChip(this)">Special transport permit</span></div>
+        </div>
+      </div>
+    </details>
+
+    <!-- Certificates (project-level, applies to all items) -->
+    <div class="card">
+      <h3><span class="material-icons-outlined">verified</span> Certificates</h3>
+      <div class="cardsub">Applied to every item. A <b>safety</b> cert also sets the operator certificate on each item.</div>
+      <div class="ffield"><label>Safety</label>
+        <div class="chips"><span class="selchip safetycert" onclick="toggleCert(this)">TÜV</span><span class="selchip safetycert" onclick="toggleCert(this)">SPSP</span><span class="selchip safetycert" onclick="toggleCert(this)">SASO technical inspection</span></div>
+      </div>
+      <div class="ffield" style="margin-top:16px"><label>Other certificates</label>
+        <div class="chips"><span class="selchip" onclick="toggleChip(this)">Local content</span><span class="selchip" onclick="toggleChip(this)">SASO registration</span></div>
+      </div>
+    </div>
+
+    <div class="actionbar">
+      <button class="btn" onclick="go('intake')">Back</button><button class="btn primary" onclick="tryProject()">Continue <span class="material-icons-outlined">arrow_forward</span></button>
+    </div>
+  </section>
+
+  <!-- ============ STEP 2 EQUIPMENT ============ -->
+  <section id="screen-equipment" class="screen">
+    <div class="phead"><h1>Your equipment</h1><p>Each line from your RFQ is matched to available equipment. Most are sorted — just answer the quick questions below, then continue. Nothing is sent until you review it.</p></div>
+
+    <!-- request-wide settings (apply to every item) — shown above the summary -->
+    <div class="card">
+      <h3><span class="material-icons-outlined">tune</span> Settings for all items</h3>
+      <div class="cardsub">These apply to every item in your request — you can still override any of them per item.</div>
+      <div class="grid3">
+        <div class="ffield"><label>Delivery to site <span class="req">Required</span></label><div class="pchips"><span class="pchip on" onclick="pickChip(this)">Me</span><span class="pchip" onclick="pickChip(this)">Supplier</span></div></div>
+        <div class="ffield"><label>Return from site <span class="req">Required</span></label><div class="pchips"><span class="pchip on" onclick="pickChip(this)">Me</span><span class="pchip" onclick="pickChip(this)">Supplier</span></div></div>
+        <div class="ffield"><label>Fuel responsibility</label><div class="pchips"><span class="pchip on" onclick="pickChip(this)">Me</span><span class="pchip" onclick="pickChip(this)">Supplier</span></div></div>
+      </div>
+    </div>
+
+    <div class="eqflow">
+      <button class="eqnode amber sel" data-filter="attention" onclick="filterEq('attention')"><span class="nicon"><span class="material-symbols-rounded">hourglass_top</span></span><span class="nlbl">Needs your OK <b id="cntAtt">3</b></span></button>
+      <span class="line"></span>
+      <button class="eqnode green" data-filter="ready" onclick="filterEq('ready')"><span class="nicon"><span class="material-symbols-rounded">task_alt</span></span><span class="nlbl">Matched <b>19</b></span></button>
+      <span class="line"></span>
+      <button class="eqnode red" data-filter="unavail" onclick="filterEq('unavail')"><span class="nicon"><span class="material-symbols-rounded">block</span></span><span class="nlbl">Not available <b>2</b></span></button>
+      <span class="line"></span>
+      <button class="eqnode all" data-filter="all" onclick="filterEq('all')"><span class="nicon"><span class="material-symbols-rounded">apps</span></span><span class="nlbl">All items <b>24</b></span></button>
+    </div>
+
+    <div class="eqtip"><span class="material-icons-outlined">lightbulb</span><span>Confirm each match below. Once an item is <b>matched</b>, open its <b>Edit</b> to set operator, fuel and other details — you can still adjust anything before sending.</span></div>
+
+    <div id="eqCards">
+    <div class="listhead">
+      <span class="h" id="listLabel">2 quick questions for you</span>
+      <span class="bulk" id="bulkBtn" onclick="bulkConfirm()"><span class="material-icons-outlined">done_all</span> Yes to all</span>
+    </div>
+
+    <!-- need your OK: each anchored on the user's own words, asked as a plain question -->
+    <div class="erow attention" data-group="attention" id="rowCrane">
+      <div class="ic"><span class="material-icons-outlined">precision_manufacturing</span><span class="conf conf-mid" title="Pending your check"><span class="material-icons-outlined">pending</span></span></div>
+      <div class="main">
+        <div class="rfqmatch">
+          <span class="rfqfrom"><span class="rfqlabel">From your RFQ</span><span class="rfqtxt">“50 t hydraulic crane”</span></span>
+          <span class="material-icons-outlined arrow">arrow_forward</span>
+          <span class="matched">Mobile crane · 50 t</span>
+        </div>
+        <div class="qhint">Is this the right match? Approve it, or Edit the suggestion.</div>
+      </div>
+      <div class="right"><span class="statlbl a"><span class="dot a"></span> Needs OK</span><div class="acts"><button class="mini go" onclick="answerYes('rowCrane')"><span class="material-icons-outlined">check</span> Approve</button><button class="editbtn" onclick="editMatch('rowCrane',this)"><span class="material-icons-outlined">swap_horiz</span> Change match <span class="material-icons-outlined chev">expand_more</span></button><button class="rmbtn" title="Remove this item" onclick="askRemove('rowCrane','Mobile crane · 50 t')"><span class="material-icons-outlined">close</span></button></div></div>
+    </div>
+
+    <div class="erow attention" data-group="attention" id="rowLoader">
+      <div class="ic"><span class="material-icons-outlined">agriculture</span><span class="conf conf-mid" title="Pending your check"><span class="material-icons-outlined">pending</span></span></div>
+      <div class="main">
+        <div class="rfqmatch">
+          <span class="rfqfrom"><span class="rfqlabel">From your RFQ</span><span class="rfqtxt">“loader 30,000 lb”</span></span>
+          <span class="material-icons-outlined arrow">arrow_forward</span>
+          <span class="matched">Wheel loader · 13–14 t</span>
+        </div>
+        <div class="convert"><span class="material-icons-outlined">swap_horiz</span> Closest available size · your 30,000 lb ≈ 13.6 t</div>
+        <div class="qhint">Use this size? Approve it, or Edit the suggestion.</div>
+      </div>
+      <div class="right"><span class="statlbl a"><span class="dot a"></span> Needs OK</span><div class="acts"><button class="mini go" onclick="answerYes('rowLoader')"><span class="material-icons-outlined">check</span> Approve</button><button class="editbtn" onclick="editMatch('rowLoader',this)"><span class="material-icons-outlined">swap_horiz</span> Change match <span class="material-icons-outlined chev">expand_more</span></button><button class="rmbtn" title="Remove this item" onclick="askRemove('rowLoader','Wheel loader · 13–14 t')"><span class="material-icons-outlined">close</span></button></div></div>
+    </div>
+
+    <div class="erow attention" data-group="attention" id="rowGen">
+      <div class="ic"><span class="material-icons-outlined">bolt</span><span class="conf conf-mid" title="Pending your check"><span class="material-icons-outlined">pending</span></span></div>
+      <div class="main">
+        <div class="rfqmatch">
+          <span class="rfqfrom"><span class="rfqlabel">From your RFQ</span><span class="rfqtxt">“silent 250 kva genset”</span></span>
+          <span class="material-icons-outlined arrow">arrow_forward</span>
+          <span class="matched">Generator · 250 kVA</span>
+        </div>
+        <div class="qhint">Is this the right match? Approve it, or Edit the suggestion.</div>
+      </div>
+      <div class="right"><span class="statlbl a"><span class="dot a"></span> Needs OK</span><div class="acts"><button class="mini go" onclick="answerYes('rowGen')"><span class="material-icons-outlined">check</span> Approve</button><button class="editbtn" onclick="editMatch('rowGen',this)"><span class="material-icons-outlined">swap_horiz</span> Change match <span class="material-icons-outlined chev">expand_more</span></button><button class="rmbtn" title="Remove this item" onclick="askRemove('rowGen','Generator · 250 kVA')"><span class="material-icons-outlined">close</span></button></div></div>
+    </div>
+
+    <!-- not available -->
+    <div class="erow unavail hide" data-group="unavail" id="rowPlant">
+      <div class="ic"><span class="material-icons-outlined">foundation</span><span class="conf conf-low" title="Not available"><span class="material-icons-outlined">block</span></span></div>
+      <div class="main">
+        <div class="rfqmatch">
+          <span class="rfqfrom"><span class="rfqlabel">From your RFQ</span><span class="rfqtxt">“60 m³/h concrete batching plant”</span></span>
+          <span class="material-icons-outlined arrow">arrow_forward</span>
+          <span class="matched" style="color:var(--danger)">Not available yet</span>
+        </div>
+      </div>
+      <div class="right"><div class="acts"><button class="mini go" onclick="resolveUnavail('rowPlant','provide')"><span class="material-icons-outlined">chat</span> Provide it for me?</button><button class="mini muted" onclick="resolveUnavail('rowPlant','removed')">Cancel</button></div></div>
+    </div>
+    <div class="erow unavail hide" data-group="unavail" id="rowTower">
+      <div class="ic"><span class="material-icons-outlined">apartment</span><span class="conf conf-low" title="Not available"><span class="material-icons-outlined">block</span></span></div>
+      <div class="main">
+        <div class="rfqmatch">
+          <span class="rfqfrom"><span class="rfqlabel">From your RFQ</span><span class="rfqtxt">“tower crane 80m jib”</span></span>
+          <span class="material-icons-outlined arrow">arrow_forward</span>
+          <span class="matched" style="color:var(--danger)">Not available yet</span>
+        </div>
+      </div>
+      <div class="right"><div class="acts"><button class="mini go" onclick="resolveUnavail('rowTower','provide')"><span class="material-icons-outlined">chat</span> Provide it for me?</button><button class="mini muted" onclick="resolveUnavail('rowTower','removed')">Cancel</button></div></div>
+    </div>
+
+    <!-- ready (condensed) — still shows your words → what we'll request, so you can spot anything wrong -->
+    <div class="erow ready hide" data-group="ready" id="rowExc"><div class="ic"><span class="material-icons-outlined">construction</span><span class="conf conf-high" title="Matched — you can still edit"><span class="material-icons-outlined">check</span></span></div><div class="main"><div class="rfqmatch"><span class="rfqfrom"><span class="rfqlabel">From your RFQ</span><span class="rfqtxt">“20 ton excavator x2”</span></span><span class="material-icons-outlined arrow">arrow_forward</span><span class="matched">Excavator · 20–22 t</span></div><div class="qtyrow"><span class="qlbl">Qty</span><span class="qstep"><button type="button" onclick="qtyDelta(this,-1)">−</button><b>2</b><button type="button" onclick="qtyDelta(this,1)">+</button></span></div><div class="imeta"><span class="mtag"><span class="material-icons-outlined">person</span> Operator: <b>Yes</b></span><span class="mtag"><span class="material-icons-outlined">local_gas_station</span> Fuel: <b>Diesel</b></span></div></div><div class="right"><span class="statlbl g"><span class="dot g"></span> Matched</span><div class="acts"><button class="editbtn" onclick="toggleDetails('rowExc',this)"><span class="material-icons-outlined">tune</span> Edit <span class="material-icons-outlined chev">expand_more</span></button><button class="rmbtn" title="Remove" onclick="askRemove('rowExc','Excavator · 20–22 t')"><span class="material-icons-outlined">close</span></button></div></div></div>
+    <div class="erow ready hide" data-group="ready" id="rowTip"><div class="ic"><span class="material-icons-outlined">local_shipping</span><span class="conf conf-high" title="Matched — you can still edit"><span class="material-icons-outlined">check</span></span></div><div class="main"><div class="rfqmatch"><span class="rfqfrom"><span class="rfqlabel">From your RFQ</span><span class="rfqtxt">“30t tippers x4”</span></span><span class="material-icons-outlined arrow">arrow_forward</span><span class="matched">Tipper truck · 30 t</span></div><div class="qtyrow"><span class="qlbl">Qty</span><span class="qstep"><button type="button" onclick="qtyDelta(this,-1)">−</button><b>4</b><button type="button" onclick="qtyDelta(this,1)">+</button></span></div><div class="imeta"><span class="mtag"><span class="material-icons-outlined">person</span> Operator: <b>Yes</b></span><span class="mtag"><span class="material-icons-outlined">local_gas_station</span> Fuel: <b>Diesel</b></span></div></div><div class="right"><span class="statlbl g"><span class="dot g"></span> Matched</span><div class="acts"><button class="editbtn" onclick="toggleDetails('rowTip',this)"><span class="material-icons-outlined">tune</span> Edit <span class="material-icons-outlined chev">expand_more</span></button><button class="rmbtn" title="Remove" onclick="askRemove('rowTip','Tipper truck · 30 t')"><span class="material-icons-outlined">close</span></button></div></div></div>
+    <div class="erow ready hide" data-group="ready" id="rowTele"><div class="ic"><span class="material-icons-outlined">forklift</span><span class="conf conf-high" title="Matched — you can still edit"><span class="material-icons-outlined">check</span></span></div><div class="main"><div class="rfqmatch"><span class="rfqfrom"><span class="rfqlabel">From your RFQ</span><span class="rfqtxt">“telehandler 4t x2”</span></span><span class="material-icons-outlined arrow">arrow_forward</span><span class="matched">Telehandler · 4 t</span></div><div class="qtyrow"><span class="qlbl">Qty</span><span class="qstep"><button type="button" onclick="qtyDelta(this,-1)">−</button><b>2</b><button type="button" onclick="qtyDelta(this,1)">+</button></span></div><div class="imeta"><span class="mtag"><span class="material-icons-outlined">person</span> Operator: <b>Yes</b></span><span class="mtag"><span class="material-icons-outlined">local_gas_station</span> Fuel: <b>Diesel</b></span></div></div><div class="right"><span class="statlbl g"><span class="dot g"></span> Matched</span><div class="acts"><button class="editbtn" onclick="toggleDetails('rowTele',this)"><span class="material-icons-outlined">tune</span> Edit <span class="material-icons-outlined chev">expand_more</span></button><button class="rmbtn" title="Remove" onclick="askRemove('rowTele','Telehandler · 4 t')"><span class="material-icons-outlined">close</span></button></div></div></div>
+    <div class="additem" id="addItem" onclick="addNewItem()"><span class="material-icons-outlined">add</span> Add a missing item</div>
+    </div><!-- /eqCards -->
+    <div id="eqTableWrap" style="display:none"></div>
+
+    <div class="actionbar">
+      <button class="btn" onclick="go('project')">Back</button><button class="btn primary" onclick="tryEquip()">Continue <span class="material-icons-outlined">arrow_forward</span></button>
+    </div>
+  </section>
+
+  <!-- ============ STEP 3 PREFERENCES ============ -->
+  <section id="screen-preferences" class="screen">
+    <div class="phead"><h1>Preferences</h1><p>These apply to the whole request. Filled in from your RFQ — edit anything.</p></div>
+
+    <div class="card">
+      <h3><span class="material-icons-outlined">receipt_long</span> Core terms</h3>
+      <div class="grid2">
+        <div class="fld"><label>Payment terms</label><select><option>End of job</option><option>Upfront</option><option>Daily</option><option>Net 30</option><option>Net 60</option></select></div>
+        <div class="fld"><label>Payment method</label><select><option>Bank transfer</option><option>Cash</option></select></div>
+      </div>
+      <div class="grid2">
+        <div class="fld"><label>Maintenance</label><div class="seg2"><button class="on" onclick="slaShow(true)">Supplier</button><button onclick="slaShow(false)">Renter</button></div></div>
+        <div class="fld" id="slaField"><label>Response time <span class="opt">supplier maintenance</span></label><div class="seg2"><button class="on">4h</button><button>8h</button><button>24h</button><button>Custom</button></div></div>
+      </div>
+      <div class="fld" style="margin-bottom:0"><label>Additional notes <span class="opt">Optional</span></label><textarea style="min-height:70px">Any extra requirements from your RFQ appear here — editable.</textarea></div>
+    </div>
+
+    <div class="card">
+      <h3><span class="material-icons-outlined">tune</span> Optional extras</h3>
+      <div class="fld"><label>Budget ceiling <span class="opt">Optional · SAR</span></label><input class="input mono" style="max-width:220px" placeholder="e.g. SAR 250,000"></div>
+      <div class="fld"><label>Suppliers</label>
+        <div class="chips">
+          <span class="selchip on" onclick="toggleChip(this)"><span class="material-icons-outlined">verified</span> Verified suppliers only</span>
+          <span class="selchip" onclick="toggleChip(this)"><span class="material-icons-outlined">cached</span> Allow subletting / crosshire</span>
+        </div>
+      </div>
+      <div class="fld" style="margin-bottom:0"><label>How long suppliers have to bid</label><div class="seg2"><button>24h</button><button class="on">48h</button><button>72h</button><button>1 week</button></div></div>
+    </div>
+
+    <div class="actionbar">
+      <button class="btn" onclick="go('equipment')">Back</button><button class="btn primary" onclick="go('review')">Continue <span class="material-icons-outlined">arrow_forward</span></button>
+    </div>
+  </section>
+
+  <!-- ============ STEP 4 REVIEW ============ -->
+  <section id="screen-review" class="screen">
+    <div class="phead"><h1>Review and send</h1><p>Here's your full request. Send it once and every supplier can bid — you'll get one quotation covering all items.</p></div>
+    <div class="rc">
+      <div class="ch"><span><span class="material-icons-outlined">place</span> Project</span><span class="edit" onclick="go('project')"><span class="material-icons-outlined">edit</span> Edit</span></div>
+      <div class="kv"><span class="k">Location</span><span>Riyadh — King Abdullah Rd <span class="statlbl g" style="margin-left:6px"><span class="dot g"></span> confirmed</span></span><span class="k">Rental basis</span><span>Daily</span><span class="k">Hours / day</span><span class="mono">8 hrs</span><span class="k">Certificates</span><span>—</span></div>
+    </div>
+    <div class="rc">
+      <div class="ch"><span><span class="material-icons-outlined">construction</span> Equipment — <span id="reviewCount">22</span> items</span><span style="display:flex;gap:8px"><span class="edit" onclick="toast('Exported as .xlsx (demo)')"><span class="material-icons-outlined">download</span> Export</span><span class="edit" onclick="toast('Opening in Excel (demo)')"><span class="material-icons-outlined">grid_on</span> Open in Excel</span><span class="edit" onclick="go('equipment')"><span class="material-icons-outlined">edit</span> Edit</span></span></div>
+      <div style="padding:14px 16px" id="reviewTable"></div>
+      <div class="excl"><span class="material-icons-outlined">info</span><div><b>2 items not sent</b> — “Concrete batching plant” and “Tower crane 80 m” aren't available, so they're left off this request.</div></div>
+    </div>
+    <div class="rc">
+      <div class="ch"><span><span class="material-icons-outlined">tune</span> Preferences</span><span class="edit" onclick="go('preferences')"><span class="material-icons-outlined">edit</span> Edit</span></div>
+      <div class="kv"><span class="k">Payment</span><span>End of job · Bank transfer</span><span class="k">Maintenance</span><span>Supplier · respond in 4h</span><span class="k">Delivery & pickup</span><span>I'll handle it</span><span class="k">Suppliers</span><span>Verified only · bid window 48h</span></div>
+    </div>
+    <div class="actionbar">
+      <button class="btn" onclick="go('preferences')">Back</button><button class="btn primary lg" onclick="go('confirmation')"><span class="material-icons-outlined">send</span> Send request</button>
+    </div>
+  </section>
+
+  <!-- ============ CONFIRMATION ============ -->
+  <section id="screen-confirmation" class="screen">
+    <div class="done-wrap">
+      <div class="done-check"><span class="material-icons-outlined">check</span></div>
+      <h2>Your request is sent</h2>
+      <p>Suppliers can now see it and send bids. You'll get one quotation covering all the items in your request.</p>
+      <div class="done-card"><span class="material-icons-outlined">inventory_2</span> 22 items · Riyadh · starts 1 Jul 2026</div>
+      <div class="done-actions">
+        <button class="btn primary" onclick="restart()"><span class="material-icons-outlined">add</span> New request</button>
+        <button class="btn" onclick="restart()">Done</button>
+      </div>
+      <div class="laternote"><span class="material-icons-outlined">info</span><div>Tracking bids and managing this request on the web is coming soon. For now you'll continue with bids in the Moedatech app as usual.</div></div>
+    </div>
+  </section>
+
+</div>
+
+<!-- guest block (Flow 4) -->
+<div class="gov" id="guestOverlay">
+  <div class="modal">
+    <div class="lock"><span class="material-icons-outlined">lock</span></div>
+    <h3>Finish creating your account</h3>
+    <p>To send a request you need a full account. You're browsing as a guest — create your account to continue.</p>
+    <div class="row"><button class="btn primary" onclick="setView('renter')"><span class="material-icons-outlined">person_add</span> Create account</button><button class="btn" onclick="setView('renter')">Not now</button></div>
+  </div>
+</div>
+
+<!-- remove item confirmation -->
+<div class="gov" id="removeOverlay">
+  <div class="modal">
+    <div class="lock" style="background:var(--danger-bg)"><span class="material-icons-outlined" style="color:var(--danger)">delete_outline</span></div>
+    <h3>Remove this item?</h3>
+    <p><b id="removeName">This item</b> will be taken off your request. You can add it back later from “Add a missing item”.</p>
+    <div class="row"><button class="btn" onclick="closeRemove()">Cancel</button><button class="btn" style="background:var(--danger);border-color:var(--danger);color:#fff" onclick="doRemove()">Remove</button></div>
+  </div>
+</div>
+
+<div id="toast"><span class="material-icons-outlined">check_circle</span><span id="toastMsg"></span></div>
+
+<script>
+  var WIZARD={project:1,equipment:2,preferences:3,review:4};
+  var procRun=0, attention=3, curFilter='attention', locConfirmed=false;
+  function flashEl(el){ if(!el) return; el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); setTimeout(function(){el.classList.remove('flash')},950); }
+  function tryProject(){ if(!locConfirmed){ flashEl(document.getElementById('locCard')); toast(document.getElementById('locResolved').style.display==='none'?'Pick the correct location first':'Confirm the location first'); } else { go('equipment'); } }
+  function tryEquip(){ if(attention>0){ var r=document.querySelector('.erow.attention:not(.hide)'); if(!r){ filterEq('attention'); r=document.querySelector('.erow.attention:not(.hide)'); } flashEl(r); toast('Answer the '+attention+' '+(attention===1?'question':'questions')+' first'); } else { go('preferences'); } }
+  var ATT={rowCrane:'Mobile crane · 50 t', rowLoader:'Wheel loader · 13–14 t', rowGen:'Generator · 250 kVA'};
+  var origMain={}, origRight={}, origClass={};
+  function captureOriginals(){
+    ['rowCrane','rowLoader','rowGen','rowPlant','rowTower'].forEach(function(id){
+      var r=document.getElementById(id);
+      origMain[id]=r.querySelector('.main').innerHTML;
+      origRight[id]=r.querySelector('.right').innerHTML;
+      origClass[id]=r.className.replace(' hide','');
+    });
+  }
+
+  function go(id){
+    document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('on')});
+    document.getElementById('screen-'+id).classList.add('on');
+    var step=WIZARD[id], stp=document.getElementById('stepper');
+    if(step){
+      stp.classList.remove('hide');
+      stp.querySelectorAll('.s').forEach(function(el){
+        var n=+el.getAttribute('data-step'); el.classList.remove('active','done');
+        if(n<step){el.classList.add('done'); el.querySelector('.num').innerHTML='<span class="material-icons-outlined">check</span>';}
+        else{el.querySelector('.num').textContent=n; if(n===step) el.classList.add('active');}
+      });
+    } else { stp.classList.add('hide'); }
+    if(id==='processing') startProcessing();
+    if(id==='equipment'){ filterEq('attention'); updateAttention(); updateAllMeta(); }
+    if(id==='review'){ var rt=document.getElementById('reviewTable'); if(rt) rt.innerHTML=tableHTML({exclude:'unavail'}); }
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+
+  function startProcessing(){
+    var myRun=++procRun;
+    var stages=['stg1','stg2','stg3','stg4'];
+    stages.forEach(function(id){ document.getElementById(id).className='stage'; });
+    document.getElementById('loadFill').style.width='0';
+    document.getElementById('loadTitle').textContent='Reading your RFQ…';
+    document.getElementById('loadSub').textContent='This usually takes a few seconds — hang tight.';
+    var i=0;
+    (function step(){
+      if(myRun!==procRun) return;
+      if(i>0) document.getElementById(stages[i-1]).className='stage done';
+      if(i<stages.length){
+        document.getElementById(stages[i]).className='stage active';
+        document.getElementById('loadFill').style.width=((i+1)/stages.length*100)+'%';
+        i++; setTimeout(step,750);
+      } else {
+        document.getElementById('loadTitle').textContent='Done — your request is ready';
+        document.getElementById('loadSub').textContent='24 items found · 3 need a quick check · 2 not available.';
+        setTimeout(function(){ if(myRun===procRun) go('project'); },650);
+      }
+    })();
+  }
+
+  function pickLoc(val,src){
+    document.getElementById('locConflict').style.display='none';
+    document.getElementById('locResolved').style.display='block';
+    document.getElementById('mapLabel').textContent=val;
+    document.getElementById('locSrc').textContent='from '+src;
+    unconfirmLocation();
+    toast('Location set — now confirm it');
+  }
+  function resetLocation(){
+    document.getElementById('locConflict').style.display='block';
+    document.getElementById('locResolved').style.display='none';
+    locConfirmed=false;
+  }
+  function confirmLocation(){
+    document.getElementById('locConfirmBar').style.display='none';
+    document.getElementById('locConfirmed').style.display='flex';
+    locConfirmed=true;
+    toast('Location confirmed');
+  }
+  function unconfirmLocation(){
+    var bar=document.getElementById('locConfirmBar'); if(bar) bar.style.display='flex';
+    var c=document.getElementById('locConfirmed'); if(c) c.style.display='none';
+    locConfirmed=false;
+  }
+  function stepDays(d){ var el=document.getElementById('wdays'); var v=Math.max(1,Math.min(7,(+el.textContent)+d)); el.textContent=v; }
+  function openNewRequest(){ window.open(window.location.href,'_blank'); toast('Opened a new request in another tab'); }
+  function toggleChip(el){ el.classList.toggle('on'); }
+  function selBasis(el){ Array.prototype.forEach.call(el.parentNode.children,function(x){x.classList.remove('on')}); el.classList.add('on'); var b=document.getElementById('extBasis'); if(b) b.textContent=el.textContent.toLowerCase(); }
+  function slaShow(show){ var f=document.getElementById('slaField'); if(f) f.style.visibility=show?'visible':'hidden'; }
+  // full item list for the spreadsheet / RFQ-template view
+  var ITEMS=[
+    {rfq:'20 ton excavator x2', cat:'Earthmoving', type:'Excavator', size:'20–22 t', qty:2, op:'Yes', fuel:'Diesel', status:'Matched', attach:'Breaker + GP bucket'},
+    {rfq:'30t tippers x4', cat:'Haulage', type:'Tipper truck', size:'30 t', qty:4, op:'Yes', fuel:'Diesel', status:'Matched'},
+    {rfq:'telehandler 4t x2', cat:'Lifting', type:'Telehandler', size:'4 t', qty:2, op:'Yes', fuel:'Diesel', status:'Matched', attach:'Forks + jib'},
+    {rfq:'50 t hydraulic crane', cat:'Lifting', type:'Mobile crane', size:'50 t', qty:1, op:'Yes', fuel:'Diesel', status:'Needs OK'},
+    {rfq:'loader 30,000 lb', cat:'Earthmoving', type:'Wheel loader', size:'13–14 t', qty:1, op:'Yes', fuel:'Diesel', status:'Needs OK', attach:'GP bucket'},
+    {rfq:'silent 250 kva genset', cat:'Power', type:'Generator', size:'250 kVA', qty:1, op:'No', fuel:'Diesel', status:'Needs OK', note:'Silent'},
+    {rfq:'60 m³/h concrete batching plant', cat:'—', type:'Concrete batching plant', size:'—', qty:1, op:'—', fuel:'—', status:'Not available'},
+    {rfq:'tower crane 80m jib', cat:'—', type:'Tower crane', size:'80 m', qty:1, op:'—', fuel:'—', status:'Not available'},
+    {rfq:'forklift 3t x3', cat:'Lifting', type:'Forklift', size:'3 t', qty:3, op:'Yes', fuel:'Diesel', status:'Matched'},
+    {rfq:'air compressor 400 cfm', cat:'Power', type:'Air compressor', size:'400 cfm', qty:1, op:'No', fuel:'Diesel', status:'Matched'},
+    {rfq:'water truck 20000 l', cat:'Haulage', type:'Water truck', size:'20,000 L', qty:2, op:'Yes', fuel:'Diesel', status:'Matched'},
+    {rfq:'light tower x6', cat:'Power', type:'Light tower', size:'9 m', qty:6, op:'No', fuel:'Diesel', status:'Matched'},
+    {rfq:'skid steer loader', cat:'Earthmoving', type:'Skid-steer loader', size:'1 t', qty:2, op:'Yes', fuel:'Diesel', status:'Matched'},
+    {rfq:'dozer D6', cat:'Earthmoving', type:'Bulldozer', size:'Medium', qty:1, op:'Yes', fuel:'Diesel', status:'Matched'},
+    {rfq:'grader 14ft', cat:'Earthmoving', type:'Motor grader', size:'14 ft', qty:1, op:'Yes', fuel:'Diesel', status:'Matched'},
+    {rfq:'roller compactor', cat:'Earthmoving', type:'Roller', size:'12 t', qty:2, op:'Yes', fuel:'Diesel', status:'Matched'},
+    {rfq:'boom lift 20m', cat:'Lifting', type:'Boom lift', size:'20 m', qty:2, op:'No', fuel:'Diesel', status:'Matched'},
+    {rfq:'scissor lift 12m', cat:'Lifting', type:'Scissor lift', size:'12 m', qty:3, op:'No', fuel:'Electric', status:'Matched'},
+    {rfq:'flatbed trailer 40t', cat:'Haulage', type:'Flatbed trailer', size:'40 t', qty:1, op:'Yes', fuel:'Diesel', status:'Matched'},
+    {rfq:'lowbed trailer 60t', cat:'Haulage', type:'Lowbed trailer', size:'60 t', qty:1, op:'Yes', fuel:'Diesel', status:'Matched'},
+    {rfq:'concrete pump 36m', cat:'Lifting', type:'Concrete pump', size:'36 m', qty:1, op:'Yes', fuel:'Diesel', status:'Matched'},
+    {rfq:'backhoe loader', cat:'Earthmoving', type:'Backhoe loader', size:'8 t', qty:2, op:'Yes', fuel:'Diesel', status:'Matched'},
+    {rfq:'mini excavator 5t', cat:'Earthmoving', type:'Mini excavator', size:'5 t', qty:2, op:'Yes', fuel:'Diesel', status:'Matched'},
+    {rfq:'generator 100 kva', cat:'Power', type:'Generator', size:'100 kVA', qty:1, op:'No', fuel:'Diesel', status:'Matched'}
+  ];
+  // the renter's equipment spec sheet — the RFQ they export and send to suppliers (no match/status; not-available items excluded)
+  function tableHTML(){
+    var rows=ITEMS.filter(function(it){ return it.status!=='Not available'; });
+    var pcert=SHARED.certs.length?SHARED.certs.join(', '):'—';
+    var h='<div class="xwrap"><table class="xtable"><thead><tr><th>#</th><th>Equipment</th><th>Category</th><th>Size</th><th>Qty</th><th>Year</th><th>Operator</th><th>Fuel</th><th>Fuel resp.</th><th>Delivery</th><th>Return</th><th>Certificate</th><th>Notes</th></tr></thead><tbody>';
+    rows.forEach(function(it,i){ h+='<tr><td class="mono">'+(i+1)+'</td><td class="eqname">'+it.type+'</td><td>'+it.cat+'</td><td class="mono">'+it.size+'</td><td class="mono">'+it.qty+'</td><td class="mono">'+(it.year||'Any')+'</td><td>'+it.op+'</td><td>'+it.fuel+'</td><td>Me</td><td>Me</td><td>Me</td><td>'+(it.cert||pcert)+'</td><td>'+(it.note||'')+'</td></tr>'; });
+    h+='</tbody></table></div>';
+    return h;
+  }
+  // shared values that auto-populate every item's on-card summary
+  var SHARED={fuel:'Diesel',certs:[]};
+  // notes the agent pulled from the RFQ wording (NOT part of the taxonomy match) — e.g. "silent"
+  var AGENTNOTES={rowGen:'Silent'};
+  // agent-learned default: some equipment doesn't take an operator
+  function itemOperator(label){ var l=(label||'').toLowerCase(); if(l.indexOf('generator')>-1||l.indexOf('genset')>-1||l.indexOf('compressor')>-1||l.indexOf('light tower')>-1) return 'No'; return 'Yes'; }
+  function metaHTML(label,note){
+    var h='<span class="mtag"><span class="material-icons-outlined">person</span> Operator: <b>'+itemOperator(label)+'</b></span>';
+    h+='<span class="mtag"><span class="material-icons-outlined">local_gas_station</span> Fuel: <b>'+SHARED.fuel+'</b></span>';
+    if(SHARED.certs.length) h+='<span class="mtag"><span class="material-icons-outlined">verified</span> Cert: <b>'+SHARED.certs.join(', ')+'</b></span>';
+    if(note) h+='<span class="mtag"><span class="material-icons-outlined">sticky_note_2</span> Note: <b>'+note+'</b></span>';
+    return h;
+  }
+  function updateAllMeta(){ document.querySelectorAll('#screen-equipment .erow .imeta').forEach(function(m){ var row=m.closest('.erow'); var mt=row.querySelector('.matched'); m.innerHTML=metaHTML(mt?mt.textContent:'', AGENTNOTES[row.id]||''); }); }
+  function setConf(row,level){ var c=row.querySelector('.conf'); if(!c) return; c.className='conf conf-'+level; var ic={high:'check',mid:'pending',low:'block'}[level]||'check'; var g=c.querySelector('.material-icons-outlined'); if(g) g.textContent=ic; }
+  function pickSharedFuel(el,fuel){ Array.prototype.forEach.call(el.parentNode.children,function(x){x.classList.remove('on')}); el.classList.add('on'); SHARED.fuel=fuel; updateAllMeta(); toast('Fuel set for all items: '+fuel); }
+  function toggleCert(el){ el.classList.toggle('on'); SHARED.certs=Array.prototype.slice.call(document.querySelectorAll('.safetycert.on')).map(function(x){return x.textContent.trim();}); updateAllMeta(); toast(SHARED.certs.length?('Operator certificate set for all items: '+SHARED.certs.join(', ')):'Certificate cleared'); }
+  function setLang(l){
+    document.getElementById('langEn').classList.toggle('on', l==='en');
+    document.getElementById('langAr').classList.toggle('on', l==='ar');
+    document.documentElement.setAttribute('dir', l==='ar'?'rtl':'ltr');
+    toast(l==='ar'?'العربية — right-to-left (demo; copy stays English here)':'English');
+  }
+
+  function filterEq(g){
+    curFilter=g;
+    document.querySelectorAll('.eqnode').forEach(function(b){b.classList.toggle('sel', b.getAttribute('data-filter')===g);});
+    var cards=document.getElementById('eqCards'), tbl=document.getElementById('eqTableWrap');
+    if(g==='all'){ // spreadsheet view of every item
+      cards.style.display='none'; tbl.style.display='block';
+      tbl.innerHTML='<div class="listhead"><span class="h">Your equipment list · 22 items</span><span style="display:flex;gap:8px"><span class="bulk" onclick="toast(\'Exported as .xlsx (demo)\')"><span class="material-icons-outlined">download</span> Export</span><span class="bulk" onclick="toast(\'Opening in Excel (demo)\')"><span class="material-icons-outlined">grid_on</span> Open in Excel</span></span></div><div class="hint2" style="margin:0 2px 12px">Your RFQ, ready to export and send to suppliers. (2 not-available items are left out.)</div>'+tableHTML();
+      return;
+    }
+    cards.style.display='block'; tbl.style.display='none';
+    document.querySelectorAll('#eqCards [data-group]').forEach(function(el){ el.classList.toggle('hide', el.getAttribute('data-group')!==g); });
+    var att=attention;
+    var labels={attention:(att===1?'question for you':'questions for you'), ready:'items matched', unavail:'items not available'};
+    var counts={attention:att, ready:(19+(3-att)), unavail:2};
+    document.getElementById('listLabel').textContent = (g==='attention' && att===0) ? 'All caught up' : (counts[g]+' '+labels[g]);
+    document.getElementById('bulkBtn').style.display = (g==='attention') && att>1 ? 'inline-flex' : 'none';
+  }
+
+  function answerYes(rowId){
+    var label=ATT[rowId]; var row=document.getElementById(rowId);
+    if(row.getAttribute('data-group')!=='attention') return;
+    var d=row.querySelector('.idetails'); if(d) d.remove();
+    var rfq=row.querySelector('.rfqtxt') ? row.querySelector('.rfqtxt').innerHTML : '';
+    row.className='erow resolved'; row.setAttribute('data-group','ready');
+    row.querySelector('.main').innerHTML='<div class="rfqmatch"><span class="rfqfrom"><span class="rfqlabel">From your RFQ</span><span class="rfqtxt">'+rfq+'</span></span><span class="material-icons-outlined arrow">arrow_forward</span><span class="matched">'+label+'</span></div><div class="qtyrow"><span class="qlbl">Qty</span><span class="qstep"><button type="button" onclick="qtyDelta(this,-1)">−</button><b>1</b><button type="button" onclick="qtyDelta(this,1)">+</button></span></div><div class="imeta">'+metaHTML(label, AGENTNOTES[rowId]||'')+'</div>';
+    setConf(row,'high');
+    row.querySelector('.right').innerHTML='<span class="statlbl g"><span class="dot g"></span> Matched</span><div class="acts"><button class="editbtn" onclick="toggleDetails(\''+rowId+'\',this)"><span class="material-icons-outlined">tune</span> Edit <span class="material-icons-outlined chev">expand_more</span></button><button class="rmbtn" title="Remove" onclick="askRemove(\''+rowId+'\',\''+label+'\')"><span class="material-icons-outlined">close</span></button></div>';
+    attention=Math.max(0,attention-1); updateAttention();
+    if(curFilter==='attention') row.classList.add('hide');
+    toast('Added to your request: '+label);
+  }
+  function reEdit(rowId){
+    var row=document.getElementById(rowId);
+    row.className='erow attention'; row.setAttribute('data-group','attention');
+    row.querySelector('.main').innerHTML=origMain[rowId]; row.querySelector('.right').innerHTML=origRight[rowId];
+    attention++; updateAttention(); filterEq('attention'); openPicker(rowId);
+  }
+
+  function bulkConfirm(){
+    ['rowCrane','rowLoader','rowGen'].forEach(function(id){
+      if(document.getElementById(id).getAttribute('data-group')==='attention') answerYes(id);
+    });
+    toast('All set — added to your request');
+  }
+
+  // taxonomy (category → subcategory → measurement). Editing cascades: a higher level clears the levels below it.
+  var TAXO={
+    'Earthmoving':{ic:'construction',subs:{
+      'Excavator':{ic:'construction',sizes:['10–12 t','13–14 t','20–22 t','30–35 t']},
+      'Wheel loader':{ic:'agriculture',sizes:['11–12 t','13–14 t','15–16 t','18–20 t']},
+      'Bulldozer':{ic:'agriculture',sizes:['Small','Medium','Large']}}},
+    'Lifting':{ic:'precision_manufacturing',subs:{
+      'Mobile crane':{ic:'precision_manufacturing',sizes:['25 t','50 t','80 t','120 t']},
+      'Telehandler':{ic:'forklift',sizes:['4 t','6 t']},
+      'Tower crane':{ic:'apartment',sizes:['40 m','60 m','80 m']}}},
+    'Power':{ic:'bolt',subs:{
+      'Generator':{ic:'bolt',sizes:['100 kVA','250 kVA','500 kVA']}}},
+    'Haulage':{ic:'local_shipping',subs:{
+      'Tipper truck':{ic:'local_shipping',sizes:['20 t','30 t','40 t']}}}
+  };
+  var EDIT={};
+  // the agent's current mapping per item — used to pre-populate the cascade
+  var AGENTMAP={
+    rowCrane:{cat:'Lifting',sub:'Mobile crane',size:'50 t'},
+    rowLoader:{cat:'Earthmoving',sub:'Wheel loader',size:'13–14 t'},
+    rowGen:{cat:'Power',sub:'Generator',size:'250 kVA'}
+  };
+  function seedEdit(rowId){
+    var st={cat:null,sub:null,size:null,open:null};
+    if(AGENTMAP[rowId]){ st.cat=AGENTMAP[rowId].cat; st.sub=AGENTMAP[rowId].sub; st.size=AGENTMAP[rowId].size; }
+    else {
+      var mt=document.getElementById(rowId).querySelector('.matched'); var lbl=mt?(mt.textContent||'').split('×')[0].trim():'';
+      var parts=lbl.split('·'), sub=(parts[0]||'').trim(), size=(parts[1]||'').trim();
+      Object.keys(TAXO).forEach(function(c){ if(TAXO[c].subs[sub]){ st.cat=c; st.sub=sub; if(TAXO[c].subs[sub].sizes.indexOf(size)>-1) st.size=size; } });
+    }
+    EDIT[rowId]=st;
+  }
+  function openPicker(rowId){
+    var row=document.getElementById(rowId), det=row.querySelector('.idetails'); if(!det) return;
+    var existing=det.querySelector('.taxopick'); if(existing){ existing.remove(); return; }
+    seedEdit(rowId);
+    det.querySelector('.eqedit').insertAdjacentHTML('afterend','<div class="taxopick" id="tp_'+rowId+'"></div>');
+    renderTaxo(rowId);
+  }
+  function renderTaxo(rowId){
+    var st=EDIT[rowId], box=document.getElementById('tp_'+rowId); if(!box) return;
+    var h='<div class="tp-head">Re-map this item <span class="x material-icons-outlined" onclick="closeTaxo(\''+rowId+'\')">close</span></div>';
+    h+='<div class="tgrid">';
+    // Category — chips with icons
+    h+='<div class="tlevel"><div class="tl-label">Category</div><div class="tl-opts">';
+    Object.keys(TAXO).forEach(function(c){ h+='<span class="topt'+(st.cat===c?' on':'')+'" onclick="selCat(\''+rowId+'\',\''+c+'\')"><span class="material-icons-outlined">'+TAXO[c].ic+'</span>'+c+'</span>'; });
+    h+='</div></div>';
+    // Type — dropdown (icon per option)
+    h+='<div class="tlevel"><div class="tl-label">Type</div><div class="dd">';
+    if(st.cat){
+      var subs=TAXO[st.cat].subs;
+      h+='<button class="dd-btn" onclick="toggleDD(\''+rowId+'\',\'type\')">'+(st.sub?('<span class="material-icons-outlined">'+subs[st.sub].ic+'</span>'+st.sub):'<span class="ph">Select a type</span>')+'<span class="car material-icons-outlined">expand_more</span></button>';
+      if(st.open==='type'){ h+='<div class="dd-menu">'; Object.keys(subs).forEach(function(s){ h+='<div class="dd-opt" onclick="selSub(\''+rowId+'\',\''+s+'\')"><span class="material-icons-outlined">'+subs[s].ic+'</span>'+s+'</div>'; }); h+='</div>'; }
+    } else { h+='<button class="dd-btn" disabled><span class="ph">Choose a category first</span><span class="car material-icons-outlined">expand_more</span></button>'; }
+    h+='</div></div>';
+    // Size — dropdown (text only, no icons)
+    h+='<div class="tlevel"><div class="tl-label">Size</div><div class="dd">';
+    if(st.cat&&st.sub){
+      h+='<button class="dd-btn" onclick="toggleDD(\''+rowId+'\',\'size\')">'+(st.size?('<span class="mono">'+st.size+'</span>'):'<span class="ph">Select a size</span>')+'<span class="car material-icons-outlined">expand_more</span></button>';
+      if(st.open==='size'){ h+='<div class="dd-menu">'; TAXO[st.cat].subs[st.sub].sizes.forEach(function(sz){ h+='<div class="dd-opt sized" onclick="selSize(\''+rowId+'\',\''+sz+'\')">'+sz+'</div>'; }); h+='</div>'; }
+    } else { h+='<button class="dd-btn" disabled><span class="ph">Choose a type first</span><span class="car material-icons-outlined">expand_more</span></button>'; }
+    h+='</div></div>';
+    h+='</div>'; // close .tgrid
+    var ready=st.cat&&st.sub&&st.size;
+    h+='<div class="tp-foot"><button class="btn primary" '+(ready?'':'disabled')+' onclick="applyTaxo(\''+rowId+'\')">Use this equipment</button></div>';
+    box.innerHTML=h;
+  }
+  function toggleDD(rowId,which){ EDIT[rowId].open=(EDIT[rowId].open===which?null:which); renderTaxo(rowId); }
+  function selCat(rowId,c){ EDIT[rowId]={cat:c,sub:null,size:null,open:null}; renderTaxo(rowId); }   // cascade: clears Type + Size
+  function selSub(rowId,s){ EDIT[rowId].sub=s; EDIT[rowId].size=null; EDIT[rowId].open=null; renderTaxo(rowId); }   // cascade: clears Size
+  function selSize(rowId,sz){ EDIT[rowId].size=sz; EDIT[rowId].open=null; renderTaxo(rowId); }
+  function closeTaxo(rowId){ var b=document.getElementById('tp_'+rowId); if(b) b.remove(); }
+  function applyTaxo(rowId){
+    var st=EDIT[rowId]; if(!(st.cat&&st.sub&&st.size)) return;
+    closeTaxo(rowId);
+    chooseOption(rowId, st.sub+' · '+st.size);
+  }
+  function chooseOption(rowId,label){
+    var row=document.getElementById(rowId);
+    var p=row.querySelector('.picker'); if(p) p.remove();
+    if(row.getAttribute('data-group')==='attention'){ ATT[rowId]=label; answerYes(rowId); }
+    else {
+      var m=row.querySelector('.matched'); if(m) m.textContent=label;
+      var ev=row.querySelector('.ee-v'); if(ev) ev.textContent=label;
+      var sl=row.querySelector('.right .statlbl'); if(sl){ sl.className='statlbl g'; sl.innerHTML='<span class="dot g"></span> Matched'; }
+      var im=row.querySelector('.imeta'); if(im) im.innerHTML=metaHTML(label, AGENTNOTES[rowId]||'');
+      setConf(row,'high');
+      toast('Updated: '+label);
+    }
+  }
+
+
+  function resolveUnavail(rowId,how){
+    var row=document.getElementById(rowId); if(!row) return;
+    var words={provide:'We\'ll source it for you',removed:'Removed from request'};
+    row.classList.add('excluded');
+    row.querySelector('.right').innerHTML='<span class="statlbl r"><span class="dot r"></span> '+words[how]+'</span>';
+    toast(how==='provide'?'Opening WhatsApp — we\'ll source it for you':'Removed from request');
+  }
+
+  function updateAttention(){
+    document.getElementById('cntAtt').textContent=attention;
+    document.getElementById('bulkBtn').style.display = (attention>1 && (curFilter==='attention'||curFilter==='all')) ? 'inline-flex' : 'none';
+    if(curFilter==='attention'){ document.getElementById('listLabel').textContent = attention===0?'All caught up':(attention+' '+(attention===1?'question for you':'questions for you')); }
+  }
+
+  function setView(v){
+    var r=v==='renter';
+    document.getElementById('asRenter').classList.toggle('on', r);
+    document.getElementById('asGuest').classList.toggle('on', !r);
+    document.getElementById('acctTier').textContent = r?'VERIFIED':'GUEST';
+    document.getElementById('acctName').textContent = r?'Al-Khaleej Contracting':'Guest';
+    document.getElementById('acctAv').textContent = r?'AK':'G';
+    var ov=document.getElementById('guestOverlay');
+    if(!r){ go('intake'); ov.classList.add('on'); } else { ov.classList.remove('on'); }
+  }
+
+  function restart(){
+    attention=3;
+    ['rowCrane','rowLoader','rowGen','rowPlant','rowTower'].forEach(function(id){
+      var r=document.getElementById(id);
+      r.className=origClass[id];
+      r.setAttribute('data-group', origClass[id].indexOf('unavail')>-1?'unavail':'attention');
+      r.querySelector('.main').innerHTML=origMain[id];
+      r.querySelector('.right').innerHTML=origRight[id];
+    });
+    SHARED={fuel:'Diesel',certs:[]}; document.querySelectorAll('.safetycert.on').forEach(function(x){x.classList.remove('on')});
+    document.querySelectorAll('.erow.user-added').forEach(function(el){el.remove()});
+    document.querySelectorAll('.picker').forEach(function(el){el.remove()});
+    updateAttention();
+    var mr=document.getElementById('moreReady'); if(mr) mr.style.display='';
+    resetLocation();
+    setView('renter'); go('intake');
+  }
+
+  var toastT;
+  function toast(msg){var t=document.getElementById('toast'); document.getElementById('toastMsg').textContent=msg; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(function(){t.classList.remove('on')},2200);}
+
+  // generic segmented controls (everywhere)
+  document.addEventListener('click',function(e){
+    var b=e.target.closest('.seg2 button'); if(!b) return;
+    Array.prototype.forEach.call(b.parentNode.children,function(x){x.classList.remove('on')}); b.classList.add('on');
+  });
+  // intake: add / remove files
+  var fileN=2;
+  function addFile(){ fileN++; document.getElementById('fileList').insertAdjacentHTML('beforeend','<span class="file"><span class="material-icons-outlined">description</span> file-'+fileN+'.pdf <span class="sz mono">'+(80+fileN*7)+' KB</span> <span class="x material-icons-outlined" onclick="this.closest(\'.file\').remove()">close</span></span>'); toast('File added'); }
+  // project: location + more options
+  function selectLoc(el,label){ Array.prototype.forEach.call(el.parentNode.children,function(x){x.classList.remove('on')}); el.classList.add('on'); document.getElementById('mapLabel').textContent=label; unconfirmLocation(); }
+  // equipment: add a missing item
+  var addId=0;
+  function addNewItem(){
+    var a=document.getElementById('addItem'), rid='rowAdd'+(++addId);
+    var meta='<div class="imeta">'+metaHTML()+'</div>';
+    a.insertAdjacentHTML('beforebegin','<div class="erow ready user-added" data-group="ready" id="'+rid+'"><div class="ic"><span class="material-icons-outlined">add</span><span class="conf conf-high" title="Added by you"><span class="material-icons-outlined">check</span></span></div><div class="main"><div class="rfqmatch"><span class="rfqfrom"><span class="rfqlabel">Added by you</span><span class="rfqtxt">New equipment</span></span><span class="material-icons-outlined arrow">arrow_forward</span><span class="matched">Pick equipment</span></div><div class="qtyrow"><span class="qlbl">Qty</span><span class="qstep"><button type="button" onclick="qtyDelta(this,-1)">−</button><b>1</b><button type="button" onclick="qtyDelta(this,1)">+</button></span></div>'+meta+'</div><div class="right"><span class="statlbl g"><span class="dot g"></span> New</span><div class="acts"><button class="editbtn open" onclick="toggleDetails(\''+rid+'\',this)"><span class="material-icons-outlined">tune</span> Edit <span class="material-icons-outlined chev">expand_more</span></button><button class="rmbtn" title="Remove" onclick="askRemove(\''+rid+'\',\'this item\')"><span class="material-icons-outlined">close</span></button></div></div></div>');
+    if(curFilter!=='all'&&curFilter!=='ready'){ filterEq('all'); }
+    var row=document.getElementById(rid);
+    row.insertAdjacentHTML('beforeend', detailsHTML(rid)); // same Edit form as every item
+    openPicker(rid);                                       // open Category → Type → Size cascade
+    row.scrollIntoView({behavior:'smooth',block:'center'});
+    toast('Pick the equipment for your new item');
+  }
+  // stepper: jump to a reached step
+  function stepGo(n){ var el=document.querySelector('#stepper .s[data-step="'+n+'"]'); if(el && (el.classList.contains('done')||el.classList.contains('active'))){ go({1:'project',2:'equipment',3:'preferences',4:'review'}[n]); } }
+
+  // per-item details (operator + subfields, fuel diesel default, model, year)
+  function detailsHTML(rowId){
+    var m=document.getElementById(rowId).querySelector('.matched');
+    var cur=ATT[rowId]||(m?m.textContent.trim():'');
+    return '<div class="idetails">'+
+      // Equipment (picker opens right under this row)
+      '<div class="dsec">'+
+        '<div class="dseclabel">Equipment</div>'+
+        '<div class="eqedit"><div class="ee-v">'+cur+'</div><button class="editbtn" onclick="openPicker(\''+rowId+'\')"><span class="material-icons-outlined">swap_horiz</span> Change</button></div>'+
+      '</div>'+
+      // Operator
+      '<div class="dsec">'+
+        '<div class="opcard">'+
+          '<div class="ophead"><span class="lft"><span class="material-icons-outlined">person</span> Operator needed</span><span class="tgl on" onclick="opToggle(this)"></span></div>'+
+          '<div class="opbody">'+
+            '<div class="frow"><span class="fl">Night shift</span><span class="tgl" onclick="toggleSwitch(this)"></span></div>'+
+            '<div class="frow"><span class="fl">Nationality</span><div class="pchips"><span class="pchip on" onclick="pickChip(this)">Any</span><span class="pchip" onclick="pickChip(this)">Non-Arab</span><span class="pchip" onclick="pickChip(this)">Arab</span></div></div>'+
+            '<div class="frow"><span class="fl">Certificate</span><div class="pchips"><span class="pchip" onclick="pickChip(this)">SPSP</span><span class="pchip" onclick="pickChip(this)">TÜV</span><span class="pchip" onclick="pickChip(this)">Certified</span></div></div>'+
+            '<div class="frow"><span class="fl">Accommodation &amp; transport</span><div class="pchips"><span class="pchip on" onclick="pickChip(this)">Me</span><span class="pchip" onclick="pickChip(this)">Supplier</span></div></div>'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+      // Fuel
+      '<div class="dsec">'+
+        '<div class="dseclabel">Fuel</div>'+
+        '<div class="grid2">'+
+          '<div class="ffield"><label>Fuel type</label><div class="pchips"><span class="pchip on" onclick="pickChip(this)">Diesel</span><span class="pchip" onclick="pickChip(this)">Petrol</span><span class="pchip" onclick="pickChip(this)">Electric</span></div></div>'+
+          '<div class="ffield"><label>Fuel responsibility</label><div class="pchips"><span class="pchip on" onclick="pickChip(this)">Me</span><span class="pchip" onclick="pickChip(this)">Supplier</span></div></div>'+
+        '</div>'+
+      '</div>'+
+      // Additional notes (per item) — agent pulls qualifiers like "silent" from the RFQ wording
+      '<div class="dsec">'+
+        '<div class="dseclabel">Additional notes</div>'+
+        '<textarea class="sinp" style="min-height:58px" placeholder="e.g. silent, low-emission, specific attachment…">'+(AGENTNOTES[rowId]||'')+'</textarea>'+
+        '<div class="hint2">Pulled from your RFQ wording — kept as a note, not part of the equipment match.</div>'+
+      '</div>'+
+      '<div class="applyall" onclick="toast(\'Applied to all items\')"><span class="material-icons-outlined">done_all</span> Apply these settings to all items</div>'+
+    '</div>';
+  }
+  function toggleDetails(rowId, btn){
+    var row=document.getElementById(rowId);
+    var ex=row.querySelector('.idetails');
+    if(ex){ ex.remove(); if(btn) btn.classList.remove('open'); return; }
+    row.insertAdjacentHTML('beforeend', detailsHTML(rowId));
+    if(btn) btn.classList.add('open');
+  }
+  // needs-OK items: Edit changes ONLY the suggested match (the taxonomy cascade), not the full item
+  function editMatch(rowId, btn){
+    var row=document.getElementById(rowId);
+    var ex=row.querySelector('.idetails');
+    if(ex){ ex.remove(); if(btn) btn.classList.remove('open'); return; }
+    seedEdit(rowId);
+    row.insertAdjacentHTML('beforeend','<div class="idetails"><div class="taxopick" id="tp_'+rowId+'"></div></div>');
+    renderTaxo(rowId);
+    if(btn) btn.classList.add('open');
+  }
+  function opToggle(el){ el.classList.toggle('on'); var b=el.closest('.opcard').querySelector('.opbody'); b.style.display=el.classList.contains('on')?'block':'none'; }
+  function toggleSwitch(el){ el.classList.toggle('on'); }
+  function pickChip(el){ Array.prototype.forEach.call(el.parentNode.children,function(x){x.classList.remove('on')}); el.classList.add('on'); }
+  function qtyDelta(btn,d){ var b=btn.parentNode.querySelector('b'); b.textContent=Math.max(1,(+b.textContent)+d); }
+
+  // remove an item, with confirmation
+  var pendingRemove=null;
+  function askRemove(rowId,label){ pendingRemove=rowId; document.getElementById('removeName').textContent=label; document.getElementById('removeOverlay').classList.add('on'); }
+  function closeRemove(){ document.getElementById('removeOverlay').classList.remove('on'); pendingRemove=null; }
+  function doRemove(){ if(pendingRemove){ var r=document.getElementById(pendingRemove); if(r) r.remove(); toast('Item removed from request'); } closeRemove(); }
+
+  captureOriginals();
+  go('intake');
+</script>
+</body>
+</html>

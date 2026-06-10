@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+/* Material Icons fonts are loaded via <link> in layout.tsx (Tailwind v4 inlines its own
+   import, which would push CSS @imports out of legal position). */
+
+/* Moedatech Design System v3 palette (from the web-app/002 prototype). */
+:root {
+  --navy: #1c3550;
+  --navy-mid: #2a4f72;
+  --gold: #b8860b;
+  --background: #f5f8fc;
+  --surface: #ffffff;
+  --surface2: #eff4f9;
+  --surface3: #e4edf5;
+  --foreground: #1c3550;
+  --muted: #6b8fa8;
+  --border: #d4e0ec;
+  --brand: #f79009; /* action orange — primary CTA */
+  --brand-fg: #ffffff;
+  --brand-soft: #fff4e5;
+  --warn: #d4780a;
+  --warn-soft: #fff3e0;
+  --danger: #d9362a;
+  --danger-soft: #fcebea;
+  --ok: #1daf58;
+  --ok-soft: #e7f7ee;
+  --info: #1a7ec8;
+  --info-soft: #e6f2fb;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface2: var(--surface2);
+  --color-surface3: var(--surface3);
+  --color-foreground: var(--foreground);
+  --color-navy: var(--navy);
+  --color-navy-mid: var(--navy-mid);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-brand: var(--brand);
+  --color-brand-fg: var(--brand-fg);
+  --color-brand-soft: var(--brand-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-plex);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter), -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Arabic uses Tajawal; layout is RTL-capable via logical properties (AC-46, flag-gated). */
+:lang(ar) body,
+[dir="rtl"] body {
+  font-family: var(--font-tajawal), var(--font-inter), sans-serif;
+}
+
+.material-symbols-rounded {
+  font-variation-settings: "opsz" 24, "wght" 500, "FILL" 0, "GRAD" 0;
+  line-height: 1;
+}
+.tabular {
+  font-family: var(--font-plex), monospace;
+}
