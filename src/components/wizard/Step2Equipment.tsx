@@ -27,12 +27,26 @@ export function Step2Equipment() {
     return c;
   }, [items]);
 
-  const [filter, setFilter] = useState<Group>("all");
+  // Default to a single group (never "all" together) — lead with whatever needs attention,
+  // matching the prototype's "Needs your OK" default. The renter switches via the nodes.
+  const initialFilter = useMemo<Group>(() => {
+    if (counts["needs-ok"]) return "needs-ok";
+    if (counts["not-available"]) return "not-available";
+    if (counts.matched) return "matched";
+    return "all";
+  }, [counts]);
+  const [filter, setFilter] = useState<Group | null>(null);
   if (!draft) return null;
 
+  const activeFilter: Group = filter ?? initialFilter;
   const project = draft.project;
   const gate = gateStep2(draft.items);
-  const visible = items.filter((i) => filter === "all" || groupOf(i) === filter);
+  const visible = items.filter((i) => activeFilter === "all" || groupOf(i) === activeFilter);
+  const activeNode = { "needs-ok": t.step2.filterNeedsOk, matched: t.step2.filterMatched, "not-available": t.step2.filterNotAvailable, all: t.step2.filterAll }[activeFilter];
+
+  function approveAll() {
+    items.filter((i) => groupOf(i) === "needs-ok").forEach((i) => actions.approveSuggestion(i.id));
+  }
 
   const partyOpts = PARTIES.map((p) => ({ value: p, label: t.options.party[p] }));
 
@@ -69,7 +83,7 @@ export function Step2Equipment() {
       {/* Triage filter nodes with counts. */}
       <div className="my-5 flex items-start gap-1 px-2">
         {nodes.map((n, idx) => {
-          const sel = filter === n.key;
+          const sel = activeFilter === n.key;
           const tone: Record<string, string> = {
             warn: sel ? "bg-warn text-white" : "bg-warn-soft text-warn",
             ok: sel ? "bg-ok text-white" : "bg-ok-soft text-ok",
@@ -99,10 +113,24 @@ export function Step2Equipment() {
 
       {!gate.ok && <p className="mb-3 rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn">{t.step2.blockedNote}</p>}
 
+      {/* Group header — shows the active group + count, with "Approve all" on the Needs-your-OK group. */}
+      <div className="mb-3 mt-1 flex items-center justify-between px-1">
+        <span className="text-[13px] font-bold text-navy">
+          {activeNode} <span className="text-muted">({visible.length})</span>
+        </span>
+        {activeFilter === "needs-ok" && visible.length > 0 && (
+          <button className="inline-flex items-center gap-1.5 text-[12.5px] font-bold text-brand" onClick={approveAll}>
+            <Icon name="done_all" size={16} /> {t.step2.approveAll}
+          </button>
+        )}
+      </div>
+
       <ul className="space-y-2">
-        {visible.map((item) => (
-          <ItemRow key={item.id} item={item} taxonomy={taxonomy} />
-        ))}
+        {visible.length === 0 ? (
+          <li className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted">{t.step2.groupEmpty}</li>
+        ) : (
+          visible.map((item) => <ItemRow key={item.id} item={item} taxonomy={taxonomy} />)
+        )}
       </ul>
 
       <button className="mt-2 inline-flex items-center gap-2 py-2.5 text-sm font-bold text-navy-mid" onClick={() => actions.addItem()}>

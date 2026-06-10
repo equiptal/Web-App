@@ -121,6 +121,8 @@ export const ar: Dictionary = {
     filterMatched: "مطابَق",
     filterNotAvailable: "غير متوفر",
     triageTip: "أكّد كل مطابقة. بمجرد مطابقة العنصر، افتح تعديل لضبط المُشغّل والوقود وبقية التفاصيل.",
+    approveAll: "اعتماد الكل",
+    groupEmpty: "لا يوجد شيء هنا.",
     status: {
       matched: "مطابَق",
       needsOk: "بحاجة إلى موافقتك",

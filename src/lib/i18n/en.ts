@@ -120,6 +120,8 @@ export const en = {
     filterMatched: "Matched",
     filterNotAvailable: "Not available",
     triageTip: "Confirm each match. Once an item is matched, open Edit to set operator, fuel and other details.",
+    approveAll: "Approve all",
+    groupEmpty: "Nothing here.",
     status: {
       matched: "Matched", // AC-54 / AC-30
       needsOk: "Needs your OK", // AC-54
