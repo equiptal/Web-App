@@ -155,7 +155,13 @@ export function Step2Equipment() {
         )}
       </ul>
 
-      <button className="mt-2 inline-flex items-center gap-2 py-2.5 text-sm font-bold text-navy-mid" onClick={() => actions.addItem()}>
+      <button
+        className="mt-2 inline-flex items-center gap-2 py-2.5 text-sm font-bold text-navy-mid"
+        onClick={() => {
+          actions.addItem();
+          setFilter("needs-ok"); // new item starts in Need-OK with its picker open — jump there so it's visible
+        }}
+      >
         <Icon name="add" size={18} className="text-brand" /> {t.step2.addItem}
       </button>
     </div>

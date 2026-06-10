@@ -8,6 +8,7 @@ import {
   EquipmentItem,
   Taxonomy,
   resolveRef,
+  isCompleteRef,
   FUEL_TYPES,
   SAFETY_CERTIFICATES,
   PARTIES,
@@ -141,7 +142,7 @@ export function ItemRow({ item, taxonomy, sharedFuelResp }: { item: EquipmentIte
         <div className="flex gap-1.5">
           {status === "needs-ok" ? (
             <>
-              <Button onClick={() => (item.suggestion ? actions.approveSuggestion(item.id) : actions.approveItem(item.id))}>
+              <Button disabled={!isCompleteRef(item.ref)} onClick={() => (item.suggestion ? actions.approveSuggestion(item.id) : actions.approveItem(item.id))}>
                 <Icon name="check" size={15} /> {t.common.approve}
               </Button>
               <Button variant="secondary" onClick={() => setEditingMatch((e) => !e)}>
@@ -159,7 +160,7 @@ export function ItemRow({ item, taxonomy, sharedFuelResp }: { item: EquipmentIte
         </div>
       </div>
 
-      {editingMatch && taxonomyEditor}
+      {(editingMatch || !isCompleteRef(item.ref)) && taxonomyEditor}
 
       {/* Per-item details — editable only once Matched (AC-54). Mirrors the prototype:
           operator card + fuel + notes. Delivery/return are request-wide only (Settings for all

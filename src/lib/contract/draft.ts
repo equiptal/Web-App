@@ -216,8 +216,10 @@ export function newManualItem(id: string): EquipmentItem {
     id,
     rawLabel: null,
     ref: { ...EMPTY_REF },
-    verdict: "confident", // manually added ⇒ no agent verdict to resolve
-    resolved: true,
+    // Manually added: starts unresolved (Need-OK) with an empty match so the renter picks
+    // category → subtype → size; it auto-resolves to Matched once the ref is complete (AC-22).
+    verdict: "needs-validation",
+    resolved: false,
     removed: false,
     quantity: 1,
     operatorNeeded: "yes",
