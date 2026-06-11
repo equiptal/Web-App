@@ -194,7 +194,6 @@ export function Step1Project() {
 
       {/* ---------- Certificates (AC-50) ---------- */}
       <Card title={<><Icon name="verified" size={18} className="me-1.5 align-[-3px] text-navy-mid" />{t.step1.certificates.card}</>}>
-        <p className="-mt-2 mb-3 text-[12.5px] text-muted">{t.step1.certificates.safetyAppliesNote}</p>
         <Field label={t.step1.certificates.safety}>
           <SelChips<SafetyCertificate>
             values={project.certificates.safety}

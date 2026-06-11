@@ -114,7 +114,6 @@ export const ar: Dictionary = {
       card: "الشهادات",
       safety: "السلامة",
       other: "شهادات أخرى",
-      safetyAppliesNote: "اختيار شهادة سلامة يضبطها على مُشغّل كل عنصر.",
     },
     requestWide: {
       delivery: "التوصيل إلى الموقع",

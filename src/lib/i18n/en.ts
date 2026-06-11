@@ -113,7 +113,6 @@ export const en = {
       card: "Certificates",
       safety: "Safety",
       other: "Other certificates",
-      safetyAppliesNote: "Selecting a safety certificate sets it on every item's operator.",
     },
     requestWide: {
       delivery: "Delivery to site",
