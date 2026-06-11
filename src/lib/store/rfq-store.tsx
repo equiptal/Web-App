@@ -134,7 +134,7 @@ function reducer(state: RfqState, a: Action): RfqState {
         draft: {
           project: a.draft.project,
           items: a.draft.items,
-          preferences: defaultPreferences(),
+          preferences: a.draft.preferences ?? defaultPreferences(), // agent-inferred Step-3 prefs when present
           detectedLocations: a.draft.detectedLocations,
           summary: a.draft.summary,
         },
@@ -150,7 +150,12 @@ function reducer(state: RfqState, a: Action): RfqState {
     case "GO_STEP":
       return { ...state, step: a.step };
     case "PATCH_LOCATION":
-      return withDraft(state, (d) => ({ ...d, project: { ...d.project, location: { ...d.project.location, ...a.patch } } }));
+      // AC-16: changing the location (map/search/GPS) invalidates a prior confirmation — require a
+      // fresh confirm. The patch can still set `confirmed` explicitly (e.g. the "Change" button).
+      return withDraft(state, (d) => ({
+        ...d,
+        project: { ...d.project, location: { ...d.project.location, ...a.patch, confirmed: a.patch.confirmed ?? false } },
+      }));
     case "CONFIRM_LOCATION":
       return withDraft(state, (d) => ({ ...d, project: { ...d.project, location: { ...d.project.location, confirmed: true } } }));
     case "RESOLVE_LOCATION_CONFLICT":
@@ -176,15 +181,27 @@ function reducer(state: RfqState, a: Action): RfqState {
       return withDraft(state, (d) => {
         const certificates = { ...d.project.certificates, ...a.patch };
         let items = d.items;
-        // AC-50: selecting a Safety certificate sets the operator certificate on every item.
+        // AC-50: the project Safety certificate applies to every item's operator — EXCEPT items the
+        // agent already set a cert on from the RFQ (those keep theirs). Fills/updates the rest.
         if (a.patch.safety) {
           const cert = a.patch.safety[a.patch.safety.length - 1] ?? null;
-          items = d.items.map((i) => ({ ...i, operator: { ...i.operator, certificate: cert } }));
+          items = d.items.map((i) => (i.operator.certByAgent ? i : { ...i, operator: { ...i.operator, certificate: cert } }));
         }
         return { ...d, project: { ...d.project, certificates }, items };
       });
     case "PATCH_REQUESTWIDE":
-      return withDraft(state, (d) => ({ ...d, project: { ...d.project, ...a.patch } }));
+      // Choosing a request-wide value applies it to ALL items — clear that field's per-item
+      // overrides so every item follows the shared setting (AC-25/26).
+      return withDraft(state, (d) => ({
+        ...d,
+        project: { ...d.project, ...a.patch },
+        items: d.items.map((i) => ({
+          ...i,
+          ...(a.patch.deliveryToSite !== undefined ? { deliveryOverride: null } : {}),
+          ...(a.patch.returnFromSite !== undefined ? { returnOverride: null } : {}),
+          ...(a.patch.fuelResponsibility !== undefined ? { fuelResponsibilityOverride: null } : {}),
+        })),
+      }));
     case "PATCH_ITEM":
       return withDraft(state, (d) => mapItem(d, a.id, (i) => ({ ...i, ...a.patch })));
     case "PATCH_ITEM_OPERATOR":

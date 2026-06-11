@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { Card, Field, Icon, MIcon, RadioGroup } from "@/components/ui";
-import { gateStep2, PARTIES, type EquipmentItem, type Party } from "@/lib/contract";
+import { gateStep2, isCompleteRef, PARTIES, type EquipmentItem, type Party } from "@/lib/contract";
 import { ItemRow } from "@/components/wizard/ItemRow";
 
 type Group = "all" | "needs-ok" | "matched" | "not-available";
@@ -27,12 +27,47 @@ export function Step2Equipment() {
     return c;
   }, [items]);
 
-  const [filter, setFilter] = useState<Group>("all");
+  // Default to a single group (never "all" together) — lead with whatever needs attention,
+  // matching the prototype's "Needs your OK" default. The renter switches via the nodes.
+  const initialFilter = useMemo<Group>(() => {
+    if (counts["needs-ok"]) return "needs-ok";
+    if (counts.matched) return "matched";
+    if (counts["not-available"]) return "not-available";
+    return "all";
+  }, [counts]);
+  const [filter, setFilter] = useState<Group | null>(null);
+
+  // After the renter clears Need-OK (approves all), surface Matched next — not Not-available.
+  useEffect(() => {
+    if ((filter ?? initialFilter) === "needs-ok" && counts["needs-ok"] === 0 && counts.matched > 0) setFilter("matched");
+  }, [filter, initialFilter, counts]);
+
   if (!draft) return null;
 
+  const activeFilter: Group = filter ?? initialFilter;
   const project = draft.project;
   const gate = gateStep2(draft.items);
-  const visible = items.filter((i) => filter === "all" || groupOf(i) === filter);
+  const visible = items.filter((i) => activeFilter === "all" || groupOf(i) === activeFilter);
+  const activeNode = { "needs-ok": t.step2.filterNeedsOk, matched: t.step2.filterMatched, "not-available": t.step2.filterNotAvailable, all: t.step2.filterAll }[activeFilter];
+
+  // In-process "back" through the triage groups (separate from the wizard's Back-to-Project).
+  const seq: Exclude<Group, "all">[] = ["needs-ok", "matched", "not-available"];
+  const seqIdx = seq.indexOf(activeFilter as Exclude<Group, "all">);
+  const prevGroup = seqIdx > 0 ? [...seq.slice(0, seqIdx)].reverse().find((g) => counts[g] > 0) : undefined;
+
+  // Approve all: only resolve items that end up with a complete taxonomy ref — either they carry a
+  // nearest-size suggestion (approveSuggestion fills the measurement) or their ref is already
+  // complete. Items still missing a size (no suggestion) are LEFT in Needs-your-OK so the renter must
+  // pick a size — they can't be bulk-approved without one.
+  function approveAll() {
+    items
+      .filter((i) => groupOf(i) === "needs-ok")
+      .forEach((i) => {
+        if (i.suggestion) actions.approveSuggestion(i.id);
+        else if (isCompleteRef(i.ref)) actions.approveItem(i.id);
+        // else: missing size, no suggestion → skip (stays in Needs your OK).
+      });
+  }
 
   const partyOpts = PARTIES.map((p) => ({ value: p, label: t.options.party[p] }));
 
@@ -45,9 +80,20 @@ export function Step2Equipment() {
 
   return (
     <div>
-      <div className="mb-5">
-        <h1 className="text-[23px] font-extrabold tracking-tight">{t.step2.title}</h1>
-        <p className="mt-1 max-w-xl text-sm text-muted">{t.step2.subtitle}</p>
+      <div className="mb-5 flex items-start gap-3">
+        {prevGroup && (
+          <button
+            onClick={() => setFilter(prevGroup)}
+            title={t.common.back}
+            className="mt-1 grid h-9 w-9 flex-none place-items-center rounded-full border border-border text-navy-mid transition hover:bg-surface2"
+          >
+            <Icon name="arrow_back" size={20} />
+          </button>
+        )}
+        <div>
+          <h1 className="text-[23px] font-extrabold tracking-tight">{t.step2.title}</h1>
+          <p className="mt-1 max-w-xl text-sm text-muted">{t.step2.subtitle}</p>
+        </div>
       </div>
 
       {/* Request-wide settings (AC-25/26) — apply to every item, per-item overridable. */}
@@ -69,7 +115,7 @@ export function Step2Equipment() {
       {/* Triage filter nodes with counts. */}
       <div className="my-5 flex items-start gap-1 px-2">
         {nodes.map((n, idx) => {
-          const sel = filter === n.key;
+          const sel = activeFilter === n.key;
           const tone: Record<string, string> = {
             warn: sel ? "bg-warn text-white" : "bg-warn-soft text-warn",
             ok: sel ? "bg-ok text-white" : "bg-ok-soft text-ok",
@@ -99,13 +145,42 @@ export function Step2Equipment() {
 
       {!gate.ok && <p className="mb-3 rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn">{t.step2.blockedNote}</p>}
 
+      {/* Group header — shows the active group + count, with "Approve all" on the Needs-your-OK group. */}
+      <div className="mb-3 mt-1 flex items-center justify-between px-1">
+        <span className="text-[13px] font-bold text-navy">
+          {activeNode} <span className="text-muted">({visible.length})</span>
+        </span>
+        {activeFilter === "needs-ok" && visible.length > 0 && (
+          <button className="inline-flex items-center gap-1.5 text-[12.5px] font-bold text-brand" onClick={approveAll}>
+            <Icon name="done_all" size={16} /> {t.step2.approveAll}
+          </button>
+        )}
+      </div>
+
       <ul className="space-y-2">
-        {visible.map((item) => (
-          <ItemRow key={item.id} item={item} taxonomy={taxonomy} />
-        ))}
+        {visible.length === 0 ? (
+          <li className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted">{t.step2.groupEmpty}</li>
+        ) : (
+          visible.map((item) => (
+            <ItemRow
+              key={item.id}
+              item={item}
+              taxonomy={taxonomy}
+              sharedFuelResp={project.fuelResponsibility}
+              sharedDelivery={project.deliveryToSite}
+              sharedReturn={project.returnFromSite}
+            />
+          ))
+        )}
       </ul>
 
-      <button className="mt-2 inline-flex items-center gap-2 py-2.5 text-sm font-bold text-navy-mid" onClick={() => actions.addItem()}>
+      <button
+        className="mt-2 inline-flex items-center gap-2 py-2.5 text-sm font-bold text-navy-mid"
+        onClick={() => {
+          actions.addItem();
+          setFilter("needs-ok"); // new item starts in Need-OK with its picker open — jump there so it's visible
+        }}
+      >
         <Icon name="add" size={18} className="text-brand" /> {t.step2.addItem}
       </button>
     </div>

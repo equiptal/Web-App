@@ -207,6 +207,104 @@ export function RadioGroup<T extends string>({
   );
 }
 
+/* ------------------------------------ Pchips (single-select) ------------------------------------ */
+
+/** Prototype `.pchips` — single-select rounded chips (e.g. Me/Supplier, fuel type). */
+export function Pchips<T extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T | null;
+  onChange: (v: T) => void;
+  options: { value: T; label: string }[];
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((o) => {
+        const on = value === o.value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onChange(o.value)}
+            className={`rounded-full border px-3.5 py-1.5 text-[12.5px] font-bold transition ${
+              on ? "border-brand bg-brand-soft text-brand" : "border-border bg-surface text-navy-mid hover:border-navy-mid"
+            }`}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ------------------------------------ Seg2 (segmented) ------------------------------------ */
+
+/** Prototype `.seg2` — segmented single-select (e.g. Daily/Weekly/Monthly, Supplier/Renter). */
+export function Seg2<T extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T | null;
+  onChange: (v: T) => void;
+  options: { value: T; label: string }[];
+}) {
+  return (
+    <div className="inline-flex flex-wrap rounded-[10px] border border-border bg-surface2 p-[3px]">
+      {options.map((o) => {
+        const on = value === o.value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onChange(o.value)}
+            className={`rounded-[7px] px-4 py-2 text-[13px] font-semibold transition ${on ? "bg-surface text-navy shadow-sm" : "text-muted"}`}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ------------------------------------ SelChips (multi toggle) ------------------------------------ */
+
+/** Prototype `.selchip` — multi-select pill that fills navy with a ✓ when on. */
+export function SelChips<T extends string>({
+  values,
+  onToggle,
+  options,
+}: {
+  values: T[];
+  onToggle: (v: T) => void;
+  options: { value: T; label: string }[];
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((o) => {
+        const on = values.includes(o.value);
+        return (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onToggle(o.value)}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[12.5px] font-bold transition ${
+              on ? "border-navy bg-navy text-white" : "border-border bg-surface text-navy-mid hover:border-navy-mid"
+            }`}
+          >
+            {on && <Icon name="check" size={14} />}
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ------------------------------------ MultiChips ------------------------------------ */
 
 export function MultiChips<T extends string>({

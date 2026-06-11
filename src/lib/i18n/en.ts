@@ -33,24 +33,32 @@ export const en = {
     preview: "Preview",
   },
   intake: {
-    heading: "Request equipment",
-    subheading: "Paste your RFQ or upload a file, and we'll draft the request for you.",
+    heading: "New rental request",
+    subheading: "Already have an RFQ? Paste it or upload your files to start a request from it. You review everything before it's sent.",
     tabRfq: "RFQ", // AC-01 tentative
     tabManual: "Manual", // AC-01 tentative
-    manualNote: "The manual builder isn't part of this release.",
-    pasteLabel: "Paste RFQ text",
+    tabLater: "LATER",
+    manualNote: "Manual entry is coming in a later release.",
+    pasteLabel: "Paste your RFQ",
     pastePlaceholder: "Paste your equipment list, email, or RFQ here…",
-    uploadLabel: "Upload files",
-    uploadHint: "PDF, image, Word, or Excel.",
+    uploadLabel: "Attach files too",
+    uploadOptional: "optional — add as many as you like",
+    dropTitle: "Drop files here, or browse",
+    uploadHint: "PDF, image, Word or Excel",
     acceptedTypes: "Accepted file types: PDF, image, Word, Excel.", // AC-07 tentative
     fileRejected: "Only PDF, image, Word, or Excel files can be processed.", // AC-07 tentative
-    startProcessing: "Start processing",
+    startProcessing: "Continue",
     attachedFiles: "Attached files",
     emptyHint: "Paste text or attach at least one file to start.",
   },
   processing: {
     title: "Reading your RFQ…",
     note: "Project details and items will appear as they're parsed.",
+    sub: "This usually takes a few seconds — hang tight.",
+    stage1: "Reading your document/text",
+    stage2: "Extracting your project details",
+    stage3: "Matching your equipment to what we provide",
+    stage4: "Preparing your request",
     // AC-56 e.g. "24 items found · 3 need a quick check · 2 not available"
     summaryItems: "{count} items found",
     summaryNeedCheck: "{count} need a quick check",
@@ -58,10 +66,14 @@ export const en = {
   },
   step1: {
     title: "Project details",
+    subtitle: "We read these from your RFQ — they apply to your whole request, across all items.",
     location: {
+      confirmPrompt: "Is this the right site? Please confirm it before you continue.",
+      fillPrompt: "Add the project location before you can confirm.", // AC-16: can't confirm an empty location
       card: "Location",
       unconfirmed: "Location not confirmed",
       confirmed: "Location confirmed",
+      changeHint: "Search above to change", // AC-16: editing the location re-requires confirm
       confirmAction: "Confirm location", // AC-16 tentative
       setViaMap: "Set on map",
       useGps: "Use my current location",
@@ -72,10 +84,13 @@ export const en = {
       fromFile: "From file", // AC-47 tentative
       multiLocationTitle: "This request covers a single location.", // AC-48
       multiLocationBody: "The other location(s) we found need a separate request.",
+      startSeparateRequest: "Start a separate request", // AC-48: opens a fresh request in a new tab
       mapPicker: {
         searchPlaceholder: "Search a place, or paste a Maps link / coordinates",
         search: "Search",
         useMyLocation: "Use my location",
+        pinnedNoAddress: "Pinned location (no address found)",
+        locating: "Locating address…",
       },
     },
     timing: {
@@ -101,7 +116,6 @@ export const en = {
       card: "Certificates",
       safety: "Safety",
       other: "Other certificates",
-      safetyAppliesNote: "Selecting a safety certificate sets it on every item's operator.",
     },
     requestWide: {
       delivery: "Delivery to site",
@@ -113,6 +127,7 @@ export const en = {
     title: "Your equipment",
     subtitle: "Each line from your RFQ is matched to available equipment. Answer the quick questions, then continue. Nothing is sent until you review it.",
     fromRfq: "From your RFQ",
+    matchedTo: "Matched to",
     settingsForAll: "Settings for all items",
     settingsForAllHint: "These apply to every item — you can still override any of them per item.",
     filterAll: "All items",
@@ -120,6 +135,8 @@ export const en = {
     filterMatched: "Matched",
     filterNotAvailable: "Not available",
     triageTip: "Confirm each match. Once an item is matched, open Edit to set operator, fuel and other details.",
+    approveAll: "Approve all",
+    groupEmpty: "Nothing here.",
     status: {
       matched: "Matched", // AC-54 / AC-30
       needsOk: "Needs your OK", // AC-54
@@ -128,6 +145,7 @@ export const en = {
     confidentReady: "Ready — no action needed.",
     needsValidationPrompt: "We matched this — approve it or change it.",
     nearestSuggested: "Nearest available size: {measurement}.", // AC-19
+    pickSizeToApprove: "Pick a size to approve.", // AC-18/19: why Approve is disabled
     unitConversion: "{fromValue}{fromUnit} ≈ {toValue}{toUnit} in our sizes.", // AC-20
     editTaxonomy: "Edit match",
     category: "Category",
@@ -142,12 +160,17 @@ export const en = {
       provide: "Provide it for me?", // AC-30/31 tentative
       cancel: "Cancel", // AC-30/32 tentative
       explainer: "We couldn't find this in our catalogue.",
+      // AC-31: prefilled WhatsApp message to Moedatech support requesting the equipment be sourced.
+      whatsappMessage: 'Hi Moedatech, I\'m creating an RFQ and need equipment that isn\'t available in the app: "{item}". Please add/source it for me so it is added to my request. Thank you!',
     },
     perItem: {
       quantity: "Quantity",
       operatorNeeded: "Operator needed",
       nightShift: "Night shift",
       nationality: "Nationality",
+      nationalityArab: "Arab",
+      nationalityOther: "Other",
+      applyToAll: "Apply these settings to all items",
       certificate: "Operator certificate",
       transfer: "Transfer",
       accommodation: "Accommodation",
@@ -163,7 +186,8 @@ export const en = {
   },
   step3: {
     title: "Preferences",
-    coreTerms: "Core Terms", // AC-35 tentative
+    subtitle: "These apply to the whole request. Filled in from your RFQ — edit anything.",
+    coreTerms: "Core terms", // AC-35 tentative
     optionalExtras: "Optional Extras", // AC-35 tentative
     payment: { title: "Payment", terms: "Payment terms", method: "Payment method" },
     maintenance: {
@@ -182,12 +206,19 @@ export const en = {
     },
   },
   preview: {
-    title: "Review your request",
+    title: "Review and send",
+    subtitle: "Here's your full request. Send it once and every supplier can bid — you'll get one quotation covering all items.",
     post: "Post request",
+    send: "Send request",
+    edit: "Edit",
+    confirmed: "confirmed",
+    notSent: "{count} not available — left off this request.",
     export: "Open in Excel", // AC-52
     itemsTable: "All items",
     projectSummary: "Project",
+    equipmentSummary: "Equipment",
     preferencesSummary: "Preferences",
+    perItem: "Per item",
     table: {
       equipment: "Equipment",
       category: "Category",
@@ -204,10 +235,12 @@ export const en = {
     },
   },
   confirmation: {
-    title: "Request submitted",
-    // AC-42 tentative
-    message: "Your request was submitted and will reach suppliers.",
-    backHome: "Create another request",
+    title: "Your request is sent",
+    message: "Suppliers can now see it and send bids. You'll get one quotation covering all the items in your request.",
+    newRequest: "New request",
+    done: "Done",
+    laterNote: "Tracking bids and managing this request on the web is coming soon — for now you'll continue with bids in the Moedatech app as usual.",
+    itemsSummary: "{count} items",
   },
   guest: {
     blockTitle: "Create an account to continue", // AC-02

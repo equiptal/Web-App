@@ -1,13 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import dynamic from "next/dynamic";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
-
-// Leaflet touches `window` at import, so the map picker is client-only.
-const MapLocationPicker = dynamic(() => import("@/components/shared/MapLocationPicker"), { ssr: false });
-import { Badge, Button, Card, Field, MultiChips, RadioGroup, Select, Stepper, TextInput, Toggle } from "@/components/ui";
+import { Card, Field, Icon, Seg2, SelChips, Select, Stepper, TextInput } from "@/components/ui";
 import {
   RENTAL_BASES,
   OVERTIME_RATES,
@@ -22,99 +18,135 @@ import {
   type OtherCertificate,
 } from "@/lib/contract";
 
+// Leaflet touches `window` at import, so the map picker is client-only.
+const MapLocationPicker = dynamic(() => import("@/components/shared/MapLocationPicker"), { ssr: false });
+
+function opt<T extends string>(values: readonly T[], dict: Record<string, string>) {
+  return values.map((v) => ({ value: v, label: dict[v] ?? v }));
+}
+function toggle<T>(arr: T[], v: T): T[] {
+  return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
+}
+
 export function Step1Project() {
   const t = useT();
   const { state, actions } = useRfq();
   const project = state.draft!.project;
   const loc = project.location;
   const conflictUnresolved = Boolean(loc.conflict && !loc.conflict.resolvedFrom);
-  const showMultiLocation = state.draft!.detectedLocations.length > 1 && !state.multiLocationDismissed;
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-
-  const opt = <T extends string>(values: readonly T[], dict: Record<string, string>) =>
-    values.map((v) => ({ value: v, label: dict[v] ?? v }));
+  // AC-16: a location must actually be set (address label or map coords) before it can be confirmed.
+  // AC-16: must be an actual point found on the map (coordinates) before it can be confirmed —
+  // a typed label alone isn't enough.
+  const hasLocation = loc.lat != null && loc.lng != null;
+  const multi = state.draft!.detectedLocations.filter(Boolean);
+  const ey = project.advanced.equipmentYear;
+  const isCustomYear = !!ey && ey.startsWith("custom:");
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold">{t.step1.title}</h2>
+      <div>
+        <h1 className="text-[23px] font-extrabold tracking-tight">{t.step1.title}</h1>
+        <p className="mt-1 max-w-xl text-sm text-muted">{t.step1.subtitle}</p>
+      </div>
 
-      {/* ---------- Location card (AC-11/16/47/48) ---------- */}
-      <Card
-        title={t.step1.location.card}
-        tone={loc.confirmed ? "ok" : "warn"}
-        aside={
-          <Badge tone={loc.confirmed ? "ok" : "warn"}>{loc.confirmed ? t.step1.location.confirmed : t.step1.location.unconfirmed}</Badge>
-        }
-      >
-        {/* AC-48: multiple locations detected → one location per request. */}
-        {showMultiLocation && (
-          <div className="mb-3 rounded-lg bg-warn-soft p-3 text-sm">
-            <p className="font-medium text-warn">{t.step1.location.multiLocationTitle}</p>
-            <p className="mt-1 text-muted">{t.step1.location.multiLocationBody}</p>
-            <ul className="mt-1 list-disc ps-5 text-xs text-muted">
-              {state.draft!.detectedLocations.map((l) => (
-                <li key={l}>{l}</li>
-              ))}
-            </ul>
-            <button className="mt-2 text-xs text-brand" onClick={() => actions.dismissMultiLocation()}>
-              {t.common.done}
-            </button>
-          </div>
-        )}
-
+      {/* ---------- Location (AC-11/16/47/48) ---------- */}
+      <Card title={<><Icon name="place" size={18} className="me-1.5 align-[-3px] text-navy-mid" />{t.step1.location.card}</>}>
         {/* AC-47: text↔file conflict — pick a source before confirming. */}
         {conflictUnresolved && loc.conflict && (
-          <div className="mb-3 rounded-lg border border-warn/40 p-3 text-sm">
-            <p className="font-medium">{t.step1.location.conflictTitle}</p>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <button className="rounded-lg border border-border p-2 text-start hover:border-brand" onClick={() => actions.resolveLocationConflict("text")}>
-                <span className="block text-xs text-muted">{t.step1.location.fromText}</span>
-                {loc.conflict.fromText}
+          <div className="mb-3 rounded-[10px] border border-warn/40 bg-warn-soft p-3.5">
+            <div className="flex items-center gap-1.5 text-[13.5px] font-extrabold text-warn">
+              <Icon name="error_outline" size={18} /> {t.step1.location.conflictTitle}
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2.5">
+              <button className="flex flex-col gap-1 rounded-[10px] border border-border bg-surface p-3 text-start hover:border-brand" onClick={() => actions.resolveLocationConflict("text")}>
+                <span className="flex items-center gap-1 text-[11px] font-bold text-muted"><Icon name="notes" size={14} /> {t.step1.location.fromText}</span>
+                <span className="text-[13.5px] font-bold">{loc.conflict.fromText}</span>
               </button>
-              <button className="rounded-lg border border-border p-2 text-start hover:border-brand" onClick={() => actions.resolveLocationConflict("file")}>
-                <span className="block text-xs text-muted">{t.step1.location.fromFile}</span>
-                {loc.conflict.fromFile}
+              <button className="flex flex-col gap-1 rounded-[10px] border border-border bg-surface p-3 text-start hover:border-brand" onClick={() => actions.resolveLocationConflict("file")}>
+                <span className="flex items-center gap-1 text-[11px] font-bold text-muted"><Icon name="picture_as_pdf" size={14} /> {t.step1.location.fromFile}</span>
+                <span className="text-[13.5px] font-bold">{loc.conflict.fromFile}</span>
               </button>
             </div>
           </div>
         )}
 
-        <Field label={t.step1.location.card}>
-          <TextInput value={loc.label ?? ""} onChange={(e) => actions.patchLocation({ label: e.target.value, source: "manual" })} />
-        </Field>
-        {loc.source === "agent" && <p className="mt-1 mb-2 text-xs text-muted">{t.step1.location.extractedFrom}</p>}
+        {!conflictUnresolved && (
+          <>
+            {/* addr line */}
+            <div className="mb-3 flex flex-wrap items-center gap-2 text-[15px] font-bold">
+              <Icon name="location_on" size={20} className="text-brand" />
+              <span>{loc.label ?? "—"}</span>
+              {loc.source === "agent" && <span className="rounded-md border border-border bg-surface2 px-2 py-0.5 text-[11px] font-bold text-navy-mid">{t.step1.location.extractedFrom}</span>}
+            </div>
 
-        {/* Real map/GPS picker (ported from Moedatech-App c-hub): search, click-to-pin, drag, use-my-location. */}
-        <div className="mt-3">
-          <MapLocationPicker
-            value={loc.lat != null && loc.lng != null ? { lat: loc.lat, lng: loc.lng } : null}
-            onChange={(lat, lng, city) => actions.patchLocation({ lat, lng, label: city || loc.label, source: "map" })}
-          />
-        </div>
+            <MapLocationPicker
+              value={loc.lat != null && loc.lng != null ? { lat: loc.lat, lng: loc.lng } : null}
+              label={loc.label}
+              onChange={(lat, lng, address) => actions.patchLocation({ lat, lng, label: address || loc.label, source: "map" })}
+            />
 
-        {/* AC-16: explicit confirm, always required (even when extracted), blocked while conflict unresolved. */}
-        <div className="mt-3">
-          <Button disabled={conflictUnresolved || loc.confirmed} onClick={() => actions.confirmLocation()}>
-            {t.step1.location.confirmAction}
-          </Button>
+            {/* AC-16: explicit confirm — always required, even when extracted. */}
+            {loc.confirmed ? (
+              // No "Change" button: editing the location in the search/map auto-unconfirms (store
+              // PATCH_LOCATION), so the renter just changes it and reconfirms.
+              <div className="mt-3 flex items-center gap-2 rounded-[10px] border border-ok/30 bg-ok-soft px-3.5 py-3 text-[13px] font-bold text-ok">
+                <Icon name="check_circle" size={19} /> {t.step1.location.confirmed}
+                <span className="ms-auto text-xs font-medium text-ok/80">{t.step1.location.changeHint}</span>
+              </div>
+            ) : (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-warn/30 bg-warn-soft px-3.5 py-3">
+                <span className="flex items-center gap-1.5 text-[12.5px] font-semibold text-warn">
+                  <Icon name="help_outline" size={17} /> {hasLocation ? t.step1.location.confirmPrompt : t.step1.location.fillPrompt}
+                </span>
+                <button
+                  disabled={!hasLocation}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-brand-fg hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={() => actions.confirmLocation()}
+                >
+                  <Icon name="check" size={16} /> {t.step1.location.confirmAction}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* AC-48: one location per request. */}
+        <div className="mt-3 flex items-start gap-3 rounded-[10px] border border-info/25 bg-info-soft px-3.5 py-3">
+          <Icon name="pin_drop" size={22} className="flex-none text-info" />
+          <div className="text-[#0e4f7e]">
+            <div className="text-[13px] font-extrabold">{t.step1.location.multiLocationTitle}</div>
+            <div className="mt-0.5 text-xs opacity-85">{t.step1.location.multiLocationBody}</div>
+            {multi.length > 1 && (
+              <ul className="mt-1 list-disc ps-5 text-xs opacity-85">
+                {multi.map((l) => (
+                  <li key={l}>{l}</li>
+                ))}
+              </ul>
+            )}
+            {/* AC-48: each other site is its own request — opens a fresh RFQ in a new tab (prototype openNewRequest). */}
+            <button
+              onClick={() => window.open(window.location.href, "_blank", "noopener")}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-info/40 bg-surface px-3 py-1.5 text-xs font-bold text-info hover:border-info"
+            >
+              {t.step1.location.startSeparateRequest} <Icon name="open_in_new" size={14} />
+            </button>
+          </div>
         </div>
       </Card>
 
-      {/* ---------- Timing & Hours card (AC-13/14) ---------- */}
-      <Card title={t.step1.timing.card}>
+      {/* ---------- Timing & Hours (AC-13/14) ---------- */}
+      <Card title={<><Icon name="schedule" size={18} className="me-1.5 align-[-3px] text-navy-mid" />{t.step1.timing.card}</>}>
         <Field label={`${t.step1.timing.rentalBasis} (${t.common.required})`}>
-          <RadioGroup<RentalBasis>
-            name="rentalBasis"
-            value={project.timing.rentalBasis}
-            onChange={(v) => actions.patchTiming({ rentalBasis: v })}
-            options={opt(RENTAL_BASES, t.options.rentalBasis)}
-          />
+          <div className="flex flex-wrap items-center gap-3">
+            <Seg2<RentalBasis> value={project.timing.rentalBasis} onChange={(v) => actions.patchTiming({ rentalBasis: v })} options={opt(RENTAL_BASES, t.options.rentalBasis)} />
+            <SelChips
+              values={project.timing.extendable ? ["extendable"] : []}
+              onToggle={() => actions.patchTiming({ extendable: !project.timing.extendable })}
+              options={[{ value: "extendable", label: t.step1.timing.extendable }]}
+            />
+          </div>
         </Field>
-        <div className="mt-2 flex items-center gap-3">
-          <Toggle checked={project.timing.extendable} onChange={(v) => actions.patchTiming({ extendable: v })} label={t.step1.timing.extendable} />
-          <span className="text-xs text-muted">{t.step1.timing.extendableHint}</span>
-        </div>
-        {project.timing.rentalBasis && <p className="mt-1 text-xs text-muted">{t.step1.timing.quoteNote}</p>}
+        <p className="mt-1.5 text-xs text-muted">{t.step1.timing.quoteNote} {t.step1.timing.extendableHint}</p>
 
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Field label={t.step1.timing.startDate} optional>
@@ -123,95 +155,67 @@ export function Step1Project() {
           <Field label={t.step1.timing.endDate} optional>
             <TextInput type="date" value={project.timing.endDate ?? ""} onChange={(e) => actions.patchTiming({ endDate: e.target.value || null })} />
           </Field>
-          <Field label={t.step1.timing.hoursPerDay}>
-            <TextInput
-              type="number"
-              min={1}
-              max={24}
-              value={project.timing.hoursPerDay}
-              onChange={(e) => actions.patchTiming({ hoursPerDay: Number(e.target.value) || 8 })}
+          <Field label={t.step1.timing.hoursPerDay} optional>
+            <TextInput type="number" min={1} max={24} value={project.timing.hoursPerDay} onChange={(e) => actions.patchTiming({ hoursPerDay: Number(e.target.value) || 8 })} />
+          </Field>
+        </div>
+      </Card>
+
+      {/* ---------- Advanced (AC-15/27/28) — open by default ---------- */}
+      <Card title={<><Icon name="tune" size={18} className="me-1.5 align-[-3px] text-navy-mid" />{t.step1.advanced.card} <span className="text-xs font-semibold text-muted">{t.common.optional}</span></>}>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Field label={t.step1.advanced.workingDays}>
+            <Stepper value={project.advanced.workingDaysPerWeek} min={1} max={7} onChange={(v) => actions.patchAdvanced({ workingDaysPerWeek: v })} />
+          </Field>
+          <Field label={t.step1.advanced.overtime}>
+            <Seg2<OvertimeRate> value={project.advanced.overtimeRate} onChange={(v) => actions.patchAdvanced({ overtimeRate: v })} options={opt(OVERTIME_RATES, t.options.overtime)} />
+          </Field>
+          <Field label={t.step1.advanced.equipmentYear} optional>
+            <Select<string>
+              value={isCustomYear ? "customize" : ey}
+              placeholder={t.options.equipmentYear.any}
+              onChange={(v) => actions.patchAdvanced({ equipmentYear: v === "customize" ? "custom:" : v })}
+              options={[...[...EQUIPMENT_YEARS].map((y) => ({ value: y, label: y === "any" ? t.options.equipmentYear.any : y })), { value: "customize", label: t.step1.advanced.customize }]}
+            />
+            {isCustomYear && (
+              <div className="mt-2">
+                <TextInput type="number" min={1980} max={2026} placeholder="YYYY" value={ey.slice("custom:".length)} onChange={(e) => actions.patchAdvanced({ equipmentYear: e.target.value ? `custom:${e.target.value}` : "custom:" })} />
+              </div>
+            )}
+          </Field>
+        </div>
+        <div className="mt-4">
+          <Field label={t.step1.advanced.siteAccess} optional>
+            <SelChips<SiteAccessRestriction>
+              values={project.advanced.siteAccessRestrictions}
+              onToggle={(v) => actions.patchAdvanced({ siteAccessRestrictions: toggle(project.advanced.siteAccessRestrictions, v) })}
+              options={opt(SITE_ACCESS_RESTRICTIONS, t.options.siteAccess)}
             />
           </Field>
         </div>
       </Card>
 
-      {/* ---------- Advanced card (AC-15/27/28) ---------- */}
-      <Card
-        title={t.step1.advanced.card}
-        aside={
-          <button className="text-xs text-brand" onClick={() => setAdvancedOpen((o) => !o)}>
-            {advancedOpen ? t.common.close : t.common.edit}
-          </button>
-        }
-      >
-        {!advancedOpen ? (
-          <p className="text-sm text-muted">{advancedSummary(project.advanced, t)}</p>
-        ) : (
-          <div className="space-y-3">
-            <Field label={t.step1.advanced.workingDays}>
-              <Stepper value={project.advanced.workingDaysPerWeek} min={1} max={7} onChange={(v) => actions.patchAdvanced({ workingDaysPerWeek: v })} />
-            </Field>
-            <Field label={t.step1.advanced.overtime}>
-              <RadioGroup<OvertimeRate>
-                name="overtime"
-                value={project.advanced.overtimeRate}
-                onChange={(v) => actions.patchAdvanced({ overtimeRate: v })}
-                options={opt(OVERTIME_RATES, t.options.overtime)}
-              />
-            </Field>
-            <Field label={t.step1.advanced.equipmentYear} optional>
-              <Select<string>
-                value={project.advanced.equipmentYear}
-                placeholder={t.step1.advanced.equipmentYear}
-                onChange={(v) => actions.patchAdvanced({ equipmentYear: v })}
-                options={[...EQUIPMENT_YEARS].map((y) => ({ value: y, label: y === "any" ? t.options.equipmentYear.any : y }))}
-              />
-            </Field>
-            <Field label={t.step1.advanced.siteAccess}>
-              <MultiChips<SiteAccessRestriction>
-                values={project.advanced.siteAccessRestrictions}
-                onToggle={(v) => actions.patchAdvanced({ siteAccessRestrictions: toggle(project.advanced.siteAccessRestrictions, v) })}
-                options={opt(SITE_ACCESS_RESTRICTIONS, t.options.siteAccess)}
-              />
-            </Field>
-          </div>
-        )}
-      </Card>
-
-      {/* ---------- Certificates card (AC-50) ---------- */}
-      <Card title={t.step1.certificates.card}>
+      {/* ---------- Certificates (AC-50) ---------- */}
+      <Card title={<><Icon name="verified" size={18} className="me-1.5 align-[-3px] text-navy-mid" />{t.step1.certificates.card}</>}>
         <Field label={t.step1.certificates.safety}>
-          <MultiChips<SafetyCertificate>
+          <SelChips<SafetyCertificate>
             values={project.certificates.safety}
             onToggle={(v) => actions.setCertificates({ safety: toggle(project.certificates.safety, v) })}
             options={opt(SAFETY_CERTIFICATES, t.options.safetyCert)}
           />
         </Field>
-        <p className="mt-1 text-xs text-muted">{t.step1.certificates.safetyAppliesNote}</p>
-        <Field label={t.step1.certificates.other}>
-          <MultiChips<OtherCertificate>
-            values={project.certificates.other}
-            onToggle={(v) => actions.setCertificates({ other: toggle(project.certificates.other, v) })}
-            options={opt(OTHER_CERTIFICATES, t.options.otherCert)}
-          />
-        </Field>
+        <div className="mt-4">
+          <Field label={t.step1.certificates.other}>
+            <SelChips<OtherCertificate>
+              values={project.certificates.other}
+              onToggle={(v) => actions.setCertificates({ other: toggle(project.certificates.other, v) })}
+              options={opt(OTHER_CERTIFICATES, t.options.otherCert)}
+            />
+          </Field>
+        </div>
       </Card>
 
-      {/* Delivery / Return / Fuel responsibility (AC-25/26) live on the Equipment step
-          ("Settings for all items"), matching the prototype. */}
+      {/* Delivery / Return / Fuel responsibility (AC-25/26) live on the Equipment step. */}
     </div>
   );
-}
-
-function toggle<T>(arr: T[], v: T): T[] {
-  return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
-}
-
-function advancedSummary(a: { workingDaysPerWeek: number; overtimeRate: string; equipmentYear: string | null; siteAccessRestrictions: string[] }, t: ReturnType<typeof useT>): string {
-  const parts: string[] = [];
-  parts.push(`${a.workingDaysPerWeek}d/wk`);
-  if (a.overtimeRate !== "without") parts.push(`OT ${a.overtimeRate}`);
-  if (a.equipmentYear) parts.push(`${a.equipmentYear}`);
-  if (a.siteAccessRestrictions.length) parts.push(`${a.siteAccessRestrictions.length} restrictions`);
-  return parts.length ? parts.join(" · ") : t.step1.advanced.collapsedEmpty;
 }

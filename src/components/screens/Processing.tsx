@@ -3,35 +3,35 @@
 import { useEffect, useState } from "react";
 import { useT, fmt } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Icon } from "@/components/ui";
 
 export function Processing() {
   const t = useT();
   const { state, actions } = useRfq();
   const { busy, error, draft } = state;
 
-  // AC-04: items populate progressively as they're parsed. We reveal the drafted rows over time
-  // once the draft arrives, to mirror progressive parsing.
-  const [revealed, setRevealed] = useState(0);
-  const itemCount = draft?.items.length ?? 0;
+  const stages = [t.processing.stage1, t.processing.stage2, t.processing.stage3, t.processing.stage4];
 
+  // Walk the 4 stages while parsing (the real call is async; this paces the loader, AC-04).
+  const [stage, setStage] = useState(0);
   useEffect(() => {
-    if (busy || error || !draft) return;
-    setRevealed(0);
-    const id = setInterval(() => {
-      setRevealed((n) => {
-        if (n >= itemCount) {
-          clearInterval(id);
-          return n;
-        }
-        return n + 1;
-      });
-    }, 180);
+    if (!busy) return;
+    setStage(0);
+    const id = setInterval(() => setStage((n) => Math.min(n + 1, stages.length - 1)), 2200);
     return () => clearInterval(id);
-  }, [busy, error, draft, itemCount]);
+  }, [busy, stages.length]);
 
+  // Auto-advance to the wizard once parsing completes — no manual "Next" (brief pause to show counts).
+  const done = !busy && !!draft && !error;
+  useEffect(() => {
+    if (!done) return;
+    const id = setTimeout(() => actions.enterWizard(), 1400);
+    return () => clearTimeout(id);
+  }, [done, actions]);
+
+  /* ----------------------------- Error (AC-09 / AC-10) ----------------------------- */
   if (error) {
-    const isEmpty = error === "empty"; // AC-09 vs AC-10
+    const isEmpty = error === "empty";
     return (
       <div className="mx-auto max-w-xl py-8">
         <Card tone={isEmpty ? "warn" : "danger"}>
@@ -48,44 +48,59 @@ export function Processing() {
     );
   }
 
-  if (busy || !draft) {
-    return (
-      <div className="mx-auto max-w-xl py-12 text-center">
-        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-border border-t-brand" />
-        <h2 className="mt-4 text-base font-semibold">{t.processing.title}</h2>
-        <p className="mt-1 text-sm text-muted">{t.processing.note}</p>
-      </div>
-    );
-  }
-
-  const s = draft.summary;
-  const done = revealed >= itemCount;
+  // Once the result is in, mark everything complete.
+  const effectiveStage = done ? stages.length : stage;
+  const barPct = done ? 100 : Math.round(((stage + 1) / stages.length) * 100);
 
   return (
-    <div className="mx-auto max-w-xl py-8">
-      <h2 className="text-base font-semibold">{t.processing.title}</h2>
-      <p className="mt-1 text-sm text-muted">{t.processing.note}</p>
-
-      {/* AC-56: processing summary counts. */}
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Badge tone="brand">{fmt(t.processing.summaryItems, { count: s.totalItems })}</Badge>
-        {s.needsValidation > 0 && <Badge tone="warn">{fmt(t.processing.summaryNeedCheck, { count: s.needsValidation })}</Badge>}
-        {s.notAvailable > 0 && <Badge tone="danger">{fmt(t.processing.summaryNotAvailable, { count: s.notAvailable })}</Badge>}
+    <div className="mx-auto mt-9 max-w-[460px] text-center">
+      {/* loadicon: document glyph + spinning ring */}
+      <div className="relative mx-auto mb-[22px] grid h-[84px] w-[84px] place-items-center rounded-full border border-border bg-surface shadow-[0_6px_20px_rgba(28,53,80,.06)]">
+        {!done && <span className="absolute -inset-px rounded-full border-[3px] border-transparent border-r-brand border-t-brand motion-safe:animate-spin" />}
+        <Icon name={done ? "task_alt" : "description"} size={34} className={done ? "text-ok" : "text-navy"} />
       </div>
 
-      <ul className="mt-4 space-y-1">
-        {draft.items.slice(0, revealed).map((i) => (
-          <li key={i.id} className="rounded-md bg-surface px-3 py-2 text-sm shadow-sm">
-            {i.rawLabel ?? i.id}
-          </li>
-        ))}
-      </ul>
+      <h2 className="text-[21px] font-extrabold tracking-tight">{t.processing.title}</h2>
+      <p className="mb-[26px] mt-1.5 text-[13.5px] text-muted">{t.processing.sub}</p>
 
-      <div className="mt-6">
-        <Button disabled={!done} onClick={() => actions.enterWizard()}>
-          {t.common.next}
-        </Button>
+      {/* stages */}
+      <div className="mx-auto mb-6 flex max-w-[330px] flex-col gap-[13px] text-start">
+        {stages.map((label, i) => {
+          const s = i < effectiveStage ? "done" : i === effectiveStage ? "active" : "todo";
+          return (
+            <div key={i} className={`flex items-center gap-[11px] text-[13.5px] font-semibold ${s === "todo" ? "text-muted/50" : s === "active" ? "text-navy" : "text-navy-mid"}`}>
+              <span
+                className={`grid h-[22px] w-[22px] flex-none place-items-center rounded-full text-[11px] font-extrabold ${
+                  s === "done"
+                    ? "bg-ok text-white"
+                    : s === "active"
+                      ? "border-2 border-brand border-t-transparent motion-safe:animate-spin"
+                      : "border-2 border-border"
+                }`}
+              >
+                {s === "done" ? "✓" : ""}
+              </span>
+              {label}
+            </div>
+          );
+        })}
       </div>
+
+      {/* progress bar */}
+      <div className="mx-auto h-1.5 max-w-[330px] overflow-hidden rounded-full bg-surface3">
+        <div className="h-full rounded-full bg-brand transition-[width] duration-500" style={{ width: `${barPct}%` }} />
+      </div>
+
+      {/* When done: AC-56 summary counts + continue. */}
+      {done && draft && (
+        <div className="mt-7">
+          <div className="flex flex-wrap justify-center gap-2">
+            <Badge tone="brand">{fmt(t.processing.summaryItems, { count: draft.summary.totalItems })}</Badge>
+            {draft.summary.needsValidation > 0 && <Badge tone="warn">{fmt(t.processing.summaryNeedCheck, { count: draft.summary.needsValidation })}</Badge>}
+            {draft.summary.notAvailable > 0 && <Badge tone="danger">{fmt(t.processing.summaryNotAvailable, { count: draft.summary.notAvailable })}</Badge>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

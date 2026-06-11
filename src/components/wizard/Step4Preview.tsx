@@ -1,8 +1,9 @@
 "use client";
 
-import { useT } from "@/lib/i18n";
+import type { ReactNode } from "react";
+import { useT, fmt } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
-import { Button, Card } from "@/components/ui";
+import { Button, Icon } from "@/components/ui";
 import { buildSpecRows, toCsv, downloadCsv, type SpecRow } from "@/lib/export/spec-sheet";
 import { postableItems } from "@/lib/contract";
 
@@ -15,7 +16,6 @@ export function Step4Preview() {
   const rows = buildSpecRows(draft, taxonomy);
   const tt = t.preview.table;
   const headers = [tt.equipment, tt.category, tt.size, tt.qty, tt.year, tt.operator, tt.fuel, tt.fuelResp, tt.delivery, tt.return, tt.certificate, tt.notes];
-
   const cell = (r: SpecRow) => [
     r.equipment,
     r.category,
@@ -31,44 +31,58 @@ export function Step4Preview() {
     r.notes || "—",
   ];
 
-  function exportExcel() {
-    const csv = toCsv(headers, rows.map(cell));
-    downloadCsv("rfq-spec-sheet.csv", csv); // AC-52: excludes Not available (buildSpecRows uses postableItems)
-  }
+  const exportExcel = () => downloadCsv("rfq-spec-sheet.csv", toCsv(headers, rows.map(cell)));
 
+  const p = draft.project;
+  const pr = draft.preferences;
   const count = postableItems(draft.items).length;
+  const notSent = draft.items.filter((i) => !i.removed && i.verdict === "no-match").length;
+  const certs = [...p.certificates.safety.map((c) => t.options.safetyCert[c]), ...p.certificates.other.map((c) => t.options.otherCert[c])].join(", ") || "—";
+  const maint = `${t.options.maintenanceResp[pr.maintenance.responsibility]}${pr.maintenance.sla ? ` · ${t.options.maintenanceSla[pr.maintenance.sla]}` : ""}`;
+  const payment = [pr.payment.terms && t.options.paymentTerm[pr.payment.terms], pr.payment.method && t.options.paymentMethod[pr.payment.method]].filter(Boolean).join(" · ") || "—";
+  const suppliers =
+    [pr.supplierFilters.verifiedOnly && t.step3.supplierFilters.verifiedOnly, pr.supplierFilters.bidWindow && t.options.bidWindow[pr.supplierFilters.bidWindow]].filter(Boolean).join(" · ") || "—";
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">{t.preview.title}</h2>
-        <Button variant="secondary" onClick={exportExcel}>
-          {t.preview.export}
-        </Button>
+      <div>
+        <h1 className="text-[23px] font-extrabold tracking-tight">{t.preview.title}</h1>
+        <p className="mt-1 max-w-xl text-sm text-muted">{t.preview.subtitle}</p>
       </div>
 
-      {/* AC-41: project + preferences summary. */}
-      <Card title={t.preview.projectSummary}>
-        <dl className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
-          <Summary label={t.step1.location.card} value={draft.project.location.label ?? "—"} />
-          <Summary label={t.step1.timing.rentalBasis} value={draft.project.timing.rentalBasis ? t.options.rentalBasis[draft.project.timing.rentalBasis] : "—"} />
-          <Summary label={t.step1.timing.hoursPerDay} value={String(draft.project.timing.hoursPerDay)} />
-          <Summary label={t.step1.requestWide.delivery} value={t.options.party[draft.project.deliveryToSite]} />
-          <Summary label={t.step1.requestWide.return} value={t.options.party[draft.project.returnFromSite]} />
-          <Summary label={t.step1.requestWide.fuelResponsibility} value={t.options.party[draft.project.fuelResponsibility]} />
-        </dl>
-      </Card>
+      {/* Project (AC-41) */}
+      <RC icon="place" title={t.preview.projectSummary} onEdit={() => actions.goStep(1)} editLabel={t.preview.edit}>
+        <KV
+          rows={[
+            [t.step1.location.card, <span key="l" className="inline-flex items-center gap-2">{p.location.label ?? "—"}{p.location.confirmed && <span className="inline-flex items-center gap-1 text-xs font-bold text-ok"><span className="h-[7px] w-[7px] rounded-full bg-ok" /> {t.preview.confirmed}</span>}</span>],
+            [t.step1.timing.rentalBasis, p.timing.rentalBasis ? t.options.rentalBasis[p.timing.rentalBasis] : "—"],
+            [t.step1.timing.hoursPerDay, String(p.timing.hoursPerDay)],
+            [t.step1.certificates.card, certs],
+          ]}
+        />
+      </RC>
 
-      {/* AC-52: all items as a table. */}
-      <Card title={`${t.preview.itemsTable} (${count})`}>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
+      {/* Equipment (AC-52) */}
+      <div className="overflow-hidden rounded-xl border border-border bg-surface">
+        <div className="flex items-center justify-between border-b border-border px-[18px] py-[13px] text-sm font-bold">
+          <span className="flex items-center gap-1.5">
+            <Icon name="construction" size={18} className="text-navy-mid" /> {t.preview.equipmentSummary} — {count} {t.preview.itemsTable.toLowerCase()}
+          </span>
+          <span className="flex gap-3">
+            <button className="inline-flex items-center gap-1 text-xs font-bold text-info" onClick={exportExcel}>
+              <Icon name="grid_on" size={15} /> {t.preview.export}
+            </button>
+            <button className="inline-flex items-center gap-1 text-xs font-bold text-info" onClick={() => actions.goStep(2)}>
+              <Icon name="edit" size={15} /> {t.preview.edit}
+            </button>
+          </span>
+        </div>
+        <div className="overflow-x-auto p-3.5">
+          <table className="w-full border-collapse text-[12.5px]">
             <thead>
-              <tr className="border-b border-border text-start text-xs text-muted">
+              <tr className="border-b border-border text-start text-[10.5px] uppercase tracking-wide text-muted">
                 {headers.map((h) => (
-                  <th key={h} className="whitespace-nowrap p-2 text-start font-medium">
-                    {h}
-                  </th>
+                  <th key={h} className="whitespace-nowrap p-2 text-start font-extrabold">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -76,34 +90,69 @@ export function Step4Preview() {
               {rows.map((r, i) => (
                 <tr key={i} className="border-b border-border/60">
                   {cell(r).map((c, j) => (
-                    <td key={j} className="whitespace-nowrap p-2">
-                      {c}
-                    </td>
+                    <td key={j} className="whitespace-nowrap p-2">{c}</td>
                   ))}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </Card>
+        {notSent > 0 && (
+          <div className="flex items-start gap-2 border-t border-border bg-surface2 px-[18px] py-2.5 text-[12.5px] text-navy-mid">
+            <Icon name="info" size={17} className="flex-none text-muted" /> {fmt(t.preview.notSent, { count: notSent })}
+          </div>
+        )}
+      </div>
+
+      {/* Preferences */}
+      <RC icon="tune" title={t.preview.preferencesSummary} onEdit={() => actions.goStep(3)} editLabel={t.preview.edit}>
+        <KV
+          rows={[
+            [t.step3.payment.title, payment],
+            [t.step3.maintenance.title, maint],
+            [`${t.step1.requestWide.delivery} / ${t.step1.requestWide.return}`, `${p.deliveryToSite ? t.options.party[p.deliveryToSite] : t.preview.perItem} / ${p.returnFromSite ? t.options.party[p.returnFromSite] : t.preview.perItem}`],
+            [t.step3.supplierFilters.title, suppliers],
+          ]}
+        />
+      </RC>
 
       {error && <p className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{t.errors.networkBody}</p>}
 
-      {/* AC-42/43: post a single broadcast covering all items. */}
+      {/* AC-42/43: send one broadcast covering all items. */}
       <div className="flex justify-end">
-        <Button disabled={busy || count === 0} onClick={() => actions.submit()}>
-          {busy ? `${t.preview.post}…` : t.preview.post}
+        <Button disabled={busy || count === 0} onClick={() => actions.submit()} className="px-6 py-3 text-[14.5px]">
+          <Icon name="send" size={18} /> {busy ? `${t.preview.send}…` : t.preview.send}
         </Button>
       </div>
     </div>
   );
 }
 
-function Summary({ label, value }: { label: string; value: string }) {
+function RC({ icon, title, onEdit, editLabel, children }: { icon: string; title: string; onEdit: () => void; editLabel: string; children: ReactNode }) {
   return (
-    <div>
-      <dt className="text-xs text-muted">{label}</dt>
-      <dd className="font-medium">{value}</dd>
+    <div className="overflow-hidden rounded-xl border border-border bg-surface">
+      <div className="flex items-center justify-between border-b border-border px-[18px] py-[13px] text-sm font-bold">
+        <span className="flex items-center gap-1.5">
+          <Icon name={icon} size={18} className="text-navy-mid" /> {title}
+        </span>
+        <button className="inline-flex items-center gap-1 text-xs font-bold text-info" onClick={onEdit}>
+          <Icon name="edit" size={15} /> {editLabel}
+        </button>
+      </div>
+      {children}
     </div>
+  );
+}
+
+function KV({ rows }: { rows: [ReactNode, ReactNode][] }) {
+  return (
+    <dl className="grid grid-cols-[140px_1fr] gap-x-3 gap-y-2.5 px-[18px] py-3.5 text-[13.5px]">
+      {rows.map(([k, v], i) => (
+        <div key={i} className="contents">
+          <dt className="font-semibold text-muted">{k}</dt>
+          <dd>{v}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }

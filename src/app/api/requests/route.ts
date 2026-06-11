@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { useRealApp, serverEnv } from "@/lib/config/env";
-import { agentsPost } from "@/lib/api/agents-backend";
+import { agentsPost, AgentsBackendError } from "@/lib/api/agents-backend";
 import { draftToCreateRequest } from "@/lib/api/app-adapters";
 import type { RfqRequestPayload } from "@/lib/contract";
 import type { CreateRequestResult } from "@/lib/contract/app";
@@ -25,12 +25,18 @@ export async function POST(req: Request) {
 
   if (useRealApp && serverEnv.agentsTestUserId && "items" in body) {
     try {
-      const nowIso = new Date().toISOString(); // full ISO datetime w/ offset (schema requirement)
-      const payload = draftToCreateRequest(body as RfqRequestPayload, serverEnv.agentsTestUserId, nowIso);
+      const payload = draftToCreateRequest(body as RfqRequestPayload, serverEnv.agentsTestUserId);
       const data = await agentsPost<CreateRequestResult>("/agents/requests", payload);
       return NextResponse.json({ requestId: data.shortCode ?? data.requestId ?? "RFQ" }, { status: 201 });
     } catch (err) {
       console.error("[requests] real submit failed:", err);
+      // Surface the real backend status + message instead of an opaque 503.
+      if (err instanceof AgentsBackendError) {
+        return NextResponse.json(
+          { code: "submit_failed", detail: err.message, backendCode: err.code, backendStatus: err.status },
+          { status: 502 },
+        );
+      }
       return NextResponse.json({ code: "network" }, { status: 503 });
     }
   }

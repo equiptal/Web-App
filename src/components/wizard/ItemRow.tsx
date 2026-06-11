@@ -3,19 +3,19 @@
 import { useState } from "react";
 import { useT, fmt } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
-import { Button, Field, Icon, RadioGroup, Select, Stepper, TextArea, TextInput, Toggle, Modal } from "@/components/ui";
+import { SUPPORT_WHATSAPP_NUMBER } from "@/lib/config/support";
+import { Button, Field, Icon, Pchips, Select, Stepper, TextArea, Toggle, Modal } from "@/components/ui";
 import {
   EquipmentItem,
   Taxonomy,
   resolveRef,
+  isCompleteRef,
   FUEL_TYPES,
   SAFETY_CERTIFICATES,
   PARTIES,
   type FuelType,
-  type OperatorNeeded,
   type OperatorCertificate,
   type Party,
-  type Accommodation,
 } from "@/lib/contract";
 
 function opt<T extends string>(values: readonly T[], dict: Record<string, string>) {
@@ -32,12 +32,29 @@ const CATEGORY_ICON: Record<string, string> = {
   concrete: "foundation",
 };
 
-export function ItemRow({ item, taxonomy }: { item: EquipmentItem; taxonomy: Taxonomy }) {
+export function ItemRow({
+  item,
+  taxonomy,
+  sharedFuelResp,
+  sharedDelivery,
+  sharedReturn,
+}: {
+  item: EquipmentItem;
+  taxonomy: Taxonomy;
+  sharedFuelResp: Party | null;
+  sharedDelivery: Party | null;
+  sharedReturn: Party | null;
+}) {
   const t = useT();
   const { actions } = useRfq();
   const [editingMatch, setEditingMatch] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+
+  const nationalityOpts = [
+    { value: "arab", label: t.step2.perItem.nationalityArab },
+    { value: "other", label: t.step2.perItem.nationalityOther },
+  ];
 
   const { category, subcategory, measurement } = resolveRef(taxonomy, item.ref);
   const status = item.verdict === "no-match" ? "not-available" : item.resolved ? "matched" : "needs-ok";
@@ -60,7 +77,8 @@ export function ItemRow({ item, taxonomy }: { item: EquipmentItem; taxonomy: Tax
           <Button
             variant="secondary"
             onClick={() => {
-              window.open("https://wa.me/966500000000?text=" + encodeURIComponent(`Please source: ${item.rawLabel ?? ""}`), "_blank");
+              const msg = fmt(t.step2.noMatch.whatsappMessage, { item: item.rawLabel ?? "" });
+              window.open(`https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
               actions.removeItem(item.id);
             }}
           >
@@ -113,7 +131,17 @@ export function ItemRow({ item, taxonomy }: { item: EquipmentItem; taxonomy: Tax
             <Icon name="swap_horiz" size={14} /> {item.advisory}
           </div>
         )}
-        {!item.resolved && <p className="mt-1.5 text-[12.5px] text-muted">{item.suggestion ? fmt(t.step2.nearestSuggested, { measurement: measurement?.name ?? "" }) : t.step2.needsValidationPrompt}</p>}
+        {!item.resolved &&
+          (!isCompleteRef(item.ref) ? (
+            // AC-18/19: Approve is disabled until the size is picked — say so explicitly.
+            <p className="mt-1.5 flex items-center gap-1.5 text-[12.5px] font-semibold text-warn">
+              <Icon name="error_outline" size={14} /> {t.step2.pickSizeToApprove}
+            </p>
+          ) : (
+            <p className="mt-1.5 text-[12.5px] text-muted">
+              {item.suggestion ? fmt(t.step2.nearestSuggested, { measurement: measurement?.name ?? "" }) : t.step2.needsValidationPrompt}
+            </p>
+          ))}
 
         {/* Matched: qty + operator/fuel meta tags */}
         {status === "matched" && (
@@ -137,7 +165,7 @@ export function ItemRow({ item, taxonomy }: { item: EquipmentItem; taxonomy: Tax
         <div className="flex gap-1.5">
           {status === "needs-ok" ? (
             <>
-              <Button onClick={() => (item.suggestion ? actions.approveSuggestion(item.id) : actions.approveItem(item.id))}>
+              <Button disabled={!isCompleteRef(item.ref)} onClick={() => (item.suggestion ? actions.approveSuggestion(item.id) : actions.approveItem(item.id))}>
                 <Icon name="check" size={15} /> {t.common.approve}
               </Button>
               <Button variant="secondary" onClick={() => setEditingMatch((e) => !e)}>
@@ -155,42 +183,69 @@ export function ItemRow({ item, taxonomy }: { item: EquipmentItem; taxonomy: Tax
         </div>
       </div>
 
-      {(editingMatch || !item.resolved) && taxonomyEditor}
+      {(editingMatch || !isCompleteRef(item.ref)) && taxonomyEditor}
 
-      {/* Per-item details — editable only once Matched (AC-54). */}
+      {/* Per-item details — editable only once Matched (AC-54). Mirrors the prototype:
+          operator card + fuel + notes. Delivery/return are request-wide only (Settings for all
+          items) — no per-item override here; values are just Me/Supplier. */}
       {status === "matched" && showDetails && (
-        <div className="col-span-full mt-3 grid grid-cols-1 gap-3 rounded-lg border border-border bg-surface2 p-4 sm:grid-cols-2">
-          <Field label={t.step2.perItem.fuelType}>
-            <Select<FuelType> value={item.fuelType} onChange={(v) => actions.patchItem(item.id, { fuelType: v })} options={opt(FUEL_TYPES, t.options.fuelType)} />
-          </Field>
-          <Field label={t.step2.perItem.operatorNeeded}>
-            <RadioGroup<OperatorNeeded> name={`op-${item.id}`} value={item.operatorNeeded} onChange={(v) => actions.patchItem(item.id, { operatorNeeded: v })} options={opt(["yes", "no"] as const, t.options.operatorNeeded)} />
-          </Field>
-
-          {item.operatorNeeded === "yes" && (
-            <div className="grid grid-cols-1 gap-3 rounded-lg bg-surface p-3 sm:col-span-2 sm:grid-cols-2">
-              <Toggle checked={item.operator.nightShift} onChange={(v) => actions.patchItemOperator(item.id, { nightShift: v })} label={t.step2.perItem.nightShift} />
-              <Field label={t.step2.perItem.nationality} optional>
-                <TextInput value={item.operator.nationality ?? ""} onChange={(e) => actions.patchItemOperator(item.id, { nationality: e.target.value || null })} />
-              </Field>
-              <Field label={t.step2.perItem.certificate} optional>
-                <Select<OperatorCertificate> value={item.operator.certificate} placeholder="—" onChange={(v) => actions.patchItemOperator(item.id, { certificate: v })} options={opt(SAFETY_CERTIFICATES, t.options.safetyCert)} />
-              </Field>
-              <Field label={t.step2.perItem.accommodation} optional>
-                <RadioGroup<Accommodation> name={`acc-${item.id}`} value={item.operator.accommodation} onChange={(v) => actions.patchItemOperator(item.id, { accommodation: v })} options={opt(PARTIES, t.options.accommodation)} />
-              </Field>
-              <Toggle checked={item.operator.transfer} onChange={(v) => actions.patchItemOperator(item.id, { transfer: v })} label={t.step2.perItem.transfer} />
+        <div className="col-span-full mt-3 space-y-4 rounded-lg border border-border bg-surface2 p-4">
+          {/* Operator (AC-24) */}
+          <div className="overflow-hidden rounded-lg border border-border bg-surface">
+            <div className="flex items-center justify-between bg-surface2 px-3 py-2.5">
+              <span className="flex items-center gap-2 text-[13.5px] font-extrabold">
+                <Icon name="person" size={18} className="text-navy-mid" /> {t.step2.perItem.operatorNeeded}
+              </span>
+              <Toggle checked={item.operatorNeeded === "yes"} onChange={(v) => actions.patchItem(item.id, { operatorNeeded: v ? "yes" : "no" })} />
             </div>
-          )}
-
-          <Field label={t.step2.perItem.additionalNotes} optional>
-            <TextArea rows={2} value={item.additionalNotes} onChange={(e) => actions.patchItem(item.id, { additionalNotes: e.target.value })} />
-          </Field>
-          <div className="grid grid-cols-1 gap-2">
-            <OverrideField label={t.step2.perItem.deliveryOverride} value={item.deliveryOverride} onChange={(v) => actions.patchItem(item.id, { deliveryOverride: v })} t={t} />
-            <OverrideField label={t.step2.perItem.returnOverride} value={item.returnOverride} onChange={(v) => actions.patchItem(item.id, { returnOverride: v })} t={t} />
-            <OverrideField label={t.step2.perItem.fuelRespOverride} value={item.fuelResponsibilityOverride} onChange={(v) => actions.patchItem(item.id, { fuelResponsibilityOverride: v })} t={t} />
+            {item.operatorNeeded === "yes" && (
+              <div className="space-y-3 px-3 py-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[13px] font-bold">{t.step2.perItem.nightShift}</span>
+                  <Toggle checked={item.operator.nightShift} onChange={(v) => actions.patchItemOperator(item.id, { nightShift: v })} />
+                </div>
+                <ChipField label={t.step2.perItem.nationality}>
+                  <Pchips value={item.operator.nationality} onChange={(v) => actions.patchItemOperator(item.id, { nationality: v })} options={nationalityOpts} />
+                </ChipField>
+                <ChipField label={t.step2.perItem.certificate}>
+                  <Pchips<OperatorCertificate> value={item.operator.certificate} onChange={(v) => actions.patchItemOperator(item.id, { certificate: v })} options={opt(SAFETY_CERTIFICATES, t.options.safetyCert)} />
+                </ChipField>
+                <ChipField label={t.step2.perItem.accommodation}>
+                  <Pchips<Party> value={item.operator.accommodation} onChange={(v) => actions.patchItemOperator(item.id, { accommodation: v })} options={opt(PARTIES, t.options.party)} />
+                </ChipField>
+                <div className="flex items-center justify-between">
+                  <span className="text-[13px] font-bold">{t.step2.perItem.transfer}</span>
+                  <Toggle checked={item.operator.transfer} onChange={(v) => actions.patchItemOperator(item.id, { transfer: v })} />
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Fuel (AC-26) */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <ChipField label={t.step2.perItem.fuelType}>
+              <Pchips<FuelType> value={item.fuelType} onChange={(v) => actions.patchItem(item.id, { fuelType: v })} options={opt(FUEL_TYPES, t.options.fuelType)} />
+            </ChipField>
+            <ChipField label={t.step1.requestWide.fuelResponsibility}>
+              <Pchips<Party> value={item.fuelResponsibilityOverride ?? sharedFuelResp} onChange={(v) => actions.patchItem(item.id, { fuelResponsibilityOverride: v })} options={opt(PARTIES, t.options.party)} />
+            </ChipField>
+          </div>
+
+          {/* Delivery / Return — per-item override of the request-wide setting (AC-25). Mansour sets
+              these per line (mobilization/demobilization), so surface + allow editing them here. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <ChipField label={t.step1.requestWide.delivery}>
+              <Pchips<Party> value={item.deliveryOverride ?? sharedDelivery} onChange={(v) => actions.patchItem(item.id, { deliveryOverride: v })} options={opt(PARTIES, t.options.party)} />
+            </ChipField>
+            <ChipField label={t.step1.requestWide.return}>
+              <Pchips<Party> value={item.returnOverride ?? sharedReturn} onChange={(v) => actions.patchItem(item.id, { returnOverride: v })} options={opt(PARTIES, t.options.party)} />
+            </ChipField>
+          </div>
+
+          {/* Additional notes (AC-53) */}
+          <ChipField label={t.step2.perItem.additionalNotes}>
+            <TextArea rows={2} value={item.additionalNotes} onChange={(e) => actions.patchItem(item.id, { additionalNotes: e.target.value })} />
+          </ChipField>
         </div>
       )}
 
@@ -226,13 +281,16 @@ function Avatar({ glyph, conf }: { glyph: string; conf: "high" | "mid" | "low" }
 function RfqMatch({ raw, matched }: { raw: string | null; matched: React.ReactNode }) {
   const t = useT();
   return (
-    <div className="flex items-end gap-3">
+    <div className="flex items-center gap-3">
       <span className="flex w-[200px] flex-none flex-col gap-0.5">
         <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted">{t.step2.fromRfq}</span>
-        <span className="text-[15px] font-bold leading-tight">{raw ? `“${raw}”` : "—"}</span>
+        <span className="text-[15px] font-bold leading-tight break-words">{raw ? `“${raw}”` : "—"}</span>
       </span>
       <Icon name="arrow_forward" size={20} className="flex-none text-muted/60" />
-      <span className="min-w-0 flex-1 truncate text-[15px] font-extrabold leading-tight">{matched}</span>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted">{t.step2.matchedTo}</span>
+        <span className="break-words text-[15px] font-extrabold leading-tight">{matched}</span>
+      </span>
     </div>
   );
 }
@@ -258,20 +316,11 @@ function MetaTag({ icon, label, value }: { icon: string; label: string; value: s
   );
 }
 
-function OverrideField({ label, value, onChange, t }: { label: string; value: Party | null; onChange: (v: Party | null) => void; t: ReturnType<typeof useT> }) {
+function ChipField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="text-sm">
-      <span className="mb-1 block text-xs font-medium text-muted">{label}</span>
-      <div className="flex flex-wrap gap-2">
-        <button onClick={() => onChange(null)} className={`rounded-lg border px-3 py-1 text-sm ${value === null ? "border-brand bg-brand-soft text-brand" : "border-border"}`}>
-          {t.step2.perItem.useRequestDefault}
-        </button>
-        {PARTIES.map((p) => (
-          <button key={p} onClick={() => onChange(p)} className={`rounded-lg border px-3 py-1 text-sm ${value === p ? "border-brand bg-brand-soft text-brand" : "border-border"}`}>
-            {t.options.party[p]}
-          </button>
-        ))}
-      </div>
+    <div>
+      <span className="mb-1.5 block text-[11.5px] font-bold text-navy-mid">{label}</span>
+      {children}
     </div>
   );
 }

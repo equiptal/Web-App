@@ -40,10 +40,42 @@ const FUEL_MAP: Record<string, CreateRequestItem["fuelTypePreference"]> = {
   // 'hybrid' has no app equivalent (AC-26 divergence, plan.md Q6) → omitted.
 };
 
+/**
+ * AC-28: UI equipmentYear ("any" | "2020".."2026" | "custom:<year>") → the backend's
+ * `maxEquipmentAge`, which despite its name stores a minimum MANUFACTURE YEAR, not an age (it must
+ * match mobile-created rows — see ALIGNMENT rule 4 / equipment_step.dart). Returns the integer year,
+ * or undefined for "any"/unset/unparseable. Tolerates a trailing "+" (mobile chips carry it).
+ */
+function toManufactureYear(equipmentYear: string | null): number | undefined {
+  if (!equipmentYear || equipmentYear === "any") return undefined;
+  const m = equipmentYear.match(/\d{4}/); // handles "2024", "custom:2024", "2024+"
+  return m ? Number(m[0]) : undefined;
+}
+
+/** AC-26: supplier ⇒ fuel included. Only meaningful for diesel/petrol; electric/hybrid ⇒ omit (null). */
+function toDieselIncluded(fuelType: string, party: "me" | "supplier"): boolean | undefined {
+  if (fuelType !== "diesel" && fuelType !== "petrol") return undefined;
+  return party === "supplier";
+}
+
 const RENTAL_MAP: Record<string, CreateRequestPayload["rentalType"]> = {
   daily: "DAILY",
   weekly: "WEEKLY",
   monthly: "MONTHLY",
+};
+
+/** AC-15: UI overtime ("without"|"1.5x"|"2x") → §4.2 enum. */
+const OVERTIME_MAP: Record<string, CreateRequestPayload["overtimeRate"]> = {
+  without: "0",
+  "1.5x": "1.5X",
+  "2x": "2X",
+};
+
+/** AC-37: UI maintenance SLA → §4.2 enum. "custom" has no enum slot → omitted. */
+const SLA_MAP: Record<string, CreateRequestPayload["breakdownResponseSla"]> = {
+  "4h": "FOUR_HR",
+  "8h": "EIGHT_HR",
+  "24h": "TWENTY_FOUR_HR",
 };
 
 /**
@@ -53,33 +85,71 @@ const RENTAL_MAP: Record<string, CreateRequestPayload["rentalType"]> = {
  * catalogue was loaded from GET /agents/taxonomy.
  *
  * `userId` is required by the backend; while web auth is bypassed it comes from AGENTS_TEST_USER_ID.
- * `todayIso` is passed in (callers stamp it) since the spec's start_date is optional but the backend
- * requires one.
+ *
+ * Integration rules (ALIGNMENT-web-app-002.md): `startDate` is optional — omit it and the server
+ * defaults to "now"; never invent one (rule 3). `urgency` is NEVER sent — the server derives it from
+ * `startDate` (mobile CR-017); any value would be ignored (rule 2).
  */
-export function draftToCreateRequest(draft: RfqRequestPayload, userId: string, nowIso: string): CreateRequestPayload {
-  const { project } = draft;
+export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): CreateRequestPayload {
+  const { project, preferences } = draft;
   const items = postableItems(draft.items);
+  // Rule 4 + §4.2: project-level fields are stored per-item — compute once, fan out onto each item.
+  const manufactureYear = toManufactureYear(project.advanced.equipmentYear);
+  const safetyCerts = project.certificates.safety.length ? project.certificates.safety.slice() : undefined; // AC-50 fanned per-item
+  // AC-50: "Other" certs → requiredCerts; the local-content flag is split out into its own boolean.
+  const otherCerts = project.certificates.other;
+  const localContent = otherCerts.includes("local-content");
+  const requiredCerts = otherCerts.filter((c) => c !== "local-content");
 
   return {
     userId: Number(userId), // agents-backend requires an integer id
     type: "BROADCAST", // web is broadcast-only (brief Non-goals)
     rentalType: (project.timing.rentalBasis && RENTAL_MAP[project.timing.rentalBasis]) || "DAILY",
-    startDate: toIsoDateTime(project.timing.startDate) || nowIso, // schema needs full ISO datetime w/ offset
+    startDate: toIsoDateTime(project.timing.startDate), // optional; omitted when unset → server defaults to now
     endDate: toIsoDateTime(project.timing.endDate),
-    urgency: "SOON", // not collected on web; sensible default
+    extendable: project.timing.extendable, // AC-13 (rule 6: needs the deployed `extendable` column)
     projectLat: project.location.lat,
     projectLng: project.location.lng,
     projectAddressLabel: project.location.label ?? undefined,
-    additionalNotes: draft.preferences.additionalNotes || undefined,
-    equipmentItems: items.map((i) => ({
-      categoryId: i.ref.categoryId as string,
-      subtypeId: i.ref.subcategoryId as string,
-      capacityId: i.ref.measurementId as string,
-      numberOfUnits: i.quantity,
-      operatorIncluded: i.operatorNeeded === "yes" ? "YES" : "NO",
-      fuelTypePreference: FUEL_MAP[i.fuelType],
-      mobilizationByRentee: (i.deliveryOverride ?? project.deliveryToSite) === "me",
-      demobilizationByRentee: (i.returnOverride ?? project.returnFromSite) === "me",
-    })),
+    additionalNotes: preferences.additionalNotes || undefined,
+    // §4.2 header fields:
+    workingHoursPerDay: project.timing.hoursPerDay, // AC-14/15 (default 8)
+    workingDaysPerWeek: project.advanced.workingDaysPerWeek, // AC-15 (default 6)
+    overtimeRate: OVERTIME_MAP[project.advanced.overtimeRate], // AC-15
+    siteAccessRestrictions: project.advanced.siteAccessRestrictions.length // AC-27: UI array → single string
+      ? project.advanced.siteAccessRestrictions.join(", ")
+      : undefined,
+    paymentTerms: preferences.payment.terms ?? undefined, // AC-36
+    paymentMethod: preferences.payment.method ?? undefined, // AC-36
+    maintenanceResponsibility: preferences.maintenance.responsibility, // AC-37 (default supplier)
+    breakdownResponseSla: preferences.maintenance.sla ? SLA_MAP[preferences.maintenance.sla] : undefined, // AC-37
+    budgetCeiling: preferences.budgetSar && preferences.budgetSar > 0 ? preferences.budgetSar : undefined, // AC-39
+    verifiedSuppliersOnly: preferences.supplierFilters.verifiedOnly, // AC-40
+    subletting: preferences.supplierFilters.sublettingAllowed, // AC-40
+    offerDuration: preferences.supplierFilters.bidWindow ?? undefined, // AC-40 bid window
+    requiredCerts: requiredCerts.length ? requiredCerts : undefined, // AC-50
+    localContent: localContent || undefined, // AC-50 (omit when false)
+    equipmentItems: items.map((i) => {
+      const fuelParty = i.fuelResponsibilityOverride ?? project.fuelResponsibility ?? "me"; // AC-26 override → request-wide → default me
+      const operatorIncluded = i.operatorNeeded === "yes";
+      return {
+        categoryId: i.ref.categoryId as string,
+        subtypeId: i.ref.subcategoryId as string,
+        capacityId: i.ref.measurementId as string,
+        numberOfUnits: i.quantity,
+        operatorIncluded: operatorIncluded ? "YES" : "NO",
+        fuelTypePreference: FUEL_MAP[i.fuelType],
+        mobilizationByRentee: (i.deliveryOverride ?? project.deliveryToSite ?? "me") === "me",
+        demobilizationByRentee: (i.returnOverride ?? project.returnFromSite ?? "me") === "me",
+        additionalNotes: i.additionalNotes || undefined, // AC-53 (rule 6: needs the deployed item column)
+        maxEquipmentAge: manufactureYear, // AC-28 project-level year, fanned out (undefined ⇒ key dropped)
+        dieselIncluded: toDieselIncluded(i.fuelType, fuelParty), // AC-26
+        fatRequired: operatorIncluded ? i.operator.transfer : false, // AC-24 operator "transfer" sub-field
+        // §4.2 per-item operator sub-fields (only meaningful when an operator is included):
+        nightShiftRequired: operatorIncluded ? i.operator.nightShift : undefined, // AC-24
+        operatorNationality: operatorIncluded ? i.operator.nationality ?? undefined : undefined, // AC-24
+        safetyCertifications: safetyCerts, // AC-50 project safety certs fanned per-item
+      };
+    }),
   };
 }

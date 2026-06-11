@@ -2,14 +2,32 @@ import {
   AgentDraft,
   EquipmentItem,
   ProjectDetails,
+  Preferences,
   defaultProjectDetails,
+  defaultPreferences,
   defaultOperatorDetails,
   defaultOperatorNeeded,
   computeSummary,
+  SITE_ACCESS_RESTRICTIONS,
+  OTHER_CERTIFICATES,
+  SAFETY_CERTIFICATES,
+  PAYMENT_TERMS,
+  PAYMENT_METHODS,
+  MAINTENANCE_RESPONSIBILITIES,
+  BID_WINDOWS,
   type FuelType,
   type RentalBasis,
   type OvertimeRate,
   type Verdict,
+  type Party,
+  type OperatorCertificate,
+  type SiteAccessRestriction,
+  type OtherCertificate,
+  type PaymentTerm,
+  type PaymentMethod,
+  type MaintenanceResponsibility,
+  type MaintenanceSla,
+  type BidWindow,
 } from "@/lib/contract";
 import type { RFQAgentOutput, RFQHeader, RFQLineItem, MissingFieldEntry } from "@/lib/contract/agent";
 
@@ -30,17 +48,27 @@ export function unwrapEnvelope(raw: unknown): Obj {
   return raw;
 }
 
-/** Extract the agent output from either the nested or flattened envelope. */
+/** Extract the agent output from the envelope, wherever the payload sits. */
 export function extractAgentOutput(raw: unknown): RFQAgentOutput {
   const a = unwrapEnvelope(raw);
-  const b = isObj(a.data) && ("rfq_header" in a.data || "line_items" in a.data) ? (a.data as Obj) : a;
+  // The agent output may live at the top, under `data` (flattened), or under `result` — the async
+  // job-poll wrapper is `{ data: { status, result: { rfq_header, line_items, ... } } }`, so after
+  // unwrapEnvelope the payload is one level deeper, under `result`. Pick the level that actually
+  // carries rfq_header / line_items.
+  const candidates: Obj[] = [a];
+  if (isObj(a.result)) candidates.push(a.result);
+  if (isObj(a.data)) {
+    candidates.push(a.data);
+    if (isObj(a.data.result)) candidates.push(a.data.result);
+  }
+  const b = candidates.find((c) => "rfq_header" in c || "line_items" in c) ?? a;
   return {
     rfq_header: (b.rfq_header ?? {}) as RFQHeader,
     line_items: (Array.isArray(b.line_items) ? b.line_items : []) as RFQLineItem[],
-    missing_required_fields: (Array.isArray(a.missing_required_fields)
-      ? a.missing_required_fields
-      : Array.isArray(b.missing_required_fields)
-        ? b.missing_required_fields
+    missing_required_fields: (Array.isArray(b.missing_required_fields)
+      ? b.missing_required_fields
+      : Array.isArray(a.missing_required_fields)
+        ? a.missing_required_fields
         : []) as MissingFieldEntry[],
   };
 }
@@ -58,6 +86,7 @@ export function jobStatus(raw: unknown): "pending" | "done" | "error" {
   const s = String(a.status ?? a.state ?? "").toLowerCase();
   if (["failed", "error", "errored"].includes(s)) return "error";
   if (["pending", "processing", "queued", "running", "in_progress"].includes(s)) return "pending";
+  if (["done", "completed", "succeeded", "success"].includes(s)) return "done";
   // No explicit status (or a done-ish one) → done iff a result is present.
   return extractAgentOutput(raw).line_items.length > 0 || a.extraction_empty === true || isObj(a.data) ? "done" : "pending";
 }
@@ -72,18 +101,78 @@ export function jobStatus(raw: unknown): "pending" | "done" | "error" {
  */
 export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
   const items = (out.line_items ?? []).map((li, idx) => toItem(li, idx));
+  const project = toProject(out.rfq_header ?? {});
+  // AC-25/26: reconcile the agent's per-item mob/demob/fuel-responsibility with the request-wide
+  // "Settings for all items": all items same → lift to request-wide + clear the per-item overrides;
+  // items differ → request-wide shows no selection (null), per-item overrides kept.
+  reconcileRequestWide(items, "deliveryOverride", (v) => (project.deliveryToSite = v));
+  reconcileRequestWide(items, "returnOverride", (v) => (project.returnFromSite = v));
+  reconcileRequestWide(items, "fuelResponsibilityOverride", (v) => (project.fuelResponsibility = v));
+  // AC-50: if the items that HAVE an agent-set operator certificate all share the same one (e.g. all
+  // TÜV), reflect it as the project-level Safety certificate (checked) and let that control them.
+  // No-operator items (no cert) don't block this — they just aren't counted.
+  const certs = items.map((i) => i.operator.certificate).filter((c): c is OperatorCertificate => c != null);
+  if (certs.length > 0 && certs.every((c) => c === certs[0])) {
+    project.certificates.safety = [certs[0]];
+    for (const i of items) i.operator.certByAgent = false;
+  }
   return {
-    project: toProject(out.rfq_header ?? {}),
+    project,
     items,
-    detectedLocations: [out.rfq_header?.project_address_label].filter(Boolean) as string[],
+    preferences: toPreferences(out.rfq_header ?? {}), // AC-36/37/39/40: prefill Step-3 from the agent
+    // Mansour now returns an explicit detected_locations list (AC-48); fall back to the single
+    // address label for older/flattened payloads that omit it.
+    detectedLocations: (Array.isArray(out.rfq_header?.detected_locations) && out.rfq_header.detected_locations.length
+      ? out.rfq_header.detected_locations
+      : [out.rfq_header?.project_address_label]
+    ).filter(Boolean) as string[],
     summary: computeSummary(items),
   };
+}
+
+type OverrideKey = "deliveryOverride" | "returnOverride" | "fuelResponsibilityOverride";
+/**
+ * Reconcile per-item agent values with the request-wide control (AC-25/26):
+ *  - every item shares one explicit value → set request-wide to it, clear the per-item overrides;
+ *  - items disagree (or a mix of set/unset) → request-wide = null (no selection), keep overrides;
+ *  - the agent set none → leave the request-wide default untouched.
+ */
+function reconcileRequestWide(items: EquipmentItem[], key: OverrideKey, set: (v: Party | null) => void): void {
+  if (!items.length) return;
+  const vals = items.map((i) => i[key]);
+  if (vals.every((v) => v == null)) return; // agent set none → keep default
+  if (vals.every((v) => v === vals[0])) {
+    set(vals[0]); // all items the same explicit value → lift to request-wide
+    for (const i of items) i[key] = null;
+  } else {
+    set(null); // items disagree → no selection on the shared control
+  }
 }
 
 const RENTAL_IN: Record<string, RentalBasis> = { DAILY: "daily", WEEKLY: "weekly", MONTHLY: "monthly" };
 const FUEL_IN: Record<string, FuelType> = { DIESEL: "diesel", PETROL: "petrol", ELECTRIC: "electric" };
 const OVERTIME_IN: Record<string, OvertimeRate> = { "0": "without", "1.5X": "1.5x", "2X": "2x" };
+const LICENSE_IN: Record<string, OperatorCertificate> = { TUV: "tuv", SPSP: "spsp" }; // agent license level → our cert
+const SLA_IN: Record<string, MaintenanceSla> = { FOUR_HR: "4h", EIGHT_HR: "8h", TWENTY_FOUR_HR: "24h" };
 const CAP_NEEDS_CHECK = new Set(["snapped", "converted", "range", "not_specified", "new"]);
+
+/** Keep a Mansour-emitted value only if it maps to a known UI option. Tolerant of case and
+ *  space/underscore vs hyphen (e.g. "NET_30" / "Net 30" → "net-30"); ignores anything unmatched. */
+function pick<T extends string>(value: string | null | undefined, allowed: readonly T[]): T | undefined {
+  if (!value) return undefined;
+  const a = allowed as readonly string[];
+  const lower = value.toLowerCase().trim();
+  const norm = lower.replace(/[\s_]+/g, "-");
+  if (a.includes(lower)) return lower as T;
+  return a.includes(norm) ? (norm as T) : undefined;
+}
+
+/** Mansour's per-item operator cert: prefer the license level, fall back to the safety-cert list. */
+function toOperatorCert(li: RFQLineItem): OperatorCertificate | null {
+  if (li.operator_license_level && LICENSE_IN[li.operator_license_level]) return LICENSE_IN[li.operator_license_level];
+  const fromList = (li.safety_certifications ?? []).map((c) => pick(c, SAFETY_CERTIFICATES)).find(Boolean);
+  return fromList ?? null;
+}
 
 function deriveVerdict(li: RFQLineItem): { verdict: Verdict; resolved: boolean } {
   const isNew = li.category_match === "new" || li.subtype_match === "new" || li.category === "No Equipment Found";
@@ -104,6 +193,7 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
     measurementId: li.capacity_id ?? null,
   };
   const operatorNeeded = li.operator_included == null ? defaultOperatorNeeded(ref.subcategoryId) : li.operator_included ? "yes" : "no";
+  const agentCert = toOperatorCert(li); // AC-50: cert the agent set from the RFQ (null if none)
   return {
     id: `a${idx}`,
     rawLabel: li.input_equipment ?? null,
@@ -119,12 +209,16 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
       ...defaultOperatorDetails(),
       nightShift: li.night_shift_required ?? false,
       nationality: li.operator_nationality ?? null,
+      certificate: agentCert, // AC-24/50: operator license level / safety cert
+      certByAgent: agentCert != null, // agent set it → project-level Safety cert won't override
+      transfer: li.fat_required ?? false, // AC-24: FAT / transfer
     },
     fuelType: (li.fuel_type_preference && FUEL_IN[li.fuel_type_preference]) || "diesel",
-    additionalNotes: "",
+    additionalNotes: li.additional_notes ?? "", // AC-53: agent-extracted per-item notes (was dropped)
     deliveryOverride: li.mobilization_by_rentee == null ? null : li.mobilization_by_rentee ? "me" : "supplier",
     returnOverride: li.demobilization_by_rentee == null ? null : li.demobilization_by_rentee ? "me" : "supplier",
-    fuelResponsibilityOverride: null,
+    // AC-26: supplier provides fuel ⇒ fuel responsibility = supplier (else me); null when Mansour didn't say.
+    fuelResponsibilityOverride: li.diesel_included == null ? null : li.diesel_included ? "supplier" : "me",
   };
 }
 
@@ -138,10 +232,36 @@ function toProject(h: RFQHeader): ProjectDetails {
     source: "agent",
   };
   p.timing.rentalBasis = h.rental_type ? RENTAL_IN[h.rental_type] ?? null : null;
+  p.timing.extendable = h.extendable ?? false; // AC-13 (was dropped)
   p.timing.startDate = h.start_date ?? null;
   p.timing.endDate = h.end_date ?? null;
   p.timing.hoursPerDay = h.working_hours_per_day ?? 8;
   p.advanced.workingDaysPerWeek = h.working_days_per_week ?? 6;
   p.advanced.overtimeRate = h.overtime_rate ? OVERTIME_IN[h.overtime_rate] ?? "without" : "without";
+  // AC-27: keep only restrictions that are valid UI options.
+  p.advanced.siteAccessRestrictions = (h.site_access_restrictions ?? [])
+    .map((r) => pick(r, SITE_ACCESS_RESTRICTIONS))
+    .filter(Boolean) as SiteAccessRestriction[];
+  // AC-50: project "Other" certificates from the local-content / saso-registration flags.
+  p.certificates.other = [
+    h.local_content ? "local-content" : null,
+    h.saso_registration ? "saso-registration" : null,
+  ].filter(Boolean) as OtherCertificate[];
+  return p;
+}
+
+/** AC-36/37/39/40: Step-3 preferences Mansour inferred. Defaults for anything it didn't emit. */
+function toPreferences(h: RFQHeader): Preferences {
+  const p = defaultPreferences();
+  p.payment.terms = (pick(h.payment_terms, PAYMENT_TERMS) as PaymentTerm | undefined) ?? null;
+  p.payment.method = (pick(h.payment_method, PAYMENT_METHODS) as PaymentMethod | undefined) ?? null;
+  p.maintenance.responsibility =
+    (pick(h.maintenance_responsibility, MAINTENANCE_RESPONSIBILITIES) as MaintenanceResponsibility | undefined) ?? "supplier";
+  p.maintenance.sla = h.breakdown_response_sla ? SLA_IN[h.breakdown_response_sla] ?? null : null;
+  p.additionalNotes = h.additional_notes ?? ""; // AC-38 request-level notes
+  p.budgetSar = h.budget_ceiling ?? null; // AC-39
+  p.supplierFilters.verifiedOnly = h.verified_suppliers_only ?? false;
+  p.supplierFilters.sublettingAllowed = h.subletting ?? false;
+  p.supplierFilters.bidWindow = (pick(h.offer_duration, BID_WINDOWS) as BidWindow | undefined) ?? null;
   return p;
 }
