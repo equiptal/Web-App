@@ -291,4 +291,33 @@ export const ar: Dictionary = {
     accommodation: { me: "أنا", supplier: "المورّد" },
     operatorNeeded: { yes: "نعم", no: "لا" },
   },
+  auth: {
+    brandTagline: "المعدات، عند الطلب",
+    brandPoint1: "انشر طلبًا في دقائق",
+    brandPoint2: "نقرأ مستندك ونبني الطلب",
+    brandFoot: "ويب المستأجر",
+    signInTitle: "مرحبًا بعودتك", // AC-01
+    signInSub: "سجّل الدخول لإدارة طلبات معداتك.",
+    phoneLabel: "رقم الجوال", // AC-01
+    phonePlaceholder: "5X XXX XXXX",
+    sendCode: "إرسال الرمز", // AC-01
+    sending: "جارٍ الإرسال…",
+    codeTitle: "أدخل الرمز المكوّن من ٤ أرقام", // AC-02
+    codeSentTo: "أرسلنا رمزًا عبر الرسائل القصيرة إلى {phone}.", // AC-02
+    verify: "تحقق وتابع", // AC-03
+    verifying: "جارٍ التحقق…",
+    editNumber: "رجوع", // AC-13
+    resend: "إعادة إرسال الرمز", // AC-12
+    resent: "تم إرسال رمز جديد.", // AC-12
+    signOut: "تسجيل الخروج", // AC-19
+    errors: {
+      invalid_phone: "أدخل رقم جوال صحيح.",
+      invalid_code: "الرمز غير صحيح. حاول مرة أخرى.", // AC-09
+      expired: "انتهت صلاحية الرمز. اطلب رمزًا جديدًا.", // AC-11
+      locked: "عدد محاولات كثير جدًا. اطلب رمزًا جديدًا.", // AC-10
+      send_failed: "تعذّر إرسال الرمز. حاول مرة أخرى.", // AC-15
+      offline: "يبدو أنك غير متصل بالإنترنت. تحقق من اتصالك وحاول مرة أخرى.", // AC-24
+      unknown: "حدث خطأ ما. حاول مرة أخرى.",
+    },
+  },
 };

@@ -1,36 +1,25 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useLocale } from "@/lib/i18n";
-import { useSession, type RenterTier } from "@/lib/session";
+import { useRouter } from "next/navigation";
+import { useLocale, useT } from "@/lib/i18n";
+import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import type { Locale } from "@/lib/i18n/config";
 
-const TIERS: RenterTier[] = ["guest", "basic", "verified"];
-
 export function AppShell({ children }: { children: ReactNode }) {
   const { locale, setLocale } = useLocale();
-  const { tier, setTier } = useSession();
+  const t = useT();
+  const { tier, status, signOut } = useSession();
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    await signOut(); // AC-19: end the session…
+    router.push("/login"); // …and return to the sign-in screen
+  };
 
   return (
     <div className="min-h-screen">
-      {/* Demo controls (meta, not product) — exercises the guest block. */}
-      <div className="flex items-center gap-3 bg-[#0e1a26] px-5 py-1.5 text-[11.5px] text-[#9fb6cc]">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-[#6b8299]">Demo controls</span>
-        <span>tier</span>
-        <div className="inline-flex rounded-md bg-white/10 p-0.5">
-          {TIERS.map((tn) => (
-            <button
-              key={tn}
-              onClick={() => setTier(tn)}
-              className={`rounded px-2.5 py-1 font-semibold capitalize ${tier === tn ? "bg-white text-navy" : "text-[#9fb6cc]"}`}
-            >
-              {tn}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* App bar */}
       <header className="sticky top-0 z-30 flex h-[60px] items-center justify-between border-b border-border bg-surface px-7">
         <div className="flex items-center gap-3 text-[17px] font-extrabold tracking-tight">
@@ -55,6 +44,16 @@ export function AppShell({ children }: { children: ReactNode }) {
             ))}
           </span>
           <span className="rounded-md border border-border bg-surface2 px-1.5 py-0.5 text-[10px] font-bold uppercase text-muted">{tier}</span>
+          {status === "authed" && (
+            <button
+              onClick={handleSignOut}
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-1 text-xs font-semibold text-muted hover:text-navy"
+              aria-label="Sign out"
+            >
+              <Icon name="logout" size={15} />
+              {t.auth.signOut}
+            </button>
+          )}
         </div>
       </header>
 

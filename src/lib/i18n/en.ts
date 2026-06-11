@@ -290,6 +290,35 @@ export const en = {
     accommodation: { me: "Me", supplier: "Supplier" },
     operatorNeeded: { yes: "Yes", no: "No" },
   },
+  auth: {
+    brandTagline: "Equipment, on demand",
+    brandPoint1: "Post a request in minutes",
+    brandPoint2: "We read your document & build the request",
+    brandFoot: "Rentee web",
+    signInTitle: "Welcome back", // AC-01
+    signInSub: "Sign in to manage your equipment requests.",
+    phoneLabel: "Phone number", // AC-01
+    phonePlaceholder: "5X XXX XXXX",
+    sendCode: "Send code", // AC-01
+    sending: "Sending…",
+    codeTitle: "Enter the 4-digit code", // AC-02
+    codeSentTo: "We sent a code by SMS to {phone}.", // AC-02
+    verify: "Verify & continue", // AC-03
+    verifying: "Verifying…",
+    editNumber: "Back", // AC-13
+    resend: "Resend code", // AC-12
+    resent: "A new code has been sent.", // AC-12
+    signOut: "Sign out", // AC-19
+    errors: {
+      invalid_phone: "Enter a valid phone number.",
+      invalid_code: "That code isn't right. Try again.", // AC-09
+      expired: "That code has expired. Request a new one.", // AC-11
+      locked: "Too many attempts. Request a new code.", // AC-10
+      send_failed: "We couldn't send the code. Please try again.", // AC-15
+      offline: "You appear to be offline. Check your connection and try again.", // AC-24
+      unknown: "Something went wrong. Please try again.",
+    },
+  },
 };
 
 export type Dictionary = typeof en;
