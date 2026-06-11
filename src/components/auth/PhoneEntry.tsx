@@ -6,11 +6,12 @@ import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 
 /**
- * Phone-entry screen (AC-01/02/15/24). `+966` preset; on submit requests a code and advances to the
- * code screen. T6 (#19) refines this to the prototype.
+ * Phone-entry screen (AC-01/02/15/24), matching the prototype's login `form-inner`. `+966` preset;
+ * on submit requests a code and advances to the code screen.
  */
 export function PhoneEntry({ onCodeSent }: { onCodeSent: (phone: string) => void }) {
   const t = useT();
+  const a = t.auth;
   const [digits, setDigits] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<AuthKind | null>(null);
@@ -27,37 +28,39 @@ export function PhoneEntry({ onCodeSent }: { onCodeSent: (phone: string) => void
   };
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-xl font-extrabold text-navy">{t.auth.signInTitle}</h1>
-        <p className="mt-1 text-sm text-muted">{t.auth.signInSub}</p>
-      </div>
-      <label className="text-sm font-semibold text-navy-mid">
-        {t.auth.phoneLabel}
-        <div className="mt-1 flex items-center overflow-hidden rounded-lg border border-border">
-          <span className="bg-surface2 px-3 py-2 text-sm font-bold text-muted" dir="ltr">
-            +966
-          </span>
-          <input
-            inputMode="numeric"
-            autoComplete="tel-national"
-            value={digits}
-            onChange={(e) => setDigits(e.target.value)}
-            className="w-full px-3 py-2 text-sm outline-none"
-            placeholder={t.auth.phonePlaceholder}
-            dir="ltr"
-          />
+    <form onSubmit={submit} noValidate>
+      <h2 className="mb-[6px] text-[26px] font-extrabold tracking-[-.5px] text-navy">{a.signInTitle}</h2>
+      <p className="mb-[28px] text-[14px] leading-[1.55] text-muted">{a.signInSub}</p>
+
+      <label className="mb-[8px] block text-[12.5px] font-bold text-navy-mid">{a.phoneLabel}</label>
+      <div className="flex gap-[10px]" dir="ltr">
+        <div className="flex h-[50px] items-center gap-[6px] whitespace-nowrap rounded-[10px] border border-border bg-surface px-[14px] text-[14.5px] font-bold text-navy">
+          <span className="text-[17px]">🇸🇦</span> +966
         </div>
-      </label>
-      {err && <p className="text-sm text-red-600">{t.auth.errors[err]}</p>}
+        <input
+          className="h-[50px] min-w-0 flex-1 rounded-[10px] border border-border bg-surface px-[14px] text-[15px] font-semibold text-navy outline-0 placeholder:font-medium placeholder:text-[#9BB3C8] focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)]"
+          type="tel"
+          inputMode="numeric"
+          autoComplete="tel-national"
+          maxLength={11}
+          value={digits}
+          onChange={(e) => setDigits(e.target.value)}
+          placeholder={a.phonePlaceholder}
+        />
+      </div>
+
+      {err && <p className="mt-[10px] text-[13px] font-semibold text-danger">{a.errors[err]}</p>}
+
       <button
         type="submit"
         disabled={busy || !digits.trim()}
-        className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-navy px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+        className="mt-[24px] flex w-full items-center justify-center gap-[7px] rounded-[10px] border border-brand bg-brand px-[24px] py-[13px] text-[14.5px] font-bold text-white transition hover:brightness-[1.04] disabled:opacity-50"
       >
-        {busy ? t.auth.sending : t.auth.sendCode}
-        {!busy && <Icon name="arrow_forward" size={16} />}
+        <span>{busy ? a.sending : a.sendCode}</span>
+        {!busy && <Icon name="arrow_forward" size={18} />}
       </button>
+
+      <div className="mt-[22px] text-center text-[13px] leading-[1.55] text-muted">{a.signInFoot}</div>
     </form>
   );
 }

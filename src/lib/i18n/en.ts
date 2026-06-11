@@ -291,21 +291,28 @@ export const en = {
     operatorNeeded: { yes: "Yes", no: "No" },
   },
   auth: {
-    brandTagline: "Equipment, on demand",
-    brandPoint1: "Post a request in minutes",
-    brandPoint2: "We read your document & build the request",
+    brandPill: "Equipment, on demand",
+    brandHeadline: "Rent the right equipment, from suppliers you can trust.",
+    brandSubtitle: "Post a request, compare competitive bids from verified suppliers, and book — all in one place.",
+    feat1Title: "Post a request in minutes",
+    feat1Sub: "Tell us what you need, when and where",
+    feat2Title: "Or upload an RFQ — your smart assistant handles it",
+    feat2Sub: "We read your document & build the request",
+    feat3Title: "Compare bids & enter the deal room to negotiate",
+    feat3Sub: "Competitive offers from verified suppliers",
     brandFoot: "Rentee web",
     signInTitle: "Welcome back", // AC-01
-    signInSub: "Sign in to manage your equipment requests.",
+    signInSub: "Enter your phone number to continue. We'll text you a verification code.",
     phoneLabel: "Phone number", // AC-01
     phonePlaceholder: "5X XXX XXXX",
     sendCode: "Send code", // AC-01
     sending: "Sending…",
+    signInFoot: "New here? Just enter your number — we'll set you up.",
     codeTitle: "Enter the 4-digit code", // AC-02
-    codeSentTo: "We sent a code by SMS to {phone}.", // AC-02
+    codeSentTo: "We sent it to {phone}", // AC-02
     verify: "Verify & continue", // AC-03
     verifying: "Verifying…",
-    editNumber: "Back", // AC-13
+    back: "Back", // AC-13
     resend: "Resend code", // AC-12
     resent: "A new code has been sent.", // AC-12
     signOut: "Sign out", // AC-19
