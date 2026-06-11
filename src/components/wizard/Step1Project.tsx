@@ -19,7 +19,8 @@ import {
 } from "@/lib/contract";
 
 // Leaflet touches `window` at import, so the map picker is client-only.
-const MapLocationPicker = dynamic(() => import("@/components/shared/MapLocationPicker"), { ssr: false });
+// web-app/002: Google Maps picker (swapped from the Leaflet/OSM MapLocationPicker — kept alongside).
+const MapLocationPicker = dynamic(() => import("@/components/shared/GoogleMapLocationPicker"), { ssr: false });
 
 function opt<T extends string>(values: readonly T[], dict: Record<string, string>) {
   return values.map((v) => ({ value: v, label: dict[v] ?? v }));
