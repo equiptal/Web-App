@@ -117,7 +117,17 @@ export function ItemRow({ item, taxonomy, sharedFuelResp }: { item: EquipmentIte
             <Icon name="swap_horiz" size={14} /> {item.advisory}
           </div>
         )}
-        {!item.resolved && <p className="mt-1.5 text-[12.5px] text-muted">{item.suggestion ? fmt(t.step2.nearestSuggested, { measurement: measurement?.name ?? "" }) : t.step2.needsValidationPrompt}</p>}
+        {!item.resolved &&
+          (!isCompleteRef(item.ref) ? (
+            // AC-18/19: Approve is disabled until the size is picked — say so explicitly.
+            <p className="mt-1.5 flex items-center gap-1.5 text-[12.5px] font-semibold text-warn">
+              <Icon name="error_outline" size={14} /> {t.step2.pickSizeToApprove}
+            </p>
+          ) : (
+            <p className="mt-1.5 text-[12.5px] text-muted">
+              {item.suggestion ? fmt(t.step2.nearestSuggested, { measurement: measurement?.name ?? "" }) : t.step2.needsValidationPrompt}
+            </p>
+          ))}
 
         {/* Matched: qty + operator/fuel meta tags */}
         {status === "matched" && (
@@ -242,13 +252,16 @@ function Avatar({ glyph, conf }: { glyph: string; conf: "high" | "mid" | "low" }
 function RfqMatch({ raw, matched }: { raw: string | null; matched: React.ReactNode }) {
   const t = useT();
   return (
-    <div className="flex items-start gap-3">
+    <div className="flex items-center gap-3">
       <span className="flex w-[200px] flex-none flex-col gap-0.5">
         <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted">{t.step2.fromRfq}</span>
         <span className="text-[15px] font-bold leading-tight break-words">{raw ? `“${raw}”` : "—"}</span>
       </span>
-      <Icon name="arrow_forward" size={20} className="mt-3.5 flex-none text-muted/60" />
-      <span className="min-w-0 flex-1 break-words text-[15px] font-extrabold leading-tight">{matched}</span>
+      <Icon name="arrow_forward" size={20} className="flex-none text-muted/60" />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted">{t.step2.matchedTo}</span>
+        <span className="break-words text-[15px] font-extrabold leading-tight">{matched}</span>
+      </span>
     </div>
   );
 }

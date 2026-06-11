@@ -34,6 +34,8 @@ export function Step1Project() {
   const project = state.draft!.project;
   const loc = project.location;
   const conflictUnresolved = Boolean(loc.conflict && !loc.conflict.resolvedFrom);
+  // AC-16: a location must actually be set (address label or map coords) before it can be confirmed.
+  const hasLocation = Boolean((loc.label && loc.label.trim()) || (loc.lat != null && loc.lng != null));
   const multi = state.draft!.detectedLocations.filter(Boolean);
   const ey = project.advanced.equipmentYear;
   const isCustomYear = !!ey && ey.startsWith("custom:");
@@ -91,9 +93,13 @@ export function Step1Project() {
             ) : (
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-warn/30 bg-warn-soft px-3.5 py-3">
                 <span className="flex items-center gap-1.5 text-[12.5px] font-semibold text-warn">
-                  <Icon name="help_outline" size={17} /> {t.step1.location.confirmPrompt}
+                  <Icon name="help_outline" size={17} /> {hasLocation ? t.step1.location.confirmPrompt : t.step1.location.fillPrompt}
                 </span>
-                <button className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-brand-fg hover:opacity-90" onClick={() => actions.confirmLocation()}>
+                <button
+                  disabled={!hasLocation}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-brand-fg hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={() => actions.confirmLocation()}
+                >
                   <Icon name="check" size={16} /> {t.step1.location.confirmAction}
                 </button>
               </div>
@@ -114,6 +120,13 @@ export function Step1Project() {
                 ))}
               </ul>
             )}
+            {/* AC-48: each other site is its own request — opens a fresh RFQ in a new tab (prototype openNewRequest). */}
+            <button
+              onClick={() => window.open(window.location.href, "_blank", "noopener")}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-info/40 bg-surface px-3 py-1.5 text-xs font-bold text-info hover:border-info"
+            >
+              {t.step1.location.startSeparateRequest} <Icon name="open_in_new" size={14} />
+            </button>
           </div>
         </div>
       </Card>

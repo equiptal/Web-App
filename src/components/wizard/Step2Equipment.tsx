@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { Card, Field, Icon, MIcon, RadioGroup } from "@/components/ui";
-import { gateStep2, PARTIES, type EquipmentItem, type Party } from "@/lib/contract";
+import { gateStep2, isCompleteRef, PARTIES, type EquipmentItem, type Party } from "@/lib/contract";
 import { ItemRow } from "@/components/wizard/ItemRow";
 
 type Group = "all" | "needs-ok" | "matched" | "not-available";
@@ -55,8 +55,18 @@ export function Step2Equipment() {
   const seqIdx = seq.indexOf(activeFilter as Exclude<Group, "all">);
   const prevGroup = seqIdx > 0 ? [...seq.slice(0, seqIdx)].reverse().find((g) => counts[g] > 0) : undefined;
 
+  // Approve all: only resolve items that end up with a complete taxonomy ref — either they carry a
+  // nearest-size suggestion (approveSuggestion fills the measurement) or their ref is already
+  // complete. Items still missing a size (no suggestion) are LEFT in Needs-your-OK so the renter must
+  // pick a size — they can't be bulk-approved without one.
   function approveAll() {
-    items.filter((i) => groupOf(i) === "needs-ok").forEach((i) => actions.approveSuggestion(i.id));
+    items
+      .filter((i) => groupOf(i) === "needs-ok")
+      .forEach((i) => {
+        if (i.suggestion) actions.approveSuggestion(i.id);
+        else if (isCompleteRef(i.ref)) actions.approveItem(i.id);
+        // else: missing size, no suggestion → skip (stays in Needs your OK).
+      });
   }
 
   const partyOpts = PARTIES.map((p) => ({ value: p, label: t.options.party[p] }));

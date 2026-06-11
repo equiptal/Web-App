@@ -57,7 +57,7 @@ export const en = {
     sub: "This usually takes a few seconds — hang tight.",
     stage1: "Reading your document/text",
     stage2: "Extracting your project details",
-    stage3: "Matching equipment to our catalogue",
+    stage3: "Matching your equipment to what we provide",
     stage4: "Preparing your request",
     // AC-56 e.g. "24 items found · 3 need a quick check · 2 not available"
     summaryItems: "{count} items found",
@@ -69,6 +69,7 @@ export const en = {
     subtitle: "We read these from your RFQ — they apply to your whole request, across all items.",
     location: {
       confirmPrompt: "Is this the right site? Please confirm it before you continue.",
+      fillPrompt: "Add the project location before you can confirm.", // AC-16: can't confirm an empty location
       card: "Location",
       unconfirmed: "Location not confirmed",
       confirmed: "Location confirmed",
@@ -82,6 +83,7 @@ export const en = {
       fromFile: "From file", // AC-47 tentative
       multiLocationTitle: "This request covers a single location.", // AC-48
       multiLocationBody: "The other location(s) we found need a separate request.",
+      startSeparateRequest: "Start a separate request", // AC-48: opens a fresh request in a new tab
       mapPicker: {
         searchPlaceholder: "Search a place, or paste a Maps link / coordinates",
         search: "Search",
@@ -123,6 +125,7 @@ export const en = {
     title: "Your equipment",
     subtitle: "Each line from your RFQ is matched to available equipment. Answer the quick questions, then continue. Nothing is sent until you review it.",
     fromRfq: "From your RFQ",
+    matchedTo: "Matched to",
     settingsForAll: "Settings for all items",
     settingsForAllHint: "These apply to every item — you can still override any of them per item.",
     filterAll: "All items",
@@ -140,6 +143,7 @@ export const en = {
     confidentReady: "Ready — no action needed.",
     needsValidationPrompt: "We matched this — approve it or change it.",
     nearestSuggested: "Nearest available size: {measurement}.", // AC-19
+    pickSizeToApprove: "Pick a size to approve.", // AC-18/19: why Approve is disabled
     unitConversion: "{fromValue}{fromUnit} ≈ {toValue}{toUnit} in our sizes.", // AC-20
     editTaxonomy: "Edit match",
     category: "Category",
