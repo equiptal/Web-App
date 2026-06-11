@@ -18,9 +18,14 @@ export type AuthErrorKind =
   | "not_configured" // APP_API_URL missing
   | "unknown";
 
-/** Backend auth error code → UI kind. Codes from apps/backend/docs/auth.md. */
+/**
+ * Backend auth error code → UI kind. Codes from apps/backend/docs/auth.md, plus the live backend's
+ * generic `VALIDATION_ERROR` (the validation middleware returns this for a malformed phone on
+ * /auth/login & /auth/resend-otp — the only validated field there — which the docs labelled E3004).
+ */
 const CODE_TO_KIND: Record<string, AuthErrorKind> = {
   E3004: "invalid_phone",
+  VALIDATION_ERROR: "invalid_phone",
   E6000: "invalid_code",
   E6001: "expired",
   E6002: "locked",

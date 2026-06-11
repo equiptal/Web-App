@@ -21,6 +21,7 @@ describe("app-backend authPost — error-code mapping (AC-09/10/11/15)", () => {
     ["E6002", "locked"],
     ["E6003", "send_failed"],
     ["E3004", "invalid_phone"],
+    ["VALIDATION_ERROR", "invalid_phone"],
   ])("maps backend %s → kind %s", async (code, kind) => {
     vi.stubGlobal("fetch", fetchOk(400, { success: false, error: { code, message: "x" } }));
     await expect(authPost("/auth/login", {})).rejects.toMatchObject({ kind });
@@ -28,9 +29,9 @@ describe("app-backend authPost — error-code mapping (AC-09/10/11/15)", () => {
 
   it("unknown backend code → unknown kind", async () => {
     vi.stubGlobal("fetch", fetchOk(500, { success: false, error: { code: "E9999" } }));
-    const err = await authPost("/auth/login", {}).catch((e) => e);
+    const err = await authPost("/auth/login", {}).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(AuthError);
-    expect(err.kind).toBe("unknown");
+    expect((err as AuthError).kind).toBe("unknown");
   });
 
   it("fetch rejection → offline (AC-24)", async () => {
