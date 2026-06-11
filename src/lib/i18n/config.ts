@@ -21,3 +21,11 @@ export function dirFor(locale: Locale): Dir {
 export function isLocale(value: string): value is Locale {
   return (LOCALES as readonly string[]).includes(value);
 }
+
+/**
+ * AC-21: pick the default locale from the browser language (`en`/`ar`) when there is no stored
+ * choice. Anything other than Arabic falls back to the default locale.
+ */
+export function detectLocale(navigatorLanguage: string | undefined): Locale {
+  return (navigatorLanguage ?? "").toLowerCase().startsWith("ar") ? "ar" : DEFAULT_LOCALE;
+}

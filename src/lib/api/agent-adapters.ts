@@ -9,7 +9,6 @@ import {
   defaultOperatorNeeded,
   computeSummary,
   SITE_ACCESS_RESTRICTIONS,
-  OTHER_CERTIFICATES,
   SAFETY_CERTIFICATES,
   PAYMENT_TERMS,
   PAYMENT_METHODS,

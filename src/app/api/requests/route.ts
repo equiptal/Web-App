@@ -1,15 +1,30 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { useRealApp, serverEnv } from "@/lib/config/env";
 import { agentsPost, AgentsBackendError } from "@/lib/api/agents-backend";
+import { USER_COOKIE } from "@/lib/api/auth-server";
 import { draftToCreateRequest } from "@/lib/api/app-adapters";
 import type { RfqRequestPayload } from "@/lib/contract";
 import type { CreateRequestResult } from "@/lib/contract/app";
+import type { RenterUser } from "@/lib/contract/auth";
+
+/** AC-03: the signed-in renter's real backend id (web-app/001), or null when there's no session. */
+async function sessionUserId(): Promise<string | null> {
+  try {
+    const raw = (await cookies()).get(USER_COOKIE)?.value;
+    if (!raw) return null;
+    const user = JSON.parse(raw) as RenterUser;
+    return typeof user.id === "number" ? String(user.id) : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * POST /api/requests — submit the assembled broadcast request.
- * Real (AGENTS_API_URL + token + AGENTS_TEST_USER_ID set): maps the draft → create_request and
- * POSTs /agents/requests. Otherwise (or if no test user while auth is bypassed) → mock.
- * Body: RfqRequestPayload & { simulateError?: boolean }
+ * Real (AGENTS_API_URL + token set): maps the draft → create_request and POSTs /agents/requests as
+ * the signed-in renter (web-app/001, AC-03), falling back to AGENTS_TEST_USER_ID only when there's
+ * no session. Otherwise → mock. Body: RfqRequestPayload & { simulateError?: boolean }
  */
 export async function POST(req: Request) {
   let body: (RfqRequestPayload & { simulateError?: boolean }) | Record<string, never> = {};
@@ -23,9 +38,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ code: "network" }, { status: 503 });
   }
 
-  if (useRealApp && serverEnv.agentsTestUserId && "items" in body) {
+  // AC-03: submit as the signed-in renter; the env test user is only a no-session fallback.
+  const userId = (await sessionUserId()) ?? serverEnv.agentsTestUserId;
+
+  if (useRealApp && userId && "items" in body) {
     try {
-      const payload = draftToCreateRequest(body as RfqRequestPayload, serverEnv.agentsTestUserId);
+      const payload = draftToCreateRequest(body as RfqRequestPayload, userId);
       const data = await agentsPost<CreateRequestResult>("/agents/requests", payload);
       return NextResponse.json({ requestId: data.shortCode ?? data.requestId ?? "RFQ" }, { status: 201 });
     } catch (err) {
