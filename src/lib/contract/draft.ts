@@ -62,10 +62,12 @@ export interface ProjectDetails {
   timing: TimingHours;
   advanced: AdvancedSettings;
   certificates: Certificates;
-  // Request-wide, per-item overridable (AC-25/26):
-  deliveryToSite: Party; // AC-25 default "me"
-  returnFromSite: Party; // AC-25 default "me"
-  fuelResponsibility: Party; // AC-26 default "me"
+  // Request-wide, per-item overridable (AC-25/26). `null` = no selection: the agent found differing
+  // per-item values (each item carries its own), or nothing chosen yet. A value applies to every
+  // item without a per-item override.
+  deliveryToSite: Party | null;
+  returnFromSite: Party | null;
+  fuelResponsibility: Party | null;
 }
 
 /* ----------------------------- Equipment item ----------------------------- */
@@ -74,6 +76,9 @@ export interface OperatorDetails {
   nightShift: boolean;
   nationality: string | null;
   certificate: OperatorCertificate | null; // defaulted from project Safety cert (AC-24/50)
+  /** AC-50: true when the agent set the cert per-item from the RFQ — the project-level Safety cert
+   *  then leaves it untouched (only fills items the agent didn't mention). */
+  certByAgent?: boolean;
   transfer: boolean;
   accommodation: Accommodation | null;
 }

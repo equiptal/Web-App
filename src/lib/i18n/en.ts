@@ -73,6 +73,7 @@ export const en = {
       card: "Location",
       unconfirmed: "Location not confirmed",
       confirmed: "Location confirmed",
+      changeHint: "Search above to change", // AC-16: editing the location re-requires confirm
       confirmAction: "Confirm location", // AC-16 tentative
       setViaMap: "Set on map",
       useGps: "Use my current location",
@@ -88,6 +89,8 @@ export const en = {
         searchPlaceholder: "Search a place, or paste a Maps link / coordinates",
         search: "Search",
         useMyLocation: "Use my location",
+        pinnedNoAddress: "Pinned location (no address found)",
+        locating: "Locating address…",
       },
     },
     timing: {
@@ -157,6 +160,8 @@ export const en = {
       provide: "Provide it for me?", // AC-30/31 tentative
       cancel: "Cancel", // AC-30/32 tentative
       explainer: "We couldn't find this in our catalogue.",
+      // AC-31: prefilled WhatsApp message to Moedatech support requesting the equipment be sourced.
+      whatsappMessage: 'Hi Moedatech, I\'m creating an RFQ and need equipment that isn\'t available in the app: "{item}". Please add/source it for me so it is added to my request. Thank you!',
     },
     perItem: {
       quantity: "Quantity",
@@ -213,6 +218,7 @@ export const en = {
     projectSummary: "Project",
     equipmentSummary: "Equipment",
     preferencesSummary: "Preferences",
+    perItem: "Per item",
     table: {
       equipment: "Equipment",
       category: "Category",

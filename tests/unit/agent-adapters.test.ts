@@ -32,6 +32,66 @@ const jobPoll = (status: string, line: object = confidentLine) => ({
   },
 });
 
+// Build an output with multiple line items (for request-wide reconciliation tests).
+const jobPollItems = (lines: object[]) => ({
+  ok: true,
+  data: { id: "j", status: "done", result: { rfq_header: {}, line_items: lines, missing_required_fields: [] } },
+});
+
+describe("agentOutputToDraft — request-wide reconciliation (AC-25/26)", () => {
+  it("lifts a common per-item value to the request-wide setting and clears the overrides", () => {
+    const d = agentOutputToDraft(
+      extractAgentOutput(
+        jobPollItems([
+          { ...confidentLine, mobilization_by_rentee: true },
+          { ...confidentLine, mobilization_by_rentee: true },
+        ]),
+      ),
+    );
+    expect(d.project.deliveryToSite).toBe("me"); // both items "me" → lifted
+    expect(d.items.every((i) => i.deliveryOverride === null)).toBe(true); // overrides cleared
+  });
+
+  it("reflects a common agent operator certificate at the project Safety level (AC-50)", () => {
+    const d = agentOutputToDraft(
+      extractAgentOutput(
+        jobPollItems([
+          { ...confidentLine, operator_license_level: "TUV" },
+          { ...confidentLine, operator_license_level: "TUV" },
+        ]),
+      ),
+    );
+    expect(d.project.certificates.safety).toEqual(["tuv"]); // checked at project level
+    expect(d.items.every((i) => i.operator.certificate === "tuv")).toBe(true);
+  });
+
+  it("lifts the common cert even when a no-operator item has none (AC-50)", () => {
+    const d = agentOutputToDraft(
+      extractAgentOutput(
+        jobPollItems([
+          { ...confidentLine, operator_license_level: "TUV" },
+          { ...confidentLine, operator_included: false }, // e.g. a generator — no cert
+        ]),
+      ),
+    );
+    expect(d.project.certificates.safety).toEqual(["tuv"]); // no-operator item doesn't block the lift
+  });
+
+  it("leaves the request-wide setting unselected (null) when items disagree", () => {
+    const d = agentOutputToDraft(
+      extractAgentOutput(
+        jobPollItems([
+          { ...confidentLine, mobilization_by_rentee: true }, // me
+          { ...confidentLine, mobilization_by_rentee: false }, // supplier
+        ]),
+      ),
+    );
+    expect(d.project.deliveryToSite).toBeNull(); // disagree → no selection
+    expect(d.items[0].deliveryOverride).toBe("me");
+    expect(d.items[1].deliveryOverride).toBe("supplier"); // per-item kept
+  });
+});
+
 describe("extractAgentOutput — envelope shapes", () => {
   it("reads the nested data.result job-poll shape (the live contract)", () => {
     const out = extractAgentOutput(jobPoll("done"));

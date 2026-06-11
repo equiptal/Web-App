@@ -34,7 +34,7 @@ export function Wizard() {
   return (
     <div>
       {/* Step indicator (AC-44). Earlier steps are clickable (free back-nav). */}
-      <ol className="mb-6 flex items-center gap-2 text-sm">
+      <ol className="mb-6 flex items-center justify-center gap-2 text-sm">
         {([1, 2, 3, 4] as Step[]).map((n) => {
           const active = n === step;
           const done = n < step;

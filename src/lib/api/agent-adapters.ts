@@ -101,8 +101,23 @@ export function jobStatus(raw: unknown): "pending" | "done" | "error" {
  */
 export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
   const items = (out.line_items ?? []).map((li, idx) => toItem(li, idx));
+  const project = toProject(out.rfq_header ?? {});
+  // AC-25/26: reconcile the agent's per-item mob/demob/fuel-responsibility with the request-wide
+  // "Settings for all items": all items same → lift to request-wide + clear the per-item overrides;
+  // items differ → request-wide shows no selection (null), per-item overrides kept.
+  reconcileRequestWide(items, "deliveryOverride", (v) => (project.deliveryToSite = v));
+  reconcileRequestWide(items, "returnOverride", (v) => (project.returnFromSite = v));
+  reconcileRequestWide(items, "fuelResponsibilityOverride", (v) => (project.fuelResponsibility = v));
+  // AC-50: if the items that HAVE an agent-set operator certificate all share the same one (e.g. all
+  // TÜV), reflect it as the project-level Safety certificate (checked) and let that control them.
+  // No-operator items (no cert) don't block this — they just aren't counted.
+  const certs = items.map((i) => i.operator.certificate).filter((c): c is OperatorCertificate => c != null);
+  if (certs.length > 0 && certs.every((c) => c === certs[0])) {
+    project.certificates.safety = [certs[0]];
+    for (const i of items) i.operator.certByAgent = false;
+  }
   return {
-    project: toProject(out.rfq_header ?? {}),
+    project,
     items,
     preferences: toPreferences(out.rfq_header ?? {}), // AC-36/37/39/40: prefill Step-3 from the agent
     // Mansour now returns an explicit detected_locations list (AC-48); fall back to the single
@@ -113,6 +128,25 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
     ).filter(Boolean) as string[],
     summary: computeSummary(items),
   };
+}
+
+type OverrideKey = "deliveryOverride" | "returnOverride" | "fuelResponsibilityOverride";
+/**
+ * Reconcile per-item agent values with the request-wide control (AC-25/26):
+ *  - every item shares one explicit value → set request-wide to it, clear the per-item overrides;
+ *  - items disagree (or a mix of set/unset) → request-wide = null (no selection), keep overrides;
+ *  - the agent set none → leave the request-wide default untouched.
+ */
+function reconcileRequestWide(items: EquipmentItem[], key: OverrideKey, set: (v: Party | null) => void): void {
+  if (!items.length) return;
+  const vals = items.map((i) => i[key]);
+  if (vals.every((v) => v == null)) return; // agent set none → keep default
+  if (vals.every((v) => v === vals[0])) {
+    set(vals[0]); // all items the same explicit value → lift to request-wide
+    for (const i of items) i[key] = null;
+  } else {
+    set(null); // items disagree → no selection on the shared control
+  }
 }
 
 const RENTAL_IN: Record<string, RentalBasis> = { DAILY: "daily", WEEKLY: "weekly", MONTHLY: "monthly" };
@@ -159,6 +193,7 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
     measurementId: li.capacity_id ?? null,
   };
   const operatorNeeded = li.operator_included == null ? defaultOperatorNeeded(ref.subcategoryId) : li.operator_included ? "yes" : "no";
+  const agentCert = toOperatorCert(li); // AC-50: cert the agent set from the RFQ (null if none)
   return {
     id: `a${idx}`,
     rawLabel: li.input_equipment ?? null,
@@ -174,7 +209,8 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
       ...defaultOperatorDetails(),
       nightShift: li.night_shift_required ?? false,
       nationality: li.operator_nationality ?? null,
-      certificate: toOperatorCert(li), // AC-24/50: operator license level / safety cert
+      certificate: agentCert, // AC-24/50: operator license level / safety cert
+      certByAgent: agentCert != null, // agent set it → project-level Safety cert won't override
       transfer: li.fat_required ?? false, // AC-24: FAT / transfer
     },
     fuelType: (li.fuel_type_preference && FUEL_IN[li.fuel_type_preference]) || "diesel",

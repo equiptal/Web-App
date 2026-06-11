@@ -123,11 +123,7 @@ export function Intake() {
           </div>
 
           {/* footer */}
-          <div className="mt-6 flex items-center justify-between gap-3">
-            {/* Dev affordance to exercise AC-10 (not part of the prototype). */}
-            <label className="flex items-center gap-1.5 text-[11px] text-muted/70">
-              <input type="checkbox" checked={state.simulateError} onChange={(e) => actions.setSimulateError(e.target.checked)} /> simulate failure
-            </label>
+          <div className="mt-6 flex items-center justify-end gap-3">
             <div className="flex items-center gap-3">
               {!canStart && <Badge>{t.intake.emptyHint}</Badge>}
               <Button disabled={!canStart} onClick={() => actions.process()} className="px-6 py-3 text-[14.5px]">

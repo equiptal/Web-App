@@ -38,9 +38,9 @@ export function buildSpecRows(draft: RfqDraft, taxonomy: Taxonomy): SpecRow[] {
       year,
       operatorNeeded: item.operatorNeeded,
       fuelType: item.fuelType,
-      fuelResp: item.fuelResponsibilityOverride ?? draft.project.fuelResponsibility,
-      delivery: item.deliveryOverride ?? draft.project.deliveryToSite,
-      ret: item.returnOverride ?? draft.project.returnFromSite,
+      fuelResp: item.fuelResponsibilityOverride ?? draft.project.fuelResponsibility ?? "me",
+      delivery: item.deliveryOverride ?? draft.project.deliveryToSite ?? "me",
+      ret: item.returnOverride ?? draft.project.returnFromSite ?? "me",
       certificate: item.operator.certificate,
       notes: item.additionalNotes,
     };

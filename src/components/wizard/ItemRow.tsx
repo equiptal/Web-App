@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useT, fmt } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
+import { SUPPORT_WHATSAPP_NUMBER } from "@/lib/config/support";
 import { Button, Field, Icon, Pchips, Select, Stepper, TextArea, Toggle, Modal } from "@/components/ui";
 import {
   EquipmentItem,
@@ -40,9 +41,9 @@ export function ItemRow({
 }: {
   item: EquipmentItem;
   taxonomy: Taxonomy;
-  sharedFuelResp: Party;
-  sharedDelivery: Party;
-  sharedReturn: Party;
+  sharedFuelResp: Party | null;
+  sharedDelivery: Party | null;
+  sharedReturn: Party | null;
 }) {
   const t = useT();
   const { actions } = useRfq();
@@ -76,7 +77,8 @@ export function ItemRow({
           <Button
             variant="secondary"
             onClick={() => {
-              window.open("https://wa.me/966500000000?text=" + encodeURIComponent(`Please source: ${item.rawLabel ?? ""}`), "_blank");
+              const msg = fmt(t.step2.noMatch.whatsappMessage, { item: item.rawLabel ?? "" });
+              window.open(`https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
               actions.removeItem(item.id);
             }}
           >

@@ -130,7 +130,7 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
     requiredCerts: requiredCerts.length ? requiredCerts : undefined, // AC-50
     localContent: localContent || undefined, // AC-50 (omit when false)
     equipmentItems: items.map((i) => {
-      const fuelParty = i.fuelResponsibilityOverride ?? project.fuelResponsibility; // AC-26 request-wide + per-item override
+      const fuelParty = i.fuelResponsibilityOverride ?? project.fuelResponsibility ?? "me"; // AC-26 override → request-wide → default me
       const operatorIncluded = i.operatorNeeded === "yes";
       return {
         categoryId: i.ref.categoryId as string,
@@ -139,8 +139,8 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
         numberOfUnits: i.quantity,
         operatorIncluded: operatorIncluded ? "YES" : "NO",
         fuelTypePreference: FUEL_MAP[i.fuelType],
-        mobilizationByRentee: (i.deliveryOverride ?? project.deliveryToSite) === "me",
-        demobilizationByRentee: (i.returnOverride ?? project.returnFromSite) === "me",
+        mobilizationByRentee: (i.deliveryOverride ?? project.deliveryToSite ?? "me") === "me",
+        demobilizationByRentee: (i.returnOverride ?? project.returnFromSite ?? "me") === "me",
         additionalNotes: i.additionalNotes || undefined, // AC-53 (rule 6: needs the deployed item column)
         maxEquipmentAge: manufactureYear, // AC-28 project-level year, fanned out (undefined ⇒ key dropped)
         dieselIncluded: toDieselIncluded(i.fuelType, fuelParty), // AC-26

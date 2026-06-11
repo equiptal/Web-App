@@ -74,6 +74,7 @@ export const ar: Dictionary = {
       card: "الموقع",
       unconfirmed: "لم يتم تأكيد الموقع",
       confirmed: "تم تأكيد الموقع",
+      changeHint: "ابحث بالأعلى للتغيير",
       confirmAction: "تأكيد الموقع",
       setViaMap: "تحديد على الخريطة",
       useGps: "استخدام موقعي الحالي",
@@ -89,7 +90,10 @@ export const ar: Dictionary = {
         searchPlaceholder: "ابحث عن مكان، أو الصق رابط خرائط / إحداثيات",
         search: "بحث",
         useMyLocation: "استخدام موقعي",
+        pinnedNoAddress: "موقع محدّد (لم يُعثر على عنوان)",
+        locating: "جارٍ تحديد العنوان…",
       },
+
     },
     timing: {
       card: "التوقيت والساعات",
@@ -158,6 +162,7 @@ export const ar: Dictionary = {
       provide: "وفّروه لي؟",
       cancel: "إلغاء",
       explainer: "لم نتمكن من إيجاد هذا في كتالوجنا.",
+      whatsappMessage: 'مرحبًا Moedatech، أقوم بإنشاء طلب عرض أسعار وأحتاج إلى معدة غير متوفرة في التطبيق: "{item}". الرجاء إضافتها/توفيرها لي لتُضاف إلى طلبي. شكرًا!',
     },
     perItem: {
       quantity: "الكمية",
@@ -214,6 +219,7 @@ export const ar: Dictionary = {
     projectSummary: "المشروع",
     equipmentSummary: "المعدات",
     preferencesSummary: "التفضيلات",
+    perItem: "حسب كل عنصر",
     table: {
       equipment: "المعدة",
       category: "الفئة",

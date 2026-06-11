@@ -35,7 +35,9 @@ export function Step1Project() {
   const loc = project.location;
   const conflictUnresolved = Boolean(loc.conflict && !loc.conflict.resolvedFrom);
   // AC-16: a location must actually be set (address label or map coords) before it can be confirmed.
-  const hasLocation = Boolean((loc.label && loc.label.trim()) || (loc.lat != null && loc.lng != null));
+  // AC-16: must be an actual point found on the map (coordinates) before it can be confirmed —
+  // a typed label alone isn't enough.
+  const hasLocation = loc.lat != null && loc.lng != null;
   const multi = state.draft!.detectedLocations.filter(Boolean);
   const ey = project.advanced.equipmentYear;
   const isCustomYear = !!ey && ey.startsWith("custom:");
@@ -79,16 +81,17 @@ export function Step1Project() {
 
             <MapLocationPicker
               value={loc.lat != null && loc.lng != null ? { lat: loc.lat, lng: loc.lng } : null}
-              onChange={(lat, lng, city) => actions.patchLocation({ lat, lng, label: city || loc.label, source: "map" })}
+              label={loc.label}
+              onChange={(lat, lng, address) => actions.patchLocation({ lat, lng, label: address || loc.label, source: "map" })}
             />
 
             {/* AC-16: explicit confirm — always required, even when extracted. */}
             {loc.confirmed ? (
+              // No "Change" button: editing the location in the search/map auto-unconfirms (store
+              // PATCH_LOCATION), so the renter just changes it and reconfirms.
               <div className="mt-3 flex items-center gap-2 rounded-[10px] border border-ok/30 bg-ok-soft px-3.5 py-3 text-[13px] font-bold text-ok">
                 <Icon name="check_circle" size={19} /> {t.step1.location.confirmed}
-                <button className="ms-auto text-xs font-bold text-info" onClick={() => actions.patchLocation({ confirmed: false })}>
-                  {t.common.change}
-                </button>
+                <span className="ms-auto text-xs font-medium text-ok/80">{t.step1.location.changeHint}</span>
               </div>
             ) : (
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-warn/30 bg-warn-soft px-3.5 py-3">

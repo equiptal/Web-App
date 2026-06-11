@@ -110,7 +110,7 @@ export function Step4Preview() {
           rows={[
             [t.step3.payment.title, payment],
             [t.step3.maintenance.title, maint],
-            [`${t.step1.requestWide.delivery} / ${t.step1.requestWide.return}`, `${t.options.party[p.deliveryToSite]} / ${t.options.party[p.returnFromSite]}`],
+            [`${t.step1.requestWide.delivery} / ${t.step1.requestWide.return}`, `${p.deliveryToSite ? t.options.party[p.deliveryToSite] : t.preview.perItem} / ${p.returnFromSite ? t.options.party[p.returnFromSite] : t.preview.perItem}`],
             [t.step3.supplierFilters.title, suppliers],
           ]}
         />
