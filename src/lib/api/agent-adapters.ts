@@ -2,14 +2,32 @@ import {
   AgentDraft,
   EquipmentItem,
   ProjectDetails,
+  Preferences,
   defaultProjectDetails,
+  defaultPreferences,
   defaultOperatorDetails,
   defaultOperatorNeeded,
   computeSummary,
+  SITE_ACCESS_RESTRICTIONS,
+  OTHER_CERTIFICATES,
+  SAFETY_CERTIFICATES,
+  PAYMENT_TERMS,
+  PAYMENT_METHODS,
+  MAINTENANCE_RESPONSIBILITIES,
+  BID_WINDOWS,
   type FuelType,
   type RentalBasis,
   type OvertimeRate,
   type Verdict,
+  type Party,
+  type OperatorCertificate,
+  type SiteAccessRestriction,
+  type OtherCertificate,
+  type PaymentTerm,
+  type PaymentMethod,
+  type MaintenanceResponsibility,
+  type MaintenanceSla,
+  type BidWindow,
 } from "@/lib/contract";
 import type { RFQAgentOutput, RFQHeader, RFQLineItem, MissingFieldEntry } from "@/lib/contract/agent";
 
@@ -86,6 +104,7 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
   return {
     project: toProject(out.rfq_header ?? {}),
     items,
+    preferences: toPreferences(out.rfq_header ?? {}), // AC-36/37/39/40: prefill Step-3 from the agent
     // Mansour now returns an explicit detected_locations list (AC-48); fall back to the single
     // address label for older/flattened payloads that omit it.
     detectedLocations: (Array.isArray(out.rfq_header?.detected_locations) && out.rfq_header.detected_locations.length
@@ -99,7 +118,27 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
 const RENTAL_IN: Record<string, RentalBasis> = { DAILY: "daily", WEEKLY: "weekly", MONTHLY: "monthly" };
 const FUEL_IN: Record<string, FuelType> = { DIESEL: "diesel", PETROL: "petrol", ELECTRIC: "electric" };
 const OVERTIME_IN: Record<string, OvertimeRate> = { "0": "without", "1.5X": "1.5x", "2X": "2x" };
+const LICENSE_IN: Record<string, OperatorCertificate> = { TUV: "tuv", SPSP: "spsp" }; // agent license level → our cert
+const SLA_IN: Record<string, MaintenanceSla> = { FOUR_HR: "4h", EIGHT_HR: "8h", TWENTY_FOUR_HR: "24h" };
 const CAP_NEEDS_CHECK = new Set(["snapped", "converted", "range", "not_specified", "new"]);
+
+/** Keep a Mansour-emitted value only if it maps to a known UI option. Tolerant of case and
+ *  space/underscore vs hyphen (e.g. "NET_30" / "Net 30" → "net-30"); ignores anything unmatched. */
+function pick<T extends string>(value: string | null | undefined, allowed: readonly T[]): T | undefined {
+  if (!value) return undefined;
+  const a = allowed as readonly string[];
+  const lower = value.toLowerCase().trim();
+  const norm = lower.replace(/[\s_]+/g, "-");
+  if (a.includes(lower)) return lower as T;
+  return a.includes(norm) ? (norm as T) : undefined;
+}
+
+/** Mansour's per-item operator cert: prefer the license level, fall back to the safety-cert list. */
+function toOperatorCert(li: RFQLineItem): OperatorCertificate | null {
+  if (li.operator_license_level && LICENSE_IN[li.operator_license_level]) return LICENSE_IN[li.operator_license_level];
+  const fromList = (li.safety_certifications ?? []).map((c) => pick(c, SAFETY_CERTIFICATES)).find(Boolean);
+  return fromList ?? null;
+}
 
 function deriveVerdict(li: RFQLineItem): { verdict: Verdict; resolved: boolean } {
   const isNew = li.category_match === "new" || li.subtype_match === "new" || li.category === "No Equipment Found";
@@ -135,12 +174,15 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
       ...defaultOperatorDetails(),
       nightShift: li.night_shift_required ?? false,
       nationality: li.operator_nationality ?? null,
+      certificate: toOperatorCert(li), // AC-24/50: operator license level / safety cert
+      transfer: li.fat_required ?? false, // AC-24: FAT / transfer
     },
     fuelType: (li.fuel_type_preference && FUEL_IN[li.fuel_type_preference]) || "diesel",
-    additionalNotes: "",
+    additionalNotes: li.additional_notes ?? "", // AC-53: agent-extracted per-item notes (was dropped)
     deliveryOverride: li.mobilization_by_rentee == null ? null : li.mobilization_by_rentee ? "me" : "supplier",
     returnOverride: li.demobilization_by_rentee == null ? null : li.demobilization_by_rentee ? "me" : "supplier",
-    fuelResponsibilityOverride: null,
+    // AC-26: supplier provides fuel ⇒ fuel responsibility = supplier (else me); null when Mansour didn't say.
+    fuelResponsibilityOverride: li.diesel_included == null ? null : li.diesel_included ? "supplier" : "me",
   };
 }
 
@@ -154,10 +196,36 @@ function toProject(h: RFQHeader): ProjectDetails {
     source: "agent",
   };
   p.timing.rentalBasis = h.rental_type ? RENTAL_IN[h.rental_type] ?? null : null;
+  p.timing.extendable = h.extendable ?? false; // AC-13 (was dropped)
   p.timing.startDate = h.start_date ?? null;
   p.timing.endDate = h.end_date ?? null;
   p.timing.hoursPerDay = h.working_hours_per_day ?? 8;
   p.advanced.workingDaysPerWeek = h.working_days_per_week ?? 6;
   p.advanced.overtimeRate = h.overtime_rate ? OVERTIME_IN[h.overtime_rate] ?? "without" : "without";
+  // AC-27: keep only restrictions that are valid UI options.
+  p.advanced.siteAccessRestrictions = (h.site_access_restrictions ?? [])
+    .map((r) => pick(r, SITE_ACCESS_RESTRICTIONS))
+    .filter(Boolean) as SiteAccessRestriction[];
+  // AC-50: project "Other" certificates from the local-content / saso-registration flags.
+  p.certificates.other = [
+    h.local_content ? "local-content" : null,
+    h.saso_registration ? "saso-registration" : null,
+  ].filter(Boolean) as OtherCertificate[];
+  return p;
+}
+
+/** AC-36/37/39/40: Step-3 preferences Mansour inferred. Defaults for anything it didn't emit. */
+function toPreferences(h: RFQHeader): Preferences {
+  const p = defaultPreferences();
+  p.payment.terms = (pick(h.payment_terms, PAYMENT_TERMS) as PaymentTerm | undefined) ?? null;
+  p.payment.method = (pick(h.payment_method, PAYMENT_METHODS) as PaymentMethod | undefined) ?? null;
+  p.maintenance.responsibility =
+    (pick(h.maintenance_responsibility, MAINTENANCE_RESPONSIBILITIES) as MaintenanceResponsibility | undefined) ?? "supplier";
+  p.maintenance.sla = h.breakdown_response_sla ? SLA_IN[h.breakdown_response_sla] ?? null : null;
+  p.additionalNotes = h.additional_notes ?? ""; // AC-38 request-level notes
+  p.budgetSar = h.budget_ceiling ?? null; // AC-39
+  p.supplierFilters.verifiedOnly = h.verified_suppliers_only ?? false;
+  p.supplierFilters.sublettingAllowed = h.subletting ?? false;
+  p.supplierFilters.bidWindow = (pick(h.offer_duration, BID_WINDOWS) as BidWindow | undefined) ?? null;
   return p;
 }

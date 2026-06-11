@@ -30,6 +30,11 @@ export interface RFQLineItem {
   number_of_operators?: number | null;
   operator_nationality?: string | null;
   operator_license_level?: AgentOperatorLicenseLevel | null;
+  // Emitted by Mansour but previously dropped by the adapter — now consumed:
+  additional_notes?: string | null; // AC-53 per-item free-text qualifiers ("silent", "breaker")
+  diesel_included?: boolean | null; // AC-26 supplier provides fuel
+  fat_required?: boolean | null; // AC-24 factory acceptance / transfer
+  safety_certifications?: string[] | null; // AC-50
   capacity_advisory?: string | null;
   fuel_type_match?: FuelTypeMatch;
   category_match?: CategoryMatch;
@@ -43,6 +48,7 @@ export interface RFQLineItem {
 
 export interface RFQHeader {
   rental_type?: AgentRentalType | null;
+  extendable?: boolean | null; // AC-13: rental basis can run beyond the period
   start_date?: string | null;
   end_date?: string | null;
   project_lat?: number | null;
@@ -52,8 +58,19 @@ export interface RFQHeader {
   working_hours_per_day?: number | null;
   working_days_per_week?: number | null;
   overtime_rate?: AgentOvertimeRate | null;
-  additional_notes?: string | null;
-  budget_ceiling?: number | null;
+  site_access_restrictions?: string[] | null; // AC-27
+  additional_notes?: string | null; // AC-38 request-level notes
+  budget_ceiling?: number | null; // AC-39
+  // Step-3 preferences Mansour can infer (previously dropped):
+  payment_terms?: string | null; // AC-36
+  payment_method?: string | null; // AC-36
+  maintenance_responsibility?: string | null; // AC-37
+  breakdown_response_sla?: string | null; // AC-37
+  verified_suppliers_only?: boolean | null; // AC-40
+  subletting?: boolean | null; // AC-40
+  offer_duration?: string | null; // AC-40 bid window
+  local_content?: boolean | null; // AC-50
+  saso_registration?: boolean | null; // AC-50
 }
 
 export interface MissingFieldEntry {

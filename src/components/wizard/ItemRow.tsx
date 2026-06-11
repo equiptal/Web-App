@@ -31,7 +31,19 @@ const CATEGORY_ICON: Record<string, string> = {
   concrete: "foundation",
 };
 
-export function ItemRow({ item, taxonomy, sharedFuelResp }: { item: EquipmentItem; taxonomy: Taxonomy; sharedFuelResp: Party }) {
+export function ItemRow({
+  item,
+  taxonomy,
+  sharedFuelResp,
+  sharedDelivery,
+  sharedReturn,
+}: {
+  item: EquipmentItem;
+  taxonomy: Taxonomy;
+  sharedFuelResp: Party;
+  sharedDelivery: Party;
+  sharedReturn: Party;
+}) {
   const t = useT();
   const { actions } = useRfq();
   const [editingMatch, setEditingMatch] = useState(false);
@@ -199,6 +211,10 @@ export function ItemRow({ item, taxonomy, sharedFuelResp }: { item: EquipmentIte
                 <ChipField label={t.step2.perItem.accommodation}>
                   <Pchips<Party> value={item.operator.accommodation} onChange={(v) => actions.patchItemOperator(item.id, { accommodation: v })} options={opt(PARTIES, t.options.party)} />
                 </ChipField>
+                <div className="flex items-center justify-between">
+                  <span className="text-[13px] font-bold">{t.step2.perItem.transfer}</span>
+                  <Toggle checked={item.operator.transfer} onChange={(v) => actions.patchItemOperator(item.id, { transfer: v })} />
+                </div>
               </div>
             )}
           </div>
@@ -210,6 +226,17 @@ export function ItemRow({ item, taxonomy, sharedFuelResp }: { item: EquipmentIte
             </ChipField>
             <ChipField label={t.step1.requestWide.fuelResponsibility}>
               <Pchips<Party> value={item.fuelResponsibilityOverride ?? sharedFuelResp} onChange={(v) => actions.patchItem(item.id, { fuelResponsibilityOverride: v })} options={opt(PARTIES, t.options.party)} />
+            </ChipField>
+          </div>
+
+          {/* Delivery / Return — per-item override of the request-wide setting (AC-25). Mansour sets
+              these per line (mobilization/demobilization), so surface + allow editing them here. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <ChipField label={t.step1.requestWide.delivery}>
+              <Pchips<Party> value={item.deliveryOverride ?? sharedDelivery} onChange={(v) => actions.patchItem(item.id, { deliveryOverride: v })} options={opt(PARTIES, t.options.party)} />
+            </ChipField>
+            <ChipField label={t.step1.requestWide.return}>
+              <Pchips<Party> value={item.returnOverride ?? sharedReturn} onChange={(v) => actions.patchItem(item.id, { returnOverride: v })} options={opt(PARTIES, t.options.party)} />
             </ChipField>
           </div>
 

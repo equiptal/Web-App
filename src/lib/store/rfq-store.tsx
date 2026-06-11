@@ -134,7 +134,7 @@ function reducer(state: RfqState, a: Action): RfqState {
         draft: {
           project: a.draft.project,
           items: a.draft.items,
-          preferences: defaultPreferences(),
+          preferences: a.draft.preferences ?? defaultPreferences(), // agent-inferred Step-3 prefs when present
           detectedLocations: a.draft.detectedLocations,
           summary: a.draft.summary,
         },

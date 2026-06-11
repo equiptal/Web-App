@@ -148,6 +148,8 @@ export interface Preferences {
 export interface AgentDraft {
   project: ProjectDetails;
   items: EquipmentItem[];
+  /** Step-3 preferences the agent inferred (payment/maintenance/budget/filters). Renter edits in Step 3. */
+  preferences?: Preferences;
   /** AC-48: every distinct site the agent detected; >1 ⇒ prompt that others need separate requests. */
   detectedLocations: string[];
   /** AC-56: processing summary counts. */
