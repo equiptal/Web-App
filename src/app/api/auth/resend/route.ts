@@ -19,7 +19,8 @@ export async function POST(req: Request) {
   try {
     const data = await authPost<{ success?: boolean; expiresAt?: string }>(
       "/auth/resend-otp",
-      { phone, countryCode: "+966", otpMethod: "SMS" },
+      // The live backend's resend schema requires `role` (the docs omitted it) — same as login.
+      { phone, countryCode: "+966", otpMethod: "SMS", role: "rentee" },
       localeFromRequest(req),
     );
     return NextResponse.json({ success: true, expiresAt: data.expiresAt });
