@@ -2,13 +2,16 @@
 
 import { useRef, useState, type ClipboardEvent, type FormEvent, type KeyboardEvent } from "react";
 import { postAuth, type AuthKind } from "./authClient";
-import { useT, fmt } from "@/lib/i18n";
+import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import type { RenterUser } from "@/lib/contract/auth";
 
+const OTP_FONT: React.CSSProperties = { fontFamily: "var(--font-plex), monospace" };
+
 /**
- * Code-entry screen (AC-02/09/10/11/12/13/15/24). 4-box OTP input, verify, resend (no cooldown —
- * AC-12; the prototype's 30s timer is illustrative only), and back/edit-number (AC-13).
+ * Code-entry screen (AC-02/09/10/11/12/13/15/24), matching the prototype's OTP `form-inner`. 4-box
+ * input with filled state, verify, resend (no cooldown — AC-12; the prototype's 30s timer is
+ * illustrative only), and back (AC-13).
  */
 export function CodeEntry({
   phone,
@@ -20,6 +23,7 @@ export function CodeEntry({
   onEditNumber: () => void;
 }) {
   const t = useT();
+  const a = t.auth;
   const inputs = useRef<Array<HTMLInputElement | null>>([]);
   const [boxes, setBoxes] = useState(["", "", "", ""]);
   const [busy, setBusy] = useState(false);
@@ -27,6 +31,7 @@ export function CodeEntry({
   const [resent, setResent] = useState(false);
 
   const code = boxes.join("");
+  const [sentPre, sentPost] = a.codeSentTo.split("{phone}");
 
   const setBox = (i: number, value: string) => {
     const digit = value.replace(/\D/g, "").slice(-1);
@@ -83,22 +88,24 @@ export function CodeEntry({
   };
 
   return (
-    <form onSubmit={verify} className="flex flex-col gap-4">
+    <form onSubmit={verify} noValidate>
       <button
         type="button"
         onClick={onEditNumber}
-        className="inline-flex w-fit items-center gap-1 text-sm font-semibold text-navy-mid"
+        className="mb-[20px] inline-flex items-center gap-[4px] text-[13px] font-bold text-muted"
       >
-        <Icon name="arrow_back" size={16} />
-        {t.auth.editNumber}
+        <Icon name="arrow_back" size={18} className="rtl:-scale-x-100" />
+        {a.back}
       </button>
 
-      <h1 className="text-xl font-extrabold text-navy">{t.auth.codeTitle}</h1>
-      <p className="text-sm text-muted">
-        {fmt(t.auth.codeSentTo, { phone })}
+      <h2 className="mb-[6px] text-[26px] font-extrabold tracking-[-.5px] text-navy">{a.codeTitle}</h2>
+      <p className="mb-[28px] text-[14px] leading-[1.55] text-muted">
+        {sentPre}
+        <b className="text-navy">{phone}</b>
+        {sentPost}
       </p>
 
-      <div className="flex gap-2" dir="ltr">
+      <div className="grid grid-cols-4 gap-[12px]" dir="ltr">
         {boxes.map((d, i) => (
           <input
             key={i}
@@ -113,26 +120,31 @@ export function CodeEntry({
             onKeyDown={(e) => onKeyDown(i, e)}
             onPaste={onPaste}
             aria-label={`Digit ${i + 1}`}
-            className="h-14 w-full rounded-lg border border-border text-center text-2xl font-bold outline-none focus:border-navy"
+            style={OTP_FONT}
+            className={`h-[60px] w-full rounded-[10px] border-[1.5px] text-center text-[24px] font-bold text-navy outline-0 focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)] ${
+              d ? "border-brand bg-brand-soft" : "border-border bg-surface"
+            }`}
           />
         ))}
       </div>
 
-      {err && <p className="text-sm text-red-600">{t.auth.errors[err]}</p>}
-      {resent && !err && <p className="text-sm text-green-600">{t.auth.resent}</p>}
+      {err && <p className="mt-[12px] text-[13px] font-semibold text-danger">{a.errors[err]}</p>}
+      {resent && !err && <p className="mt-[12px] text-[13px] font-semibold text-ok">{a.resent}</p>}
 
       <button
         type="submit"
         disabled={busy || code.length < 4}
-        className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-navy px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+        className="mt-[24px] flex w-full items-center justify-center gap-[7px] rounded-[10px] border border-brand bg-brand px-[24px] py-[13px] text-[14.5px] font-bold text-white transition hover:brightness-[1.04] disabled:opacity-50"
       >
-        {!busy && <Icon name="check" size={16} />}
-        {busy ? t.auth.verifying : t.auth.verify}
+        {!busy && <Icon name="check" size={18} />}
+        <span>{busy ? a.verifying : a.verify}</span>
       </button>
 
-      <button type="button" onClick={resend} className="text-sm font-semibold text-brand">
-        {t.auth.resend}
-      </button>
+      <div className="mt-[22px] text-center text-[13px] text-muted">
+        <button type="button" onClick={resend} className="font-bold text-[#2563EB]">
+          {a.resend}
+        </button>
+      </div>
     </form>
   );
 }

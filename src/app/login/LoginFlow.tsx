@@ -25,9 +25,13 @@ export function LoginFlow({ next }: { next: string }) {
     router.replace(safe); // AC-07 (next) / AC-08 (home)
   };
 
-  return phone === null ? (
-    <PhoneEntry onCodeSent={onCodeSent} />
-  ) : (
-    <CodeEntry phone={phone} onVerified={onVerified} onEditNumber={onEditNumber} />
+  return (
+    <div className="w-full max-w-[380px]">
+      {phone === null ? (
+        <PhoneEntry onCodeSent={onCodeSent} />
+      ) : (
+        <CodeEntry phone={phone} onVerified={onVerified} onEditNumber={onEditNumber} />
+      )}
+    </div>
   );
 }
