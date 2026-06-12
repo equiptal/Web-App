@@ -19,7 +19,7 @@ export function GuestBlock() {
           <h2 className="text-lg font-semibold">{t.guest.blockTitle}</h2>
           <p className="mt-2 text-sm text-muted">{t.guest.blockBody}</p>
           <div className="mt-5">
-            <Button onClick={() => router.push("/onboarding?next=/")}>{t.guest.createAccount}</Button>
+            <Button onClick={() => router.push("/onboarding?next=/create")}>{t.guest.createAccount}</Button>
           </div>
         </div>
       </Card>

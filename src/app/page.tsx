@@ -1,13 +1,14 @@
 import { AppShell } from "@/components/AppShell";
-import { RfqProvider } from "@/lib/store/rfq-store";
-import { CreateSurface } from "@/components/CreateSurface";
+import { HomeHub } from "@/components/home/HomeHub";
 
+/**
+ * / — the renter web home hub (web-app/004). Inside the app shell; the RFQ create flow now lives at
+ * /create (reached via the home banner and the sidebar Request action).
+ */
 export default function Home() {
   return (
-    <RfqProvider>
-      <AppShell>
-        <CreateSurface />
-      </AppShell>
-    </RfqProvider>
+    <AppShell>
+      <HomeHub />
+    </AppShell>
   );
 }
