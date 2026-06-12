@@ -23,6 +23,16 @@ function toOpt(raw: unknown, ar: boolean): Opt | null {
   return null;
 }
 
+// Static fallback lists so city/job-title are ALWAYS dropdowns (like the app), even before the live
+// master-data list loads or if it's unavailable. Live `/master-data/*` overrides these when fetched.
+const FALLBACK_CITIES: Opt[] = [
+  "Riyadh", "Jeddah", "Makkah", "Madinah", "Dammam", "Khobar", "Dhahran", "Jubail",
+  "Taif", "Tabuk", "Abha", "Hail", "Buraidah", "Yanbu", "Najran", "Khamis Mushait",
+].map((c) => ({ value: c, label: c }));
+const FALLBACK_JOBS: Opt[] = [
+  "Company Owner", "Project Manager", "Procurement", "Site Engineer", "Operations", "Logistics", "Foreman", "Other",
+].map((j) => ({ value: j, label: j }));
+
 /**
  * Account-creation form (web-app/003 Flow 1, AC-01/02/03/04/05/06). Prototype design, app/AC fields:
  * first/last name, city + job-title selectors (master-data), optional email + WhatsApp; phone read-only.
@@ -41,8 +51,8 @@ export function OnboardingForm({ next }: { next: string }) {
   const [jobTitle, setJobTitle] = useState("");
   const [email, setEmail] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
-  const [cities, setCities] = useState<Opt[]>([]);
-  const [jobs, setJobs] = useState<Opt[]>([]);
+  const [cities, setCities] = useState<Opt[]>(FALLBACK_CITIES);
+  const [jobs, setJobs] = useState<Opt[]>(FALLBACK_JOBS);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [fe, setFe] = useState<Record<string, string>>({});
@@ -54,12 +64,14 @@ export function OnboardingForm({ next }: { next: string }) {
         const r = await fetch(path);
         if (!r.ok) return;
         const raw: unknown = await r.json();
-        const arr = Array.isArray(raw)
-          ? raw
-          : ((raw as Record<string, unknown>)?.data ?? (raw as Record<string, unknown>)?.items ?? []);
-        set((Array.isArray(arr) ? arr : []).map((x) => toOpt(x, ar)).filter((x): x is Opt => !!x));
+        // Backend wraps the list under a key (`{ cities: [...] }` / `{ jobTitles: [...] }`),
+        // and the BFF unwraps the `data` envelope — so take the first array-valued property.
+        const obj = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+        const arr = Array.isArray(raw) ? raw : ((Object.values(obj).find((v) => Array.isArray(v)) as unknown[]) ?? []);
+        const opts = arr.map((x) => toOpt(x, ar)).filter((x): x is Opt => !!x);
+        if (opts.length) set(opts);
       } catch {
-        /* leave empty → free-text fallback */
+        /* leave the static fallback list (still a dropdown) */
       }
     };
     void load("/api/master-data/cities", setCities);
@@ -151,30 +163,22 @@ export function OnboardingForm({ next }: { next: string }) {
         <div className="grid grid-cols-2 gap-[12px]">
           <div>
             <label className={labelCls}>{o.city}</label>
-            {cities.length ? (
-              <select className={inputCls} value={city} onChange={(e) => setCity(e.target.value)}>
-                <option value="">{o.selectCity}</option>
-                {cities.map((c) => (
-                  <option key={c.value} value={c.value}>{c.label}</option>
-                ))}
-              </select>
-            ) : (
-              <input className={inputCls} value={city} onChange={(e) => setCity(e.target.value)} maxLength={100} />
-            )}
+            <select className={inputCls} value={city} onChange={(e) => setCity(e.target.value)}>
+              <option value="">{o.selectCity}</option>
+              {cities.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
             {fe.city && <p className="mt-1 text-[12px] text-danger">{fe.city}</p>}
           </div>
           <div>
             <label className={labelCls}>{o.jobTitle}</label>
-            {jobs.length ? (
-              <select className={inputCls} value={jobTitle} onChange={(e) => setJobTitle(e.target.value)}>
-                <option value="">{o.selectJobTitle}</option>
-                {jobs.map((j) => (
-                  <option key={j.value} value={j.value}>{j.label}</option>
-                ))}
-              </select>
-            ) : (
-              <input className={inputCls} value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} maxLength={100} />
-            )}
+            <select className={inputCls} value={jobTitle} onChange={(e) => setJobTitle(e.target.value)}>
+              <option value="">{o.selectJobTitle}</option>
+              {jobs.map((j) => (
+                <option key={j.value} value={j.value}>{j.label}</option>
+              ))}
+            </select>
             {fe.jobTitle && <p className="mt-1 text-[12px] text-danger">{fe.jobTitle}</p>}
           </div>
         </div>
