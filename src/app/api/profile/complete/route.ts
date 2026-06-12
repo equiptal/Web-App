@@ -30,7 +30,7 @@ export async function POST(req: Request) {
       if (str(body.whatsapp)) payload.whatsapp = str(body.whatsapp);
 
       await call<Record<string, unknown>>("/users/me/profile", {
-        method: "POST",
+        method: "PUT", // completeProfile is PUT /users/me/profile (POST 404s)
         body: JSON.stringify(payload),
       });
       // Re-read the live user so the session's mt_user cookie reflects the new tier (guest→basic),
