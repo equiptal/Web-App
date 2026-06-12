@@ -37,6 +37,13 @@ export const en = {
     profile: "Profile",
     request: "Request",
     account: "Account",
+    welcome: "Welcome",
+    tierGuest: "Guest",
+    tierBasic: "Basic rentee",
+    tierVerified: "Verified",
+    stepsGuest: "1 of 3 steps · complete your profile to unlock requests.",
+    stepsBasic: "2 of 3 steps · verify your company to unlock unlimited requests.",
+    verifiedNote: "Your company is verified.",
   },
   home: {
     title: "Home",

@@ -39,6 +39,13 @@ export const ar: Dictionary = {
     profile: "الملف الشخصي",
     request: "طلب",
     account: "الحساب",
+    welcome: "أهلاً",
+    tierGuest: "زائر",
+    tierBasic: "مستأجر أساسي",
+    tierVerified: "موثّق",
+    stepsGuest: "١ من ٣ خطوات · أكمل ملفك الشخصي لفتح الطلبات.",
+    stepsBasic: "٢ من ٣ خطوات · وثّق منشأتك لفتح طلبات غير محدودة.",
+    verifiedNote: "تم توثيق منشأتك.",
   },
   home: {
     title: "الرئيسية",
