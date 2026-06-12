@@ -79,6 +79,21 @@ export function mediaUrl(keyOrUrl: unknown): string | null {
   return `${MEDIA_BASE}/${v.replace(/^\/+/, "")}`;
 }
 
+/**
+ * First usable photo URL from a `photoKeys` array. The backend stores entries as structured
+ * objects (`{ key, slot }`) and signs the `.key` into a full URL, but legacy/plain entries may be
+ * bare strings — handle both, then run through `mediaUrl` (passes signed http URLs through).
+ */
+function firstPhotoUrl(v: unknown): string | null {
+  if (!Array.isArray(v) || v.length === 0) return null;
+  for (const e of v) {
+    const key = typeof e === "string" ? e : e && typeof e === "object" && "key" in e ? str((e as Raw).key) : null;
+    const url = mediaUrl(key);
+    if (url) return url;
+  }
+  return null;
+}
+
 /** Pull the store array out of a browse payload (bare array or `{ data | stores | items: [...] }`). */
 export function extractStoreList(raw: unknown): Raw[] {
   if (Array.isArray(raw)) return raw as Raw[];
@@ -119,7 +134,7 @@ export function mapEquipment(raw: Raw): EquipmentCard {
     price: num(raw.price),
     priceUnit: str(raw.priceUnit),
     isVerified: raw.verificationStatus === "VERIFIED",
-    photoUrl: Array.isArray(raw.photoKeys) && raw.photoKeys.length ? mediaUrl(raw.photoKeys[0]) : null,
+    photoUrl: firstPhotoUrl(raw.photoKeys),
   };
 }
 

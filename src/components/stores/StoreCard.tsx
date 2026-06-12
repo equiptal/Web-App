@@ -23,7 +23,7 @@ export function StoreCard({ store }: { store: StoreCardData }) {
           <div className="relative flex-none">
             <div
               className="grid h-[60px] w-[60px] place-items-center overflow-hidden rounded-[10px] bg-white text-[24px] font-extrabold text-navy"
-              style={store.logoUrl ? { backgroundImage: `url(${store.logoUrl})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
+              style={store.logoUrl ? { backgroundImage: `url("${store.logoUrl}")`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
             >
               {!store.logoUrl && (store.name.trim()[0]?.toUpperCase() ?? "?")}
             </div>

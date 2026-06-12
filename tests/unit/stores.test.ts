@@ -56,9 +56,18 @@ describe("stores mappers (web-app/004)", () => {
     expect(mediaUrl(null)).toBeNull();
   });
 
-  it("maps an equipment photo key to a full media URL", () => {
+  it("maps an equipment photo key (bare string) to a full media URL", () => {
     const e = mapEquipment({ id: "e0", photoKeys: ["default/equipment/photos/a.jpg"], verificationStatus: "VERIFIED" });
     expect(e.photoUrl).toBe("https://moedatech-eu-storage.s3.eu-central-1.amazonaws.com/default/equipment/photos/a.jpg");
+  });
+
+  it("extracts .key from structured photoKeys objects and passes signed URLs through", () => {
+    // The backend stores photoKeys as {key, slot} objects and signs .key into a full URL.
+    const e = mapEquipment({
+      id: "e0b",
+      photoKeys: [{ key: "https://moedatech-eu-storage.s3.eu-central-1.amazonaws.com/default/equipment/photos/a.jpg?X-Amz-Signature=abc", slot: "front" }],
+    });
+    expect(e.photoUrl).toBe("https://moedatech-eu-storage.s3.eu-central-1.amazonaws.com/default/equipment/photos/a.jpg?X-Amz-Signature=abc");
   });
 
   it("maps equipment price → price-on-request when price is null, and the verification tick", () => {

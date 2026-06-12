@@ -83,7 +83,7 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
         <div className="relative z-10 flex items-center gap-3.5">
           <div
             className="grid h-[54px] w-[54px] flex-none place-items-center overflow-hidden rounded-full border-2 border-white/30 bg-white/[.12] text-[20px] font-extrabold"
-            style={detail.logoUrl ? { backgroundImage: `url(${detail.logoUrl})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
+            style={detail.logoUrl ? { backgroundImage: `url("${detail.logoUrl}")`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
           >
             {!detail.logoUrl && (detail.name.trim()[0]?.toUpperCase() ?? "?")}
           </div>
@@ -180,11 +180,11 @@ function EquipmentTile({ eq, iconUrl }: { eq: EquipmentCard; iconUrl: string | n
     <div className="overflow-hidden rounded-[14px] border border-border bg-surface transition hover:-translate-y-0.5 hover:shadow-[0_12px_26px_rgba(16,40,68,.12)]">
       <div
         className="relative grid h-[120px] place-items-center bg-gradient-to-br from-surface2 to-surface3"
-        style={eq.photoUrl ? { backgroundImage: `url(${eq.photoUrl})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
+        style={eq.photoUrl ? { backgroundImage: `url("${eq.photoUrl}")`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
       >
         {!eq.photoUrl &&
           (iconUrl ? (
-            <div className="h-full w-full bg-center bg-no-repeat" style={{ backgroundImage: `url(${iconUrl})`, backgroundSize: "44px" }} />
+            <div className="h-full w-full bg-center bg-no-repeat" style={{ backgroundImage: `url("${iconUrl}")`, backgroundSize: "44px" }} />
           ) : (
             <Icon name="construction" size={40} className="text-muted" />
           ))}
