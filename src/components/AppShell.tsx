@@ -46,11 +46,18 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
   const initials = (name.trim() ? name.trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("") : "").toUpperCase();
   const greeting = `${t.shell.welcome}${name ? `, ${name}` : ""}`;
+  // Tier badge beside the avatar: green = verified, blue = basic, grey = guest.
+  const tierBadge: Record<string, { label: string; cls: string }> = {
+    verified: { label: t.shell.tierVerified, cls: "border-ok/30 bg-ok-soft text-ok" },
+    basic: { label: t.shell.tierBasic, cls: "border-info/30 bg-info-soft text-info" },
+    guest: { label: t.shell.tierGuest, cls: "border-border bg-surface2 text-muted" },
+  };
+  const badge = tierBadge[tier] ?? tierBadge.guest;
 
   return (
     <div className="flex min-h-screen">
-      {/* Sidebar (navy) — AC-02 */}
-      <aside className="hidden w-[232px] flex-none flex-col bg-navy px-3.5 py-5 text-white md:flex">
+      {/* Sidebar (navy) — AC-02. Sticky full-height so the tier card stays in view (no page-scroll). */}
+      <aside className="hidden w-[232px] flex-none flex-col self-start bg-navy px-3.5 py-5 text-white md:flex md:sticky md:top-0 md:h-screen md:overflow-y-auto">
         <div className="flex items-center gap-2.5 px-2 pb-[18px] text-[17px] font-extrabold tracking-tight">
           <span className="grid h-9 w-9 flex-none place-items-center rounded-[9px] border border-white/[.16] bg-white/10">
             <Icon name="precision_manufacturing" size={20} className="text-white" />
@@ -96,6 +103,10 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
                 </button>
               ))}
             </span>
+
+            {status === "authed" && (
+              <span className={`hidden rounded-full border px-2.5 py-1 text-[11px] font-bold sm:inline-flex ${badge.cls}`}>{badge.label}</span>
+            )}
 
             {status === "authed" && (
               <div className="relative">
