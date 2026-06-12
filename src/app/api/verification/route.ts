@@ -8,8 +8,14 @@ interface BackendProfileStatus {
   companyName?: string | null;
   nationalId?: string | null;
   companyCity?: string | null;
+  companyAddress?: string | null;
+  companyLat?: number | null;
+  companyLng?: number | null;
   vatDocKey?: string | null;
   crDocKey?: string | null;
+  nationalAddressDocKey?: string | null;
+  localContentDocKey?: string | null;
+  sasoHeavyEquipDocKey?: string | null;
 }
 
 /**
@@ -28,8 +34,14 @@ export async function GET(req: Request) {
           companyName: s.companyName ?? null,
           nationalId: s.nationalId ?? null,
           companyCity: s.companyCity ?? null,
+          companyAddress: s.companyAddress ?? null,
+          companyLat: s.companyLat ?? null,
+          companyLng: s.companyLng ?? null,
           crDocKey: s.crDocKey ?? null,
           vatDocKey: s.vatDocKey ?? null,
+          nationalAddressDocKey: s.nationalAddressDocKey ?? null,
+          localContentDocKey: s.localContentDocKey ?? null,
+          sasoHeavyEquipDocKey: s.sasoHeavyEquipDocKey ?? null,
         },
       });
     } catch (err) {

@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import type { VerificationStatus } from "@/lib/contract/onboarding";
+
+// Reuse the 002 Google Maps picker for the optional company location (AC-15).
+const MapPicker = dynamic(() => import("@/components/shared/GoogleMapLocationPicker"), { ssr: false });
 
 const ACCEPT = "image/jpeg,image/png,image/webp,application/pdf";
 const inputCls =
@@ -98,8 +102,14 @@ export function VerificationFlow() {
   const [companyName, setCompanyName] = useState("");
   const [nationalId, setNationalId] = useState("");
   const [companyCity, setCompanyCity] = useState("");
+  const [companyAddress, setCompanyAddress] = useState("");
+  const [loc, setLoc] = useState<{ lat: number; lng: number } | null>(null);
   const [crDocKey, setCrDocKey] = useState<string | null>(null);
   const [vatDocKey, setVatDocKey] = useState<string | null>(null);
+  const [nationalAddressDocKey, setNationalAddressDocKey] = useState<string | null>(null);
+  const [localContentDocKey, setLocalContentDocKey] = useState<string | null>(null);
+  const [sasoHeavyEquipDocKey, setSasoHeavyEquipDocKey] = useState<string | null>(null);
+  const [otherDocKeys, setOtherDocKeys] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [fe, setFe] = useState<Record<string, string>>({});
@@ -120,7 +130,18 @@ export function VerificationFlow() {
         }
         const d = (await r.json()) as {
           status: VerificationStatus;
-          submission?: { authorityRole?: string | null; companyName?: string | null; nationalId?: string | null; companyCity?: string | null };
+          submission?: {
+            authorityRole?: string | null;
+            companyName?: string | null;
+            nationalId?: string | null;
+            companyCity?: string | null;
+            companyAddress?: string | null;
+            companyLat?: number | null;
+            companyLng?: number | null;
+            nationalAddressDocKey?: string | null;
+            localContentDocKey?: string | null;
+            sasoHeavyEquipDocKey?: string | null;
+          };
         };
         setStatus(d.status);
         const s = d.submission;
@@ -129,6 +150,11 @@ export function VerificationFlow() {
           setCompanyName(s.companyName ?? "");
           setNationalId(s.nationalId ?? "");
           setCompanyCity(s.companyCity ?? "");
+          setCompanyAddress(s.companyAddress ?? "");
+          if (typeof s.companyLat === "number" && typeof s.companyLng === "number") setLoc({ lat: s.companyLat, lng: s.companyLng });
+          setNationalAddressDocKey(s.nationalAddressDocKey ?? null);
+          setLocalContentDocKey(s.localContentDocKey ?? null);
+          setSasoHeavyEquipDocKey(s.sasoHeavyEquipDocKey ?? null);
         }
       } catch {
         setStatus("none");
@@ -162,6 +188,13 @@ export function VerificationFlow() {
           vatDocKey,
           nationalId: nationalId.trim() || undefined,
           companyCity: companyCity.trim() || undefined,
+          companyAddress: companyAddress.trim() || undefined,
+          companyLat: loc?.lat,
+          companyLng: loc?.lng,
+          nationalAddressDocKey: nationalAddressDocKey || undefined,
+          localContentDocKey: localContentDocKey || undefined,
+          sasoHeavyEquipDocKey: sasoHeavyEquipDocKey || undefined,
+          otherDocKeys: otherDocKeys.length ? otherDocKeys : undefined,
         }),
       });
     } catch {
@@ -239,19 +272,57 @@ export function VerificationFlow() {
         <DocUpload label={v.vatDoc} required docKey={vatDocKey} onKey={setVatDocKey} onError={setErr} />
         {fe.vat && <p className="-mt-2 text-[12px] text-danger">{fe.vat}</p>}
 
+        {/* Optional details & documents (AC-15) — mirrors the app's verification form. */}
+        <div className="mt-1 border-t border-border pt-[14px] text-[11px] font-bold uppercase tracking-wide text-muted">
+          {v.optionalSection}
+        </div>
+
         <div className="grid grid-cols-2 gap-[12px]">
           <div>
-            <label className={labelCls}>
-              {v.nationalId} <span className="text-[11px] font-medium text-muted">— {v.optional}</span>
-            </label>
+            <label className={labelCls}>{v.nationalId}</label>
             <input className={inputCls} value={nationalId} onChange={(e) => setNationalId(e.target.value)} maxLength={20} dir="ltr" />
           </div>
           <div>
-            <label className={labelCls}>
-              {v.companyCity} <span className="text-[11px] font-medium text-muted">— {v.optional}</span>
-            </label>
+            <label className={labelCls}>{v.companyCity}</label>
             <input className={inputCls} value={companyCity} onChange={(e) => setCompanyCity(e.target.value)} maxLength={100} />
           </div>
+        </div>
+
+        <div>
+          <label className={labelCls}>{v.companyAddress}</label>
+          <input className={inputCls} value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)} maxLength={500} />
+        </div>
+
+        <div>
+          <label className={labelCls}>{v.companyLocation}</label>
+          <MapPicker
+            value={loc}
+            onChange={(lat, lng, address) => {
+              setLoc({ lat, lng });
+              if (address && !companyAddress.trim()) setCompanyAddress(address);
+            }}
+            height="220px"
+          />
+        </div>
+
+        <DocUpload label={v.nationalAddressDoc} docKey={nationalAddressDocKey} onKey={setNationalAddressDocKey} onError={setErr} />
+        <DocUpload label={v.localContentDoc} docKey={localContentDocKey} onKey={setLocalContentDocKey} onError={setErr} />
+        <DocUpload label={v.sasoDoc} docKey={sasoHeavyEquipDocKey} onKey={setSasoHeavyEquipDocKey} onError={setErr} />
+
+        <div>
+          <label className={labelCls}>{v.otherDoc}</label>
+          {otherDocKeys.map((_, i) => (
+            <p key={i} className="mb-1 inline-flex items-center gap-1 text-[12px] text-ok">
+              <Icon name="check_circle" size={14} /> {v.uploaded} {i + 1}
+            </p>
+          ))}
+          <DocUpload
+            key={otherDocKeys.length}
+            label={v.otherDoc}
+            docKey={null}
+            onKey={(k) => k && setOtherDocKeys((prev) => [...prev, k])}
+            onError={setErr}
+          />
         </div>
 
         {err && <p className="text-[13px] font-semibold text-danger">{err}</p>}
