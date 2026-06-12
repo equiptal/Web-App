@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
+import { EquipmentDetailModal } from "@/components/stores/EquipmentDetailModal";
 import type { EquipmentCard, StoreDetail, TaxonomyNode } from "@/lib/contract/stores";
 
 /**
@@ -19,6 +20,8 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
   const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [icons, setIcons] = useState<Record<string, string>>({});
+  const [selectedEq, setSelectedEq] = useState<string | null>(null);
+  const [showDocs, setShowDocs] = useState(false);
 
   // Taxonomy icons (shared bucket) → map node id → iconUrl, for equipment with no photo.
   useEffect(() => {
@@ -121,7 +124,11 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
 
       {/* Trust tiles (AC-19) + operators (AC-18) */}
       <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="flex items-center gap-3 rounded-[14px] border border-border bg-surface px-4 py-[15px]">
+        <button
+          type="button"
+          onClick={() => setShowDocs(true)}
+          className="flex w-full items-center gap-3 rounded-[14px] border border-border bg-surface px-4 py-[15px] text-start transition hover:border-brand"
+        >
           <span className="grid h-10 w-10 flex-none place-items-center rounded-[10px] bg-ok-soft text-ok">
             <Icon name="description" size={22} />
           </span>
@@ -134,7 +141,7 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
           <span className={`inline-flex flex-none items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-bold ${detail.isVerified ? "bg-ok-soft text-ok" : "bg-surface2 text-muted"}`}>
             <Icon name={detail.isVerified ? "check_circle" : "schedule"} size={13} /> {docStatus}
           </span>
-        </div>
+        </button>
         <div className="flex items-center gap-3 rounded-[14px] border border-border bg-surface px-4 py-[15px] opacity-55">
           <span className="grid h-10 w-10 flex-none place-items-center rounded-[10px] bg-info-soft text-info">
             <Icon name="engineering" size={22} />
@@ -156,15 +163,56 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {detail.equipment.map((e) => (
-            <EquipmentTile key={e.id} eq={e} iconUrl={(e.subcategoryId && icons[e.subcategoryId]) || (e.measurementId && icons[e.measurementId]) || null} />
+            <EquipmentTile
+              key={e.id}
+              eq={e}
+              iconUrl={(e.subcategoryId && icons[e.subcategoryId]) || (e.measurementId && icons[e.measurementId]) || null}
+              onOpen={() => setSelectedEq(e.id)}
+            />
           ))}
         </div>
       )}
+
+      {selectedEq && <EquipmentDetailModal equipmentId={selectedEq} onClose={() => setSelectedEq(null)} />}
+      {showDocs && <StoreDocsModal isVerified={detail.isVerified} onClose={() => setShowDocs(false)} />}
     </div>
   );
 }
 
-function EquipmentTile({ eq, iconUrl }: { eq: EquipmentCard; iconUrl: string | null }) {
+/** Store documents sheet (AC-19) — three labels + verified/pending status, no contents (matches the app). */
+function StoreDocsModal({ isVerified, onClose }: { isVerified: boolean; onClose: () => void }) {
+  const t = useT();
+  const rows = [t.store.docCR, t.store.docVAT, t.store.docNationalAddress];
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-end overflow-y-auto bg-black/50 sm:place-items-center sm:p-4" onClick={onClose}>
+      <div className="w-full max-w-md overflow-hidden rounded-t-[18px] bg-surface sm:rounded-[16px]" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <span className="text-[15px] font-extrabold text-navy">{t.store.documents}</span>
+          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface2" aria-label={t.store.close}>
+            <Icon name="close" size={18} />
+          </button>
+        </div>
+        <div className="flex flex-col gap-2.5 p-4">
+          {rows.map((label) => (
+            <div key={label} className="flex items-center gap-3 rounded-[12px] border border-border bg-surface px-3.5 py-3">
+              <span className={`grid h-9 w-9 flex-none place-items-center rounded-[9px] ${isVerified ? "bg-ok-soft text-ok" : "bg-surface2 text-muted"}`}>
+                <Icon name={isVerified ? "check_circle" : "hourglass_empty"} size={18} />
+              </span>
+              <div>
+                <div className="text-[13.5px] font-bold text-navy">{label}</div>
+                <div className={`text-[12px] font-semibold ${isVerified ? "text-ok" : "text-muted"}`}>
+                  {isVerified ? t.store.statusVerified : t.store.statusPending}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EquipmentTile({ eq, iconUrl, onOpen }: { eq: EquipmentCard; iconUrl: string | null; onOpen: () => void }) {
   const t = useT();
   const { locale } = useLocale();
   const ar = locale === "ar";
@@ -177,7 +225,13 @@ function EquipmentTile({ eq, iconUrl }: { eq: EquipmentCard; iconUrl: string | n
     eq.priceUnit === "PER_WEEK" ? t.store.perWeek : eq.priceUnit === "PER_MONTH" ? t.store.perMonth : eq.priceUnit === "PER_JOB" ? t.store.perJob : t.store.perDay;
 
   return (
-    <div className="overflow-hidden rounded-[14px] border border-border bg-surface transition hover:-translate-y-0.5 hover:shadow-[0_12px_26px_rgba(16,40,68,.12)]">
+    <div
+      onClick={onOpen}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onOpen()}
+      className="cursor-pointer overflow-hidden rounded-[14px] border border-border bg-surface transition hover:-translate-y-0.5 hover:shadow-[0_12px_26px_rgba(16,40,68,.12)]"
+    >
       <div
         className="relative grid h-[120px] place-items-center bg-gradient-to-br from-surface2 to-surface3"
         style={eq.photoUrl ? { backgroundImage: `url("${eq.photoUrl}")`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}

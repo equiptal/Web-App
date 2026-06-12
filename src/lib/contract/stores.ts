@@ -52,6 +52,30 @@ export interface StoreDetail {
   equipment: EquipmentCard[];
 }
 
+/** Full equipment detail (the app's public equipment sheet — GET /equipment/{id}). */
+export interface EquipmentDetail {
+  id: string;
+  category: string | null;
+  categoryAr: string | null;
+  subcategory: string | null;
+  subcategoryAr: string | null;
+  measurement: string | null;
+  measurementAr: string | null;
+  manufacturer: string | null;
+  modelName: string | null;
+  year: number | null;
+  fuel: string | null;
+  operatingHours: number | null;
+  price: number | null;
+  priceUnit: string | null;
+  isVerified: boolean;
+  photos: string[]; // signed photo URLs for the carousel
+  docTypes: string[]; // document types present (e.g. tuv/spsp/saso) — status only, no contents
+  yardName: string | null;
+  yardCity: string | null;
+  storeName: string | null;
+}
+
 /** A node in the equipment taxonomy tree used by the browse filters (AC-11/24). */
 export interface TaxonomyNode {
   id: string;
@@ -135,6 +159,49 @@ export function mapEquipment(raw: Raw): EquipmentCard {
     priceUnit: str(raw.priceUnit),
     isVerified: raw.verificationStatus === "VERIFIED",
     photoUrl: firstPhotoUrl(raw.photoKeys),
+  };
+}
+
+/** All signed photo URLs from a `photoKeys`/`documentKeys` array (entries are `{key}` objects or strings). */
+function allKeyUrls(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .map((e) => (typeof e === "string" ? e : e && typeof e === "object" && "key" in e ? str((e as Raw).key) : null))
+    .map((k) => mediaUrl(k))
+    .filter((u): u is string => !!u);
+}
+
+/** The `type`/`slot` labels present in a structured key array (e.g. document types). */
+function keyField(v: unknown, field: "type" | "slot"): string[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .map((e) => (e && typeof e === "object" && field in e ? str((e as Raw)[field]) : null))
+    .filter((x): x is string => !!x && x !== "OTHER");
+}
+
+export function mapEquipmentDetail(raw: Raw): EquipmentDetail {
+  const store = raw.store && typeof raw.store === "object" ? (raw.store as Raw) : {};
+  return {
+    id: String(raw.id ?? ""),
+    category: str(raw.categoryName),
+    categoryAr: str(raw.categoryNameAr),
+    subcategory: str(raw.subcategoryName),
+    subcategoryAr: str(raw.subcategoryNameAr),
+    measurement: str(raw.measurementName),
+    measurementAr: str(raw.measurementNameAr),
+    manufacturer: str(raw.manufacturer),
+    modelName: str(raw.modelName),
+    year: num(raw.year),
+    fuel: str(raw.fuelType),
+    operatingHours: num(raw.operatingHours),
+    price: num(raw.price),
+    priceUnit: str(raw.priceUnit),
+    isVerified: raw.verificationStatus === "VERIFIED",
+    photos: allKeyUrls(raw.photoKeys),
+    docTypes: keyField(raw.documentKeys, "type"),
+    yardName: str(raw.yardName),
+    yardCity: str(raw.yardCity),
+    storeName: str(store.name),
   };
 }
 
