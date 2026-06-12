@@ -131,6 +131,9 @@ Write `docs/implementation-plans/<card-id>/plan.md` with this template — fill 
 ## Backend — mobile
 <same, but for the mobile app surface>
 
+## Backend — mobile
+<same, but for the web app surface>
+
 ## API integration
 <contract changes, integration points, breaking-change notes, versioning>
 

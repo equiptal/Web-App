@@ -5,6 +5,7 @@ import {
   mapEquipment,
   mapStoreDetail,
   mapTaxonomy,
+  mapEquipmentDetail,
   mediaUrl,
 } from "@/lib/contract/stores";
 import { en } from "@/lib/i18n/en";
@@ -56,9 +57,18 @@ describe("stores mappers (web-app/004)", () => {
     expect(mediaUrl(null)).toBeNull();
   });
 
-  it("maps an equipment photo key to a full media URL", () => {
+  it("maps an equipment photo key (bare string) to a full media URL", () => {
     const e = mapEquipment({ id: "e0", photoKeys: ["default/equipment/photos/a.jpg"], verificationStatus: "VERIFIED" });
     expect(e.photoUrl).toBe("https://moedatech-eu-storage.s3.eu-central-1.amazonaws.com/default/equipment/photos/a.jpg");
+  });
+
+  it("extracts .key from structured photoKeys objects and passes signed URLs through", () => {
+    // The backend stores photoKeys as {key, slot} objects and signs .key into a full URL.
+    const e = mapEquipment({
+      id: "e0b",
+      photoKeys: [{ key: "https://moedatech-eu-storage.s3.eu-central-1.amazonaws.com/default/equipment/photos/a.jpg?X-Amz-Signature=abc", slot: "front" }],
+    });
+    expect(e.photoUrl).toBe("https://moedatech-eu-storage.s3.eu-central-1.amazonaws.com/default/equipment/photos/a.jpg?X-Amz-Signature=abc");
   });
 
   it("maps equipment price → price-on-request when price is null, and the verification tick", () => {
@@ -104,6 +114,35 @@ describe("stores mappers (web-app/004)", () => {
     expect(d.activeEquipmentCount).toBe(7); // from equipmentMeta.total
     expect(d.equipment).toHaveLength(1);
     expect(d.equipment[0].isVerified).toBe(true);
+  });
+
+  it("maps equipment detail: photo URLs from {key} objects, doc types (drops OTHER), price", () => {
+    const d = mapEquipmentDetail({
+      id: "eqd",
+      categoryName: "Cranes",
+      subcategoryName: "Mobile Crane",
+      manufacturer: "SANY",
+      modelName: "STC1000",
+      year: 2023,
+      fuelType: "diesel",
+      operatingHours: 1500,
+      price: 4500,
+      priceUnit: "per_day",
+      verificationStatus: "VERIFIED",
+      photoKeys: [
+        { key: "https://x/p1.jpg?sig=1", slot: "front" },
+        { key: "https://x/p2.jpg?sig=2", slot: "serial" },
+      ],
+      documentKeys: [{ key: "https://x/d1?sig", type: "tuv" }, { key: "https://x/d2?sig", type: "OTHER" }],
+      yardName: "Riyadh Yard",
+      yardCity: "Riyadh",
+      store: { id: "s1", name: "SANY Store" },
+    });
+    expect(d.photos).toEqual(["https://x/p1.jpg?sig=1", "https://x/p2.jpg?sig=2"]);
+    expect(d.docTypes).toEqual(["tuv"]); // OTHER filtered out
+    expect(d.isVerified).toBe(true);
+    expect(d.price).toBe(4500);
+    expect(d.storeName).toBe("SANY Store");
   });
 
   it("maps the taxonomy tree keeping id/name/nameAr/children", () => {
