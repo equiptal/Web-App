@@ -11,9 +11,9 @@ interface CityOpt {
   label: string;
 }
 
-// Matches the prototype `.fdrop` pill.
+// Matches the prototype `.fdrop` pill — equal width so all filters are the same size.
 const selectCls =
-  "h-[40px] rounded-[10px] border border-border bg-surface px-3 text-[13px] font-bold text-navy-mid outline-0 hover:border-navy-mid focus:border-brand";
+  "h-[40px] flex-1 min-w-[150px] rounded-[10px] border border-border bg-surface px-3 text-[13px] font-bold text-navy-mid outline-0 hover:border-navy-mid focus:border-brand";
 
 /**
  * Suggested-suppliers surface (web-app/004, AC-10–17, AC-23). The filter bar (search + city +

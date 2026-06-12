@@ -42,7 +42,7 @@ export function EquipmentDetailModal({ equipmentId, onClose }: { equipmentId: st
   return (
     <div className="fixed inset-0 z-50 grid place-items-end overflow-y-auto bg-black/50 p-0 sm:place-items-center sm:p-4" onClick={onClose}>
       <div
-        className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[18px] bg-surface sm:rounded-[16px]"
+        className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-[18px] bg-surface sm:rounded-[16px]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header / close */}
