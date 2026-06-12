@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { serverEnv } from "@/lib/config/env";
 import { authPost } from "@/lib/api/app-backend";
 import {
-  ACCESS_COOKIE,
+  ID_COOKIE,
   REFRESH_COOKIE,
   clearAuthCookies,
   localeFromRequest,
@@ -142,17 +142,19 @@ export async function withAuthedBackend(
   op: (call: AuthedCall) => Promise<NextResponse>,
 ): Promise<NextResponse> {
   const jar = await cookies();
-  let access = jar.get(ACCESS_COOKIE)?.value;
+  // Authenticated endpoints want the Cognito ID TOKEN (it carries `aud` + `custom:dbUserId`); the
+  // access token is rejected by the gateway authorizer. The mobile app sends the ID token too.
+  let bearer = jar.get(ID_COOKIE)?.value;
   const refreshToken = jar.get(REFRESH_COOKIE)?.value;
   const locale = localeFromRequest(req);
   let refreshed: { accessToken: string; idToken?: string; expiresIn?: number } | null = null;
 
-  // No live access token but a refresh token → refresh up-front.
-  if (!access && refreshToken) {
+  // No live id token but a refresh token → refresh up-front.
+  if (!bearer && refreshToken) {
     refreshed = await tryRefresh(refreshToken, locale);
-    access = refreshed?.accessToken;
+    bearer = refreshed?.idToken;
   }
-  if (!access) {
+  if (!bearer) {
     const res = NextResponse.json({ code: "unauthorized" }, { status: 401 });
     clearAuthCookies(res);
     return res;
@@ -160,20 +162,21 @@ export async function withAuthedBackend(
 
   const call: AuthedCall = async <T>(path: string, init: RequestInit = {}) => {
     try {
-      return await rawCall<T>(path, init, access as string, locale);
+      return await rawCall<T>(path, init, bearer as string, locale);
     } catch (err) {
-      // Access token rejected mid-flight → refresh once and retry.
+      // ID token rejected mid-flight → refresh once and retry.
       if (err instanceof AppAuthError && err.kind === "unauthorized" && refreshToken && !refreshed) {
         refreshed = await tryRefresh(refreshToken, locale);
-        if (!refreshed) throw err;
-        access = refreshed.accessToken;
-        return await rawCall<T>(path, init, access, locale);
+        if (!refreshed?.idToken) throw err;
+        bearer = refreshed.idToken;
+        return await rawCall<T>(path, init, bearer, locale);
       }
       throw err;
     }
   };
 
   const res = await op(call);
+  // Persist refreshed tokens (access cookie maxAge ~1h, id cookie carried for subsequent authed calls).
   if (refreshed) setAccessCookie(res, refreshed.accessToken, refreshed.expiresIn, refreshed.idToken);
   return res;
 }

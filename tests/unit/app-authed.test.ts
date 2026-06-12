@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 
-const h = vi.hoisted(() => ({ jar: { mt_access: "acc", mt_refresh: "ref" } as Record<string, string> }));
+const h = vi.hoisted(() => ({ jar: { mt_id: "idt", mt_access: "acc", mt_refresh: "ref" } as Record<string, string> }));
 
 vi.mock("@/lib/config/env", () => ({
   serverEnv: {
@@ -27,7 +27,7 @@ const reply = (status: number, body: unknown) => ({ ok: status < 400, status, js
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  h.jar = { mt_access: "acc", mt_refresh: "ref" };
+  h.jar = { mt_id: "idt", mt_access: "acc", mt_refresh: "ref" };
 });
 
 describe("GET /api/me (authenticated)", () => {
@@ -49,14 +49,14 @@ describe("GET /api/me (authenticated)", () => {
     expect(json.user.id).toBe(7);
     expect(json.user.tier).toBe("basic");
     expect(json.verification.status).toBe("pending");
-    expect((fetchMock.mock.calls[0][1] as RequestInit).headers).toMatchObject({ Authorization: "Bearer acc" });
+    expect((fetchMock.mock.calls[0][1] as RequestInit).headers).toMatchObject({ Authorization: "Bearer idt" });
   });
 
   it("refreshes on 401, retries, and re-sets the access cookie", async () => {
     let meCalls = 0;
     const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => {
       const u = String(url);
-      if (u.includes("/auth/refresh")) return reply(200, { success: true, data: { accessToken: "new", expiresIn: 3600 } });
+      if (u.includes("/auth/refresh")) return reply(200, { success: true, data: { accessToken: "new", idToken: "newid", expiresIn: 3600 } });
       if (u.includes("/users/me/profile-status")) return reply(200, { success: true, data: { supplierStatus: 2 } });
       if (u.includes("/users/me")) {
         meCalls++;
