@@ -53,7 +53,7 @@ export const ar: Dictionary = {
     bannerSubtitle: "انشر طلبك واحصل على عروض من مؤجرين موثّقين — أو ارفع طلب عروض ومساعدك الذكي ينشئه لك.",
     createRequest: "إنشاء طلب",
     uploadRfq: "رفع طلب عروض",
-    suppliersTitle: "مؤجرون موثّقون",
+    suppliersTitle: "مؤجرون مقترحون",
     viewAll: "عرض الكل",
     showLess: "عرض أقل",
     nudgeGuestTitle: "أكمل ملفك الشخصي",

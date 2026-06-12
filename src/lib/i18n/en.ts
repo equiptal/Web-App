@@ -51,7 +51,7 @@ export const en = {
     bannerSubtitle: "Post your request and get bids from verified suppliers — or upload an RFQ and your smart assistant builds it.",
     createRequest: "Create request",
     uploadRfq: "Upload RFQ",
-    suppliersTitle: "Verified Suppliers",
+    suppliersTitle: "Suggested Suppliers",
     viewAll: "View all",
     showLess: "Show less",
     nudgeGuestTitle: "Complete your profile",
