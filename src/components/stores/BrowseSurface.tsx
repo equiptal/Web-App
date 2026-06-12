@@ -154,17 +154,29 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
               <option key={c.id} value={c.id}>{tabel(c, ar)}</option>
             ))}
           </select>
-          <select className={selectCls} value={subcategoryId} onChange={(e) => onSubcategory(e.target.value)} disabled={!subcategories.length}>
-            <option value="">{t.browse.anySubcategory}</option>
-            {subcategories.map((s) => (
-              <option key={s.id} value={s.id}>{tabel(s, ar)}</option>
-            ))}
+          <select className={selectCls} value={subcategoryId} onChange={(e) => onSubcategory(e.target.value)}>
+            {categoryId ? (
+              <>
+                <option value="">{t.browse.anySubcategory}</option>
+                {subcategories.map((s) => (
+                  <option key={s.id} value={s.id}>{tabel(s, ar)}</option>
+                ))}
+              </>
+            ) : (
+              <option value="">{t.browse.pickCategoryFirst}</option>
+            )}
           </select>
-          <select className={selectCls} value={measurementId} onChange={(e) => setMeasurementId(e.target.value)} disabled={!measurements.length}>
-            <option value="">{t.browse.anyMeasurement}</option>
-            {measurements.map((m) => (
-              <option key={m.id} value={m.id}>{tabel(m, ar)}</option>
-            ))}
+          <select className={selectCls} value={measurementId} onChange={(e) => setMeasurementId(e.target.value)}>
+            {subcategoryId ? (
+              <>
+                <option value="">{t.browse.anyMeasurement}</option>
+                {measurements.map((m) => (
+                  <option key={m.id} value={m.id}>{tabel(m, ar)}</option>
+                ))}
+              </>
+            ) : (
+              <option value="">{t.browse.pickSubcategoryFirst}</option>
+            )}
           </select>
           <button
             type="button"

@@ -77,6 +77,8 @@ export const ar: Dictionary = {
     anyCategory: "كل الفئات",
     anySubcategory: "كل الفئات الفرعية",
     anyMeasurement: "كل المقاييس",
+    pickCategoryFirst: "اختر فئة أولاً",
+    pickSubcategoryFirst: "اختر فئة فرعية أولاً",
     newLabel: "جديد",
     equipmentCount: "معدّة",
     empty: "لا يوجد مؤجرون مطابقون لعوامل التصفية.",

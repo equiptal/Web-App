@@ -75,6 +75,8 @@ export const en = {
     anyCategory: "All categories",
     anySubcategory: "All subcategories",
     anyMeasurement: "All measurements",
+    pickCategoryFirst: "Select a category first",
+    pickSubcategoryFirst: "Select a subcategory first",
     newLabel: "New",
     equipmentCount: "equipment",
     empty: "No suppliers match your filters.",
