@@ -45,6 +45,11 @@ export function setAccessCookie(res: NextResponse, accessToken: string, expiresI
   if (idToken) res.cookies.set(ID_COOKIE, idToken, { ...baseCookie, maxAge: THIRTY_DAYS });
 }
 
+/** Refresh the `mt_user` identity cookie (e.g. after a profile-complete flips tier guest→basic). */
+export function setUserCookie(res: NextResponse, user: RenterUser): void {
+  res.cookies.set(USER_COOKIE, JSON.stringify(user), { ...baseCookie, maxAge: THIRTY_DAYS });
+}
+
 /** Clear all auth cookies on sign-out / failed refresh (AC-19/20). */
 export function clearAuthCookies(res: NextResponse): void {
   for (const name of [ACCESS_COOKIE, REFRESH_COOKIE, ID_COOKIE, USER_COOKIE]) {

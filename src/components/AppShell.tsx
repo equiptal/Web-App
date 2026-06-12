@@ -43,6 +43,24 @@ export function AppShell({ children }: { children: ReactNode }) {
               </button>
             ))}
           </span>
+          {/* web-app/003 tier-progression entries */}
+          {status === "authed" && tier === "guest" && (
+            <button
+              onClick={() => router.push("/onboarding")}
+              className="rounded-md bg-brand px-2.5 py-1 text-xs font-bold text-brand-fg hover:opacity-90"
+            >
+              {t.guest.createAccount}
+            </button>
+          )}
+          {status === "authed" && tier === "basic" && (
+            <button
+              onClick={() => router.push("/verify")}
+              className="inline-flex items-center gap-1 rounded-md border border-brand px-2.5 py-1 text-xs font-bold text-brand hover:bg-brand-soft"
+            >
+              <Icon name="verified" size={14} />
+              {locale === "ar" ? "توثيق المنشأة" : "Verify"}
+            </button>
+          )}
           <span className="rounded-md border border-border bg-surface2 px-1.5 py-0.5 text-[10px] font-bold uppercase text-muted">{tier}</span>
           {status === "authed" && (
             <button
