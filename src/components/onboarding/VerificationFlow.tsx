@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useT } from "@/lib/i18n";
+import { useT, useLocale } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import type { VerificationStatus } from "@/lib/contract/onboarding";
@@ -86,6 +86,22 @@ function DocUpload({
 
 type Role = "owner" | "manager" | "employee";
 
+// Fixed company-city list — mirrors the mobile app's 11-item dropdown exactly (value + EN/AR label).
+// Values are the canonical English strings the app/back-end store, so web + mobile submissions match.
+const VERIFY_CITIES: { value: string; en: string; ar: string }[] = [
+  { value: "Riyadh", en: "Riyadh", ar: "الرياض" },
+  { value: "Jeddah", en: "Jeddah", ar: "جدة" },
+  { value: "Dammam", en: "Dammam", ar: "الدمام" },
+  { value: "Mecca", en: "Mecca", ar: "مكة المكرمة" },
+  { value: "Medina", en: "Medina", ar: "المدينة المنورة" },
+  { value: "Khobar", en: "Khobar", ar: "الخبر" },
+  { value: "Tabuk", en: "Tabuk", ar: "تبوك" },
+  { value: "Abha", en: "Abha", ar: "أبها" },
+  { value: "Jizan", en: "Jizan", ar: "جازان" },
+  { value: "Hail", en: "Hail", ar: "حائل" },
+  { value: "Other", en: "Other", ar: "أخرى" },
+];
+
 /**
  * Verification flow (web-app/003 Flows 2/3, AC-08–20). Reads status from `/api/verification`; routes
  * a guest to onboarding first (AC-08); shows verified/pending states or the (re)submit form. Submits
@@ -94,6 +110,7 @@ type Role = "owner" | "manager" | "employee";
 export function VerificationFlow() {
   const t = useT();
   const v = t.verify;
+  const { locale } = useLocale();
   const router = useRouter();
   const { status: sessionStatus, tier } = useSession();
 
@@ -169,6 +186,7 @@ export function VerificationFlow() {
     if (companyName.trim().length < 2 || companyName.trim().length > 200) next_fe.companyName = v.errors.companyName;
     if (!crDocKey) next_fe.cr = v.errors.cr;
     if (!vatDocKey) next_fe.vat = v.errors.vat;
+    if (!nationalAddressDocKey) next_fe.nationalAddress = v.errors.nationalAddress; // required to match the app (company_verification_page.dart:302)
     if (Object.keys(next_fe).length) {
       setFe(next_fe);
       return;
@@ -244,6 +262,7 @@ export function VerificationFlow() {
         </div>
       )}
 
+      {/* Field order mirrors the mobile app's verification form exactly. */}
       <div className="flex flex-col gap-[14px] p-[22px]">
         <div>
           <label className={labelCls}>{v.authorityRole}</label>
@@ -262,50 +281,33 @@ export function VerificationFlow() {
         </div>
 
         <div>
+          <label className={labelCls}>{v.nationalId}</label>
+          <input className={inputCls} value={nationalId} onChange={(e) => setNationalId(e.target.value)} maxLength={20} dir="ltr" />
+        </div>
+
+        <div>
           <label className={labelCls}>{v.companyName}</label>
           <input className={inputCls} value={companyName} onChange={(e) => setCompanyName(e.target.value)} maxLength={200} />
           {fe.companyName && <p className="mt-1 text-[12px] text-danger">{fe.companyName}</p>}
+        </div>
+
+        {/* Company documents — CR, VAT, National Address are required (AC-09/10). */}
+        <div className="mt-1 border-t border-border pt-[14px] text-[11px] font-bold uppercase tracking-wide text-muted">
+          {v.docsTitle}
         </div>
 
         <DocUpload label={v.crDoc} required docKey={crDocKey} onKey={setCrDocKey} onError={setErr} />
         {fe.cr && <p className="-mt-2 text-[12px] text-danger">{fe.cr}</p>}
         <DocUpload label={v.vatDoc} required docKey={vatDocKey} onKey={setVatDocKey} onError={setErr} />
         {fe.vat && <p className="-mt-2 text-[12px] text-danger">{fe.vat}</p>}
+        <DocUpload label={v.nationalAddressDoc} required docKey={nationalAddressDocKey} onKey={setNationalAddressDocKey} onError={setErr} />
+        {fe.nationalAddress && <p className="-mt-2 text-[12px] text-danger">{fe.nationalAddress}</p>}
 
-        {/* Optional details & documents (AC-15) — mirrors the app's verification form. */}
+        {/* Additional documents — all optional (AC-15). */}
         <div className="mt-1 border-t border-border pt-[14px] text-[11px] font-bold uppercase tracking-wide text-muted">
-          {v.optionalSection}
+          {v.moreDocsTitle}
         </div>
 
-        <div className="grid grid-cols-2 gap-[12px]">
-          <div>
-            <label className={labelCls}>{v.nationalId}</label>
-            <input className={inputCls} value={nationalId} onChange={(e) => setNationalId(e.target.value)} maxLength={20} dir="ltr" />
-          </div>
-          <div>
-            <label className={labelCls}>{v.companyCity}</label>
-            <input className={inputCls} value={companyCity} onChange={(e) => setCompanyCity(e.target.value)} maxLength={100} />
-          </div>
-        </div>
-
-        <div>
-          <label className={labelCls}>{v.companyAddress}</label>
-          <input className={inputCls} value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)} maxLength={500} />
-        </div>
-
-        <div>
-          <label className={labelCls}>{v.companyLocation}</label>
-          <MapPicker
-            value={loc}
-            onChange={(lat, lng, address) => {
-              setLoc({ lat, lng });
-              if (address && !companyAddress.trim()) setCompanyAddress(address);
-            }}
-            height="220px"
-          />
-        </div>
-
-        <DocUpload label={v.nationalAddressDoc} docKey={nationalAddressDocKey} onKey={setNationalAddressDocKey} onError={setErr} />
         <DocUpload label={v.localContentDoc} docKey={localContentDocKey} onKey={setLocalContentDocKey} onError={setErr} />
         <DocUpload label={v.sasoDoc} docKey={sasoHeavyEquipDocKey} onKey={setSasoHeavyEquipDocKey} onError={setErr} />
 
@@ -322,6 +324,35 @@ export function VerificationFlow() {
             docKey={null}
             onKey={(k) => k && setOtherDocKeys((prev) => [...prev, k])}
             onError={setErr}
+          />
+        </div>
+
+        {/* Company details — city + location (AC-15). */}
+        <div className="mt-1 border-t border-border pt-[14px] text-[11px] font-bold uppercase tracking-wide text-muted">
+          {v.detailsTitle}
+        </div>
+
+        <div>
+          <label className={labelCls}>{v.companyCity}</label>
+          <select className={inputCls} value={companyCity} onChange={(e) => setCompanyCity(e.target.value)}>
+            <option value="">{v.cityPlaceholder}</option>
+            {VERIFY_CITIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {locale === "ar" ? c.ar : c.en}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className={labelCls}>{v.companyLocation}</label>
+          <MapPicker
+            value={loc}
+            onChange={(lat, lng, address) => {
+              setLoc({ lat, lng });
+              if (address && !companyAddress.trim()) setCompanyAddress(address);
+            }}
+            height="220px"
           />
         </div>
 

@@ -368,6 +368,7 @@ export const en = {
     companyName: "Company name",
     nationalId: "National ID",
     companyCity: "Company city",
+    cityPlaceholder: "Select a city",
     companyAddress: "Company address",
     companyLocation: "Company location",
     crDoc: "Commercial Registration (CR)",
@@ -376,7 +377,9 @@ export const en = {
     localContentDoc: "Local Content certificate",
     sasoDoc: "SASO Heavy Equipment certificate",
     otherDoc: "Other document",
-    optionalSection: "Optional details & documents",
+    docsTitle: "Company documents",
+    moreDocsTitle: "Additional documents",
+    detailsTitle: "Company details",
     optional: "optional",
     upload: "Upload",
     uploading: "Uploading…",
@@ -396,6 +399,7 @@ export const en = {
       companyName: "Company name must be 2–200 characters.", // AC-09
       cr: "The CR document is required.", // AC-10
       vat: "The VAT document is required.", // AC-10
+      nationalAddress: "The National Address document is required.", // required to match the app (company_verification_page.dart:302 + '*' label); AC-10 lists only CR/VAT
       docType: "Only JPEG, PNG, WebP, or PDF files are accepted.", // AC-11
       submit: "We couldn't submit. Please try again.",
       offline: "You appear to be offline. Your input is kept — try again.", // AC-23
