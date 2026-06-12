@@ -5,6 +5,7 @@ import {
   mapEquipment,
   mapStoreDetail,
   mapTaxonomy,
+  mediaUrl,
 } from "@/lib/contract/stores";
 import { en } from "@/lib/i18n/en";
 import { ar } from "@/lib/i18n/ar";
@@ -45,6 +46,19 @@ describe("stores mappers (web-app/004)", () => {
     expect(extractStoreList({ data: [{ id: "b" }], meta: {} })).toHaveLength(1);
     expect(extractStoreList({ stores: [{ id: "c" }, { id: "d" }] })).toHaveLength(2);
     expect(extractStoreList(null)).toEqual([]);
+  });
+
+  it("mediaUrl builds the shared-bucket URL for a raw key and passes http URLs through", () => {
+    expect(mediaUrl("default/equipment/photos/x.jpg")).toBe(
+      "https://moedatech-eu-storage.s3.eu-central-1.amazonaws.com/default/equipment/photos/x.jpg",
+    );
+    expect(mediaUrl("https://signed.example/x.jpg?sig=1")).toBe("https://signed.example/x.jpg?sig=1");
+    expect(mediaUrl(null)).toBeNull();
+  });
+
+  it("maps an equipment photo key to a full media URL", () => {
+    const e = mapEquipment({ id: "e0", photoKeys: ["default/equipment/photos/a.jpg"], verificationStatus: "VERIFIED" });
+    expect(e.photoUrl).toBe("https://moedatech-eu-storage.s3.eu-central-1.amazonaws.com/default/equipment/photos/a.jpg");
   });
 
   it("maps equipment price → price-on-request when price is null, and the verification tick", () => {

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
-import type { EquipmentCard, StoreDetail } from "@/lib/contract/stores";
+import type { EquipmentCard, StoreDetail, TaxonomyNode } from "@/lib/contract/stores";
 
 /**
  * Store detail surface (web-app/004, AC-18/19/20/23/24). Banner (logo, name, verified badge only
@@ -18,6 +18,23 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
   const [detail, setDetail] = useState<StoreDetail | null>(null);
   const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [icons, setIcons] = useState<Record<string, string>>({});
+
+  // Taxonomy icons (shared bucket) → map node id → iconUrl, for equipment with no photo (AC-20 best effort).
+  useEffect(() => {
+    fetch("/api/stores/taxonomy", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
+      .then((d: { taxonomy: TaxonomyNode[] }) => {
+        const map: Record<string, string> = {};
+        const walk = (n: TaxonomyNode) => {
+          if (n.iconUrl) map[n.id] = n.iconUrl;
+          n.children.forEach(walk);
+        };
+        (d.taxonomy ?? []).forEach(walk);
+        setIcons(map);
+      })
+      .catch(() => setIcons({}));
+  }, []);
 
   useEffect(() => {
     setError(false);
@@ -140,7 +157,7 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {detail.equipment.map((e) => (
-              <EquipmentTile key={e.id} eq={e} />
+              <EquipmentTile key={e.id} eq={e} iconUrl={(e.subcategoryId && icons[e.subcategoryId]) || (e.measurementId && icons[e.measurementId]) || null} />
             ))}
           </div>
         )}
@@ -149,7 +166,7 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
   );
 }
 
-function EquipmentTile({ eq }: { eq: EquipmentCard }) {
+function EquipmentTile({ eq, iconUrl }: { eq: EquipmentCard; iconUrl: string | null }) {
   const t = useT();
   const { locale } = useLocale();
   const ar = locale === "ar";
@@ -168,7 +185,17 @@ function EquipmentTile({ eq }: { eq: EquipmentCard }) {
         className="h-28 bg-surface2"
         style={eq.photoUrl ? { backgroundImage: `url(${eq.photoUrl})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
       >
-        {!eq.photoUrl && <div className="grid h-full place-items-center text-muted"><Icon name="construction" size={28} /></div>}
+        {!eq.photoUrl &&
+          (iconUrl ? (
+            <div
+              className="h-full bg-surface2"
+              style={{ backgroundImage: `url(${iconUrl})`, backgroundSize: "40px", backgroundRepeat: "no-repeat", backgroundPosition: "center" }}
+            />
+          ) : (
+            <div className="grid h-full place-items-center text-muted">
+              <Icon name="construction" size={28} />
+            </div>
+          ))}
       </div>
       <div className="p-3">
         <div className="flex items-center gap-1.5">

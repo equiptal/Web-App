@@ -19,6 +19,8 @@ export interface StoreCard {
 /** One equipment listing on a store detail (AC-20). Localized names carried as en + ar. */
 export interface EquipmentCard {
   id: string;
+  subcategoryId: string | null;
+  measurementId: string | null;
   category: string | null;
   categoryAr: string | null;
   subcategory: string | null;
@@ -55,6 +57,7 @@ export interface TaxonomyNode {
   id: string;
   name: string;
   nameAr: string;
+  iconUrl: string | null;
   children: TaxonomyNode[];
 }
 
@@ -63,6 +66,18 @@ type Raw = Record<string, unknown>;
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v : null);
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const bool = (v: unknown): boolean => v === true;
+
+// Shared public asset bucket (constant across envs — same as the mobile app's S3Url). Equipment
+// photos and taxonomy icons are stored as raw S3 keys (e.g. `default/equipment/photos/x.jpg`); the
+// backend returns logos/banners pre-signed (full http URLs). `mediaUrl` passes http URLs through and
+// builds the public URL for bare keys. Pure string construction — no AWS SDK / credentials.
+const MEDIA_BASE = "https://moedatech-eu-storage.s3.eu-central-1.amazonaws.com";
+export function mediaUrl(keyOrUrl: unknown): string | null {
+  const v = str(keyOrUrl);
+  if (!v) return null;
+  if (v.startsWith("http")) return v;
+  return `${MEDIA_BASE}/${v.replace(/^\/+/, "")}`;
+}
 
 /** Pull the store array out of a browse payload (bare array or `{ data | stores | items: [...] }`). */
 export function extractStoreList(raw: unknown): Raw[] {
@@ -79,7 +94,7 @@ export function mapStoreCard(raw: Raw): StoreCard {
   return {
     id: String(raw.id ?? ""),
     name: str(raw.name) ?? "",
-    logoUrl: str(raw.logoUrl),
+    logoUrl: mediaUrl(raw.logoUrl ?? raw.logoKey),
     isVerified: bool(raw.isVerified),
     activeEquipmentCount: num(raw.activeEquipmentCount) ?? 0,
     city: str(raw.city),
@@ -89,6 +104,8 @@ export function mapStoreCard(raw: Raw): StoreCard {
 export function mapEquipment(raw: Raw): EquipmentCard {
   return {
     id: String(raw.id ?? ""),
+    subcategoryId: str(raw.subcategoryId),
+    measurementId: str(raw.measurementId),
     category: str(raw.categoryName),
     categoryAr: str(raw.categoryNameAr),
     subcategory: str(raw.subcategoryName),
@@ -102,7 +119,7 @@ export function mapEquipment(raw: Raw): EquipmentCard {
     price: num(raw.price),
     priceUnit: str(raw.priceUnit),
     isVerified: raw.verificationStatus === "VERIFIED",
-    photoUrl: Array.isArray(raw.photoKeys) && raw.photoKeys.length ? str(raw.photoKeys[0]) : null,
+    photoUrl: Array.isArray(raw.photoKeys) && raw.photoKeys.length ? mediaUrl(raw.photoKeys[0]) : null,
   };
 }
 
@@ -116,8 +133,8 @@ export function mapStoreDetail(raw: Raw): StoreDetail {
     id: String(store.id ?? ""),
     name: str(store.name) ?? "",
     description: str(store.description),
-    logoUrl: str(store.logoUrl),
-    bannerUrl: str(store.bannerUrl),
+    logoUrl: mediaUrl(store.logoUrl ?? store.logoKey),
+    bannerUrl: mediaUrl(store.bannerUrl ?? store.bannerKey),
     viewCount: num(store.viewCount) ?? 0,
     isVerified: bool(store.isVerified),
     supplierName: str(store.supplierName),
@@ -134,6 +151,7 @@ export function mapTaxonomy(raw: unknown): TaxonomyNode[] {
     id: String(n.id ?? ""),
     name: str(n.name) ?? "",
     nameAr: str(n.nameAr) ?? str(n.name) ?? "",
+    iconUrl: mediaUrl(n.imageUrl ?? n.imageKey),
     children: Array.isArray(n.children) ? (n.children as Raw[]).map(walk) : [],
   });
   return (arr as Raw[]).map(walk);
