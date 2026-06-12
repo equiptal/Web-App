@@ -11,8 +11,9 @@ interface CityOpt {
   label: string;
 }
 
+// Matches the prototype `.fdrop` pill.
 const selectCls =
-  "h-[40px] rounded-[10px] border border-border bg-surface px-3 text-[13px] font-semibold text-navy-mid outline-0 focus:border-brand";
+  "h-[40px] rounded-[10px] border border-border bg-surface px-3 text-[13px] font-bold text-navy-mid outline-0 hover:border-navy-mid focus:border-brand";
 
 /**
  * Stores browse surface (web-app/004, AC-10–17, AC-23). Filter bar (city, dependent category →
@@ -154,10 +155,17 @@ export function BrowseSurface() {
             <option key={m.id} value={m.id}>{tabel(m, ar)}</option>
           ))}
         </select>
-        <label className="inline-flex cursor-pointer items-center gap-2 rounded-[10px] border border-border bg-surface px-3 py-2 text-[13px] font-semibold text-navy-mid">
-          <input type="checkbox" checked={verifiedOnly} onChange={(e) => setVerifiedOnly(e.target.checked)} className="accent-brand" />
+        <button
+          type="button"
+          onClick={() => setVerifiedOnly((v) => !v)}
+          className="ms-1 inline-flex select-none items-center gap-2 text-[13px] font-bold text-navy-mid"
+          aria-pressed={verifiedOnly}
+        >
+          <span className={`relative h-[23px] w-[40px] flex-none rounded-full border transition ${verifiedOnly ? "border-ok bg-ok" : "border-border bg-surface3"}`}>
+            <span className={`absolute top-[2px] h-[17px] w-[17px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,.2)] transition-all ${verifiedOnly ? "start-[19px]" : "start-[2px]"}`} />
+          </span>
           {t.browse.verifiedOnly}
-        </label>
+        </button>
       </div>
 
       {/* Results (AC-16/17/23) */}
@@ -180,7 +188,7 @@ export function BrowseSurface() {
           {t.browse.empty}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {stores.map((s) => (
             <StoreCard key={s.id} store={s} />
           ))}
