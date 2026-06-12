@@ -60,13 +60,6 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
           </span>
         </div>
 
-        <button
-          onClick={() => router.push("/create")}
-          className="mx-1 mb-3.5 flex items-center justify-center gap-2 rounded-[10px] bg-gradient-to-br from-brand to-[#FFA733] py-3 text-[14px] font-extrabold text-white shadow-[0_8px_20px_rgba(247,144,9,.32)]"
-        >
-          <Icon name="radar" size={20} /> {t.shell.request}
-        </button>
-
         <nav className="flex flex-col gap-0.5">
           {navItems.map((it) => (
             <button
@@ -162,10 +155,10 @@ function TierCard({ tier, onGo }: { tier: string; onGo: (href: string) => void }
   return (
     <div className="mt-auto rounded-[14px] border border-white/10 bg-white/[.06] p-3.5">
       <div className="flex items-center gap-1.5 text-[12.5px] font-extrabold">
-        <Icon name="workspace_premium" size={17} className="text-[#FCD9A0]" /> {label}
+        <Icon name={verified ? "verified" : "workspace_premium"} size={17} className={verified ? "text-ok" : "text-[#FCD9A0]"} /> {label}
       </div>
       <div className="my-[11px] mb-1.5 h-[5px] overflow-hidden rounded-full bg-white/[.14]">
-        <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
+        <div className={`h-full rounded-full ${verified ? "bg-ok" : "bg-brand"}`} style={{ width: `${pct}%` }} />
       </div>
       <small className="block text-[11px] leading-snug text-white/55">{note}</small>
       {!verified && (

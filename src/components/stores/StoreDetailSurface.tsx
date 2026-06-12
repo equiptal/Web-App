@@ -79,7 +79,7 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
       {/* Banner (navy gradient) — AC-18 */}
       <div className="relative mb-4 overflow-hidden rounded-[14px] bg-gradient-to-br from-navy to-[#0a1b30] px-6 py-5 text-white">
         <div className="relative z-10 mb-[18px] flex justify-between">
-          <button onClick={() => router.push("/browse")} className="grid h-[38px] w-[38px] place-items-center rounded-full bg-white/[.12] text-white">
+          <button onClick={() => router.back()} className="grid h-[38px] w-[38px] place-items-center rounded-full bg-white/[.12] text-white">
             <Icon name="arrow_back" size={20} className="rtl:scale-x-[-1]" />
           </button>
         </div>

@@ -55,6 +55,7 @@ export const ar: Dictionary = {
     uploadRfq: "رفع طلب عروض",
     suppliersTitle: "مؤجرون موثّقون",
     viewAll: "عرض الكل",
+    showLess: "عرض أقل",
     nudgeGuestTitle: "أكمل ملفك الشخصي",
     nudgeGuestBody: "أضف بياناتك لفتح الطلبات والعروض.",
     nudgeGuestCta: "إكمال الملف",

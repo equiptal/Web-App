@@ -53,6 +53,7 @@ export const en = {
     uploadRfq: "Upload RFQ",
     suppliersTitle: "Verified Suppliers",
     viewAll: "View all",
+    showLess: "Show less",
     nudgeGuestTitle: "Complete your profile",
     nudgeGuestBody: "Add your details to unlock requests and bids.",
     nudgeGuestCta: "Complete profile",
