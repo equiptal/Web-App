@@ -326,6 +326,74 @@ export const en = {
       unknown: "Something went wrong. Please try again.",
     },
   },
+  onboarding: {
+    step1: "Create account",
+    step2: "Verify company",
+    later: "later",
+    title: "Create your account",
+    subtitle: "Complete your details to start requesting equipment from verified suppliers.",
+    firstName: "First name",
+    lastName: "Last name",
+    phone: "Phone number",
+    verified: "Verified",
+    city: "City",
+    jobTitle: "Job title",
+    email: "Email",
+    whatsapp: "WhatsApp number",
+    optional: "optional",
+    selectCity: "Select your city",
+    selectJobTitle: "Select your job title",
+    submit: "Create account",
+    submitting: "Creating…",
+    errors: {
+      firstName: "First name must be 2–30 characters.", // AC-02/03
+      lastName: "Last name must be 2–50 characters.", // AC-02/03
+      city: "Select your city.", // AC-02
+      jobTitle: "Select your job title.", // AC-02
+      whatsapp: "Enter a valid Saudi mobile number.", // AC-04
+      submit: "We couldn't save your details. Please try again.",
+      offline: "You appear to be offline. Your details are kept — try again.", // AC-23
+    },
+  },
+  verify: {
+    step1: "Create account",
+    step2: "Verify company",
+    done: "done",
+    title: "Verify your company",
+    subtitle: "Submit your company details for review to become a verified renter.",
+    authorityRole: "Your authority",
+    roleOwner: "Owner",
+    roleManager: "Manager",
+    roleEmployee: "Employee",
+    companyName: "Company name",
+    nationalId: "National ID",
+    companyCity: "Company city",
+    crDoc: "Commercial Registration (CR)",
+    vatDoc: "VAT certificate",
+    optional: "optional",
+    upload: "Upload",
+    uploading: "Uploading…",
+    uploaded: "Uploaded",
+    submit: "Submit for verification",
+    submitting: "Submitting…",
+    resubmit: "Resubmit",
+    back: "Back",
+    pendingTitle: "Verification pending",
+    pendingBody: "Your company details are under review. We'll update your status here.", // AC-13/14
+    verifiedTitle: "You're verified",
+    verifiedBody: "Your company has been verified.", // AC-19
+    rejectedTitle: "Verification not approved",
+    rejectedBody: "Your submission wasn't approved. You can adjust your details and resubmit.", // AC-17
+    errors: {
+      role: "Select your authority.", // AC-09
+      companyName: "Company name must be 2–200 characters.", // AC-09
+      cr: "The CR document is required.", // AC-10
+      vat: "The VAT document is required.", // AC-10
+      docType: "Only JPEG, PNG, WebP, or PDF files are accepted.", // AC-11
+      submit: "We couldn't submit. Please try again.",
+      offline: "You appear to be offline. Your input is kept — try again.", // AC-23
+    },
+  },
 };
 
 export type Dictionary = typeof en;
