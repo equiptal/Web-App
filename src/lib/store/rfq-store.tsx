@@ -28,6 +28,16 @@ export type Step = 1 | 2 | 3 | 4;
 /** localStorage key for the persisted RFQ draft (web-app/002 save-on-reload). */
 const DRAFT_STORAGE_KEY = "rfq-draft-v1";
 
+/**
+ * web-app/002: true when a field's current value still equals what the agent originally filled in
+ * (and the agent actually supplied one). Drives the orange "AI" marker; returns false once the
+ * renter edits the value (so the mark clears), or when the agent left the field empty.
+ */
+export function agentMatches(current: unknown, original: unknown): boolean {
+  if (original == null || original === "" || (Array.isArray(original) && original.length === 0)) return false;
+  return JSON.stringify(current) === JSON.stringify(original);
+}
+
 export interface RfqState {
   phase: Phase;
   step: Step;
@@ -43,6 +53,9 @@ export interface RfqState {
   requestId: string | null;
   multiLocationDismissed: boolean;
   seq: number;
+  /** web-app/002: the project + items exactly as the agent first returned them — used to mark
+   *  agent-filled values (orange) and clear the mark once the renter edits past them. */
+  agentOrigin: { project: ProjectDetails; items: EquipmentItem[] } | null;
 }
 
 const initialState: RfqState = {
@@ -58,6 +71,7 @@ const initialState: RfqState = {
   requestId: null,
   multiLocationDismissed: false,
   seq: 100,
+  agentOrigin: null,
 };
 
 type Action =
@@ -142,6 +156,8 @@ function reducer(state: RfqState, a: Action): RfqState {
           detectedLocations: a.draft.detectedLocations,
           summary: a.draft.summary,
         },
+        // Snapshot the agent's values (refs are safe — all edits are immutable copies).
+        agentOrigin: { project: a.draft.project, items: a.draft.items },
         multiLocationDismissed: false,
       };
     case "PROCESS_ERROR":
@@ -376,18 +392,18 @@ export function RfqProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Persist the editable draft + position whenever they change (skip processing/confirmation phases).
-  const { phase, step, draft, text, multiLocationDismissed, seq } = state;
+  const { phase, step, draft, text, multiLocationDismissed, seq, agentOrigin } = state;
   useEffect(() => {
     try {
       if (draft && (phase === "intake" || phase === "wizard")) {
-        window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({ phase, step, draft, text, multiLocationDismissed, seq }));
+        window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({ phase, step, draft, text, multiLocationDismissed, seq, agentOrigin }));
       } else if (phase === "confirmation") {
         window.localStorage.removeItem(DRAFT_STORAGE_KEY); // request sent → clear the saved draft
       }
     } catch {
       /* ignore quota/availability errors */
     }
-  }, [phase, step, draft, text, multiLocationDismissed, seq]);
+  }, [phase, step, draft, text, multiLocationDismissed, seq, agentOrigin]);
 
   // Load the taxonomy once.
   useEffect(() => {

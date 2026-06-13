@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useT, fmt } from "@/lib/i18n";
-import { useRfq } from "@/lib/store/rfq-store";
+import { useRfq, agentMatches } from "@/lib/store/rfq-store";
 import { SUPPORT_WHATSAPP_NUMBER } from "@/lib/config/support";
 import { Button, Field, Icon, Pchips, Select, Stepper, TextArea, Toggle, Modal } from "@/components/ui";
 import {
@@ -46,7 +46,8 @@ export function ItemRow({
   sharedReturn: Party | null;
 }) {
   const t = useT();
-  const { actions } = useRfq();
+  const { state, actions } = useRfq();
+  const ai = state.agentOrigin?.items.find((i) => i.id === item.id); // agent's original item, for the AI marker
   const [editingMatch, setEditingMatch] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -94,13 +95,13 @@ export function ItemRow({
 
   const taxonomyEditor = (
     <div className="col-span-full mt-3 grid grid-cols-1 gap-2 rounded-lg border border-border bg-surface2 p-3 sm:grid-cols-3">
-      <Field label={t.step2.category}>
+      <Field label={t.step2.category} required missing={!item.ref.categoryId} agent={agentMatches(item.ref.categoryId, ai?.ref.categoryId)}>
         <Select value={item.ref.categoryId} placeholder={t.step2.pickCategory} onChange={(v) => actions.setItemCategory(item.id, v)} options={taxonomy.map((c) => ({ value: c.id, label: c.name }))} />
       </Field>
-      <Field label={t.step2.subcategory}>
+      <Field label={t.step2.subcategory} required missing={!item.ref.subcategoryId} agent={agentMatches(item.ref.subcategoryId, ai?.ref.subcategoryId)}>
         <Select value={item.ref.subcategoryId} placeholder={t.step2.pickSubcategory} disabled={!category} onChange={(v) => actions.setItemSubcategory(item.id, v)} options={(category?.subcategories ?? []).map((s) => ({ value: s.id, label: s.name }))} />
       </Field>
-      <Field label={t.step2.measurement}>
+      <Field label={t.step2.measurement} required missing={!item.ref.measurementId} agent={agentMatches(item.ref.measurementId, ai?.ref.measurementId)}>
         <Select value={item.ref.measurementId} placeholder={t.step2.pickMeasurement} disabled={!subcategory} onChange={(v) => actions.setItemMeasurement(item.id, v)} options={(subcategory?.measurements ?? []).map((m) => ({ value: m.id, label: m.name }))} />
       </Field>
     </div>
@@ -168,9 +169,12 @@ export function ItemRow({
               <Button disabled={!isCompleteRef(item.ref)} onClick={() => (item.suggestion ? actions.approveSuggestion(item.id) : actions.approveItem(item.id))}>
                 <Icon name="check" size={15} /> {t.common.approve}
               </Button>
-              <Button variant="secondary" onClick={() => setEditingMatch((e) => !e)}>
-                <Icon name="swap_horiz" size={15} /> {t.common.change}
-              </Button>
+              {/* #8: when the ref is incomplete the picker is already open below — no redundant "Change". */}
+              {isCompleteRef(item.ref) && (
+                <Button variant="secondary" onClick={() => setEditingMatch((e) => !e)}>
+                  <Icon name="swap_horiz" size={15} /> {t.common.change}
+                </Button>
+              )}
             </>
           ) : (
             <Button variant="secondary" onClick={() => setShowDetails((d) => !d)}>

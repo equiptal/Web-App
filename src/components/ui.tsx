@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode, InputHTMLAttributes, TextareaHTMLAttributes } from "react";
+import { useT } from "@/lib/i18n";
 
 /* ------------------------------------ Icon ------------------------------------ */
 
@@ -93,22 +94,56 @@ export function Card({
 
 /* ------------------------------------ Field ------------------------------------ */
 
+/**
+ * web-app/002: marks a value the AI agent filled in from the RFQ (orange + agent icon). The caller
+ * decides when to show it — it clears once the renter edits the field (the value stops matching the
+ * agent's original). See `agentMatches` in the rfq-store.
+ */
+export function AgentMark({ className = "" }: { className?: string }) {
+  const t = useT();
+  return (
+    <span
+      className={`inline-flex items-center gap-0.5 rounded-full bg-warn/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-warn ${className}`}
+      title={t.common.byAgent}
+    >
+      <Icon name="auto_awesome" size={11} /> {t.common.agentTag}
+    </span>
+  );
+}
+
 export function Field({
   label,
   hint,
   optional,
+  agent,
+  required,
+  missing,
   children,
 }: {
   label: ReactNode;
   hint?: ReactNode;
   optional?: boolean;
+  /** AC: value was filled by the AI agent (orange badge). */
+  agent?: boolean;
+  /** AC: field is required to advance. */
+  required?: boolean;
+  /** AC: required field with no value the RFQ/agent supplied → render in red. */
+  missing?: boolean;
   children: ReactNode;
 }) {
+  const t = useT();
   return (
     <label className="block">
-      <span className="mb-1 flex items-center gap-2 text-xs font-medium text-muted">
+      <span className={`mb-1 flex items-center gap-2 text-xs font-medium ${missing ? "text-danger" : "text-muted"}`}>
         {label}
-        {optional && <span className="text-[10px] uppercase tracking-wide text-muted/70">opt</span>}
+        {required && (
+          <span className="text-danger" aria-hidden>
+            *
+          </span>
+        )}
+        {agent && <AgentMark />}
+        {optional && <span className="text-[10px] uppercase tracking-wide text-muted/70">{t.common.optional}</span>}
+        {missing && <span className="text-[10px] font-semibold lowercase text-danger">{t.common.missing}</span>}
       </span>
       {children}
       {hint && <span className="mt-1 block text-xs text-muted">{hint}</span>}
