@@ -57,7 +57,7 @@ export function Step1Project() {
             <div className="flex items-center gap-1.5 text-[13.5px] font-extrabold text-warn">
               <Icon name="error_outline" size={18} /> {t.step1.location.conflictTitle}
             </div>
-            <div className="mt-2 grid grid-cols-2 gap-2.5">
+            <div className="mt-2 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               <button className="flex flex-col gap-1 rounded-[10px] border border-border bg-surface p-3 text-start hover:border-brand" onClick={() => actions.resolveLocationConflict("text")}>
                 <span className="flex items-center gap-1 text-[11px] font-bold text-muted"><Icon name="notes" size={14} /> {t.step1.location.fromText}</span>
                 <span className="text-[13.5px] font-bold">{loc.conflict.fromText}</span>

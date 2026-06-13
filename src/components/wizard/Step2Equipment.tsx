@@ -88,7 +88,7 @@ export function Step2Equipment() {
             title={t.common.back}
             className="mt-1 grid h-9 w-9 flex-none place-items-center rounded-full border border-border text-navy-mid transition hover:bg-surface2"
           >
-            <Icon name="arrow_back" size={20} />
+            <Icon name="arrow_back" size={20} className="rtl:scale-x-[-1]" />
           </button>
         )}
         <div>

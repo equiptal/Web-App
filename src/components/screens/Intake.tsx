@@ -166,7 +166,7 @@ export function Intake() {
             <Icon name="info" size={15} /> {t.intake.emptyHint}
           </span>
           <Button disabled={!canStart} onClick={() => actions.process()} className="px-6 py-3 text-[14px]">
-            {t.intake.startProcessing} <Icon name="arrow_forward" size={18} />
+            {t.intake.startProcessing} <Icon name="arrow_forward" size={18} className="rtl:scale-x-[-1]" />
           </Button>
         </div>
       </Card>

@@ -84,7 +84,7 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
       {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top bar — AC-03 */}
-        <header className="sticky top-0 z-30 flex h-[62px] items-center gap-4 border-b border-border bg-surface px-7">
+        <header className="sticky top-0 z-30 flex h-[62px] items-center gap-4 border-b border-border bg-surface px-4 sm:px-7">
           <b className="truncate text-[19px] font-extrabold tracking-[-.4px] text-navy">
             {title ?? (
               <>
@@ -150,8 +150,23 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-6xl px-7 py-7 pb-24">{children}</main>
+        <main className="mx-auto w-full max-w-6xl px-4 py-6 pb-24 sm:px-7 sm:py-7">{children}</main>
       </div>
+
+      {/* Mobile bottom nav — the navy sidebar is desktop-only, so phones navigate from here. */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-surface md:hidden">
+        {navItems.map((it) => (
+          <button
+            key={it.key}
+            onClick={() => router.push(it.href)}
+            className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-bold transition ${
+              isActive(it.href) ? "text-brand" : "text-muted"
+            }`}
+          >
+            <Icon name={it.icon} size={22} /> {it.label}
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }

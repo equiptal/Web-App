@@ -287,11 +287,11 @@ function RfqMatch({ raw, matched }: { raw: string | null; matched: React.ReactNo
   const t = useT();
   return (
     <div className="flex items-center gap-3">
-      <span className="flex w-[200px] flex-none flex-col gap-0.5">
+      <span className="flex w-[120px] flex-none flex-col gap-0.5 sm:w-[200px]">
         <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted">{t.step2.fromRfq}</span>
         <span className="text-[15px] font-bold leading-tight break-words">{raw ? `“${raw}”` : "—"}</span>
       </span>
-      <Icon name="arrow_forward" size={20} className="flex-none text-muted/60" />
+      <Icon name="arrow_forward" size={20} className="flex-none text-muted/60 rtl:scale-x-[-1]" />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted">{t.step2.matchedTo}</span>
         <span className="break-words text-[15px] font-extrabold leading-tight">{matched}</span>

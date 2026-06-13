@@ -146,7 +146,7 @@ function RC({ icon, title, onEdit, editLabel, children }: { icon: string; title:
 
 function KV({ rows }: { rows: [ReactNode, ReactNode][] }) {
   return (
-    <dl className="grid grid-cols-[140px_1fr] gap-x-3 gap-y-2.5 px-[18px] py-3.5 text-[13.5px]">
+    <dl className="grid grid-cols-[110px_1fr] gap-x-3 gap-y-2.5 px-[18px] py-3.5 text-[13.5px] sm:grid-cols-[140px_1fr]">
       {rows.map(([k, v], i) => (
         <div key={i} className="contents">
           <dt className="font-semibold text-muted">{k}</dt>
