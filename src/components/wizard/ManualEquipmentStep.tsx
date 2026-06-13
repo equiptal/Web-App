@@ -81,7 +81,11 @@ export function ManualEquipmentStep() {
                     {measurements.map((mn) => (
                       <button
                         key={mn.id}
-                        onClick={() => actions.setItemMeasurement(item.id, mn.id)}
+                        onClick={() => {
+                          actions.setItemMeasurement(item.id, mn.id);
+                          // Store a readable label so the agent-taxonomy-based preview can show the item.
+                          actions.patchItem(item.id, { rawLabel: [cat && label(cat), sub && label(sub), label(mn)].filter(Boolean).join(" · ") });
+                        }}
                         className={`rounded-full border px-3 py-1.5 text-[12.5px] font-semibold transition ${
                           item.ref.measurementId === mn.id ? "border-brand bg-brand-soft text-brand" : "border-border bg-surface text-navy-mid hover:border-navy-mid"
                         }`}

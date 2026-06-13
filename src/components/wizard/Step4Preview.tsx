@@ -50,6 +50,13 @@ export function Step4Preview() {
         <p className="mt-1 max-w-xl text-sm text-muted">{t.preview.subtitle}</p>
       </div>
 
+      {/* Direct request — chosen supplier (web-app/005, AC-14) */}
+      {state.channel === "direct" && state.supplier && (
+        <div className="flex items-center gap-2 rounded-xl border border-info/30 bg-info-soft px-4 py-3 text-[13.5px] font-semibold text-info">
+          <Icon name="storefront" size={18} /> {t.manual.directSupplier} {state.supplier.name}
+        </div>
+      )}
+
       {/* Project (AC-41) */}
       <RC icon="place" title={t.preview.projectSummary} onEdit={() => actions.goStep(1)} editLabel={t.preview.edit}>
         <KV
@@ -62,7 +69,30 @@ export function Step4Preview() {
         />
       </RC>
 
-      {/* Equipment (AC-52) */}
+      {/* Equipment (AC-52). Manual mode: app-taxonomy items don't resolve in the agent spec sheet,
+          so render a simple labelled list from the items the renter picked. */}
+      {state.manualMode ? (
+        <div className="overflow-hidden rounded-xl border border-border bg-surface">
+          <div className="flex items-center justify-between border-b border-border px-[18px] py-[13px] text-sm font-bold">
+            <span className="flex items-center gap-1.5">
+              <Icon name="construction" size={18} className="text-navy-mid" /> {t.preview.equipmentSummary} — {count} {t.preview.itemsTable.toLowerCase()}
+            </span>
+            <button className="inline-flex items-center gap-1 text-xs font-bold text-info" onClick={() => actions.goStep(2)}>
+              <Icon name="edit" size={15} /> {t.preview.edit}
+            </button>
+          </div>
+          <ul className="divide-y divide-border/60">
+            {postableItems(draft.items).map((i) => (
+              <li key={i.id} className="flex items-center justify-between gap-3 px-[18px] py-3 text-[13.5px]">
+                <span className="font-semibold text-navy">{i.rawLabel || "—"}</span>
+                <span className="flex-none text-[12px] text-muted">
+                  ×{i.quantity} · {t.options.operatorNeeded[i.operatorNeeded]} · {t.options.fuelType[i.fuelType]}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
       <div className="overflow-hidden rounded-xl border border-border bg-surface">
         <div className="flex items-center justify-between border-b border-border px-[18px] py-[13px] text-sm font-bold">
           <span className="flex items-center gap-1.5">
@@ -103,6 +133,7 @@ export function Step4Preview() {
           </div>
         )}
       </div>
+      )}
 
       {/* Preferences */}
       <RC icon="tune" title={t.preview.preferencesSummary} onEdit={() => actions.goStep(3)} editLabel={t.preview.edit}>
