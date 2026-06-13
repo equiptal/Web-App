@@ -165,6 +165,8 @@ export const en = {
     search: "Search equipment…",
     noResults: "No matching equipment.",
     orBrowse: "or browse the catalogue",
+    empty: "Search or browse above to add equipment.",
+    addedItems: "Your equipment",
   },
   intake: {
     heading: "How would you like to create your request?",

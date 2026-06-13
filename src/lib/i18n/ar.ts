@@ -167,6 +167,8 @@ export const ar: Dictionary = {
     search: "ابحث عن معدة…",
     noResults: "لا توجد معدات مطابقة.",
     orBrowse: "أو تصفّح الكتالوج",
+    empty: "ابحث أو تصفّح بالأعلى لإضافة معدات.",
+    addedItems: "معداتك",
   },
   intake: {
     heading: "كيف تريد إنشاء طلبك؟",
