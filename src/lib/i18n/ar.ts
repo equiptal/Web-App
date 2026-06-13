@@ -364,6 +364,8 @@ export const ar: Dictionary = {
     blockTitle: "أنشئ حسابًا للمتابعة",
     blockBody: "إنشاء طلبات عروض الأسعار متاح للمستأجرين المسجّلين. أنشئ حسابًا لبدء طلب.",
     createAccount: "إنشاء حساب",
+    postTitle: "أنشئ حسابك لإرسال طلبك",
+    postBody: "أكمل بياناتك وسيُرسَل طلبك مباشرةً.",
   },
   gate: {
     confirmLocation: "أكّد الموقع للمتابعة.",

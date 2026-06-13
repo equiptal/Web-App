@@ -1,17 +1,24 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useT, fmt } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
+import { useSession } from "@/lib/session";
 import { Button, Icon } from "@/components/ui";
+import { AccountModal } from "@/components/onboarding/AccountModal";
 import { buildSpecRows, toCsv, downloadCsv, type SpecRow } from "@/lib/export/spec-sheet";
 import { postableItems } from "@/lib/contract";
 
 export function Step4Preview() {
   const t = useT();
   const { state, actions } = useRfq();
+  const { tier } = useSession();
+  const [showAccount, setShowAccount] = useState(false);
   const { draft, taxonomy, busy, error } = state;
   if (!draft) return null;
+
+  // Guests run the whole flow; the account gate lands here. Guest → account popup, then auto-post.
+  const onSubmit = () => (tier === "guest" ? setShowAccount(true) : actions.submit());
 
   const rows = buildSpecRows(draft, taxonomy);
   const tt = t.preview.table;
@@ -137,10 +144,19 @@ export function Step4Preview() {
 
       {/* AC-42/43: send one broadcast covering all items. */}
       <div className="flex justify-end">
-        <Button disabled={busy || count === 0} onClick={() => actions.submit()} className="px-6 py-3 text-[14.5px]">
+        <Button disabled={busy || count === 0} onClick={onSubmit} className="px-6 py-3 text-[14.5px]">
           <Icon name="send" size={18} /> {busy ? `${t.preview.send}…` : t.preview.send}
         </Button>
       </div>
+
+      <AccountModal
+        open={showAccount}
+        onClose={() => setShowAccount(false)}
+        onCreated={() => {
+          setShowAccount(false);
+          void actions.submit(); // account created (now basic) → post the request
+        }}
+      />
     </div>
   );
 }

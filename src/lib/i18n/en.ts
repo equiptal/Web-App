@@ -363,6 +363,8 @@ export const en = {
     blockTitle: "Create an account to continue", // AC-02
     blockBody: "RFQ creation is available to registered renters. Create an account to start a request.",
     createAccount: "Create account",
+    postTitle: "Create your account to post your request",
+    postBody: "Complete your details and your request will be posted right away.",
   },
   gate: {
     confirmLocation: "Confirm the location to continue.", // AC-12/16

@@ -38,7 +38,19 @@ const FALLBACK_JOBS: Opt[] = [
  * first/last name, city + job-title selectors (master-data), optional email + WhatsApp; phone read-only.
  * Submit → `/api/profile/complete` → guest becomes basic → refresh session → return to `next` or home.
  */
-export function OnboardingForm({ next }: { next: string }) {
+export function OnboardingForm({
+  next,
+  onDone,
+  headline,
+  subhead,
+}: {
+  next: string;
+  /** When provided, called after the account is created instead of navigating (e.g. modal flow). */
+  onDone?: () => void;
+  /** Optional header overrides (e.g. "Create your account to post your request"). */
+  headline?: string;
+  subhead?: string;
+}) {
   const t = useT();
   const o = t.onboarding;
   const { locale } = useLocale();
@@ -119,6 +131,10 @@ export function OnboardingForm({ next }: { next: string }) {
       return;
     }
     await refresh(); // AC-05: session tier guest→basic, unblocks canCreate
+    if (onDone) {
+      onDone(); // modal flow: caller closes + continues (e.g. auto-submit the RFQ)
+      return;
+    }
     const dest = next.startsWith("/") && !next.startsWith("//") ? next : "/"; // AC-06
     router.replace(dest);
   };
@@ -134,8 +150,8 @@ export function OnboardingForm({ next }: { next: string }) {
           <Icon name="person_add" size={22} />
         </span>
         <div>
-          <h1 className="text-[20px] font-extrabold text-navy">{o.title}</h1>
-          <p className="mt-1 text-[13.5px] text-muted">{o.subtitle}</p>
+          <h1 className="text-[20px] font-extrabold text-navy">{headline ?? o.title}</h1>
+          <p className="mt-1 text-[13.5px] text-muted">{subhead ?? o.subtitle}</p>
         </div>
       </div>
 
