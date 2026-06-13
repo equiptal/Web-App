@@ -7,6 +7,7 @@ function makeItem(over: Partial<EquipmentItem> = {}): EquipmentItem {
   return {
     id: "i1",
     rawLabel: "excavator",
+    rawSize: null,
     ref: { categoryId: "cat", subcategoryId: "sub", measurementId: "cap" },
     verdict: "confident",
     resolved: true,
@@ -74,13 +75,14 @@ describe("draftToCreateRequest — ALIGNMENT rules", () => {
     expect(di("supplier", "electric")).toBeUndefined();
   });
 
-  it("rule 4: fatRequired = F.A.T by supplier, only when operator included", () => {
-    const fat = (op: "yes" | "no", who: "me" | "supplier") =>
+  it("rule 4: fatRequired = F.A.T side (supplier⇒true / me⇒false), only when operator included; omitted when unset", () => {
+    const fat = (op: "yes" | "no", who: "me" | "supplier" | null) =>
       draftToCreateRequest(makeDraft({ items: [makeItem({ operatorNeeded: op, operator: { ...defaultOperatorDetails(), fat: who } })] }), "46")
         .equipmentItems[0].fatRequired;
     expect(fat("yes", "supplier")).toBe(true);
     expect(fat("yes", "me")).toBe(false);
-    expect(fat("no", "supplier")).toBe(false);
+    expect(fat("yes", null)).toBeUndefined(); // side unset → no assumption
+    expect(fat("no", "supplier")).toBeUndefined(); // no operator → omit
   });
 
   it("rule 6: sends extendable + per-item additionalNotes", () => {

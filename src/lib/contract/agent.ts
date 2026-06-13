@@ -20,6 +20,7 @@ export interface RFQLineItem {
   category: string;
   subtype: string;
   capacity: string;
+  capacity_input_value?: string | null; // verbatim size phrase the renter stated (e.g. "30 ton")
   quantity: number | null;
   operator_included: boolean | null;
   fuel_type_preference: AgentFuelType | null;
@@ -33,7 +34,8 @@ export interface RFQLineItem {
   // Emitted by Mansour but previously dropped by the adapter — now consumed:
   additional_notes?: string | null; // AC-53 per-item free-text qualifiers ("silent", "breaker")
   diesel_included?: boolean | null; // AC-26 supplier provides fuel
-  fat_required?: boolean | null; // AC-24 factory acceptance / transfer
+  fat_required?: boolean | null; // AC-24 FAT applies (operator included)
+  operator_accommodation_by_rentee?: boolean | null; // AC-24 who covers FAT: true = rentee/me, false = supplier
   safety_certifications?: string[] | null; // AC-50
   capacity_advisory?: string | null;
   fuel_type_match?: FuelTypeMatch;
@@ -94,6 +96,9 @@ export interface RFQAgentOutput {
   rfq_header: RFQHeader;
   line_items: RFQLineItem[];
   missing_required_fields: MissingFieldEntry[];
+  /** Short, plain, conversational notes on values the agent assumed/inferred, in the renter's
+   *  language (location vagueness, responsibility assumptions, size auto-fill, fuel default). */
+  justifications?: string[];
 }
 
 /** Request body for `POST /rfq` and `POST /rfq/jobs`. Attachments are base64 (no `data:` prefix). */

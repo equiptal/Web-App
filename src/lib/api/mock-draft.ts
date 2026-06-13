@@ -82,6 +82,7 @@ function base(id: string, rawLabel: string | null, quantity: number): EquipmentI
   return {
     id,
     rawLabel,
+    rawSize: null,
     ref: { categoryId: null, subcategoryId: null, measurementId: null },
     verdict: "confident",
     resolved: true,

@@ -334,6 +334,7 @@ export const ar: Dictionary = {
     projectSummary: "المشروع",
     equipmentSummary: "المعدات",
     preferencesSummary: "التفضيلات",
+    whyTitle: "ما افترضتُه — يرجى التأكيد",
     perItem: "حسب كل عنصر",
     table: {
       equipment: "المعدة",

@@ -51,6 +51,8 @@ export interface RfqState {
   busy: boolean;
   error: ApiErrorKind | null;
   requestId: string | null;
+  /** Every short code from the fan-out (one per equipment item); requestId is the first. */
+  requestIds: string[];
   multiLocationDismissed: boolean;
   seq: number;
   /** web-app/002: the project + items exactly as the agent first returned them — used to mark
@@ -69,6 +71,7 @@ const initialState: RfqState = {
   busy: false,
   error: null,
   requestId: null,
+  requestIds: [],
   multiLocationDismissed: false,
   seq: 100,
   agentOrigin: null,
@@ -105,7 +108,7 @@ type Action =
   | { t: "REMOVE_ITEM"; id: string }
   | { t: "PATCH_PREFERENCES"; patch: DeepPrefPatch }
   | { t: "SUBMIT_START" }
-  | { t: "SUBMIT_SUCCESS"; requestId: string }
+  | { t: "SUBMIT_SUCCESS"; requestId: string; requestIds: string[] }
   | { t: "SUBMIT_ERROR"; kind: ApiErrorKind }
   | { t: "HYDRATE"; saved: Partial<RfqState> }
   | { t: "RESET" };
@@ -155,6 +158,7 @@ function reducer(state: RfqState, a: Action): RfqState {
           preferences: a.draft.preferences ?? defaultPreferences(), // agent-inferred Step-3 prefs when present
           detectedLocations: a.draft.detectedLocations,
           summary: a.draft.summary,
+          justifications: a.draft.justifications ?? [],
         },
         // Snapshot the agent's values (refs are safe — all edits are immutable copies).
         agentOrigin: { project: a.draft.project, items: a.draft.items },
@@ -286,7 +290,7 @@ function reducer(state: RfqState, a: Action): RfqState {
     case "SUBMIT_START":
       return { ...state, busy: true, error: null };
     case "SUBMIT_SUCCESS":
-      return { ...state, busy: false, phase: "confirmation", requestId: a.requestId };
+      return { ...state, busy: false, phase: "confirmation", requestId: a.requestId, requestIds: a.requestIds };
     case "SUBMIT_ERROR":
       return { ...state, busy: false, error: a.kind };
     case "RESET":
@@ -356,13 +360,13 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
       if (!s.draft) return;
       dispatch({ t: "SUBMIT_START" });
       try {
-        const { requestId } = await submitRequest({
+        const { requestId, requestIds } = await submitRequest({
           project: s.draft.project,
           items: postableItems(s.draft.items), // AC-33/34: exclude no-match/removed
           preferences: s.draft.preferences,
           simulateError: s.simulateError,
         });
-        dispatch({ t: "SUBMIT_SUCCESS", requestId });
+        dispatch({ t: "SUBMIT_SUCCESS", requestId, requestIds: requestIds ?? (requestId ? [requestId] : []) });
       } catch (e) {
         dispatch({ t: "SUBMIT_ERROR", kind: e instanceof ApiError ? e.kind : "unknown" });
       }

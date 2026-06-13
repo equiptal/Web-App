@@ -333,6 +333,7 @@ export const en = {
     projectSummary: "Project",
     equipmentSummary: "Equipment",
     preferencesSummary: "Preferences",
+    whyTitle: "What I assumed — please confirm",
     perItem: "Per item",
     table: {
       equipment: "Equipment",
