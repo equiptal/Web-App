@@ -74,6 +74,15 @@ export function submitRequest(payload: RfqRequestPayload & { simulateError?: boo
   return postJson<{ requestId: string }>("/api/requests", payload);
 }
 
+/** web-app/005: submit a manual (broadcast) or direct request to the shared app backend. */
+export function submitCreateRequest(payload: {
+  draft: RfqRequestPayload;
+  channel: "broadcast" | "direct";
+  supplierId?: number | null;
+}): Promise<{ requestId: string }> {
+  return postJson<{ requestId: string }>("/api/create-request", payload);
+}
+
 /** Fetch the equipment taxonomy. */
 export async function fetchTaxonomy(): Promise<Taxonomy> {
   try {

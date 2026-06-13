@@ -86,19 +86,20 @@ export function Intake() {
           </div>
         </div>
 
-        {/* Fill Manually — coming soon */}
-        <div className="flex items-start gap-3 rounded-[14px] border border-border bg-surface p-4 opacity-80">
-          <span className="grid h-11 w-11 flex-none place-items-center rounded-[10px] bg-surface2 text-muted">
+        {/* Fill Manually — manual builder (web-app/005, AC-01) */}
+        <button
+          type="button"
+          onClick={() => actions.enterManual()}
+          className="flex items-start gap-3 rounded-[14px] border border-border bg-surface p-4 text-start transition hover:border-brand"
+        >
+          <span className="grid h-11 w-11 flex-none place-items-center rounded-[10px] bg-surface2 text-navy-mid">
             <Icon name="edit_note" size={22} />
           </span>
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <b className="text-[14px] font-bold text-navy">{t.intake.optManualTitle}</b>
-              <span className="rounded-full bg-surface2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">{t.intake.comingSoon}</span>
-            </div>
+            <b className="text-[14px] font-bold text-navy">{t.intake.optManualTitle}</b>
             <p className="mt-1 text-[12.5px] leading-relaxed text-muted">{t.intake.optManualDesc}</p>
           </div>
-        </div>
+        </button>
       </div>
 
       {/* Paste + attach card */}

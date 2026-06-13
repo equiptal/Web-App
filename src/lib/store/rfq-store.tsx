@@ -15,12 +15,25 @@ import {
   AdvancedSettings,
   computeSummary,
   defaultPreferences,
+  defaultProjectDetails,
   defaultOperatorNeeded,
   isCompleteRef,
   newManualItem,
   postableItems,
 } from "@/lib/contract";
-import { ApiError, ApiErrorKind, fetchTaxonomy, processRfq, submitRequest } from "@/lib/api/client";
+import { ApiError, ApiErrorKind, fetchTaxonomy, processRfq, submitRequest, submitCreateRequest } from "@/lib/api/client";
+import type { RequestChannel } from "@/lib/contract/create-request";
+
+/** web-app/005: a supplier bound to a direct request. */
+export interface RequestSupplier {
+  id: number;
+  name: string;
+}
+
+/** Build an empty manual draft (no agent) — default project, one blank item, default preferences. */
+function emptyManualDraft(items: EquipmentItem[]): RfqDraft {
+  return { project: defaultProjectDetails(), items, preferences: defaultPreferences(), detectedLocations: [], summary: computeSummary(items) };
+}
 
 export type Phase = "intake" | "processing" | "wizard" | "confirmation";
 export type Step = 1 | 2 | 3 | 4;
@@ -40,6 +53,11 @@ export interface RfqState {
   requestId: string | null;
   multiLocationDismissed: boolean;
   seq: number;
+  // web-app/005: manual/direct create. `manualMode` routes submit to the app backend
+  // (/api/create-request) instead of the agent (/api/requests).
+  manualMode: boolean;
+  channel: RequestChannel;
+  supplier: RequestSupplier | null;
 }
 
 const initialState: RfqState = {
@@ -55,6 +73,9 @@ const initialState: RfqState = {
   requestId: null,
   multiLocationDismissed: false,
   seq: 100,
+  manualMode: false,
+  channel: "broadcast",
+  supplier: null,
 };
 
 type Action =
@@ -67,6 +88,8 @@ type Action =
   | { t: "PROCESS_SUCCESS"; draft: AgentDraft }
   | { t: "PROCESS_ERROR"; kind: ApiErrorKind }
   | { t: "ENTER_WIZARD" }
+  | { t: "ENTER_MANUAL" }
+  | { t: "START_DIRECT"; supplier: RequestSupplier; item: EquipmentItem }
   | { t: "GO_INTAKE" }
   | { t: "GO_STEP"; step: Step }
   | { t: "PATCH_LOCATION"; patch: Partial<ProjectDetails["location"]> }
@@ -144,6 +167,14 @@ function reducer(state: RfqState, a: Action): RfqState {
       return { ...state, busy: false, error: a.kind };
     case "ENTER_WIZARD":
       return { ...state, phase: "wizard", step: 1 };
+    case "ENTER_MANUAL": {
+      // Manual broadcast: enter the wizard with an empty draft + one blank item (no agent). AC-01/10.
+      const items = [newManualItem(`m${state.seq}`)];
+      return { ...state, seq: state.seq + 1, phase: "wizard", step: 1, manualMode: true, channel: "broadcast", supplier: null, error: null, requestId: null, draft: emptyManualDraft(items) };
+    }
+    case "START_DIRECT":
+      // Direct request from a store: bind the supplier + seed the selected item. AC-12/13.
+      return { ...state, phase: "wizard", step: 1, manualMode: true, channel: "direct", supplier: a.supplier, error: null, requestId: null, draft: emptyManualDraft([a.item]) };
     case "GO_INTAKE":
       // Return to intake preserving text/files (AC-10: input preserved).
       return { ...state, phase: "intake", error: null };
@@ -303,6 +334,8 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
       }
     },
     enterWizard: () => dispatch({ t: "ENTER_WIZARD" }),
+    enterManual: () => dispatch({ t: "ENTER_MANUAL" }),
+    startDirect: (supplier: RequestSupplier, item: EquipmentItem) => dispatch({ t: "START_DIRECT", supplier, item }),
     goIntake: () => dispatch({ t: "GO_INTAKE" }),
     goStep: (step: Step) => dispatch({ t: "GO_STEP", step }),
 
@@ -328,18 +361,23 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
 
     patchPreferences: (patch: DeepPrefPatch) => dispatch({ t: "PATCH_PREFERENCES", patch }),
 
-    async submit() {
+    async submit(override?: { channel?: RequestChannel; supplierId?: number | null }) {
       const s = getState();
       if (!s.draft) return;
       dispatch({ t: "SUBMIT_START" });
+      const draft = { project: s.draft.project, items: postableItems(s.draft.items), preferences: s.draft.preferences };
       try {
-        const { requestId } = await submitRequest({
-          project: s.draft.project,
-          items: postableItems(s.draft.items), // AC-33/34: exclude no-match/removed
-          preferences: s.draft.preferences,
-          simulateError: s.simulateError,
-        });
-        dispatch({ t: "SUBMIT_SUCCESS", requestId });
+        if (s.manualMode) {
+          // web-app/005: post to the shared app backend. `override` lets the send-choice modal pick
+          // direct vs broadcast-instead (one-way supplier clear) at submit time (AC-17/18).
+          const channel = override?.channel ?? s.channel;
+          const supplierId = channel === "direct" ? (override?.supplierId ?? s.supplier?.id ?? null) : null;
+          const { requestId } = await submitCreateRequest({ draft, channel, supplierId });
+          dispatch({ t: "SUBMIT_SUCCESS", requestId });
+        } else {
+          const { requestId } = await submitRequest({ ...draft, simulateError: s.simulateError });
+          dispatch({ t: "SUBMIT_SUCCESS", requestId });
+        }
       } catch (e) {
         dispatch({ t: "SUBMIT_ERROR", kind: e instanceof ApiError ? e.kind : "unknown" });
       }
