@@ -142,13 +142,13 @@ function EquipmentItemCard({ item, ar, L }: { item: RequestItem; ar: boolean; L:
   if (item.maxEquipmentAge) terms.push(["calendar_month", `${item.maxEquipmentAge}+`]);
   (item.safetyCertifications ?? []).forEach((c) => terms.push(["verified", c]));
   return (
-    <div className="flex gap-3 p-4">
-      <span className="grid h-10 w-10 flex-none place-items-center overflow-hidden rounded-[10px] bg-brand-soft">
+    <div className="flex gap-3.5 p-4">
+      <span className="grid h-[54px] w-[54px] flex-none place-items-center overflow-hidden rounded-xl border border-border bg-surface2">
         {item.subtypeImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={item.subtypeImageUrl} alt="" className="h-6 w-6 object-contain" />
+          <img src={item.subtypeImageUrl} alt="" className="h-8 w-8 object-contain" />
         ) : (
-          <Icon name="construction" size={20} className="text-brand" />
+          <Icon name="construction" size={26} className="text-muted" />
         )}
       </span>
       <div className="min-w-0">
