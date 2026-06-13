@@ -48,6 +48,9 @@ export const en = {
   home: {
     title: "Home",
     eyebrow: "Smart Equipment Marketplace",
+    statSuppliers: "Verified Suppliers",
+    statEquipment: "Equipment Listed",
+    statCities: "Cities Covered",
     bannerTitle: "Order your next equipment, faster than ever",
     bannerSubtitle: "Post your request and get competitive bids from verified suppliers — or upload an RFQ and let your smart assistant build it automatically.",
     createRequest: "Create request",

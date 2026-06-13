@@ -50,6 +50,9 @@ export const ar: Dictionary = {
   home: {
     title: "الرئيسية",
     eyebrow: "سوق المعدات الذكي",
+    statSuppliers: "مؤجرون موثّقون",
+    statEquipment: "معدات مدرجة",
+    statCities: "مدن مغطاة",
     bannerTitle: "اطلب معدتك القادمة، أسرع من أي وقت",
     bannerSubtitle: "انشر طلبك واحصل على عروض تنافسية من مؤجرين موثّقين — أو ارفع طلب عروض ودع مساعدك الذكي ينشئه تلقائياً.",
     createRequest: "إنشاء طلب",

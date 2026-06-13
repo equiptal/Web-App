@@ -18,7 +18,7 @@ export function StoreCard({ store }: { store: StoreCardData }) {
       className="block overflow-hidden rounded-[16px] border border-border bg-surface transition hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(0,0,0,.1)]"
     >
       {/* Banner */}
-      <div className="relative flex h-[90px] items-end bg-gradient-to-br from-navy to-[#1e3a5f] px-4">
+      <div className="relative flex h-[90px] items-end bg-gradient-to-br from-[#1e3a5f] to-[#0f1e2e] px-4">
         <div
           className="grid h-[52px] w-[52px] flex-none translate-y-[26px] place-items-center overflow-hidden rounded-[12px] border-[3px] border-surface bg-surface text-[20px] font-extrabold text-navy"
           style={store.logoUrl ? { backgroundImage: `url("${store.logoUrl}")`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
