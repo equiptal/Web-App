@@ -55,11 +55,11 @@ export function HomeHub() {
         </div>
       </div>
 
-      {/* Activity cards — no web data/pages yet (future epics) → coming-soon */}
+      {/* Activity cards — wired to the renter's requests/bids/deals screens. */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <ActivityCard accent="brand" icon="assignment" title={t.home.yourRequests} sub={t.home.reqSub} />
-        <ActivityCard accent="info" icon="gavel" title={t.home.priceBids} sub={t.home.bidsSub} />
-        <ActivityCard accent="ok" icon="handshake" title={t.home.completedDeals} sub={t.home.dealsSub} />
+        <ActivityCard accent="brand" icon="assignment" title={t.home.yourRequests} sub={t.home.reqSub} href="/requests" />
+        <ActivityCard accent="info" icon="gavel" title={t.home.priceBids} sub={t.home.bidsSub} href="/requests?tab=bids" />
+        <ActivityCard accent="ok" icon="handshake" title={t.home.completedDeals} sub={t.home.dealsSub} href="/requests?tab=deals" />
       </div>
 
       {/* Suggested suppliers — filter bar always shown; View all only adds cards (AC-05/10/11/12/13) */}
@@ -79,27 +79,33 @@ function ActivityCard({
   icon,
   title,
   sub,
+  href,
 }: {
   accent: "brand" | "info" | "ok";
   icon: string;
   title: string;
   sub: string;
+  href?: string;
 }) {
-  const t = useT();
+  const router = useRouter();
   const c = ACCENT[accent];
   return (
-    <div className="group relative flex cursor-default flex-col gap-3.5 overflow-hidden rounded-[16px] border border-border bg-surface p-5 transition hover:-translate-y-0.5 hover:shadow-[0_8px_28px_rgba(0,0,0,.09)]">
+    <button
+      type="button"
+      onClick={() => href && router.push(href)}
+      className="group relative flex cursor-pointer flex-col gap-3.5 overflow-hidden rounded-[16px] border border-border bg-surface p-5 text-start transition hover:-translate-y-0.5 hover:shadow-[0_8px_28px_rgba(0,0,0,.09)]"
+    >
       <div className="flex items-start justify-between">
         <span className={`grid h-11 w-11 place-items-center rounded-[12px] ${c.iconBg}`}>
           <Icon name={icon} size={22} className={c.iconText} />
         </span>
-        <span className="rounded-full bg-surface2 px-2.5 py-[3px] text-[11px] font-semibold text-muted">{t.home.soon}</span>
+        <Icon name="chevron_right" size={20} className="text-muted/60 rtl:scale-x-[-1]" />
       </div>
       <div>
         <div className="text-[15px] font-bold text-navy">{title}</div>
         <div className="mt-0.5 text-[12px] text-muted">{sub}</div>
       </div>
       <div className={`absolute inset-x-0 bottom-0 h-[3px] opacity-0 transition group-hover:opacity-100 ${c.bar}`} />
-    </div>
+    </button>
   );
 }
