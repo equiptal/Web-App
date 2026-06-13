@@ -25,7 +25,7 @@ function fileGlyph(type: string): string {
   return "description";
 }
 
-const FILE_CHIPS = ["PDF", "Word", "Excel", "Image", "Email (.eml)"];
+const FILE_CHIPS = ["PDF", "Word", "Excel", "Image"];
 
 /**
  * RFQ intake (web-app/002, AC-01/05/07/08). Two mode cards (Upload/Paste — active; Fill Manually —
@@ -64,7 +64,7 @@ export function Intake() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="w-full">
       <h1 className="text-[22px] font-extrabold tracking-tight text-navy">{t.intake.heading}</h1>
       <p className="mt-1 text-[13.5px] text-muted">{t.intake.subheading}</p>
 
