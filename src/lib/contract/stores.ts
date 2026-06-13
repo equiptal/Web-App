@@ -74,6 +74,8 @@ export interface EquipmentDetail {
   yardName: string | null;
   yardCity: string | null;
   storeName: string | null;
+  /** The supplier's numeric user id — bound as `supplierId` on a direct request (web-app/005). */
+  supplierId: number | null;
 }
 
 /** A node in the equipment taxonomy tree used by the browse filters (AC-11/24). */
@@ -202,6 +204,7 @@ export function mapEquipmentDetail(raw: Raw): EquipmentDetail {
     yardName: str(raw.yardName),
     yardCity: str(raw.yardCity),
     storeName: str(store.name),
+    supplierId: num(raw.userId) ?? num(store.userId),
   };
 }
 
