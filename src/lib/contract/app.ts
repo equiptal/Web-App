@@ -73,7 +73,6 @@ export interface CreateRequestPayload {
   workingHoursPerDay?: number; // int 1–24
   workingDaysPerWeek?: number; // int 1–7
   overtimeRate?: "0" | "1X" | "1.5X" | "2X"; // UI "without" → "0"
-  siteAccessRestrictions?: string; // single string ≤500 (NOT per-item) — UI array joined
   paymentTerms?: string; // ≤100
   paymentMethod?: string; // ≤100
   maintenanceResponsibility?: string; // ≤50

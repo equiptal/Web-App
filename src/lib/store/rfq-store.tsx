@@ -25,6 +25,9 @@ import { ApiError, ApiErrorKind, fetchTaxonomy, processRfq, submitRequest } from
 export type Phase = "intake" | "processing" | "wizard" | "confirmation";
 export type Step = 1 | 2 | 3 | 4;
 
+/** localStorage key for the persisted RFQ draft (web-app/002 save-on-reload). */
+const DRAFT_STORAGE_KEY = "rfq-draft-v1";
+
 export interface RfqState {
   phase: Phase;
   step: Step;
@@ -90,6 +93,7 @@ type Action =
   | { t: "SUBMIT_START" }
   | { t: "SUBMIT_SUCCESS"; requestId: string }
   | { t: "SUBMIT_ERROR"; kind: ApiErrorKind }
+  | { t: "HYDRATE"; saved: Partial<RfqState> }
   | { t: "RESET" };
 
 interface DeepPrefPatch {
@@ -271,6 +275,9 @@ function reducer(state: RfqState, a: Action): RfqState {
       return { ...state, busy: false, error: a.kind };
     case "RESET":
       return { ...initialState, taxonomy: state.taxonomy };
+    case "HYDRATE":
+      // Restore a saved draft on reload (web-app/002) — keep the freshly-fetched taxonomy.
+      return { ...state, ...a.saved, taxonomy: state.taxonomy };
     default:
       return state;
   }
@@ -354,6 +361,33 @@ export function RfqProvider({ children }: { children: ReactNode }) {
   stateRef.current = state;
 
   const actions = useMemo(() => makeActions(dispatch, () => stateRef.current), []);
+
+  // Restore a saved draft on reload (web-app/002): data + the step the renter was on. Uploaded
+  // files can't be re-created by the browser, so they aren't persisted (renter re-attaches if needed).
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as Partial<RfqState>;
+      if (saved && saved.draft) dispatch({ t: "HYDRATE", saved });
+    } catch {
+      /* corrupt/blocked storage → start fresh */
+    }
+  }, []);
+
+  // Persist the editable draft + position whenever they change (skip processing/confirmation phases).
+  const { phase, step, draft, text, multiLocationDismissed, seq } = state;
+  useEffect(() => {
+    try {
+      if (draft && (phase === "intake" || phase === "wizard")) {
+        window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({ phase, step, draft, text, multiLocationDismissed, seq }));
+      } else if (phase === "confirmation") {
+        window.localStorage.removeItem(DRAFT_STORAGE_KEY); // request sent → clear the saved draft
+      }
+    } catch {
+      /* ignore quota/availability errors */
+    }
+  }, [phase, step, draft, text, multiLocationDismissed, seq]);
 
   // Load the taxonomy once.
   useEffect(() => {

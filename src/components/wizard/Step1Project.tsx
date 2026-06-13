@@ -8,12 +8,10 @@ import {
   RENTAL_BASES,
   OVERTIME_RATES,
   EQUIPMENT_YEARS,
-  SITE_ACCESS_RESTRICTIONS,
   SAFETY_CERTIFICATES,
   OTHER_CERTIFICATES,
   type RentalBasis,
   type OvertimeRate,
-  type SiteAccessRestriction,
   type SafetyCertificate,
   type OtherCertificate,
 } from "@/lib/contract";
@@ -185,15 +183,6 @@ export function Step1Project() {
             )}
           </Field>
         </div>
-        <div className="mt-4">
-          <Field label={t.step1.advanced.siteAccess} optional>
-            <SelChips<SiteAccessRestriction>
-              values={project.advanced.siteAccessRestrictions}
-              onToggle={(v) => actions.patchAdvanced({ siteAccessRestrictions: toggle(project.advanced.siteAccessRestrictions, v) })}
-              options={opt(SITE_ACCESS_RESTRICTIONS, t.options.siteAccess)}
-            />
-          </Field>
-        </div>
       </Card>
 
       {/* ---------- Certificates (AC-50) ---------- */}
@@ -204,6 +193,15 @@ export function Step1Project() {
             onToggle={(v) => actions.setCertificates({ safety: toggle(project.certificates.safety, v) })}
             options={opt(SAFETY_CERTIFICATES, t.options.safetyCert)}
           />
+          {project.certificates.safety.includes("other") && (
+            <div className="mt-2">
+              <TextInput
+                placeholder={t.step1.certificates.otherSafetyPlaceholder}
+                value={project.certificates.safetyOther}
+                onChange={(e) => actions.setCertificates({ safetyOther: e.target.value })}
+              />
+            </div>
+          )}
         </Field>
         <div className="mt-4">
           <Field label={t.step1.certificates.other}>

@@ -11,7 +11,7 @@ import {
   resolveRef,
   isCompleteRef,
   FUEL_TYPES,
-  SAFETY_CERTIFICATES,
+  OPERATOR_CERTIFICATES,
   PARTIES,
   type FuelType,
   type OperatorCertificate,
@@ -208,15 +208,11 @@ export function ItemRow({
                   <Pchips value={item.operator.nationality} onChange={(v) => actions.patchItemOperator(item.id, { nationality: v })} options={nationalityOpts} />
                 </ChipField>
                 <ChipField label={t.step2.perItem.certificate}>
-                  <Pchips<OperatorCertificate> value={item.operator.certificate} onChange={(v) => actions.patchItemOperator(item.id, { certificate: v })} options={opt(SAFETY_CERTIFICATES, t.options.safetyCert)} />
+                  <Pchips<OperatorCertificate> value={item.operator.certificate} onChange={(v) => actions.patchItemOperator(item.id, { certificate: v })} options={opt(OPERATOR_CERTIFICATES, t.options.safetyCert)} />
                 </ChipField>
-                <ChipField label={t.step2.perItem.accommodation}>
-                  <Pchips<Party> value={item.operator.accommodation} onChange={(v) => actions.patchItemOperator(item.id, { accommodation: v })} options={opt(PARTIES, t.options.party)} />
+                <ChipField label={t.step2.perItem.fat}>
+                  <Pchips<Party> value={item.operator.fat} onChange={(v) => actions.patchItemOperator(item.id, { fat: v })} options={opt(PARTIES, t.options.party)} />
                 </ChipField>
-                <div className="flex items-center justify-between">
-                  <span className="text-[13px] font-bold">{t.step2.perItem.transfer}</span>
-                  <Toggle checked={item.operator.transfer} onChange={(v) => actions.patchItemOperator(item.id, { transfer: v })} />
-                </div>
               </div>
             )}
           </div>

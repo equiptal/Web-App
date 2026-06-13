@@ -12,24 +12,10 @@ export const OVERTIME_RATES: OvertimeRate[] = ["without", "1.5x", "2x"];
 /** AC-28: Any + 2020–2026 + Customize. `custom:<year>` carries a custom value. */
 export const EQUIPMENT_YEARS = ["any", "2020", "2021", "2022", "2023", "2024", "2025", "2026"] as const;
 
-export type SiteAccessRestriction =
-  | "weight-limit"
-  | "height-limit"
-  | "security-permit"
-  | "delivery-window"
-  | "no-overnight-storage"
-  | "special-transport-permit"; // AC-27
-export const SITE_ACCESS_RESTRICTIONS: SiteAccessRestriction[] = [
-  "weight-limit",
-  "height-limit",
-  "security-permit",
-  "delivery-window",
-  "no-overnight-storage",
-  "special-transport-permit",
-];
-
-export type SafetyCertificate = "tuv" | "spsp" | "saso-technical"; // AC-50
-export const SAFETY_CERTIFICATES: SafetyCertificate[] = ["tuv", "spsp", "saso-technical"];
+export type SafetyCertificate = "tuv" | "spsp" | "saso-technical" | "other"; // AC-50 (+ web-app/002 free-text "other")
+export const SAFETY_CERTIFICATES: SafetyCertificate[] = ["tuv", "spsp", "saso-technical", "other"];
+/** Operator per-item certificate options — the fixed safety certs WITHOUT the free-text "other". */
+export const OPERATOR_CERTIFICATES: SafetyCertificate[] = ["tuv", "spsp", "saso-technical"];
 
 export type OtherCertificate = "local-content" | "saso-registration"; // AC-50
 export const OTHER_CERTIFICATES: OtherCertificate[] = ["local-content", "saso-registration"];

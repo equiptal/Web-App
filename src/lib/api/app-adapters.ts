@@ -112,7 +112,12 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
   const items = postableItems(draft.items);
   // Rule 4 + §4.2: project-level fields are stored per-item — compute once, fan out onto each item.
   const manufactureYear = toManufactureYear(project.advanced.equipmentYear);
-  const safetyCerts = project.certificates.safety.length ? project.certificates.safety.slice() : undefined; // AC-50 fanned per-item
+  // AC-50: safety certs fanned per-item. "other" carries the optional free-text name (dropped if blank).
+  const safetyOtherText = project.certificates.safetyOther.trim();
+  const safetyCertList = project.certificates.safety
+    .map((c) => (c === "other" ? safetyOtherText || null : c))
+    .filter(Boolean) as string[];
+  const safetyCerts = safetyCertList.length ? safetyCertList : undefined;
   // AC-50: "Other" certs → requiredCerts; the local-content flag is split out into its own boolean.
   const otherCerts = project.certificates.other;
   const localContent = otherCerts.includes("local-content");
@@ -134,9 +139,6 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
     workingHoursPerDay: project.timing.hoursPerDay, // AC-14/15 (default 8)
     workingDaysPerWeek: project.advanced.workingDaysPerWeek, // AC-15 (default 6)
     overtimeRate: OVERTIME_MAP[project.advanced.overtimeRate], // AC-15
-    siteAccessRestrictions: project.advanced.siteAccessRestrictions.length // AC-27: UI array → single string
-      ? project.advanced.siteAccessRestrictions.join(", ")
-      : undefined,
     paymentTerms: preferences.payment.terms ?? undefined, // AC-36
     paymentMethod: preferences.payment.method ?? undefined, // AC-36
     maintenanceResponsibility: preferences.maintenance.responsibility, // AC-37 (default supplier)
@@ -162,7 +164,7 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
         additionalNotes: i.additionalNotes || undefined, // AC-53 (rule 6: needs the deployed item column)
         maxEquipmentAge: manufactureYear, // AC-28 project-level year, fanned out (undefined ⇒ key dropped)
         dieselIncluded: toDieselIncluded(i.fuelType, fuelParty), // AC-26
-        fatRequired: operatorIncluded ? i.operator.transfer : false, // AC-24 operator "transfer" sub-field
+        fatRequired: operatorIncluded ? i.operator.fat === "supplier" : false, // AC-24 F.A.T: supplier covers ⇒ included
         // §4.2 per-item operator sub-fields (only meaningful when an operator is included):
         nightShiftRequired: operatorIncluded ? i.operator.nightShift : undefined, // AC-24
         operatorNationality: operatorIncluded ? i.operator.nationality ?? undefined : undefined, // AC-24

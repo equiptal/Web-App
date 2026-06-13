@@ -32,9 +32,16 @@ function makeDraft(p?: Partial<{ project: ProjectDetails; items: EquipmentItem[]
 }
 
 describe("draftToCreateRequest — ALIGNMENT rules", () => {
-  it("rule 2: never sends urgency", () => {
-    const p = draftToCreateRequest(makeDraft(), "46");
-    expect(p).not.toHaveProperty("urgency");
+  it("rule 2: urgency derived from start date (mobile CR-017 parity)", () => {
+    const at = (days: number | null) => {
+      const project = defaultProjectDetails();
+      project.timing.startDate = days == null ? null : new Date(Date.now() + days * 86_400_000).toISOString();
+      return draftToCreateRequest(makeDraft({ project }), "46").urgency;
+    };
+    expect(at(null)).toBe("FAR_FUTURE"); // no date
+    expect(at(1)).toBe("ASAP"); // < 2 days
+    expect(at(7)).toBe("SOON"); // 2–14 days
+    expect(at(40)).toBe("FAR_FUTURE"); // 14+ days
   });
 
   it("rule 3: omits startDate when unset; sends it (ISO) when set", () => {
@@ -67,13 +74,13 @@ describe("draftToCreateRequest — ALIGNMENT rules", () => {
     expect(di("supplier", "electric")).toBeUndefined();
   });
 
-  it("rule 4: fatRequired = operator transfer, only when operator included", () => {
-    const fat = (op: "yes" | "no", transfer: boolean) =>
-      draftToCreateRequest(makeDraft({ items: [makeItem({ operatorNeeded: op, operator: { ...defaultOperatorDetails(), transfer } })] }), "46")
+  it("rule 4: fatRequired = F.A.T by supplier, only when operator included", () => {
+    const fat = (op: "yes" | "no", who: "me" | "supplier") =>
+      draftToCreateRequest(makeDraft({ items: [makeItem({ operatorNeeded: op, operator: { ...defaultOperatorDetails(), fat: who } })] }), "46")
         .equipmentItems[0].fatRequired;
-    expect(fat("yes", true)).toBe(true);
-    expect(fat("yes", false)).toBe(false);
-    expect(fat("no", true)).toBe(false);
+    expect(fat("yes", "supplier")).toBe(true);
+    expect(fat("yes", "me")).toBe(false);
+    expect(fat("no", "supplier")).toBe(false);
   });
 
   it("rule 6: sends extendable + per-item additionalNotes", () => {
@@ -101,11 +108,15 @@ describe("draftToCreateRequest — §4.2 fields", () => {
     expect(p.overtimeRate).toBe("0"); // default "without"
   });
 
-  it("joins site access restrictions into one string; omits when empty", () => {
-    expect(draftToCreateRequest(makeDraft(), "46").siteAccessRestrictions).toBeUndefined();
+  it("maps safety cert 'other' to its free-text name; drops blank", () => {
     const project = defaultProjectDetails();
-    project.advanced.siteAccessRestrictions = ["weight-limit", "height-limit"];
-    expect(draftToCreateRequest(makeDraft({ project }), "46").siteAccessRestrictions).toBe("weight-limit, height-limit");
+    project.certificates.safety = ["tuv", "other"];
+    project.certificates.safetyOther = "ISO 9001";
+    expect(draftToCreateRequest(makeDraft({ project }), "46").equipmentItems[0].safetyCertifications).toEqual(["tuv", "ISO 9001"]);
+    // a blank "other" name is dropped (optional)
+    const p2 = defaultProjectDetails();
+    p2.certificates.safety = ["other"];
+    expect(draftToCreateRequest(makeDraft({ project: p2 }), "46").equipmentItems[0].safetyCertifications).toBeUndefined();
   });
 
   it("budgetCeiling only when > 0", () => {
