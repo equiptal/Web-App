@@ -160,6 +160,8 @@ export const en = {
     confirmRemove: "Remove",
     cancel: "Cancel",
     directSupplier: "Direct request to",
+    options: "Options",
+    sharedSettings: "Shared for all items",
   },
   intake: {
     heading: "How would you like to create your request?",

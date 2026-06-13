@@ -162,6 +162,8 @@ export const ar: Dictionary = {
     confirmRemove: "إزالة",
     cancel: "إلغاء",
     directSupplier: "طلب مباشر إلى",
+    options: "خيارات",
+    sharedSettings: "إعدادات لكل العناصر",
   },
   intake: {
     heading: "كيف تريد إنشاء طلبك؟",

@@ -3,8 +3,14 @@
 import { useEffect, useState } from "react";
 import { useLocale, useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
-import { Icon } from "@/components/ui";
+import { Icon, Pchips } from "@/components/ui";
+import { PARTIES, type Party } from "@/lib/contract";
+import { ItemDetails } from "@/components/wizard/ItemDetails";
 import type { TaxonomyNode } from "@/lib/contract/stores";
+
+function partyOpts(dict: Record<string, string>) {
+  return PARTIES.map((v) => ({ value: v, label: dict[v] ?? v }));
+}
 
 /**
  * Manual Step 2 — equipment picker using the APP taxonomy (with category/type icons), mirroring the
@@ -19,6 +25,8 @@ export function ManualEquipmentStep() {
   const { state, actions } = useRfq();
   const [tax, setTax] = useState<TaxonomyNode[]>([]);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const proj = state.draft?.project;
 
   useEffect(() => {
     fetch("/api/stores/taxonomy", { cache: "no-store" })
@@ -37,6 +45,27 @@ export function ManualEquipmentStep() {
       {state.channel === "direct" && state.supplier && (
         <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-info-soft px-3 py-1 text-[12.5px] font-semibold text-info">
           <Icon name="storefront" size={14} /> {m.directSupplier} {state.supplier.name}
+        </div>
+      )}
+
+      {/* Request-wide logistics (web-app/002 structure) — delivery / return / fuel for all items. */}
+      {proj && (
+        <div className="mt-4 rounded-[12px] border border-border bg-surface2/50 p-3.5">
+          <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wide text-muted">{m.sharedSettings}</div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div>
+              <span className="mb-1.5 block text-[11.5px] font-bold text-navy-mid">{t.step1.requestWide.delivery}</span>
+              <Pchips<Party> value={proj.deliveryToSite} onChange={(v) => actions.patchRequestWide({ deliveryToSite: v })} options={partyOpts(t.options.party)} />
+            </div>
+            <div>
+              <span className="mb-1.5 block text-[11.5px] font-bold text-navy-mid">{t.step1.requestWide.return}</span>
+              <Pchips<Party> value={proj.returnFromSite} onChange={(v) => actions.patchRequestWide({ returnFromSite: v })} options={partyOpts(t.options.party)} />
+            </div>
+            <div>
+              <span className="mb-1.5 block text-[11.5px] font-bold text-navy-mid">{t.step1.requestWide.fuelResponsibility}</span>
+              <Pchips<Party> value={proj.fuelResponsibility} onChange={(v) => actions.patchRequestWide({ fuelResponsibility: v })} options={partyOpts(t.options.party)} />
+            </div>
+          </div>
         </div>
       )}
 
@@ -95,47 +124,35 @@ export function ManualEquipmentStep() {
                 </div>
               )}
 
-              {/* Per-item options (AC-08) */}
-              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <Field label={m.quantity}>
-                  <input
-                    type="number"
-                    min={1}
-                    value={item.quantity}
-                    onChange={(e) => actions.patchItem(item.id, { quantity: Math.max(1, Number(e.target.value) || 1) })}
-                    className="h-[38px] w-full rounded-[10px] border border-border bg-surface2 px-3 text-[13px] outline-0 focus:border-brand"
-                  />
-                </Field>
-                <Field label={m.operator}>
-                  <select
-                    value={item.operatorNeeded}
-                    onChange={(e) => actions.patchItem(item.id, { operatorNeeded: e.target.value as "yes" | "no" })}
-                    className="h-[38px] w-full rounded-[10px] border border-border bg-surface2 px-2 text-[13px] font-semibold text-navy-mid outline-0 focus:border-brand"
-                  >
-                    <option value="yes">{m.withOperator}</option>
-                    <option value="no">{m.noOperator}</option>
-                  </select>
-                </Field>
-                <Field label={m.fuel}>
-                  <select
-                    value={item.fuelType}
-                    onChange={(e) => actions.patchItem(item.id, { fuelType: e.target.value as "diesel" | "petrol" | "electric" })}
-                    className="h-[38px] w-full rounded-[10px] border border-border bg-surface2 px-2 text-[13px] font-semibold text-navy-mid outline-0 focus:border-brand"
-                  >
-                    <option value="diesel">{m.fuelDiesel}</option>
-                    <option value="petrol">{m.fuelPetrol}</option>
-                    <option value="electric">{m.fuelElectric}</option>
-                  </select>
-                </Field>
-                <Field label={m.notes} full>
-                  <input
-                    value={item.additionalNotes}
-                    onChange={(e) => actions.patchItem(item.id, { additionalNotes: e.target.value })}
-                    placeholder={m.notesPlaceholder}
-                    className="h-[38px] w-full rounded-[10px] border border-border bg-surface2 px-3 text-[13px] outline-0 focus:border-brand"
-                  />
-                </Field>
+              {/* Quantity inline + full 002 per-item controls in an expander (AC-08) */}
+              <div className="mt-4 flex items-center gap-3">
+                <span className="text-[11px] font-bold uppercase tracking-wide text-muted">{m.quantity}</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={item.quantity}
+                  onChange={(e) => actions.patchItem(item.id, { quantity: Math.max(1, Number(e.target.value) || 1) })}
+                  className="h-[38px] w-[90px] rounded-[10px] border border-border bg-surface2 px-3 text-[13px] outline-0 focus:border-brand"
+                />
+                <button
+                  onClick={() =>
+                    setExpanded((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(item.id)) next.delete(item.id);
+                      else next.add(item.id);
+                      return next;
+                    })
+                  }
+                  className="ms-auto inline-flex items-center gap-1 text-[12.5px] font-bold text-info"
+                >
+                  <Icon name="tune" size={15} /> {m.options}
+                </button>
               </div>
+              {expanded.has(item.id) && proj && (
+                <div className="mt-3">
+                  <ItemDetails item={item} sharedFuelResp={proj.fuelResponsibility} sharedDelivery={proj.deliveryToSite} sharedReturn={proj.returnFromSite} />
+                </div>
+              )}
             </div>
           );
         })}
@@ -199,11 +216,3 @@ function PickGrid({
   );
 }
 
-function Field({ label, children, full }: { label: string; children: React.ReactNode; full?: boolean }) {
-  return (
-    <label className={`flex flex-col gap-1 ${full ? "col-span-2 sm:col-span-1" : ""}`}>
-      <span className="text-[11px] font-bold uppercase tracking-wide text-muted">{label}</span>
-      {children}
-    </label>
-  );
-}
