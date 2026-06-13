@@ -226,7 +226,7 @@ export const ar: Dictionary = {
       fromText: "من النص",
       fromFile: "من الملف",
       multiLocationTitle: "يغطي هذا الطلب موقعًا واحدًا فقط.",
-      multiLocationBody: "تحتاج المواقع الأخرى التي وجدناها إلى طلب منفصل.",
+      multiLocationBody: "إذا كان لمشروعك أكثر من موقع، فكل موقع يحتاج إلى طلب منفصل.",
       startSeparateRequest: "ابدأ طلبًا منفصلًا",
       mapPicker: {
         searchPlaceholder: "ابحث عن مكان، أو الصق رابط خرائط / إحداثيات",

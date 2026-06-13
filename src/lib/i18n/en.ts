@@ -225,7 +225,7 @@ export const en = {
       fromText: "From text", // AC-47 tentative
       fromFile: "From file", // AC-47 tentative
       multiLocationTitle: "This request covers a single location.", // AC-48
-      multiLocationBody: "The other location(s) we found need a separate request.",
+      multiLocationBody: "If you have more than one location for your project, each location needs a separate request.",
       startSeparateRequest: "Start a separate request", // AC-48: opens a fresh request in a new tab
       mapPicker: {
         searchPlaceholder: "Search a place, or paste a Maps link / coordinates",
