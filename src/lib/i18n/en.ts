@@ -67,6 +67,12 @@ export const en = {
     priceBids: "Price Bids",
     completedDeals: "Completed Deals",
     soon: "Coming soon",
+    reqSub: "Equipment requests you've posted",
+    bidsSub: "Supplier offers on your requests",
+    dealsSub: "Your closed & fulfilled orders",
+    reqStat: "Open requests",
+    bidsStat: "Total bids received",
+    dealsStat: "No deals yet",
   },
   browse: {
     title: "Verified Suppliers",

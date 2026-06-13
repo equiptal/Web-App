@@ -69,6 +69,12 @@ export const ar: Dictionary = {
     priceBids: "عروض الأسعار",
     completedDeals: "صفقات مكتملة",
     soon: "قريباً",
+    reqSub: "طلبات المعدات التي نشرتها",
+    bidsSub: "عروض المؤجرين على طلباتك",
+    dealsSub: "طلباتك المكتملة والمنفّذة",
+    reqStat: "طلبات مفتوحة",
+    bidsStat: "إجمالي العروض",
+    dealsStat: "لا صفقات بعد",
   },
   browse: {
     title: "مؤجرون موثّقون",
