@@ -33,6 +33,22 @@ function toIsoDateTime(d: string | null): string | undefined {
   return isNaN(dt.getTime()) ? undefined : dt.toISOString();
 }
 
+/**
+ * Client-derived urgency from the start date — EXACT mirror of the mobile app's CR-017 rule
+ * (`create_request_bloc.dart::_computeUrgency`): floor the whole-day gap, then <2d → ASAP, 2–14d →
+ * SOON, 14+d (or no/unparseable date) → FAR_FUTURE. The app backend stores the client value verbatim
+ * (`request.service.ts`), so the web must compute it identically rather than rely on server defaulting.
+ */
+function computeUrgency(startDate: string | null): "ASAP" | "SOON" | "FAR_FUTURE" {
+  if (!startDate) return "FAR_FUTURE";
+  const start = new Date(startDate.length <= 10 ? `${startDate}T00:00:00Z` : startDate).getTime();
+  if (Number.isNaN(start)) return "FAR_FUTURE";
+  const daysUntil = Math.floor((start - Date.now()) / 86_400_000);
+  if (daysUntil < 2) return "ASAP";
+  if (daysUntil <= 14) return "SOON";
+  return "FAR_FUTURE";
+}
+
 const FUEL_MAP: Record<string, CreateRequestItem["fuelTypePreference"]> = {
   diesel: "DIESEL",
   petrol: "PETROL",
@@ -87,8 +103,9 @@ const SLA_MAP: Record<string, CreateRequestPayload["breakdownResponseSla"]> = {
  * `userId` is required by the backend; while web auth is bypassed it comes from AGENTS_TEST_USER_ID.
  *
  * Integration rules (ALIGNMENT-web-app-002.md): `startDate` is optional — omit it and the server
- * defaults to "now"; never invent one (rule 3). `urgency` is NEVER sent — the server derives it from
- * `startDate` (mobile CR-017); any value would be ignored (rule 2).
+ * defaults to "now"; never invent one (rule 3). `urgency` is now sent, computed client-side to mirror
+ * the mobile app's CR-017 rule (the agents endpoint is aligning to require it like the app endpoint,
+ * which stores the client value verbatim) — see `computeUrgency`.
  */
 export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): CreateRequestPayload {
   const { project, preferences } = draft;
@@ -107,6 +124,7 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
     rentalType: (project.timing.rentalBasis && RENTAL_MAP[project.timing.rentalBasis]) || "DAILY",
     startDate: toIsoDateTime(project.timing.startDate), // optional; omitted when unset → server defaults to now
     endDate: toIsoDateTime(project.timing.endDate),
+    urgency: computeUrgency(project.timing.startDate), // mobile CR-017 parity (see computeUrgency)
     extendable: project.timing.extendable, // AC-13 (rule 6: needs the deployed `extendable` column)
     projectLat: project.location.lat,
     projectLng: project.location.lng,

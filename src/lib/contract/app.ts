@@ -59,8 +59,12 @@ export interface CreateRequestPayload {
   endDate?: string | null;
   /** AC-13 rental extendable flag. Requires the `extendable` column (rule 6 migration). */
   extendable?: boolean;
-  // `urgency` intentionally absent: the server derives it from startDate (ALIGNMENT rule 2 / mobile
-  // CR-017); any value sent is ignored, so the web never sends it.
+  /**
+   * Client-derived from startDate, mirroring the mobile app's CR-017 rule (<2d ASAP, 2–14d SOON, 14+d
+   * or no/invalid date FAR_FUTURE). The app backend stores the client value verbatim; the agents
+   * endpoint is aligning to require it too — so the web sends it (see `computeUrgency` in app-adapters).
+   */
+  urgency: "ASAP" | "SOON" | "FAR_FUTURE";
   projectLat?: number;
   projectLng?: number;
   projectAddressLabel?: string;
