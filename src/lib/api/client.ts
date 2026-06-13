@@ -1,4 +1,5 @@
 import type { AgentDraft, RfqRequestPayload, Taxonomy } from "@/lib/contract";
+import type { RequestListItem, RequestRecord } from "@/lib/contract/requests";
 
 /** Error kinds the UI distinguishes: empty/unreadable input (AC-09) vs connectivity (AC-10). */
 export type ApiErrorKind = "empty" | "network" | "unknown";
@@ -44,6 +45,17 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   return (await res.json()) as T;
 }
 
+async function getJson<T>(url: string): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(url, { headers: { Accept: "application/json" } });
+  } catch {
+    throw new ApiError("network");
+  }
+  if (!res.ok) throw new ApiError(res.status >= 500 ? "network" : "unknown", `HTTP ${res.status}`);
+  return (await res.json()) as T;
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
@@ -71,6 +83,20 @@ export async function processRfq(input: ProcessInput): Promise<AgentDraft> {
 
 /** Submit the assembled broadcast (AC-42/43). The server fans out one request per item, so
  *  `requestIds` carries every short code (`requestId` = the first, for back-compat). */
+/** The renter's own requests (web-app/request-details-bids). One row per item (backend fan-out). */
+export function fetchMyRequests(filter?: { status?: string; type?: string }): Promise<{ requests: RequestListItem[] }> {
+  const qs = new URLSearchParams();
+  if (filter?.status) qs.set("status", filter.status);
+  if (filter?.type) qs.set("type", filter.type);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return getJson<{ requests: RequestListItem[] }>(`/api/me/requests${suffix}`);
+}
+
+/** Full detail for one request (every stored field + the single item + dealRoomId). */
+export function fetchRequestDetail(id: string): Promise<RequestRecord> {
+  return getJson<RequestRecord>(`/api/me/requests/${encodeURIComponent(id)}`);
+}
+
 export function submitRequest(
   payload: RfqRequestPayload & { simulateError?: boolean },
 ): Promise<{ requestId: string; requestIds?: string[] }> {

@@ -38,6 +38,7 @@ export const en = {
   shell: {
     home: "Home",
     profile: "Profile",
+    requests: "Requests",
     request: "Request",
     account: "Account",
     welcome: "Welcome",

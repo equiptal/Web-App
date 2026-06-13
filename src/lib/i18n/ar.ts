@@ -40,6 +40,7 @@ export const ar: Dictionary = {
   shell: {
     home: "الرئيسية",
     profile: "الملف الشخصي",
+    requests: "الطلبات",
     request: "طلب",
     account: "الحساب",
     welcome: "أهلاً",
