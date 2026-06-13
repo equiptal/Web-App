@@ -64,6 +64,10 @@ export const ar: Dictionary = {
     nudgeBasicCta: "توثيق",
     verifiedTitle: "أنت موثّق",
     verifiedBody: "تم توثيق منشأتك.",
+    yourRequests: "طلباتك",
+    priceBids: "عروض الأسعار",
+    completedDeals: "صفقات مكتملة",
+    soon: "قريباً",
   },
   browse: {
     title: "مؤجرون موثّقون",

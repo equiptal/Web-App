@@ -62,6 +62,10 @@ export const en = {
     nudgeBasicCta: "Get verified",
     verifiedTitle: "You're verified",
     verifiedBody: "Your company is verified.",
+    yourRequests: "Your Requests",
+    priceBids: "Price Bids",
+    completedDeals: "Completed Deals",
+    soon: "Coming soon",
   },
   browse: {
     title: "Verified Suppliers",
