@@ -193,7 +193,9 @@ export function ItemRow({
         </div>
       </div>
 
-      {(editingMatch || !isCompleteRef(item.ref)) && taxonomyEditor}
+      {/* The 3-level cat→sub→size picker: while editing a match, when the ref is incomplete, and
+          always inside a matched item's Edit panel so all three levels stay changeable. */}
+      {(editingMatch || !isCompleteRef(item.ref) || (status === "matched" && showDetails)) && taxonomyEditor}
 
       {/* Per-item details — editable only once Matched (AC-54). Mirrors the prototype:
           operator card + fuel + notes. Delivery/return are request-wide only (Settings for all
