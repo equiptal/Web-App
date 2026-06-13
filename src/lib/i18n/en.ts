@@ -162,6 +162,9 @@ export const en = {
     directSupplier: "Direct request to",
     options: "Options",
     sharedSettings: "Shared for all items",
+    search: "Search equipment…",
+    noResults: "No matching equipment.",
+    orBrowse: "or browse the catalogue",
   },
   intake: {
     heading: "How would you like to create your request?",

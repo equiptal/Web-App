@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocale, useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { Icon, Pchips } from "@/components/ui";
@@ -26,7 +26,11 @@ export function ManualEquipmentStep() {
   const [tax, setTax] = useState<TaxonomyNode[]>([]);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState<Record<string, string>>({});
   const proj = state.draft?.project;
+
+  // Flatten subcategories (with their parent category) for the app-style search (web-app/005).
+  const allSubs = useMemo(() => tax.flatMap((c) => c.children.map((s) => ({ cat: c, sub: s }))), [tax]);
 
   useEffect(() => {
     fetch("/api/stores/taxonomy", { cache: "no-store" })
@@ -97,9 +101,35 @@ export function ManualEquipmentStep() {
                   ))}
               </div>
 
-              <PickGrid label={m.category} hint={m.pickCategory} nodes={tax} selectedId={item.ref.categoryId} labelOf={label} onPick={(id) => actions.setItemCategory(item.id, id)} icons />
-              {cat && (
-                <PickGrid label={m.subcategory} hint={m.pickSubcategory} nodes={cat.children} selectedId={item.ref.subcategoryId} labelOf={label} onPick={(id) => actions.setItemSubcategory(item.id, id)} icons />
+              {/* Search (app-style) — find a type by name; or browse the catalogue below */}
+              <div className="relative mt-3">
+                <Icon name="search" size={18} className="absolute start-3 top-1/2 -translate-y-1/2 text-muted" />
+                <input
+                  value={query[item.id] ?? ""}
+                  onChange={(e) => setQuery((p) => ({ ...p, [item.id]: e.target.value }))}
+                  placeholder={m.search}
+                  className="h-[40px] w-full rounded-[10px] border border-border bg-surface2 ps-9 pe-3 text-[13px] outline-0 focus:border-brand"
+                />
+              </div>
+              {(query[item.id] ?? "").trim() ? (
+                <SearchResults
+                  q={query[item.id]}
+                  subs={allSubs}
+                  labelOf={label}
+                  noResults={m.noResults}
+                  onPick={(catId, subId) => {
+                    actions.setItemCategory(item.id, catId);
+                    actions.setItemSubcategory(item.id, subId);
+                    setQuery((p) => ({ ...p, [item.id]: "" }));
+                  }}
+                />
+              ) : (
+                <>
+                  <PickGrid label={m.category} hint={m.pickCategory} nodes={tax} selectedId={item.ref.categoryId} labelOf={label} onPick={(id) => actions.setItemCategory(item.id, id)} icons />
+                  {cat && (
+                    <PickGrid label={m.subcategory} hint={m.pickSubcategory} nodes={cat.children} selectedId={item.ref.subcategoryId} labelOf={label} onPick={(id) => actions.setItemSubcategory(item.id, id)} icons />
+                  )}
+                </>
               )}
               {sub && (
                 <div className="mt-3">
@@ -164,6 +194,54 @@ export function ManualEquipmentStep() {
       >
         <Icon name="add" size={16} /> {m.addItem}
       </button>
+    </div>
+  );
+}
+
+function SearchResults({
+  q,
+  subs,
+  labelOf,
+  onPick,
+  noResults,
+}: {
+  q: string;
+  subs: { cat: TaxonomyNode; sub: TaxonomyNode }[];
+  labelOf: (n: TaxonomyNode) => string;
+  onPick: (categoryId: string, subcategoryId: string) => void;
+  noResults: string;
+}) {
+  const query = q.trim().toLowerCase();
+  const matches = subs
+    .filter(
+      ({ cat, sub }) =>
+        sub.name.toLowerCase().includes(query) ||
+        sub.nameAr.includes(q.trim()) ||
+        cat.name.toLowerCase().includes(query) ||
+        cat.nameAr.includes(q.trim()),
+    )
+    .slice(0, 40);
+  if (!matches.length) return <p className="mt-3 text-[13px] text-muted">{noResults}</p>;
+  return (
+    <div className="mt-3 flex flex-col gap-2">
+      {matches.map(({ cat, sub }) => (
+        <button
+          key={sub.id}
+          onClick={() => onPick(cat.id, sub.id)}
+          className="flex items-center gap-3 rounded-[12px] border border-border bg-surface p-3 text-start transition hover:border-brand"
+        >
+          <span
+            className="grid h-10 w-10 flex-none place-items-center rounded-[8px] bg-surface2"
+            style={(sub.iconUrl || cat.iconUrl) ? { backgroundImage: `url("${sub.iconUrl || cat.iconUrl}")`, backgroundSize: "contain", backgroundRepeat: "no-repeat", backgroundPosition: "center" } : undefined}
+          >
+            {!(sub.iconUrl || cat.iconUrl) && <Icon name="construction" size={18} className="text-muted" />}
+          </span>
+          <span className="min-w-0">
+            <span className="inline-block rounded-full bg-surface2 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-muted">{labelOf(cat)}</span>
+            <span className="mt-0.5 block truncate text-[14px] font-bold text-navy">{labelOf(sub)}</span>
+          </span>
+        </button>
+      ))}
     </div>
   );
 }

@@ -164,6 +164,9 @@ export const ar: Dictionary = {
     directSupplier: "طلب مباشر إلى",
     options: "خيارات",
     sharedSettings: "إعدادات لكل العناصر",
+    search: "ابحث عن معدة…",
+    noResults: "لا توجد معدات مطابقة.",
+    orBrowse: "أو تصفّح الكتالوج",
   },
   intake: {
     heading: "كيف تريد إنشاء طلبك؟",
