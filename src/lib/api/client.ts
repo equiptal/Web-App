@@ -69,9 +69,12 @@ export async function processRfq(input: ProcessInput): Promise<AgentDraft> {
   throw new ApiError("network"); // timed out
 }
 
-/** Submit the assembled broadcast (AC-42/43). */
-export function submitRequest(payload: RfqRequestPayload & { simulateError?: boolean }): Promise<{ requestId: string }> {
-  return postJson<{ requestId: string }>("/api/requests", payload);
+/** Submit the assembled broadcast (AC-42/43). The server fans out one request per item, so
+ *  `requestIds` carries every short code (`requestId` = the first, for back-compat). */
+export function submitRequest(
+  payload: RfqRequestPayload & { simulateError?: boolean },
+): Promise<{ requestId: string; requestIds?: string[] }> {
+  return postJson<{ requestId: string; requestIds?: string[] }>("/api/requests", payload);
 }
 
 /** Fetch the equipment taxonomy. */

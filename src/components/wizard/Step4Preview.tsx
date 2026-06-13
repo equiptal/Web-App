@@ -50,6 +50,23 @@ export function Step4Preview() {
         <p className="mt-1 max-w-xl text-sm text-muted">{t.preview.subtitle}</p>
       </div>
 
+      {/* Plain-language notes on what the agent assumed/inferred — renter confirms (④b). */}
+      {draft.justifications && draft.justifications.length > 0 && (
+        <div className="rounded-xl border border-info/30 bg-info-soft/40 px-[18px] py-3.5">
+          <div className="mb-1.5 flex items-center gap-1.5 text-sm font-bold text-navy-mid">
+            <Icon name="lightbulb" size={17} className="text-info" /> {t.preview.whyTitle}
+          </div>
+          <ul className="space-y-1 text-[13px] text-navy">
+            {draft.justifications.map((j, i) => (
+              <li key={i} className="flex gap-2">
+                <span className="mt-[2px] flex-none text-info">•</span>
+                <span>{j}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Project (AC-41) */}
       <RC icon="place" title={t.preview.projectSummary} onEdit={() => actions.goStep(1)} editLabel={t.preview.edit}>
         <KV

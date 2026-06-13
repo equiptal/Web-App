@@ -144,7 +144,10 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
         additionalNotes: i.additionalNotes || undefined, // AC-53 (rule 6: needs the deployed item column)
         maxEquipmentAge: manufactureYear, // AC-28 project-level year, fanned out (undefined ⇒ key dropped)
         dieselIncluded: toDieselIncluded(i.fuelType, fuelParty), // AC-26
-        fatRequired: operatorIncluded ? i.operator.transfer : false, // AC-24 operator "transfer" sub-field
+        // AC-24 FAT — the endpoint's fatRequired encodes the SIDE: supplier→true, me→false.
+        // Derive from who covers FAT (operator.accommodation), NOT the "transfer" toggle. Omit
+        // (undefined) when no operator or the side is unset, so the backend stores no assumption.
+        fatRequired: operatorIncluded && i.operator.accommodation ? i.operator.accommodation === "supplier" : undefined,
         // §4.2 per-item operator sub-fields (only meaningful when an operator is included):
         nightShiftRequired: operatorIncluded ? i.operator.nightShift : undefined, // AC-24
         operatorNationality: operatorIncluded ? i.operator.nationality ?? undefined : undefined, // AC-24

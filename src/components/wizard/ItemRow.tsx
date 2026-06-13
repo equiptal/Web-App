@@ -59,7 +59,12 @@ export function ItemRow({
   const { category, subcategory, measurement } = resolveRef(taxonomy, item.ref);
   const status = item.verdict === "no-match" ? "not-available" : item.resolved ? "matched" : "needs-ok";
   const glyph = (item.ref.categoryId && CATEGORY_ICON[item.ref.categoryId]) || "construction";
-  const matchLabel = [category?.name, subcategory?.name, measurement?.name].filter(Boolean).join(" · ") || (item.rawLabel ?? "—");
+  // Show the size even when it didn't resolve to a taxonomy measurement (off-taxonomy / unstated):
+  // fall back to the verbatim stated size so it never disappears from the match line.
+  const sizeLabel = measurement?.name ?? item.rawSize ?? undefined;
+  const matchLabel = [category?.name, subcategory?.name, sizeLabel].filter(Boolean).join(" · ") || (item.rawLabel ?? "—");
+  // What the renter actually wrote — name + stated size — so "from your RFQ" keeps the size visible.
+  const rawDisplay = [item.rawLabel, item.rawSize].filter(Boolean).join(" · ") || item.rawLabel;
 
   const borderClass =
     status === "needs-ok" ? "border-s-[3px] border-s-warn" : status === "not-available" ? "border-s-[3px] border-s-danger" : "border-s-[3px] border-s-ok";
@@ -70,7 +75,7 @@ export function ItemRow({
       <li className="grid grid-cols-[38px_1fr_auto] items-center gap-3 rounded-xl border border-s-[3px] border-border border-s-danger bg-surface px-4 py-3">
         <Avatar glyph={glyph} conf="low" />
         <div className="min-w-0">
-          <RfqMatch raw={item.rawLabel} matched={<span className="text-danger">{t.step2.status.notAvailable}</span>} />
+          <RfqMatch raw={rawDisplay} matched={<span className="text-danger">{t.step2.status.notAvailable}</span>} />
           <p className="mt-1 text-xs text-muted">{t.step2.noMatch.explainer}</p>
         </div>
         <div className="flex gap-2">
@@ -111,7 +116,7 @@ export function ItemRow({
       <Avatar glyph={glyph} conf={status === "matched" ? "high" : "mid"} />
 
       <div className="min-w-0">
-        <RfqMatch raw={item.rawLabel} matched={matchLabel} />
+        <RfqMatch raw={rawDisplay} matched={matchLabel} />
 
         {/* Unit conversion / nearest-size advisory (AC-19/20) */}
         {item.suggestion?.unitConversion && (

@@ -27,7 +27,14 @@ export async function POST(req: Request) {
     try {
       const payload = draftToCreateRequest(body as RfqRequestPayload, serverEnv.agentsTestUserId);
       const data = await agentsPost<CreateRequestResult>("/agents/requests", payload);
-      return NextResponse.json({ requestId: data.shortCode ?? data.requestId ?? "RFQ" }, { status: 201 });
+      // The server fans out one request per equipment item → `requests[]`. Surface every code.
+      const codes = (data.requests ?? [])
+        .map((r) => r.shortCode ?? r.requestId)
+        .filter((c): c is string => !!c);
+      return NextResponse.json(
+        { requestId: codes[0] ?? "RFQ", requestIds: codes.length ? codes : ["RFQ"] },
+        { status: 201 },
+      );
     } catch (err) {
       console.error("[requests] real submit failed:", err);
       // Surface the real backend status + message instead of an opaque 503.
@@ -45,7 +52,7 @@ export async function POST(req: Request) {
   await new Promise((r) => setTimeout(r, 300));
   const items = "items" in body && Array.isArray(body.items) ? body.items : [];
   const requestId = "RFQ-" + Math.abs(hash(JSON.stringify(items))).toString(36).toUpperCase().slice(0, 6);
-  return NextResponse.json({ requestId }, { status: 201 });
+  return NextResponse.json({ requestId, requestIds: [requestId] }, { status: 201 });
 }
 
 function hash(s: string): number {

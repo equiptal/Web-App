@@ -33,7 +33,9 @@ export function buildSpecRows(draft: RfqDraft, taxonomy: Taxonomy): SpecRow[] {
     return {
       equipment: subcategory?.name ?? item.rawLabel ?? "—",
       category: category?.name ?? "—",
-      size: measurement?.name ?? "—",
+      // Prefer the resolved taxonomy size; otherwise show the size the renter actually stated
+      // (off-taxonomy / unmatched) so it never silently disappears from the preview.
+      size: measurement?.name ?? item.rawSize ?? "—",
       qty: item.quantity, // AC-55 / AC-52 (x2 → 2)
       year,
       operatorNeeded: item.operatorNeeded,

@@ -99,6 +99,12 @@ export interface EquipmentItem {
   id: string;
   /** Free-text label as it appeared in the RFQ (display aid). */
   rawLabel: string | null;
+  /**
+   * Verbatim capacity/size as stated in the RFQ (e.g. "30 ton", "2.5 m³"), kept even when it
+   * doesn't resolve to a taxonomy measurement id. Display fallback so a stated-but-off-taxonomy
+   * (or "Not Specified") size still shows instead of "—". null when the RFQ stated no size.
+   */
+  rawSize: string | null;
   ref: TaxonomyRef;
   verdict: Verdict; // from the agent
   /** AC-19: nearest-measurement suggestion when the RFQ measurement isn't in the taxonomy. */
@@ -159,6 +165,8 @@ export interface AgentDraft {
   detectedLocations: string[];
   /** AC-56: processing summary counts. */
   summary: ProcessingSummary;
+  /** Plain, conversational notes on values the agent assumed/inferred — shown to the renter to confirm. */
+  justifications?: string[];
 }
 
 export interface ProcessingSummary {
@@ -174,6 +182,8 @@ export interface RfqDraft {
   preferences: Preferences;
   detectedLocations: string[];
   summary: ProcessingSummary;
+  /** Plain, conversational notes on values the agent assumed/inferred — shown to the renter to confirm. */
+  justifications?: string[];
 }
 
 /** Posted to /api/requests (AC-42/43). Mirrors the shared app request shape. */
@@ -222,6 +232,7 @@ export function newManualItem(id: string): EquipmentItem {
   return {
     id,
     rawLabel: null,
+    rawSize: null,
     ref: { ...EMPTY_REF },
     // Manually added: starts unresolved (Need-OK) with an empty match so the renter picks
     // category → subtype → size; it auto-resolves to Matched once the ref is complete (AC-22).

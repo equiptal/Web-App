@@ -69,6 +69,12 @@ export function extractAgentOutput(raw: unknown): RFQAgentOutput {
       : Array.isArray(a.missing_required_fields)
         ? a.missing_required_fields
         : []) as MissingFieldEntry[],
+    // justifications sit beside `data` (sibling of missing_required_fields), so read b then a.
+    justifications: (Array.isArray(b.justifications)
+      ? b.justifications
+      : Array.isArray(a.justifications)
+        ? a.justifications
+        : []) as string[],
   };
 }
 
@@ -126,6 +132,7 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
       : [out.rfq_header?.project_address_label]
     ).filter(Boolean) as string[],
     summary: computeSummary(items),
+    justifications: out.justifications ?? [],
   };
 }
 
@@ -196,6 +203,12 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
   return {
     id: `a${idx}`,
     rawLabel: li.input_equipment ?? null,
+    // Keep the stated size verbatim so the preview can show it even when it didn't resolve to a
+    // measurement id (off-taxonomy "(new)" or unstated). Prefer the verbatim phrase; fall back to
+    // the agent's canonical capacity string, dropping the placeholder "Not Specified".
+    rawSize:
+      li.capacity_input_value ??
+      (li.capacity && li.capacity.toLowerCase() !== "not specified" ? li.capacity : null),
     ref,
     verdict,
     resolved,
@@ -210,7 +223,11 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
       nationality: li.operator_nationality ?? null,
       certificate: agentCert, // AC-24/50: operator license level / safety cert
       certByAgent: agentCert != null, // agent set it → project-level Safety cert won't override
-      transfer: li.fat_required ?? false, // AC-24: FAT / transfer
+      transfer: li.fat_required ?? false, // AC-24: FAT applies (operator included)
+      // AC-24: who covers FAT — Mansour emits the side as operator_accommodation_by_rentee
+      // (true = rentee/me, false = supplier). Map to the UI's Party; null when unstated.
+      accommodation:
+        li.operator_accommodation_by_rentee == null ? null : li.operator_accommodation_by_rentee ? "me" : "supplier",
     },
     fuelType: (li.fuel_type_preference && FUEL_IN[li.fuel_type_preference]) || "diesel",
     additionalNotes: li.additional_notes ?? "", // AC-53: agent-extracted per-item notes (was dropped)

@@ -26,7 +26,7 @@ export function Confirmation() {
       <div className="inline-flex items-center gap-2.5 rounded-[10px] border border-border bg-surface px-[18px] py-[11px] text-[13.5px] font-bold">
         <Icon name="inventory_2" size={19} className="text-navy-mid" />
         {summary}
-        {state.requestId && <span className="text-muted">· {state.requestId}</span>}
+        {state.requestIds.length > 0 && <span className="text-muted">· {state.requestIds.join(", ")}</span>}
       </div>
 
       <div className="mt-[26px] flex justify-center gap-2.5">

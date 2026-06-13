@@ -83,9 +83,15 @@ export interface CreateRequestPayload {
   equipmentItems: CreateRequestItem[];
 }
 
-export interface CreateRequestResult {
+/** One request created by POST /agents/requests (the server fans out one per equipment item). */
+export interface CreatedRequest {
   requestId: string;
   shortCode?: string;
   status?: string;
   matchedSupplierCount?: number;
+}
+
+/** POST /agents/requests response — an ARRAY, one entry per equipment item (server-side fan-out). */
+export interface CreateRequestResult {
+  requests: CreatedRequest[];
 }
