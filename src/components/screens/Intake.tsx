@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
-import { Button, Card, TextArea, Badge, Icon } from "@/components/ui";
+import { Button, Card, TextArea, Icon } from "@/components/ui";
 
 /** Accepted file types (AC-05/07): PDF, image, Word, Excel. No size/count/length limit (AC-08). */
 const ACCEPT_ATTR =
@@ -25,10 +25,16 @@ function fileGlyph(type: string): string {
   return "description";
 }
 
+const FILE_CHIPS = ["PDF", "Word", "Excel", "Image"];
+
+/**
+ * RFQ intake (web-app/002, AC-01/05/07/08). Two mode cards (Upload/Paste — active; Fill Manually —
+ * coming soon), a paste card with a char count, an orange attach dropzone with file-type chips, and
+ * a footer Continue. Paste text and/or attach files, then Continue to parse.
+ */
 export function Intake() {
   const t = useT();
   const { state, actions } = useRfq();
-  const [tab, setTab] = useState<"rfq" | "manual">("rfq");
   const [rejected, setRejected] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -58,81 +64,112 @@ export function Intake() {
   }
 
   return (
-    <div>
-      {/* phead */}
-      <h1 className="text-[23px] font-extrabold tracking-tight">{t.intake.heading}</h1>
-      <p className="mt-1 max-w-xl text-sm text-muted">{t.intake.subheading}</p>
+    <div className="w-full">
+      <h1 className="text-[22px] font-extrabold tracking-tight text-navy">{t.intake.heading}</h1>
+      <p className="mt-1 text-[13.5px] text-muted">{t.intake.subheading}</p>
 
-      {/* modeline — segmented tabs (AC-01) */}
-      <div className="mt-5 inline-flex w-max overflow-hidden rounded-[10px] border border-border bg-surface">
-        <button
-          onClick={() => setTab("rfq")}
-          className={`flex items-center gap-2 border-e border-border px-[18px] py-2.5 text-[13.5px] font-bold ${tab === "rfq" ? "bg-surface2 text-navy shadow-[inset_0_-2px_0_var(--brand)]" : "text-muted"}`}
-        >
-          <Icon name="upload_file" size={18} /> {t.intake.tabRfq}
-        </button>
-        <button
-          onClick={() => setTab("manual")}
-          className={`flex items-center gap-2 px-[18px] py-2.5 text-[13.5px] font-bold ${tab === "manual" ? "bg-surface2 text-navy" : "text-muted"}`}
-        >
-          <Icon name="edit_note" size={18} /> {t.intake.tabManual}
-          <span className="rounded bg-surface3 px-1.5 py-0.5 text-[9.5px] font-extrabold text-muted">{t.intake.tabLater}</span>
-        </button>
+      {/* Mode option cards (AC-01) */}
+      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {/* Upload / Paste — the active mode */}
+        <div className="flex items-start gap-3 rounded-[14px] border-2 border-brand bg-brand-soft p-4">
+          <span className="grid h-11 w-11 flex-none place-items-center rounded-[10px] bg-brand text-white">
+            <Icon name="upload" size={22} />
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <b className="text-[14px] font-bold text-navy">{t.intake.optUploadTitle}</b>
+              <span className="inline-flex items-center gap-1 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand">
+                <Icon name="check_circle" size={12} /> {t.intake.recommended}
+              </span>
+            </div>
+            <p className="mt-1 text-[12.5px] leading-relaxed text-muted">{t.intake.optUploadDesc}</p>
+          </div>
+        </div>
+
+        {/* Fill Manually — coming soon */}
+        <div className="flex items-start gap-3 rounded-[14px] border border-border bg-surface p-4 opacity-80">
+          <span className="grid h-11 w-11 flex-none place-items-center rounded-[10px] bg-surface2 text-muted">
+            <Icon name="edit_note" size={22} />
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <b className="text-[14px] font-bold text-navy">{t.intake.optManualTitle}</b>
+              <span className="rounded-full bg-surface2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">{t.intake.comingSoon}</span>
+            </div>
+            <p className="mt-1 text-[12.5px] leading-relaxed text-muted">{t.intake.optManualDesc}</p>
+          </div>
+        </div>
       </div>
 
-      {tab === "manual" ? (
-        <Card className="mt-4">
-          <p className="text-sm text-muted">{t.intake.manualNote}</p>
-        </Card>
-      ) : (
-        <Card className="mt-4">
-          {/* Paste (AC-01) */}
-          <label className="mb-2 block text-[12.5px] font-bold text-navy-mid">{t.intake.pasteLabel}</label>
+      {/* Paste + attach card */}
+      <Card className="mt-5 !p-0">
+        <div className="flex items-center justify-between px-5 pt-5">
+          <b className="text-[14px] font-bold text-navy">{t.intake.pasteLabel}</b>
+          <span className="text-[12.5px] text-muted">{t.intake.orUploadBelow}</span>
+        </div>
+
+        <div className="relative px-5 pt-3">
           <TextArea rows={6} value={state.text} placeholder={t.intake.pastePlaceholder} onChange={(e) => actions.setText(e.target.value)} />
+          <span className="pointer-events-none absolute bottom-2.5 end-7 text-[11px] text-muted">
+            {state.text.length} {t.intake.chars}
+          </span>
+        </div>
 
-          {/* Attach (AC-05/07/08) */}
-          <div className="mt-4">
-            <label className="mb-2 block text-[12.5px] font-bold text-navy-mid">
-              {t.intake.uploadLabel} <span className="font-semibold text-text-disabled text-muted/70">{t.intake.uploadOptional}</span>
-            </label>
-            <button
-              onClick={() => fileInput.current?.click()}
-              className="w-full rounded-[10px] border-[1.5px] border-dashed border-border bg-surface2 px-4 py-6 text-center transition-colors hover:border-brand"
-            >
-              <Icon name="upload" size={28} className="text-navy-mid" />
-              <div className="mt-1.5 text-[13.5px] font-bold text-navy-mid">{t.intake.dropTitle}</div>
-              <div className="text-xs text-muted">{t.intake.uploadHint}</div>
-            </button>
-            <input ref={fileInput} type="file" multiple accept={ACCEPT_ATTR} className="hidden" onChange={(e) => onFiles(e.target.files)} />
+        {/* divider */}
+        <div className="my-4 flex items-center gap-3 px-5 text-[12px] text-muted">
+          <div className="h-px flex-1 bg-border" /> {t.intake.attachDivider} <div className="h-px flex-1 bg-border" />
+        </div>
 
-            {rejected && <p className="mt-2 text-xs text-danger">{t.intake.fileRejected}</p>}
-
-            {state.files.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {state.files.map((f, i) => (
-                  <span key={`${f.name}-${i}`} className="flex items-center gap-2 rounded-[10px] border border-border bg-surface px-2.5 py-1.5 text-[12.5px] font-semibold">
-                    <Icon name={fileGlyph(f.type)} size={16} className="text-navy-mid" />
-                    <span className="max-w-[160px] truncate">{f.name}</span>
-                    <button onClick={() => actions.removeFile(i)} className="text-muted hover:text-danger">
-                      <Icon name="close" size={15} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* footer */}
-          <div className="mt-6 flex items-center justify-end gap-3">
-            <div className="flex items-center gap-3">
-              {!canStart && <Badge>{t.intake.emptyHint}</Badge>}
-              <Button disabled={!canStart} onClick={() => actions.process()} className="px-6 py-3 text-[14.5px]">
-                {t.intake.startProcessing} <Icon name="arrow_forward" size={18} />
-              </Button>
+        {/* dropzone */}
+        <div className="px-5">
+          <button
+            onClick={() => fileInput.current?.click()}
+            className="w-full rounded-[14px] border-[1.5px] border-dashed border-brand/45 bg-brand-soft/50 px-4 py-7 text-center transition-colors hover:border-brand"
+          >
+            <span className="mx-auto grid h-12 w-12 place-items-center rounded-[12px] border border-border bg-surface text-navy-mid">
+              <Icon name="upload" size={22} />
+            </span>
+            <div className="mt-2.5 text-[14px] font-bold text-navy">
+              {t.intake.dropTitle} <span className="text-brand">{t.intake.browse}</span>
             </div>
-          </div>
-        </Card>
-      )}
+            <div className="mt-0.5 text-[12px] text-muted">{t.intake.dropSub}</div>
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              {FILE_CHIPS.map((c) => (
+                <span key={c} className="rounded-md border border-border bg-surface px-2 py-1 text-[11px] font-semibold text-navy-mid">
+                  {c}
+                </span>
+              ))}
+            </div>
+          </button>
+          <input ref={fileInput} type="file" multiple accept={ACCEPT_ATTR} className="hidden" onChange={(e) => onFiles(e.target.files)} />
+
+          {rejected && <p className="mt-2 text-xs text-danger">{t.intake.fileRejected}</p>}
+
+          {state.files.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {state.files.map((f, i) => (
+                <span key={`${f.name}-${i}`} className="flex items-center gap-2 rounded-[10px] border border-border bg-surface px-2.5 py-1.5 text-[12.5px] font-semibold">
+                  <Icon name={fileGlyph(f.type)} size={16} className="text-navy-mid" />
+                  <span className="max-w-[160px] truncate">{f.name}</span>
+                  <button onClick={() => actions.removeFile(i)} className="text-muted hover:text-danger">
+                    <Icon name="close" size={15} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* footer */}
+        <div className="mt-5 flex items-center justify-between gap-3 border-t border-border px-5 py-4">
+          <span className="inline-flex items-center gap-1.5 text-[12.5px] text-muted">
+            <Icon name="info" size={15} /> {t.intake.emptyHint}
+          </span>
+          <Button disabled={!canStart} onClick={() => actions.process()} className="px-6 py-3 text-[14px]">
+            {t.intake.startProcessing} <Icon name="arrow_forward" size={18} />
+          </Button>
+        </div>
+      </Card>
     </div>
   );
 }

@@ -32,9 +32,122 @@ export const en = {
     preferences: "Preferences",
     preview: "Preview",
   },
+  shell: {
+    home: "Home",
+    profile: "Profile",
+    request: "Request",
+    account: "Account",
+    welcome: "Welcome",
+    tierGuest: "Guest",
+    tierBasic: "Basic rentee",
+    tierVerified: "Verified",
+    stepsGuest: "1 of 3 steps · complete your profile to unlock requests.",
+    stepsBasic: "2 of 3 steps · verify your company to unlock unlimited requests.",
+    verifiedNote: "Your company is verified.",
+  },
+  home: {
+    title: "Home",
+    eyebrow: "Smart Equipment Marketplace",
+    statSuppliers: "Verified Suppliers",
+    statEquipment: "Equipment Listed",
+    statCities: "Cities Covered",
+    bannerTitle: "Order your next equipment, faster than ever",
+    bannerSubtitle: "Post your request and get competitive bids from verified suppliers — or upload an RFQ and let your smart assistant build it automatically.",
+    createRequest: "Create request",
+    uploadRfq: "Upload RFQ",
+    suppliersTitle: "Suggested Suppliers",
+    viewAll: "View all",
+    showLess: "Show less",
+    nudgeGuestTitle: "Complete your profile",
+    nudgeGuestBody: "Add your details to unlock requests and bids.",
+    nudgeGuestCta: "Complete profile",
+    nudgeBasicTitle: "Get verified",
+    nudgeBasicBody: "Verify your company to become a trusted renter.",
+    nudgeBasicCta: "Get verified",
+    verifiedTitle: "You're verified",
+    verifiedBody: "Your company is verified.",
+    yourRequests: "Your Requests",
+    priceBids: "Price Bids",
+    completedDeals: "Completed Deals",
+    soon: "Coming soon",
+    reqSub: "Equipment requests you've posted",
+    bidsSub: "Supplier offers on your requests",
+    dealsSub: "Your closed & fulfilled orders",
+    reqStat: "Open requests",
+    bidsStat: "Total bids received",
+    dealsStat: "No deals yet",
+  },
+  browse: {
+    title: "Verified Suppliers",
+    search: "Search stores or equipment",
+    city: "City",
+    category: "Category",
+    subcategory: "Subcategory",
+    measurement: "Measurement",
+    verifiedOnly: "Verified only",
+    anyCity: "All cities",
+    anyCategory: "All categories",
+    anySubcategory: "All subcategories",
+    anyMeasurement: "All measurements",
+    pickCategoryFirst: "Select a category first",
+    pickSubcategoryFirst: "Select a subcategory first",
+    newLabel: "New",
+    equipmentCount: "equipment",
+    empty: "No suppliers match your filters.",
+    error: "We couldn't load suppliers.",
+    retry: "Retry",
+    loading: "Loading…",
+  },
+  store: {
+    back: "Back",
+    share: "Share",
+    verified: "Verified",
+    newLabel: "New",
+    equipment: "Equipment",
+    views: "views",
+    documents: "Store Documents",
+    docCR: "Commercial Registration",
+    docVAT: "VAT",
+    docNationalAddress: "National Address",
+    statusVerified: "Verified",
+    statusPending: "Pending",
+    operators: "Operators",
+    comingSoon: "Coming soon",
+    priceOnRequest: "Price on request",
+    perDay: "/ day",
+    perWeek: "/ week",
+    perMonth: "/ month",
+    perJob: "/ job",
+    noEquipment: "No equipment listed yet.",
+    error: "We couldn't load this store.",
+    retry: "Retry",
+    loading: "Loading…",
+    requestThis: "Request this equipment",
+    specManufacturer: "Manufacturer",
+    specModel: "Model",
+    specYear: "Year",
+    specFuel: "Fuel",
+    specPrice: "Price",
+    specLocation: "Location",
+    specHours: "Operating hours",
+    photos: "Photos",
+    docsShort: "Documents",
+    close: "Close",
+  },
   intake: {
-    heading: "New rental request",
-    subheading: "Already have an RFQ? Paste it or upload your files to start a request from it. You review everything before it's sent.",
+    heading: "How would you like to create your request?",
+    subheading: "Start from an existing RFQ document, or fill it in manually. You'll review everything before it's sent.",
+    optUploadTitle: "Upload / Paste RFQ",
+    optUploadDesc: "Paste text or upload a file — your AI assistant fills the form automatically.",
+    recommended: "Recommended",
+    optManualTitle: "Fill Manually",
+    optManualDesc: "Enter equipment details step by step using a guided form.",
+    comingSoon: "Coming soon",
+    orUploadBelow: "Or upload a file below",
+    attachDivider: "or attach a file",
+    browse: "browse",
+    dropSub: "Add as many files as you like — we'll read them all",
+    chars: "chars",
     tabRfq: "RFQ", // AC-01 tentative
     tabManual: "Manual", // AC-01 tentative
     tabLater: "LATER",
@@ -43,13 +156,13 @@ export const en = {
     pastePlaceholder: "Paste your equipment list, email, or RFQ here…",
     uploadLabel: "Attach files too",
     uploadOptional: "optional — add as many as you like",
-    dropTitle: "Drop files here, or browse",
+    dropTitle: "Drop files here, or",
     uploadHint: "PDF, image, Word or Excel",
     acceptedTypes: "Accepted file types: PDF, image, Word, Excel.", // AC-07 tentative
     fileRejected: "Only PDF, image, Word, or Excel files can be processed.", // AC-07 tentative
     startProcessing: "Continue",
     attachedFiles: "Attached files",
-    emptyHint: "Paste text or attach at least one file to start.",
+    emptyHint: "Paste text or attach at least one file to continue.",
   },
   processing: {
     title: "Reading your RFQ…",
@@ -289,6 +402,121 @@ export const en = {
     bidWindow: { "24h": "24h", "48h": "48h", "72h": "72h", "1-week": "1 week" },
     accommodation: { me: "Me", supplier: "Supplier" },
     operatorNeeded: { yes: "Yes", no: "No" },
+  },
+  auth: {
+    brandPill: "Equipment, on demand",
+    brandHeadline: "Rent the right equipment, from suppliers you can trust.",
+    brandSubtitle: "Post a request, compare competitive bids from verified suppliers, and book — all in one place.",
+    feat1Title: "Post a request in minutes",
+    feat1Sub: "Tell us what you need, when and where",
+    feat2Title: "Or upload an RFQ — your smart assistant handles it",
+    feat2Sub: "We read your document & build the request",
+    feat3Title: "Compare bids & enter the deal room to negotiate",
+    feat3Sub: "Competitive offers from verified suppliers",
+    brandFoot: "Rentee web",
+    signInTitle: "Welcome back", // AC-01
+    signInSub: "Enter your phone number to continue. We'll text you a verification code.",
+    phoneLabel: "Phone number", // AC-01
+    phonePlaceholder: "5X XXX XXXX",
+    sendCode: "Send code", // AC-01
+    sending: "Sending…",
+    signInFoot: "New here? Just enter your number — we'll set you up.",
+    codeTitle: "Enter the 4-digit code", // AC-02
+    codeSentTo: "We sent it to {phone}", // AC-02
+    verify: "Verify & continue", // AC-03
+    verifying: "Verifying…",
+    back: "Back", // AC-13
+    resend: "Resend code", // AC-12
+    resent: "A new code has been sent.", // AC-12
+    signOut: "Sign out", // AC-19
+    errors: {
+      invalid_phone: "Enter a valid phone number.",
+      invalid_code: "That code isn't right. Try again.", // AC-09
+      expired: "That code has expired. Request a new one.", // AC-11
+      locked: "Too many attempts. Request a new code.", // AC-10
+      send_failed: "We couldn't send the code. Please try again.", // AC-15
+      offline: "You appear to be offline. Check your connection and try again.", // AC-24
+      unknown: "Something went wrong. Please try again.",
+    },
+  },
+  onboarding: {
+    step1: "Create account",
+    step2: "Verify company",
+    later: "later",
+    title: "Create your account",
+    subtitle: "Complete your details to start requesting equipment from verified suppliers.",
+    firstName: "First name",
+    lastName: "Last name",
+    phone: "Phone number",
+    verified: "Verified",
+    city: "City",
+    jobTitle: "Job title",
+    email: "Email",
+    whatsapp: "WhatsApp number",
+    optional: "optional",
+    selectCity: "Select your city",
+    selectJobTitle: "Select your job title",
+    submit: "Create account",
+    submitting: "Creating…",
+    errors: {
+      firstName: "First name must be 2–30 characters.", // AC-02/03
+      lastName: "Last name must be 2–50 characters.", // AC-02/03
+      city: "Select your city.", // AC-02
+      jobTitle: "Select your job title.", // AC-02
+      whatsapp: "Enter a valid Saudi mobile number.", // AC-04
+      submit: "We couldn't save your details. Please try again.",
+      offline: "You appear to be offline. Your details are kept — try again.", // AC-23
+    },
+  },
+  verify: {
+    step1: "Create account",
+    step2: "Verify company",
+    done: "done",
+    title: "Verify your company",
+    subtitle: "Submit your company details for review to become a verified renter.",
+    authorityRole: "Your authority",
+    roleOwner: "Owner",
+    roleManager: "Manager",
+    roleEmployee: "Employee",
+    companyName: "Company name",
+    nationalId: "National ID",
+    companyCity: "Company city",
+    cityPlaceholder: "Select a city",
+    companyAddress: "Company address",
+    companyLocation: "Company location",
+    crDoc: "Commercial Registration (CR)",
+    vatDoc: "VAT certificate",
+    nationalAddressDoc: "National Address document",
+    localContentDoc: "Local Content certificate",
+    sasoDoc: "SASO Heavy Equipment certificate",
+    otherDoc: "Other document",
+    docsTitle: "Company documents",
+    moreDocsTitle: "Additional documents",
+    detailsTitle: "Company details",
+    optional: "optional",
+    upload: "Upload",
+    uploading: "Uploading…",
+    uploaded: "Uploaded",
+    submit: "Submit for verification",
+    submitting: "Submitting…",
+    resubmit: "Resubmit",
+    back: "Back",
+    pendingTitle: "Verification pending",
+    pendingBody: "Your company details are under review. We'll update your status here.", // AC-13/14
+    verifiedTitle: "You're verified",
+    verifiedBody: "Your company has been verified.", // AC-19
+    rejectedTitle: "Verification not approved",
+    rejectedBody: "Your submission wasn't approved. You can adjust your details and resubmit.", // AC-17
+    errors: {
+      role: "Select your authority.", // AC-09
+      companyName: "Company name must be 2–200 characters.", // AC-09
+      cr: "The CR document is required.", // AC-10
+      vat: "The VAT document is required.", // AC-10
+      nationalAddress: "The National Address document is required.", // required to match the app (company_verification_page.dart:302 + '*' label); AC-10 lists only CR/VAT
+      docType: "Only JPEG, PNG, WebP, or PDF files are accepted.", // AC-11
+      submit: "We couldn't submit. Please try again.",
+      offline: "You appear to be offline. Your input is kept — try again.", // AC-23
+    },
   },
 };
 

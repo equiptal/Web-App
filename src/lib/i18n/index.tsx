@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { en, type Dictionary } from "./en";
 import { ar } from "./ar";
-import { DEFAULT_LOCALE, dirFor, isLocale, type Dir, type Locale } from "./config";
+import { DEFAULT_LOCALE, detectLocale, dirFor, isLocale, type Dir, type Locale } from "./config";
 
 const DICTS: Record<Locale, Dictionary> = { en, ar };
 const STORAGE_KEY = "moedatech.locale";
@@ -27,10 +27,14 @@ export function LocaleProvider({
 }) {
   const [locale, setLocaleState] = useState<Locale>(initialLocale);
 
-  // Restore a persisted choice on mount.
+  // Restore a persisted choice on mount, else default to the browser locale (AC-21).
   useEffect(() => {
     const stored = typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEY) : null;
-    if (stored && isLocale(stored)) setLocaleState(stored);
+    if (stored && isLocale(stored)) {
+      setLocaleState(stored);
+      return;
+    }
+    if (typeof navigator !== "undefined") setLocaleState(detectLocale(navigator.language));
   }, []);
 
   // Keep <html lang/dir> in sync.
