@@ -27,11 +27,9 @@ export function OnboardingShell({ step, children }: { step: 1 | 2; children: Rea
   return (
     <div dir={locale === "ar" ? "rtl" : "ltr"} className="min-h-screen bg-surface2">
       <div className="flex h-[60px] items-center justify-between border-b border-border bg-surface px-6">
-        <div className="flex items-center gap-2 text-[16px] font-extrabold tracking-tight">
-          <span className="grid h-8 w-8 place-items-center rounded-[8px] bg-navy">
-            <Icon name="precision_manufacturing" className="text-white" size={18} />
-          </span>
-          MOEDA<span className="text-brand">TECH</span>
+        <div className="flex items-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/moedatech-logo.png" alt="Moedatech" className="h-7 w-auto" />
         </div>
         <span className="inline-flex overflow-hidden rounded-md border border-border">
           {(["en", "ar"] as Locale[]).map((l) => (
