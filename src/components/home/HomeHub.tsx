@@ -10,6 +10,15 @@ import type { StoreCard as StoreCardData } from "@/lib/contract/stores";
 /** Gradient that darkens to the corner — shared by the hero and the store-card banners. */
 export const DARK_GRADIENT = "bg-gradient-to-br from-[#1e3a5f] to-[#0f1e2e]";
 
+/** Subtle grid overlay with a radial mask — the "blended light" look from the login page. */
+const GRID_STYLE: React.CSSProperties = {
+  backgroundImage:
+    "linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px)",
+  backgroundSize: "46px 46px",
+  maskImage: "radial-gradient(circle at 75% 40%,#000 34%,transparent 82%)",
+  WebkitMaskImage: "radial-gradient(circle at 75% 40%,#000 34%,transparent 82%)",
+};
+
 /** Count up from 0 to `target` (easeOut) — used for the hero's live website stats. */
 function useCountUp(target: number, durationMs = 1100): number {
   const [val, setVal] = useState(0);
@@ -65,37 +74,40 @@ export function HomeHub() {
     <div className="flex flex-col gap-7">
       {/* Hero */}
       <div className={`relative overflow-hidden rounded-[20px] px-8 py-9 sm:px-10 ${DARK_GRADIENT}`}>
-        <div className="pointer-events-none absolute -end-16 -top-16 h-[300px] w-[300px] rounded-full bg-brand/[.10]" />
-        <div className="relative z-10 flex flex-col gap-8 lg:flex-row lg:items-stretch">
-          {/* Left: pitch + live stats */}
-          <div className="flex flex-1 flex-col">
+        {/* Blended light: grid + soft glows (like the login page) */}
+        <div className="pointer-events-none absolute inset-0" style={GRID_STYLE} />
+        <span className="pointer-events-none absolute -top-[60px] end-[-40px] h-[260px] w-[260px] rounded-full bg-brand opacity-[0.20] blur-[80px]" />
+        <span className="pointer-events-none absolute -bottom-[90px] end-[120px] h-[280px] w-[280px] rounded-full opacity-20 blur-[80px]" style={{ background: "#2563EB" }} />
+
+        <div className="relative z-10 flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+          {/* Left: pitch + buttons */}
+          <div className="flex-1">
             <span className="mb-3 inline-flex w-fit items-center gap-1.5 rounded-full bg-brand/20 px-3 py-1 text-[12px] font-semibold uppercase tracking-wide text-[#FB923C]">
               <Icon name="bolt" size={13} /> {t.home.eyebrow}
             </span>
             <h1 className="text-[26px] font-bold leading-tight text-white sm:text-[29px]">{t.home.bannerTitle}</h1>
             <p className="mt-2.5 max-w-[520px] text-[13.5px] leading-relaxed text-white/65">{t.home.bannerSubtitle}</p>
-
-            <div className="mt-auto grid grid-cols-3 gap-3 pt-7">
-              <HeroStat value={stats.suppliers} plus={stats.capped} label={t.home.statSuppliers} />
-              <HeroStat value={stats.equipment} plus={stats.capped} label={t.home.statEquipment} />
-              <HeroStat value={stats.cities} label={t.home.statCities} />
+            <div className="mt-7 flex flex-wrap gap-3">
+              <button
+                onClick={() => router.push("/create")}
+                className="inline-flex items-center gap-2 rounded-[12px] bg-brand px-6 py-3 text-[14px] font-semibold text-brand-fg transition hover:brightness-[1.04]"
+              >
+                <Icon name="add" size={16} /> {t.home.createRequest}
+              </button>
+              <button
+                onClick={() => router.push("/create")}
+                className="inline-flex items-center gap-2 rounded-[12px] border border-white/20 bg-white/10 px-5 py-3 text-[14px] font-medium text-white transition hover:bg-white/[.16]"
+              >
+                <Icon name="upload_file" size={16} /> {t.home.uploadRfq}
+              </button>
             </div>
           </div>
 
-          {/* Right: create-request card */}
-          <div className="flex flex-none flex-col justify-center gap-2.5 rounded-[16px] border border-white/15 bg-white/[.07] p-5 lg:w-[250px]">
-            <button
-              onClick={() => router.push("/create")}
-              className="flex items-center justify-center gap-2 rounded-[12px] bg-brand px-5 py-3 text-[14px] font-semibold text-brand-fg transition hover:brightness-[1.04]"
-            >
-              <Icon name="add" size={16} /> {t.home.createRequest}
-            </button>
-            <button
-              onClick={() => router.push("/create")}
-              className="flex items-center justify-center gap-2 rounded-[12px] border border-white/20 bg-white/10 px-5 py-3 text-[14px] font-medium text-white transition hover:bg-white/[.16]"
-            >
-              <Icon name="upload_file" size={16} /> {t.home.uploadRfq}
-            </button>
+          {/* Right: stacked live stat cards */}
+          <div className="grid w-full grid-cols-3 gap-3 lg:flex lg:w-[210px] lg:flex-col">
+            <HeroStat value={stats.suppliers} plus={stats.capped} label={t.home.statSuppliers} />
+            <HeroStat value={stats.equipment} plus={stats.capped} label={t.home.statEquipment} />
+            <HeroStat value={stats.cities} label={t.home.statCities} />
           </div>
         </div>
       </div>
