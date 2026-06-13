@@ -135,8 +135,19 @@ export const en = {
     close: "Close",
   },
   intake: {
-    heading: "New rental request",
-    subheading: "Already have an RFQ? Paste it or upload your files to start a request from it. You review everything before it's sent.",
+    heading: "How would you like to create your request?",
+    subheading: "Start from an existing RFQ document, or fill it in manually. You'll review everything before it's sent.",
+    optUploadTitle: "Upload / Paste RFQ",
+    optUploadDesc: "Paste text or upload a file — your AI assistant fills the form automatically.",
+    recommended: "Recommended",
+    optManualTitle: "Fill Manually",
+    optManualDesc: "Enter equipment details step by step using a guided form.",
+    comingSoon: "Coming soon",
+    orUploadBelow: "Or upload a file below",
+    attachDivider: "or attach a file",
+    browse: "browse",
+    dropSub: "Add as many files as you like — we'll read them all",
+    chars: "chars",
     tabRfq: "RFQ", // AC-01 tentative
     tabManual: "Manual", // AC-01 tentative
     tabLater: "LATER",
@@ -145,13 +156,13 @@ export const en = {
     pastePlaceholder: "Paste your equipment list, email, or RFQ here…",
     uploadLabel: "Attach files too",
     uploadOptional: "optional — add as many as you like",
-    dropTitle: "Drop files here, or browse",
+    dropTitle: "Drop files here, or",
     uploadHint: "PDF, image, Word or Excel",
     acceptedTypes: "Accepted file types: PDF, image, Word, Excel.", // AC-07 tentative
     fileRejected: "Only PDF, image, Word, or Excel files can be processed.", // AC-07 tentative
     startProcessing: "Continue",
     attachedFiles: "Attached files",
-    emptyHint: "Paste text or attach at least one file to start.",
+    emptyHint: "Paste text or attach at least one file to continue.",
   },
   processing: {
     title: "Reading your RFQ…",
