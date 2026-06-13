@@ -75,10 +75,10 @@ export function Wizard() {
 
         {step < 4 && (
           <div className="flex items-center gap-3">
-            {!gate.ok && <span className="text-xs text-warn">{gate.reasons.map(reasonText).join(" · ")}</span>}
-            <Button disabled={!gate.ok} onClick={() => actions.goStep((step + 1) as Step)}>
-              {t.common.next}
-            </Button>
+            {/* Next never blocks — advance through every step regardless of item state. The gate
+                reasons stay as a non-blocking hint of what's still incomplete. */}
+            {!gate.ok && <span className="hidden text-xs text-warn sm:inline">{gate.reasons.map(reasonText).join(" · ")}</span>}
+            <Button onClick={() => actions.goStep((step + 1) as Step)}>{t.common.next}</Button>
           </div>
         )}
       </div>
