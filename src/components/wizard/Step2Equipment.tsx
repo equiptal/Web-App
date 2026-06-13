@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useT } from "@/lib/i18n";
-import { useRfq } from "@/lib/store/rfq-store";
+import { useRfq, agentMatches } from "@/lib/store/rfq-store";
 import { Card, Field, Icon, MIcon, RadioGroup } from "@/components/ui";
 import { gateStep2, isCompleteRef, PARTIES, type EquipmentItem, type Party } from "@/lib/contract";
 import { ItemRow } from "@/components/wizard/ItemRow";
@@ -46,6 +46,7 @@ export function Step2Equipment() {
 
   const activeFilter: Group = filter ?? initialFilter;
   const project = draft.project;
+  const ap = state.agentOrigin?.project; // agent's original request-wide values, for the AI marker
   const gate = gateStep2(draft.items);
   const visible = items.filter((i) => activeFilter === "all" || groupOf(i) === activeFilter);
   const activeNode = { "needs-ok": t.step2.filterNeedsOk, matched: t.step2.filterMatched, "not-available": t.step2.filterNotAvailable, all: t.step2.filterAll }[activeFilter];
@@ -100,13 +101,13 @@ export function Step2Equipment() {
       <Card title={<><Icon name="tune" size={18} className="me-1.5 align-[-3px] text-navy-mid" />{t.step2.settingsForAll}</>}>
         <p className="-mt-2 mb-4 text-[12.5px] text-muted">{t.step2.settingsForAllHint}</p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Field label={t.step1.requestWide.delivery}>
+          <Field label={t.step1.requestWide.delivery} agent={agentMatches(project.deliveryToSite, ap?.deliveryToSite)}>
             <RadioGroup<Party> name="delivery" value={project.deliveryToSite} onChange={(v) => actions.patchRequestWide({ deliveryToSite: v })} options={partyOpts} />
           </Field>
-          <Field label={t.step1.requestWide.return}>
+          <Field label={t.step1.requestWide.return} agent={agentMatches(project.returnFromSite, ap?.returnFromSite)}>
             <RadioGroup<Party> name="return" value={project.returnFromSite} onChange={(v) => actions.patchRequestWide({ returnFromSite: v })} options={partyOpts} />
           </Field>
-          <Field label={t.step1.requestWide.fuelResponsibility}>
+          <Field label={t.step1.requestWide.fuelResponsibility} agent={agentMatches(project.fuelResponsibility, ap?.fuelResponsibility)}>
             <RadioGroup<Party> name="fuelResp" value={project.fuelResponsibility} onChange={(v) => actions.patchRequestWide({ fuelResponsibility: v })} options={partyOpts} />
           </Field>
         </div>

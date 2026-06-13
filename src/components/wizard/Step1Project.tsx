@@ -160,7 +160,7 @@ export function Step1Project() {
           <Field label={t.step1.timing.endDate} optional agent={agentMatches(project.timing.endDate, ap?.timing.endDate)}>
             <TextInput type="date" value={project.timing.endDate ?? ""} onChange={(e) => actions.patchTiming({ endDate: e.target.value || null })} />
           </Field>
-          <Field label={t.step1.timing.hoursPerDay} optional>
+          <Field label={t.step1.timing.hoursPerDay} optional agent={agentMatches(project.timing.hoursPerDay, ap?.timing.hoursPerDay)}>
             <TextInput type="number" min={1} max={24} value={project.timing.hoursPerDay} onChange={(e) => actions.patchTiming({ hoursPerDay: Number(e.target.value) || 8 })} />
           </Field>
         </div>
@@ -169,10 +169,10 @@ export function Step1Project() {
       {/* ---------- Advanced (AC-15/27/28) — open by default ---------- */}
       <Card title={<><Icon name="tune" size={18} className="me-1.5 align-[-3px] text-navy-mid" />{t.step1.advanced.card} <span className="text-xs font-semibold text-muted">{t.common.optional}</span></>}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Field label={t.step1.advanced.workingDays}>
+          <Field label={t.step1.advanced.workingDays} agent={agentMatches(project.advanced.workingDaysPerWeek, ap?.advanced.workingDaysPerWeek)}>
             <Stepper value={project.advanced.workingDaysPerWeek} min={1} max={7} onChange={(v) => actions.patchAdvanced({ workingDaysPerWeek: v })} />
           </Field>
-          <Field label={t.step1.advanced.overtime}>
+          <Field label={t.step1.advanced.overtime} agent={agentMatches(project.advanced.overtimeRate, ap?.advanced.overtimeRate)}>
             <Seg2<OvertimeRate> value={project.advanced.overtimeRate} onChange={(v) => actions.patchAdvanced({ overtimeRate: v })} options={opt(OVERTIME_RATES, t.options.overtime)} />
           </Field>
           <Field label={t.step1.advanced.equipmentYear} optional agent={agentMatches(project.advanced.equipmentYear, ap?.advanced.equipmentYear)}>

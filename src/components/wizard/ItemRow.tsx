@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useT, fmt } from "@/lib/i18n";
 import { useRfq, agentMatches } from "@/lib/store/rfq-store";
 import { SUPPORT_WHATSAPP_NUMBER } from "@/lib/config/support";
-import { Button, Field, Icon, Pchips, Select, Stepper, TextArea, Toggle, Modal } from "@/components/ui";
+import { AgentMark, Button, Field, Icon, Pchips, Select, Stepper, TextArea, Toggle, Modal } from "@/components/ui";
 import {
   EquipmentItem,
   Taxonomy,
@@ -150,6 +150,7 @@ export function ItemRow({
             <div className="mt-2.5 flex items-center gap-2.5">
               <span className="text-[10.5px] font-extrabold uppercase tracking-wide text-muted">{t.step2.perItem.quantity}</span>
               <Stepper value={item.quantity} min={1} onChange={(v) => actions.patchItem(item.id, { quantity: v })} />
+              {agentMatches(item.quantity, ai?.quantity) && <AgentMark />}
             </div>
             <div className="mt-2.5 flex flex-wrap gap-2">
               <MetaTag icon="person" label={t.step2.perItem.operatorNeeded} value={t.options.operatorNeeded[item.operatorNeeded]} />
@@ -199,22 +200,26 @@ export function ItemRow({
             <div className="flex items-center justify-between bg-surface2 px-3 py-2.5">
               <span className="flex items-center gap-2 text-[13.5px] font-extrabold">
                 <Icon name="person" size={18} className="text-navy-mid" /> {t.step2.perItem.operatorNeeded}
+                {agentMatches(item.operatorNeeded, ai?.operatorNeeded) && <AgentMark />}
               </span>
               <Toggle checked={item.operatorNeeded === "yes"} onChange={(v) => actions.patchItem(item.id, { operatorNeeded: v ? "yes" : "no" })} />
             </div>
             {item.operatorNeeded === "yes" && (
               <div className="space-y-3 px-3 py-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-[13px] font-bold">{t.step2.perItem.nightShift}</span>
+                  <span className="flex items-center gap-2 text-[13px] font-bold">
+                    {t.step2.perItem.nightShift}
+                    {agentMatches(item.operator.nightShift, ai?.operator.nightShift) && <AgentMark />}
+                  </span>
                   <Toggle checked={item.operator.nightShift} onChange={(v) => actions.patchItemOperator(item.id, { nightShift: v })} />
                 </div>
-                <ChipField label={t.step2.perItem.nationality}>
+                <ChipField label={t.step2.perItem.nationality} agent={agentMatches(item.operator.nationality, ai?.operator.nationality)}>
                   <Pchips value={item.operator.nationality} onChange={(v) => actions.patchItemOperator(item.id, { nationality: v })} options={nationalityOpts} />
                 </ChipField>
-                <ChipField label={t.step2.perItem.certificate}>
+                <ChipField label={t.step2.perItem.certificate} agent={agentMatches(item.operator.certificate, ai?.operator.certificate)}>
                   <Pchips<OperatorCertificate> value={item.operator.certificate} onChange={(v) => actions.patchItemOperator(item.id, { certificate: v })} options={opt(OPERATOR_CERTIFICATES, t.options.safetyCert)} />
                 </ChipField>
-                <ChipField label={t.step2.perItem.fat}>
+                <ChipField label={t.step2.perItem.fat} agent={agentMatches(item.operator.fat, ai?.operator.fat)}>
                   <Pchips<Party> value={item.operator.fat} onChange={(v) => actions.patchItemOperator(item.id, { fat: v })} options={opt(PARTIES, t.options.party)} />
                 </ChipField>
               </div>
@@ -223,10 +228,10 @@ export function ItemRow({
 
           {/* Fuel (AC-26) */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <ChipField label={t.step2.perItem.fuelType}>
+            <ChipField label={t.step2.perItem.fuelType} agent={agentMatches(item.fuelType, ai?.fuelType)}>
               <Pchips<FuelType> value={item.fuelType} onChange={(v) => actions.patchItem(item.id, { fuelType: v })} options={opt(FUEL_TYPES, t.options.fuelType)} />
             </ChipField>
-            <ChipField label={t.step1.requestWide.fuelResponsibility}>
+            <ChipField label={t.step1.requestWide.fuelResponsibility} agent={agentMatches(item.fuelResponsibilityOverride, ai?.fuelResponsibilityOverride)}>
               <Pchips<Party> value={item.fuelResponsibilityOverride ?? sharedFuelResp} onChange={(v) => actions.patchItem(item.id, { fuelResponsibilityOverride: v })} options={opt(PARTIES, t.options.party)} />
             </ChipField>
           </div>
@@ -234,16 +239,16 @@ export function ItemRow({
           {/* Delivery / Return — per-item override of the request-wide setting (AC-25). Mansour sets
               these per line (mobilization/demobilization), so surface + allow editing them here. */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <ChipField label={t.step1.requestWide.delivery}>
+            <ChipField label={t.step1.requestWide.delivery} agent={agentMatches(item.deliveryOverride, ai?.deliveryOverride)}>
               <Pchips<Party> value={item.deliveryOverride ?? sharedDelivery} onChange={(v) => actions.patchItem(item.id, { deliveryOverride: v })} options={opt(PARTIES, t.options.party)} />
             </ChipField>
-            <ChipField label={t.step1.requestWide.return}>
+            <ChipField label={t.step1.requestWide.return} agent={agentMatches(item.returnOverride, ai?.returnOverride)}>
               <Pchips<Party> value={item.returnOverride ?? sharedReturn} onChange={(v) => actions.patchItem(item.id, { returnOverride: v })} options={opt(PARTIES, t.options.party)} />
             </ChipField>
           </div>
 
           {/* Additional notes (AC-53) */}
-          <ChipField label={t.step2.perItem.additionalNotes}>
+          <ChipField label={t.step2.perItem.additionalNotes} agent={agentMatches(item.additionalNotes, ai?.additionalNotes)}>
             <TextArea rows={2} value={item.additionalNotes} onChange={(e) => actions.patchItem(item.id, { additionalNotes: e.target.value })} />
           </ChipField>
         </div>
@@ -316,10 +321,13 @@ function MetaTag({ icon, label, value }: { icon: string; label: string; value: s
   );
 }
 
-function ChipField({ label, children }: { label: string; children: React.ReactNode }) {
+function ChipField({ label, agent, children }: { label: string; agent?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <span className="mb-1.5 block text-[11.5px] font-bold text-navy-mid">{label}</span>
+      <span className="mb-1.5 flex items-center gap-2 text-[11.5px] font-bold text-navy-mid">
+        {label}
+        {agent && <AgentMark />}
+      </span>
       {children}
     </div>
   );
