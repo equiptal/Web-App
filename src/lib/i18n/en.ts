@@ -47,8 +47,9 @@ export const en = {
   },
   home: {
     title: "Home",
-    bannerTitle: "Order your next equipment",
-    bannerSubtitle: "Post your request and get bids from verified suppliers — or upload an RFQ and your smart assistant builds it.",
+    eyebrow: "Smart Equipment Marketplace",
+    bannerTitle: "Order your next equipment, faster than ever",
+    bannerSubtitle: "Post your request and get competitive bids from verified suppliers — or upload an RFQ and let your smart assistant build it automatically.",
     createRequest: "Create request",
     uploadRfq: "Upload RFQ",
     suppliersTitle: "Suggested Suppliers",

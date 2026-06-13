@@ -6,39 +6,46 @@ import { Icon } from "@/components/ui";
 import { BrowseSurface } from "@/components/stores/BrowseSurface";
 
 /**
- * Renter web home hub (web-app/004, AC-04/05/07/10/25). A navy create-request banner, then the
- * suggested-suppliers surface — the filter bar is always shown, and View all only changes how many
- * cards appear (no separate route). The tier-aware nudge lives in the sidebar tier card. No bid/deal
- * counts or Requests/Jobs surfaces (AC-25).
+ * Renter web home hub (web-app/004, AC-04/05/07/10/25). A gradient hero (eyebrow, heading, Create-
+ * request entry, and the activity stat cards) over the suggested-suppliers surface. The activity
+ * cards (Your Requests / Price Bids / Completed Deals) have no web data/pages yet → shown coming-
+ * soon. The tier-aware nudge lives in the sidebar tier card.
  */
 export function HomeHub() {
   const t = useT();
   const router = useRouter();
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Create-request banner (navy) — AC-04/07. Single Create-request entry. */}
-      <div className="relative flex flex-col items-center gap-[18px] overflow-hidden rounded-[14px] bg-gradient-to-br from-navy to-[#0a1b30] px-[26px] py-[22px] text-white sm:flex-row">
-        <span className="grid h-14 w-14 flex-none place-items-center rounded-full border border-brand/40 bg-brand/[.18] text-[#FCD9A0]">
-          <Icon name="post_add" size={28} />
-        </span>
-        <div className="flex-1">
-          <h2 className="text-[20px] font-extrabold tracking-[-.4px]">{t.home.bannerTitle}</h2>
-          <p className="mt-1 text-[13.5px] leading-relaxed text-white/70">{t.home.bannerSubtitle}</p>
-        </div>
-        <button
-          onClick={() => router.push("/create")}
-          className="inline-flex flex-none items-center gap-1.5 rounded-[10px] bg-brand px-5 py-2.5 text-[13.5px] font-bold text-brand-fg transition hover:brightness-[1.04]"
-        >
-          {t.home.createRequest} <Icon name="arrow_forward" size={16} className="rtl:scale-x-[-1]" />
-        </button>
-      </div>
+    <div className="flex flex-col gap-8">
+      {/* Hero */}
+      <div className="relative overflow-hidden rounded-[20px] bg-gradient-to-br from-navy to-[#1e3a5f] px-8 py-10 sm:px-12">
+        <div className="pointer-events-none absolute -end-16 -top-16 h-[300px] w-[300px] rounded-full bg-brand/[.12]" />
+        <div className="pointer-events-none absolute -bottom-20 end-28 h-[200px] w-[200px] rounded-full bg-white/[.04]" />
 
-      {/* Activity cards (prototype dash). No web data/pages yet (future epics) → shown coming-soon. */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <DashCard icon="inbox" tone="brand" label={t.home.yourRequests} />
-        <DashCard icon="gavel" tone="info" label={t.home.priceBids} />
-        <DashCard icon="handshake" tone="ok" label={t.home.completedDeals} />
+        <div className="relative z-10 flex flex-col items-start justify-between gap-8 lg:flex-row lg:items-center">
+          <div className="flex-1">
+            <span className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-brand/20 px-3 py-1 text-[12px] font-semibold uppercase tracking-wide text-[#FB923C]">
+              <Icon name="bolt" size={13} /> {t.home.eyebrow}
+            </span>
+            <h1 className="text-[28px] font-bold leading-tight text-white sm:text-[30px]">{t.home.bannerTitle}</h1>
+            <p className="mt-3 max-w-[480px] text-[14px] leading-relaxed text-white/65">{t.home.bannerSubtitle}</p>
+            <div className="mt-7">
+              <button
+                onClick={() => router.push("/create")}
+                className="inline-flex items-center gap-2 rounded-[12px] bg-brand px-6 py-3 text-[14px] font-semibold text-brand-fg transition hover:brightness-[1.04]"
+              >
+                <Icon name="add" size={16} /> {t.home.createRequest}
+              </button>
+            </div>
+          </div>
+
+          {/* Activity stat cards (no web data yet → coming-soon) */}
+          <div className="flex w-full flex-row gap-3 lg:w-auto lg:flex-col">
+            <StatCard label={t.home.yourRequests} />
+            <StatCard label={t.home.priceBids} />
+            <StatCard label={t.home.completedDeals} />
+          </div>
+        </div>
       </div>
 
       {/* Suggested suppliers — filter bar always shown; View all only adds cards (AC-05/10/11/12/13) */}
@@ -47,18 +54,12 @@ export function HomeHub() {
   );
 }
 
-function DashCard({ icon, tone, label }: { icon: string; tone: "brand" | "info" | "ok"; label: string }) {
+function StatCard({ label }: { label: string }) {
   const t = useT();
-  const toneCls = tone === "brand" ? "bg-brand-soft text-brand" : tone === "info" ? "bg-info-soft text-info" : "bg-ok-soft text-ok";
   return (
-    <div className="flex items-center gap-3 rounded-[14px] border border-border bg-surface px-4 py-3.5">
-      <span className={`grid h-10 w-10 flex-none place-items-center rounded-[10px] ${toneCls}`}>
-        <Icon name={icon} size={20} />
-      </span>
-      <div className="min-w-0">
-        <div className="truncate text-[13.5px] font-bold text-navy">{label}</div>
-        <div className="text-[12px] font-semibold text-muted">{t.home.soon}</div>
-      </div>
+    <div className="flex-1 rounded-[14px] border border-white/[.12] bg-white/[.08] px-5 py-4 text-center lg:min-w-[150px]">
+      <div className="text-[13px] font-bold text-white">{label}</div>
+      <div className="mt-1 text-[10.5px] font-semibold uppercase tracking-wide text-white/45">{t.home.soon}</div>
     </div>
   );
 }

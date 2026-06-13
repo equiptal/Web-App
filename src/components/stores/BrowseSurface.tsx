@@ -11,9 +11,9 @@ interface CityOpt {
   label: string;
 }
 
-// Matches the prototype `.fdrop` pill — equal width so all filters are the same size.
+// Filter pill — equal width so all filters are the same size.
 const selectCls =
-  "h-[40px] flex-1 min-w-[150px] rounded-[10px] border border-border bg-surface px-3 text-[13px] font-bold text-navy-mid outline-0 hover:border-navy-mid focus:border-brand";
+  "h-[40px] flex-1 min-w-[150px] rounded-[10px] border border-border bg-surface2 px-3 text-[13px] font-semibold text-navy-mid outline-0 hover:border-navy-mid focus:border-brand";
 
 /**
  * Suggested-suppliers surface (web-app/004, AC-10–17, AC-23). The filter bar (search + city +
@@ -130,15 +130,15 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
         </div>
       )}
 
-      {/* Filter bar — always shown. Search row, then filters + verified toggle on one row. */}
-      <div className="flex flex-col gap-2.5">
+      {/* Filter bar — always shown, in a card. Search row, then filters + verified toggle on one row. */}
+      <div className="flex flex-col gap-2.5 rounded-[16px] border border-border bg-surface p-4">
         <div className="relative">
           <Icon name="search" size={18} className="absolute start-3 top-1/2 -translate-y-1/2 text-muted" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t.browse.search}
-            className="h-[40px] w-full rounded-[10px] border border-border bg-surface ps-9 pe-3 text-[13px] outline-0 focus:border-brand"
+            className="h-[40px] w-full rounded-[10px] border border-border bg-surface2 ps-9 pe-3 text-[13px] outline-0 focus:border-brand"
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -209,7 +209,7 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
           {t.browse.empty}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(240px,1fr))]">
           {shown.map((s) => (
             <StoreCard key={s.id} store={s} />
           ))}
