@@ -6,6 +6,7 @@ import { Button, Icon } from "@/components/ui";
 import { gateStep1, gateStep2, gateStep3, type GateResult } from "@/lib/contract";
 import { Step1Project } from "@/components/wizard/Step1Project";
 import { Step2Equipment } from "@/components/wizard/Step2Equipment";
+import { ManualEquipmentStep } from "@/components/wizard/ManualEquipmentStep";
 import { Step3Preferences } from "@/components/wizard/Step3Preferences";
 import { Step4Preview } from "@/components/wizard/Step4Preview";
 
@@ -63,7 +64,7 @@ export function Wizard() {
       </ol>
 
       {step === 1 && <Step1Project />}
-      {step === 2 && <Step2Equipment />}
+      {step === 2 && (state.manualMode ? <ManualEquipmentStep /> : <Step2Equipment />)}
       {step === 3 && <Step3Preferences />}
       {step === 4 && <Step4Preview />}
 
