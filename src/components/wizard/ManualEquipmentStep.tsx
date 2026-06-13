@@ -11,8 +11,6 @@ import type { TaxonomyNode } from "@/lib/contract/stores";
  * mobile app (web-app/005, AC-05/06/07/08/13). Sets each item's ref to app-taxonomy ids (posted to
  * `/rentees/me/requests`). Multi-item; per-item quantity/operator/fuel/notes; remove with confirm.
  */
-const FUELS = ["diesel", "petrol", "electric"] as const;
-
 export function ManualEquipmentStep() {
   const t = useT();
   const m = t.manual;
@@ -121,7 +119,7 @@ export function ManualEquipmentStep() {
                 <Field label={m.fuel}>
                   <select
                     value={item.fuelType}
-                    onChange={(e) => actions.patchItem(item.id, { fuelType: e.target.value as (typeof FUELS)[number] })}
+                    onChange={(e) => actions.patchItem(item.id, { fuelType: e.target.value as "diesel" | "petrol" | "electric" })}
                     className="h-[38px] w-full rounded-[10px] border border-border bg-surface2 px-2 text-[13px] font-semibold text-navy-mid outline-0 focus:border-brand"
                   >
                     <option value="diesel">{m.fuelDiesel}</option>

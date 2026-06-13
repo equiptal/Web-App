@@ -37,7 +37,8 @@ export function buildCreateRequest(
   opts: { channel: RequestChannel; supplierId?: number | null },
 ): AppCreateRequest {
   // The userId arg is irrelevant here (stripped below) — the endpoint is me-scoped.
-  const { userId: _omitUserId, ...base } = draftToCreateRequest(draft, "0");
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { userId, ...base } = draftToCreateRequest(draft, "0");
   const direct = opts.channel === "direct" && opts.supplierId != null;
   const itemCount = base.equipmentItems.length;
   return {
