@@ -6,6 +6,7 @@ import { useLocale } from "@/lib/i18n";
 import { fetchRequestDetail } from "@/lib/api/client";
 import type { RequestItem, RequestRecord } from "@/lib/contract/requests";
 import { Icon } from "@/components/ui";
+import { RequestBids } from "@/components/requests/RequestBids";
 
 /** Keys handled by a dedicated section or that are internal/relational — excluded from the generic dump. */
 const SKIP = new Set([
@@ -30,13 +31,14 @@ function fmtVal(v: unknown, ar: boolean): string {
   return String(v);
 }
 
-export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: string) => void }) {
+export function RequestDetail({ id, onTitle, initialTab = "details" }: { id: string; onTitle?: (t: string) => void; initialTab?: "details" | "bids" }) {
   const { locale } = useLocale();
   const ar = locale === "ar";
   const L = (en: string, arr: string) => (ar ? arr : en);
   const router = useRouter();
   const [r, setR] = useState<RequestRecord | null>(null);
   const [error, setError] = useState(false);
+  const [tab, setTab] = useState<"details" | "bids">(initialTab);
 
   useEffect(() => {
     let active = true;
@@ -80,51 +82,74 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
         <Info lab={L("Urgency", "الإلحاح")} val={r.urgency === "ASAP" ? L("ASAP", "فوري") : r.urgency === "SOON" ? L("Soon", "قريباً") : L("Scheduled", "مجدول")} />
       </div>
 
-      {/* equipment */}
-      <Section icon="construction" title={L("Equipment", "المعدات")}>
-        {item ? <EquipmentItemCard item={item} ar={ar} L={L} /> : <p className="p-4 text-[13px] text-muted">—</p>}
-      </Section>
-
-      {/* location */}
-      <Section icon="place" title={L("Project location", "موقع المشروع")}>
-        <div className="flex items-center gap-2.5 p-4 text-[13.5px]">
-          <Icon name="location_on" size={20} className="text-brand" />
-          <span className="font-extrabold text-navy">{r.projectAddressLabel ?? "—"}</span>
-          {r.projectLat != null && r.projectLng != null && (
-            <span className="text-[12px] text-muted" dir="ltr">({Number(r.projectLat).toFixed(4)}, {Number(r.projectLng).toFixed(4)})</span>
-          )}
-        </div>
-      </Section>
-
-      {/* ALL request fields (everything from the body) */}
-      <Section icon="tune" title={L("Request details", "تفاصيل الطلب")}>
-        <dl className="grid grid-cols-[130px_1fr] gap-x-3 gap-y-3 p-4 text-[13.5px] sm:grid-cols-[180px_1fr]">
-          {fields.map(([k, v]) => (
-            <div key={k} className="contents">
-              <dt className="font-semibold text-muted">{humanize(k)}</dt>
-              <dd className="font-bold text-navy">{fmtVal(v, ar)}</dd>
-            </div>
-          ))}
-        </dl>
-      </Section>
-
-      {/* actions */}
-      <div className="mt-6 flex flex-wrap items-center gap-2.5 border-t border-border pt-4">
-        <span className="flex-1" />
-        {r.dealRoomId && (
-          <button onClick={() => router.push(`/deal-room/${r.dealRoomId}`)} className="inline-flex items-center gap-1.5 rounded-[10px] border border-border bg-surface px-4 py-2.5 text-[13px] font-bold text-navy">
-            <Icon name="forum" size={16} /> {L("Deal room", "غرفة الصفقة")}
-          </button>
-        )}
-        <button
-          disabled={(r.bidCount ?? 0) === 0}
-          onClick={() => router.push(`/requests/${r.id}/bids`)}
-          className="inline-flex items-center gap-1.5 rounded-[10px] bg-brand px-5 py-2.5 text-[13.5px] font-bold text-brand-fg disabled:opacity-50"
-        >
-          <Icon name="gavel" size={16} /> {L("View bids", "عرض العروض")} ({r.bidCount ?? 0})
-        </button>
+      {/* tabs */}
+      <div className="mb-5 flex gap-1 border-b border-border">
+        <TabBtn on={tab === "details"} onClick={() => setTab("details")}>{L("Details", "التفاصيل")}</TabBtn>
+        <TabBtn on={tab === "bids"} onClick={() => setTab("bids")}>{L("Bids", "العروض")} ({r.bidCount ?? 0})</TabBtn>
       </div>
+
+      {tab === "bids" ? (
+        <RequestBids requestId={r.id} />
+      ) : (
+        <>
+          {/* equipment */}
+          <Section icon="construction" title={L("Equipment", "المعدات")}>
+            {item ? <EquipmentItemCard item={item} ar={ar} L={L} /> : <p className="p-4 text-[13px] text-muted">—</p>}
+          </Section>
+
+          {/* location */}
+          <Section icon="place" title={L("Project location", "موقع المشروع")}>
+            <div className="flex items-center gap-2.5 p-4 text-[13.5px]">
+              <Icon name="location_on" size={20} className="text-brand" />
+              <span className="font-extrabold text-navy">{r.projectAddressLabel ?? "—"}</span>
+              {r.projectLat != null && r.projectLng != null && (
+                <span className="text-[12px] text-muted" dir="ltr">({Number(r.projectLat).toFixed(4)}, {Number(r.projectLng).toFixed(4)})</span>
+              )}
+            </div>
+          </Section>
+
+          {/* ALL request fields (everything from the body) */}
+          <Section icon="tune" title={L("Request details", "تفاصيل الطلب")}>
+            <dl className="grid grid-cols-[130px_1fr] gap-x-3 gap-y-3 p-4 text-[13.5px] sm:grid-cols-[180px_1fr]">
+              {fields.map(([k, v]) => (
+                <div key={k} className="contents">
+                  <dt className="font-semibold text-muted">{humanize(k)}</dt>
+                  <dd className="font-bold text-navy">{fmtVal(v, ar)}</dd>
+                </div>
+              ))}
+            </dl>
+          </Section>
+
+          {/* actions */}
+          <div className="mt-6 flex flex-wrap items-center gap-2.5 border-t border-border pt-4">
+            <span className="flex-1" />
+            {r.dealRoomId && (
+              <button onClick={() => router.push(`/deal-room/${r.dealRoomId}`)} className="inline-flex items-center gap-1.5 rounded-[10px] border border-border bg-surface px-4 py-2.5 text-[13px] font-bold text-navy">
+                <Icon name="forum" size={16} /> {L("Deal room", "غرفة الصفقة")}
+              </button>
+            )}
+            <button
+              disabled={(r.bidCount ?? 0) === 0}
+              onClick={() => setTab("bids")}
+              className="inline-flex items-center gap-1.5 rounded-[10px] bg-brand px-5 py-2.5 text-[13.5px] font-bold text-brand-fg disabled:opacity-50"
+            >
+              <Icon name="gavel" size={16} /> {L("View bids", "عرض العروض")} ({r.bidCount ?? 0})
+            </button>
+          </div>
+        </>
+      )}
     </div>
+  );
+}
+
+function TabBtn({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`-mb-px border-b-2 px-4 py-2.5 text-[13.5px] font-bold transition ${on ? "border-brand text-navy" : "border-transparent text-muted hover:text-navy-mid"}`}
+    >
+      {children}
+    </button>
   );
 }
 

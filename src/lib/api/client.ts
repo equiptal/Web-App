@@ -1,5 +1,6 @@
 import type { AgentDraft, RfqRequestPayload, Taxonomy } from "@/lib/contract";
 import type { RequestListItem, RequestRecord } from "@/lib/contract/requests";
+import type { BidCard } from "@/lib/contract/bids";
 
 /** Error kinds the UI distinguishes: empty/unreadable input (AC-09) vs connectivity (AC-10). */
 export type ApiErrorKind = "empty" | "network" | "unknown";
@@ -95,6 +96,16 @@ export function fetchMyRequests(filter?: { status?: string; type?: string }): Pr
 /** Full detail for one request (every stored field + the single item + dealRoomId). */
 export function fetchRequestDetail(id: string): Promise<RequestRecord> {
   return getJson<RequestRecord>(`/api/me/requests/${encodeURIComponent(id)}`);
+}
+
+/** Bids received on a request (active then expired). */
+export function fetchBids(requestId: string): Promise<{ bids: BidCard[] }> {
+  return getJson<{ bids: BidCard[] }>(`/api/me/requests/${encodeURIComponent(requestId)}/bids`);
+}
+
+/** Accept a supplier's bid. */
+export function acceptBid(bidId: string): Promise<unknown> {
+  return postJson(`/api/me/bids/${encodeURIComponent(bidId)}/accept`, {});
 }
 
 export function submitRequest(
