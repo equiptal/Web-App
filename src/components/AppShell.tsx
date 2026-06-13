@@ -58,14 +58,9 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
     <div className="flex min-h-screen">
       {/* Sidebar (navy) — AC-02. Sticky full-height so the tier card stays in view (no page-scroll). */}
       <aside className="hidden w-[232px] flex-none flex-col self-start bg-navy px-3.5 py-5 text-white md:flex md:sticky md:top-0 md:h-screen md:overflow-y-auto">
-        <div className="flex items-center gap-2.5 px-2 pb-[18px] text-[17px] font-extrabold tracking-tight">
-          <span className="grid h-9 w-9 flex-none place-items-center rounded-[9px] border border-white/[.16] bg-white/10">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/moedatech-logomark.svg" alt="Moedatech" className="h-6 w-6 object-contain" />
-          </span>
-          <span>
-            MOEDA<span className="text-brand">TECH</span>
-          </span>
+        <div className="flex items-center px-2 pb-[18px]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/moedatech-logo.png" alt="Moedatech" className="h-7 w-auto [filter:brightness(0)_invert(1)]" />
         </div>
 
         <nav className="flex flex-col gap-0.5">

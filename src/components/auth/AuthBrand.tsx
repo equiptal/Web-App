@@ -46,12 +46,9 @@ export function AuthBrand() {
       />
 
       {/* brand mark */}
-      <div className="relative z-[2] flex items-center gap-[11px] text-[18px] font-extrabold tracking-[-.2px]">
-        <span className="flex h-9 w-9 flex-none items-center justify-center rounded-[9px] border border-white/[0.18] bg-white/10">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/moedatech-logomark.svg" alt="Moedatech" className="h-6 w-6 object-contain" />
-        </span>
-        MOEDA<i className="not-italic text-brand">TECH</i>
+      <div className="relative z-[2] flex items-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/moedatech-logo.png" alt="Moedatech" className="h-9 w-auto [filter:brightness(0)_invert(1)]" />
       </div>
 
       {/* hero */}
