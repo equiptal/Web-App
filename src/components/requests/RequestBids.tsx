@@ -25,6 +25,9 @@ const CTA: Record<string, { en: string; ar: string; icon: string }> = {
 
 const money = (v: number | null, ar: boolean) => (v == null ? "—" : `${v.toLocaleString(ar ? "ar-SA" : "en-US")} ${ar ? "ر.س" : "SAR"}`);
 
+/** Flip to true once the deal-room screen ships (next slice) — keeps the CTA from dead-ending. */
+const DEAL_ROOM_READY = false;
+
 export function RequestBids({ requestId }: { requestId: string }) {
   const { locale } = useLocale();
   const ar = locale === "ar";
@@ -143,7 +146,12 @@ export function RequestBids({ requestId }: { requestId: string }) {
                   </button>
                 )}
                 {cta && (
-                  <button onClick={() => goDeal(b)} disabled={disabled} className="inline-flex items-center gap-1.5 rounded-[10px] bg-brand px-4 py-2 text-[12.5px] font-bold text-brand-fg disabled:opacity-50">
+                  <button
+                    onClick={() => goDeal(b)}
+                    disabled={disabled || !DEAL_ROOM_READY}
+                    title={DEAL_ROOM_READY ? undefined : L("Deal room — coming next", "غرفة الصفقة — قريباً")}
+                    className="inline-flex items-center gap-1.5 rounded-[10px] bg-brand px-4 py-2 text-[12.5px] font-bold text-brand-fg disabled:opacity-50"
+                  >
                     <Icon name={cta.icon} size={15} /> {ar ? cta.ar : cta.en}
                   </button>
                 )}
