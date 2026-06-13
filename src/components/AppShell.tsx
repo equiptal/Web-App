@@ -57,7 +57,7 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
   return (
     <div className="flex min-h-screen">
       {/* Sidebar (navy) — AC-02. Sticky full-height so the tier card stays in view (no page-scroll). */}
-      <aside className="hidden w-[232px] flex-none flex-col self-start bg-navy px-3.5 py-5 text-white md:flex md:sticky md:top-0 md:h-screen md:overflow-y-auto">
+      <aside className="hidden w-[232px] flex-none flex-col self-start bg-gradient-to-b from-[#1e3a5f] to-[#0f1e2e] px-3.5 py-5 text-white md:flex md:sticky md:top-0 md:h-screen md:overflow-y-auto">
         <div className="flex items-center justify-center px-2 pb-[18px] pt-1">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/moedatech-logo.png" alt="Moedatech" className="h-8 w-auto [filter:brightness(0)_invert(1)]" />
@@ -85,7 +85,13 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top bar — AC-03 */}
         <header className="sticky top-0 z-30 flex h-[62px] items-center gap-4 border-b border-border bg-surface px-7">
-          <b className="truncate text-[19px] font-extrabold tracking-[-.4px] text-navy">{title ?? greeting}</b>
+          <b className="truncate text-[19px] font-extrabold tracking-[-.4px] text-navy">
+            {title ?? (
+              <>
+                {greeting} <span className="wave-emoji">👋</span>
+              </>
+            )}
+          </b>
 
           <div className="ms-auto flex items-center gap-3 text-[13px] font-semibold text-navy-mid">
             <span className="inline-flex overflow-hidden rounded-md border border-border">
