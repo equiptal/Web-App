@@ -64,7 +64,7 @@ export function Processing() {
       <p className="mb-[26px] mt-1.5 text-[13.5px] text-muted">{t.processing.sub}</p>
 
       {/* stages */}
-      <div className="mx-auto mb-6 flex max-w-[330px] flex-col gap-[13px] text-start">
+      <div className="mx-auto mb-6 flex max-w-full sm:max-w-[330px] flex-col gap-[13px] text-start">
         {stages.map((label, i) => {
           const s = i < effectiveStage ? "done" : i === effectiveStage ? "active" : "todo";
           return (
@@ -87,7 +87,7 @@ export function Processing() {
       </div>
 
       {/* progress bar */}
-      <div className="mx-auto h-1.5 max-w-[330px] overflow-hidden rounded-full bg-surface3">
+      <div className="mx-auto h-1.5 max-w-full sm:max-w-[330px] overflow-hidden rounded-full bg-surface3">
         <div className="h-full rounded-full bg-brand transition-[width] duration-500" style={{ width: `${barPct}%` }} />
       </div>
 

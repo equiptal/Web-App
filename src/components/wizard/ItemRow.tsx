@@ -2,16 +2,16 @@
 
 import { useState } from "react";
 import { useT, fmt } from "@/lib/i18n";
-import { useRfq } from "@/lib/store/rfq-store";
+import { useRfq, agentMatches } from "@/lib/store/rfq-store";
 import { SUPPORT_WHATSAPP_NUMBER } from "@/lib/config/support";
-import { Button, Field, Icon, Pchips, Select, Stepper, TextArea, Toggle, Modal } from "@/components/ui";
+import { AgentMark, Button, Field, Icon, Pchips, Select, Stepper, TextArea, Toggle, Modal } from "@/components/ui";
 import {
   EquipmentItem,
   Taxonomy,
   resolveRef,
   isCompleteRef,
   FUEL_TYPES,
-  SAFETY_CERTIFICATES,
+  OPERATOR_CERTIFICATES,
   PARTIES,
   type FuelType,
   type OperatorCertificate,
@@ -46,7 +46,8 @@ export function ItemRow({
   sharedReturn: Party | null;
 }) {
   const t = useT();
-  const { actions } = useRfq();
+  const { state, actions } = useRfq();
+  const ai = state.agentOrigin?.items.find((i) => i.id === item.id); // agent's original item, for the AI marker
   const [editingMatch, setEditingMatch] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -59,7 +60,12 @@ export function ItemRow({
   const { category, subcategory, measurement } = resolveRef(taxonomy, item.ref);
   const status = item.verdict === "no-match" ? "not-available" : item.resolved ? "matched" : "needs-ok";
   const glyph = (item.ref.categoryId && CATEGORY_ICON[item.ref.categoryId]) || "construction";
-  const matchLabel = [category?.name, subcategory?.name, measurement?.name].filter(Boolean).join(" · ") || (item.rawLabel ?? "—");
+  // Show the size even when it didn't resolve to a taxonomy measurement (off-taxonomy / unstated):
+  // fall back to the verbatim stated size so it never disappears from the match line.
+  const sizeLabel = measurement?.name ?? item.rawSize ?? undefined;
+  const matchLabel = [category?.name, subcategory?.name, sizeLabel].filter(Boolean).join(" · ") || (item.rawLabel ?? "—");
+  // What the renter actually wrote — name + stated size — so "from your RFQ" keeps the size visible.
+  const rawDisplay = [item.rawLabel, item.rawSize].filter(Boolean).join(" · ") || item.rawLabel;
 
   const borderClass =
     status === "needs-ok" ? "border-s-[3px] border-s-warn" : status === "not-available" ? "border-s-[3px] border-s-danger" : "border-s-[3px] border-s-ok";
@@ -70,7 +76,7 @@ export function ItemRow({
       <li className="grid grid-cols-[38px_1fr_auto] items-center gap-3 rounded-xl border border-s-[3px] border-border border-s-danger bg-surface px-4 py-3">
         <Avatar glyph={glyph} conf="low" />
         <div className="min-w-0">
-          <RfqMatch raw={item.rawLabel} matched={<span className="text-danger">{t.step2.status.notAvailable}</span>} />
+          <RfqMatch raw={rawDisplay} matched={<span className="text-danger">{t.step2.status.notAvailable}</span>} />
           <p className="mt-1 text-xs text-muted">{t.step2.noMatch.explainer}</p>
         </div>
         <div className="flex gap-2">
@@ -94,13 +100,13 @@ export function ItemRow({
 
   const taxonomyEditor = (
     <div className="col-span-full mt-3 grid grid-cols-1 gap-2 rounded-lg border border-border bg-surface2 p-3 sm:grid-cols-3">
-      <Field label={t.step2.category}>
+      <Field label={t.step2.category} required missing={!item.ref.categoryId} agent={agentMatches(item.ref.categoryId, ai?.ref.categoryId)}>
         <Select value={item.ref.categoryId} placeholder={t.step2.pickCategory} onChange={(v) => actions.setItemCategory(item.id, v)} options={taxonomy.map((c) => ({ value: c.id, label: c.name }))} />
       </Field>
-      <Field label={t.step2.subcategory}>
+      <Field label={t.step2.subcategory} required missing={!item.ref.subcategoryId} agent={agentMatches(item.ref.subcategoryId, ai?.ref.subcategoryId)}>
         <Select value={item.ref.subcategoryId} placeholder={t.step2.pickSubcategory} disabled={!category} onChange={(v) => actions.setItemSubcategory(item.id, v)} options={(category?.subcategories ?? []).map((s) => ({ value: s.id, label: s.name }))} />
       </Field>
-      <Field label={t.step2.measurement}>
+      <Field label={t.step2.measurement} required missing={!item.ref.measurementId} agent={agentMatches(item.ref.measurementId, ai?.ref.measurementId)}>
         <Select value={item.ref.measurementId} placeholder={t.step2.pickMeasurement} disabled={!subcategory} onChange={(v) => actions.setItemMeasurement(item.id, v)} options={(subcategory?.measurements ?? []).map((m) => ({ value: m.id, label: m.name }))} />
       </Field>
     </div>
@@ -111,7 +117,7 @@ export function ItemRow({
       <Avatar glyph={glyph} conf={status === "matched" ? "high" : "mid"} />
 
       <div className="min-w-0">
-        <RfqMatch raw={item.rawLabel} matched={matchLabel} />
+        <RfqMatch raw={rawDisplay} matched={matchLabel} />
 
         {/* Unit conversion / nearest-size advisory (AC-19/20) */}
         {item.suggestion?.unitConversion && (
@@ -149,6 +155,7 @@ export function ItemRow({
             <div className="mt-2.5 flex items-center gap-2.5">
               <span className="text-[10.5px] font-extrabold uppercase tracking-wide text-muted">{t.step2.perItem.quantity}</span>
               <Stepper value={item.quantity} min={1} onChange={(v) => actions.patchItem(item.id, { quantity: v })} />
+              {agentMatches(item.quantity, ai?.quantity) && <AgentMark />}
             </div>
             <div className="mt-2.5 flex flex-wrap gap-2">
               <MetaTag icon="person" label={t.step2.perItem.operatorNeeded} value={t.options.operatorNeeded[item.operatorNeeded]} />
@@ -168,9 +175,12 @@ export function ItemRow({
               <Button disabled={!isCompleteRef(item.ref)} onClick={() => (item.suggestion ? actions.approveSuggestion(item.id) : actions.approveItem(item.id))}>
                 <Icon name="check" size={15} /> {t.common.approve}
               </Button>
-              <Button variant="secondary" onClick={() => setEditingMatch((e) => !e)}>
-                <Icon name="swap_horiz" size={15} /> {t.common.change}
-              </Button>
+              {/* #8: when the ref is incomplete the picker is already open below — no redundant "Change". */}
+              {isCompleteRef(item.ref) && (
+                <Button variant="secondary" onClick={() => setEditingMatch((e) => !e)}>
+                  <Icon name="swap_horiz" size={15} /> {t.common.change}
+                </Button>
+              )}
             </>
           ) : (
             <Button variant="secondary" onClick={() => setShowDetails((d) => !d)}>
@@ -195,38 +205,38 @@ export function ItemRow({
             <div className="flex items-center justify-between bg-surface2 px-3 py-2.5">
               <span className="flex items-center gap-2 text-[13.5px] font-extrabold">
                 <Icon name="person" size={18} className="text-navy-mid" /> {t.step2.perItem.operatorNeeded}
+                {agentMatches(item.operatorNeeded, ai?.operatorNeeded) && <AgentMark />}
               </span>
               <Toggle checked={item.operatorNeeded === "yes"} onChange={(v) => actions.patchItem(item.id, { operatorNeeded: v ? "yes" : "no" })} />
             </div>
             {item.operatorNeeded === "yes" && (
               <div className="space-y-3 px-3 py-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-[13px] font-bold">{t.step2.perItem.nightShift}</span>
+                  <span className="flex items-center gap-2 text-[13px] font-bold">
+                    {t.step2.perItem.nightShift}
+                    {agentMatches(item.operator.nightShift, ai?.operator.nightShift) && <AgentMark />}
+                  </span>
                   <Toggle checked={item.operator.nightShift} onChange={(v) => actions.patchItemOperator(item.id, { nightShift: v })} />
                 </div>
-                <ChipField label={t.step2.perItem.nationality}>
+                <ChipField label={t.step2.perItem.nationality} agent={agentMatches(item.operator.nationality, ai?.operator.nationality)}>
                   <Pchips value={item.operator.nationality} onChange={(v) => actions.patchItemOperator(item.id, { nationality: v })} options={nationalityOpts} />
                 </ChipField>
-                <ChipField label={t.step2.perItem.certificate}>
-                  <Pchips<OperatorCertificate> value={item.operator.certificate} onChange={(v) => actions.patchItemOperator(item.id, { certificate: v })} options={opt(SAFETY_CERTIFICATES, t.options.safetyCert)} />
+                <ChipField label={t.step2.perItem.certificate} agent={agentMatches(item.operator.certificate, ai?.operator.certificate)}>
+                  <Pchips<OperatorCertificate> value={item.operator.certificate} onChange={(v) => actions.patchItemOperator(item.id, { certificate: v })} options={opt(OPERATOR_CERTIFICATES, t.options.safetyCert)} />
                 </ChipField>
-                <ChipField label={t.step2.perItem.accommodation}>
-                  <Pchips<Party> value={item.operator.accommodation} onChange={(v) => actions.patchItemOperator(item.id, { accommodation: v })} options={opt(PARTIES, t.options.party)} />
+                <ChipField label={t.step2.perItem.fat} agent={agentMatches(item.operator.fat, ai?.operator.fat)}>
+                  <Pchips<Party> value={item.operator.fat} onChange={(v) => actions.patchItemOperator(item.id, { fat: v })} options={opt(PARTIES, t.options.party)} />
                 </ChipField>
-                <div className="flex items-center justify-between">
-                  <span className="text-[13px] font-bold">{t.step2.perItem.transfer}</span>
-                  <Toggle checked={item.operator.transfer} onChange={(v) => actions.patchItemOperator(item.id, { transfer: v })} />
-                </div>
               </div>
             )}
           </div>
 
           {/* Fuel (AC-26) */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <ChipField label={t.step2.perItem.fuelType}>
+            <ChipField label={t.step2.perItem.fuelType} agent={agentMatches(item.fuelType, ai?.fuelType)}>
               <Pchips<FuelType> value={item.fuelType} onChange={(v) => actions.patchItem(item.id, { fuelType: v })} options={opt(FUEL_TYPES, t.options.fuelType)} />
             </ChipField>
-            <ChipField label={t.step1.requestWide.fuelResponsibility}>
+            <ChipField label={t.step1.requestWide.fuelResponsibility} agent={agentMatches(item.fuelResponsibilityOverride, ai?.fuelResponsibilityOverride)}>
               <Pchips<Party> value={item.fuelResponsibilityOverride ?? sharedFuelResp} onChange={(v) => actions.patchItem(item.id, { fuelResponsibilityOverride: v })} options={opt(PARTIES, t.options.party)} />
             </ChipField>
           </div>
@@ -234,16 +244,16 @@ export function ItemRow({
           {/* Delivery / Return — per-item override of the request-wide setting (AC-25). Mansour sets
               these per line (mobilization/demobilization), so surface + allow editing them here. */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <ChipField label={t.step1.requestWide.delivery}>
+            <ChipField label={t.step1.requestWide.delivery} agent={agentMatches(item.deliveryOverride, ai?.deliveryOverride)}>
               <Pchips<Party> value={item.deliveryOverride ?? sharedDelivery} onChange={(v) => actions.patchItem(item.id, { deliveryOverride: v })} options={opt(PARTIES, t.options.party)} />
             </ChipField>
-            <ChipField label={t.step1.requestWide.return}>
+            <ChipField label={t.step1.requestWide.return} agent={agentMatches(item.returnOverride, ai?.returnOverride)}>
               <Pchips<Party> value={item.returnOverride ?? sharedReturn} onChange={(v) => actions.patchItem(item.id, { returnOverride: v })} options={opt(PARTIES, t.options.party)} />
             </ChipField>
           </div>
 
           {/* Additional notes (AC-53) */}
-          <ChipField label={t.step2.perItem.additionalNotes}>
+          <ChipField label={t.step2.perItem.additionalNotes} agent={agentMatches(item.additionalNotes, ai?.additionalNotes)}>
             <TextArea rows={2} value={item.additionalNotes} onChange={(e) => actions.patchItem(item.id, { additionalNotes: e.target.value })} />
           </ChipField>
         </div>
@@ -282,11 +292,11 @@ function RfqMatch({ raw, matched }: { raw: string | null; matched: React.ReactNo
   const t = useT();
   return (
     <div className="flex items-center gap-3">
-      <span className="flex w-[200px] flex-none flex-col gap-0.5">
+      <span className="flex w-[120px] flex-none flex-col gap-0.5 sm:w-[200px]">
         <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted">{t.step2.fromRfq}</span>
         <span className="text-[15px] font-bold leading-tight break-words">{raw ? `“${raw}”` : "—"}</span>
       </span>
-      <Icon name="arrow_forward" size={20} className="flex-none text-muted/60" />
+      <Icon name="arrow_forward" size={20} className="flex-none text-muted/60 rtl:scale-x-[-1]" />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted">{t.step2.matchedTo}</span>
         <span className="break-words text-[15px] font-extrabold leading-tight">{matched}</span>
@@ -316,10 +326,13 @@ function MetaTag({ icon, label, value }: { icon: string; label: string; value: s
   );
 }
 
-function ChipField({ label, children }: { label: string; children: React.ReactNode }) {
+function ChipField({ label, agent, children }: { label: string; agent?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <span className="mb-1.5 block text-[11.5px] font-bold text-navy-mid">{label}</span>
+      <span className="mb-1.5 flex items-center gap-2 text-[11.5px] font-bold text-navy-mid">
+        {label}
+        {agent && <AgentMark />}
+      </span>
       {children}
     </div>
   );

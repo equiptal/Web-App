@@ -48,7 +48,7 @@ export default function ProfilePage() {
               <p className="text-[13.5px] font-bold text-navy">{tier === "guest" ? t.home.nudgeGuestTitle : t.home.nudgeBasicTitle}</p>
               <p className="text-[12.5px] text-muted">{tier === "guest" ? t.home.nudgeGuestBody : t.home.nudgeBasicBody}</p>
             </div>
-            <Icon name="arrow_forward" size={18} className="flex-none text-brand" />
+            <Icon name="arrow_forward" size={18} className="flex-none text-brand rtl:scale-x-[-1]" />
           </button>
         )}
       </div>

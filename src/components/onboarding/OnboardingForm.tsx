@@ -140,7 +140,7 @@ export function OnboardingForm({ next }: { next: string }) {
       </div>
 
       <div className="flex flex-col gap-[14px] p-[22px]">
-        <div className="grid grid-cols-2 gap-[12px]">
+        <div className="grid grid-cols-1 gap-[12px] sm:grid-cols-2">
           <div>
             <label className={labelCls}>{o.firstName}</label>
             <input className={inputCls} value={firstName} onChange={(e) => setFirstName(e.target.value)} maxLength={30} />
@@ -160,7 +160,7 @@ export function OnboardingForm({ next }: { next: string }) {
           <input className={`${inputCls} bg-surface2 text-muted`} value={user?.phone ?? ""} readOnly dir="ltr" />
         </div>
 
-        <div className="grid grid-cols-2 gap-[12px]">
+        <div className="grid grid-cols-1 gap-[12px] sm:grid-cols-2">
           <div>
             <label className={labelCls}>{o.city}</label>
             <select className={inputCls} value={city} onChange={(e) => setCity(e.target.value)}>
@@ -207,7 +207,7 @@ export function OnboardingForm({ next }: { next: string }) {
           className="flex w-full items-center justify-center gap-[7px] rounded-[10px] border border-brand bg-brand px-[24px] py-[13px] text-[14.5px] font-bold text-brand-fg transition hover:brightness-[1.04] disabled:opacity-50"
         >
           {busy ? o.submitting : o.submit}
-          {!busy && <Icon name="arrow_forward" size={18} />}
+          {!busy && <Icon name="arrow_forward" size={18} className="rtl:scale-x-[-1]" />}
         </button>
       </div>
     </form>

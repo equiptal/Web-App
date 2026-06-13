@@ -5,12 +5,11 @@ export type Locale = (typeof LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = "en";
 
 /**
- * AC-46 (RTL) is `(tentative — PM-confirm)` and STANDARDS § RTL is unresolved (🟡 Q1 in plan.md).
- * The layout is built RTL-capable (logical CSS + a `dir` attribute), but the actual Arabic mirror
- * is gated here. Flip to `true` once STANDARDS confirms full RTL for the web. Arabic *strings*
- * (AC-45) are unaffected by this flag — they render regardless.
+ * AC-46 (RTL): Arabic mirrors the layout right-to-left. The app is built RTL-capable (logical CSS +
+ * a `dir` attribute set on <html> by the i18n provider); this enables the mirror for Arabic. Arabic
+ * *strings* (AC-45) render regardless of this flag.
  */
-export const RTL_ENABLED = false;
+export const RTL_ENABLED = true;
 
 export type Dir = "ltr" | "rtl";
 

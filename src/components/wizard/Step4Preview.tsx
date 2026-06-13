@@ -50,6 +50,23 @@ export function Step4Preview() {
         <p className="mt-1 max-w-xl text-sm text-muted">{t.preview.subtitle}</p>
       </div>
 
+      {/* Plain-language notes on what the agent assumed/inferred — renter confirms (④b). */}
+      {draft.justifications && draft.justifications.length > 0 && (
+        <div className="rounded-xl border border-info/30 bg-info-soft/40 px-[18px] py-3.5">
+          <div className="mb-1.5 flex items-center gap-1.5 text-sm font-bold text-navy-mid">
+            <Icon name="lightbulb" size={17} className="text-info" /> {t.preview.whyTitle}
+          </div>
+          <ul className="space-y-1 text-[13px] text-navy">
+            {draft.justifications.map((j, i) => (
+              <li key={i} className="flex gap-2">
+                <span className="mt-[2px] flex-none text-info">•</span>
+                <span>{j}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Project (AC-41) */}
       <RC icon="place" title={t.preview.projectSummary} onEdit={() => actions.goStep(1)} editLabel={t.preview.edit}>
         <KV
@@ -146,7 +163,7 @@ function RC({ icon, title, onEdit, editLabel, children }: { icon: string; title:
 
 function KV({ rows }: { rows: [ReactNode, ReactNode][] }) {
   return (
-    <dl className="grid grid-cols-[140px_1fr] gap-x-3 gap-y-2.5 px-[18px] py-3.5 text-[13.5px]">
+    <dl className="grid grid-cols-[110px_1fr] gap-x-3 gap-y-2.5 px-[18px] py-3.5 text-[13.5px] sm:grid-cols-[140px_1fr]">
       {rows.map(([k, v], i) => (
         <div key={i} className="contents">
           <dt className="font-semibold text-muted">{k}</dt>

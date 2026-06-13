@@ -59,8 +59,12 @@ export interface CreateRequestPayload {
   endDate?: string | null;
   /** AC-13 rental extendable flag. Requires the `extendable` column (rule 6 migration). */
   extendable?: boolean;
-  // `urgency` intentionally absent: the server derives it from startDate (ALIGNMENT rule 2 / mobile
-  // CR-017); any value sent is ignored, so the web never sends it.
+  /**
+   * Client-derived from startDate, mirroring the mobile app's CR-017 rule (<2d ASAP, 2–14d SOON, 14+d
+   * or no/invalid date FAR_FUTURE). The app backend stores the client value verbatim; the agents
+   * endpoint is aligning to require it too — so the web sends it (see `computeUrgency` in app-adapters).
+   */
+  urgency: "ASAP" | "SOON" | "FAR_FUTURE";
   projectLat?: number;
   projectLng?: number;
   projectAddressLabel?: string;
@@ -69,7 +73,6 @@ export interface CreateRequestPayload {
   workingHoursPerDay?: number; // int 1–24
   workingDaysPerWeek?: number; // int 1–7
   overtimeRate?: "0" | "1X" | "1.5X" | "2X"; // UI "without" → "0"
-  siteAccessRestrictions?: string; // single string ≤500 (NOT per-item) — UI array joined
   paymentTerms?: string; // ≤100
   paymentMethod?: string; // ≤100
   maintenanceResponsibility?: string; // ≤50
@@ -83,9 +86,15 @@ export interface CreateRequestPayload {
   equipmentItems: CreateRequestItem[];
 }
 
-export interface CreateRequestResult {
+/** One request created by POST /agents/requests (the server fans out one per equipment item). */
+export interface CreatedRequest {
   requestId: string;
   shortCode?: string;
   status?: string;
   matchedSupplierCount?: number;
+}
+
+/** POST /agents/requests response — an ARRAY, one entry per equipment item (server-side fan-out). */
+export interface CreateRequestResult {
+  requests: CreatedRequest[];
 }

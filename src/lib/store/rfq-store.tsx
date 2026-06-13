@@ -25,6 +25,19 @@ import { ApiError, ApiErrorKind, fetchTaxonomy, processRfq, submitRequest } from
 export type Phase = "intake" | "processing" | "wizard" | "confirmation";
 export type Step = 1 | 2 | 3 | 4;
 
+/** localStorage key for the persisted RFQ draft (web-app/002 save-on-reload). */
+const DRAFT_STORAGE_KEY = "rfq-draft-v1";
+
+/**
+ * web-app/002: true when a field's current value still equals what the agent originally filled in
+ * (and the agent actually supplied one). Drives the orange "AI" marker; returns false once the
+ * renter edits the value (so the mark clears), or when the agent left the field empty.
+ */
+export function agentMatches(current: unknown, original: unknown): boolean {
+  if (original == null || original === "" || (Array.isArray(original) && original.length === 0)) return false;
+  return JSON.stringify(current) === JSON.stringify(original);
+}
+
 export interface RfqState {
   phase: Phase;
   step: Step;
@@ -38,8 +51,13 @@ export interface RfqState {
   busy: boolean;
   error: ApiErrorKind | null;
   requestId: string | null;
+  /** Every short code from the fan-out (one per equipment item); requestId is the first. */
+  requestIds: string[];
   multiLocationDismissed: boolean;
   seq: number;
+  /** web-app/002: the project + items exactly as the agent first returned them — used to mark
+   *  agent-filled values (orange) and clear the mark once the renter edits past them. */
+  agentOrigin: { project: ProjectDetails; items: EquipmentItem[] } | null;
 }
 
 const initialState: RfqState = {
@@ -53,8 +71,10 @@ const initialState: RfqState = {
   busy: false,
   error: null,
   requestId: null,
+  requestIds: [],
   multiLocationDismissed: false,
   seq: 100,
+  agentOrigin: null,
 };
 
 type Action =
@@ -88,8 +108,9 @@ type Action =
   | { t: "REMOVE_ITEM"; id: string }
   | { t: "PATCH_PREFERENCES"; patch: DeepPrefPatch }
   | { t: "SUBMIT_START" }
-  | { t: "SUBMIT_SUCCESS"; requestId: string }
+  | { t: "SUBMIT_SUCCESS"; requestId: string; requestIds: string[] }
   | { t: "SUBMIT_ERROR"; kind: ApiErrorKind }
+  | { t: "HYDRATE"; saved: Partial<RfqState> }
   | { t: "RESET" };
 
 interface DeepPrefPatch {
@@ -137,7 +158,10 @@ function reducer(state: RfqState, a: Action): RfqState {
           preferences: a.draft.preferences ?? defaultPreferences(), // agent-inferred Step-3 prefs when present
           detectedLocations: a.draft.detectedLocations,
           summary: a.draft.summary,
+          justifications: a.draft.justifications ?? [],
         },
+        // Snapshot the agent's values (refs are safe — all edits are immutable copies).
+        agentOrigin: { project: a.draft.project, items: a.draft.items },
         multiLocationDismissed: false,
       };
     case "PROCESS_ERROR":
@@ -266,11 +290,14 @@ function reducer(state: RfqState, a: Action): RfqState {
     case "SUBMIT_START":
       return { ...state, busy: true, error: null };
     case "SUBMIT_SUCCESS":
-      return { ...state, busy: false, phase: "confirmation", requestId: a.requestId };
+      return { ...state, busy: false, phase: "confirmation", requestId: a.requestId, requestIds: a.requestIds };
     case "SUBMIT_ERROR":
       return { ...state, busy: false, error: a.kind };
     case "RESET":
       return { ...initialState, taxonomy: state.taxonomy };
+    case "HYDRATE":
+      // Restore a saved draft on reload (web-app/002) — keep the freshly-fetched taxonomy.
+      return { ...state, ...a.saved, taxonomy: state.taxonomy };
     default:
       return state;
   }
@@ -333,13 +360,13 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
       if (!s.draft) return;
       dispatch({ t: "SUBMIT_START" });
       try {
-        const { requestId } = await submitRequest({
+        const { requestId, requestIds } = await submitRequest({
           project: s.draft.project,
           items: postableItems(s.draft.items), // AC-33/34: exclude no-match/removed
           preferences: s.draft.preferences,
           simulateError: s.simulateError,
         });
-        dispatch({ t: "SUBMIT_SUCCESS", requestId });
+        dispatch({ t: "SUBMIT_SUCCESS", requestId, requestIds: requestIds ?? (requestId ? [requestId] : []) });
       } catch (e) {
         dispatch({ t: "SUBMIT_ERROR", kind: e instanceof ApiError ? e.kind : "unknown" });
       }
@@ -354,6 +381,33 @@ export function RfqProvider({ children }: { children: ReactNode }) {
   stateRef.current = state;
 
   const actions = useMemo(() => makeActions(dispatch, () => stateRef.current), []);
+
+  // Restore a saved draft on reload (web-app/002): data + the step the renter was on. Uploaded
+  // files can't be re-created by the browser, so they aren't persisted (renter re-attaches if needed).
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as Partial<RfqState>;
+      if (saved && saved.draft) dispatch({ t: "HYDRATE", saved });
+    } catch {
+      /* corrupt/blocked storage → start fresh */
+    }
+  }, []);
+
+  // Persist the editable draft + position whenever they change (skip processing/confirmation phases).
+  const { phase, step, draft, text, multiLocationDismissed, seq, agentOrigin } = state;
+  useEffect(() => {
+    try {
+      if (draft && (phase === "intake" || phase === "wizard")) {
+        window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({ phase, step, draft, text, multiLocationDismissed, seq, agentOrigin }));
+      } else if (phase === "confirmation") {
+        window.localStorage.removeItem(DRAFT_STORAGE_KEY); // request sent → clear the saved draft
+      }
+    } catch {
+      /* ignore quota/availability errors */
+    }
+  }, [phase, step, draft, text, multiLocationDismissed, seq, agentOrigin]);
 
   // Load the taxonomy once.
   useEffect(() => {

@@ -2,18 +2,16 @@
 
 import dynamic from "next/dynamic";
 import { useT } from "@/lib/i18n";
-import { useRfq } from "@/lib/store/rfq-store";
+import { useRfq, agentMatches } from "@/lib/store/rfq-store";
 import { Card, Field, Icon, Seg2, SelChips, Select, Stepper, TextInput } from "@/components/ui";
 import {
   RENTAL_BASES,
   OVERTIME_RATES,
   EQUIPMENT_YEARS,
-  SITE_ACCESS_RESTRICTIONS,
   SAFETY_CERTIFICATES,
   OTHER_CERTIFICATES,
   type RentalBasis,
   type OvertimeRate,
-  type SiteAccessRestriction,
   type SafetyCertificate,
   type OtherCertificate,
 } from "@/lib/contract";
@@ -40,6 +38,7 @@ export function Step1Project() {
   // a typed label alone isn't enough.
   const hasLocation = loc.lat != null && loc.lng != null;
   const multi = state.draft!.detectedLocations.filter(Boolean);
+  const ap = state.agentOrigin?.project; // agent's original values, for the orange "AI" marker
   const ey = project.advanced.equipmentYear;
   const isCustomYear = !!ey && ey.startsWith("custom:");
 
@@ -58,7 +57,7 @@ export function Step1Project() {
             <div className="flex items-center gap-1.5 text-[13.5px] font-extrabold text-warn">
               <Icon name="error_outline" size={18} /> {t.step1.location.conflictTitle}
             </div>
-            <div className="mt-2 grid grid-cols-2 gap-2.5">
+            <div className="mt-2 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               <button className="flex flex-col gap-1 rounded-[10px] border border-border bg-surface p-3 text-start hover:border-brand" onClick={() => actions.resolveLocationConflict("text")}>
                 <span className="flex items-center gap-1 text-[11px] font-bold text-muted"><Icon name="notes" size={14} /> {t.step1.location.fromText}</span>
                 <span className="text-[13.5px] font-bold">{loc.conflict.fromText}</span>
@@ -137,7 +136,12 @@ export function Step1Project() {
 
       {/* ---------- Timing & Hours (AC-13/14) ---------- */}
       <Card title={<><Icon name="schedule" size={18} className="me-1.5 align-[-3px] text-navy-mid" />{t.step1.timing.card}</>}>
-        <Field label={`${t.step1.timing.rentalBasis} (${t.common.required})`}>
+        <Field
+          label={t.step1.timing.rentalBasis}
+          required
+          missing={!project.timing.rentalBasis}
+          agent={agentMatches(project.timing.rentalBasis, ap?.timing.rentalBasis)}
+        >
           <div className="flex flex-wrap items-center gap-3">
             <Seg2<RentalBasis> value={project.timing.rentalBasis} onChange={(v) => actions.patchTiming({ rentalBasis: v })} options={opt(RENTAL_BASES, t.options.rentalBasis)} />
             <SelChips
@@ -150,13 +154,13 @@ export function Step1Project() {
         <p className="mt-1.5 text-xs text-muted">{t.step1.timing.quoteNote} {t.step1.timing.extendableHint}</p>
 
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Field label={t.step1.timing.startDate} optional>
+          <Field label={t.step1.timing.startDate} optional agent={agentMatches(project.timing.startDate, ap?.timing.startDate)}>
             <TextInput type="date" value={project.timing.startDate ?? ""} onChange={(e) => actions.patchTiming({ startDate: e.target.value || null })} />
           </Field>
-          <Field label={t.step1.timing.endDate} optional>
+          <Field label={t.step1.timing.endDate} optional agent={agentMatches(project.timing.endDate, ap?.timing.endDate)}>
             <TextInput type="date" value={project.timing.endDate ?? ""} onChange={(e) => actions.patchTiming({ endDate: e.target.value || null })} />
           </Field>
-          <Field label={t.step1.timing.hoursPerDay} optional>
+          <Field label={t.step1.timing.hoursPerDay} optional agent={agentMatches(project.timing.hoursPerDay, ap?.timing.hoursPerDay)}>
             <TextInput type="number" min={1} max={24} value={project.timing.hoursPerDay} onChange={(e) => actions.patchTiming({ hoursPerDay: Number(e.target.value) || 8 })} />
           </Field>
         </div>
@@ -165,13 +169,13 @@ export function Step1Project() {
       {/* ---------- Advanced (AC-15/27/28) — open by default ---------- */}
       <Card title={<><Icon name="tune" size={18} className="me-1.5 align-[-3px] text-navy-mid" />{t.step1.advanced.card} <span className="text-xs font-semibold text-muted">{t.common.optional}</span></>}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Field label={t.step1.advanced.workingDays}>
+          <Field label={t.step1.advanced.workingDays} agent={agentMatches(project.advanced.workingDaysPerWeek, ap?.advanced.workingDaysPerWeek)}>
             <Stepper value={project.advanced.workingDaysPerWeek} min={1} max={7} onChange={(v) => actions.patchAdvanced({ workingDaysPerWeek: v })} />
           </Field>
-          <Field label={t.step1.advanced.overtime}>
+          <Field label={t.step1.advanced.overtime} agent={agentMatches(project.advanced.overtimeRate, ap?.advanced.overtimeRate)}>
             <Seg2<OvertimeRate> value={project.advanced.overtimeRate} onChange={(v) => actions.patchAdvanced({ overtimeRate: v })} options={opt(OVERTIME_RATES, t.options.overtime)} />
           </Field>
-          <Field label={t.step1.advanced.equipmentYear} optional>
+          <Field label={t.step1.advanced.equipmentYear} optional agent={agentMatches(project.advanced.equipmentYear, ap?.advanced.equipmentYear)}>
             <Select<string>
               value={isCustomYear ? "customize" : ey}
               placeholder={t.options.equipmentYear.any}
@@ -185,28 +189,28 @@ export function Step1Project() {
             )}
           </Field>
         </div>
-        <div className="mt-4">
-          <Field label={t.step1.advanced.siteAccess} optional>
-            <SelChips<SiteAccessRestriction>
-              values={project.advanced.siteAccessRestrictions}
-              onToggle={(v) => actions.patchAdvanced({ siteAccessRestrictions: toggle(project.advanced.siteAccessRestrictions, v) })}
-              options={opt(SITE_ACCESS_RESTRICTIONS, t.options.siteAccess)}
-            />
-          </Field>
-        </div>
       </Card>
 
       {/* ---------- Certificates (AC-50) ---------- */}
       <Card title={<><Icon name="verified" size={18} className="me-1.5 align-[-3px] text-navy-mid" />{t.step1.certificates.card}</>}>
-        <Field label={t.step1.certificates.safety}>
+        <Field label={t.step1.certificates.safety} optional agent={agentMatches(project.certificates.safety, ap?.certificates.safety)}>
           <SelChips<SafetyCertificate>
             values={project.certificates.safety}
             onToggle={(v) => actions.setCertificates({ safety: toggle(project.certificates.safety, v) })}
             options={opt(SAFETY_CERTIFICATES, t.options.safetyCert)}
           />
+          {project.certificates.safety.includes("other") && (
+            <div className="mt-2">
+              <TextInput
+                placeholder={t.step1.certificates.otherSafetyPlaceholder}
+                value={project.certificates.safetyOther}
+                onChange={(e) => actions.setCertificates({ safetyOther: e.target.value })}
+              />
+            </div>
+          )}
         </Field>
         <div className="mt-4">
-          <Field label={t.step1.certificates.other}>
+          <Field label={t.step1.certificates.other} optional agent={agentMatches(project.certificates.other, ap?.certificates.other)}>
             <SelChips<OtherCertificate>
               values={project.certificates.other}
               onToggle={(v) => actions.setCertificates({ other: toggle(project.certificates.other, v) })}

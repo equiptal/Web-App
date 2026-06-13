@@ -57,7 +57,7 @@ export function PhoneEntry({ onCodeSent }: { onCodeSent: (phone: string) => void
         className="mt-[24px] flex w-full items-center justify-center gap-[7px] rounded-[10px] border border-brand bg-brand px-[24px] py-[13px] text-[14.5px] font-bold text-white transition hover:brightness-[1.04] disabled:opacity-50"
       >
         <span>{busy ? a.sending : a.sendCode}</span>
-        {!busy && <Icon name="arrow_forward" size={18} />}
+        {!busy && <Icon name="arrow_forward" size={18} className="rtl:scale-x-[-1]" />}
       </button>
 
       <div className="mt-[22px] text-center text-[13px] leading-[1.55] text-muted">{a.signInFoot}</div>

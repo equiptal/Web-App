@@ -8,7 +8,6 @@ import {
   defaultOperatorDetails,
   defaultOperatorNeeded,
   computeSummary,
-  SITE_ACCESS_RESTRICTIONS,
   SAFETY_CERTIFICATES,
   PAYMENT_TERMS,
   PAYMENT_METHODS,
@@ -20,7 +19,6 @@ import {
   type Verdict,
   type Party,
   type OperatorCertificate,
-  type SiteAccessRestriction,
   type OtherCertificate,
   type PaymentTerm,
   type PaymentMethod,
@@ -69,6 +67,12 @@ export function extractAgentOutput(raw: unknown): RFQAgentOutput {
       : Array.isArray(a.missing_required_fields)
         ? a.missing_required_fields
         : []) as MissingFieldEntry[],
+    // justifications sit beside `data` (sibling of missing_required_fields), so read b then a.
+    justifications: (Array.isArray(b.justifications)
+      ? b.justifications
+      : Array.isArray(a.justifications)
+        ? a.justifications
+        : []) as string[],
   };
 }
 
@@ -126,6 +130,7 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
       : [out.rfq_header?.project_address_label]
     ).filter(Boolean) as string[],
     summary: computeSummary(items),
+    justifications: out.justifications ?? [],
   };
 }
 
@@ -196,6 +201,12 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
   return {
     id: `a${idx}`,
     rawLabel: li.input_equipment ?? null,
+    // Keep the stated size verbatim so the preview can show it even when it didn't resolve to a
+    // measurement id (off-taxonomy "(new)" or unstated). Prefer the verbatim phrase; fall back to
+    // the agent's canonical capacity string, dropping the placeholder "Not Specified".
+    rawSize:
+      li.capacity_input_value ??
+      (li.capacity && li.capacity.toLowerCase() !== "not specified" ? li.capacity : null),
     ref,
     verdict,
     resolved,
@@ -210,7 +221,10 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
       nationality: li.operator_nationality ?? null,
       certificate: agentCert, // AC-24/50: operator license level / safety cert
       certByAgent: agentCert != null, // agent set it → project-level Safety cert won't override
-      transfer: li.fat_required ?? false, // AC-24: FAT / transfer
+      // AC-24: F.A.T — who covers the operator's Food/Accommodation/Transport. Mansour emits
+      // operator_accommodation_by_rentee (true = rentee/me, false = supplier); supplier only when
+      // explicitly false, else me (matches the default). Merges the old transfer+accommodation pair.
+      fat: li.operator_accommodation_by_rentee === false ? "supplier" : "me",
     },
     fuelType: (li.fuel_type_preference && FUEL_IN[li.fuel_type_preference]) || "diesel",
     additionalNotes: li.additional_notes ?? "", // AC-53: agent-extracted per-item notes (was dropped)
@@ -237,10 +251,6 @@ function toProject(h: RFQHeader): ProjectDetails {
   p.timing.hoursPerDay = h.working_hours_per_day ?? 8;
   p.advanced.workingDaysPerWeek = h.working_days_per_week ?? 6;
   p.advanced.overtimeRate = h.overtime_rate ? OVERTIME_IN[h.overtime_rate] ?? "without" : "without";
-  // AC-27: keep only restrictions that are valid UI options.
-  p.advanced.siteAccessRestrictions = (h.site_access_restrictions ?? [])
-    .map((r) => pick(r, SITE_ACCESS_RESTRICTIONS))
-    .filter(Boolean) as SiteAccessRestriction[];
   // AC-50: project "Other" certificates from the local-content / saso-registration flags.
   p.certificates.other = [
     h.local_content ? "local-content" : null,

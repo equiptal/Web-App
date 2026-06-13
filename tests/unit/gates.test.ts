@@ -6,6 +6,7 @@ function makeItem(over: Partial<EquipmentItem> = {}): EquipmentItem {
   return {
     id: "i1",
     rawLabel: null,
+    rawSize: null,
     ref: { categoryId: "cat", subcategoryId: "sub", measurementId: "cap" },
     verdict: "confident",
     resolved: true,

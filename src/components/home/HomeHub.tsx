@@ -43,19 +43,13 @@ export function HomeHub() {
             <p className="mt-2.5 max-w-[520px] text-[13.5px] leading-relaxed text-white/65">{t.home.bannerSubtitle}</p>
           </div>
 
-          {/* Buttons, aligned right */}
+          {/* Single entry into the RFQ input flow (web-app/002). */}
           <div className="flex flex-none flex-col gap-3 sm:flex-row lg:flex-col lg:items-stretch">
             <button
               onClick={() => router.push("/create")}
               className="inline-flex items-center justify-center gap-2 rounded-[12px] bg-brand px-6 py-3 text-[14px] font-semibold text-brand-fg transition hover:brightness-[1.04]"
             >
               <Icon name="add" size={16} /> {t.home.createRequest}
-            </button>
-            <button
-              onClick={() => router.push("/create")}
-              className="inline-flex items-center justify-center gap-2 rounded-[12px] border border-white/20 bg-white/10 px-5 py-3 text-[14px] font-medium text-white transition hover:bg-white/[.16]"
-            >
-              <Icon name="upload_file" size={16} /> {t.home.uploadRfq}
             </button>
           </div>
         </div>

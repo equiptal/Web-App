@@ -9,13 +9,11 @@ import { TaxonomyRef, EMPTY_REF } from "./taxonomy";
 import {
   RentalBasis,
   OvertimeRate,
-  SiteAccessRestriction,
   SafetyCertificate,
   OtherCertificate,
   Party,
   OperatorNeeded,
   OperatorCertificate,
-  Accommodation,
   FuelType,
   PaymentTerm,
   PaymentMethod,
@@ -49,11 +47,12 @@ export interface AdvancedSettings {
   workingDaysPerWeek: number; // AC-15 stepper 1–7, default 6
   overtimeRate: OvertimeRate; // AC-15 default "without"
   equipmentYear: string | null; // AC-28 "any" | "2020".."2026" | custom; optional
-  siteAccessRestrictions: SiteAccessRestriction[]; // AC-27 multi-select
 }
 
 export interface Certificates {
   safety: SafetyCertificate[]; // AC-50; a pick sets each item's operator certificate (AC-24)
+  /** web-app/002: free-text name when "other" is selected in `safety` (optional). */
+  safetyOther: string;
   other: OtherCertificate[]; // AC-50
 }
 
@@ -79,8 +78,9 @@ export interface OperatorDetails {
   /** AC-50: true when the agent set the cert per-item from the RFQ — the project-level Safety cert
    *  then leaves it untouched (only fills items the agent didn't mention). */
   certByAgent?: boolean;
-  transfer: boolean;
-  accommodation: Accommodation | null;
+  /** AC-24: F.A.T — who covers the operator's Food, Accommodation & Transport (supplier / me).
+   *  web-app/002 merged the old `accommodation` + `transfer` fields into this single choice. */
+  fat: Party | null;
 }
 
 /** AC-19/20: nearest-measurement + optional unit conversion the agent suggests. */
@@ -99,6 +99,12 @@ export interface EquipmentItem {
   id: string;
   /** Free-text label as it appeared in the RFQ (display aid). */
   rawLabel: string | null;
+  /**
+   * Verbatim capacity/size as stated in the RFQ (e.g. "30 ton", "2.5 m³"), kept even when it
+   * doesn't resolve to a taxonomy measurement id. Display fallback so a stated-but-off-taxonomy
+   * (or "Not Specified") size still shows instead of "—". null when the RFQ stated no size.
+   */
+  rawSize: string | null;
   ref: TaxonomyRef;
   verdict: Verdict; // from the agent
   /** AC-19: nearest-measurement suggestion when the RFQ measurement isn't in the taxonomy. */
@@ -159,6 +165,8 @@ export interface AgentDraft {
   detectedLocations: string[];
   /** AC-56: processing summary counts. */
   summary: ProcessingSummary;
+  /** Plain, conversational notes on values the agent assumed/inferred — shown to the renter to confirm. */
+  justifications?: string[];
 }
 
 export interface ProcessingSummary {
@@ -174,6 +182,8 @@ export interface RfqDraft {
   preferences: Preferences;
   detectedLocations: string[];
   summary: ProcessingSummary;
+  /** Plain, conversational notes on values the agent assumed/inferred — shown to the renter to confirm. */
+  justifications?: string[];
 }
 
 /** Posted to /api/requests (AC-42/43). Mirrors the shared app request shape. */
@@ -194,9 +204,8 @@ export function defaultProjectDetails(): ProjectDetails {
       workingDaysPerWeek: 6,
       overtimeRate: "without",
       equipmentYear: null,
-      siteAccessRestrictions: [],
     },
-    certificates: { safety: [], other: [] },
+    certificates: { safety: [], safetyOther: "", other: [] },
     deliveryToSite: "me",
     returnFromSite: "me",
     fuelResponsibility: "me",
@@ -214,7 +223,7 @@ export function defaultPreferences(): Preferences {
 }
 
 export function defaultOperatorDetails(): OperatorDetails {
-  return { nightShift: false, nationality: null, certificate: null, transfer: false, accommodation: null };
+  return { nightShift: false, nationality: null, certificate: null, fat: "me" };
 }
 
 /** Build a blank item (used when the renter adds a missed item — AC-22). */
@@ -222,6 +231,7 @@ export function newManualItem(id: string): EquipmentItem {
   return {
     id,
     rawLabel: null,
+    rawSize: null,
     ref: { ...EMPTY_REF },
     // Manually added: starts unresolved (Need-OK) with an empty match so the renter picks
     // category → subtype → size; it auto-resolves to Matched once the ref is complete (AC-22).

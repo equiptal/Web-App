@@ -72,13 +72,13 @@ export function EquipmentDetailModal({ equipmentId, onClose }: { equipmentId: st
                     onClick={() => setIdx((i) => (i - 1 + photos.length) % photos.length)}
                     className="absolute start-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-black/40 text-white"
                   >
-                    <Icon name="chevron_left" size={20} />
+                    <Icon name="chevron_left" size={20} className="rtl:scale-x-[-1]" />
                   </button>
                   <button
                     onClick={() => setIdx((i) => (i + 1) % photos.length)}
                     className="absolute end-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-black/40 text-white"
                   >
-                    <Icon name="chevron_right" size={20} />
+                    <Icon name="chevron_right" size={20} className="rtl:scale-x-[-1]" />
                   </button>
                   <span className="absolute end-2 top-2 rounded-full bg-black/50 px-2 py-0.5 text-[11px] font-bold text-white">
                     {idx + 1}/{photos.length}
