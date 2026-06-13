@@ -73,13 +73,15 @@ export function ItemRow({
   /* ----------------------------- No-match (AC-30/31/32) ----------------------------- */
   if (item.verdict === "no-match") {
     return (
-      <li className="grid grid-cols-[38px_1fr_auto] items-center gap-3 rounded-xl border border-s-[3px] border-border border-s-danger bg-surface px-4 py-3">
-        <Avatar glyph={glyph} conf="low" />
-        <div className="min-w-0">
-          <RfqMatch raw={rawDisplay} matched={<span className="text-danger">{t.step2.status.notAvailable}</span>} />
-          <p className="mt-1 text-xs text-muted">{t.step2.noMatch.explainer}</p>
+      <li className="rounded-xl border border-s-[3px] border-border border-s-danger bg-surface px-4 py-3">
+        <div className="flex items-start gap-3">
+          <Avatar glyph={glyph} conf="low" />
+          <div className="min-w-0 flex-1">
+            <RfqMatch raw={rawDisplay} matched={<span className="text-danger">{t.step2.status.notAvailable}</span>} />
+            <p className="mt-1 text-xs text-muted">{t.step2.noMatch.explainer}</p>
+          </div>
         </div>
-        <div className="flex gap-2">
+        <div className="mt-3 flex flex-wrap gap-2 sm:justify-end">
           <Button
             variant="secondary"
             onClick={() => {
@@ -113,7 +115,7 @@ export function ItemRow({
   );
 
   return (
-    <li className={`grid grid-cols-[38px_1fr_auto] items-start gap-3 rounded-xl border border-border bg-surface px-4 py-3 ${borderClass}`}>
+    <li className={`grid grid-cols-[38px_1fr] items-start gap-3 rounded-xl border border-border bg-surface px-4 py-3 sm:grid-cols-[38px_1fr_auto] ${borderClass}`}>
       <Avatar glyph={glyph} conf={status === "matched" ? "high" : "mid"} />
 
       <div className="min-w-0">
@@ -166,8 +168,8 @@ export function ItemRow({
         )}
       </div>
 
-      {/* Right: status + actions */}
-      <div className="flex flex-col items-end gap-2">
+      {/* Right: status + actions — side rail on desktop, full-width row below on mobile */}
+      <div className="col-span-2 flex flex-wrap items-center justify-end gap-2 sm:col-span-1 sm:flex-col sm:items-end">
         <StatusLabel status={status} t={t} />
         <div className="flex gap-1.5">
           {status === "needs-ok" ? (
@@ -293,13 +295,13 @@ function Avatar({ glyph, conf }: { glyph: string; conf: "high" | "mid" | "low" }
 function RfqMatch({ raw, matched }: { raw: string | null; matched: React.ReactNode }) {
   const t = useT();
   return (
-    <div className="flex items-center gap-3">
-      <span className="flex w-[120px] flex-none flex-col gap-0.5 sm:w-[200px]">
+    <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+      <span className="flex min-w-0 flex-col gap-0.5 sm:w-[200px] sm:flex-none">
         <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted">{t.step2.fromRfq}</span>
-        <span className="text-[15px] font-bold leading-tight break-words">{raw ? `“${raw}”` : "—"}</span>
+        <span className="break-words text-[15px] font-bold leading-tight">{raw ? `“${raw}”` : "—"}</span>
       </span>
-      <Icon name="arrow_forward" size={20} className="flex-none text-muted/60 rtl:scale-x-[-1]" />
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <Icon name="arrow_forward" size={20} className="hidden flex-none text-muted/60 rtl:scale-x-[-1] sm:block" />
+      <span className="flex min-w-0 flex-col gap-0.5 sm:flex-1">
         <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted">{t.step2.matchedTo}</span>
         <span className="break-words text-[15px] font-extrabold leading-tight">{matched}</span>
       </span>
