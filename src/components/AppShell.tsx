@@ -60,7 +60,8 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
       <aside className="hidden w-[232px] flex-none flex-col self-start bg-navy px-3.5 py-5 text-white md:flex md:sticky md:top-0 md:h-screen md:overflow-y-auto">
         <div className="flex items-center gap-2.5 px-2 pb-[18px] text-[17px] font-extrabold tracking-tight">
           <span className="grid h-9 w-9 flex-none place-items-center rounded-[9px] border border-white/[.16] bg-white/10">
-            <Icon name="precision_manufacturing" size={20} className="text-white" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/moedatech-logomark.svg" alt="Moedatech" className="h-6 w-6 object-contain" />
           </span>
           <span>
             MOEDA<span className="text-brand">TECH</span>

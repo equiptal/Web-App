@@ -29,7 +29,8 @@ export function OnboardingShell({ step, children }: { step: 1 | 2; children: Rea
       <div className="flex h-[60px] items-center justify-between border-b border-border bg-surface px-6">
         <div className="flex items-center gap-2 text-[16px] font-extrabold tracking-tight">
           <span className="grid h-8 w-8 place-items-center rounded-[8px] bg-navy">
-            <Icon name="precision_manufacturing" className="text-white" size={18} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/moedatech-logomark.svg" alt="Moedatech" className="h-5 w-5 object-contain" />
           </span>
           MOEDA<span className="text-brand">TECH</span>
         </div>
