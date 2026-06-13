@@ -63,9 +63,9 @@ export function HomeHub() {
 
       {/* Activity cards — no web data/pages yet (future epics) → coming-soon */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <ActivityCard accent="brand" icon="assignment" title={t.home.yourRequests} sub={t.home.reqSub} statLabel={t.home.reqStat} />
-        <ActivityCard accent="info" icon="gavel" title={t.home.priceBids} sub={t.home.bidsSub} statLabel={t.home.bidsStat} />
-        <ActivityCard accent="ok" icon="handshake" title={t.home.completedDeals} sub={t.home.dealsSub} statLabel={t.home.dealsStat} />
+        <ActivityCard accent="brand" icon="assignment" title={t.home.yourRequests} sub={t.home.reqSub} />
+        <ActivityCard accent="info" icon="gavel" title={t.home.priceBids} sub={t.home.bidsSub} />
+        <ActivityCard accent="ok" icon="handshake" title={t.home.completedDeals} sub={t.home.dealsSub} />
       </div>
 
       {/* Suggested suppliers — filter bar always shown; View all only adds cards (AC-05/10/11/12/13) */}
@@ -85,13 +85,11 @@ function ActivityCard({
   icon,
   title,
   sub,
-  statLabel,
 }: {
   accent: "brand" | "info" | "ok";
   icon: string;
   title: string;
   sub: string;
-  statLabel: string;
 }) {
   const t = useT();
   const c = ACCENT[accent];
@@ -106,15 +104,6 @@ function ActivityCard({
       <div>
         <div className="text-[15px] font-bold text-navy">{title}</div>
         <div className="mt-0.5 text-[12px] text-muted">{sub}</div>
-      </div>
-      <div className="flex items-center justify-between border-t border-surface2 pt-2.5">
-        <div>
-          <div className="text-[13px] font-medium tracking-wide text-border">— —</div>
-          <div className="mt-0.5 text-[11px] uppercase tracking-wide text-muted">{statLabel}</div>
-        </div>
-        <span className="grid h-8 w-8 place-items-center rounded-full border border-border bg-surface2 text-muted">
-          <Icon name="chevron_right" size={14} className="rtl:scale-x-[-1]" />
-        </span>
       </div>
       <div className={`absolute inset-x-0 bottom-0 h-[3px] opacity-0 transition group-hover:opacity-100 ${c.bar}`} />
     </div>

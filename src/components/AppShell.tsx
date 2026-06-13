@@ -85,7 +85,13 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top bar — AC-03 */}
         <header className="sticky top-0 z-30 flex h-[62px] items-center gap-4 border-b border-border bg-surface px-7">
-          <b className="truncate text-[19px] font-extrabold tracking-[-.4px] text-navy">{title ?? greeting}</b>
+          <b className="truncate text-[19px] font-extrabold tracking-[-.4px] text-navy">
+            {title ?? (
+              <>
+                {greeting} <span className="wave-emoji">👋</span>
+              </>
+            )}
+          </b>
 
           <div className="ms-auto flex items-center gap-3 text-[13px] font-semibold text-navy-mid">
             <span className="inline-flex overflow-hidden rounded-md border border-border">

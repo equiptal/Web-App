@@ -72,3 +72,15 @@ body {
 .tabular {
   font-family: var(--font-plex), monospace;
 }
+
+/* Waving hand for the home greeting — plays a couple of times on first land. */
+@keyframes wave {
+  0%, 60%, 100% { transform: rotate(0deg); }
+  10%, 30%, 50% { transform: rotate(14deg); }
+  20%, 40% { transform: rotate(-8deg); }
+}
+.wave-emoji {
+  display: inline-block;
+  transform-origin: 70% 70%;
+  animation: wave 2.2s ease 0.3s 2;
+}
