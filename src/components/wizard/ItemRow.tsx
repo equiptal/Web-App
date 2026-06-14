@@ -49,8 +49,11 @@ export function ItemRow({
   const { state, actions } = useRfq();
   const ai = state.agentOrigin?.items.find((i) => i.id === item.id); // agent's original item, for the AI marker
   // Agent's per-field note for THIS item (dotted path "line_items[<agentIdx>].<field>"); "" for manual items.
+  // Cleared once the item is resolved (the renter approved it) — and per-field via agentMatches when edited.
   const fn = (f: string) =>
-    item.id.startsWith("a") && /^\d+$/.test(item.id.slice(1)) ? state.draft?.fieldNotes?.[`line_items[${item.id.slice(1)}].${f}`] : undefined;
+    item.resolved || !(item.id.startsWith("a") && /^\d+$/.test(item.id.slice(1)))
+      ? undefined
+      : state.draft?.fieldNotes?.[`line_items[${item.id.slice(1)}].${f}`];
   const [editingMatch, setEditingMatch] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -134,8 +137,8 @@ export function ItemRow({
             })}
           </div>
         )}
-        {/* Agent's free-text capacity advisory (real Mansour output, AC-19/20) */}
-        {item.advisory && !item.suggestion?.unitConversion && (
+        {/* Agent's free-text capacity advisory (real Mansour output, AC-19/20) — clears once approved. */}
+        {item.advisory && !item.suggestion?.unitConversion && !item.resolved && (
           <div className="mt-1.5 flex items-center gap-1.5 text-[11.5px] font-semibold text-warn">
             <Icon name="swap_horiz" size={14} /> {item.advisory}
           </div>
