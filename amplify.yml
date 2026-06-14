@@ -1,0 +1,22 @@
+# AWS Amplify build spec — matches how the Moedatech admin panel (apps/c-hub) is hosted.
+# This is a standalone Next.js (SSR) repo, so the build runs at the repo root (no monorepo appRoot).
+# Environment variables (MANSOUR_URL / AGENTS_API_URL / AGENTS_API_TOKEN) are set per-branch in the
+# Amplify console — never committed. See .env.example for the full list.
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci
+    build:
+      commands:
+        - env | grep -E '^(MANSOUR_URL|AGENTS_API_URL)=' || true   # token intentionally not logged
+        - npm run build
+  artifacts:
+    baseDirectory: .next
+    files:
+      - "**/*"
+  cache:
+    paths:
+      - node_modules/**/*
+      - .next/cache/**/*
