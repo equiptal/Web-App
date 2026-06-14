@@ -96,9 +96,11 @@ export interface RFQAgentOutput {
   rfq_header: RFQHeader;
   line_items: RFQLineItem[];
   missing_required_fields: MissingFieldEntry[];
-  /** Short, plain, conversational notes on values the agent assumed/inferred, in the renter's
-   *  language (location vagueness, responsibility assumptions, size auto-fill, fuel default). */
+  /** DEPRECATED flat conversational notes (lumped Step-4 box). Prefer field_notes. */
   justifications?: string[];
+  /** Field-keyed notes on values the agent assumed/inferred — { field, note } keyed by dotted path
+   *  ("rfq_header.<name>" | "line_items[<i>].<name>"). Rendered inline beside each field. */
+  field_notes?: { field: string; note: string }[];
 }
 
 /** Request body for `POST /rfq` and `POST /rfq/jobs`. Attachments are base64 (no `data:` prefix). */

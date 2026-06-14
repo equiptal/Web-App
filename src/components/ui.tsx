@@ -114,6 +114,7 @@ export function AgentMark({ className = "" }: { className?: string }) {
 export function Field({
   label,
   hint,
+  note,
   optional,
   agent,
   required,
@@ -122,6 +123,9 @@ export function Field({
 }: {
   label: ReactNode;
   hint?: ReactNode;
+  /** Agent's note for this field — shown (info-styled) ONLY while `agent` is true, i.e. the value
+   *  still holds what the agent assumed; it clears the moment the renter edits. Dynamic by design. */
+  note?: ReactNode;
   optional?: boolean;
   /** AC: value was filled by the AI agent (orange badge). */
   agent?: boolean;
@@ -146,6 +150,11 @@ export function Field({
         {missing && <span className="text-[10px] font-semibold lowercase text-danger">{t.common.missing}</span>}
       </span>
       {children}
+      {agent && note && (
+        <span className="mt-1 flex items-start gap-1.5 text-[12px] leading-snug text-info">
+          <Icon name="lightbulb" size={13} className="mt-[1.5px] flex-none" /> {note}
+        </span>
+      )}
       {hint && <span className="mt-1 block text-xs text-muted">{hint}</span>}
     </label>
   );

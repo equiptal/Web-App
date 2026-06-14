@@ -73,6 +73,11 @@ export function extractAgentOutput(raw: unknown): RFQAgentOutput {
       : Array.isArray(a.justifications)
         ? a.justifications
         : []) as string[],
+    field_notes: (Array.isArray(b.field_notes)
+      ? b.field_notes
+      : Array.isArray(a.field_notes)
+        ? a.field_notes
+        : []) as { field: string; note: string }[],
   };
 }
 
@@ -126,6 +131,11 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
     project.certificates.safety = [certs[0]];
     for (const i of items) i.operator.certByAgent = false;
   }
+  // Field-keyed agent notes (dotted path → note) for inline rendering beside each field.
+  const fieldNotes: Record<string, string> = {};
+  for (const fn of out.field_notes ?? []) {
+    if (fn?.field && typeof fn.note === "string" && fn.note.trim()) fieldNotes[fn.field] = fn.note.trim();
+  }
   return {
     project,
     items,
@@ -138,6 +148,7 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
     ).filter(Boolean) as string[],
     summary: computeSummary(items),
     justifications: out.justifications ?? [],
+    fieldNotes,
   };
 }
 

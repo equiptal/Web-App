@@ -48,6 +48,9 @@ export function ItemRow({
   const t = useT();
   const { state, actions } = useRfq();
   const ai = state.agentOrigin?.items.find((i) => i.id === item.id); // agent's original item, for the AI marker
+  // Agent's per-field note for THIS item (dotted path "line_items[<agentIdx>].<field>"); "" for manual items.
+  const fn = (f: string) =>
+    item.id.startsWith("a") && /^\d+$/.test(item.id.slice(1)) ? state.draft?.fieldNotes?.[`line_items[${item.id.slice(1)}].${f}`] : undefined;
   const [editingMatch, setEditingMatch] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -103,7 +106,7 @@ export function ItemRow({
       <Field label={t.step2.category} required missing={!item.ref.categoryId} agent={agentMatches(item.ref.categoryId, ai?.ref.categoryId)}>
         <Select value={item.ref.categoryId} placeholder={t.step2.pickCategory} onChange={(v) => actions.setItemCategory(item.id, v)} options={taxonomy.map((c) => ({ value: c.id, label: c.name }))} />
       </Field>
-      <Field label={t.step2.subcategory} required missing={!item.ref.subcategoryId} agent={agentMatches(item.ref.subcategoryId, ai?.ref.subcategoryId)}>
+      <Field label={t.step2.subcategory} required missing={!item.ref.subcategoryId} agent={agentMatches(item.ref.subcategoryId, ai?.ref.subcategoryId)} note={fn("subtype")}>
         <Select value={item.ref.subcategoryId} placeholder={t.step2.pickSubcategory} disabled={!category} onChange={(v) => actions.setItemSubcategory(item.id, v)} options={(category?.subcategories ?? []).map((s) => ({ value: s.id, label: s.name }))} />
       </Field>
       <Field label={t.step2.measurement} required missing={!item.ref.measurementId} agent={agentMatches(item.ref.measurementId, ai?.ref.measurementId)}>
@@ -232,7 +235,7 @@ export function ItemRow({
                 <ChipField label={t.step2.perItem.certificate} agent={agentMatches(item.operator.certificate, ai?.operator.certificate)}>
                   <Pchips<OperatorCertificate> value={item.operator.certificate} onChange={(v) => actions.patchItemOperator(item.id, { certificate: v })} options={opt(OPERATOR_CERTIFICATES, t.options.safetyCert)} />
                 </ChipField>
-                <ChipField label={t.step2.perItem.fat} agent={agentMatches(item.operator.fat, ai?.operator.fat)}>
+                <ChipField label={t.step2.perItem.fat} agent={agentMatches(item.operator.fat, ai?.operator.fat)} note={fn("operator_accommodation_by_rentee")}>
                   <Pchips<Party> value={item.operator.fat} onChange={(v) => actions.patchItemOperator(item.id, { fat: v })} options={opt(PARTIES, t.options.party)} />
                 </ChipField>
               </div>
@@ -241,10 +244,10 @@ export function ItemRow({
 
           {/* Fuel (AC-26) */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <ChipField label={t.step2.perItem.fuelType} agent={agentMatches(item.fuelType, ai?.fuelType)}>
+            <ChipField label={t.step2.perItem.fuelType} agent={agentMatches(item.fuelType, ai?.fuelType)} note={fn("fuel_type_preference")}>
               <Pchips<FuelType> value={item.fuelType} onChange={(v) => actions.patchItem(item.id, { fuelType: v })} options={opt(FUEL_TYPES, t.options.fuelType)} />
             </ChipField>
-            <ChipField label={t.step1.requestWide.fuelResponsibility} agent={agentMatches(item.fuelResponsibilityOverride, ai?.fuelResponsibilityOverride)}>
+            <ChipField label={t.step1.requestWide.fuelResponsibility} agent={agentMatches(item.fuelResponsibilityOverride, ai?.fuelResponsibilityOverride)} note={fn("diesel_included")}>
               <Pchips<Party> value={item.fuelResponsibilityOverride ?? sharedFuelResp} onChange={(v) => actions.patchItem(item.id, { fuelResponsibilityOverride: v })} options={opt(PARTIES, t.options.party)} />
             </ChipField>
           </div>
@@ -252,10 +255,10 @@ export function ItemRow({
           {/* Delivery / Return — per-item override of the request-wide setting (AC-25). Mansour sets
               these per line (mobilization/demobilization), so surface + allow editing them here. */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <ChipField label={t.step1.requestWide.delivery} agent={agentMatches(item.deliveryOverride, ai?.deliveryOverride)}>
+            <ChipField label={t.step1.requestWide.delivery} agent={agentMatches(item.deliveryOverride, ai?.deliveryOverride)} note={fn("mobilization_by_rentee")}>
               <Pchips<Party> value={item.deliveryOverride ?? sharedDelivery} onChange={(v) => actions.patchItem(item.id, { deliveryOverride: v })} options={opt(PARTIES, t.options.party)} />
             </ChipField>
-            <ChipField label={t.step1.requestWide.return} agent={agentMatches(item.returnOverride, ai?.returnOverride)}>
+            <ChipField label={t.step1.requestWide.return} agent={agentMatches(item.returnOverride, ai?.returnOverride)} note={fn("demobilization_by_rentee")}>
               <Pchips<Party> value={item.returnOverride ?? sharedReturn} onChange={(v) => actions.patchItem(item.id, { returnOverride: v })} options={opt(PARTIES, t.options.party)} />
             </ChipField>
           </div>
@@ -334,7 +337,7 @@ function MetaTag({ icon, label, value }: { icon: string; label: string; value: s
   );
 }
 
-function ChipField({ label, agent, children }: { label: string; agent?: boolean; children: React.ReactNode }) {
+function ChipField({ label, agent, note, children }: { label: string; agent?: boolean; note?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
       <span className="mb-1.5 flex items-center gap-2 text-[11.5px] font-bold text-navy-mid">
@@ -342,6 +345,13 @@ function ChipField({ label, agent, children }: { label: string; agent?: boolean;
         {agent && <AgentMark />}
       </span>
       {children}
+      {/* Agent's note — shown only while the field still holds the agent's value (agent=true),
+          so it disappears the moment the renter changes the selection. */}
+      {agent && note && (
+        <p className="mt-1 flex items-start gap-1.5 text-[12px] leading-snug text-info">
+          <Icon name="lightbulb" size={13} className="mt-[1.5px] flex-none" /> {note}
+        </p>
+      )}
     </div>
   );
 }

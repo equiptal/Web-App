@@ -79,6 +79,15 @@ export function Step1Project() {
               {loc.source === "agent" && <span className="rounded-md border border-border bg-surface2 px-2 py-0.5 text-[11px] font-bold text-navy-mid">{t.step1.location.extractedFrom}</span>}
             </div>
 
+            {/* Agent's location note — shown while it's still the agent's pin and unconfirmed; clears
+                once the renter moves the pin (source→map) or confirms. */}
+            {loc.source === "agent" && !loc.confirmed && state.draft?.fieldNotes?.["rfq_header.project_address_label"] && (
+              <p className="mb-3 flex items-start gap-1.5 text-[12px] leading-snug text-info">
+                <Icon name="lightbulb" size={14} className="mt-[1.5px] flex-none" />
+                {state.draft.fieldNotes["rfq_header.project_address_label"]}
+              </p>
+            )}
+
             <MapLocationPicker
               value={loc.lat != null && loc.lng != null ? { lat: loc.lat, lng: loc.lng } : null}
               label={loc.label}
@@ -141,6 +150,7 @@ export function Step1Project() {
           required
           missing={!project.timing.rentalBasis}
           agent={agentMatches(project.timing.rentalBasis, ap?.timing.rentalBasis)}
+          note={state.draft?.fieldNotes?.["rfq_header.rental_type"]}
         >
           <div className="flex flex-wrap items-center gap-3">
             <Seg2<RentalBasis> value={project.timing.rentalBasis} onChange={(v) => actions.patchTiming({ rentalBasis: v })} options={opt(RENTAL_BASES, t.options.rentalBasis)} />

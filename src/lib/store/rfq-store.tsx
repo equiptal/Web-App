@@ -159,6 +159,7 @@ function reducer(state: RfqState, a: Action): RfqState {
           detectedLocations: a.draft.detectedLocations,
           summary: a.draft.summary,
           justifications: a.draft.justifications ?? [],
+          fieldNotes: a.draft.fieldNotes ?? {},
         },
         // Snapshot the agent's values (refs are safe — all edits are immutable copies).
         agentOrigin: { project: a.draft.project, items: a.draft.items },

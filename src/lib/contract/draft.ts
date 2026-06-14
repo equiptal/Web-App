@@ -169,8 +169,10 @@ export interface AgentDraft {
   detectedLocations: string[];
   /** AC-56: processing summary counts. */
   summary: ProcessingSummary;
-  /** Plain, conversational notes on values the agent assumed/inferred — shown to the renter to confirm. */
+  /** DEPRECATED flat notes (lumped Step-4 box). Prefer fieldNotes. */
   justifications?: string[];
+  /** Field-keyed agent notes (dotted path → note), rendered inline beside each field. */
+  fieldNotes?: Record<string, string>;
 }
 
 export interface ProcessingSummary {
@@ -186,8 +188,10 @@ export interface RfqDraft {
   preferences: Preferences;
   detectedLocations: string[];
   summary: ProcessingSummary;
-  /** Plain, conversational notes on values the agent assumed/inferred — shown to the renter to confirm. */
+  /** DEPRECATED flat notes (lumped Step-4 box). Prefer fieldNotes. */
   justifications?: string[];
+  /** Field-keyed agent notes (dotted path → note), rendered inline beside each field. */
+  fieldNotes?: Record<string, string>;
 }
 
 /** Posted to /api/requests (AC-42/43). Mirrors the shared app request shape. */
