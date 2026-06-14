@@ -104,6 +104,13 @@ export function jobStatus(raw: unknown): "pending" | "done" | "error" {
  */
 export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
   const items = (out.line_items ?? []).map((li, idx) => toItem(li, idx));
+  // Surface the agent's per-item capacity guidance (the question it raised for an unresolved size)
+  // next to "pick a size to approve". Keyed by the same line-item index toItem used (id "a<idx>").
+  const mrf = out.missing_required_fields ?? [];
+  items.forEach((it, idx) => {
+    const cap = mrf.find((m) => m?.field === `line_items[${idx}].capacity`);
+    if (cap?.question_for_customer) it.sizeNote = cap.question_for_customer;
+  });
   const project = toProject(out.rfq_header ?? {});
   // AC-25/26: reconcile the agent's per-item mob/demob/fuel-responsibility with the request-wide
   // "Settings for all items": all items same → lift to request-wide + clear the per-item overrides;
