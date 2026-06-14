@@ -1,19 +1,17 @@
 "use client";
 
 import { useRfq } from "@/lib/store/rfq-store";
-import { useSession } from "@/lib/session";
-import { GuestBlock } from "@/components/screens/GuestBlock";
 import { Intake } from "@/components/screens/Intake";
 import { Processing } from "@/components/screens/Processing";
 import { Confirmation } from "@/components/screens/Confirmation";
 import { Wizard } from "@/components/wizard/Wizard";
 
+/**
+ * The RFQ create surface. Guests can now run the WHOLE flow — the account gate moved to Submit
+ * (Step 4): a guest who posts is shown the account-creation modal, then the request auto-submits.
+ */
 export function CreateSurface() {
   const { state } = useRfq();
-  const { canCreate } = useSession();
-
-  // Flow 4 (AC-02/03): guest tier is blocked at entry, before reaching the RFQ intake.
-  if (!canCreate) return <GuestBlock />;
 
   switch (state.phase) {
     case "intake":

@@ -57,10 +57,10 @@ const FUEL_MAP: Record<string, CreateRequestItem["fuelTypePreference"]> = {
 };
 
 /**
- * AC-28: UI equipmentYear ("any" | "2020".."2026" | "custom:<year>") → the backend's
- * `maxEquipmentAge`, which despite its name stores a minimum MANUFACTURE YEAR, not an age (it must
- * match mobile-created rows — see ALIGNMENT rule 4 / equipment_step.dart). Returns the integer year,
- * or undefined for "any"/unset/unparseable. Tolerates a trailing "+" (mobile chips carry it).
+ * AC-28: UI equipmentYear ("any" | "2015+".."2022+") → the backend's `maxEquipmentAge`, which
+ * despite its name stores a minimum MANUFACTURE YEAR, not an age (it must match mobile-created rows
+ * — see ALIGNMENT rule 4 / equipment_step.dart). Returns the integer year, or undefined for
+ * "any"/unset/unparseable. Tolerates the trailing "+" the mobile chips carry.
  */
 function toManufactureYear(equipmentYear: string | null): number | undefined {
   if (!equipmentYear || equipmentYear === "any") return undefined;
@@ -87,11 +87,13 @@ const OVERTIME_MAP: Record<string, CreateRequestPayload["overtimeRate"]> = {
   "2x": "2X",
 };
 
-/** AC-37: UI maintenance SLA → §4.2 enum. "custom" has no enum slot → omitted. */
+/** AC-37: UI maintenance SLA → §4.2 enum (matches the app's breakdown_response_sla values). */
 const SLA_MAP: Record<string, CreateRequestPayload["breakdownResponseSla"]> = {
   "4h": "FOUR_HR",
   "8h": "EIGHT_HR",
   "24h": "TWENTY_FOUR_HR",
+  "48h": "FORTY_EIGHT_HR",
+  "72h": "SEVENTY_TWO_HR",
 };
 
 /**

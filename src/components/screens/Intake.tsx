@@ -69,8 +69,8 @@ export function Intake() {
       <p className="mt-1 text-[13.5px] text-muted">{t.intake.subheading}</p>
 
       {/* Mode option cards (AC-01) */}
-      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {/* Upload / Paste — the active mode */}
+      <div className="mt-5">
+        {/* Upload / Paste — the only mode (manual entry removed) */}
         <div className="flex items-start gap-3 rounded-[14px] border-2 border-brand bg-brand-soft p-4">
           <span className="grid h-11 w-11 flex-none place-items-center rounded-[10px] bg-brand text-white">
             <Icon name="upload" size={22} />
@@ -86,19 +86,6 @@ export function Intake() {
           </div>
         </div>
 
-        {/* Fill Manually — coming soon */}
-        <div className="flex items-start gap-3 rounded-[14px] border border-border bg-surface p-4 opacity-80">
-          <span className="grid h-11 w-11 flex-none place-items-center rounded-[10px] bg-surface2 text-muted">
-            <Icon name="edit_note" size={22} />
-          </span>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <b className="text-[14px] font-bold text-navy">{t.intake.optManualTitle}</b>
-              <span className="rounded-full bg-surface2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">{t.intake.comingSoon}</span>
-            </div>
-            <p className="mt-1 text-[12.5px] leading-relaxed text-muted">{t.intake.optManualDesc}</p>
-          </div>
-        </div>
       </div>
 
       {/* Paste + attach card */}

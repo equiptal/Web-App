@@ -148,6 +148,7 @@ export async function withAuthedBackend(
   const refreshToken = jar.get(REFRESH_COOKIE)?.value;
   const locale = localeFromRequest(req);
   let refreshed: { accessToken: string; idToken?: string; expiresIn?: number } | null = null;
+  let switchedToRentee = false; // one-time guard for the E9009 → switch-to-rentee retry
 
   // No live id token but a refresh token → refresh up-front.
   if (!bearer && refreshToken) {
@@ -170,6 +171,18 @@ export async function withAuthedBackend(
         if (!refreshed?.idToken) throw err;
         bearer = refreshed.idToken;
         return await rawCall<T>(path, init, bearer, locale);
+      }
+      // This is the renter web app, so every authed endpoint runs as rentee. The backend's activeRole
+      // is sticky (the account may have last been in supplier mode), so a rentee-guarded endpoint can
+      // return E9009 ACTIVE_ROLE_REQUIRED (403). Flip the account to rentee once, then retry.
+      if (err instanceof AppAuthError && err.code === "E9009" && !switchedToRentee) {
+        switchedToRentee = true;
+        try {
+          await rawCall("/users/me/role", { method: "PUT", body: JSON.stringify({ role: "rentee" }) }, bearer as string, locale);
+        } catch {
+          throw err; // couldn't switch → surface the original forbidden error
+        }
+        return await rawCall<T>(path, init, bearer as string, locale);
       }
       throw err;
     }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import type { EquipmentDetail } from "@/lib/contract/stores";
@@ -14,7 +13,6 @@ import type { EquipmentDetail } from "@/lib/contract/stores";
  */
 export function EquipmentDetailModal({ equipmentId, onClose }: { equipmentId: string; onClose: () => void }) {
   const t = useT();
-  const router = useRouter();
   const { locale } = useLocale();
   const ar = locale === "ar";
   const [eq, setEq] = useState<EquipmentDetail | null>(null);
@@ -143,17 +141,6 @@ export function EquipmentDetailModal({ equipmentId, onClose }: { equipmentId: st
           </div>
         )}
 
-        {/* Request CTA */}
-        {eq && (
-          <div className="border-t border-border p-4">
-            <button
-              onClick={() => router.push("/create")}
-              className="flex w-full items-center justify-center gap-2 rounded-[10px] bg-gradient-to-br from-brand to-[#FFA733] py-3 text-[14px] font-extrabold text-white shadow-[0_8px_20px_rgba(247,144,9,.28)]"
-            >
-              <Icon name="send" size={18} /> {t.store.requestThis}
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );
