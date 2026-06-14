@@ -171,7 +171,7 @@ export function Step1Project() {
             <TextInput type="date" value={project.timing.endDate ?? ""} onChange={(e) => actions.patchTiming({ endDate: e.target.value || null })} />
           </Field>
           <Field label={t.step1.timing.hoursPerDay} optional agent={agentMatches(project.timing.hoursPerDay, ap?.timing.hoursPerDay)}>
-            <TextInput type="number" min={1} max={24} value={project.timing.hoursPerDay} onChange={(e) => actions.patchTiming({ hoursPerDay: Number(e.target.value) || 8 })} />
+            <TextInput type="number" min={1} max={24} value={project.timing.hoursPerDay} onChange={(e) => actions.patchTiming({ hoursPerDay: Number(e.target.value) || 10 })} />
           </Field>
         </div>
       </Card>

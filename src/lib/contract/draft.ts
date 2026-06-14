@@ -40,7 +40,7 @@ export interface TimingHours {
   extendable: boolean; // AC-13 flag on the chosen basis
   startDate: string | null; // AC-14 optional, bypassable
   endDate: string | null; // AC-14 optional
-  hoursPerDay: number; // AC-14 default 8
+  hoursPerDay: number; // AC-14 default 10
 }
 
 export interface AdvancedSettings {
@@ -207,7 +207,7 @@ export interface RfqRequestPayload {
 export function defaultProjectDetails(): ProjectDetails {
   return {
     location: { label: null, confirmed: false },
-    timing: { rentalBasis: null, extendable: false, startDate: null, endDate: null, hoursPerDay: 8 },
+    timing: { rentalBasis: null, extendable: false, startDate: null, endDate: null, hoursPerDay: 10 },
     advanced: {
       workingDaysPerWeek: 6,
       overtimeRate: "without",

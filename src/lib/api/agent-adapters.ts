@@ -276,7 +276,7 @@ function toProject(h: RFQHeader): ProjectDetails {
   p.timing.extendable = h.extendable ?? false; // AC-13 (was dropped)
   p.timing.startDate = h.start_date ?? null;
   p.timing.endDate = h.end_date ?? null;
-  p.timing.hoursPerDay = h.working_hours_per_day ?? 8;
+  p.timing.hoursPerDay = h.working_hours_per_day ?? 10;
   p.advanced.workingDaysPerWeek = h.working_days_per_week ?? 6;
   p.advanced.overtimeRate = h.overtime_rate ? OVERTIME_IN[h.overtime_rate] ?? "without" : "without";
   // AC-50: project "Other" certificates from the local-content / saso-registration flags.
