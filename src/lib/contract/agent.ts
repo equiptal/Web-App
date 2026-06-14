@@ -57,6 +57,9 @@ export interface RFQHeader {
   project_lng?: number | null;
   project_address_label?: string | null;
   detected_locations?: string[] | null; // AC-48: every distinct site Mansour found
+  /** AC-47: cross-source disagreements. Each entry: a dotted field path + candidates labelled by
+   *  source ("pasted text" / "file:<name>"). The web renders a pick-one resolver (location today). */
+  conflicts?: { field: string; candidates: { value: string; source: string }[] }[] | null;
   working_hours_per_day?: number | null;
   working_days_per_week?: number | null;
   overtime_rate?: AgentOvertimeRate | null;

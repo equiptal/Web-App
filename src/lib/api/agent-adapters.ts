@@ -255,12 +255,22 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
 
 function toProject(h: RFQHeader): ProjectDetails {
   const p = defaultProjectDetails();
+  // AC-47: map an agent location conflict (text↔file) into the renter's pick-one resolver.
+  // The agent labels candidates "pasted text" vs "file:<name>"; collapse to fromText/fromFile.
+  const locConflict = (h.conflicts ?? []).find((c) => c?.field === "rfq_header.project_address_label");
+  let conflict: ProjectDetails["location"]["conflict"];
+  if (locConflict && Array.isArray(locConflict.candidates) && locConflict.candidates.length >= 2) {
+    const fromText = locConflict.candidates.find((c) => !/^file:/i.test(c.source))?.value;
+    const fromFile = locConflict.candidates.find((c) => /^file:/i.test(c.source))?.value;
+    if (fromText && fromFile) conflict = { fromText, fromFile };
+  }
   p.location = {
     label: h.project_address_label ?? null,
     lat: h.project_lat ?? undefined,
     lng: h.project_lng ?? undefined,
     confirmed: false, // AC-16: always re-confirmed by the renter, even when extracted
     source: "agent",
+    conflict, // AC-47: unresolved conflict → Step 1 shows the From-text/From-file picker
   };
   p.timing.rentalBasis = h.rental_type ? RENTAL_IN[h.rental_type] ?? null : null;
   p.timing.extendable = h.extendable ?? false; // AC-13 (was dropped)
