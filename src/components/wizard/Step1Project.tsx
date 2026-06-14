@@ -40,7 +40,6 @@ export function Step1Project() {
   const multi = state.draft!.detectedLocations.filter(Boolean);
   const ap = state.agentOrigin?.project; // agent's original values, for the orange "AI" marker
   const ey = project.advanced.equipmentYear;
-  const isCustomYear = !!ey && ey.startsWith("custom:");
 
   return (
     <div className="space-y-4">
@@ -177,16 +176,11 @@ export function Step1Project() {
           </Field>
           <Field label={t.step1.advanced.equipmentYear} optional agent={agentMatches(project.advanced.equipmentYear, ap?.advanced.equipmentYear)}>
             <Select<string>
-              value={isCustomYear ? "customize" : ey}
+              value={ey}
               placeholder={t.options.equipmentYear.any}
-              onChange={(v) => actions.patchAdvanced({ equipmentYear: v === "customize" ? "custom:" : v })}
-              options={[...[...EQUIPMENT_YEARS].map((y) => ({ value: y, label: y === "any" ? t.options.equipmentYear.any : y })), { value: "customize", label: t.step1.advanced.customize }]}
+              onChange={(v) => actions.patchAdvanced({ equipmentYear: v })}
+              options={EQUIPMENT_YEARS.map((y) => ({ value: y, label: y === "any" ? t.options.equipmentYear.any : y }))}
             />
-            {isCustomYear && (
-              <div className="mt-2">
-                <TextInput type="number" min={1980} max={2026} placeholder="YYYY" value={ey.slice("custom:".length)} onChange={(e) => actions.patchAdvanced({ equipmentYear: e.target.value ? `custom:${e.target.value}` : "custom:" })} />
-              </div>
-            )}
           </Field>
         </div>
       </Card>

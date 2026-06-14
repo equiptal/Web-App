@@ -104,7 +104,7 @@ export interface RequestListItem {
   createdAt: string | null;
   bidCount: number;
   /** The single fanned-out item (name + qty), used as the card title. */
-  item: { name: string; nameAr: string; qty: number; imageUrl: string | null } | null;
+  item: { name: string; nameAr: string; qty: number; imageUrl: string | null; categoryId: string | null } | null;
 }
 
 const num = (v: unknown): number | null => (typeof v === "number" && !Number.isNaN(v) ? v : null);
@@ -141,7 +141,7 @@ export function mapRequestListItem(r: RequestRecord): RequestListItem {
     createdAt: str(r.createdAt),
     bidCount: num(r.bidCount) ?? 0,
     item: it
-      ? { name: itemName(it, false), nameAr: itemName(it, true), qty: it.numberOfUnits ?? 1, imageUrl: it.subtypeImageUrl ?? it.categoryImageUrl ?? null }
+      ? { name: itemName(it, false), nameAr: itemName(it, true), qty: it.numberOfUnits ?? 1, imageUrl: it.subtypeImageUrl ?? it.categoryImageUrl ?? null, categoryId: it.categoryId }
       : null,
   };
 }

@@ -69,7 +69,8 @@ export function Wizard() {
 
       {/* Footer nav. Step 4 carries its own Post action. */}
       <div className="mt-8 flex items-center justify-between border-t border-border pt-4">
-        <Button variant="secondary" disabled={step === 1} onClick={() => actions.goStep((step - 1) as Step)}>
+        {/* Step 1 Back returns to the RFQ input screen (draft preserved); later steps go one step back. */}
+        <Button variant="secondary" onClick={() => (step === 1 ? actions.goIntake() : actions.goStep((step - 1) as Step))}>
           {t.common.back}
         </Button>
 

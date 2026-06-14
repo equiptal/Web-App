@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useT } from "@/lib/i18n";
+import { useT, useLocale } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { BrowseSurface } from "@/components/stores/BrowseSurface";
+import { fetchActivity, type ActivityCounts } from "@/lib/api/client";
 
 /** Gradient that darkens to the corner — shared by the hero and the store-card banners. */
 export const DARK_GRADIENT = "bg-gradient-to-br from-[#1e3a5f] to-[#0f1e2e]";
@@ -24,7 +26,22 @@ const GRID_STYLE: React.CSSProperties = {
  */
 export function HomeHub() {
   const t = useT();
+  const { locale } = useLocale();
+  const ar = locale === "ar";
   const router = useRouter();
+  const [activity, setActivity] = useState<ActivityCounts | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetchActivity()
+      .then((a) => active && setActivity(a))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const newBids = activity?.newBids ?? 0;
 
   return (
     <div className="flex flex-col gap-7">
@@ -55,11 +72,32 @@ export function HomeHub() {
         </div>
       </div>
 
+      {/* New-bids banner — mirrors the app's HomeNewBidsCard; shown only when unread bids exist. */}
+      {newBids > 0 && (
+        <button
+          type="button"
+          onClick={() => router.push("/requests?tab=bids")}
+          className="flex items-center gap-3 rounded-[14px] border border-[#f59e0b]/30 bg-[#f59e0b]/[0.06] p-3.5 text-start transition hover:bg-[#f59e0b]/[0.10]"
+        >
+          <span className="relative grid h-9 w-9 flex-none place-items-center rounded-[10px] bg-[#f59e0b]/[0.14]">
+            <Icon name="gavel" size={20} className="text-[#d97706]" />
+            <span className="absolute -end-1.5 -top-1.5 grid min-w-[18px] place-items-center rounded-full bg-[#d97706] px-1 text-[10px] font-bold leading-[18px] text-white">{newBids}</span>
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[14px] font-bold text-navy">
+              {ar ? `${newBids} ${newBids === 1 ? "عرض جديد" : "عروض جديدة"} على طلباتك` : `${newBids} new ${newBids === 1 ? "bid" : "bids"} on your requests`}
+            </span>
+            <span className="block text-[13px] font-semibold text-[#d97706]">{ar ? "عرض العروض" : "View bids"}</span>
+          </span>
+          <Icon name="chevron_right" size={20} className="flex-none text-[#d97706] rtl:scale-x-[-1]" />
+        </button>
+      )}
+
       {/* Activity cards — wired to the renter's requests/bids/deals screens. */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <ActivityCard accent="brand" icon="assignment" title={t.home.yourRequests} sub={t.home.reqSub} href="/requests" />
-        <ActivityCard accent="info" icon="gavel" title={t.home.priceBids} sub={t.home.bidsSub} href="/requests?tab=bids" />
-        <ActivityCard accent="ok" icon="handshake" title={t.home.completedDeals} sub={t.home.dealsSub} href="/requests?tab=deals" />
+        <ActivityCard accent="brand" icon="assignment" title={t.home.yourRequests} sub={t.home.reqSub} href="/requests" count={activity?.openRequests} />
+        <ActivityCard accent="info" icon="gavel" title={t.home.priceBids} sub={t.home.bidsSub} href="/requests?tab=bids" count={newBids} />
+        <ActivityCard accent="ok" icon="handshake" title={t.home.completedDeals} sub={t.home.dealsSub} href="/requests?tab=deals" count={activity?.completedDeals} />
       </div>
 
       {/* Suggested suppliers — filter bar always shown; View all only adds cards (AC-05/10/11/12/13) */}
@@ -80,12 +118,14 @@ function ActivityCard({
   title,
   sub,
   href,
+  count,
 }: {
   accent: "brand" | "info" | "ok";
   icon: string;
   title: string;
   sub: string;
   href?: string;
+  count?: number;
 }) {
   const router = useRouter();
   const c = ACCENT[accent];
@@ -96,8 +136,11 @@ function ActivityCard({
       className="group relative flex cursor-pointer flex-col gap-3.5 overflow-hidden rounded-[16px] border border-border bg-surface p-5 text-start transition hover:-translate-y-0.5 hover:shadow-[0_8px_28px_rgba(0,0,0,.09)]"
     >
       <div className="flex items-start justify-between">
-        <span className={`grid h-11 w-11 place-items-center rounded-[12px] ${c.iconBg}`}>
+        <span className={`relative grid h-11 w-11 place-items-center rounded-[12px] ${c.iconBg}`}>
           <Icon name={icon} size={22} className={c.iconText} />
+          {count != null && count > 0 && (
+            <span className={`absolute -end-1.5 -top-1.5 grid min-w-[19px] place-items-center rounded-full px-1 text-[10px] font-bold leading-[19px] text-white ${c.bar}`}>{count}</span>
+          )}
         </span>
         <Icon name="chevron_right" size={20} className="text-muted/60 rtl:scale-x-[-1]" />
       </div>

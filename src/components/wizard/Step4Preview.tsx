@@ -64,12 +64,18 @@ export function Step4Preview() {
             <Icon name="lightbulb" size={17} className="text-info" /> {t.preview.whyTitle}
           </div>
           <ul className="space-y-1 text-[13px] text-navy">
-            {draft.justifications.map((j, i) => (
-              <li key={i} className="flex gap-2">
-                <span className="mt-[2px] flex-none text-info">•</span>
-                <span>{j}</span>
-              </li>
-            ))}
+            {draft.justifications.map((j, i) => {
+              // Justifications may be plain strings or {field, note} objects depending on the agent build.
+              const text = typeof j === "string" ? j : ((j as { note?: string; text?: string })?.note ?? (j as { text?: string })?.text ?? "");
+              const field = typeof j === "string" ? "" : ((j as { field?: string })?.field ?? "");
+              if (!text) return null;
+              return (
+                <li key={i} className="flex gap-2">
+                  <span className="mt-[2px] flex-none text-info">•</span>
+                  <span>{field ? <b className="font-semibold">{field}: </b> : null}{text}</span>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
