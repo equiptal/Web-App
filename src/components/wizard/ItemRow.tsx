@@ -140,9 +140,17 @@ export function ItemRow({
         {!item.resolved &&
           (!isCompleteRef(item.ref) ? (
             // AC-18/19: Approve is disabled until the size is picked — say so explicitly.
-            <p className="mt-1.5 flex items-center gap-1.5 text-[12.5px] font-semibold text-warn">
-              <Icon name="error_outline" size={14} /> {t.step2.pickSizeToApprove}
-            </p>
+            <>
+              <p className="mt-1.5 flex items-center gap-1.5 text-[12.5px] font-semibold text-warn">
+                <Icon name="error_outline" size={14} /> {t.step2.pickSizeToApprove}
+              </p>
+              {/* Agent's plain-language size guidance (what it's asking for this item). */}
+              {item.sizeNote && (
+                <p className="mt-1 flex items-start gap-1.5 text-[12px] leading-snug text-info">
+                  <Icon name="lightbulb" size={13} className="mt-[1.5px] flex-none" /> {item.sizeNote}
+                </p>
+              )}
+            </>
           ) : (
             <p className="mt-1.5 text-[12.5px] text-muted">
               {item.suggestion ? fmt(t.step2.nearestSuggested, { measurement: measurement?.name ?? "" }) : t.step2.needsValidationPrompt}

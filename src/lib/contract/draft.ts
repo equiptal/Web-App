@@ -111,6 +111,10 @@ export interface EquipmentItem {
   suggestion?: MeasurementSuggestion;
   /** AC-19/20: free-text capacity advisory from the agent (unit mismatch / snap explanation). */
   advisory?: string | null;
+  /** Agent's plain-language size guidance when the size is unresolved — the question/options it
+   *  raised for this item's capacity (from missing_required_fields[line_items[i].capacity]). Shown
+   *  beside "pick a size to approve" so the renter sees what the agent is asking. null when none. */
+  sizeNote?: string | null;
   /**
    * AC-18/19/29: whether a needs-validation match or measurement suggestion has been resolved
    * (Approved or Edited). Confident/no-match items are not gated by this.
