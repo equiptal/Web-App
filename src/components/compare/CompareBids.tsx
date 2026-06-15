@@ -17,8 +17,62 @@ const nf = (n: number) => Math.round(n).toLocaleString("en-US");
 /** One supplier's offer on an item — a received bid, with its computed VAT-inclusive total. */
 type Offer = { bid: BidCard; total: number };
 
+/** Computed conclusion (no AI) — the takeaways from one item's offers, in a couple of lines. */
+function comparisonSummary(offers: Offer[], ar: boolean, L: (en: string, arr: string) => string): string[] {
+  if (!offers.length) return [];
+  const sar = L("SAR", "ر.س");
+  const reqMet = (o: Offer) => [o.bid.verified, o.bid.compliance.activityLicense, o.bid.compliance.taxNumber, o.bid.compliance.safety, o.bid.compliance.localContent, o.bid.compliance.saso, o.bid.eqVerified].filter(Boolean).length;
+  const yearOf = (o: Offer) => o.bid.equipment?.year ?? 0;
+  const nm = (o: Offer) => o.bid.supplierName;
+  const cheapest = offers.reduce((a, b) => (b.total < a.total ? b : a));
+  const topCompliant = offers.reduce((a, b) => (reqMet(b) > reqMet(a) ? b : a));
+  const out: string[] = [];
+  if (offers.length === 1) {
+    const o = offers[0];
+    out.push(L(`${nm(o)} is the only quotation: ${nf(o.total)} ${sar} total (incl. VAT), meeting ${reqMet(o)} of 7 requirements.`,
+      `${nm(o)} هو العرض الوحيد: ${nf(o.total)} ${sar} الإجمالي (شامل الضريبة)، ويستوفي ${reqMet(o)} من 7 متطلبات.`));
+  } else {
+    const maxTotal = Math.max(...offers.map((o) => o.total));
+    const saving = maxTotal - cheapest.total;
+    out.push(saving > 0
+      ? L(`Cheapest: ${nm(cheapest)} at ${nf(cheapest.total)} ${sar} — ${nf(saving)} ${sar} below the highest offer.`,
+          `الأرخص: ${nm(cheapest)} بسعر ${nf(cheapest.total)} ${sar} — أقل بـ ${nf(saving)} ${sar} من أعلى عرض.`)
+      : L(`All offers are priced the same (${nf(cheapest.total)} ${sar} incl. VAT).`,
+          `جميع العروض بنفس السعر (${nf(cheapest.total)} ${sar} شامل الضريبة).`));
+    out.push(nm(topCompliant) === nm(cheapest)
+      ? L(`${nm(cheapest)} also meets the most requirements (${reqMet(cheapest)}/7) — strongest overall.`,
+          `${nm(cheapest)} يستوفي أيضًا أكثر المتطلبات (${reqMet(cheapest)}/7) — الأقوى إجمالاً.`)
+      : L(`Best documented: ${nm(topCompliant)} meets ${reqMet(topCompliant)}/7 requirements (vs ${reqMet(cheapest)}/7 for the cheapest).`,
+          `الأكثر توثيقًا: ${nm(topCompliant)} يستوفي ${reqMet(topCompliant)}/7 (مقابل ${reqMet(cheapest)}/7 للأرخص).`));
+    const withYear = offers.filter((o) => yearOf(o) > 0);
+    if (withYear.length) {
+      const newest = withYear.reduce((a, b) => (yearOf(b) > yearOf(a) ? b : a));
+      if (nm(newest) !== nm(cheapest)) out.push(L(`${nm(newest)} has the newest equipment (${yearOf(newest)}).`, `${nm(newest)} لديه أحدث معدة (${yearOf(newest)}).`));
+    }
+  }
+  return out;
+}
+
 /** One uploaded quotation's resolved data — its group + items + bids per item. */
 type Loaded = { group: RequestGroup; items: RequestListItem[]; bidsByItem: Record<string, BidCard[]> };
+
+/** A saved comparison = the set of uploaded quotations, kept so the renter can reopen it later. */
+type SavedComparison = { id: string; savedAt: string; entries: { code: string; name: string }[] };
+const SAVED_KEY = "mt-compare-saved-v1";
+/** Stable identity for a comparison = its sorted set of quotation codes. */
+const codeKey = (es: { code: string }[]) => es.map((e) => e.code).sort().join("|");
+function loadSavedComparisons(): SavedComparison[] {
+  try {
+    const raw = window.localStorage.getItem(SAVED_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? (arr as SavedComparison[]).filter((s) => s?.id && Array.isArray(s.entries)) : [];
+  } catch {
+    return [];
+  }
+}
+function persistSavedComparisons(list: SavedComparison[]) {
+  try { window.localStorage.setItem(SAVED_KEY, JSON.stringify(list.slice(0, 10))); } catch { /* storage blocked/full → skip */ }
+}
 
 export function CompareBids() {
   const { locale } = useLocale();
@@ -33,6 +87,8 @@ export function CompareBids() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [saved, setSaved] = useState<SavedComparison[]>([]);
+  const restoredRef = useRef(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -68,6 +124,28 @@ export function CompareBids() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries]);
 
+  // On first mount, load saved comparisons and reopen the most recent (so it's not lost on return).
+  useEffect(() => {
+    const list = loadSavedComparisons();
+    setSaved(list);
+    if (!restoredRef.current && list.length) {
+      restoredRef.current = true;
+      setEntries(list[0].entries);
+    }
+  }, []);
+
+  // Auto-save the current set whenever it changes — keep the original date for an unchanged set.
+  useEffect(() => {
+    if (!entries.length) return;
+    const id = codeKey(entries);
+    setSaved((prev) => {
+      const existing = prev.find((s) => s.id === id);
+      const next = [{ id, savedAt: existing?.savedAt ?? new Date().toISOString(), entries }, ...prev.filter((s) => s.id !== id)].slice(0, 10);
+      persistSavedComparisons(next);
+      return next;
+    });
+  }, [entries]);
+
   function addCode(code: string, name: string) {
     setError(null);
     setEntries((prev) => (prev.some((e) => e.code === code) ? prev : [...prev, { code, name }]));
@@ -83,6 +161,8 @@ export function CompareBids() {
   }
   function removeEntry(code: string) { setEntries((prev) => prev.filter((e) => e.code !== code)); }
   function clearAll() { setEntries([]); setLoaded({}); setSelKey(null); setError(null); }
+  function openSaved(s: SavedComparison) { setError(null); setSelKey(null); setEntries(s.entries); }
+  function deleteSaved(id: string) { setSaved((prev) => { const next = prev.filter((s) => s.id !== id); persistSavedComparisons(next); return next; }); }
 
   // Combine items + bids across every successfully-loaded quotation (different request ids never collide).
   const okGroups = entries.map((e) => loaded[e.code]).filter((d): d is Loaded => !!d && d !== "error");
@@ -110,6 +190,73 @@ export function CompareBids() {
   const noBidsFound = allItems.length > 0 && basketItems === 0;
   const showNoBidsNote = !stillLoading && entries.length > 0 && (someNotFound || noBidsFound);
 
+  // Export every item's comparison (table + summary) as a print-ready PDF (browser "Save as PDF").
+  function exportComparisonPdf() {
+    const items = allItems.filter((it) => offersFor(it).length > 0);
+    if (!items.length) return;
+    const esc = (s: unknown) => String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
+    const sar = L("SAR", "ر.س");
+    const dateStr = new Date().toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
+
+    const sections = items.map((it) => {
+      const offers = offersFor(it);
+      const minTotal = Math.min(...offers.map((o) => o.total));
+      const yearOf = (o: Offer) => o.bid.equipment?.year ?? 0;
+      const distOf = (o: Offer) => o.bid.distanceKm ?? Infinity;
+      const maxYear = Math.max(...offers.map(yearOf));
+      const minDist = Math.min(...offers.map(distOf));
+      const reqMet = (o: Offer) => [o.bid.verified, o.bid.compliance.activityLicense, o.bid.compliance.taxNumber, o.bid.compliance.safety, o.bid.compliance.localContent, o.bid.compliance.saso, o.bid.eqVerified].filter(Boolean).length;
+      const maxReq = Math.max(...offers.map(reqMet));
+      const title = (ar ? it.item?.nameAr : it.item?.name) || it.displayId;
+      const money = (v: number | null) => (v == null ? `<span class="soft">${esc(L("Not specified", "غير محدّد"))}</span>` : v === 0 ? `<span class="soft">${esc(L("Included", "مشمول"))}</span>` : `${nf(v)} ${esc(sar)}`);
+      const chk = (b: boolean) => `<span class="${b ? "ok" : "no"}">${b ? "✓" : "✕"}</span>`;
+      const row = (label: string, cell: (o: Offer) => string, win?: (o: Offer) => boolean) =>
+        `<tr><td class="lbl">${esc(label)}</td>${offers.map((o) => `<td class="${win && win(o) ? "win" : ""}">${cell(o)}</td>`).join("")}</tr>`;
+      const bh = (label: string, cls: string) => `<tr class="bh ${cls}"><td colspan="${offers.length + 1}">${esc(label)}</td></tr>`;
+      const body = [
+        bh(L("Price", "السعر"), "p"),
+        row(L("Total incl. VAT", "الإجمالي شامل الضريبة"), (o) => `<b>${nf(o.total)} ${esc(sar)}</b>`, (o) => o.total === minTotal),
+        row(`${L("Rate", "السعر")} / ${(it.rentalType ?? "day").toLowerCase()}`, (o) => `${nf(o.bid.price ?? 0)} ${esc(sar)}`),
+        row(L("Delivery to site", "التوصيل للموقع"), (o) => money(o.bid.mobPrice)),
+        row(L("Pickup from site", "الاستلام من الموقع"), (o) => money(o.bid.demobPrice)),
+        bh(L("Quality & suitability", "الجودة والملاءمة"), "q"),
+        row(L("Year of manufacture", "سنة الصنع"), (o) => String(o.bid.equipment?.year ?? "—"), (o) => yearOf(o) === maxYear && maxYear > 0),
+        row(L("Brand", "العلامة"), (o) => esc(o.bid.equipment?.make ?? "—")),
+        row(L("Model", "الطراز"), (o) => esc(o.bid.equipment?.model ?? "—")),
+        row(L("Distance from site", "المسافة من الموقع"), (o) => (o.bid.distanceKm != null ? `${Math.round(o.bid.distanceKm)} ${esc(L("km", "كم"))}` : "—"), (o) => distOf(o) === minDist && Number.isFinite(minDist)),
+        row(L("Rating", "التقييم"), (o) => (o.bid.rating != null ? `★ ${o.bid.rating.toFixed(1)}` : "—")),
+        bh(L("Compliance & documents", "الامتثال والمستندات"), "c"),
+        row(L("Verification status", "حالة التوثيق"), (o) => (o.bid.verified ? esc(L("Verified", "موثّق")) : esc(L("Not verified", "غير موثّق")))),
+        row(L("Entity type", "نوع الكيان"), (o) => (o.bid.compliance.entityType === "company" ? esc(L("Company", "شركة")) : esc(L("Individual", "فرد")))),
+        row(L("Activity license", "رخصة النشاط"), (o) => chk(o.bid.compliance.activityLicense)),
+        row(L("Tax number", "الرقم الضريبي"), (o) => chk(o.bid.compliance.taxNumber)),
+        row(L("Safety certifications", "شهادات السلامة"), (o) => chk(o.bid.compliance.safety)),
+        row(L("Local content certificate", "شهادة المحتوى المحلي"), (o) => chk(o.bid.compliance.localContent)),
+        row(L("SASO certificate", "شهادة ساسو"), (o) => chk(o.bid.compliance.saso)),
+        row(L("Equipment verification", "توثيق المعدة"), (o) => chk(o.bid.eqVerified)),
+        row(L("Requirements met", "المتطلبات المستوفاة"), (o) => `${reqMet(o)} / 7`, (o) => reqMet(o) === maxReq && maxReq > 0),
+      ].join("");
+      const sup = offers.map((o) => `<th>${esc(o.bid.supplierName)}${o.bid.verified ? " ✓" : ""}</th>`).join("");
+      const summary = comparisonSummary(offers, ar, L);
+      const meta = `${it.item?.qty ?? 1} ${esc(L("units", "وحدة"))} · ${offers.length} ${esc(offers.length === 1 ? L("quotation", "عرض") : L("quotations", "عروض"))}`;
+      return `<section class="cmp-doc"><h2>${esc(title)} <small>${meta}</small></h2>` +
+        `<table><thead><tr><th class="lbl"></th>${sup}</tr></thead><tbody>${body}</tbody></table>` +
+        (summary.length ? `<div class="sum"><div class="sum-h">${esc(L("Summary", "الخلاصة"))}</div><ul>${summary.map((s) => `<li>${esc(s)}</li>`).join("")}</ul></div>` : "") +
+        `</section>`;
+    }).join("");
+
+    const basket = basketItems > 0 ? `<div class="basket">${esc(L("Cheapest basket — lowest offer per item", "أرخص سلة — أقل عرض لكل عنصر"))}: <b>${nf(basketTotal)} ${esc(sar)}</b> <span class="soft">(${basketItems} ${esc(L("of", "من"))} ${allItems.length} ${esc(L("items", "عناصر"))})</span></div>` : "";
+    const css = `*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'Inter','Segoe UI',Roboto,sans-serif;color:#1c3550;padding:22px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}h1{font-size:20px;font-weight:900;}.head{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #1c3550;padding-bottom:10px;margin-bottom:14px;}.head .d{font-size:12px;color:#6b8fa8;font-weight:700;}.basket{background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:13px;font-weight:700;}.basket b{color:#f79009;}.cmp-doc{margin-bottom:22px;page-break-inside:avoid;}.cmp-doc h2{font-size:15px;font-weight:800;margin-bottom:8px;}.cmp-doc h2 small{font-size:11.5px;font-weight:600;color:#6b8fa8;}table{width:100%;border-collapse:collapse;font-size:12px;}th,td{border:1px solid #e4edf5;padding:7px 9px;text-align:start;}thead th{background:#1c3550;color:#fff;font-weight:800;font-size:11.5px;}thead th.lbl{background:#fff;}td.lbl{background:#f7fafd;font-weight:700;color:#6b8fa8;width:200px;}tr.bh td{font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.04em;}tr.bh.p td{background:rgba(247,144,9,.1);color:#b45309;}tr.bh.q td{background:rgba(37,99,235,.1);color:#1d4ed8;}tr.bh.c td{background:rgba(29,175,88,.1);color:#15803d;}td.win{background:rgba(29,175,88,.12);}.ok{color:#15803d;font-weight:800;}.no{color:#dc2626;font-weight:800;}.soft{color:#94a3b8;}.sum{background:#eef4fe;border:1px solid #cfe0fb;border-radius:8px;padding:9px 12px;margin-top:8px;}.sum-h{font-size:11.5px;font-weight:800;color:#2563eb;margin-bottom:4px;}.sum ul{padding-inline-start:18px;}.sum li{font-size:12px;font-weight:600;color:#33506e;line-height:1.5;}@media print{body{padding:0;}}`;
+    const html = `<!doctype html><html lang="${ar ? "ar" : "en"}" dir="${ar ? "rtl" : "ltr"}"><head><meta charset="utf-8"><title>${esc(L("Bid comparison", "مقارنة العروض"))}</title>` +
+      `<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet"><style>${css}</style></head><body>` +
+      `<div class="head"><h1>${esc(L("Bid comparison", "مقارنة العروض"))}</h1><span class="d">${esc(dateStr)}</span></div>${basket}${sections}` +
+      `<script>window.onload=function(){setTimeout(function(){window.print();},350);}</script></body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+  }
+
   return (
     <div className="rproto" dir={ar ? "rtl" : "ltr"}>
       {/* drop zone — stays visible so more quotations (even from other requests) can be added */}
@@ -126,6 +273,31 @@ export function CompareBids() {
         <input ref={fileRef} type="file" accept="application/pdf" multiple hidden onChange={(e) => { onFiles(e.target.files); e.target.value = ""; }} />
       </div>
       {error && <p className="cmp-error">{error}</p>}
+
+      {/* saved comparisons — reopen a past comparison (kept locally so it isn't lost on return) */}
+      {saved.length > 0 && (
+        <div className="saved-cmps">
+          <div className="flab"><span className="material-icons-outlined">history</span>{L("Saved comparisons", "المقارنات المحفوظة")}</div>
+          <div className="chips-row">
+            {saved.map((s) => {
+              const active = codeKey(entries) === s.id;
+              const d = new Date(s.savedAt).toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+              return (
+                <button key={s.id} className={`saved-chip${active ? " on" : ""}`} onClick={() => openSaved(s)}>
+                  <span className="material-icons-outlined">description</span>
+                  <span className="sc-d">{d}</span>
+                  <span className="ct">{s.entries.length}</span>
+                  <span className="x" title={L("Remove", "إزالة")} onClick={(e) => { e.stopPropagation(); deleteSaved(s.id); }}><span className="material-icons-outlined">close</span></span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="cmp-note">
+            <span className="material-icons-outlined">info</span>
+            {L("Saved on your device so you won’t lose them. Prices and terms can change after a quotation is issued — re-upload the latest quotations and re-export to re-check.", "محفوظة على جهازك حتى لا تفقدها. قد تتغير الأسعار والشروط بعد إصدار العرض — أعد رفع أحدث العروض وأعد التصدير للتحقق.")}
+          </p>
+        </div>
+      )}
 
       {/* uploaded tray — one chip per quotation */}
       {entries.length > 0 && (
@@ -171,6 +343,15 @@ export function CompareBids() {
                 <div className="bk-s">{L("Lowest offer on", "أقل عرض على")} {basketItems} {L("of", "من")} {allItems.length} {L("items, combined (incl. VAT)", "عناصر، شامل الضريبة")}</div>
               </div>
               <span className="bk-v">{nf(basketTotal)} {L("SAR", "ر.س")}</span>
+            </div>
+          )}
+
+          {/* export the whole comparison (all items) as a print-ready PDF */}
+          {basketItems > 0 && (
+            <div className="cmp-actions">
+              <button className="cmp-export" onClick={exportComparisonPdf}>
+                <span className="material-icons-outlined">picture_as_pdf</span> {L("Export comparison (PDF)", "تصدير المقارنة (PDF)")}
+              </button>
             </div>
           )}
 
@@ -232,40 +413,8 @@ function ItemComparison({ item, offers, ar, L }: { item: RequestListItem; offers
     : <span className="cmoney">{nf(v)} <span className="sar">{sar}</span></span>;
   const chk = (b: boolean) => <span className={`cchk ${b ? "ok" : "no"}`}>{b ? "✓" : "✕"}</span>;
 
-  // Computed conclusion (no AI) — the takeaways from the table above, in a couple of lines.
-  const nm = (o: Offer) => o.bid.supplierName;
-  const cheapest = offers.reduce((a, b) => (b.total < a.total ? b : a));
-  const topCompliant = offers.reduce((a, b) => (reqMet(b) > reqMet(a) ? b : a));
-  const conclusion: string[] = [];
-  if (offers.length === 1) {
-    const o = offers[0];
-    conclusion.push(L(`${nm(o)} is the only quotation: ${nf(o.total)} ${sar} total (incl. VAT), meeting ${reqMet(o)} of 7 requirements.`,
-      `${nm(o)} هو العرض الوحيد: ${nf(o.total)} ${sar} الإجمالي (شامل الضريبة)، ويستوفي ${reqMet(o)} من 7 متطلبات.`));
-  } else {
-    const maxTotal = Math.max(...offers.map((o) => o.total));
-    const saving = maxTotal - cheapest.total;
-    conclusion.push(
-      saving > 0
-        ? L(`Cheapest: ${nm(cheapest)} at ${nf(cheapest.total)} ${sar} — ${nf(saving)} ${sar} below the highest offer.`,
-            `الأرخص: ${nm(cheapest)} بسعر ${nf(cheapest.total)} ${sar} — أقل بـ ${nf(saving)} ${sar} من أعلى عرض.`)
-        : L(`All offers are priced the same (${nf(cheapest.total)} ${sar} incl. VAT).`,
-            `جميع العروض بنفس السعر (${nf(cheapest.total)} ${sar} شامل الضريبة).`),
-    );
-    conclusion.push(
-      nm(topCompliant) === nm(cheapest)
-        ? L(`${nm(cheapest)} also meets the most requirements (${reqMet(cheapest)}/7) — strongest overall.`,
-            `${nm(cheapest)} يستوفي أيضًا أكثر المتطلبات (${reqMet(cheapest)}/7) — الأقوى إجمالاً.`)
-        : L(`Best documented: ${nm(topCompliant)} meets ${reqMet(topCompliant)}/7 requirements (vs ${reqMet(cheapest)}/7 for the cheapest).`,
-            `الأكثر توثيقًا: ${nm(topCompliant)} يستوفي ${reqMet(topCompliant)}/7 (مقابل ${reqMet(cheapest)}/7 للأرخص).`),
-    );
-    const withYear = offers.filter((o) => yearOf(o) > 0);
-    if (withYear.length) {
-      const newest = withYear.reduce((a, b) => (yearOf(b) > yearOf(a) ? b : a));
-      if (nm(newest) !== nm(cheapest)) {
-        conclusion.push(L(`${nm(newest)} has the newest equipment (${yearOf(newest)}).`, `${nm(newest)} لديه أحدث معدة (${yearOf(newest)}).`));
-      }
-    }
-  }
+  // Computed conclusion (no AI) — shared with the PDF export.
+  const conclusion = comparisonSummary(offers, ar, L);
 
   const Row = ({ label, cell }: { label: string; cell: (o: Offer) => ReactNode }) => (
     <div className="crow cgrid" style={gt}>
