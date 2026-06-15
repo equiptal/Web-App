@@ -26,8 +26,14 @@ import { ApiError, ApiErrorKind, fetchTaxonomy, processRfq, submitRequest } from
 export type Phase = "intake" | "processing" | "wizard" | "confirmation";
 export type Step = 1 | 2 | 3 | 4;
 
-/** localStorage key for the persisted RFQ draft (web-app/002 save-on-reload). */
-const DRAFT_STORAGE_KEY = "rfq-draft-v1";
+/**
+ * localStorage key for the persisted RFQ draft (web-app/002 save-on-reload).
+ * v2: operator.certificate became multi-select (array). A v1 draft holds a single
+ * string there, which crashes `.certificate.map(...)` on render — so bump the key to
+ * ignore (not rehydrate) incompatible old drafts and clear the stale v1 entry.
+ */
+const DRAFT_STORAGE_KEY = "rfq-draft-v2";
+const LEGACY_DRAFT_STORAGE_KEYS = ["rfq-draft-v1"];
 
 /**
  * web-app/002: true when a field's current value still equals what the agent originally filled in
@@ -391,6 +397,8 @@ export function RfqProvider({ children }: { children: ReactNode }) {
   // files can't be re-created by the browser, so they aren't persisted (renter re-attaches if needed).
   useEffect(() => {
     try {
+      // Drop incompatible drafts saved under older keys (different shape → would crash on render).
+      for (const k of LEGACY_DRAFT_STORAGE_KEYS) window.localStorage.removeItem(k);
       const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY);
       if (!raw) return;
       const saved = JSON.parse(raw) as Partial<RfqState>;

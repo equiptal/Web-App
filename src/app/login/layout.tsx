@@ -29,7 +29,26 @@ export default function LoginLayout({ children }: { children: ReactNode }) {
 
       <AuthBrand />
 
-      <div className="flex items-center justify-center bg-surface p-12">{children}</div>
+      {/* Form panel. Desktop (lg+): white surface beside the navy brand panel.
+          Mobile (< lg, where the brand panel is hidden): navy backdrop with the form in a white card. */}
+      <div className="relative flex items-center justify-center p-6 lg:bg-surface lg:p-12">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 lg:hidden"
+          style={{ background: "linear-gradient(165deg,var(--navy),#12263A)" }}
+        />
+        <div className="relative z-[1] w-full max-w-[380px]">
+          {/* Mobile-only white brand mark above the card (desktop shows it in the navy panel). */}
+          <div className="mb-6 flex items-center lg:hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/moedatech-logo.png" alt="Moedatech" className="h-8 w-auto [filter:brightness(0)_invert(1)]" />
+          </div>
+          {/* White card on mobile; plain (transparent, no padding) on desktop. */}
+          <div className="rounded-2xl bg-surface p-6 shadow-[0_10px_40px_rgba(0,0,0,0.28)] lg:rounded-none lg:bg-transparent lg:p-0 lg:shadow-none">
+            {children}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

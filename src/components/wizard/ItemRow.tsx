@@ -342,6 +342,8 @@ function RfqMatch({ raw, matched }: { raw: string | null; matched: React.ReactNo
         <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted">{t.step2.fromRfq}</span>
         <span className="break-words text-[15px] font-bold leading-tight">{raw ? `“${raw}”` : "—"}</span>
       </span>
+      {/* Mobile: vertical flow (RFQ ↓ matched). Desktop: horizontal arrow. */}
+      <Icon name="arrow_downward" size={18} className="block flex-none text-muted/60 sm:hidden" />
       <Icon name="arrow_forward" size={20} className="hidden flex-none text-muted/60 rtl:scale-x-[-1] sm:block" />
       <span className="flex min-w-0 flex-col gap-0.5 sm:flex-1">
         <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted">{t.step2.matchedTo}</span>
