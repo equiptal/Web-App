@@ -112,6 +112,15 @@ async function rawCall<T>(path: string, init: RequestInit, accessToken: string, 
   return (body && "data" in body ? (body.data as T) : (body as unknown as T));
 }
 
+/**
+ * Validate a carried idToken (app→web handoff) by fetching the renter AS that token. Returns the
+ * safe identity on success; throws AppAuthError("unauthorized") if the token is invalid/expired —
+ * so a forged `?handoff=` can never establish a session (the backend verifies the Cognito JWT).
+ */
+export async function fetchMeWithToken(token: string, locale: string): Promise<{ id: number; phone: string; tier?: string }> {
+  return rawCall<{ id: number; phone: string; tier?: string }>("/users/me", { method: "GET" }, token, locale);
+}
+
 async function tryRefresh(
   refreshToken: string,
   locale: string,

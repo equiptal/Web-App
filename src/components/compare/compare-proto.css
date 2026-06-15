@@ -78,18 +78,6 @@
 .rproto .cchk { font-size: 16px; font-weight: 900; } .rproto .cchk.ok { color: var(--success); } .rproto .cchk.no { color: var(--danger); }
 .rproto .cfrac { font-size: 13px; font-weight: 900; color: var(--navy); }
 
-/* saved comparisons — reopen past comparisons */
-.rproto .saved-cmps { margin: 14px 0 4px; }
-.rproto .saved-cmps .chips-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-.rproto .saved-chip { display: inline-flex; align-items: center; gap: 7px; border: 1.5px solid var(--border); background: var(--surface1); border-radius: var(--r-full); padding: 7px 9px 7px 12px; font-size: 12px; font-weight: 800; color: var(--navy-mid); cursor: pointer; }
-.rproto .saved-chip:hover { border-color: var(--navy-mid); }
-.rproto .saved-chip.on { background: var(--navy); border-color: var(--navy); color: #fff; }
-.rproto .saved-chip .material-icons-outlined { font-size: 15px; }
-.rproto .saved-chip .sc-d { font-weight: 700; }
-.rproto .saved-chip .x { display: inline-flex; cursor: pointer; color: var(--text-disabled); }
-.rproto .saved-chip.on .x { color: rgba(255,255,255,0.7); }
-.rproto .saved-chip .x .material-icons-outlined { font-size: 15px; }
-
 /* export-to-PDF action */
 .rproto .cmp-actions { display: flex; justify-content: flex-end; margin: 4px 0 12px; }
 .rproto .cmp-export { display: inline-flex; align-items: center; gap: 7px; background: var(--navy); color: #fff; border: 0; border-radius: var(--r-full); padding: 9px 16px; font-size: 12.5px; font-weight: 800; cursor: pointer; }

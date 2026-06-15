@@ -399,6 +399,13 @@ export function RfqProvider({ children }: { children: ReactNode }) {
     try {
       // Drop incompatible drafts saved under older keys (different shape → would crash on render).
       for (const k of LEGACY_DRAFT_STORAGE_KEYS) window.localStorage.removeItem(k);
+      // Fresh-start handoff (mobile/017 AC-08, `?new=1`): discard any saved draft and start at page 1.
+      if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("new") === "1") {
+        window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+        // Strip the flag so a later reload doesn't wipe an in-progress draft.
+        window.history.replaceState(null, "", window.location.pathname);
+        return;
+      }
       const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY);
       if (!raw) return;
       const saved = JSON.parse(raw) as Partial<RfqState>;

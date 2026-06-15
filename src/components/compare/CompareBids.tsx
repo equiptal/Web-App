@@ -56,24 +56,6 @@ function comparisonSummary(offers: Offer[], ar: boolean, L: (en: string, arr: st
 /** One uploaded quotation's resolved data — its group + items + bids per item. */
 type Loaded = { group: RequestGroup; items: RequestListItem[]; bidsByItem: Record<string, BidCard[]> };
 
-/** A saved comparison = the set of uploaded quotations, kept so the renter can reopen it later. */
-type SavedComparison = { id: string; savedAt: string; entries: { code: string; name: string }[] };
-const SAVED_KEY = "mt-compare-saved-v1";
-/** Stable identity for a comparison = its sorted set of quotation codes. */
-const codeKey = (es: { code: string }[]) => es.map((e) => e.code).sort().join("|");
-function loadSavedComparisons(): SavedComparison[] {
-  try {
-    const raw = window.localStorage.getItem(SAVED_KEY);
-    const arr = raw ? JSON.parse(raw) : [];
-    return Array.isArray(arr) ? (arr as SavedComparison[]).filter((s) => s?.id && Array.isArray(s.entries)) : [];
-  } catch {
-    return [];
-  }
-}
-function persistSavedComparisons(list: SavedComparison[]) {
-  try { window.localStorage.setItem(SAVED_KEY, JSON.stringify(list.slice(0, 10))); } catch { /* storage blocked/full → skip */ }
-}
-
 export function CompareBids() {
   const { locale } = useLocale();
   const ar = locale === "ar";
@@ -87,7 +69,6 @@ export function CompareBids() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
-  const [saved, setSaved] = useState<SavedComparison[]>([]);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -123,24 +104,6 @@ export function CompareBids() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries]);
 
-  // On first mount, load the saved-comparison tabs (history) only. Do NOT auto-open any — closing
-  // the web or switching tabs shows nothing for a comparison until the renter clicks its tab.
-  useEffect(() => {
-    setSaved(loadSavedComparisons());
-  }, []);
-
-  // Auto-save the current set whenever it changes — keep the original date for an unchanged set.
-  useEffect(() => {
-    if (!entries.length) return;
-    const id = codeKey(entries);
-    setSaved((prev) => {
-      const existing = prev.find((s) => s.id === id);
-      const next = [{ id, savedAt: existing?.savedAt ?? new Date().toISOString(), entries }, ...prev.filter((s) => s.id !== id)].slice(0, 10);
-      persistSavedComparisons(next);
-      return next;
-    });
-  }, [entries]);
-
   function addCode(code: string, name: string) {
     setError(null);
     setEntries((prev) => (prev.some((e) => e.code === code) ? prev : [...prev, { code, name }]));
@@ -156,8 +119,6 @@ export function CompareBids() {
   }
   function removeEntry(code: string) { setEntries((prev) => prev.filter((e) => e.code !== code)); }
   function clearAll() { setEntries([]); setLoaded({}); setSelKey(null); setError(null); }
-  function openSaved(s: SavedComparison) { setError(null); setSelKey(null); setEntries(s.entries); }
-  function deleteSaved(id: string) { setSaved((prev) => { const next = prev.filter((s) => s.id !== id); persistSavedComparisons(next); return next; }); }
 
   // Combine items + bids across every successfully-loaded quotation (different request ids never collide).
   const okGroups = entries.map((e) => loaded[e.code]).filter((d): d is Loaded => !!d && d !== "error");
@@ -268,31 +229,6 @@ export function CompareBids() {
         <input ref={fileRef} type="file" accept="application/pdf" multiple hidden onChange={(e) => { onFiles(e.target.files); e.target.value = ""; }} />
       </div>
       {error && <p className="cmp-error">{error}</p>}
-
-      {/* saved comparisons — reopen a past comparison (kept locally so it isn't lost on return) */}
-      {saved.length > 0 && (
-        <div className="saved-cmps">
-          <div className="flab"><span className="material-icons-outlined">history</span>{L("Saved comparisons", "المقارنات المحفوظة")}</div>
-          <div className="chips-row">
-            {saved.map((s) => {
-              const active = codeKey(entries) === s.id;
-              const d = new Date(s.savedAt).toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
-              return (
-                <button key={s.id} className={`saved-chip${active ? " on" : ""}`} onClick={() => openSaved(s)}>
-                  <span className="material-icons-outlined">description</span>
-                  <span className="sc-d">{d}</span>
-                  <span className="ct">{s.entries.length}</span>
-                  <span className="x" title={L("Remove", "إزالة")} onClick={(e) => { e.stopPropagation(); deleteSaved(s.id); }}><span className="material-icons-outlined">close</span></span>
-                </button>
-              );
-            })}
-          </div>
-          <p className="cmp-note">
-            <span className="material-icons-outlined">info</span>
-            {L("Saved on your device so you won’t lose them. Prices and terms can change after a quotation is issued — re-upload the latest quotations and re-export to re-check.", "محفوظة على جهازك حتى لا تفقدها. قد تتغير الأسعار والشروط بعد إصدار العرض — أعد رفع أحدث العروض وأعد التصدير للتحقق.")}
-          </p>
-        </div>
-      )}
 
       {/* uploaded tray — one chip per quotation */}
       {entries.length > 0 && (
