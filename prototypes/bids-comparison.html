@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Compare quotations — per item</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=IBM+Plex+Sans:wght@400;600;700&family=Material+Icons+Outlined&display=swap" rel="stylesheet" />
+
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #eff4f9; font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1c3550; }
+    .page { padding: 24px 16px 80px; }
+    .toolbar { max-width: 1120px; margin: 0 auto 18px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .toolbar h1 { font-size: 18px; font-weight: 900; margin: 0; letter-spacing: -.3px; }
+    .toolbar .logo i { font-style: normal; color: #f79009; }
+
+    .rproto {
+      --navy: #1c3550; --navy-deep: #12263a; --navy-mid: #2a4f72;
+      --action: #f79009; --action-dim: #fff4e5; --rentee: #2563eb; --rentee-dim: #eaf1fe;
+      --success: #1daf58; --success-bg: #e7f7ee; --warning: #d4780a; --warning-bg: #fff3e0;
+      --danger: #d9362a; --danger-bg: #fcebea; --info: #1a7ec8; --info-bg: #e6f2fb;
+      --muted: #6b8fa8; --surface1: #fff; --surface2: #eff4f9; --surface3: #e4edf5;
+      --border: #d4e0ec; --line: #e4edf5; --text-disabled: #9bb3c8; --shadow: rgba(28, 53, 80, 0.06);
+      --r-sm: 8px; --r-md: 10px; --r-lg: 14px; --r-full: 100px;
+      max-width: 1120px; margin: 0 auto; color: var(--navy);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .rproto .mono { font-family: "IBM Plex Sans", monospace; }
+    .rproto .material-icons-outlined { font-family: "Material Icons Outlined"; line-height: 1; vertical-align: middle; }
+
+    /* request context strip */
+    .rproto .gctx { display: flex; align-items: center; gap: 13px; background: linear-gradient(135deg, var(--navy), var(--navy-deep)); color: #fff; border-radius: var(--r-lg); padding: 14px 16px; margin-bottom: 16px; }
+    .rproto .gctx .gx-ic { width: 40px; height: 40px; border-radius: 10px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.12); }
+    .rproto .gctx .gx-main { flex: 1; min-width: 0; }
+    .rproto .gctx .gx-title { font-size: 14.5px; font-weight: 900; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .rproto .gctx .gx-count { font-size: 10.5px; font-weight: 800; background: rgba(255,255,255,0.18); border-radius: var(--r-full); padding: 2px 9px; }
+    .rproto .gctx .gx-meta { font-size: 11.5px; font-weight: 600; color: rgba(255,255,255,0.62); margin-top: 4px; }
+
+    /* drop zone */
+    .rproto .dropzone { border: 2px dashed var(--border); background: rgba(255,255,255,0.5); border-radius: var(--r-lg); padding: 26px 18px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+    .rproto .dropzone:hover { border-color: var(--rentee); background: var(--rentee-dim); }
+    .rproto .dropzone.over { border-color: var(--rentee); background: var(--rentee-dim); }
+    .rproto .dropzone .dz-ic { width: 46px; height: 46px; border-radius: 12px; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; background: var(--rentee-dim); color: var(--rentee); }
+    .rproto .dropzone .dz-ic .material-icons-outlined { font-size: 26px; }
+    .rproto .dropzone .dz-t { font-size: 14px; font-weight: 800; }
+    .rproto .dropzone .dz-s { font-size: 12px; color: var(--muted); font-weight: 600; margin-top: 4px; }
+    .rproto .dz-sim { display: inline-flex; align-items: center; gap: 5px; margin-top: 12px; font-size: 11px; font-weight: 700; color: var(--warning); background: var(--warning-bg); border-radius: var(--r-full); padding: 4px 10px; }
+    .rproto .dz-sim .material-icons-outlined { font-size: 13px; }
+
+    /* uploaded tray */
+    .rproto .tray { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin: 14px 0 6px; }
+    .rproto .tray .tlab { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+    .rproto .qchip { display: inline-flex; align-items: center; gap: 8px; background: var(--surface1); border: 1px solid var(--border); border-radius: var(--r-full); padding: 6px 8px 6px 12px; font-size: 12.5px; font-weight: 800; }
+    .rproto .qchip .av { width: 20px; height: 20px; border-radius: 50%; background: #e8dec0; border: 1px solid var(--navy); display: inline-flex; align-items: center; justify-content: center; font-size: 10px; flex: 0 0 auto; }
+    .rproto .qchip .fn { font-weight: 600; color: var(--muted); font-size: 11px; }
+    .rproto .qchip .x { display: inline-flex; cursor: pointer; color: var(--text-disabled); }
+    .rproto .qchip .x .material-icons-outlined { font-size: 16px; }
+    .rproto .qchip .vtick { color: var(--success); font-size: 13px; }
+    .rproto .clear-all { font-size: 12px; font-weight: 700; color: var(--danger); cursor: pointer; margin-inline-start: 4px; }
+
+    /* basket summary */
+    .rproto .basket { display: flex; align-items: center; gap: 12px; background: var(--action-dim); border: 1.5px solid rgba(247,144,9,0.4); border-radius: var(--r-lg); padding: 13px 16px; margin: 16px 0; }
+    .rproto .basket .bk-ic { color: var(--action); }
+    .rproto .basket .bk-t { font-size: 13px; font-weight: 800; }
+    .rproto .basket .bk-s { font-size: 11.5px; color: var(--navy-mid); font-weight: 600; margin-top: 2px; }
+    .rproto .basket .bk-v { margin-inline-start: auto; font-family: "IBM Plex Sans", monospace; font-size: 19px; font-weight: 800; color: var(--action); }
+
+    /* item tabs */
+    .rproto .item-tabs { margin: 4px 0 14px; }
+    .rproto .flab { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin: 0 2px 8px; }
+    .rproto .flab .material-icons-outlined { font-size: 14px; }
+    .rproto .itabs { display: flex; gap: 9px; overflow-x: auto; padding-bottom: 4px; }
+    .rproto .itab { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; border: 1.5px solid var(--border); background: var(--surface1); border-radius: var(--r-full); padding: 9px 15px; font-size: 12.5px; font-weight: 800; color: var(--navy-mid); cursor: pointer; white-space: nowrap; transition: background .12s, border-color .12s; }
+    .rproto .itab:hover { border-color: var(--navy-mid); }
+    .rproto .itab.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+    .rproto .itab .material-icons-outlined { font-size: 16px; }
+    .rproto .itab .ct { display: inline-flex; align-items: center; justify-content: center; min-width: 19px; height: 19px; padding: 0 6px; border-radius: var(--r-full); background: var(--surface2); color: var(--navy-mid); font-family: "IBM Plex Sans", monospace; font-size: 11px; font-weight: 800; }
+    .rproto .itab.on .ct { background: rgba(255,255,255,0.22); color: #fff; }
+    /* per-item comparison */
+    .rproto .cmp { margin-bottom: 20px; }
+    .rproto .cmp-h { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .rproto .cmp-h .ci { width: 40px; height: 40px; border-radius: 10px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; background: var(--surface3); color: var(--navy-mid); }
+    .rproto .cmp-h .ct { font-size: 15px; font-weight: 900; }
+    .rproto .cmp-h .cs { font-size: 11.5px; font-weight: 700; color: var(--muted); margin-top: 2px; }
+    .rproto .cmp-empty { border: 1px dashed var(--border); border-radius: var(--r-lg); padding: 22px; text-align: center; font-size: 12.5px; color: var(--muted); background: rgba(239,244,249,0.5); }
+
+    .rproto .cmp-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface1); }
+    /* comparison table — offers as rows, attributes as columns (like the quotation pricing table) */
+    .rproto .ctbl { border-collapse: collapse; width: 100%; min-width: 940px; }
+    .rproto .ctbl th { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); text-align: start; padding: 10px 13px; background: var(--surface2); border-bottom: 2px solid var(--border); white-space: nowrap; }
+    .rproto .ctbl th.num, .rproto .ctbl td.num { text-align: end; }
+    .rproto .ctbl td { padding: 11px 13px; border-bottom: 1px solid var(--line); font-size: 12.5px; vertical-align: middle; }
+    .rproto .ctbl tbody tr:last-child td { border-bottom: 0; }
+    .rproto .ctbl tbody tr.best td { background: rgba(29,175,88,0.06); }
+    .rproto .ctbl .sup { display: flex; align-items: center; gap: 8px; }
+    .rproto .ctbl .sup .av { width: 30px; height: 30px; border-radius: 50%; background: #e8dec0; border: 1.5px solid var(--navy); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; flex: 0 0 auto; }
+    .rproto .ctbl .sn { font-weight: 800; font-size: 12.5px; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+    .rproto .ctbl .sn .vtick { color: var(--success); font-size: 13px; }
+    .rproto .ctbl .sr { font-size: 10.5px; font-weight: 700; color: var(--muted); display: flex; align-items: center; gap: 3px; margin-top: 2px; }
+    .rproto .ctbl .sr .star { color: var(--action); font-size: 12px; }
+    .rproto .ctbl .money { font-family: "IBM Plex Sans", monospace; font-weight: 700; }
+    .rproto .ctbl .tot { font-family: "IBM Plex Sans", monospace; font-weight: 800; font-size: 14px; }
+    .rproto .ctbl tbody tr.best .tot { color: var(--action); }
+    .rproto .ctbl .bestbadge { display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 800; color: var(--success); background: var(--success-bg); border-radius: var(--r-full); padding: 1px 7px; margin-top: 3px; }
+    .rproto .ctbl .bestbadge .material-icons-outlined { font-size: 11px; }
+    .rproto .ctbl .delta { font-size: 10px; font-weight: 800; color: var(--danger); margin-top: 3px; }
+
+    .rproto .eqcell { font-weight: 700; font-size: 12.5px; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .rproto .eqcell .eqv-ok { color: var(--success); font-size: 14px; }
+    .rproto .eqcell .eqv-no { color: var(--text-disabled); font-size: 14px; }
+    .rproto .termscell { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+    .rproto .donut { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; flex: 0 0 auto; }
+    .rproto .donut::before { content: ""; position: absolute; inset: 4px; background: var(--surface1); border-radius: 50%; }
+    .rproto .ctbl tbody tr.best .donut::before { background: #f3fbf6; }
+    .rproto .donut span { position: relative; font-family: "IBM Plex Sans", monospace; font-size: 10px; font-weight: 700; }
+    .rproto .tbest { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 800; color: var(--success); }
+    .rproto .tbest .material-icons-outlined { font-size: 12px; }
+    .rproto .pick { border: 0; border-radius: var(--r-sm); padding: 8px 12px; font: inherit; font-weight: 800; font-size: 11.5px; color: #fff; background: var(--action); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .rproto .pick .material-icons-outlined { font-size: 15px; }
+
+    /* ── compare overlay (compare_overlay.dart): suppliers = columns, terms = rows, 3 blocks ── */
+    .rproto .cmpx-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface1); }
+    .rproto .cgrid { display: grid; }
+    .rproto .cstrip { position: sticky; top: 0; z-index: 4; background: var(--surface1); border-bottom: 1px solid var(--border); }
+    .rproto .cstrip .clbl { background: var(--surface1); }
+    .rproto .csup { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 12px 6px; border-inline-start: 1px solid var(--line); }
+    .rproto .cava { position: relative; width: 36px; height: 36px; border-radius: 50%; background: #F3E9D8; color: var(--navy); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; }
+    .rproto .cava .ctick { position: absolute; inset-inline-start: -3px; bottom: -3px; width: 15px; height: 15px; border-radius: 50%; background: var(--success); border: 1.5px solid #fff; color: #fff; font-size: 9px; display: flex; align-items: center; justify-content: center; }
+    .rproto .cname { font-size: 11.5px; font-weight: 800; text-align: center; line-height: 1.25; }
+    .rproto .cacc { background: var(--success); color: #fff; font-size: 9px; font-weight: 800; padding: 2px 8px; border-radius: 999px; }
+    .rproto .cbhead { display: flex; align-items: center; gap: 8px; padding: 9px 14px; font-size: 12px; font-weight: 800; }
+    .rproto .cdot { width: 8px; height: 8px; border-radius: 50%; }
+    .rproto .b-price .cbhead { background: rgba(247,144,9,.08); color: var(--action); } .rproto .b-price .cdot { background: var(--action); }
+    .rproto .b-qual .cbhead { background: rgba(37,99,235,.08); color: var(--rentee); } .rproto .b-qual .cdot { background: var(--rentee); }
+    .rproto .b-comp .cbhead { background: rgba(29,175,88,.08); color: var(--success); } .rproto .b-comp .cdot { background: var(--success); }
+    .rproto .crow { border-bottom: 1px solid var(--line); }
+    .rproto .crow .clbl { background: #FAFCFE; font-size: 11px; font-weight: 800; color: var(--muted); display: flex; align-items: center; padding: 10px 10px; }
+    .rproto .ccell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 10px 6px; text-align: center; border-inline-start: 1px solid var(--line); }
+    .rproto .ccell.win { background: rgba(29,175,88,0.10); }
+    .rproto .cmoney { font-weight: 800; font-size: 12.5px; color: var(--navy); } .rproto .cmoney.big { font-size: 14px; }
+    .rproto .sar { font-size: 10px; font-weight: 700; opacity: .8; }
+    .rproto .cval { font-size: 12px; font-weight: 700; color: var(--navy); } .rproto .cval.num { font-size: 13px; font-weight: 800; }
+    .rproto .clead { font-size: 9.5px; font-weight: 600; color: var(--muted); }
+    .rproto .csoft { font-size: 12px; font-weight: 700; color: var(--muted); }
+    .rproto .cvpill { font-size: 10px; font-weight: 800; padding: 3px 9px; border-radius: 999px; }
+    .rproto .cvpill.ok { background: var(--success-bg); color: var(--success); } .rproto .cvpill.no { background: var(--danger-bg); color: var(--danger); }
+    .rproto .cchk { font-size: 16px; font-weight: 900; } .rproto .cchk.ok { color: var(--success); } .rproto .cchk.no { color: var(--danger); }
+    .rproto .cfrac { font-size: 13px; font-weight: 900; color: var(--navy); }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="toolbar"><span class="logo"><h1>MOEDA<i>TECH</i> — Compare quotations</h1></span></div>
+
+    <div class="rproto" dir="ltr">
+      <!-- which request we're comparing for -->
+      <div class="gctx">
+        <span class="gx-ic"><span class="material-icons-outlined">compare_arrows</span></span>
+        <div class="gx-main">
+          <div class="gx-title">Riyadh — Al Malqa site <span class="gx-count" id="ctx-items">3 items</span></div>
+          <div class="gx-meta">14 Jun 2026 · REQ-2041-G · comparing supplier quotations per item</div>
+        </div>
+      </div>
+
+      <!-- drop zone -->
+      <div class="dropzone" id="dropzone">
+        <div class="dz-ic"><span class="material-icons-outlined">upload_file</span></div>
+        <div class="dz-t">Drop quotation files here</div>
+        <div class="dz-s">PDF or image · or click to browse · we read each quotation and slot its lines under the matching item</div>
+        <div class="dz-sim"><span class="material-icons-outlined">science</span>Prototype: dropped files are simulated as sample quotations</div>
+        <input type="file" id="fileInput" multiple accept="application/pdf,image/*" style="display:none" />
+      </div>
+
+      <!-- uploaded tray -->
+      <div class="tray hidden" id="tray"></div>
+
+      <!-- best-price basket -->
+      <div class="basket hidden" id="basket">
+        <span class="bk-ic"><span class="material-icons-outlined">shopping_basket</span></span>
+        <div><div class="bk-t">Cheapest basket — lowest-priced offer for each item</div><div class="bk-s" id="basket-sub"></div></div>
+        <span class="bk-v" id="basket-total"></span>
+      </div>
+
+      <!-- item tabs — each requested item on its own tab -->
+      <div class="item-tabs hidden" id="itemtabs-wrap">
+        <div class="flab"><span class="material-icons-outlined">view_module</span>Item</div>
+        <div class="itabs" id="itemtabs"></div>
+      </div>
+
+      <!-- selected item's comparison -->
+      <div id="comparison"></div>
+    </div>
+  </div>
+
+  <script>
+    const nf = (n) => Math.round(n).toLocaleString("en-US");
+    const classLabel = (...parts) => { const seen = []; parts.forEach(p => { if (p && !seen.includes(p)) seen.push(p); }); return seen.join(" · "); };
+    const donutBg = (m, c) => { const t = m + c || 1, mp = ((m / t) * 100).toFixed(0); return `conic-gradient(var(--success) 0 ${mp}%, var(--warning) ${mp}% 100%, var(--surface3) 100% 100%)`; };
+
+    // the request being compared — items the renter asked for
+    const REQUEST = {
+      items: [
+        { key: "exc", icon: "agriculture", cat: "Excavator", sub: "Crawler", size: "20–24 ton", units: 2, dur: 14, rentalType: "WEEKLY" },
+        { key: "doz", icon: "construction", cat: "Bulldozer", sub: "Bulldozer", size: "70 ton", units: 1, dur: 14, rentalType: "WEEKLY" },
+        { key: "crn", icon: "precision_manufacturing", cat: "Crane", sub: "Tower crane", size: "45 m", units: 1, dur: 14, rentalType: "WEEKLY" },
+      ],
+    };
+
+    // pool a "dropped file" resolves to (simulated extraction). Each supplier quote covers some items.
+    const POOL = [
+      { supplier: "Al Rajhi Heavy Equipment", verified: true, rating: 4.8, file: "alrajhi_quote.pdf",
+        entity: "Company", license: true, tax: true, safety: true, localContent: true, saso: false, lines: {
+          exc: { equip: "Komatsu · PC210 · 2022", eqVerified: true, dist: 12, price: 26500, mob: 8000, demob: 8000, lead: 5, m: 7, c: 0, valid: "21 Jun" },
+          doz: { equip: "CAT · D8T · 2021", eqVerified: true, dist: 12, price: 31000, mob: 9000, demob: 9000, lead: 5, m: 6, c: 1, valid: "20 Jun" } } },
+      { supplier: "Bin Laden Rentals", verified: true, rating: 4.5, file: "binladen_quote.pdf",
+        entity: "Individual supplier", license: true, tax: false, safety: true, localContent: false, saso: true, lines: {
+          exc: { equip: "CAT · 320D · 2021", eqVerified: false, dist: 28, price: 26000, mob: 9000, demob: 9000, lead: 3, m: 5, c: 2, valid: "19 Jun" },
+          crn: { equip: "Potain · MDT 219 · 2020", eqVerified: true, dist: 28, price: 44000, mob: 15000, demob: 15000, lead: 4, m: 6, c: 1, valid: "22 Jun" } } },
+      { supplier: "Nesma Trading Co.", verified: true, rating: 4.9, file: "nesma_quote.pdf",
+        entity: "Company", license: true, tax: true, safety: true, localContent: true, saso: true, lines: {
+          crn: { equip: "Liebherr · 71 EC-B · 2023", eqVerified: true, dist: 9, price: 42000, mob: 14000, demob: 14000, lead: 2, m: 7, c: 0, valid: "25 Jun" } } },
+      { supplier: "Arabian Equipment Co.", verified: true, rating: 4.3, file: "arabian_quote.pdf",
+        entity: "Company", license: true, tax: true, safety: true, localContent: false, saso: true, lines: {
+          exc: { equip: "Hyundai · R220 · 2021", eqVerified: true, dist: 18, price: 25800, mob: 8500, demob: 8500, lead: 4, m: 6, c: 1, valid: "23 Jun" },
+          doz: { equip: "Komatsu · D85 · 2022", eqVerified: true, dist: 18, price: 30000, mob: 9500, demob: 9500, lead: 4, m: 7, c: 0, valid: "23 Jun" },
+          crn: { equip: "XCMG · XGT 7517 · 2021", eqVerified: false, dist: 18, price: 43000, mob: 14500, demob: 14500, lead: 4, m: 5, c: 2, valid: "23 Jun" } } },
+      { supplier: "Saudi Plant Hire", verified: false, rating: 3.9, file: "saudiplant_quote.pdf",
+        entity: "Individual supplier", license: true, tax: false, safety: false, localContent: false, saso: false, lines: {
+          doz: { equip: "Shantui · SD22 · 2018", eqVerified: false, dist: 47, price: 28000, mob: 13000, demob: 13000, lead: 6, m: 4, c: 3, valid: "17 Jun" } } },
+    ];
+
+    const uploaded = POOL.slice();   // pre-loaded with the three quotations from REQ-2041-G (drop more / remove to change)
+    let selKey = REQUEST.items[0].key;   // which item tab is open
+    const item = (k) => REQUEST.items.find(i => i.key === k);
+    const lineTotal = (k, ln) => { const it = item(k); const rental = ln.price * it.dur; const sub = rental + ln.mob + ln.demob; return sub + Math.round(sub * 0.15); };
+
+    /* ── drop / browse ── */
+    const dz = document.getElementById("dropzone");
+    const fileInput = document.getElementById("fileInput");
+    dz.addEventListener("dragover", (e) => { e.preventDefault(); dz.classList.add("over"); });
+    dz.addEventListener("dragleave", () => dz.classList.remove("over"));
+    dz.addEventListener("drop", (e) => { e.preventDefault(); dz.classList.remove("over"); addFiles(e.dataTransfer.files ? e.dataTransfer.files.length : 1); });
+    dz.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", (e) => { addFiles(e.target.files ? e.target.files.length : 1); fileInput.value = ""; });
+
+    function addFiles(count) {
+      for (let i = 0; i < (count || 1); i++) {
+        const next = POOL.find(p => !uploaded.some(u => u.file === p.file));
+        if (next) uploaded.push(next);
+      }
+      render();
+    }
+    function removeQuote(file) { const i = uploaded.findIndex(u => u.file === file); if (i > -1) uploaded.splice(i, 1); render(); }
+    function clearAll() { uploaded.length = 0; render(); }
+    function pickItemTab(k) { selKey = k; render(); }
+
+    /* ── one item's comparison, laid out like compare_overlay.dart: suppliers as columns,
+         terms as rows across the Price / Quality / Compliance blocks. ── */
+    function compareTable(it, offers) {
+      const n = offers.length;
+      const gt = `132px repeat(${n}, 1fr)`;
+      const yearOf = (o) => parseInt(String(o.ln.equip).split(" · ").pop(), 10) || 0;
+      const partOf = (o, i) => String(o.ln.equip).split(" · ")[i] || "—";
+      const reqMet = (o) => [o.q.verified, o.q.license, o.q.tax, o.q.safety, o.q.localContent, o.q.saso, o.ln.eqVerified].filter(Boolean).length;
+
+      const minTotal = Math.min(...offers.map(o => o.total));
+      const maxYear = Math.max(...offers.map(yearOf));
+      const minDist = Math.min(...offers.map(o => o.ln.dist));
+      const maxReq = Math.max(...offers.map(reqMet));
+
+      const chk = (b) => b ? '<span class="cchk ok">✓</span>' : '<span class="cchk no">✕</span>';
+      const moneyOrState = (v, lead) => v == null ? '<span class="csoft">Not specified</span>'
+        : v === 0 ? '<span class="csoft">Included</span>'
+        : `<span class="cmoney">${nf(v)} <span class="sar">SAR</span></span>${lead ? `<span class="clead">within ${lead} days</span>` : ""}`;
+      const row = (label, cellFn) => `<div class="crow cgrid" style="grid-template-columns:${gt}"><div class="clbl">${label}</div>${offers.map(cellFn).join("")}</div>`;
+
+      const strip = `<div class="cstrip cgrid" style="grid-template-columns:${gt}"><div class="clbl"></div>` +
+        offers.map(o => `<div class="csup"><div class="cava">${o.q.supplier.charAt(0)}${o.q.verified ? '<span class="ctick">✓</span>' : ""}</div><div class="cname">${o.q.supplier}</div>${o.accepted ? '<span class="cacc">Accepted</span>' : ""}</div>`).join("") + `</div>`;
+
+      const price = `<div class="cblock b-price"><div class="cbhead"><span class="cdot"></span>Price</div>` +
+        row("Total incl. VAT", o => `<div class="ccell${o.total === minTotal ? " win" : ""}"><span class="cmoney big">${nf(o.total)} <span class="sar">SAR</span></span></div>`) +
+        row(`Rate / ${it.rentalType.toLowerCase()}`, o => `<div class="ccell"><span class="cmoney">${nf(o.ln.price)} <span class="sar">SAR</span></span></div>`) +
+        row("Delivery to site", o => `<div class="ccell">${moneyOrState(o.ln.mob, o.ln.lead)}</div>`) +
+        row("Pickup from site", o => `<div class="ccell">${moneyOrState(o.ln.demob, o.ln.lead)}</div>`) +
+        `</div>`;
+
+      const qual = `<div class="cblock b-qual"><div class="cbhead"><span class="cdot"></span>Quality &amp; equipment suitability</div>` +
+        row("Year of manufacture", o => `<div class="ccell${yearOf(o) === maxYear ? " win" : ""}"><span class="cval num">${yearOf(o)}</span></div>`) +
+        row("Brand", o => `<div class="ccell"><span class="cval">${partOf(o, 0)}</span></div>`) +
+        row("Model", o => `<div class="ccell"><span class="cval">${partOf(o, 1)}</span></div>`) +
+        row("Distance from site", o => `<div class="ccell${o.ln.dist === minDist ? " win" : ""}"><span class="cval">${o.ln.dist} km</span></div>`) +
+        row("Capacity", o => `<div class="ccell"><span class="cval">${it.size}</span></div>`) +
+        `</div>`;
+
+      const compliance = `<div class="cblock b-comp"><div class="cbhead"><span class="cdot"></span>Compliance &amp; documents</div>` +
+        row("Verification status", o => `<div class="ccell"><span class="cvpill ${o.q.verified ? "ok" : "no"}">${o.q.verified ? "Verified" : "Not verified"}</span></div>`) +
+        row("Entity type", o => `<div class="ccell"><span class="cval">${o.q.entity}</span></div>`) +
+        row("Activity license", o => `<div class="ccell">${chk(o.q.license)}</div>`) +
+        row("Tax number", o => `<div class="ccell">${chk(o.q.tax)}</div>`) +
+        row("Safety certifications", o => `<div class="ccell">${chk(o.q.safety)}</div>`) +
+        row("Local content certificate", o => `<div class="ccell">${chk(o.q.localContent)}</div>`) +
+        row("SASO certificate", o => `<div class="ccell">${chk(o.q.saso)}</div>`) +
+        row("Equipment verification", o => `<div class="ccell">${chk(o.ln.eqVerified)}</div>`) +
+        row("Requirements met", o => `<div class="ccell${reqMet(o) === maxReq ? " win" : ""}"><span class="cfrac">${reqMet(o)} / 7</span></div>`) +
+        `</div>`;
+
+      return `<div class="cmpx-scroll"><div class="cmpx" style="min-width:${132 + n * 150}px">${strip}${price}${qual}${compliance}</div></div>`;
+    }
+
+    /* ── render ── */
+    function render() {
+      // tray
+      const tray = document.getElementById("tray");
+      tray.classList.toggle("hidden", uploaded.length === 0);
+      tray.innerHTML = uploaded.length
+        ? `<span class="tlab">${uploaded.length} quotation${uploaded.length > 1 ? "s" : ""}</span>` +
+          uploaded.map(q => `<span class="qchip"><span class="av">${q.supplier.charAt(0)}</span>${q.supplier}${q.verified ? '<span class="material-icons-outlined vtick">verified</span>' : ""}<span class="fn">${q.file}</span><span class="x" onclick="removeQuote('${q.file}')"><span class="material-icons-outlined">close</span></span></span>`).join("") +
+          `<span class="clear-all" onclick="clearAll()">Clear all</span>`
+        : "";
+
+      const comp = document.getElementById("comparison");
+      const basket = document.getElementById("basket");
+      const tabsWrap = document.getElementById("itemtabs-wrap");
+      if (uploaded.length === 0) {
+        comp.innerHTML = `<div class="cmp-empty">No quotations yet — drop supplier quotation files above and we'll compare them per item.</div>`;
+        basket.classList.add("hidden");
+        tabsWrap.classList.add("hidden");
+        return;
+      }
+
+      // offers for one item across all uploaded quotations
+      const offersFor = (i) => uploaded.filter(q => q.lines[i.key]).map(q => ({ q, ln: q.lines[i.key], total: lineTotal(i.key, q.lines[i.key]) }));
+
+      // item tabs — one per requested item (with how many quotations cover it)
+      if (!REQUEST.items.some(i => i.key === selKey)) selKey = REQUEST.items[0].key;
+      tabsWrap.classList.remove("hidden");
+      document.getElementById("itemtabs").innerHTML = REQUEST.items.map(i => {
+        const n = offersFor(i).length;
+        return `<button class="itab${i.key === selKey ? " on" : ""}" onclick="pickItemTab('${i.key}')"><span class="material-icons-outlined">${i.icon}</span>${classLabel(i.cat, i.sub, i.size)}<span class="ct">${n}</span></button>`;
+      }).join("");
+
+      // selected item's comparison (compare-overlay layout)
+      const it = item(selKey);
+      const offers = offersFor(it);
+      const head = `<div class="cmp-h"><span class="ci"><span class="material-icons-outlined">${it.icon}</span></span><div><div class="ct">${classLabel(it.cat, it.sub, it.size)}</div><div class="cs">${it.units} unit${it.units > 1 ? "s" : ""} · ${offers.length} quotation${offers.length === 1 ? "" : "s"} · ${it.dur} ${it.rentalType.toLowerCase()} periods</div></div></div>`;
+      comp.innerHTML = offers.length
+        ? `<section class="cmp">${head}${compareTable(it, offers)}</section>`
+        : `<section class="cmp">${head}<div class="cmp-empty">No uploaded quotation includes this item yet.</div></section>`;
+
+      // basket — cheapest per item across ALL items (independent of the open tab)
+      let basketTotal = 0, basketItems = 0;
+      REQUEST.items.forEach(i2 => { const offs = offersFor(i2); if (offs.length) { basketTotal += Math.min(...offs.map(o => o.total)); basketItems++; } });
+      basket.classList.toggle("hidden", basketItems === 0);
+      document.getElementById("basket-total").textContent = `${nf(basketTotal)} SAR`;
+      document.getElementById("basket-sub").textContent = `Lowest offer on ${basketItems} of ${REQUEST.items.length} items, combined (incl. VAT)`;
+    }
+
+    render();
+  </script>
+</body>
+</html>

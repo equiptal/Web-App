@@ -1,0 +1,809 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>My Requests &amp; Bids — grouped prototype</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=IBM+Plex+Sans:wght@400;600;700&family=Material+Icons+Outlined&display=swap" rel="stylesheet" />
+
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #eff4f9; font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1c3550; }
+    .page { padding: 24px 16px 80px; }
+    .toolbar { max-width: 1060px; margin: 0 auto 18px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .toolbar h1 { font-size: 18px; font-weight: 900; margin: 0; letter-spacing: -.3px; }
+    .toolbar .logo i { font-style: normal; color: #f79009; }
+
+    .rproto {
+      --navy: #1c3550; --navy-deep: #12263a; --navy-mid: #2a4f72;
+      --action: #f79009; --action-dim: #fff4e5; --rentee: #2563eb; --rentee-dim: #eaf1fe;
+      --success: #1daf58; --success-bg: #e7f7ee; --warning: #d4780a; --warning-bg: #fff3e0;
+      --danger: #d9362a; --danger-bg: #fcebea; --info: #1a7ec8; --info-bg: #e6f2fb;
+      --muted: #6b8fa8; --surface1: #fff; --surface2: #eff4f9; --surface3: #e4edf5;
+      --border: #d4e0ec; --line: #e4edf5; --text-disabled: #9bb3c8; --shadow: rgba(28, 53, 80, 0.06);
+      --r-sm: 8px; --r-md: 10px; --r-lg: 14px; --r-full: 100px;
+      max-width: 1060px; margin: 0 auto; color: var(--navy);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .rproto .mono { font-family: "IBM Plex Sans", monospace; }
+
+    /* segments */
+    .rproto .seg-tabs { display: flex; gap: 10px; margin-bottom: 18px; }
+    .rproto .seg { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid var(--border); background: var(--surface1); border-radius: var(--r-md); padding: 10px 24px; cursor: pointer; }
+    .rproto .seg .c { font-family: "IBM Plex Sans", monospace; font-size: 20px; font-weight: 700; }
+    .rproto .seg .l { font-size: 12.5px; font-weight: 700; color: var(--muted); }
+    .rproto .seg.on { background: var(--action); border-color: var(--action); }
+    .rproto .seg.on .c, .rproto .seg.on .l { color: #fff; }
+
+    /* badges */
+    .rproto .stbadge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: var(--r-full); }
+    .rproto .stbadge .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .rproto .st-open { background: var(--info-bg); color: var(--info); } .rproto .st-open .dot { background: var(--info); }
+    .rproto .st-active, .rproto .st-accepted { background: var(--success-bg); color: var(--success); } .rproto .st-active .dot, .rproto .st-accepted .dot { background: var(--success); }
+    .rproto .st-expired { background: var(--warning-bg); color: var(--warning); } .rproto .st-expired .dot { background: var(--warning); }
+    .rproto .st-closed { background: var(--surface2); color: var(--muted); } .rproto .st-closed .dot { background: var(--muted); }
+    .rproto .st-mixed { background: rgba(28,53,80,0.07); color: var(--navy-mid); } .rproto .st-mixed .dot { background: var(--navy-mid); }
+    .rproto .typebadge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: var(--r-full); }
+    .rproto .typebadge .material-icons-outlined { font-size: 13px; }
+    .rproto .tb-broadcast { background: rgba(28, 53, 80, 0.07); color: var(--navy-mid); }
+    .rproto .tb-direct { background: var(--action-dim); color: var(--action); }
+    .rproto .asap { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 800; color: var(--danger); background: var(--danger-bg); padding: 3px 9px; border-radius: var(--r-full); }
+    .rproto .asap .material-icons-outlined { font-size: 13px; }
+
+    /* filter levels */
+    .rproto .flevel { margin-bottom: 14px; }
+    .rproto .flab { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); margin: 0 2px 8px; }
+    .rproto .flab .material-icons-outlined { font-size: 14px; }
+    .rproto .chips-row { display: flex; gap: 9px; overflow-x: auto; padding-bottom: 4px; }
+    .rproto .req-chip { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; border: 1.5px solid var(--border); background: var(--surface1); border-radius: var(--r-full); padding: 9px 15px; font-size: 12.5px; font-weight: 800; color: var(--navy-mid); cursor: pointer; transition: background .12s, border-color .12s; white-space: nowrap; }
+    .rproto .req-chip:hover { border-color: var(--navy-mid); }
+    .rproto .req-chip.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+    .rproto .req-chip .ct { display: inline-flex; align-items: center; justify-content: center; min-width: 19px; height: 19px; padding: 0 6px; border-radius: var(--r-full); background: var(--surface2); color: var(--navy-mid); font-family: "IBM Plex Sans", monospace; font-size: 11px; font-weight: 800; }
+    .rproto .req-chip.on .ct { background: rgba(255,255,255,0.22); color: #fff; }
+    .rproto .req-chip .asap-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--danger); flex: 0 0 auto; }
+    .rproto .sup-chip .av { width: 20px; height: 20px; border-radius: 50%; background: #e8dec0; border: 1px solid var(--navy); display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: var(--navy); flex: 0 0 auto; }
+    .rproto .sup-chip .vtick { font-size: 13px; color: var(--success); }
+    .rproto .req-chip.on .sup-chip .vtick, .rproto .req-chip.on .vtick { color: #79e0a6; }
+    .rproto .level2 { background: var(--surface1); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 12px 12px 8px; }
+
+    /* group context strip */
+    .rproto .gctx { display: flex; align-items: center; gap: 13px; background: linear-gradient(135deg, var(--navy), var(--navy-deep)); color: #fff; border-radius: var(--r-lg); padding: 13px 15px; margin-bottom: 14px; }
+    .rproto .gctx .gx-ic { width: 40px; height: 40px; border-radius: 10px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.12); }
+    .rproto .gctx .gx-main { flex: 1; min-width: 0; }
+    .rproto .gctx .gx-title { font-size: 14.5px; font-weight: 900; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .rproto .gctx .gx-count { font-size: 10.5px; font-weight: 800; background: rgba(255,255,255,0.18); border-radius: var(--r-full); padding: 2px 9px; }
+    .rproto .gctx .gx-meta { font-size: 11.5px; font-weight: 600; color: rgba(255,255,255,0.62); margin-top: 4px; }
+    .rproto .gctx .gx-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+    .rproto .gctx .gx-bids { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 800; }
+    .rproto .gctx .gx-bids .material-icons-outlined { font-size: 15px; color: #79e0a6; }
+    .rproto .gctx .stbadge, .rproto .gctx .typebadge { background: rgba(255,255,255,0.14); color: #fff; }
+    .rproto .gctx .stbadge .dot { background: #fff; }
+
+    .rproto .contentbar { display: flex; align-items: center; gap: 10px; margin: 2px 0 12px; }
+    .rproto .contentbar .count { font-size: 13px; font-weight: 700; color: var(--muted); }
+
+    /* request (item) card */
+    .rproto .rq { position: relative; overflow: hidden; background: var(--surface1); border: 1px solid var(--border); border-radius: var(--r-lg); margin-bottom: 12px; cursor: pointer; transition: box-shadow 0.14s, transform 0.14s; width: 100%; display: block; text-align: start; }
+    .rproto .rq:hover { transform: translateY(-1px); box-shadow: 0 8px 20px var(--shadow); }
+    .rproto .rq .accent { position: absolute; inset-block: 0; inset-inline-start: 0; width: 4px; background: linear-gradient(var(--navy), var(--navy-mid)); }
+    .rproto .rq.asap .accent { background: linear-gradient(var(--danger), var(--warning)); }
+    .rproto .rq-in { padding: 15px 16px 15px 19px; }
+    .rproto .rq-head { display: flex; gap: 14px; align-items: flex-start; }
+    .rproto .rq-thumb { width: 54px; height: 54px; border-radius: 12px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; background: var(--surface2); border: 1px solid var(--border); color: var(--navy-mid); }
+    .rproto .rq-thumb .material-icons-outlined { font-size: 28px; }
+    .rproto .rq-h { flex: 1; min-width: 0; }
+    .rproto .rq-title { font-size: 15.5px; font-weight: 800; color: var(--navy); letter-spacing: -0.2px; }
+    .rproto .rq-created { font-size: 11.5px; color: var(--muted); font-weight: 600; margin-top: 2px; }
+    .rproto .rq-arrow { color: var(--text-disabled); }
+    .rproto .rq-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .rproto .rq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 14px; margin-top: 13px; padding-top: 13px; border-top: 1px solid var(--line); }
+    .rproto .rq-cell { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--navy-mid); font-weight: 600; min-width: 0; }
+    .rproto .rq-cell .ci { width: 28px; height: 28px; border-radius: 8px; flex: 0 0 auto; background: rgba(247, 144, 9, 0.1); color: var(--action); display: flex; align-items: center; justify-content: center; }
+    .rproto .rq-cell .ci .material-icons-outlined { font-size: 16px; }
+    .rproto .rq-cell .tx { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rproto .rq-cell .tx b { font-weight: 800; color: var(--navy); }
+    .rproto .rq-cell.bids .ci { background: var(--success-bg); color: var(--success); } .rproto .rq-cell.bids .tx b { color: var(--success); }
+    @media (max-width: 560px) { .rproto .rq-grid { grid-template-columns: 1fr; } }
+
+    /* bid card (v3) */
+    .rproto .bid { background: var(--surface1); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; margin-bottom: 14px; position: relative; }
+    .rproto .bid-for { display: flex; align-items: center; gap: 7px; padding: 8px 14px; background: var(--rentee-dim); border-bottom: 1px solid #cfe0fb; font-size: 11.5px; font-weight: 800; color: #1849a9; }
+    .rproto .bid-for .material-icons-outlined { font-size: 15px; }
+    .rproto .bid-for .ix { margin-inline-start: auto; font-weight: 700; color: #3f6bb5; font-size: 10.5px; }
+    /* equipment-focused header */
+    .rproto .bid-eq { width: 46px; height: 46px; border-radius: 11px; background: var(--surface2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--navy-mid); flex: 0 0 auto; }
+    .rproto .bid-eq .material-icons-outlined { font-size: 24px; }
+    .rproto .bid-by { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 11.5px; font-weight: 700; color: var(--navy-mid); margin-top: 5px; }
+    .rproto .bid-by > .material-icons-outlined { font-size: 13px; color: var(--muted); }
+    .rproto .bid-by .vf { color: var(--success); }
+    .rproto .bid-by .dotsep { color: var(--text-disabled); }
+    .rproto .bid-by .star { display: inline-flex; align-items: center; gap: 2px; color: var(--action); }
+    .rproto .bid-by .star .material-icons-outlined { font-size: 13px; color: var(--action); }
+    .rproto .bid-for-line { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; font-size: 10.5px; font-weight: 800; color: #1849a9; background: var(--rentee-dim); border: 1px solid #cfe0fb; border-radius: var(--r-full); padding: 3px 9px; }
+    .rproto .bid-for-line .material-icons-outlined { font-size: 13px; }
+    .rproto .bid-for-line .ixs { color: #3f6bb5; font-weight: 700; }
+    .rproto .eqv-ok { color: var(--success); font-size: 16px; }
+    .rproto .eqv-no { color: var(--text-disabled); font-size: 16px; }
+    .rproto .eqcreds { display: flex; gap: 6px; margin-top: 7px; flex-wrap: wrap; }
+    .rproto .equip-row .equip-view { cursor: pointer; }
+    .rproto .eq-chip .material-icons-outlined { font-size: 15px; }
+    /* select-for-quotation */
+    .rproto .bid.sel { border-color: var(--navy); border-width: 2px; box-shadow: 0 8px 24px rgba(19,36,59,0.1); }
+    .rproto .bid-check { width: 26px; height: 26px; border-radius: 7px; border: 1.5px solid var(--border); background: var(--surface1); display: flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; color: transparent; }
+    .rproto .bid-check.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+    .rproto .bid-check .material-icons-outlined { font-size: 18px; }
+    .rproto .qbar { position: sticky; bottom: 14px; z-index: 5; display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 12px 16px; background: var(--navy); color: #fff; border-radius: var(--r-lg); box-shadow: 0 10px 28px rgba(19,36,59,0.28); }
+    .rproto .qbar .qn { font-size: 13.5px; font-weight: 800; }
+    .rproto .qbar .qclear { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.7); cursor: pointer; }
+    .rproto .qbar .qdl { margin-inline-start: auto; display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: var(--r-md); padding: 10px 16px; font: inherit; font-weight: 800; font-size: 13px; color: #fff; background: var(--action); cursor: pointer; }
+    .rproto .qbar .qdl .material-icons-outlined { font-size: 17px; }
+    /* view-request-details link on the group strip */
+    .rproto .gctx .gx-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 9px; background: rgba(255,255,255,0.14); color: #fff; border: 0; border-radius: var(--r-full); padding: 6px 12px; font: inherit; font-weight: 800; font-size: 11.5px; cursor: pointer; }
+    .rproto .gctx .gx-link:hover { background: rgba(255,255,255,0.24); }
+    .rproto .gctx .gx-link .material-icons-outlined { font-size: 14px; }
+    /* request-details screen */
+    .rproto .reqscreen { position: fixed; inset: 0; z-index: 70; background: #eff4f9; display: flex; flex-direction: column; }
+    .rproto .rs-bar { display: flex; align-items: center; gap: 12px; background: #fff; border-bottom: 1px solid var(--border); padding: 12px 18px; flex: 0 0 auto; }
+    .rproto .rs-back { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); background: var(--surface1); border-radius: var(--r-md); padding: 8px 14px; font: inherit; font-weight: 800; font-size: 12.5px; color: var(--navy); cursor: pointer; }
+    .rproto .rs-back .material-icons-outlined { font-size: 18px; }
+    .rproto .rs-title { font-size: 14px; font-weight: 800; color: var(--navy-mid); }
+    .rproto .reqscreen iframe { flex: 1; border: 0; width: 100%; }
+    /* equipment-detail modal */
+    .rproto .eqmodal { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(0,0,0,0.5); padding: 16px; }
+    .rproto .eqsheet { width: 100%; max-width: 640px; max-height: 92vh; display: flex; flex-direction: column; background: var(--surface1); border-radius: 16px; overflow: hidden; box-shadow: 0 20px 50px rgba(19,36,59,0.35); }
+    .rproto .eqm-head { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding: 12px 16px; }
+    .rproto .eqm-store { font-size: 14px; font-weight: 800; color: var(--navy); }
+    .rproto .eqm-close { border: 0; background: none; cursor: pointer; color: var(--muted); width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; }
+    .rproto .eqm-close:hover { background: var(--surface2); }
+    .rproto .eqm-body { overflow-y: auto; }
+    .rproto .eqm-photo { height: 220px; display: grid; place-items: center; background: linear-gradient(135deg, var(--surface2), var(--surface3)); color: var(--muted); }
+    .rproto .eqm-photo .material-icons-outlined { font-size: 56px; }
+    .rproto .eqm-in { padding: 18px; display: flex; flex-direction: column; gap: 16px; }
+    .rproto .eqm-tax h2 { font-size: 18px; font-weight: 800; margin: 0; display: inline-flex; align-items: center; gap: 6px; }
+    .rproto .eqm-tax h2 .vt { color: var(--success); font-size: 16px; }
+    .rproto .eqm-chips { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+    .rproto .eqm-chips .c { background: var(--navy); color: #fff; border-radius: var(--r-full); padding: 4px 10px; font-size: 11px; font-weight: 800; }
+    .rproto .eqm-mm { font-size: 13px; color: var(--muted); margin-top: 8px; }
+    .rproto .eqm-specs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    @media (max-width: 560px) { .rproto .eqm-specs { grid-template-columns: repeat(2, 1fr); } }
+    .rproto .eqm-spec { border: 1px solid var(--border); border-radius: 10px; padding: 8px 11px; }
+    .rproto .eqm-spec .sl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); }
+    .rproto .eqm-spec .sv { font-size: 13px; font-weight: 800; margin-top: 3px; }
+    .rproto .eqm-spec.hl .sv { color: var(--action); }
+    .rproto .eqm-docs { border: 1px solid var(--border); background: rgba(239,244,249,0.4); border-radius: 12px; padding: 13px; }
+    .rproto .eqm-docs .row { display: flex; align-items: center; gap: 8px; font-weight: 800; color: var(--navy); font-size: 12.5px; flex-wrap: wrap; }
+    .rproto .eqm-docs .row + .row { margin-top: 10px; }
+    .rproto .eqm-docs .cnt { background: var(--surface3); color: var(--muted); border-radius: var(--r-full); padding: 1px 8px; font-size: 11px; }
+    .rproto .eqm-docs .doc { display: inline-flex; align-items: center; gap: 3px; background: var(--success-bg); color: var(--success); border-radius: var(--r-full); padding: 2px 8px; font-size: 11px; font-weight: 800; }
+    .rproto .eqm-docs .doc .material-icons-outlined { font-size: 12px; color: inherit; }
+    .rproto .eqm-docs > .row > .material-icons-outlined { font-size: 16px; color: var(--muted); }
+    .rproto .bid-head { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px 8px; }
+    .rproto .bid-av { position: relative; width: 40px; height: 40px; border-radius: 50%; background: #e8dec0; border: 1.5px solid var(--navy); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 17px; color: var(--navy); flex: 0 0 auto; }
+    .rproto .bid-av .vchk { position: absolute; bottom: -2px; inset-inline-end: -2px; width: 14px; height: 14px; border-radius: 50%; background: var(--success); border: 1.5px solid #fff; display: flex; align-items: center; justify-content: center; }
+    .rproto .bid-av .vchk .material-icons-outlined { font-size: 9px; color: #fff; }
+    .rproto .bid-hh { flex: 1; min-width: 0; }
+    .rproto .bid-hh .r1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .rproto .bid-hh .sname { font-size: 14px; font-weight: 800; color: var(--navy); }
+    .rproto .bid-evt { font-size: 11px; font-weight: 600; color: var(--muted); margin-top: 4px; }
+    .rproto .credrow { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+    .rproto .credpill { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: var(--r-full); }
+    .rproto .credpill .material-icons-outlined { font-size: 11px; }
+    .rproto .cp-ok { background: var(--success-bg); color: var(--success); } .rproto .cp-miss { background: var(--surface2); color: var(--muted); }
+    .rproto .spill { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: var(--r-full); line-height: 1.1; }
+    .rproto .spill .d { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+    .rproto .sp-pending { color: #1849a9; background: var(--rentee-dim); border: 1px solid #c3d8fb; }
+    .rproto .sp-open { color: var(--navy-deep); background: rgba(42, 79, 114, 0.12); } .rproto .sp-open .d { display: none; }
+    .rproto .sp-counter { color: var(--warning); background: var(--action-dim); } .rproto .sp-counter .d { animation: rpulse 1.2s infinite; }
+    .rproto .sp-accepted { color: var(--success); background: var(--success-bg); } .rproto .sp-accepted .d { display: none; }
+    .rproto .sp-expired, .rproto .sp-withdrawn { color: #666; background: rgba(0, 0, 0, 0.08); } .rproto .sp-expired .d, .rproto .sp-withdrawn .d { display: none; }
+    @keyframes rpulse { 50% { opacity: 0.35; } }
+    .rproto .row-sep { border-top: 1px solid var(--border); }
+    .rproto .terms-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; }
+    .rproto .terms-row .tlab { font-size: 13px; font-weight: 800; color: var(--navy); flex: 0 0 auto; }
+    .rproto .buckets { flex: 1; display: flex; justify-content: flex-end; gap: 16px; min-width: 0; }
+    .rproto .bucket { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+    .rproto .bucket .bl { font-size: 12px; font-weight: 700; color: var(--navy); white-space: nowrap; }
+    .rproto .donut { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; flex: 0 0 auto; }
+    .rproto .donut::before { content: ""; position: absolute; inset: 4px; background: var(--surface1); border-radius: 50%; }
+    .rproto .donut span { position: relative; font-family: "IBM Plex Sans", monospace; font-size: 11px; font-weight: 700; color: var(--navy); }
+    .rproto .equip-row { display: flex; align-items: center; gap: 10px; padding: 11px 14px; }
+    .rproto .equip-row .el { flex: 1; min-width: 0; }
+    .rproto .equip-row .elab { font-size: 13px; font-weight: 800; color: var(--navy); display: flex; align-items: center; gap: 6px; }
+    .rproto .equip-row .elab .vt { font-size: 13px; color: var(--success); }
+    .rproto .equip-row .esub { font-size: 11px; font-weight: 700; color: var(--navy-mid); margin-top: 3px; }
+    .rproto .equip-row .equip-view { display: inline-flex; align-items: center; gap: 2px; flex: none; font-size: 12px; font-weight: 800; color: var(--rentee); white-space: nowrap; }
+    .rproto .equip-row .equip-view .material-icons-outlined { font-size: 16px; }
+    .rproto .price-row { border-top: 1px solid var(--border); }
+    .rproto .price-collapsed { display: flex; align-items: center; padding: 12px 14px; cursor: pointer; }
+    .rproto .price-collapsed .pl { font-size: 13px; font-weight: 800; color: var(--navy); }
+    .rproto .price-collapsed .pr { margin-inline-start: auto; display: flex; align-items: center; gap: 6px; font-family: "IBM Plex Sans", monospace; font-size: 17px; font-weight: 700; color: var(--action); }
+    .rproto .price-collapsed .pr .chev { font-family: "Material Icons Outlined"; font-size: 18px; color: var(--muted); transition: 0.2s; }
+    .rproto .price-row.open .price-collapsed .pr .chev { transform: rotate(180deg); }
+    .rproto .price-row .price-body { display: none; padding: 2px 14px 14px; }
+    .rproto .price-row.open .price-body { display: block; }
+    .rproto .prow { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; font-size: 13px; border-bottom: 1px solid var(--line); }
+    .rproto .prow:last-child { border-bottom: 0; }
+    .rproto .prow .pl2 { color: var(--navy-mid); font-weight: 600; }
+    .rproto .prow .pv { font-family: "IBM Plex Sans", monospace; font-weight: 700; }
+    .rproto .grandcard { border: 1.5px solid rgba(247, 144, 9, 0.4); background: var(--action-dim); border-radius: var(--r-md); padding: 11px 13px; margin-top: 10px; display: flex; align-items: center; }
+    .rproto .grandcard .gl { font-size: 13px; font-weight: 800; color: var(--navy); }
+    .rproto .grandcard .gv { margin-inline-start: auto; font-family: "IBM Plex Sans", monospace; font-size: 16px; font-weight: 800; color: var(--action); }
+    .rproto .lc-chips { display: flex; gap: 7px; padding: 8px 14px 4px; flex-wrap: wrap; }
+    .rproto .lc-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--navy-mid); background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-full); padding: 4px 10px; }
+    .rproto .lc-chip .material-icons-outlined { font-size: 13px; color: var(--muted); }
+    .rproto .neg-footer { border-top: 1px solid var(--border); padding: 10px 14px 12px; }
+    .rproto .neg-pill { width: 100%; border: 0; border-radius: var(--r-md); padding: 12px; font: inherit; font-weight: 800; font-size: 13.5px; color: #fff; background: var(--action); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; }
+    .rproto .neg-pill:disabled { background: var(--surface2); color: var(--text-disabled); cursor: not-allowed; }
+    .rproto .neg-pill .material-icons-outlined { font-size: 18px; }
+    .rproto .nf-hint { margin: 8px 0 0; text-align: center; font-size: 11px; font-weight: 600; color: #7a8fa0; line-height: 1.5; }
+
+    .rproto .material-icons-outlined { font-family: "Material Icons Outlined"; line-height: 1; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="toolbar"><span class="logo"><h1>MOEDA<i>TECH</i> — Requests &amp; Bids (grouped)</h1></span></div>
+
+    <div class="rproto" dir="ltr">
+      <!-- segment switch -->
+      <div class="seg-tabs">
+        <div class="seg" id="seg-requests" onclick="setSeg('requests')"><span class="c" id="seg-req-c">3</span><span class="l">My Requests</span></div>
+        <div class="seg" id="seg-bids" onclick="setSeg('bids')"><span class="c" id="seg-bid-c">8</span><span class="l">My Bids</span></div>
+      </div>
+
+      <!-- LEVEL 1 — by request/group (shared) -->
+      <div class="flevel">
+        <div class="flab"><span class="material-icons-outlined">inventory_2</span>Request</div>
+        <div class="chips-row" id="level1"></div>
+      </div>
+
+      <!-- group context strip -->
+      <div class="gctx" id="gctx"></div>
+
+      <!-- LEVEL 2 — by supplier (bids segment only) -->
+      <div class="flevel hidden" id="level2wrap">
+        <div class="flab"><span class="material-icons-outlined">storefront</span>Supplier</div>
+        <div class="level2"><div class="chips-row" id="level2"></div></div>
+      </div>
+
+      <div class="contentbar"><span class="count" id="contentcount"></span></div>
+      <div id="content"></div>
+
+      <!-- sticky download bar (My Bids) -->
+      <div class="qbar hidden" id="qbar">
+        <span class="qn"><span id="qn-count">0</span> selected</span>
+        <span class="qclear" onclick="clearSel()">Clear</span>
+        <button class="qdl" onclick="downloadQuotations()"><span class="material-icons-outlined">download</span> Download quotations</button>
+      </div>
+
+      <!-- request-details screen (opened from "View full request details") -->
+      <div class="reqscreen hidden" id="reqscreen">
+        <div class="rs-bar"><button class="rs-back" onclick="closeRequestDetail()"><span class="material-icons-outlined">arrow_back</span> Back</button><span class="rs-title">Request details</span></div>
+        <iframe id="rs-frame" title="Request details"></iframe>
+      </div>
+
+      <!-- equipment-detail modal (opened from a bid's "View details") -->
+      <div class="eqmodal hidden" id="eqmodal" onclick="closeEquip()">
+        <div class="eqsheet" onclick="event.stopPropagation()">
+          <div class="eqm-head"><span class="eqm-store" id="eqm-store"></span><button class="eqm-close" onclick="closeEquip()"><span class="material-icons-outlined">close</span></button></div>
+          <div class="eqm-body" id="eqm-body"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const nf = (n) => Math.round(n).toLocaleString("en-US");
+
+    const STATUS = {
+      OPEN: { cls: "st-open", label: "Open" }, ACTIVE: { cls: "st-active", label: "Active" },
+      ACCEPTED: { cls: "st-accepted", label: "Accepted" }, EXPIRED: { cls: "st-expired", label: "Expired" },
+      CLOSED: { cls: "st-closed", label: "Closed" },
+    };
+    const TYPE = {
+      BROADCAST: { cls: "tb-broadcast", icon: "campaign", label: "Broadcast" },
+      DIRECT: { cls: "tb-direct", icon: "person", label: "Direct" },
+    };
+    const SPILL = {
+      PENDING: { cls: "sp-pending", dot: true, label: "New" },
+      OPEN_FOR_NEGOTIATION: { cls: "sp-open", dot: false, label: "Negotiating" },
+      COUNTER_OFFERED: { cls: "sp-counter", dot: true, label: "Counter-offer" },
+      ACCEPTED: { cls: "sp-accepted", dot: false, label: "Accepted" },
+      EXPIRED: { cls: "sp-expired", dot: false, label: "Expired" },
+      WITHDRAWN: { cls: "sp-withdrawn", dot: false, label: "Withdrawn" },
+    };
+    const pillLabel = (s) => ({
+      OPEN_FOR_NEGOTIATION: "Open chat", COUNTER_OFFERED: "Review counter-offer", ACCEPTED: "View deal",
+      EXPIRED: "Expired", WITHDRAWN: "Withdrawn",
+    }[s] || "Start negotiation on this bid");
+    function donut(m, c) { const t = m + c || 1, mp = ((m / t) * 100).toFixed(0); return `conic-gradient(var(--success) 0 ${mp}%, var(--warning) ${mp}% 100%, var(--surface3) 100% 100%)`; }
+
+    /* ── one shared model: a group (submission) has items (for My Requests) AND suppliers→bids (for My Bids).
+         Per-item bid counts are DERIVED from the supplier bids, so the two views can never disagree. ── */
+    const GROUPS = [
+      {
+        id: "g1", city: "Riyadh", label: "Riyadh — Al Malqa", title: "Riyadh — Al Malqa site",
+        gid: "REQ-2041-G", date: "14 Jun 2026", address: "7194 Ibn Barakah, Al Olaya, Riyadh 12331", type: "BROADCAST", asap: false,
+        detail: { period: "18 Jun – 2 Jul 2026", duration: 14, urgency: "Soon", lat: 24.8221, lng: 46.6093, rentalType: "WEEKLY", paymentTerms: "Net 30", paymentMethod: "Bank transfer", workingHours: 10, maintenance: "Supplier", budget: 450000, notes: "Access gate closes at 6pm. Coordinate mobilization with the site supervisor before delivery." },
+        items: [
+          { ix: "REQ-2041-1", title: "Excavator · 20–24 ton · ×2", icon: "agriculture", cat: "Excavator", sub: "Crawler", size: "20–24 ton", status: "ACTIVE", rentalType: "WEEKLY", duration: 14, extra: { icon: "person_outline", label: "With operator" } },
+          { ix: "REQ-2041-2", title: "Dozer · D10 (70 ton)", icon: "construction", cat: "Bulldozer", sub: "Bulldozer", size: "70 ton", status: "OPEN", rentalType: "WEEKLY", duration: 14, extra: { icon: "local_gas_station", label: "DIESEL" } },
+          { ix: "REQ-2041-3", title: "Tower Crane · 45 m", icon: "precision_manufacturing", cat: "Crane", sub: "Tower crane", size: "45 m", status: "ACTIVE", rentalType: "WEEKLY", duration: 14, extra: { icon: "height", label: "45 m" } },
+        ],
+        suppliers: [
+          { id: "alrajhi", name: "Al Rajhi Heavy Equipment", verified: true, rating: 4.8, bids: [
+            { ix: "REQ-2041-1", item: "Excavator · 20–24 ton", status: "PENDING", equip: "Komatsu · PC210 · 2022", eqVerified: true, dist: 12, price: 26500, dur: 14, mob: 8000, demob: 8000, m: 7, c: 0, valid: "21 Jun", evt: "Submitted · 14 Jun" },
+            { ix: "REQ-2041-2", item: "Dozer · D10 (70 ton)", status: "OPEN_FOR_NEGOTIATION", equip: "CAT · D8T · 2021", eqVerified: true, dist: 12, price: 31000, dur: 14, mob: 9000, demob: 9000, m: 6, c: 1, valid: "20 Jun", evt: "Submitted · 13 Jun" },
+          ]},
+          { id: "binladen", name: "Bin Laden Rentals", verified: true, rating: 4.5, bids: [
+            { ix: "REQ-2041-1", item: "Excavator · 20–24 ton", status: "COUNTER_OFFERED", equip: "CAT · 320D · 2021", eqVerified: false, dist: 28, price: 26000, dur: 14, mob: 9000, demob: 9000, m: 5, c: 2, valid: "19 Jun", evt: "Countered" },
+            { ix: "REQ-2041-3", item: "Tower Crane · 45 m", status: "PENDING", equip: "Potain · MDT 219 · 2020", eqVerified: true, dist: 28, price: 44000, dur: 14, mob: 15000, demob: 15000, m: 6, c: 1, valid: "22 Jun", evt: "Submitted · 14 Jun" },
+          ]},
+          { id: "nesma", name: "Nesma Trading Co.", verified: true, rating: 4.9, bids: [
+            { ix: "REQ-2041-3", item: "Tower Crane · 45 m", status: "ACCEPTED", equip: "Liebherr · 71 EC-B · 2023", eqVerified: true, dist: 9, price: 42000, dur: 14, mob: 14000, demob: 14000, m: 7, c: 0, valid: "25 Jun", evt: "Accepted" },
+          ]},
+        ],
+      },
+      {
+        id: "g2", city: "Jeddah", label: "Jeddah — Airport", title: "Jeddah — King Abdulaziz Airport",
+        gid: "REQ-2042-G", date: "14 Jun 2026", address: "King Abdulaziz International Airport, Jeddah", type: "DIRECT", asap: false,
+        detail: { period: "20 Jun 2026", duration: 30, urgency: "Scheduled", lat: 21.6796, lng: 39.1565, rentalType: "MONTHLY", paymentTerms: "Net 60", paymentMethod: "Bank transfer", workingHours: 8, maintenance: "Supplier", budget: 90000, notes: "Airside access — security clearance required for operators before mobilization." },
+        items: [
+          { ix: "REQ-2042-1", title: "Forklift · 10 ton", icon: "forklift", cat: "Forklift", sub: "Forklift", size: "10 ton", status: "OPEN", rentalType: "MONTHLY", duration: 30, extra: { icon: "local_gas_station", label: "DIESEL" } },
+        ],
+        suppliers: [],
+      },
+      {
+        id: "g3", city: "Dammam", label: "Dammam — Ind. City 2", title: "Dammam — Industrial City 2",
+        gid: "REQ-2039-G", date: "13 Jun 2026", address: "Dammam 2nd Industrial City", type: "BROADCAST", asap: true,
+        detail: { period: "14 Jun – 21 Jun 2026", duration: 7, urgency: "ASAP", lat: 26.4207, lng: 50.0888, rentalType: "DAILY", paymentTerms: "Per day", paymentMethod: "Cash", workingHours: 12, maintenance: "Renter", budget: 120000, notes: "Urgent earthworks — equipment needed on site within 48 hours." },
+        items: [
+          { ix: "REQ-2039-1", title: "Dump Truck · 30 ton · ×4", icon: "local_shipping", cat: "Truck", sub: "Dump truck", size: "30 ton", status: "ACTIVE", rentalType: "DAILY", duration: 7, extra: { icon: "person_outline", label: "With operator" } },
+          { ix: "REQ-2039-2", title: "Water Tanker · 20,000 L", icon: "water_drop", cat: "Truck", sub: "Water tanker", size: "20,000 L", status: "ACTIVE", rentalType: "DAILY", duration: 7, extra: { icon: "local_gas_station", label: "DIESEL" } },
+        ],
+        suppliers: [
+          { id: "gulf", name: "Gulf Fleet Services", verified: true, rating: 4.6, bids: [
+            { ix: "REQ-2039-1", item: "Dump Truck · 30 ton ×4", status: "PENDING", equip: "Mercedes · Arocs · 2022", eqVerified: true, dist: 18, price: 3200, dur: 7, mob: 2000, demob: 2000, m: 6, c: 1, valid: "16 Jun", evt: "Submitted · 13 Jun" },
+            { ix: "REQ-2039-2", item: "Water Tanker · 20,000 L", status: "OPEN_FOR_NEGOTIATION", equip: "Isuzu · FVR · 2021", eqVerified: true, dist: 18, price: 1800, dur: 7, mob: 1200, demob: 1200, m: 7, c: 0, valid: "16 Jun", evt: "Submitted · 13 Jun" },
+          ]},
+          { id: "saudirent", name: "Saudi Rentals Group", verified: false, rating: 4.1, bids: [
+            { ix: "REQ-2039-1", item: "Dump Truck · 30 ton ×4", status: "EXPIRED", equip: "Volvo · FMX · 2019", eqVerified: false, dist: 35, price: 3000, dur: 7, mob: 2500, demob: 2500, m: 4, c: 3, valid: "14 Jun", evt: "Validity ended" },
+          ]},
+        ],
+      },
+    ];
+
+    const allBids = (g) => g.suppliers.flatMap(s => s.bids.map(b => {
+      const it = g.items.find(i => i.ix === b.ix) || {};
+      return { ...b, id: `${g.id}|${s.id}|${b.ix}`, sup: s, icon: it.icon || "construction", cat: it.cat, sub: it.sub, size: it.size, rentalType: it.rentalType, scope: it.title };
+    }));
+    // category · subtype · size, but collapse any repeated part (e.g. category === subtype shows once)
+    const classLabel = (...parts) => { const seen = []; parts.forEach(p => { if (p && !seen.includes(p)) seen.push(p); }); return seen.join(" · "); };
+    const itemBids = (g, ix) => allBids(g).filter(b => b.ix === ix).length;
+    const groupHasBids = (g) => allBids(g).length > 0;
+    function overallStatus(g) {
+      const set = [...new Set(g.items.map(i => i.status))];
+      return set.length === 1 ? STATUS[set[0]] : { cls: "st-mixed", label: "Mixed" };
+    }
+
+    let state = { seg: "requests", gid: "g1", sid: "all" };
+    const selected = new Set();   // bid ids chosen for quotation (within the current request)
+
+    function itemCard(it, g) {
+      const st = STATUS[it.status] || STATUS.CLOSED;
+      return `
+      <button class="rq${g.asap ? " asap" : ""}">
+        <span class="accent"></span>
+        <div class="rq-in">
+          <div class="rq-head">
+            <span class="rq-thumb"><span class="material-icons-outlined">${it.icon}</span></span>
+            <div class="rq-h"><div class="rq-title">${it.title}</div><div class="rq-created">${it.ix}</div></div>
+            <span class="material-icons-outlined rq-arrow">chevron_right</span>
+          </div>
+          <div class="rq-badges">
+            <span class="stbadge ${st.cls}"><span class="dot"></span>${st.label}</span>
+            ${g.asap ? '<span class="asap"><span class="material-icons-outlined">flash_on</span>ASAP</span>' : ""}
+          </div>
+          <div class="rq-grid">
+            <div class="rq-cell"><span class="ci"><span class="material-icons-outlined">schedule</span></span><span class="tx">${it.rentalType}</span></div>
+            <div class="rq-cell"><span class="ci"><span class="material-icons-outlined">calendar_today</span></span><span class="tx">${it.duration} days</span></div>
+            <div class="rq-cell bids"><span class="ci"><span class="material-icons-outlined">gavel</span></span><span class="tx"><b>${itemBids(g, it.ix)}</b> bids</span></div>
+            <div class="rq-cell"><span class="ci"><span class="material-icons-outlined">${it.extra.icon}</span></span><span class="tx">${it.extra.label}</span></div>
+          </div>
+        </div>
+      </button>`;
+    }
+
+    function bidCard(b) {
+      const sp = SPILL[b.status] || SPILL.PENDING;
+      const disabled = b.status === "EXPIRED" || b.status === "WITHDRAWN";
+      const rental = b.price * b.dur, sub = rental + b.mob + b.demob, vat = Math.round(sub * 0.15), grand = sub + vat;
+      return `
+      <div class="bid${selected.has(b.id) ? " sel" : ""}">
+        <div class="bid-head">
+          <div class="bid-eq"><span class="material-icons-outlined">${b.icon}</span></div>
+          <div class="bid-hh">
+            <div class="r1"><span class="sname">${classLabel(b.cat, b.sub, b.size)}</span>${b.eqVerified ? '<span class="material-icons-outlined eqv-ok" title="Equipment verified">verified</span>' : '<span class="material-icons-outlined eqv-no" title="Equipment not verified">gpp_bad</span>'}<span class="spill ${sp.cls}">${sp.dot ? '<span class="d"></span>' : ""}${sp.label}</span></div>
+            <div class="bid-by">
+              <span class="material-icons-outlined">storefront</span>${b.sup.name}
+              ${b.sup.verified ? '<span class="material-icons-outlined vf">verified</span>' : ""}
+              <span class="dotsep">·</span><span class="star"><span class="material-icons-outlined">star</span>${b.sup.rating.toFixed(1)}</span>
+            </div>
+          </div>
+          <div class="bid-check${selected.has(b.id) ? " on" : ""}" onclick="toggleBid('${b.id}')" title="Select for quotation"><span class="material-icons-outlined">check</span></div>
+        </div>
+        <div class="equip-row row-sep">
+          <div class="el"><div class="elab">${b.equip}</div><div class="esub">${b.dist} km away</div></div>
+          <span class="equip-view" onclick="openEquip('${b.id}')">View details<span class="material-icons-outlined">chevron_right</span></span>
+        </div>
+        <div class="terms-row row-sep">
+          <span class="tlab">Terms</span>
+          <div class="buckets"><span class="bucket"><span class="donut" style="background:${donut(b.m, b.c)}"><span>${b.m + b.c}</span></span><span class="bl">${b.c > 0 ? b.c + " differ" : "All match"}</span></span></div>
+        </div>
+        <div class="price-row" onclick="this.classList.toggle('open')">
+          <div class="price-collapsed"><span class="pl">Total</span><span class="pr">${nf(grand)} SAR<span class="chev">expand_more</span></span></div>
+          <div class="price-body">
+            <div class="prow"><span class="pl2">Rental (${nf(b.price)} × ${b.dur})</span><span class="pv">${nf(rental)}</span></div>
+            <div class="prow"><span class="pl2">Mobilization</span><span class="pv">${nf(b.mob)}</span></div>
+            <div class="prow"><span class="pl2">Return</span><span class="pv">${nf(b.demob)}</span></div>
+            <div class="prow"><span class="pl2">VAT 15%</span><span class="pv">${nf(vat)}</span></div>
+            <div class="grandcard"><span class="gl">Estimated total</span><span class="gv">${nf(grand)} SAR</span></div>
+          </div>
+        </div>
+        <div class="lc-chips">
+          <span class="lc-chip"><span class="material-icons-outlined">schedule</span>Valid until ${b.valid}</span>
+          <span class="lc-chip"><span class="material-icons-outlined">place</span>${b.dist} km</span>
+        </div>
+        <div class="neg-footer">
+          <button class="neg-pill"${disabled ? " disabled" : ""}>${pillLabel(b.status)}${disabled ? "" : '<span class="material-icons-outlined">arrow_forward</span>'}</button>
+          <p class="nf-hint">${b.status === "ACCEPTED" ? "Tap to open the deal room and continue with this supplier." : "Tapping opens the deal room — a signal to the supplier that you are serious about this bid"}</p>
+        </div>
+      </div>`;
+    }
+
+    function render() {
+      // seg counts
+      document.getElementById("seg-req-c").textContent = GROUPS.length;
+      document.getElementById("seg-bid-c").textContent = GROUPS.reduce((s, g) => s + allBids(g).length, 0);
+      document.getElementById("seg-requests").classList.toggle("on", state.seg === "requests");
+      document.getElementById("seg-bids").classList.toggle("on", state.seg === "bids");
+
+      // which groups are visible in this segment
+      const groups = state.seg === "bids" ? GROUPS.filter(groupHasBids) : GROUPS;
+      if (!groups.some(g => g.id === state.gid)) state.gid = groups[0]?.id;
+      const g = GROUPS.find(x => x.id === state.gid);
+
+      // level 1 chips — city + item count
+      document.getElementById("level1").innerHTML = groups.map(gr =>
+        `<button class="req-chip${gr.id === state.gid ? " on" : ""}" onclick="pickGroup('${gr.id}')">${gr.asap ? '<span class="asap-dot"></span>' : ""}${gr.label} <span class="ct">${gr.items.length} items</span></button>`
+      ).join("");
+
+      // context strip — full address lives here
+      const ov = overallStatus(g), ty = TYPE[g.type], total = allBids(g).length;
+      document.getElementById("gctx").innerHTML = `
+        <span class="gx-ic"><span class="material-icons-outlined">inventory_2</span></span>
+        <div class="gx-main"><div class="gx-title">${g.title} <span class="gx-count">${g.items.length} items</span></div><div class="gx-meta">${g.date} · ${g.gid} · ${g.address}</div><button class="gx-link" onclick="openRequestDetail()"><span class="material-icons-outlined">description</span>View full request details<span class="material-icons-outlined">open_in_new</span></button></div>
+        <div class="gx-badges">
+          ${g.asap ? '<span class="asap"><span class="material-icons-outlined">flash_on</span>ASAP</span>' : ""}
+          <span class="stbadge ${ov.cls}"><span class="dot"></span>${ov.label}</span>
+          <span class="typebadge ${ty.cls}"><span class="material-icons-outlined">${ty.icon}</span>${ty.label}</span>
+          <span class="gx-bids"><span class="material-icons-outlined">gavel</span>${total} bids</span>
+        </div>`;
+
+      const l2 = document.getElementById("level2wrap");
+      if (state.seg === "requests") {
+        l2.classList.add("hidden");
+        document.getElementById("qbar").classList.add("hidden");
+        document.getElementById("contentcount").textContent = `${g.items.length} item${g.items.length > 1 ? "s" : ""} in this request`;
+        document.getElementById("content").innerHTML = g.items.map(it => itemCard(it, g)).join("");
+      } else {
+        l2.classList.remove("hidden");
+        const bids = allBids(g);
+        // level 2 = supplier filter; the card itself stays equipment-focused
+        const chips = [`<button class="req-chip${state.sid === "all" ? " on" : ""}" onclick="pickSup('all')">All suppliers <span class="ct">${bids.length}</span></button>`]
+          .concat(g.suppliers.map(s =>
+            `<button class="req-chip sup-chip${state.sid === s.id ? " on" : ""}" onclick="pickSup('${s.id}')"><span class="av">${s.name.charAt(0)}</span>${s.name}${s.verified ? '<span class="material-icons-outlined vtick">verified</span>' : ""}<span class="ct">${s.bids.length}</span></button>`));
+        document.getElementById("level2").innerHTML = chips.join("");
+        // keep competing offers on the same equipment together even when showing all suppliers
+        const shown = state.sid === "all" ? bids.slice().sort((a, b) => a.ix.localeCompare(b.ix)) : bids.filter(b => b.sup.id === state.sid);
+        document.getElementById("contentcount").textContent =
+          (state.sid === "all" ? `${shown.length} bids from ${g.suppliers.length} suppliers` : `${shown.length} bids from this supplier`) + " — select cards to quote";
+        document.getElementById("content").innerHTML = shown.map(bidCard).join("");
+        renderQbar();
+      }
+    }
+
+    function setSeg(seg) { state.seg = seg; state.sid = "all"; selected.clear(); render(); }
+    function pickGroup(id) { state.gid = id; state.sid = "all"; selected.clear(); render(); }
+    function pickSup(id) { state.sid = id; render(); }
+    function toggleBid(id) { if (selected.has(id)) selected.delete(id); else selected.add(id); render(); }
+    function clearSel() { selected.clear(); render(); }
+
+    function renderQbar() {
+      const g = GROUPS.find(x => x.id === state.gid);
+      const ids = new Set(allBids(g).map(b => b.id));
+      let n = 0; selected.forEach(id => { if (ids.has(id)) n++; });
+      document.getElementById("qbar").classList.toggle("hidden", n === 0);
+      document.getElementById("qn-count").textContent = n;
+    }
+
+    /* ── quotation export — template inspired by the Moedatech quotation PDF, adapted to our
+         equipment-focused, grouped structure. One quotation per selected bid (page-break between). ── */
+    function numWords(n) {
+      n = Math.round(n); if (n === 0) return "Zero";
+      const o = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
+      const t = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+      const u = (x) => { let s = ""; if (x >= 100) { s += o[Math.floor(x / 100)] + " hundred"; x %= 100; if (x) s += " and "; } if (x >= 20) { s += t[Math.floor(x / 10)]; if (x % 10) s += "-" + o[x % 10]; } else if (x > 0) s += o[x]; return s; };
+      let r = "";
+      [["million", 1e6], ["thousand", 1e3]].forEach(([nm, v]) => { if (n >= v) { r += u(Math.floor(n / v)) + " " + nm + " "; n %= v; } });
+      if (n > 0) r += u(n);
+      r = r.trim(); return r.charAt(0).toUpperCase() + r.slice(1);
+    }
+
+    const QSTYLE = `
+      *{box-sizing:border-box;margin:0;padding:0;}
+      body{font-family:'Inter','Segoe UI',Roboto,sans-serif;color:#1c3550;background:#f1f5f9;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+      .q-doc{max-width:780px;margin:18px auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 6px 24px rgba(28,53,80,.1);page-break-after:always;}
+      .q-doc:last-child{page-break-after:auto;}
+      .q-head{background:linear-gradient(135deg,#1c3550,#12263a);color:#fff;padding:26px 34px;}
+      .q-title{font-size:23px;font-weight:900;letter-spacing:-.3px;}
+      .q-sub{display:flex;justify-content:space-between;margin-top:10px;font-size:12.5px;font-weight:700;color:rgba(255,255,255,.72);}
+      .q-sub .qn{color:#fff;font-family:'IBM Plex Sans',monospace;}
+      .q-body{padding:24px 34px 30px;}
+      .parties{display:flex;gap:30px;padding-bottom:18px;border-bottom:1px solid #e4edf5;}
+      .party{flex:1;}
+      .plabel{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#6b8fa8;}
+      .pname{font-size:17px;font-weight:800;margin-top:5px;}
+      .pmeta{font-size:12px;color:#6b8fa8;font-weight:600;margin-top:3px;}
+      .metastrip{display:grid;grid-template-columns:repeat(5,1fr);margin:18px 0;border:1px solid #e4edf5;border-radius:10px;overflow:hidden;}
+      .metastrip>div{padding:11px 13px;border-inline-end:1px solid #e4edf5;}
+      .metastrip>div:last-child{border-inline-end:0;}
+      .metastrip span{display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b8fa8;}
+      .metastrip b{font-size:12.5px;font-weight:800;margin-top:4px;display:block;}
+      .listed{background:#f7fafd;border:1px solid #e4edf5;border-radius:10px;padding:13px 15px;margin-bottom:18px;}
+      .listed .ll{font-size:10.5px;font-weight:700;text-transform:uppercase;color:#6b8fa8;}
+      .listed .lv{font-size:13.5px;font-weight:700;color:#2a4f72;margin-top:5px;}
+      .ptable{width:100%;border-collapse:collapse;margin-bottom:8px;}
+      .ptable th{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#6b8fa8;text-align:start;padding:8px 10px;background:#eff4f9;}
+      .ptable th.num,.ptable td.num{text-align:end;font-family:'IBM Plex Sans',monospace;}
+      .ptable td{padding:11px 10px;border-bottom:1px solid #e4edf5;font-size:13px;vertical-align:top;}
+      .ptable td .sm{font-size:11px;color:#6b8fa8;font-weight:600;margin-top:2px;}
+      .totals{margin:6px 0 18px;}
+      .trow{display:flex;justify-content:space-between;padding:7px 10px;font-size:13.5px;}
+      .trow span{color:#2a4f72;font-weight:600;}
+      .trow b{font-family:'IBM Plex Sans',monospace;font-weight:800;}
+      .trow.grand{border-top:2px solid #d4e0ec;margin-top:4px;padding-top:11px;font-size:16px;}
+      .trow.grand b{color:#f79009;}
+      .words{background:#eaf1fe;border:1px solid #cfe0fb;border-radius:10px;padding:13px 15px;margin-bottom:18px;font-size:13px;color:#1849a9;}
+      .words .wl{font-size:10px;font-weight:800;text-transform:uppercase;margin-bottom:4px;}
+      .card{border:1px solid #e4edf5;border-radius:10px;overflow:hidden;margin-bottom:18px;}
+      .card-h{background:#fbeeea;padding:11px 15px;font-size:13.5px;font-weight:800;}
+      .kv{display:flex;justify-content:space-between;gap:14px;padding:10px 15px;border-top:1px solid #f0f4f8;font-size:13px;}
+      .kv span{color:#6b8fa8;font-weight:600;}.kv b{font-weight:800;text-align:end;}
+      .tc{margin:0 0 18px;padding-inline-start:20px;font-size:11.5px;color:#2a4f72;line-height:1.7;}
+      .tc li{margin-bottom:5px;}
+      .signed{background:#eef7f1;border-radius:10px;padding:13px 15px;font-size:12px;}
+      .signed b{display:block;color:#1c3550;}.signed div{color:#6b8fa8;font-family:'IBM Plex Sans',monospace;margin-top:3px;}
+      .foot{text-align:center;color:#9bb3c8;font-size:11px;margin-top:16px;}
+      @media print{body{background:#fff;}.q-doc{box-shadow:none;margin:0;border-radius:0;}}`;
+
+    function quotationDoc(bids, g) {
+      const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+      const RENTEE = { name: "Khalid Al-Abdullah", org: "Moedatech Renter", city: g.city };
+      const sections = bids.map((b) => {
+        const rental = b.price * b.dur, sub = rental + b.mob + b.demob, vat = Math.round(sub * 0.15), total = sub + vat;
+        const units = (String(b.scope).match(/×\s*(\d+)/) || [])[1] || "1";
+        const qnum = `Q-${g.gid.replace(/-G$/, "")}-${b.sup.id.toUpperCase()}`;
+        return `<section class="q-doc">
+          <div class="q-head"><div class="q-title">Equipment rental quotation</div><div class="q-sub"><span class="qn">${esc(qnum)}</span><span>${esc(g.date)}</span></div></div>
+          <div class="q-body">
+            <div class="parties">
+              <div class="party"><div class="plabel">Supplier</div><div class="pname">${esc(b.sup.name)}</div><div class="pmeta">${b.sup.verified ? "Verified supplier · " : ""}★ ${b.sup.rating.toFixed(1)} · ${b.eqVerified ? "equipment verified" : "equipment not verified"}</div></div>
+              <div class="party"><div class="plabel">Rentee</div><div class="pname">${esc(RENTEE.name)}</div><div class="pmeta">${esc(RENTEE.org)} · ${esc(RENTEE.city)}</div></div>
+            </div>
+            <div class="metastrip">
+              <div><span>Request #</span><b>${esc(g.gid)}</b></div>
+              <div><span>Issue date</span><b>${esc(g.date)}</b></div>
+              <div><span>Valid until</span><b>${esc(b.valid)}</b></div>
+              <div><span>Rental basis</span><b>${esc(b.rentalType || "—")}</b></div>
+              <div><span>Currency</span><b>SAR</b></div>
+            </div>
+            <div class="listed"><div class="ll">Listed equipment</div><div class="lv">${esc(classLabel(b.cat, b.sub, b.size))} &nbsp;·&nbsp; ${esc(b.equip)} &nbsp;·&nbsp; ${esc(units)} unit${units > 1 ? "s" : ""}${b.eqVerified ? " &nbsp;·&nbsp; ✔ verified" : ""}</div></div>
+            <table class="ptable">
+              <thead><tr><th>#</th><th>Item</th><th>Unit</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Total</th></tr></thead>
+              <tbody>
+                <tr><td>1</td><td><b>Rental</b><div class="sm">${esc(b.rentalType || "")} rental · ${b.dur} periods</div></td><td>period</td><td class="num">${b.dur}</td><td class="num">${nf(b.price)}</td><td class="num">${nf(rental)}</td></tr>
+                ${b.mob ? `<tr><td>2</td><td><b>Mobilization to site</b></td><td>trip</td><td class="num">1</td><td class="num">${nf(b.mob)}</td><td class="num">${nf(b.mob)}</td></tr>` : ""}
+                ${b.demob ? `<tr><td>3</td><td><b>Return from site</b></td><td>trip</td><td class="num">1</td><td class="num">${nf(b.demob)}</td><td class="num">${nf(b.demob)}</td></tr>` : ""}
+              </tbody>
+            </table>
+            <div class="totals">
+              <div class="trow"><span>Subtotal before VAT</span><b>${nf(sub)}</b></div>
+              <div class="trow"><span>VAT (15%)</span><b>${nf(vat)}</b></div>
+              <div class="trow grand"><span>Total</span><b>${nf(total)} SAR</b></div>
+            </div>
+            <div class="words"><div class="wl">Amount in words</div>${esc(numWords(total))} Saudi Riyals · estimate over ${b.dur} ${esc(b.rentalType ? b.rentalType.toLowerCase() : "")} periods · final amount as operated</div>
+            <div class="card"><div class="card-h">Project terms</div>
+              <div class="kv"><span>Scope</span><b>${esc(b.scope || "—")}</b></div>
+              <div class="kv"><span>Responds to</span><b>${esc(b.item)} · ${esc(b.ix)}</b></div>
+              <div class="kv"><span>Distance to site</span><b>${b.dist} km</b></div>
+              <div class="kv"><span>Terms match</span><b>${b.c > 0 ? b.c + " differ from request" : "All terms match request"}</b></div>
+            </div>
+            <ol class="tc">
+              <li>This quotation is valid until ${esc(b.valid)} and expires automatically thereafter unless confirmed through the Moedatech platform.</li>
+              <li>Prices are inclusive of items explicitly listed above. VAT at 15% applies per Saudi tax law.</li>
+              <li>The supplier is responsible for the equipment's roadworthiness and technical safety on the delivery date, and for required safety certifications.</li>
+              <li>This quotation is governed by the laws of the Kingdom of Saudi Arabia; competent Saudi courts have exclusive jurisdiction over any dispute.</li>
+              <li>Issued electronically via the Moedatech platform and legally equivalent to a signed document under the Saudi Electronic Transactions Law.</li>
+            </ol>
+            <div class="signed"><b>Electronically signed via the Moedatech platform</b><div>${esc(qnum)} · ${esc(g.date)}</div></div>
+            <div class="foot">Auto-generated by Moedatech · support@moedatech.com</div>
+          </div>
+        </section>`;
+      }).join("");
+      return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Quotations · ${esc(g.gid)}</title>` +
+        `<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">` +
+        `<style>${QSTYLE}</style></head><body>${sections}` +
+        `<scr` + `ipt>window.onload=function(){setTimeout(function(){window.print();},350);}</scr` + `ipt></body></html>`;
+    }
+
+    function downloadQuotations() {
+      const g = GROUPS.find(x => x.id === state.gid);
+      const chosen = allBids(g).filter(b => selected.has(b.id));
+      if (!chosen.length) return;
+      const w = window.open("", "_blank");
+      if (!w) return;
+      w.document.write(quotationDoc(chosen, g));
+      w.document.close();
+    }
+
+    /* ── equipment-detail modal — mirrors the app's equipment sheet (photo, taxonomy header,
+         verified badge, specs grid, document/photo status). Opened from a bid's "View details". ── */
+    const spec = (l, v, hl) => v ? `<div class="eqm-spec${hl ? " hl" : ""}"><div class="sl">${l}</div><div class="sv">${v}</div></div>` : "";
+    function openEquip(id) {
+      const g = GROUPS.find(x => x.id === state.gid);
+      const b = allBids(g).find(x => x.id === id);
+      if (!b) return;
+      const [make, model, year] = String(b.equip).split(" · ");
+      document.getElementById("eqm-store").textContent = b.sup.name;
+      document.getElementById("eqm-body").innerHTML = `
+        <div class="eqm-photo"><span class="material-icons-outlined">${b.icon}</span></div>
+        <div class="eqm-in">
+          <div class="eqm-tax">
+            <h2>${b.cat || classLabel(b.cat, b.sub, b.size)}${b.eqVerified ? '<span class="material-icons-outlined vt">verified</span>' : ""}</h2>
+            <div class="eqm-chips">${b.sub ? `<span class="c">${b.sub}</span>` : ""}${b.size ? `<span class="c">${b.size}</span>` : ""}</div>
+            <div class="eqm-mm">${[make, model].filter(Boolean).join(" ")}</div>
+          </div>
+          <div class="eqm-specs">
+            ${spec("Manufacturer", make)}${spec("Model", model)}${spec("Year", year)}
+            ${spec("Fuel", "Diesel")}${spec("Operating hours", "4,200")}${spec("Location", `${b.dist} km · ${g.city}`)}
+            ${spec("Rate", `${nf(b.price)} SAR / ${(b.rentalType || "DAY").toLowerCase()}`, true)}
+          </div>
+          <div class="eqm-docs">
+            <div class="row"><span class="material-icons-outlined">photo_camera</span>Photos<span class="cnt">3</span></div>
+            <div class="row"><span class="material-icons-outlined">description</span>Documents
+              <span class="doc"><span class="material-icons-outlined">check</span>ISTIMARA</span>
+              <span class="doc"><span class="material-icons-outlined">check</span>INSURANCE</span>
+              ${b.eqVerified ? '<span class="doc"><span class="material-icons-outlined">check</span>SASO</span>' : ""}
+            </div>
+          </div>
+        </div>`;
+      document.getElementById("eqmodal").classList.remove("hidden");
+    }
+    function closeEquip() { document.getElementById("eqmodal").classList.add("hidden"); }
+
+    /* ── request-details screen — same layout as the web RequestDetail, opened in a new tab.
+         Shows the whole submission (all grouped items + shared project / preferences). ── */
+    const DETAIL_STYLE = `
+      *{box-sizing:border-box;margin:0;padding:0;}
+      body{font-family:'Inter','Segoe UI',Roboto,sans-serif;background:#eff4f9;color:#1c3550;}
+      .material-icons-outlined{font-family:'Material Icons Outlined';line-height:1;vertical-align:middle;}
+      .topbar{display:flex;align-items:center;gap:14px;background:#fff;border-bottom:1px solid #d4e0ec;padding:14px 22px;}
+      .topbar .logo{font-size:17px;font-weight:900;}.topbar .logo i{font-style:normal;color:#f79009;}
+      .topbar .tt{font-size:14px;font-weight:800;color:#2a4f72;}
+      .rproto{--navy:#1c3550;--navy-deep:#12263a;--navy-mid:#2a4f72;--action:#f79009;--action-dim:#fff4e5;--success:#1daf58;--success-bg:#e7f7ee;--warning:#d4780a;--warning-bg:#fff3e0;--muted:#6b8fa8;--surface1:#fff;--surface2:#eff4f9;--surface3:#e4edf5;--border:#d4e0ec;--line:#e4edf5;--info:#1a7ec8;--info-bg:#e6f2fb;--r-md:10px;--r-lg:14px;--r-full:100px;max-width:1060px;margin:0 auto;padding:22px 16px 60px;}
+      .rproto .mono{font-family:'IBM Plex Sans',monospace;}
+      .detail-status{display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+      .stbadge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;padding:3px 9px;border-radius:var(--r-full);}
+      .stbadge .dot{width:6px;height:6px;border-radius:50%;}
+      .st-open{background:var(--info-bg);color:var(--info);}.st-open .dot{background:var(--info);}
+      .st-active,.st-accepted{background:var(--success-bg);color:var(--success);}.st-active .dot{background:var(--success);}
+      .st-expired{background:var(--warning-bg);color:var(--warning);}.st-expired .dot{background:var(--warning);}
+      .st-mixed{background:rgba(28,53,80,.07);color:var(--navy-mid);}.st-mixed .dot{background:var(--navy-mid);}
+      .hdr-bids{margin-inline-start:auto;}
+      .typebadge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;padding:3px 9px;border-radius:var(--r-full);}
+      .typebadge .material-icons-outlined{font-size:13px;}
+      .tb-broadcast{background:rgba(28,53,80,.07);color:var(--navy-mid);}
+      .tb-direct{background:var(--action-dim);color:var(--action);}
+      .reqid{font-size:12px;color:var(--muted);font-weight:700;}
+      .infostrip{display:grid;grid-template-columns:repeat(4,1fr);border-radius:var(--r-lg);overflow:hidden;background:linear-gradient(135deg,var(--navy),var(--navy-deep));color:#fff;margin-bottom:18px;}
+      .infostrip .ic{padding:16px 18px;position:relative;}
+      .infostrip .ic+.ic::before{content:"";position:absolute;inset-block:14px;inset-inline-start:0;width:1px;background:rgba(255,255,255,.12);}
+      .infostrip .lab{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:rgba(255,255,255,.55);}
+      .infostrip .val{font-size:14px;font-weight:800;margin-top:5px;}
+      @media(max-width:900px){.infostrip{grid-template-columns:1fr 1fr;}}
+      .dsec{margin-bottom:18px;}
+      .dsec-h{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--navy-mid);margin:0 2px 11px;}
+      .dsec-h .material-icons-outlined{font-size:17px;color:var(--muted);}
+      .dcount{margin-inline-start:6px;font-size:11px;font-weight:800;color:var(--action);background:rgba(247,144,9,.12);border-radius:var(--r-full);padding:2px 9px;}
+      .dcard{background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;}
+      .ditem{display:flex;gap:13px;padding:15px 16px;border-bottom:1px solid var(--line);}
+      .ditem:last-child{border-bottom:0;}
+      .ditem .di{width:38px;height:38px;border-radius:10px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;background:var(--surface2);color:var(--navy-mid);}
+      .ditem .di .material-icons-outlined{font-size:21px;color:var(--navy-mid);}
+      .ditem .dn{font-size:14px;font-weight:800;}
+      .terms{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;}
+      .tchip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--navy-mid);background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:4px 9px;}
+      .tchip .material-icons-outlined{font-size:13px;color:var(--muted);}
+      .mapbox{height:150px;background:linear-gradient(135deg,#dbe7f2,#c7d9ea);display:flex;align-items:center;justify-content:center;color:var(--muted);font-weight:700;font-size:12px;gap:6px;border-bottom:1px solid var(--line);}
+      .addr{display:flex;align-items:center;gap:9px;padding:16px;font-size:13.5px;}
+      .addr .material-icons-outlined.pin{color:var(--action);font-size:20px;}
+      .addr b{font-weight:800;}.addr span{color:var(--muted);}
+      .kv{display:grid;grid-template-columns:160px 1fr;row-gap:11px;padding:16px;font-size:13.5px;}
+      .kv .k{color:var(--muted);font-weight:600;}.kv .v{font-weight:700;}
+      @media(max-width:560px){.kv{grid-template-columns:1fr;row-gap:4px;}}
+      .notes{padding:16px;font-size:13.5px;color:var(--navy-mid);line-height:1.6;}
+      .actionbar{display:flex;gap:10px;align-items:center;margin-top:22px;padding-top:18px;border-top:1px solid var(--border);flex-wrap:wrap;}
+      .actionbar .spacer{flex:1;}
+      .btn{border:1px solid var(--border);background:var(--surface1);border-radius:var(--r-md);padding:11px 18px;font:inherit;font-weight:700;font-size:13.5px;color:var(--navy);display:inline-flex;align-items:center;gap:7px;cursor:pointer;}
+      .btn .material-icons-outlined{font-size:18px;}
+      .btn.primary{background:var(--action);border-color:var(--action);color:#fff;}`;
+
+    function requestDetailDoc(g) {
+      const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+      const ov = overallStatus(g), ty = TYPE[g.type], d = g.detail, total = allBids(g).length;
+      const ditems = g.items.map((it) => `
+        <div class="ditem"><span class="di"><span class="material-icons-outlined">${it.icon}</span></span>
+          <div><div class="dn">${esc(it.title)}</div>
+            <div class="terms">
+              <span class="tchip">${esc(classLabel(it.cat, it.sub, it.size))}</span>
+              <span class="tchip"><span class="material-icons-outlined">${it.extra.icon}</span>${esc(it.extra.label)}</span>
+              <span class="tchip"><span class="material-icons-outlined">schedule</span>${esc(it.rentalType)}</span>
+            </div>
+          </div>
+        </div>`).join("");
+      const body = `
+        <div class="detail-status">
+          <span class="stbadge ${ov.cls}"><span class="dot"></span>${ov.label}</span>
+          <span class="typebadge ${ty.cls}"><span class="material-icons-outlined">${ty.icon}</span>${ty.label}</span>
+          <span class="reqid">${esc(g.gid)}</span>
+          <span class="stbadge st-active hdr-bids"><span class="material-icons-outlined" style="font-size:13px">gavel</span>${total} bids</span>
+        </div>
+        <div class="infostrip">
+          <div class="ic"><div class="lab">Location</div><div class="val">${esc(g.city)}</div></div>
+          <div class="ic"><div class="lab">Period</div><div class="val">${esc(d.period)}</div></div>
+          <div class="ic"><div class="lab">Duration</div><div class="val mono">${d.duration} days</div></div>
+          <div class="ic"><div class="lab">Urgency</div><div class="val">${esc(d.urgency)}</div></div>
+        </div>
+        <div class="dsec"><div class="dsec-h"><span class="material-icons-outlined">construction</span>Equipment details <span class="dcount">${g.items.length}</span></div><div class="dcard">${ditems}</div></div>
+        <div class="dsec"><div class="dsec-h"><span class="material-icons-outlined">place</span>Project location</div><div class="dcard"><div class="mapbox"><span class="material-icons-outlined">map</span> Map preview</div><div class="addr"><span class="material-icons-outlined pin">location_on</span><span><b>${esc(g.address)}</b> · (${d.lat}, ${d.lng})</span></div></div></div>
+        <div class="dsec"><div class="dsec-h"><span class="material-icons-outlined">tune</span>Preferences</div><div class="dcard"><div class="kv">
+          <span class="k">Rental basis</span><span class="v">${esc(d.rentalType)}</span>
+          <span class="k">Payment terms</span><span class="v">${esc(d.paymentTerms)}</span>
+          <span class="k">Payment method</span><span class="v">${esc(d.paymentMethod)}</span>
+          <span class="k">Working hours</span><span class="v">${d.workingHours} hrs/day</span>
+          <span class="k">Maintenance</span><span class="v">${esc(d.maintenance)}</span>
+          <span class="k">Budget</span><span class="v">${nf(d.budget)} SAR</span>
+        </div></div></div>
+        <div class="dsec"><div class="dsec-h"><span class="material-icons-outlined">notes</span>Additional notes</div><div class="dcard"><div class="notes">${esc(d.notes)}</div></div></div>
+        <div class="actionbar"><button class="btn"><span class="material-icons-outlined">close</span> Cancel request</button><span class="spacer"></span><button class="btn primary"><span class="material-icons-outlined">gavel</span> View bids (${total})</button></div>`;
+      return `<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><title>${esc(g.gid)} · Request details</title>` +
+        `<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=IBM+Plex+Sans:wght@400;600;700&family=Material+Icons+Outlined&display=swap" rel="stylesheet">` +
+        `<style>${DETAIL_STYLE}</style></head><body><div class="rproto">${body}</div></body></html>`;
+    }
+    function openRequestDetail() {
+      const g = GROUPS.find(x => x.id === state.gid);
+      document.getElementById("rs-frame").srcdoc = requestDetailDoc(g);
+      document.getElementById("reqscreen").classList.remove("hidden");
+    }
+    function closeRequestDetail() { document.getElementById("reqscreen").classList.add("hidden"); }
+
+    render();
+  </script>
+</body>
+</html>
