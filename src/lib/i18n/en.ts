@@ -281,8 +281,12 @@ export const en = {
       provide: "Provide it for me?", // AC-30/31 tentative
       cancel: "Cancel", // AC-30/32 tentative
       explainer: "We couldn't find this in our catalogue.",
+      // Shown when the equipment IS in the catalogue but the requested SIZE isn't yet (a genuine new size).
+      newSizeExplainer: "We carry this equipment, but not this size yet — message us to add it, or remove the item.",
       // AC-31: prefilled WhatsApp message to Moedatech support requesting the equipment be sourced.
       whatsappMessage: 'Hi Moedatech, I\'m creating an RFQ and need equipment that isn\'t available in the app: "{item}". Please add/source it for me so it is added to my request. Thank you!',
+      // New-size variant: equipment exists, the size doesn't — ask support to add the size.
+      whatsappMessageSize: 'Hi Moedatech, I\'m creating an RFQ for "{item}" but the size I need isn\'t in the app yet. Please add this size so it can be added to my request. Thank you!',
     },
     perItem: {
       quantity: "Quantity",
