@@ -126,9 +126,10 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
   // AC-50: if the items that HAVE an agent-set operator certificate all share the same one (e.g. all
   // TÜV), reflect it as the project-level Safety certificate (checked) and let that control them.
   // No-operator items (no cert) don't block this — they just aren't counted.
-  const certs = items.map((i) => i.operator.certificate).filter((c): c is OperatorCertificate => c != null);
-  if (certs.length > 0 && certs.every((c) => c === certs[0])) {
-    project.certificates.safety = [certs[0]];
+  const certLists = items.map((i) => i.operator.certificate).filter((c) => c.length > 0);
+  const certKey = (c: OperatorCertificate[]) => [...c].sort().join(",");
+  if (certLists.length > 0 && certLists.every((c) => certKey(c) === certKey(certLists[0]))) {
+    project.certificates.safety = [...certLists[0]];
     for (const i of items) i.operator.certByAgent = false;
   }
   // Field-keyed agent notes (dotted path → note) for inline rendering beside each field.
@@ -235,7 +236,7 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
       ...defaultOperatorDetails(),
       nightShift: li.night_shift_required ?? false,
       nationality: li.operator_nationality ?? null,
-      certificate: agentCert, // AC-24/50: operator license level / safety cert
+      certificate: agentCert ? [agentCert] : [], // AC-24/50: operator license level / safety cert (multi-select)
       certByAgent: agentCert != null, // agent set it → project-level Safety cert won't override
       // AC-24: F.A.T — who covers the operator's Food/Accommodation/Transport. Mansour emits
       // operator_accommodation_by_rentee (true = rentee/me, false = supplier); supplier only when

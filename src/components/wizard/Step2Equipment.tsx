@@ -1,11 +1,28 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useT } from "@/lib/i18n";
+import { useT, fmt } from "@/lib/i18n";
 import { useRfq, agentMatches } from "@/lib/store/rfq-store";
-import { Card, Field, Icon, MIcon, RadioGroup } from "@/components/ui";
-import { gateStep2, isCompleteRef, PARTIES, type EquipmentItem, type Party } from "@/lib/contract";
+import { Card, Field, Icon, MIcon, RadioGroup, SelChips, TextInput } from "@/components/ui";
+import {
+  gateStep2,
+  isCompleteRef,
+  PARTIES,
+  SAFETY_CERTIFICATES,
+  OTHER_CERTIFICATES,
+  type EquipmentItem,
+  type Party,
+  type SafetyCertificate,
+  type OtherCertificate,
+} from "@/lib/contract";
 import { ItemRow } from "@/components/wizard/ItemRow";
+
+function toggle<T>(arr: T[], v: T): T[] {
+  return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
+}
+function opt<T extends string>(values: readonly T[], dict: Record<string, string>) {
+  return values.map((v) => ({ value: v, label: dict[v] ?? v }));
+}
 
 type Group = "all" | "needs-ok" | "matched" | "not-available";
 
@@ -49,6 +66,8 @@ export function Step2Equipment() {
   const ap = state.agentOrigin?.project; // agent's original request-wide values, for the AI marker
   const gate = gateStep2(draft.items);
   const visible = items.filter((i) => activeFilter === "all" || groupOf(i) === activeFilter);
+  // Auto-open the per-item settings on the first matched item (teaching cue) — the rest stay collapsed.
+  const firstMatchedId = visible.find((i) => groupOf(i) === "matched")?.id;
   const activeNode = { "needs-ok": t.step2.filterNeedsOk, matched: t.step2.filterMatched, "not-available": t.step2.filterNotAvailable, all: t.step2.filterAll }[activeFilter];
 
   // In-process "back" through the triage groups (separate from the wizard's Back-to-Project).
@@ -97,8 +116,16 @@ export function Step2Equipment() {
         </div>
       </div>
 
-      {/* Request-wide settings (AC-25/26) — apply to every item, per-item overridable. */}
-      <Card title={<><Icon name="tune" size={18} className="me-1.5 align-[-3px] text-navy-mid" />{t.step2.settingsForAll}</>}>
+      {/* Unified request-wide settings (AC-25/26/50) — Logistics + Certificates that apply to EVERY
+          item, each per-item overridable. One panel so the "applies to all" model is clear. */}
+      <Card
+        title={<><Icon name="tune" size={18} className="me-1.5 align-[-3px] text-navy-mid" />{t.step2.settingsForAll}</>}
+        aside={
+          <span className="inline-flex items-center gap-1 rounded-full bg-info-soft px-2.5 py-1 text-[11px] font-bold text-info">
+            <Icon name="layers" size={13} /> {fmt(t.step2.appliesToItems, { count: items.length })}
+          </span>
+        }
+      >
         <p className="-mt-2 mb-4 text-[12.5px] text-muted">{t.step2.settingsForAllHint}</p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label={t.step1.requestWide.delivery} agent={agentMatches(project.deliveryToSite, ap?.deliveryToSite)}>
@@ -110,6 +137,36 @@ export function Step2Equipment() {
           <Field label={t.step1.requestWide.fuelResponsibility} agent={agentMatches(project.fuelResponsibility, ap?.fuelResponsibility)}>
             <RadioGroup<Party> name="fuelResp" value={project.fuelResponsibility} onChange={(v) => actions.patchRequestWide({ fuelResponsibility: v })} options={partyOpts} />
           </Field>
+        </div>
+
+        {/* Certificates — moved here from the Project step so all request-wide settings are unified. */}
+        <div className="mt-5 border-t border-border pt-4">
+          <div className="mb-2.5 text-[11px] font-extrabold uppercase tracking-wide text-muted">{t.step2.certificatesTitle}</div>
+          <Field label={t.step1.certificates.safety} optional agent={agentMatches(project.certificates.safety, ap?.certificates.safety)}>
+            <SelChips<SafetyCertificate>
+              values={project.certificates.safety}
+              onToggle={(v) => actions.setCertificates({ safety: toggle(project.certificates.safety, v) })}
+              options={opt(SAFETY_CERTIFICATES, t.options.safetyCert)}
+            />
+            {project.certificates.safety.includes("other") && (
+              <div className="mt-2">
+                <TextInput
+                  placeholder={t.step1.certificates.otherSafetyPlaceholder}
+                  value={project.certificates.safetyOther}
+                  onChange={(e) => actions.setCertificates({ safetyOther: e.target.value })}
+                />
+              </div>
+            )}
+          </Field>
+          <div className="mt-4">
+            <Field label={t.step1.certificates.other} optional agent={agentMatches(project.certificates.other, ap?.certificates.other)}>
+              <SelChips<OtherCertificate>
+                values={project.certificates.other}
+                onToggle={(v) => actions.setCertificates({ other: toggle(project.certificates.other, v) })}
+                options={opt(OTHER_CERTIFICATES, t.options.otherCert)}
+              />
+            </Field>
+          </div>
         </div>
       </Card>
 
@@ -170,6 +227,7 @@ export function Step2Equipment() {
               sharedFuelResp={project.fuelResponsibility}
               sharedDelivery={project.deliveryToSite}
               sharedReturn={project.returnFromSite}
+              defaultOpen={item.id === firstMatchedId}
             />
           ))
         )}

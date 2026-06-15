@@ -8,12 +8,8 @@ import {
   RENTAL_BASES,
   OVERTIME_RATES,
   EQUIPMENT_YEARS,
-  SAFETY_CERTIFICATES,
-  OTHER_CERTIFICATES,
   type RentalBasis,
   type OvertimeRate,
-  type SafetyCertificate,
-  type OtherCertificate,
 } from "@/lib/contract";
 
 // Leaflet touches `window` at import, so the map picker is client-only.
@@ -22,9 +18,6 @@ const MapLocationPicker = dynamic(() => import("@/components/shared/GoogleMapLoc
 
 function opt<T extends string>(values: readonly T[], dict: Record<string, string>) {
   return values.map((v) => ({ value: v, label: dict[v] ?? v }));
-}
-function toggle<T>(arr: T[], v: T): T[] {
-  return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
 }
 
 export function Step1Project() {
@@ -195,36 +188,8 @@ export function Step1Project() {
         </div>
       </Card>
 
-      {/* ---------- Certificates (AC-50) ---------- */}
-      <Card title={<><Icon name="verified" size={18} className="me-1.5 align-[-3px] text-navy-mid" />{t.step1.certificates.card}</>}>
-        <Field label={t.step1.certificates.safety} optional agent={agentMatches(project.certificates.safety, ap?.certificates.safety)}>
-          <SelChips<SafetyCertificate>
-            values={project.certificates.safety}
-            onToggle={(v) => actions.setCertificates({ safety: toggle(project.certificates.safety, v) })}
-            options={opt(SAFETY_CERTIFICATES, t.options.safetyCert)}
-          />
-          {project.certificates.safety.includes("other") && (
-            <div className="mt-2">
-              <TextInput
-                placeholder={t.step1.certificates.otherSafetyPlaceholder}
-                value={project.certificates.safetyOther}
-                onChange={(e) => actions.setCertificates({ safetyOther: e.target.value })}
-              />
-            </div>
-          )}
-        </Field>
-        <div className="mt-4">
-          <Field label={t.step1.certificates.other} optional agent={agentMatches(project.certificates.other, ap?.certificates.other)}>
-            <SelChips<OtherCertificate>
-              values={project.certificates.other}
-              onToggle={(v) => actions.setCertificates({ other: toggle(project.certificates.other, v) })}
-              options={opt(OTHER_CERTIFICATES, t.options.otherCert)}
-            />
-          </Field>
-        </div>
-      </Card>
-
-      {/* Delivery / Return / Fuel responsibility (AC-25/26) live on the Equipment step. */}
+      {/* Certificates + Delivery / Return / Fuel responsibility (AC-25/26/50) are unified in the
+          "Settings for all equipment" panel on the Equipment step. */}
     </div>
   );
 }

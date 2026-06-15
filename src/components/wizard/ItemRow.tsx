@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useT, useLocale, fmt } from "@/lib/i18n";
 import { useRfq, agentMatches } from "@/lib/store/rfq-store";
 import { SUPPORT_WHATSAPP_NUMBER } from "@/lib/config/support";
-import { AgentMark, Button, Field, Icon, Pchips, Select, Stepper, TextArea, Toggle, Modal } from "@/components/ui";
+import { AgentMark, Button, Field, Icon, Pchips, SelChips, Select, Stepper, TextArea, Toggle, Modal } from "@/components/ui";
 import {
   EquipmentItem,
   Taxonomy,
@@ -21,6 +21,9 @@ import {
 
 function opt<T extends string>(values: readonly T[], dict: Record<string, string>) {
   return values.map((v) => ({ value: v, label: dict[v] ?? v }));
+}
+function toggle<T>(arr: T[], v: T): T[] {
+  return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
 }
 
 /** Best-effort category → Material icon glyph for the row avatar. */
@@ -39,12 +42,15 @@ export function ItemRow({
   sharedFuelResp,
   sharedDelivery,
   sharedReturn,
+  defaultOpen = false,
 }: {
   item: EquipmentItem;
   taxonomy: Taxonomy;
   sharedFuelResp: Party | null;
   sharedDelivery: Party | null;
   sharedReturn: Party | null;
+  /** Open the per-item settings on first render (used for the first matched item, as a teaching cue). */
+  defaultOpen?: boolean;
 }) {
   const t = useT();
   const { locale } = useLocale(); // render taxonomy names in Arabic when the UI is Arabic
@@ -57,12 +63,12 @@ export function ItemRow({
       ? undefined
       : state.draft?.fieldNotes?.[`line_items[${item.id.slice(1)}].${f}`];
   const [editingMatch, setEditingMatch] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
+  const [showDetails, setShowDetails] = useState(defaultOpen);
   const [confirmRemove, setConfirmRemove] = useState(false);
 
   const nationalityOpts = [
-    { value: "arab", label: t.step2.perItem.nationalityArab },
-    { value: "other", label: t.step2.perItem.nationalityOther },
+    { value: "restricted", label: t.step2.perItem.nationalityRestricted },
+    { value: "any", label: t.step2.perItem.nationalityAny },
   ];
 
   const { category, subcategory, measurement } = resolveRef(taxonomy, item.ref);
@@ -175,9 +181,24 @@ export function ItemRow({
               <Stepper value={item.quantity} min={1} onChange={(v) => actions.patchItem(item.id, { quantity: v })} />
               {agentMatches(item.quantity, ai?.quantity) && <AgentMark />}
             </div>
+            {/* At-a-glance summary of every per-item setting — so the renter sees what's set (and what
+                they might want to change) without opening the editor. The Edit panel below changes them. */}
             <div className="mt-2.5 flex flex-wrap gap-2">
               <MetaTag icon="person" label={t.step2.perItem.operatorNeeded} value={t.options.operatorNeeded[item.operatorNeeded]} />
+              {item.operatorNeeded === "yes" && (
+                <>
+                  <MetaTag icon="dark_mode" label={t.step2.perItem.nightShift} value={item.operator.nightShift ? t.common.yes : t.common.no} />
+                  <MetaTag icon="public" label={t.step2.perItem.nationality} value={nationalityOpts.find((o) => o.value === item.operator.nationality)?.label ?? "—"} />
+                  {item.operator.certificate.length > 0 && (
+                    <MetaTag icon="workspace_premium" label={t.step2.perItem.certificate} value={item.operator.certificate.map((c) => t.options.safetyCert[c]).join(", ")} />
+                  )}
+                  <MetaTag icon="hotel" label={t.step2.perItem.fat} value={item.operator.fat ? t.options.party[item.operator.fat] : "—"} />
+                </>
+              )}
               <MetaTag icon="local_gas_station" label={t.step2.perItem.fuelType} value={t.options.fuelType[item.fuelType]} />
+              <MetaTag icon="oil_barrel" label={t.step1.requestWide.fuelResponsibility} value={t.options.party[item.fuelResponsibilityOverride ?? sharedFuelResp ?? "me"]} />
+              <MetaTag icon="local_shipping" label={t.step1.requestWide.delivery} value={t.options.party[item.deliveryOverride ?? sharedDelivery ?? "me"]} />
+              <MetaTag icon="assignment_return" label={t.step1.requestWide.return} value={t.options.party[item.returnOverride ?? sharedReturn ?? "me"]} />
               {item.additionalNotes && <MetaTag icon="sticky_note_2" label={t.step2.perItem.additionalNotes} value={item.additionalNotes} />}
             </div>
           </>
@@ -202,7 +223,8 @@ export function ItemRow({
             </>
           ) : (
             <Button variant="secondary" onClick={() => setShowDetails((d) => !d)}>
-              <Icon name="tune" size={15} /> {t.common.edit}
+              <Icon name="tune" size={15} /> {t.step2.itemSettings}
+              <Icon name="expand_more" size={16} className={`transition-transform ${showDetails ? "rotate-180" : ""}`} />
             </Button>
           )}
           <button className="grid h-8 w-8 place-items-center rounded-lg border border-border text-muted hover:border-danger hover:text-danger" title={t.common.remove} onClick={() => setConfirmRemove(true)}>
@@ -242,7 +264,11 @@ export function ItemRow({
                   <Pchips value={item.operator.nationality} onChange={(v) => actions.patchItemOperator(item.id, { nationality: v })} options={nationalityOpts} />
                 </ChipField>
                 <ChipField label={t.step2.perItem.certificate} agent={agentMatches(item.operator.certificate, ai?.operator.certificate)}>
-                  <Pchips<OperatorCertificate> value={item.operator.certificate} onChange={(v) => actions.patchItemOperator(item.id, { certificate: v })} options={opt(OPERATOR_CERTIFICATES, t.options.safetyCert)} />
+                  <SelChips<OperatorCertificate>
+                    values={item.operator.certificate}
+                    onToggle={(v) => actions.patchItemOperator(item.id, { certificate: toggle(item.operator.certificate, v) })}
+                    options={opt(OPERATOR_CERTIFICATES, t.options.safetyCert)}
+                  />
                 </ChipField>
                 <ChipField label={t.step2.perItem.fat} agent={agentMatches(item.operator.fat, ai?.operator.fat)} note={fn("operator_accommodation_by_rentee")}>
                   <Pchips<Party> value={item.operator.fat} onChange={(v) => actions.patchItemOperator(item.id, { fat: v })} options={opt(PARTIES, t.options.party)} />
@@ -349,11 +375,12 @@ function MetaTag({ icon, label, value }: { icon: string; label: string; value: s
 function ChipField({ label, agent, note, children }: { label: string; agent?: boolean; note?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
-      <span className="mb-1.5 flex items-center gap-2 text-[11.5px] font-bold text-navy-mid">
+      <span className={`mb-1.5 flex items-center gap-2 text-[11.5px] font-bold ${agent ? "text-warn" : "text-navy-mid"}`}>
         {label}
         {agent && <AgentMark />}
       </span>
-      {children}
+      {/* Orange box around the options when the agent filled them in. */}
+      <div className={agent ? "rounded-lg p-1.5 ring-1 ring-warn/60" : ""}>{children}</div>
       {/* Agent's note — shown only while the field still holds the agent's value (agent=true),
           so it disappears the moment the renter changes the selection. */}
       {agent && note && (

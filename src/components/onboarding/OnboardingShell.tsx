@@ -45,16 +45,17 @@ export function OnboardingShell({ step, children }: { step: 1 | 2; children: Rea
       </div>
 
       <div className="mx-auto max-w-lg px-5 py-8">
-        <div className="flex items-center gap-2 text-[13px] font-semibold text-navy-mid">
-          <Dot n={1} done={step === 2} active={step === 1} />
-          {t.onboarding.step1}
-          <span className="mx-1 h-px flex-1 bg-border" />
-          <Dot n={2} active={step === 2} />
-          <span className={step === 2 ? "" : "text-muted"}>
-            {t.onboarding.step2}
-            {step !== 2 && ` (${t.onboarding.later})`}
-          </span>
-        </div>
+        {/* Stepline only on the verify step — on account creation the "Verify company (later)"
+            preview read as overwhelming, so the account form stands on its own. */}
+        {step === 2 && (
+          <div className="flex items-center gap-2 text-[13px] font-semibold text-navy-mid">
+            <Dot n={1} done active={false} />
+            {t.onboarding.step1}
+            <span className="mx-1 h-px flex-1 bg-border" />
+            <Dot n={2} active />
+            <span>{t.onboarding.step2}</span>
+          </div>
+        )}
 
         <div className="mt-5 overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">{children}</div>
       </div>

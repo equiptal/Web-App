@@ -56,6 +56,46 @@ const n = (v: unknown): number | null => {
 };
 const s = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v : null);
 
+/**
+ * One document the renter can view in the deal room. The backend (`GET /api/deal-rooms/{id}/documents`)
+ * returns the OTHER party's documents only — for the renter (rentee), that's the supplier's company
+ * docs (CR, municipal license, insurance) and equipment docs (TÜV/SPSP/istimara/… + photos).
+ * `url` is a backend presigned link; `fileType` is "pdf" or "image".
+ */
+export interface DealRoomDocument {
+  type: string;
+  label: string;
+  labelAr: string | null;
+  url: string;
+  fileType: "pdf" | "image" | string;
+}
+
+/** Two groups, matching the app's documents sheet. */
+export interface DealRoomDocuments {
+  companyDocuments: DealRoomDocument[];
+  equipmentDocuments: DealRoomDocument[];
+}
+
+function mapDoc(raw: Record<string, unknown>): DealRoomDocument {
+  return {
+    type: s(raw.type) ?? "",
+    label: s(raw.label) ?? s(raw.type) ?? "Document",
+    labelAr: s(raw.labelAr),
+    url: s(raw.url) ?? "",
+    fileType: s(raw.fileType) ?? "pdf",
+  };
+}
+
+export function mapDealRoomDocuments(raw: unknown): DealRoomDocuments {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const company = Array.isArray(r.companyDocuments) ? (r.companyDocuments as Record<string, unknown>[]) : [];
+  const equipment = Array.isArray(r.equipmentDocuments) ? (r.equipmentDocuments as Record<string, unknown>[]) : [];
+  return {
+    companyDocuments: company.map(mapDoc).filter((d) => d.url),
+    equipmentDocuments: equipment.map(mapDoc).filter((d) => d.url),
+  };
+}
+
 export function mapDealRoom(raw: unknown): DealRoomView {
   const d = (raw ?? {}) as Record<string, unknown>;
   const sup = (d.supplier ?? {}) as Record<string, unknown>;

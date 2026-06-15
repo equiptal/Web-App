@@ -74,7 +74,7 @@ export interface ProjectDetails {
 export interface OperatorDetails {
   nightShift: boolean;
   nationality: string | null;
-  certificate: OperatorCertificate | null; // defaulted from project Safety cert (AC-24/50)
+  certificate: OperatorCertificate[]; // multi-select; defaulted from project Safety certs (AC-24/50)
   /** AC-50: true when the agent set the cert per-item from the RFQ — the project-level Safety cert
    *  then leaves it untouched (only fills items the agent didn't mention). */
   certByAgent?: boolean;
@@ -231,7 +231,7 @@ export function defaultPreferences(): Preferences {
 }
 
 export function defaultOperatorDetails(): OperatorDetails {
-  return { nightShift: false, nationality: null, certificate: null, fat: "me" };
+  return { nightShift: false, nationality: null, certificate: [], fat: "me" };
 }
 
 /** Build a blank item (used when the renter adds a missed item — AC-22). */
