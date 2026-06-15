@@ -8,12 +8,8 @@ import {
   RENTAL_BASES,
   OVERTIME_RATES,
   EQUIPMENT_YEARS,
-  SAFETY_CERTIFICATES,
-  OTHER_CERTIFICATES,
   type RentalBasis,
   type OvertimeRate,
-  type SafetyCertificate,
-  type OtherCertificate,
 } from "@/lib/contract";
 
 // Leaflet touches `window` at import, so the map picker is client-only.
@@ -22,9 +18,6 @@ const MapLocationPicker = dynamic(() => import("@/components/shared/GoogleMapLoc
 
 function opt<T extends string>(values: readonly T[], dict: Record<string, string>) {
   return values.map((v) => ({ value: v, label: dict[v] ?? v }));
-}
-function toggle<T>(arr: T[], v: T): T[] {
-  return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
 }
 
 export function Step1Project() {
@@ -77,6 +70,15 @@ export function Step1Project() {
               <span>{loc.label ?? "—"}</span>
               {loc.source === "agent" && <span className="rounded-md border border-border bg-surface2 px-2 py-0.5 text-[11px] font-bold text-navy-mid">{t.step1.location.extractedFrom}</span>}
             </div>
+
+            {/* Agent's location note — shown while it's still the agent's pin and unconfirmed; clears
+                once the renter moves the pin (source→map) or confirms. */}
+            {loc.source === "agent" && !loc.confirmed && state.draft?.fieldNotes?.["rfq_header.project_address_label"] && (
+              <p className="mb-3 flex items-start gap-1.5 text-[12px] leading-snug text-info">
+                <Icon name="lightbulb" size={14} className="mt-[1.5px] flex-none" />
+                {state.draft.fieldNotes["rfq_header.project_address_label"]}
+              </p>
+            )}
 
             <MapLocationPicker
               value={loc.lat != null && loc.lng != null ? { lat: loc.lat, lng: loc.lng } : null}
@@ -140,6 +142,7 @@ export function Step1Project() {
           required
           missing={!project.timing.rentalBasis}
           agent={agentMatches(project.timing.rentalBasis, ap?.timing.rentalBasis)}
+          note={state.draft?.fieldNotes?.["rfq_header.rental_type"]}
         >
           <div className="flex flex-wrap items-center gap-3">
             <Seg2<RentalBasis> value={project.timing.rentalBasis} onChange={(v) => actions.patchTiming({ rentalBasis: v })} options={opt(RENTAL_BASES, t.options.rentalBasis)} />
@@ -160,7 +163,7 @@ export function Step1Project() {
             <TextInput type="date" value={project.timing.endDate ?? ""} onChange={(e) => actions.patchTiming({ endDate: e.target.value || null })} />
           </Field>
           <Field label={t.step1.timing.hoursPerDay} optional agent={agentMatches(project.timing.hoursPerDay, ap?.timing.hoursPerDay)}>
-            <TextInput type="number" min={1} max={24} value={project.timing.hoursPerDay} onChange={(e) => actions.patchTiming({ hoursPerDay: Number(e.target.value) || 8 })} />
+            <TextInput type="number" min={1} max={24} value={project.timing.hoursPerDay} onChange={(e) => actions.patchTiming({ hoursPerDay: Number(e.target.value) || 10 })} />
           </Field>
         </div>
       </Card>
@@ -185,36 +188,8 @@ export function Step1Project() {
         </div>
       </Card>
 
-      {/* ---------- Certificates (AC-50) ---------- */}
-      <Card title={<><Icon name="verified" size={18} className="me-1.5 align-[-3px] text-navy-mid" />{t.step1.certificates.card}</>}>
-        <Field label={t.step1.certificates.safety} optional agent={agentMatches(project.certificates.safety, ap?.certificates.safety)}>
-          <SelChips<SafetyCertificate>
-            values={project.certificates.safety}
-            onToggle={(v) => actions.setCertificates({ safety: toggle(project.certificates.safety, v) })}
-            options={opt(SAFETY_CERTIFICATES, t.options.safetyCert)}
-          />
-          {project.certificates.safety.includes("other") && (
-            <div className="mt-2">
-              <TextInput
-                placeholder={t.step1.certificates.otherSafetyPlaceholder}
-                value={project.certificates.safetyOther}
-                onChange={(e) => actions.setCertificates({ safetyOther: e.target.value })}
-              />
-            </div>
-          )}
-        </Field>
-        <div className="mt-4">
-          <Field label={t.step1.certificates.other} optional agent={agentMatches(project.certificates.other, ap?.certificates.other)}>
-            <SelChips<OtherCertificate>
-              values={project.certificates.other}
-              onToggle={(v) => actions.setCertificates({ other: toggle(project.certificates.other, v) })}
-              options={opt(OTHER_CERTIFICATES, t.options.otherCert)}
-            />
-          </Field>
-        </div>
-      </Card>
-
-      {/* Delivery / Return / Fuel responsibility (AC-25/26) live on the Equipment step. */}
+      {/* Certificates + Delivery / Return / Fuel responsibility (AC-25/26/50) are unified in the
+          "Settings for all equipment" panel on the Equipment step. */}
     </div>
   );
 }

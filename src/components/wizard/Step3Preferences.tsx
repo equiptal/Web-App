@@ -5,12 +5,10 @@ import { useRfq } from "@/lib/store/rfq-store";
 import { Card, Field, Icon, Seg2, SelChips, Select, TextArea, TextInput } from "@/components/ui";
 import {
   PAYMENT_TERMS,
-  PAYMENT_METHODS,
   MAINTENANCE_RESPONSIBILITIES,
   MAINTENANCE_SLAS,
   BID_WINDOWS,
   type PaymentTerm,
-  type PaymentMethod,
   type MaintenanceResponsibility,
   type MaintenanceSla,
   type BidWindow,
@@ -38,9 +36,6 @@ export function Step3Preferences() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t.step3.payment.terms}>
             <Select<PaymentTerm> value={p.payment.terms} placeholder="—" onChange={(v) => actions.patchPreferences({ payment: { terms: v } })} options={opt(PAYMENT_TERMS, t.options.paymentTerm)} />
-          </Field>
-          <Field label={t.step3.payment.method}>
-            <Select<PaymentMethod> value={p.payment.method} placeholder="—" onChange={(v) => actions.patchPreferences({ payment: { method: v } })} options={opt(PAYMENT_METHODS, t.options.paymentMethod)} />
           </Field>
         </div>
 

@@ -73,6 +73,11 @@ export function extractAgentOutput(raw: unknown): RFQAgentOutput {
       : Array.isArray(a.justifications)
         ? a.justifications
         : []) as string[],
+    field_notes: (Array.isArray(b.field_notes)
+      ? b.field_notes
+      : Array.isArray(a.field_notes)
+        ? a.field_notes
+        : []) as { field: string; note: string }[],
   };
 }
 
@@ -121,10 +126,16 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
   // AC-50: if the items that HAVE an agent-set operator certificate all share the same one (e.g. all
   // TÜV), reflect it as the project-level Safety certificate (checked) and let that control them.
   // No-operator items (no cert) don't block this — they just aren't counted.
-  const certs = items.map((i) => i.operator.certificate).filter((c): c is OperatorCertificate => c != null);
-  if (certs.length > 0 && certs.every((c) => c === certs[0])) {
-    project.certificates.safety = [certs[0]];
+  const certLists = items.map((i) => i.operator.certificate).filter((c) => c.length > 0);
+  const certKey = (c: OperatorCertificate[]) => [...c].sort().join(",");
+  if (certLists.length > 0 && certLists.every((c) => certKey(c) === certKey(certLists[0]))) {
+    project.certificates.safety = [...certLists[0]];
     for (const i of items) i.operator.certByAgent = false;
+  }
+  // Field-keyed agent notes (dotted path → note) for inline rendering beside each field.
+  const fieldNotes: Record<string, string> = {};
+  for (const fn of out.field_notes ?? []) {
+    if (fn?.field && typeof fn.note === "string" && fn.note.trim()) fieldNotes[fn.field] = fn.note.trim();
   }
   return {
     project,
@@ -138,6 +149,7 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
     ).filter(Boolean) as string[],
     summary: computeSummary(items),
     justifications: out.justifications ?? [],
+    fieldNotes,
   };
 }
 
@@ -208,12 +220,10 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
   return {
     id: `a${idx}`,
     rawLabel: li.input_equipment ?? null,
-    // Keep the stated size verbatim so the preview can show it even when it didn't resolve to a
-    // measurement id (off-taxonomy "(new)" or unstated). Prefer the verbatim phrase; fall back to
-    // the agent's canonical capacity string, dropping the placeholder "Not Specified".
-    rawSize:
-      li.capacity_input_value ??
-      (li.capacity && li.capacity.toLowerCase() !== "not specified" ? li.capacity : null),
+    // ONLY the size the renter literally typed (capacity_input_value) — so "FROM YOUR RFQ" never
+    // shows a size they didn't write. NEVER fall back to li.capacity (that's the agent's RESOLVED
+    // size; it belongs in "MATCHED TO", not the raw input). null when the renter stated no size.
+    rawSize: li.capacity_input_value ?? null,
     ref,
     verdict,
     resolved,
@@ -226,7 +236,7 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
       ...defaultOperatorDetails(),
       nightShift: li.night_shift_required ?? false,
       nationality: li.operator_nationality ?? null,
-      certificate: agentCert, // AC-24/50: operator license level / safety cert
+      certificate: agentCert ? [agentCert] : [], // AC-24/50: operator license level / safety cert (multi-select)
       certByAgent: agentCert != null, // agent set it → project-level Safety cert won't override
       // AC-24: F.A.T — who covers the operator's Food/Accommodation/Transport. Mansour emits
       // operator_accommodation_by_rentee (true = rentee/me, false = supplier); supplier only when
@@ -244,18 +254,28 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
 
 function toProject(h: RFQHeader): ProjectDetails {
   const p = defaultProjectDetails();
+  // AC-47: map an agent location conflict (text↔file) into the renter's pick-one resolver.
+  // The agent labels candidates "pasted text" vs "file:<name>"; collapse to fromText/fromFile.
+  const locConflict = (h.conflicts ?? []).find((c) => c?.field === "rfq_header.project_address_label");
+  let conflict: ProjectDetails["location"]["conflict"];
+  if (locConflict && Array.isArray(locConflict.candidates) && locConflict.candidates.length >= 2) {
+    const fromText = locConflict.candidates.find((c) => !/^file:/i.test(c.source))?.value;
+    const fromFile = locConflict.candidates.find((c) => /^file:/i.test(c.source))?.value;
+    if (fromText && fromFile) conflict = { fromText, fromFile };
+  }
   p.location = {
     label: h.project_address_label ?? null,
     lat: h.project_lat ?? undefined,
     lng: h.project_lng ?? undefined,
     confirmed: false, // AC-16: always re-confirmed by the renter, even when extracted
     source: "agent",
+    conflict, // AC-47: unresolved conflict → Step 1 shows the From-text/From-file picker
   };
   p.timing.rentalBasis = h.rental_type ? RENTAL_IN[h.rental_type] ?? null : null;
   p.timing.extendable = h.extendable ?? false; // AC-13 (was dropped)
   p.timing.startDate = h.start_date ?? null;
   p.timing.endDate = h.end_date ?? null;
-  p.timing.hoursPerDay = h.working_hours_per_day ?? 8;
+  p.timing.hoursPerDay = h.working_hours_per_day ?? 10;
   p.advanced.workingDaysPerWeek = h.working_days_per_week ?? 6;
   p.advanced.overtimeRate = h.overtime_rate ? OVERTIME_IN[h.overtime_rate] ?? "without" : "without";
   // AC-50: project "Other" certificates from the local-content / saso-registration flags.

@@ -236,6 +236,11 @@
 .rproto .equip-row .elab { font-size: 13px; font-weight: 800; color: var(--navy); display: flex; align-items: center; gap: 6px; }
 .rproto .equip-row .elab .vt { font-size: 13px; color: var(--success); }
 .rproto .equip-row .esub { font-size: 11px; font-weight: 700; color: var(--navy-mid); margin-top: 3px; }
+.rproto .equip-row.tappable { cursor: pointer; }
+.rproto .equip-row.tappable:hover { background: var(--surface2, #f5f7fa); }
+.rproto .equip-row .equip-view { display: inline-flex; align-items: center; gap: 2px; flex: none; font-size: 12px; font-weight: 800; color: var(--rentee); white-space: nowrap; }
+.rproto .equip-row .equip-view .material-icons-outlined { font-size: 16px; }
+.rproto[dir="rtl"] .equip-row .equip-view .material-icons-outlined.go { transform: scaleX(-1); }
 .rproto .price-row { border-top: 1px solid var(--border); }
 .rproto .price-collapsed { display: flex; align-items: center; padding: 12px 14px; cursor: pointer; }
 .rproto .price-collapsed .pl { font-size: 13px; font-weight: 800; color: var(--navy); }

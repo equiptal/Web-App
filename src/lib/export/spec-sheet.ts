@@ -21,7 +21,7 @@ export interface SpecRow {
   fuelResp: Party;
   delivery: Party;
   ret: Party;
-  certificate: OperatorCertificate | null;
+  certificate: OperatorCertificate[];
   notes: string;
 }
 

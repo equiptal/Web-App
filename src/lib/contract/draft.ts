@@ -40,7 +40,7 @@ export interface TimingHours {
   extendable: boolean; // AC-13 flag on the chosen basis
   startDate: string | null; // AC-14 optional, bypassable
   endDate: string | null; // AC-14 optional
-  hoursPerDay: number; // AC-14 default 8
+  hoursPerDay: number; // AC-14 default 10
 }
 
 export interface AdvancedSettings {
@@ -74,7 +74,7 @@ export interface ProjectDetails {
 export interface OperatorDetails {
   nightShift: boolean;
   nationality: string | null;
-  certificate: OperatorCertificate | null; // defaulted from project Safety cert (AC-24/50)
+  certificate: OperatorCertificate[]; // multi-select; defaulted from project Safety certs (AC-24/50)
   /** AC-50: true when the agent set the cert per-item from the RFQ — the project-level Safety cert
    *  then leaves it untouched (only fills items the agent didn't mention). */
   certByAgent?: boolean;
@@ -169,8 +169,10 @@ export interface AgentDraft {
   detectedLocations: string[];
   /** AC-56: processing summary counts. */
   summary: ProcessingSummary;
-  /** Plain, conversational notes on values the agent assumed/inferred — shown to the renter to confirm. */
+  /** DEPRECATED flat notes (lumped Step-4 box). Prefer fieldNotes. */
   justifications?: string[];
+  /** Field-keyed agent notes (dotted path → note), rendered inline beside each field. */
+  fieldNotes?: Record<string, string>;
 }
 
 export interface ProcessingSummary {
@@ -186,8 +188,10 @@ export interface RfqDraft {
   preferences: Preferences;
   detectedLocations: string[];
   summary: ProcessingSummary;
-  /** Plain, conversational notes on values the agent assumed/inferred — shown to the renter to confirm. */
+  /** DEPRECATED flat notes (lumped Step-4 box). Prefer fieldNotes. */
   justifications?: string[];
+  /** Field-keyed agent notes (dotted path → note), rendered inline beside each field. */
+  fieldNotes?: Record<string, string>;
 }
 
 /** Posted to /api/requests (AC-42/43). Mirrors the shared app request shape. */
@@ -203,7 +207,7 @@ export interface RfqRequestPayload {
 export function defaultProjectDetails(): ProjectDetails {
   return {
     location: { label: null, confirmed: false },
-    timing: { rentalBasis: null, extendable: false, startDate: null, endDate: null, hoursPerDay: 8 },
+    timing: { rentalBasis: null, extendable: false, startDate: null, endDate: null, hoursPerDay: 10 },
     advanced: {
       workingDaysPerWeek: 6,
       overtimeRate: "without",
@@ -227,7 +231,7 @@ export function defaultPreferences(): Preferences {
 }
 
 export function defaultOperatorDetails(): OperatorDetails {
-  return { nightShift: false, nationality: null, certificate: null, fat: "me" };
+  return { nightShift: false, nationality: null, certificate: [], fat: "me" };
 }
 
 /** Build a blank item (used when the renter adds a missed item — AC-22). */

@@ -1,7 +1,7 @@
 import type { AgentDraft, RfqRequestPayload, Taxonomy } from "@/lib/contract";
 import type { RequestListItem, RequestRecord } from "@/lib/contract/requests";
 import type { BidCard } from "@/lib/contract/bids";
-import type { DealRoomView } from "@/lib/contract/deal-room";
+import type { DealRoomView, DealRoomDocuments } from "@/lib/contract/deal-room";
 
 /** Error kinds the UI distinguishes: empty/unreadable input (AC-09) vs connectivity (AC-10). */
 export type ApiErrorKind = "empty" | "network" | "unknown";
@@ -84,12 +84,22 @@ async function getJson<T>(url: string): Promise<T> {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * How long to wait for the agent parse before giving up (AC-10 "Connection problem"). Big RFQs take
+ * 30–60s, but the FIRST request after an idle period also pays a cold start (Railway wake + Lambda),
+ * which can blow past 2 min — so we wait up to 4 min to ride that out before erroring.
+ */
+const PROCESS_TIMEOUT_MS = 240_000;
+
+/**
  * Send the renter's input to the agent and get a drafted request (AC-04/05/06).
  * Starts an async job then polls — big RFQs take 30–60s, so a single request would time out.
  */
 export async function processRfq(input: ProcessInput): Promise<AgentDraft> {
-  const { jobId } = await postJson<{ jobId: string }>("/api/agent/process", input); // throws ApiError on empty/network
-  const deadline = Date.now() + 120_000;
+  // Tell the agent the UI locale so it writes free-text (notes/advisories/questions) in Arabic
+  // even when the RFQ text is English. <html lang> is kept in sync with the locale by the i18n provider.
+  const locale = typeof document !== "undefined" ? document.documentElement.lang : "en";
+  const { jobId } = await postJson<{ jobId: string }>("/api/agent/process", { ...input, locale }); // throws ApiError on empty/network
+  const deadline = Date.now() + PROCESS_TIMEOUT_MS;
   while (Date.now() < deadline) {
     let res: Response;
     try {
@@ -173,6 +183,11 @@ export function startDealRoom(bidId: string): Promise<{ id: string }> {
 /** A deal room the renter is party to. */
 export function fetchDealRoom(id: string): Promise<DealRoomView> {
   return getJson<DealRoomView>(`/api/me/deal-rooms/${encodeURIComponent(id)}`);
+}
+
+/** The supplier's (other party's) documents the renter can view in a deal room. */
+export function fetchDealRoomDocuments(id: string): Promise<DealRoomDocuments> {
+  return getJson<DealRoomDocuments>(`/api/me/deal-rooms/${encodeURIComponent(id)}/documents`);
 }
 
 /** GetStream token + channel for a deal room's live chat. */

@@ -7,6 +7,8 @@ import {
   Certificates,
   EquipmentItem,
   OperatorDetails,
+  OPERATOR_CERTIFICATES,
+  type OperatorCertificate,
   Preferences,
   ProjectDetails,
   RfqDraft,
@@ -158,6 +160,7 @@ function reducer(state: RfqState, a: Action): RfqState {
           detectedLocations: a.draft.detectedLocations,
           summary: a.draft.summary,
           justifications: a.draft.justifications ?? [],
+          fieldNotes: a.draft.fieldNotes ?? {},
         },
         // Snapshot the agent's values (refs are safe — all edits are immutable copies).
         agentOrigin: { project: a.draft.project, items: a.draft.items },
@@ -204,11 +207,12 @@ function reducer(state: RfqState, a: Action): RfqState {
       return withDraft(state, (d) => {
         const certificates = { ...d.project.certificates, ...a.patch };
         let items = d.items;
-        // AC-50: the project Safety certificate applies to every item's operator — EXCEPT items the
-        // agent already set a cert on from the RFQ (those keep theirs). Fills/updates the rest.
+        // AC-50: the project Safety certificates apply to every item's operator — EXCEPT items the
+        // agent already set certs on from the RFQ (those keep theirs). Multi-select, so fan the whole
+        // list (restricted to the operator-selectable certs — the free-text "other" stays project-level).
         if (a.patch.safety) {
-          const cert = a.patch.safety[a.patch.safety.length - 1] ?? null;
-          items = d.items.map((i) => (i.operator.certByAgent ? i : { ...i, operator: { ...i.operator, certificate: cert } }));
+          const certs = a.patch.safety.filter((c) => (OPERATOR_CERTIFICATES as string[]).includes(c)) as OperatorCertificate[];
+          items = d.items.map((i) => (i.operator.certByAgent ? i : { ...i, operator: { ...i.operator, certificate: certs } }));
         }
         return { ...d, project: { ...d.project, certificates }, items };
       });

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchBids, startDealRoom, acceptBid } from "@/lib/api/client";
 import type { BidCard } from "@/lib/contract/bids";
+import { EquipmentDetailModal } from "@/components/stores/EquipmentDetailModal";
 
 /** Lifecycle pill (matches the prototype SPILL). */
 const SPILL: Record<string, { cls: string; dot: boolean; en: string; ar: string }> = {
@@ -52,6 +53,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
   const [openPrice, setOpenPrice] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [viewEquipId, setViewEquipId] = useState<string | null>(null);
 
   const toggleSelect = (id: string) =>
     setSelected((prev) => {
@@ -220,12 +222,25 @@ export function RequestBids({ requestId }: { requestId: string }) {
               </div>
             </div>
 
-            {/* equipment row */}
-            <div className="equip-row row-sep">
+            {/* equipment row — tap to view full equipment details (app parity) */}
+            <div
+              className={`equip-row row-sep${b.equipment?.id ? " tappable" : ""}`}
+              role={b.equipment?.id ? "button" : undefined}
+              tabIndex={b.equipment?.id ? 0 : undefined}
+              onClick={() => b.equipment?.id && setViewEquipId(b.equipment.id)}
+              onKeyDown={(e) => b.equipment?.id && (e.key === "Enter" || e.key === " ") && setViewEquipId(b.equipment.id)}
+              title={b.equipment?.id ? L("View equipment details", "عرض تفاصيل المعدات") : undefined}
+            >
               <div className="el">
                 <div className="elab">{L("Equipment", "المعدات")}{b.verified && <span className="material-icons-outlined vt">verified</span>}</div>
                 <div className="esub">{eqSub}{b.distanceKm != null ? ` · ${Math.round(b.distanceKm)} ${L("km", "كم")}` : ""}</div>
               </div>
+              {b.equipment?.id && (
+                <span className="equip-view">
+                  {L("View details", "عرض التفاصيل")}
+                  <span className="material-icons-outlined go">chevron_right</span>
+                </span>
+              )}
             </div>
 
             {/* price expandable */}
@@ -279,6 +294,8 @@ export function RequestBids({ requestId }: { requestId: string }) {
           </button>
         </div>
       )}
+
+      {viewEquipId && <EquipmentDetailModal equipmentId={viewEquipId} onClose={() => setViewEquipId(null)} />}
     </div>
   );
 }

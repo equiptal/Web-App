@@ -103,10 +103,11 @@ export function AgentMark({ className = "" }: { className?: string }) {
   const t = useT();
   return (
     <span
-      className={`inline-flex items-center gap-0.5 rounded-full bg-warn/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-warn ${className}`}
+      className={`inline-flex items-center text-warn ${className}`}
       title={t.common.byAgent}
+      aria-label={t.common.byAgent}
     >
-      <Icon name="auto_awesome" size={11} /> {t.common.agentTag}
+      <Icon name="smart_toy" size={14} />
     </span>
   );
 }
@@ -114,6 +115,7 @@ export function AgentMark({ className = "" }: { className?: string }) {
 export function Field({
   label,
   hint,
+  note,
   optional,
   agent,
   required,
@@ -122,6 +124,9 @@ export function Field({
 }: {
   label: ReactNode;
   hint?: ReactNode;
+  /** Agent's note for this field — shown (info-styled) ONLY while `agent` is true, i.e. the value
+   *  still holds what the agent assumed; it clears the moment the renter edits. Dynamic by design. */
+  note?: ReactNode;
   optional?: boolean;
   /** AC: value was filled by the AI agent (orange badge). */
   agent?: boolean;
@@ -134,7 +139,7 @@ export function Field({
   const t = useT();
   return (
     <label className="block">
-      <span className={`mb-1 flex items-center gap-2 text-xs font-medium ${missing ? "text-danger" : "text-muted"}`}>
+      <span className={`mb-1 flex items-center gap-2 text-xs font-medium ${missing ? "text-danger" : agent ? "text-warn" : "text-muted"}`}>
         {label}
         {required && (
           <span className="text-danger" aria-hidden>
@@ -145,7 +150,15 @@ export function Field({
         {optional && <span className="text-[10px] uppercase tracking-wide text-muted/70">{t.common.optional}</span>}
         {missing && <span className="text-[10px] font-semibold lowercase text-danger">{t.common.missing}</span>}
       </span>
-      {children}
+      {/* Field box: red ring when a required value is missing, orange ring when the agent filled it. */}
+      <div className={`rounded-lg ${missing ? "ring-2 ring-danger/70" : agent ? "ring-1 ring-warn/60" : ""}`}>
+        {children}
+      </div>
+      {agent && note && (
+        <span className="mt-1 flex items-start gap-1.5 text-[12px] leading-snug text-info">
+          <Icon name="lightbulb" size={13} className="mt-[1.5px] flex-none" /> {note}
+        </span>
+      )}
       {hint && <span className="mt-1 block text-xs text-muted">{hint}</span>}
     </label>
   );

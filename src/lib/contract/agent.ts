@@ -57,6 +57,9 @@ export interface RFQHeader {
   project_lng?: number | null;
   project_address_label?: string | null;
   detected_locations?: string[] | null; // AC-48: every distinct site Mansour found
+  /** AC-47: cross-source disagreements. Each entry: a dotted field path + candidates labelled by
+   *  source ("pasted text" / "file:<name>"). The web renders a pick-one resolver (location today). */
+  conflicts?: { field: string; candidates: { value: string; source: string }[] }[] | null;
   working_hours_per_day?: number | null;
   working_days_per_week?: number | null;
   overtime_rate?: AgentOvertimeRate | null;
@@ -96,9 +99,11 @@ export interface RFQAgentOutput {
   rfq_header: RFQHeader;
   line_items: RFQLineItem[];
   missing_required_fields: MissingFieldEntry[];
-  /** Short, plain, conversational notes on values the agent assumed/inferred, in the renter's
-   *  language (location vagueness, responsibility assumptions, size auto-fill, fuel default). */
+  /** DEPRECATED flat conversational notes (lumped Step-4 box). Prefer field_notes. */
   justifications?: string[];
+  /** Field-keyed notes on values the agent assumed/inferred — { field, note } keyed by dotted path
+   *  ("rfq_header.<name>" | "line_items[<i>].<name>"). Rendered inline beside each field. */
+  field_notes?: { field: string; note: string }[];
 }
 
 /** Request body for `POST /rfq` and `POST /rfq/jobs`. Attachments are base64 (no `data:` prefix). */
@@ -108,4 +113,6 @@ export interface NormalizeRequest {
   /** "web_rfq" triggers the web policy (start_date/delivery/fulfillment → optional, rental_type
    *  constrained to daily/weekly/monthly, extendable mapping). "api" = hard app policy. */
   source?: "web_rfq" | "api";
+  /** UI locale → the agent writes free-text (notes/advisories/questions) in Arabic when "ar". */
+  language?: "ar" | "en";
 }

@@ -105,7 +105,7 @@ describe("draftToCreateRequest — ALIGNMENT rules", () => {
 describe("draftToCreateRequest — §4.2 fields", () => {
   it("maps hours/days/overtime with the enum", () => {
     const p = draftToCreateRequest(makeDraft(), "46");
-    expect(p.workingHoursPerDay).toBe(8);
+    expect(p.workingHoursPerDay).toBe(10);
     expect(p.workingDaysPerWeek).toBe(6);
     expect(p.overtimeRate).toBe("0"); // default "without"
   });
