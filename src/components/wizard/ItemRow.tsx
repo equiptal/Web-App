@@ -74,9 +74,15 @@ export function ItemRow({
   const { category, subcategory, measurement } = resolveRef(taxonomy, item.ref);
   const status = item.verdict === "no-match" ? "not-available" : item.resolved ? "matched" : "needs-ok";
   const glyph = (item.ref.categoryId && CATEGORY_ICON[item.ref.categoryId]) || "construction";
-  // Show the size even when it didn't resolve to a taxonomy measurement (off-taxonomy / unstated):
-  // fall back to the verbatim stated size so it never disappears from the match line.
-  const sizeLabel = (measurement ? taxName(measurement, locale) : undefined) ?? item.rawSize ?? undefined;
+  // "MATCHED TO" must show ONLY values that exist in our taxonomy: the resolved measurement, or the
+  // agent's suggested canonical size (also a real taxonomy node) while the size is still pending.
+  // NEVER the verbatim stated size — that's the raw input (e.g. "23 ton") and lives in "FROM YOUR
+  // RFQ". Falling back to it made the match line claim a size we don't actually carry.
+  const suggestedMeasurement = item.suggestion?.measurementId
+    ? resolveRef(taxonomy, { ...item.ref, measurementId: item.suggestion.measurementId }).measurement
+    : undefined;
+  const matchedMeasurement = measurement ?? suggestedMeasurement;
+  const sizeLabel = matchedMeasurement ? taxName(matchedMeasurement, locale) : undefined;
   const matchLabel = [taxName(category, locale) || undefined, taxName(subcategory, locale) || undefined, sizeLabel].filter(Boolean).join(" · ") || (item.rawLabel ?? "—");
   // What the renter actually wrote — name + stated size — so "from your RFQ" keeps the size visible.
   const rawDisplay = [item.rawLabel, item.rawSize].filter(Boolean).join(" · ") || item.rawLabel;
@@ -208,10 +214,17 @@ export function ItemRow({
               )}
             </>
           ) : (
-            <Button variant="secondary" onClick={() => setShowDetails((d) => !d)}>
-              <Icon name="tune" size={15} /> {t.step2.itemSettings}
-              <Icon name="expand_more" size={16} className={`transition-transform ${showDetails ? "rotate-180" : ""}`} />
-            </Button>
+            <>
+              {/* Matched: classification is collapsed by default — "Change" opens the cat→sub→size
+                  picker on demand. "Item settings" opens the operator/fuel/notes panel separately. */}
+              <Button variant="secondary" onClick={() => setEditingMatch((e) => !e)}>
+                <Icon name="swap_horiz" size={15} /> {t.common.change}
+              </Button>
+              <Button variant="secondary" onClick={() => setShowDetails((d) => !d)}>
+                <Icon name="tune" size={15} /> {t.step2.itemSettings}
+                <Icon name="expand_more" size={16} className={`transition-transform ${showDetails ? "rotate-180" : ""}`} />
+              </Button>
+            </>
           )}
           <button className="grid h-8 w-8 place-items-center rounded-lg border border-border text-muted hover:border-danger hover:text-danger" title={t.common.remove} onClick={() => setConfirmRemove(true)}>
             <Icon name="close" size={17} />
@@ -219,9 +232,10 @@ export function ItemRow({
         </div>
       </div>
 
-      {/* The 3-level cat→sub→size picker: while editing a match, when the ref is incomplete, and
-          always inside a matched item's Edit panel so all three levels stay changeable. */}
-      {(editingMatch || !isCompleteRef(item.ref) || (status === "matched" && showDetails)) && taxonomyEditor}
+      {/* The 3-level cat→sub→size picker opens when the renter clicks "Change" (editingMatch), or when
+          the ref is incomplete (a required level is missing). A complete match stays COLLAPSED — the
+          renter opens it on demand via Change — it's no longer forced open inside the settings panel. */}
+      {(editingMatch || !isCompleteRef(item.ref)) && taxonomyEditor}
 
       {/* Per-item details — editable only once Matched (AC-54). Mirrors the prototype:
           operator card + fuel + notes. Delivery/return are request-wide only (Settings for all
