@@ -92,20 +92,36 @@ export function ItemRow({
 
   /* ----------------------------- No-match (AC-30/31/32) ----------------------------- */
   if (item.verdict === "no-match") {
+    // The equipment IS in our catalogue but the requested SIZE isn't yet (a genuine new size) when
+    // category + subtype resolved. Then show the matched equipment + a size-specific message, rather
+    // than "we couldn't find this equipment". Otherwise it's an unknown-equipment no-match.
+    const newSizeOnly = Boolean(item.ref.categoryId && item.ref.subcategoryId);
     return (
       <li className="rounded-xl border border-s-[3px] border-border border-s-danger bg-surface px-4 py-3">
         <div className="flex items-start gap-3">
           <Avatar glyph={glyph} conf="low" />
           <div className="min-w-0 flex-1">
-            <RfqMatch raw={rawDisplay} matched={<span className="text-danger">{t.step2.status.notAvailable}</span>} />
-            <p className="mt-1 text-xs text-muted">{t.step2.noMatch.explainer}</p>
+            <RfqMatch
+              raw={rawDisplay}
+              matched={
+                newSizeOnly ? (
+                  <span>
+                    {matchLabel} · <span className="text-danger">{t.step2.status.notAvailable}</span>
+                  </span>
+                ) : (
+                  <span className="text-danger">{t.step2.status.notAvailable}</span>
+                )
+              }
+            />
+            <p className="mt-1 text-xs text-muted">{newSizeOnly ? t.step2.noMatch.newSizeExplainer : t.step2.noMatch.explainer}</p>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2 sm:justify-end">
           <Button
             variant="secondary"
             onClick={() => {
-              const msg = fmt(t.step2.noMatch.whatsappMessage, { item: item.rawLabel ?? "" });
+              const tmpl = newSizeOnly ? t.step2.noMatch.whatsappMessageSize : t.step2.noMatch.whatsappMessage;
+              const msg = fmt(tmpl, { item: rawDisplay ?? item.rawLabel ?? "" });
               window.open(`https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
               actions.removeItem(item.id);
             }}
