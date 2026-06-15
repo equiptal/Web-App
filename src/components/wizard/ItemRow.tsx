@@ -74,9 +74,15 @@ export function ItemRow({
   const { category, subcategory, measurement } = resolveRef(taxonomy, item.ref);
   const status = item.verdict === "no-match" ? "not-available" : item.resolved ? "matched" : "needs-ok";
   const glyph = (item.ref.categoryId && CATEGORY_ICON[item.ref.categoryId]) || "construction";
-  // Show the size even when it didn't resolve to a taxonomy measurement (off-taxonomy / unstated):
-  // fall back to the verbatim stated size so it never disappears from the match line.
-  const sizeLabel = (measurement ? taxName(measurement, locale) : undefined) ?? item.rawSize ?? undefined;
+  // "MATCHED TO" must show ONLY values that exist in our taxonomy: the resolved measurement, or the
+  // agent's suggested canonical size (also a real taxonomy node) while the size is still pending.
+  // NEVER the verbatim stated size — that's the raw input (e.g. "23 ton") and lives in "FROM YOUR
+  // RFQ". Falling back to it made the match line claim a size we don't actually carry.
+  const suggestedMeasurement = item.suggestion?.measurementId
+    ? resolveRef(taxonomy, { ...item.ref, measurementId: item.suggestion.measurementId }).measurement
+    : undefined;
+  const matchedMeasurement = measurement ?? suggestedMeasurement;
+  const sizeLabel = matchedMeasurement ? taxName(matchedMeasurement, locale) : undefined;
   const matchLabel = [taxName(category, locale) || undefined, taxName(subcategory, locale) || undefined, sizeLabel].filter(Boolean).join(" · ") || (item.rawLabel ?? "—");
   // What the renter actually wrote — name + stated size — so "from your RFQ" keeps the size visible.
   const rawDisplay = [item.rawLabel, item.rawSize].filter(Boolean).join(" · ") || item.rawLabel;
