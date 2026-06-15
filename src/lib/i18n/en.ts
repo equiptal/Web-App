@@ -39,6 +39,7 @@ export const en = {
     home: "Home",
     profile: "Profile",
     requests: "Requests",
+    compare: "Compare bids",
     request: "Request",
     account: "Account",
     welcome: "Welcome",

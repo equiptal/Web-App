@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Request &amp; Bids — prototype</title>
+
+  <!-- Fonts + Material Icons (same families the app uses) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=IBM+Plex+Sans:wght@400;600;700&family=Material+Icons+Outlined&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── page chrome (not part of the app component — just to host the prototype) ── */
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #eff4f9; font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1c3550; }
+    .page { padding: 24px 16px 80px; }
+    .toolbar { max-width: 1060px; margin: 0 auto 18px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .toolbar h1 { font-size: 18px; font-weight: 900; margin: 0; letter-spacing: -.3px; }
+    .toolbar .logo i { font-style: normal; color: #f79009; }
+    .toolbar .spacer { flex: 1; }
+    .tgl { display: inline-flex; align-items: center; gap: 7px; border: 1px solid #d4e0ec; background: #fff; border-radius: 100px; padding: 7px 13px; font-size: 12.5px; font-weight: 800; color: #2a4f72; cursor: pointer; }
+    .tgl.on { background: #1c3550; border-color: #1c3550; color: #fff; }
+    .tgl .material-icons-outlined { font-size: 16px; }
+
+    /* ════════════════════════════════════════════════════════════════════
+       Verbatim port of requests-proto.css (.rproto scope)
+       ════════════════════════════════════════════════════════════════════ */
+    .rproto {
+      --navy: #1c3550;
+      --navy-deep: #12263a;
+      --navy-mid: #2a4f72;
+      --action: #f79009;
+      --action-dim: #fff4e5;
+      --rentee: #2563eb;
+      --rentee-dim: #eaf1fe;
+      --success: #1daf58;
+      --success-bg: #e7f7ee;
+      --warning: #d4780a;
+      --warning-bg: #fff3e0;
+      --danger: #d9362a;
+      --danger-bg: #fcebea;
+      --info: #1a7ec8;
+      --info-bg: #e6f2fb;
+      --muted: #6b8fa8;
+      --surface1: #fff;
+      --surface2: #eff4f9;
+      --surface3: #e4edf5;
+      --border: #d4e0ec;
+      --line: #e4edf5;
+      --text-disabled: #9bb3c8;
+      --shadow: rgba(28, 53, 80, 0.06);
+      --r-sm: 8px;
+      --r-md: 10px;
+      --r-lg: 14px;
+      --r-full: 100px;
+
+      max-width: 1060px;
+      margin: 0 auto;
+      color: var(--navy);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .rproto .mono { font-family: "IBM Plex Sans", monospace; }
+
+    /* buttons */
+    .rproto .btn { border: 1px solid var(--border); background: var(--surface1); border-radius: var(--r-md); padding: 11px 18px; font: inherit; font-weight: 700; font-size: 13.5px; color: var(--navy); display: inline-flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer; transition: filter 0.12s, background 0.12s; }
+    .rproto .btn .material-icons-outlined { font-size: 18px; }
+    .rproto .btn.primary { background: var(--action); border-color: var(--action); color: #fff; }
+    .rproto .btn.primary:disabled { background: var(--surface2); border-color: var(--border); color: var(--text-disabled); cursor: not-allowed; }
+    .rproto .btn.danger { border-color: rgba(217, 54, 42, 0.35); color: var(--danger); }
+    .rproto .btn.sm { padding: 9px 14px; font-size: 12.5px; }
+
+    /* status / type badges */
+    .rproto .stbadge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: var(--r-full); }
+    .rproto .stbadge .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .rproto .st-open { background: var(--info-bg); color: var(--info); } .rproto .st-open .dot { background: var(--info); }
+    .rproto .st-active, .rproto .st-accepted { background: var(--success-bg); color: var(--success); } .rproto .st-active .dot, .rproto .st-accepted .dot { background: var(--success); }
+    .rproto .st-expired { background: var(--warning-bg); color: var(--warning); } .rproto .st-expired .dot { background: var(--warning); }
+    .rproto .st-closed { background: var(--surface2); color: var(--muted); } .rproto .st-closed .dot { background: var(--muted); }
+    .rproto .typebadge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: var(--r-full); }
+    .rproto .typebadge .material-icons-outlined { font-size: 13px; }
+    .rproto .tb-broadcast { background: rgba(28, 53, 80, 0.07); color: var(--navy-mid); }
+    .rproto .tb-direct { background: var(--action-dim); color: var(--action); }
+
+    /* request detail */
+    .rproto .detail-status { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .rproto .infostrip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border-radius: var(--r-lg); overflow: hidden; background: linear-gradient(135deg, var(--navy), var(--navy-deep)); color: #fff; margin-bottom: 18px; }
+    .rproto .infostrip .ic { padding: 16px 18px; position: relative; }
+    .rproto .infostrip .ic + .ic::before { content: ""; position: absolute; inset-block: 14px; inset-inline-start: 0; width: 1px; background: rgba(255, 255, 255, 0.12); }
+    .rproto .infostrip .lab { font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(255, 255, 255, 0.55); }
+    .rproto .infostrip .val { font-size: 14px; font-weight: 800; margin-top: 5px; }
+    .rproto .infostrip .val.mono { font-family: "IBM Plex Sans", monospace; }
+    @media (max-width: 900px) { .rproto .infostrip { grid-template-columns: 1fr 1fr; } .rproto .infostrip .ic:nth-child(3)::before { display: none; } }
+    .rproto .dsec { margin-bottom: 18px; }
+    .rproto .dsec-h { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--navy-mid); margin: 0 2px 11px; }
+    .rproto .dsec-h .material-icons-outlined { font-size: 17px; color: var(--muted); }
+    .rproto .dcard { background: var(--surface1); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; }
+    .rproto .ditem { display: flex; gap: 13px; padding: 15px 16px; border-bottom: 1px solid var(--line); }
+    .rproto .ditem:last-child { border-bottom: 0; }
+    .rproto .ditem .di { width: 38px; height: 38px; border-radius: 10px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; font-size: 21px; background: var(--surface2); color: var(--navy-mid); overflow: hidden; }
+    .rproto .ditem .di .material-icons-outlined { color: var(--navy-mid); }
+    .rproto .ditem .dn { font-size: 14px; font-weight: 800; color: var(--navy); }
+    .rproto .terms { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+    .rproto .tchip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--navy-mid); background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; padding: 4px 9px; }
+    .rproto .tchip .material-icons-outlined { font-size: 13px; color: var(--muted); }
+    .rproto .tchip b { font-weight: 800; color: var(--navy); }
+    .rproto .kv { display: grid; grid-template-columns: 160px 1fr; row-gap: 11px; padding: 16px; font-size: 13.5px; }
+    .rproto .kv .k { color: var(--muted); font-weight: 600; }
+    .rproto .kv .v { font-weight: 700; }
+    @media (max-width: 560px) { .rproto .kv { grid-template-columns: 1fr; row-gap: 4px; } .rproto .kv .v { margin-bottom: 8px; } }
+    .rproto .addr { display: flex; align-items: center; gap: 9px; padding: 16px; font-size: 13.5px; }
+    .rproto .addr .material-icons-outlined.pin { color: var(--action); font-size: 20px; }
+    .rproto .addr b { font-weight: 800; } .rproto .addr span { color: var(--muted); }
+    .rproto .notes { padding: 16px; font-size: 13.5px; color: var(--navy-mid); line-height: 1.6; }
+    .rproto .actionbar { display: flex; gap: 10px; align-items: center; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+    .rproto .actionbar .spacer { flex: 1; }
+    .rproto .mapbox { height: 150px; background: linear-gradient(135deg, #dbe7f2, #c7d9ea); display: flex; align-items: center; justify-content: center; color: var(--muted); font-weight: 700; font-size: 12px; gap: 6px; border-bottom: 1px solid var(--line); }
+
+    /* bids list */
+    .rproto .bids-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .rproto .bids-bar .count { font-size: 13px; font-weight: 700; color: var(--muted); }
+
+    /* view-request link + quotation select bar */
+    .rproto .view-req { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 800; color: var(--rentee); background: var(--rentee-dim); border: 1px solid #c3d8fb; border-radius: var(--r-full); padding: 7px 13px; cursor: pointer; margin-bottom: 14px; }
+    .rproto .view-req .material-icons-outlined { font-size: 15px; }
+    .rproto[dir="rtl"] .view-req .material-icons-outlined.go { transform: scaleX(-1); }
+    .rproto .qbar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; gap: 12px; margin-top: 6px; padding: 12px 16px; background: var(--navy); color: #fff; border-radius: var(--r-lg); box-shadow: 0 8px 24px rgba(19, 36, 59, 0.18); }
+    .rproto .qbar .qn { font-size: 13.5px; font-weight: 800; }
+    .rproto .qbar .qclear { font-size: 12px; font-weight: 700; color: rgba(255, 255, 255, 0.7); cursor: pointer; }
+    .rproto .qbar .qdl { margin-inline-start: auto; display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: var(--r-md); padding: 10px 16px; font: inherit; font-weight: 800; font-size: 13px; color: #fff; background: var(--action); cursor: pointer; }
+    .rproto .qbar .qdl .material-icons-outlined { font-size: 17px; }
+
+    /* v3 bid card */
+    .rproto .bid { background: var(--surface1); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; margin-bottom: 14px; position: relative; }
+    .rproto .bid.sel { border-color: var(--navy); border-width: 2px; box-shadow: 0 8px 24px rgba(19, 36, 59, 0.1); }
+    .rproto .bid.sel::before { content: ""; position: absolute; inset-block: 0; inset-inline-start: 0; width: 4px; background: var(--navy); }
+    .rproto .bid-check { width: 26px; height: 26px; border-radius: 7px; border: 1.5px solid var(--border); background: var(--surface1); display: flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; color: transparent; }
+    .rproto .bid-check.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+    .rproto .bid-check .material-icons-outlined { font-size: 18px; }
+    .rproto .bid-head { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px 8px; }
+    .rproto .bid-av { position: relative; width: 40px; height: 40px; border-radius: 50%; background: #e8dec0; border: 1.5px solid var(--navy); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 17px; color: var(--navy); flex: 0 0 auto; }
+    .rproto .bid-av .vchk { position: absolute; bottom: -2px; inset-inline-end: -2px; width: 14px; height: 14px; border-radius: 50%; background: var(--success); border: 1.5px solid #fff; display: flex; align-items: center; justify-content: center; }
+    .rproto .bid-av .vchk .material-icons-outlined { font-size: 9px; color: #fff; }
+    .rproto .bid-hh { flex: 1; min-width: 0; }
+    .rproto .bid-hh .r1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .rproto .bid-hh .sname { font-size: 14px; font-weight: 800; color: var(--navy); }
+    .rproto .bid-evt { font-size: 11px; font-weight: 600; color: var(--muted); margin-top: 4px; }
+    .rproto .credrow { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+    .rproto .credpill { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: var(--r-full); }
+    .rproto .credpill .material-icons-outlined { font-size: 11px; }
+    .rproto .cp-ok { background: var(--success-bg); color: var(--success); } .rproto .cp-miss { background: var(--surface2); color: var(--muted); }
+    .rproto .spill { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: var(--r-full); line-height: 1.1; }
+    .rproto .spill .d { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+    .rproto .sp-pending { color: #1849a9; background: var(--rentee-dim); border: 1px solid #c3d8fb; }
+    .rproto .sp-open { color: var(--navy-deep); background: rgba(42, 79, 114, 0.12); } .rproto .sp-open .d { display: none; }
+    .rproto .sp-counter { color: var(--warning); background: var(--action-dim); } .rproto .sp-counter .d { animation: rpulse 1.2s infinite; }
+    .rproto .sp-accepted { color: var(--success); background: var(--success-bg); } .rproto .sp-accepted .d { display: none; }
+    .rproto .sp-expired, .rproto .sp-withdrawn { color: #666; background: rgba(0, 0, 0, 0.08); } .rproto .sp-expired .d, .rproto .sp-withdrawn .d { display: none; }
+    @keyframes rpulse { 50% { opacity: 0.35; } }
+    .rproto .row-sep { border-top: 1px solid var(--border); }
+    .rproto .terms-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; }
+    .rproto .terms-row .tlab { font-size: 13px; font-weight: 800; color: var(--navy); flex: 0 0 auto; }
+    .rproto .buckets { flex: 1; display: flex; justify-content: flex-end; gap: 16px; min-width: 0; }
+    .rproto .bucket { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+    .rproto .bucket .bl { font-size: 12px; font-weight: 700; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rproto .donut { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; flex: 0 0 auto; }
+    .rproto .donut::before { content: ""; position: absolute; inset: 4px; background: var(--surface1); border-radius: 50%; }
+    .rproto .donut span { position: relative; font-family: "IBM Plex Sans", monospace; font-size: 11px; font-weight: 700; color: var(--navy); }
+    .rproto .equip-row { display: flex; align-items: center; gap: 10px; padding: 11px 14px; }
+    .rproto .equip-row .el { flex: 1; min-width: 0; }
+    .rproto .equip-row .elab { font-size: 13px; font-weight: 800; color: var(--navy); display: flex; align-items: center; gap: 6px; }
+    .rproto .equip-row .elab .vt { font-size: 13px; color: var(--success); }
+    .rproto .equip-row .esub { font-size: 11px; font-weight: 700; color: var(--navy-mid); margin-top: 3px; }
+    .rproto .equip-row.tappable { cursor: pointer; }
+    .rproto .equip-row.tappable:hover { background: var(--surface2, #f5f7fa); }
+    .rproto .equip-row .equip-view { display: inline-flex; align-items: center; gap: 2px; flex: none; font-size: 12px; font-weight: 800; color: var(--rentee); white-space: nowrap; }
+    .rproto .equip-row .equip-view .material-icons-outlined { font-size: 16px; }
+    .rproto[dir="rtl"] .equip-row .equip-view .material-icons-outlined.go { transform: scaleX(-1); }
+    .rproto .price-row { border-top: 1px solid var(--border); }
+    .rproto .price-collapsed { display: flex; align-items: center; padding: 12px 14px; cursor: pointer; }
+    .rproto .price-collapsed .pl { font-size: 13px; font-weight: 800; color: var(--navy); }
+    .rproto .price-collapsed .pr { margin-inline-start: auto; display: flex; align-items: center; gap: 6px; font-family: "IBM Plex Sans", monospace; font-size: 17px; font-weight: 700; color: var(--action); }
+    .rproto .price-collapsed .pr .chev { font-family: "Material Icons Outlined"; font-size: 18px; color: var(--muted); transition: 0.2s; }
+    .rproto .price-row.open .price-collapsed .pr .chev { transform: rotate(180deg); }
+    .rproto .price-body { padding: 2px 14px 14px; }
+    .rproto .prow { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; font-size: 13px; border-bottom: 1px solid var(--line); }
+    .rproto .prow:last-child { border-bottom: 0; }
+    .rproto .prow .pl2 { color: var(--navy-mid); font-weight: 600; }
+    .rproto .prow .pv { font-family: "IBM Plex Sans", monospace; font-weight: 700; }
+    .rproto .grandcard { border: 1.5px solid rgba(247, 144, 9, 0.4); background: var(--action-dim); border-radius: var(--r-md); padding: 11px 13px; margin-top: 10px; display: flex; align-items: center; }
+    .rproto .grandcard .gl { font-size: 13px; font-weight: 800; color: var(--navy); }
+    .rproto .grandcard .gv { margin-inline-start: auto; font-family: "IBM Plex Sans", monospace; font-size: 16px; font-weight: 800; color: var(--action); }
+    .rproto .lc-chips { display: flex; gap: 7px; padding: 8px 14px 4px; flex-wrap: wrap; }
+    .rproto .lc-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--navy-mid); background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-full); padding: 4px 10px; }
+    .rproto .lc-chip .material-icons-outlined { font-size: 13px; color: var(--muted); }
+    .rproto .neg-footer { border-top: 1px solid var(--border); padding: 10px 14px 12px; }
+    .rproto .neg-pill { width: 100%; border: 0; border-radius: var(--r-md); padding: 12px; font: inherit; font-weight: 800; font-size: 13.5px; color: #fff; background: var(--action); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; }
+    .rproto .neg-pill:disabled { background: var(--surface2); color: var(--text-disabled); cursor: not-allowed; }
+    .rproto .neg-pill .material-icons-outlined { font-size: 18px; }
+    .rproto[dir="rtl"] .neg-pill .material-icons-outlined { transform: scaleX(-1); }
+    .rproto .nf-hint { margin: 8px 0 0; text-align: center; font-size: 11px; font-weight: 600; color: #7a8fa0; line-height: 1.5; }
+
+    /* shared loading/empty */
+    .rproto .rempty { border: 1px dashed var(--border); background: rgba(239, 244, 249, 0.4); border-radius: var(--r-lg); padding: 40px; text-align: center; font-size: 13.5px; color: var(--muted); }
+    .rproto .material-icons-outlined { font-family: "Material Icons Outlined"; line-height: 1; }
+    .rproto[dir="rtl"] .rq-arrow { transform: scaleX(-1); }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="toolbar">
+      <span class="logo"><h1>MOEDA<i>TECH</i> — Request &amp; Bids prototype</h1></span>
+      <span class="spacer"></span>
+      <button class="tgl on" id="tab-details" onclick="showView('details')"><span class="material-icons-outlined">description</span> Request details</button>
+      <button class="tgl" id="tab-bids" onclick="showView('bids')"><span class="material-icons-outlined">gavel</span> Bids (4)</button>
+    </div>
+
+    <!-- ════════════════ REQUEST DETAIL VIEW ════════════════ -->
+    <div class="rproto" dir="ltr" id="view-details">
+      <!-- status -->
+      <div class="detail-status">
+        <span class="stbadge st-active"><span class="dot"></span>ACTIVE</span>
+        <span class="typebadge tb-broadcast"><span class="material-icons-outlined">campaign</span>BROADCAST</span>
+        <span style="font-size:12px;color:var(--muted);font-weight:700;">REQ-2041</span>
+        <span class="stbadge st-active" style="margin-inline-start:auto;"><span class="material-icons-outlined" style="font-size:13px;">gavel</span>4 bids</span>
+      </div>
+
+      <!-- infostrip -->
+      <div class="infostrip">
+        <div class="ic"><div class="lab">Location</div><div class="val">Riyadh — Al Malqa</div></div>
+        <div class="ic"><div class="lab">Period</div><div class="val">18 Jun 2026 – 2 Jul 2026</div></div>
+        <div class="ic"><div class="lab">Duration</div><div class="val mono">14 days</div></div>
+        <div class="ic"><div class="lab">Urgency</div><div class="val">Soon</div></div>
+      </div>
+
+      <!-- equipment -->
+      <div class="dsec">
+        <div class="dsec-h"><span class="material-icons-outlined">construction</span>Equipment details</div>
+        <div class="dcard">
+          <div class="ditem">
+            <span class="di"><span class="material-icons-outlined" style="font-size:21px;">agriculture</span></span>
+            <div>
+              <div class="dn">Excavator · 20–24 ton <span style="color:var(--muted);"> × 2</span></div>
+              <div class="terms">
+                <span class="tchip"><span class="material-icons-outlined">person_outline</span>With operator</span>
+                <span class="tchip"><span class="material-icons-outlined">local_gas_station</span>DIESEL</span>
+                <span class="tchip"><span class="material-icons-outlined">local_shipping</span>Delivery by supplier</span>
+                <span class="tchip"><span class="material-icons-outlined">keyboard_return</span>Return by supplier</span>
+                <span class="tchip"><span class="material-icons-outlined">restaurant</span>F.A.T by supplier</span>
+                <span class="tchip"><span class="material-icons-outlined">nightlight</span>Night shift</span>
+                <span class="tchip"><span class="material-icons-outlined">verified</span>OSHA</span>
+              </div>
+              <div class="notes" style="padding:8px 0 0;">Site has soft sand access — track machines preferred.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- location -->
+      <div class="dsec">
+        <div class="dsec-h"><span class="material-icons-outlined">place</span>Project location</div>
+        <div class="dcard">
+          <div class="mapbox"><span class="material-icons-outlined">map</span> Map preview</div>
+          <div class="addr">
+            <span class="material-icons-outlined pin">location_on</span>
+            <span><b>Riyadh — Al Malqa</b><span dir="ltr"> · (24.8221, 46.6093)</span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- preferences -->
+      <div class="dsec">
+        <div class="dsec-h"><span class="material-icons-outlined">tune</span>Preferences</div>
+        <div class="dcard">
+          <div class="kv">
+            <span class="k">Rental basis</span><span class="v">WEEKLY</span>
+            <span class="k">Payment terms</span><span class="v">net_30</span>
+            <span class="k">Payment method</span><span class="v">bank_transfer</span>
+            <span class="k">Working hours</span><span class="v">10 hrs/day</span>
+            <span class="k">Maintenance</span><span class="v">supplier</span>
+            <span class="k">Budget</span><span class="v">450,000 SAR</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- notes -->
+      <div class="dsec">
+        <div class="dsec-h"><span class="material-icons-outlined">notes</span>Additional notes</div>
+        <div class="dcard"><div class="notes">Access gate closes at 6pm. Coordinate mobilization with site supervisor before delivery.</div></div>
+      </div>
+
+      <!-- actions -->
+      <div class="actionbar">
+        <button class="btn sm danger"><span class="material-icons-outlined">close</span> Cancel request</button>
+        <span class="spacer"></span>
+        <button class="btn sm"><span class="material-icons-outlined">forum</span> Deal room</button>
+        <button class="btn primary" onclick="showView('bids')"><span class="material-icons-outlined">gavel</span> View bids (4)</button>
+      </div>
+    </div>
+
+    <!-- ════════════════ BIDS VIEW ════════════════ -->
+    <div class="rproto hidden" dir="ltr" id="view-bids">
+      <button class="view-req" onclick="showView('details')">
+        <span class="material-icons-outlined">description</span>
+        View full request details
+        <span class="material-icons-outlined go">chevron_right</span>
+      </button>
+      <div class="bids-bar"><span class="count">4 bids</span></div>
+
+      <!-- ── Bid 1 — PENDING (New), verified, all match ── -->
+      <div class="bid" data-bid="1">
+        <div class="bid-head">
+          <div class="bid-av">A<span class="vchk"><span class="material-icons-outlined">check</span></span></div>
+          <div class="bid-hh">
+            <div class="r1">
+              <span class="sname">Al Rajhi Heavy Equipment</span>
+              <span class="spill sp-pending"><span class="d"></span>New</span>
+            </div>
+            <div class="bid-evt">Submitted · 14 Jun</div>
+            <div class="credrow">
+              <span class="credpill cp-ok"><span class="material-icons-outlined">verified</span>Verified</span>
+              <span class="credpill cp-ok"><span class="material-icons-outlined">star</span>4.8</span>
+            </div>
+          </div>
+          <div class="bid-check" onclick="toggleSel(1)" title="Select for quotation"><span class="material-icons-outlined">check</span></div>
+        </div>
+        <div class="terms-row row-sep">
+          <span class="tlab">Terms</span>
+          <div class="buckets">
+            <span class="bucket">
+              <span class="donut" style="background: conic-gradient(var(--success) 0 100%, var(--warning) 100% 100%, var(--surface3) 100% 100%);"><span>7</span></span>
+              <span class="bl">All match</span>
+            </span>
+          </div>
+        </div>
+        <div class="equip-row row-sep tappable" role="button" tabindex="0" title="View equipment details">
+          <div class="el">
+            <div class="elab">Equipment<span class="material-icons-outlined vt">verified</span></div>
+            <div class="esub">Komatsu · PC210 · 2022 · 12 km</div>
+          </div>
+          <span class="equip-view">View details<span class="material-icons-outlined go">chevron_right</span></span>
+        </div>
+        <div class="price-row">
+          <div class="price-collapsed" onclick="togglePrice(1)">
+            <span class="pl">Total</span>
+            <span class="pr">386,400 SAR<span class="chev">expand_more</span></span>
+          </div>
+        </div>
+        <div class="lc-chips">
+          <span class="lc-chip"><span class="material-icons-outlined">schedule</span>Valid until 21 Jun</span>
+          <span class="lc-chip"><span class="material-icons-outlined">place</span>12 km</span>
+        </div>
+        <div class="neg-footer">
+          <button class="neg-pill">Start negotiation on this bid<span class="material-icons-outlined">arrow_forward</span></button>
+          <p class="nf-hint">Tapping opens the deal room — a signal to the supplier that you are serious about this bid</p>
+        </div>
+      </div>
+
+      <!-- ── Bid 2 — COUNTER_OFFERED, verified, 2 differ, price EXPANDED ── -->
+      <div class="bid" data-bid="2">
+        <div class="bid-head">
+          <div class="bid-av">B<span class="vchk"><span class="material-icons-outlined">check</span></span></div>
+          <div class="bid-hh">
+            <div class="r1">
+              <span class="sname">Bin Laden Rentals</span>
+              <span class="spill sp-counter"><span class="d"></span>Counter-offer</span>
+            </div>
+            <div class="bid-evt">Countered</div>
+            <div class="credrow">
+              <span class="credpill cp-ok"><span class="material-icons-outlined">verified</span>Verified</span>
+              <span class="credpill cp-ok"><span class="material-icons-outlined">star</span>4.5</span>
+            </div>
+          </div>
+          <div class="bid-check" onclick="toggleSel(2)" title="Select for quotation"><span class="material-icons-outlined">check</span></div>
+        </div>
+        <div class="terms-row row-sep">
+          <span class="tlab">Terms</span>
+          <div class="buckets">
+            <span class="bucket">
+              <span class="donut" style="background: conic-gradient(var(--success) 0 71%, var(--warning) 71% 100%, var(--surface3) 100% 100%);"><span>7</span></span>
+              <span class="bl">2 differ</span>
+            </span>
+          </div>
+        </div>
+        <div class="equip-row row-sep tappable" role="button" tabindex="0" title="View equipment details">
+          <div class="el">
+            <div class="elab">Equipment<span class="material-icons-outlined vt">verified</span></div>
+            <div class="esub">CAT · 320D · 2021 · 28 km</div>
+          </div>
+          <span class="equip-view">View details<span class="material-icons-outlined go">chevron_right</span></span>
+        </div>
+        <div class="price-row open">
+          <div class="price-collapsed" onclick="togglePrice(2)">
+            <span class="pl">Total</span>
+            <span class="pr">421,000 SAR<span class="chev">expand_more</span></span>
+          </div>
+          <div class="price-body">
+            <div class="prow"><span class="pl2">Rental (26,000 × 14)</span><span class="pv">364,000</span></div>
+            <div class="prow"><span class="pl2">Mobilization</span><span class="pv">9,000</span></div>
+            <div class="prow"><span class="pl2">Return</span><span class="pv">9,000</span></div>
+            <div class="prow"><span class="pl2">VAT 15%</span><span class="pv">57,300</span></div>
+            <div class="grandcard"><span class="gl">Estimated total</span><span class="gv">439,300 SAR</span></div>
+          </div>
+        </div>
+        <div class="lc-chips">
+          <span class="lc-chip"><span class="material-icons-outlined">schedule</span>Valid until 19 Jun</span>
+          <span class="lc-chip"><span class="material-icons-outlined">place</span>28 km</span>
+        </div>
+        <div class="neg-footer">
+          <button class="neg-pill">Review counter-offer<span class="material-icons-outlined">arrow_forward</span></button>
+          <p class="nf-hint">Tapping opens the deal room — a signal to the supplier that you are serious about this bid</p>
+        </div>
+      </div>
+
+      <!-- ── Bid 3 — ACCEPTED, verified, all match — selected ── -->
+      <div class="bid sel" data-bid="3">
+        <div class="bid-head">
+          <div class="bid-av">N<span class="vchk"><span class="material-icons-outlined">check</span></span></div>
+          <div class="bid-hh">
+            <div class="r1">
+              <span class="sname">Nesma Trading Co.</span>
+              <span class="spill sp-accepted"><span class="d"></span>Accepted</span>
+            </div>
+            <div class="bid-evt">Accepted</div>
+            <div class="credrow">
+              <span class="credpill cp-ok"><span class="material-icons-outlined">verified</span>Verified</span>
+              <span class="credpill cp-ok"><span class="material-icons-outlined">star</span>4.9</span>
+            </div>
+          </div>
+          <div class="bid-check on" onclick="toggleSel(3)" title="Select for quotation"><span class="material-icons-outlined">check</span></div>
+        </div>
+        <div class="terms-row row-sep">
+          <span class="tlab">Terms</span>
+          <div class="buckets">
+            <span class="bucket">
+              <span class="donut" style="background: conic-gradient(var(--success) 0 100%, var(--warning) 100% 100%, var(--surface3) 100% 100%);"><span>7</span></span>
+              <span class="bl">All match</span>
+            </span>
+          </div>
+        </div>
+        <div class="equip-row row-sep tappable" role="button" tabindex="0" title="View equipment details">
+          <div class="el">
+            <div class="elab">Equipment<span class="material-icons-outlined vt">verified</span></div>
+            <div class="esub">Volvo · EC220 · 2023 · 9 km</div>
+          </div>
+          <span class="equip-view">View details<span class="material-icons-outlined go">chevron_right</span></span>
+        </div>
+        <div class="price-row">
+          <div class="price-collapsed" onclick="togglePrice(3)">
+            <span class="pl">Total</span>
+            <span class="pr">372,800 SAR<span class="chev">expand_more</span></span>
+          </div>
+        </div>
+        <div class="lc-chips">
+          <span class="lc-chip"><span class="material-icons-outlined">schedule</span>Valid until 25 Jun</span>
+          <span class="lc-chip"><span class="material-icons-outlined">place</span>9 km</span>
+        </div>
+        <div class="neg-footer">
+          <button class="neg-pill">View deal<span class="material-icons-outlined">arrow_forward</span></button>
+          <p class="nf-hint">Tap to open the deal room and continue with this supplier.</p>
+        </div>
+      </div>
+
+      <!-- ── Bid 4 — EXPIRED, no certs, disabled ── -->
+      <div class="bid" data-bid="4">
+        <div class="bid-head">
+          <div class="bid-av">S</div>
+          <div class="bid-hh">
+            <div class="r1">
+              <span class="sname">Sahara Equipment Hire</span>
+              <span class="spill sp-expired"><span class="d"></span>Expired</span>
+            </div>
+            <div class="bid-evt">Validity ended</div>
+            <div class="credrow">
+              <span class="credpill cp-miss"><span class="material-icons-outlined">remove</span>No certs</span>
+              <span class="credpill cp-ok"><span class="material-icons-outlined">star</span>3.9</span>
+            </div>
+          </div>
+          <div class="bid-check" onclick="toggleSel(4)" title="Select for quotation"><span class="material-icons-outlined">check</span></div>
+        </div>
+        <div class="terms-row row-sep">
+          <span class="tlab">Terms</span>
+          <div class="buckets">
+            <span class="bucket">
+              <span class="donut" style="background: conic-gradient(var(--success) 0 57%, var(--warning) 57% 100%, var(--surface3) 100% 100%);"><span>7</span></span>
+              <span class="bl">3 differ</span>
+            </span>
+          </div>
+        </div>
+        <div class="equip-row row-sep">
+          <div class="el">
+            <div class="elab">Equipment</div>
+            <div class="esub">Hyundai · R220 · 2019 · 41 km</div>
+          </div>
+        </div>
+        <div class="price-row">
+          <div class="price-collapsed" onclick="togglePrice(4)">
+            <span class="pl">Total</span>
+            <span class="pr">358,000 SAR<span class="chev">expand_more</span></span>
+          </div>
+        </div>
+        <div class="lc-chips">
+          <span class="lc-chip"><span class="material-icons-outlined">place</span>41 km</span>
+        </div>
+        <div class="neg-footer">
+          <button class="neg-pill" disabled>Expired</button>
+          <p class="nf-hint">Tapping opens the deal room — a signal to the supplier that you are serious about this bid</p>
+        </div>
+      </div>
+
+      <!-- quotation select bar (1 selected) -->
+      <div class="qbar" id="qbar">
+        <span class="qn"><span id="qn-count">1</span> selected</span>
+        <span class="qclear" onclick="clearSel()">Clear</span>
+        <button class="qdl"><span class="material-icons-outlined">download</span> Download quotation</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showView(v) {
+      document.getElementById('view-details').classList.toggle('hidden', v !== 'details');
+      document.getElementById('view-bids').classList.toggle('hidden', v !== 'bids');
+      document.getElementById('tab-details').classList.toggle('on', v === 'details');
+      document.getElementById('tab-bids').classList.toggle('on', v === 'bids');
+      window.scrollTo(0, 0);
+    }
+    function togglePrice(id) {
+      const row = document.querySelector('.bid[data-bid="' + id + '"] .price-row');
+      const open = row.classList.toggle('open');
+      // build/remove the breakdown body on demand (mirrors the React expandable)
+      let body = row.querySelector('.price-body');
+      if (open && !body) {
+        body = document.createElement('div');
+        body.className = 'price-body';
+        body.innerHTML = '<div class="prow"><span class="pl2">Rental</span><span class="pv">—</span></div>' +
+          '<div class="prow"><span class="pl2">VAT 15%</span><span class="pv">—</span></div>' +
+          '<div class="grandcard"><span class="gl">Estimated total</span><span class="gv">see card</span></div>';
+        row.appendChild(body);
+      } else if (!open && body && !body.dataset.keep) {
+        body.remove();
+      }
+    }
+    function toggleSel(id) {
+      const card = document.querySelector('.bid[data-bid="' + id + '"]');
+      const sel = card.classList.toggle('sel');
+      card.querySelector('.bid-check').classList.toggle('on', sel);
+      refreshQbar();
+    }
+    function clearSel() {
+      document.querySelectorAll('.bid.sel').forEach(c => {
+        c.classList.remove('sel');
+        c.querySelector('.bid-check').classList.remove('on');
+      });
+      refreshQbar();
+    }
+    function refreshQbar() {
+      const n = document.querySelectorAll('.bid.sel').length;
+      document.getElementById('qbar').classList.toggle('hidden', n === 0);
+      document.getElementById('qn-count').textContent = n;
+    }
+    // keep bid 2's expanded breakdown from being torn down
+    document.querySelector('.bid[data-bid="2"] .price-body')?.setAttribute('data-keep', '1');
+  </script>
+</body>
+</html>

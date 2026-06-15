@@ -37,12 +37,6 @@ export function Confirmation() {
           {t.confirmation.done}
         </Button>
       </div>
-
-      {/* "viewing/tracking on web is out of scope — later epic" (brief Non-goals). */}
-      <div className="mx-auto mt-[22px] flex max-w-[520px] items-start gap-2.5 rounded-[10px] border border-border bg-surface px-3.5 py-[11px] text-left text-xs text-muted">
-        <Icon name="info" size={16} className="flex-none text-muted" />
-        <span>{t.confirmation.laterNote}</span>
-      </div>
     </div>
   );
 }

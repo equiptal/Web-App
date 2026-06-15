@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchRequestDetail, cancelRequest, updateRequest } from "@/lib/api/client";
-import type { RequestItem, RequestRecord } from "@/lib/contract/requests";
+import { publicTaxonomyUrl, type RequestItem, type RequestRecord } from "@/lib/contract/requests";
 import { RequestBids } from "@/components/requests/RequestBids";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { LocationMap } from "@/components/requests/LocationMap";
@@ -379,7 +379,7 @@ function EditRequestModal({ r, ar, L, onClose, onSaved }: { r: RequestRecord; ar
   );
 }
 
-function Ditem({ item, ar, L }: { item: RequestItem; ar: boolean; L: (en: string, arr: string) => string }) {
+export function Ditem({ item, ar, L }: { item: RequestItem; ar: boolean; L: (en: string, arr: string) => string }) {
   const name = [ar ? item.subtypeNameAr ?? item.subtypeName : item.subtypeName, ar ? item.capacityNameAr ?? item.capacityName : item.capacityName].filter(Boolean).join(" · ") || "—";
   const terms: [string, string][] = [];
   if (item.operatorIncluded === "YES") terms.push(["person_outline", L("With operator", "مع مشغّل")]);
@@ -394,7 +394,7 @@ function Ditem({ item, ar, L }: { item: RequestItem; ar: boolean; L: (en: string
   (item.safetyCertifications ?? []).forEach((c) => terms.push(["verified", c]));
   return (
     <div className="ditem">
-      <span className="di"><EquipImg src={item.subtypeImageUrl ?? item.categoryImageUrl ?? null} categoryId={item.categoryId} box="" img="" iconSize={21} /></span>
+      <span className="di"><EquipImg src={publicTaxonomyUrl(item.subtypeImageUrl ?? item.categoryImageUrl)} categoryId={item.categoryId} name={name} box="" img="h-8 w-8 object-contain" iconSize={21} /></span>
       <div>
         <div className="dn">{name}{item.numberOfUnits > 1 ? <span style={{ color: "var(--muted)" }}> × {item.numberOfUnits}</span> : null}</div>
         {terms.length > 0 && (

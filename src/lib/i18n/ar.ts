@@ -41,6 +41,7 @@ export const ar: Dictionary = {
     home: "الرئيسية",
     profile: "الملف الشخصي",
     requests: "الطلبات",
+    compare: "مقارنة العروض",
     request: "طلب",
     account: "الحساب",
     welcome: "أهلاً",

@@ -109,12 +109,18 @@ export async function processRfq(input: ProcessInput): Promise<AgentDraft> {
 /** Submit the assembled broadcast (AC-42/43). The server fans out one request per item, so
  *  `requestIds` carries every short code (`requestId` = the first, for back-compat). */
 /** The renter's own requests (web-app/request-details-bids). One row per item (backend fan-out). */
-export function fetchMyRequests(filter?: { status?: string; type?: string }): Promise<{ requests: RequestListItem[] }> {
+export function fetchMyRequests(filter?: { status?: string; type?: string; groupId?: string }): Promise<{ requests: RequestListItem[] }> {
   const qs = new URLSearchParams();
   if (filter?.status) qs.set("status", filter.status);
   if (filter?.type) qs.set("type", filter.type);
+  if (filter?.groupId) qs.set("groupId", filter.groupId);
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
   return getJson<{ requests: RequestListItem[] }>(`/api/me/requests${suffix}`);
+}
+
+/** All requests in one submission group (multi-item view) — filtered by `requestGroupId`. */
+export function fetchRequestGroup(groupId: string): Promise<{ requests: RequestListItem[] }> {
+  return fetchMyRequests({ groupId });
 }
 
 /** Home activity counters (new bids, open/total requests, completed deals) for the renter hub. */
