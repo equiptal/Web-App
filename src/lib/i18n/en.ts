@@ -145,6 +145,7 @@ export const en = {
     optUploadTitle: "Upload / Paste RFQ",
     optUploadDesc: "Paste text or upload a file — your AI assistant fills the form automatically.",
     recommended: "Recommended",
+    beta: "Beta",
     optManualTitle: "Fill Manually",
     optManualDesc: "Enter equipment details step by step using a guided form.",
     comingSoon: "Coming soon",

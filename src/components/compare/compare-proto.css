@@ -78,6 +78,13 @@
 .rproto .cchk { font-size: 16px; font-weight: 900; } .rproto .cchk.ok { color: var(--success); } .rproto .cchk.no { color: var(--danger); }
 .rproto .cfrac { font-size: 13px; font-weight: 900; color: var(--navy); }
 
+/* computed conclusion under each item's comparison table */
+.rproto .cmp-summary { margin-top: 12px; border: 1px solid #cfe0fb; background: var(--rentee-dim); border-radius: var(--r-lg); padding: 12px 14px; }
+.rproto .cmp-summary .cmp-sum-h { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 800; color: var(--rentee); margin-bottom: 7px; }
+.rproto .cmp-summary .cmp-sum-h .material-icons-outlined { font-size: 17px; }
+.rproto .cmp-summary ul { margin: 0; padding-inline-start: 18px; }
+.rproto .cmp-summary li { font-size: 12.5px; font-weight: 600; color: var(--navy-mid); line-height: 1.55; margin-bottom: 3px; }
+
 /* mobile / responsive */
 @media (max-width: 560px) {
   .rproto .basket { flex-wrap: wrap; }

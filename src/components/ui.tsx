@@ -103,11 +103,12 @@ export function AgentMark({ className = "" }: { className?: string }) {
   const t = useT();
   return (
     <span
-      className={`inline-flex items-center text-warn ${className}`}
+      className={`inline-flex items-center gap-0.5 text-warn ${className}`}
       title={t.common.byAgent}
       aria-label={t.common.byAgent}
     >
       <Icon name="smart_toy" size={14} />
+      <Icon name="auto_awesome" size={13} />
     </span>
   );
 }

@@ -232,6 +232,41 @@ function ItemComparison({ item, offers, ar, L }: { item: RequestListItem; offers
     : <span className="cmoney">{nf(v)} <span className="sar">{sar}</span></span>;
   const chk = (b: boolean) => <span className={`cchk ${b ? "ok" : "no"}`}>{b ? "✓" : "✕"}</span>;
 
+  // Computed conclusion (no AI) — the takeaways from the table above, in a couple of lines.
+  const nm = (o: Offer) => o.bid.supplierName;
+  const cheapest = offers.reduce((a, b) => (b.total < a.total ? b : a));
+  const topCompliant = offers.reduce((a, b) => (reqMet(b) > reqMet(a) ? b : a));
+  const conclusion: string[] = [];
+  if (offers.length === 1) {
+    const o = offers[0];
+    conclusion.push(L(`${nm(o)} is the only quotation: ${nf(o.total)} ${sar} total (incl. VAT), meeting ${reqMet(o)} of 7 requirements.`,
+      `${nm(o)} هو العرض الوحيد: ${nf(o.total)} ${sar} الإجمالي (شامل الضريبة)، ويستوفي ${reqMet(o)} من 7 متطلبات.`));
+  } else {
+    const maxTotal = Math.max(...offers.map((o) => o.total));
+    const saving = maxTotal - cheapest.total;
+    conclusion.push(
+      saving > 0
+        ? L(`Cheapest: ${nm(cheapest)} at ${nf(cheapest.total)} ${sar} — ${nf(saving)} ${sar} below the highest offer.`,
+            `الأرخص: ${nm(cheapest)} بسعر ${nf(cheapest.total)} ${sar} — أقل بـ ${nf(saving)} ${sar} من أعلى عرض.`)
+        : L(`All offers are priced the same (${nf(cheapest.total)} ${sar} incl. VAT).`,
+            `جميع العروض بنفس السعر (${nf(cheapest.total)} ${sar} شامل الضريبة).`),
+    );
+    conclusion.push(
+      nm(topCompliant) === nm(cheapest)
+        ? L(`${nm(cheapest)} also meets the most requirements (${reqMet(cheapest)}/7) — strongest overall.`,
+            `${nm(cheapest)} يستوفي أيضًا أكثر المتطلبات (${reqMet(cheapest)}/7) — الأقوى إجمالاً.`)
+        : L(`Best documented: ${nm(topCompliant)} meets ${reqMet(topCompliant)}/7 requirements (vs ${reqMet(cheapest)}/7 for the cheapest).`,
+            `الأكثر توثيقًا: ${nm(topCompliant)} يستوفي ${reqMet(topCompliant)}/7 (مقابل ${reqMet(cheapest)}/7 للأرخص).`),
+    );
+    const withYear = offers.filter((o) => yearOf(o) > 0);
+    if (withYear.length) {
+      const newest = withYear.reduce((a, b) => (yearOf(b) > yearOf(a) ? b : a));
+      if (nm(newest) !== nm(cheapest)) {
+        conclusion.push(L(`${nm(newest)} has the newest equipment (${yearOf(newest)}).`, `${nm(newest)} لديه أحدث معدة (${yearOf(newest)}).`));
+      }
+    }
+  }
+
   const Row = ({ label, cell }: { label: string; cell: (o: Offer) => ReactNode }) => (
     <div className="crow cgrid" style={gt}>
       <div className="clbl">{label}</div>
@@ -296,6 +331,12 @@ function ItemComparison({ item, offers, ar, L }: { item: RequestListItem; offers
           </div>
         </div>
       </div>
+      {conclusion.length > 0 && (
+        <div className="cmp-summary">
+          <div className="cmp-sum-h"><span className="material-icons-outlined">insights</span>{L("Summary", "الخلاصة")}</div>
+          <ul>{conclusion.map((ln, i) => <li key={i}>{ln}</li>)}</ul>
+        </div>
+      )}
     </section>
   );
 }

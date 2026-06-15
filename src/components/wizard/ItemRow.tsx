@@ -49,7 +49,7 @@ export function ItemRow({
   sharedFuelResp: Party | null;
   sharedDelivery: Party | null;
   sharedReturn: Party | null;
-  /** Open the per-item settings on first render (used for the first matched item, as a teaching cue). */
+  /** Open the per-item settings expanded on first render, so the renter sees them directly (matched items). */
   defaultOpen?: boolean;
 }) {
   const t = useT();
@@ -181,25 +181,11 @@ export function ItemRow({
               <Stepper value={item.quantity} min={1} onChange={(v) => actions.patchItem(item.id, { quantity: v })} />
               {agentMatches(item.quantity, ai?.quantity) && <AgentMark />}
             </div>
-            {/* At-a-glance summary of every per-item setting — so the renter sees what's set (and what
-                they might want to change) without opening the editor. The Edit panel below changes them. */}
+            {/* Compact summary — just the two key settings. Everything else (operator details,
+                fuel responsibility, delivery/return, notes) stays in the Edit panel below. */}
             <div className="mt-2.5 flex flex-wrap gap-2">
               <MetaTag icon="person" label={t.step2.perItem.operatorNeeded} value={t.options.operatorNeeded[item.operatorNeeded]} />
-              {item.operatorNeeded === "yes" && (
-                <>
-                  <MetaTag icon="dark_mode" label={t.step2.perItem.nightShift} value={item.operator.nightShift ? t.common.yes : t.common.no} />
-                  <MetaTag icon="public" label={t.step2.perItem.nationality} value={nationalityOpts.find((o) => o.value === item.operator.nationality)?.label ?? "—"} />
-                  {item.operator.certificate.length > 0 && (
-                    <MetaTag icon="workspace_premium" label={t.step2.perItem.certificate} value={item.operator.certificate.map((c) => t.options.safetyCert[c]).join(", ")} />
-                  )}
-                  <MetaTag icon="hotel" label={t.step2.perItem.fat} value={item.operator.fat ? t.options.party[item.operator.fat] : "—"} />
-                </>
-              )}
               <MetaTag icon="local_gas_station" label={t.step2.perItem.fuelType} value={t.options.fuelType[item.fuelType]} />
-              <MetaTag icon="oil_barrel" label={t.step1.requestWide.fuelResponsibility} value={t.options.party[item.fuelResponsibilityOverride ?? sharedFuelResp ?? "me"]} />
-              <MetaTag icon="local_shipping" label={t.step1.requestWide.delivery} value={t.options.party[item.deliveryOverride ?? sharedDelivery ?? "me"]} />
-              <MetaTag icon="assignment_return" label={t.step1.requestWide.return} value={t.options.party[item.returnOverride ?? sharedReturn ?? "me"]} />
-              {item.additionalNotes && <MetaTag icon="sticky_note_2" label={t.step2.perItem.additionalNotes} value={item.additionalNotes} />}
             </div>
           </>
         )}

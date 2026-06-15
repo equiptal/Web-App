@@ -147,6 +147,7 @@ export const ar: Dictionary = {
     optUploadTitle: "رفع / لصق طلب العروض",
     optUploadDesc: "الصق نصًا أو ارفع ملفًا — ومساعدك الذكي يملأ النموذج تلقائيًا.",
     recommended: "موصى به",
+    beta: "تجريبي",
     optManualTitle: "الإدخال اليدوي",
     optManualDesc: "أدخل تفاصيل المعدات خطوة بخطوة عبر نموذج موجّه.",
     comingSoon: "قريباً",

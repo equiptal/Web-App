@@ -196,54 +196,87 @@ export function GroupBids({ group }: { group: RequestGroup }) {
     const dateStr = new Date().toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
     const rentee = { name: renterName || L("Moedatech renter", "مستأجر مودياتك"), org: "Moedatech", city: group.city ?? group.locationLabel };
 
-    const sections = chosen.map((b) => {
-      const it = itemMap.get(b.requestId);
-      const dur = b.duration ?? it?.durationDays ?? 1;
-      const rental = (b.price ?? 0) * dur;
-      const sub = rental + (b.mobPrice ?? 0) + (b.demobPrice ?? 0);
+    // One quotation per supplier: group the selected bids by supplier, then list ALL of that
+    // supplier's chosen equipment as line items under a single quotation (with this request's terms).
+    // Multiple suppliers → multiple quotation sections in the same file.
+    const bySupplier = new Map<string, GroupBid[]>();
+    for (const b of chosen) {
+      const key = b.supplierId ?? b.supplierName ?? "—";
+      const list = bySupplier.get(key);
+      if (list) list.push(b);
+      else bySupplier.set(key, [b]);
+    }
+    const reqCode = String(group.items[0]?.displayId ?? group.id).replace(/[^A-Za-z0-9-]/g, "");
+
+    const sections = [...bySupplier.values()].map((supBids, si) => {
+      const sup = supBids[0];
+      const supInit = (sup.supplierName || "S").replace(/[^A-Za-z0-9]/g, "").slice(0, 3).toUpperCase() || "S";
+      const qnum = `Q-${reqCode}-${supInit}${si + 1}`;
+      const validRaw = supBids.map((b) => b.validUntil).filter(Boolean).sort()[0] ?? null;
+      const valid = validRaw ? new Date(validRaw).toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
+      const reqIds = [...new Set(supBids.map((b) => itemMap.get(b.requestId)?.displayId ?? b.requestId))];
+      const reqLabel = reqIds.length === 1 ? reqIds[0] : `${reqIds[0]} +${reqIds.length - 1}`;
+      const rentalBasis = itemMap.get(sup.requestId)?.rentalType ?? "";
+
+      const eqLine = (b: GroupBid) => (b.equipment ? [b.equipment.make, b.equipment.model, b.equipment.year].filter(Boolean).join(" · ") : "—");
+      const labelOf = (b: GroupBid) => (ar ? b.itemLabelAr : b.itemLabel) || (itemMap.get(b.requestId)?.displayId ?? b.requestId);
+
+      // Pricing rows across every selected equipment for this supplier.
+      let rowNum = 0;
+      let sub = 0;
+      const rows = supBids.map((b) => {
+        const it = itemMap.get(b.requestId);
+        const dur = b.duration ?? it?.durationDays ?? 1;
+        const rental = (b.price ?? 0) * dur;
+        const rtype = it?.rentalType ?? "";
+        sub += rental + (b.mobPrice ?? 0) + (b.demobPrice ?? 0);
+        let r = `<tr><td>${++rowNum}</td><td><b>${esc(labelOf(b))}</b><div class="sm">${esc(eqLine(b))}${rtype ? " · " + esc(rtype) : ""} · ${dur} ${esc(L("periods", "فترات"))}</div></td><td>${esc(L("period", "فترة"))}</td><td class="num">${dur}</td><td class="num">${nf(b.price ?? 0)}</td><td class="num">${nf(rental)}</td></tr>`;
+        if (b.mobPrice) r += `<tr><td>${++rowNum}</td><td><b>${esc(L("Mobilization to site", "النقل إلى الموقع"))}</b><div class="sm">${esc(labelOf(b))}</div></td><td>${esc(L("trip", "رحلة"))}</td><td class="num">1</td><td class="num">${nf(b.mobPrice)}</td><td class="num">${nf(b.mobPrice)}</td></tr>`;
+        if (b.demobPrice) r += `<tr><td>${++rowNum}</td><td><b>${esc(L("Return from site", "الإرجاع من الموقع"))}</b><div class="sm">${esc(labelOf(b))}</div></td><td>${esc(L("trip", "رحلة"))}</td><td class="num">1</td><td class="num">${nf(b.demobPrice)}</td><td class="num">${nf(b.demobPrice)}</td></tr>`;
+        return r;
+      }).join("");
       const vat = Math.round(sub * 0.15);
       const total = sub + vat;
-      const units = it?.item?.qty ?? 1;
-      const rentalType = it?.rentalType ?? "";
-      const reqId = it?.displayId ?? b.requestId;
-      const itemLabel = (ar ? b.itemLabelAr : b.itemLabel) || reqId;
-      const equip = b.equipment ? [b.equipment.make, b.equipment.model, b.equipment.year].filter(Boolean).join(" · ") : "—";
-      const valid = b.validUntil ? new Date(b.validUntil).toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
-      const qnum = `Q-${String(reqId).replace(/[^A-Za-z0-9-]/g, "")}-${(b.supplierName || "S").charAt(0).toUpperCase()}`;
+
+      const listedLines = supBids.map((b) => {
+        const units = itemMap.get(b.requestId)?.item?.qty ?? 1;
+        return `<div class="lv">${esc(labelOf(b))} &nbsp;·&nbsp; ${esc(eqLine(b))} &nbsp;·&nbsp; ${units} ${esc(units > 1 ? L("units", "وحدات") : L("unit", "وحدة"))}${b.eqVerified ? " &nbsp;·&nbsp; ✔ " + esc(L("verified", "موثّقة")) : ""}</div>`;
+      }).join("");
+      const scopeRows = supBids.map((b) => {
+        const it = itemMap.get(b.requestId);
+        const units = it?.item?.qty ?? 1;
+        return `<div class="kv"><span>${esc(it?.displayId ?? b.requestId)}</span><b>${units} × ${esc(labelOf(b))}</b></div>`;
+      }).join("");
+
       return `<section class="q-doc">
         <div class="q-head"><div class="q-title">${esc(L("Equipment rental quotation", "عرض سعر تأجير معدات"))}</div><div class="q-sub"><span class="qn">${esc(qnum)}</span><span>${esc(dateStr)}</span></div></div>
         <div class="q-body">
           <div class="parties">
-            <div class="party"><div class="plabel">${esc(L("Supplier", "المؤجّر"))}</div><div class="pname">${esc(b.supplierName)}</div><div class="pmeta">${b.verified ? esc(L("Verified supplier", "مؤجّر موثّق")) + " · " : ""}${b.rating != null ? "★ " + b.rating.toFixed(1) + " · " : ""}${b.eqVerified ? esc(L("equipment verified", "معدة موثّقة")) : esc(L("equipment not verified", "معدة غير موثّقة"))}</div></div>
+            <div class="party"><div class="plabel">${esc(L("Supplier", "المؤجّر"))}</div><div class="pname">${esc(sup.supplierName)}</div><div class="pmeta">${sup.verified ? esc(L("Verified supplier", "مؤجّر موثّق")) + " · " : ""}${sup.rating != null ? "★ " + sup.rating.toFixed(1) : ""}</div></div>
             <div class="party"><div class="plabel">${esc(L("Rentee", "المستأجر"))}</div><div class="pname">${esc(rentee.name)}</div><div class="pmeta">${esc(rentee.org)}${rentee.city ? " · " + esc(rentee.city) : ""}</div></div>
           </div>
           <div class="metastrip">
-            <div><span>${esc(L("Request #", "رقم الطلب"))}</span><b>${esc(reqId)}</b></div>
+            <div><span>${esc(L("Request #", "رقم الطلب"))}</span><b>${esc(reqLabel)}</b></div>
             <div><span>${esc(L("Issue date", "تاريخ الإصدار"))}</span><b>${esc(dateStr)}</b></div>
             <div><span>${esc(L("Valid until", "صالح حتى"))}</span><b>${esc(valid)}</b></div>
-            <div><span>${esc(L("Rental basis", "أساس الإيجار"))}</span><b>${esc(rentalType || "—")}</b></div>
+            <div><span>${esc(L("Rental basis", "أساس الإيجار"))}</span><b>${esc(rentalBasis || "—")}</b></div>
             <div><span>${esc(L("Currency", "العملة"))}</span><b>${esc(sar)}</b></div>
           </div>
-          <div class="listed"><div class="ll">${esc(L("Listed equipment", "المعدات المدرجة"))}</div><div class="lv">${esc(itemLabel)} &nbsp;·&nbsp; ${esc(equip)} &nbsp;·&nbsp; ${units} ${esc(units > 1 ? L("units", "وحدات") : L("unit", "وحدة"))}${b.eqVerified ? " &nbsp;·&nbsp; ✔ " + esc(L("verified", "موثّقة")) : ""}</div></div>
+          <div class="listed"><div class="ll">${esc(L("Listed equipment", "المعدات المدرجة"))} (${supBids.length})</div>${listedLines}</div>
           <table class="ptable">
             <thead><tr><th>#</th><th>${esc(L("Item", "البند"))}</th><th>${esc(L("Unit", "الوحدة"))}</th><th class="num">${esc(L("Qty", "الكمية"))}</th><th class="num">${esc(L("Price", "السعر"))}</th><th class="num">${esc(L("Total", "الإجمالي"))}</th></tr></thead>
-            <tbody>
-              <tr><td>1</td><td><b>${esc(L("Rental", "الإيجار"))}</b><div class="sm">${esc(rentalType)} · ${dur} ${esc(L("periods", "فترات"))}</div></td><td>${esc(L("period", "فترة"))}</td><td class="num">${dur}</td><td class="num">${nf(b.price ?? 0)}</td><td class="num">${nf(rental)}</td></tr>
-              ${b.mobPrice ? `<tr><td>2</td><td><b>${esc(L("Mobilization to site", "النقل إلى الموقع"))}</b></td><td>${esc(L("trip", "رحلة"))}</td><td class="num">1</td><td class="num">${nf(b.mobPrice)}</td><td class="num">${nf(b.mobPrice)}</td></tr>` : ""}
-              ${b.demobPrice ? `<tr><td>3</td><td><b>${esc(L("Return from site", "الإرجاع من الموقع"))}</b></td><td>${esc(L("trip", "رحلة"))}</td><td class="num">1</td><td class="num">${nf(b.demobPrice)}</td><td class="num">${nf(b.demobPrice)}</td></tr>` : ""}
-            </tbody>
+            <tbody>${rows}</tbody>
           </table>
           <div class="totals">
             <div class="trow"><span>${esc(L("Subtotal before VAT", "الإجمالي قبل الضريبة"))}</span><b>${nf(sub)}</b></div>
             <div class="trow"><span>${esc(L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"))}</span><b>${nf(vat)}</b></div>
             <div class="trow grand"><span>${esc(L("Total", "الإجمالي"))}</span><b>${nf(total)} ${esc(sar)}</b></div>
           </div>
-          ${!ar ? `<div class="words"><div class="wl">Amount in words</div>${esc(numWords(total))} Saudi Riyals · estimate over ${dur} ${esc(rentalType.toLowerCase())} periods · final amount as operated</div>` : ""}
+          ${!ar ? `<div class="words"><div class="wl">Amount in words</div>${esc(numWords(total))} Saudi Riyals · ${supBids.length} ${supBids.length > 1 ? "items" : "item"} · final amount as operated</div>` : ""}
           <div class="card"><div class="card-h">${esc(L("Project terms", "شروط المشروع"))}</div>
-            <div class="kv"><span>${esc(L("Scope", "النطاق"))}</span><b>${esc(itemLabel)}</b></div>
-            <div class="kv"><span>${esc(L("Responds to", "يستجيب لـ"))}</span><b>${esc(reqId)}</b></div>
-            <div class="kv"><span>${esc(L("Distance to site", "المسافة للموقع"))}</span><b>${b.distanceKm != null ? Math.round(b.distanceKm) + " " + esc(L("km", "كم")) : "—"}</b></div>
-            <div class="kv"><span>${esc(L("Terms match", "مطابقة الشروط"))}</span><b>${b.conflictCount > 0 ? b.conflictCount + " " + esc(L("differ from request", "مختلفة عن الطلب")) : esc(L("All terms match request", "كل الشروط مطابقة"))}</b></div>
+            ${scopeRows}
+            <div class="kv"><span>${esc(L("Rental basis", "أساس الإيجار"))}</span><b>${esc(rentalBasis || "—")}</b></div>
+            <div class="kv"><span>${esc(L("Equipment count", "عدد المعدات"))}</span><b>${supBids.length}</b></div>
           </div>
           <ol class="tc">
             <li>${esc(L(`This quotation is valid until ${valid} and expires automatically thereafter unless confirmed through the Moedatech platform.`, `هذا العرض صالح حتى ${valid} وينتهي تلقائيًا بعد ذلك ما لم يُؤكَّد عبر منصة مودياتك.`))}</li>

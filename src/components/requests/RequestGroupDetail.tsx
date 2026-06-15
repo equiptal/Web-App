@@ -137,7 +137,7 @@ export function RequestGroupDetail({ groupId, onTitle }: { groupId: string; onTi
                 <span className={`stbadge ${st}`}><span className="dot" />{rec.status}</span>
                 <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 700 }}>{rec.displayId ?? rec.shortCode ?? rec.id}</span>
                 {(rec.bidCount ?? 0) > 0 && (
-                  <button className="btn sm" style={{ marginInlineStart: "auto" }} onClick={() => router.push(`/requests/${rec.id}`)}>
+                  <button className="btn sm" style={{ marginInlineStart: "auto" }} onClick={() => router.push(`/requests/${rec.id}?view=bids`)}>
                     <span className="material-icons-outlined">gavel</span> {L("View bids", "عرض العروض")} ({rec.bidCount})
                   </button>
                 )}

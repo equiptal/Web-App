@@ -34,18 +34,18 @@ export function Step3Preferences() {
       {/* Core terms (AC-36/37/38) */}
       <Card title={<><Icon name="receipt_long" size={18} className="me-1.5 align-[-3px] text-navy-mid" />{t.step3.coreTerms}</>}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label={t.step3.payment.terms}>
+          <Field label={t.step3.payment.terms} optional>
             <Select<PaymentTerm> value={p.payment.terms} placeholder="—" onChange={(v) => actions.patchPreferences({ payment: { terms: v } })} options={opt(PAYMENT_TERMS, t.options.paymentTerm)} />
           </Field>
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label={t.step3.maintenance.title}>
+          <Field label={t.step3.maintenance.title} optional>
             <Seg2<MaintenanceResponsibility> value={p.maintenance.responsibility} onChange={(v) => actions.patchPreferences({ maintenance: { responsibility: v } })} options={opt(MAINTENANCE_RESPONSIBILITIES, t.options.maintenanceResp)} />
           </Field>
           {/* AC-37: SLA shown only when responsibility is Supplier. */}
           {p.maintenance.responsibility === "supplier" && (
-            <Field label={t.step3.maintenance.sla}>
+            <Field label={t.step3.maintenance.sla} optional>
               <Seg2<MaintenanceSla> value={p.maintenance.sla} onChange={(v) => actions.patchPreferences({ maintenance: { sla: v } })} options={opt(MAINTENANCE_SLAS, t.options.maintenanceSla)} />
             </Field>
           )}

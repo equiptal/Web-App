@@ -66,9 +66,7 @@ export function Step2Equipment() {
   const ap = state.agentOrigin?.project; // agent's original request-wide values, for the AI marker
   const gate = gateStep2(draft.items);
   const visible = items.filter((i) => activeFilter === "all" || groupOf(i) === activeFilter);
-  // Auto-open the per-item settings on the first matched item (teaching cue) — the rest stay collapsed.
-  const firstMatchedId = visible.find((i) => groupOf(i) === "matched")?.id;
-  const activeNode = { "needs-ok": t.step2.filterNeedsOk, matched: t.step2.filterMatched, "not-available": t.step2.filterNotAvailable, all: t.step2.filterAll }[activeFilter];
+  const activeNode ={ "needs-ok": t.step2.filterNeedsOk, matched: t.step2.filterMatched, "not-available": t.step2.filterNotAvailable, all: t.step2.filterAll }[activeFilter];
 
   // In-process "back" through the triage groups (separate from the wizard's Back-to-Project).
   const seq: Exclude<Group, "all">[] = ["needs-ok", "matched", "not-available"];
@@ -227,7 +225,7 @@ export function Step2Equipment() {
               sharedFuelResp={project.fuelResponsibility}
               sharedDelivery={project.deliveryToSite}
               sharedReturn={project.returnFromSite}
-              defaultOpen={item.id === firstMatchedId}
+              defaultOpen
             />
           ))
         )}

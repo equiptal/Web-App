@@ -54,10 +54,10 @@ export function Processing() {
 
   return (
     <div className="mx-auto mt-9 max-w-[460px] text-center">
-      {/* loadicon: document glyph + spinning ring */}
+      {/* loadicon: the AI agent glyph (our agent mark) + spinning ring; check when done */}
       <div className="relative mx-auto mb-[22px] grid h-[84px] w-[84px] place-items-center rounded-full border border-border bg-surface shadow-[0_6px_20px_rgba(28,53,80,.06)]">
         {!done && <span className="absolute -inset-px rounded-full border-[3px] border-transparent border-r-brand border-t-brand motion-safe:animate-spin" />}
-        <Icon name={done ? "task_alt" : "description"} size={34} className={done ? "text-ok" : "text-navy"} />
+        <Icon name={done ? "task_alt" : "smart_toy"} size={34} className={done ? "text-ok" : "text-warn"} />
       </div>
 
       <h2 className="text-[21px] font-extrabold tracking-tight">{t.processing.title}</h2>
