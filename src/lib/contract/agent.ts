@@ -8,7 +8,7 @@
 export type AgentRentalType = "DAILY" | "WEEKLY" | "MONTHLY" | "PER_JOB" | "LONG_TERM";
 export type AgentFuelType = "DIESEL" | "PETROL" | "ELECTRIC";
 export type AgentOvertimeRate = "0" | "1.5X" | "2X";
-export type AgentOperatorLicenseLevel = "CERTIFIED" | "TUV" | "SPSP";
+export type AgentOperatorLicenseLevel = "SPSP" | "TUV" | "SASO" | "CERTIFIED";
 
 export type FuelTypeMatch = "stated" | "defaulted" | null;
 export type CategoryMatch = "exact" | "new";
@@ -30,13 +30,14 @@ export interface RFQLineItem {
   night_shift_required?: boolean | null;
   number_of_operators?: number | null;
   operator_nationality?: string | null;
-  operator_license_level?: AgentOperatorLicenseLevel | null;
+  operator_license_level?: AgentOperatorLicenseLevel | null; // back-compat: first of the array
+  operator_license_levels?: AgentOperatorLicenseLevel[] | null; // ALL operator certs the RFQ named
   // Emitted by Mansour but previously dropped by the adapter — now consumed:
   additional_notes?: string | null; // AC-53 per-item free-text qualifiers ("silent", "breaker")
   diesel_included?: boolean | null; // AC-26 supplier provides fuel
   fat_required?: boolean | null; // AC-24 FAT applies (operator included)
   operator_accommodation_by_rentee?: boolean | null; // AC-24 who covers FAT: true = rentee/me, false = supplier
-  safety_certifications?: string[] | null; // AC-50
+  safety_certifications?: string[] | string | null; // AC-50 — agent emits a single value; tolerate both
   capacity_advisory?: string | null;
   fuel_type_match?: FuelTypeMatch;
   category_match?: CategoryMatch;

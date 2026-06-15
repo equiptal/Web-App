@@ -123,15 +123,19 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
   reconcileRequestWide(items, "deliveryOverride", (v) => (project.deliveryToSite = v));
   reconcileRequestWide(items, "returnOverride", (v) => (project.returnFromSite = v));
   reconcileRequestWide(items, "fuelResponsibilityOverride", (v) => (project.fuelResponsibility = v));
-  // AC-50: if the items that HAVE an agent-set operator certificate all share the same one (e.g. all
-  // TÜV), reflect it as the project-level Safety certificate (checked) and let that control them.
-  // No-operator items (no cert) don't block this — they just aren't counted.
+  // AC-50: equipment-level safety certs the agent detected (per-item safety_certifications, e.g. the
+  // equipment must hold SASO/TÜV) → project-level Safety field. Tolerates single value or array.
+  const equipSafety = (out.line_items ?? []).flatMap((li) => safetyList(li.safety_certifications));
+  // AC-50: if the items that HAVE an agent-set operator certificate all share the same set (e.g. all
+  // TÜV), also reflect it at project level and let that control them. No-operator items (no cert)
+  // don't block this — they just aren't counted.
   const certLists = items.map((i) => i.operator.certificate).filter((c) => c.length > 0);
   const certKey = (c: OperatorCertificate[]) => [...c].sort().join(",");
-  if (certLists.length > 0 && certLists.every((c) => certKey(c) === certKey(certLists[0]))) {
-    project.certificates.safety = [...certLists[0]];
-    for (const i of items) i.operator.certByAgent = false;
-  }
+  const sharedOperatorCerts =
+    certLists.length > 0 && certLists.every((c) => certKey(c) === certKey(certLists[0])) ? certLists[0] : [];
+  if (sharedOperatorCerts.length) for (const i of items) i.operator.certByAgent = false;
+  const projectSafety = [...new Set([...equipSafety, ...sharedOperatorCerts])];
+  if (projectSafety.length) project.certificates.safety = projectSafety;
   // Field-keyed agent notes (dotted path → note) for inline rendering beside each field.
   const fieldNotes: Record<string, string> = {};
   for (const fn of out.field_notes ?? []) {
@@ -175,7 +179,15 @@ function reconcileRequestWide(items: EquipmentItem[], key: OverrideKey, set: (v:
 const RENTAL_IN: Record<string, RentalBasis> = { DAILY: "daily", WEEKLY: "weekly", MONTHLY: "monthly" };
 const FUEL_IN: Record<string, FuelType> = { DIESEL: "diesel", PETROL: "petrol", ELECTRIC: "electric" };
 const OVERTIME_IN: Record<string, OvertimeRate> = { "0": "without", "1.5X": "1.5x", "2X": "2x" };
-const LICENSE_IN: Record<string, OperatorCertificate> = { TUV: "tuv", SPSP: "spsp" }; // agent license level → our cert
+// Agent cert enum → our UI option. Mansour emits SPSP / TUV / TUV_INSPECTION / SASO; the UI uses
+// tuv / spsp / saso-technical. Both operator license levels AND equipment safety certs go through this,
+// so "SASO" and "TUV_INSPECTION" stop getting silently dropped (they matched no UI option before).
+const CERT_NORM: Record<string, OperatorCertificate> = {
+  SPSP: "spsp",
+  TUV: "tuv",
+  TUV_INSPECTION: "tuv",
+  SASO: "saso-technical",
+};
 const SLA_IN: Record<string, MaintenanceSla> = { FOUR_HR: "4h", EIGHT_HR: "8h", TWENTY_FOUR_HR: "24h", FORTY_EIGHT_HR: "48h", SEVENTY_TWO_HR: "72h" };
 const CAP_NEEDS_CHECK = new Set(["snapped", "converted", "range", "not_specified", "new"]);
 
@@ -190,11 +202,27 @@ function pick<T extends string>(value: string | null | undefined, allowed: reado
   return a.includes(norm) ? (norm as T) : undefined;
 }
 
-/** Mansour's per-item operator cert: prefer the license level, fall back to the safety-cert list. */
-function toOperatorCert(li: RFQLineItem): OperatorCertificate | null {
-  if (li.operator_license_level && LICENSE_IN[li.operator_license_level]) return LICENSE_IN[li.operator_license_level];
-  const fromList = (li.safety_certifications ?? []).map((c) => pick(c, SAFETY_CERTIFICATES)).find(Boolean);
-  return fromList ?? null;
+function normCert(value: string | null | undefined): OperatorCertificate | undefined {
+  if (!value) return undefined;
+  const up = value.toUpperCase().trim();
+  if (CERT_NORM[up]) return CERT_NORM[up];
+  return pick(value, SAFETY_CERTIFICATES) as OperatorCertificate | undefined; // tolerate already-UI-form values
+}
+/** Coerce the agent's safety_certifications (single value OR array OR null) to a normalized list. */
+function safetyList(v: string[] | string | null | undefined): OperatorCertificate[] {
+  const raw = Array.isArray(v) ? v : v ? [v] : [];
+  return raw.map((c) => normCert(c)).filter((c): c is OperatorCertificate => c != null);
+}
+/** Mansour's per-item operator cert(s) from the OPERATOR license level(s): prefer the full array
+ *  (operator_license_levels), fall back to the singular. The chip is multi-select, so we return ALL.
+ *  Equipment safety certs (safety_certifications) are surfaced at the PROJECT level, not here. */
+function toOperatorCert(li: RFQLineItem): OperatorCertificate[] {
+  const levels = li.operator_license_levels?.length
+    ? li.operator_license_levels
+    : li.operator_license_level
+      ? [li.operator_license_level]
+      : [];
+  return [...new Set(levels.map((c) => normCert(c)).filter((c): c is OperatorCertificate => c != null))];
 }
 
 function deriveVerdict(li: RFQLineItem): { verdict: Verdict; resolved: boolean } {
@@ -216,7 +244,7 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
     measurementId: li.capacity_id ?? null,
   };
   const operatorNeeded = li.operator_included == null ? defaultOperatorNeeded(ref.subcategoryId) : li.operator_included ? "yes" : "no";
-  const agentCert = toOperatorCert(li); // AC-50: cert the agent set from the RFQ (null if none)
+  const agentCert = toOperatorCert(li); // AC-50: operator cert(s) the agent set from the RFQ (empty if none)
   return {
     id: `a${idx}`,
     rawLabel: li.input_equipment ?? null,
@@ -236,8 +264,8 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
       ...defaultOperatorDetails(),
       nightShift: li.night_shift_required ?? false,
       nationality: li.operator_nationality ?? null,
-      certificate: agentCert ? [agentCert] : [], // AC-24/50: operator license level / safety cert (multi-select)
-      certByAgent: agentCert != null, // agent set it → project-level Safety cert won't override
+      certificate: agentCert, // AC-24/50: operator license level(s) (multi-select)
+      certByAgent: agentCert.length > 0, // agent set it → project-level Safety cert won't override
       // AC-24: F.A.T — who covers the operator's Food/Accommodation/Transport. Mansour emits
       // operator_accommodation_by_rentee (true = rentee/me, false = supplier); supplier only when
       // explicitly false, else me (matches the default). Merges the old transfer+accommodation pair.
