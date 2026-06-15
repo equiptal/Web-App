@@ -46,7 +46,7 @@ export interface TimingHours {
 export interface AdvancedSettings {
   workingDaysPerWeek: number; // AC-15 stepper 1–7, default 6
   overtimeRate: OvertimeRate; // AC-15 default "without"
-  equipmentYear: string | null; // AC-28 "any" | "2020".."2026" | custom; optional
+  equipmentYear: string | null; // AC-28 "any" | "2015+".."2022+" (matches app); optional
 }
 
 export interface Certificates {

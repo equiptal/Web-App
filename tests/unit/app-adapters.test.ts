@@ -52,14 +52,14 @@ describe("draftToCreateRequest — ALIGNMENT rules", () => {
     expect(draftToCreateRequest(makeDraft({ project }), "46").startDate).toContain("2026-07-01");
   });
 
-  it("rule 4: maxEquipmentAge stores the YEAR (any⇒omit, custom:<y> parsed)", () => {
+  it("rule 4: maxEquipmentAge stores the YEAR (any⇒omit, '2020+' chip parsed)", () => {
     const year = (ey: string | null) => {
       const project = defaultProjectDetails();
       project.advanced.equipmentYear = ey;
       return draftToCreateRequest(makeDraft({ project }), "46").equipmentItems[0].maxEquipmentAge;
     };
-    expect(year("2024")).toBe(2024);
-    expect(year("custom:2019")).toBe(2019);
+    expect(year("2020+")).toBe(2020);
+    expect(year("2015+")).toBe(2015);
     expect(year("any")).toBeUndefined();
     expect(year(null)).toBeUndefined();
   });
@@ -138,7 +138,7 @@ describe("draftToCreateRequest — §4.2 fields", () => {
     expect(p.equipmentItems[0].safetyCertifications).toEqual(["tuv", "spsp"]);
   });
 
-  it("maps SLA enum and omits 'custom'", () => {
+  it("maps SLA enum (4h/8h/24h/48h/72h — matches the app)", () => {
     const sla = (v: Preferences["maintenance"]["sla"]) => {
       const prefs = defaultPreferences();
       prefs.maintenance.sla = v;
@@ -146,7 +146,8 @@ describe("draftToCreateRequest — §4.2 fields", () => {
     };
     expect(sla("4h")).toBe("FOUR_HR");
     expect(sla("24h")).toBe("TWENTY_FOUR_HR");
-    expect(sla("custom")).toBeUndefined();
+    expect(sla("48h")).toBe("FORTY_EIGHT_HR");
+    expect(sla("72h")).toBe("SEVENTY_TWO_HR");
   });
 });
 

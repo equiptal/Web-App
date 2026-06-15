@@ -175,7 +175,7 @@ const RENTAL_IN: Record<string, RentalBasis> = { DAILY: "daily", WEEKLY: "weekly
 const FUEL_IN: Record<string, FuelType> = { DIESEL: "diesel", PETROL: "petrol", ELECTRIC: "electric" };
 const OVERTIME_IN: Record<string, OvertimeRate> = { "0": "without", "1.5X": "1.5x", "2X": "2x" };
 const LICENSE_IN: Record<string, OperatorCertificate> = { TUV: "tuv", SPSP: "spsp" }; // agent license level → our cert
-const SLA_IN: Record<string, MaintenanceSla> = { FOUR_HR: "4h", EIGHT_HR: "8h", TWENTY_FOUR_HR: "24h" };
+const SLA_IN: Record<string, MaintenanceSla> = { FOUR_HR: "4h", EIGHT_HR: "8h", TWENTY_FOUR_HR: "24h", FORTY_EIGHT_HR: "48h", SEVENTY_TWO_HR: "72h" };
 const CAP_NEEDS_CHECK = new Set(["snapped", "converted", "range", "not_specified", "new"]);
 
 /** Keep a Mansour-emitted value only if it maps to a known UI option. Tolerant of case and

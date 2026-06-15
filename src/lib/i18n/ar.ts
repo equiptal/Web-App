@@ -40,6 +40,8 @@ export const ar: Dictionary = {
   shell: {
     home: "الرئيسية",
     profile: "الملف الشخصي",
+    requests: "الطلبات",
+    compare: "مقارنة العروض",
     request: "طلب",
     account: "الحساب",
     welcome: "أهلاً",
@@ -227,7 +229,6 @@ export const ar: Dictionary = {
       workingDays: "أيام العمل في الأسبوع",
       overtime: "معدل العمل الإضافي",
       equipmentYear: "سنة الصنع",
-      customize: "تخصيص…",
     },
     certificates: {
       card: "الشهادات",
@@ -310,7 +311,6 @@ export const ar: Dictionary = {
       title: "الصيانة",
       responsibility: "المسؤولية",
       sla: "زمن الاستجابة",
-      customSla: "زمن مخصص",
     },
     additionalNotes: "ملاحظات إضافية",
     budget: { title: "الميزانية", label: "سقف الميزانية", hint: "يُدخل بالريال السعودي." },
@@ -363,6 +363,8 @@ export const ar: Dictionary = {
     blockTitle: "أنشئ حسابًا للمتابعة",
     blockBody: "إنشاء طلبات عروض الأسعار متاح للمستأجرين المسجّلين. أنشئ حسابًا لبدء طلب.",
     createAccount: "إنشاء حساب",
+    postTitle: "أنشئ حسابك لإرسال طلبك",
+    postBody: "أكمل بياناتك وسيُرسَل طلبك مباشرةً.",
   },
   gate: {
     confirmLocation: "أكّد الموقع للمتابعة.",
@@ -394,7 +396,7 @@ export const ar: Dictionary = {
     },
     paymentMethod: { "bank-transfer": "تحويل بنكي", cash: "نقدًا" },
     maintenanceResp: { supplier: "المورّد", renter: "المستأجر" },
-    maintenanceSla: { "4h": "4 ساعات", "8h": "8 ساعات", "24h": "24 ساعة", custom: "مخصص" },
+    maintenanceSla: { "4h": "4 ساعات", "8h": "8 ساعات", "24h": "24 ساعة", "48h": "48 ساعة", "72h": "72 ساعة" },
     bidWindow: { "24h": "24 ساعة", "48h": "48 ساعة", "72h": "72 ساعة", "1-week": "أسبوع واحد" },
     accommodation: { me: "أنا", supplier: "المورّد" },
     operatorNeeded: { yes: "نعم", no: "لا" },

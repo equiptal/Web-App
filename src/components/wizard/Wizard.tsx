@@ -69,16 +69,17 @@ export function Wizard() {
 
       {/* Footer nav. Step 4 carries its own Post action. */}
       <div className="mt-8 flex items-center justify-between border-t border-border pt-4">
-        <Button variant="secondary" disabled={step === 1} onClick={() => actions.goStep((step - 1) as Step)}>
+        {/* Step 1 Back returns to the RFQ input screen (draft preserved); later steps go one step back. */}
+        <Button variant="secondary" onClick={() => (step === 1 ? actions.goIntake() : actions.goStep((step - 1) as Step))}>
           {t.common.back}
         </Button>
 
         {step < 4 && (
           <div className="flex items-center gap-3">
-            {!gate.ok && <span className="text-xs text-warn">{gate.reasons.map(reasonText).join(" · ")}</span>}
-            <Button disabled={!gate.ok} onClick={() => actions.goStep((step + 1) as Step)}>
-              {t.common.next}
-            </Button>
+            {/* Next never blocks — advance through every step regardless of item state. The gate
+                reasons stay as a non-blocking hint of what's still incomplete. */}
+            {!gate.ok && <span className="hidden text-xs text-warn sm:inline">{gate.reasons.map(reasonText).join(" · ")}</span>}
+            <Button onClick={() => actions.goStep((step + 1) as Step)}>{t.common.next}</Button>
           </div>
         )}
       </div>

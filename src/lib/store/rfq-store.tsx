@@ -16,7 +16,6 @@ import {
   computeSummary,
   defaultPreferences,
   defaultOperatorNeeded,
-  isCompleteRef,
   newManualItem,
   postableItems,
 } from "@/lib/contract";
@@ -254,7 +253,9 @@ function reducer(state: RfqState, a: Action): RfqState {
       return withDraft(state, (d) =>
         mapItem(d, a.id, (i) => {
           const ref = { ...i.ref, measurementId: a.measurementId };
-          return { ...i, ref, resolved: isCompleteRef(ref) }; // editing to a valid value resolves it (AC-18/19)
+          // Don't auto-match: filling a missing size keeps the item where it is (a needs-ok item
+          // stays needs-ok until the renter clicks Approve; an already-matched item stays matched).
+          return { ...i, ref, resolved: i.resolved };
         }),
       );
     case "APPROVE_ITEM":

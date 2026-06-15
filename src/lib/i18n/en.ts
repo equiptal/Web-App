@@ -38,6 +38,8 @@ export const en = {
   shell: {
     home: "Home",
     profile: "Profile",
+    requests: "Requests",
+    compare: "Compare bids",
     request: "Request",
     account: "Account",
     welcome: "Welcome",
@@ -225,7 +227,6 @@ export const en = {
       workingDays: "Working days per week",
       overtime: "Overtime rate",
       equipmentYear: "Equipment year",
-      customize: "Customize…",
     },
     certificates: {
       card: "Certificates",
@@ -309,7 +310,6 @@ export const en = {
       title: "Maintenance",
       responsibility: "Responsibility",
       sla: "Response SLA",
-      customSla: "Custom SLA",
     },
     additionalNotes: "Additional notes",
     budget: { title: "Budget", label: "Budget ceiling", hint: "Entered in SAR." },
@@ -362,6 +362,8 @@ export const en = {
     blockTitle: "Create an account to continue", // AC-02
     blockBody: "RFQ creation is available to registered renters. Create an account to start a request.",
     createAccount: "Create account",
+    postTitle: "Create your account to post your request",
+    postBody: "Complete your details and your request will be posted right away.",
   },
   gate: {
     confirmLocation: "Confirm the location to continue.", // AC-12/16
@@ -393,7 +395,7 @@ export const en = {
     },
     paymentMethod: { "bank-transfer": "Bank transfer", cash: "Cash" },
     maintenanceResp: { supplier: "Supplier", renter: "Renter" },
-    maintenanceSla: { "4h": "4h", "8h": "8h", "24h": "24h", custom: "Custom" },
+    maintenanceSla: { "4h": "4h", "8h": "8h", "24h": "24h", "48h": "48h", "72h": "72h" },
     bidWindow: { "24h": "24h", "48h": "48h", "72h": "72h", "1-week": "1 week" },
     accommodation: { me: "Me", supplier: "Supplier" },
     operatorNeeded: { yes: "Yes", no: "No" },

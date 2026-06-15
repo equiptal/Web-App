@@ -10,7 +10,11 @@ frontend:
         - npm ci
     build:
       commands:
-        - env | grep -E '^(MANSOUR_URL|AGENTS_API_URL)=' || true   # token intentionally not logged
+        # Amplify injects branch env vars at BUILD time only — the SSR compute (Lambda) does not get
+        # them at runtime. Write them into .env.production so `next build` bundles them into the server
+        # output (AWS-documented workaround for Next.js SSR env vars). Token is written but never echoed.
+        - env | grep -E '^(MANSOUR_URL|AGENTS_API_URL|AGENTS_API_TOKEN|AGENTS_TEST_USER_ID|APP_API_URL|TENANT_ID|NEXT_PUBLIC_GOOGLE_MAPS_API_KEY|NEXT_PUBLIC_STREAM_API_KEY)=' >> .env.production || true
+        - env | grep -E '^(MANSOUR_URL|AGENTS_API_URL|APP_API_URL)=' || true   # token intentionally not logged
         - npm run build
   artifacts:
     baseDirectory: .next

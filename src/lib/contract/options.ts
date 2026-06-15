@@ -9,8 +9,8 @@ export const RENTAL_BASES: RentalBasis[] = ["daily", "weekly", "monthly"];
 export type OvertimeRate = "without" | "1.5x" | "2x"; // AC-15
 export const OVERTIME_RATES: OvertimeRate[] = ["without", "1.5x", "2x"];
 
-/** AC-28: Any + 2020–2026 + Customize. `custom:<year>` carries a custom value. */
-export const EQUIPMENT_YEARS = ["any", "2020", "2021", "2022", "2023", "2024", "2025", "2026"] as const;
+/** Min manufacture year — matches the mobile request form: 2015+ / 2018+ / 2020+ / 2022+ + Any. */
+export const EQUIPMENT_YEARS = ["2015+", "2018+", "2020+", "2022+", "any"] as const;
 
 export type SafetyCertificate = "tuv" | "spsp" | "saso-technical" | "other"; // AC-50 (+ web-app/002 free-text "other")
 export const SAFETY_CERTIFICATES: SafetyCertificate[] = ["tuv", "spsp", "saso-technical", "other"];
@@ -45,8 +45,8 @@ export const PAYMENT_METHODS: PaymentMethod[] = ["bank-transfer", "cash"];
 export type MaintenanceResponsibility = "supplier" | "renter"; // AC-37 default supplier
 export const MAINTENANCE_RESPONSIBILITIES: MaintenanceResponsibility[] = ["supplier", "renter"];
 
-export type MaintenanceSla = "4h" | "8h" | "24h" | "custom"; // AC-37 (only when supplier)
-export const MAINTENANCE_SLAS: MaintenanceSla[] = ["4h", "8h", "24h", "custom"];
+export type MaintenanceSla = "4h" | "8h" | "24h" | "48h" | "72h"; // AC-37 (only when supplier) — matches app
+export const MAINTENANCE_SLAS: MaintenanceSla[] = ["4h", "8h", "24h", "48h", "72h"];
 
 export type BidWindow = "24h" | "48h" | "72h" | "1-week"; // AC-40
 export const BID_WINDOWS: BidWindow[] = ["24h", "48h", "72h", "1-week"];
