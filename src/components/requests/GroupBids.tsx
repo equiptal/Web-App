@@ -220,17 +220,42 @@ export function GroupBids({ group }: { group: RequestGroup }) {
 
       const eqLine = (b: GroupBid) => (b.equipment ? [b.equipment.make, b.equipment.model, b.equipment.year].filter(Boolean).join(" · ") : "—");
       const labelOf = (b: GroupBid) => (ar ? b.itemLabelAr : b.itemLabel) || (itemMap.get(b.requestId)?.displayId ?? b.requestId);
+      // App rule (014 CR #141): the bid is priced per billing period; the unit count is NOT multiplied
+      // into the price (it's shown for information only). Open-ended → ∞ qty + one-period "as operated".
+      const daysPerPeriod = (u: string | null) => { switch ((u ?? "PER_DAY").toUpperCase()) { case "PER_WEEK": return 7; case "PER_MONTH": return 30; case "PER_JOB": return 0; default: return 1; } };
+      const periodLabel = (u: string | null) => { switch ((u ?? "PER_DAY").toUpperCase()) { case "PER_WEEK": return L("week", "أسبوع"); case "PER_MONTH": return L("month", "شهر"); case "PER_JOB": return L("job", "مهمة"); default: return L("day", "يوم"); } };
 
       // Pricing rows across every selected equipment for this supplier.
       let rowNum = 0;
       let sub = 0;
       const rows = supBids.map((b) => {
         const it = itemMap.get(b.requestId);
-        const dur = b.duration ?? it?.durationDays ?? 1;
-        const rental = (b.price ?? 0) * dur;
-        const rtype = it?.rentalType ?? "";
-        sub += rental + (b.mobPrice ?? 0) + (b.demobPrice ?? 0);
-        let r = `<tr><td>${++rowNum}</td><td><b>${esc(labelOf(b))}</b><div class="sm">${esc(eqLine(b))}${rtype ? " · " + esc(rtype) : ""} · ${dur} ${esc(L("periods", "فترات"))}</div></td><td>${esc(L("period", "فترة"))}</td><td class="num">${dur}</td><td class="num">${nf(b.price ?? 0)}</td><td class="num">${nf(rental)}</td></tr>`;
+        const rate = b.price ?? 0;
+        const dpp = daysPerPeriod(b.priceUnit);
+        const plabel = periodLabel(b.priceUnit);
+        const durDays = it?.durationDays ?? null;
+        const openEnded = durDays == null;
+        let lineSub: number, qtyCell: string, totalCell: string, durTxt: string;
+        if (openEnded) {
+          lineSub = rate; // one-period preview; billed "as operated"
+          qtyCell = "∞";
+          totalCell = `<div class="sm">${esc(L("As operated", "حسب التشغيل"))}</div>${nf(rate)} / ${esc(plabel)}`;
+          durTxt = esc(L("open-ended", "غير محدّد"));
+        } else if (dpp > 0) {
+          const dd = durDays as number;
+          const periods = dd / dpp;
+          lineSub = (rate / dpp) * dd;
+          qtyCell = Number.isInteger(periods) ? String(periods) : periods.toFixed(2);
+          totalCell = nf(lineSub);
+          durTxt = `${qtyCell} × ${esc(plabel)}`;
+        } else {
+          lineSub = rate; // PER_JOB — the rate is the line total
+          qtyCell = "1";
+          totalCell = nf(lineSub);
+          durTxt = esc(L("per job", "لكل مهمة"));
+        }
+        sub += lineSub + (b.mobPrice ?? 0) + (b.demobPrice ?? 0);
+        let r = `<tr><td>${++rowNum}</td><td><b>${esc(labelOf(b))}</b><div class="sm">${esc(eqLine(b))} · ${durTxt}</div></td><td>${esc(plabel)}</td><td class="num">${qtyCell}</td><td class="num">${nf(rate)}</td><td class="num">${totalCell}</td></tr>`;
         if (b.mobPrice) r += `<tr><td>${++rowNum}</td><td><b>${esc(L("Mobilization to site", "النقل إلى الموقع"))}</b><div class="sm">${esc(labelOf(b))}</div></td><td>${esc(L("trip", "رحلة"))}</td><td class="num">1</td><td class="num">${nf(b.mobPrice)}</td><td class="num">${nf(b.mobPrice)}</td></tr>`;
         if (b.demobPrice) r += `<tr><td>${++rowNum}</td><td><b>${esc(L("Return from site", "الإرجاع من الموقع"))}</b><div class="sm">${esc(labelOf(b))}</div></td><td>${esc(L("trip", "رحلة"))}</td><td class="num">1</td><td class="num">${nf(b.demobPrice)}</td><td class="num">${nf(b.demobPrice)}</td></tr>`;
         return r;
@@ -276,7 +301,8 @@ export function GroupBids({ group }: { group: RequestGroup }) {
           <div class="card"><div class="card-h">${esc(L("Project terms", "شروط المشروع"))}</div>
             ${scopeRows}
             <div class="kv"><span>${esc(L("Rental basis", "أساس الإيجار"))}</span><b>${esc(rentalBasis || "—")}</b></div>
-            <div class="kv"><span>${esc(L("Equipment count", "عدد المعدات"))}</span><b>${supBids.length}</b></div>
+            <div class="kv"><span>${esc(L("Equipment lines", "بنود المعدات"))}</span><b>${supBids.length}</b></div>
+            <div class="kv"><span>${esc(L("Total units", "إجمالي الوحدات"))}</span><b>${supBids.reduce((s, b) => s + (itemMap.get(b.requestId)?.item?.qty ?? 1), 0)}</b></div>
           </div>
           <ol class="tc">
             <li>${esc(L(`This quotation is valid until ${valid} and expires automatically thereafter unless confirmed through the Moedatech platform.`, `هذا العرض صالح حتى ${valid} وينتهي تلقائيًا بعد ذلك ما لم يُؤكَّد عبر منصة مودياتك.`))}</li>
