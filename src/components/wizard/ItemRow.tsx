@@ -214,10 +214,17 @@ export function ItemRow({
               )}
             </>
           ) : (
-            <Button variant="secondary" onClick={() => setShowDetails((d) => !d)}>
-              <Icon name="tune" size={15} /> {t.step2.itemSettings}
-              <Icon name="expand_more" size={16} className={`transition-transform ${showDetails ? "rotate-180" : ""}`} />
-            </Button>
+            <>
+              {/* Matched: classification is collapsed by default — "Change" opens the cat→sub→size
+                  picker on demand. "Item settings" opens the operator/fuel/notes panel separately. */}
+              <Button variant="secondary" onClick={() => setEditingMatch((e) => !e)}>
+                <Icon name="swap_horiz" size={15} /> {t.common.change}
+              </Button>
+              <Button variant="secondary" onClick={() => setShowDetails((d) => !d)}>
+                <Icon name="tune" size={15} /> {t.step2.itemSettings}
+                <Icon name="expand_more" size={16} className={`transition-transform ${showDetails ? "rotate-180" : ""}`} />
+              </Button>
+            </>
           )}
           <button className="grid h-8 w-8 place-items-center rounded-lg border border-border text-muted hover:border-danger hover:text-danger" title={t.common.remove} onClick={() => setConfirmRemove(true)}>
             <Icon name="close" size={17} />
@@ -225,9 +232,10 @@ export function ItemRow({
         </div>
       </div>
 
-      {/* The 3-level cat→sub→size picker: while editing a match, when the ref is incomplete, and
-          always inside a matched item's Edit panel so all three levels stay changeable. */}
-      {(editingMatch || !isCompleteRef(item.ref) || (status === "matched" && showDetails)) && taxonomyEditor}
+      {/* The 3-level cat→sub→size picker opens when the renter clicks "Change" (editingMatch), or when
+          the ref is incomplete (a required level is missing). A complete match stays COLLAPSED — the
+          renter opens it on demand via Change — it's no longer forced open inside the settings panel. */}
+      {(editingMatch || !isCompleteRef(item.ref)) && taxonomyEditor}
 
       {/* Per-item details — editable only once Matched (AC-54). Mirrors the prototype:
           operator card + fuel + notes. Delivery/return are request-wide only (Settings for all
