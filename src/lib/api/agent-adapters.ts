@@ -219,12 +219,10 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
   return {
     id: `a${idx}`,
     rawLabel: li.input_equipment ?? null,
-    // Keep the stated size verbatim so the preview can show it even when it didn't resolve to a
-    // measurement id (off-taxonomy "(new)" or unstated). Prefer the verbatim phrase; fall back to
-    // the agent's canonical capacity string, dropping the placeholder "Not Specified".
-    rawSize:
-      li.capacity_input_value ??
-      (li.capacity && li.capacity.toLowerCase() !== "not specified" ? li.capacity : null),
+    // ONLY the size the renter literally typed (capacity_input_value) — so "FROM YOUR RFQ" never
+    // shows a size they didn't write. NEVER fall back to li.capacity (that's the agent's RESOLVED
+    // size; it belongs in "MATCHED TO", not the raw input). null when the renter stated no size.
+    rawSize: li.capacity_input_value ?? null,
     ref,
     verdict,
     resolved,
