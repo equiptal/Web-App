@@ -88,7 +88,6 @@ export function CompareBids() {
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [saved, setSaved] = useState<SavedComparison[]>([]);
-  const restoredRef = useRef(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -124,14 +123,10 @@ export function CompareBids() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries]);
 
-  // On first mount, load saved comparisons and reopen the most recent (so it's not lost on return).
+  // On first mount, load the saved-comparison tabs (history) only. Do NOT auto-open any — closing
+  // the web or switching tabs shows nothing for a comparison until the renter clicks its tab.
   useEffect(() => {
-    const list = loadSavedComparisons();
-    setSaved(list);
-    if (!restoredRef.current && list.length) {
-      restoredRef.current = true;
-      setEntries(list[0].entries);
-    }
+    setSaved(loadSavedComparisons());
   }, []);
 
   // Auto-save the current set whenever it changes — keep the original date for an unchanged set.
