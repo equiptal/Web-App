@@ -113,4 +113,6 @@ export interface NormalizeRequest {
   /** "web_rfq" triggers the web policy (start_date/delivery/fulfillment → optional, rental_type
    *  constrained to daily/weekly/monthly, extendable mapping). "api" = hard app policy. */
   source?: "web_rfq" | "api";
+  /** UI locale → the agent writes free-text (notes/advisories/questions) in Arabic when "ar". */
+  language?: "ar" | "en";
 }

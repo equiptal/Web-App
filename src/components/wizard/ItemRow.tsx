@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useT, fmt } from "@/lib/i18n";
+import { useT, useLocale, fmt } from "@/lib/i18n";
 import { useRfq, agentMatches } from "@/lib/store/rfq-store";
 import { SUPPORT_WHATSAPP_NUMBER } from "@/lib/config/support";
 import { AgentMark, Button, Field, Icon, Pchips, Select, Stepper, TextArea, Toggle, Modal } from "@/components/ui";
@@ -9,6 +9,7 @@ import {
   EquipmentItem,
   Taxonomy,
   resolveRef,
+  taxName,
   isCompleteRef,
   FUEL_TYPES,
   OPERATOR_CERTIFICATES,
@@ -46,6 +47,7 @@ export function ItemRow({
   sharedReturn: Party | null;
 }) {
   const t = useT();
+  const { locale } = useLocale(); // render taxonomy names in Arabic when the UI is Arabic
   const { state, actions } = useRfq();
   const ai = state.agentOrigin?.items.find((i) => i.id === item.id); // agent's original item, for the AI marker
   // Agent's per-field note for THIS item (dotted path "line_items[<agentIdx>].<field>"); "" for manual items.
@@ -68,8 +70,8 @@ export function ItemRow({
   const glyph = (item.ref.categoryId && CATEGORY_ICON[item.ref.categoryId]) || "construction";
   // Show the size even when it didn't resolve to a taxonomy measurement (off-taxonomy / unstated):
   // fall back to the verbatim stated size so it never disappears from the match line.
-  const sizeLabel = measurement?.name ?? item.rawSize ?? undefined;
-  const matchLabel = [category?.name, subcategory?.name, sizeLabel].filter(Boolean).join(" · ") || (item.rawLabel ?? "—");
+  const sizeLabel = (measurement ? taxName(measurement, locale) : undefined) ?? item.rawSize ?? undefined;
+  const matchLabel = [taxName(category, locale) || undefined, taxName(subcategory, locale) || undefined, sizeLabel].filter(Boolean).join(" · ") || (item.rawLabel ?? "—");
   // What the renter actually wrote — name + stated size — so "from your RFQ" keeps the size visible.
   const rawDisplay = [item.rawLabel, item.rawSize].filter(Boolean).join(" · ") || item.rawLabel;
 
@@ -107,13 +109,13 @@ export function ItemRow({
   const taxonomyEditor = (
     <div className="col-span-full mt-3 grid grid-cols-1 gap-2 rounded-lg border border-border bg-surface2 p-3 sm:grid-cols-3">
       <Field label={t.step2.category} required missing={!item.ref.categoryId} agent={agentMatches(item.ref.categoryId, ai?.ref.categoryId)}>
-        <Select value={item.ref.categoryId} placeholder={t.step2.pickCategory} onChange={(v) => actions.setItemCategory(item.id, v)} options={taxonomy.map((c) => ({ value: c.id, label: c.name }))} />
+        <Select value={item.ref.categoryId} placeholder={t.step2.pickCategory} onChange={(v) => actions.setItemCategory(item.id, v)} options={taxonomy.map((c) => ({ value: c.id, label: taxName(c, locale) }))} />
       </Field>
       <Field label={t.step2.subcategory} required missing={!item.ref.subcategoryId} agent={agentMatches(item.ref.subcategoryId, ai?.ref.subcategoryId)} note={fn("subtype")}>
-        <Select value={item.ref.subcategoryId} placeholder={t.step2.pickSubcategory} disabled={!category} onChange={(v) => actions.setItemSubcategory(item.id, v)} options={(category?.subcategories ?? []).map((s) => ({ value: s.id, label: s.name }))} />
+        <Select value={item.ref.subcategoryId} placeholder={t.step2.pickSubcategory} disabled={!category} onChange={(v) => actions.setItemSubcategory(item.id, v)} options={(category?.subcategories ?? []).map((s) => ({ value: s.id, label: taxName(s, locale) }))} />
       </Field>
       <Field label={t.step2.measurement} required missing={!item.ref.measurementId} agent={agentMatches(item.ref.measurementId, ai?.ref.measurementId)}>
-        <Select value={item.ref.measurementId} placeholder={t.step2.pickMeasurement} disabled={!subcategory} onChange={(v) => actions.setItemMeasurement(item.id, v)} options={(subcategory?.measurements ?? []).map((m) => ({ value: m.id, label: m.name }))} />
+        <Select value={item.ref.measurementId} placeholder={t.step2.pickMeasurement} disabled={!subcategory} onChange={(v) => actions.setItemMeasurement(item.id, v)} options={(subcategory?.measurements ?? []).map((m) => ({ value: m.id, label: taxName(m, locale) }))} />
       </Field>
     </div>
   );

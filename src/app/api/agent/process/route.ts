@@ -12,7 +12,7 @@ import type { NormalizeRequest } from "@/lib/contract/agent";
  * Body: { text?, files?: {name,type,data?}[], simulateError? }
  */
 export async function POST(req: Request) {
-  let body: { text?: string; files?: { name: string; type: string; data?: string }[]; simulateError?: boolean } = {};
+  let body: { text?: string; files?: { name: string; type: string; data?: string }[]; simulateError?: boolean; locale?: string } = {};
   try {
     body = await req.json();
   } catch {
@@ -31,6 +31,7 @@ export async function POST(req: Request) {
         message: body.text || undefined,
         attachments: files.filter((f) => f.data).map((f) => ({ type: f.type, filename: f.name, data: stripDataUrl(f.data as string) })),
         source: "web_rfq", // triggers the web policy (non-blocking optional fields, basis constrained)
+        language: body.locale === "ar" ? "ar" : undefined, // free-text in Arabic when the UI is Arabic
       };
       const res = await fetch(`${serverEnv.mansourUrl}/rfq/jobs`, {
         method: "POST",

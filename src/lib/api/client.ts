@@ -51,7 +51,10 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * Starts an async job then polls — big RFQs take 30–60s, so a single request would time out.
  */
 export async function processRfq(input: ProcessInput): Promise<AgentDraft> {
-  const { jobId } = await postJson<{ jobId: string }>("/api/agent/process", input); // throws ApiError on empty/network
+  // Tell the agent the UI locale so it writes free-text (notes/advisories/questions) in Arabic
+  // even when the RFQ text is English. <html lang> is kept in sync with the locale by the i18n provider.
+  const locale = typeof document !== "undefined" ? document.documentElement.lang : "en";
+  const { jobId } = await postJson<{ jobId: string }>("/api/agent/process", { ...input, locale }); // throws ApiError on empty/network
   const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
     let res: Response;

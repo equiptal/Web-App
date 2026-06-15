@@ -7,6 +7,8 @@
 export interface Measurement {
   id: string;
   name: string;
+  /** Arabic display name (from the taxonomy DB name_ar); null when not set. */
+  nameAr?: string | null;
   /** Unit the taxonomy records this measurement in, e.g. "ton", "m". Used for unit conversion (AC-20). */
   unit?: string;
 }
@@ -14,16 +16,25 @@ export interface Measurement {
 export interface Subcategory {
   id: string;
   name: string;
+  nameAr?: string | null;
   measurements: Measurement[];
 }
 
 export interface Category {
   id: string;
   name: string;
+  nameAr?: string | null;
   subcategories: Subcategory[];
 }
 
 export type Taxonomy = Category[];
+
+/** Locale-aware display name for a taxonomy node: Arabic when locale is "ar" and a name_ar exists,
+ *  else the canonical English name. Keeps the English value as the source of truth. */
+export function taxName(node: { name: string; nameAr?: string | null } | undefined, locale: string): string {
+  if (!node) return "";
+  return locale === "ar" && node.nameAr ? node.nameAr : node.name;
+}
 
 /** A point in the taxonomy. A complete match has all three; partial selections leave lower levels null. */
 export interface TaxonomyRef {

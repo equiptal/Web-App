@@ -12,16 +12,18 @@ export function nodesToTree(nodes: TaxonomyNode[]): Taxonomy {
   return cats.map((c) => ({
     id: c.id,
     name: c.name,
+    nameAr: c.name_ar, // carry Arabic display names (was dropped) so the UI can render them by locale
     subcategories: subs
       .filter((s) => s.parent_id === c.id)
       .sort(bySort)
       .map((s) => ({
         id: s.id,
         name: s.name,
+        nameAr: s.name_ar,
         measurements: meas
           .filter((m) => m.parent_id === s.id)
           .sort(bySort)
-          .map((m) => ({ id: m.id, name: m.name })),
+          .map((m) => ({ id: m.id, name: m.name, nameAr: m.name_ar })),
       })),
   }));
 }
