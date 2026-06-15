@@ -228,6 +228,11 @@ function toOperatorCert(li: RFQLineItem): OperatorCertificate[] {
 function deriveVerdict(li: RFQLineItem): { verdict: Verdict; resolved: boolean } {
   const isNew = li.category_match === "new" || li.subtype_match === "new" || li.category === "No Equipment Found";
   if (isNew || !li.category_id || !li.subtype_id) return { verdict: "no-match", resolved: false };
+  // A genuine NEW size — an on-axis value above the taxonomy that resolved to NO measurement id —
+  // is "Not available / add as new", NOT a Need-your-OK suggestion (per the size rule). Off-axis /
+  // wrong-unit sizes now resolve to an existing entry (capacity_match "converted" + id), so they
+  // don't reach here; only a true above-the-catalog size does.
+  if (li.capacity_match === "new" && !li.capacity_id) return { verdict: "no-match", resolved: false };
   const needsCheck =
     (li.capacity_match && CAP_NEEDS_CHECK.has(li.capacity_match)) ||
     li.fuel_type_match === "defaulted" ||
