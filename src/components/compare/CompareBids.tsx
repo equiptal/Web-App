@@ -8,7 +8,7 @@ import { fetchRequestGroup, fetchBids, fetchRequestDetail } from "@/lib/api/clie
 import { groupRequests, mapRequestListItem, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
 import type { BidCard } from "@/lib/contract/bids";
 import { EquipImg, equipmentIcon } from "@/components/requests/EquipImg";
-import { groupIdFromFileName } from "@/lib/compare/quotation-token";
+import { groupIdFromFileName, itemCodesFromFileName } from "@/lib/compare/quotation-token";
 import "@/components/requests/requests-proto.css";
 import "@/components/compare/compare-proto.css";
 
@@ -88,6 +88,13 @@ export function CompareBids() {
             if (rec) items = [mapRequestListItem(rec)];
           }
           if (!items.length) { if (active) setLoaded((p) => ({ ...p, [e.code]: "error" })); continue; }
+          // Scope to ONLY the equipment the uploaded quotation covered (stamped in its filename).
+          // If none were stamped (older file / renamed), keep the whole group.
+          const wanted = itemCodesFromFileName(e.name);
+          if (wanted.length) {
+            const scoped = items.filter((it) => wanted.includes(it.displayId));
+            if (scoped.length) items = scoped;
+          }
           const [g] = groupRequests(items);
           const lists = await Promise.all(
             items.map((r) => fetchBids(r.id).then((d) => [r.id, d.bids] as const).catch(() => [r.id, [] as BidCard[]] as const)),

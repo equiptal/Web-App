@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { quotationFileTitle, groupIdFromFileName, normalizeComparisonCode } from "@/lib/compare/quotation-token";
+import { quotationFileTitle, groupIdFromFileName, normalizeComparisonCode, itemCodesFromFileName } from "@/lib/compare/quotation-token";
 
 const GID = "9ed26539-d7e0-4c25-8ee0-551059177ebc";
 
@@ -26,5 +26,19 @@ describe("quotation token (stamp ↔ recognize)", () => {
     expect(normalizeComparisonCode(`  ${GID}  `)).toBe(GID);
     expect(normalizeComparisonCode(`moedatech-quotation-${GID}.pdf`)).toBe(GID);
     expect(normalizeComparisonCode("")).toBeNull();
+  });
+
+  it("stamps + recovers the covered request codes (scope the comparison to the uploaded items)", () => {
+    const title = quotationFileTitle(GID, ["REQ-00132", "REQ-00134"]);
+    expect(title).toBe(`moedatech-quotation-${GID}__items__REQ-00132__REQ-00134`);
+    // group id still recovers, plus the scoped item codes
+    expect(groupIdFromFileName(`${title}.pdf`)).toBe(GID);
+    expect(itemCodesFromFileName(`${title}.pdf`)).toEqual(["REQ-00132", "REQ-00134"]);
+    // de-dupes and ignores empties
+    expect(quotationFileTitle(GID, ["REQ-1", "REQ-1"])).toBe(`moedatech-quotation-${GID}__items__REQ-1`);
+  });
+
+  it("returns no item codes for an unstamped (older) quotation file", () => {
+    expect(itemCodesFromFileName(`moedatech-quotation-${GID}.pdf`)).toEqual([]);
   });
 });

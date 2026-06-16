@@ -11,10 +11,26 @@
  */
 
 export const QUOTATION_FILE_PREFIX = "moedatech-quotation-";
+/** Separates the group id from the list of request codes the quotation actually covers. */
+const ITEMS_MARKER = "__items__";
 
-/** Document title for the printed quotation → the browser's default "Save as PDF" filename. */
-export function quotationFileTitle(groupId: string): string {
-  return `${QUOTATION_FILE_PREFIX}${groupId}`;
+/**
+ * Document title for the printed quotation → the browser's default "Save as PDF" filename.
+ * Optionally stamps the request codes (e.g. REQ-00132) the quotation covers, so on re-upload the
+ * Compare tab can show ONLY those equipment items — not every item in the group.
+ */
+export function quotationFileTitle(groupId: string, reqCodes: string[] = []): string {
+  const base = `${QUOTATION_FILE_PREFIX}${groupId}`;
+  const codes = [...new Set(reqCodes)].map((c) => String(c).replace(/[^A-Za-z0-9-]/g, "")).filter(Boolean);
+  return codes.length ? `${base}${ITEMS_MARKER}${codes.join("__")}` : base;
+}
+
+/** The request codes a quotation filename was stamped with (empty when none / renamed away). */
+export function itemCodesFromFileName(fileName: string): string[] {
+  const base = fileName.replace(/\.pdf$/i, "");
+  const i = base.indexOf(ITEMS_MARKER);
+  if (i === -1) return [];
+  return base.slice(i + ITEMS_MARKER.length).split("__").map((c) => c.trim()).filter(Boolean);
 }
 
 /** A UUID (the requestGroupId) — used to validate a pasted/extracted comparison code. */
