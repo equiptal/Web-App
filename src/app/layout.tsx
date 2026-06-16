@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, IBM_Plex_Sans, Tajawal } from "next/font/google";
 import "./globals.css";
 import { LocaleProvider } from "@/lib/i18n";
@@ -8,9 +8,41 @@ const inter = Inter({ variable: "--font-inter", subsets: ["latin"], weight: ["40
 const plex = IBM_Plex_Sans({ variable: "--font-plex", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 const tajawal = Tajawal({ variable: "--font-tajawal", subsets: ["arabic"], weight: ["400", "500", "700", "800"] });
 
+const siteUrl = "https://web.moedatech.net";
+
 export const metadata: Metadata = {
-  title: "Request equipment — Moedatech",
-  description: "Create an equipment RFQ from a pasted or uploaded document.",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "Moedatech — Equipment RFQs",
+    template: "%s — Moedatech",
+  },
+  description:
+    "Create an equipment RFQ from a pasted or uploaded document, collect bids, and close the deal — all in one place.",
+  applicationName: "Moedatech",
+  keywords: ["Moedatech", "equipment", "RFQ", "rental", "bids", "construction equipment", "معداتك"],
+  authors: [{ name: "Moedatech" }],
+  creator: "Moedatech",
+  publisher: "Moedatech",
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: "Moedatech",
+    title: "Moedatech — Equipment RFQs",
+    description:
+      "Create an equipment RFQ from a pasted or uploaded document, collect bids, and close the deal — all in one place.",
+    url: siteUrl,
+    images: [{ url: "/moedatech-app-icon.png", width: 1024, height: 1024, alt: "Moedatech" }],
+  },
+  twitter: {
+    card: "summary",
+    title: "Moedatech — Equipment RFQs",
+    description: "Create an equipment RFQ, collect bids, and close the deal — all in one place.",
+    images: ["/moedatech-app-icon.png"],
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#1c3550",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
