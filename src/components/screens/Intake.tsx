@@ -78,8 +78,8 @@ export function Intake() {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <b className="text-[14px] font-bold text-navy">{t.intake.optUploadTitle}</b>
-              <span className="inline-flex items-center gap-1 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand">
-                <Icon name="check_circle" size={12} /> {t.intake.recommended}
+              <span className="inline-flex items-center gap-1 rounded-full bg-warn/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warn">
+                <Icon name="science" size={12} /> {t.intake.beta}
               </span>
             </div>
             <p className="mt-1 text-[12.5px] leading-relaxed text-muted">{t.intake.optUploadDesc}</p>

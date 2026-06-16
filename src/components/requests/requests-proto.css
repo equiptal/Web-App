@@ -47,10 +47,10 @@
 
 /* segments + chips */
 .rproto .seg-tabs { display: flex; gap: 10px; margin-bottom: 18px; }
-.rproto .seg { display: flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid var(--border); background: var(--surface1); border-radius: var(--r-md); padding: 10px 24px; cursor: pointer; min-width: 130px; }
+.rproto .seg { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid var(--border); background: var(--surface1); border-radius: var(--r-md); padding: 10px 24px; cursor: pointer; min-width: 130px; }
 .rproto .seg .c { font-family: "IBM Plex Sans", monospace; font-size: 20px; font-weight: 700; }
 .rproto .seg .l { font-size: 12.5px; font-weight: 700; color: var(--muted); }
-.rproto .seg.on { background: var(--navy); border-color: var(--navy); }
+.rproto .seg.on { background: var(--action); border-color: var(--action); }
 .rproto .seg.on .c, .rproto .seg.on .l { color: #fff; }
 .rproto .chips { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
 
@@ -132,6 +132,42 @@
 .rproto .req-chips { display: flex; gap: 9px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 16px; }
 .rproto .req-chip { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; border: 1.5px solid var(--border); background: var(--surface1); border-radius: var(--r-full); padding: 8px 14px; font-size: 12.5px; font-weight: 700; color: var(--navy-mid); cursor: pointer; }
 .rproto .req-chip.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+.rproto .req-chip .ct { display: inline-flex; align-items: center; justify-content: center; min-width: 19px; height: 19px; padding: 0 6px; border-radius: var(--r-full); background: var(--surface2); color: var(--navy-mid); font-family: "IBM Plex Sans", monospace; font-size: 11px; font-weight: 800; }
+.rproto .req-chip.on .ct { background: rgba(255,255,255,0.22); color: #fff; }
+.rproto .req-chip .asap-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--danger); flex: 0 0 auto; }
+
+/* grouped requests — level-1 filter + group context strip */
+.rproto .flevel { margin-bottom: 14px; }
+.rproto .flab { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); margin: 0 2px 8px; }
+.rproto .flab .material-icons-outlined { font-size: 14px; }
+.rproto .chips-row { display: flex; gap: 9px; overflow-x: auto; padding-bottom: 4px; }
+.rproto .gctx { display: flex; align-items: center; gap: 13px; background: linear-gradient(135deg, var(--navy), var(--navy-deep, #12263a)); color: #fff; border-radius: var(--r-lg); padding: 13px 15px; margin-bottom: 14px; }
+.rproto .gctx .gx-ic { position: relative; width: 40px; height: 40px; border-radius: 10px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; background: #fff; }
+.rproto .gctx .gx-ic .gx-more-badge { position: absolute; bottom: -5px; inset-inline-end: -5px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: var(--r-full); background: var(--action); color: #fff; font-size: 9.5px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid var(--navy-deep, #12263a); }
+.rproto .gctx .gx-main { flex: 1; min-width: 0; }
+.rproto .gctx .gx-title { font-size: 14.5px; font-weight: 900; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rproto .gctx .gx-more { color: #ffb86b; font-weight: 800; }
+.rproto .gctx .gx-count { font-size: 10.5px; font-weight: 800; background: rgba(255,255,255,0.18); border-radius: var(--r-full); padding: 2px 9px; }
+.rproto .gctx .gx-meta { font-size: 11.5px; font-weight: 600; color: rgba(255,255,255,0.62); margin-top: 4px; }
+.rproto .gctx .gx-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.rproto .gctx .gx-bids { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 800; }
+.rproto .gctx .gx-bids .material-icons-outlined { font-size: 15px; color: #79e0a6; }
+.rproto .gctx .stbadge, .rproto .gctx .typebadge { background: rgba(255,255,255,0.14); color: #fff; }
+.rproto .gctx .stbadge .dot { background: #fff; }
+.rproto .gctx .gx-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 9px; background: rgba(255,255,255,0.14); color: #fff; border: 0; border-radius: var(--r-full); padding: 6px 12px; font: inherit; font-weight: 800; font-size: 11.5px; cursor: pointer; }
+.rproto .gctx .gx-link:hover { background: rgba(255,255,255,0.24); }
+.rproto .gctx .gx-link .material-icons-outlined { font-size: 14px; }
+.rproto[dir="rtl"] .gctx .gx-link .material-icons-outlined { transform: scaleX(-1); }
+.rproto .st-mixed { background: rgba(28,53,80,0.07); color: var(--navy-mid); } .rproto .st-mixed .dot { background: var(--navy-mid); }
+.rproto .contentbar { display: flex; align-items: center; gap: 10px; margin: 2px 0 12px; }
+.rproto .contentbar .count { font-size: 13px; font-weight: 700; color: var(--muted); }
+/* mobile: let the group strip's badges wrap to their own row instead of squeezing the title */
+@media (max-width: 640px) {
+  .rproto .gctx { flex-wrap: wrap; }
+  .rproto .gctx .gx-main { flex: 1 1 60%; }
+  .rproto .gctx .gx-badges { width: 100%; justify-content: flex-start; margin-top: 6px; }
+}
+
 .rproto .bids-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .rproto .bids-bar .count { font-size: 13px; font-weight: 700; color: var(--muted); }
 
@@ -156,6 +192,20 @@
 .rproto .bid-av { position: relative; width: 40px; height: 40px; border-radius: 50%; background: #e8dec0; border: 1.5px solid var(--navy); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 17px; color: var(--navy); flex: 0 0 auto; }
 .rproto .bid-av .vchk { position: absolute; bottom: -2px; inset-inline-end: -2px; width: 14px; height: 14px; border-radius: 50%; background: var(--success); border: 1.5px solid #fff; display: flex; align-items: center; justify-content: center; }
 .rproto .bid-av .vchk .material-icons-outlined { font-size: 9px; color: #fff; }
+/* equipment-focused bid header (grouped My Bids) */
+.rproto .bid-eq { width: 46px; height: 46px; border-radius: 11px; background: var(--surface2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--navy-mid); flex: 0 0 auto; }
+.rproto .bid-eq .material-icons-outlined { font-size: 24px; }
+.rproto .bid-by { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 11.5px; font-weight: 700; color: var(--navy-mid); margin-top: 5px; }
+.rproto .bid-by > .material-icons-outlined { font-size: 13px; color: var(--muted); }
+.rproto .bid-by .vf { color: var(--success); }
+.rproto .bid-by .dotsep { color: var(--text-disabled); }
+.rproto .bid-by .star { display: inline-flex; align-items: center; gap: 2px; color: var(--action); }
+.rproto .bid-by .star .material-icons-outlined { font-size: 13px; color: var(--action); }
+.rproto .eqv-ok { color: var(--success); font-size: 16px; }
+.rproto .eqv-no { color: var(--text-disabled); font-size: 16px; }
+.rproto .sup-chip .av { width: 20px; height: 20px; border-radius: 50%; background: #e8dec0; border: 1px solid var(--navy); display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: var(--navy); flex: 0 0 auto; }
+.rproto .sup-chip .vtick { font-size: 13px; color: var(--success); }
+.rproto .req-chip.on .sup-chip .vtick { color: #79e0a6; }
 .rproto .bid-hh { flex: 1; min-width: 0; }
 .rproto .bid-hh .r1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .rproto .bid-hh .sname { font-size: 14px; font-weight: 800; color: var(--navy); }
@@ -186,6 +236,11 @@
 .rproto .equip-row .elab { font-size: 13px; font-weight: 800; color: var(--navy); display: flex; align-items: center; gap: 6px; }
 .rproto .equip-row .elab .vt { font-size: 13px; color: var(--success); }
 .rproto .equip-row .esub { font-size: 11px; font-weight: 700; color: var(--navy-mid); margin-top: 3px; }
+.rproto .equip-row.tappable { cursor: pointer; }
+.rproto .equip-row.tappable:hover { background: var(--surface2, #f5f7fa); }
+.rproto .equip-row .equip-view { display: inline-flex; align-items: center; gap: 2px; flex: none; font-size: 12px; font-weight: 800; color: var(--rentee); white-space: nowrap; }
+.rproto .equip-row .equip-view .material-icons-outlined { font-size: 16px; }
+.rproto[dir="rtl"] .equip-row .equip-view .material-icons-outlined.go { transform: scaleX(-1); }
 .rproto .price-row { border-top: 1px solid var(--border); }
 .rproto .price-collapsed { display: flex; align-items: center; padding: 12px 14px; cursor: pointer; }
 .rproto .price-collapsed .pl { font-size: 13px; font-weight: 800; color: var(--navy); }

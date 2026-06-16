@@ -29,7 +29,7 @@ export function buildMockDraft(): AgentDraft {
     source: "agent",
     conflict: { fromText: "Riyadh — King Fahd Rd site", fromFile: "Riyadh — Exit 18 yard" },
   };
-  project.timing.hoursPerDay = 8;
+  project.timing.hoursPerDay = 10;
 
   const items: EquipmentItem[] = [
     confident("i1", ["earthmoving", "excavators", "exc-20t"], {

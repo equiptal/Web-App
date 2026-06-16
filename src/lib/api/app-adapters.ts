@@ -1,5 +1,5 @@
 import type { Taxonomy } from "@/lib/contract";
-import { postableItems } from "@/lib/contract";
+import { postableItems, OPERATOR_CERTIFICATES } from "@/lib/contract";
 import type { RfqRequestPayload } from "@/lib/contract";
 import type { TaxonomyNode, CreateRequestPayload, CreateRequestItem } from "@/lib/contract/app";
 
@@ -12,16 +12,18 @@ export function nodesToTree(nodes: TaxonomyNode[]): Taxonomy {
   return cats.map((c) => ({
     id: c.id,
     name: c.name,
+    nameAr: c.name_ar, // carry Arabic display names (was dropped) so the UI can render them by locale
     subcategories: subs
       .filter((s) => s.parent_id === c.id)
       .sort(bySort)
       .map((s) => ({
         id: s.id,
         name: s.name,
+        nameAr: s.name_ar,
         measurements: meas
           .filter((m) => m.parent_id === s.id)
           .sort(bySort)
-          .map((m) => ({ id: m.id, name: m.name })),
+          .map((m) => ({ id: m.id, name: m.name, nameAr: m.name_ar })),
       })),
   }));
 }
@@ -120,6 +122,9 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
     .map((c) => (c === "other" ? safetyOtherText || null : c))
     .filter(Boolean) as string[];
   const safetyCerts = safetyCertList.length ? safetyCertList : undefined;
+  // Project-level certs that aren't selectable per item (e.g. the free-text "other") — always merged
+  // into an operator item's per-item certs so a per-item override never drops them.
+  const projectExtraCerts = safetyCertList.filter((c) => !(OPERATOR_CERTIFICATES as string[]).includes(c));
   // AC-50: "Other" certs → requiredCerts; the local-content flag is split out into its own boolean.
   const otherCerts = project.certificates.other;
   const localContent = otherCerts.includes("local-content");
@@ -172,7 +177,12 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
         // §4.2 per-item operator sub-fields (only meaningful when an operator is included):
         nightShiftRequired: operatorIncluded ? i.operator.nightShift : undefined, // AC-24
         operatorNationality: operatorIncluded ? i.operator.nationality ?? undefined : undefined, // AC-24
-        safetyCertifications: safetyCerts, // AC-50 project safety certs fanned per-item
+        // AC-24/50: per-item operator certs (multi-select) + project-level extras (e.g. "other");
+        // falls back to the project safety list when the item has no per-item selection.
+        safetyCertifications:
+          operatorIncluded && i.operator.certificate.length
+            ? [...new Set([...i.operator.certificate, ...projectExtraCerts])]
+            : safetyCerts,
       };
     }),
   };

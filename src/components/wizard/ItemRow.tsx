@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { useT, fmt } from "@/lib/i18n";
+import { useT, useLocale, fmt } from "@/lib/i18n";
 import { useRfq, agentMatches } from "@/lib/store/rfq-store";
 import { SUPPORT_WHATSAPP_NUMBER } from "@/lib/config/support";
-import { AgentMark, Button, Field, Icon, Pchips, Select, Stepper, TextArea, Toggle, Modal } from "@/components/ui";
+import { AgentMark, Button, Field, Icon, Pchips, SelChips, Select, Stepper, TextArea, Toggle, Modal } from "@/components/ui";
 import {
   EquipmentItem,
   Taxonomy,
   resolveRef,
+  taxName,
   isCompleteRef,
   FUEL_TYPES,
   OPERATOR_CERTIFICATES,
@@ -20,6 +21,9 @@ import {
 
 function opt<T extends string>(values: readonly T[], dict: Record<string, string>) {
   return values.map((v) => ({ value: v, label: dict[v] ?? v }));
+}
+function toggle<T>(arr: T[], v: T): T[] {
+  return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
 }
 
 /** Best-effort category → Material icon glyph for the row avatar. */
@@ -38,32 +42,48 @@ export function ItemRow({
   sharedFuelResp,
   sharedDelivery,
   sharedReturn,
+  defaultOpen = false,
 }: {
   item: EquipmentItem;
   taxonomy: Taxonomy;
   sharedFuelResp: Party | null;
   sharedDelivery: Party | null;
   sharedReturn: Party | null;
+  /** Open the per-item settings expanded on first render, so the renter sees them directly (matched items). */
+  defaultOpen?: boolean;
 }) {
   const t = useT();
+  const { locale } = useLocale(); // render taxonomy names in Arabic when the UI is Arabic
   const { state, actions } = useRfq();
   const ai = state.agentOrigin?.items.find((i) => i.id === item.id); // agent's original item, for the AI marker
+  // Agent's per-field note for THIS item (dotted path "line_items[<agentIdx>].<field>"); "" for manual items.
+  // Cleared once the item is resolved (the renter approved it) — and per-field via agentMatches when edited.
+  const fn = (f: string) =>
+    item.resolved || !(item.id.startsWith("a") && /^\d+$/.test(item.id.slice(1)))
+      ? undefined
+      : state.draft?.fieldNotes?.[`line_items[${item.id.slice(1)}].${f}`];
   const [editingMatch, setEditingMatch] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
+  const [showDetails, setShowDetails] = useState(defaultOpen);
   const [confirmRemove, setConfirmRemove] = useState(false);
 
   const nationalityOpts = [
-    { value: "arab", label: t.step2.perItem.nationalityArab },
-    { value: "other", label: t.step2.perItem.nationalityOther },
+    { value: "restricted", label: t.step2.perItem.nationalityRestricted },
+    { value: "any", label: t.step2.perItem.nationalityAny },
   ];
 
   const { category, subcategory, measurement } = resolveRef(taxonomy, item.ref);
   const status = item.verdict === "no-match" ? "not-available" : item.resolved ? "matched" : "needs-ok";
   const glyph = (item.ref.categoryId && CATEGORY_ICON[item.ref.categoryId]) || "construction";
-  // Show the size even when it didn't resolve to a taxonomy measurement (off-taxonomy / unstated):
-  // fall back to the verbatim stated size so it never disappears from the match line.
-  const sizeLabel = measurement?.name ?? item.rawSize ?? undefined;
-  const matchLabel = [category?.name, subcategory?.name, sizeLabel].filter(Boolean).join(" · ") || (item.rawLabel ?? "—");
+  // "MATCHED TO" must show ONLY values that exist in our taxonomy: the resolved measurement, or the
+  // agent's suggested canonical size (also a real taxonomy node) while the size is still pending.
+  // NEVER the verbatim stated size — that's the raw input (e.g. "23 ton") and lives in "FROM YOUR
+  // RFQ". Falling back to it made the match line claim a size we don't actually carry.
+  const suggestedMeasurement = item.suggestion?.measurementId
+    ? resolveRef(taxonomy, { ...item.ref, measurementId: item.suggestion.measurementId }).measurement
+    : undefined;
+  const matchedMeasurement = measurement ?? suggestedMeasurement;
+  const sizeLabel = matchedMeasurement ? taxName(matchedMeasurement, locale) : undefined;
+  const matchLabel = [taxName(category, locale) || undefined, taxName(subcategory, locale) || undefined, sizeLabel].filter(Boolean).join(" · ") || (item.rawLabel ?? "—");
   // What the renter actually wrote — name + stated size — so "from your RFQ" keeps the size visible.
   const rawDisplay = [item.rawLabel, item.rawSize].filter(Boolean).join(" · ") || item.rawLabel;
 
@@ -72,20 +92,36 @@ export function ItemRow({
 
   /* ----------------------------- No-match (AC-30/31/32) ----------------------------- */
   if (item.verdict === "no-match") {
+    // The equipment IS in our catalogue but the requested SIZE isn't yet (a genuine new size) when
+    // category + subtype resolved. Then show the matched equipment + a size-specific message, rather
+    // than "we couldn't find this equipment". Otherwise it's an unknown-equipment no-match.
+    const newSizeOnly = Boolean(item.ref.categoryId && item.ref.subcategoryId);
     return (
       <li className="rounded-xl border border-s-[3px] border-border border-s-danger bg-surface px-4 py-3">
         <div className="flex items-start gap-3">
           <Avatar glyph={glyph} conf="low" />
           <div className="min-w-0 flex-1">
-            <RfqMatch raw={rawDisplay} matched={<span className="text-danger">{t.step2.status.notAvailable}</span>} />
-            <p className="mt-1 text-xs text-muted">{t.step2.noMatch.explainer}</p>
+            <RfqMatch
+              raw={rawDisplay}
+              matched={
+                newSizeOnly ? (
+                  <span>
+                    {matchLabel} · <span className="text-danger">{t.step2.status.notAvailable}</span>
+                  </span>
+                ) : (
+                  <span className="text-danger">{t.step2.status.notAvailable}</span>
+                )
+              }
+            />
+            <p className="mt-1 text-xs text-muted">{newSizeOnly ? t.step2.noMatch.newSizeExplainer : t.step2.noMatch.explainer}</p>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2 sm:justify-end">
           <Button
             variant="secondary"
             onClick={() => {
-              const msg = fmt(t.step2.noMatch.whatsappMessage, { item: item.rawLabel ?? "" });
+              const tmpl = newSizeOnly ? t.step2.noMatch.whatsappMessageSize : t.step2.noMatch.whatsappMessage;
+              const msg = fmt(tmpl, { item: rawDisplay ?? item.rawLabel ?? "" });
               window.open(`https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
               actions.removeItem(item.id);
             }}
@@ -103,13 +139,13 @@ export function ItemRow({
   const taxonomyEditor = (
     <div className="col-span-full mt-3 grid grid-cols-1 gap-2 rounded-lg border border-border bg-surface2 p-3 sm:grid-cols-3">
       <Field label={t.step2.category} required missing={!item.ref.categoryId} agent={agentMatches(item.ref.categoryId, ai?.ref.categoryId)}>
-        <Select value={item.ref.categoryId} placeholder={t.step2.pickCategory} onChange={(v) => actions.setItemCategory(item.id, v)} options={taxonomy.map((c) => ({ value: c.id, label: c.name }))} />
+        <Select value={item.ref.categoryId} placeholder={t.step2.pickCategory} onChange={(v) => actions.setItemCategory(item.id, v)} options={taxonomy.map((c) => ({ value: c.id, label: taxName(c, locale) }))} />
       </Field>
-      <Field label={t.step2.subcategory} required missing={!item.ref.subcategoryId} agent={agentMatches(item.ref.subcategoryId, ai?.ref.subcategoryId)}>
-        <Select value={item.ref.subcategoryId} placeholder={t.step2.pickSubcategory} disabled={!category} onChange={(v) => actions.setItemSubcategory(item.id, v)} options={(category?.subcategories ?? []).map((s) => ({ value: s.id, label: s.name }))} />
+      <Field label={t.step2.subcategory} required missing={!item.ref.subcategoryId} agent={agentMatches(item.ref.subcategoryId, ai?.ref.subcategoryId)} note={fn("subtype")}>
+        <Select value={item.ref.subcategoryId} placeholder={t.step2.pickSubcategory} disabled={!category} onChange={(v) => actions.setItemSubcategory(item.id, v)} options={(category?.subcategories ?? []).map((s) => ({ value: s.id, label: taxName(s, locale) }))} />
       </Field>
       <Field label={t.step2.measurement} required missing={!item.ref.measurementId} agent={agentMatches(item.ref.measurementId, ai?.ref.measurementId)}>
-        <Select value={item.ref.measurementId} placeholder={t.step2.pickMeasurement} disabled={!subcategory} onChange={(v) => actions.setItemMeasurement(item.id, v)} options={(subcategory?.measurements ?? []).map((m) => ({ value: m.id, label: m.name }))} />
+        <Select value={item.ref.measurementId} placeholder={t.step2.pickMeasurement} disabled={!subcategory} onChange={(v) => actions.setItemMeasurement(item.id, v)} options={(subcategory?.measurements ?? []).map((m) => ({ value: m.id, label: taxName(m, locale) }))} />
       </Field>
     </div>
   );
@@ -133,8 +169,8 @@ export function ItemRow({
             })}
           </div>
         )}
-        {/* Agent's free-text capacity advisory (real Mansour output, AC-19/20) */}
-        {item.advisory && !item.suggestion?.unitConversion && (
+        {/* Agent's free-text capacity advisory (real Mansour output, AC-19/20) — clears once approved. */}
+        {item.advisory && !item.suggestion?.unitConversion && !item.resolved && (
           <div className="mt-1.5 flex items-center gap-1.5 text-[11.5px] font-semibold text-warn">
             <Icon name="swap_horiz" size={14} /> {item.advisory}
           </div>
@@ -167,10 +203,11 @@ export function ItemRow({
               <Stepper value={item.quantity} min={1} onChange={(v) => actions.patchItem(item.id, { quantity: v })} />
               {agentMatches(item.quantity, ai?.quantity) && <AgentMark />}
             </div>
+            {/* Compact summary — just the two key settings. Everything else (operator details,
+                fuel responsibility, delivery/return, notes) stays in the Edit panel below. */}
             <div className="mt-2.5 flex flex-wrap gap-2">
               <MetaTag icon="person" label={t.step2.perItem.operatorNeeded} value={t.options.operatorNeeded[item.operatorNeeded]} />
               <MetaTag icon="local_gas_station" label={t.step2.perItem.fuelType} value={t.options.fuelType[item.fuelType]} />
-              {item.additionalNotes && <MetaTag icon="sticky_note_2" label={t.step2.perItem.additionalNotes} value={item.additionalNotes} />}
             </div>
           </>
         )}
@@ -193,9 +230,17 @@ export function ItemRow({
               )}
             </>
           ) : (
-            <Button variant="secondary" onClick={() => setShowDetails((d) => !d)}>
-              <Icon name="tune" size={15} /> {t.common.edit}
-            </Button>
+            <>
+              {/* Matched: classification is collapsed by default — "Change" opens the cat→sub→size
+                  picker on demand. "Item settings" opens the operator/fuel/notes panel separately. */}
+              <Button variant="secondary" onClick={() => setEditingMatch((e) => !e)}>
+                <Icon name="swap_horiz" size={15} /> {t.common.change}
+              </Button>
+              <Button variant="secondary" onClick={() => setShowDetails((d) => !d)}>
+                <Icon name="tune" size={15} /> {t.step2.itemSettings}
+                <Icon name="expand_more" size={16} className={`transition-transform ${showDetails ? "rotate-180" : ""}`} />
+              </Button>
+            </>
           )}
           <button className="grid h-8 w-8 place-items-center rounded-lg border border-border text-muted hover:border-danger hover:text-danger" title={t.common.remove} onClick={() => setConfirmRemove(true)}>
             <Icon name="close" size={17} />
@@ -203,9 +248,10 @@ export function ItemRow({
         </div>
       </div>
 
-      {/* The 3-level cat→sub→size picker: while editing a match, when the ref is incomplete, and
-          always inside a matched item's Edit panel so all three levels stay changeable. */}
-      {(editingMatch || !isCompleteRef(item.ref) || (status === "matched" && showDetails)) && taxonomyEditor}
+      {/* The 3-level cat→sub→size picker opens when the renter clicks "Change" (editingMatch), or when
+          the ref is incomplete (a required level is missing). A complete match stays COLLAPSED — the
+          renter opens it on demand via Change — it's no longer forced open inside the settings panel. */}
+      {(editingMatch || !isCompleteRef(item.ref)) && taxonomyEditor}
 
       {/* Per-item details — editable only once Matched (AC-54). Mirrors the prototype:
           operator card + fuel + notes. Delivery/return are request-wide only (Settings for all
@@ -234,9 +280,13 @@ export function ItemRow({
                   <Pchips value={item.operator.nationality} onChange={(v) => actions.patchItemOperator(item.id, { nationality: v })} options={nationalityOpts} />
                 </ChipField>
                 <ChipField label={t.step2.perItem.certificate} agent={agentMatches(item.operator.certificate, ai?.operator.certificate)}>
-                  <Pchips<OperatorCertificate> value={item.operator.certificate} onChange={(v) => actions.patchItemOperator(item.id, { certificate: v })} options={opt(OPERATOR_CERTIFICATES, t.options.safetyCert)} />
+                  <SelChips<OperatorCertificate>
+                    values={item.operator.certificate}
+                    onToggle={(v) => actions.patchItemOperator(item.id, { certificate: toggle(item.operator.certificate, v) })}
+                    options={opt(OPERATOR_CERTIFICATES, t.options.safetyCert)}
+                  />
                 </ChipField>
-                <ChipField label={t.step2.perItem.fat} agent={agentMatches(item.operator.fat, ai?.operator.fat)}>
+                <ChipField label={t.step2.perItem.fat} agent={agentMatches(item.operator.fat, ai?.operator.fat)} note={fn("operator_accommodation_by_rentee")}>
                   <Pchips<Party> value={item.operator.fat} onChange={(v) => actions.patchItemOperator(item.id, { fat: v })} options={opt(PARTIES, t.options.party)} />
                 </ChipField>
               </div>
@@ -245,10 +295,10 @@ export function ItemRow({
 
           {/* Fuel (AC-26) */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <ChipField label={t.step2.perItem.fuelType} agent={agentMatches(item.fuelType, ai?.fuelType)}>
+            <ChipField label={t.step2.perItem.fuelType} agent={agentMatches(item.fuelType, ai?.fuelType)} note={fn("fuel_type_preference")}>
               <Pchips<FuelType> value={item.fuelType} onChange={(v) => actions.patchItem(item.id, { fuelType: v })} options={opt(FUEL_TYPES, t.options.fuelType)} />
             </ChipField>
-            <ChipField label={t.step1.requestWide.fuelResponsibility} agent={agentMatches(item.fuelResponsibilityOverride, ai?.fuelResponsibilityOverride)}>
+            <ChipField label={t.step1.requestWide.fuelResponsibility} agent={agentMatches(item.fuelResponsibilityOverride, ai?.fuelResponsibilityOverride)} note={fn("diesel_included")}>
               <Pchips<Party> value={item.fuelResponsibilityOverride ?? sharedFuelResp} onChange={(v) => actions.patchItem(item.id, { fuelResponsibilityOverride: v })} options={opt(PARTIES, t.options.party)} />
             </ChipField>
           </div>
@@ -256,10 +306,10 @@ export function ItemRow({
           {/* Delivery / Return — per-item override of the request-wide setting (AC-25). Mansour sets
               these per line (mobilization/demobilization), so surface + allow editing them here. */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <ChipField label={t.step1.requestWide.delivery} agent={agentMatches(item.deliveryOverride, ai?.deliveryOverride)}>
+            <ChipField label={t.step1.requestWide.delivery} agent={agentMatches(item.deliveryOverride, ai?.deliveryOverride)} note={fn("mobilization_by_rentee")}>
               <Pchips<Party> value={item.deliveryOverride ?? sharedDelivery} onChange={(v) => actions.patchItem(item.id, { deliveryOverride: v })} options={opt(PARTIES, t.options.party)} />
             </ChipField>
-            <ChipField label={t.step1.requestWide.return} agent={agentMatches(item.returnOverride, ai?.returnOverride)}>
+            <ChipField label={t.step1.requestWide.return} agent={agentMatches(item.returnOverride, ai?.returnOverride)} note={fn("demobilization_by_rentee")}>
               <Pchips<Party> value={item.returnOverride ?? sharedReturn} onChange={(v) => actions.patchItem(item.id, { returnOverride: v })} options={opt(PARTIES, t.options.party)} />
             </ChipField>
           </div>
@@ -308,6 +358,8 @@ function RfqMatch({ raw, matched }: { raw: string | null; matched: React.ReactNo
         <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted">{t.step2.fromRfq}</span>
         <span className="break-words text-[15px] font-bold leading-tight">{raw ? `“${raw}”` : "—"}</span>
       </span>
+      {/* Mobile: vertical flow (RFQ ↓ matched). Desktop: horizontal arrow. */}
+      <Icon name="arrow_downward" size={18} className="block flex-none text-muted/60 sm:hidden" />
       <Icon name="arrow_forward" size={20} className="hidden flex-none text-muted/60 rtl:scale-x-[-1] sm:block" />
       <span className="flex min-w-0 flex-col gap-0.5 sm:flex-1">
         <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted">{t.step2.matchedTo}</span>
@@ -338,14 +390,22 @@ function MetaTag({ icon, label, value }: { icon: string; label: string; value: s
   );
 }
 
-function ChipField({ label, agent, children }: { label: string; agent?: boolean; children: React.ReactNode }) {
+function ChipField({ label, agent, note, children }: { label: string; agent?: boolean; note?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
-      <span className="mb-1.5 flex items-center gap-2 text-[11.5px] font-bold text-navy-mid">
+      <span className={`mb-1.5 flex items-center gap-2 text-[11.5px] font-bold ${agent ? "text-warn" : "text-navy-mid"}`}>
         {label}
         {agent && <AgentMark />}
       </span>
-      {children}
+      {/* Orange box around the options when the agent filled them in. */}
+      <div className={agent ? "rounded-lg p-1.5 ring-1 ring-warn/60" : ""}>{children}</div>
+      {/* Agent's note — shown only while the field still holds the agent's value (agent=true),
+          so it disappears the moment the renter changes the selection. */}
+      {agent && note && (
+        <p className="mt-1 flex items-start gap-1.5 text-[12px] leading-snug text-info">
+          <Icon name="lightbulb" size={13} className="mt-[1.5px] flex-none" /> {note}
+        </p>
+      )}
     </div>
   );
 }

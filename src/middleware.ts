@@ -13,6 +13,7 @@ import type { NextRequest } from "next/server";
  * while signed out and assets aren't gated.
  */
 const REFRESH_COOKIE = "mt_refresh";
+const ID_COOKIE = "mt_id";
 
 function safeNext(next: string | null): string {
   // Only allow same-origin relative paths (block protocol-relative `//host`).
@@ -21,7 +22,20 @@ function safeNext(next: string | null): string {
 
 export function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
-  const authed = Boolean(req.cookies.get(REFRESH_COOKIE)?.value);
+
+  // Mobile→web sign-in handoff (mobile/017 AC-08): the app opens `<web>/?handoff=<idToken>`. Forward
+  // the carried token to the handoff route (an /api/* path, so it runs past this login gate) which
+  // validates it, sets the session, and lands on a fresh request.
+  const handoff = req.nextUrl.searchParams.get("handoff");
+  if (handoff) {
+    const dest = req.nextUrl.clone();
+    dest.pathname = "/api/auth/handoff";
+    dest.search = `?token=${encodeURIComponent(handoff)}`;
+    return NextResponse.redirect(dest);
+  }
+
+  // A refresh token (normal sign-in) OR an idToken (handoff session, no refresh) counts as authed.
+  const authed = Boolean(req.cookies.get(REFRESH_COOKIE)?.value || req.cookies.get(ID_COOKIE)?.value);
 
   if (pathname === "/login") {
     if (authed) {

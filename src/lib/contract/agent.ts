@@ -8,7 +8,7 @@
 export type AgentRentalType = "DAILY" | "WEEKLY" | "MONTHLY" | "PER_JOB" | "LONG_TERM";
 export type AgentFuelType = "DIESEL" | "PETROL" | "ELECTRIC";
 export type AgentOvertimeRate = "0" | "1.5X" | "2X";
-export type AgentOperatorLicenseLevel = "CERTIFIED" | "TUV" | "SPSP";
+export type AgentOperatorLicenseLevel = "SPSP" | "TUV" | "SASO" | "CERTIFIED";
 
 export type FuelTypeMatch = "stated" | "defaulted" | null;
 export type CategoryMatch = "exact" | "new";
@@ -30,13 +30,14 @@ export interface RFQLineItem {
   night_shift_required?: boolean | null;
   number_of_operators?: number | null;
   operator_nationality?: string | null;
-  operator_license_level?: AgentOperatorLicenseLevel | null;
+  operator_license_level?: AgentOperatorLicenseLevel | null; // back-compat: first of the array
+  operator_license_levels?: AgentOperatorLicenseLevel[] | null; // ALL operator certs the RFQ named
   // Emitted by Mansour but previously dropped by the adapter — now consumed:
   additional_notes?: string | null; // AC-53 per-item free-text qualifiers ("silent", "breaker")
   diesel_included?: boolean | null; // AC-26 supplier provides fuel
   fat_required?: boolean | null; // AC-24 FAT applies (operator included)
   operator_accommodation_by_rentee?: boolean | null; // AC-24 who covers FAT: true = rentee/me, false = supplier
-  safety_certifications?: string[] | null; // AC-50
+  safety_certifications?: string[] | string | null; // AC-50 — agent emits a single value; tolerate both
   capacity_advisory?: string | null;
   fuel_type_match?: FuelTypeMatch;
   category_match?: CategoryMatch;
@@ -57,6 +58,9 @@ export interface RFQHeader {
   project_lng?: number | null;
   project_address_label?: string | null;
   detected_locations?: string[] | null; // AC-48: every distinct site Mansour found
+  /** AC-47: cross-source disagreements. Each entry: a dotted field path + candidates labelled by
+   *  source ("pasted text" / "file:<name>"). The web renders a pick-one resolver (location today). */
+  conflicts?: { field: string; candidates: { value: string; source: string }[] }[] | null;
   working_hours_per_day?: number | null;
   working_days_per_week?: number | null;
   overtime_rate?: AgentOvertimeRate | null;
@@ -96,9 +100,11 @@ export interface RFQAgentOutput {
   rfq_header: RFQHeader;
   line_items: RFQLineItem[];
   missing_required_fields: MissingFieldEntry[];
-  /** Short, plain, conversational notes on values the agent assumed/inferred, in the renter's
-   *  language (location vagueness, responsibility assumptions, size auto-fill, fuel default). */
+  /** DEPRECATED flat conversational notes (lumped Step-4 box). Prefer field_notes. */
   justifications?: string[];
+  /** Field-keyed notes on values the agent assumed/inferred — { field, note } keyed by dotted path
+   *  ("rfq_header.<name>" | "line_items[<i>].<name>"). Rendered inline beside each field. */
+  field_notes?: { field: string; note: string }[];
 }
 
 /** Request body for `POST /rfq` and `POST /rfq/jobs`. Attachments are base64 (no `data:` prefix). */
@@ -108,4 +114,6 @@ export interface NormalizeRequest {
   /** "web_rfq" triggers the web policy (start_date/delivery/fulfillment → optional, rental_type
    *  constrained to daily/weekly/monthly, extendable mapping). "api" = hard app policy. */
   source?: "web_rfq" | "api";
+  /** UI locale → the agent writes free-text (notes/advisories/questions) in Arabic when "ar". */
+  language?: "ar" | "en";
 }

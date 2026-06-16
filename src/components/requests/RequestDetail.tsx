@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchRequestDetail, cancelRequest, updateRequest } from "@/lib/api/client";
-import type { RequestItem, RequestRecord } from "@/lib/contract/requests";
+import { publicTaxonomyUrl, type RequestItem, type RequestRecord } from "@/lib/contract/requests";
 import { RequestBids } from "@/components/requests/RequestBids";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { LocationMap } from "@/components/requests/LocationMap";
@@ -57,6 +57,12 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
     const it = r?.equipmentItems?.[0];
     if (onTitle && it) onTitle((ar ? it.subtypeNameAr ?? it.subtypeName : it.subtypeName) ?? "");
   }, [r, ar, onTitle]);
+
+  // Deep-link straight to the bids list — e.g. the group detail's "View bids" links to ?view=bids.
+  // Read after mount (not during render) to avoid a hydration mismatch.
+  useEffect(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("view") === "bids") setView("bids");
+  }, []);
 
   if (error) return <div className="rproto"><div className="rempty">{L("Couldn’t load this request.", "تعذّر تحميل هذا الطلب.")}</div></div>;
   if (!r) return <div className="rproto"><div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 28 }}>progress_activity</span></div></div>;
@@ -199,7 +205,6 @@ const PAYTERMS_OPTS: Opt[] = [
   { v: "net_30", en: "Net 30", ar: "خلال ٣٠ يوم" }, { v: "net_60", en: "Net 60", ar: "خلال ٦٠ يوم" },
   { v: "end_of_job", en: "End of job", ar: "نهاية المهمة" },
 ];
-const PAYMETHOD_OPTS: Opt[] = [{ v: "bank_transfer", en: "Bank transfer", ar: "تحويل بنكي" }, { v: "cash", en: "Cash", ar: "نقدي" }];
 const MAINT_OPTS: Opt[] = [{ v: "supplier", en: "Supplier", ar: "المؤجّر" }, { v: "rentee", en: "Me (renter)", ar: "أنا (المستأجر)" }];
 const SLA_OPTS: Opt[] = [
   { v: "FOUR_HR", en: "4 hours", ar: "٤ ساعات" }, { v: "EIGHT_HR", en: "8 hours", ar: "٨ ساعات" },
@@ -210,7 +215,8 @@ const FULFILL_OPTS: Opt[] = [{ v: "SINGLE_SUPPLIER", en: "Single supplier", ar: 
 const OFFER_OPTS: Opt[] = [{ v: "24H", en: "24 hours", ar: "٢٤ ساعة" }, { v: "48H", en: "48 hours", ar: "٤٨ ساعة" }, { v: "72H", en: "72 hours", ar: "٧٢ ساعة" }, { v: "1W", en: "1 week", ar: "أسبوع" }];
 const OPERATOR_OPTS: Opt[] = [{ v: "YES", en: "With operator", ar: "مع مشغّل" }, { v: "NO", en: "Without operator", ar: "بدون مشغّل" }];
 const FUEL_OPTS: Opt[] = [{ v: "DIESEL", en: "Diesel", ar: "ديزل" }, { v: "PETROL", en: "Petrol", ar: "بنزين" }, { v: "ELECTRIC", en: "Electric", ar: "كهربائي" }];
-const NATIONALITY_OPTS: Opt[] = [{ v: "saudi", en: "Saudi", ar: "سعودي" }, { v: "non_saudi", en: "Non-Saudi", ar: "غير سعودي" }, { v: "any", en: "Any", ar: "أي" }];
+// Match the create form (ItemRow): operator nationality is Restricted / Any (values sent to the backend).
+const NATIONALITY_OPTS: Opt[] = [{ v: "restricted", en: "Restricted", ar: "مقيّدة" }, { v: "any", en: "Any", ar: "أي" }];
 const BYWHO_OPTS: Opt[] = [{ v: "rentee", en: "Me (renter)", ar: "أنا (المستأجر)" }, { v: "supplier", en: "Supplier", ar: "المؤجّر" }];
 
 function EditRequestModal({ r, ar, L, onClose, onSaved }: { r: RequestRecord; ar: boolean; L: (en: string, arr: string) => string; onClose: () => void; onSaved: () => void }) {
@@ -237,7 +243,6 @@ function EditRequestModal({ r, ar, L, onClose, onSaved }: { r: RequestRecord; ar
   const [itemNotes, setItemNotes] = useState(s(it?.additionalNotes));
   // Preferences
   const [payTerms, setPayTerms] = useState(s(r.paymentTerms));
-  const [payMethod, setPayMethod] = useState(s(r.paymentMethod));
   const [maint, setMaint] = useState(s(r.maintenanceResponsibility));
   const [sla, setSla] = useState(s((r as Record<string, unknown>).breakdownResponseSla));
   const [budget, setBudget] = useState(s(r.budgetCeiling));
@@ -259,7 +264,6 @@ function EditRequestModal({ r, ar, L, onClose, onSaved }: { r: RequestRecord; ar
     if (overtime) patch.overtimeRate = overtime;
     patch.terrainType = terrain || undefined;
     if (payTerms) patch.paymentTerms = payTerms;
-    if (payMethod) patch.paymentMethod = payMethod;
     if (maint) patch.maintenanceResponsibility = maint;
     if (sla) patch.breakdownResponseSla = sla;
     if (budget) patch.budgetCeiling = Number(budget);
@@ -356,7 +360,6 @@ function EditRequestModal({ r, ar, L, onClose, onSaved }: { r: RequestRecord; ar
           <SecH icon="tune">{L("Preferences", "التفضيلات")}</SecH>
           <div className="grid grid-cols-2 gap-3">
             <Sel label={L("Payment terms", "شروط الدفع")} value={payTerms} onChange={setPayTerms} opts={PAYTERMS_OPTS} />
-            <Sel label={L("Payment method", "طريقة الدفع")} value={payMethod} onChange={setPayMethod} opts={PAYMETHOD_OPTS} />
             <Sel label={L("Maintenance by", "الصيانة من قبل")} value={maint} onChange={setMaint} opts={MAINT_OPTS} />
             <Sel label={L("Breakdown response", "زمن الاستجابة للأعطال")} value={sla} onChange={setSla} opts={SLA_OPTS} />
             <Num label={L("Budget ceiling (SAR)", "سقف الميزانية (ر.س)")} value={budget} onChange={setBudget} min={0} />
@@ -379,7 +382,7 @@ function EditRequestModal({ r, ar, L, onClose, onSaved }: { r: RequestRecord; ar
   );
 }
 
-function Ditem({ item, ar, L }: { item: RequestItem; ar: boolean; L: (en: string, arr: string) => string }) {
+export function Ditem({ item, ar, L }: { item: RequestItem; ar: boolean; L: (en: string, arr: string) => string }) {
   const name = [ar ? item.subtypeNameAr ?? item.subtypeName : item.subtypeName, ar ? item.capacityNameAr ?? item.capacityName : item.capacityName].filter(Boolean).join(" · ") || "—";
   const terms: [string, string][] = [];
   if (item.operatorIncluded === "YES") terms.push(["person_outline", L("With operator", "مع مشغّل")]);
@@ -394,7 +397,7 @@ function Ditem({ item, ar, L }: { item: RequestItem; ar: boolean; L: (en: string
   (item.safetyCertifications ?? []).forEach((c) => terms.push(["verified", c]));
   return (
     <div className="ditem">
-      <span className="di"><EquipImg src={item.subtypeImageUrl ?? item.categoryImageUrl ?? null} categoryId={item.categoryId} box="" img="" iconSize={21} /></span>
+      <span className="di"><EquipImg src={publicTaxonomyUrl(item.subtypeImageUrl ?? item.categoryImageUrl)} categoryId={item.categoryId} name={name} box="" img="h-8 w-8 object-contain" iconSize={21} /></span>
       <div>
         <div className="dn">{name}{item.numberOfUnits > 1 ? <span style={{ color: "var(--muted)" }}> × {item.numberOfUnits}</span> : null}</div>
         {terms.length > 0 && (

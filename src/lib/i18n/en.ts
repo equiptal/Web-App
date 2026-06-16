@@ -39,6 +39,7 @@ export const en = {
     home: "Home",
     profile: "Profile",
     requests: "Requests",
+    compare: "Compare bids",
     request: "Request",
     account: "Account",
     welcome: "Welcome",
@@ -144,6 +145,7 @@ export const en = {
     optUploadTitle: "Upload / Paste RFQ",
     optUploadDesc: "Paste text or upload a file — your AI assistant fills the form automatically.",
     recommended: "Recommended",
+    beta: "Beta",
     optManualTitle: "Fill Manually",
     optManualDesc: "Enter equipment details step by step using a guided form.",
     comingSoon: "Coming soon",
@@ -244,8 +246,11 @@ export const en = {
     subtitle: "Each line from your RFQ is matched to available equipment. Answer the quick questions, then continue. Nothing is sent until you review it.",
     fromRfq: "From your RFQ",
     matchedTo: "Matched to",
-    settingsForAll: "Settings for all items",
-    settingsForAllHint: "These apply to every item — you can still override any of them per item.",
+    settingsForAll: "Settings for all equipment",
+    settingsForAllHint: "Defaults for every item below — open any item to change it for that item only.",
+    appliesToItems: "Applies to {count} items",
+    certificatesTitle: "Required certificates",
+    itemSettings: "Operator, fuel & delivery",
     filterAll: "All items",
     filterNeedsOk: "Needs your OK",
     filterMatched: "Matched",
@@ -276,16 +281,20 @@ export const en = {
       provide: "Provide it for me?", // AC-30/31 tentative
       cancel: "Cancel", // AC-30/32 tentative
       explainer: "We couldn't find this in our catalogue.",
+      // Shown when the equipment IS in the catalogue but the requested SIZE isn't yet (a genuine new size).
+      newSizeExplainer: "We carry this equipment, but not this size yet — message us to add it, or remove the item.",
       // AC-31: prefilled WhatsApp message to Moedatech support requesting the equipment be sourced.
       whatsappMessage: 'Hi Moedatech, I\'m creating an RFQ and need equipment that isn\'t available in the app: "{item}". Please add/source it for me so it is added to my request. Thank you!',
+      // New-size variant: equipment exists, the size doesn't — ask support to add the size.
+      whatsappMessageSize: 'Hi Moedatech, I\'m creating an RFQ for "{item}" but the size I need isn\'t in the app yet. Please add this size so it can be added to my request. Thank you!',
     },
     perItem: {
       quantity: "Quantity",
       operatorNeeded: "Operator needed",
       nightShift: "Night shift",
       nationality: "Nationality",
-      nationalityArab: "Arab",
-      nationalityOther: "Other",
+      nationalityRestricted: "Restricted",
+      nationalityAny: "Any",
       applyToAll: "Apply these settings to all items",
       certificate: "Operator certificate",
       fat: "F.A.T (Food, Accommodation & Transport)",

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useT } from "@/lib/i18n";
 import { useRfq, type Step } from "@/lib/store/rfq-store";
 import { Button, Icon } from "@/components/ui";
@@ -13,6 +14,12 @@ export function Wizard() {
   const t = useT();
   const { state, actions } = useRfq();
   const { step, draft } = state;
+
+  // Land each step at the top on entry, so its header + settings panel are visible (not scrolled past).
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [step]);
+
   if (!draft) return null;
 
   const labels: Record<Step, string> = {

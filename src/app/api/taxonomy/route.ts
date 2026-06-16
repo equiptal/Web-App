@@ -5,6 +5,11 @@ import { agentsGet } from "@/lib/api/agents-backend";
 import { nodesToTree } from "@/lib/api/app-adapters";
 import type { TaxonomyNode, TaxonomyResponse } from "@/lib/contract/app";
 
+// Always fetch the live catalogue — a node/size added in the marketplace must appear in the
+// dropdowns without a redeploy. (agentsGet already sends cache:"no-store"; this pins the route
+// itself dynamic so Next never serves a statically-cached catalogue.)
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/taxonomy — the equipment catalogue.
  * Real (AGENTS_API_URL + token set): proxies GET /agents/taxonomy and shapes the flat node list

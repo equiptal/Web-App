@@ -7,6 +7,8 @@ import {
   Certificates,
   EquipmentItem,
   OperatorDetails,
+  OPERATOR_CERTIFICATES,
+  type OperatorCertificate,
   Preferences,
   ProjectDetails,
   RfqDraft,
@@ -24,8 +26,14 @@ import { ApiError, ApiErrorKind, fetchTaxonomy, processRfq, submitRequest } from
 export type Phase = "intake" | "processing" | "wizard" | "confirmation";
 export type Step = 1 | 2 | 3 | 4;
 
-/** localStorage key for the persisted RFQ draft (web-app/002 save-on-reload). */
-const DRAFT_STORAGE_KEY = "rfq-draft-v1";
+/**
+ * localStorage key for the persisted RFQ draft (web-app/002 save-on-reload).
+ * v2: operator.certificate became multi-select (array). A v1 draft holds a single
+ * string there, which crashes `.certificate.map(...)` on render — so bump the key to
+ * ignore (not rehydrate) incompatible old drafts and clear the stale v1 entry.
+ */
+const DRAFT_STORAGE_KEY = "rfq-draft-v2";
+const LEGACY_DRAFT_STORAGE_KEYS = ["rfq-draft-v1"];
 
 /**
  * web-app/002: true when a field's current value still equals what the agent originally filled in
@@ -158,6 +166,7 @@ function reducer(state: RfqState, a: Action): RfqState {
           detectedLocations: a.draft.detectedLocations,
           summary: a.draft.summary,
           justifications: a.draft.justifications ?? [],
+          fieldNotes: a.draft.fieldNotes ?? {},
         },
         // Snapshot the agent's values (refs are safe — all edits are immutable copies).
         agentOrigin: { project: a.draft.project, items: a.draft.items },
@@ -204,11 +213,12 @@ function reducer(state: RfqState, a: Action): RfqState {
       return withDraft(state, (d) => {
         const certificates = { ...d.project.certificates, ...a.patch };
         let items = d.items;
-        // AC-50: the project Safety certificate applies to every item's operator — EXCEPT items the
-        // agent already set a cert on from the RFQ (those keep theirs). Fills/updates the rest.
+        // AC-50: the project Safety certificates apply to every item's operator — EXCEPT items the
+        // agent already set certs on from the RFQ (those keep theirs). Multi-select, so fan the whole
+        // list (restricted to the operator-selectable certs — the free-text "other" stays project-level).
         if (a.patch.safety) {
-          const cert = a.patch.safety[a.patch.safety.length - 1] ?? null;
-          items = d.items.map((i) => (i.operator.certByAgent ? i : { ...i, operator: { ...i.operator, certificate: cert } }));
+          const certs = a.patch.safety.filter((c) => (OPERATOR_CERTIFICATES as string[]).includes(c)) as OperatorCertificate[];
+          items = d.items.map((i) => (i.operator.certByAgent ? i : { ...i, operator: { ...i.operator, certificate: certs } }));
         }
         return { ...d, project: { ...d.project, certificates }, items };
       });
@@ -387,6 +397,15 @@ export function RfqProvider({ children }: { children: ReactNode }) {
   // files can't be re-created by the browser, so they aren't persisted (renter re-attaches if needed).
   useEffect(() => {
     try {
+      // Drop incompatible drafts saved under older keys (different shape → would crash on render).
+      for (const k of LEGACY_DRAFT_STORAGE_KEYS) window.localStorage.removeItem(k);
+      // Fresh-start handoff (mobile/017 AC-08, `?new=1`): discard any saved draft and start at page 1.
+      if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("new") === "1") {
+        window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+        // Strip the flag so a later reload doesn't wipe an in-progress draft.
+        window.history.replaceState(null, "", window.location.pathname);
+        return;
+      }
       const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY);
       if (!raw) return;
       const saved = JSON.parse(raw) as Partial<RfqState>;

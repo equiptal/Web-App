@@ -39,6 +39,18 @@ export function setAuthCookies(res: NextResponse, tokens: Tokens, user: RenterUs
   res.cookies.set(USER_COOKIE, JSON.stringify(user), { ...baseCookie, maxAge: THIRTY_DAYS });
 }
 
+/**
+ * Set a mobile→web HANDOFF session (mobile/017 AC-08): the carried Cognito idToken is both the
+ * Bearer (`mt_id`, used by the authed backend client) and the access cookie, plus the safe identity.
+ * No refresh token — so the cookies expire WITH the token (~1h); once it lapses the gate fails and
+ * the renter is sent to normal sign-in (rather than being let in with a dead token).
+ */
+export function setHandoffSession(res: NextResponse, idToken: string, user: RenterUser, ttlSeconds = 3600): void {
+  res.cookies.set(ACCESS_COOKIE, idToken, { ...baseCookie, maxAge: ttlSeconds });
+  res.cookies.set(ID_COOKIE, idToken, { ...baseCookie, maxAge: ttlSeconds });
+  res.cookies.set(USER_COOKIE, JSON.stringify(user), { ...baseCookie, maxAge: ttlSeconds });
+}
+
 /** Refresh just the access (and optionally id) cookie after `/auth/refresh` (AC-17). */
 export function setAccessCookie(res: NextResponse, accessToken: string, expiresIn?: number, idToken?: string): void {
   res.cookies.set(ACCESS_COOKIE, accessToken, { ...baseCookie, maxAge: expiresIn ?? 3600 });

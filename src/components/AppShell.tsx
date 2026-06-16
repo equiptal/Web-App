@@ -42,6 +42,7 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
   const navItems = [
     { key: "home", icon: "home", label: t.shell.home, href: "/" },
     { key: "requests", icon: "grid_view", label: t.shell.requests, href: "/requests" },
+    { key: "compare", icon: "compare_arrows", label: t.shell.compare, href: "/compare" },
     { key: "profile", icon: "person", label: t.shell.profile, href: "/profile" },
   ];
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));

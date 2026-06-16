@@ -62,7 +62,7 @@ describe("agentOutputToDraft — request-wide reconciliation (AC-25/26)", () => 
       ),
     );
     expect(d.project.certificates.safety).toEqual(["tuv"]); // checked at project level
-    expect(d.items.every((i) => i.operator.certificate === "tuv")).toBe(true);
+    expect(d.items.every((i) => JSON.stringify(i.operator.certificate) === JSON.stringify(["tuv"]))).toBe(true);
   });
 
   it("lifts the common cert even when a no-operator item has none (AC-50)", () => {
