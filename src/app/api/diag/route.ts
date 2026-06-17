@@ -50,6 +50,10 @@ export async function GET(req: Request) {
       agentsApiUrlHost: host(serverEnv.agentsApiUrl),
       agentsApiTokenSet: Boolean(serverEnv.agentsApiToken),
       agentsApiTokenLen: serverEnv.agentsApiToken ? serverEnv.agentsApiToken.length : 0,
+      // Non-secret fingerprint (first 6 + last 6) to tell staging (…597da1) from prod (…460d9ff).
+      agentsApiTokenFp: serverEnv.agentsApiToken
+        ? `${serverEnv.agentsApiToken.slice(0, 6)}…${serverEnv.agentsApiToken.slice(-6)}`
+        : null,
       appApiUrlHost: host(serverEnv.appApiUrl),
       mansourUrlHost: host(serverEnv.mansourUrl),
       tenantId: serverEnv.tenantId,
