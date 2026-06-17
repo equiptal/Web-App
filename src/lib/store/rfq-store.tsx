@@ -22,6 +22,7 @@ import {
   postableItems,
 } from "@/lib/contract";
 import { ApiError, ApiErrorKind, fetchTaxonomy, processRfq, submitRequest } from "@/lib/api/client";
+import { useSession } from "@/lib/session";
 
 export type Phase = "intake" | "processing" | "wizard" | "confirmation";
 export type Step = 1 | 2 | 3 | 4;
@@ -32,7 +33,7 @@ export type Step = 1 | 2 | 3 | 4;
  * string there, which crashes `.certificate.map(...)` on render — so bump the key to
  * ignore (not rehydrate) incompatible old drafts and clear the stale v1 entry.
  */
-const DRAFT_STORAGE_KEY = "rfq-draft-v2";
+export const DRAFT_STORAGE_KEY = "rfq-draft-v2";
 const LEGACY_DRAFT_STORAGE_KEYS = ["rfq-draft-v1"];
 
 /**
@@ -390,12 +391,19 @@ export function RfqProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const stateRef = useRef(state);
   stateRef.current = state;
+  // The signed-in renter — used to scope the persisted draft to its owner (the draft lives in
+  // device-local storage, which would otherwise leak one account's request into another's session).
+  const { status, user } = useSession();
+  const hydratedRef = useRef(false);
 
   const actions = useMemo(() => makeActions(dispatch, () => stateRef.current), []);
 
   // Restore a saved draft on reload (web-app/002): data + the step the renter was on. Uploaded
   // files can't be re-created by the browser, so they aren't persisted (renter re-attaches if needed).
+  // Waits for the session to resolve so we know who owns the draft, and runs only once.
   useEffect(() => {
+    if (status === "loading" || hydratedRef.current) return;
+    hydratedRef.current = true;
     try {
       // Drop incompatible drafts saved under older keys (different shape → would crash on render).
       for (const k of LEGACY_DRAFT_STORAGE_KEYS) window.localStorage.removeItem(k);
@@ -408,26 +416,45 @@ export function RfqProvider({ children }: { children: ReactNode }) {
       }
       const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY);
       if (!raw) return;
-      const saved = JSON.parse(raw) as Partial<RfqState>;
-      if (saved && saved.draft) dispatch({ t: "HYDRATE", saved });
+      const saved = JSON.parse(raw) as Partial<RfqState> & { userId?: number | null };
+      // Only rehydrate a draft whose stamped owner is EXACTLY the current renter (a signed-out guest
+      // owns `null` and matches `null`). Any mismatch — another account's id, or a legacy/un-owned
+      // draft (`userId` absent) saved before this scoping existed — is discarded so a request never
+      // leaks across accounts on a shared device. A guest who signs in keeps their draft because the
+      // persist effect re-stamps it with the new id the moment the session changes (no reload needed).
+      const savedUserId = saved?.userId ?? null;
+      const currentUserId = user?.id ?? null;
+      if (savedUserId !== currentUserId) {
+        window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+        return;
+      }
+      if (saved && saved.draft) {
+        const { userId: _ownerId, ...rest } = saved;
+        void _ownerId;
+        dispatch({ t: "HYDRATE", saved: rest });
+      }
     } catch {
       /* corrupt/blocked storage → start fresh */
     }
-  }, []);
+  }, [status, user]);
 
   // Persist the editable draft + position whenever they change (skip processing/confirmation phases).
+  // Stamp the owning user id so a later session can tell whose draft this is.
   const { phase, step, draft, text, multiLocationDismissed, seq, agentOrigin } = state;
   useEffect(() => {
     try {
       if (draft && (phase === "intake" || phase === "wizard")) {
-        window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({ phase, step, draft, text, multiLocationDismissed, seq, agentOrigin }));
+        window.localStorage.setItem(
+          DRAFT_STORAGE_KEY,
+          JSON.stringify({ phase, step, draft, text, multiLocationDismissed, seq, agentOrigin, userId: user?.id ?? null }),
+        );
       } else if (phase === "confirmation") {
         window.localStorage.removeItem(DRAFT_STORAGE_KEY); // request sent → clear the saved draft
       }
     } catch {
       /* ignore quota/availability errors */
     }
-  }, [phase, step, draft, text, multiLocationDismissed, seq, agentOrigin]);
+  }, [phase, step, draft, text, multiLocationDismissed, seq, agentOrigin, user]);
 
   // Load the taxonomy once.
   useEffect(() => {
