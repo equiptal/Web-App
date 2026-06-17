@@ -46,7 +46,7 @@ export function Step3Preferences() {
           {/* AC-37: SLA shown only when responsibility is Supplier. */}
           {p.maintenance.responsibility === "supplier" && (
             <Field label={t.step3.maintenance.sla} optional>
-              <Seg2<MaintenanceSla> value={p.maintenance.sla} onChange={(v) => actions.patchPreferences({ maintenance: { sla: v } })} options={opt(MAINTENANCE_SLAS, t.options.maintenanceSla)} />
+              <Seg2<MaintenanceSla> value={p.maintenance.sla} onChange={(v) => actions.patchPreferences({ maintenance: { sla: v } })} onClear={() => actions.patchPreferences({ maintenance: { sla: null } })} options={opt(MAINTENANCE_SLAS, t.options.maintenanceSla)} />
             </Field>
           )}
         </div>
@@ -82,7 +82,7 @@ export function Step3Preferences() {
 
         <div className="mt-4">
           <Field label={t.step3.supplierFilters.bidWindow} optional>
-            <Seg2<BidWindow> value={sf.bidWindow} onChange={(v) => actions.patchPreferences({ supplierFilters: { bidWindow: v } })} options={opt(BID_WINDOWS, t.options.bidWindow)} />
+            <Seg2<BidWindow> value={sf.bidWindow} onChange={(v) => actions.patchPreferences({ supplierFilters: { bidWindow: v } })} onClear={() => actions.patchPreferences({ supplierFilters: { bidWindow: null } })} options={opt(BID_WINDOWS, t.options.bidWindow)} />
           </Field>
         </div>
       </Card>

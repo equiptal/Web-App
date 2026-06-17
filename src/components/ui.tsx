@@ -262,10 +262,13 @@ export function RadioGroup<T extends string>({
 export function Pchips<T extends string>({
   value,
   onChange,
+  onClear,
   options,
 }: {
   value: T | null;
   onChange: (v: T) => void;
+  /** When provided, clicking the already-selected pill clears the value (tap-again to unselect). */
+  onClear?: () => void;
   options: { value: T; label: string }[];
 }) {
   return (
@@ -276,7 +279,7 @@ export function Pchips<T extends string>({
           <button
             key={o.value}
             type="button"
-            onClick={() => onChange(o.value)}
+            onClick={() => (on && onClear ? onClear() : onChange(o.value))}
             className={`rounded-full border px-3.5 py-1.5 text-[12.5px] font-bold transition ${
               on ? "border-brand bg-brand-soft text-brand" : "border-border bg-surface text-navy-mid hover:border-navy-mid"
             }`}
@@ -295,10 +298,13 @@ export function Pchips<T extends string>({
 export function Seg2<T extends string>({
   value,
   onChange,
+  onClear,
   options,
 }: {
   value: T | null;
   onChange: (v: T) => void;
+  /** When provided, clicking the already-selected segment clears the value (tap-again to unselect). */
+  onClear?: () => void;
   options: { value: T; label: string }[];
 }) {
   return (
@@ -309,7 +315,7 @@ export function Seg2<T extends string>({
           <button
             key={o.value}
             type="button"
-            onClick={() => onChange(o.value)}
+            onClick={() => (on && onClear ? onClear() : onChange(o.value))}
             className={`rounded-[7px] px-4 py-2 text-[13px] font-semibold transition ${on ? "bg-surface text-navy shadow-sm" : "text-muted"}`}
           >
             {o.label}

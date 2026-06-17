@@ -111,7 +111,9 @@ export function Step1Project() {
           </>
         )}
 
-        {/* AC-48: one location per request. */}
+        {/* AC-48: one request = one location. Only surfaced when the agent actually found 2+ sites,
+            so a single-location request isn't nagged with a "separate request" prompt it doesn't need. */}
+        {multi.length > 1 && (
         <div className="mt-3 flex items-start gap-3 rounded-[10px] border border-info/25 bg-info-soft px-3.5 py-3">
           <Icon name="pin_drop" size={22} className="flex-none text-info" />
           <div className="text-[#0e4f7e]">
@@ -133,6 +135,7 @@ export function Step1Project() {
             </button>
           </div>
         </div>
+        )}
       </Card>
 
       {/* ---------- Timing & Hours (AC-13/14) ---------- */}
@@ -145,7 +148,7 @@ export function Step1Project() {
           note={state.draft?.fieldNotes?.["rfq_header.rental_type"]}
         >
           <div className="flex flex-wrap items-center gap-3">
-            <Seg2<RentalBasis> value={project.timing.rentalBasis} onChange={(v) => actions.patchTiming({ rentalBasis: v })} options={opt(RENTAL_BASES, t.options.rentalBasis)} />
+            <Seg2<RentalBasis> value={project.timing.rentalBasis} onChange={(v) => actions.patchTiming({ rentalBasis: v })} onClear={() => actions.patchTiming({ rentalBasis: null })} options={opt(RENTAL_BASES, t.options.rentalBasis)} />
             <SelChips
               values={project.timing.extendable ? ["extendable"] : []}
               onToggle={() => actions.patchTiming({ extendable: !project.timing.extendable })}

@@ -45,8 +45,10 @@ export const PAYMENT_METHODS: PaymentMethod[] = ["bank-transfer", "cash"];
 export type MaintenanceResponsibility = "supplier" | "renter"; // AC-37 default supplier
 export const MAINTENANCE_RESPONSIBILITIES: MaintenanceResponsibility[] = ["supplier", "renter"];
 
-export type MaintenanceSla = "4h" | "8h" | "24h" | "48h" | "72h"; // AC-37 (only when supplier) — matches app
-export const MAINTENANCE_SLAS: MaintenanceSla[] = ["4h", "8h", "24h", "48h", "72h"];
+export type MaintenanceSla = "4h" | "8h" | "24h" | "48h" | "72h"; // AC-37 (only when supplier) — full app enum
+// Web offers only 24h/48h/72h as selectable buttons (4h/8h dropped per product). The type keeps the
+// full set so an agent-inferred 4h/8h value still type-checks and maps to the backend.
+export const MAINTENANCE_SLAS: MaintenanceSla[] = ["24h", "48h", "72h"];
 
 export type BidWindow = "24h" | "48h" | "72h" | "1-week"; // AC-40
 export const BID_WINDOWS: BidWindow[] = ["24h", "48h", "72h", "1-week"];

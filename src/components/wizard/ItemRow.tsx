@@ -277,7 +277,7 @@ export function ItemRow({
                   <Toggle checked={item.operator.nightShift} onChange={(v) => actions.patchItemOperator(item.id, { nightShift: v })} />
                 </div>
                 <ChipField label={t.step2.perItem.nationality} agent={agentMatches(item.operator.nationality, ai?.operator.nationality)}>
-                  <Pchips value={item.operator.nationality} onChange={(v) => actions.patchItemOperator(item.id, { nationality: v })} options={nationalityOpts} />
+                  <Pchips value={item.operator.nationality} onChange={(v) => actions.patchItemOperator(item.id, { nationality: v })} onClear={() => actions.patchItemOperator(item.id, { nationality: null })} options={nationalityOpts} />
                 </ChipField>
                 <ChipField label={t.step2.perItem.certificate} agent={agentMatches(item.operator.certificate, ai?.operator.certificate)}>
                   <SelChips<OperatorCertificate>
@@ -287,7 +287,7 @@ export function ItemRow({
                   />
                 </ChipField>
                 <ChipField label={t.step2.perItem.fat} agent={agentMatches(item.operator.fat, ai?.operator.fat)} note={fn("operator_accommodation_by_rentee")}>
-                  <Pchips<Party> value={item.operator.fat} onChange={(v) => actions.patchItemOperator(item.id, { fat: v })} options={opt(PARTIES, t.options.party)} />
+                  <Pchips<Party> value={item.operator.fat} onChange={(v) => actions.patchItemOperator(item.id, { fat: v })} onClear={() => actions.patchItemOperator(item.id, { fat: null })} options={opt(PARTIES, t.options.party)} />
                 </ChipField>
               </div>
             )}
