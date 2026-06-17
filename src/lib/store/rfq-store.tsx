@@ -58,6 +58,8 @@ export interface RfqState {
   // status
   busy: boolean;
   error: ApiErrorKind | null;
+  /** The real backend reason behind a submit failure, surfaced in the UI for diagnosis. */
+  errorDetail: { detail?: string; backendCode?: string; backendStatus?: number; status?: number } | null;
   requestId: string | null;
   /** Every short code from the fan-out (one per equipment item); requestId is the first. */
   requestIds: string[];
@@ -78,6 +80,7 @@ const initialState: RfqState = {
   simulateError: false,
   busy: false,
   error: null,
+  errorDetail: null,
   requestId: null,
   requestIds: [],
   multiLocationDismissed: false,
@@ -117,7 +120,7 @@ type Action =
   | { t: "PATCH_PREFERENCES"; patch: DeepPrefPatch }
   | { t: "SUBMIT_START" }
   | { t: "SUBMIT_SUCCESS"; requestId: string; requestIds: string[] }
-  | { t: "SUBMIT_ERROR"; kind: ApiErrorKind }
+  | { t: "SUBMIT_ERROR"; kind: ApiErrorKind; detail?: RfqState["errorDetail"] }
   | { t: "HYDRATE"; saved: Partial<RfqState> }
   | { t: "RESET" };
 
@@ -300,11 +303,11 @@ function reducer(state: RfqState, a: Action): RfqState {
         };
       });
     case "SUBMIT_START":
-      return { ...state, busy: true, error: null };
+      return { ...state, busy: true, error: null, errorDetail: null };
     case "SUBMIT_SUCCESS":
       return { ...state, busy: false, phase: "confirmation", requestId: a.requestId, requestIds: a.requestIds };
     case "SUBMIT_ERROR":
-      return { ...state, busy: false, error: a.kind };
+      return { ...state, busy: false, error: a.kind, errorDetail: a.detail ?? null };
     case "RESET":
       return { ...initialState, taxonomy: state.taxonomy };
     case "HYDRATE":
@@ -380,7 +383,11 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
         });
         dispatch({ t: "SUBMIT_SUCCESS", requestId, requestIds: requestIds ?? (requestId ? [requestId] : []) });
       } catch (e) {
-        dispatch({ t: "SUBMIT_ERROR", kind: e instanceof ApiError ? e.kind : "unknown" });
+        const detail =
+          e instanceof ApiError
+            ? { detail: e.detail, backendCode: e.backendCode, backendStatus: e.backendStatus, status: e.status }
+            : null;
+        dispatch({ t: "SUBMIT_ERROR", kind: e instanceof ApiError ? e.kind : "unknown", detail });
       }
     },
     reset: () => dispatch({ t: "RESET" }),

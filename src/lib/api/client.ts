@@ -13,7 +13,13 @@ export class ApiError extends Error {
   messageAr?: string;
   backendCode?: string;
   status?: number;
-  constructor(kind: ApiErrorKind, message?: string, extra?: { detail?: string; messageAr?: string; backendCode?: string; status?: number }) {
+  /** The real upstream backend HTTP status (e.g. agents-backend), distinct from our relay's status. */
+  backendStatus?: number;
+  constructor(
+    kind: ApiErrorKind,
+    message?: string,
+    extra?: { detail?: string; messageAr?: string; backendCode?: string; status?: number; backendStatus?: number },
+  ) {
     super(message ?? kind);
     this.kind = kind;
     this.name = "ApiError";
@@ -21,6 +27,7 @@ export class ApiError extends Error {
     this.messageAr = extra?.messageAr;
     this.backendCode = extra?.backendCode;
     this.status = extra?.status;
+    this.backendStatus = extra?.backendStatus;
   }
 }
 
@@ -44,11 +51,11 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   }
   if (!res.ok) {
     let code: ApiErrorKind = "unknown";
-    let extra: { detail?: string; messageAr?: string; backendCode?: string; status?: number } = { status: res.status };
+    let extra: { detail?: string; messageAr?: string; backendCode?: string; status?: number; backendStatus?: number } = { status: res.status };
     try {
-      const data = (await res.json()) as { code?: ApiErrorKind; detail?: string; messageAr?: string; backendCode?: string };
+      const data = (await res.json()) as { code?: ApiErrorKind; detail?: string; messageAr?: string; backendCode?: string; backendStatus?: number };
       if (data.code === "empty" || data.code === "network") code = data.code;
-      extra = { ...extra, detail: data.detail, messageAr: data.messageAr, backendCode: data.backendCode };
+      extra = { ...extra, detail: data.detail, messageAr: data.messageAr, backendCode: data.backendCode, backendStatus: data.backendStatus };
     } catch {
       /* ignore */
     }

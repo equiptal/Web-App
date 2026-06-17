@@ -14,7 +14,7 @@ export function Step4Preview() {
   const { state, actions } = useRfq();
   const { tier } = useSession();
   const [showAccount, setShowAccount] = useState(false);
-  const { draft, taxonomy, busy, error } = state;
+  const { draft, taxonomy, busy, error, errorDetail } = state;
   if (!draft) return null;
 
   // Guests run the whole flow; the account gate lands here. Guest → account popup, then auto-post.
@@ -146,7 +146,18 @@ export function Step4Preview() {
         />
       </RC>
 
-      {error && <p className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{t.errors.networkBody}</p>}
+      {error && (
+        <div className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">
+          <p>{t.errors.networkBody}</p>
+          {(errorDetail?.detail || errorDetail?.backendCode || errorDetail?.backendStatus) && (
+            <p className="mt-1 break-words font-mono text-xs opacity-80">
+              {errorDetail.detail}
+              {errorDetail.backendCode ? ` · ${errorDetail.backendCode}` : ""}
+              {errorDetail.backendStatus ? ` · backend ${errorDetail.backendStatus}` : ""}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* AC-42/43: send one broadcast covering all items. */}
       <div className="flex justify-end">
