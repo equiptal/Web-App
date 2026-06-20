@@ -1,7 +1,7 @@
 import type { AgentDraft, RfqRequestPayload, Taxonomy } from "@/lib/contract";
 import type { RequestListItem, RequestRecord } from "@/lib/contract/requests";
 import type { BidCard } from "@/lib/contract/bids";
-import type { DealRoomView, DealRoomDocuments } from "@/lib/contract/deal-room";
+import type { DealRoomView, DealRoomDocuments, QuotationView } from "@/lib/contract/deal-room";
 
 /** Error kinds the UI distinguishes: empty/unreadable input (AC-09) vs connectivity (AC-10). */
 export type ApiErrorKind = "empty" | "network" | "unknown";
@@ -195,6 +195,11 @@ export function fetchDealRoom(id: string): Promise<DealRoomView> {
 /** The supplier's (other party's) documents the renter can view in a deal room. */
 export function fetchDealRoomDocuments(id: string): Promise<DealRoomDocuments> {
   return getJson<DealRoomDocuments>(`/api/me/deal-rooms/${encodeURIComponent(id)}/documents`);
+}
+
+/** The official quotation PDF for a closed deal (app parity — backend-generated from the template). */
+export function fetchQuotation(id: string): Promise<QuotationView> {
+  return getJson<QuotationView>(`/api/me/deal-rooms/${encodeURIComponent(id)}/quotation`);
 }
 
 /** GetStream token + channel for a deal room's live chat. */

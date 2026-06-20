@@ -68,6 +68,9 @@ export interface RfqState {
   /** web-app/002: the project + items exactly as the agent first returned them — used to mark
    *  agent-filled values (orange) and clear the mark once the renter edits past them. */
   agentOrigin: { project: ProjectDetails; items: EquipmentItem[] } | null;
+  /** True right after a saved draft was rehydrated on entering /create → show the continue/start-over
+   *  prompt so the renter chooses to resume or reset (instead of silently dropping into the draft). */
+  draftPrompt: boolean;
 }
 
 const initialState: RfqState = {
@@ -86,6 +89,7 @@ const initialState: RfqState = {
   multiLocationDismissed: false,
   seq: 100,
   agentOrigin: null,
+  draftPrompt: false,
 };
 
 type Action =
@@ -98,7 +102,9 @@ type Action =
   | { t: "PROCESS_SUCCESS"; draft: AgentDraft }
   | { t: "PROCESS_ERROR"; kind: ApiErrorKind }
   | { t: "ENTER_WIZARD" }
+  | { t: "RESUME_WIZARD" }
   | { t: "GO_INTAKE" }
+  | { t: "DISMISS_DRAFT_PROMPT" }
   | { t: "GO_STEP"; step: Step }
   | { t: "PATCH_LOCATION"; patch: Partial<ProjectDetails["location"]> }
   | { t: "CONFIRM_LOCATION" }
@@ -180,9 +186,15 @@ function reducer(state: RfqState, a: Action): RfqState {
       return { ...state, busy: false, error: a.kind };
     case "ENTER_WIZARD":
       return { ...state, phase: "wizard", step: 1 };
+    case "RESUME_WIZARD":
+      // Return to the wizard at the SAME step (e.g. from the "Your request" input step) — no re-parse.
+      return { ...state, phase: "wizard", error: null };
     case "GO_INTAKE":
-      // Return to intake preserving text/files (AC-10: input preserved).
+      // Return to intake preserving text/files (AC-10: input preserved). Keeps `step` so the renter
+      // can jump back to the wizard where they were ("Your request" step → back to review).
       return { ...state, phase: "intake", error: null };
+    case "DISMISS_DRAFT_PROMPT":
+      return { ...state, draftPrompt: false };
     case "GO_STEP":
       return { ...state, step: a.step };
     case "PATCH_LOCATION":
@@ -311,8 +323,9 @@ function reducer(state: RfqState, a: Action): RfqState {
     case "RESET":
       return { ...initialState, taxonomy: state.taxonomy };
     case "HYDRATE":
-      // Restore a saved draft on reload (web-app/002) — keep the freshly-fetched taxonomy.
-      return { ...state, ...a.saved, taxonomy: state.taxonomy };
+      // Restore a saved draft on reload (web-app/002) — keep the freshly-fetched taxonomy, and raise
+      // the continue/start-over prompt so the renter decides to resume or reset.
+      return { ...state, ...a.saved, taxonomy: state.taxonomy, draftPrompt: true };
     default:
       return state;
   }
@@ -345,7 +358,9 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
       }
     },
     enterWizard: () => dispatch({ t: "ENTER_WIZARD" }),
+    resumeWizard: () => dispatch({ t: "RESUME_WIZARD" }),
     goIntake: () => dispatch({ t: "GO_INTAKE" }),
+    dismissDraftPrompt: () => dispatch({ t: "DISMISS_DRAFT_PROMPT" }),
     goStep: (step: Step) => dispatch({ t: "GO_STEP", step }),
 
     patchLocation: (patch: Partial<ProjectDetails["location"]>) => dispatch({ t: "PATCH_LOCATION", patch }),
@@ -390,7 +405,15 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
         dispatch({ t: "SUBMIT_ERROR", kind: e instanceof ApiError ? e.kind : "unknown", detail });
       }
     },
-    reset: () => dispatch({ t: "RESET" }),
+    reset: () => {
+      // Start over: drop the saved draft so it can't rehydrate, then reset state to a fresh intake.
+      try {
+        window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+      } catch {
+        /* ignore */
+      }
+      dispatch({ t: "RESET" });
+    },
   };
 }
 
@@ -462,6 +485,54 @@ export function RfqProvider({ children }: { children: ReactNode }) {
       /* ignore quota/availability errors */
     }
   }, [phase, step, draft, text, multiLocationDismissed, seq, agentOrigin, user]);
+
+  // ---- Browser history ⇄ wizard position. The browser Back/Forward buttons step through the wizard
+  // like the in-app Back/Next: each forward step pushes a history entry; Back/Forward fire popstate,
+  // which moves the store to that step. Backward in-app nav (Back button / step chips / "Your request")
+  // routes through window.history too (see Wizard), so both stay in sync. ----
+  const poppingRef = useRef(false);
+  const lastOrdRef = useRef(0);
+  useEffect(() => {
+    // Baseline entry for the create flow, so the first Back returns here rather than straight off-page.
+    try {
+      window.history.replaceState({ ...(window.history.state ?? {}), rfqOrd: 0 }, "");
+    } catch {
+      /* history unavailable */
+    }
+    const onPop = (e: PopStateEvent) => {
+      const target = e.state && typeof (e.state as { rfqOrd?: unknown }).rfqOrd === "number" ? ((e.state as { rfqOrd: number }).rfqOrd) : 0;
+      poppingRef.current = true;
+      const s = stateRef.current;
+      if (target >= 1 && s.draft) {
+        dispatch({ t: "RESUME_WIZARD" });
+        dispatch({ t: "GO_STEP", step: Math.min(Math.max(target, 1), 4) as Step });
+      } else {
+        dispatch({ t: "GO_INTAKE" }); // baseline / no draft → the input screen ("Your request")
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  // Push a history entry whenever the renter moves FORWARD (intake→step, step→next) so each is a
+  // Back-stop. Backward moves arrive via popstate (poppingRef) and must not re-push.
+  useEffect(() => {
+    const ord = phase === "wizard" ? step : phase === "intake" ? 0 : -1;
+    if (ord < 0) return; // processing / confirmation aren't part of the back/forward chain
+    if (poppingRef.current) {
+      poppingRef.current = false;
+      lastOrdRef.current = ord;
+      return;
+    }
+    if (ord > lastOrdRef.current) {
+      try {
+        window.history.pushState({ rfqOrd: ord }, "");
+      } catch {
+        /* ignore */
+      }
+    }
+    lastOrdRef.current = ord;
+  }, [phase, step]);
 
   // Load the taxonomy once.
   useEffect(() => {

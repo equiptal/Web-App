@@ -34,20 +34,31 @@ export interface CreateRequestItem {
   demobilizationByRentee: boolean;
   /** AC-53 per-item free-text qualifier. Requires the `additional_notes` item column (rule 6 migration). */
   additionalNotes?: string;
+  /** Part 1: optional free-text work type (crane subtypes only). Backend `work_type` VARCHAR(255). */
+  workType?: string;
   // Project-level fields fanned out onto every item (ALIGNMENT rule 4):
   /** AC-28: a minimum MANUFACTURE YEAR (a misnomer — NOT an age). e.g. 2024. Omitted for "any". */
   maxEquipmentAge?: number;
   /** AC-26: supplier provides fuel. supplier⇒true, me⇒false. Omitted unless fuel is diesel/petrol. */
   dieselIncluded?: boolean;
-  /** AC-24: from the operator "transfer" sub-field; only when an operator is included. */
+  /** AC-24 (legacy): single F.A.T flag — supplier covers ⇒ true. Kept for back-compat; superseded by
+   *  fatFood + fatAccommodationTransport. Only when an operator is included. */
   fatRequired?: boolean;
+  /** Part 2: F.A.T split — supplier covers Food ⇒ true / rentee ⇒ false. Operator-only. Negotiable. */
+  fatFood?: boolean;
+  /** Part 2: F.A.T split — supplier covers Accommodation & Transport ⇒ true / rentee ⇒ false. */
+  fatAccommodationTransport?: boolean;
   // §4.2 per-item fields (operator sub-fields + fanned project safety certs):
   /** AC-24: per-item night-shift flag (operator sub-field). */
   nightShiftRequired?: boolean;
   /** AC-24: per-item operator nationality (≤100). */
   operatorNationality?: string;
-  /** AC-50: project Safety certificates fanned onto each item. */
+  /** Part 3: free-text nationalities when operatorNationality === "restricted". Backend ≤100. */
+  operatorNationalityCustom?: string;
+  /** AC-50: project Safety certificates fanned onto each item (equipment certs; gating). */
   safetyCertifications?: string[];
+  /** Operator certification — the app's NON-gating license level(s), comma-joined (CERTIFIED/TUV/SPSP). */
+  operatorLicenseLevel?: string;
 }
 
 export interface CreateRequestPayload {

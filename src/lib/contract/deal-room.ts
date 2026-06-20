@@ -86,6 +86,27 @@ function mapDoc(raw: Record<string, unknown>): DealRoomDocument {
   };
 }
 
+/**
+ * The official quotation for a closed deal (app parity — `GET /api/deal-rooms/{id}/quotation`). The
+ * backend generates the PDF from an admin-configured template and stores it in S3; `pdfUrl` is a
+ * fresh presigned download link. `pdfStatus` is `PENDING` while the PDF is still being generated
+ * (the app polls until it's ready), then ready.
+ */
+export interface QuotationView {
+  pdfUrl: string | null;
+  pdfStatus: string | null;
+  quotationNumber: string | null;
+}
+
+export function mapQuotation(raw: unknown): QuotationView {
+  const q = (raw ?? {}) as Record<string, unknown>;
+  return {
+    pdfUrl: s(q.pdfUrl),
+    pdfStatus: s(q.pdfStatus),
+    quotationNumber: s(q.quotationNumber) ?? s(q.number),
+  };
+}
+
 export function mapDealRoomDocuments(raw: unknown): DealRoomDocuments {
   const r = (raw ?? {}) as Record<string, unknown>;
   const company = Array.isArray(r.companyDocuments) ? (r.companyDocuments as Record<string, unknown>[]) : [];

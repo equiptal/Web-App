@@ -75,14 +75,62 @@ describe("draftToCreateRequest — ALIGNMENT rules", () => {
     expect(di("supplier", "electric")).toBeUndefined();
   });
 
-  it("rule 4: fatRequired = F.A.T side (supplier⇒true / me⇒false), only when operator included; omitted when unset", () => {
-    const fat = (op: "yes" | "no", who: "me" | "supplier" | null) =>
-      draftToCreateRequest(makeDraft({ items: [makeItem({ operatorNeeded: op, operator: { ...defaultOperatorDetails(), fat: who } })] }), "46")
-        .equipmentItems[0].fatRequired;
-    expect(fat("yes", "supplier")).toBe(true);
-    expect(fat("yes", "me")).toBe(false);
-    expect(fat("yes", null)).toBeUndefined(); // side unset → no assumption
-    expect(fat("no", "supplier")).toBeUndefined(); // no operator → omit
+  it("F.A.T split: fatFood / fatAccommodationTransport encode the side (supplier⇒true / me⇒false), operator-only", () => {
+    const item = (op: "yes" | "no", food: "me" | "supplier" | null, transport: "me" | "supplier" | null) =>
+      draftToCreateRequest(
+        makeDraft({ items: [makeItem({ operatorNeeded: op, operator: { ...defaultOperatorDetails(), fatFood: food, fatAccommodationTransport: transport } })] }),
+        "46",
+      ).equipmentItems[0];
+    expect(item("yes", "supplier", "me").fatFood).toBe(true);
+    expect(item("yes", "supplier", "me").fatAccommodationTransport).toBe(false);
+    expect(item("yes", null, null).fatFood).toBeUndefined(); // side unset → no assumption
+    expect(item("no", "supplier", "supplier").fatFood).toBeUndefined(); // no operator → omit
+    // legacy back-compat flag: supplier covers any part ⇒ true
+    expect(item("yes", "supplier", "me").fatRequired).toBe(true);
+    expect(item("yes", "me", "me").fatRequired).toBe(false);
+    expect(item("no", "supplier", "supplier").fatRequired).toBeUndefined();
+  });
+
+  it("Part 1/3: work type (crane free-text) and restricted-nationality custom text pass through", () => {
+    const it1 = draftToCreateRequest(makeDraft({ items: [makeItem({ workType: "  tower assembly  " })] }), "46").equipmentItems[0];
+    expect(it1.workType).toBe("tower assembly"); // trimmed
+    const restricted = draftToCreateRequest(
+      makeDraft({ items: [makeItem({ operatorNeeded: "yes", operator: { ...defaultOperatorDetails(), nationality: "restricted", nationalityCustom: "Saudi, Egyptian" } })] }),
+      "46",
+    ).equipmentItems[0];
+    expect(restricted.operatorNationality).toBe("restricted");
+    expect(restricted.operatorNationalityCustom).toBe("Saudi, Egyptian");
+    // custom omitted unless nationality is "restricted"
+    const any = draftToCreateRequest(
+      makeDraft({ items: [makeItem({ operatorNeeded: "yes", operator: { ...defaultOperatorDetails(), nationality: "any", nationalityCustom: "ignored" } })] }),
+      "46",
+    ).equipmentItems[0];
+    expect(any.operatorNationalityCustom).toBeUndefined();
+  });
+
+  it("operator certs → non-gating operatorLicenseLevel (TUV/SPSP); saso-technical operator pick → safetyCertifications", () => {
+    // tuv/spsp operator certs → comma-joined operatorLicenseLevel, and NOT folded into safetyCertifications
+    const a = draftToCreateRequest(
+      makeDraft({ items: [makeItem({ operatorNeeded: "yes", operator: { ...defaultOperatorDetails(), certificate: ["tuv", "spsp"] } })] }),
+      "46",
+    ).equipmentItems[0];
+    expect(a.operatorLicenseLevel).toBe("TUV,SPSP");
+    expect(a.safetyCertifications).toBeUndefined(); // no project safety certs; operator certs not gating
+
+    // operator-picked saso-technical has no license-level equivalent → routed to safety (canonical token)
+    const b = draftToCreateRequest(
+      makeDraft({ items: [makeItem({ operatorNeeded: "yes", operator: { ...defaultOperatorDetails(), certificate: ["saso-technical"] } })] }),
+      "46",
+    ).equipmentItems[0];
+    expect(b.operatorLicenseLevel).toBeUndefined();
+    expect(b.safetyCertifications).toEqual(["saso_technical_inspection"]);
+
+    // no operator → no license level
+    const c = draftToCreateRequest(
+      makeDraft({ items: [makeItem({ operatorNeeded: "no", operator: { ...defaultOperatorDetails(), certificate: ["tuv"] } })] }),
+      "46",
+    ).equipmentItems[0];
+    expect(c.operatorLicenseLevel).toBeUndefined();
   });
 
   it("rule 6: sends extendable + per-item additionalNotes", () => {
@@ -110,15 +158,24 @@ describe("draftToCreateRequest — §4.2 fields", () => {
     expect(p.overtimeRate).toBe("0"); // default "without"
   });
 
-  it("maps safety cert 'other' to its free-text name; drops blank", () => {
+  it("routes free-text 'other' cert to notes (never the gating cert list); maps fixed certs to canonical tokens", () => {
     const project = defaultProjectDetails();
     project.certificates.safety = ["tuv", "other"];
     project.certificates.safetyOther = "ISO 9001";
-    expect(draftToCreateRequest(makeDraft({ project }), "46").equipmentItems[0].safetyCertifications).toEqual(["tuv", "ISO 9001"]);
-    // a blank "other" name is dropped (optional)
+    const p = draftToCreateRequest(makeDraft({ project }), "46");
+    // free text can never match an equipment doc type → carried as a note, not a (matchable) cert
+    expect(p.equipmentItems[0].safetyCertifications).toEqual(["tuv"]);
+    expect(p.additionalNotes).toContain("ISO 9001");
+    // a blank "other" name adds neither a cert nor a note
     const p2 = defaultProjectDetails();
     p2.certificates.safety = ["other"];
     expect(draftToCreateRequest(makeDraft({ project: p2 }), "46").equipmentItems[0].safetyCertifications).toBeUndefined();
+  });
+
+  it("maps saso-technical to the canonical underscore token suppliers upload against", () => {
+    const project = defaultProjectDetails();
+    project.certificates.safety = ["saso-technical"];
+    expect(draftToCreateRequest(makeDraft({ project }), "46").equipmentItems[0].safetyCertifications).toEqual(["saso_technical_inspection"]);
   });
 
   it("budgetCeiling only when > 0", () => {
@@ -134,7 +191,7 @@ describe("draftToCreateRequest — §4.2 fields", () => {
     project.certificates.safety = ["tuv", "spsp"];
     const p = draftToCreateRequest(makeDraft({ project }), "46");
     expect(p.localContent).toBe(true);
-    expect(p.requiredCerts).toEqual(["saso-registration"]);
+    expect(p.requiredCerts).toEqual(["saso_registration"]);
     expect(p.equipmentItems[0].safetyCertifications).toEqual(["tuv", "spsp"]);
   });
 

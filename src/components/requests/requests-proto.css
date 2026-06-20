@@ -184,6 +184,18 @@
 /* v3 bid card */
 .rproto .bid { background: var(--surface1); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; margin-bottom: 14px; position: relative; }
 .rproto .bid.sel { border-color: var(--navy); border-width: 2px; box-shadow: 0 8px 24px rgba(19, 36, 59, 0.1); }
+/* deal-room status banner — top strip of the bid card (app parity): whose move it is + agreed-terms meter */
+.rproto .dr-banner { display: flex; align-items: center; gap: 8px; padding: 7px 14px; font-size: 12px; font-weight: 800; }
+.rproto .dr-banner .material-icons-outlined { font-size: 16px; }
+.rproto .dr-banner .drb-meter { margin-inline-start: auto; font-weight: 700; font-size: 11px; opacity: 0.85; }
+.rproto .dr-banner.drb-action, .rproto .dr-banner.drb-fresh { background: var(--action-dim); color: var(--action); }
+.rproto .dr-banner.drb-new, .rproto .dr-banner.drb-accepted { background: var(--success-bg); color: var(--success); }
+.rproto .dr-banner.drb-wait, .rproto .dr-banner.drb-open { background: var(--surface2, #eef3f8); color: var(--muted); }
+/* supplier verification docs on file (CR / VAT / National address) — green chips, app parity with the quotation */
+.rproto .sup-docs { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.rproto .sup-docs .sd-lab { font-size: 10px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
+.rproto .sup-docs .sd-chip { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: var(--r-full); background: var(--success-bg); color: var(--success); }
+.rproto .sup-docs .sd-chip .material-icons-outlined { font-size: 11px; }
 .rproto .bid.sel::before { content: ""; position: absolute; inset-block: 0; inset-inline-start: 0; width: 4px; background: var(--navy); }
 .rproto .bid-check { width: 26px; height: 26px; border-radius: 7px; border: 1.5px solid var(--border); background: var(--surface1); display: flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; color: transparent; }
 .rproto .bid-check.on { background: var(--navy); border-color: var(--navy); color: #fff; }
@@ -209,10 +221,37 @@
 .rproto .bid-hh { flex: 1; min-width: 0; }
 .rproto .bid-hh .r1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .rproto .bid-hh .sname { font-size: 14px; font-weight: 800; color: var(--navy); }
+.rproto .bid-hh .qty-badge { display: inline-flex; align-items: center; padding: 1px 7px; border-radius: var(--r-full); background: var(--action-dim); color: var(--action); font-size: 11px; font-weight: 800; }
 .rproto .bid-evt { font-size: 11px; font-weight: 600; color: var(--muted); margin-top: 4px; }
 .rproto .credrow { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
 .rproto .credpill { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: var(--r-full); }
 .rproto .credpill .material-icons-outlined { font-size: 11px; }
+/* credential pills (013 AC-01/02/03) — per required cert: ✓ held / ✗ missing */
+.rproto .cred-pills { display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.rproto .cred-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: var(--r-full); }
+.rproto .cred-pill .material-icons-outlined { font-size: 12px; }
+.rproto .cred-pill.ok { background: var(--success-bg); color: var(--success); }
+.rproto .cred-pill.no { background: var(--danger-bg); color: var(--danger); }
+
+/* Live deal-room terms on the card (014 DealRoomTermsList) */
+.rproto .dr-terms { display: flex; flex-direction: column; gap: 8px; padding: 11px 14px; }
+.rproto .dr-head { display: flex; align-items: center; gap: 8px; }
+.rproto .dr-head > .material-icons-outlined { font-size: 17px; color: var(--navy-mid); }
+.rproto .dr-label { font-size: 13px; font-weight: 800; color: var(--navy); }
+.rproto .dr-prog { font-size: 12px; font-weight: 700; color: var(--muted); }
+.rproto .dr-turn { margin-inline-start: auto; font-size: 11px; font-weight: 800; color: var(--action); background: var(--action-dim); border-radius: var(--r-full); padding: 2px 9px; }
+.rproto .dr-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.rproto .dr-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: var(--r-full); border: 1px solid var(--border); color: var(--navy-mid); }
+.rproto .dr-chip .material-icons-outlined { font-size: 13px; }
+.rproto .dr-chip.locked { background: var(--success-bg); color: var(--success); border-color: transparent; }
+.rproto .dr-chip.open { background: var(--warning-bg); color: var(--warning); border-color: transparent; }
+.rproto .dr-chip.pending { background: var(--surface2); color: var(--muted); }
+/* supplier note on a bid */
+.rproto .bid-note { display: flex; align-items: flex-start; gap: 8px; padding: 10px 0; font-size: 12.5px; font-weight: 600; color: var(--navy-mid); }
+.rproto .bid-note > .material-icons-outlined { font-size: 16px; color: var(--action); flex: 0 0 auto; margin-top: 1px; }
+.rproto .bid-note .bn-text { line-height: 1.5; white-space: pre-wrap; }
+/* lead-time inline tag in the price breakdown (013 AC-11) */
+.rproto .prow .pl2 .lead { display: inline-block; margin-inline-start: 6px; font-size: 10px; font-weight: 700; color: var(--muted); background: var(--surface2); border-radius: var(--r-full); padding: 1px 7px; }
 .rproto .cp-ok { background: var(--success-bg); color: var(--success); } .rproto .cp-miss { background: var(--surface2); color: var(--muted); }
 .rproto .spill { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: var(--r-full); line-height: 1.1; }
 .rproto .spill .d { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
@@ -231,6 +270,56 @@
 .rproto .donut { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; flex: 0 0 auto; }
 .rproto .donut::before { content: ""; position: absolute; inset: 4px; background: var(--surface1); border-radius: 50%; }
 .rproto .donut span { position: relative; font-family: "IBM Plex Sans", monospace; font-size: 11px; font-weight: 700; color: var(--navy); }
+/* Per-class term status chips on the bid card (Equipment / Project / Supplier) — colored by the worst
+   issue in the class, with a "settled / total" fraction so the renter sees how far each class is. */
+.rproto .term-classes { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; justify-content: flex-end; min-width: 0; }
+.rproto .tcls { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: var(--r-full); font-size: 11px; font-weight: 800; border: 1px solid transparent; }
+.rproto .tcls .material-icons-outlined { font-size: 14px; }
+.rproto .tcls .tcls-frac { font-variant-numeric: tabular-nums; opacity: 0.9; }
+.rproto .tcls-ok { background: var(--success-bg); color: var(--success); }
+.rproto .tcls-warn { background: var(--action-dim); color: var(--action); }
+.rproto .tcls-bad { background: #fdecea; color: var(--danger); }
+.rproto .tcls-neutral { background: var(--surface2, #eef3f8); color: var(--muted); }
+.rproto button.terms-row { width: 100%; background: none; border: 0; font: inherit; text-align: inherit; cursor: pointer; }
+.rproto button.terms-row.tappable:hover { background: var(--surface1); }
+.rproto .terms-row .chev { flex: 0 0 auto; font-size: 20px; color: var(--text-muted); transition: transform 0.2s; }
+.rproto .terms-row.open .chev { transform: rotate(180deg); }
+/* Inline Terms dropdown (expands within the card, not a popup) */
+.rproto .terms-panel { padding: 4px 14px 12px; background: var(--surface2, #f6f9fc); }
+.rproto .tp-bucket { margin-top: 12px; }
+.rproto .tp-bucket:first-child { margin-top: 4px; }
+.rproto .tp-bh { font-size: 11px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
+.rproto .tp-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.rproto .tp-row:last-child { border-bottom: 0; }
+.rproto .tp-lab { font-size: 13px; font-weight: 600; color: var(--navy); }
+.rproto .tp-state { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.rproto .tp-state .material-icons-outlined { font-size: 15px; }
+.rproto .tp-state.ok { color: var(--success); }
+.rproto .tp-state.warn { color: var(--action); }
+.rproto .tp-state.bad { color: var(--danger); }
+.rproto .tp-state.neutral { color: var(--muted); }
+
+/* Terms modal (013 AC-04/05) */
+.rproto .tm-overlay { position: fixed; inset: 0; z-index: 80; background: rgba(15, 23, 42, 0.45); display: flex; align-items: flex-end; justify-content: center; padding: 0; }
+.rproto .tm-modal { width: 100%; max-width: 520px; max-height: 86vh; overflow-y: auto; background: var(--surface1); border-radius: 18px 18px 0 0; box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.2); }
+@media (min-width: 560px) { .rproto .tm-overlay { align-items: center; } .rproto .tm-modal { border-radius: 18px; } }
+.rproto .tm-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface1); }
+.rproto .tm-head h3 { margin: 0; font-size: 16px; font-weight: 800; color: var(--navy); }
+.rproto .tm-head button { background: none; border: 0; cursor: pointer; color: var(--text-muted); display: flex; }
+.rproto .tm-body { padding: 12px 18px 20px; }
+.rproto .tm-bucket { margin-top: 14px; }
+.rproto .tm-bucket:first-child { margin-top: 0; }
+.rproto .tm-bh { font-size: 13px; font-weight: 800; color: var(--navy); margin-bottom: 6px; }
+.rproto .tm-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.rproto .tm-row:last-child { border-bottom: 0; }
+.rproto .tm-lab { font-size: 13px; font-weight: 600; color: var(--navy); }
+.rproto .tm-state { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.rproto .tm-state .material-icons-outlined { font-size: 15px; }
+.rproto .tm-state.matched { color: var(--success); }
+.rproto .tm-state.conflict { color: var(--danger); }
+.rproto .tm-state.grey { color: var(--muted); }
+.rproto .tm-state.locked { color: var(--success); }
+.rproto .tm-state.open { color: var(--warning); }
 .rproto .equip-row { display: flex; align-items: center; gap: 10px; padding: 11px 14px; }
 .rproto .equip-row .el { flex: 1; min-width: 0; }
 .rproto .equip-row .elab { font-size: 13px; font-weight: 800; color: var(--navy); display: flex; align-items: center; gap: 6px; }

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useT, useLocale, fmt } from "@/lib/i18n";
 import { useRfq, agentMatches } from "@/lib/store/rfq-store";
 import { SUPPORT_WHATSAPP_NUMBER } from "@/lib/config/support";
-import { AgentMark, Button, Field, Icon, Pchips, SelChips, Select, Stepper, TextArea, Toggle, Modal } from "@/components/ui";
+import { AgentMark, Button, Field, Icon, Pchips, SelChips, Select, Stepper, TextArea, TextInput, Toggle, Modal } from "@/components/ui";
 import {
   EquipmentItem,
   Taxonomy,
@@ -72,6 +72,9 @@ export function ItemRow({
   ];
 
   const { category, subcategory, measurement } = resolveRef(taxonomy, item.ref);
+  // Part 1: the optional free-text "work type" is surfaced only for crane subtypes — mirror the mobile
+  // gate (equipment_step.dart `_isCraneSelected`: the subtype's English name contains "crane").
+  const isCrane = (subcategory?.name ?? "").toLowerCase().includes("crane");
   const status = item.verdict === "no-match" ? "not-available" : item.resolved ? "matched" : "needs-ok";
   const glyph = (item.ref.categoryId && CATEGORY_ICON[item.ref.categoryId]) || "construction";
   // "MATCHED TO" must show ONLY values that exist in our taxonomy: the resolved measurement, or the
@@ -151,7 +154,7 @@ export function ItemRow({
   );
 
   return (
-    <li className={`grid grid-cols-[38px_1fr] items-start gap-3 rounded-xl border border-border bg-surface px-4 py-3 sm:grid-cols-[38px_1fr_auto] ${borderClass}`}>
+    <li className={`grid grid-cols-[38px_1fr] items-start gap-3 rounded-xl border border-border bg-surface px-4 py-3 lg:grid-cols-[38px_1fr_auto] ${borderClass}`}>
       <Avatar glyph={glyph} conf={status === "matched" ? "high" : "mid"} />
 
       <div className="min-w-0">
@@ -214,7 +217,7 @@ export function ItemRow({
       </div>
 
       {/* Right: status + actions — side rail on desktop, full-width row below on mobile */}
-      <div className="col-span-2 flex flex-wrap items-center justify-end gap-2 sm:col-span-1 sm:flex-col sm:items-end">
+      <div className="col-span-2 flex flex-wrap items-center justify-end gap-2 lg:col-span-1 lg:flex-col lg:items-end">
         <StatusLabel status={status} t={t} />
         <div className="flex gap-1.5">
           {status === "needs-ok" ? (
@@ -258,6 +261,18 @@ export function ItemRow({
           items) — no per-item override here; values are just Me/Supplier. */}
       {status === "matched" && showDetails && (
         <div className="col-span-full mt-3 space-y-4 rounded-lg border border-border bg-surface2 p-4">
+          {/* Part 1: free-text work type — crane subtypes only (mirrors the mobile create flow). */}
+          {isCrane && (
+            <ChipField label={t.step2.perItem.workType}>
+              <TextInput
+                maxLength={255}
+                value={item.workType ?? ""}
+                placeholder={t.step2.perItem.workTypePlaceholder}
+                onChange={(e) => actions.patchItem(item.id, { workType: e.target.value })}
+              />
+            </ChipField>
+          )}
+
           {/* Operator (AC-24) */}
           <div className="overflow-hidden rounded-lg border border-border bg-surface">
             <div className="flex items-center justify-between bg-surface2 px-3 py-2.5">
@@ -279,6 +294,17 @@ export function ItemRow({
                 <ChipField label={t.step2.perItem.nationality} agent={agentMatches(item.operator.nationality, ai?.operator.nationality)}>
                   <Pchips value={item.operator.nationality} onChange={(v) => actions.patchItemOperator(item.id, { nationality: v })} onClear={() => actions.patchItemOperator(item.id, { nationality: null })} options={nationalityOpts} />
                 </ChipField>
+                {/* Part 3: when nationalities are restricted, let the renter type which ones (≤100). */}
+                {item.operator.nationality === "restricted" && (
+                  <ChipField label={t.step2.perItem.nationalityCustom}>
+                    <TextInput
+                      maxLength={100}
+                      value={item.operator.nationalityCustom ?? ""}
+                      placeholder={t.step2.perItem.nationalityCustomPlaceholder}
+                      onChange={(e) => actions.patchItemOperator(item.id, { nationalityCustom: e.target.value })}
+                    />
+                  </ChipField>
+                )}
                 <ChipField label={t.step2.perItem.certificate} agent={agentMatches(item.operator.certificate, ai?.operator.certificate)}>
                   <SelChips<OperatorCertificate>
                     values={item.operator.certificate}
@@ -286,8 +312,12 @@ export function ItemRow({
                     options={opt(OPERATOR_CERTIFICATES, t.options.safetyCert)}
                   />
                 </ChipField>
-                <ChipField label={t.step2.perItem.fat} agent={agentMatches(item.operator.fat, ai?.operator.fat)} note={fn("operator_accommodation_by_rentee")}>
-                  <Pchips<Party> value={item.operator.fat} onChange={(v) => actions.patchItemOperator(item.id, { fat: v })} onClear={() => actions.patchItemOperator(item.id, { fat: null })} options={opt(PARTIES, t.options.party)} />
+                {/* Part 2: F.A.T split into two who-covers controls — Food, and Accommodation & transport. */}
+                <ChipField label={t.step2.perItem.fatFood} agent={agentMatches(item.operator.fatFood, ai?.operator.fatFood)} note={fn("operator_accommodation_by_rentee")}>
+                  <Pchips<Party> value={item.operator.fatFood} onChange={(v) => actions.patchItemOperator(item.id, { fatFood: v })} onClear={() => actions.patchItemOperator(item.id, { fatFood: null })} options={opt(PARTIES, t.options.party)} />
+                </ChipField>
+                <ChipField label={t.step2.perItem.fatTransport} agent={agentMatches(item.operator.fatAccommodationTransport, ai?.operator.fatAccommodationTransport)}>
+                  <Pchips<Party> value={item.operator.fatAccommodationTransport} onChange={(v) => actions.patchItemOperator(item.id, { fatAccommodationTransport: v })} onClear={() => actions.patchItemOperator(item.id, { fatAccommodationTransport: null })} options={opt(PARTIES, t.options.party)} />
                 </ChipField>
               </div>
             )}

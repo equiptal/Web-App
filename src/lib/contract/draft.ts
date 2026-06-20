@@ -74,13 +74,17 @@ export interface ProjectDetails {
 export interface OperatorDetails {
   nightShift: boolean;
   nationality: string | null;
+  /** Part 3: free-text nationalities the rentee allows — shown only when `nationality === "restricted"`.
+   *  Sent as operatorNationalityCustom (≤100). */
+  nationalityCustom?: string | null;
   certificate: OperatorCertificate[]; // multi-select; defaulted from project Safety certs (AC-24/50)
   /** AC-50: true when the agent set the cert per-item from the RFQ — the project-level Safety cert
    *  then leaves it untouched (only fills items the agent didn't mention). */
   certByAgent?: boolean;
-  /** AC-24: F.A.T — who covers the operator's Food, Accommodation & Transport (supplier / me).
-   *  web-app/002 merged the old `accommodation` + `transfer` fields into this single choice. */
-  fat: Party | null;
+  /** AC-24: F.A.T split — who covers the operator's Food vs Accommodation & Transport (supplier / me).
+   *  Per-item; both become negotiable deal-room terms. (Superseded the old single `fat` choice.) */
+  fatFood: Party | null;
+  fatAccommodationTransport: Party | null;
 }
 
 /** AC-19/20: nearest-measurement + optional unit conversion the agent suggests. */
@@ -128,6 +132,8 @@ export interface EquipmentItem {
   operatorNeeded: OperatorNeeded; // AC-24
   operator: OperatorDetails;
   fuelType: FuelType; // AC-26 default "diesel"
+  /** Part 1: optional free-text "work type" — surfaced only for crane subtypes (mirrors mobile). ≤255. */
+  workType?: string;
   additionalNotes: string; // AC-53 agent-extracted free-text qualifiers, editable
 
   // Per-item overrides of request-wide settings (AC-25/26):
@@ -231,7 +237,7 @@ export function defaultPreferences(): Preferences {
 }
 
 export function defaultOperatorDetails(): OperatorDetails {
-  return { nightShift: false, nationality: null, certificate: [], fat: "me" };
+  return { nightShift: false, nationality: null, nationalityCustom: null, certificate: [], fatFood: "me", fatAccommodationTransport: "me" };
 }
 
 /** Build a blank item (used when the renter adds a missed item — AC-22). */

@@ -1,5 +1,5 @@
 import type { Taxonomy } from "@/lib/contract";
-import { postableItems, OPERATOR_CERTIFICATES } from "@/lib/contract";
+import { postableItems } from "@/lib/contract";
 import type { RfqRequestPayload } from "@/lib/contract";
 import type { TaxonomyNode, CreateRequestPayload, CreateRequestItem } from "@/lib/contract/app";
 
@@ -98,6 +98,52 @@ const SLA_MAP: Record<string, CreateRequestPayload["breakdownResponseSla"]> = {
   "72h": "SEVENTY_TWO_HR",
 };
 
+// The maps below align the values the web sends with the exact strings the backend's deal-room term
+// matching expects. Without them these terms drift silently (the web's UI-friendly values never match
+// the supplier's declared values), so they always read as "not agreed" in the deal room.
+
+/** AC-36: UI payment terms → backend enum (`upfront` already matches). */
+const PAYMENT_TERMS_MAP: Record<string, string> = {
+  upfront: "upfront",
+  daily: "per_day",
+  "net-30": "net_30",
+  "net-60": "net_60",
+  "end-of-job": "end_of_job",
+};
+
+/** AC-36: UI payment method → backend enum (`cash` already matches). */
+const PAYMENT_METHOD_MAP: Record<string, string> = {
+  "bank-transfer": "bank_transfer",
+  cash: "cash",
+};
+
+/** AC-37: UI maintenance responsibility → backend enum (`supplier` already matches; renter → rentee). */
+const MAINTENANCE_RESP_MAP: Record<string, string> = {
+  supplier: "supplier",
+  renter: "rentee",
+};
+
+/** AC-40: UI bid window → backend offer-duration enum (uppercase unit; 1-week → 1W). */
+const OFFER_DURATION_MAP: Record<string, string> = {
+  "24h": "24H",
+  "48h": "48H",
+  "72h": "72H",
+  "1-week": "1W",
+};
+
+/**
+ * AC-50: UI cert values → the canonical equipment doc-type enum the SUPPLIER uploads against (and the
+ * bid-eligibility matcher compares to). The web's hyphenated values never match the underscored
+ * supplier docs, so an unmapped required cert silently excludes EVERY supplier (zero eligible bids).
+ * `local-content` is split into its own `localContent` boolean; free-text "other" is routed to notes.
+ */
+const CERT_TOKEN_MAP: Record<string, string> = {
+  tuv: "tuv",
+  spsp: "spsp",
+  "saso-technical": "saso_technical_inspection",
+  "saso-registration": "saso_registration",
+};
+
 /**
  * Map the UI draft → the app's create_request payload (POST /agents/requests). Resolves the field
  * divergences logged in plan.md Q6: rental basis → rentalType, me/supplier → mob/demob booleans
@@ -116,19 +162,20 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
   const items = postableItems(draft.items);
   // Rule 4 + §4.2: project-level fields are stored per-item — compute once, fan out onto each item.
   const manufactureYear = toManufactureYear(project.advanced.equipmentYear);
-  // AC-50: safety certs fanned per-item. "other" carries the optional free-text name (dropped if blank).
+  // AC-50: safety certs fanned per-item, mapped to the canonical equipment doc-type enum (see
+  // CERT_TOKEN_MAP). Unmapped values are dropped — they could never match a supplier's doc.
   const safetyOtherText = project.certificates.safetyOther.trim();
-  const safetyCertList = project.certificates.safety
-    .map((c) => (c === "other" ? safetyOtherText || null : c))
-    .filter(Boolean) as string[];
-  const safetyCerts = safetyCertList.length ? safetyCertList : undefined;
-  // Project-level certs that aren't selectable per item (e.g. the free-text "other") — always merged
-  // into an operator item's per-item certs so a per-item override never drops them.
-  const projectExtraCerts = safetyCertList.filter((c) => !(OPERATOR_CERTIFICATES as string[]).includes(c));
-  // AC-50: "Other" certs → requiredCerts; the local-content flag is split out into its own boolean.
+  const toCertTokens = (certs: string[]): string[] =>
+    [...new Set(certs.map((c) => CERT_TOKEN_MAP[c]).filter(Boolean) as string[])];
+  // AC-50: "Other" certs → requiredCerts (canonical tokens); the local-content flag is its own boolean.
   const otherCerts = project.certificates.other;
   const localContent = otherCerts.includes("local-content");
-  const requiredCerts = otherCerts.filter((c) => c !== "local-content");
+  const requiredCerts = toCertTokens(otherCerts.filter((c) => c !== "local-content"));
+  // A free-text "other" cert can never match an equipment doc type (it would silently kill bidding),
+  // so carry it to suppliers as a note instead of placing it in the gating cert list.
+  const otherCertNote =
+    project.certificates.safety.includes("other") && safetyOtherText ? `Additional certificate required: ${safetyOtherText}` : "";
+  const mergedNotes = [preferences.additionalNotes?.trim(), otherCertNote].filter(Boolean).join("\n") || undefined;
 
   return {
     userId: Number(userId), // agents-backend requires an integer id
@@ -141,19 +188,19 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
     projectLat: project.location.lat,
     projectLng: project.location.lng,
     projectAddressLabel: project.location.label ?? undefined,
-    additionalNotes: preferences.additionalNotes || undefined,
+    additionalNotes: mergedNotes,
     // §4.2 header fields:
     workingHoursPerDay: project.timing.hoursPerDay, // AC-14/15 (default 8)
     workingDaysPerWeek: project.advanced.workingDaysPerWeek, // AC-15 (default 6)
     overtimeRate: OVERTIME_MAP[project.advanced.overtimeRate], // AC-15
-    paymentTerms: preferences.payment.terms ?? undefined, // AC-36
-    paymentMethod: preferences.payment.method ?? undefined, // AC-36
-    maintenanceResponsibility: preferences.maintenance.responsibility, // AC-37 (default supplier)
+    paymentTerms: preferences.payment.terms ? PAYMENT_TERMS_MAP[preferences.payment.terms] : undefined, // AC-36
+    paymentMethod: preferences.payment.method ? PAYMENT_METHOD_MAP[preferences.payment.method] : undefined, // AC-36
+    maintenanceResponsibility: MAINTENANCE_RESP_MAP[preferences.maintenance.responsibility], // AC-37 (default supplier)
     breakdownResponseSla: preferences.maintenance.sla ? SLA_MAP[preferences.maintenance.sla] : undefined, // AC-37
     budgetCeiling: preferences.budgetSar && preferences.budgetSar > 0 ? preferences.budgetSar : undefined, // AC-39
     verifiedSuppliersOnly: preferences.supplierFilters.verifiedOnly, // AC-40
     subletting: preferences.supplierFilters.sublettingAllowed, // AC-40
-    offerDuration: preferences.supplierFilters.bidWindow ?? undefined, // AC-40 bid window
+    offerDuration: preferences.supplierFilters.bidWindow ? OFFER_DURATION_MAP[preferences.supplierFilters.bidWindow] : undefined, // AC-40 bid window
     requiredCerts: requiredCerts.length ? requiredCerts : undefined, // AC-50
     localContent: localContent || undefined, // AC-50 (omit when false)
     equipmentItems: items.map((i) => {
@@ -169,20 +216,40 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
         mobilizationByRentee: (i.deliveryOverride ?? project.deliveryToSite ?? "me") === "me",
         demobilizationByRentee: (i.returnOverride ?? project.returnFromSite ?? "me") === "me",
         additionalNotes: i.additionalNotes || undefined, // AC-53 (rule 6: needs the deployed item column)
+        // Part 1: free-text work type, crane subtypes only (≤255). Trimmed; omitted when blank.
+        workType: i.workType?.trim() ? i.workType.trim().slice(0, 255) : undefined,
         maxEquipmentAge: manufactureYear, // AC-28 project-level year, fanned out (undefined ⇒ key dropped)
         dieselIncluded: toDieselIncluded(i.fuelType, fuelParty), // AC-26
-        // AC-24 F.A.T — fatRequired encodes the SIDE: supplier⇒true (supplier covers), me⇒false.
-        // Omit (undefined) when there's no operator so the backend stores no assumption.
-        fatRequired: operatorIncluded && i.operator.fat ? i.operator.fat === "supplier" : undefined,
+        // Part 2: F.A.T split — each encodes the SIDE (supplier⇒true / me⇒false), omitted without an
+        // operator. `fatRequired` is the legacy single flag, kept for back-compat (supplier covers any
+        // part) until the agent backend reads the split booleans.
+        fatFood: operatorIncluded && i.operator.fatFood ? i.operator.fatFood === "supplier" : undefined,
+        fatAccommodationTransport:
+          operatorIncluded && i.operator.fatAccommodationTransport ? i.operator.fatAccommodationTransport === "supplier" : undefined,
+        fatRequired:
+          operatorIncluded && (i.operator.fatFood || i.operator.fatAccommodationTransport)
+            ? i.operator.fatFood === "supplier" || i.operator.fatAccommodationTransport === "supplier"
+            : undefined,
         // §4.2 per-item operator sub-fields (only meaningful when an operator is included):
         nightShiftRequired: operatorIncluded ? i.operator.nightShift : undefined, // AC-24
         operatorNationality: operatorIncluded ? i.operator.nationality ?? undefined : undefined, // AC-24
-        // AC-24/50: per-item operator certs (multi-select) + project-level extras (e.g. "other");
-        // falls back to the project safety list when the item has no per-item selection.
-        safetyCertifications:
-          operatorIncluded && i.operator.certificate.length
-            ? [...new Set([...i.operator.certificate, ...projectExtraCerts])]
-            : safetyCerts,
+        // Part 3: free-text nationalities when the rentee restricts them (≤100).
+        operatorNationalityCustom:
+          operatorIncluded && i.operator.nationality === "restricted" ? i.operator.nationalityCustom?.trim() || undefined : undefined,
+        // Operator certs → the app's NON-gating operatorLicenseLevel (CERTIFIED/TUV/SPSP), comma-joined.
+        // Web chips are tuv/spsp (the web has no CERTIFIED chip — fine, the app's set is a superset).
+        // saso-technical is an EQUIPMENT cert with no operator-license equivalent → routed to safety below.
+        operatorLicenseLevel: operatorIncluded
+          ? i.operator.certificate.map((c) => (({ tuv: "TUV", spsp: "SPSP" }) as Record<string, string>)[c]).filter(Boolean).join(",") || undefined
+          : undefined,
+        // Equipment safety certs (gating) — the project safety list PLUS an operator-picked saso-technical
+        // (no operatorLicenseLevel equivalent, so don't drop it), all as canonical doc-type tokens.
+        safetyCertifications: (() => {
+          const base = [...project.certificates.safety];
+          if (operatorIncluded && i.operator.certificate.includes("saso-technical")) base.push("saso-technical");
+          const tokens = toCertTokens(base);
+          return tokens.length ? tokens : undefined;
+        })(),
       };
     }),
   };

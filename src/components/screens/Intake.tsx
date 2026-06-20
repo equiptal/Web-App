@@ -39,6 +39,9 @@ export function Intake() {
   const fileInput = useRef<HTMLInputElement>(null);
 
   const canStart = state.text.trim().length > 0 || state.files.length > 0;
+  // A draft exists when the renter came back here from a wizard step ("Your request") — show
+  // Back-to-review + re-analyze instead of the first-run Continue.
+  const hasDraft = !!state.draft;
 
   function onFiles(list: FileList | null) {
     if (!list) return;
@@ -148,13 +151,24 @@ export function Intake() {
         </div>
 
         {/* footer */}
-        <div className="mt-5 flex items-center justify-between gap-3 border-t border-border px-5 py-4">
-          <span className="inline-flex items-center gap-1.5 text-[12.5px] text-muted">
-            <Icon name="info" size={15} /> {t.intake.emptyHint}
-          </span>
-          <Button disabled={!canStart} onClick={() => actions.process()} className="px-6 py-3 text-[14px]">
-            {t.intake.startProcessing} <Icon name="arrow_forward" size={18} className="rtl:scale-x-[-1]" />
-          </Button>
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-4">
+          {hasDraft ? (
+            // Reached from a wizard step ("Your request") — return without re-parsing.
+            <Button variant="secondary" onClick={() => actions.resumeWizard()}>
+              <Icon name="arrow_back" size={16} className="rtl:scale-x-[-1]" /> {t.intake.backToReview}
+            </Button>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12.5px] text-muted">
+              <Icon name="info" size={15} /> {t.intake.emptyHint}
+            </span>
+          )}
+          <div className="flex items-center gap-3">
+            {hasDraft && <span className="hidden text-[12px] text-muted sm:inline">{t.intake.editReparseNote}</span>}
+            <Button disabled={!canStart} onClick={() => actions.process()} className="px-6 py-3 text-[14px]">
+              {hasDraft ? t.intake.reAnalyze : t.intake.startProcessing}{" "}
+              <Icon name="arrow_forward" size={18} className="rtl:scale-x-[-1]" />
+            </Button>
+          </div>
         </div>
       </Card>
     </div>

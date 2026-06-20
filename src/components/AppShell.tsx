@@ -152,7 +152,10 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-6xl px-4 py-6 pb-24 sm:px-7 sm:py-7">{children}</main>
+        {/* pb-24 keeps the wizard's Back/Next footer clear of the fixed mobile bottom-nav. The nav is
+            only hidden at md+, so keep the bottom padding large until md (sm:py-7 alone would shrink
+            it at 640–767px while the nav is still showing, hiding the footer under it). */}
+        <main className="mx-auto w-full max-w-6xl px-4 py-6 pb-24 sm:px-7 sm:pt-7 md:py-7">{children}</main>
       </div>
 
       {/* Mobile bottom nav — the navy sidebar is desktop-only, so phones navigate from here. */}

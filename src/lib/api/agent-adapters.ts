@@ -206,7 +206,14 @@ function normCert(value: string | null | undefined): OperatorCertificate | undef
   if (!value) return undefined;
   const up = value.toUpperCase().trim();
   if (CERT_NORM[up]) return CERT_NORM[up];
-  return pick(value, SAFETY_CERTIFICATES) as OperatorCertificate | undefined; // tolerate already-UI-form values
+  const picked = pick(value, SAFETY_CERTIFICATES) as OperatorCertificate | undefined; // tolerate already-UI-form values
+  if (!picked) {
+    // Safety net: a cert the agent emitted that maps to no UI option is dropped here (hop 1) and would
+    // otherwise vanish silently. Surface it so a NEW Mansour token gets caught (add it to CERT_NORM)
+    // instead of quietly disappearing from the request.
+    console.warn(`[agent-adapters] unrecognized agent cert value dropped: ${JSON.stringify(value)} — add it to CERT_NORM if it should map to a UI cert.`);
+  }
+  return picked;
 }
 /** Coerce the agent's safety_certifications (single value OR array OR null) to a normalized list. */
 function safetyList(v: string[] | string | null | undefined): OperatorCertificate[] {
@@ -271,10 +278,11 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
       nationality: li.operator_nationality ?? null,
       certificate: agentCert, // AC-24/50: operator license level(s) (multi-select)
       certByAgent: agentCert.length > 0, // agent set it → project-level Safety cert won't override
-      // AC-24: F.A.T — who covers the operator's Food/Accommodation/Transport. Mansour emits
-      // operator_accommodation_by_rentee (true = rentee/me, false = supplier); supplier only when
-      // explicitly false, else me (matches the default). Merges the old transfer+accommodation pair.
-      fat: li.operator_accommodation_by_rentee === false ? "supplier" : "me",
+      // AC-24: F.A.T split — who covers the operator's Food vs Accommodation & Transport. Mansour still
+      // emits a single operator_accommodation_by_rentee (true = rentee/me, false = supplier), so both
+      // sides derive from it (supplier only when explicitly false) until the agent splits the signal.
+      fatFood: li.operator_accommodation_by_rentee === false ? "supplier" : "me",
+      fatAccommodationTransport: li.operator_accommodation_by_rentee === false ? "supplier" : "me",
     },
     fuelType: (li.fuel_type_preference && FUEL_IN[li.fuel_type_preference]) || "diesel",
     additionalNotes: li.additional_notes ?? "", // AC-53: agent-extracted per-item notes (was dropped)

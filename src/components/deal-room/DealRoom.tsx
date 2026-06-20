@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { StreamChat, type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
-import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, proposeRate, acceptDeal, resolveTerm, ApiError } from "@/lib/api/client";
+import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, resolveTerm, ApiError } from "@/lib/api/client";
 import type { DealRoomView, DealRoomDocument, DealRoomDocuments } from "@/lib/contract/deal-room";
 import "@/components/deal-room/deal-room-proto.css";
 
@@ -33,6 +33,8 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const [showCounter, setShowCounter] = useState(false);
   const [counterErr, setCounterErr] = useState<string | null>(null);
   const [showDocs, setShowDocs] = useState(false);
+  const [quoteBusy, setQuoteBusy] = useState(false);
+  const [quoteErr, setQuoteErr] = useState<string | null>(null);
   const [termsOpen, setTermsOpen] = useState(true);
   const termsToggled = useRef(false);
 
@@ -46,6 +48,28 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const errMsg = (e: unknown, fb: string) => (e instanceof ApiError ? (ar ? e.messageAr : e.detail) || fb : fb);
 
   const loadRoom = () => fetchDealRoom(id).then(setRoom).catch(() => setError(true));
+
+  // Download the official quotation for a closed deal (app parity) — fetch the backend-generated PDF
+  // and open its presigned URL. While the PDF is still being generated (`pdfStatus: PENDING`) the
+  // backend has no URL yet, so we tell the renter to try again shortly (the app polls; here a re-tap).
+  async function downloadQuotation() {
+    if (quoteBusy) return;
+    setQuoteBusy(true);
+    setQuoteErr(null);
+    try {
+      const q = await fetchQuotation(id);
+      if (q.pdfUrl) {
+        window.open(q.pdfUrl, "_blank", "noopener,noreferrer");
+      } else {
+        setQuoteErr(L("Quotation is being prepared — try again in a moment.", "يتم تجهيز عرض السعر — حاول مرة أخرى بعد لحظات."));
+      }
+    } catch (e) {
+      setQuoteErr(errMsg(e, L("Couldn’t load the quotation.", "تعذّر تحميل عرض السعر.")));
+    } finally {
+      setQuoteBusy(false);
+    }
+  }
+
   useEffect(() => {
     let active = true;
     fetchDealRoom(id).then((d) => active && setRoom(d)).catch(() => active && setError(true));
@@ -294,8 +318,16 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
       </div>
 
       {/* composer */}
-      {closed || abandoned ? (
-        <div className="composer ro"><span className="ro-note">{closed ? L("Deal room is closed · quotation ready", "غرفة الصفقة مغلقة · عرض السعر جاهز") : L("Deal room has been cancelled", "تم إلغاء غرفة الصفقة")}</span></div>
+      {closed ? (
+        <div className="composer ro quote-bar">
+          <button type="button" className="dl-quote" onClick={downloadQuotation} disabled={quoteBusy}>
+            <span className="material-icons-outlined">{quoteBusy ? "hourglass_top" : "download"}</span>
+            {quoteBusy ? L("Preparing quotation…", "يتم تجهيز عرض السعر…") : L("Download quotation", "تنزيل عرض السعر")}
+          </button>
+          {quoteErr && <span className="ro-note quote-err">{quoteErr}</span>}
+        </div>
+      ) : abandoned ? (
+        <div className="composer ro"><span className="ro-note">{L("Deal room has been cancelled", "تم إلغاء غرفة الصفقة")}</span></div>
       ) : (
         <div className="composer">
           <span className="ib"><span className="material-icons-outlined">attach_file</span></span>
