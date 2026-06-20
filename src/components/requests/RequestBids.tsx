@@ -96,7 +96,8 @@ export function RequestBids({ requestId }: { requestId: string }) {
             ${row(`${L("Rental", "الإيجار")} (${nf(b.price ?? 0)} × ${periods}${unitsTxt})`, `${nf(rental)} ${sar}`)}
             ${b.mobPrice ? row(L("Mobilization", "النقل"), `${nf(b.mobPrice)} ${sar}`) : ""}
             ${b.demobPrice ? row(L("Return", "الإرجاع"), `${nf(b.demobPrice)} ${sar}`) : ""}
-            ${row(L("VAT 15%", "ضريبة ١٥٪"), `${nf(vat)} ${sar}`)}
+            ${row(L("Subtotal before VAT", "المجموع قبل الضريبة"), `${nf(sub)} ${sar}`)}
+            ${row(L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"), `${nf(vat)} ${sar}`)}
             <tr class="tot"><td>${esc(L("Estimated total", "الإجمالي التقديري"))}</td><td class="v">${nf(grand)} ${sar}</td></tr>
           </table>
         </section>`;

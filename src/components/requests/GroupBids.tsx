@@ -243,40 +243,38 @@ export function GroupBids({ group }: { group: RequestGroup }) {
       const periodLabel = (u: string | null) => { switch ((u ?? "PER_DAY").toUpperCase()) { case "PER_WEEK": return L("week", "أسبوع"); case "PER_MONTH": return L("month", "شهر"); case "PER_JOB": return L("job", "مهمة"); default: return L("day", "يوم"); } };
 
       // Pricing rows across every selected equipment for this supplier.
-      let rowNum = 0;
       let sub = 0;
       const rows = supBids.map((b) => {
-        const it = itemMap.get(b.requestId);
         const rate = b.price ?? 0;
-        const units = b.numberOfUnits || 1; // bid price is per-unit → multiply by quantity (app parity)
+        const units = b.numberOfUnits || 1; // bid price is PER-UNIT → × quantity (app parity)
         const dpp = daysPerPeriod(b.priceUnit);
         const plabel = periodLabel(b.priceUnit);
-        const durDays = it?.durationDays ?? null;
-        const openEnded = durDays == null;
-        let lineSub: number, qtyCell: string, totalCell: string, durTxt: string;
-        const unitsTxt = units > 1 ? ` · ${units} ${esc(L("units", "وحدة"))}` : "";
-        if (openEnded) {
-          lineSub = rate * units; // one-period preview × quantity; billed "as operated"
-          qtyCell = "∞";
-          totalCell = `<div class="sm">${esc(L("As operated", "حسب التشغيل"))}</div>${nf(rate)}${units > 1 ? " × " + units : ""} / ${esc(plabel)}`;
-          durTxt = esc(L("open-ended", "غير محدّد")) + unitsTxt;
+        const durDays = itemMap.get(b.requestId)?.durationDays ?? null;
+        const unitsPart = units > 1 ? `${units} ${esc(L("units", "وحدات"))} × ` : "";
+        const ratePart = `${nf(rate)} ${esc(sar)}/${esc(plabel)}`;
+        // App-style single rental line ("2 units × 30 days @ 200 SAR/day") — no Qty/Price columns, so the
+        // duration is never mislabelled as a quantity. Matches the bid card, deal room, and mobile app.
+        let lineSub: number, desc: string, amountCell: string;
+        if (durDays == null) {
+          lineSub = rate * units; // open-ended: one-period preview feeds the estimate; billed "as operated"
+          desc = `${unitsPart}${ratePart} · ${esc(L("as operated", "حسب التشغيل"))}`;
+          amountCell = `<div class="sm">${esc(L("As operated", "حسب التشغيل"))}</div>${nf(lineSub)} / ${esc(plabel)}`;
         } else if (dpp > 0) {
-          const dd = durDays as number;
-          const periods = dd / dpp;
-          lineSub = (rate / dpp) * dd * units;
-          qtyCell = Number.isInteger(periods) ? String(periods) : periods.toFixed(2);
-          totalCell = nf(lineSub);
-          durTxt = `${qtyCell} × ${esc(plabel)}${units > 1 ? ` × ${units} ${esc(L("units", "وحدة"))}` : ""}`;
+          const periods = durDays / dpp;
+          const pStr = Number.isInteger(periods) ? String(periods) : periods.toFixed(2);
+          const perWord = isAr || Number(pStr) === 1 ? plabel : `${plabel}s`;
+          lineSub = (rate / dpp) * durDays * units;
+          desc = `${unitsPart}${pStr} ${esc(perWord)} @ ${ratePart}`;
+          amountCell = nf(lineSub);
         } else {
-          lineSub = rate * units; // PER_JOB — per-unit rate × quantity
-          qtyCell = "1";
-          totalCell = nf(lineSub);
-          durTxt = esc(L("per job", "لكل مهمة")) + unitsTxt;
+          lineSub = rate * units; // PER_JOB
+          desc = `${unitsPart}${ratePart}`;
+          amountCell = nf(lineSub);
         }
         sub += lineSub + (b.mobPrice ?? 0) + (b.demobPrice ?? 0);
-        let r = `<tr><td>${++rowNum}</td><td><b>${esc(labelOf(b))}</b><div class="sm">${esc(eqLine(b))} · ${durTxt}</div></td><td>${esc(plabel)}</td><td class="num">${qtyCell}</td><td class="num">${nf(rate)}</td><td class="num">${totalCell}</td></tr>`;
-        if (b.mobPrice) r += `<tr><td>${++rowNum}</td><td><b>${esc(L("Mobilization to site", "النقل إلى الموقع"))}</b><div class="sm">${esc(labelOf(b))}</div></td><td>${esc(L("trip", "رحلة"))}</td><td class="num">1</td><td class="num">${nf(b.mobPrice)}</td><td class="num">${nf(b.mobPrice)}</td></tr>`;
-        if (b.demobPrice) r += `<tr><td>${++rowNum}</td><td><b>${esc(L("Return from site", "الإرجاع من الموقع"))}</b><div class="sm">${esc(labelOf(b))}</div></td><td>${esc(L("trip", "رحلة"))}</td><td class="num">1</td><td class="num">${nf(b.demobPrice)}</td><td class="num">${nf(b.demobPrice)}</td></tr>`;
+        let r = `<tr><td><b>${esc(labelOf(b))}</b><div class="sm">${esc(eqLine(b))} · ${desc}</div></td><td class="num">${amountCell}</td></tr>`;
+        if (b.mobPrice) r += `<tr><td><b>${esc(L("Mobilization to site", "النقل إلى الموقع"))}</b> <span class="sm">(1 ${esc(L("trip", "رحلة"))})</span><div class="sm">${esc(labelOf(b))}</div></td><td class="num">${nf(b.mobPrice)}</td></tr>`;
+        if (b.demobPrice) r += `<tr><td><b>${esc(L("Return from site", "الإرجاع من الموقع"))}</b> <span class="sm">(1 ${esc(L("trip", "رحلة"))})</span><div class="sm">${esc(labelOf(b))}</div></td><td class="num">${nf(b.demobPrice)}</td></tr>`;
         return r;
       }).join("");
       const vat = Math.round(sub * 0.15);
@@ -347,13 +345,13 @@ export function GroupBids({ group }: { group: RequestGroup }) {
           </div>
           <div class="listed"><div class="ll">${esc(L("Listed equipment", "المعدات المدرجة"))} (${supBids.length})</div>${listedLines}</div>
           <table class="ptable">
-            <thead><tr><th>#</th><th>${esc(L("Item", "البند"))}</th><th>${esc(L("Unit", "الوحدة"))}</th><th class="num">${esc(L("Qty", "الكمية"))}</th><th class="num">${esc(L("Price", "السعر"))}</th><th class="num">${esc(L("Total", "الإجمالي"))}</th></tr></thead>
+            <thead><tr><th>${esc(L("Item", "البند"))}</th><th class="num">${esc(L("Amount", "المبلغ"))}</th></tr></thead>
             <tbody>${rows}</tbody>
           </table>
           <div class="totals">
             <div class="trow"><span>${esc(L("Subtotal before VAT", "الإجمالي قبل الضريبة"))}</span><b>${nf(sub)}</b></div>
             <div class="trow"><span>${esc(L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"))}</span><b>${nf(vat)}</b></div>
-            <div class="trow grand"><span>${esc(L("Total", "الإجمالي"))}</span><b>${nf(total)} ${esc(sar)}</b></div>
+            <div class="trow grand"><span>${esc(L("Estimated total", "الإجمالي التقديري"))}</span><b>${nf(total)} ${esc(sar)}</b></div>
           </div>
           ${!isAr ? `<div class="words"><div class="wl">Amount in words</div>${esc(numWords(total))} Saudi Riyals · ${supBids.length} ${supBids.length > 1 ? "items" : "item"} · final amount as operated</div>` : ""}
           <div class="card"><div class="card-h">${esc(L("Project terms", "شروط المشروع"))}</div>

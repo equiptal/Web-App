@@ -186,9 +186,20 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
 
   const rate = room.rate ?? 0;
   const periods = room.periods ?? 1;
-  const subtotal = rate * periods + (room.mobPrice ?? 0) + (room.demobPrice ?? 0);
+  const units = room.numberOfUnits || 1; // rate is PER-UNIT → rental × units (consistent with cards/quotations)
+  const rentalTotal = rate * periods * units;
+  const subtotal = rentalTotal + (room.mobPrice ?? 0) + (room.demobPrice ?? 0);
   const vat = Math.round(subtotal * 0.15);
   const grand = subtotal + vat;
+  // Billing-period label from the bid's price unit (same mapping the bid cards use).
+  const periodLabel = (() => {
+    switch ((room.priceUnit ?? "PER_DAY").toUpperCase()) {
+      case "PER_WEEK": return L("week", "أسبوع");
+      case "PER_MONTH": return L("month", "شهر");
+      case "PER_JOB": return L("job", "مهمة");
+      default: return L("day", "يوم");
+    }
+  })();
   const closed = room.status === "CLOSED";
   const abandoned = room.status === "ABANDONED";
   const awaiting = room.status === "AWAITING_SUPPLIER_CONFIRMATION";
@@ -217,18 +228,19 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
           <span className="terms-btn"><span className="material-icons-outlined">check_circle</span>{room.contractType ?? L("Terms", "الشروط")}</span>
         </div>
         <div className="pc-body">
-          <div className="pc-rate">{L("SR", "ر.س")} {nf(rate)} <small>/ {L("day", "يوم")}</small></div>
-          <div className="pc-total">{L("Est. total", "الإجمالي التقديري")}: <b>{nf(grand)} {L("SAR", "ريال")}</b></div>
+          <div className="pc-rate">{L("SAR", "ر.س")} {nf(rate)} <small>/ {periodLabel}{units > 1 ? ` · ${L("per unit", "لكل وحدة")}` : ""}</small></div>
+          <div className="pc-total">{L("Estimated total", "الإجمالي التقديري")}: <b>{nf(grand)} {L("SAR", "ر.س")}</b></div>
           <div className={`bd-toggle${breakdown ? " open" : ""}`} onClick={() => setBreakdown((b) => !b)}>
             {breakdown ? L("Hide breakdown", "إخفاء التفصيل") : L("Show breakdown", "عرض التفصيل")}<span className="material-icons-outlined">expand_more</span>
           </div>
           {breakdown && (
             <div className="breakdown">
-              <div className="brow"><span className="l">{L("Rental", "الإيجار")} ({nf(rate)} × {periods})</span><span className="v">{nf(rate * periods)}</span></div>
+              <div className="brow"><span className="l">{L("Rental", "الإيجار")} ({nf(rate)} × {periods}{units > 1 ? ` × ${units}` : ""})</span><span className="v">{nf(rentalTotal)}</span></div>
               {room.mobPrice ? <div className="brow"><span className="l">{L("Mobilization", "النقل")}</span><span className="v">{nf(room.mobPrice)}</span></div> : null}
               {room.demobPrice ? <div className="brow"><span className="l">{L("Return", "الإرجاع")}</span><span className="v">{nf(room.demobPrice)}</span></div> : null}
-              <div className="brow"><span className="l">{L("VAT 15%", "ضريبة ١٥٪")}</span><span className="v">{nf(vat)}</span></div>
-              <div className="brow tot"><span className="l">{L("Grand total", "الإجمالي")}</span><span className="v">{nf(grand)} {L("SAR", "ر.س")}</span></div>
+              <div className="brow"><span className="l">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="v">{nf(subtotal)}</span></div>
+              <div className="brow"><span className="l">{L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)")}</span><span className="v">{nf(vat)}</span></div>
+              <div className="brow tot"><span className="l">{L("Estimated total", "الإجمالي التقديري")}</span><span className="v">{nf(grand)} {L("SAR", "ر.س")}</span></div>
             </div>
           )}
         </div>
@@ -337,7 +349,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
       )}
 
       {showAccept && (
-        <AcceptModal ar={ar} L={L} busy={busy} rate={rate} periods={periods} grand={grand} onClose={() => !busy && setShowAccept(false)} onConfirm={doAccept} />
+        <AcceptModal ar={ar} L={L} busy={busy} rate={rate} periods={periods} units={units} grand={grand} onClose={() => !busy && setShowAccept(false)} onConfirm={doAccept} />
       )}
 
       {showCounter && (
@@ -475,7 +487,7 @@ function CounterModal({ ar, L, busy, error, initialRate, onClose, onSubmit }: { 
   );
 }
 
-function AcceptModal({ ar, L, busy, rate, periods, grand, onClose, onConfirm }: { ar: boolean; L: (en: string, arr: string) => string; busy: boolean; rate: number; periods: number; grand: number; onClose: () => void; onConfirm: () => void }) {
+function AcceptModal({ ar, L, busy, rate, periods, units, grand, onClose, onConfirm }: { ar: boolean; L: (en: string, arr: string) => string; busy: boolean; rate: number; periods: number; units: number; grand: number; onClose: () => void; onConfirm: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" dir={ar ? "rtl" : "ltr"} onClick={onClose}>
       <div className="w-full max-w-sm rounded-2xl bg-[var(--surface1,#fff)] p-5 text-center shadow-xl" onClick={(e) => e.stopPropagation()}>
@@ -488,11 +500,11 @@ function AcceptModal({ ar, L, busy, rate, periods, grand, onClose, onConfirm }: 
         </p>
         <div className="mt-3.5 rounded-[12px] px-4 py-3 text-start" style={{ background: "var(--surface2,#f5f7fa)" }}>
           <div className="flex items-center justify-between text-[13px]">
-            <span style={{ color: "var(--muted,#6b7280)" }}>{L("Daily rate", "السعر اليومي")}</span>
-            <span className="font-bold" style={{ color: "var(--navy,#0f1e2e)" }}>{nf(rate)} × {periods}</span>
+            <span style={{ color: "var(--muted,#6b7280)" }}>{L("Rate", "السعر")}</span>
+            <span className="font-bold" style={{ color: "var(--navy,#0f1e2e)" }}>{nf(rate)} × {periods}{units > 1 ? ` × ${units}` : ""}</span>
           </div>
           <div className="mt-1.5 flex items-center justify-between text-[14px]">
-            <span className="font-bold" style={{ color: "var(--navy,#0f1e2e)" }}>{L("Grand total", "الإجمالي")}</span>
+            <span className="font-bold" style={{ color: "var(--navy,#0f1e2e)" }}>{L("Estimated total", "الإجمالي التقديري")}</span>
             <span className="font-extrabold" style={{ color: "#16a34a" }}>{nf(grand)} {L("SAR", "ر.س")}</span>
           </div>
         </div>

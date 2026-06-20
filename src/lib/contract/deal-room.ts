@@ -40,6 +40,9 @@ export interface DealRoomView {
   demobPrice: number | null;
   periods: number | null;
   priceUnit: string | null;
+  /** Units the RFQ asked for — the rate is PER-UNIT, so the rental total multiplies by this
+   *  (consistent with the bid cards + quotations + the backend deal quotation). */
+  numberOfUnits: number;
   /** Who made the last counter ("rentee" | "supplier" | null). The renter is the rentee. */
   lastCounterBy: string | null;
   /** Convenience: is it the renter's turn to act (accept/counter)? */
@@ -161,6 +164,8 @@ export function mapDealRoom(raw: unknown): DealRoomView {
     demobPrice: n(d.lastProposedDemobPrice) ?? n(bid.demobPrice),
     periods: n(bid.duration) ?? n((d.request as Record<string, unknown>)?.estimatedDurationDays),
     priceUnit: s(d.lastProposedPriceUnit) ?? s(bid.priceUnit),
+    numberOfUnits:
+      n((Array.isArray((d.request as Record<string, unknown>)?.equipmentItems) ? ((d.request as Record<string, unknown>).equipmentItems as Record<string, unknown>[])[0] : undefined)?.numberOfUnits) ?? 1,
     lastCounterBy,
     myTurn,
     terms,
