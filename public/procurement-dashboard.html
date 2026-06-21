@@ -525,5 +525,57 @@
   }
   render();
 </script>
+
+<!-- ── real-data loader (Moedatech): rebuild D/ORDER from the signed-in renter's requests + bids.
+     Same-origin fetches carry the auth cookie. Any failure keeps the sample data above. ── -->
+<script>
+(async function(){
+  function grand(b){ var p=b.duration||1, u=b.numberOfUnits||1; var s=(b.price||0)*p*u+(b.mobPrice||0)+(b.demobPrice||0); return Math.round(s*1.15); }
+  function days(a,b){ if(!a||!b) return null; var d=(new Date(b)-new Date(a))/86400000; return (isFinite(d)&&d>=0)?d:null; }
+  function locLabel(city){ if(!city) return t("Unassigned","غير محدّد"); var parts=String(city).split(",").map(function(s){return s.trim();}).filter(Boolean); var lbl = parts.length>=2 ? parts.slice(-2).join(" — ") : (parts[0]||city); return lbl.replace(/\s*\d{4,}\s*/g," ").replace(/\s*—\s*/," — ").trim(); }
+  function scope(list, bidsByReq, nameEn){
+    var bidsReceived=0, withBids=0, gmv=0, units=0, speeds=[], byEq={};
+    list.forEach(function(r){
+      var bids=bidsByReq[r.id]||[]; bidsReceived+=bids.length; units+=((r.item&&r.item.qty)||1);
+      var tot=bids.map(grand).filter(function(x){return x>0;}); var cheap=tot.length?Math.min.apply(null,tot):0;
+      if(bids.length){ withBids++; gmv+=cheap; }
+      var fb=bids.map(function(b){return b.submittedAt;}).filter(Boolean).sort()[0]||null; var sp=days(r.createdAt,fb); if(sp!=null) speeds.push(sp);
+      var nm=(r.item&&r.item.name)||t("Other","أخرى"); var e=byEq[nm]||(byEq[nm]={reqs:0,bids:0,gmv:0,noBid:0}); e.reqs++; e.bids+=bids.length; e.gmv+=cheap; if(!bids.length) e.noBid++;
+    });
+    var rfqs=list.length, comp=rfqs?Math.round(withBids/rfqs*100):0, speed=speeds.length?(speeds.reduce(function(s,x){return s+x;},0)/speeds.length):null;
+    var eq=Object.keys(byEq).map(function(nm){ var e=byEq[nm]; var avg=e.reqs?e.bids/e.reqs:0; var label,cls;
+      if(e.noBid===e.reqs){ cls="warn"; label=t("No bids yet","لا عروض بعد"); }
+      else if(avg<2){ cls="bad"; label=t("Single-source","مصدر وحيد"); }
+      else { cls="ok"; label=t("Healthy","جيّد"); }
+      return [nm, e.bids, (e.gmv/1e6).toFixed(2)+"M", label, cls];
+    }).sort(function(a,b){ return parseFloat(b[2])-parseFloat(a[2]); });
+    var ins=[]; var noB=rfqs-withBids;
+    if(noB>0) ins.push(["risk", t("Supply risk","مخاطر توريد"), noB+" "+t("RFQs have no bids yet","طلب بلا عروض بعد"), t("Chase suppliers or broaden the invite list.","تابع المؤجّرين أو وسّع قائمة الدعوة.")]);
+    var single=eq.filter(function(x){return x[4]==="bad";});
+    if(single.length) ins.push(["gap", t("Single source","مصدر وحيد"), single.map(function(x){return x[0];}).join(", ")+" — "+t("thin supply","توريد ضعيف"), t("Fewer than 2 bids on average — add verified suppliers.","أقل من عرضين وسطياً — أضف مؤجّرين موثّقين.")]);
+    if(eq[0]&&parseFloat(eq[0][2])>0) ins.push(["save", t("Savings","توفير"), eq[0][0]+" "+t("is your biggest spend","أكبر بند إنفاق"), t("Compare its bids to push the cost down.","قارن عروضه لخفض التكلفة.")]);
+    return { nameEn:nameEn, nameAr:nameEn, officer:"—", orders:rfqs, equip:units, speed:(speed!=null?speed.toFixed(1):"0.0"), score:comp, active:bidsReceived, gmv:(gmv/1e6).toFixed(2), comp:comp, intl:38, ext:62,
+      compH_en: withBids+" of "+rfqs+" RFQs received at least one bid.", compH_ar: withBids+" من "+rfqs+" طلباً وصلها عرض واحد على الأقل.", eq:eq, ins:ins };
+  }
+  try{
+    var me=null; try{ me=await fetch("/api/me",{cache:"no-store"}).then(function(r){return r.ok?r.json():null;}); }catch(e){}
+    var officer = (me&&me.user) ? [me.user.firstName,me.user.lastName].filter(Boolean).join(" ") : "—";
+    var rj = await fetch("/api/me/requests",{cache:"no-store"}).then(function(r){return r.json();});
+    var reqs = (rj&&rj.requests)||[];
+    if(!reqs.length) return; // no real data → keep the sample dashboard
+    var lists = await Promise.all(reqs.map(function(r){ return fetch("/api/me/requests/"+encodeURIComponent(r.id)+"/bids",{cache:"no-store"}).then(function(x){return x.ok?x.json():{bids:[]};}).then(function(x){return x.bids||[];}).catch(function(){return [];}); }));
+    var bidsByReq={}; reqs.forEach(function(r,i){ bidsByReq[r.id]=lists[i]; });
+    var groups={}, gorder=[]; reqs.forEach(function(r){ var key=locLabel(r.city); if(!groups[key]){ groups[key]={label:key,reqs:[]}; gorder.push(key); } groups[key].reqs.push(r); });
+    Object.keys(D).forEach(function(k){ delete D[k]; });
+    D.all = scope(reqs, bidsByReq, t("All projects","كل المشاريع")); D.all.officer=null; D.all.score=null;
+    ORDER.length=0;
+    gorder.forEach(function(key,i){ var pk="p"+i; D[pk]=scope(groups[key].reqs, bidsByReq, key); D[pk].officer=officer; ORDER.push(pk); });
+    var pt=document.querySelector(".ptabs");
+    if(pt){ pt.innerHTML = '<div class="ptab on" data-proj="all" onclick="selectProject(\'all\')"><span class="material-icons-outlined">grid_view</span>'+t("All projects","كل المشاريع")+'</div>' + ORDER.map(function(pk){ return '<div class="ptab" data-proj="'+pk+'" onclick="selectProject(\''+pk+'\')">'+D[pk].nameEn+'</div>'; }).join(""); }
+    curProj="all";
+    render();
+  }catch(e){ /* keep sample data on any failure */ }
+})();
+</script>
 </body>
 </html>

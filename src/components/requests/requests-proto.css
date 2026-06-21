@@ -421,3 +421,29 @@
 .rproto .rd-track .rt-stat.sub b { color: #ffc97a; }
 .rproto .rd-track .rt-copy { margin-inline-start: auto; display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 700; color: #fff; background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: var(--r-sm); padding: 7px 13px; cursor: pointer; }
 .rproto .rd-track .rt-copy .material-icons-outlined { font-size: 14px; }
+
+/* Filter bids dropdown (source + refine) */
+.rproto .filterbar { position: relative; margin-bottom: 14px; }
+.rproto .filterbtn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 15px; border: 1px solid var(--border); background: var(--surface1); border-radius: var(--r-md); font: inherit; font-size: 13px; font-weight: 700; color: var(--navy); cursor: pointer; }
+.rproto .filterbtn > .material-icons-outlined { font-size: 18px; color: var(--navy-mid); }
+.rproto .filterbtn .chev { transition: transform 0.15s; margin-inline-start: 2px; }
+.rproto .filterbtn.open .chev { transform: rotate(180deg); }
+.rproto .fb-count { font-size: 11px; font-weight: 800; background: var(--action); color: #fff; border-radius: 100px; padding: 1px 7px; }
+.rproto .filter-backdrop { position: fixed; inset: 0; z-index: 79; }
+.rproto .filter-pop { position: absolute; top: calc(100% + 6px); inset-inline-start: 0; z-index: 80; width: 300px; max-width: calc(100vw - 28px); background: var(--surface1); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: 0 18px 44px rgba(28, 53, 80, 0.22); padding: 8px; }
+.rproto .fp-h { font-size: 11px; font-weight: 800; color: var(--muted); letter-spacing: 0.3px; padding: 8px 10px 6px; }
+.rproto .fp-opt { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: var(--r-md); cursor: pointer; font-size: 13px; font-weight: 700; color: var(--navy); }
+.rproto .fp-opt:hover { background: var(--surface2); }
+.rproto .fp-opt .radio { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--border); flex: 0 0 auto; display: grid; place-items: center; }
+.rproto .fp-opt.on .radio { border-color: var(--rentee); }
+.rproto .fp-opt.on .radio::after { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--rentee); }
+.rproto .fp-opt .fp-ic { font-size: 16px; }
+.rproto .fp-opt .fp-n { margin-inline-start: auto; font-size: 11px; font-weight: 700; background: var(--surface3); color: var(--navy-mid); border-radius: 100px; padding: 1px 8px; }
+.rproto .fp-div { height: 1px; background: var(--surface3); margin: 7px 6px; }
+.rproto .fp-check .box { width: 18px; height: 18px; border-radius: 5px; border: 2px solid var(--border); flex: 0 0 auto; display: grid; place-items: center; color: #fff; }
+.rproto .fp-check.on .box { background: var(--rentee); border-color: var(--rentee); }
+.rproto .fp-check .box .material-icons-outlined { font-size: 14px; opacity: 0; }
+.rproto .fp-check.on .box .material-icons-outlined { opacity: 1; }
+.rproto .fp-foot { display: flex; align-items: center; gap: 8px; padding: 8px 6px 2px; border-top: 1px solid var(--surface3); margin-top: 6px; }
+.rproto .fp-foot .clr { font: inherit; font-size: 12px; font-weight: 700; color: var(--muted); background: none; border: 0; cursor: pointer; padding: 8px 10px; }
+.rproto .fp-foot .done { margin-inline-start: auto; font: inherit; font-size: 12.5px; font-weight: 800; color: #fff; background: var(--action); border: 0; border-radius: var(--r-sm); padding: 9px 18px; cursor: pointer; }
