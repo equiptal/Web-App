@@ -10,6 +10,9 @@ import { CredentialPills } from "@/components/requests/CredentialPills";
 import { TermsPanel } from "@/components/requests/TermsPanel";
 import { TermClassBadges } from "@/components/requests/TermClassBadges";
 import { DealRoomBanner, SupplierDocs } from "@/components/requests/BidCardExtras";
+import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
+import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
+import { useSharedLinkMock, tagSharedLinkBids } from "@/lib/mock/shared-link-bids";
 
 /** Lifecycle pill (matches the prototype SPILL). */
 const SPILL: Record<string, { cls: string; dot: boolean; en: string; ar: string }> = {
@@ -62,6 +65,9 @@ export function RequestBids({ requestId }: { requestId: string }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [equipBid, setEquipBid] = useState<BidCard | null>(null);
   const [openTermsId, setOpenTermsId] = useState<string | null>(null);
+  // web-app/006 demo (staging only) — relabel real bids as off-platform "via shared link".
+  const mockEnabled = useSharedLinkMock();
+  const [submissionBid, setSubmissionBid] = useState<BidCard | null>(null);
 
   const toggleSelect = (id: string) =>
     setSelected((prev) => {
@@ -167,7 +173,9 @@ export function RequestBids({ requestId }: { requestId: string }) {
 
   if (error) return <div className="rempty">{L("Couldn’t load the bids.", "تعذّر تحميل العروض.")}</div>;
   if (!bids) return <div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 26 }}>progress_activity</span></div>;
-  if (bids.length === 0) return <div className="rempty">{L("No bids yet — suppliers' offers will appear here.", "لا توجد عروض بعد — ستظهر عروض المؤجّرين هنا.")}</div>;
+  // Staging demo: relabel the first couple of real bids as off-platform shared-link submissions.
+  const allBids = mockEnabled ? tagSharedLinkBids(bids) : bids;
+  if (allBids.length === 0) return <div className="rempty">{L("No bids yet — suppliers' offers will appear here.", "لا توجد عروض بعد — ستظهر عروض المؤجّرين هنا.")}</div>;
 
   return (
     <div>
@@ -177,9 +185,22 @@ export function RequestBids({ requestId }: { requestId: string }) {
         <span className="material-icons-outlined go">chevron_right</span>
       </button>
       <div className="bids-bar">
-        <span className="count">{bids.length} {L("bids", "عروض")}</span>
+        <span className="count">{allBids.length} {L("bids", "عروض")}</span>
       </div>
-      {bids.map((b) => {
+      {allBids.map((b) => {
+        if (b.viaSharedLink) {
+          return (
+            <SharedLinkBidCard
+              key={b.id}
+              bid={b}
+              ar={ar}
+              L={L}
+              isSel={selected.has(b.id)}
+              onToggleSelect={() => toggleSelect(b.id)}
+              onViewSubmission={() => setSubmissionBid(b)}
+            />
+          );
+        }
         const sp = SPILL[b.status] ?? SPILL.PENDING;
         const accepted = b.status === "ACCEPTED";
         const disabled = b.status === "EXPIRED" || b.status === "WITHDRAWN" || b.expired;
@@ -333,6 +354,17 @@ export function RequestBids({ requestId }: { requestId: string }) {
           busy={busyId === equipBid.id}
           onRequestDetails={() => startNegotiation(equipBid)}
           onClose={() => setEquipBid(null)}
+        />
+      )}
+
+      {/* web-app/006 demo — read-only viewer of an off-platform shared-link submission */}
+      {submissionBid && (
+        <SharedBidSubmissionModal
+          bid={submissionBid}
+          ar={ar}
+          L={L}
+          onClose={() => setSubmissionBid(null)}
+          onAddToCompare={() => setSelected((prev) => new Set(prev).add(submissionBid.id))}
         />
       )}
     </div>

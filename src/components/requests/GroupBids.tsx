@@ -8,6 +8,9 @@ import { CredentialPills } from "@/components/requests/CredentialPills";
 import { TermsPanel } from "@/components/requests/TermsPanel";
 import { TermClassBadges } from "@/components/requests/TermClassBadges";
 import { DealRoomBanner, SupplierDocs } from "@/components/requests/BidCardExtras";
+import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
+import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
+import { useSharedLinkMock, tagSharedLinkBids } from "@/lib/mock/shared-link-bids";
 import { bidSuppliers, CERT_LABEL, type BidCard } from "@/lib/contract/bids";
 import type { RequestGroup } from "@/lib/contract/requests";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
@@ -133,6 +136,9 @@ export function GroupBids({ group }: { group: RequestGroup }) {
   const [openTermsId, setOpenTermsId] = useState<string | null>(null);
   const [langPick, setLangPick] = useState(false); // quotation language chooser (Arabic | English)
   const [renterName, setRenterName] = useState("");
+  // web-app/006 demo (staging only) — relabel real bids as off-platform "via shared link".
+  const mockEnabled = useSharedLinkMock();
+  const [submissionBid, setSubmissionBid] = useState<GroupBid | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -407,11 +413,13 @@ export function GroupBids({ group }: { group: RequestGroup }) {
 
   if (error) return <div className="rempty">{L("Couldn’t load the bids.", "تعذّر تحميل العروض.")}</div>;
   if (!bids) return <div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 26 }}>progress_activity</span></div>;
-  if (bids.length === 0) return <div className="rempty">{L("No bids yet for this request.", "لا توجد عروض بعد لهذا الطلب.")}</div>;
+  // Staging demo: relabel the first couple of real bids as off-platform shared-link submissions.
+  const allBids = mockEnabled ? tagSharedLinkBids(bids) : bids;
+  if (allBids.length === 0) return <div className="rempty">{L("No bids yet for this request.", "لا توجد عروض بعد لهذا الطلب.")}</div>;
 
-  const suppliers = bidSuppliers(bids);
-  const shown = (supplierKey === "all" ? [...bids].sort((a, b) => a.requestId.localeCompare(b.requestId)) : bids.filter((b) => (b.supplierId ?? b.supplierName) === supplierKey));
-  const selectedCount = bids.filter((b) => selected.has(b.id)).length;
+  const suppliers = bidSuppliers(allBids);
+  const shown = (supplierKey === "all" ? [...allBids].sort((a, b) => a.requestId.localeCompare(b.requestId)) : allBids.filter((b) => (b.supplierId ?? b.supplierName) === supplierKey));
+  const selectedCount = allBids.filter((b) => selected.has(b.id)).length;
 
   return (
     <div>
@@ -442,6 +450,22 @@ export function GroupBids({ group }: { group: RequestGroup }) {
       </div>
 
       {shown.map((b) => {
+        if (b.viaSharedLink) {
+          return (
+            <SharedLinkBidCard
+              key={b.id}
+              bid={b}
+              ar={ar}
+              L={L}
+              isSel={selected.has(b.id)}
+              onToggleSelect={() => toggleSelect(b.id)}
+              onViewSubmission={() => setSubmissionBid(b)}
+              itemLabel={ar ? b.itemLabelAr : b.itemLabel}
+              itemImage={b.itemImage}
+              categoryId={b.categoryId}
+            />
+          );
+        }
         const sp = SPILL[b.status] ?? SPILL.PENDING;
         const disabled = b.status === "EXPIRED" || b.status === "WITHDRAWN" || b.expired;
         const periods = b.duration ?? 1;
@@ -612,6 +636,17 @@ export function GroupBids({ group }: { group: RequestGroup }) {
           busy={busyId === equipBid.id}
           onRequestDetails={() => startNegotiation(equipBid)}
           onClose={() => setEquipBid(null)}
+        />
+      )}
+
+      {/* web-app/006 demo — read-only viewer of an off-platform shared-link submission */}
+      {submissionBid && (
+        <SharedBidSubmissionModal
+          bid={submissionBid}
+          ar={ar}
+          L={L}
+          onClose={() => setSubmissionBid(null)}
+          onAddToCompare={() => setSelected((prev) => new Set(prev).add(submissionBid.id))}
         />
       )}
     </div>

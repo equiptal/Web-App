@@ -8,6 +8,7 @@ import { publicTaxonomyUrl, type RequestItem, type RequestRecord } from "@/lib/c
 import { RequestBids } from "@/components/requests/RequestBids";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { LocationMap } from "@/components/requests/LocationMap";
+import { useSharedLinkMock, SHARED_LINK_STATS } from "@/lib/mock/shared-link-bids";
 import "@/components/requests/requests-proto.css";
 
 const STATUS_CLS: Record<string, string> = { OPEN: "st-open", ACTIVE: "st-active", ACCEPTED: "st-accepted", EXPIRED: "st-expired", CLOSED: "st-closed", ABANDONED: "st-closed" };
@@ -29,6 +30,16 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
   const [busy, setBusy] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
+  const [copied, setCopied] = useState(false);
+  // web-app/006 demo (staging only) — shared-link reach tracker on the request detail.
+  const showLinkTracker = useSharedLinkMock();
+  function copyShareLink() {
+    const url = `${window.location.origin}/supplier-bid-v2.html?req=${encodeURIComponent(r?.displayId ?? r?.id ?? "")}`;
+    navigator.clipboard?.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    }).catch(() => {});
+  }
 
   const reload = () => fetchRequestDetail(id).then(setR).catch(() => setError(true));
   useEffect(() => {
@@ -80,6 +91,19 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
         <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 700 }}>{r.displayId ?? r.shortCode ?? r.id}</span>
         {(r.bidCount ?? 0) > 0 && <span className="stbadge st-active" style={{ marginInlineStart: "auto" }}><span className="material-icons-outlined" style={{ fontSize: 13 }}>gavel</span>{r.bidCount} {L("bids", "عروض")}</span>}
       </div>
+
+      {/* web-app/006 demo — shared-link reach tracker (staging only) */}
+      {showLinkTracker && (
+        <div className="rd-track">
+          <span className="material-icons-outlined">link</span>
+          <span className="rt-lbl">{L("Shared link", "الرابط المشترك")}</span>
+          <span className="rt-stat"><span className="material-icons-outlined">visibility</span><b>{SHARED_LINK_STATS.opened}</b> {L("opened", "فتحة")}</span>
+          <span className="rt-stat sub"><span className="material-icons-outlined">gavel</span><b>{SHARED_LINK_STATS.submitted}</b> {L("submitted", "عرض")}</span>
+          <button className="rt-copy" onClick={copyShareLink}>
+            <span className="material-icons-outlined">{copied ? "check" : "content_copy"}</span>{copied ? L("Copied", "تم النسخ") : L("Copy link", "نسخ الرابط")}
+          </button>
+        </div>
+      )}
 
       {/* infostrip */}
       <div className="infostrip">
