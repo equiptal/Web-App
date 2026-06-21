@@ -45,7 +45,6 @@ export function Step4Preview() {
   const count = postableItems(draft.items).length;
   const notSent = draft.items.filter((i) => !i.removed && i.verdict === "no-match").length;
   const certs = [...p.certificates.safety.map((c) => t.options.safetyCert[c]), ...p.certificates.other.map((c) => t.options.otherCert[c])].join(", ") || "—";
-  const maint = `${t.options.maintenanceResp[pr.maintenance.responsibility]}${pr.maintenance.sla ? ` · ${t.options.maintenanceSla[pr.maintenance.sla]}` : ""}`;
   const payment = [pr.payment.terms && t.options.paymentTerm[pr.payment.terms], pr.payment.method && t.options.paymentMethod[pr.payment.method]].filter(Boolean).join(" · ") || "—";
   const suppliers =
     [pr.supplierFilters.verifiedOnly && t.step3.supplierFilters.verifiedOnly, pr.supplierFilters.bidWindow && t.options.bidWindow[pr.supplierFilters.bidWindow]].filter(Boolean).join(" · ") || "—";
@@ -139,7 +138,6 @@ export function Step4Preview() {
         <KV
           rows={[
             [t.step3.payment.title, payment],
-            [t.step3.maintenance.title, maint],
             [`${t.step1.requestWide.delivery} / ${t.step1.requestWide.return}`, `${p.deliveryToSite ? t.options.party[p.deliveryToSite] : t.preview.perItem} / ${p.returnFromSite ? t.options.party[p.returnFromSite] : t.preview.perItem}`],
             [t.step3.supplierFilters.title, suppliers],
           ]}

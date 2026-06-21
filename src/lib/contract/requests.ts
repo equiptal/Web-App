@@ -106,6 +106,9 @@ export interface RequestListItem {
   durationDays: number | null;
   createdAt: string | null;
   bidCount: number;
+  /** Who the request assigned mobilization / demobilization to (true = renter bears it, false = supplier). */
+  mobByRentee: boolean | null;
+  demobByRentee: boolean | null;
   /** The single fanned-out item (name + qty), used as the card title. */
   item: { name: string; nameAr: string; qty: number; imageUrl: string | null; categoryId: string | null } | null;
 }
@@ -185,6 +188,8 @@ export function mapRequestListItem(r: RequestRecord): RequestListItem {
     durationDays: num(r.estimatedDurationDays),
     createdAt: str(r.createdAt),
     bidCount: num(r.bidCount) ?? 0,
+    mobByRentee: it?.mobilizationByRentee ?? null,
+    demobByRentee: it?.demobilizationByRentee ?? null,
     item: it
       ? { name: itemName(it, false), nameAr: itemName(it, true), qty: it.numberOfUnits ?? 1, imageUrl: publicTaxonomyUrl(it.subtypeImageUrl ?? it.categoryImageUrl), categoryId: it.categoryId }
       : null,

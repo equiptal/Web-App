@@ -561,6 +561,7 @@ export function GroupBids({ group }: { group: RequestGroup }) {
       {selectedCount > 0 && (
         <div className="qbar">
           <span className="qn">{selectedCount} {L("selected", "محدّد")}</span>
+          {selectedCount < shown.length && <span className="qclear" onClick={() => setSelected(new Set(shown.map((b) => b.id)))}>{L("Select all", "تحديد الكل")}</span>}
           <span className="qclear" onClick={() => setSelected(new Set())}>{L("Clear", "مسح")}</span>
           {/* web-app/007 — Compare the selected bids side by side (needs ≥2). */}
           <button

@@ -5,12 +5,8 @@ import { useRfq } from "@/lib/store/rfq-store";
 import { Card, Field, Icon, Seg2, SelChips, Select, TextArea, TextInput } from "@/components/ui";
 import {
   PAYMENT_TERMS,
-  MAINTENANCE_RESPONSIBILITIES,
-  MAINTENANCE_SLAS,
   BID_WINDOWS,
   type PaymentTerm,
-  type MaintenanceResponsibility,
-  type MaintenanceSla,
   type BidWindow,
 } from "@/lib/contract";
 
@@ -37,18 +33,6 @@ export function Step3Preferences() {
           <Field label={t.step3.payment.terms} optional>
             <Select<PaymentTerm> value={p.payment.terms} placeholder="—" onChange={(v) => actions.patchPreferences({ payment: { terms: v } })} options={opt(PAYMENT_TERMS, t.options.paymentTerm)} />
           </Field>
-        </div>
-
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label={t.step3.maintenance.title} optional>
-            <Seg2<MaintenanceResponsibility> value={p.maintenance.responsibility} onChange={(v) => actions.patchPreferences({ maintenance: { responsibility: v } })} options={opt(MAINTENANCE_RESPONSIBILITIES, t.options.maintenanceResp)} />
-          </Field>
-          {/* AC-37: SLA shown only when responsibility is Supplier. */}
-          {p.maintenance.responsibility === "supplier" && (
-            <Field label={t.step3.maintenance.sla} optional>
-              <Seg2<MaintenanceSla> value={p.maintenance.sla} onChange={(v) => actions.patchPreferences({ maintenance: { sla: v } })} onClear={() => actions.patchPreferences({ maintenance: { sla: null } })} options={opt(MAINTENANCE_SLAS, t.options.maintenanceSla)} />
-            </Field>
-          )}
         </div>
 
         <div className="mt-4">

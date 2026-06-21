@@ -77,6 +77,7 @@ export function BidComparisonWorkspace() {
   // UI chrome state to mirror the prototype.
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selectorOpen, setSelectorOpen] = useState(true);
+  const [agentOpen, setAgentOpen] = useState(true); // the AI assistant panel sits above the table, collapsible
   const [uploadOpen, setUploadOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [chat, setChat] = useState<ChatMsg[]>([]);
@@ -203,6 +204,7 @@ export function BidComparisonWorkspace() {
   const activeItemObj = items.find((i) => i.id === activeItem);
   const durationDays = activeItemObj?.durationDays ?? null;
   const units = activeItemObj?.item?.qty ?? 1;
+  const mobByRentee = activeItemObj?.mobByRentee ?? null; // who YOUR request assigned delivery to (true = you, false = supplier)
   // Displayed total = the supplier's STATED costs + 15% VAT + the renter's own entered costs (responsibilities
   // on them + their delivery estimate). Always shown as a running total of what's known — never "not stated".
   const VAT = 0.15;
@@ -568,6 +570,89 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
             )}
           </div>
 
+          {/* ── Your AI assistant (collapsible) — above the table ── */}
+          <div className="overflow-hidden rounded-xl border" style={{ borderColor: C.border, background: "#fff" }}>
+            <button onClick={() => setAgentOpen((o) => !o)} className="flex w-full items-center gap-2.5 px-4 py-3.5 text-start text-white" style={{ background: `linear-gradient(150deg,${C.navy},${C.navyDeep})` }}>
+              <div className="grid h-9 w-9 flex-none place-items-center rounded-lg" style={{ background: `linear-gradient(135deg,${C.action},#FFA733)` }}><span className="material-icons-outlined" style={{ fontSize: 21 }}>auto_awesome</span></div>
+              <div><b className="text-[15px]">{L("Your AI assistant", "مساعدك الذكي")}</b><p className="m-0 text-[11.5px]" style={{ color: "rgba(255,255,255,.66)" }}>{L("Qualified first, then ranked on what matters to you", "التأهيل أولاً، ثم الترتيب حسب ما يهمّك")}</p></div>
+              <span className="ms-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-extrabold" style={recLoading ? { background: "rgba(247,144,9,.18)", border: "1px solid rgba(247,144,9,.45)", color: "#FFC97A" } : agentLive ? { background: "rgba(29,175,88,.18)", border: "1px solid rgba(29,175,88,.45)", color: "#7BE0A5" } : { background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.2)", color: "rgba(255,255,255,.7)" }}>
+                {recLoading ? <span className="material-icons-outlined animate-spin" style={{ fontSize: 13 }}>autorenew</span> : <span className="h-2 w-2 rounded-full" style={{ background: agentLive ? "#7BE0A5" : "rgba(255,255,255,.6)" }} />}
+                {recLoading ? L("thinking…", "يفكّر…") : agentLive ? `${L("live", "متصل")}${conf != null ? ` · ${conf}%` : ""}` : L("offline", "غير متصل")}
+              </span>
+              <span className="material-icons-outlined" style={{ fontSize: 22, color: "rgba(255,255,255,.72)", transform: agentOpen ? "" : "rotate(-90deg)" }}>expand_more</span>
+            </button>
+            {agentOpen && (<>
+              {/* rank by what matters — the agent re-orders the table below (AC-20/21) */}
+              <div className="border-b px-4 py-3.5" style={{ borderColor: C.line, background: "#fff" }}>
+                <div className="mb-2.5 flex flex-wrap items-center gap-2 text-[12.5px] font-extrabold" style={{ color: C.navyMid }}>
+                  <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>tune</span>{L("Rank the table by what matters to you", "رتّب الجدول حسب ما يهمّك")}
+                  <span className="ms-auto">{agentBadge()}</span>
+                </div>
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {presetDefs.map(([p, ic, en, arl]) => (
+                    <button key={p} onClick={() => choosePreset(p, en, arl)} className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-bold transition"
+                      style={preset === p && !fxEcho ? { background: C.navy, borderColor: C.navy, color: "#fff" } : { background: C.surface2, borderColor: C.border, color: C.navyMid }}>
+                      <span className="material-icons-outlined" style={{ fontSize: 16 }}>{ic}</span>{ar ? arl : en}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2.5">
+                  <div className="flex h-[46px] flex-1 items-center gap-2.5 rounded-lg border px-3.5" style={{ background: C.surface2, borderColor: C.border }}>
+                    <span className="material-icons-outlined" style={{ fontSize: 19, color: C.action }}>auto_awesome</span>
+                    <input value={freeText} onChange={(e) => setFreeText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") applyFreeText(); }}
+                      placeholder={L("Tell your assistant what matters — e.g. 'closest machine, fuel must be included'…", "أخبر مساعدك بما يهمّك — مثلاً: 'أقرب معدّة، ويجب أن يكون الوقود مشمولاً'…")}
+                      className="min-w-0 flex-1 bg-transparent text-[14px] outline-none" style={{ color: C.navy }} />
+                  </div>
+                  <button onClick={applyFreeText} className="inline-flex items-center gap-1.5 rounded-lg px-4 text-[13.5px] font-bold text-white" style={{ background: C.action }}>
+                    <span className="material-icons-outlined" style={{ fontSize: 18 }}>send</span>{L("Re-rank", "إعادة الترتيب")}
+                  </button>
+                </div>
+                {fxEcho && (
+                  <div className="mt-3 flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-[12.5px]" style={{ background: C.actionDim, borderColor: "rgba(247,144,9,.3)", color: "#8A5A06" }}>
+                    <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>auto_awesome</span>{fxEcho}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex max-h-[420px] flex-col gap-3 overflow-y-auto p-4">
+                {recoMsg && (
+                  <div className="flex max-w-[92%] gap-2.5">
+                    <div className="grid h-[30px] w-[30px] flex-none place-items-center rounded-lg" style={{ background: `linear-gradient(135deg,${C.action},#FFA733)` }}><span className="material-icons-outlined" style={{ fontSize: 17, color: "#fff" }}>auto_awesome</span></div>
+                    <div className="rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed" style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.navy, borderStartStartRadius: 4 }}>
+                      <span className="mb-1 flex items-center gap-1.5 text-[12px] font-extrabold">
+                        <span className="grid h-5 w-5 flex-none place-items-center rounded-full text-[11px] font-black text-white" style={{ background: `linear-gradient(135deg,${C.gold},#E0A92E)`, color: "#2A1D00" }}>1</span>
+                        {(cols.find((c) => c.bid.id === pickId) ?? cols[0])?.bid.supplierName}
+                      </span>
+                      {recoMsg}
+                    </div>
+                  </div>
+                )}
+                {chat.map((m, i) => (
+                  <div key={i} className={`flex max-w-[92%] gap-2.5 ${m.role === "user" ? "ms-auto flex-row-reverse" : ""}`}>
+                    {m.role === "mansour" && <div className="grid h-[30px] w-[30px] flex-none place-items-center rounded-lg" style={{ background: `linear-gradient(135deg,${C.action},#FFA733)` }}><span className="material-icons-outlined" style={{ fontSize: 17, color: "#fff" }}>auto_awesome</span></div>}
+                    <div className="rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed" style={m.role === "user" ? { background: C.rentee, color: "#fff", borderStartEndRadius: 4 } : { background: C.surface2, border: `1px solid ${C.border}`, color: C.navy, borderStartStartRadius: 4 }}>{m.text}</div>
+                  </div>
+                ))}
+              </div>
+              {suggestions.length > 0 && (
+                <div className="flex flex-wrap gap-2 px-4 pb-3">
+                  {suggestions.map((s, i) => (
+                    <button key={i} onClick={() => sendChat(s.message)} className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[12.5px] font-bold" style={{ borderColor: C.border, color: C.rentee, background: "#fff" }}>
+                      <span className="material-icons-outlined" style={{ fontSize: 15 }}>{SUGGEST_ICON[s.icon] ?? "help"}</span>{s.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2.5 border-t px-4 py-3" style={{ borderColor: C.line, background: C.surface2 }}>
+                <div className="flex h-[46px] flex-1 items-center gap-2.5 rounded-full border px-4" style={{ background: "#fff", borderColor: C.border }}>
+                  <span className="material-icons-outlined" style={{ fontSize: 18, color: C.action }}>auto_awesome</span>
+                  <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") sendChat(chatInput); }} placeholder={L("Ask your assistant…", "اسأل مساعدك…")} className="min-w-0 flex-1 bg-transparent text-[14px] outline-none" style={{ color: C.navy }} />
+                </div>
+                <button onClick={() => sendChat(chatInput)} className="grid h-[46px] w-[46px] flex-none place-items-center rounded-full text-white" style={{ background: C.action }}><span className="material-icons-outlined" style={{ fontSize: 20, transform: ar ? "scaleX(-1)" : undefined }}>send</span></button>
+              </div>
+            </>)}
+          </div>
+
           {/* ── how-to-read tip (compact, expandable) ── */}
           <details className="group rounded-lg border" style={{ borderColor: C.border, background: "#fff" }}>
             <summary className="flex cursor-pointer list-none items-center gap-2 px-3.5 py-2.5 text-[12.5px] font-bold" style={{ color: C.navyMid }}>
@@ -664,7 +749,7 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
                         const realDays = c.bid.duration ?? durationDays; // actual rental length (days); null → defaulted to 1 period
                         const per = periodLabel(c.bid.priceUnit);
                         return (
-                          <Td key={c.bid.id}>
+                          <Td key={c.bid.id} ok={c.bid.price != null}>
                             {c.bid.price == null ? (
                               <span style={{ color: C.muted }}>{L("not stated", "غير محدد")}</span>
                             ) : (<>
@@ -683,22 +768,29 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
                       })}
                     </tr>
                     <tr>
-                      <RowHead title={L("Mobilization + demob", "النقل + الإرجاع")} sub={L("one-time, whole job", "لمرة واحدة، لكامل العمل")} />
+                      <RowHead title={L("Mobilization + demob", "النقل + الإرجاع")} sub={mobByRentee === true ? L("you bear delivery", "النقل عليك") : mobByRentee === false ? L("required from the supplier", "مطلوب من المؤجّر") : L("one-time, whole job", "لمرة واحدة، لكامل العمل")} />
                       {cols.map((c) => {
                         const stated = c.mob.stated || c.demob.stated;
                         const rm = renterMob[c.bid.id];
+                        // From YOUR request: who bears delivery. Supplier-required but the bid didn't price it → conflict (red).
+                        const onRenter = mobByRentee === true;
+                        const onSupplier = mobByRentee === false;
+                        const conflict = onSupplier && !stated;
+                        const addBtn = (
+                          <button onClick={() => addMobCost(c.bid.id, L("Delivery + pickup", "النقل والإرجاع"))} className="inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[9.5px] font-extrabold" style={{ color: C.rentee, borderColor: "rgba(37,99,235,.4)", background: "#fff" }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>add</span>{L("add cost", "أضف تكلفة")}</button>
+                        );
                         return (
-                          <Td key={c.bid.id}>
+                          <Td key={c.bid.id} ok={!conflict} fail={conflict}>
                             {stated ? (<>
                               <span className="text-[13px] font-bold">{sar} {nf((c.mob.stated ? c.mob.value : 0) + (c.demob.stated ? c.demob.value : 0))}</span>
                               <Sub>{`${sar} ${nf(c.mob.value)} ${L("mob", "نقل")} + ${sar} ${nf(c.demob.value)} ${L("demob", "إرجاع")}`}</Sub>
                             </>) : rm ? (<>
                               <span className="text-[13px] font-bold">{sar} {nf(rm)} <button onClick={() => addMobCost(c.bid.id, L("Delivery + pickup", "النقل والإرجاع"))} className="text-[10px] font-bold underline" style={{ color: C.rentee }}>{L("edit", "تعديل")}</button></span>
-                              <Sub>{L("your estimate · delivery on you", "تقديرك · النقل عليك")}</Sub>
-                            </>) : (
-                              <span className="inline-flex items-center gap-1.5 text-[12px]" style={{ color: C.muted }}>{L("not stated", "غير محدد")}
-                                <button onClick={() => addMobCost(c.bid.id, L("Delivery + pickup", "النقل والإرجاع"))} className="inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[9.5px] font-extrabold" style={{ color: C.rentee, borderColor: "rgba(37,99,235,.4)", background: "#fff" }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>add</span>{L("add cost", "أضف تكلفة")}</button>
-                              </span>
+                              <Sub>{L("your estimate · on you", "تقديرك · عليك")}</Sub>
+                            </>) : conflict ? (
+                              <span className="inline-flex items-center gap-1.5 text-[12px] font-bold" style={{ color: C.danger }}>{L("supplier didn't include it", "لم يُدرجه المؤجّر")}{addBtn}</span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 text-[12px]" style={{ color: C.muted }}>{onRenter ? L("on you", "عليك") : L("not stated", "غير محدد")}{addBtn}</span>
                             )}
                           </Td>
                         );
@@ -713,10 +805,10 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
                               const cr = c.costResponsibilities.find((x) => x.key === m.key)!;
                               // RED only on a real conflict: your request assigned this to the supplier but the bid puts it on you.
                               // Supplier-covered = green; on you (but not required of the supplier) or unknown = neutral.
-                              const kind = cr.bidSide === "supplier" ? "y" : cr.state === "red" ? "n" : "muted";
-                              // Only offer "add cost" where the cost genuinely lands on you. Terms the bid doesn't
-                              // state (fuel/overtime/food/transport today) show neutral — no fake "add cost" on every one.
-                              const canAdd = cr.bidSide === "me";
+                              // Binary: conflicts with your request → red; otherwise green (incl. a cost you
+                              // chose to bear, or one the bid doesn't state). Supplier-covered → green, no add.
+                              const kind = cr.state === "red" ? "n" : "y";
+                              const canAdd = cr.bidSide !== "supplier"; // on you / not stated → let you enter your figure
                               return <span key={m.key}>{incChip(ar ? m.ar : m.en, kind, canAdd ? () => addCost(m.key, ar ? m.ar : m.en) : undefined, m.icon)}</span>;
                             })}
                           </div>
@@ -730,15 +822,15 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
                   {!collapsed.has("equip") && (<>
                     <tr>
                       <RowHead title={L("Year", "سنة الصنع")} />
-                      {cols.map((c) => { const yr = c.equipment.find((r) => r.key === "year"); const isNewest = (c.bid.equipment?.year ?? 0) > 0 && c.bid.equipment?.year === Math.max(...cols.map((x) => x.bid.equipment?.year ?? 0)); return <Td key={c.bid.id} ok={yr?.state === "matched"} fail={yr?.state === "conflict"}><span className="text-[13px] font-bold">{c.bid.equipment?.year ?? "—"}</span>{isNewest && cols.length > 1 && <Sub>{L("newest", "الأحدث")}</Sub>}</Td>; })}
+                      {cols.map((c) => { const yr = c.equipment.find((r) => r.key === "year"); const isNewest = (c.bid.equipment?.year ?? 0) > 0 && c.bid.equipment?.year === Math.max(...cols.map((x) => x.bid.equipment?.year ?? 0)); return <Td key={c.bid.id} ok={yr?.state !== "conflict"} fail={yr?.state === "conflict"}><span className="text-[13px] font-bold">{c.bid.equipment?.year ?? "—"}</span>{isNewest && cols.length > 1 && <Sub>{L("newest", "الأحدث")}</Sub>}</Td>; })}
                     </tr>
                     <tr>
                       <RowHead title={L("Model", "الطراز")} />
-                      {cols.map((c) => <Td key={c.bid.id}><span className="text-[13px] font-bold">{[c.bid.equipment?.make, c.bid.equipment?.model].filter(Boolean).join(" ") || "—"}</span></Td>)}
+                      {cols.map((c) => <Td key={c.bid.id} ok><span className="text-[13px] font-bold">{[c.bid.equipment?.make, c.bid.equipment?.model].filter(Boolean).join(" ") || "—"}</span></Td>)}
                     </tr>
                     <tr>
                       <RowHead title={L("Distance to site", "المسافة للموقع")} />
-                      {cols.map((c) => <Td key={c.bid.id}><span className="text-[13px] font-bold">{c.bid.distanceKm != null ? `${Math.round(c.bid.distanceKm)} ${L("km", "كم")}` : <span style={{ color: C.muted }}>—</span>}</span></Td>)}
+                      {cols.map((c) => <Td key={c.bid.id} ok><span className="text-[13px] font-bold">{c.bid.distanceKm != null ? `${Math.round(c.bid.distanceKm)} ${L("km", "كم")}` : <span style={{ color: C.muted }}>—</span>}</span></Td>)}
                     </tr>
                     <CertRow label={L("Equipment certificates", "شهادات المعدّة")} sub={L("required", "مطلوبة")} cols={cols} pick={EQUIP_CERTS} certLabel={certLabel} incChip={incChip} />
                     <CertRow label={L("Operator certificates", "شهادات المشغّل")} sub={L("required", "مطلوبة")} cols={cols} pick={OPER_CERTS} certLabel={certLabel} incChip={incChip} />
@@ -750,9 +842,9 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
                     <tr>
                       <RowHead title={L("Verified supplier", "مؤجر موثّق")} />
                       {cols.map((c) => (
-                        <Td key={c.bid.id} ok={c.bid.verified}>
-                          <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-extrabold" style={c.bid.verified ? { background: C.successBg, color: C.success } : { background: C.surface3, color: C.muted }}>
-                            <span className="material-icons-outlined" style={{ fontSize: 14 }}>{c.bid.verified ? "verified_user" : "remove"}</span>{c.bid.verified ? L("Verified", "موثّق") : L("Not verified", "غير موثّق")}
+                        <Td key={c.bid.id} ok={c.bid.verified} fail={!c.bid.verified}>
+                          <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-extrabold" style={c.bid.verified ? { background: C.successBg, color: C.success } : { background: C.dangerBg, color: C.danger }}>
+                            <span className="material-icons-outlined" style={{ fontSize: 14 }}>{c.bid.verified ? "verified_user" : "gpp_bad"}</span>{c.bid.verified ? L("Verified", "موثّق") : L("Not verified", "غير موثّق")}
                           </span>
                           {c.bid.id.startsWith("upload:") && <Sub>{L("off-platform", "خارج المنصة")}</Sub>}
                         </Td>
@@ -772,7 +864,7 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
                         ].filter((d) => d.has || d.req); // show held docs + required-missing; hide irrelevant absent ones
                         const missingRequired = docs.some((d) => d.req && !d.has);
                         return (
-                          <Td key={c.bid.id} ok={docs.length > 0 && !missingRequired} fail={missingRequired}>
+                          <Td key={c.bid.id} ok={!missingRequired} fail={missingRequired}>
                             {docs.length ? <div className="flex flex-wrap gap-1.5">{docs.map((d) => <span key={d.lbl}>{incChip(d.lbl, d.has ? "y" : d.req ? "n" : "muted")}</span>)}</div> : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}
                           </Td>
                         );
@@ -809,88 +901,6 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
             </div>
           </div>
 
-          {/* ── Ask Mansour chat ── */}
-          <div className="overflow-hidden rounded-xl border" style={{ borderColor: C.border, background: "#fff" }}>
-            <div className="flex items-center gap-2.5 px-4 py-3.5 text-white" style={{ background: `linear-gradient(150deg,${C.navy},${C.navyDeep})` }}>
-              <div className="grid h-9 w-9 flex-none place-items-center rounded-lg" style={{ background: `linear-gradient(135deg,${C.action},#FFA733)` }}><span className="material-icons-outlined" style={{ fontSize: 21 }}>auto_awesome</span></div>
-              <div><b className="text-[15px]">{L("Your AI assistant", "مساعدك الذكي")}</b><p className="m-0 text-[11.5px]" style={{ color: "rgba(255,255,255,.66)" }}>{L("Qualified first, then ranked on what matters to you", "التأهيل أولاً، ثم الترتيب حسب ما يهمّك")}</p></div>
-              <span className="ms-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-extrabold" style={recLoading ? { background: "rgba(247,144,9,.18)", border: "1px solid rgba(247,144,9,.45)", color: "#FFC97A" } : agentLive ? { background: "rgba(29,175,88,.18)", border: "1px solid rgba(29,175,88,.45)", color: "#7BE0A5" } : { background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.2)", color: "rgba(255,255,255,.7)" }}>
-                {recLoading ? <span className="material-icons-outlined animate-spin" style={{ fontSize: 13 }}>autorenew</span> : <span className="h-2 w-2 rounded-full" style={{ background: agentLive ? "#7BE0A5" : "rgba(255,255,255,.6)" }} />}
-                {recLoading ? L("thinking…", "يفكّر…") : agentLive ? `${L("live", "متصل")}${conf != null ? ` · ${conf}%` : ""}` : L("offline", "غير متصل")}
-              </span>
-            </div>
-
-            {/* rank by what matters — the agent re-orders the table above (AC-20/21) */}
-            <div className="border-b px-4 py-3.5" style={{ borderColor: C.line, background: "#fff" }}>
-              <div className="mb-2.5 flex flex-wrap items-center gap-2 text-[12.5px] font-extrabold" style={{ color: C.navyMid }}>
-                <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>tune</span>{L("Rank the table by what matters to you", "رتّب الجدول حسب ما يهمّك")}
-                <span className="ms-auto">{agentBadge()}</span>
-              </div>
-              <div className="mb-3 flex flex-wrap gap-2">
-                {presetDefs.map(([p, ic, en, arl]) => (
-                  <button key={p} onClick={() => choosePreset(p, en, arl)} className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-bold transition"
-                    style={preset === p && !fxEcho ? { background: C.navy, borderColor: C.navy, color: "#fff" } : { background: C.surface2, borderColor: C.border, color: C.navyMid }}>
-                    <span className="material-icons-outlined" style={{ fontSize: 16 }}>{ic}</span>{ar ? arl : en}
-                  </button>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-2.5">
-                <div className="flex h-[46px] flex-1 items-center gap-2.5 rounded-lg border px-3.5" style={{ background: C.surface2, borderColor: C.border }}>
-                  <span className="material-icons-outlined" style={{ fontSize: 19, color: C.action }}>auto_awesome</span>
-                  <input value={freeText} onChange={(e) => setFreeText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") applyFreeText(); }}
-                    placeholder={L("Tell your assistant what matters — e.g. 'closest machine, fuel must be included'…", "أخبر مساعدك بما يهمّك — مثلاً: 'أقرب معدّة، ويجب أن يكون الوقود مشمولاً'…")}
-                    className="min-w-0 flex-1 bg-transparent text-[14px] outline-none" style={{ color: C.navy }} />
-                </div>
-                <button onClick={applyFreeText} className="inline-flex items-center gap-1.5 rounded-lg px-4 text-[13.5px] font-bold text-white" style={{ background: C.action }}>
-                  <span className="material-icons-outlined" style={{ fontSize: 18 }}>send</span>{L("Re-rank", "إعادة الترتيب")}
-                </button>
-              </div>
-              {fxEcho && (
-                <div className="mt-3 flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-[12.5px]" style={{ background: C.actionDim, borderColor: "rgba(247,144,9,.3)", color: "#8A5A06" }}>
-                  <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>auto_awesome</span>{fxEcho}
-                </div>
-              )}
-            </div>
-
-            <div className="flex max-h-[420px] flex-col gap-3 overflow-y-auto p-4">
-              {/* live recommendation — tracks the current ranking */}
-              {recoMsg && (
-                <div className="flex max-w-[92%] gap-2.5">
-                  <div className="grid h-[30px] w-[30px] flex-none place-items-center rounded-lg" style={{ background: `linear-gradient(135deg,${C.action},#FFA733)` }}><span className="material-icons-outlined" style={{ fontSize: 17, color: "#fff" }}>auto_awesome</span></div>
-                  <div className="rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed" style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.navy, borderStartStartRadius: 4 }}>
-                    <span className="mb-1 flex items-center gap-1.5 text-[12px] font-extrabold">
-                      <span className="grid h-5 w-5 flex-none place-items-center rounded-full text-[11px] font-black text-white" style={{ background: `linear-gradient(135deg,${C.gold},#E0A92E)`, color: "#2A1D00" }}>1</span>
-                      {(cols.find((c) => c.bid.id === pickId) ?? cols[0])?.bid.supplierName}
-                    </span>
-                    {recoMsg}
-                  </div>
-                </div>
-              )}
-              {chat.map((m, i) => (
-                <div key={i} className={`flex max-w-[92%] gap-2.5 ${m.role === "user" ? "ms-auto flex-row-reverse" : ""}`}>
-                  {m.role === "mansour" && <div className="grid h-[30px] w-[30px] flex-none place-items-center rounded-lg" style={{ background: `linear-gradient(135deg,${C.action},#FFA733)` }}><span className="material-icons-outlined" style={{ fontSize: 17, color: "#fff" }}>auto_awesome</span></div>}
-                  <div className="rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed" style={m.role === "user" ? { background: C.rentee, color: "#fff", borderStartEndRadius: 4 } : { background: C.surface2, border: `1px solid ${C.border}`, color: C.navy, borderStartStartRadius: 4 }}>{m.text}</div>
-                </div>
-              ))}
-            </div>
-            {/* Context-aware what-if chips — tailored by Mansour to THIS comparison (not a fixed list). */}
-            {suggestions.length > 0 && (
-              <div className="flex flex-wrap gap-2 px-4 pb-3">
-                {suggestions.map((s, i) => (
-                  <button key={i} onClick={() => sendChat(s.message)} className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[12.5px] font-bold" style={{ borderColor: C.border, color: C.rentee, background: "#fff" }}>
-                    <span className="material-icons-outlined" style={{ fontSize: 15 }}>{SUGGEST_ICON[s.icon] ?? "help"}</span>{s.label}
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className="flex gap-2.5 border-t px-4 py-3" style={{ borderColor: C.line, background: C.surface2 }}>
-              <div className="flex h-[46px] flex-1 items-center gap-2.5 rounded-full border px-4" style={{ background: "#fff", borderColor: C.border }}>
-                <span className="material-icons-outlined" style={{ fontSize: 18, color: C.action }}>auto_awesome</span>
-                <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") sendChat(chatInput); }} placeholder={L("Ask your assistant…", "اسأل مساعدك…")} className="min-w-0 flex-1 bg-transparent text-[14px] outline-none" style={{ color: C.navy }} />
-              </div>
-              <button onClick={() => sendChat(chatInput)} className="grid h-[46px] w-[46px] flex-none place-items-center rounded-full text-white" style={{ background: C.action }}><span className="material-icons-outlined" style={{ fontSize: 20, transform: ar ? "scaleX(-1)" : undefined }}>send</span></button>
-            </div>
-          </div>
         </>
       )}
 
@@ -1029,9 +1039,8 @@ function CertRow({ label, sub, cols, pick, certLabel, incChip }: { label: string
         const held = c.bid.heldCertCodes.filter((x) => pick.includes(x));
         const missing = c.bid.requiredCerts.filter((x) => pick.includes(x) && !c.bid.heldCertCodes.includes(x));
         const anyMissing = missing.length > 0;
-        const anyHeld = held.length > 0;
         return (
-          <Td key={c.bid.id} ok={anyHeld && !anyMissing} fail={anyMissing}>
+          <Td key={c.bid.id} ok={!anyMissing} fail={anyMissing}>
             {held.length || missing.length ? (
               <div className="flex flex-wrap gap-1.5">
                 {held.map((x) => <span key={x}>{incChip(certLabel(x), "y")}</span>)}

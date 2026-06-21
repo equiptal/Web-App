@@ -21,7 +21,7 @@ describe("daysPerPeriod", () => {
   it("maps the price unit to days (PER_JOB → 0)", () => {
     expect(daysPerPeriod("PER_DAY")).toBe(1);
     expect(daysPerPeriod("PER_WEEK")).toBe(7);
-    expect(daysPerPeriod("PER_MONTH")).toBe(30);
+    expect(daysPerPeriod("PER_MONTH")).toBe(26); // 26 working days per month, not 30 calendar
     expect(daysPerPeriod("PER_JOB")).toBe(0);
     expect(daysPerPeriod(null)).toBe(1);
   });
@@ -59,10 +59,10 @@ describe("buildItemComparison — all-in (AC-09/10/35)", () => {
     expect(columns[0].rental).toEqual({ value: 200, stated: true });
   });
 
-  it("monthly rate is prorated by the period, not multiplied by raw days", () => {
-    // 17,000/month over 22 days · 1 unit = (17000/30)*22 = 12,467 (NOT 17000*22).
+  it("monthly rate is prorated over 26 working days, not raw calendar days", () => {
+    // 17,000/month over 22 days · 1 unit = (17000/26)*22 ≈ 14,385 (a month = 26 working days, NOT 30).
     const { columns } = buildItemComparison([bc({ id: "a", supplierId: "1", price: 17000, priceUnit: "PER_MONTH", duration: 22 })]);
-    expect(Math.round(columns[0].rental.value)).toBe(12467); // (17000/30)*22 ≈ 12,466.7 → shown as 12,467, NOT 17000*22
+    expect(Math.round(columns[0].rental.value)).toBe(14385);
   });
 
   it("falls back to the request duration when the bid omits its own", () => {

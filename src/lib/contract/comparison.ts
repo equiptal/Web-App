@@ -10,11 +10,12 @@
  */
 import type { BidCard, TermRow } from "@/lib/contract/bids";
 
-/** Days in one billing period for the bid's price unit. PER_JOB → 0 (a single job, no period count). */
+/** Working days in one billing period for the bid's price unit (a month = 26 working days, not 30
+ *  calendar days). PER_JOB → 0 (a single job, no period count). */
 export function daysPerPeriod(unit: string | null): number {
   switch ((unit ?? "PER_DAY").toUpperCase()) {
     case "PER_WEEK": return 7;
-    case "PER_MONTH": return 30;
+    case "PER_MONTH": return 26;
     case "PER_JOB": return 0;
     default: return 1; // PER_DAY
   }

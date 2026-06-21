@@ -1,0 +1,354 @@
+<!-- BUILD REFERENCE: AI-assembled prototype for web-app/006 · Renter "Share for bids".
+     Derived from schematic/share-for-bids.html (pins 1–5), styled to the rentee-web design system
+     (matches 001/003/004). Reference, not contract — acceptance.md wins where they diverge.
+     Dev latitude on colors/UI; assemble against the prototype + official Moedatech logo. -->
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moedatech · Rentee Web — Share for bids</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined">
+<style>
+  :root{
+    --navy:#1C3550;--navy-deep:#12263A;--navy-mid:#2A4F72;--gold:#B8860B;
+    --action:#F79009;--action-dim:#FFF4E5;--rentee:#2563EB;--rentee-dim:#EAF1FE;--supplier:#0D8A6A;
+    --success:#1DAF58;--success-bg:#E7F7EE;--warning:#D4780A;--warning-bg:#FFF3E0;
+    --danger:#D9362A;--danger-bg:#FCEBEA;--info:#1A7EC8;--info-bg:#E6F2FB;--muted:#6B8FA8;
+    --background:#F5F8FC;--surface1:#FFFFFF;--surface2:#EFF4F9;--surface3:#E4EDF5;
+    --border:#D4E0EC;--line:#E4EDF5;--text-disabled:#9BB3C8;--shadow:rgba(28,53,80,.06);
+    --r-sm:8px;--r-md:10px;--r-lg:14px;--r-xl:20px;--r-full:100px;
+    --sidebar-w:248px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--surface2);color:var(--navy);line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh}
+  html[dir="rtl"] body{font-family:"Tajawal","Inter",sans-serif}
+  .mono{font-family:"IBM Plex Sans",monospace}
+  .material-icons-outlined{font-family:'Material Icons Outlined';line-height:1}
+  [hidden]{display:none!important}
+
+  .brand{display:flex;align-items:center;gap:11px;font-weight:800;font-size:17px;letter-spacing:-.2px}
+  .brand .mark{width:36px;height:36px;border-radius:9px;background:var(--navy);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .brand .mark .material-icons-outlined{color:#fff;font-size:20px}
+  .brand i{font-style:normal;color:var(--action)}
+
+  .btn{border:1px solid var(--border);background:var(--surface1);border-radius:var(--r-md);padding:11px 18px;font:inherit;font-weight:700;font-size:13.5px;color:var(--navy);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;transition:filter .12s,background .12s}
+  .btn .material-icons-outlined{font-size:18px}
+  .btn.primary{background:var(--action);border-color:var(--action);color:#fff}
+  .btn.primary:hover{filter:brightness(1.04)}
+  .btn.ghost{background:var(--surface2)}
+  .btn.lg{font-size:14.5px;padding:13px 24px}
+  .btn.block{width:100%}
+
+  /* ════════ APP SHELL ════════ */
+  .sidebar{position:fixed;inset-block:0;inset-inline-start:0;width:var(--sidebar-w);background:var(--navy);color:#fff;display:flex;flex-direction:column;padding:20px 14px;z-index:60}
+  .sidebar .brand{color:#fff;padding:4px 8px 18px}
+  .sidebar .brand .mark{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16)}
+  .req-btn{display:flex;align-items:center;justify-content:center;gap:8px;margin:2px 4px 14px;padding:13px;border:0;border-radius:var(--r-md);cursor:pointer;font:inherit;font-weight:800;font-size:14px;color:#fff;background:linear-gradient(135deg,var(--action),#FFA733);box-shadow:0 8px 20px rgba(247,144,9,.32)}
+  .req-btn .material-icons-outlined{font-size:20px}
+  .nav{display:flex;flex-direction:column;gap:2px}
+  .nav-item{display:flex;align-items:center;gap:13px;padding:11px 12px;border-radius:var(--r-md);cursor:pointer;color:rgba(255,255,255,.72);font-size:13.5px;font-weight:700;text-decoration:none;transition:background .14s,color .14s}
+  .nav-item .material-icons-outlined{font-size:21px}
+  .nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+  .nav-item.active{background:rgba(255,255,255,.1);color:#fff;box-shadow:inset 3px 0 0 var(--action)}
+  html[dir="rtl"] .nav-item.active{box-shadow:inset -3px 0 0 var(--action)}
+  .nav-item .count{margin-inline-start:auto;font-family:"IBM Plex Sans",monospace;background:var(--danger);color:#fff;border-radius:var(--r-full);font-size:11px;font-weight:700;padding:1px 8px}
+
+  .main{margin-inline-start:var(--sidebar-w)}
+  .appbar{position:sticky;top:0;z-index:50;background:var(--surface1);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;padding:0 28px;height:62px}
+  .crumb b{font-size:19px;font-weight:800;letter-spacing:-.4px}
+  .top-actions{margin-inline-start:auto;display:flex;align-items:center;gap:11px}
+  .langtog{display:inline-flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;background:var(--surface1)}
+  .langtog button{border:0;background:var(--surface1);color:var(--muted);padding:7px 13px;font:inherit;font-weight:700;font-size:12px;cursor:pointer}
+  .langtog button.on{background:var(--navy);color:#fff}
+  .icon-btn{width:42px;height:42px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface1);color:var(--navy-mid);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative}
+  .av{width:36px;height:36px;border-radius:50%;background:var(--surface3);color:var(--navy);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+
+  .page{max-width:760px;margin:0 auto;padding:36px 28px 80px}
+
+  /* ── confirmation text on the page (no card) ── */
+  .pagehead{display:flex;align-items:center;gap:16px;margin-bottom:22px}
+  .pagehead .check{width:48px;height:48px;border-radius:50%;flex:0 0 auto;background:var(--success-bg);border:1px solid rgba(29,175,88,.35);color:var(--success);display:flex;align-items:center;justify-content:center}
+  .pagehead .check .material-icons-outlined{font-size:28px}
+  .pagehead .ct-tx{flex:1;min-width:0}
+  .pagehead h1{margin:0 0 3px;font-size:20px;font-weight:800;letter-spacing:-.3px;color:var(--navy)}
+  .pagehead p{margin:0;font-size:13px;line-height:1.5;color:var(--muted)}
+  .pagehead .reqid{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-full);padding:6px 13px;font-size:12px;font-weight:700;color:var(--navy-mid);font-family:"IBM Plex Sans",monospace;white-space:nowrap}
+  .pagehead .reqid .material-icons-outlined{font-size:15px;color:var(--muted)}
+  @media (max-width:560px){ .pagehead{flex-wrap:wrap} .pagehead .reqid{margin-inline-start:64px} }
+
+  /* ── invite to bid — navy card ── */
+  .invite-card{position:relative;overflow:hidden;border-radius:var(--r-xl);padding:30px 32px 26px;color:#fff;background:linear-gradient(150deg,var(--navy),var(--navy-deep));text-align:center;box-shadow:0 8px 24px var(--shadow)}
+  .invite-card::after{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);background-size:30px 30px;mask-image:radial-gradient(circle at 50% 0,#000,transparent 72%);pointer-events:none}
+  .invite-card > *{position:relative;z-index:2}
+  .invite-card h2{margin:0 0 9px;font-size:19px;font-weight:800;letter-spacing:-.3px}
+  .invite-card .lead{margin:0 auto 20px;max-width:50ch;font-size:13.5px;color:rgba(255,255,255,.74);line-height:1.6}
+  .invite-card .btn{min-width:280px}
+  .cta-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:4px}
+  .invite-card .cta-row .btn{min-width:0;flex:1 1 220px;max-width:300px}
+  .invite-card .btn.ghost{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.25);color:#fff}
+  .invite-card .btn.ghost:hover{background:rgba(255,255,255,.16);filter:none}
+  .reopen-note{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:22px;padding-top:18px;border-top:1px solid rgba(255,255,255,.14);font-size:12.5px;color:rgba(255,255,255,.66);font-weight:600;text-align:start}
+  .reopen-note .material-icons-outlined{font-size:16px;color:#FCD9A0;flex:0 0 auto}
+
+  .footer-note{text-align:center;color:var(--muted);font-size:12px;margin-top:42px}
+
+  /* ── share panel (modal) ── */
+  .modal-overlay{position:fixed;inset:0;z-index:400;background:rgba(28,53,80,.42);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:24px}
+  .modal-overlay.on{display:flex}
+  .modal{width:480px;max-width:100%;max-height:90vh;overflow:auto;background:var(--surface1);border-radius:var(--r-xl);box-shadow:0 30px 70px rgba(28,53,80,.35)}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .modal-overlay.on .modal{animation:fade .2s ease}
+  .modal-head{display:flex;align-items:flex-start;gap:13px;padding:22px 24px 18px;border-bottom:1px solid var(--line)}
+  .modal-head .mh-ic{width:44px;height:44px;border-radius:var(--r-md);flex:0 0 auto;background:var(--action-dim);color:var(--action);display:flex;align-items:center;justify-content:center}
+  .modal-head .mh-ic .material-icons-outlined{font-size:24px}
+  .modal-head h3{margin:0 0 3px;font-size:18px;font-weight:800;letter-spacing:-.3px}
+  .modal-head p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.5}
+  .modal-head .x{margin-inline-start:auto;width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:var(--surface1);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto}
+  .modal-body{padding:20px 24px 8px}
+
+  .fieldlbl{display:flex;align-items:center;font-size:12.5px;font-weight:800;color:var(--navy-mid);margin:0 0 8px}
+  .fieldlbl .opt{margin-inline-start:auto;font-size:11px;font-weight:700;color:var(--text-disabled);text-transform:none}
+  .block + .block{margin-top:20px}
+
+  /* bid link + copy (pin 2) */
+  .linkrow{display:flex;gap:8px}
+  .linkbox{flex:1;min-width:0;display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:0 13px;height:46px;font-family:"IBM Plex Sans",monospace;font-size:13px;font-weight:600;color:var(--navy);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .linkbox .material-icons-outlined{font-size:16px;color:var(--muted);flex:0 0 auto}
+  .copybtn{flex:0 0 auto;border:1px solid var(--action);background:var(--action);color:#fff;border-radius:var(--r-md);height:46px;padding:0 16px;font:inherit;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .copybtn.done{background:var(--success);border-color:var(--success)}
+  .copybtn .material-icons-outlined{font-size:17px}
+
+  /* share channels (pin 3) */
+  .channels{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .chan{display:flex;flex-direction:column;align-items:center;gap:7px;border:1px solid var(--border);background:var(--surface1);border-radius:var(--r-md);padding:13px 6px;cursor:pointer;font-size:11.5px;font-weight:700;color:var(--navy-mid);transition:.12s}
+  .chan:hover{border-color:var(--navy-mid);box-shadow:0 4px 12px var(--shadow)}
+  .chan .cic{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff}
+  .chan .cic .material-icons-outlined{font-size:20px}
+  .chan.wa .cic{background:#25D366}.chan.em .cic{background:var(--rentee)}.chan.sms .cic{background:var(--navy-mid)}.chan.more .cic{background:var(--surface3);color:var(--navy-mid)}
+
+  /* optional deadline (pin 4) */
+  .deadrow{display:flex;align-items:center;gap:12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:13px 15px}
+  .deadrow .dtx{flex:1;min-width:0}
+  .deadrow .dtx b{display:block;font-size:13px;font-weight:800;color:var(--navy)}
+  .deadrow .dtx span{font-size:11.5px;color:var(--muted)}
+  .tgl{width:44px;height:25px;border-radius:999px;background:var(--surface3);border:1px solid var(--border);position:relative;transition:.15s;flex:0 0 auto;cursor:pointer}
+  .tgl::after{content:"";position:absolute;top:2px;inset-inline-start:2px;width:19px;height:19px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:.15s}
+  .tgl.on{background:var(--success);border-color:var(--success)}
+  .tgl.on::after{inset-inline-start:21px}
+  .deadpick{margin-top:11px}
+  .deadpick input{width:100%;height:46px;border:1px solid var(--border);border-radius:var(--r-md);padding:0 13px;font:inherit;font-size:14px;color:var(--navy);background:var(--surface1);outline:0}
+  .deadpick input:focus{border-color:var(--action);box-shadow:0 0 0 3px rgba(247,144,9,.12)}
+  .expiry-hint{display:flex;align-items:center;gap:7px;margin-top:9px;font-size:11.5px;font-weight:600;color:var(--info);background:var(--info-bg);border-radius:var(--r-md);padding:8px 11px}
+  .expiry-hint .material-icons-outlined{font-size:15px}
+  .noexpiry-hint{margin-top:9px;font-size:11.5px;color:var(--muted);font-style:italic}
+  .previewlink{display:flex;align-items:center;gap:11px;border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px;text-decoration:none;color:var(--navy);background:var(--surface1);transition:.12s}
+  .previewlink:hover{border-color:var(--rentee);background:var(--rentee-dim)}
+  .previewlink > .material-icons-outlined{font-size:22px;color:var(--rentee);flex:0 0 auto}
+  .previewlink .ptx{flex:1;min-width:0}
+  .previewlink .ptx b{display:block;font-size:13.5px;font-weight:800}
+  .previewlink .ptx span{font-size:12px;color:var(--muted)}
+  .previewlink .chev{font-size:17px;color:var(--muted);flex:0 0 auto}
+  html[dir="rtl"] .previewlink .chev{transform:scaleX(-1)}
+
+  .modal-foot{display:flex;gap:10px;justify-content:flex-end;padding:16px 24px;border-top:1px solid var(--line)}
+
+  /* toast */
+  .toast{position:fixed;inset-block-end:26px;inset-inline:0;margin:auto;width:max-content;max-width:90%;background:var(--navy);color:#fff;border-radius:var(--r-md);padding:11px 18px;font-size:13px;font-weight:700;box-shadow:0 14px 30px rgba(28,53,80,.35);display:flex;align-items:center;gap:8px;z-index:500;opacity:0;transform:translateY(10px);transition:.2s;pointer-events:none}
+  .toast.on{opacity:1;transform:none}
+  .toast .material-icons-outlined{font-size:18px;color:#7BE0A5}
+
+  @media (max-width:900px){ :root{--sidebar-w:0px} .sidebar{transform:translateX(-100%)} html[dir="rtl"] .sidebar{transform:translateX(100%)} }
+  @media (max-width:560px){ .page,.appbar{padding-inline:16px} .invite .actions .btn{min-width:100%} }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="brand"><span class="mark"><span class="material-icons-outlined">precision_manufacturing</span></span>MOEDA<i>TECH</i></div>
+  <button class="req-btn"><span class="material-icons-outlined">radar</span><span data-en="Request" data-ar="طلب">Request</span></button>
+  <nav class="nav">
+    <a class="nav-item"><span class="material-icons-outlined">home</span><span data-en="Home" data-ar="الرئيسية">Home</span></a>
+    <a class="nav-item active"><span class="material-icons-outlined">grid_view</span><span data-en="Requests" data-ar="الطلبات">Requests</span><span class="count">3</span></a>
+    <a class="nav-item"><span class="material-icons-outlined">assignment</span><span data-en="Jobs" data-ar="الوظائف">Jobs</span></a>
+    <a class="nav-item"><span class="material-icons-outlined">person</span><span data-en="Profile" data-ar="الملف">Profile</span></a>
+  </nav>
+</aside>
+
+<div class="main">
+  <header class="appbar">
+    <div class="crumb"><b data-en="Request submitted" data-ar="تم إرسال الطلب">Request submitted</b></div>
+    <div class="top-actions">
+      <div class="langtog"><button id="lEn" class="on" onclick="setLang('en')">EN</button><button id="lAr" onclick="setLang('ar')">ع</button></div>
+      <button class="icon-btn"><span class="material-icons-outlined">notifications</span></button>
+      <div class="av">AK</div>
+    </div>
+  </header>
+
+  <div class="page">
+
+    <!-- ═══ confirmation text on the page (web-app/002) ═══ -->
+    <div class="pagehead">
+      <div class="check"><span class="material-icons-outlined">check</span></div>
+      <div class="ct-tx">
+        <h1 data-en="Your request was submitted" data-ar="تم إرسال طلبك">Your request was submitted</h1>
+        <p data-en="It will reach verified suppliers on Moedatech, and you'll get bids here."
+           data-ar="سيصل طلبك إلى المؤجرين الموثوقين على مؤيداتك، وستصلك العروض هنا.">It will reach verified suppliers on Moedatech, and you'll get bids here.</p>
+      </div>
+      <span class="reqid"><span class="material-icons-outlined">tag</span>REQ-2026-04812</span>
+    </div>
+
+    <!-- ═══ invite to bid — navy card (pin 1) ═══ -->
+    <div class="invite-card">
+      <h2 data-en="Want bids from suppliers you already know?" data-ar="تبي عروضاً من مؤجرين تعرفهم؟">Want bids from suppliers you already know?</h2>
+      <p class="lead" data-en="Share a bid link with any supplier — even off-platform. Their bids land with this request, so you can view and compare them side by side in Moedatech's bid-comparison tool."
+         data-ar="شارك رابط تقديم عرض مع أي مؤجر — حتى خارج المنصة. تصلك عروضهم مع هذا الطلب، فتقدر تعرضها وتقارنها جنباً إلى جنب في أداة مقارنة العروض على مؤيداتك.">Share a bid link with any supplier — even off-platform. Their bids land with this request, so you can view and compare them side by side in Moedatech's bid-comparison tool.</p>
+      <div class="cta-row">
+        <a class="btn ghost lg" href="supplier-bid-v2.html?preview=1" target="_blank" rel="noopener"><span class="material-icons-outlined">visibility</span><span data-en="View the bid form" data-ar="عرض نموذج العرض">View the bid form</span></a>
+        <button class="btn primary lg" onclick="openShare()"><span class="material-icons-outlined">ios_share</span><span data-en="Share your request for bids" data-ar="شارك طلبك لتلقّي العروض">Share your request for bids</span></button>
+      </div>
+      <div class="reopen-note">
+        <span class="material-icons-outlined">history</span>
+        <span data-en="You can come back to this request anytime to share the same link again or set a deadline."
+              data-ar="تقدر ترجع لهذا الطلب في أي وقت تشارك نفس الرابط أو تضيف موعد نهائي.">You can come back to this request anytime to share the same link again or set a deadline.</span>
+      </div>
+    </div>
+
+    <div class="footer-note">© 2026 Moedatech · <span data-en="Rentee web" data-ar="ويب المستأجر">Rentee web</span></div>
+  </div>
+</div>
+
+<!-- ═══ SHARE PANEL (modal) ═══ -->
+<div class="modal-overlay" id="shareModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="mh-ic"><span class="material-icons-outlined">ios_share</span></div>
+      <div>
+        <h3 data-en="Share for bids" data-ar="مشاركة لتلقّي العروض">Share for bids</h3>
+        <p data-en="Send this link to suppliers — they submit a bid without signing up." data-ar="أرسل هذا الرابط للمؤجرين — يقدّمون عرضهم بدون تسجيل.">Send this link to suppliers — they submit a bid without signing up.</p>
+      </div>
+      <button class="x" onclick="closeShare()"><span class="material-icons-outlined">close</span></button>
+    </div>
+
+    <div class="modal-body">
+
+      <!-- pin 2 — bid link + copy -->
+      <div class="block">
+        <div class="fieldlbl" data-en="Bid link" data-ar="رابط تقديم العرض">Bid link</div>
+        <div class="linkrow">
+          <div class="linkbox" style="cursor:pointer" title="Open the bid form" onclick="window.open('supplier-bid-v2.html','_blank','noopener')"><span class="material-icons-outlined">link</span><span id="bidLink">moedatech.com/bid/REQ-2026-04812</span></div>
+          <button class="copybtn" id="copyBtn" onclick="copyLink()"><span class="material-icons-outlined">content_copy</span><span id="copyLbl" data-en="Copy" data-ar="نسخ">Copy</span></button>
+        </div>
+      </div>
+
+      <!-- pin 3 — share via channels -->
+      <div class="block">
+        <div class="fieldlbl" data-en="Share via" data-ar="المشاركة عبر">Share via</div>
+        <div class="channels">
+          <div class="chan wa" onclick="shareVia('WhatsApp')"><span class="cic"><span class="material-icons-outlined">chat</span></span><span data-en="WhatsApp" data-ar="واتساب">WhatsApp</span></div>
+          <div class="chan em" onclick="shareVia('Email')"><span class="cic"><span class="material-icons-outlined">mail</span></span><span data-en="Email" data-ar="إيميل">Email</span></div>
+          <div class="chan sms" onclick="shareVia('SMS')"><span class="cic"><span class="material-icons-outlined">sms</span></span><span data-en="SMS" data-ar="رسالة">SMS</span></div>
+          <div class="chan more" onclick="shareVia('More')"><span class="cic"><span class="material-icons-outlined">more_horiz</span></span><span data-en="More" data-ar="المزيد">More</span></div>
+        </div>
+      </div>
+
+      <!-- pin 4 — optional deadline = link expiry -->
+      <div class="block">
+        <div class="fieldlbl"><span data-en="Bid-submission deadline" data-ar="موعد نهائي لتقديم العروض">Bid-submission deadline</span><span class="opt" data-en="Optional" data-ar="اختياري">Optional</span></div>
+        <div class="deadrow">
+          <div class="dtx">
+            <b data-en="Set a deadline" data-ar="حدّد موعداً نهائياً">Set a deadline</b>
+            <span data-en="When the link stops accepting bids" data-ar="متى يتوقف الرابط عن استقبال العروض">When the link stops accepting bids</span>
+          </div>
+          <div class="tgl" id="deadTgl" onclick="toggleDeadline()"></div>
+        </div>
+        <div class="deadpick" id="deadPick" hidden>
+          <input type="datetime-local" id="deadInput" onchange="renderExpiry()">
+          <div class="expiry-hint" id="expiryHint"><span class="material-icons-outlined">schedule</span><span data-en="The link expires at the deadline; suppliers see a countdown." data-ar="ينتهي الرابط عند الموعد النهائي؛ يرى المؤجرون عدّاً تنازلياً.">The link expires at the deadline; suppliers see a countdown.</span></div>
+        </div>
+        <div class="noexpiry-hint" id="noExpiry" data-en="No deadline set — the link stays open until you close the request." data-ar="لا يوجد موعد نهائي — يبقى الرابط مفتوحاً حتى تُغلق الطلب.">No deadline set — the link stays open until you close the request.</div>
+      </div>
+
+      <!-- preview the supplier bid form (read-only) -->
+      <div class="block">
+        <div class="fieldlbl" data-en="Preview" data-ar="معاينة">Preview</div>
+        <a class="previewlink" href="supplier-bid-v2.html?preview=1" target="_blank" rel="noopener">
+          <span class="material-icons-outlined">visibility</span>
+          <span class="ptx">
+            <b data-en="View the bid form" data-ar="عرض نموذج تقديم العرض">View the bid form</b>
+            <span data-en="See exactly what suppliers fill in — read-only." data-ar="شاهد ما سيعبّيه المؤجرون — للعرض فقط.">See exactly what suppliers fill in — read-only.</span>
+          </span>
+          <span class="material-icons-outlined chev">open_in_new</span>
+        </a>
+      </div>
+
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="closeShare()" data-en="Done" data-ar="تم">Done</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span class="material-icons-outlined">check_circle</span><span id="toastTx"></span></div>
+
+<script>
+  let lang = "en";
+
+  // Prototype: the shared bid link points at the supplier bid form (prototype 2) on this host.
+  document.addEventListener("DOMContentLoaded", function(){
+    try { document.getElementById("bidLink").textContent = location.origin + "/supplier-bid-v2.html"; } catch (e) {}
+  });
+
+  function openShare(){ document.getElementById("shareModal").classList.add("on"); }
+  function closeShare(){ document.getElementById("shareModal").classList.remove("on"); }
+
+  function copyLink(){
+    const link = document.getElementById("bidLink").textContent;
+    if(navigator.clipboard){ navigator.clipboard.writeText(link).catch(()=>{}); }
+    const btn = document.getElementById("copyBtn"), lbl = document.getElementById("copyLbl");
+    btn.classList.add("done");
+    lbl.setAttribute("data-en","Copied"); lbl.setAttribute("data-ar","تم النسخ");
+    lbl.textContent = lang==="ar" ? "تم النسخ" : "Copied";
+    toast(lang==="ar" ? "تم نسخ الرابط" : "Link copied");
+    setTimeout(()=>{
+      btn.classList.remove("done");
+      lbl.setAttribute("data-en","Copy"); lbl.setAttribute("data-ar","نسخ");
+      lbl.textContent = lang==="ar" ? "نسخ" : "Copy";
+    }, 1800);
+  }
+
+  function shareVia(ch){ toast((lang==="ar" ? "المشاركة عبر " : "Share via ") + ch + (lang==="ar" ? " (نموذج أولي)" : " (prototype)")); }
+
+  function toggleDeadline(){
+    const tgl = document.getElementById("deadTgl");
+    const on = tgl.classList.toggle("on");
+    document.getElementById("deadPick").hidden = !on;
+    document.getElementById("noExpiry").hidden = on;
+    if(!on){ document.getElementById("deadInput").value = ""; }
+  }
+  function renderExpiry(){ /* picker drives the supplier-side countdown — wireframe only */ }
+
+  let toastTimer = null;
+  function toast(msg){
+    const t = document.getElementById("toast");
+    document.getElementById("toastTx").textContent = msg;
+    t.classList.add("on");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>t.classList.remove("on"), 2200);
+  }
+
+  function setLang(l){
+    lang = l;
+    const html = document.documentElement;
+    html.lang = l; html.dir = l === "ar" ? "rtl" : "ltr";
+    document.getElementById("lEn").classList.toggle("on", l==="en");
+    document.getElementById("lAr").classList.toggle("on", l==="ar");
+    document.querySelectorAll("[data-en]").forEach(n=>{ n.textContent = n.getAttribute("data-" + l); });
+  }
+</script>
+</body>
+</html>
