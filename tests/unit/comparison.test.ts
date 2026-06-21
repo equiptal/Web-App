@@ -53,9 +53,16 @@ describe("buildItemComparison — all-in (AC-09/10/35)", () => {
     expect(columns[0].allIn.stated).toBe(false);
   });
 
-  it("open-ended (no duration) → rental not stated", () => {
+  it("open-ended (no duration) → defaults to one rental period (matches the deal room's periods ?? 1)", () => {
+    // PER_DAY, no duration anywhere → 1 day × 1 unit = 200 (one period), not "not stated".
     const { columns } = buildItemComparison([bc({ id: "a", supplierId: "1", price: 200, priceUnit: "PER_DAY", duration: null })]);
-    expect(columns[0].rental.stated).toBe(false);
+    expect(columns[0].rental).toEqual({ value: 200, stated: true });
+  });
+
+  it("monthly rate is prorated by the period, not multiplied by raw days", () => {
+    // 17,000/month over 22 days · 1 unit = (17000/30)*22 = 12,467 (NOT 17000*22).
+    const { columns } = buildItemComparison([bc({ id: "a", supplierId: "1", price: 17000, priceUnit: "PER_MONTH", duration: 22 })]);
+    expect(Math.round(columns[0].rental.value)).toBe(12467); // (17000/30)*22 ≈ 12,466.7 → shown as 12,467, NOT 17000*22
   });
 
   it("falls back to the request duration when the bid omits its own", () => {

@@ -85,10 +85,10 @@ function computeRental(bid: BidCard, fallbackDays?: number | null): Money {
   if (rate == null) return { value: 0, stated: false };
   const dpp = daysPerPeriod(bid.priceUnit);
   if (dpp === 0) return { value: rate * units, stated: true }; // PER_JOB
-  // The bid's own duration, else the duration the request asked for (so a bid that omits it still totals).
+  // The bid's own duration, else the duration the request asked for; if neither, default to ONE rental
+  // period (rate × units) — same fallback as the deal room (periods ?? 1) so the totals stay consistent.
   const fb = num(fallbackDays);
-  const days = num(bid.duration) ?? (fb != null && fb > 0 ? fb : null);
-  if (days == null) return { value: 0, stated: false }; // truly open-ended → no full total (AC-35)
+  const days = num(bid.duration) ?? (fb != null && fb > 0 ? fb : null) ?? dpp;
   return { value: (rate / dpp) * days * units, stated: true };
 }
 
