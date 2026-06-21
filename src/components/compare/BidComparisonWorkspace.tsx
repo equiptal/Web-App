@@ -117,7 +117,10 @@ export function BidComparisonWorkspace() {
       node.bidCount += g.totalBids;
       map.set(key, node);
     }
-    return [...map.values()].sort((a, b) => b.bidCount - a.bidCount);
+    // Only surface locations that actually have bids to compare (fall back to all if none do).
+    const all = [...map.values()];
+    const withBids = all.filter((n) => n.bidCount > 0);
+    return (withBids.length ? withBids : all).sort((a, b) => b.bidCount - a.bidCount);
   }, [groups, ar]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -141,7 +144,7 @@ export function BidComparisonWorkspace() {
   }, [locations, activeLoc]);
 
   const loc = locations.find((l) => l.key === activeLoc) ?? locations[0];
-  const group = loc?.groups[0];
+  const group = loc?.groups.find((g) => g.totalBids > 0) ?? loc?.groups[0];
   const items = loc ? loc.groups.flatMap((g) => g.items) : [];
 
   useEffect(() => {
