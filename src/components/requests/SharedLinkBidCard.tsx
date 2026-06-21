@@ -47,7 +47,7 @@ export function SharedLinkBidCard({
       {/* off-platform / shared-link strip */}
       <div className="slb-strip">
         <span className="material-icons-outlined">link</span>
-        {L("Submitted via your shared link · off-platform (no account)", "مُقدّم عبر رابطك المشترك · خارج المنصة (بدون حساب)")}
+        {L("Submitted via your request shared link", "مُقدّم عبر رابط طلبك المشترك")}
       </div>
 
       <div className="slb-body">
