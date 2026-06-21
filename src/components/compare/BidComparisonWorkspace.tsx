@@ -408,7 +408,6 @@ ${row(L("Rental cost", "تكلفة الإيجار"), rental)}
 ${row(L("Mobilization + demob", "النقل + الإرجاع"), (c) => m({ value: (c.mob.stated ? c.mob.value : 0) + (c.demob.stated ? c.demob.value : 0), stated: c.mob.stated || c.demob.stated }))}
 ${row(L("Who handles the costs", "من يتحمّل التكاليف"), resp)}
 ${row(L("Year", "سنة الصنع"), (c) => esc(c.bid.equipment?.year ?? "—"))}
-${row(L("Model", "الطراز"), (c) => esc([c.bid.equipment?.make, c.bid.equipment?.model].filter(Boolean).join(" ") || "—"))}
 ${row(L("Distance to site", "المسافة للموقع"), (c) => c.bid.distanceKm != null ? `${Math.round(c.bid.distanceKm)} ${L("km", "كم")}` : "—")}
 ${row(L("Equipment certificates", "شهادات المعدّة"), (c) => certsOf(c, EQUIP_CERTS))}
 ${row(L("Operator certificates", "شهادات المشغّل"), (c) => certsOf(c, OPER_CERTS))}
@@ -823,10 +822,6 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
                     <tr>
                       <RowHead title={L("Year", "سنة الصنع")} />
                       {cols.map((c) => { const yr = c.equipment.find((r) => r.key === "year"); const isNewest = (c.bid.equipment?.year ?? 0) > 0 && c.bid.equipment?.year === Math.max(...cols.map((x) => x.bid.equipment?.year ?? 0)); return <Td key={c.bid.id} ok={yr?.state !== "conflict"} fail={yr?.state === "conflict"}><span className="text-[13px] font-bold">{c.bid.equipment?.year ?? "—"}</span>{isNewest && cols.length > 1 && <Sub>{L("newest", "الأحدث")}</Sub>}</Td>; })}
-                    </tr>
-                    <tr>
-                      <RowHead title={L("Model", "الطراز")} />
-                      {cols.map((c) => <Td key={c.bid.id} ok><span className="text-[13px] font-bold">{[c.bid.equipment?.make, c.bid.equipment?.model].filter(Boolean).join(" ") || "—"}</span></Td>)}
                     </tr>
                     <tr>
                       <RowHead title={L("Distance to site", "المسافة للموقع")} />
