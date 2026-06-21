@@ -39,11 +39,14 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
     router.push("/login");
   };
 
+  // Static prototype pages (public/*.html) aren't Next routes — hard-navigate to them.
+  const go = (href: string) => (href.endsWith(".html") ? window.location.assign(href) : router.push(href));
+
   const navItems = [
     { key: "home", icon: "home", label: t.shell.home, href: "/" },
     { key: "requests", icon: "grid_view", label: t.shell.requests, href: "/requests" },
     { key: "compare", icon: "compare_arrows", label: t.shell.compare, href: "/compare" },
-    { key: "dashboard", icon: "dashboard", label: t.shell.dashboard, href: "/dashboard" },
+    { key: "dashboard", icon: "dashboard", label: t.shell.dashboard, href: "/procurement-dashboard.html" },
     { key: "profile", icon: "person", label: t.shell.profile, href: "/profile" },
   ];
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
@@ -70,7 +73,7 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
           {navItems.map((it) => (
             <button
               key={it.key}
-              onClick={() => router.push(it.href)}
+              onClick={() => go(it.href)}
               className={`flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-[13.5px] font-bold transition ${
                 isActive(it.href) ? "bg-white/10 text-white shadow-[inset_3px_0_0_#f79009]" : "text-white/70 hover:bg-white/[.06] hover:text-white"
               }`}
@@ -164,7 +167,7 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
         {navItems.map((it) => (
           <button
             key={it.key}
-            onClick={() => router.push(it.href)}
+            onClick={() => go(it.href)}
             className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-bold transition ${
               isActive(it.href) ? "text-brand" : "text-muted"
             }`}

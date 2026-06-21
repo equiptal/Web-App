@@ -1,0 +1,529 @@
+<!-- BUILD REFERENCE: AI-assembled EXPLORATORY prototype · Enterprise-renter "Procurement command-center dashboard".
+     Per-project tabs (All projects + Qiddiya / KSP / Airport / Diriyah Gate / Aramco) — EVERY section re-scopes per project:
+     KPIs, project officer + speed + orders + equipment, equipment-type analytics, internal(PMV)-vs-external, compliance, insights.
+     The AI assistant is a floating launcher button → opens a chat drawer (not a mid-page card). Data is illustrative sample.
+     Styled to the rentee-web design system. Reference, not contract. -->
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moedatech · Procurement Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined">
+<style>
+  :root{
+    --navy:#1C3550;--navy-deep:#12263A;--navy-mid:#2A4F72;--gold:#B8860B;
+    --action:#F79009;--action-dim:#FFF4E5;--rentee:#2563EB;--rentee-dim:#EAF1FE;--supplier:#0D8A6A;--supplier-dim:#E7F5F0;
+    --success:#1DAF58;--success-bg:#E7F7EE;--warning:#D4780A;--warning-bg:#FFF3E0;
+    --danger:#D9362A;--danger-bg:#FCEBEA;--info:#1A7EC8;--info-bg:#E6F2FB;--muted:#6B8FA8;
+    --background:#F5F8FC;--surface1:#FFFFFF;--surface2:#EFF4F9;--surface3:#E4EDF5;
+    --border:#D4E0EC;--line:#E4EDF5;--text-disabled:#9BB3C8;--shadow:rgba(28,53,80,.06);
+    --r-sm:8px;--r-md:10px;--r-lg:14px;--r-xl:20px;--r-full:100px;--sidebar-w:248px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--surface2);color:var(--navy);line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh}
+  html[dir="rtl"] body{font-family:"Tajawal","Inter",sans-serif}
+  .material-icons-outlined{font-family:'Material Icons Outlined';line-height:1}
+  [hidden]{display:none!important}
+
+  .brand{display:flex;align-items:center;gap:11px;font-weight:800;font-size:17px;letter-spacing:-.2px}
+  .brand .mark{width:36px;height:36px;border-radius:9px;background:var(--navy);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .brand .mark .material-icons-outlined{color:#fff;font-size:20px}
+  .brand i{font-style:normal;color:var(--action)}
+  .btn{border:1px solid var(--border);background:var(--surface1);border-radius:var(--r-md);padding:10px 16px;font:inherit;font-weight:700;font-size:13px;color:var(--navy);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;transition:.12s}
+  .btn .material-icons-outlined{font-size:17px}
+  .btn.primary{background:var(--action);border-color:var(--action);color:#fff}
+
+  /* shell */
+  .sidebar{position:fixed;inset-block:0;inset-inline-start:0;width:var(--sidebar-w);background:var(--navy);color:#fff;display:flex;flex-direction:column;padding:20px 14px;z-index:60;overflow-y:auto}
+  .sidebar .brand{color:#fff;padding:4px 8px 18px}
+  .sidebar .brand .mark{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16)}
+  .nav-grp{font-size:10px;font-weight:800;color:rgba(255,255,255,.4);letter-spacing:.5px;padding:14px 12px 6px}
+  .nav{display:flex;flex-direction:column;gap:2px}
+  .nav-item{display:flex;align-items:center;gap:13px;padding:11px 12px;border-radius:var(--r-md);cursor:pointer;color:rgba(255,255,255,.72);font-size:13.5px;font-weight:700;text-decoration:none;transition:.14s}
+  .nav-item .material-icons-outlined{font-size:21px}
+  .nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+  .nav-item.active{background:rgba(255,255,255,.1);color:#fff;box-shadow:inset 3px 0 0 var(--action)}
+  html[dir="rtl"] .nav-item.active{box-shadow:inset -3px 0 0 var(--action)}
+  .nav-item .count{margin-inline-start:auto;font-family:"IBM Plex Sans",monospace;background:rgba(255,255,255,.16);color:#fff;border-radius:var(--r-full);font-size:11px;font-weight:700;padding:1px 8px}
+
+  .main{margin-inline-start:var(--sidebar-w)}
+  .appbar{position:sticky;top:0;z-index:50;background:var(--surface1);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;padding:0 28px;height:62px}
+  .crumb b{font-size:19px;font-weight:800;letter-spacing:-.4px;color:var(--navy)}
+  .crumb span{font-size:12px;color:var(--muted);font-weight:700}
+  .top-actions{margin-inline-start:auto;display:flex;align-items:center;gap:11px}
+  .daterange{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface1);padding:8px 13px;font-size:12.5px;font-weight:700;color:var(--navy);cursor:pointer}
+  .daterange .material-icons-outlined{font-size:16px;color:var(--muted)}
+  .langtog{display:inline-flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;background:var(--surface1)}
+  .langtog button{border:0;background:var(--surface1);color:var(--muted);padding:7px 13px;font:inherit;font-weight:700;font-size:12px;cursor:pointer}
+  .langtog button.on{background:var(--navy);color:#fff}
+  .icon-btn{width:42px;height:42px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface1);color:var(--navy-mid);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative}
+  .icon-btn .dotmark{position:absolute;top:9px;inset-inline-end:10px;width:8px;height:8px;border-radius:50%;background:var(--danger);border:2px solid #fff}
+  .av{width:36px;height:36px;border-radius:50%;background:var(--surface3);color:var(--navy);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+
+  .page{max-width:1320px;margin:0 auto;padding:20px 28px 110px}
+  .sec-title{display:flex;align-items:center;gap:9px;margin:26px 0 13px;font-size:15px;font-weight:800;color:var(--navy);letter-spacing:-.2px}
+  .sec-title .material-icons-outlined{font-size:19px;color:var(--navy-mid)}
+  .sec-title .sub{margin-inline-start:auto;font-size:12px;font-weight:600;color:var(--muted)}
+
+  /* project tabs */
+  .ptabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:16px}
+  .ptab{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border:1px solid var(--border);background:var(--surface1);border-radius:var(--r-full);font-size:13px;font-weight:700;color:var(--navy-mid);cursor:pointer;white-space:nowrap}
+  .ptab:hover{border-color:var(--navy-mid)}
+  .ptab.on{background:var(--navy);border-color:var(--navy);color:#fff}
+  .ptab .material-icons-outlined{font-size:16px}
+
+  /* project detail (focused) */
+  .pdetail{background:linear-gradient(150deg,var(--navy),var(--navy-deep));color:#fff;border-radius:var(--r-lg);padding:16px 18px;margin-bottom:16px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;box-shadow:0 6px 18px var(--shadow)}
+  .pdetail .pd-officer{display:flex;align-items:center;gap:11px;flex:0 0 auto}
+  .pdetail .pd-av{width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
+  .pdetail .pd-officer .pd-ot{font-size:11px;color:rgba(255,255,255,.6);font-weight:700}
+  .pdetail .pd-officer .pd-on{font-size:15px;font-weight:800}
+  .pdetail .pd-stats{display:flex;gap:22px;flex-wrap:wrap;margin-inline-start:auto}
+  .pdetail .pd-s{display:flex;flex-direction:column}
+  .pdetail .pd-s b{font-family:"IBM Plex Sans",monospace;font-size:19px;font-weight:800}
+  .pdetail .pd-s span{font-size:10.5px;color:rgba(255,255,255,.62);font-weight:700}
+  .pdetail .pd-score{width:54px;height:54px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-family:"IBM Plex Sans",monospace;font-weight:900;font-size:18px}
+
+  /* KPI cards */
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+  .kpi{background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-lg);padding:15px 16px;box-shadow:0 2px 8px var(--shadow)}
+  .kpi .k-top{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--muted)}
+  .kpi .k-ic{width:30px;height:30px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .kpi .k-ic .material-icons-outlined{font-size:18px}
+  .kpi .k-val{font-family:"IBM Plex Sans",monospace;font-size:25px;font-weight:800;color:var(--navy);margin-top:9px;letter-spacing:-.5px}
+  .kpi .k-val small{font-size:13px;font-weight:700;color:var(--muted)}
+  .kpi .k-hint{font-size:10.5px;color:var(--text-disabled);font-weight:600;margin-top:7px;line-height:1.35}
+  .ic-blue{background:var(--rentee-dim);color:var(--rentee)} .ic-orange{background:var(--action-dim);color:var(--action)}
+  .ic-teal{background:var(--supplier-dim);color:var(--supplier)} .ic-green{background:var(--success-bg);color:var(--success)} .ic-amber{background:var(--warning-bg);color:var(--warning)}
+
+  .grid2{display:grid;grid-template-columns:1.5fr 1fr;gap:16px}
+  .panel{background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:0 2px 8px var(--shadow);overflow:hidden}
+  .panel-head{display:flex;align-items:center;gap:9px;padding:14px 16px;border-bottom:1px solid var(--line)}
+  .panel-head .material-icons-outlined{font-size:18px;color:var(--navy-mid)}
+  .panel-head b{font-size:13.5px;font-weight:800}
+  .panel-head .ph-act{margin-inline-start:auto;font-size:12px;font-weight:700;color:var(--rentee);cursor:pointer}
+  .panel-body{padding:15px 16px}
+
+  table.tbl{width:100%;border-collapse:collapse}
+  table.tbl th{text-align:start;font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;padding:8px 10px;border-bottom:1px solid var(--line)}
+  table.tbl td{padding:11px 10px;border-bottom:1px solid var(--line);font-size:13px;font-weight:600;color:var(--navy);vertical-align:middle}
+  table.tbl tr:last-child td{border-bottom:0}
+  table.tbl tr:hover td{background:var(--surface2)}
+  .site-n{font-weight:800}.site-n small{display:block;font-size:11px;font-weight:600;color:var(--muted)}
+  .num{font-family:"IBM Plex Sans",monospace;font-weight:700}
+  .scorepill{display:inline-flex;align-items:center;justify-content:center;min-width:42px;font-family:"IBM Plex Sans",monospace;font-size:13px;font-weight:800;border-radius:var(--r-full);padding:4px 10px}
+  .scorepill.hi{background:var(--success-bg);color:var(--success)} .scorepill.mid{background:var(--warning-bg);color:var(--warning)} .scorepill.lo{background:var(--danger-bg);color:var(--danger)}
+  .off{display:inline-flex;align-items:center;gap:7px;font-weight:700;white-space:nowrap}
+  .off-av{width:24px;height:24px;border-radius:50%;background:var(--navy);color:#fff;font-size:9.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .tag-st{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:800;border-radius:var(--r-full);padding:3px 9px}
+  .tag-st.warn{background:var(--warning-bg);color:var(--warning)} .tag-st.bad{background:var(--danger-bg);color:var(--danger)} .tag-st.ok{background:var(--success-bg);color:var(--success)} .tag-st.neu{background:var(--surface3);color:var(--muted)}
+  .tag-st .material-icons-outlined{font-size:12px}
+
+  /* donut + gauge */
+  .donut-wrap{display:flex;flex-direction:column;align-items:center;gap:14px;padding:6px 0}
+  .donut{width:160px;height:160px;border-radius:50%;position:relative;flex:0 0 auto}
+  .donut::after{content:"";position:absolute;inset:25px;background:var(--surface1);border-radius:50%}
+  .donut .dc{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2}
+  .donut .dc b{font-family:"IBM Plex Sans",monospace;font-size:22px;font-weight:800}
+  .donut .dc span{font-size:11px;color:var(--muted);font-weight:700}
+  .legend2{display:flex;gap:18px;flex-wrap:wrap;justify-content:center}
+  .legend2 .lg{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:var(--navy)}
+  .legend2 .lg .sw{width:12px;height:12px;border-radius:3px}
+  .legend2 .lg .sw.t{background:var(--supplier)} .legend2 .lg .sw.b{background:var(--rentee)}
+  .legend2 .lg small{color:var(--muted);font-weight:700}
+  .comp-top{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+  .gauge{width:118px;height:118px;border-radius:50%;flex:0 0 auto;position:relative}
+  .gauge::after{content:"";position:absolute;inset:15px;background:var(--surface1);border-radius:50%}
+  .gauge .gc{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2}
+  .gauge .gc b{font-family:"IBM Plex Sans",monospace;font-size:24px;font-weight:800}
+  .gauge .gc span{font-size:10px;color:var(--muted);font-weight:700}
+  .comp-top .ct-tx{flex:1;min-width:200px}
+  .comp-top .ct-tx h4{margin:0 0 5px;font-size:14px;font-weight:800}
+  .comp-top .ct-tx p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.55}
+
+  .bars{display:flex;flex-direction:column;gap:11px}
+  .bar-row{display:grid;grid-template-columns:120px 1fr 38px;align-items:center;gap:11px}
+  .bar-row .bl{font-size:12.5px;font-weight:700;color:var(--navy);display:flex;align-items:center;gap:7px}
+  .bar-row .bl .material-icons-outlined{font-size:16px;color:var(--navy-mid)}
+  .bar-track{height:11px;border-radius:6px;background:var(--surface3);overflow:hidden}
+  .bar-track>i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--navy-mid),var(--rentee))}
+  .bar-row .bn{font-family:"IBM Plex Sans",monospace;font-size:12.5px;font-weight:800;color:var(--navy);text-align:end}
+  .cmp-togs{display:flex;gap:7px;flex-wrap:wrap}
+  .cmp-tog{padding:8px 14px;border:1px solid var(--border);background:var(--surface1);border-radius:var(--r-full);font-size:12.5px;font-weight:700;color:var(--navy-mid);cursor:pointer}
+  .cmp-tog.on{background:var(--navy);border-color:var(--navy);color:#fff}
+  .cmp-bars .bar-row{grid-template-columns:130px 1fr 92px}
+  .cmp-bars .bar-track.rank-best>i{background:linear-gradient(90deg,var(--supplier),var(--success))}
+  .cmp-bars .bar-track.rank-worst>i{background:linear-gradient(90deg,var(--warning),var(--danger))}
+  .cmp-hint{font-size:11.5px;color:var(--muted);font-weight:600;margin-top:12px;display:flex;align-items:center;gap:6px}
+  .cmp-hint .material-icons-outlined{font-size:15px}
+
+  /* AI assistant: floating launcher + chat drawer */
+  .ai-fab{position:fixed;inset-block-end:24px;inset-inline-end:24px;z-index:90;display:inline-flex;align-items:center;gap:9px;padding:13px 18px;border:0;border-radius:var(--r-full);background:linear-gradient(135deg,var(--action),#FFA733);color:#fff;font:inherit;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 12px 28px rgba(247,144,9,.42)}
+  .ai-fab .material-icons-outlined{font-size:21px}
+  .ai-fab .fab-badge{font-family:"IBM Plex Sans",monospace;font-size:11px;font-weight:800;background:rgba(255,255,255,.25);border-radius:var(--r-full);padding:1px 7px}
+  .drawer-backdrop{position:fixed;inset:0;z-index:95;background:rgba(28,53,80,.4);backdrop-filter:blur(2px);display:none}
+  body.chat-open .drawer-backdrop{display:block}
+  .main{transition:margin .2s}
+  .drawer{position:fixed;inset-block:0;inset-inline-end:0;width:420px;max-width:100%;z-index:96;background:var(--surface1);box-shadow:-12px 0 40px rgba(28,53,80,.25);display:flex;flex-direction:column;transform:translateX(110%);transition:transform .22s}
+  html[dir="rtl"] .drawer{transform:translateX(-110%)}
+  body.chat-open .drawer{transform:none}
+  /* on wide screens, dock the chat beside the dashboard (push content, no overlay) */
+  @media (min-width:901px){
+    body.chat-open .main{margin-inline-end:420px}
+    body.chat-open .drawer-backdrop{display:none}
+    body.chat-open .ai-fab{display:none}
+  }
+  .drawer-head{display:flex;align-items:center;gap:11px;padding:16px 18px;background:linear-gradient(150deg,var(--navy),var(--navy-deep));color:#fff}
+  .drawer-head .ai{width:40px;height:40px;border-radius:11px;flex:0 0 auto;background:linear-gradient(135deg,var(--action),#FFA733);display:flex;align-items:center;justify-content:center}
+  .drawer-head .ai .material-icons-outlined{font-size:22px;color:#fff}
+  .drawer-head h3{margin:0;font-size:15px;font-weight:800}
+  .drawer-head p{margin:1px 0 0;font-size:11.5px;color:rgba(255,255,255,.66)}
+  .drawer-head .dx{margin-inline-start:auto;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .drawer-body{flex:1;overflow:auto;padding:16px 18px;display:flex;flex-direction:column;gap:12px;background:var(--surface2)}
+  .msg{display:flex;gap:9px;max-width:94%}
+  .msg .av-m{width:28px;height:28px;border-radius:8px;flex:0 0 auto;background:linear-gradient(135deg,var(--action),#FFA733);display:flex;align-items:center;justify-content:center}
+  .msg .av-m .material-icons-outlined{font-size:16px;color:#fff}
+  .msg .bubble{background:var(--surface1);border:1px solid var(--border);border-radius:13px;border-start-start-radius:4px;padding:10px 13px;font-size:13px;line-height:1.5;color:var(--navy)}
+  .msg.user{margin-inline-start:auto;flex-direction:row-reverse}
+  .msg.user .bubble{background:var(--rentee);border-color:var(--rentee);color:#fff;border-start-end-radius:4px}
+  .ins{background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 13px;border-inline-start:4px solid var(--muted)}
+  .ins.buy{border-inline-start-color:var(--action)} .ins.risk{border-inline-start-color:var(--danger)} .ins.gap{border-inline-start-color:var(--warning)} .ins.save{border-inline-start-color:var(--success)}
+  .ins .ins-tag{display:inline-flex;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;border-radius:var(--r-full);padding:2px 8px;margin-bottom:6px}
+  .ins.buy .ins-tag{background:var(--action-dim);color:#8A5A06}.ins.risk .ins-tag{background:var(--danger-bg);color:var(--danger)}.ins.gap .ins-tag{background:var(--warning-bg);color:var(--warning)}.ins.save .ins-tag{background:var(--success-bg);color:var(--success)}
+  .ins b{display:block;font-size:13px;font-weight:800;margin-bottom:3px}
+  .ins p{margin:0;font-size:12px;color:var(--navy-mid);line-height:1.5}
+  .quickasks{display:flex;flex-wrap:wrap;gap:7px;padding:0 18px 12px;background:var(--surface2)}
+  .qa{display:inline-flex;align-items:center;gap:5px;background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-full);padding:7px 12px;font-size:12px;font-weight:700;color:var(--rentee);cursor:pointer}
+  .qa .material-icons-outlined{font-size:14px}
+  .drawer-input{display:flex;gap:9px;padding:12px 18px;border-top:1px solid var(--line)}
+  .drawer-input .di-box{flex:1;display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-full);padding:0 14px;height:44px}
+  .drawer-input .di-box .material-icons-outlined{font-size:18px;color:var(--action)}
+  .drawer-input .di-box input{flex:1;min-width:0;border:0;background:transparent;font:inherit;font-size:14px;color:var(--navy);outline:0}
+  .drawer-input .di-send{width:44px;height:44px;border-radius:50%;border:0;background:var(--action);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+
+  .botnav{display:none}
+  .botnav .bn-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 2px;text-decoration:none;color:var(--muted);font-size:10px;font-weight:700;background:none;border:0;cursor:pointer}
+  .botnav .bn-item .material-icons-outlined{font-size:22px}
+  .botnav .bn-item.active{color:var(--action)}
+  .toast{position:fixed;inset-block-end:90px;inset-inline:0;margin:auto;width:max-content;max-width:90%;background:var(--navy);color:#fff;border-radius:var(--r-md);padding:11px 18px;font-size:13px;font-weight:700;box-shadow:0 14px 30px rgba(28,53,80,.35);display:flex;align-items:center;gap:8px;z-index:500;opacity:0;transform:translateY(10px);transition:.2s;pointer-events:none}
+  .toast.on{opacity:1;transform:none}
+  .toast .material-icons-outlined{font-size:18px;color:#7BE0A5}
+
+  @media (max-width:1150px){ .kpis{grid-template-columns:repeat(2,1fr)} .grid2{grid-template-columns:1fr} }
+  @media (max-width:900px){ :root{--sidebar-w:0px} .sidebar{display:none} .botnav{display:flex;position:fixed;inset-block-end:0;inset-inline:0;z-index:70;background:var(--surface1);border-top:1px solid var(--border);box-shadow:0 -4px 16px rgba(28,53,80,.08);padding:6px 4px} .page{padding-bottom:92px} .ai-fab{inset-block-end:70px} .drawer{width:100%} }
+  @media (max-width:560px){ .page,.appbar{padding-inline:14px} .kpis{grid-template-columns:1fr 1fr} .daterange{display:none} .ai-fab span.fab-tx{display:none} }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="brand"><span class="mark"><span class="material-icons-outlined">precision_manufacturing</span></span>MOEDA<i>TECH</i></div>
+  <div class="nav-grp" data-en="PROCUREMENT" data-ar="المشتريات">PROCUREMENT</div>
+  <nav class="nav">
+    <a class="nav-item active"><span class="material-icons-outlined">dashboard</span><span data-en="Dashboard" data-ar="لوحة التحكم">Dashboard</span></a>
+    <a class="nav-item"><span class="material-icons-outlined">radar</span><span data-en="Requests / RFQs" data-ar="الطلبات">Requests / RFQs</span><span class="count">79</span></a>
+    <a class="nav-item"><span class="material-icons-outlined">forklift</span><span data-en="Active rentals" data-ar="الإيجارات النشطة">Active rentals</span><span class="count">142</span></a>
+    <a class="nav-item"><span class="material-icons-outlined">store</span><span data-en="Suppliers" data-ar="المؤجرون">Suppliers</span></a>
+    <a class="nav-item"><span class="material-icons-outlined">location_city</span><span data-en="Projects" data-ar="المشاريع">Projects</span></a>
+    <a class="nav-item"><span class="material-icons-outlined">verified_user</span><span data-en="Compliance" data-ar="الالتزام">Compliance</span></a>
+  </nav>
+  <div class="nav-grp" data-en="FLEET" data-ar="الأسطول">FLEET</div>
+  <nav class="nav">
+    <a class="nav-item"><span class="material-icons-outlined">inventory_2</span><span data-en="PMV fleet" data-ar="أسطول PMV">PMV fleet</span></a>
+  </nav>
+</aside>
+
+<div class="main">
+  <header class="appbar">
+    <div class="crumb"><span data-en="Procurement" data-ar="المشتريات">Procurement</span> · <b data-en="Dashboard" data-ar="لوحة التحكم">Dashboard</b></div>
+    <div class="top-actions">
+      <div class="daterange" onclick="toast(t('Date range (prototype)','النطاق الزمني'))"><span class="material-icons-outlined">calendar_month</span><span data-en="This month" data-ar="هذا الشهر">This month</span><span class="material-icons-outlined">expand_more</span></div>
+      <div class="langtog"><button id="lEn" class="on" onclick="setLang('en')">EN</button><button id="lAr" onclick="setLang('ar')">ع</button></div>
+      <button class="icon-btn"><span class="material-icons-outlined">notifications</span><span class="dotmark"></span></button>
+      <div class="av">MS</div>
+    </div>
+  </header>
+
+  <div class="page">
+
+    <!-- project tabs -->
+    <div class="ptabs">
+      <div class="ptab on" data-proj="all" onclick="selectProject('all')"><span class="material-icons-outlined">grid_view</span><span data-en="All projects" data-ar="كل المشاريع">All projects</span></div>
+      <div class="ptab" data-proj="qiddiya" onclick="selectProject('qiddiya')">Qiddiya</div>
+      <div class="ptab" data-proj="ksp" onclick="selectProject('ksp')">KSP</div>
+      <div class="ptab" data-proj="airport" onclick="selectProject('airport')">Airport</div>
+      <div class="ptab" data-proj="diriyah" onclick="selectProject('diriyah')">Diriyah Gate</div>
+      <div class="ptab" data-proj="aramco" onclick="selectProject('aramco')">Aramco</div>
+    </div>
+
+    <!-- project detail (focused only) -->
+    <div class="pdetail" id="pdetail" hidden></div>
+
+    <!-- KPIs -->
+    <div class="kpis" id="kpis"></div>
+
+    <!-- equipment analytics + internal/external -->
+    <div class="sec-title"><span class="material-icons-outlined">donut_small</span><span id="t-analytics" data-en="Analytics by equipment type" data-ar="تحليلات حسب نوع المعدّة">Analytics by equipment type</span></div>
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-head"><span class="material-icons-outlined">category</span><b data-en="By equipment type — demand, spend & signal" data-ar="حسب نوع المعدّة — الطلب والإنفاق والإشارة">By equipment type — demand, spend &amp; signal</b></div>
+        <div class="panel-body" style="padding:4px 8px;overflow-x:auto">
+          <table class="tbl"><thead><tr><th data-en="Equipment" data-ar="المعدّة">Equipment</th><th class="num" data-en="Active" data-ar="نشطة">Active</th><th class="num">GMV</th><th data-en="Signal" data-ar="الإشارة">Signal</th></tr></thead><tbody id="equipBody"></tbody></table>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span class="material-icons-outlined">balance</span><b data-en="Internal (PMV) vs external" data-ar="داخلي (PMV) مقابل خارجي">Internal (PMV) vs external</b></div>
+        <div class="panel-body"><div class="donut-wrap">
+          <div class="donut" id="donut"><div class="dc"><b id="donutTot">142</b><span data-en="active" data-ar="نشط">active</span></div></div>
+          <div class="legend2">
+            <div class="lg"><span class="sw t"></span><span data-en="Own fleet · PMV" data-ar="أسطولنا · PMV">Own fleet · PMV</span> <small id="legInt">38%</small></div>
+            <div class="lg"><span class="sw b"></span><span data-en="Rented · external" data-ar="مستأجر · خارجي">Rented · external</span> <small id="legExt">62%</small></div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- compliance (database / mandated suppliers) -->
+    <div class="sec-title"><span class="material-icons-outlined">verified_user</span><span data-en="Compliance — mandated (database) suppliers in RFQs" data-ar="الالتزام — المؤجرون الإلزاميون في الطلبات">Compliance — mandated (database) suppliers in RFQs</span></div>
+    <div class="panel"><div class="panel-body">
+      <div class="comp-top">
+        <div class="gauge" id="gauge"><div class="gc"><b id="gaugePct">78%</b><span data-en="RFQ compliance" data-ar="التزام الطلبات">RFQ compliance</span></div></div>
+        <div class="ct-tx"><h4 id="compH">—</h4><p data-en="Mandated suppliers must be invited to every eligible RFQ — this tracks who's actually being included." data-ar="يجب دعوة المؤجرين الإلزاميين لكل طلب مؤهّل — يتتبّع هذا من يُدرَج فعلاً.">Mandated suppliers must be invited to every eligible RFQ — this tracks who's actually being included.</p></div>
+      </div>
+    </div></div>
+
+    <!-- OVERALL-ONLY: cross-project comparison -->
+    <div id="overallOnly">
+      <div class="sec-title"><span class="material-icons-outlined">leaderboard</span><span data-en="Project scoring — speed of execution & cost" data-ar="تقييم المشاريع — سرعة التنفيذ والتكلفة">Project scoring — speed of execution &amp; cost</span></div>
+      <div class="panel"><div class="panel-body" style="padding:4px 8px;overflow-x:auto">
+        <table class="tbl"><thead><tr>
+          <th data-en="Project" data-ar="المشروع">Project</th><th data-en="Procurement officer" data-ar="مسؤول المشتريات">Procurement officer</th>
+          <th class="num" data-en="Orders" data-ar="الطلبات">Orders</th><th class="num" data-en="Equipment" data-ar="المعدّات">Equipment</th>
+          <th class="num" data-en="Speed" data-ar="السرعة">Speed</th><th data-en="Score" data-ar="الدرجة">Score</th>
+        </tr></thead><tbody id="scoreBody"></tbody></table>
+      </div></div>
+
+      <div class="sec-title"><span class="material-icons-outlined">bar_chart</span><span data-en="Compare projects" data-ar="قارن المشاريع">Compare projects</span><span class="sub" data-en="best on top, worst at the bottom" data-ar="الأفضل أعلى والأسوأ أسفل">best on top, worst at the bottom</span></div>
+      <div class="panel"><div class="panel-body">
+        <div class="cmp-togs">
+          <div class="cmp-tog on" onclick="renderCompare('score',this)"><span data-en="Overall score" data-ar="الدرجة">Overall score</span></div>
+          <div class="cmp-tog" onclick="renderCompare('gmv',this)"><span data-en="GMV spent" data-ar="الإنفاق">GMV spent</span></div>
+          <div class="cmp-tog" onclick="renderCompare('speed',this)"><span data-en="Speed" data-ar="السرعة">Speed</span></div>
+          <div class="cmp-tog" onclick="renderCompare('orders',this)"><span data-en="Orders" data-ar="الطلبات">Orders</span></div>
+          <div class="cmp-tog" onclick="renderCompare('compliance',this)"><span data-en="Compliance" data-ar="الالتزام">Compliance</span></div>
+        </div>
+        <div class="bars cmp-bars" id="cmpBars" style="margin-top:15px"></div>
+        <div class="cmp-hint"><span class="material-icons-outlined">info</span><span id="cmpHint"></span></div>
+      </div></div>
+    </div>
+
+    <div style="text-align:center;color:var(--muted);font-size:12px;margin-top:30px">© 2026 Moedatech · <span data-en="Procurement dashboard · exploratory prototype" data-ar="لوحة المشتريات · نموذج استكشافي">Procurement dashboard · exploratory prototype</span></div>
+  </div>
+</div>
+
+<!-- AI assistant: floating launcher -->
+<button class="ai-fab" onclick="openChat()"><span class="material-icons-outlined">auto_awesome</span><span class="fab-tx" data-en="Ask AI" data-ar="اسأل الذكاء">Ask AI</span><span class="fab-badge" id="fabBadge">4</span></button>
+
+<!-- chat drawer -->
+<div class="drawer-backdrop" id="drawerBd" onclick="closeChat()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <div class="ai"><span class="material-icons-outlined">auto_awesome</span></div>
+    <div><h3 data-en="Procurement AI assistant" data-ar="مساعد المشتريات الذكي">Procurement AI assistant</h3><p id="drawerScope">—</p></div>
+    <button class="dx" onclick="closeChat()"><span class="material-icons-outlined">close</span></button>
+  </div>
+  <div class="drawer-body" id="chatBody"></div>
+  <div class="quickasks">
+    <button class="qa" onclick="askQuick('buy')"><span class="material-icons-outlined">shopping_cart</span><span data-en="Buy or rent?" data-ar="شراء أم إيجار؟">Buy or rent?</span></button>
+    <button class="qa" onclick="askQuick('risk')"><span class="material-icons-outlined">warning</span><span data-en="Any supply risk?" data-ar="مخاطر توريد؟">Any supply risk?</span></button>
+    <button class="qa" onclick="askQuick('save')"><span class="material-icons-outlined">savings</span><span data-en="Where can I save?" data-ar="أين أوفّر؟">Where can I save?</span></button>
+  </div>
+  <div class="drawer-input">
+    <div class="di-box"><span class="material-icons-outlined">auto_awesome</span><input id="chatInput" placeholder="Ask the assistant…" onkeydown="if(event.key==='Enter')sendChat()"></div>
+    <button class="di-send" onclick="sendChat()"><span class="material-icons-outlined">send</span></button>
+  </div>
+</div>
+
+<nav class="botnav">
+  <a class="bn-item active"><span class="material-icons-outlined">dashboard</span><span data-en="Dashboard" data-ar="اللوحة">Dashboard</span></a>
+  <a class="bn-item"><span class="material-icons-outlined">radar</span><span data-en="RFQs" data-ar="الطلبات">RFQs</span></a>
+  <a class="bn-item"><span class="material-icons-outlined">forklift</span><span data-en="Rentals" data-ar="الإيجارات">Rentals</span></a>
+  <a class="bn-item"><span class="material-icons-outlined">verified_user</span><span data-en="Compliance" data-ar="الالتزام">Compliance</span></a>
+  <a class="bn-item"><span class="material-icons-outlined">location_city</span><span data-en="Projects" data-ar="المشاريع">Projects</span></a>
+</nav>
+
+<div class="toast" id="toast"><span class="material-icons-outlined">check_circle</span><span id="toastTx"></span></div>
+
+<script>
+  let lang="en";
+  function t(en,ar){ return lang==="ar"?ar:en; }
+  function E(en,ar){ return '<span data-en="'+en+'" data-ar="'+ar+'">'+(lang==="ar"?ar:en)+'</span>'; }
+
+  /* ───────── per-project data ───────── */
+  const D = {
+    all:{ nameEn:"All projects", nameAr:"كل المشاريع", officer:null, orders:79, equip:41, speed:"2.4", score:null,
+      active:142, gmv:"5.0", comp:78, intl:38, ext:62, compH_en:"40 of 52 eligible RFQs invited every mandated supplier.", compH_ar:"٤٠ من ٥٢ طلباً مؤهّلاً دعت كل مؤجر إلزامي.",
+      eq:[["Manlift",34,"1.10M","Consider buying","warn"],["Crane",18,"1.00M","Single-source","bad"],["Excavator",22,"0.95M","Rent — healthy","neu"],["Forklift",28,"0.90M","Rent — healthy","neu"],["Generator",25,"0.80M","Use PMV","ok"],["Wheel loader",15,"0.45M","Rent — healthy","neu"]],
+      ins:[["buy","Buy vs rent","Stop renting manlifts — buy 4 units","Rented 9 of 12 weeks across 3 projects · rent ≈612k vs ~480k to own — payback ~7 months."],
+           ["risk","Supply risk","Cranes at Diriyah Gate are single-source","Only 1 verified crane supplier answered the last 4 requests — broaden the pool."],
+           ["gap","Compliance gap","22% of RFQs skipped a mandated supplier","Mostly Aramco (officer M. Salem) — United Rentals left off 5 RFQs."],
+           ["save","Savings","Use idle PMV generators at Aramco","6 PMV generators idle while Aramco rents 5 externally — saves ≈95k/month."]] },
+    qiddiya:{ nameEn:"Qiddiya", nameAr:"القدية", officer:"Faisal Al-Harbi", orders:15, equip:22, speed:"2.0", score:88,
+      active:22, gmv:"0.90", comp:88, intl:45, ext:55, compH_en:"13 of 15 RFQs invited every mandated supplier.", compH_ar:"١٣ من ١٥ طلباً دعت كل مؤجر إلزامي.",
+      eq:[["Forklift",8,"0.30M","Rent — healthy","neu"],["Generator",6,"0.22M","Use PMV","ok"],["Manlift",5,"0.20M","Consider buying","warn"],["Excavator",3,"0.18M","Rent — healthy","neu"]],
+      ins:[["save","Savings","Steady manlift demand — pilot 1 owned unit","Manlifts up 5/12 weeks here; one owned unit covers the baseline."],
+           ["buy","Buy vs rent","Forklifts: keep renting","Demand is lumpy — renting stays cheaper than owning at Qiddiya."]] },
+    ksp:{ nameEn:"KSP", nameAr:"حديقة الملك سلمان", officer:"Nora Al-Otaibi", orders:12, equip:18, speed:"2.4", score:84,
+      active:18, gmv:"0.75", comp:85, intl:40, ext:60, compH_en:"10 of 12 RFQs invited every mandated supplier.", compH_ar:"١٠ من ١٢ طلباً دعت كل مؤجر إلزامي.",
+      eq:[["Forklift",6,"0.26M","Rent — healthy","neu"],["Generator",5,"0.20M","Use PMV","ok"],["Crane",4,"0.20M","Single-source","bad"],["Wheel loader",3,"0.09M","Rent — healthy","neu"]],
+      ins:[["risk","Supply risk","Crane supply is thin at KSP","Add a second verified crane supplier before the next phase."]] },
+    airport:{ nameEn:"Airport", nameAr:"المطار", officer:"Sara Al-Dossari", orders:9, equip:14, speed:"2.6", score:80,
+      active:14, gmv:"0.55", comp:90, intl:35, ext:65, compH_en:"8 of 9 RFQs compliant — best of all projects.", compH_ar:"٨ من ٩ طلبات ملتزمة — الأفضل.",
+      eq:[["Manlift",5,"0.22M","Consider buying","warn"],["Forklift",4,"0.16M","Rent — healthy","neu"],["Generator",3,"0.11M","Use PMV","ok"],["Excavator",2,"0.06M","Rent — healthy","neu"]],
+      ins:[["buy","Buy vs rent","Manlift demand rising at Airport","Track 2 more weeks; if it holds, buying beats renting."]] },
+    diriyah:{ nameEn:"Diriyah Gate", nameAr:"بوابة الدرعية", officer:"Khalid Al-Ghamdi", orders:19, equip:28, speed:"3.1", score:74,
+      active:28, gmv:"1.10", comp:75, intl:33, ext:67, compH_en:"14 of 19 RFQs invited every mandated supplier.", compH_ar:"١٤ من ١٩ طلباً دعت كل مؤجر إلزامي.",
+      eq:[["Excavator",8,"0.34M","Rent — healthy","neu"],["Crane",7,"0.30M","Single-source","bad"],["Forklift",7,"0.28M","Rent — healthy","neu"],["Generator",6,"0.18M","Use PMV","ok"]],
+      ins:[["risk","Supply risk","Cranes are single-source — schedule risk","1 supplier on the last 4 crane requests; pre-book or broaden."],
+           ["gap","Compliance gap","5 RFQs missed a mandated supplier","Bring Diriyah back to policy next cycle."]] },
+    aramco:{ nameEn:"Aramco", nameAr:"أرامكو", officer:"M. Salem", orders:24, equip:41, speed:"4.0", score:66,
+      active:41, gmv:"1.70", comp:62, intl:30, ext:70, compH_en:"15 of 24 RFQs compliant — needs attention.", compH_ar:"١٥ من ٢٤ طلباً ملتزمة — يحتاج انتباهاً.",
+      eq:[["Manlift",12,"0.42M","Consider buying","warn"],["Generator",9,"0.30M","Use PMV","ok"],["Excavator",8,"0.34M","Rent — healthy","neu"],["Forklift",7,"0.34M","Rent — healthy","neu"],["Crane",5,"0.30M","Single-source","bad"]],
+      ins:[["gap","Compliance gap","Worst compliance — 9 RFQs missed a mandated supplier","Officer M. Salem below policy; United Rentals left off 5 RFQs."],
+           ["save","Savings","Shift idle PMV generators here","6 PMV generators idle while Aramco rents 5 externally — saves ≈95k/month."],
+           ["buy","Buy vs rent","Highest manlift demand — buy 4 units","12 active manlifts; owning pays back fastest at Aramco."]] }
+  };
+  const ORDER = ["qiddiya","ksp","airport","diriyah","aramco"];
+  function scoreCls(s){ return s>=84?"hi":s>=70?"mid":"lo"; }
+
+  let curProj = "all";
+  function selectProject(key){
+    curProj = key;
+    document.querySelectorAll(".ptab").forEach(x=>x.classList.toggle("on", x.getAttribute("data-proj")===key));
+    render();
+    window.scrollTo({top:0,behavior:"smooth"});
+  }
+
+  function render(){
+    const d = D[curProj];
+    // KPIs
+    document.getElementById("kpis").innerHTML =
+      kpi("ic-blue","forklift", t("Active rentals","الإيجارات النشطة"), d.active, "", t("machines out on rent right now","معدّات مؤجَّرة حالياً"))
+    + kpi("ic-orange","bolt", t("Speed of execution","سرعة التنفيذ"), d.speed, t("days","يوم"), t("avg days: request → machine on site","متوسط الأيام: الطلب → وصول المعدّة"))
+    + kpi("ic-teal","payments", t("Rental spend","إنفاق الإيجار"), "SAR "+d.gmv, "M", t("total rental value (GMV)","إجمالي قيمة الإيجارات (GMV)"))
+    + kpi("ic-amber","verified_user", t("RFQ compliance","التزام الطلبات"), d.comp, "%", t("RFQs that invited the must-include suppliers","الطلبات التي دعت المؤجرين الإلزاميين"))
+    + kpi("ic-green","balance", t("Own fleet vs rented","أسطولنا مقابل المستأجَر"), d.intl+"<small>/"+d.ext+"</small>", "", t("% own PMV fleet vs % rented from market","نسبة أسطول PMV مقابل الاستئجار"));
+    // project detail (focused)
+    const pd = document.getElementById("pdetail");
+    if(curProj==="all"){ pd.hidden = true; }
+    else {
+      pd.hidden = false;
+      const init = d.officer.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+      pd.innerHTML =
+        '<div class="pd-officer"><div class="pd-av">'+init+'</div><div><div class="pd-ot">'+t("Procurement officer","مسؤول المشتريات")+'</div><div class="pd-on">'+d.officer+'</div></div></div>'
+       +'<div class="pd-stats">'
+       + pds(d.orders, t("Orders (RFQs)","الطلبات")) + pds(d.equip, t("Equipment","المعدّات")) + pds(d.speed+"d", t("Speed","السرعة"))
+       +'</div>'
+       +'<div class="pd-score" style="background:'+(d.score>=84?'rgba(29,175,88,.25)':d.score>=70?'rgba(212,120,10,.3)':'rgba(217,54,42,.3)')+';color:#fff">'+d.score+'</div>';
+    }
+    // equipment analytics
+    document.getElementById("equipBody").innerHTML = d.eq.map(r=>
+      '<tr><td><span class="off"><span class="material-icons-outlined" style="font-size:17px;color:var(--navy-mid)">build</span>'+r[0]+'</span></td>'
+     +'<td class="num">'+r[1]+'</td><td class="num">'+r[2]+'</td>'
+     +'<td><span class="tag-st '+r[4]+'">'+r[3]+'</span></td></tr>').join("");
+    // donut
+    document.getElementById("donut").style.background = "conic-gradient(var(--supplier) 0 "+d.intl+"%, var(--rentee) "+d.intl+"% 100%)";
+    document.getElementById("donutTot").textContent = d.active;
+    document.getElementById("legInt").textContent = d.intl+"%";
+    document.getElementById("legExt").textContent = d.ext+"%";
+    // compliance
+    document.getElementById("gauge").style.background = "conic-gradient("+(d.comp>=85?'var(--success)':d.comp>=70?'var(--warning)':'var(--danger)')+" 0 "+d.comp+"%, var(--surface3) "+d.comp+"% 100%)";
+    const gp = document.getElementById("gaugePct"); gp.textContent = d.comp+"%"; gp.style.color = d.comp>=85?'var(--success)':d.comp>=70?'var(--warning)':'var(--danger)';
+    document.getElementById("compH").textContent = t(d.compH_en, d.compH_ar);
+    // overall-only sections
+    document.getElementById("overallOnly").hidden = (curProj!=="all");
+    if(curProj==="all"){
+      document.getElementById("scoreBody").innerHTML = ORDER.map(k=>{ const p=D[k];
+        return '<tr style="cursor:pointer" onclick="selectProject(\''+k+'\')">'
+          +'<td><span class="site-n">'+p.nameEn+'</span></td>'
+          +'<td><span class="off"><span class="off-av">'+p.officer.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()+'</span>'+p.officer+'</span></td>'
+          +'<td class="num">'+p.orders+'</td><td class="num">'+p.equip+'</td><td class="num">'+p.speed+'d</td>'
+          +'<td><span class="scorepill '+scoreCls(p.score)+'">'+p.score+'</span></td></tr>'; }).join("");
+      renderCompare(curMetric);
+    }
+    // assistant
+    document.getElementById("fabBadge").textContent = d.ins.length;
+    document.getElementById("drawerScope").textContent = t("Watching "+d.nameEn+" · "+d.ins.length+" findings","يراقب "+d.nameAr+" · "+d.ins.length+" ملاحظات");
+    renderChat();
+  }
+  function kpi(ic,icon,lbl,val,unit,hint){
+    return '<div class="kpi"><div class="k-top"><span class="k-ic '+ic+'"><span class="material-icons-outlined">'+icon+'</span></span>'+lbl+'</div>'
+      +'<div class="k-val">'+val+(unit?' <small>'+unit+'</small>':'')+'</div><div class="k-hint">'+hint+'</div></div>';
+  }
+  function pds(v,l){ return '<div class="pd-s"><b>'+v+'</b><span>'+l+'</span></div>'; }
+  function p_name(k){ return D[k].nameEn; }
+
+  /* compare projects */
+  const metricCfg = {
+    score:{low:false,fmt:v=>v,hint:["Best overall: {b}. Weakest: {w}.","الأفضل: {b}. الأضعف: {w}."]},
+    gmv:{low:false,fmt:v=>"SAR "+v.toFixed(2)+"M",hint:["{b} spends most; {w} least.","{b} الأعلى إنفاقاً؛ {w} الأقل."]},
+    speed:{low:true,fmt:v=>v.toFixed(1)+"d",hint:["Fastest: {b}. Slowest: {w}.","الأسرع: {b}. الأبطأ: {w}."]},
+    orders:{low:false,fmt:v=>v+" RFQs",hint:["Most orders: {b}. Fewest: {w}.","الأكثر: {b}. الأقل: {w}."]},
+    compliance:{low:false,fmt:v=>v+"%",hint:["Most compliant: {b}. Needs attention: {w}.","الأكثر التزاماً: {b}. الأضعف: {w}."]}
+  };
+  let curMetric="score";
+  function mval(k,m){ const p=D[k]; return m==="gmv"?parseFloat(p.gmv):m==="speed"?parseFloat(p.speed):p[m]; }
+  function renderCompare(metric, el){
+    if(el){ document.querySelectorAll(".cmp-tog").forEach(x=>x.classList.remove("on")); el.classList.add("on"); }
+    curMetric=metric; const cfg=metricCfg[metric];
+    const rows=[...ORDER].sort((a,b)=> cfg.low? mval(a,metric)-mval(b,metric) : mval(b,metric)-mval(a,metric));
+    const vals=rows.map(k=>mval(k,metric)), max=Math.max(...vals), min=Math.min(...vals);
+    document.getElementById("cmpBars").innerHTML = rows.map((k,i)=>{
+      const v=mval(k,metric), w=cfg.low? Math.round(min/v*100):Math.round(v/max*100);
+      const cls=i===0?"rank-best":i===rows.length-1?"rank-worst":"";
+      return '<div class="bar-row"><span class="bl">'+D[k].nameEn+'</span><div class="bar-track '+cls+'"><i style="width:'+Math.max(w,6)+'%"></i></div><span class="bn">'+cfg.fmt(v)+'</span></div>';
+    }).join("");
+    const h=t(cfg.hint[0],cfg.hint[1]).replace("{b}",D[rows[0]].nameEn).replace("{w}",D[rows[rows.length-1]].nameEn);
+    document.getElementById("cmpHint").textContent=h;
+  }
+
+  /* AI assistant chat drawer */
+  function openChat(){ document.body.classList.add("chat-open"); }
+  function closeChat(){ document.body.classList.remove("chat-open"); }
+  function renderChat(){
+    const d=D[curProj];
+    let h='<div class="msg"><div class="av-m"><span class="material-icons-outlined">auto_awesome</span></div><div class="bubble">'
+      + t("Here's what needs attention for <b>"+d.nameEn+"</b> — "+d.ins.length+" finding"+(d.ins.length>1?"s":"")+":","إليك ما يحتاج انتباهاً في <b>"+d.nameAr+"</b> — "+d.ins.length+" ملاحظة:")
+      + '</div></div>';
+    d.ins.forEach(i=>{ h+='<div class="ins '+i[0]+'"><span class="ins-tag">'+i[1]+'</span><b>'+i[2]+'</b><p>'+i[3]+'</p></div>'; });
+    document.getElementById("chatBody").innerHTML = h;
+  }
+  function addMsg(role,txt){ const b=document.getElementById("chatBody"); const m=document.createElement("div"); m.className="msg "+role; m.innerHTML=(role==="user"?"":'<div class="av-m"><span class="material-icons-outlined">auto_awesome</span></div>')+'<div class="bubble"></div>'; m.querySelector(".bubble").textContent=txt; b.appendChild(m); b.scrollTop=b.scrollHeight; }
+  function askQuick(kind){
+    const d=D[curProj]; const map={buy:"Buy or rent?",risk:"Any supply risk?",save:"Where can I save?"};
+    addMsg("user", t(map[kind], kind==="buy"?"شراء أم إيجار؟":kind==="risk"?"مخاطر توريد؟":"أين أوفّر؟"));
+    const found = d.ins.find(i=> (kind==="buy"&&i[0]==="buy")||(kind==="risk"&&i[0]==="risk")||(kind==="save"&&i[0]==="save"));
+    const reply = found ? found[2]+" — "+found[3] : t("Nothing flagged for "+d.nameEn+" on that.","لا شيء بهذا الخصوص لـ "+d.nameAr+".");
+    setTimeout(()=>addMsg("mansour", reply), 260);
+  }
+  function sendChat(){ const inp=document.getElementById("chatInput"); const v=inp.value.trim(); if(!v)return; addMsg("user",v); inp.value=""; setTimeout(()=>addMsg("mansour", t("Looking at "+D[curProj].nameEn+"'s demand, spend & supply…","أحلّل طلب وإنفاق وتوريد "+D[curProj].nameAr+"…")), 260); }
+
+  let toastTimer=null;
+  function toast(msg){ const el=document.getElementById("toast"); document.getElementById("toastTx").textContent=msg; el.classList.add("on"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove("on"),2400); }
+
+  function setLang(l){
+    lang=l; const html=document.documentElement; html.lang=l; html.dir=l==="ar"?"rtl":"ltr";
+    document.getElementById("lEn").classList.toggle("on",l==="en");
+    document.getElementById("lAr").classList.toggle("on",l==="ar");
+    document.querySelectorAll("[data-en]").forEach(n=>{ n.textContent=n.getAttribute("data-"+l); });
+    document.getElementById("chatInput").placeholder = l==="ar"?"اسأل المساعد…":"Ask the assistant…";
+    render();
+  }
+  render();
+</script>
+</body>
+</html>
