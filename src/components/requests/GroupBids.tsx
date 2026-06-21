@@ -10,7 +10,7 @@ import { TermClassBadges } from "@/components/requests/TermClassBadges";
 import { DealRoomBanner, SupplierDocs } from "@/components/requests/BidCardExtras";
 import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
-import { useSharedLinkMock, tagSharedLinkBids, SHARED_LINK_STATS } from "@/lib/mock/shared-link-bids";
+import { useSharedLinkMock, tagSharedLinkBids } from "@/lib/mock/shared-link-bids";
 import { bidSuppliers, CERT_LABEL, type BidCard } from "@/lib/contract/bids";
 import type { RequestGroup } from "@/lib/contract/requests";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
@@ -139,7 +139,6 @@ export function GroupBids({ group }: { group: RequestGroup }) {
   // web-app/006 demo (staging only) — relabel real bids as off-platform "via shared link".
   const mockEnabled = useSharedLinkMock();
   const [submissionBid, setSubmissionBid] = useState<GroupBid | null>(null);
-  const [copied, setCopied] = useState(false);
   // Bid filter (source + refine), matching the bids-by-supplier prototype.
   const [filterOpen, setFilterOpen] = useState(false);
   const [fSource, setFSource] = useState<"all" | "link" | "platform" | "file">("all");
@@ -437,28 +436,8 @@ export function GroupBids({ group }: { group: RequestGroup }) {
   const fActive = (fSource !== "all" ? 1 : 0) + (fVerified ? 1 : 0) + (fKm ? 1 : 0);
   const selectedCount = allBids.filter((b) => selected.has(b.id)).length;
 
-  const copyShareLink = () => {
-    const code = group.items[0]?.displayId ?? group.id;
-    navigator.clipboard?.writeText(`${window.location.origin}/supplier-bid-v2.html?req=${encodeURIComponent(code)}`)
-      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); })
-      .catch(() => {});
-  };
-
   return (
     <div>
-      {/* web-app/006 demo — shared-link reach tracker on the bids list */}
-      {mockEnabled && (
-        <div className="rd-track" style={{ marginBottom: 14 }}>
-          <span className="material-icons-outlined">link</span>
-          <span className="rt-lbl">{L("Shared link", "الرابط المشترك")}</span>
-          <span className="rt-stat"><span className="material-icons-outlined">visibility</span><b>{SHARED_LINK_STATS.opened}</b> {L("opened", "فتحة")}</span>
-          <span className="rt-stat sub"><span className="material-icons-outlined">gavel</span><b>{SHARED_LINK_STATS.submitted}</b> {L("submitted", "عرض")}</span>
-          <button className="rt-copy" onClick={copyShareLink}>
-            <span className="material-icons-outlined">{copied ? "check" : "content_copy"}</span>{copied ? L("Copied", "تم النسخ") : L("Copy link", "نسخ الرابط")}
-          </button>
-        </div>
-      )}
-
       {/* Filter bids — by source + refine (matches the bids-by-supplier prototype) */}
       <div className="filterbar">
         <button className={`filterbtn${filterOpen ? " open" : ""}`} onClick={() => setFilterOpen((o) => !o)}>

@@ -77,7 +77,7 @@ export function BidComparisonWorkspace() {
   // UI chrome state to mirror the prototype.
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selectorOpen, setSelectorOpen] = useState(true);
-  const [agentOpen, setAgentOpen] = useState(true); // the AI assistant panel sits above the table, collapsible
+  const [chatOpen, setChatOpen] = useState(false); // the AI chat is a side drawer (the re-rank bar stays inline)
   const [uploadOpen, setUploadOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [chat, setChat] = useState<ChatMsg[]>([]);
@@ -572,88 +572,100 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
             )}
           </div>
 
-          {/* ── Your AI assistant (collapsible) — above the table ── */}
-          <div className="overflow-hidden rounded-xl border" style={{ borderColor: C.border, background: "#fff" }}>
-            <button onClick={() => setAgentOpen((o) => !o)} className="flex w-full items-center gap-2.5 px-4 py-3.5 text-start text-white" style={{ background: `linear-gradient(150deg,${C.navy},${C.navyDeep})` }}>
-              <div className="grid h-9 w-9 flex-none place-items-center rounded-lg" style={{ background: `linear-gradient(135deg,${C.action},#FFA733)` }}><span className="material-icons-outlined" style={{ fontSize: 21 }}>auto_awesome</span></div>
-              <div><b className="text-[15px]">{L("Your AI assistant", "مساعدك الذكي")}</b><p className="m-0 text-[11.5px]" style={{ color: "rgba(255,255,255,.66)" }}>{L("Qualified first, then ranked on what matters to you", "التأهيل أولاً، ثم الترتيب حسب ما يهمّك")}</p></div>
-              <span className="ms-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-extrabold" style={recLoading ? { background: "rgba(247,144,9,.18)", border: "1px solid rgba(247,144,9,.45)", color: "#FFC97A" } : agentLive ? { background: "rgba(29,175,88,.18)", border: "1px solid rgba(29,175,88,.45)", color: "#7BE0A5" } : { background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.2)", color: "rgba(255,255,255,.7)" }}>
-                {recLoading ? <span className="material-icons-outlined animate-spin" style={{ fontSize: 13 }}>autorenew</span> : <span className="h-2 w-2 rounded-full" style={{ background: agentLive ? "#7BE0A5" : "rgba(255,255,255,.6)" }} />}
-                {recLoading ? L("thinking…", "يفكّر…") : agentLive ? `${L("live", "متصل")}${conf != null ? ` · ${conf}%` : ""}` : L("offline", "غير متصل")}
-              </span>
-              <span className="material-icons-outlined" style={{ fontSize: 22, color: "rgba(255,255,255,.72)", transform: agentOpen ? "" : "rotate(-90deg)" }}>expand_more</span>
-            </button>
-            {agentOpen && (<>
-              {/* rank by what matters — the agent re-orders the table below (AC-20/21) */}
-              <div className="border-b px-4 py-3.5" style={{ borderColor: C.line, background: "#fff" }}>
-                <div className="mb-2.5 flex flex-wrap items-center gap-2 text-[12.5px] font-extrabold" style={{ color: C.navyMid }}>
-                  <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>tune</span>{L("Rank the table by what matters to you", "رتّب الجدول حسب ما يهمّك")}
-                  <span className="ms-auto">{agentBadge()}</span>
-                </div>
-                <div className="mb-3 flex flex-wrap gap-2">
-                  {presetDefs.map(([p, ic, en, arl]) => (
-                    <button key={p} onClick={() => choosePreset(p, en, arl)} className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-bold transition"
-                      style={preset === p && !fxEcho ? { background: C.navy, borderColor: C.navy, color: "#fff" } : { background: C.surface2, borderColor: C.border, color: C.navyMid }}>
-                      <span className="material-icons-outlined" style={{ fontSize: 16 }}>{ic}</span>{ar ? arl : en}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-2.5">
-                  <div className="flex h-[46px] flex-1 items-center gap-2.5 rounded-lg border px-3.5" style={{ background: C.surface2, borderColor: C.border }}>
-                    <span className="material-icons-outlined" style={{ fontSize: 19, color: C.action }}>auto_awesome</span>
-                    <input value={freeText} onChange={(e) => setFreeText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") applyFreeText(); }}
-                      placeholder={L("Tell your assistant what matters — e.g. 'closest machine, fuel must be included'…", "أخبر مساعدك بما يهمّك — مثلاً: 'أقرب معدّة، ويجب أن يكون الوقود مشمولاً'…")}
-                      className="min-w-0 flex-1 bg-transparent text-[14px] outline-none" style={{ color: C.navy }} />
-                  </div>
-                  <button onClick={applyFreeText} className="inline-flex items-center gap-1.5 rounded-lg px-4 text-[13.5px] font-bold text-white" style={{ background: C.action }}>
-                    <span className="material-icons-outlined" style={{ fontSize: 18 }}>send</span>{L("Re-rank", "إعادة الترتيب")}
-                  </button>
-                </div>
-                {fxEcho && (
-                  <div className="mt-3 flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-[12.5px]" style={{ background: C.actionDim, borderColor: "rgba(247,144,9,.3)", color: "#8A5A06" }}>
-                    <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>auto_awesome</span>{fxEcho}
-                  </div>
-                )}
+          {/* ── Rank the table by what matters — always visible, inline above the table (AC-20/21) ── */}
+          <div className="rounded-xl border px-4 py-3.5" style={{ borderColor: C.border, background: "#fff" }}>
+            <div className="mb-2.5 flex flex-wrap items-center gap-2 text-[12.5px] font-extrabold" style={{ color: C.navyMid }}>
+              <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>tune</span>{L("Rank the table by what matters to you", "رتّب الجدول حسب ما يهمّك")}
+              <span className="ms-auto">{agentBadge()}</span>
+            </div>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {presetDefs.map(([p, ic, en, arl]) => (
+                <button key={p} onClick={() => choosePreset(p, en, arl)} className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-bold transition"
+                  style={preset === p && !fxEcho ? { background: C.navy, borderColor: C.navy, color: "#fff" } : { background: C.surface2, borderColor: C.border, color: C.navyMid }}>
+                  <span className="material-icons-outlined" style={{ fontSize: 16 }}>{ic}</span>{ar ? arl : en}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2.5">
+              <div className="flex h-[46px] flex-1 items-center gap-2.5 rounded-lg border px-3.5" style={{ background: C.surface2, borderColor: C.border }}>
+                <span className="material-icons-outlined" style={{ fontSize: 19, color: C.action }}>auto_awesome</span>
+                <input value={freeText} onChange={(e) => setFreeText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") applyFreeText(); }}
+                  placeholder={L("Tell your assistant what matters — e.g. 'closest machine, fuel must be included'…", "أخبر مساعدك بما يهمّك — مثلاً: 'أقرب معدّة، ويجب أن يكون الوقود مشمولاً'…")}
+                  className="min-w-0 flex-1 bg-transparent text-[14px] outline-none" style={{ color: C.navy }} />
               </div>
-
-              <div className="flex max-h-[420px] flex-col gap-3 overflow-y-auto p-4">
-                {recoMsg && (
-                  <div className="flex max-w-[92%] gap-2.5">
-                    <div className="grid h-[30px] w-[30px] flex-none place-items-center rounded-lg" style={{ background: `linear-gradient(135deg,${C.action},#FFA733)` }}><span className="material-icons-outlined" style={{ fontSize: 17, color: "#fff" }}>auto_awesome</span></div>
-                    <div className="rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed" style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.navy, borderStartStartRadius: 4 }}>
-                      <span className="mb-1 flex items-center gap-1.5 text-[12px] font-extrabold">
-                        <span className="grid h-5 w-5 flex-none place-items-center rounded-full text-[11px] font-black text-white" style={{ background: `linear-gradient(135deg,${C.gold},#E0A92E)`, color: "#2A1D00" }}>1</span>
-                        {(cols.find((c) => c.bid.id === pickId) ?? cols[0])?.bid.supplierName}
-                      </span>
-                      {recoMsg}
-                    </div>
-                  </div>
-                )}
-                {chat.map((m, i) => (
-                  <div key={i} className={`flex max-w-[92%] gap-2.5 ${m.role === "user" ? "ms-auto flex-row-reverse" : ""}`}>
-                    {m.role === "mansour" && <div className="grid h-[30px] w-[30px] flex-none place-items-center rounded-lg" style={{ background: `linear-gradient(135deg,${C.action},#FFA733)` }}><span className="material-icons-outlined" style={{ fontSize: 17, color: "#fff" }}>auto_awesome</span></div>}
-                    <div className="rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed" style={m.role === "user" ? { background: C.rentee, color: "#fff", borderStartEndRadius: 4 } : { background: C.surface2, border: `1px solid ${C.border}`, color: C.navy, borderStartStartRadius: 4 }}>{m.text}</div>
-                  </div>
-                ))}
+              <button onClick={applyFreeText} className="inline-flex items-center gap-1.5 rounded-lg px-4 text-[13.5px] font-bold text-white" style={{ background: C.action }}>
+                <span className="material-icons-outlined" style={{ fontSize: 18 }}>send</span>{L("Re-rank", "إعادة الترتيب")}
+              </button>
+            </div>
+            {fxEcho && (
+              <div className="mt-3 flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-[12.5px]" style={{ background: C.actionDim, borderColor: "rgba(247,144,9,.3)", color: "#8A5A06" }}>
+                <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>auto_awesome</span>{fxEcho}
               </div>
-              {suggestions.length > 0 && (
-                <div className="flex flex-wrap gap-2 px-4 pb-3">
-                  {suggestions.map((s, i) => (
-                    <button key={i} onClick={() => sendChat(s.message)} className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[12.5px] font-bold" style={{ borderColor: C.border, color: C.rentee, background: "#fff" }}>
-                      <span className="material-icons-outlined" style={{ fontSize: 15 }}>{SUGGEST_ICON[s.icon] ?? "help"}</span>{s.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="flex gap-2.5 border-t px-4 py-3" style={{ borderColor: C.line, background: C.surface2 }}>
-                <div className="flex h-[46px] flex-1 items-center gap-2.5 rounded-full border px-4" style={{ background: "#fff", borderColor: C.border }}>
-                  <span className="material-icons-outlined" style={{ fontSize: 18, color: C.action }}>auto_awesome</span>
-                  <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") sendChat(chatInput); }} placeholder={L("Ask your assistant…", "اسأل مساعدك…")} className="min-w-0 flex-1 bg-transparent text-[14px] outline-none" style={{ color: C.navy }} />
-                </div>
-                <button onClick={() => sendChat(chatInput)} className="grid h-[46px] w-[46px] flex-none place-items-center rounded-full text-white" style={{ background: C.action }}><span className="material-icons-outlined" style={{ fontSize: 20, transform: ar ? "scaleX(-1)" : undefined }}>send</span></button>
-              </div>
-            </>)}
+            )}
           </div>
+
+          {/* ── Ask-AI floating button → opens the side chat drawer (ranking above stays visible) ── */}
+          <button onClick={() => setChatOpen(true)} className="fixed bottom-6 z-40 inline-flex items-center gap-2 rounded-full px-5 py-3.5 text-[13.5px] font-extrabold text-white"
+            style={{ insetInlineEnd: "1.5rem", background: `linear-gradient(135deg,${C.action},#FFA733)`, boxShadow: "0 10px 26px rgba(247,144,9,.4)" }}>
+            <span className="material-icons-outlined" style={{ fontSize: 19 }}>auto_awesome</span>{L("Ask AI", "اسأل الذكاء")}
+            {suggestions.length > 0 && <span className="grid h-5 min-w-[20px] place-items-center rounded-full px-1 text-[11px] font-black" style={{ background: "#fff", color: C.action }}>{suggestions.length}</span>}
+          </button>
+          {chatOpen && (
+            <>
+              <div className="fixed inset-0 z-40" style={{ background: "rgba(28,53,80,.4)" }} onClick={() => setChatOpen(false)} />
+              <div className="fixed inset-y-0 z-50 flex w-[400px] max-w-full flex-col bg-white" style={{ insetInlineEnd: 0, boxShadow: "-10px 0 40px rgba(28,53,80,.25)" }}>
+                <div className="flex items-start gap-2.5 px-4 py-4 text-white" style={{ background: `linear-gradient(150deg,${C.navy},${C.navyDeep})` }}>
+                  <div className="grid h-9 w-9 flex-none place-items-center rounded-lg" style={{ background: `linear-gradient(135deg,${C.action},#FFA733)` }}><span className="material-icons-outlined" style={{ fontSize: 21 }}>auto_awesome</span></div>
+                  <div className="flex-1">
+                    <b className="text-[15px]">{L("Your AI assistant", "مساعدك الذكي")}</b>
+                    <p className="m-0 text-[11.5px]" style={{ color: "rgba(255,255,255,.66)" }}>
+                      {recLoading ? L("thinking…", "يفكّر…") : agentLive ? `${L("live", "متصل")}${conf != null ? ` · ${conf}%` : ""}` : L("offline · ranking from your stated data", "غير متصل · يرتّب من بياناتك")}
+                    </p>
+                  </div>
+                  <button onClick={() => setChatOpen(false)} className="grid h-8 w-8 flex-none place-items-center rounded-full" style={{ border: "1px solid rgba(255,255,255,.3)", background: "rgba(255,255,255,.1)", color: "#fff" }}><span className="material-icons-outlined" style={{ fontSize: 18 }}>close</span></button>
+                </div>
+                <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
+                  {recoMsg && (
+                    <div className="flex max-w-[92%] gap-2.5">
+                      <div className="grid h-[30px] w-[30px] flex-none place-items-center rounded-lg" style={{ background: `linear-gradient(135deg,${C.action},#FFA733)` }}><span className="material-icons-outlined" style={{ fontSize: 17, color: "#fff" }}>auto_awesome</span></div>
+                      <div className="rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed" style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.navy, borderStartStartRadius: 4 }}>
+                        <span className="mb-1 flex items-center gap-1.5 text-[12px] font-extrabold">
+                          <span className="grid h-5 w-5 flex-none place-items-center rounded-full text-[11px] font-black" style={{ background: `linear-gradient(135deg,${C.gold},#E0A92E)`, color: "#2A1D00" }}>1</span>
+                          {(cols.find((c) => c.bid.id === pickId) ?? cols[0])?.bid.supplierName}
+                        </span>
+                        {recoMsg}
+                      </div>
+                    </div>
+                  )}
+                  {chat.length === 0 && !recoMsg && (
+                    <p className="text-[13px]" style={{ color: C.muted }}>{L("Ask anything about these bids — or use the suggestions below.", "اسأل أي شيء عن هذه العروض — أو استخدم الاقتراحات أدناه.")}</p>
+                  )}
+                  {chat.map((m, i) => (
+                    <div key={i} className={`flex max-w-[92%] gap-2.5 ${m.role === "user" ? "ms-auto flex-row-reverse" : ""}`}>
+                      {m.role === "mansour" && <div className="grid h-[30px] w-[30px] flex-none place-items-center rounded-lg" style={{ background: `linear-gradient(135deg,${C.action},#FFA733)` }}><span className="material-icons-outlined" style={{ fontSize: 17, color: "#fff" }}>auto_awesome</span></div>}
+                      <div className="rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed" style={m.role === "user" ? { background: C.rentee, color: "#fff", borderStartEndRadius: 4 } : { background: C.surface2, border: `1px solid ${C.border}`, color: C.navy, borderStartStartRadius: 4 }}>{m.text}</div>
+                    </div>
+                  ))}
+                </div>
+                {suggestions.length > 0 && (
+                  <div className="flex flex-wrap gap-2 px-4 pb-3">
+                    {suggestions.map((s, i) => (
+                      <button key={i} onClick={() => sendChat(s.message)} className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[12.5px] font-bold" style={{ borderColor: C.border, color: C.rentee, background: "#fff" }}>
+                        <span className="material-icons-outlined" style={{ fontSize: 15 }}>{SUGGEST_ICON[s.icon] ?? "help"}</span>{s.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2.5 border-t px-4 py-3" style={{ borderColor: C.line, background: C.surface2 }}>
+                  <div className="flex h-[46px] flex-1 items-center gap-2.5 rounded-full border px-4" style={{ background: "#fff", borderColor: C.border }}>
+                    <span className="material-icons-outlined" style={{ fontSize: 18, color: C.action }}>auto_awesome</span>
+                    <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") sendChat(chatInput); }} placeholder={L("Ask your assistant…", "اسأل مساعدك…")} className="min-w-0 flex-1 bg-transparent text-[14px] outline-none" style={{ color: C.navy }} />
+                  </div>
+                  <button onClick={() => sendChat(chatInput)} className="grid h-[46px] w-[46px] flex-none place-items-center rounded-full text-white" style={{ background: C.action }}><span className="material-icons-outlined" style={{ fontSize: 20, transform: ar ? "scaleX(-1)" : undefined }}>send</span></button>
+                </div>
+              </div>
+            </>
+          )}
 
           {/* ── how-to-read tip (compact, expandable) ── */}
           <details className="group rounded-lg border" style={{ borderColor: C.border, background: "#fff" }}>

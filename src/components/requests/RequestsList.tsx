@@ -7,6 +7,7 @@ import { fetchMyRequests } from "@/lib/api/client";
 import { groupRequests, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
 import { GroupBids } from "@/components/requests/GroupBids";
 import { EquipImg } from "@/components/requests/EquipImg";
+import { useSharedLinkMock, SHARED_LINK_STATS } from "@/lib/mock/shared-link-bids";
 import "@/components/requests/requests-proto.css";
 
 const STATUS: Record<string, { cls: string; en: string; ar: string }> = {
@@ -182,25 +183,47 @@ export function GroupStrip({ group, ar, L, router }: { group: RequestGroup; ar: 
   const leadBase = (ar ? lead?.nameAr : lead?.name) || group.locationLabel;
   const leadName = lead ? `${leadBase} · ${lead.qty} ${lead.qty === 1 ? L("unit", "وحدة") : L("units", "وحدات")}` : leadBase;
   const more = group.items.length - 1;
+  // web-app/006 demo (staging) — shared-link reach tracker, embedded in this card (not a 2nd card).
+  const showTracker = useSharedLinkMock();
+  const [copied, setCopied] = useState(false);
+  const copyShareLink = () => {
+    const code = group.items[0]?.displayId ?? group.id;
+    navigator.clipboard?.writeText(`${window.location.origin}/supplier-bid-v2.html?req=${encodeURIComponent(code)}`)
+      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); })
+      .catch(() => {});
+  };
   return (
     <div className="gctx">
-      <span className="gx-ic">
-        <EquipImg src={lead?.imageUrl ?? null} categoryId={lead?.categoryId ?? null} name={ar ? lead?.nameAr : lead?.name} box="" img="h-6 w-6 object-contain" iconSize={22} />
-        {more > 0 && <span className="gx-more-badge">+{more}</span>}
-      </span>
-      <div className="gx-main">
-        <div className="gx-title">{leadName}{more > 0 && <span className="gx-more"> + {more} {L("more", "أخرى")}</span>}<span className="gx-count">{group.totalUnits} {L("total equipment", "إجمالي المعدات")}</span></div>
-        <div className="gx-meta">{group.locationLabel}{group.createdAt ? ` · ${fmtDate(group.createdAt, ar)}` : ""}</div>
-        <button className="gx-link" onClick={() => router.push(`/requests/group/${encodeURIComponent(group.id)}`)}>
-          <span className="material-icons-outlined">description</span>{L("View full request details", "عرض تفاصيل الطلب كاملة")}<span className="material-icons-outlined">open_in_new</span>
-        </button>
+      <div className="gx-row">
+        <span className="gx-ic">
+          <EquipImg src={lead?.imageUrl ?? null} categoryId={lead?.categoryId ?? null} name={ar ? lead?.nameAr : lead?.name} box="" img="h-6 w-6 object-contain" iconSize={22} />
+          {more > 0 && <span className="gx-more-badge">+{more}</span>}
+        </span>
+        <div className="gx-main">
+          <div className="gx-title">{leadName}{more > 0 && <span className="gx-more"> + {more} {L("more", "أخرى")}</span>}<span className="gx-count">{group.totalUnits} {L("total equipment", "إجمالي المعدات")}</span></div>
+          <div className="gx-meta">{group.locationLabel}{group.createdAt ? ` · ${fmtDate(group.createdAt, ar)}` : ""}</div>
+          <button className="gx-link" onClick={() => router.push(`/requests/group/${encodeURIComponent(group.id)}`)}>
+            <span className="material-icons-outlined">description</span>{L("View full request details", "عرض تفاصيل الطلب كاملة")}<span className="material-icons-outlined">open_in_new</span>
+          </button>
+        </div>
+        <div className="gx-badges">
+          {group.asap && <span className="asap"><span className="material-icons-outlined">flash_on</span>{L("ASAP", "فوري")}</span>}
+          <span className={`stbadge ${ov.cls}`}><span className="dot" />{ar ? ov.ar : ov.en}</span>
+          {gty && <span className={`typebadge ${gty.cls}`}><span className="material-icons-outlined">{gty.icon}</span>{ar ? gty.ar : gty.en}</span>}
+          <span className="gx-bids"><span className="material-icons-outlined">gavel</span>{group.totalBids} {L("bids", "عروض")}</span>
+        </div>
       </div>
-      <div className="gx-badges">
-        {group.asap && <span className="asap"><span className="material-icons-outlined">flash_on</span>{L("ASAP", "فوري")}</span>}
-        <span className={`stbadge ${ov.cls}`}><span className="dot" />{ar ? ov.ar : ov.en}</span>
-        {gty && <span className={`typebadge ${gty.cls}`}><span className="material-icons-outlined">{gty.icon}</span>{ar ? gty.ar : gty.en}</span>}
-        <span className="gx-bids"><span className="material-icons-outlined">gavel</span>{group.totalBids} {L("bids", "عروض")}</span>
-      </div>
+      {showTracker && (
+        <div className="gx-track">
+          <span className="material-icons-outlined gx-tk-ic">link</span>
+          <span className="rt-lbl">{L("Shared link", "الرابط المشترك")}</span>
+          <span className="rt-stat"><span className="material-icons-outlined">visibility</span><b>{SHARED_LINK_STATS.opened}</b> {L("opened", "فتحة")}</span>
+          <span className="rt-stat sub"><span className="material-icons-outlined">gavel</span><b>{SHARED_LINK_STATS.submitted}</b> {L("submitted", "عرض")}</span>
+          <button className="rt-copy" onClick={copyShareLink}>
+            <span className="material-icons-outlined">{copied ? "check" : "content_copy"}</span>{copied ? L("Copied", "تم النسخ") : L("Copy link", "نسخ الرابط")}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
