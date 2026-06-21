@@ -40,6 +40,7 @@ export const en = {
     profile: "Profile",
     requests: "Requests",
     compare: "Compare bids",
+    dashboard: "Dashboard",
     request: "Request",
     account: "Account",
     welcome: "Welcome",
