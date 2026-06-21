@@ -1,0 +1,1038 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useLocale } from "@/lib/i18n";
+import { fetchMyRequests, fetchBids, startDealRoom, recommendBids, askBids, parseBid, captureBidEvents } from "@/lib/api/client";
+import { groupRequests, type RequestGroup } from "@/lib/contract/requests";
+import { CERT_LABEL, type BidCard, type CertCode } from "@/lib/contract/bids";
+import { buildItemComparison, sortByPreset, type BidColumn, type Preset, type CostResponsibility } from "@/lib/contract/comparison";
+import { bidColumnToComputed, normalizedBidToBidCard, presetToAgent, type RecommendResult } from "@/lib/contract/agent-bids";
+
+const nf = (n: number) => Math.round(n).toLocaleString("en-US");
+
+// Prototype palette (bid-comparison-workspace.html) — exact hex for the bits Tailwind tokens don't cover.
+const C = {
+  navy: "#1C3550", navyDeep: "#12263A", navyMid: "#2A4F72", gold: "#B8860B",
+  action: "#F79009", actionDim: "#FFF4E5", rentee: "#2563EB", renteeDim: "#EAF1FE", supplier: "#0D8A6A",
+  success: "#1DAF58", successBg: "#E7F7EE", warning: "#D4780A", warningBg: "#FFF3E0",
+  danger: "#D9362A", dangerBg: "#FCEBEA", muted: "#6B8FA8",
+  surface2: "#EFF4F9", surface3: "#E4EDF5", border: "#D4E0EC", line: "#E4EDF5", disabled: "#9BB3C8",
+};
+
+/** The five cost-responsibility items (AC-11/12). */
+const RESP_META: { key: CostResponsibility["key"]; en: string; ar: string }[] = [
+  { key: "fuel", en: "Fuel", ar: "الوقود" },
+  { key: "maintenance", en: "Maintenance", ar: "الصيانة" },
+  { key: "overtime", en: "Overtime", ar: "إضافي" },
+  { key: "operator_food", en: "Operator food", ar: "طعام المشغّل" },
+  { key: "operator_transport_accommodation", en: "Transport & accom", ar: "النقل والإقامة" },
+];
+
+interface LocationNode { key: string; label: string; groups: RequestGroup[]; itemCount: number; bidCount: number }
+interface ChatMsg { role: "mansour" | "user"; text: string }
+
+const EQUIP_CERTS: CertCode[] = ["TUV", "SASO"];
+const OPER_CERTS: CertCode[] = ["SPSP"];
+
+/** Map Mansour's semantic suggestion icon → a material icon. */
+const SUGGEST_ICON: Record<string, string> = {
+  fuel: "local_gas_station", maintenance: "build", overtime: "more_time", food: "restaurant",
+  transport: "local_shipping", recency: "new_releases", shield: "verified_user", help: "help",
+};
+
+export function BidComparisonWorkspace() {
+  const { locale } = useLocale();
+  const ar = locale === "ar";
+  const L = (e: string, a: string) => (ar ? a : e);
+  const sar = L("SAR", "ر.س");
+  const certLabel = (c: CertCode) => (ar ? CERT_LABEL[c].ar : CERT_LABEL[c].en);
+  const periodLabel = (u: string | null) => {
+    switch ((u ?? "PER_DAY").toUpperCase()) {
+      case "PER_WEEK": return L("week", "أسبوع");
+      case "PER_MONTH": return L("month", "شهر");
+      case "PER_JOB": return L("job", "مهمة");
+      default: return L("day", "يوم");
+    }
+  };
+
+  const [groups, setGroups] = useState<RequestGroup[] | null>(null);
+  const [error, setError] = useState(false);
+  const [activeLoc, setActiveLoc] = useState<string | null>(null);
+  const [activeItem, setActiveItem] = useState<string | null>(null);
+  const [bids, setBids] = useState<BidCard[] | null>(null);
+  const [bidsLoading, setBidsLoading] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [preset, setPreset] = useState<Preset>("best");
+  const [busy, setBusy] = useState(false);
+  const [renterCosts, setRenterCosts] = useState<Partial<Record<CostResponsibility["key"], number>>>({});
+  // Mansour judgement layer (live when connected; deterministic fallback otherwise).
+  const [uploaded, setUploaded] = useState<BidCard[]>([]);
+  const [rec, setRec] = useState<RecommendResult | null>(null);
+  const [agentLive, setAgentLive] = useState(false);
+  const [recLoading, setRecLoading] = useState(false);
+  const [freeText, setFreeText] = useState("");
+  const [freeApplied, setFreeApplied] = useState("");
+  const [fxEcho, setFxEcho] = useState<string | null>(null);
+  // UI chrome state to mirror the prototype.
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [selectorOpen, setSelectorOpen] = useState(true);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [chat, setChat] = useState<ChatMsg[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [costAsk, setCostAsk] = useState<{ type: "resp"; key: CostResponsibility["key"]; label: string } | { type: "mob"; bidId: string; label: string } | null>(null);
+  const [costInput, setCostInput] = useState("");
+  const [renterMob, setRenterMob] = useState<Record<string, number>>({}); // renter's own delivery (mob/demob) estimate per bid
+  // A parsed quote the agent flagged (match.needs_confirmation) — added to the comparison only on confirm.
+  const [confirmAdd, setConfirmAdd] = useState<{ card: BidCard; warnings: string[] } | null>(null);
+  const prevRankRef = useRef<RecommendResult["ranking"] | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const preselectRef = useRef<Set<string> | null>(null); // bid ids to pre-select from ?bids= (one-shot, from My Bids)
+  const router = useRouter();
+
+  function toast(msg: string) {
+    setToastMsg(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToastMsg(null), 2600);
+  }
+
+  useEffect(() => {
+    let active = true;
+    fetchMyRequests()
+      .then((d) => active && setGroups(groupRequests(d.requests)))
+      .catch(() => active && setError(true));
+    return () => { active = false; };
+  }, []);
+
+  const locations = useMemo<LocationNode[]>(() => {
+    if (!groups) return [];
+    const map = new Map<string, LocationNode>();
+    for (const g of groups) {
+      const key = g.locationLabel || g.city || g.id;
+      const node = map.get(key) ?? { key, label: g.locationLabel || g.city || L("Location", "الموقع"), groups: [], itemCount: 0, bidCount: 0 };
+      node.groups.push(g);
+      node.itemCount += g.items.length;
+      node.bidCount += g.totalBids;
+      map.set(key, node);
+    }
+    return [...map.values()].sort((a, b) => b.bidCount - a.bidCount);
+  }, [groups, ar]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!locations.length || activeLoc) return;
+    const sp = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    const groupId = sp?.get("group") ?? null;
+    const itemId = sp?.get("item") ?? null;
+    const bidsParam = sp?.get("bids"); // pre-selected bids passed from My Bids → Compare
+    if (bidsParam) preselectRef.current = new Set(bidsParam.split(",").filter(Boolean));
+    if (groupId) {
+      const node = locations.find((l) => l.groups.some((g) => g.id === groupId));
+      if (node) {
+        setActiveLoc(node.key);
+        const g = node.groups.find((gg) => gg.id === groupId);
+        const target = (itemId && g?.items.find((i) => i.id === itemId)) || g?.items.find((i) => i.bidCount > 0) || g?.items[0];
+        if (target) setActiveItem(target.id);
+        return;
+      }
+    }
+    setActiveLoc(locations[0].key);
+  }, [locations, activeLoc]);
+
+  const loc = locations.find((l) => l.key === activeLoc) ?? locations[0];
+  const group = loc?.groups[0];
+  const items = loc ? loc.groups.flatMap((g) => g.items) : [];
+
+  useEffect(() => {
+    if (items.length && !items.some((i) => i.id === activeItem)) {
+      const firstWithBids = items.find((i) => i.bidCount > 0) ?? items[0];
+      setActiveItem(firstWithBids?.id ?? null);
+    }
+  }, [loc?.key]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!activeItem) { setBids(null); return; }
+    let active = true;
+    setBidsLoading(true);
+    setUploaded([]); setRec(null); setAgentLive(false); setFreeText(""); setFreeApplied(""); setFxEcho(null); setChat([]); setConfirmAdd(null); setRenterMob({}); prevRankRef.current = null;
+    fetchBids(activeItem)
+      .then((d) => active && setBids(d.bids))
+      .catch(() => active && setBids([]))
+      .finally(() => active && setBidsLoading(false));
+    return () => { active = false; };
+  }, [activeItem]);
+
+  const reqDurationDays = items.find((i) => i.id === activeItem)?.durationDays ?? null;
+  const raw = useMemo<BidCard[] | null>(() => (bids ? [...bids, ...uploaded] : null), [bids, uploaded]);
+  const comparison = useMemo(() => (raw ? buildItemComparison(raw, { renterCosts, requestDurationDays: reqDurationDays }) : null), [raw, renterCosts, reqDurationDays]);
+  useEffect(() => {
+    if (!comparison) return;
+    const all = comparison.columns.map((c) => c.bid.id);
+    const pre = preselectRef.current;
+    if (pre && pre.size) {
+      const inter = all.filter((id) => pre.has(id)); // honor the My Bids selection once
+      setSelected(new Set(inter.length ? inter : all));
+      preselectRef.current = null;
+    } else {
+      setSelected(new Set(all));
+    }
+  }, [comparison]);
+
+  const allCols = useMemo(() => (comparison ? [...comparison.columns, ...comparison.excluded] : []), [comparison]);
+  const baseCols = useMemo(() => allCols.filter((c) => selected.has(c.bid.id)), [allCols, selected]);
+  const detCols = useMemo(() => sortByPreset(baseCols, preset), [baseCols, preset]);
+  const cols = useMemo(() => {
+    if (agentLive && rec?.ranking?.length) {
+      // String() both sides so a number/string id mismatch can't break the match.
+      const rank = new Map(rec.ranking.map((r) => [String(r.bid_id), r.rank] as const));
+      // Only trust the agent order when it actually covers the current columns; otherwise fall back to
+      // the deterministic preset sort (which always reflects the chosen rank) so the table never freezes.
+      const covered = baseCols.length > 0 && baseCols.every((c) => rank.has(String(c.bid.id)));
+      if (covered) return [...baseCols].sort((a, b) => rank.get(String(a.bid.id))! - rank.get(String(b.bid.id))!);
+    }
+    return detCols;
+  }, [baseCols, detCols, agentLive, rec]);
+  // The pick = the agent's pick when it maps to a visible column, else the top-ranked column. Either way it
+  // tracks the current order, so the highlight moves when you re-rank.
+  const pickIdRaw = rec?.recommendation.pick_bid_id != null ? String(rec.recommendation.pick_bid_id) : null;
+  const pickId = agentLive && pickIdRaw && cols.some((c) => String(c.bid.id) === pickIdRaw)
+    ? pickIdRaw
+    : cols.length > 1 ? cols[0]?.bid.id ?? null : null;
+  const suggestions = rec?.suggestions ?? []; // context-aware what-if chips from Mansour (replace the hardcoded set)
+  const awarded = bids?.find((b) => b.status === "ACCEPTED") ?? null;
+  const activeItemObj = items.find((i) => i.id === activeItem);
+  const durationDays = activeItemObj?.durationDays ?? null;
+  const units = activeItemObj?.item?.qty ?? 1;
+  // Displayed total = the supplier's STATED costs + 15% VAT + the renter's own entered costs (responsibilities
+  // on them + their delivery estimate). Always shown as a running total of what's known — never "not stated".
+  const VAT = 0.15;
+  const renterAddBid = (c: BidColumn) => c.costResponsibilities.reduce((s, x) => (x.renterCost && (x.bidSide === "me" || (x.bidSide == null && x.requestSide === "me")) ? s + x.renterCost : s), 0) + (renterMob[c.bid.id] ?? 0);
+  const supplierStated = (c: BidColumn) => (c.rental.stated ? c.rental.value : 0) + (c.mob.stated ? c.mob.value : 0) + (c.demob.stated ? c.demob.value : 0);
+  const grandTotal = (c: BidColumn) => Math.round(supplierStated(c) * (1 + VAT)) + renterAddBid(c);
+  const hasCost = (c: BidColumn) => supplierStated(c) > 0 || renterAddBid(c) > 0;
+  const grandList = cols.filter(hasCost).map(grandTotal);
+  const lowestGrand = grandList.length ? Math.min(...grandList) : null;
+  const maxGrand = grandList.length ? Math.max(...grandList) : 1;
+
+  // Ask Mansour to rank + recommend whenever the candidate set / preset / free text / costs change.
+  const recKey = useMemo(() => baseCols.map((c) => c.bid.id).join(","), [baseCols]);
+  const costsKey = useMemo(() => JSON.stringify(renterCosts), [renterCosts]);
+  useEffect(() => {
+    if (baseCols.length < 1) { setRec(null); setAgentLive(false); return; }
+    let active = true;
+    const hasRequirements = baseCols.some((c) => [...c.cost, ...c.equipment, ...c.trust].some((r) => r.state !== "grey"));
+    setRecLoading(true);
+    recommendBids({
+      request: { hasRequirements },
+      bids: baseCols.map(bidColumnToComputed),
+      preference: { preset: presetToAgent(preset), free_text: freeApplied || null },
+      previous_ranking: prevRankRef.current,
+    })
+      .then((r) => {
+        if (!active) return;
+        if (r.agent && r.result) { setRec(r.result); setAgentLive(true); prevRankRef.current = r.result.ranking; }
+        else { setRec(null); setAgentLive(false); }
+      })
+      .finally(() => active && setRecLoading(false));
+    return () => { active = false; };
+  }, [recKey, preset, freeApplied, costsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Mansour's recommendation — LIVE: recomputes whenever the ranking/pick changes (preset, re-rank,
+  // costs). Rendered as the pinned first bubble in the chat, so the agent's advice tracks the user's rank.
+  const recoMsg = useMemo<string | null>(() => {
+    const pickCol = cols.find((c) => c.bid.id === pickId) ?? cols[0];
+    if (!pickCol) return null;
+    if (agentLive && rec) {
+      const reasons = rec.recommendation.reasons.map((x) => x.text).join(" ");
+      const conf = rec.recommendation.confidence != null ? ` · ${Math.round(rec.recommendation.confidence * 100)}% ${L("confidence", "ثقة")}` : "";
+      const flags = rec.recommendation.cost_shift_flags.length ? L(` Watch: ${rec.recommendation.cost_shift_flags.join(", ")} lands on you.`, ` انتبه: ${rec.recommendation.cost_shift_flags.join("، ")} عليك.`) : "";
+      return L(`I'd go with ${pickCol.bid.supplierName}${conf}. ${reasons}${flags}`, `أنصح بـ ${pickCol.bid.supplierName}${conf}. ${reasons}${flags}`);
+    }
+    return L(`From the stated data, ${pickCol.bid.supplierName} ranks first. Connect your AI assistant for the full reasoning.`,
+             `من البيانات المذكورة، ${pickCol.bid.supplierName} الأول. اربط مساعدك الذكي للتفسير الكامل.`);
+  }, [cols, pickId, agentLive, rec]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleBid = (id: string) => {
+    setSelected((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  };
+  const toggleSection = (k: string) => setCollapsed((p) => { const n = new Set(p); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+
+  function choosePreset(p: Preset, labelEn: string, labelAr: string) {
+    setPreset(p);
+    setFxEcho(null); setFreeText(""); setFreeApplied("");
+    captureBidEvents([{ event_type: "choice", request_id: activeItem, payload: { kind: "preset", value: presetToAgent(p) } }]);
+    toast(L(`Re-ranked by ${labelEn} — best match highlighted`, `أُعيد الترتيب حسب ${labelAr} — أُبرز الأنسب`));
+  }
+
+  // Free-text echo — read the words into ranking factors, exactly like the prototype.
+  const fxFactors = [
+    { k: ["price", "cost", "cheap", "budget", "سعر", "تكلفة", "رخيص"], en: "lowest all-in cost", ar: "أقل تكلفة شاملة" },
+    { k: ["reliab", "trust", "verified", "ثقة", "موثوق", "سمعة"], en: "trusted, verified suppliers", ar: "مؤجرون موثوقون" },
+    { k: ["fuel", "وقود"], en: "fuel included", ar: "الوقود مشمول" },
+    { k: ["clos", "near", "distance", "قريب", "مسافة", "الموقع"], en: "closest to your site", ar: "الأقرب لموقعك" },
+    { k: ["new", "recent", "year", "model", "حديث", "جديد", "موديل"], en: "newer machines", ar: "معدّات أحدث" },
+    { k: ["fast", "quick", "urgent", "arriv", "soon", "سريع", "عاجل", "وصول"], en: "fastest to arrive", ar: "الأسرع وصولاً" },
+    { k: ["cert", "safety", "tüv", "tuv", "spsp", "saso", "شهادة", "سلامة"], en: "required certifications", ar: "الشهادات المطلوبة" },
+  ];
+  function applyFreeText() {
+    const v = freeText.trim();
+    if (!v) { setFxEcho(null); return; }
+    const low = v.toLowerCase();
+    const hits = fxFactors.filter((f) => f.k.some((w) => low.includes(w)));
+    const labels = hits.map((f) => (ar ? f.ar : f.en));
+    setFxEcho(
+      labels.length
+        ? L(`Got it — I'll rank by ${labels.join(", ")}, then re-sort the table. Saved for next time.`, `تمام — سأرتّب حسب ${labels.join("، ")}، ثم أُعيد ترتيب الجدول. حُفظ للمرة القادمة.`)
+        : L(`Got it — I'll factor in “${v}” and re-sort the table.`, `تمام — سآخذ «${v}» بعين الاعتبار وأُعيد الترتيب.`)
+    );
+    setFreeApplied(v);
+    captureBidEvents([{ event_type: "chat_message", request_id: activeItem, payload: { text: v } }]);
+    toast(L("Re-ranked the bids", "أُعيد ترتيب العروض"));
+  }
+
+  function addCost(key: CostResponsibility["key"], label: string) {
+    setCostInput("");
+    setCostAsk({ type: "resp", key, label });
+  }
+  function addMobCost(bidId: string, label: string) {
+    setCostInput("");
+    setCostAsk({ type: "mob", bidId, label });
+  }
+  function submitCost() {
+    if (!costAsk) return;
+    const n = parseInt(costInput.replace(/[^0-9]/g, ""), 10);
+    if (n) {
+      if (costAsk.type === "resp") setRenterCosts((p) => ({ ...p, [costAsk.key]: (p[costAsk.key] ?? 0) + n }));
+      else setRenterMob((p) => ({ ...p, [costAsk.bidId]: n }));
+      toast(L("Added your estimate — added to the total so you can compare the real cost", "أُضيف تقديرك — يُضاف للإجمالي لمقارنة التكلفة الحقيقية"));
+    }
+    setCostAsk(null);
+  }
+
+  async function onUpload(file: File) {
+    setUploadOpen(false);
+    toast(L("Reading the quote…", "جارٍ قراءة العرض…"));
+    try {
+      const data = await fileToBase64(file);
+      const r = await parseBid({ attachments: [{ type: file.type || "application/octet-stream", filename: file.name, data }], request_context: { subtype: activeItemObj?.item?.name ?? null } });
+      if (!r.agent) { toast(L("Quote upload needs your AI assistant — not connected.", "رفع العرض يحتاج مساعدك الذكي — غير متصل.")); return; }
+      if (r.result && r.result.ok) {
+        const card = normalizedBidToBidCard(r.result.bid, { duration: durationDays, units });
+        // The agent flags a mismatch (wrong type/size, different location/dates) → confirm before adding (AC-26/36).
+        if (r.result.match?.needs_confirmation) {
+          setConfirmAdd({ card, warnings: r.result.match.warnings ?? [] });
+        } else {
+          setUploaded((p) => [...p.filter((b) => b.id !== card.id), card]);
+          toast(L(`Added ${card.supplierName}'s quote from the file.`, `أُضيف عرض ${card.supplierName} من الملف.`));
+        }
+      } else {
+        toast(L("Couldn't read that file. Nothing was added.", "تعذّرت قراءة الملف. لم يُضف شيء."));
+      }
+    } catch { toast(L("Couldn't read that file. Nothing was added.", "تعذّرت قراءة الملف.")); }
+  }
+  function confirmAddBid() {
+    if (!confirmAdd) return;
+    const card = confirmAdd.card;
+    setUploaded((p) => [...p.filter((b) => b.id !== card.id), card]);
+    toast(L(`Added ${card.supplierName}'s quote — flagged for review.`, `أُضيف عرض ${card.supplierName} — مع تنبيه للمراجعة.`));
+    setConfirmAdd(null);
+  }
+
+  async function goDealRoom(bid: BidCard, kind: "award" | "negotiate") {
+    if (busy) return;
+    captureBidEvents([{
+      event_type: kind === "award" ? "award" : "choice",
+      request_id: activeItem, bid_id: bid.id, supplier_id: bid.supplierId,
+      payload: kind === "award" ? { chosen_bid: bid.id, beaten_bids: baseCols.map((c) => c.bid.id).filter((id) => id !== bid.id) } : { kind: "negotiate" },
+    }]);
+    toast(kind === "award" ? L(`Opening ${bid.supplierName} deal room…`, `يتم فتح غرفة صفقة ${bid.supplierName}…`) : L("Opening the deal room…", "يتم فتح غرفة الصفقة…"));
+    if (bid.dealRoomId) { router.push(`/deal-room/${bid.dealRoomId}`); return; }
+    setBusy(true);
+    try { const { id } = await startDealRoom(bid.id); if (id) router.push(`/deal-room/${id}`); else setBusy(false); }
+    catch { setBusy(false); }
+  }
+
+  // The chat uses /bids/ask (LLM narration) — NOT /recommend. It renders data.reply and applies the
+  // (possibly re-ranked) ranking/pick so the table re-renders from a chat instruction too.
+  async function sendChat(text: string) {
+    const v = text.trim();
+    if (!v) return;
+    setChat((c) => [...c, { role: "user", text: v }]);
+    setChatInput("");
+    const r = await askBids({
+      message: v,
+      request: { hasRequirements: true },
+      bids: baseCols.map(bidColumnToComputed),
+      current_ranking: prevRankRef.current,
+    });
+    if (r.agent && r.result) {
+      const a = r.result;
+      setAgentLive(true);
+      prevRankRef.current = a.ranking;
+      // Keep the prior recommend's reasons/flags for the pinned bubble; update the order + pick + confidence.
+      setRec((prev) => prev
+        ? { ...prev, ranking: a.ranking, recommendation: { ...prev.recommendation, pick_bid_id: a.pick_bid_id, confidence: a.confidence }, interpretation: a.interpretation, changes: a.changes, suggestions: a.suggestions ?? prev.suggestions }
+        : { ranking: a.ranking, recommendation: { pick_bid_id: a.pick_bid_id, confidence: a.confidence, reasons: [], cost_shift_flags: [] }, interpretation: a.interpretation, changes: a.changes, suggestions: a.suggestions });
+      setChat((c) => [...c, { role: "mansour", text: a.reply }]);
+    } else {
+      setChat((c) => [...c, { role: "mansour", text: L("I couldn't reach the assistant just now — the ranking above is from your stated data.", "تعذّر الوصول للمساعد الآن — الترتيب أعلاه من بياناتك المذكورة.") }]);
+    }
+  }
+
+  // Export the current comparison as a print-ready sheet (Save as PDF from the print dialog).
+  function exportPdf() {
+    if (!cols.length) { toast(L("Nothing to export yet.", "لا شيء للتصدير بعد.")); return; }
+    const w = window.open("", "_blank");
+    if (!w) { toast(L("Allow pop-ups to export the PDF.", "اسمح بالنوافذ المنبثقة للتصدير.")); return; }
+    const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch] as string));
+    const itemName = (ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? L("Item", "صنف");
+    const when = new Date().toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+    const yes = L("Yes", "نعم"), no = L("No", "لا"), sup = L("Supplier", "المؤجّر"), you = L("You", "أنت");
+    const m = (x: { value: number; stated: boolean }) => (x.stated ? `${sar} ${nf(x.value)}` : "—");
+    const certsOf = (c: BidColumn, pick: CertCode[]) => { const h = c.bid.heldCertCodes.filter((x) => pick.includes(x)).map(certLabel); return h.length ? esc(h.join(", ")) : "—"; };
+    const docsOf = (c: BidColumn) => { const d: string[] = []; const k = c.bid.compliance; if (k.localContent) d.push(L("Local Content", "المحتوى المحلي")); if (k.saso) d.push("SASO"); if (k.activityLicense) d.push(L("Activity license", "رخصة النشاط")); if (k.taxNumber) d.push(L("Tax number", "الرقم الضريبي")); if (k.nationalAddress) d.push(L("National address", "العنوان الوطني")); return d.length ? esc(d.join(", ")) : "—"; };
+    const rental = (c: BidColumn) => c.bid.price == null ? "—" : c.rental.stated ? `${sar} ${nf(c.bid.price)}/${periodLabel(c.bid.priceUnit)} → ${sar} ${nf(c.rental.value)}` : `${sar} ${nf(c.bid.price)}/${periodLabel(c.bid.priceUnit)}`;
+    const resp = (c: BidColumn) => c.costResponsibilities.map((r) => `${esc(ar ? r.labelAr : r.labelEn)}: ${r.bidSide === "supplier" ? sup : r.bidSide === "me" ? you : "—"}`).join("<br>");
+    const row = (label: string, fn: (c: BidColumn) => string) => `<tr><th class="lbl">${esc(label)}</th>${cols.map((c) => `<td>${fn(c)}</td>`).join("")}</tr>`;
+    const pickName = cols.find((c) => c.bid.id === pickId)?.bid.supplierName;
+    const html = `<!doctype html><html dir="${ar ? "rtl" : "ltr"}" lang="${ar ? "ar" : "en"}"><head><meta charset="utf-8"><title>${esc(itemName)} — ${L("Bid comparison", "مقارنة العروض")}</title>
+<style>*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#1C3550;margin:26px}h1{font-size:18px;margin:0 0 4px}.meta{color:#6B8FA8;font-size:12px;margin-bottom:12px}.pick{display:inline-block;background:#FFF4E5;color:#8A5A06;border:1px solid #F79009;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:bold;margin-bottom:14px}table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid #D4E0EC;padding:8px 10px;text-align:${ar ? "right" : "left"};vertical-align:top}thead th{background:#1C3550;color:#fff}th.lbl{background:#EFF4F9;width:175px}.star{color:#FFC97A}.foot{margin-top:16px;color:#9BB3C8;font-size:10px}@media print{@page{margin:12mm}}</style></head><body>
+<h1>${esc(itemName)} — ${L("Bid comparison", "مقارنة العروض")}</h1>
+<div class="meta">${esc(group?.items[0]?.displayId ?? "")} · ${esc(loc?.label ?? "")} · ${esc(when)}${durationDays ? ` · ${durationDays} ${L("days", "يوم")}` : ""}${units > 1 ? ` · ${units} ${L("units", "وحدات")}` : ""}</div>
+${pickName ? `<div class="pick">★ ${L("AI pick", "اختيار المساعد")}: ${esc(pickName)}</div>` : ""}
+<table><thead><tr><th class="lbl"></th>${cols.map((c) => `<th>${esc(c.bid.supplierName)}${c.bid.id === pickId ? ' <span class="star">★</span>' : ""}</th>`).join("")}</tr></thead><tbody>
+${row(L("Total (incl. VAT & your costs)", "الإجمالي (شامل الضريبة وتكاليفك)"), (c) => hasCost(c) ? `${sar} ${nf(grandTotal(c))}${lowestGrand != null ? (grandTotal(c) === lowestGrand ? ` (${L("lowest", "الأقل")})` : ` (+${Math.round(((grandTotal(c) - lowestGrand) / lowestGrand) * 100)}%)`) : ""}` : c.bid.price != null ? `${sar} ${nf(Math.round(c.bid.price * (1 + VAT)))}/${periodLabel(c.bid.priceUnit)} (${L("rate incl. VAT", "السعر شامل الضريبة")})` : "—")}
+${row(L("Rental cost", "تكلفة الإيجار"), rental)}
+${row(L("Mobilization + demob", "النقل + الإرجاع"), (c) => m({ value: (c.mob.stated ? c.mob.value : 0) + (c.demob.stated ? c.demob.value : 0), stated: c.mob.stated || c.demob.stated }))}
+${row(L("Who handles the costs", "من يتحمّل التكاليف"), resp)}
+${row(L("Year", "سنة الصنع"), (c) => esc(c.bid.equipment?.year ?? "—"))}
+${row(L("Model", "الطراز"), (c) => esc([c.bid.equipment?.make, c.bid.equipment?.model].filter(Boolean).join(" ") || "—"))}
+${row(L("Distance to site", "المسافة للموقع"), (c) => c.bid.distanceKm != null ? `${Math.round(c.bid.distanceKm)} ${L("km", "كم")}` : "—")}
+${row(L("Equipment certificates", "شهادات المعدّة"), (c) => certsOf(c, EQUIP_CERTS))}
+${row(L("Operator certificates", "شهادات المشغّل"), (c) => certsOf(c, OPER_CERTS))}
+${row(L("Verified supplier", "مؤجّر موثّق"), (c) => (c.bid.verified ? yes : no))}
+${row(L("Business documents", "المستندات التجارية"), docsOf)}
+</tbody></table>
+<div class="foot">© ${new Date().getFullYear()} Moedatech · ${L("Generated from stated bid data — figures are the suppliers' stated values.", "أُنشئ من بيانات العروض المذكورة.")}</div>
+<script>window.onload=function(){window.focus();setTimeout(function(){window.print();},150);};</script></body></html>`;
+    w.document.write(html);
+    w.document.close();
+  }
+
+  if (error) return <Box>{L("Couldn’t load your requests.", "تعذّر تحميل طلباتك.")}</Box>;
+  if (!groups) return <Spinner />;
+  if (!locations.length) return <Box>{L("No requests to compare yet.", "لا توجد طلبات للمقارنة بعد.")}</Box>;
+
+  /* ── small renderers ── */
+  const incChip = (label: string, kind: "y" | "n" | "muted", onAdd?: () => void) => {
+    const bg = kind === "y" ? C.successBg : kind === "n" ? C.dangerBg : C.surface3;
+    const fg = kind === "y" ? C.success : kind === "n" ? C.danger : C.muted;
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold" style={{ background: bg, color: fg }}>
+        {label}
+        {onAdd && <button onClick={onAdd} className="inline-flex items-center gap-0.5 rounded-full border px-1.5 text-[9.5px] font-extrabold" style={{ color: C.rentee, borderColor: "rgba(37,99,235,.4)", background: "#fff" }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>add</span>{L("cost", "تكلفة")}</button>}
+      </span>
+    );
+  };
+  const presetDefs: [Preset, string, string, string][] = [
+    ["best", "workspace_premium", "Best overall", "الأفضل إجمالاً"],
+    ["lowest", "savings", "Lowest cost", "الأقل تكلفة"],
+    ["newest", "new_releases", "Newest equipment", "أحدث معدّة"],
+    ["trusted", "verified_user", "Most trusted", "الأكثر ثقة"],
+  ];
+  // Visible agent status: pulses "thinking…" while a /bids/recommend call is in flight, then "live · N%".
+  const conf = rec?.recommendation.confidence != null ? Math.round(rec.recommendation.confidence * 100) : null;
+  const agentBadge = () => {
+    if (recLoading) return <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: C.actionDim, color: "#8A5A06" }}><span className="material-icons-outlined animate-spin" style={{ fontSize: 13 }}>autorenew</span>{L("AI thinking…", "الذكاء يفكّر…")}</span>;
+    if (agentLive) return <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: C.successBg, color: C.success }}><span className="h-2 w-2 rounded-full" style={{ background: C.success }} />{L("AI assistant · live", "المساعد الذكي · متصل")}{conf != null ? ` · ${conf}%` : ""}</span>;
+    return <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: C.surface3, color: C.muted }}><span className="h-2 w-2 rounded-full" style={{ background: C.muted }} />{L("AI assistant · offline", "المساعد · غير متصل")}</span>;
+  };
+  // Documents sub-label — names only the docs your request actually requires (drives which cells can go red).
+  const docReqs = (cols[0]?.bid.requiredCerts ?? []).filter((x) => x === "LC" || x === "SASO").map(certLabel);
+  const docReqSub = docReqs.length ? `${docReqs.join(" · ")} ${L("required", "مطلوبة")}` : L("none required", "لا متطلبات");
+
+  return (
+    <div className="space-y-4" style={{ color: C.navy }}>
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-[13px] font-bold" style={{ color: C.muted }}>
+        <button onClick={() => router.push("/requests")} className="hover:underline">{L("Requests", "الطلبات")}</button>
+        <span className="material-icons-outlined" style={{ fontSize: 16, transform: ar ? "scaleX(-1)" : undefined }}>chevron_right</span>
+        <b style={{ color: C.navy, fontSize: 18 }}>{L("Compare bids", "مقارنة العروض")}</b>
+      </div>
+
+      {/* ── Level 1 — location tabs ── */}
+      <div className="flex items-center gap-1.5 text-[11px] font-extrabold" style={{ color: C.muted, letterSpacing: ".4px" }}>
+        <span className="material-icons-outlined" style={{ fontSize: 15 }}>location_on</span>{L("Location", "الموقع")}
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {locations.map((l) => (
+          <button key={l.key} onClick={() => setActiveLoc(l.key)}
+            className="inline-flex flex-none items-center gap-2 rounded-full border px-4 py-2.5 text-[12.5px] font-bold transition"
+            style={l.key === loc?.key ? { background: C.navy, borderColor: C.navy, color: "#fff" } : { background: "#fff", borderColor: C.border, color: C.navyMid }}>
+            {l.label}
+            <span className="rounded-full px-2 text-[11px] font-bold" style={l.key === loc?.key ? { background: "rgba(255,255,255,.2)", color: "#fff" } : { background: C.surface3, color: C.navy }}>{l.itemCount} {L("items", "أصناف")}</span>
+            {l.bidCount > 0 && <span className="rounded-full px-2 text-[11px] font-bold" style={{ background: C.successBg, color: C.success }}>{l.bidCount} {L("bids", "عروض")}</span>}
+          </button>
+        ))}
+      </div>
+
+      {/* ── request header card ── */}
+      {group && (
+        <div className="relative overflow-hidden rounded-xl p-4 text-white" style={{ background: `linear-gradient(150deg,${C.navy},${C.navyDeep})` }}>
+          <div className="flex gap-3">
+            <div className="relative grid h-10 w-10 flex-none place-items-center rounded-lg" style={{ background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.16)" }}>
+              <span className="material-icons-outlined" style={{ fontSize: 22 }}>forklift</span>
+              {units > 1 && <span className="absolute -end-1.5 -top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-extrabold" style={{ background: C.action }}>×{units}</span>}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[13.5px] font-extrabold leading-tight">
+                {ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name}{units > 1 ? ` · ×${units}` : ""}
+                {items.length > 1 && <span style={{ color: "#FFC97A" }}> + {items.length - 1} {L("more", "غيره")}</span>}
+                <span className="ms-1.5 rounded-full px-2 text-[10px] font-bold" style={{ background: "rgba(255,255,255,.14)" }}>{group.totalUnits} {L("total equipment", "إجمالي المعدات")}</span>
+              </div>
+              <div className="mt-1 flex items-center gap-1.5 text-[11px]" style={{ color: "rgba(255,255,255,.66)" }}>
+                <span className="material-icons-outlined" style={{ fontSize: 13 }}>event</span>
+                {(group.items[0]?.displayId ?? group.id)} · {loc?.label} · {group.createdAt ? new Date(group.createdAt).toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : ""}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {items.length > 1 && <Pill icon={null}>{L("Mixed", "مختلط")}</Pill>}
+                <Pill icon="campaign">{L("Broadcast", "بثّ")}</Pill>
+                <Pill icon="gavel">{group.totalBids} {L("bids", "عروض")}</Pill>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Level 2 — item tabs + actions ── */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap gap-2">
+          {items.map((it) => (
+            <button key={it.id} onClick={() => setActiveItem(it.id)}
+              className="inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-[13px] font-bold transition"
+              style={it.id === activeItem ? { background: C.action, borderColor: C.action, color: "#fff" } : { background: "#fff", borderColor: C.border, color: C.navyMid, opacity: it.bidCount === 0 ? 0.6 : 1 }}>
+              {ar ? it.item?.nameAr : it.item?.name}
+              <span className="rounded-full px-1.5 text-[11px] font-bold" style={it.id === activeItem ? { background: "rgba(255,255,255,.25)", color: "#fff" } : { background: C.surface3, color: C.navy }}>{it.bidCount > 0 ? `${it.bidCount} ${L("bids", "عروض")}` : L("no bids", "بلا عروض")}</span>
+            </button>
+          ))}
+        </div>
+        <div className="ms-auto flex gap-2">
+          <button onClick={() => setUploadOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[12.5px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>
+            <span className="material-icons-outlined" style={{ fontSize: 17 }}>upload_file</span>{L("Upload a quote", "رفع عرض سعر")}
+          </button>
+          <button onClick={exportPdf} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[12.5px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>
+            <span className="material-icons-outlined" style={{ fontSize: 17 }}>picture_as_pdf</span>{L("Export PDF", "تصدير PDF")}
+          </button>
+        </div>
+      </div>
+
+      {bidsLoading ? (
+        <Spinner />
+      ) : !comparison || allCols.length === 0 ? (
+        <Box title={L("No bids yet", "لا توجد عروض بعد")}>{L("This item has no bids to compare yet — you can re-broadcast the request.", "لا توجد عروض على هذه المعدة بعد — يمكنك إعادة بثّ الطلب.")}</Box>
+      ) : (
+        <>
+          {/* ── bid selector ── */}
+          <div className="overflow-hidden rounded-xl border" style={{ borderColor: C.border, background: "#fff" }}>
+            <button onClick={() => setSelectorOpen((o) => !o)} className="flex w-full items-center gap-2.5 px-4 py-3 text-start" style={{ background: C.surface2, borderBottom: selectorOpen ? `1px solid ${C.line}` : "none" }}>
+              <span className="material-icons-outlined" style={{ fontSize: 19, color: C.action }}>fact_check</span>
+              <b className="text-[13.5px]">{L("Bids in this comparison", "العروض في هذه المقارنة")}</b>
+              <span className="rounded-full px-2 py-0.5 text-[11.5px] font-bold" style={{ background: C.surface3, color: C.muted }}>{selected.size} {L("shown", "معروضة")}</span>
+              <span className="material-icons-outlined ms-auto" style={{ color: C.muted, transform: selectorOpen ? "" : "rotate(-90deg)" }}>expand_more</span>
+            </button>
+            {selectorOpen && (
+              <div className="px-4 pb-3 pt-2">
+                <div className="mb-1 text-[11px] font-extrabold" style={{ color: C.muted }}>{L("Suppliers — tap to add, or × to remove from the comparison", "المؤجرون — انقر للإضافة، أو × للإزالة من المقارنة")}</div>
+                <div className="flex flex-wrap gap-2">
+                  {comparison.columns.map((c) => {
+                    const on = selected.has(c.bid.id);
+                    return (
+                      <button key={c.bid.id} onClick={() => toggleBid(c.bid.id)} title={on ? L("Remove from comparison", "إزالة من المقارنة") : L("Add to comparison", "إضافة للمقارنة")} className="inline-flex items-center gap-1.5 rounded-full border ps-3.5 pe-2.5 py-2 text-[13px] font-bold transition"
+                        style={on ? { background: C.renteeDim, borderColor: C.rentee, color: C.navy } : { background: "#fff", borderColor: C.border, color: C.muted, borderStyle: "dashed" }}>
+                        {!on && <span className="material-icons-outlined" style={{ fontSize: 16, color: C.muted }}>add</span>}
+                        {c.bid.supplierName}
+                        {c.bid.verified && <span className="material-icons-outlined" style={{ fontSize: 14, color: on ? C.success : C.disabled }}>verified</span>}
+                        {on && <span className="material-icons-outlined grid h-4 w-4 place-items-center rounded-full" style={{ fontSize: 13, background: "rgba(37,99,235,.16)", color: C.rentee }}>close</span>}
+                      </button>
+                    );
+                  })}
+                  {comparison.excluded.map((c) => (
+                    <button key={c.bid.id} onClick={() => goDealRoom(c.bid, "negotiate")} className="inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-[12.5px] font-bold" style={{ background: C.dangerBg, borderColor: "rgba(217,54,42,.35)", color: C.danger, borderStyle: "dashed" }}>
+                      <span className="rounded-full px-2 text-[10px] font-extrabold" style={{ background: "#fff", color: C.danger }}>{L("excluded", "مستبعد")}</span>
+                      {c.bid.supplierName}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── how-to-read tip (compact, expandable) ── */}
+          <details className="group rounded-lg border" style={{ borderColor: C.border, background: "#fff" }}>
+            <summary className="flex cursor-pointer list-none items-center gap-2 px-3.5 py-2.5 text-[12.5px] font-bold" style={{ color: C.navyMid }}>
+              <span className="material-icons-outlined" style={{ fontSize: 17, color: C.warning }}>lightbulb</span>
+              {L("How to read this comparison", "كيف تقرأ هذه المقارنة")}
+              <span className="material-icons-outlined ms-auto transition group-open:rotate-180" style={{ fontSize: 18, color: C.muted }}>expand_more</span>
+            </summary>
+            <div className="flex flex-col gap-2 border-t px-3.5 py-3 text-[12px]" style={{ borderColor: C.line, color: C.navyMid }}>
+              <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 flex-none rounded" style={{ background: C.success }} />{L("Good — matches your request, or a cert that's held", "جيد — يطابق طلبك، أو شهادة متوفّرة")}</span>
+              <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 flex-none rounded" style={{ background: C.danger }} />{L("Problem — conflicts with your request, or a required cert is missing", "مشكلة — يتعارض مع طلبك، أو شهادة مطلوبة ناقصة")}</span>
+              <span className="inline-flex items-center gap-1.5" style={{ color: C.rentee }}><span className="material-icons-outlined flex-none" style={{ fontSize: 15 }}>add</span>{L("For a cost that's on you, add your own estimate — it's added to the total so you get a sense of the real cost", "لتكلفة تقع عليك، أضف تقديرك — يُضاف للإجمالي لتتكوّن لديك صورة عن التكلفة الحقيقية")}</span>
+            </div>
+          </details>
+
+          {/* ── table caption + live agent status (call #1 fires on every re-rank) ── */}
+          <div className="flex flex-wrap items-center gap-2 px-1 text-[12.5px] font-bold" style={{ color: C.navyMid }}>
+            <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>auto_awesome</span>
+            {agentLive ? L("Ranked by your AI assistant", "مرتّب بواسطة مساعدك الذكي") : L("Ranked from your stated data", "مرتّب من بياناتك المذكورة")}
+            {agentBadge()}
+          </div>
+
+          {/* ── comparison table ── */}
+          <div className="overflow-hidden rounded-xl border" style={{ borderColor: C.border, background: "#fff" }}>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse" style={{ minWidth: 320 + cols.length * 215 }}>
+                {/* tint the whole rank-winning column green (cells' own red/green layer on top) */}
+                <colgroup>
+                  <col style={{ width: 190 }} />
+                  {cols.map((c) => <col key={c.bid.id} style={c.bid.id === pickId ? { background: "rgba(29,175,88,0.09)" } : undefined} />)}
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th className="sticky start-0 z-[3] p-3 text-start align-top text-[12.5px] font-bold" style={{ background: C.surface2, color: C.navyMid, width: 190, minWidth: 190, borderBottom: `1px solid ${C.line}` }}>
+                      {durationDays ? L(`${durationDays}-day rental · ${units} unit${units > 1 ? "s" : ""}`, `إيجار ${durationDays} يوم · ${units} وحدة`) : L("Comparison", "المقارنة")}
+                    </th>
+                    {cols.map((c, idx) => {
+                      const isPick = c.bid.id === pickId;
+                      const isUpload = c.bid.id.startsWith("upload:");
+                      const recog = rec?.ranking.find((r) => r.bid_id === c.bid.id)?.recognition ?? null;
+                      const verdict = c.conflicts === 0 ? "good" : c.conflicts <= 2 ? "warn" : "bad";
+                      const vbg = verdict === "good" ? C.successBg : verdict === "warn" ? C.warningBg : C.dangerBg;
+                      const vfg = verdict === "good" ? C.success : verdict === "warn" ? C.warning : C.danger;
+                      const fuelOnMe = c.costResponsibilities.find((x) => x.key === "fuel" && (x.bidSide === "me" || (x.bidSide == null && x.requestSide === "me")));
+                      const yourCosts = renterAddBid(c);
+                      const total = grandTotal(c);
+                      const partial = !c.rental.stated && c.bid.price != null; // a rate exists but no duration → rental not in the total yet
+                      const rateInclVat = c.bid.price != null ? Math.round(c.bid.price * (1 + VAT)) : null; // per-period rate incl. VAT (shown when no full total)
+                      return (
+                        <th key={c.bid.id} className="p-3 text-start align-top transition-colors" style={{ minWidth: 215, background: isPick ? "linear-gradient(180deg,#E7F7EE,#fff)" : "#fff", borderBottom: `1px solid ${C.line}`, boxShadow: isPick ? `inset 0 4px 0 ${C.success}` : undefined }}>
+                          <div className="flex items-start gap-2.5">
+                            <div className="relative flex-none">
+                              <div className="grid h-9 w-9 place-items-center rounded-lg text-[13px] font-extrabold" style={{ background: C.surface3, color: C.navy }}>{c.bid.supplierName.slice(0, 2).toUpperCase()}</div>
+                              {cols.length > 1 && agentLive && <span className="absolute -top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 font-mono text-[10px] font-black text-white" style={{ background: idx === 0 ? C.success : C.navyMid, insetInlineStart: "-6px" }}>#{idx + 1}</span>}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <b className="block text-[14px] leading-tight" style={{ color: C.navy }}>{c.bid.supplierName}</b>
+                              <span className="mt-0.5 inline-flex items-center gap-1 text-[10.5px] font-bold" style={{ color: C.muted }}>
+                                <span className="material-icons-outlined" style={{ fontSize: 13 }}>{isUpload ? "description" : "smartphone"}</span>{isUpload ? L("From uploaded file", "من ملف مرفوع") : L("App bid", "عرض من التطبيق")}
+                              </span>
+                            </div>
+                          </div>
+                          {isPick && <span className="mt-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-extrabold" style={{ background: C.successBg, color: C.success, borderColor: "rgba(29,175,88,.4)" }}><span className="material-icons-outlined" style={{ fontSize: 13, color: C.success }}>auto_awesome</span>{L("AI pick · best match", "اختيار المساعد · الأنسب")}</span>}
+                          {recog && <span className="mt-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-bold" style={{ background: C.renteeDim, color: "#1E4FB8", borderColor: "rgba(37,99,235,.28)" }}><span className="material-icons-outlined" style={{ fontSize: 13, color: C.rentee }}>history</span>{recog}</span>}
+                          <div className="mt-2"><span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-extrabold" style={{ background: vbg, color: vfg }}><span className="material-icons-outlined" style={{ fontSize: 14 }}>{verdict === "good" ? "check_circle" : "error_outline"}</span>{c.conflicts === 0 ? L("Meets every requirement", "يحقق كل الشروط") : L(`${c.conflicts} things to check`, `${c.conflicts} أمور للمراجعة`)}</span></div>
+                          <div className="mt-2.5">
+                            {hasCost(c) ? (<>
+                              <span className="font-mono text-[19px] font-extrabold" style={{ color: C.navy }}>{sar} {nf(total)}</span>
+                              {cols.length > 1 && lowestGrand != null && <span className="ms-1.5 rounded-full px-2 py-0.5 font-mono text-[10.5px] font-extrabold" style={total === lowestGrand ? { background: C.successBg, color: C.success } : { background: C.warningBg, color: C.warning }}>{total === lowestGrand ? L("lowest", "الأقل") : `+${Math.round(((total - lowestGrand) / lowestGrand) * 100)}%`}</span>}
+                              <div className="text-[10.5px] font-bold uppercase" style={{ color: C.muted, letterSpacing: ".3px" }}>{L("Total · incl. VAT & your costs", "الإجمالي · شامل الضريبة وتكاليفك")}</div>
+                              <div className="mt-1.5 h-[7px] max-w-[175px] overflow-hidden rounded" style={{ background: C.surface3 }}><i className="block h-full rounded" style={{ width: `${Math.round((total / maxGrand) * 100)}%`, background: total === lowestGrand ? C.success : total === maxGrand ? C.warning : C.navyMid }} /></div>
+                              {partial && <div className="mt-1 text-[10.5px] font-bold" style={{ color: C.warning }}>{L("rental rate not totaled — set a duration", "لم تُحتسب المدة — حدّد مدة")}</div>}
+                              {c.cashUpfront.stated && <div className="mt-1 text-[11px]" style={{ color: C.muted }}>{L("Cash upfront", "مقدّم")} ~{nf(c.cashUpfront.value)}{fuelOnMe ? L(" · fuel on you", " · الوقود عليك") : ""}</div>}
+                              {yourCosts > 0 && <div className="mt-1.5 rounded border px-2 py-1 text-[10.5px] font-extrabold" style={{ background: C.renteeDim, borderColor: "rgba(37,99,235,.22)", color: C.rentee }}>{L(`incl. ${sar} ${nf(yourCosts)} of your estimates`, `يشمل ${sar} ${nf(yourCosts)} من تقديراتك`)}</div>}
+                            </>) : rateInclVat != null ? (<>
+                              <span className="font-mono text-[19px] font-extrabold" style={{ color: C.navy }}>{sar} {nf(rateInclVat)}<small className="text-[11px] font-bold" style={{ color: C.muted }}>/{periodLabel(c.bid.priceUnit)}</small></span>
+                              <div className="text-[10.5px] font-bold uppercase" style={{ color: C.muted, letterSpacing: ".3px" }}>{L("incl. VAT · rate only", "شامل الضريبة · السعر فقط")}</div>
+                              <div className="mt-1 text-[10.5px] font-bold" style={{ color: C.warning }}>{L("set a duration for the full total", "حدّد مدة للإجمالي الكامل")}</div>
+                            </>) : (
+                              <span className="font-mono text-[15px] font-bold" style={{ color: C.muted }}>{L("not stated", "غير محدد")}</span>
+                            )}
+                          </div>
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* 💰 COST */}
+                  <SectionRow id="cost" emoji="💰" title={L("Cost", "التكلفة")} accent={C.action} accentText="#FFC97A" n={cols.length} collapsed={collapsed.has("cost")} onToggle={() => toggleSection("cost")} />
+                  {!collapsed.has("cost") && (<>
+                    <tr>
+                      <RowHead title={L("Rental cost", "تكلفة الإيجار")} sub={L("rate × days × units", "السعر × الأيام × الوحدات")} />
+                      {cols.map((c) => (
+                        <Td key={c.bid.id}>
+                          {c.bid.price == null ? (
+                            <span style={{ color: C.muted }}>{L("not stated", "غير محدد")}</span>
+                          ) : c.rental.stated ? (<>
+                            <span className="inline-flex flex-wrap items-center gap-1.5">
+                              <span className="font-mono font-bold" style={{ color: C.navyMid }}>{sar} {nf(c.bid.price)}<small style={{ fontSize: 10.5, color: C.muted }}>/{periodLabel(c.bid.priceUnit)}</small></span>
+                              <span style={{ color: C.action, fontWeight: 800, transform: ar ? "scaleX(-1)" : undefined }}>→</span>
+                              <span className="font-mono font-extrabold" style={{ color: C.navy }}>{sar} {nf(c.rental.value)}</span>
+                            </span>
+                            <Sub>{L(`× ${durationDays} days${units > 1 ? ` × ${units} units` : ""}`, `× ${durationDays} يوم${units > 1 ? ` × ${units} وحدة` : ""}`)}</Sub>
+                          </>) : (
+                            <span className="font-mono font-bold" style={{ color: C.navy }}>{sar} {nf(c.bid.price)}<small style={{ fontSize: 10.5, color: C.muted }}>/{periodLabel(c.bid.priceUnit)}</small></span>
+                          )}
+                        </Td>
+                      ))}
+                    </tr>
+                    <tr>
+                      <RowHead title={L("Mobilization + demob", "النقل + الإرجاع")} sub={L("one-time, whole job", "لمرة واحدة، لكامل العمل")} />
+                      {cols.map((c) => {
+                        const stated = c.mob.stated || c.demob.stated;
+                        const rm = renterMob[c.bid.id];
+                        return (
+                          <Td key={c.bid.id}>
+                            {stated ? (<>
+                              <span className="text-[13px] font-bold">{sar} {nf((c.mob.stated ? c.mob.value : 0) + (c.demob.stated ? c.demob.value : 0))}</span>
+                              <Sub>{`${sar} ${nf(c.mob.value)} ${L("mob", "نقل")} + ${sar} ${nf(c.demob.value)} ${L("demob", "إرجاع")}`}</Sub>
+                            </>) : rm ? (<>
+                              <span className="text-[13px] font-bold">{sar} {nf(rm)} <button onClick={() => addMobCost(c.bid.id, L("Delivery + pickup", "النقل والإرجاع"))} className="text-[10px] font-bold underline" style={{ color: C.rentee }}>{L("edit", "تعديل")}</button></span>
+                              <Sub>{L("your estimate · delivery on you", "تقديرك · النقل عليك")}</Sub>
+                            </>) : (
+                              <span className="inline-flex items-center gap-1.5 text-[12px]" style={{ color: C.muted }}>{L("not stated", "غير محدد")}
+                                <button onClick={() => addMobCost(c.bid.id, L("Delivery + pickup", "النقل والإرجاع"))} className="inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[9.5px] font-extrabold" style={{ color: C.rentee, borderColor: "rgba(37,99,235,.4)", background: "#fff" }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>add</span>{L("add cost", "أضف تكلفة")}</button>
+                              </span>
+                            )}
+                          </Td>
+                        );
+                      })}
+                    </tr>
+                    <tr>
+                      <RowHead title={L("Who handles the costs", "من يتحمّل التكاليف")} sub={L("colours explained above", "الألوان موضّحة أعلاه")} />
+                      {cols.map((c) => (
+                        <Td key={c.bid.id}>
+                          <div className="flex flex-wrap gap-1.5">
+                            {RESP_META.map((m) => {
+                              const cr = c.costResponsibilities.find((x) => x.key === m.key)!;
+                              // RED only on a real conflict: your request assigned this to the supplier but the bid puts it on you.
+                              // Supplier-covered = green; on you (but not required of the supplier) or unknown = neutral.
+                              const kind = cr.bidSide === "supplier" ? "y" : cr.state === "red" ? "n" : "muted";
+                              const canAdd = cr.bidSide === "me" || cr.bidSide == null; // a cost that may land on you → let them add a figure
+                              return <span key={m.key}>{incChip(ar ? m.ar : m.en, kind, canAdd ? () => addCost(m.key, ar ? m.ar : m.en) : undefined)}</span>;
+                            })}
+                          </div>
+                        </Td>
+                      ))}
+                    </tr>
+                  </>)}
+
+                  {/* 🚜 EQUIPMENT */}
+                  <SectionRow id="equip" emoji="🚜" title={L("Equipment", "المعدّة")} accent={C.supplier} accentText="#7BE0C2" n={cols.length} collapsed={collapsed.has("equip")} onToggle={() => toggleSection("equip")} />
+                  {!collapsed.has("equip") && (<>
+                    <tr>
+                      <RowHead title={L("Year", "سنة الصنع")} />
+                      {cols.map((c) => { const yr = c.equipment.find((r) => r.key === "year"); const isNewest = (c.bid.equipment?.year ?? 0) > 0 && c.bid.equipment?.year === Math.max(...cols.map((x) => x.bid.equipment?.year ?? 0)); return <Td key={c.bid.id} ok={yr?.state === "matched"} fail={yr?.state === "conflict"}><span className="text-[13px] font-bold">{c.bid.equipment?.year ?? "—"}</span>{isNewest && cols.length > 1 && <Sub>{L("newest", "الأحدث")}</Sub>}</Td>; })}
+                    </tr>
+                    <tr>
+                      <RowHead title={L("Model", "الطراز")} />
+                      {cols.map((c) => <Td key={c.bid.id}><span className="text-[13px] font-bold">{[c.bid.equipment?.make, c.bid.equipment?.model].filter(Boolean).join(" ") || "—"}</span></Td>)}
+                    </tr>
+                    <tr>
+                      <RowHead title={L("Distance to site", "المسافة للموقع")} />
+                      {cols.map((c) => <Td key={c.bid.id}><span className="text-[13px] font-bold">{c.bid.distanceKm != null ? `${Math.round(c.bid.distanceKm)} ${L("km", "كم")}` : <span style={{ color: C.muted }}>—</span>}</span></Td>)}
+                    </tr>
+                    <CertRow label={L("Equipment certificates", "شهادات المعدّة")} sub={L("required", "مطلوبة")} cols={cols} pick={EQUIP_CERTS} certLabel={certLabel} incChip={incChip} />
+                    <CertRow label={L("Operator certificates", "شهادات المشغّل")} sub={L("required", "مطلوبة")} cols={cols} pick={OPER_CERTS} certLabel={certLabel} incChip={incChip} />
+                  </>)}
+
+                  {/* 🛡️ TRUST & DOCUMENTS */}
+                  <SectionRow id="trust" emoji="🛡️" title={L("Trust & documents", "الثقة والوثائق")} accent={C.rentee} accentText="#9DC0FF" n={cols.length} collapsed={collapsed.has("trust")} onToggle={() => toggleSection("trust")} />
+                  {!collapsed.has("trust") && (<>
+                    <tr>
+                      <RowHead title={L("Verified supplier", "مؤجر موثّق")} />
+                      {cols.map((c) => (
+                        <Td key={c.bid.id} ok={c.bid.verified}>
+                          <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-extrabold" style={c.bid.verified ? { background: C.successBg, color: C.success } : { background: C.surface3, color: C.muted }}>
+                            <span className="material-icons-outlined" style={{ fontSize: 14 }}>{c.bid.verified ? "verified_user" : "remove"}</span>{c.bid.verified ? L("Verified", "موثّق") : L("Not verified", "غير موثّق")}
+                          </span>
+                          {c.bid.id.startsWith("upload:") && <Sub>{L("off-platform", "خارج المنصة")}</Sub>}
+                        </Td>
+                      ))}
+                    </tr>
+                    <tr>
+                      <RowHead title={L("Business documents", "المستندات التجارية")} sub={docReqSub} />
+                      {cols.map((c) => {
+                        const k = c.bid.compliance;
+                        // req = your request asked for it (LC / SASO are request certs). Others are informational only.
+                        const docs = [
+                          { lbl: L("Local Content", "المحتوى المحلي"), has: k.localContent, req: c.bid.requiredCerts.includes("LC") },
+                          { lbl: "SASO", has: k.saso, req: c.bid.requiredCerts.includes("SASO") },
+                          { lbl: L("Activity license", "رخصة النشاط"), has: k.activityLicense, req: false },
+                          { lbl: L("Tax number", "الرقم الضريبي"), has: k.taxNumber, req: false },
+                          { lbl: L("National address", "العنوان الوطني"), has: k.nationalAddress, req: false },
+                        ].filter((d) => d.has || d.req); // show held docs + required-missing; hide irrelevant absent ones
+                        const missingRequired = docs.some((d) => d.req && !d.has);
+                        return (
+                          <Td key={c.bid.id} ok={docs.length > 0 && !missingRequired} fail={missingRequired}>
+                            {docs.length ? <div className="flex flex-wrap gap-1.5">{docs.map((d) => <span key={d.lbl}>{incChip(d.lbl, d.has ? "y" : d.req ? "n" : "muted")}</span>)}</div> : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}
+                          </Td>
+                        );
+                      })}
+                    </tr>
+                  </>)}
+
+                  {/* actions */}
+                  <tr>
+                    <th className="sticky start-0 z-[2] p-3.5 text-start align-top text-[12.5px] font-bold" style={{ background: C.surface2, color: C.navyMid, borderTop: `1px solid ${C.line}` }}>
+                      {L("Decide", "القرار")}<span className="block text-[11px] font-semibold" style={{ color: C.muted }}>{L("opens the deal room", "يفتح غرفة الصفقة")}</span>
+                    </th>
+                    {cols.map((c) => {
+                      const isAwardedBid = !!awarded && (awarded.id === c.bid.id || (awarded.supplierId != null && awarded.supplierId === c.bid.supplierId));
+                      const isPick = c.bid.id === pickId;
+                      return (
+                        <td key={c.bid.id} className="p-3.5 align-top" style={{ borderTop: `1px solid ${C.line}` }}>
+                          {awarded ? (
+                            <span className="inline-flex rounded-full px-3 py-1.5 text-[11.5px] font-bold" style={isAwardedBid ? { background: C.successBg, color: C.success } : { background: C.surface2, color: C.muted }}>{isAwardedBid ? `${L("Awarded", "تمت الترسية")} ✓` : L("Item awarded", "مُرسى")}</span>
+                          ) : (
+                            <div className="flex flex-col gap-2">
+                              <button onClick={() => goDealRoom(c.bid, "award")} disabled={busy} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-bold disabled:opacity-60" style={isPick ? { background: C.action, color: "#fff" } : { background: "#fff", border: `1px solid ${C.border}`, color: C.navy }}>
+                                <span className="material-icons-outlined" style={{ fontSize: 16 }}>gavel</span>{L("Award", "ترسية")}
+                              </button>
+                              <button onClick={() => goDealRoom(c.bid, "negotiate")} disabled={busy} className="inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-[12.5px] font-bold disabled:opacity-60" style={{ background: C.surface2, color: C.navy }}>{L("Negotiate", "تفاوض")}</button>
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ── Ask Mansour chat ── */}
+          <div className="overflow-hidden rounded-xl border" style={{ borderColor: C.border, background: "#fff" }}>
+            <div className="flex items-center gap-2.5 px-4 py-3.5 text-white" style={{ background: `linear-gradient(150deg,${C.navy},${C.navyDeep})` }}>
+              <div className="grid h-9 w-9 flex-none place-items-center rounded-lg" style={{ background: `linear-gradient(135deg,${C.action},#FFA733)` }}><span className="material-icons-outlined" style={{ fontSize: 21 }}>auto_awesome</span></div>
+              <div><b className="text-[15px]">{L("Your AI assistant", "مساعدك الذكي")}</b><p className="m-0 text-[11.5px]" style={{ color: "rgba(255,255,255,.66)" }}>{L("Qualified first, then ranked on what matters to you", "التأهيل أولاً، ثم الترتيب حسب ما يهمّك")}</p></div>
+              <span className="ms-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-extrabold" style={recLoading ? { background: "rgba(247,144,9,.18)", border: "1px solid rgba(247,144,9,.45)", color: "#FFC97A" } : agentLive ? { background: "rgba(29,175,88,.18)", border: "1px solid rgba(29,175,88,.45)", color: "#7BE0A5" } : { background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.2)", color: "rgba(255,255,255,.7)" }}>
+                {recLoading ? <span className="material-icons-outlined animate-spin" style={{ fontSize: 13 }}>autorenew</span> : <span className="h-2 w-2 rounded-full" style={{ background: agentLive ? "#7BE0A5" : "rgba(255,255,255,.6)" }} />}
+                {recLoading ? L("thinking…", "يفكّر…") : agentLive ? `${L("live", "متصل")}${conf != null ? ` · ${conf}%` : ""}` : L("offline", "غير متصل")}
+              </span>
+            </div>
+
+            {/* rank by what matters — the agent re-orders the table above (AC-20/21) */}
+            <div className="border-b px-4 py-3.5" style={{ borderColor: C.line, background: "#fff" }}>
+              <div className="mb-2.5 flex flex-wrap items-center gap-2 text-[12.5px] font-extrabold" style={{ color: C.navyMid }}>
+                <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>tune</span>{L("Rank the table by what matters to you", "رتّب الجدول حسب ما يهمّك")}
+                <span className="ms-auto">{agentBadge()}</span>
+              </div>
+              <div className="mb-3 flex flex-wrap gap-2">
+                {presetDefs.map(([p, ic, en, arl]) => (
+                  <button key={p} onClick={() => choosePreset(p, en, arl)} className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-bold transition"
+                    style={preset === p && !fxEcho ? { background: C.navy, borderColor: C.navy, color: "#fff" } : { background: C.surface2, borderColor: C.border, color: C.navyMid }}>
+                    <span className="material-icons-outlined" style={{ fontSize: 16 }}>{ic}</span>{ar ? arl : en}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-2.5">
+                <div className="flex h-[46px] flex-1 items-center gap-2.5 rounded-lg border px-3.5" style={{ background: C.surface2, borderColor: C.border }}>
+                  <span className="material-icons-outlined" style={{ fontSize: 19, color: C.action }}>auto_awesome</span>
+                  <input value={freeText} onChange={(e) => setFreeText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") applyFreeText(); }}
+                    placeholder={L("Tell your assistant what matters — e.g. 'closest machine, fuel must be included'…", "أخبر مساعدك بما يهمّك — مثلاً: 'أقرب معدّة، ويجب أن يكون الوقود مشمولاً'…")}
+                    className="min-w-0 flex-1 bg-transparent text-[14px] outline-none" style={{ color: C.navy }} />
+                </div>
+                <button onClick={applyFreeText} className="inline-flex items-center gap-1.5 rounded-lg px-4 text-[13.5px] font-bold text-white" style={{ background: C.action }}>
+                  <span className="material-icons-outlined" style={{ fontSize: 18 }}>send</span>{L("Re-rank", "إعادة الترتيب")}
+                </button>
+              </div>
+              {fxEcho && (
+                <div className="mt-3 flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-[12.5px]" style={{ background: C.actionDim, borderColor: "rgba(247,144,9,.3)", color: "#8A5A06" }}>
+                  <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>auto_awesome</span>{fxEcho}
+                </div>
+              )}
+            </div>
+
+            <div className="flex max-h-[420px] flex-col gap-3 overflow-y-auto p-4">
+              {/* live recommendation — tracks the current ranking */}
+              {recoMsg && (
+                <div className="flex max-w-[92%] gap-2.5">
+                  <div className="grid h-[30px] w-[30px] flex-none place-items-center rounded-lg" style={{ background: `linear-gradient(135deg,${C.action},#FFA733)` }}><span className="material-icons-outlined" style={{ fontSize: 17, color: "#fff" }}>auto_awesome</span></div>
+                  <div className="rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed" style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.navy, borderStartStartRadius: 4 }}>
+                    <span className="mb-1 flex items-center gap-1.5 text-[12px] font-extrabold">
+                      <span className="grid h-5 w-5 flex-none place-items-center rounded-full text-[11px] font-black text-white" style={{ background: `linear-gradient(135deg,${C.gold},#E0A92E)`, color: "#2A1D00" }}>1</span>
+                      {(cols.find((c) => c.bid.id === pickId) ?? cols[0])?.bid.supplierName}
+                    </span>
+                    {recoMsg}
+                  </div>
+                </div>
+              )}
+              {chat.map((m, i) => (
+                <div key={i} className={`flex max-w-[92%] gap-2.5 ${m.role === "user" ? "ms-auto flex-row-reverse" : ""}`}>
+                  {m.role === "mansour" && <div className="grid h-[30px] w-[30px] flex-none place-items-center rounded-lg" style={{ background: `linear-gradient(135deg,${C.action},#FFA733)` }}><span className="material-icons-outlined" style={{ fontSize: 17, color: "#fff" }}>auto_awesome</span></div>}
+                  <div className="rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed" style={m.role === "user" ? { background: C.rentee, color: "#fff", borderStartEndRadius: 4 } : { background: C.surface2, border: `1px solid ${C.border}`, color: C.navy, borderStartStartRadius: 4 }}>{m.text}</div>
+                </div>
+              ))}
+            </div>
+            {/* Context-aware what-if chips — tailored by Mansour to THIS comparison (not a fixed list). */}
+            {suggestions.length > 0 && (
+              <div className="flex flex-wrap gap-2 px-4 pb-3">
+                {suggestions.map((s, i) => (
+                  <button key={i} onClick={() => sendChat(s.message)} className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[12.5px] font-bold" style={{ borderColor: C.border, color: C.rentee, background: "#fff" }}>
+                    <span className="material-icons-outlined" style={{ fontSize: 15 }}>{SUGGEST_ICON[s.icon] ?? "help"}</span>{s.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2.5 border-t px-4 py-3" style={{ borderColor: C.line, background: C.surface2 }}>
+              <div className="flex h-[46px] flex-1 items-center gap-2.5 rounded-full border px-4" style={{ background: "#fff", borderColor: C.border }}>
+                <span className="material-icons-outlined" style={{ fontSize: 18, color: C.action }}>auto_awesome</span>
+                <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") sendChat(chatInput); }} placeholder={L("Ask your assistant…", "اسأل مساعدك…")} className="min-w-0 flex-1 bg-transparent text-[14px] outline-none" style={{ color: C.navy }} />
+              </div>
+              <button onClick={() => sendChat(chatInput)} className="grid h-[46px] w-[46px] flex-none place-items-center rounded-full text-white" style={{ background: C.action }}><span className="material-icons-outlined" style={{ fontSize: 20, transform: ar ? "scaleX(-1)" : undefined }}>send</span></button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── upload modal ── */}
+      {uploadOpen && (
+        <div className="fixed inset-0 z-[400] grid place-items-center p-6" style={{ background: "rgba(28,53,80,.42)", backdropFilter: "blur(3px)" }} onClick={() => setUploadOpen(false)}>
+          <div className="w-[460px] max-w-full overflow-hidden rounded-2xl" style={{ background: "#fff" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start gap-3 border-b px-6 py-5" style={{ borderColor: C.line }}>
+              <div className="grid h-11 w-11 flex-none place-items-center rounded-lg" style={{ background: C.actionDim, color: C.action }}><span className="material-icons-outlined" style={{ fontSize: 24 }}>upload_file</span></div>
+              <div className="flex-1"><h3 className="m-0 text-[18px] font-extrabold">{L("Upload an off-platform quote", "رفع عرض سعر خارجي")}</h3><p className="m-0 text-[12.5px]" style={{ color: C.muted }}>{L("Your AI assistant reads it and adds it to this comparison.", "يقرأه مساعدك الذكي ويضيفه إلى هذه المقارنة.")}</p></div>
+              <button onClick={() => setUploadOpen(false)} className="grid h-8 w-8 flex-none place-items-center rounded-full border" style={{ borderColor: C.border, color: C.muted }}><span className="material-icons-outlined" style={{ fontSize: 18 }}>close</span></button>
+            </div>
+            <div className="px-6 py-5">
+              <label className="block cursor-pointer rounded-xl border-2 border-dashed p-7 text-center" style={{ borderColor: C.border, background: C.surface2 }}>
+                <span className="material-icons-outlined" style={{ fontSize: 38, color: C.action }}>cloud_upload</span>
+                <b className="mt-2 block text-[14px]" style={{ color: C.navy }}>{L("Drop a file or click to browse", "أفلت ملفاً أو انقر للتصفّح")}</b>
+                <span className="text-[12px]" style={{ color: C.muted }}>{L("Excel or PDF quote", "عرض سعر Excel أو PDF")}</span>
+                <input type="file" accept=".pdf,.xlsx,.xls,.csv,image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); e.currentTarget.value = ""; }} />
+              </label>
+              <div className="mt-3.5 flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-[12px]" style={{ background: C.renteeDim, borderColor: "rgba(37,99,235,.2)", color: C.navyMid }}>
+                <span className="material-icons-outlined" style={{ fontSize: 17, color: C.rentee }}>auto_awesome</span>{L("Your assistant normalizes the quote to the same basis as platform bids — same rate units, same all-in, same requirement checks — so it compares like-for-like.", "يوحّد مساعدك عرض السعر على نفس أساس عروض المنصة — نفس الوحدات ونفس الإجمالي ونفس الفحوصات — ليقارن مثلاً بمثل.")}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2.5 border-t px-6 py-4" style={{ borderColor: C.line }}>
+              <button onClick={() => setUploadOpen(false)} className="rounded-lg border px-4 py-2 text-[13px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>{L("Cancel", "إلغاء")}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── confirm-before-adding a flagged uploaded quote (match.needs_confirmation) ── */}
+      {confirmAdd && (
+        <div className="fixed inset-0 z-[420] grid place-items-center p-6" style={{ background: "rgba(28,53,80,.42)", backdropFilter: "blur(3px)" }} onClick={() => setConfirmAdd(null)}>
+          <div className="w-[460px] max-w-full overflow-hidden rounded-2xl" style={{ background: "#fff" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start gap-3 border-b px-6 py-5" style={{ borderColor: C.line }}>
+              <div className="grid h-11 w-11 flex-none place-items-center rounded-lg" style={{ background: C.warningBg, color: C.warning }}><span className="material-icons-outlined" style={{ fontSize: 24 }}>warning_amber</span></div>
+              <div className="flex-1"><h3 className="m-0 text-[17px] font-extrabold">{L("This quote may not match", "قد لا يطابق هذا العرض")}</h3><p className="m-0 text-[12.5px]" style={{ color: C.muted }}>{L(`${confirmAdd.card.supplierName} — check these before adding it to the comparison.`, `${confirmAdd.card.supplierName} — راجع هذه قبل إضافته للمقارنة.`)}</p></div>
+              <button onClick={() => setConfirmAdd(null)} className="grid h-8 w-8 flex-none place-items-center rounded-full border" style={{ borderColor: C.border, color: C.muted }}><span className="material-icons-outlined" style={{ fontSize: 18 }}>close</span></button>
+            </div>
+            <div className="px-6 py-5">
+              <ul className="flex flex-col gap-2">
+                {confirmAdd.warnings.length ? confirmAdd.warnings.map((wn, i) => (
+                  <li key={i} className="flex items-start gap-2 rounded-lg border px-3 py-2.5 text-[12.5px]" style={{ background: C.warningBg, borderColor: "rgba(212,120,10,.3)", color: "#8A5A06" }}>
+                    <span className="material-icons-outlined" style={{ fontSize: 16, color: C.warning }}>error_outline</span>{wn}
+                  </li>
+                )) : (
+                  <li className="text-[12.5px]" style={{ color: C.muted }}>{L("The assistant couldn't fully confirm this quote matches your item, location and dates.", "تعذّر على المساعد تأكيد مطابقة العرض للصنف والموقع والتواريخ.")}</li>
+                )}
+              </ul>
+              <p className="mt-3 text-[11.5px]" style={{ color: C.muted }}>{L("Adding it keeps it flagged — it's still shown for review, never auto-excluded.", "ستبقى الإضافة مع تنبيه — يظهر للمراجعة ولا يُستبعد تلقائياً.")}</p>
+            </div>
+            <div className="flex justify-end gap-2.5 border-t px-6 py-4" style={{ borderColor: C.line }}>
+              <button onClick={() => setConfirmAdd(null)} className="rounded-lg border px-4 py-2 text-[13px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>{L("Don't add", "لا تُضِف")}</button>
+              <button onClick={confirmAddBid} className="rounded-lg px-4 py-2 text-[13px] font-bold text-white" style={{ background: C.action }}>{L("Add anyway", "أضِفه على أي حال")}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── add-your-cost popup (replaces the browser prompt) ── */}
+      {costAsk && (
+        <div className="fixed inset-0 z-[420] grid place-items-center p-6" style={{ background: "rgba(28,53,80,.42)", backdropFilter: "blur(3px)" }} onClick={() => setCostAsk(null)}>
+          <div className="w-[420px] max-w-full overflow-hidden rounded-2xl" style={{ background: "#fff" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start gap-3 border-b px-6 py-5" style={{ borderColor: C.line }}>
+              <div className="grid h-11 w-11 flex-none place-items-center rounded-lg" style={{ background: C.renteeDim, color: C.rentee }}><span className="material-icons-outlined" style={{ fontSize: 24 }}>add_card</span></div>
+              <div className="flex-1"><h3 className="m-0 text-[17px] font-extrabold">{L(`Your estimate — ${costAsk.label}`, `تقديرك — ${costAsk.label}`)}</h3><p className="m-0 text-[12.5px]" style={{ color: C.muted }}>{L("Your own estimate — added to the total so you get a sense of the real cost.", "تقديرك أنت — يُضاف للإجمالي لتتكوّن لديك صورة عن التكلفة الحقيقية.")}</p></div>
+              <button onClick={() => setCostAsk(null)} className="grid h-8 w-8 flex-none place-items-center rounded-full border" style={{ borderColor: C.border, color: C.muted }}><span className="material-icons-outlined" style={{ fontSize: 18 }}>close</span></button>
+            </div>
+            <div className="px-6 py-5">
+              <div className="flex h-[50px] items-center gap-2.5 rounded-lg border px-4" style={{ background: C.surface2, borderColor: C.border }}>
+                <span className="text-[14px] font-extrabold" style={{ color: C.muted }}>{sar}</span>
+                <input autoFocus type="number" inputMode="numeric" min={0} value={costInput} onChange={(e) => setCostInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") submitCost(); }} placeholder="0" className="min-w-0 flex-1 bg-transparent text-[16px] font-bold outline-none" style={{ color: C.navy }} />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2.5 border-t px-6 py-4" style={{ borderColor: C.line }}>
+              <button onClick={() => setCostAsk(null)} className="rounded-lg border px-4 py-2 text-[13px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>{L("Cancel", "إلغاء")}</button>
+              <button onClick={submitCost} className="rounded-lg px-4 py-2 text-[13px] font-bold text-white" style={{ background: C.rentee }}>{L("Add to total", "أضِف للإجمالي")}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── toast ── */}
+      {toastMsg && (
+        <div className="fixed inset-x-0 bottom-6 z-[500] mx-auto flex w-max max-w-[90%] items-center gap-2 rounded-lg px-4 py-3 text-[13px] font-bold text-white" style={{ background: C.navy, boxShadow: "0 14px 30px rgba(28,53,80,.35)" }}>
+          <span className="material-icons-outlined" style={{ fontSize: 18, color: "#7BE0A5" }}>check_circle</span>{toastMsg}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------------------------- bits ---------------------------------- */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => { const s = String(reader.result ?? ""); const i = s.indexOf("base64,"); resolve(i >= 0 ? s.slice(i + "base64,".length) : s); };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+function Box({ title, children }: { title?: string; children: React.ReactNode }) {
+  return <div className="rounded-xl border p-8 text-center" style={{ borderColor: C.border, background: "#fff" }}>{title && <div className="text-[14px] font-bold" style={{ color: C.navy }}>{title}</div>}<div className="mt-1 text-[12.5px]" style={{ color: C.muted }}>{children}</div></div>;
+}
+function Spinner() {
+  return <div className="grid place-items-center py-16" style={{ color: C.muted }}><span className="material-icons-outlined animate-spin" style={{ fontSize: 28 }}>progress_activity</span></div>;
+}
+function Pill({ icon, children }: { icon: string | null; children: React.ReactNode }) {
+  return <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold text-white" style={{ background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.18)" }}>{icon ? <span className="material-icons-outlined" style={{ fontSize: 12 }}>{icon}</span> : <span className="h-1.5 w-1.5 rounded-full" style={{ background: "#FFC97A" }} />}{children}</span>;
+}
+function SectionRow({ emoji, title, accent, accentText, n, collapsed, onToggle }: { id: string; emoji: string; title: string; accent: string; accentText: string; n: number; collapsed: boolean; onToggle: () => void }) {
+  return (
+    <tr><td colSpan={n + 1} style={{ background: `linear-gradient(180deg,${C.navy},${C.navyDeep})`, borderInlineStart: `4px solid ${accent}`, padding: 0 }}>
+      <button onClick={onToggle} className="flex w-full items-center gap-2.5 px-4 py-3 text-start">
+        <span style={{ fontSize: 14 }}>{emoji}</span>
+        <b className="text-[12.5px] font-extrabold uppercase" style={{ color: accentText, letterSpacing: ".3px" }}>{title}</b>
+        <span className="material-icons-outlined ms-auto" style={{ fontSize: 20, color: "rgba(255,255,255,.72)", transform: collapsed ? "rotate(-90deg)" : "" }}>expand_more</span>
+      </button>
+    </td></tr>
+  );
+}
+function RowHead({ title, sub }: { title: string; sub?: string }) {
+  return <td className="sticky start-0 z-[1] p-3.5 align-top text-[12.5px] font-bold" style={{ background: C.surface2, color: C.navyMid, width: 190, minWidth: 190, borderBottom: `1px solid ${C.line}` }}>{title}{sub && <span className="block text-[11px] font-semibold" style={{ color: C.muted }}>{sub}</span>}</td>;
+}
+function Td({ children, ok, fail }: { children: React.ReactNode; ok?: boolean; fail?: boolean }) {
+  return <td className="p-3.5 align-top text-[13px] font-bold" style={{ borderBottom: `1px solid ${C.line}`, color: C.navy, background: ok ? "rgba(29,175,88,.06)" : fail ? "rgba(217,54,42,.07)" : undefined }}>{children}</td>;
+}
+function Sub({ children }: { children: React.ReactNode }) {
+  return <span className="mt-1 block text-[11px] font-semibold" style={{ color: C.muted }}>{children}</span>;
+}
+function CertRow({ label, sub, cols, pick, certLabel, incChip }: { label: string; sub: string; cols: BidColumn[]; pick: CertCode[]; certLabel: (c: CertCode) => string; incChip: (label: string, kind: "y" | "n" | "muted", onAdd?: () => void) => React.ReactNode }) {
+  return (
+    <tr>
+      <RowHead title={label} sub={sub} />
+      {cols.map((c) => {
+        const held = c.bid.heldCertCodes.filter((x) => pick.includes(x));
+        const missing = c.bid.requiredCerts.filter((x) => pick.includes(x) && !c.bid.heldCertCodes.includes(x));
+        const anyMissing = missing.length > 0;
+        const anyHeld = held.length > 0;
+        return (
+          <Td key={c.bid.id} ok={anyHeld && !anyMissing} fail={anyMissing}>
+            {held.length || missing.length ? (
+              <div className="flex flex-wrap gap-1.5">
+                {held.map((x) => <span key={x}>{incChip(certLabel(x), "y")}</span>)}
+                {missing.map((x) => <span key={x}>{incChip(certLabel(x), "n")}</span>)}
+              </div>
+            ) : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}
+          </Td>
+        );
+      })}
+    </tr>
+  );
+}

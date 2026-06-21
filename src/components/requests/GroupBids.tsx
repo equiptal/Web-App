@@ -182,6 +182,17 @@ export function GroupBids({ group }: { group: RequestGroup }) {
       return next;
     });
 
+  // web-app/007 — open the comparison workspace pre-selected to the chosen bids (and their item).
+  function goCompare() {
+    const chosen = (bids ?? []).filter((b) => selected.has(b.id));
+    if (chosen.length < 2) return;
+    const params = new URLSearchParams({ group: group.id });
+    const itemId = chosen[0]?.requestId;
+    if (itemId) params.set("item", itemId);
+    params.set("bids", chosen.map((b) => b.id).join(","));
+    router.push(`/compare?${params.toString()}`);
+  }
+
   async function startNegotiation(b: GroupBid) {
     if (busyId) return;
     if (b.dealRoomId) {
@@ -551,6 +562,16 @@ export function GroupBids({ group }: { group: RequestGroup }) {
         <div className="qbar">
           <span className="qn">{selectedCount} {L("selected", "محدّد")}</span>
           <span className="qclear" onClick={() => setSelected(new Set())}>{L("Clear", "مسح")}</span>
+          {/* web-app/007 — Compare the selected bids side by side (needs ≥2). */}
+          <button
+            className="qdl"
+            disabled={selectedCount < 2}
+            style={{ background: "var(--navy)", opacity: selectedCount < 2 ? 0.5 : 1 }}
+            title={selectedCount < 2 ? L("Select at least 2 to compare", "اختر عرضين على الأقل") : L("Compare side by side", "قارن جنبًا إلى جنب")}
+            onClick={goCompare}
+          >
+            <span className="material-icons-outlined">compare_arrows</span> {L("Compare", "قارن")}
+          </button>
           <button className="qdl" onClick={() => setLangPick(true)}>
             <span className="material-icons-outlined">download</span> {L("Download quotations", "تنزيل عروض الأسعار")}
           </button>

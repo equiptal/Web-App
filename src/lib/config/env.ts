@@ -8,6 +8,8 @@
  */
 export const serverEnv = {
   mansourUrl: process.env.MANSOUR_URL?.trim() || null,
+  /** Optional bearer for Mansour's `/bids/*` routes — sent only if the agent has enabled BIDS_API_TOKEN. */
+  bidsApiToken: process.env.BIDS_API_TOKEN?.trim() || null,
   agentsApiUrl: process.env.AGENTS_API_URL?.trim() || null,
   agentsApiToken: process.env.AGENTS_API_TOKEN?.trim() || null,
   /** Fallback rentee user id for submissions when no signed-in session is present (create_request needs one). */

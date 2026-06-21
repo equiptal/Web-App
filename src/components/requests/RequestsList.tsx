@@ -146,6 +146,16 @@ export function RequestsList() {
             {activeBidGroup && (
               <>
                 <GroupStrip group={activeBidGroup} ar={ar} L={L} router={router} />
+                {/* web-app/007 AC-02 — Compare entry: opens the workspace reorganized by item for this request. */}
+                <div className="mb-2 flex justify-end">
+                  <button
+                    onClick={() => router.push(`/compare?group=${encodeURIComponent(activeBidGroup.id)}`)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-navy px-3.5 py-2 text-[12.5px] font-bold text-white transition hover:brightness-110"
+                  >
+                    <span className="material-icons-outlined" style={{ fontSize: 16 }}>compare_arrows</span>
+                    {L("Compare bids", "قارن العروض")}
+                  </button>
+                </div>
                 <GroupBids group={activeBidGroup} />
               </>
             )}

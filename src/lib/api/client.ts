@@ -2,6 +2,15 @@ import type { AgentDraft, RfqRequestPayload, Taxonomy } from "@/lib/contract";
 import type { RequestListItem, RequestRecord } from "@/lib/contract/requests";
 import type { BidCard } from "@/lib/contract/bids";
 import type { DealRoomView, DealRoomDocuments, QuotationView } from "@/lib/contract/deal-room";
+import type { ComputedBid, RecommendResult, BidAskResult, BidParseResult, AwardNudgeResult, PreferencePreset, RankingPreference, RankedBid, BidEventInput } from "@/lib/contract/agent-bids";
+
+/** Body of POST /api/me/bids/recommend. user_id is attached server-side. */
+export interface RecommendPayload {
+  request?: { hasRequirements?: boolean } | null;
+  bids: ComputedBid[];
+  preference?: RankingPreference | null;
+  previous_ranking?: RankedBid[] | null;
+}
 
 /** Error kinds the UI distinguishes: empty/unreadable input (AC-09) vs connectivity (AC-10). */
 export type ApiErrorKind = "empty" | "network" | "unknown";
@@ -226,6 +235,74 @@ export function submitRequest(
   payload: RfqRequestPayload & { simulateError?: boolean },
 ): Promise<{ requestId: string; requestIds?: string[] }> {
   return postJson<{ requestId: string; requestIds?: string[] }>("/api/requests", payload);
+}
+
+/* ----------------- web-app/007: Mansour judgement layer (soft) ----------------- */
+// These never throw — on any miss they return the "no agent" shape so the comparison
+// keeps its deterministic ranking. The matrix works fully without Mansour.
+
+/** Ask Mansour to rank + recommend over the web-computed bids. `agent:false` → keep deterministic sort. */
+export async function recommendBids(payload: RecommendPayload): Promise<{ agent: boolean; result?: RecommendResult }> {
+  try {
+    const res = await fetch("/api/me/bids/recommend", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), cache: "no-store" });
+    if (!res.ok) return { agent: false };
+    return (await res.json()) as { agent: boolean; result?: RecommendResult };
+  } catch {
+    return { agent: false };
+  }
+}
+
+/** Conversational "Ask your assistant" — LLM reply grounded in the ranking; also returns a re-ranking. */
+export async function askBids(payload: { message: string; request?: { hasRequirements?: boolean } | null; bids: ComputedBid[]; current_ranking?: RankedBid[] | null }): Promise<{ agent: boolean; result?: BidAskResult }> {
+  try {
+    const res = await fetch("/api/me/bids/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), cache: "no-store" });
+    if (!res.ok) return { agent: false };
+    return (await res.json()) as { agent: boolean; result?: BidAskResult };
+  } catch {
+    return { agent: false };
+  }
+}
+
+/** Parse one uploaded supplier quote → a NormalizedBid (or a parse failure that adds no bid). */
+export async function parseBid(payload: { message?: string; attachments?: { type: string; filename?: string; data: string }[]; request_context?: { subtype?: string | null; capacity?: string | null } }): Promise<{ agent: boolean; result?: BidParseResult }> {
+  try {
+    const res = await fetch("/api/me/bids/parse", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), cache: "no-store" });
+    if (!res.ok) return { agent: false };
+    return (await res.json()) as { agent: boolean; result?: BidParseResult };
+  } catch {
+    return { agent: false };
+  }
+}
+
+/** Save the renter's ranking preference to their profile (durable once the agent's migration 0016 lands). */
+export async function saveBidPreference(payload: { preset: PreferencePreset; require_supplier?: string[]; free_text?: string | null }): Promise<{ ok: boolean }> {
+  try {
+    const res = await fetch("/api/me/bids/preferences", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), cache: "no-store" });
+    return (await res.json()) as { ok: boolean };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/** The post-award "make this my default" nudge. */
+export async function awardLearning(payload: { awarded?: unknown; bids?: unknown[]; history?: unknown[]; confirm?: boolean }): Promise<{ agent: boolean; result?: AwardNudgeResult }> {
+  try {
+    const res = await fetch("/api/me/bids/award-learning", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), cache: "no-store" });
+    if (!res.ok) return { agent: false };
+    return (await res.json()) as { agent: boolean; result?: AwardNudgeResult };
+  } catch {
+    return { agent: false };
+  }
+}
+
+/** Fire-and-forget capture of comparison-page actions for learning. */
+export function captureBidEvents(events: BidEventInput[]): void {
+  if (!events.length) return;
+  try {
+    fetch("/api/me/bids/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ events }), keepalive: true }).catch(() => {});
+  } catch {
+    /* never disrupt the UI */
+  }
 }
 
 /** Fetch the equipment taxonomy. */
