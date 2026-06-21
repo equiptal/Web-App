@@ -8,6 +8,7 @@ import { groupRequests, type RequestGroup } from "@/lib/contract/requests";
 import { CERT_LABEL, type BidCard, type CertCode } from "@/lib/contract/bids";
 import { buildItemComparison, sortByPreset, type BidColumn, type Preset, type CostResponsibility } from "@/lib/contract/comparison";
 import { bidColumnToComputed, normalizedBidToBidCard, presetToAgent, type RecommendResult } from "@/lib/contract/agent-bids";
+import { EquipImg } from "@/components/requests/EquipImg";
 
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
 
@@ -485,8 +486,8 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
       {group && (
         <div className="relative overflow-hidden rounded-xl p-4 text-white" style={{ background: `linear-gradient(150deg,${C.navy},${C.navyDeep})` }}>
           <div className="flex gap-3">
-            <div className="relative grid h-10 w-10 flex-none place-items-center rounded-lg" style={{ background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.16)" }}>
-              <span className="material-icons-outlined" style={{ fontSize: 22 }}>forklift</span>
+            <div className="relative grid h-10 w-10 flex-none place-items-center rounded-lg" style={{ background: "#fff", border: "1px solid rgba(255,255,255,.16)" }}>
+              <EquipImg src={activeItemObj?.item?.imageUrl ?? null} categoryId={activeItemObj?.item?.categoryId ?? null} name={(ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? ""} box="" img="h-7 w-7 object-contain" iconSize={22} />
               {units > 1 && <span className="absolute -end-1.5 -top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-extrabold" style={{ background: C.action }}>×{units}</span>}
             </div>
             <div className="min-w-0 flex-1">
