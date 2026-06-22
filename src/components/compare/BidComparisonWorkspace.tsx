@@ -660,15 +660,32 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
                     </div>
                   ))}
                 </div>
-                {suggestions.length > 0 && (
-                  <div className="flex flex-wrap gap-2 px-4 pb-3">
-                    {suggestions.map((s, i) => (
-                      <button key={i} onClick={() => sendChat(s.message)} className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[12.5px] font-bold" style={{ borderColor: C.border, color: C.rentee, background: "#fff" }}>
-                        <span className="material-icons-outlined" style={{ fontSize: 15 }}>{SUGGEST_ICON[s.icon] ?? "help"}</span>{s.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                {/* What-if quick prompts — always available, plus any dynamic agent suggestions. */}
+                {(() => {
+                  const whatif = [
+                    { label: L("Lowest all-in?", "الأقل إجمالاً؟"), message: "rank by lowest all-in cost", icon: "savings" },
+                    { label: L("Newest machine?", "أحدث معدّة؟"), message: "rank by newest machine", icon: "new_releases" },
+                    { label: L("Fuel included only?", "الوقود مشمول فقط؟"), message: "only the bids where fuel is included", icon: "local_gas_station" },
+                    { label: L("Closest to site?", "الأقرب للموقع؟"), message: "rank by closest distance to site", icon: "place" },
+                    { label: L("Most trusted?", "الأكثر ثقة؟"), message: "rank by most trusted supplier", icon: "verified_user" },
+                  ];
+                  const seen = new Set(whatif.map((w) => w.label));
+                  const extra = suggestions.filter((s) => !seen.has(s.label));
+                  const chip = (key: string, icon: string, label: string, message: string) => (
+                    <button key={key} onClick={() => sendChat(message)} className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[12.5px] font-bold" style={{ borderColor: C.border, color: C.rentee, background: "#fff" }}>
+                      <span className="material-icons-outlined" style={{ fontSize: 15 }}>{icon}</span>{label}
+                    </button>
+                  );
+                  return (
+                    <div className="px-4 pb-3">
+                      <div className="mb-1.5 text-[11px] font-extrabold" style={{ color: C.muted, letterSpacing: ".3px" }}>{L("What if…", "ماذا لو…")}</div>
+                      <div className="flex flex-wrap gap-2">
+                        {whatif.map((s, i) => chip(`w${i}`, s.icon, s.label, s.message))}
+                        {extra.map((s, i) => chip(`s${i}`, SUGGEST_ICON[s.icon] ?? "help", s.label, s.message))}
+                      </div>
+                    </div>
+                  );
+                })()}
                 <div className="flex gap-2.5 border-t px-4 py-3" style={{ borderColor: C.line, background: C.surface2 }}>
                   <div className="flex h-[46px] flex-1 items-center gap-2.5 rounded-full border px-4" style={{ background: "#fff", borderColor: C.border }}>
                     <span className="material-icons-outlined" style={{ fontSize: 18, color: C.action }}>auto_awesome</span>
