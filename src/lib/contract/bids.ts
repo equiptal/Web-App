@@ -243,7 +243,17 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   if (certs.SPSP && !held.includes("SPSP")) held.push("SPSP");
   if (docKey("sasoHeavyEquipDocKey", "saso_heavy_equip_doc_key") && !held.includes("SASO")) held.push("SASO");
   if (docKey("localContentDocKey", "local_content_doc_key") && !held.includes("LC")) held.push("LC");
-  // Equipment-level certs: equipment_listings.document_keys = [{ key, type }] (type = tuv/saso/spsp/lc).
+  // Company-wide typed cert-docs map: heldCertDocs = { TUV: "key", SASO: "key", ... } on the profile.
+  for (const src of profSources) {
+    const map = src.heldCertDocs ?? src.held_cert_docs;
+    if (map && typeof map === "object" && !Array.isArray(map)) {
+      for (const [type, val] of Object.entries(map as Record<string, unknown>)) {
+        if (val) { const c = toCert(type); if (c && !held.includes(c)) held.push(c); }
+      }
+    }
+  }
+  // Equipment-level certs: equipment_listings.documentKeys = [{ key, type }] (type = tuv/saso/spsp/…).
+  // Ownership types (istimara/customs/sale_contract/saso_registration) aren't certs → toCert ignores them.
   const eqDocs = (Array.isArray(eq?.documentKeys) ? eq!.documentKeys : Array.isArray(eq?.document_keys) ? eq!.document_keys : []) as unknown[];
   for (const d of eqDocs) {
     const dk = d as Record<string, unknown>;
@@ -258,7 +268,7 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   // "verified ⇒ has all docs" assumption.
   const hasCr = docKey("crDocKey", "cr_doc_key", "crNumber", "commercialRegistrationNumber", "commercial_registration_number", "crFileKey");
   const hasVat = docKey("vatDocKey", "vat_doc_key", "vatNumber", "taxNumber", "tax_number", "vatFileKey");
-  const hasNationalAddr = docKey("nationalAddressDocKey", "national_address_doc_key", "companyAddress", "company_address", "shortAddress", "short_address", "postalCode", "postal_code", "buildingNumber", "building_number");
+  const hasNationalAddr = docKey("nationalAddressDocKey", "national_address_doc_key", "nationalId", "national_id", "companyAddress", "company_address", "shortAddress", "short_address", "postalCode", "postal_code", "buildingNumber", "building_number");
   const requiredCerts = certList((raw.request as Record<string, unknown> | undefined)?.requiredCerts);
   const rq = (raw.request ?? {}) as Record<string, unknown>;
   const rqItem = (Array.isArray(rq.equipmentItems) ? (rq.equipmentItems as Record<string, unknown>[]) : [])[0] ?? {};
