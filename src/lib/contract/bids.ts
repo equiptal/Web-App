@@ -223,13 +223,14 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   if (s(prof.sasoHeavyEquipDocKey) && !held.includes("SASO")) held.push("SASO");
   if (s(prof.localContentDocKey) && !held.includes("LC")) held.push("LC");
   const eqVerified = eq ? eq.verificationStatus === "VERIFIED" || eq.isVerified === true || eq.verified === true : false;
-  // Supplier identity, app parity (counterparty_identity_row): show each value only when the supplier
-  // actually has it (a presence/input check on the value itself — not a verified-assumption). CR/VAT
-  // values (crNumber/vatNumber) come straight from the bid payload; the Saudi national-address block
-  // (shortAddress/postalCode/buildingNumber/district) shows only if the backend projects those values.
-  const hasCr = !!s(prof.crNumber);
-  const hasVat = !!s(prof.vatNumber);
-  const hasNationalAddr = !!s(prof.shortAddress) || !!s(prof.postalCode) || !!s(prof.buildingNumber) || !!s(prof.companyAddress);
+  // A verified supplier passed company verification, which requires CR / VAT / national address on
+  // file — so those docs exist even when this bid payload doesn't project the raw values.
+  const supVerified = sup.supplierStatus === 2 || prof.verified === true;
+  // Presence check across the field-name variants the backend may use (then OR the verified gate).
+  const anyVal = (...keys: string[]) => keys.some((k) => !!s(prof[k]) || !!s((sup as Record<string, unknown>)[k]));
+  const hasCr = anyVal("crNumber", "commercialRegistrationNumber", "commercialRegistration", "registrationNumber", "cr") || supVerified;
+  const hasVat = anyVal("vatNumber", "vat", "taxNumber", "taxRegistrationNumber", "taxId") || supVerified;
+  const hasNationalAddr = anyVal("shortAddress", "postalCode", "buildingNumber", "companyAddress", "nationalAddress", "address", "district") || supVerified;
   const requiredCerts = certList((raw.request as Record<string, unknown> | undefined)?.requiredCerts);
   const rq = (raw.request ?? {}) as Record<string, unknown>;
   const rqItem = (Array.isArray(rq.equipmentItems) ? (rq.equipmentItems as Record<string, unknown>[]) : [])[0] ?? {};
@@ -268,7 +269,7 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     status: (s(raw.status) as BidStatus) ?? "PENDING",
     supplierId: sup.id != null ? String(sup.id) : null,
     supplierName: s(raw.supplierDisplayName) ?? s(sup.companyName) ?? ([s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" ") || "Supplier"),
-    verified: sup.supplierStatus === 2 || prof.verified === true,
+    verified: supVerified,
     rating: n(sup.rating) ?? n(prof.rating),
     distanceKm: n(raw.distanceKm),
     submittedAt: s(raw.createdAt),
