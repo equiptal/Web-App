@@ -221,19 +221,13 @@
 <body>
 
 <aside class="sidebar">
-  <div class="brand"><span class="mark"><span class="material-icons-outlined">precision_manufacturing</span></span>MOEDA<i>TECH</i></div>
-  <div class="nav-grp" data-en="PROCUREMENT" data-ar="المشتريات">PROCUREMENT</div>
+  <div class="brand" style="justify-content:center;padding-bottom:14px"><img src="/moedatech-logo.png" alt="Moedatech" style="height:30px;width:auto;filter:brightness(0) invert(1)"></div>
   <nav class="nav">
-    <a class="nav-item active"><span class="material-icons-outlined">dashboard</span><span data-en="Dashboard" data-ar="لوحة التحكم">Dashboard</span></a>
-    <a class="nav-item"><span class="material-icons-outlined">radar</span><span data-en="Requests / RFQs" data-ar="الطلبات">Requests / RFQs</span><span class="count">79</span></a>
-    <a class="nav-item"><span class="material-icons-outlined">forklift</span><span data-en="Active rentals" data-ar="الإيجارات النشطة">Active rentals</span><span class="count">142</span></a>
-    <a class="nav-item"><span class="material-icons-outlined">store</span><span data-en="Suppliers" data-ar="المؤجرون">Suppliers</span></a>
-    <a class="nav-item"><span class="material-icons-outlined">location_city</span><span data-en="Projects" data-ar="المشاريع">Projects</span></a>
-    <a class="nav-item"><span class="material-icons-outlined">verified_user</span><span data-en="Compliance" data-ar="الالتزام">Compliance</span></a>
-  </nav>
-  <div class="nav-grp" data-en="FLEET" data-ar="الأسطول">FLEET</div>
-  <nav class="nav">
-    <a class="nav-item"><span class="material-icons-outlined">inventory_2</span><span data-en="PMV fleet" data-ar="أسطول PMV">PMV fleet</span></a>
+    <a class="nav-item" href="/"><span class="material-icons-outlined">home</span><span data-en="Home" data-ar="الرئيسية">Home</span></a>
+    <a class="nav-item" href="/requests"><span class="material-icons-outlined">grid_view</span><span data-en="Requests" data-ar="الطلبات">Requests</span></a>
+    <a class="nav-item" href="/compare"><span class="material-icons-outlined">compare_arrows</span><span data-en="Compare bids" data-ar="مقارنة العروض">Compare bids</span></a>
+    <a class="nav-item active" href="/procurement-dashboard.html"><span class="material-icons-outlined">dashboard</span><span data-en="Dashboard" data-ar="لوحة التحكم">Dashboard</span></a>
+    <a class="nav-item" href="/profile"><span class="material-icons-outlined">person</span><span data-en="Profile" data-ar="الملف الشخصي">Profile</span></a>
   </nav>
 </aside>
 
@@ -349,11 +343,11 @@
 </div>
 
 <nav class="botnav">
-  <a class="bn-item active"><span class="material-icons-outlined">dashboard</span><span data-en="Dashboard" data-ar="اللوحة">Dashboard</span></a>
-  <a class="bn-item"><span class="material-icons-outlined">radar</span><span data-en="RFQs" data-ar="الطلبات">RFQs</span></a>
-  <a class="bn-item"><span class="material-icons-outlined">forklift</span><span data-en="Rentals" data-ar="الإيجارات">Rentals</span></a>
-  <a class="bn-item"><span class="material-icons-outlined">verified_user</span><span data-en="Compliance" data-ar="الالتزام">Compliance</span></a>
-  <a class="bn-item"><span class="material-icons-outlined">location_city</span><span data-en="Projects" data-ar="المشاريع">Projects</span></a>
+  <a class="bn-item" href="/"><span class="material-icons-outlined">home</span><span data-en="Home" data-ar="الرئيسية">Home</span></a>
+  <a class="bn-item" href="/requests"><span class="material-icons-outlined">grid_view</span><span data-en="Requests" data-ar="الطلبات">Requests</span></a>
+  <a class="bn-item" href="/compare"><span class="material-icons-outlined">compare_arrows</span><span data-en="Compare" data-ar="مقارنة">Compare</span></a>
+  <a class="bn-item active" href="/procurement-dashboard.html"><span class="material-icons-outlined">dashboard</span><span data-en="Dashboard" data-ar="اللوحة">Dashboard</span></a>
+  <a class="bn-item" href="/profile"><span class="material-icons-outlined">person</span><span data-en="Profile" data-ar="الملف">Profile</span></a>
 </nav>
 
 <div class="toast" id="toast"><span class="material-icons-outlined">check_circle</span><span id="toastTx"></span></div>
@@ -526,8 +520,9 @@
   render();
 </script>
 
-<!-- ── real-data loader (Moedatech): rebuild D/ORDER from the signed-in renter's requests + bids.
-     Same-origin fetches carry the auth cookie. Any failure keeps the sample data above. ── -->
+<!-- ── data loader (Moedatech): label projects with the renter's REAL request locations, but keep the
+     prototype's MOCK numbers (templates). Same-origin fetch carries the auth cookie. Any failure or no
+     requests keeps the default sample data above. ── -->
 <script>
 (async function(){
   function grand(b){ var p=b.duration||1, u=b.numberOfUnits||1; var s=(b.price||0)*p*u+(b.mobPrice||0)+(b.demobPrice||0); return Math.round(s*1.15); }
@@ -558,19 +553,21 @@
       compH_en: withBids+" of "+rfqs+" RFQs received at least one bid.", compH_ar: withBids+" من "+rfqs+" طلباً وصلها عرض واحد على الأقل.", eq:eq, ins:ins };
   }
   try{
-    var me=null; try{ me=await fetch("/api/me",{cache:"no-store"}).then(function(r){return r.ok?r.json():null;}); }catch(e){}
-    var officer = (me&&me.user) ? [me.user.firstName,me.user.lastName].filter(Boolean).join(" ") : "—";
+    // Keep the prototype's rich MOCK numbers as templates; only the project NAMES come from real data.
+    var TEMPLATES = ["qiddiya","ksp","airport","diriyah","aramco"].map(function(k){ return D[k]; }).filter(Boolean);
+    var ALL = D.all;
+    var OFFICERS = ["Faisal Al-Harbi","Nora Al-Otaibi","Sara Al-Dossari","Khalid Al-Ghamdi","Mohammed Salem","Layla Al-Qahtani","Omar Al-Zahrani","Huda Al-Shehri"];
     var rj = await fetch("/api/me/requests",{cache:"no-store"}).then(function(r){return r.json();});
     var reqs = (rj&&rj.requests)||[];
-    if(!reqs.length) return; // no real data → keep the sample dashboard
-    var lists = await Promise.all(reqs.map(function(r){ return fetch("/api/me/requests/"+encodeURIComponent(r.id)+"/bids",{cache:"no-store"}).then(function(x){return x.ok?x.json():{bids:[]};}).then(function(x){return x.bids||[];}).catch(function(){return [];}); }));
-    var bidsByReq={}; reqs.forEach(function(r,i){ bidsByReq[r.id]=lists[i]; });
-    var groups={}, gorder=[]; reqs.forEach(function(r){ var key=locLabel(r.city); if(!groups[key]){ groups[key]={label:key,reqs:[]}; gorder.push(key); } groups[key].reqs.push(r); });
-    var OFFICERS = ["Faisal Al-Harbi","Nora Al-Otaibi","Sara Al-Dossari","Khalid Al-Ghamdi","Mohammed Salem","Layla Al-Qahtani","Omar Al-Zahrani","Huda Al-Shehri"];
+    if(!reqs.length || !TEMPLATES.length) return; // no real projects → keep the default prototype data
+    var names=[], seen={}; reqs.forEach(function(r){ var nm=locLabel(r.city); if(nm&&!seen[nm]){ seen[nm]=1; names.push(nm); } });
+    if(!names.length) return;
     Object.keys(D).forEach(function(k){ delete D[k]; });
-    D.all = scope(reqs, bidsByReq, t("All projects","كل المشاريع")); D.all.officer=null; D.all.score=null;
+    D.all = ALL; // aggregate KPIs stay mock
     ORDER.length=0;
-    gorder.forEach(function(key,i){ var pk="p"+i; D[pk]=scope(groups[key].reqs, bidsByReq, key); D[pk].officer = OFFICERS[i % OFFICERS.length]; ORDER.push(pk); });
+    names.forEach(function(nm,i){ var tpl=TEMPLATES[i%TEMPLATES.length]; var pk="p"+i; D[pk]=Object.assign({}, tpl, { nameEn:nm, nameAr:nm, officer: OFFICERS[i%OFFICERS.length] }); ORDER.push(pk); });
+    // Global assistant findings aligned to the real project names (one per project).
+    D.all.ins = ORDER.map(function(pk){ var d=D[pk]; var ins=(d.ins&&d.ins[0])||["save","Insight",d.nameEn,""]; return [ins[0], ins[1], d.nameEn+" — "+ins[2], ins[3]]; }).slice(0,6);
     var pt=document.querySelector(".ptabs");
     if(pt){ pt.innerHTML = '<div class="ptab on" data-proj="all" onclick="selectProject(\'all\')"><span class="material-icons-outlined">grid_view</span>'+t("All projects","كل المشاريع")+'</div>' + ORDER.map(function(pk){ return '<div class="ptab" data-proj="'+pk+'" onclick="selectProject(\''+pk+'\')">'+D[pk].nameEn+'</div>'; }).join(""); }
 
