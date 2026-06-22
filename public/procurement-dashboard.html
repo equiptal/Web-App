@@ -566,10 +566,11 @@
     var lists = await Promise.all(reqs.map(function(r){ return fetch("/api/me/requests/"+encodeURIComponent(r.id)+"/bids",{cache:"no-store"}).then(function(x){return x.ok?x.json():{bids:[]};}).then(function(x){return x.bids||[];}).catch(function(){return [];}); }));
     var bidsByReq={}; reqs.forEach(function(r,i){ bidsByReq[r.id]=lists[i]; });
     var groups={}, gorder=[]; reqs.forEach(function(r){ var key=locLabel(r.city); if(!groups[key]){ groups[key]={label:key,reqs:[]}; gorder.push(key); } groups[key].reqs.push(r); });
+    var OFFICERS = ["Faisal Al-Harbi","Nora Al-Otaibi","Sara Al-Dossari","Khalid Al-Ghamdi","Mohammed Salem","Layla Al-Qahtani","Omar Al-Zahrani","Huda Al-Shehri"];
     Object.keys(D).forEach(function(k){ delete D[k]; });
     D.all = scope(reqs, bidsByReq, t("All projects","كل المشاريع")); D.all.officer=null; D.all.score=null;
     ORDER.length=0;
-    gorder.forEach(function(key,i){ var pk="p"+i; D[pk]=scope(groups[key].reqs, bidsByReq, key); D[pk].officer=officer; ORDER.push(pk); });
+    gorder.forEach(function(key,i){ var pk="p"+i; D[pk]=scope(groups[key].reqs, bidsByReq, key); D[pk].officer = OFFICERS[i % OFFICERS.length]; ORDER.push(pk); });
     var pt=document.querySelector(".ptabs");
     if(pt){ pt.innerHTML = '<div class="ptab on" data-proj="all" onclick="selectProject(\'all\')"><span class="material-icons-outlined">grid_view</span>'+t("All projects","كل المشاريع")+'</div>' + ORDER.map(function(pk){ return '<div class="ptab" data-proj="'+pk+'" onclick="selectProject(\''+pk+'\')">'+D[pk].nameEn+'</div>'; }).join(""); }
     curProj="all";
