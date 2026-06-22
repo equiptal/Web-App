@@ -534,7 +534,7 @@
 (async function(){
   function grand(b){ var p=b.duration||1, u=b.numberOfUnits||1; var s=(b.price||0)*p*u+(b.mobPrice||0)+(b.demobPrice||0); return Math.round(s*1.15); }
   function days(a,b){ if(!a||!b) return null; var d=(new Date(b)-new Date(a))/86400000; return (isFinite(d)&&d>=0)?d:null; }
-  function locLabel(city){ if(!city) return t("Unassigned","غير محدّد"); var parts=String(city).split(",").map(function(s){return s.trim();}).filter(Boolean); var lbl = parts.length>=2 ? parts.slice(-2).join(" — ") : (parts[0]||city); lbl = lbl.replace(/\s*\d{4,}\s*/g," ").replace(/\s*—\s*/," — ").trim(); return /king khalid/i.test(lbl) ? lbl : lbl.replace(/\bairport\b/gi,"King Khalid Airport"); }
+  function locLabel(city){ if(!city) return t("Unassigned","غير محدّد"); var parts=String(city).split(",").map(function(s){return s.trim();}).filter(Boolean); var lbl = parts.length>=2 ? parts.slice(-2).join(" — ") : (parts[0]||city); lbl = lbl.replace(/\s*\d{4,}\s*/g," ").replace(/\s*—\s*/," — ").trim(); if(/airport|king khalid/i.test(lbl)) return "King Khalid Airport — Riyadh"; return lbl; }
   function scope(list, bidsByReq, nameEn){
     var bidsReceived=0, withBids=0, gmv=0, units=0, speeds=[], byEq={};
     list.forEach(function(r){
