@@ -223,14 +223,14 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   if (s(prof.sasoHeavyEquipDocKey) && !held.includes("SASO")) held.push("SASO");
   if (s(prof.localContentDocKey) && !held.includes("LC")) held.push("LC");
   const eqVerified = eq ? eq.verificationStatus === "VERIFIED" || eq.isVerified === true || eq.verified === true : false;
-  // A verified supplier passed company verification, which requires CR / VAT / national address on
-  // file — so those docs exist even when this bid payload doesn't project the raw values.
   const supVerified = sup.supplierStatus === 2 || prof.verified === true;
-  // Presence check across the field-name variants the backend may use (then OR the verified gate).
-  const anyVal = (...keys: string[]) => keys.some((k) => !!s(prof[k]) || !!s((sup as Record<string, unknown>)[k]));
-  const hasCr = anyVal("crNumber", "commercialRegistrationNumber", "commercialRegistration", "registrationNumber", "cr") || supVerified;
-  const hasVat = anyVal("vatNumber", "vat", "taxNumber", "taxRegistrationNumber", "taxId") || supVerified;
-  const hasNationalAddr = anyVal("shortAddress", "postalCode", "buildingNumber", "companyAddress", "nationalAddress", "address", "district") || supVerified;
+  // App parity (counterparty_identity_row): a company doc is "held" only when the supplier ACTUALLY
+  // uploaded it in their verification submission — check the document keys that submission stores
+  // (crDocKey / vatDocKey / nationalAddressDocKey), with the raw values as fallbacks. No static
+  // "verified ⇒ has all docs" assumption.
+  const hasCr = !!s(prof.crDocKey) || !!s(prof.crNumber) || !!s(prof.commercialRegistrationNumber);
+  const hasVat = !!s(prof.vatDocKey) || !!s(prof.vatNumber) || !!s(prof.taxNumber);
+  const hasNationalAddr = !!s(prof.nationalAddressDocKey) || !!s(prof.companyAddress) || !!s(prof.shortAddress) || !!s(prof.postalCode) || !!s(prof.buildingNumber);
   const requiredCerts = certList((raw.request as Record<string, unknown> | undefined)?.requiredCerts);
   const rq = (raw.request ?? {}) as Record<string, unknown>;
   const rqItem = (Array.isArray(rq.equipmentItems) ? (rq.equipmentItems as Record<string, unknown>[]) : [])[0] ?? {};
