@@ -571,8 +571,7 @@
     D.all = ALL; // aggregate KPIs stay mock
     ORDER.length=0;
     names.forEach(function(nm,i){ var tpl=TEMPLATES[i%TEMPLATES.length]; var pk="p"+i; D[pk]=Object.assign({}, tpl, { nameEn:nm, nameAr:nm, officer: OFFICERS[i%OFFICERS.length] }); ORDER.push(pk); });
-    // Global assistant findings aligned to the real project names (one per project).
-    D.all.ins = ORDER.map(function(pk){ var d=D[pk]; var ins=(d.ins&&d.ins[0])||["save","Insight",d.nameEn,""]; return [ins[0], ins[1], d.nameEn+" — "+ins[2], ins[3]]; }).slice(0,6);
+    // Global assistant keeps the prototype's rich findings (D.all = ALL already carries ALL.ins).
     var pt=document.querySelector(".ptabs");
     if(pt){ pt.innerHTML = '<div class="ptab on" data-proj="all" onclick="selectProject(\'all\')"><span class="material-icons-outlined">grid_view</span>'+t("All projects","كل المشاريع")+'</div>' + ORDER.map(function(pk){ return '<div class="ptab" data-proj="'+pk+'" onclick="selectProject(\''+pk+'\')">'+D[pk].nameEn+'</div>'; }).join(""); }
 
@@ -582,8 +581,9 @@
       var n = GINS.length;
       document.getElementById("fabBadge").textContent = n;
       document.getElementById("drawerScope").textContent = t("Across all projects · "+n+" finding"+(n===1?"":"s"), "عبر كل المشاريع · "+n+" ملاحظة");
+      var np = ORDER.length;
       var h = '<div class="msg"><div class="av-m"><span class="material-icons-outlined">auto_awesome</span></div><div class="bubble">'
-        + (n ? t("Here's what stands out across all your projects:","إليك ما يبرز عبر كل مشاريعك:") : t("Nothing flagged across your projects.","لا ملاحظات عبر مشاريعك."))
+        + (n ? t("Across your "+np+" project"+(np===1?"":"s")+" I found "+n+" thing"+(n===1?"":"s")+" worth your attention today:","عبر "+np+" مشاريع وجدت "+n+" ملاحظة تستحق انتباهك اليوم:") : t("Nothing flagged across your projects.","لا ملاحظات عبر مشاريعك."))
         + '</div></div>';
       GINS.forEach(function(i){ h += '<div class="ins '+i[0]+'"><span class="ins-tag">'+i[1]+'</span><b>'+i[2]+'</b><p>'+i[3]+'</p></div>'; });
       document.getElementById("chatBody").innerHTML = h;

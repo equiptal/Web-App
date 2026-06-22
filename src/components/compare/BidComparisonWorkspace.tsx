@@ -468,9 +468,6 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
     if (agentLive) return <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: C.successBg, color: C.success }}><span className="h-2 w-2 rounded-full" style={{ background: C.success }} />{L("AI assistant · live", "المساعد الذكي · متصل")}{conf != null ? ` · ${conf}%` : ""}</span>;
     return <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: C.surface3, color: C.muted }}><span className="h-2 w-2 rounded-full" style={{ background: C.muted }} />{L("AI assistant · offline", "المساعد · غير متصل")}</span>;
   };
-  // Documents sub-label — names only the docs your request actually requires (drives which cells can go red).
-  const docReqs = (cols[0]?.bid.requiredCerts ?? []).filter((x) => x === "LC" || x === "SASO").map(certLabel);
-  const docReqSub = docReqs.length ? `${docReqs.join(" · ")} ${L("required", "مطلوبة")}` : L("none required", "لا متطلبات");
 
   return (
     <div className="space-y-4" style={{ color: C.navy }}>
@@ -881,21 +878,22 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
                       ))}
                     </tr>
                     <tr>
-                      <RowHead title={L("Business documents", "المستندات التجارية")} sub={docReqSub} />
+                      <RowHead title={L("Business documents", "المستندات التجارية")} sub={L("company verification — held or not", "توثيق الشركة — متوفّر أو لا")} />
                       {cols.map((c) => {
                         const k = c.bid.compliance;
-                        // req = your request asked for it (LC / SASO are request certs). Others are informational only.
+                        // Company-verification docs always show (held ✓ or not ✗). LC/SASO are request certs —
+                        // show only when your request requires them (or the supplier holds them).
                         const docs = [
-                          { lbl: L("Local Content", "المحتوى المحلي"), has: k.localContent, req: c.bid.requiredCerts.includes("LC") },
-                          { lbl: "SASO", has: k.saso, req: c.bid.requiredCerts.includes("SASO") },
-                          { lbl: L("Activity license", "رخصة النشاط"), has: k.activityLicense, req: false },
-                          { lbl: L("Tax number", "الرقم الضريبي"), has: k.taxNumber, req: false },
-                          { lbl: L("National address", "العنوان الوطني"), has: k.nationalAddress, req: false },
-                        ].filter((d) => d.has || d.req); // show held docs + required-missing; hide irrelevant absent ones
+                          { lbl: L("Commercial registration", "السجل التجاري"), has: k.activityLicense, req: false, always: true },
+                          { lbl: L("VAT number", "الرقم الضريبي"), has: k.taxNumber, req: false, always: true },
+                          { lbl: L("National address", "العنوان الوطني"), has: k.nationalAddress, req: false, always: true },
+                          { lbl: L("Local Content", "المحتوى المحلي"), has: k.localContent, req: c.bid.requiredCerts.includes("LC"), always: false },
+                          { lbl: "SASO", has: k.saso, req: c.bid.requiredCerts.includes("SASO"), always: false },
+                        ].filter((d) => d.always || d.has || d.req);
                         const missingRequired = docs.some((d) => d.req && !d.has);
                         return (
                           <Td key={c.bid.id} ok={!missingRequired} fail={missingRequired}>
-                            {docs.length ? <div className="flex flex-wrap gap-1.5">{docs.map((d) => <span key={d.lbl}>{incChip(d.lbl, d.has ? "y" : d.req ? "n" : "muted")}</span>)}</div> : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}
+                            {docs.length ? <div className="flex flex-wrap gap-1.5">{docs.map((d) => <span key={d.lbl}>{incChip(d.lbl, d.has ? "y" : d.req ? "n" : "muted", undefined, d.has ? "check" : "close")}</span>)}</div> : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}
                           </Td>
                         );
                       })}
