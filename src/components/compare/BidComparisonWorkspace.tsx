@@ -465,6 +465,11 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
       </span>
     );
   };
+  // Sub-label for a cert row = the request's actual required certs in that class ("TÜV required").
+  const certReqSub = (pick: CertCode[]) => {
+    const req = pick.filter((x) => cols.some((c) => c.bid.requiredCerts.includes(x)));
+    return req.length ? `${req.map(certLabel).join(" · ")} ${L("required", "مطلوبة")}` : L("none required", "غير مطلوبة");
+  };
   const presetDefs: [Preset, string, string, string][] = [
     ["best", "workspace_premium", "Best overall", "الأفضل إجمالاً"],
     ["lowest", "savings", "Lowest cost", "الأقل تكلفة"],
@@ -880,15 +885,15 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
                   <SectionRow id="equip" icon="construction" title={L("Equipment", "المعدّة")} accent={C.supplier} accentText="#7BE0C2" n={cols.length} collapsed={collapsed.has("equip")} onToggle={() => toggleSection("equip")} />
                   {!collapsed.has("equip") && (<>
                     <tr>
-                      <RowHead title={L("Year", "سنة الصنع")} />
+                      <RowHead title={L("Year", "سنة الصنع")} sub={(() => { const my = cols[0]?.bid.reqMinYear; return my == null ? undefined : my >= 1990 ? `${L("min year", "أدنى سنة")} ${my}` : `${L("max age", "أقصى عمر")} ${my} ${L("yrs", "سنة")}`; })()} />
                       {cols.map((c) => { const yr = c.equipment.find((r) => r.key === "year"); const isNewest = (c.bid.equipment?.year ?? 0) > 0 && c.bid.equipment?.year === Math.max(...cols.map((x) => x.bid.equipment?.year ?? 0)); return <Td key={c.bid.id} ok={yr?.state !== "conflict"} fail={yr?.state === "conflict"}><span className="text-[13px] font-bold">{c.bid.equipment?.year ?? "—"}</span>{isNewest && cols.length > 1 && <Sub>{L("newest", "الأحدث")}</Sub>}</Td>; })}
                     </tr>
                     <tr>
                       <RowHead title={L("Distance to site", "المسافة للموقع")} />
                       {cols.map((c) => <Td key={c.bid.id} ok><span className="text-[13px] font-bold">{c.bid.distanceKm != null ? `${Math.round(c.bid.distanceKm)} ${L("km", "كم")}` : <span style={{ color: C.muted }}>—</span>}</span></Td>)}
                     </tr>
-                    <CertRow label={L("Equipment certificates", "شهادات المعدّة")} sub={L("required", "مطلوبة")} cols={cols} pick={EQUIP_CERTS} certLabel={certLabel} incChip={incChip} />
-                    <CertRow label={L("Operator certificates", "شهادات المشغّل")} sub={L("required", "مطلوبة")} cols={cols} pick={OPER_CERTS} certLabel={certLabel} incChip={incChip} />
+                    <CertRow label={L("Equipment certificates", "شهادات المعدّة")} sub={certReqSub(EQUIP_CERTS)} cols={cols} pick={EQUIP_CERTS} certLabel={certLabel} incChip={incChip} />
+                    <CertRow label={L("Operator certificates", "شهادات المشغّل")} sub={certReqSub(OPER_CERTS)} cols={cols} pick={OPER_CERTS} certLabel={certLabel} incChip={incChip} />
                   </>)}
 
                   {/* 🛡️ TRUST & DOCUMENTS */}
