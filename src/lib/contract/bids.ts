@@ -40,6 +40,20 @@ function certList(v: unknown): CertCode[] {
   }
   return out;
 }
+/**
+ * Equipment `documentKeys[].type` → cert, EXACT match only — so ownership docs (istimara, customs,
+ * sale_contract, saso_registration, saso_technical_inspection) are ignored, exactly like the backend's
+ * resolveHeldCerts (keeps LC/SASO/TUV/SPSP only). A loose /SASO/ test would wrongly treat
+ * `saso_registration`/`saso_technical_inspection` as a SASO cert.
+ */
+function eqDocTypeToCert(type: string): CertCode | null {
+  const t = type.trim().toLowerCase();
+  if (t === "tuv" || t === "tüv") return "TUV";
+  if (t === "spsp") return "SPSP";
+  if (t === "saso") return "SASO";
+  if (t === "lc" || t === "local_content") return "LC";
+  return null;
+}
 
 export interface BidCard {
   id: string;
@@ -257,7 +271,7 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   const eqDocs = (Array.isArray(eq?.documentKeys) ? eq!.documentKeys : Array.isArray(eq?.document_keys) ? eq!.document_keys : []) as unknown[];
   for (const d of eqDocs) {
     const dk = d as Record<string, unknown>;
-    const c = toCert(String((typeof d === "string" ? d : (dk.type ?? dk.key ?? dk.code)) ?? ""));
+    const c = eqDocTypeToCert(String((typeof d === "string" ? d : (dk.type ?? dk.code ?? "")) ?? ""));
     if (c && !held.includes(c)) held.push(c);
   }
   const eqVerified = eq ? eq.verificationStatus === "VERIFIED" || eq.isVerified === true || eq.verified === true : false;
