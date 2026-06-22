@@ -429,6 +429,14 @@
     var sb = document.querySelector(".submit-bar"); if(sb) sb.hidden = true;
     var se = document.getElementById("submitErr"); if(se) se.hidden = true;
     if(submitted){
+      // Fill the supplier's submitted figures so the read-only view shows a real, priced bid.
+      var supplier = qs.get("supplier") || "alnajm";
+      var rate = supplier === "gulf" ? 14000 : 15000; // monthly rate this supplier quoted
+      document.querySelectorAll("#view-form input.ptbl-in").forEach(function(inp){
+        var id = inp.id || "";
+        inp.value = /^rate-/.test(id) ? String(rate) : "500"; // rental rate vs delivery/return trip
+      });
+      if(typeof recompute === "function") recompute();
       // Frame it as the supplier's submission, not a live form.
       var cd = document.querySelector(".countdown"); if(cd) cd.hidden = true;
       var h1 = document.querySelector("#view-form .intro h1"); if(h1){ h1.setAttribute("data-en","Submitted bid"); h1.setAttribute("data-ar","العرض المُقدَّم"); h1.textContent = (lang==="ar"?"العرض المُقدَّم":"Submitted bid"); }
