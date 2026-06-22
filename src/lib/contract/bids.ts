@@ -147,6 +147,19 @@ const n = (v: unknown): number | null => {
   return typeof x === "number" && !Number.isNaN(x) ? x : null;
 };
 const s = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v : null);
+/** First present number across several candidate keys (camelCase + snake_case payloads). */
+const pickNum = (o: Record<string, unknown>, ...keys: string[]): number | null => {
+  for (const k of keys) { const x = n(o[k]); if (x != null) return x; }
+  return null;
+};
+/** Great-circle distance in km between two lat/lng points; null if either is missing. */
+function haversineKm(aLat: number | null, aLng: number | null, bLat: number | null, bLng: number | null): number | null {
+  if (aLat == null || aLng == null || bLat == null || bLng == null) return null;
+  const R = 6371, toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(bLat - aLat), dLng = toRad(bLng - aLng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
 /** Normalize a term key for fuzzy matching across the request, deal-room, and Terms-modal vocabularies. */
 const normKey = (k: string) => k.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -217,22 +230,30 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   const eq = (raw.equipment ?? null) as Record<string, unknown> | null;
   const certs = (sup.certs ?? {}) as { TUV?: boolean; SASO?: boolean; SPSP?: boolean };
   const heldCerts = Array.isArray(sup.heldCerts) ? (sup.heldCerts as string[]) : [];
-  // Supplier's held certs (app parity): heldCerts list ∪ certs flags ∪ profile doc keys.
+  // Supplier's held certs (app parity): heldCerts list ∪ certs flags ∪ profile doc keys ∪ the
+  // EQUIPMENT listing's document_keys (TÜV/SASO live on equipment_listings.document_keys = [{key,type}]).
   const held = certList(heldCerts);
   if (certs.TUV && !held.includes("TUV")) held.push("TUV");
   if (certs.SASO && !held.includes("SASO")) held.push("SASO");
   if (certs.SPSP && !held.includes("SPSP")) held.push("SPSP");
-  if (s(prof.sasoHeavyEquipDocKey) && !held.includes("SASO")) held.push("SASO");
-  if (s(prof.localContentDocKey) && !held.includes("LC")) held.push("LC");
+  if ((s(prof.sasoHeavyEquipDocKey) || s(prof.saso_heavy_equip_doc_key)) && !held.includes("SASO")) held.push("SASO");
+  if ((s(prof.localContentDocKey) || s(prof.local_content_doc_key)) && !held.includes("LC")) held.push("LC");
+  // Equipment-level certs: equipment_listings.document_keys = [{ key, type }] (type = tuv/saso/spsp/lc).
+  const eqDocs = (Array.isArray(eq?.documentKeys) ? eq!.documentKeys : Array.isArray(eq?.document_keys) ? eq!.document_keys : []) as unknown[];
+  for (const d of eqDocs) {
+    const dk = d as Record<string, unknown>;
+    const c = toCert(String((typeof d === "string" ? d : (dk.type ?? dk.key ?? dk.code)) ?? ""));
+    if (c && !held.includes(c)) held.push(c);
+  }
   const eqVerified = eq ? eq.verificationStatus === "VERIFIED" || eq.isVerified === true || eq.verified === true : false;
   const supVerified = sup.supplierStatus === 2 || prof.verified === true;
   // App parity (counterparty_identity_row): a company doc is "held" only when the supplier ACTUALLY
   // uploaded it in their verification submission — check the document keys that submission stores
   // (crDocKey / vatDocKey / nationalAddressDocKey), with the raw values as fallbacks. No static
   // "verified ⇒ has all docs" assumption.
-  const hasCr = !!s(prof.crDocKey) || !!s(prof.crNumber) || !!s(prof.commercialRegistrationNumber);
-  const hasVat = !!s(prof.vatDocKey) || !!s(prof.vatNumber) || !!s(prof.taxNumber);
-  const hasNationalAddr = !!s(prof.nationalAddressDocKey) || !!s(prof.companyAddress) || !!s(prof.shortAddress) || !!s(prof.postalCode) || !!s(prof.buildingNumber);
+  const hasCr = !!s(prof.crDocKey) || !!s(prof.cr_doc_key) || !!s(prof.crNumber) || !!s(prof.commercialRegistrationNumber);
+  const hasVat = !!s(prof.vatDocKey) || !!s(prof.vat_doc_key) || !!s(prof.vatNumber) || !!s(prof.taxNumber);
+  const hasNationalAddr = !!s(prof.nationalAddressDocKey) || !!s(prof.national_address_doc_key) || !!s(prof.companyAddress) || !!s(prof.shortAddress) || !!s(prof.postalCode) || !!s(prof.buildingNumber);
   const requiredCerts = certList((raw.request as Record<string, unknown> | undefined)?.requiredCerts);
   const rq = (raw.request ?? {}) as Record<string, unknown>;
   const rqItem = (Array.isArray(rq.equipmentItems) ? (rq.equipmentItems as Record<string, unknown>[]) : [])[0] ?? {};
@@ -246,6 +267,15 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   const unreadTerms = (Array.isArray(raw.unreadTerms) ? (raw.unreadTerms as unknown[]) : []).map(String);
   const pm = (raw.progressMeter ?? {}) as Record<string, unknown>;
   const progress = { agreed: n(pm.agreed) ?? 0, total: n(pm.total) ?? 0 };
+  // Distance: use a server-computed value if present, else derive it from the bid's equipment
+  // coordinates (bids.equipment_lat/lng) vs the request's project location. Null → "—" (no location).
+  const eqObj = (eq ?? {}) as Record<string, unknown>;
+  const bidLat = pickNum(raw, "equipmentLat", "equipment_lat", "bidLat", "lat") ?? pickNum(eqObj, "lat", "latitude");
+  const bidLng = pickNum(raw, "equipmentLng", "equipment_lng", "bidLng", "lng") ?? pickNum(eqObj, "lng", "longitude");
+  const reqLat = pickNum(rq, "projectLat", "project_lat", "lat");
+  const reqLng = pickNum(rq, "projectLng", "project_lng", "lng");
+  const distanceKm = n(raw.distanceKm) ?? haversineKm(bidLat, bidLng, reqLat, reqLng);
+
   const lockedKeys = new Set(lockedTerms.map((t) => normKey(t.key)));
   const unreadKeys = new Set(unreadTerms.map(normKey));
   const lockedVal = (pred: (k: string) => boolean): string | null => {
@@ -273,7 +303,7 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     supplierName: s(raw.supplierDisplayName) ?? s(sup.companyName) ?? ([s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" ") || "Supplier"),
     verified: supVerified,
     rating: n(sup.rating) ?? n(prof.rating),
-    distanceKm: n(raw.distanceKm),
+    distanceKm,
     submittedAt: s(raw.createdAt),
     validUntil: s(raw.validUntil),
     price: n(raw.currentPrice) ?? n(raw.priceAmount),
