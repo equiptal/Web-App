@@ -16,9 +16,6 @@
 import { useEffect, useState } from "react";
 import type { BidCard } from "@/lib/contract/bids";
 
-/** Renter id the demo is wired for (the test account on staging). */
-const MOCK_USER_IDS = new Set(["896"]);
-
 /** Shared-link tracker stat for the request detail strip (illustrative). */
 export interface SharedLinkStats {
   opened: number;
@@ -44,38 +41,17 @@ function hostIsStaging(): boolean {
   return /staging|localhost|127\.0\.0\.1/.test(h);
 }
 
-/** True when the shared-link demo mock should be shown for this user (staging-only). */
-export function sharedLinkMockEnabled(userId: string | null): boolean {
-  if (!hostIsStaging()) return false;
-  if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("mocklink") === "1") return true;
-  return !!userId && MOCK_USER_IDS.has(userId);
+/** True when the shared-link demo mock should be shown: ON for everyone on staging (or ?mocklink=1),
+ *  OFF on production. (No per-user gate — the demo should be visible to whoever is testing staging.) */
+export function sharedLinkMockEnabled(): boolean {
+  if (hostIsStaging()) return true;
+  return typeof window !== "undefined" && new URLSearchParams(window.location.search).get("mocklink") === "1";
 }
 
-/**
- * Resolve once whether the mock is on: checks the staging host, then `/api/me` for the user id.
- * Returns false on prod without a network call (the host gate short-circuits).
- */
+/** Resolve once whether the demo mock is on (staging host or ?mocklink=1). No network call. */
 export function useSharedLinkMock(): boolean {
   const [enabled, setEnabled] = useState(false);
-  useEffect(() => {
-    if (!hostIsStaging()) return;
-    // ?mocklink=1 forces it on without needing the test account.
-    if (new URLSearchParams(window.location.search).get("mocklink") === "1") {
-      setEnabled(true);
-      return;
-    }
-    let active = true;
-    fetch("/api/me", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { user?: { id?: number | string } } | null) => {
-        const id = d?.user?.id != null ? String(d.user.id) : null;
-        if (active) setEnabled(sharedLinkMockEnabled(id));
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, []);
+  useEffect(() => { setEnabled(sharedLinkMockEnabled()); }, []);
   return enabled;
 }
 
