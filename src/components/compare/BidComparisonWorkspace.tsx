@@ -9,6 +9,7 @@ import { CERT_LABEL, type BidCard, type CertCode } from "@/lib/contract/bids";
 import { buildItemComparison, sortByPreset, type BidColumn, type Preset, type CostResponsibility } from "@/lib/contract/comparison";
 import { bidColumnToComputed, normalizedBidToBidCard, presetToAgent, type RecommendResult } from "@/lib/contract/agent-bids";
 import { EquipImg } from "@/components/requests/EquipImg";
+import { useSharedLinkMock, tagSharedLinkBids } from "@/lib/mock/shared-link-bids";
 
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
 
@@ -63,6 +64,7 @@ export function BidComparisonWorkspace() {
   const [activeItem, setActiveItem] = useState<string | null>(null);
   const [bids, setBids] = useState<BidCard[] | null>(null);
   const [bidsLoading, setBidsLoading] = useState(false);
+  const mockEnabled = useSharedLinkMock(); // staging demo: label one bid "via shared link"
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [preset, setPreset] = useState<Preset>("best");
   const [busy, setBusy] = useState(false);
@@ -168,7 +170,12 @@ export function BidComparisonWorkspace() {
   }, [activeItem]);
 
   const reqDurationDays = items.find((i) => i.id === activeItem)?.durationDays ?? null;
-  const raw = useMemo<BidCard[] | null>(() => (bids ? [...bids, ...uploaded] : null), [bids, uploaded]);
+  // Staging demo: tag the first real bid as off-platform "via shared link" (rest = via Moedatech app).
+  const raw = useMemo<BidCard[] | null>(() => {
+    if (!bids) return null;
+    const tagged = mockEnabled ? tagSharedLinkBids(bids, 1) : bids;
+    return [...tagged, ...uploaded];
+  }, [bids, uploaded, mockEnabled]);
   const comparison = useMemo(() => (raw ? buildItemComparison(raw, { renterCosts, requestDurationDays: reqDurationDays }) : null), [raw, renterCosts, reqDurationDays]);
   useEffect(() => {
     if (!comparison) return;
@@ -750,8 +757,9 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
                             </div>
                             <div className="min-w-0 flex-1">
                               <b className="block text-[14px] leading-tight" style={{ color: C.navy }}>{c.bid.supplierName}</b>
-                              <span className="mt-0.5 inline-flex items-center gap-1 text-[10.5px] font-bold" style={{ color: C.muted }}>
-                                <span className="material-icons-outlined" style={{ fontSize: 13 }}>{isUpload ? "description" : "smartphone"}</span>{isUpload ? L("From uploaded file", "من ملف مرفوع") : L("App bid", "عرض من التطبيق")}
+                              <span className="mt-0.5 inline-flex items-center gap-1 text-[10.5px] font-bold" style={{ color: c.bid.viaSharedLink ? C.action : C.muted }}>
+                                <span className="material-icons-outlined" style={{ fontSize: 13 }}>{isUpload ? "description" : c.bid.viaSharedLink ? "link" : "smartphone"}</span>
+                                {isUpload ? L("From uploaded file", "من ملف مرفوع") : c.bid.viaSharedLink ? L("via shared link", "عبر الرابط") : L("via Moedatech app", "عبر تطبيق معداتك")}
                               </span>
                             </div>
                             {/* remove this bid from the comparison (same as un-ticking it in the selector) */}
