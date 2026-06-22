@@ -485,7 +485,7 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
   };
 
   return (
-    <div className="space-y-4" style={{ color: C.navy }}>
+    <div className={`space-y-4 transition-[margin] duration-200 ${chatOpen ? "md:me-[412px]" : ""}`} style={{ color: C.navy }}>
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-[13px] font-bold" style={{ color: C.muted }}>
         <button onClick={() => router.push("/requests")} className="hover:underline">{L("Requests", "الطلبات")}</button>
@@ -640,7 +640,7 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
           </button>
           {chatOpen && (
             <>
-              <div className="fixed inset-0 z-40" style={{ background: "rgba(28,53,80,.4)" }} onClick={() => setChatOpen(false)} />
+              <div className="fixed inset-0 z-40 md:hidden" style={{ background: "rgba(28,53,80,.4)" }} onClick={() => setChatOpen(false)} />
               <div className="fixed inset-y-0 z-50 flex w-[400px] max-w-full flex-col bg-white" style={{ insetInlineEnd: 0, boxShadow: "-10px 0 40px rgba(28,53,80,.25)" }}>
                 <div className="flex items-start gap-2.5 px-4 py-4 text-white" style={{ background: `linear-gradient(150deg,${C.navy},${C.navyDeep})` }}>
                   <div className="grid h-9 w-9 flex-none place-items-center rounded-lg" style={{ background: `linear-gradient(135deg,${C.action},#FFA733)` }}><span className="material-icons-outlined" style={{ fontSize: 21 }}>auto_awesome</span></div>
