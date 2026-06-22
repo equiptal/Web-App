@@ -227,6 +227,11 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
 function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   const sup = (raw.supplier ?? {}) as Record<string, unknown>;
   const prof = (sup.supplierProfile ?? {}) as Record<string, unknown>;
+  // The company-verification docs (CR/VAT/national address) can hang off several shapes depending on
+  // the projection — scan every plausible profile object so we read them wherever they live.
+  const profSources = [prof, sup, sup.profile, sup.company, sup.companyProfile, raw.supplierProfile, raw.profile]
+    .filter((o): o is Record<string, unknown> => !!o && typeof o === "object");
+  const docKey = (...keys: string[]) => profSources.some((o) => keys.some((k) => !!s(o[k])));
   const eq = (raw.equipment ?? null) as Record<string, unknown> | null;
   const certs = (sup.certs ?? {}) as { TUV?: boolean; SASO?: boolean; SPSP?: boolean };
   const heldCerts = Array.isArray(sup.heldCerts) ? (sup.heldCerts as string[]) : [];
@@ -236,8 +241,8 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   if (certs.TUV && !held.includes("TUV")) held.push("TUV");
   if (certs.SASO && !held.includes("SASO")) held.push("SASO");
   if (certs.SPSP && !held.includes("SPSP")) held.push("SPSP");
-  if ((s(prof.sasoHeavyEquipDocKey) || s(prof.saso_heavy_equip_doc_key)) && !held.includes("SASO")) held.push("SASO");
-  if ((s(prof.localContentDocKey) || s(prof.local_content_doc_key)) && !held.includes("LC")) held.push("LC");
+  if (docKey("sasoHeavyEquipDocKey", "saso_heavy_equip_doc_key") && !held.includes("SASO")) held.push("SASO");
+  if (docKey("localContentDocKey", "local_content_doc_key") && !held.includes("LC")) held.push("LC");
   // Equipment-level certs: equipment_listings.document_keys = [{ key, type }] (type = tuv/saso/spsp/lc).
   const eqDocs = (Array.isArray(eq?.documentKeys) ? eq!.documentKeys : Array.isArray(eq?.document_keys) ? eq!.document_keys : []) as unknown[];
   for (const d of eqDocs) {
@@ -251,9 +256,9 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   // uploaded it in their verification submission — check the document keys that submission stores
   // (crDocKey / vatDocKey / nationalAddressDocKey), with the raw values as fallbacks. No static
   // "verified ⇒ has all docs" assumption.
-  const hasCr = !!s(prof.crDocKey) || !!s(prof.cr_doc_key) || !!s(prof.crNumber) || !!s(prof.commercialRegistrationNumber);
-  const hasVat = !!s(prof.vatDocKey) || !!s(prof.vat_doc_key) || !!s(prof.vatNumber) || !!s(prof.taxNumber);
-  const hasNationalAddr = !!s(prof.nationalAddressDocKey) || !!s(prof.national_address_doc_key) || !!s(prof.companyAddress) || !!s(prof.shortAddress) || !!s(prof.postalCode) || !!s(prof.buildingNumber);
+  const hasCr = docKey("crDocKey", "cr_doc_key", "crNumber", "commercialRegistrationNumber", "commercial_registration_number", "crFileKey");
+  const hasVat = docKey("vatDocKey", "vat_doc_key", "vatNumber", "taxNumber", "tax_number", "vatFileKey");
+  const hasNationalAddr = docKey("nationalAddressDocKey", "national_address_doc_key", "companyAddress", "company_address", "shortAddress", "short_address", "postalCode", "postal_code", "buildingNumber", "building_number");
   const requiredCerts = certList((raw.request as Record<string, unknown> | undefined)?.requiredCerts);
   const rq = (raw.request ?? {}) as Record<string, unknown>;
   const rqItem = (Array.isArray(rq.equipmentItems) ? (rq.equipmentItems as Record<string, unknown>[]) : [])[0] ?? {};
@@ -323,8 +328,8 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
       taxNumber: hasVat,
       nationalAddress: hasNationalAddr,
       safety: certs.TUV === true || certs.SPSP === true || heldCerts.some((c) => /tuv|spsp|safety/i.test(c)),
-      saso: certs.SASO === true || !!s(prof.sasoHeavyEquipDocKey) || heldCerts.some((c) => /saso/i.test(c)),
-      localContent: !!s(prof.localContentDocKey) || heldCerts.some((c) => /local.?content/i.test(c)),
+      saso: certs.SASO === true || docKey("sasoHeavyEquipDocKey", "saso_heavy_equip_doc_key") || held.includes("SASO") || heldCerts.some((c) => /saso/i.test(c)),
+      localContent: docKey("localContentDocKey", "local_content_doc_key") || held.includes("LC") || heldCerts.some((c) => /local.?content/i.test(c)),
     },
     matchCount: n(raw.matchCount) ?? 0,
     conflictCount: n(raw.conflictCount) ?? 0,
