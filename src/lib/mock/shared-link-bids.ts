@@ -26,6 +26,18 @@ export interface SharedLinkStats {
 }
 export const SHARED_LINK_STATS: SharedLinkStats = { opened: 14, submitted: 3 };
 
+/**
+ * Per-project shared-link stats (deterministic mock): "submitted" scales with that project's bid
+ * count, "opened" is a larger derived number. Stable for a given key, but different across projects.
+ */
+export function sharedLinkStatsFor(key: string, bidCount = 0): SharedLinkStats {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  const submitted = bidCount > 0 ? Math.max(1, Math.min(bidCount, 1 + (h % 4))) : 1 + (h % 3);
+  const opened = submitted * (3 + (h % 4)) + (h % 7) + 2; // always > submitted
+  return { opened, submitted };
+}
+
 function hostIsStaging(): boolean {
   if (typeof window === "undefined") return false;
   const h = window.location.hostname.toLowerCase();

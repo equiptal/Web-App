@@ -8,7 +8,7 @@ import { publicTaxonomyUrl, type RequestItem, type RequestRecord } from "@/lib/c
 import { RequestBids } from "@/components/requests/RequestBids";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { LocationMap } from "@/components/requests/LocationMap";
-import { useSharedLinkMock, SHARED_LINK_STATS } from "@/lib/mock/shared-link-bids";
+import { useSharedLinkMock, sharedLinkStatsFor } from "@/lib/mock/shared-link-bids";
 import "@/components/requests/requests-proto.css";
 
 const STATUS_CLS: Record<string, string> = { OPEN: "st-open", ACTIVE: "st-active", ACCEPTED: "st-accepted", EXPIRED: "st-expired", CLOSED: "st-closed", ABANDONED: "st-closed" };
@@ -81,6 +81,7 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
   const item = r.equipmentItems?.[0];
   const period = r.startDate ? (r.endDate ? `${fmtDate(r.startDate, ar)} – ${fmtDate(r.endDate, ar)}` : fmtDate(r.startDate, ar)) : "—";
   const urgency = r.urgency === "ASAP" ? L("ASAP", "فوري") : r.urgency === "SOON" ? L("Soon", "قريباً") : L("Scheduled", "مجدول");
+  const linkStats = sharedLinkStatsFor(r.id, r.bidCount ?? 0); // per-request shared-link mock
 
   return (
     <div className="rproto" dir={ar ? "rtl" : "ltr"}>
@@ -97,8 +98,8 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
         <div className="rd-track">
           <span className="material-icons-outlined">link</span>
           <span className="rt-lbl">{L("Shared link", "الرابط المشترك")}</span>
-          <span className="rt-stat"><span className="material-icons-outlined">visibility</span><b>{SHARED_LINK_STATS.opened}</b> {L("opened", "فتحة")}</span>
-          <span className="rt-stat sub"><span className="material-icons-outlined">gavel</span><b>{SHARED_LINK_STATS.submitted}</b> {L("submitted", "عرض")}</span>
+          <span className="rt-stat"><span className="material-icons-outlined">visibility</span><b>{linkStats.opened}</b> {L("opened", "فتحة")}</span>
+          <span className="rt-stat sub"><span className="material-icons-outlined">gavel</span><b>{linkStats.submitted}</b> {L("submitted", "عرض")}</span>
           <button className="rt-copy" onClick={copyShareLink}>
             <span className="material-icons-outlined">{copied ? "check" : "content_copy"}</span>{copied ? L("Copied", "تم النسخ") : L("Copy link", "نسخ الرابط")}
           </button>
