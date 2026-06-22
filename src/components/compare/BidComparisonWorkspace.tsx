@@ -212,7 +212,9 @@ export function BidComparisonWorkspace() {
   // Displayed total = the supplier's STATED costs + 15% VAT + the renter's own entered costs (responsibilities
   // on them + their delivery estimate). Always shown as a running total of what's known — never "not stated".
   const VAT = 0.15;
-  const renterAddBid = (c: BidColumn) => c.costResponsibilities.reduce((s, x) => (x.renterCost && (x.bidSide === "me" || (x.bidSide == null && x.requestSide === "me")) ? s + x.renterCost : s), 0) + (renterMob[c.bid.id] ?? 0);
+  // A cost the renter adds counts toward their total unless the supplier already covers it (AC-12).
+  // (Matches the chips: you can only add a cost where bidSide !== "supplier".)
+  const renterAddBid = (c: BidColumn) => c.costResponsibilities.reduce((s, x) => (x.renterCost && x.bidSide !== "supplier" ? s + x.renterCost : s), 0) + (renterMob[c.bid.id] ?? 0);
   const supplierStated = (c: BidColumn) => (c.rental.stated ? c.rental.value : 0) + (c.mob.stated ? c.mob.value : 0) + (c.demob.stated ? c.demob.value : 0);
   const grandTotal = (c: BidColumn) => Math.round(supplierStated(c) * (1 + VAT)) + renterAddBid(c);
   const hasCost = (c: BidColumn) => supplierStated(c) > 0 || renterAddBid(c) > 0;

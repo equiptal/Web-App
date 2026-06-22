@@ -180,12 +180,12 @@ export function buildItemComparison(rawBids: BidCard[], opts: BuildOptions = {})
       const renterCost = opts.renterCosts?.[cr.key];
       return renterCost != null ? { ...cr, renterCost } : cr;
     });
-    // AC-12: a renter-entered cost adjusts the comparable total ONLY for a responsibility that lands
-    // on the renter for this bid (supplier-covered responsibilities aren't the renter's cost).
+    // AC-12: a renter-entered cost adjusts the comparable total unless the supplier already covers
+    // that responsibility (supplier-covered costs aren't the renter's). Unknown/own → counted, so a
+    // cost the renter explicitly adds always flows into the total — like the mob/demob estimate.
     const renterAdj = costResponsibilities.reduce((sum, cr) => {
       if (cr.renterCost == null) return sum;
-      const onRenter = cr.bidSide === "me" || (cr.bidSide == null && cr.requestSide === "me");
-      return onRenter ? sum + cr.renterCost : sum;
+      return cr.bidSide !== "supplier" ? sum + cr.renterCost : sum;
     }, 0);
     if (renterAdj > 0 && allIn.stated) allIn.value += renterAdj;
 
