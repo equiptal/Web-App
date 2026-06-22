@@ -176,7 +176,7 @@ export function BidComparisonWorkspace() {
   // Staging demo: tag the first real bid as off-platform "via shared link" (rest = via Moedatech app).
   const raw = useMemo<BidCard[] | null>(() => {
     if (!bids) return null;
-    const tagged = mockEnabled ? tagSharedLinkBids(bids, 1) : bids;
+    const tagged = mockEnabled ? tagSharedLinkBids(bids) : bids;
     return [...tagged, ...uploaded];
   }, [bids, uploaded, mockEnabled]);
   const comparison = useMemo(() => (raw ? buildItemComparison(raw, { renterCosts, requestDurationDays: reqDurationDays }) : null), [raw, renterCosts, reqDurationDays]);

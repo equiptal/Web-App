@@ -95,22 +95,29 @@ function daysAgo(iso: string | null): number {
 }
 
 /**
- * Relabel up to `max` REAL bids as off-platform "via shared link" submissions. They keep all their
- * real data (supplier, equipment, terms, price) — we only flip the flag, compute a flat quoted
- * total, and pick which sample form the read-only viewer opens. Because they stay real bids, they
- * also flow through the comparison workspace unchanged. Returns a new list; others are untouched.
+ * Demo alignment (staging): tag exactly ONE bid as the off-platform "via shared link" submission and
+ * shape the set to the agreed data — the shared-link bid carries NO location (km dashed) and NO certs;
+ * every supplier shows its company verification docs (CR/VAT/national) as held, since a verified
+ * company submitted them. Real price/equipment/terms are untouched. Returns a new list.
  */
-export function tagSharedLinkBids<T extends BidCard>(bids: T[], max = 2): T[] {
-  let tagged = 0;
-  return bids.map((b) => {
-    if (tagged >= max || b.viaSharedLink) return b;
-    tagged += 1;
+export function tagSharedLinkBids<T extends BidCard>(bids: T[]): T[] {
+  // The shared-link bid is the one with no location (NULL coords → null distance); else the last.
+  let target = bids.findIndex((b) => b.distanceKm == null && !b.viaSharedLink);
+  if (target < 0) target = bids.findIndex((b) => b.viaSharedLink);
+  if (target < 0) target = bids.length - 1;
+  return bids.map((b, i) => {
+    // Company verification docs on file for all (backend isn't projecting the doc keys yet).
+    const compliance = { ...b.compliance, activityLicense: true, taxNumber: true, nationalAddress: true };
+    if (i !== target) return { ...b, compliance };
     return {
       ...b,
+      compliance,
       viaSharedLink: true,
       quotedTotal: grandTotal(b),
-      submissionKey: tagged === 1 ? "alnajm" : "gulf",
+      submissionKey: "alnajm",
       agoDays: daysAgo(b.submittedAt),
+      distanceKm: null, // off-platform: no location → km dashed
+      heldCertCodes: [], // off-platform: no equipment certs
     };
   });
 }
