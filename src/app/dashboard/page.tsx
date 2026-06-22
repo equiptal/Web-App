@@ -15,8 +15,8 @@ export default function DashboardPage() {
       <iframe
         src={`/procurement-dashboard.html?embed=1&lang=${locale}`}
         title="Procurement Dashboard"
-        className="block w-full"
-        style={{ height: "calc(100vh - 62px)", border: 0 }}
+        className="block min-h-0 w-full flex-1"
+        style={{ border: 0 }}
       />
     </AppShell>
   );

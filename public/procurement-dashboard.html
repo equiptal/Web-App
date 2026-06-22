@@ -219,6 +219,8 @@
   /* Embedded mode (?embed=1): hide this page's own chrome — it lives inside the app's AppShell sidebar. */
   html.embedded .sidebar, html.embedded .appbar, html.embedded .botnav { display:none !important; }
   html.embedded .main { margin-inline-start:0 !important; }
+  html.embedded .page { padding-bottom:28px; }
+  html.embedded, html.embedded body { min-height:0; }
   html.embedded .ai-fab { position:fixed; }
 </style>
 </head>
