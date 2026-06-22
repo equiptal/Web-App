@@ -571,7 +571,13 @@
     D.all = ALL; // aggregate KPIs stay mock
     ORDER.length=0;
     names.forEach(function(nm,i){ var tpl=TEMPLATES[i%TEMPLATES.length]; var pk="p"+i; D[pk]=Object.assign({}, tpl, { nameEn:nm, nameAr:nm, officer: OFFICERS[i%OFFICERS.length] }); ORDER.push(pk); });
-    // Global assistant keeps the prototype's rich findings (D.all = ALL already carries ALL.ins).
+    // Global assistant — the prototype's rich findings (shown across all projects).
+    D.all.ins = [
+      ["buy", t("Buy vs rent","شراء أم إيجار"), t("Stop renting manlifts — buy 4 units","أوقف استئجار المناولات — اشترِ ٤ وحدات"), t("Rented 9 of 12 weeks across 3 projects · cumulative rent ≈ SAR 612k vs ~SAR 480k to own — payback ~7 months at current demand.","استُؤجرت ٩ من ١٢ أسبوعاً عبر ٣ مشاريع · الإيجار التراكمي ≈ ٦١٢ ألف ر.س مقابل ~٤٨٠ ألف للتملّك — الاسترداد ~٧ أشهر.")],
+      ["risk", t("Supply risk","مخاطر توريد"), t("Cranes at Diriyah Gate are single-source","الرافعات في بوابة الدرعية من مصدر وحيد"), t("Only 1 verified crane supplier responded in the last 4 Diriyah Gate requests. A second supplier de-risks the schedule — broaden the pool or pre-book.","ردّ مؤجّر رافعات موثّق واحد فقط في آخر ٤ طلبات. مؤجّر ثانٍ يقلّل المخاطر — وسّع القائمة أو احجز مسبقاً.")],
+      ["gap", t("Compliance gap","فجوة التزام"), t("22% of RFQs skipped a mandated supplier","٢٢٪ من الطلبات تخطّت مؤجّراً إلزامياً"), t("Mostly the Aramco Project (United Rentals left off 5 RFQs). Two officers are below the inclusion policy this month.","غالباً مشروع أرامكو (استُبعدت United Rentals من ٥ طلبات). مسؤولان تحت سياسة الإدراج هذا الشهر.")],
+      ["save", t("Savings","توفير"), t("Use idle PMV generators at Aramco","استخدم مولّدات PMV الخاملة في أرامكو"), t("6 PMV generators idle while the Aramco Project rents 5 externally. Shifting three saves SAR ~95k/month and lifts PMV utilization.","٦ مولّدات PMV خاملة بينما يستأجر مشروع أرامكو ٥ خارجياً. نقل ٣ يوفّر ~٩٥ ألف ر.س/شهر.")]
+    ];
     var pt=document.querySelector(".ptabs");
     if(pt){ pt.innerHTML = '<div class="ptab on" data-proj="all" onclick="selectProject(\'all\')"><span class="material-icons-outlined">grid_view</span>'+t("All projects","كل المشاريع")+'</div>' + ORDER.map(function(pk){ return '<div class="ptab" data-proj="'+pk+'" onclick="selectProject(\''+pk+'\')">'+D[pk].nameEn+'</div>'; }).join(""); }
 
