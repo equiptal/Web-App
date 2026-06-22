@@ -573,6 +573,31 @@
     gorder.forEach(function(key,i){ var pk="p"+i; D[pk]=scope(groups[key].reqs, bidsByReq, key); D[pk].officer = OFFICERS[i % OFFICERS.length]; ORDER.push(pk); });
     var pt=document.querySelector(".ptabs");
     if(pt){ pt.innerHTML = '<div class="ptab on" data-proj="all" onclick="selectProject(\'all\')"><span class="material-icons-outlined">grid_view</span>'+t("All projects","كل المشاريع")+'</div>' + ORDER.map(function(pk){ return '<div class="ptab" data-proj="'+pk+'" onclick="selectProject(\''+pk+'\')">'+D[pk].nameEn+'</div>'; }).join(""); }
+
+    // One global assistant — same findings/answers from any project tab (overrides the per-project chat).
+    var GINS = D.all.ins;
+    renderChat = function(){
+      var n = GINS.length;
+      document.getElementById("fabBadge").textContent = n;
+      document.getElementById("drawerScope").textContent = t("Across all projects · "+n+" finding"+(n===1?"":"s"), "عبر كل المشاريع · "+n+" ملاحظة");
+      var h = '<div class="msg"><div class="av-m"><span class="material-icons-outlined">auto_awesome</span></div><div class="bubble">'
+        + (n ? t("Here's what stands out across all your projects:","إليك ما يبرز عبر كل مشاريعك:") : t("Nothing flagged across your projects.","لا ملاحظات عبر مشاريعك."))
+        + '</div></div>';
+      GINS.forEach(function(i){ h += '<div class="ins '+i[0]+'"><span class="ins-tag">'+i[1]+'</span><b>'+i[2]+'</b><p>'+i[3]+'</p></div>'; });
+      document.getElementById("chatBody").innerHTML = h;
+    };
+    askQuick = function(kind){
+      var map = { buy:t("Buy or rent?","شراء أم إيجار؟"), risk:t("Any supply risk?","مخاطر توريد؟"), save:t("Where can I save?","أين أوفّر؟") };
+      addMsg("user", map[kind] || kind);
+      var found = GINS.find(function(i){ return (kind==="buy"&&i[0]==="buy") || (kind==="risk"&&(i[0]==="risk"||i[0]==="gap")) || (kind==="save"&&i[0]==="save"); });
+      var reply = found ? (found[2]+" — "+found[3]) : t("Nothing flagged across your projects on that.","لا شيء بهذا الخصوص عبر مشاريعك.");
+      setTimeout(function(){ addMsg("mansour", reply); }, 260);
+    };
+    sendChat = function(){
+      var inp=document.getElementById("chatInput"); var v=inp.value.trim(); if(!v) return; addMsg("user", v); inp.value="";
+      setTimeout(function(){ addMsg("mansour", t("Looking across all your projects' demand, spend & supply…","أنظر في الطلب والإنفاق والتوريد عبر كل مشاريعك…")); }, 260);
+    };
+
     curProj="all";
     render();
   }catch(e){ /* keep sample data on any failure */ }
