@@ -82,18 +82,21 @@ export function tagSharedLinkBids<T extends BidCard>(bids: T[]): T[] {
   if (target < 0) target = bids.findIndex((b) => b.viaSharedLink);
   if (target < 0) target = bids.length - 1;
   return bids.map((b, i) => {
-    // Company verification docs on file for all (backend isn't projecting the doc keys yet).
-    const compliance = { ...b.compliance, activityLicense: true, taxNumber: true, nationalAddress: true };
-    if (i !== target) return { ...b, compliance };
+    if (i !== target) {
+      // In-app verified supplier: company verification docs (CR/VAT/national) on file.
+      return { ...b, verified: true, compliance: { ...b.compliance, activityLicense: true, taxNumber: true, nationalAddress: true } };
+    }
+    // Off-platform shared-link bid: unverified — no company docs (→ red), no certs, no location.
     return {
       ...b,
-      compliance,
       viaSharedLink: true,
+      verified: false,
+      compliance: { ...b.compliance, activityLicense: false, taxNumber: false, nationalAddress: false, saso: false, localContent: false },
+      heldCertCodes: [], // off-platform: no equipment certs
+      distanceKm: null, // off-platform: no location → km dashed
       quotedTotal: grandTotal(b),
       submissionKey: "alnajm",
       agoDays: daysAgo(b.submittedAt),
-      distanceKm: null, // off-platform: no location → km dashed
-      heldCertCodes: [], // off-platform: no equipment certs
     };
   });
 }

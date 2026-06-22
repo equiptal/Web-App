@@ -923,10 +923,11 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
                           { lbl: L("Local Content", "المحتوى المحلي"), has: k.localContent, req: c.bid.requiredCerts.includes("LC"), always: false },
                           { lbl: "SASO", has: k.saso, req: c.bid.requiredCerts.includes("SASO"), always: false },
                         ].filter((d) => d.always || d.has || d.req);
-                        const missingRequired = docs.some((d) => d.req && !d.has);
+                        // A company-verification doc (CR/VAT/national) or a required cert that's missing → red.
+                        const anyMissing = docs.some((d) => (d.always || d.req) && !d.has);
                         return (
-                          <Td key={c.bid.id} ok={!missingRequired} fail={missingRequired}>
-                            {docs.length ? <div className="flex flex-wrap gap-1.5">{docs.map((d) => <span key={d.lbl}>{incChip(d.lbl, d.has ? "y" : d.req ? "n" : "muted", undefined, d.has ? "check" : "close")}</span>)}</div> : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}
+                          <Td key={c.bid.id} ok={!anyMissing} fail={anyMissing}>
+                            {docs.length ? <div className="flex flex-wrap gap-1.5">{docs.map((d) => <span key={d.lbl}>{incChip(d.lbl, d.has ? "y" : "n", undefined, d.has ? "check" : "close")}</span>)}</div> : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}
                           </Td>
                         );
                       })}
