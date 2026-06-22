@@ -236,7 +236,7 @@ export function groupRequests(items: RequestListItem[]): RequestGroup[] {
     const first = groupItems[0];
     const address = first.city; // RequestListItem.city holds the full project address label
     const { city, neighbourhood } = parseAddress(address);
-    const locationLabel = city ? (neighbourhood ? `${city} — ${neighbourhood}` : city) : (address ?? "—");
+    const locationLabel = prettyLocation(city ? (neighbourhood ? `${city} — ${neighbourhood}` : city) : (address ?? "—"));
     const statuses = [...new Set(groupItems.map((i) => i.status))];
     return {
       id: first.requestGroupId ?? first.id,
@@ -253,6 +253,11 @@ export function groupRequests(items: RequestListItem[]): RequestGroup[] {
       asap: groupItems.some((i) => i.urgency === "ASAP"),
     };
   });
+}
+
+/** Demo label fix: show the airport project by its real name ("Airport" → "King Khalid Airport"). */
+export function prettyLocation(s: string): string {
+  return /king\s*khalid/i.test(s) ? s : s.replace(/\bairport\b/gi, "King Khalid Airport");
 }
 
 /** Demo ordering: pin the Airport project's group(s) to the front, keeping the rest in order. */
