@@ -306,6 +306,15 @@ export function BidComparisonWorkspace() {
     setCostInput("");
     setCostAsk({ type: "mob", bidId, label });
   }
+  // Undo a renter-entered estimate → back to the supplier-only view.
+  function removeCost(key: CostResponsibility["key"]) {
+    setRenterCosts((p) => { const n = { ...p }; delete n[key]; return n; });
+    toast(L("Removed your estimate", "أُزيل تقديرك"));
+  }
+  function removeMobCost(bidId: string) {
+    setRenterMob((p) => { const n = { ...p }; delete n[bidId]; return n; });
+    toast(L("Removed your estimate", "أُزيل تقديرك"));
+  }
   function submitCost() {
     if (!costAsk) return;
     const n = parseInt(costInput.replace(/[^0-9]/g, ""), 10);
@@ -431,14 +440,18 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
   if (!locations.length) return <Box>{L("No requests to compare yet.", "لا توجد طلبات للمقارنة بعد.")}</Box>;
 
   /* ── small renderers ── */
-  const incChip = (label: string, kind: "y" | "n" | "muted", onAdd?: () => void, icon?: string) => {
+  const incChip = (label: string, kind: "y" | "n" | "muted", onAdd?: () => void, icon?: string, value?: number, onRemove?: () => void) => {
     const bg = kind === "y" ? C.successBg : kind === "n" ? C.dangerBg : C.surface3;
     const fg = kind === "y" ? C.success : kind === "n" ? C.danger : C.muted;
+    const entered = value != null;
     return (
       <span className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold" style={{ background: bg, color: fg }}>
         {icon && <span className="material-icons-outlined" style={{ fontSize: 13 }}>{icon}</span>}
         {label}
-        {onAdd && <button onClick={onAdd} className="inline-flex items-center gap-0.5 rounded-full border px-1.5 text-[9.5px] font-extrabold" style={{ color: C.rentee, borderColor: "rgba(37,99,235,.4)", background: "#fff" }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>add</span>{L("cost", "تكلفة")}</button>}
+        {entered && <span style={{ color: C.rentee }}>· {sar} {nf(value!)}</span>}
+        {entered && onRemove ? (
+          <button onClick={onRemove} title={L("Remove your estimate", "إزالة تقديرك")} className="grid h-4 w-4 place-items-center rounded-full" style={{ background: "#fff", color: C.muted, border: "1px solid rgba(37,99,235,.3)" }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>close</span></button>
+        ) : onAdd ? <button onClick={onAdd} className="inline-flex items-center gap-0.5 rounded-full border px-1.5 text-[9.5px] font-extrabold" style={{ color: C.rentee, borderColor: "rgba(37,99,235,.4)", background: "#fff" }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>add</span>{L("cost", "تكلفة")}</button> : null}
       </span>
     );
   };
@@ -802,7 +815,10 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
                               <span className="text-[13px] font-bold">{sar} {nf((c.mob.stated ? c.mob.value : 0) + (c.demob.stated ? c.demob.value : 0))}</span>
                               <Sub>{`${sar} ${nf(c.mob.value)} ${L("mob", "نقل")} + ${sar} ${nf(c.demob.value)} ${L("demob", "إرجاع")}`}</Sub>
                             </>) : rm ? (<>
-                              <span className="text-[13px] font-bold">{sar} {nf(rm)} <button onClick={() => addMobCost(c.bid.id, L("Delivery + pickup", "النقل والإرجاع"))} className="text-[10px] font-bold underline" style={{ color: C.rentee }}>{L("edit", "تعديل")}</button></span>
+                              <span className="inline-flex items-center gap-1.5 text-[13px] font-bold">{sar} {nf(rm)}
+                                <button onClick={() => addMobCost(c.bid.id, L("Delivery + pickup", "النقل والإرجاع"))} className="text-[10px] font-bold underline" style={{ color: C.rentee }}>{L("edit", "تعديل")}</button>
+                                <button onClick={() => removeMobCost(c.bid.id)} title={L("Remove your estimate", "إزالة تقديرك")} className="grid h-4 w-4 place-items-center rounded-full" style={{ background: C.surface3, color: C.muted }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>close</span></button>
+                              </span>
                               <Sub>{L("your estimate · on you", "تقديرك · عليك")}</Sub>
                             </>) : conflict ? (
                               <span className="inline-flex items-center gap-1.5 text-[12px] font-bold" style={{ color: C.danger }}>{L("supplier didn't include it", "لم يُدرجه المؤجّر")}{addBtn}</span>
@@ -826,7 +842,8 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
                               // chose to bear, or one the bid doesn't state). Supplier-covered → green, no add.
                               const kind = cr.state === "red" ? "n" : "y";
                               const canAdd = cr.bidSide !== "supplier"; // on you / not stated → let you enter your figure
-                              return <span key={m.key}>{incChip(ar ? m.ar : m.en, kind, canAdd ? () => addCost(m.key, ar ? m.ar : m.en) : undefined, m.icon)}</span>;
+                              const entered = renterCosts[m.key]; // your estimate for this cost (if any)
+                              return <span key={m.key}>{incChip(ar ? m.ar : m.en, kind, canAdd ? () => addCost(m.key, ar ? m.ar : m.en) : undefined, m.icon, entered, entered != null ? () => removeCost(m.key) : undefined)}</span>;
                             })}
                           </div>
                         </Td>
