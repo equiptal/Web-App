@@ -77,9 +77,10 @@ function daysAgo(iso: string | null): number {
  * company submitted them. Real price/equipment/terms are untouched. Returns a new list.
  */
 export function tagSharedLinkBids<T extends BidCard>(bids: T[]): T[] {
-  // The shared-link bid is the one with no location (NULL coords → null distance); else the last.
-  let target = bids.findIndex((b) => b.distanceKm == null && !b.viaSharedLink);
-  if (target < 0) target = bids.findIndex((b) => b.viaSharedLink);
+  // The off-platform bid is Ahmad Al-Humaidi (the shared-link supplier in this demo); fall back to
+  // the bid with no location (NULL coords), then to the last column.
+  let target = bids.findIndex((b) => /الحميدي|أحمد|احمد|humaidi|ahmad/i.test(b.supplierName || ""));
+  if (target < 0) target = bids.findIndex((b) => b.distanceKm == null && !b.viaSharedLink);
   if (target < 0) target = bids.length - 1;
   return bids.map((b, i) => {
     if (i !== target) {
