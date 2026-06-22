@@ -123,7 +123,10 @@ export function BidComparisonWorkspace() {
     // Only surface locations that actually have bids to compare (fall back to all if none do).
     const all = [...map.values()];
     const withBids = all.filter((n) => n.bidCount > 0);
-    return (withBids.length ? withBids : all).sort((a, b) => b.bidCount - a.bidCount);
+    const ranked = (withBids.length ? withBids : all).sort((a, b) => b.bidCount - a.bidCount);
+    // Demo ordering: Airport project first.
+    const isAir = (n: LocationNode) => /airport|مطار/i.test(n.label || "");
+    return [...ranked.filter(isAir), ...ranked.filter((n) => !isAir(n))];
   }, [groups, ar]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {

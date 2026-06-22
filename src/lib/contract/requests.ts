@@ -255,6 +255,12 @@ export function groupRequests(items: RequestListItem[]): RequestGroup[] {
   });
 }
 
+/** Demo ordering: pin the Airport project's group(s) to the front, keeping the rest in order. */
+export function pinAirportFirst(groups: RequestGroup[]): RequestGroup[] {
+  const isAir = (g: RequestGroup) => /airport|مطار/i.test(g.locationLabel || g.city || "");
+  return [...groups.filter(isAir), ...groups.filter((g) => !isAir(g))];
+}
+
 /** Detail passes the record through largely intact (the screen renders every field). */
 export function mapRequestDetail(raw: unknown): RequestRecord {
   return raw as RequestRecord;

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchMyRequests } from "@/lib/api/client";
-import { groupRequests, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
+import { groupRequests, pinAirportFirst, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
 import { GroupBids } from "@/components/requests/GroupBids";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { useSharedLinkMock, sharedLinkStatsFor } from "@/lib/mock/shared-link-bids";
@@ -59,8 +59,8 @@ export function RequestsList() {
     };
   }, []);
 
-  // Cluster the fanned-out requests into submission groups.
-  const groups = groupRequests(items ?? []);
+  // Cluster the fanned-out requests into submission groups (Airport project pinned first).
+  const groups = pinAirportFirst(groupRequests(items ?? []));
   const bidGroups = groups.filter((g) => g.totalBids > 0); // only groups with received bids
   const totalBids = groups.reduce((s, g) => s + g.totalBids, 0);
 

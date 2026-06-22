@@ -569,6 +569,9 @@
     if(!reqs.length || !TEMPLATES.length) return; // no real projects → keep the default prototype data
     var names=[], seen={}; reqs.forEach(function(r){ var nm=locLabel(r.city); if(nm&&!seen[nm]){ seen[nm]=1; names.push(nm); } });
     if(!names.length) return;
+    // Demo ordering: Airport project first.
+    var isAir=function(n){ return /airport|مطار/i.test(n); };
+    names = names.filter(isAir).concat(names.filter(function(n){ return !isAir(n); }));
     Object.keys(D).forEach(function(k){ delete D[k]; });
     D.all = ALL; // aggregate KPIs stay mock
     ORDER.length=0;
