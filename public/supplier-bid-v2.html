@@ -416,17 +416,31 @@
   }
   recompute();
 
-  /* read-only preview — renter viewing the form suppliers fill (?preview=1) */
-  if(new URLSearchParams(location.search).has("preview")){
-    document.querySelectorAll("#view-form input, #view-form textarea").forEach(el=>{ el.readOnly = true; el.tabIndex = -1; });
-    document.querySelectorAll("#view-form .miniseg button").forEach(b=>{ b.disabled = true; });
-    const sb = document.querySelector(".submit-bar"); if(sb) sb.hidden = true;
-    const se = document.getElementById("submitErr"); if(se) se.hidden = true;
-    const pv = document.createElement("div");
+  /* read-only — renter viewing a submitted bid (?submitted=1) or the blank form (?preview=1) */
+  (function(){
+    var qs = new URLSearchParams(location.search);
+    var submitted = qs.has("submitted");
+    if(!qs.has("preview") && !submitted) return;
+    // Read-only, but keep the supplier's chosen answers HIGHLIGHTED (pointer-events off, not disabled,
+    // so the green/red selected segment styling stays visible).
+    document.querySelectorAll("#view-form input, #view-form textarea").forEach(function(el){ el.readOnly = true; el.tabIndex = -1; });
+    document.querySelectorAll("#view-form .miniseg button").forEach(function(b){ b.style.cursor = "default"; b.setAttribute("onclick",""); b.style.pointerEvents = "none"; });
+    document.querySelectorAll("#view-form .miniseg").forEach(function(seg){ seg.style.pointerEvents = "none"; });
+    var sb = document.querySelector(".submit-bar"); if(sb) sb.hidden = true;
+    var se = document.getElementById("submitErr"); if(se) se.hidden = true;
+    if(submitted){
+      // Frame it as the supplier's submission, not a live form.
+      var cd = document.querySelector(".countdown"); if(cd) cd.hidden = true;
+      var h1 = document.querySelector("#view-form .intro h1"); if(h1){ h1.setAttribute("data-en","Submitted bid"); h1.setAttribute("data-ar","العرض المُقدَّم"); h1.textContent = (lang==="ar"?"العرض المُقدَّم":"Submitted bid"); }
+      var p = document.querySelector("#view-form .intro p"); if(p){ p.setAttribute("data-en","Read-only — exactly what the supplier submitted, with their answers highlighted."); p.setAttribute("data-ar","للقراءة فقط — تمامًا كما أرسله المؤجّر، مع إبراز إجاباته."); p.textContent = (lang==="ar"?"للقراءة فقط — تمامًا كما أرسله المؤجّر، مع إبراز إجاباته.":"Read-only — exactly what the supplier submitted, with their answers highlighted."); }
+    }
+    var pv = document.createElement("div");
     pv.className = "preview-banner";
-    pv.innerHTML = '<span class="material-icons-outlined">visibility</span><span data-en="Read-only preview — this is the form suppliers fill in" data-ar="معاينة للقراءة فقط — هذا النموذج الذي يعبّيه المؤجرون">Read-only preview — this is the form suppliers fill in</span>';
+    var en = submitted ? "Submitted bid — read-only · the supplier's answers are highlighted" : "Read-only preview — this is the form suppliers fill in";
+    var arr = submitted ? "العرض المُقدَّم — للقراءة فقط · إجابات المؤجّر مُبرَزة" : "معاينة للقراءة فقط — هذا النموذج الذي يعبّيه المؤجرون";
+    pv.innerHTML = '<span class="material-icons-outlined">visibility</span><span data-en="'+en+'" data-ar="'+arr+'">'+(lang==="ar"?arr:en)+'</span>';
     document.body.insertBefore(pv, document.body.firstChild);
-  }
+  })();
 </script>
 </body>
 </html>

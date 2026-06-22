@@ -37,7 +37,7 @@ export function SharedBidSubmissionModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const src = `/supplier-bid-v2.html?preview=1&supplier=${encodeURIComponent(bid.submissionKey ?? "alnajm")}&lang=${ar ? "ar" : "en"}`;
+  const src = `/supplier-bid-v2.html?submitted=1&supplier=${encodeURIComponent(bid.submissionKey ?? "alnajm")}&lang=${ar ? "ar" : "en"}`;
 
   return (
     <div className="slb-overlay" dir={ar ? "rtl" : "ltr"} onClick={(e) => e.target === e.currentTarget && onClose()}>
