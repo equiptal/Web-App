@@ -1091,21 +1091,26 @@ function CertRow({ label, sub, cols, pick, certLabel, incChip }: { label: string
   return (
     <tr>
       <RowHead title={label} sub={sub} />
-      {cols.map((c) => {
-        const held = c.bid.heldCertCodes.filter((x) => pick.includes(x));
-        const missing = c.bid.requiredCerts.filter((x) => pick.includes(x) && !c.bid.heldCertCodes.includes(x));
-        const anyMissing = missing.length > 0;
-        return (
-          <Td key={c.bid.id} ok={!anyMissing} fail={anyMissing}>
-            {held.length || missing.length ? (
-              <div className="flex flex-wrap gap-1.5">
-                {held.map((x) => <span key={x}>{incChip(certLabel(x), "y")}</span>)}
-                {missing.map((x) => <span key={x}>{incChip(certLabel(x), "n")}</span>)}
-              </div>
-            ) : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}
-          </Td>
-        );
-      })}
+      {(() => {
+        // The request's required certs are request-level — take the union across the compared bids so
+        // a requirement (e.g. TÜV) flags EVERY supplier that lacks it, not only the bid that declared it.
+        const required = pick.filter((x) => cols.some((c) => c.bid.requiredCerts.includes(x)));
+        return cols.map((c) => {
+          const has = (x: CertCode) => c.bid.heldCertCodes.includes(x);
+          const anyMissing = required.some((x) => !has(x)); // a required cert this supplier doesn't hold → red
+          const heldExtra = c.bid.heldCertCodes.filter((x) => pick.includes(x) && !required.includes(x)); // held but not required
+          return (
+            <Td key={c.bid.id} ok={required.length > 0 && !anyMissing} fail={anyMissing}>
+              {required.length || heldExtra.length ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {required.map((x) => <span key={x}>{incChip(certLabel(x), has(x) ? "y" : "n", undefined, has(x) ? "check" : "close")}</span>)}
+                  {heldExtra.map((x) => <span key={x}>{incChip(certLabel(x), "muted", undefined, "check")}</span>)}
+                </div>
+              ) : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}
+            </Td>
+          );
+        });
+      })()}
     </tr>
   );
 }
