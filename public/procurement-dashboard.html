@@ -216,9 +216,14 @@
   @media (max-width:1150px){ .kpis{grid-template-columns:repeat(2,1fr)} .grid2{grid-template-columns:1fr} }
   @media (max-width:900px){ :root{--sidebar-w:0px} .sidebar{display:none} .botnav{display:flex;position:fixed;inset-block-end:0;inset-inline:0;z-index:70;background:var(--surface1);border-top:1px solid var(--border);box-shadow:0 -4px 16px rgba(28,53,80,.08);padding:6px 4px} .page{padding-bottom:92px} .ai-fab{inset-block-end:70px} .drawer{width:100%} }
   @media (max-width:560px){ .page,.appbar{padding-inline:14px} .kpis{grid-template-columns:1fr 1fr} .daterange{display:none} .ai-fab span.fab-tx{display:none} }
+  /* Embedded mode (?embed=1): hide this page's own chrome — it lives inside the app's AppShell sidebar. */
+  html.embedded .sidebar, html.embedded .appbar, html.embedded .botnav { display:none !important; }
+  html.embedded .main { margin-inline-start:0 !important; }
+  html.embedded .ai-fab { position:fixed; }
 </style>
 </head>
 <body>
+<script>(function(){var p=new URLSearchParams(location.search); if(p.has("embed"))document.documentElement.classList.add("embedded");})();</script>
 
 <aside class="sidebar">
   <div class="brand" style="justify-content:center;padding-bottom:14px"><img src="/moedatech-logo.png" alt="Moedatech" style="height:30px;width:auto;filter:brightness(0) invert(1)"></div>
@@ -600,5 +605,8 @@
   }catch(e){ /* keep sample data on any failure */ }
 })();
 </script>
+
+<!-- match the app's language when embedded (?lang=ar|en) -->
+<script>(function(){ var l=new URLSearchParams(location.search).get("lang"); if(l==="ar"&&typeof setLang==="function") setLang("ar"); })();</script>
 </body>
 </html>

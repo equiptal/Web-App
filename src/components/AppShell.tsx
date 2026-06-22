@@ -46,7 +46,7 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
     { key: "home", icon: "home", label: t.shell.home, href: "/" },
     { key: "requests", icon: "grid_view", label: t.shell.requests, href: "/requests" },
     { key: "compare", icon: "compare_arrows", label: t.shell.compare, href: "/compare" },
-    { key: "dashboard", icon: "dashboard", label: t.shell.dashboard, href: "/procurement-dashboard.html" },
+    { key: "dashboard", icon: "dashboard", label: t.shell.dashboard, href: "/dashboard" },
     { key: "profile", icon: "person", label: t.shell.profile, href: "/profile" },
   ];
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
