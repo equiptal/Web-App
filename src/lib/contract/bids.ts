@@ -50,17 +50,19 @@ function eqDocTypeToCert(type: string): CertCode | null {
   const t = type.trim().toLowerCase();
   if (t === "tuv" || t === "tüv") return "TUV";
   if (t === "spsp") return "SPSP";
-  if (t === "saso") return "SASO";
+  // saso AND saso_technical_inspection are the SASO safety cert (NOT ownership).
+  if (t === "saso" || t === "saso_technical_inspection" || t === "saso-technical" || t === "saso_technical") return "SASO";
   if (t === "lc" || t === "local_content") return "LC";
   return null;
 }
-/** Equipment proof-of-ownership / registration doc types → labels (shown in the Business-documents row). */
+/** Equipment proof-of-ownership / registration doc types → labels (Business-documents row).
+ *  NOTE: saso_technical_inspection is a SASO CERT (see eqDocTypeToCert), so it's NOT listed here;
+ *  only true ownership docs are. */
 const OWNERSHIP_DOC_LABELS: Record<string, { key: string; labelEn: string; labelAr: string }> = {
   istimara: { key: "istimara", labelEn: "Istimara", labelAr: "استمارة" },
   customs: { key: "customs", labelEn: "Customs", labelAr: "بيان جمركي" },
   sale_contract: { key: "sale_contract", labelEn: "Sale contract", labelAr: "عقد بيع" },
   saso_registration: { key: "saso_registration", labelEn: "SASO registration", labelAr: "تسجيل ساسو" },
-  saso_technical_inspection: { key: "saso_technical_inspection", labelEn: "SASO inspection", labelAr: "فحص فني ساسو" },
 };
 
 export interface BidCard {
@@ -298,9 +300,15 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   const hasCr = docKey("crDocKey", "cr_doc_key", "crNumber", "commercialRegistrationNumber", "commercial_registration_number", "crFileKey");
   const hasVat = docKey("vatDocKey", "vat_doc_key", "vatNumber", "taxNumber", "tax_number", "vatFileKey");
   const hasNationalAddr = docKey("nationalAddressDocKey", "national_address_doc_key", "nationalId", "national_id", "companyAddress", "company_address", "shortAddress", "short_address", "postalCode", "postal_code", "buildingNumber", "building_number");
-  const requiredCerts = certList((raw.request as Record<string, unknown> | undefined)?.requiredCerts);
   const rq = (raw.request ?? {}) as Record<string, unknown>;
   const rqItem = (Array.isArray(rq.equipmentItems) ? (rq.equipmentItems as Record<string, unknown>[]) : [])[0] ?? {};
+  // The safety-cert requirement (TUV/SPSP/SASO) lives in the item's `safetyCertifications`; request-level
+  // `requiredCerts` carries LC / SASO-registration etc. Union both so the cert rows reflect what the
+  // request actually asks for (new web/agent requests put safety certs only in safetyCertifications).
+  const requiredCerts = certList([
+    ...(Array.isArray(rq.requiredCerts) ? (rq.requiredCerts as unknown[]) : []),
+    ...(Array.isArray(rqItem.safetyCertifications) ? (rqItem.safetyCertifications as unknown[]) : []),
+  ]);
 
   // 014 lifecycle — server-enriched in getBidList (the same source the mobile bid card reads): each
   // locked (agreed) term carries its negotiated value, so they overlay the Terms-modal state + the
