@@ -923,11 +923,18 @@ ${row(L("Business documents", "المستندات التجارية"), docsOf)}
                           { lbl: L("Local Content", "المحتوى المحلي"), has: k.localContent, req: c.bid.requiredCerts.includes("LC"), always: false },
                           { lbl: "SASO", has: k.saso, req: c.bid.requiredCerts.includes("SASO"), always: false },
                         ].filter((d) => d.always || d.has || d.req);
+                        // Proof-of-ownership / registration docs the supplier actually submitted (held → green).
+                        const owned = c.bid.ownershipDocs ?? [];
                         // A company-verification doc (CR/VAT/national) or a required cert that's missing → red.
                         const anyMissing = docs.some((d) => (d.always || d.req) && !d.has);
                         return (
                           <Td key={c.bid.id} ok={!anyMissing} fail={anyMissing}>
-                            {docs.length ? <div className="flex flex-wrap gap-1.5">{docs.map((d) => <span key={d.lbl}>{incChip(d.lbl, d.has ? "y" : "n", undefined, d.has ? "check" : "close")}</span>)}</div> : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}
+                            {docs.length || owned.length ? (
+                              <div className="flex flex-wrap gap-1.5">
+                                {docs.map((d) => <span key={d.lbl}>{incChip(d.lbl, d.has ? "y" : "n", undefined, d.has ? "check" : "close")}</span>)}
+                                {owned.map((o) => <span key={o.key}>{incChip(ar ? o.labelAr : o.labelEn, "y", undefined, "check")}</span>)}
+                              </div>
+                            ) : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}
                           </Td>
                         );
                       })}

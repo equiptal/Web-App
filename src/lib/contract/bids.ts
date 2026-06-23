@@ -54,6 +54,14 @@ function eqDocTypeToCert(type: string): CertCode | null {
   if (t === "lc" || t === "local_content") return "LC";
   return null;
 }
+/** Equipment proof-of-ownership / registration doc types → labels (shown in the Business-documents row). */
+const OWNERSHIP_DOC_LABELS: Record<string, { key: string; labelEn: string; labelAr: string }> = {
+  istimara: { key: "istimara", labelEn: "Istimara", labelAr: "استمارة" },
+  customs: { key: "customs", labelEn: "Customs", labelAr: "بيان جمركي" },
+  sale_contract: { key: "sale_contract", labelEn: "Sale contract", labelAr: "عقد بيع" },
+  saso_registration: { key: "saso_registration", labelEn: "SASO registration", labelAr: "تسجيل ساسو" },
+  saso_technical_inspection: { key: "saso_technical_inspection", labelEn: "SASO inspection", labelAr: "فحص فني ساسو" },
+};
 
 export interface BidCard {
   id: string;
@@ -99,6 +107,9 @@ export interface BidCard {
   requiredCerts: CertCode[];
   /** Certs this supplier actually holds (app: supplier.heldCerts) — ✓/✗ vs requiredCerts. */
   heldCertCodes: CertCode[];
+  /** Proof-of-ownership / registration docs the equipment carries (istimara/customs/…) — shown as
+   *  held documents in the Business-documents row (not certs, never a cert pill). */
+  ownershipDocs: { key: string; labelEn: string; labelAr: string }[];
   /** Lead times for the price breakdown's mobilization/return rows (013 AC-11 inline tags). */
   mobLeadTime: string | null;
   demobLeadTime: string | null;
@@ -266,13 +277,17 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
       }
     }
   }
-  // Equipment-level certs: equipment_listings.documentKeys = [{ key, type }] (type = tuv/saso/spsp/…).
-  // Ownership types (istimara/customs/sale_contract/saso_registration) aren't certs → toCert ignores them.
+  // Equipment-level docs: equipment_listings.documentKeys = [{ key, type }]. Certs (tuv/saso/spsp/lc)
+  // feed held certs; ownership/proof-of-ownership types feed the Business-documents row.
   const eqDocs = (Array.isArray(eq?.documentKeys) ? eq!.documentKeys : Array.isArray(eq?.document_keys) ? eq!.document_keys : []) as unknown[];
+  const ownershipDocs: { key: string; labelEn: string; labelAr: string }[] = [];
   for (const d of eqDocs) {
     const dk = d as Record<string, unknown>;
-    const c = eqDocTypeToCert(String((typeof d === "string" ? d : (dk.type ?? dk.code ?? "")) ?? ""));
+    const rawType = String((typeof d === "string" ? d : (dk.type ?? dk.code ?? "")) ?? "");
+    const c = eqDocTypeToCert(rawType);
     if (c && !held.includes(c)) held.push(c);
+    const own = OWNERSHIP_DOC_LABELS[rawType.trim().toLowerCase()];
+    if (own && !ownershipDocs.some((o) => o.key === own.key)) ownershipDocs.push(own);
   }
   const eqVerified = eq ? eq.verificationStatus === "VERIFIED" || eq.isVerified === true || eq.verified === true : false;
   const supVerified = sup.supplierStatus === 2 || prof.verified === true;
@@ -362,6 +377,7 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     note: s(raw.note),
     requiredCerts,
     heldCertCodes: held,
+    ownershipDocs,
     mobLeadTime: negMobLead ?? s(raw.mobLeadTime),
     demobLeadTime: s(raw.demobLeadTime),
     terms: {

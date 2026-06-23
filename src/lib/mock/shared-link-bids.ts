@@ -94,6 +94,7 @@ export function tagSharedLinkBids<T extends BidCard>(bids: T[]): T[] {
       verified: false,
       compliance: { ...b.compliance, activityLicense: false, taxNumber: false, nationalAddress: false, saso: false, localContent: false },
       heldCertCodes: [], // off-platform: no equipment certs
+      ownershipDocs: [], // off-platform: no proof-of-ownership docs
       distanceKm: null, // off-platform: no location → km dashed
       quotedTotal: grandTotal(b),
       submissionKey: "alnajm",

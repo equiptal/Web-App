@@ -8,7 +8,7 @@ const bc = (p: Partial<BidCard>): BidCard => ({
   priceUnit: null, duration: null, numberOfUnits: 1, reqMinYear: null, equipment: null, eqVerified: false,
   compliance: { entityType: "individual", activityLicense: false, taxNumber: false, nationalAddress: false, safety: false, saso: false, localContent: false },
   matchCount: 0, conflictCount: 0, dealRoomId: null, expired: false,
-  note: null, requiredCerts: [], heldCertCodes: [], mobLeadTime: null, demobLeadTime: null,
+  note: null, requiredCerts: [], heldCertCodes: [], ownershipDocs: [], mobLeadTime: null, demobLeadTime: null,
   terms: { equipment: [], contract: [], supplier: [] },
   requestTerms: { operatorIncluded: null, operatorNationality: null, fuelType: null, paymentMethod: null, paymentTerms: null, breakdownResponseSla: null, overtimeRate: null, maintenanceResponsibility: null },
   lockedTerms: [], unreadTerms: [], progress: { agreed: 0, total: 0 }, lastEventAr: null, round: 1,

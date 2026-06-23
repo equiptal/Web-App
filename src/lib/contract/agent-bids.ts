@@ -242,6 +242,7 @@ export function normalizedBidToBidCard(nb: NormalizedBid, ctx: { duration: numbe
     note: nb.notes ?? (nb.source_file ? `From uploaded file: ${nb.source_file}` : "From uploaded file"),
     requiredCerts: [],
     heldCertCodes: nb.certificates as unknown as CertCode[],
+    ownershipDocs: [],
     mobLeadTime: null,
     demobLeadTime: null,
     terms: { equipment: [], contract: [], supplier: [] },
