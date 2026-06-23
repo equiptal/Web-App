@@ -55,7 +55,7 @@ export function CreateSurface() {
                 {t.draftPrompt.startOver}
               </button>
               <button
-                onClick={() => actions.dismissDraftPrompt()}
+                onClick={() => actions.resumeDraft()}
                 className="rounded-[10px] bg-brand px-4 py-2.5 text-[13.5px] font-bold text-brand-fg transition hover:brightness-[1.04]"
               >
                 {t.draftPrompt.continue}

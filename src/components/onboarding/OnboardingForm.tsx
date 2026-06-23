@@ -61,6 +61,7 @@ export function OnboardingForm({
   const [lastName, setLastName] = useState("");
   const [city, setCity] = useState("");
   const [jobTitle, setJobTitle] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [cities, setCities] = useState<Opt[]>(FALLBACK_CITIES);
@@ -115,6 +116,7 @@ export function OnboardingForm({
           lastName: lastName.trim(),
           city: city.trim(),
           jobTitle: jobTitle.trim(),
+          companyName: companyName.trim() || undefined,
           email: email.trim() || undefined,
           whatsapp: whatsapp.trim() || undefined,
         }),
@@ -197,6 +199,13 @@ export function OnboardingForm({
             </select>
             {fe.jobTitle && <p className="mt-1 text-[12px] text-danger">{fe.jobTitle}</p>}
           </div>
+        </div>
+
+        <div>
+          <label className={labelCls}>
+            {o.companyName} <span className="text-[11px] font-medium text-muted">— {o.optional}</span>
+          </label>
+          <input className={inputCls} value={companyName} onChange={(e) => setCompanyName(e.target.value)} maxLength={200} placeholder={o.companyNamePlaceholder} />
         </div>
 
         <div>

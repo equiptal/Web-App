@@ -240,7 +240,7 @@ export const en = {
       collapsedEmpty: "No advanced settings set",
       workingDays: "Working days per week",
       overtime: "Overtime rate",
-      equipmentYear: "Equipment year",
+      equipmentYear: "Minimum equipment year",
     },
     certificates: {
       card: "Certificates",
@@ -315,6 +315,12 @@ export const en = {
       fatTransport: "F.A.T — Accommodation & transport",
       workType: "Work type",
       workTypePlaceholder: "e.g. lifting steel beams, tower assembly",
+      equipmentYear: "Minimum equipment year",
+      equipmentYearHint: "Leave on “Any” to use the request-wide year",
+      attachments: "Attachments",
+      attachmentsHint: "Accessories needed with this equipment (optional)",
+      customAttachmentPlaceholder: "Add another (e.g. breaker, auger)",
+      addAttachment: "Add",
       nationalityCustom: "Which nationalities?",
       nationalityCustomPlaceholder: "e.g. Saudi, Egyptian, Filipino",
       fuelType: "Fuel type",
@@ -408,7 +414,7 @@ export const en = {
   options: {
     rentalBasis: { daily: "Daily", weekly: "Weekly", monthly: "Monthly" },
     overtime: { without: "Without", "1.5x": "1.5×", "2x": "2×" },
-    equipmentYear: { any: "Any" },
+    equipmentYear: { any: "Any", custom: "Custom…", customPlaceholder: "Type a year, e.g. 2008" },
     safetyCert: { tuv: "TÜV", spsp: "SPSP", "saso-technical": "SASO technical inspection", other: "Other" },
     otherCert: { "local-content": "Local content", "saso-registration": "SASO registration" },
     party: { me: "Me", supplier: "Supplier" },
@@ -475,6 +481,8 @@ export const en = {
     verified: "Verified",
     city: "City",
     jobTitle: "Job title",
+    companyName: "Company name",
+    companyNamePlaceholder: "Your company name",
     email: "Email",
     whatsapp: "WhatsApp number",
     optional: "optional",
@@ -503,6 +511,8 @@ export const en = {
     roleManager: "Manager",
     roleEmployee: "Employee",
     companyName: "Company name",
+    companyLegalName: "Legal Company Name",
+    companyLegalNameHint: "Enter the registered legal company name",
     nationalId: "National ID",
     companyCity: "Company city",
     cityPlaceholder: "Select a city",
@@ -534,6 +544,7 @@ export const en = {
     errors: {
       role: "Select your authority.", // AC-09
       companyName: "Company name must be 2–200 characters.", // AC-09
+      companyLegalName: "Legal company name must be 2–200 characters.",
       cr: "The CR document is required.", // AC-10
       vat: "The VAT document is required.", // AC-10
       nationalAddress: "The National Address document is required.", // required to match the app (company_verification_page.dart:302 + '*' label); AC-10 lists only CR/VAT

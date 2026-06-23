@@ -117,6 +117,7 @@ export function VerificationFlow() {
   const [status, setStatus] = useState<VerificationStatus | "loading">("loading");
   const [role, setRole] = useState<Role>("owner");
   const [companyName, setCompanyName] = useState("");
+  const [companyLegalName, setCompanyLegalName] = useState("");
   const [nationalId, setNationalId] = useState("");
   const [companyCity, setCompanyCity] = useState("");
   const [companyAddress, setCompanyAddress] = useState("");
@@ -150,6 +151,7 @@ export function VerificationFlow() {
           submission?: {
             authorityRole?: string | null;
             companyName?: string | null;
+            companyLegalName?: string | null;
             nationalId?: string | null;
             companyCity?: string | null;
             companyAddress?: string | null;
@@ -165,6 +167,7 @@ export function VerificationFlow() {
         if (s) {
           if (s.authorityRole === "owner" || s.authorityRole === "manager" || s.authorityRole === "employee") setRole(s.authorityRole);
           setCompanyName(s.companyName ?? "");
+          setCompanyLegalName(s.companyLegalName ?? "");
           setNationalId(s.nationalId ?? "");
           setCompanyCity(s.companyCity ?? "");
           setCompanyAddress(s.companyAddress ?? "");
@@ -184,6 +187,7 @@ export function VerificationFlow() {
     setErr(null);
     const next_fe: Record<string, string> = {};
     if (companyName.trim().length < 2 || companyName.trim().length > 200) next_fe.companyName = v.errors.companyName;
+    if (companyLegalName.trim().length < 2 || companyLegalName.trim().length > 200) next_fe.companyLegalName = v.errors.companyLegalName;
     if (!crDocKey) next_fe.cr = v.errors.cr;
     if (!vatDocKey) next_fe.vat = v.errors.vat;
     if (!nationalAddressDocKey) next_fe.nationalAddress = v.errors.nationalAddress; // required to match the app (company_verification_page.dart:302)
@@ -202,6 +206,7 @@ export function VerificationFlow() {
         body: JSON.stringify({
           authorityRole: role,
           companyName: companyName.trim(),
+          companyLegalName: companyLegalName.trim(),
           crDocKey,
           vatDocKey,
           nationalId: nationalId.trim() || undefined,
@@ -289,6 +294,11 @@ export function VerificationFlow() {
           <label className={labelCls}>{v.companyName}</label>
           <input className={inputCls} value={companyName} onChange={(e) => setCompanyName(e.target.value)} maxLength={200} />
           {fe.companyName && <p className="mt-1 text-[12px] text-danger">{fe.companyName}</p>}
+        </div>
+        <div>
+          <label className={labelCls}>{v.companyLegalName}</label>
+          <input className={inputCls} value={companyLegalName} onChange={(e) => setCompanyLegalName(e.target.value)} maxLength={200} placeholder={v.companyLegalNameHint} />
+          {fe.companyLegalName && <p className="mt-1 text-[12px] text-danger">{fe.companyLegalName}</p>}
         </div>
 
         {/* Company documents — CR, VAT, National Address are required (AC-09/10). */}

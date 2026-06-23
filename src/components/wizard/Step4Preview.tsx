@@ -45,7 +45,7 @@ export function Step4Preview() {
   const count = postableItems(draft.items).length;
   const notSent = draft.items.filter((i) => !i.removed && i.verdict === "no-match").length;
   const certs = [...p.certificates.safety.map((c) => t.options.safetyCert[c]), ...p.certificates.other.map((c) => t.options.otherCert[c])].join(", ") || "—";
-  const payment = [pr.payment.terms && t.options.paymentTerm[pr.payment.terms], pr.payment.method && t.options.paymentMethod[pr.payment.method]].filter(Boolean).join(" · ") || "—";
+  const payment = (pr.payment.terms && t.options.paymentTerm[pr.payment.terms]) || "—";
   const suppliers =
     [pr.supplierFilters.verifiedOnly && t.step3.supplierFilters.verifiedOnly, pr.supplierFilters.bidWindow && t.options.bidWindow[pr.supplierFilters.bidWindow]].filter(Boolean).join(" · ") || "—";
 
@@ -157,9 +157,10 @@ export function Step4Preview() {
         </div>
       )}
 
-      {/* AC-42/43: send one broadcast covering all items. */}
-      <div className="flex justify-end">
-        <Button disabled={busy || count === 0} onClick={onSubmit} className="px-6 py-3 text-[14.5px]">
+      {/* AC-42/43: send one broadcast covering all items. Rental basis is required to submit. */}
+      <div className="flex flex-col items-end gap-1.5">
+        {!draft.project.timing.rentalBasis && <span className="text-xs font-bold text-warn">{t.gate.chooseRentalBasis}</span>}
+        <Button disabled={busy || count === 0 || !draft.project.timing.rentalBasis} onClick={onSubmit} className="px-6 py-3 text-[14.5px]">
           <Icon name="send" size={18} /> {busy ? `${t.preview.send}…` : t.preview.send}
         </Button>
       </div>

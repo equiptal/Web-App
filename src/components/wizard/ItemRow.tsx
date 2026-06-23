@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useT, useLocale, fmt } from "@/lib/i18n";
+import type { SubtypeAttachmentOption } from "@/lib/contract/app";
 import { useRfq, agentMatches } from "@/lib/store/rfq-store";
 import { SUPPORT_WHATSAPP_NUMBER } from "@/lib/config/support";
 import { AgentMark, Button, Field, Icon, Pchips, SelChips, Select, Stepper, TextArea, TextInput, Toggle, Modal } from "@/components/ui";
+import { YearPicker } from "@/components/wizard/YearPicker";
 import {
   EquipmentItem,
   Taxonomy,
@@ -75,7 +77,9 @@ export function ItemRow({
   // Part 1: the optional free-text "work type" is surfaced only for crane subtypes — mirror the mobile
   // gate (equipment_step.dart `_isCraneSelected`: the subtype's English name contains "crane").
   const isCrane = (subcategory?.name ?? "").toLowerCase().includes("crane");
-  const status = item.verdict === "no-match" ? "not-available" : item.resolved ? "matched" : "needs-ok";
+  // "Need OK" auto-resolves to Matched once the taxonomy ref is complete — the renter no longer has to
+  // click Approve. Only a no-match (not-available) or an item still missing a ref level shows otherwise.
+  const status = item.verdict === "no-match" ? "not-available" : item.resolved || isCompleteRef(item.ref) ? "matched" : "needs-ok";
   const glyph = (item.ref.categoryId && CATEGORY_ICON[item.ref.categoryId]) || "construction";
   // "MATCHED TO" must show ONLY values that exist in our taxonomy: the resolved measurement, or the
   // agent's suggested canonical size (also a real taxonomy node) while the size is still pending.
@@ -344,6 +348,20 @@ export function ItemRow({
             </ChipField>
           </div>
 
+          {/* Equipment year (AC-28) — per-item override of the request-wide year. "Any" inherits it. */}
+          <ChipField label={t.step2.perItem.equipmentYear} note={t.step2.perItem.equipmentYearHint}>
+            <YearPicker
+              value={item.equipmentYear ?? null}
+              onChange={(v) => actions.patchItem(item.id, { equipmentYear: v })}
+              anyLabel={t.options.equipmentYear.any}
+              customLabel={t.options.equipmentYear.custom}
+              customPlaceholder={t.options.equipmentYear.customPlaceholder}
+            />
+          </ChipField>
+
+          {/* Attachments / accessories — admin-defined per subtype + free-text customs. */}
+          <ItemAttachments item={item} />
+
           {/* Additional notes (AC-53) */}
           <ChipField label={t.step2.perItem.additionalNotes} agent={agentMatches(item.additionalNotes, ai?.additionalNotes)}>
             <TextArea rows={2} value={item.additionalNotes} onChange={(e) => actions.patchItem(item.id, { additionalNotes: e.target.value })} />
@@ -437,5 +455,68 @@ function ChipField({ label, agent, note, children }: { label: string; agent?: bo
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * Per-item equipment attachments. Pulls the admin-defined attachment list for the item's subtype
+ * (GET /api/equipment/attachments/:subtypeId) and shows it as multi-select chips — the renter can ONLY
+ * pick from this predefined set (SubtypeAttachment rows), never free-text. `preSelected` rows default
+ * on. Selections persist on the draft item as `attachmentIds` → backend `attachment_ids`. The section
+ * is hidden when the subtype has no configured attachments.
+ */
+function ItemAttachments({ item }: { item: EquipmentItem }) {
+  const t = useT();
+  const { locale } = useLocale();
+  const { actions } = useRfq();
+  const subtypeId = item.ref.subcategoryId;
+  const [avail, setAvail] = useState<SubtypeAttachmentOption[]>([]);
+  const initedFor = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!subtypeId) {
+      setAvail([]);
+      return;
+    }
+    let active = true;
+    fetch(`/api/equipment/attachments/${encodeURIComponent(subtypeId)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: SubtypeAttachmentOption[]) => {
+        if (!active) return;
+        const arr = Array.isArray(list) ? list : [];
+        setAvail(arr);
+        // Apply admin "pre-selected" defaults once per subtype, only when nothing is chosen yet.
+        if (initedFor.current !== subtypeId) {
+          initedFor.current = subtypeId;
+          if ((item.attachmentIds ?? []).length === 0) {
+            const pre = arr.filter((a) => a.preSelected).map((a) => a.id);
+            if (pre.length) actions.patchItem(item.id, { attachmentIds: pre });
+          }
+        }
+      })
+      .catch(() => {
+        if (active) setAvail([]);
+      });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subtypeId]);
+
+  const selected = item.attachmentIds ?? [];
+  const nameOf = (a: SubtypeAttachmentOption) => (locale === "ar" ? a.nameAr || a.name : a.name);
+
+  // Choose-from-set only: nothing to show when this subtype has no admin-defined attachments.
+  if (avail.length === 0) return null;
+
+  return (
+    <ChipField label={t.step2.perItem.attachments}>
+      <p className="-mt-1 mb-2 text-[12px] text-muted">{t.step2.perItem.attachmentsHint}</p>
+      <SelChips<string>
+        values={selected}
+        onToggle={(v) => actions.patchItem(item.id, { attachmentIds: toggle(selected, v) })}
+        options={avail.map((a) => ({ value: a.id, label: nameOf(a) }))}
+      />
+    </ChipField>
   );
 }

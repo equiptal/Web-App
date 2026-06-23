@@ -8,11 +8,13 @@ interface BackendMe {
   phone: string;
   firstName?: string | null;
   lastName?: string | null;
+  companyName?: string | null;
   city?: string | null;
   jobTitle?: string | null;
   email?: string | null;
   whatsapp?: string | null;
   tier?: string;
+  supplierProfile?: { companyName?: string | null } | null;
 }
 interface BackendStatus {
   supplierStatus?: number | null;
@@ -34,6 +36,7 @@ export async function GET(req: Request) {
         tier: normalizeTier(me.tier),
         firstName: me.firstName ?? null,
         lastName: me.lastName ?? null,
+        companyName: me.companyName ?? me.supplierProfile?.companyName ?? null,
         city: me.city ?? null,
         jobTitle: me.jobTitle ?? null,
         email: me.email ?? null,

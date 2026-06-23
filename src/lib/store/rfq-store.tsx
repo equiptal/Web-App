@@ -104,7 +104,7 @@ type Action =
   | { t: "ENTER_WIZARD" }
   | { t: "RESUME_WIZARD" }
   | { t: "GO_INTAKE" }
-  | { t: "DISMISS_DRAFT_PROMPT" }
+  | { t: "RESUME_DRAFT" }
   | { t: "GO_STEP"; step: Step }
   | { t: "PATCH_LOCATION"; patch: Partial<ProjectDetails["location"]> }
   | { t: "CONFIRM_LOCATION" }
@@ -193,8 +193,12 @@ function reducer(state: RfqState, a: Action): RfqState {
       // Return to intake preserving text/files (AC-10: input preserved). Keeps `step` so the renter
       // can jump back to the wizard where they were ("Your request" step → back to review).
       return { ...state, phase: "intake", error: null };
-    case "DISMISS_DRAFT_PROMPT":
-      return { ...state, draftPrompt: false };
+    case "RESUME_DRAFT":
+      // "Continue draft": dismiss the prompt and drop the renter back INTO the review wizard at the
+      // step they left (restored by HYDRATE) — never the raw "Your request" input screen, whose
+      // primary action is "Re-analyze" and would discard their edits. A rehydrated draft has always
+      // already been processed (the prompt only shows when a saved draft exists).
+      return { ...state, draftPrompt: false, phase: "wizard", error: null };
     case "GO_STEP":
       return { ...state, step: a.step };
     case "PATCH_LOCATION":
@@ -224,7 +228,16 @@ function reducer(state: RfqState, a: Action): RfqState {
     case "PATCH_TIMING":
       return withDraft(state, (d) => ({ ...d, project: { ...d.project, timing: { ...d.project.timing, ...a.patch } } }));
     case "PATCH_ADVANCED":
-      return withDraft(state, (d) => ({ ...d, project: { ...d.project, advanced: { ...d.project.advanced, ...a.patch } } }));
+      return withDraft(state, (d) => {
+        const advanced = { ...d.project.advanced, ...a.patch };
+        let items = d.items;
+        // The request-wide minimum equipment year applies to EVERY item so it's reflected on each item's
+        // own picker (the renter can still override a single item afterwards via patchItem). AC-28.
+        if (a.patch.equipmentYear !== undefined) {
+          items = d.items.map((i) => ({ ...i, equipmentYear: a.patch.equipmentYear ?? null }));
+        }
+        return { ...d, project: { ...d.project, advanced }, items };
+      });
     case "SET_CERTIFICATES":
       return withDraft(state, (d) => {
         const certificates = { ...d.project.certificates, ...a.patch };
@@ -360,7 +373,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
     enterWizard: () => dispatch({ t: "ENTER_WIZARD" }),
     resumeWizard: () => dispatch({ t: "RESUME_WIZARD" }),
     goIntake: () => dispatch({ t: "GO_INTAKE" }),
-    dismissDraftPrompt: () => dispatch({ t: "DISMISS_DRAFT_PROMPT" }),
+    resumeDraft: () => dispatch({ t: "RESUME_DRAFT" }),
     goStep: (step: Step) => dispatch({ t: "GO_STEP", step }),
 
     patchLocation: (patch: Partial<ProjectDetails["location"]>) => dispatch({ t: "PATCH_LOCATION", patch }),

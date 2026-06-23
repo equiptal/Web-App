@@ -44,27 +44,28 @@ export function Step3Preferences() {
 
       {/* Optional extras (AC-39/40) */}
       <Card title={<><Icon name="tune" size={18} className="me-1.5 align-[-3px] text-navy-mid" />{t.step3.optionalExtras}</>}>
-        <Field label={`${t.step3.budget.label} · ${t.common.sar}`} optional hint={t.step3.budget.hint}>
-          <TextInput type="number" min={0} className="max-w-[220px]" value={p.budgetSar ?? ""} onChange={(e) => actions.patchPreferences({ budgetSar: e.target.value === "" ? null : Number(e.target.value) })} />
-        </Field>
+        {/* Budget · Supplier filters · Bid window — one row on desktop, stacked on mobile. */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Field label={`${t.step3.budget.label} · ${t.common.sar}`} optional hint={t.step3.budget.hint}>
+            <TextInput type="number" min={0} value={p.budgetSar ?? ""} onChange={(e) => actions.patchPreferences({ budgetSar: e.target.value === "" ? null : Number(e.target.value) })} />
+          </Field>
 
-        <div className="mt-4">
-          <span className="mb-1.5 block text-[12.5px] font-bold text-navy-mid">{t.step3.supplierFilters.title}</span>
-          <SelChips
-            values={[...(sf.verifiedOnly ? ["verified"] : []), ...(sf.sublettingAllowed ? ["subletting"] : [])]}
-            onToggle={(v) =>
-              v === "verified"
-                ? actions.patchPreferences({ supplierFilters: { verifiedOnly: !sf.verifiedOnly } })
-                : actions.patchPreferences({ supplierFilters: { sublettingAllowed: !sf.sublettingAllowed } })
-            }
-            options={[
-              { value: "verified", label: t.step3.supplierFilters.verifiedOnly },
-              { value: "subletting", label: t.step3.supplierFilters.subletting },
-            ]}
-          />
-        </div>
+          <div>
+            <span className="mb-1.5 block text-[12.5px] font-bold text-navy-mid">{t.step3.supplierFilters.title}</span>
+            <SelChips
+              values={[...(sf.verifiedOnly ? ["verified"] : []), ...(sf.sublettingAllowed ? ["subletting"] : [])]}
+              onToggle={(v) =>
+                v === "verified"
+                  ? actions.patchPreferences({ supplierFilters: { verifiedOnly: !sf.verifiedOnly } })
+                  : actions.patchPreferences({ supplierFilters: { sublettingAllowed: !sf.sublettingAllowed } })
+              }
+              options={[
+                { value: "verified", label: t.step3.supplierFilters.verifiedOnly },
+                { value: "subletting", label: t.step3.supplierFilters.subletting },
+              ]}
+            />
+          </div>
 
-        <div className="mt-4">
           <Field label={t.step3.supplierFilters.bidWindow} optional>
             <Seg2<BidWindow> value={sf.bidWindow} onChange={(v) => actions.patchPreferences({ supplierFilters: { bidWindow: v } })} onClear={() => actions.patchPreferences({ supplierFilters: { bidWindow: null } })} options={opt(BID_WINDOWS, t.options.bidWindow)} />
           </Field>

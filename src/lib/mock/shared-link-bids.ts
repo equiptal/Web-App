@@ -77,16 +77,14 @@ function daysAgo(iso: string | null): number {
  * company submitted them. Real price/equipment/terms are untouched. Returns a new list.
  */
 export function tagSharedLinkBids<T extends BidCard>(bids: T[]): T[] {
-  // The off-platform bid is Ahmad Al-Humaidi (the shared-link supplier in this demo); fall back to
-  // the bid with no location (NULL coords), then to the last column.
-  let target = bids.findIndex((b) => /الحميدي|أحمد|احمد|humaidi|ahmad/i.test(b.supplierName || ""));
-  if (target < 0) target = bids.findIndex((b) => b.distanceKm == null && !b.viaSharedLink);
-  if (target < 0) target = bids.length - 1;
+  // Only the demo off-platform supplier (Ahmad Al-Humaidi) gets the shared-link treatment. If this
+  // comparison has no such bid, leave EVERY bid as real data — don't fall back to the last column,
+  // which would wrongly flip a real verified supplier to "off-platform / not verified / red docs".
+  const target = bids.findIndex((b) => /الحميدي|أحمد|احمد|humaidi|ahmad/i.test(b.supplierName || ""));
+  if (target < 0) return bids;
   return bids.map((b, i) => {
-    if (i !== target) {
-      // In-app verified supplier: company verification docs (CR/VAT/national) on file.
-      return { ...b, verified: true, compliance: { ...b.compliance, activityLicense: true, taxNumber: true, nationalAddress: true } };
-    }
+    // Only the demo bid is mocked — every real supplier renders from the real payload as-is.
+    if (i !== target) return b;
     // Off-platform shared-link bid: unverified — no company docs (→ red), no certs, no location.
     return {
       ...b,

@@ -11,6 +11,8 @@ import { DealRoomBanner, SupplierDocs } from "@/components/requests/BidCardExtra
 import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
 import { useSharedLinkMock, tagSharedLinkBids } from "@/lib/mock/shared-link-bids";
+import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
+import { useSession } from "@/lib/session";
 import { bidSuppliers, CERT_LABEL, type BidCard } from "@/lib/contract/bids";
 import type { RequestGroup } from "@/lib/contract/requests";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
@@ -136,6 +138,10 @@ export function GroupBids({ group }: { group: RequestGroup }) {
   const [openTermsId, setOpenTermsId] = useState<string | null>(null);
   const [langPick, setLangPick] = useState(false); // quotation language chooser (Arabic | English)
   const [renterName, setRenterName] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const { tier } = useSession();
+  const verified = tier === "verified";
+  const [quoteGate, setQuoteGate] = useState(false); // unverified → confirm before issuing the quotation
   // web-app/006 demo (staging only) — relabel real bids as off-platform "via shared link".
   const mockEnabled = useSharedLinkMock();
   const [submissionBid, setSubmissionBid] = useState<GroupBid | null>(null);
@@ -149,8 +155,11 @@ export function GroupBids({ group }: { group: RequestGroup }) {
     let active = true;
     fetch("/api/me", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { user?: { firstName?: string; lastName?: string } } | null) => {
-        if (active && d?.user) setRenterName([d.user.firstName, d.user.lastName].filter(Boolean).join(" "));
+      .then((d: { user?: { firstName?: string; lastName?: string; companyName?: string | null } } | null) => {
+        if (active && d?.user) {
+          setRenterName([d.user.firstName, d.user.lastName].filter(Boolean).join(" "));
+          setCompanyName(d.user.companyName ?? "");
+        }
       })
       .catch(() => {});
     return () => { active = false; };
@@ -196,7 +205,7 @@ export function GroupBids({ group }: { group: RequestGroup }) {
   // web-app/007 — open the comparison workspace pre-selected to the chosen bids (and their item).
   function goCompare() {
     const chosen = (bids ?? []).filter((b) => selected.has(b.id));
-    if (chosen.length < 2) return;
+    if (chosen.length < 1) return;
     const params = new URLSearchParams({ group: group.id });
     const itemId = chosen[0]?.requestId;
     if (itemId) params.set("item", itemId);
@@ -247,7 +256,8 @@ export function GroupBids({ group }: { group: RequestGroup }) {
       const L = (en: string, arr: string) => (isAr ? arr : en);
       const sar = L("SAR", "ر.س");
       const dateStr = new Date().toLocaleDateString(isAr ? "ar-SA" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
-      const rentee = { name: renterName || L("Moedatech renter", "مستأجر معداتك"), org: "Moedatech", city: group.city ?? group.locationLabel };
+      // Verified renters issue the quotation under their company name; otherwise their personal name.
+      const rentee = { name: (verified && companyName.trim() ? companyName.trim() : renterName) || L("Moedatech renter", "مستأجر معداتك"), org: "Moedatech", city: group.city ?? group.locationLabel };
       const sup = supBids[0];
       const supInit = (sup.supplierName || "S").replace(/[^A-Za-z0-9]/g, "").slice(0, 3).toUpperCase() || "S";
       const qnum = `Q-${reqCode}-${supInit}${si + 1}`;
@@ -340,7 +350,6 @@ export function GroupBids({ group }: { group: RequestGroup }) {
       const eqTermsCard = eqTermRows ? `<div class="card"><div class="card-h">${esc(L("Equipment terms", "شروط المعدة"))}</div>${eqTermRows}</div>` : "";
       const ct = sup.requestTerms;
       const contractRows =
-        kvRow(L("Payment method", "طريقة الدفع"), ct.paymentMethod) +
         kvRow(L("Payment terms", "شروط الدفع"), tfmt.payTerms(ct.paymentTerms)) +
         kvRow(L("Breakdown response", "زمن الاستجابة للأعطال"), tfmt.sla(ct.breakdownResponseSla)) +
         kvRow(L("Overtime", "العمل الإضافي"), tfmt.overtime(ct.overtimeRate)) +
@@ -647,17 +656,17 @@ export function GroupBids({ group }: { group: RequestGroup }) {
           <span className="qn">{selectedCount} {L("selected", "محدّد")}</span>
           {selectedCount < shown.length && <span className="qclear" onClick={() => setSelected(new Set(shown.map((b) => b.id)))}>{L("Select all", "تحديد الكل")}</span>}
           <span className="qclear" onClick={() => setSelected(new Set())}>{L("Clear", "مسح")}</span>
-          {/* web-app/007 — Compare the selected bids side by side (needs ≥2). */}
+          {/* web-app/007 — Compare the selected bids side by side (1+ allowed). */}
           <button
             className="qdl"
-            disabled={selectedCount < 2}
-            style={{ background: "var(--navy)", opacity: selectedCount < 2 ? 0.5 : 1 }}
-            title={selectedCount < 2 ? L("Select at least 2 to compare", "اختر عرضين على الأقل") : L("Compare side by side", "قارن جنبًا إلى جنب")}
+            disabled={selectedCount < 1}
+            style={{ background: "var(--navy)", opacity: selectedCount < 1 ? 0.5 : 1 }}
+            title={L("Compare side by side", "قارن جنبًا إلى جنب")}
             onClick={goCompare}
           >
             <span className="material-icons-outlined">compare_arrows</span> {L("Compare", "قارن")}
           </button>
-          <button className="qdl" onClick={() => setLangPick(true)}>
+          <button className="qdl" onClick={() => (verified ? setLangPick(true) : setQuoteGate(true))}>
             <span className="material-icons-outlined">download</span> {L("Download quotations", "تنزيل عروض الأسعار")}
           </button>
         </div>
@@ -696,6 +705,17 @@ export function GroupBids({ group }: { group: RequestGroup }) {
           busy={busyId === equipBid.id}
           onRequestDetails={() => startNegotiation(equipBid)}
           onClose={() => setEquipBid(null)}
+        />
+      )}
+
+      {/* Issue-quotation gate for an unverified renter (company name vs personal name). */}
+      {quoteGate && (
+        <QuotationVerifyGate
+          ar={ar}
+          L={L}
+          onClose={() => setQuoteGate(false)}
+          onVerify={() => { setQuoteGate(false); router.push("/verify"); }}
+          onContinue={() => { setQuoteGate(false); setLangPick(true); }}
         />
       )}
 

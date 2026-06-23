@@ -20,6 +20,8 @@ export interface RenterProfile {
   tier: RenterTier;
   firstName: string | null;
   lastName: string | null;
+  /** Company name on the renter's profile (display name; verification holds the legal name). */
+  companyName: string | null;
   city: string | null;
   jobTitle: string | null;
   email: string | null;

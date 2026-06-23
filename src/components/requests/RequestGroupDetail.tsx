@@ -117,7 +117,6 @@ export function RequestGroupDetail({ groupId, onTitle }: { groupId: string; onTi
           <div className="kv">
             <span className="k">{L("Rental basis", "أساس الإيجار")}</span><span className="v">{first.rentalType ?? "—"}</span>
             <span className="k">{L("Payment terms", "شروط الدفع")}</span><span className="v">{first.paymentTerms ?? "—"}</span>
-            <span className="k">{L("Payment method", "طريقة الدفع")}</span><span className="v">{first.paymentMethod ?? "—"}</span>
             <span className="k">{L("Working hours", "ساعات العمل")}</span><span className="v">{first.workingHoursPerDay ? `${first.workingHoursPerDay} ${L("hrs/day", "ساعة/يوم")}` : "—"}</span>
             <span className="k">{L("Maintenance", "الصيانة")}</span><span className="v">{first.maintenanceResponsibility ?? "—"}</span>
             <span className="k">{L("Budget", "الميزانية")}</span><span className="v">{first.budgetCeiling ? `${Number(first.budgetCeiling).toLocaleString(ar ? "ar-SA" : "en-US")} ${L("SAR", "ر.س")}` : "—"}</span>

@@ -22,11 +22,25 @@ export interface TaxonomyResponse {
   nodes: TaxonomyNode[];
 }
 
+/** An admin-configured equipment attachment for a subtype (GET /equipment/attachments/{subtypeId}).
+ *  `preSelected` ⇒ checked by default when the renter picks this subtype. */
+export interface SubtypeAttachmentOption {
+  id: string;
+  name: string;
+  nameAr: string;
+  preSelected?: boolean;
+}
+
 /** One equipment line in POST /agents/requests. All 3 ids required (422 if null). */
 export interface CreateRequestItem {
   categoryId: string;
   subtypeId: string;
   capacityId: string;
+  /** Per-item equipment attachments: admin-defined SubtypeAttachment ids selected for this item.
+   *  Backend `attachment_ids` (Json); the agents create schema defaults to []. */
+  attachmentIds?: string[];
+  /** Renter free-text attachments not in the admin list. Backend `custom_attachments` (Json). */
+  customAttachments?: string[];
   numberOfUnits: number;
   operatorIncluded: "YES" | "NO";
   fuelTypePreference?: "DIESEL" | "PETROL" | "ELECTRIC";

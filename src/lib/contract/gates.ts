@@ -30,9 +30,8 @@ export function gateStep1(project: ProjectDetails): GateResult {
  */
 export function itemBlocksAdvance(item: EquipmentItem): boolean {
   if (item.removed || item.verdict === "no-match") return false;
-  // needs-validation match, or a measurement suggestion, must be resolved (AC-18/19)
-  if ((item.verdict === "needs-validation" || item.suggestion) && !item.resolved) return true;
-  // a matched/added item must carry a complete taxonomy ref
+  // A "Need OK" item with a complete taxonomy ref is auto-accepted as Matched (no explicit approve
+  // step) — only a genuinely incomplete ref (missing category/subtype/size) still blocks advancing.
   if (!isCompleteRef(item.ref)) return true;
   // required per-item fields (AC-24 operator, AC-26 fuel type, AC-55 quantity ≥ 1)
   if (!item.operatorNeeded) return true;

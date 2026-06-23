@@ -140,6 +140,14 @@ export interface EquipmentItem {
   deliveryOverride: Party | null;
   returnOverride: Party | null;
   fuelResponsibilityOverride: Party | null;
+  /** AC-28: per-item equipment year override. null ⇒ inherit the request-wide year
+   *  (`project.advanced.equipmentYear`). Value is "any" | a 4-digit year | "custom:<text>". */
+  equipmentYear?: string | null;
+  /** Per-item equipment attachments/accessories. `attachmentIds` are admin-defined SubtypeAttachment
+   *  ids for this subtype; `customAttachments` are renter free-text additions. Stored on the request
+   *  item as `attachment_ids` / `custom_attachments` (Json arrays). */
+  attachmentIds?: string[];
+  customAttachments?: string[];
 
   /** AC-57: confidence on agent-prefilled per-item fields (UI badges). */
   fieldConfidence?: {
@@ -260,6 +268,9 @@ export function newManualItem(id: string): EquipmentItem {
     deliveryOverride: null,
     returnOverride: null,
     fuelResponsibilityOverride: null,
+    equipmentYear: null, // inherit request-wide year unless overridden
+    attachmentIds: [],
+    customAttachments: [],
   };
 }
 

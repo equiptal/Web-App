@@ -10,6 +10,8 @@ import { CredentialPills } from "@/components/requests/CredentialPills";
 import { TermsPanel } from "@/components/requests/TermsPanel";
 import { TermClassBadges } from "@/components/requests/TermClassBadges";
 import { DealRoomBanner, SupplierDocs } from "@/components/requests/BidCardExtras";
+import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
+import { useSession } from "@/lib/session";
 import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
 import { useSharedLinkMock, tagSharedLinkBids } from "@/lib/mock/shared-link-bids";
@@ -65,6 +67,8 @@ export function RequestBids({ requestId }: { requestId: string }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [equipBid, setEquipBid] = useState<BidCard | null>(null);
   const [openTermsId, setOpenTermsId] = useState<string | null>(null);
+  const { tier } = useSession();
+  const [quoteGate, setQuoteGate] = useState(false); // unverified → confirm before issuing the quotation
   // web-app/006 demo (staging only) — relabel real bids as off-platform "via shared link".
   const mockEnabled = useSharedLinkMock();
   const [submissionBid, setSubmissionBid] = useState<BidCard | null>(null);
@@ -342,7 +346,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
         <div className="qbar">
           <span className="qn">{selected.size} {L("selected", "محدّد")}</span>
           <span className="qclear" onClick={() => setSelected(new Set())}>{L("Clear", "مسح")}</span>
-          <button className="qdl" onClick={downloadQuotation}>
+          <button className="qdl" onClick={() => (tier === "verified" ? downloadQuotation() : setQuoteGate(true))}>
             <span className="material-icons-outlined">download</span> {L("Download quotation", "تنزيل عرض السعر")}
           </button>
         </div>
@@ -365,6 +369,17 @@ export function RequestBids({ requestId }: { requestId: string }) {
           L={L}
           onClose={() => setSubmissionBid(null)}
           onAddToCompare={() => setSelected((prev) => new Set(prev).add(submissionBid.id))}
+        />
+      )}
+
+      {/* Issue-quotation gate for an unverified renter (company name vs personal name). */}
+      {quoteGate && (
+        <QuotationVerifyGate
+          ar={ar}
+          L={L}
+          onClose={() => setQuoteGate(false)}
+          onVerify={() => { setQuoteGate(false); router.push("/verify"); }}
+          onContinue={() => { setQuoteGate(false); downloadQuotation(); }}
         />
       )}
     </div>

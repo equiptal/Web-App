@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
 import { useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
@@ -39,9 +40,6 @@ export function AppShell({ children, title, fullBleed }: { children: ReactNode; 
     router.push("/login");
   };
 
-  // Static prototype pages (public/*.html) aren't Next routes — hard-navigate to them.
-  const go = (href: string) => (href.endsWith(".html") ? window.location.assign(href) : router.push(href));
-
   const navItems = [
     { key: "home", icon: "home", label: t.shell.home, href: "/" },
     { key: "requests", icon: "grid_view", label: t.shell.requests, href: "/requests" },
@@ -71,15 +69,15 @@ export function AppShell({ children, title, fullBleed }: { children: ReactNode; 
 
         <nav className="flex flex-col gap-0.5">
           {navItems.map((it) => (
-            <button
+            <Link
               key={it.key}
-              onClick={() => go(it.href)}
+              href={it.href}
               className={`flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-[13.5px] font-bold transition ${
                 isActive(it.href) ? "bg-white/10 text-white shadow-[inset_3px_0_0_#f79009]" : "text-white/70 hover:bg-white/[.06] hover:text-white"
               }`}
             >
               <Icon name={it.icon} size={21} /> {it.label}
-            </button>
+            </Link>
           ))}
         </nav>
 
@@ -165,15 +163,15 @@ export function AppShell({ children, title, fullBleed }: { children: ReactNode; 
       {/* Mobile bottom nav — the navy sidebar is desktop-only, so phones navigate from here. */}
       <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-surface md:hidden">
         {navItems.map((it) => (
-          <button
+          <Link
             key={it.key}
-            onClick={() => go(it.href)}
+            href={it.href}
             className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-bold transition ${
               isActive(it.href) ? "text-brand" : "text-muted"
             }`}
           >
             <Icon name={it.icon} size={22} /> {it.label}
-          </button>
+          </Link>
         ))}
       </nav>
     </div>

@@ -160,8 +160,8 @@ const CERT_TOKEN_MAP: Record<string, string> = {
 export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): CreateRequestPayload {
   const { project, preferences } = draft;
   const items = postableItems(draft.items);
-  // Rule 4 + §4.2: project-level fields are stored per-item — compute once, fan out onto each item.
-  const manufactureYear = toManufactureYear(project.advanced.equipmentYear);
+  // Rule 4 + §4.2: project-level fields are stored per-item — fanned out onto each item below. The
+  // equipment year is per-item overridable (AC-28): an item's own year wins over the request-wide one.
   // AC-50: safety certs fanned per-item, mapped to the canonical equipment doc-type enum (see
   // CERT_TOKEN_MAP). Unmapped values are dropped — they could never match a supplier's doc.
   const safetyOtherText = project.certificates.safetyOther.trim();
@@ -210,6 +210,9 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
         categoryId: i.ref.categoryId as string,
         subtypeId: i.ref.subcategoryId as string,
         capacityId: i.ref.measurementId as string,
+        // Per-item attachments: admin-defined ids + free-text customs (trimmed, de-duped, blanks dropped).
+        attachmentIds: i.attachmentIds ?? [],
+        customAttachments: [...new Set((i.customAttachments ?? []).map((s) => s.trim()).filter(Boolean))],
         numberOfUnits: i.quantity,
         operatorIncluded: operatorIncluded ? "YES" : "NO",
         fuelTypePreference: FUEL_MAP[i.fuelType],
@@ -218,7 +221,7 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
         additionalNotes: i.additionalNotes || undefined, // AC-53 (rule 6: needs the deployed item column)
         // Part 1: free-text work type, crane subtypes only (≤255). Trimmed; omitted when blank.
         workType: i.workType?.trim() ? i.workType.trim().slice(0, 255) : undefined,
-        maxEquipmentAge: manufactureYear, // AC-28 project-level year, fanned out (undefined ⇒ key dropped)
+        maxEquipmentAge: toManufactureYear(i.equipmentYear ?? project.advanced.equipmentYear), // AC-28 per-item year, falls back to request-wide (undefined ⇒ key dropped)
         dieselIncluded: toDieselIncluded(i.fuelType, fuelParty), // AC-26
         // Part 2: F.A.T split — each encodes the SIDE (supplier⇒true / me⇒false), omitted without an
         // operator. `fatRequired` is the legacy single flag, kept for back-compat (supplier covers any

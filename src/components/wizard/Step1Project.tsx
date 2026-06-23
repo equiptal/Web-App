@@ -3,11 +3,10 @@
 import dynamic from "next/dynamic";
 import { useT } from "@/lib/i18n";
 import { useRfq, agentMatches } from "@/lib/store/rfq-store";
-import { Card, Field, Icon, Seg2, SelChips, Select, Stepper, TextInput } from "@/components/ui";
+import { Card, Field, Icon, Seg2, SelChips, Stepper, TextInput } from "@/components/ui";
 import {
   RENTAL_BASES,
   OVERTIME_RATES,
-  EQUIPMENT_YEARS,
   type RentalBasis,
   type OvertimeRate,
 } from "@/lib/contract";
@@ -32,7 +31,6 @@ export function Step1Project() {
   const hasLocation = loc.lat != null && loc.lng != null;
   const multi = state.draft!.detectedLocations.filter(Boolean);
   const ap = state.agentOrigin?.project; // agent's original values, for the orange "AI" marker
-  const ey = project.advanced.equipmentYear;
 
   return (
     <div className="space-y-4">
@@ -169,30 +167,22 @@ export function Step1Project() {
             <TextInput type="number" min={1} max={24} value={project.timing.hoursPerDay} onChange={(e) => actions.patchTiming({ hoursPerDay: Number(e.target.value) || 10 })} />
           </Field>
         </div>
-      </Card>
 
-      {/* ---------- Advanced (AC-15/27/28) — open by default ---------- */}
-      <Card title={<><Icon name="tune" size={18} className="me-1.5 align-[-3px] text-navy-mid" />{t.step1.advanced.card} <span className="text-xs font-semibold text-muted">{t.common.optional}</span></>}>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {/* Advanced timing — working days + overtime, merged in from the former "Advanced options"
+            card so all timing settings live in one section (AC-15). Equipment year moved to the
+            Equipment step's "settings for all" panel (request-wide + per item). */}
+        <div className="mt-4 grid grid-cols-1 gap-4 border-t border-border pt-4 sm:grid-cols-2">
           <Field label={t.step1.advanced.workingDays} agent={agentMatches(project.advanced.workingDaysPerWeek, ap?.advanced.workingDaysPerWeek)}>
             <Stepper value={project.advanced.workingDaysPerWeek} min={1} max={7} onChange={(v) => actions.patchAdvanced({ workingDaysPerWeek: v })} />
           </Field>
           <Field label={t.step1.advanced.overtime} agent={agentMatches(project.advanced.overtimeRate, ap?.advanced.overtimeRate)}>
             <Seg2<OvertimeRate> value={project.advanced.overtimeRate} onChange={(v) => actions.patchAdvanced({ overtimeRate: v })} options={opt(OVERTIME_RATES, t.options.overtime)} />
           </Field>
-          <Field label={t.step1.advanced.equipmentYear} optional agent={agentMatches(project.advanced.equipmentYear, ap?.advanced.equipmentYear)}>
-            <Select<string>
-              value={ey}
-              placeholder={t.options.equipmentYear.any}
-              onChange={(v) => actions.patchAdvanced({ equipmentYear: v })}
-              options={EQUIPMENT_YEARS.map((y) => ({ value: y, label: y === "any" ? t.options.equipmentYear.any : y }))}
-            />
-          </Field>
         </div>
       </Card>
 
-      {/* Certificates + Delivery / Return / Fuel responsibility (AC-25/26/50) are unified in the
-          "Settings for all equipment" panel on the Equipment step. */}
+      {/* Certificates + Delivery / Return / Fuel responsibility (AC-25/26/50) + Equipment year (AC-28)
+          are unified in the "Settings for all equipment" panel on the Equipment step. */}
     </div>
   );
 }

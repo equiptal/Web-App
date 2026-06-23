@@ -148,7 +148,6 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
               <div className="kv">
                 <span className="k">{L("Rental basis", "أساس الإيجار")}</span><span className="v">{r.rentalType ?? "—"}</span>
                 <span className="k">{L("Payment terms", "شروط الدفع")}</span><span className="v">{r.paymentTerms ?? "—"}</span>
-                <span className="k">{L("Payment method", "طريقة الدفع")}</span><span className="v">{r.paymentMethod ?? "—"}</span>
                 <span className="k">{L("Working hours", "ساعات العمل")}</span><span className="v">{r.workingHoursPerDay ? `${r.workingHoursPerDay} ${L("hrs/day", "ساعة/يوم")}` : "—"}</span>
                 <span className="k">{L("Maintenance", "الصيانة")}</span><span className="v">{r.maintenanceResponsibility ?? "—"}</span>
                 <span className="k">{L("Budget", "الميزانية")}</span><span className="v">{r.budgetCeiling ? `${Number(r.budgetCeiling).toLocaleString(ar ? "ar-SA" : "en-US")} ${L("SAR", "ر.س")}` : "—"}</span>

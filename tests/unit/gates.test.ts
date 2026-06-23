@@ -38,8 +38,11 @@ describe("gateStep1 (AC-12/16)", () => {
 });
 
 describe("itemBlocksAdvance (AC-18/19/29/33)", () => {
-  it("blocks an unresolved needs-validation item", () => {
-    expect(itemBlocksAdvance(makeItem({ verdict: "needs-validation", resolved: false }))).toBe(true);
+  it("auto-accepts a complete-ref needs-validation item (Need-OK → Matched, no approve step)", () => {
+    expect(itemBlocksAdvance(makeItem({ verdict: "needs-validation", resolved: false }))).toBe(false);
+  });
+  it("still blocks a needs-validation item with an incomplete ref", () => {
+    expect(itemBlocksAdvance(makeItem({ verdict: "needs-validation", resolved: false, ref: { categoryId: "c", subcategoryId: null, measurementId: null } }))).toBe(true);
   });
   it("does not block a no-match item (excluded from broadcast)", () => {
     expect(itemBlocksAdvance(makeItem({ verdict: "no-match" }))).toBe(false);
@@ -52,7 +55,9 @@ describe("itemBlocksAdvance (AC-18/19/29/33)", () => {
   });
   it("gateStep2 ok only when no item blocks", () => {
     expect(gateStep2([makeItem(), makeItem({ id: "i2" })]).ok).toBe(true);
-    expect(gateStep2([makeItem({ verdict: "needs-validation", resolved: false })]).ok).toBe(false);
+    // Need-OK with a complete ref auto-passes; only an incomplete ref still blocks.
+    expect(gateStep2([makeItem({ verdict: "needs-validation", resolved: false })]).ok).toBe(true);
+    expect(gateStep2([makeItem({ ref: { categoryId: "c", subcategoryId: null, measurementId: null } })]).ok).toBe(false);
   });
 });
 
