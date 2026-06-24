@@ -459,8 +459,7 @@ ${row(L("Mobilization + demob", "النقل + الإرجاع"), (c) => m({ value
 ${row(L("Who handles the costs", "من يتحمّل التكاليف"), resp)}
 ${row(L("Year", "سنة الصنع"), (c) => esc(c.bid.equipment?.year ?? "—"))}
 ${row(L("Distance to site", "المسافة للموقع"), (c) => c.bid.distanceKm != null ? `${Math.round(c.bid.distanceKm)} ${L("km", "كم")}` : "—")}
-${row(L("Equipment certificates", "شهادات المعدّة"), (c) => certsOf(c, EQUIP_CERTS, c.bid.equipmentCertCodes ?? []))}
-${row(L("Equipment ownership", "ملكية المعدّة"), ownedOf)}
+${row(L("Equipment certificates & ownership", "شهادات وملكية المعدّة"), (c) => { const parts = [certsOf(c, EQUIP_CERTS, c.bid.equipmentCertCodes ?? []), ownedOf(c)].filter((p) => p !== "—"); return parts.length ? parts.join(", ") : "—"; })}
 ${row(L("Operator certificate", "شهادة المشغّل"), (c) => esc(c.bid.operatorCertDeclared ?? "—"))}
 ${row(L("Verified supplier", "مؤجّر موثّق"), (c) => (c.bid.verified ? yes : no))}
 ${row(L("Company documents", "وثائق الشركة"), docsOf)}
@@ -918,17 +917,24 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                       <RowHead title={L("Distance to site", "المسافة للموقع")} />
                       {cols.map((c) => <Td key={c.bid.id} ok><span className="text-[13px] font-bold">{c.bid.distanceKm != null ? `${Math.round(c.bid.distanceKm)} ${L("km", "كم")}` : <span style={{ color: C.muted }}>—</span>}</span></Td>)}
                     </tr>
-                    {/* L2 equipment safety certs — pills, read from the EQUIPMENT documentKeys only. */}
-                    <CertRow label={L("Equipment certificates", "شهادات المعدّة")} sub={certReqSub(EQUIP_CERTS)} cols={cols} pick={EQUIP_CERTS} certLabel={certLabel} incChip={incChip} heldOf={(c) => c.bid.equipmentCertCodes ?? []} />
-                    {/* L2 equipment proof-of-ownership docs (istimara / customs / sale_contract / saso_registration) — held docs, not pills. */}
+                    {/* L2 equipment — ONE field: safety certs (required ✓/✗ + held) + proof-of-ownership
+                        docs (istimara / customs / sale_contract / saso_registration), combined per column. */}
                     <tr>
-                      <RowHead title={L("Equipment ownership", "ملكية المعدّة")} sub={L("proof-of-ownership docs", "وثائق إثبات الملكية")} />
+                      <RowHead title={L("Equipment certificates & ownership", "شهادات وملكية المعدّة")} sub={certReqSub(EQUIP_CERTS)} />
                       {cols.map((c) => {
+                        const eqCerts = c.bid.equipmentCertCodes ?? [];
                         const owned = c.bid.ownershipDocs ?? [];
+                        const required = EQUIP_CERTS.filter((x) => cols.some((cc) => cc.bid.requiredCerts.includes(x)));
+                        const has = (x: CertCode) => eqCerts.includes(x);
+                        const heldExtra = eqCerts.filter((x) => !required.includes(x));
+                        const anyMissing = required.some((x) => !has(x)); // a required cert not held → red
+                        const hasAny = required.length > 0 || heldExtra.length > 0 || owned.length > 0;
                         return (
-                          <Td key={c.bid.id} ok={owned.length > 0}>
-                            {owned.length ? (
+                          <Td key={c.bid.id} ok={hasAny && !anyMissing} fail={anyMissing}>
+                            {hasAny ? (
                               <div className="flex flex-wrap gap-1.5">
+                                {required.map((x) => <span key={x}>{incChip(certLabel(x), has(x) ? "y" : "n", undefined, has(x) ? "check" : "close")}</span>)}
+                                {heldExtra.map((x) => <span key={x}>{incChip(certLabel(x), "muted", undefined, "check")}</span>)}
                                 {owned.map((o) => <span key={o.key}>{incChip(ar ? o.labelAr : o.labelEn, "y", undefined, "check")}</span>)}
                               </div>
                             ) : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}
@@ -966,14 +972,14 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                       {cols.map((c) => {
                         const k = c.bid.compliance;
                         // L1 company verification docs only (CR/VAT/National + Local Content + SASO registration).
-                        // Show a doc ONLY when held (green ✓). If absent: red ✗ only when the request requires
-                        // it, otherwise hidden. A verified supplier passed company verification, so
-                        // CR/VAT/National read as held even when the field isn't projected.
-                        const verified = c.bid.verified;
+                        // Show a doc ONLY when the supplier ACTUALLY has it (real projected field → green ✓).
+                        // If absent: red ✗ only when the request requires it, otherwise hidden. NOT inferred
+                        // from "verified" — so the row matches the admin panel (a verified supplier may still
+                        // lack a given doc).
                         const docs = [
-                          { lbl: L("Commercial registration", "السجل التجاري"), has: verified || k.activityLicense, req: false },
-                          { lbl: L("VAT number", "الرقم الضريبي"), has: verified || k.taxNumber, req: false },
-                          { lbl: L("National address", "العنوان الوطني"), has: verified || k.nationalAddress, req: false },
+                          { lbl: L("Commercial registration", "السجل التجاري"), has: k.activityLicense, req: false },
+                          { lbl: L("VAT number", "الرقم الضريبي"), has: k.taxNumber, req: false },
+                          { lbl: L("National address", "العنوان الوطني"), has: k.nationalAddress, req: false },
                           { lbl: L("Local Content", "المحتوى المحلي"), has: k.localContent, req: c.bid.requiredCerts.includes("LC") },
                           { lbl: L("SASO registration", "تسجيل ساسو"), has: k.saso, req: c.bid.requiredCerts.includes("SASO") },
                         ].filter((d) => d.has || d.req); // held → show; required-but-missing → show (red); else hide
@@ -1149,34 +1155,4 @@ function Td({ children, ok, fail }: { children: React.ReactNode; ok?: boolean; f
 }
 function Sub({ children }: { children: React.ReactNode }) {
   return <span className="mt-1 block text-[11px] font-semibold" style={{ color: C.muted }}>{children}</span>;
-}
-function CertRow({ label, sub, cols, pick, certLabel, incChip, heldOf }: { label: string; sub: string; cols: BidColumn[]; pick: CertCode[]; certLabel: (c: CertCode) => string; incChip: (label: string, kind: "y" | "n" | "muted", onAdd?: () => void, icon?: string) => React.ReactNode; heldOf?: (c: BidColumn) => CertCode[] }) {
-  // Which held-cert set this row checks against — level-accurate (e.g. equipmentCertCodes), defaulting
-  // to the flat union for back-compat.
-  const heldList = (c: BidColumn) => heldOf?.(c) ?? c.bid.heldCertCodes;
-  return (
-    <tr>
-      <RowHead title={label} sub={sub} />
-      {(() => {
-        // The request's required certs are request-level — take the union across the compared bids so
-        // a requirement (e.g. TÜV) flags EVERY supplier that lacks it, not only the bid that declared it.
-        const required = pick.filter((x) => cols.some((c) => c.bid.requiredCerts.includes(x)));
-        return cols.map((c) => {
-          const has = (x: CertCode) => heldList(c).includes(x);
-          const anyMissing = required.some((x) => !has(x)); // a required cert this supplier doesn't hold → red
-          const heldExtra = heldList(c).filter((x) => pick.includes(x) && !required.includes(x)); // held but not required
-          return (
-            <Td key={c.bid.id} ok={required.length > 0 && !anyMissing} fail={anyMissing}>
-              {required.length || heldExtra.length ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {required.map((x) => <span key={x}>{incChip(certLabel(x), has(x) ? "y" : "n", undefined, has(x) ? "check" : "close")}</span>)}
-                  {heldExtra.map((x) => <span key={x}>{incChip(certLabel(x), "muted", undefined, "check")}</span>)}
-                </div>
-              ) : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}
-            </Td>
-          );
-        });
-      })()}
-    </tr>
-  );
 }

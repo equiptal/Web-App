@@ -353,14 +353,13 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   // flag is set OR it reached verification status 2. Read `isVerified` first — it's the signal the
   // app's bid card trusts; `supplierStatus === 2` is kept as a fallback for older projections.
   const supVerified = sup.isVerified === true || sup.supplierStatus === 2 || prof.verified === true;
-  // Company docs: prefer the actual uploaded doc keys (crDocKey / vatDocKey / nationalAddressDocKey),
-  // with the raw numbers as fallbacks. BUT the bid-list projection often omits these keys, so a
-  // VERIFIED supplier (which by definition passed company verification — CR + VAT + national address
-  // are required to verify) reads as holding them. This mirrors the comparison's Company-documents row
-  // so the card and the matrix agree with the admin panel. LC / SASO stay doc-key-only (optional certs).
-  const hasCr = supVerified || docKey("crDocKey", "cr_doc_key", "crNumber", "commercialRegistrationNumber", "commercial_registration_number", "crFileKey");
-  const hasVat = supVerified || docKey("vatDocKey", "vat_doc_key", "vatNumber", "taxNumber", "tax_number", "vatFileKey");
-  const hasNationalAddr = supVerified || docKey("nationalAddressDocKey", "national_address_doc_key", "nationalId", "national_id", "companyAddress", "company_address", "shortAddress", "short_address", "postalCode", "postal_code", "buildingNumber", "building_number");
+  // Company docs are read from the supplier's REAL verification fields projected in the bid list
+  // (crNumber / vatNumber / national-address parts / localContentDocKey / sasoHeavyEquipDocKey). Show a
+  // doc ONLY when its actual field is present — NEVER inferred from "verified" (a verified supplier can
+  // still lack an optional doc), so the table + card match the admin panel exactly.
+  const hasCr = docKey("crDocKey", "cr_doc_key", "crNumber", "commercialRegistrationNumber", "commercial_registration_number", "crFileKey");
+  const hasVat = docKey("vatDocKey", "vat_doc_key", "vatNumber", "taxNumber", "tax_number", "vatFileKey");
+  const hasNationalAddr = docKey("nationalAddressDocKey", "national_address_doc_key", "nationalId", "national_id", "companyAddress", "company_address", "companyCity", "shortAddress", "short_address", "postalCode", "postal_code", "buildingNumber", "building_number", "district");
   const rq = (raw.request ?? {}) as Record<string, unknown>;
   const rqItem = (Array.isArray(rq.equipmentItems) ? (rq.equipmentItems as Record<string, unknown>[]) : [])[0] ?? {};
   // The safety-cert requirement (TUV/SPSP/SASO) lives in the item's `safetyCertifications`; request-level
@@ -414,6 +413,11 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   const negMobLead = lockedVal((k) => k.includes("leadtime"));
   const negMobPrice = lockedVal((k) => k.includes("mobilizationpricing"));
   const negDemobPrice = lockedVal((k) => k.includes("demobilizationpricing"));
+  // Rate: only reflect a deal-room change once it's CONFIRMED — i.e. the synthetic PRICE term is
+  // locked/agreed (both sides accepted). `raw.currentPrice` is the deal room's lastProposedRate (the
+  // latest PENDING counter), so we ignore it; show the agreed rate if locked, else the supplier's
+  // original submitted offer (`priceAmount`). Same lock-gating as mob/demob above.
+  const negRate = lockedVal((k) => k === "price");
 
   return {
     id: String(raw.id ?? ""),
@@ -425,7 +429,7 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     distanceKm,
     submittedAt: s(raw.createdAt),
     validUntil: s(raw.validUntil),
-    price: n(raw.currentPrice) ?? n(raw.priceAmount),
+    price: n(negRate) ?? n(raw.priceAmount), // confirmed (locked) rate, else the original offer — never the pending counter
     mobPrice: n(negMobPrice) ?? n(raw.mobPrice),
     demobPrice: n(negDemobPrice) ?? n(raw.demobPrice),
     priceUnit: s(raw.priceUnit),

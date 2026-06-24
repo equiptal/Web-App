@@ -24,6 +24,9 @@ export interface DealTerm {
   renteePreference: unknown;
   supplierDeclared: unknown;
   itemLabel: string | null;
+  /** Inline choices for this term (from the resolved T3 platform default) — drives the pill picker
+   *  when countering a non-binary / non-price term. */
+  options: { value: string; labelEn: string; labelAr: string }[];
 }
 
 export interface DealRoomView {
@@ -144,6 +147,11 @@ export function mapDealRoom(raw: unknown): DealRoomView {
       renteePreference: t.renteePreference,
       supplierDeclared: t.supplierDeclared,
       itemLabel: s(t.itemLabel),
+      options: (Array.isArray(t.options) ? (t.options as Record<string, unknown>[]) : []).map((o) => ({
+        value: s(o.value) ?? "",
+        labelEn: s(o.labelEn) ?? s(o.label) ?? s(o.value) ?? "",
+        labelAr: s(o.labelAr) ?? s(o.labelEn) ?? s(o.value) ?? "",
+      })),
     }));
   const hasDisputedTerms = terms.some((t) => t.state === "disputed");
 

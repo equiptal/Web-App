@@ -3,22 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import { StreamChat, type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
-import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, resolveTerm, ApiError } from "@/lib/api/client";
+import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, acceptDeal, ApiError } from "@/lib/api/client";
 import type { DealRoomView, DealRoomDocument, DealRoomDocuments } from "@/lib/contract/deal-room";
+import { CounterOfferFlow } from "@/components/deal-room/CounterOfferFlow";
+import { valText, STATE_META } from "@/components/deal-room/DealRoomTerms";
 import "@/components/deal-room/deal-room-proto.css";
 
 type ChatMsg = { id: string; text?: string; user?: { id?: string }; created_at?: string | Date };
 
 const STREAM_KEY = process.env.NEXT_PUBLIC_STREAM_API_KEY ?? "";
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
-
-/** Render a term value (scalar/bool/null) for display. */
-function fmtVal(v: unknown, L: (en: string, ar: string) => string): string {
-  if (v == null || v === "") return "—";
-  if (typeof v === "boolean") return v ? L("Yes", "نعم") : L("No", "لا");
-  if (typeof v === "number") return String(v);
-  return String(v);
-}
 
 export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) => void }) {
   const { locale } = useLocale();
@@ -30,8 +24,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const [breakdown, setBreakdown] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showAccept, setShowAccept] = useState(false);
-  const [showCounter, setShowCounter] = useState(false);
-  const [counterErr, setCounterErr] = useState<string | null>(null);
+  const [flowOpen, setFlowOpen] = useState(false);
   const [showDocs, setShowDocs] = useState(false);
   const [quoteBusy, setQuoteBusy] = useState(false);
   const [quoteErr, setQuoteErr] = useState<string | null>(null);
@@ -135,36 +128,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
 
   function onCounter() {
     if (!room || busy) return;
-    setCounterErr(null);
-    setShowCounter(true);
-  }
-
-  async function submitCounter(rate: number) {
-    if (!room || busy) return;
-    setBusy(true);
-    setCounterErr(null);
-    try {
-      await proposeRate(id, { proposedRate: rate, priceUnit: "PER_DAY" });
-      await loadRoom();
-      setShowCounter(false);
-    } catch (e) {
-      setCounterErr(errMsg(e, L("Couldn’t send your counter — please try again.", "تعذّر إرسال عرضك المقابل — حاول مرة أخرى.")));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function onResolve(key: string, action: "accept" | "counter", value?: unknown) {
-    if (!room || busy) return;
-    setBusy(true);
-    try {
-      await resolveTerm(id, key, action, value);
-      await loadRoom();
-    } catch (e) {
-      window.alert(errMsg(e, L("Couldn’t update that term — please try again.", "تعذّر تحديث هذا الشرط — حاول مرة أخرى.")));
-    } finally {
-      setBusy(false);
-    }
+    setFlowOpen(true);
   }
 
   async function doAccept() {
@@ -224,7 +188,13 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
       {/* price card */}
       <div className={`price-card ${cardCls}`}>
         <div className="pc-top">
-          {waiting && <span className="turn-chip"><span className="material-icons-outlined">hourglass_top</span>{L("Waiting for supplier response", "في انتظار رد المؤجر")}</span>}
+          {closed ? (
+            <span className="turn-chip done"><span className="material-icons-outlined">verified</span>{L("Accepted", "تم القبول")}</span>
+          ) : room.myTurn ? (
+            <span className="turn-chip mine"><span className="material-icons-outlined">bolt</span>{L("Your move", "دورك")}</span>
+          ) : waiting ? (
+            <span className="turn-chip"><span className="material-icons-outlined">hourglass_top</span>{L("Waiting for supplier response", "في انتظار رد المؤجر")}</span>
+          ) : null}
           <span className="terms-btn"><span className="material-icons-outlined">check_circle</span>{room.contractType ?? L("Terms", "الشروط")}</span>
         </div>
         <div className="pc-body">
@@ -277,33 +247,28 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
             <span className="tc-h-meta">{room.terms.length}{room.hasDisputedTerms ? ` · ${room.terms.filter((tm) => tm.state === "disputed").length} ${L("differ", "مختلف")}` : ""}</span>
             <span className="material-icons-outlined tc-chev" style={{ transform: termsOpen ? "rotate(180deg)" : "none" }}>expand_more</span>
           </button>
-          {termsOpen && room.terms.map((tm) => {
-            const disputed = tm.state === "disputed";
-            const settled = tm.state === "agreed" || tm.state === "fixed" || tm.state === "soft_accepted";
-            return (
-              <div className={`tc-row${disputed ? " differ" : ""}`} key={tm.key + (tm.itemLabel ?? "")}>
-                <div className="tc-main">
-                  <span className="tc-lab">{ar ? tm.labelAr : tm.label}{tm.itemLabel ? <em> · {tm.itemLabel}</em> : null}</span>
-                  {disputed ? (
-                    <span className="tc-diff">
-                      <span>{L("Supplier", "المؤجّر")}: <b>{fmtVal(tm.supplierDeclared, L)}</b></span>
-                      <span>{L("You", "أنت")}: <b>{fmtVal(tm.renteePreference, L)}</b></span>
-                    </span>
-                  ) : (
-                    <span className="tc-val">{fmtVal(tm.value ?? tm.supplierDeclared ?? tm.renteePreference, L)}</span>
-                  )}
-                </div>
-                {disputed ? (
-                  <div className="tc-acts">
-                    <button className="tc-btn ghost" disabled={busy} onClick={() => onResolve(tm.key, "counter", tm.renteePreference)}>{L("Keep mine", "إبقاء عرضي")}</button>
-                    <button className="tc-btn solid" disabled={busy} onClick={() => onResolve(tm.key, "accept")}>{L("Accept supplier’s", "قبول عرض المؤجّر")}</button>
+          {termsOpen && (
+            <div className="terms-review ro">
+              {room.terms.map((tm) => {
+                const st = STATE_META[tm.state] ?? STATE_META.pending;
+                const disputed = tm.state === "disputed";
+                return (
+                  <div className={`tcard tcard-ro${disputed ? " tcard-critical" : ""}`} key={tm.key + (tm.itemLabel ?? "")}>
+                    <div className="tcard-main">
+                      <span className="tcard-lab">{ar ? tm.labelAr : tm.label}{tm.itemLabel ? <em> · {tm.itemLabel}</em> : null}</span>
+                      {disputed ? (
+                        <span className="tcard-diff"><span>{L("Supplier", "المؤجّر")}: <b>{valText(tm.supplierDeclared, L)}</b></span><span>{L("You", "أنت")}: <b>{valText(tm.renteePreference, L)}</b></span></span>
+                      ) : (
+                        <span className="tcard-val">{valText(tm.value ?? tm.supplierDeclared ?? tm.renteePreference, L)}</span>
+                      )}
+                    </div>
+                    <span className={`tcard-state ${st.cls}`}>{ar ? st.ar : st.en}</span>
                   </div>
-                ) : settled ? (
-                  <span className="tc-ok"><span className="material-icons-outlined">check_circle</span></span>
-                ) : null}
-              </div>
-            );
-          })}
+                );
+              })}
+              {room.myTurn && <button type="button" className="btn outline co-open" onClick={onCounter}><span className="material-icons-outlined">swap_horiz</span>{L("Review & counter terms", "مراجعة الشروط وتقديم عرض مضاد")}</button>}
+            </div>
+          )}
         </div>
       )}
 
@@ -352,8 +317,8 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
         <AcceptModal ar={ar} L={L} busy={busy} rate={rate} periods={periods} units={units} grand={grand} onClose={() => !busy && setShowAccept(false)} onConfirm={doAccept} />
       )}
 
-      {showCounter && (
-        <CounterModal ar={ar} L={L} busy={busy} error={counterErr} initialRate={room.rate ?? 0} onClose={() => !busy && setShowCounter(false)} onSubmit={submitCounter} />
+      {flowOpen && (
+        <CounterOfferFlow room={room} id={id} ar={ar} L={L} onClose={() => setFlowOpen(false)} onSubmitted={() => { setFlowOpen(false); void loadRoom(); }} />
       )}
 
       {showDocs && <DocumentsModal id={id} ar={ar} L={L} supplierName={room.supplier.name} onClose={() => setShowDocs(false)} />}
@@ -445,48 +410,6 @@ function fmtDocsTitle(L: (en: string, arr: string) => string, supplierName: stri
 }
 
 /** Styled in-app accept confirmation (replaces the browser confirm) — matches the app's deal dialog. */
-function CounterModal({ ar, L, busy, error, initialRate, onClose, onSubmit }: { ar: boolean; L: (en: string, arr: string) => string; busy: boolean; error: string | null; initialRate: number; onClose: () => void; onSubmit: (rate: number) => void }) {
-  const [val, setVal] = useState(initialRate > 0 ? String(initialRate) : "");
-  const rate = Number(val);
-  const valid = val.trim() !== "" && !Number.isNaN(rate) && rate > 0;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" dir={ar ? "rtl" : "ltr"} onClick={onClose}>
-      <div className="w-full max-w-sm rounded-2xl bg-[var(--surface1,#fff)] p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full" style={{ background: "rgba(247,144,9,.12)" }}>
-          <span className="material-icons-outlined" style={{ color: "var(--action,#f7900a)", fontSize: 26 }}>swap_horiz</span>
-        </div>
-        <h3 className="text-center text-[17px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>{L("Send a counter-offer", "إرسال عرض مقابل")}</h3>
-        <p className="mt-1.5 text-center text-[13px] leading-relaxed" style={{ color: "var(--muted,#6b7280)" }}>
-          {L("Propose your daily rate. The supplier can accept it or counter back.", "اقترح سعرك اليومي. يمكن للمؤجّر قبوله أو الرد بعرض مقابل.")}
-        </p>
-        <label className="mt-4 block">
-          <span className="text-[12px] font-bold" style={{ color: "var(--navy-mid,#33506e)" }}>{L("Your daily rate (SAR)", "سعرك اليومي (ر.س)")}</span>
-          <div className="mt-1 flex items-center gap-2 rounded-[10px] border px-3" style={{ borderColor: "var(--border,#e5e7eb)", background: "var(--surface2,#f5f7fa)" }}>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={1}
-              autoFocus
-              className="h-[44px] w-full bg-transparent text-[15px] font-bold outline-0"
-              style={{ color: "var(--navy,#0f1e2e)" }}
-              value={val}
-              onChange={(e) => setVal(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && valid && !busy) onSubmit(rate); }}
-              placeholder="0"
-            />
-            <span className="flex-none text-[12px] font-bold" style={{ color: "var(--muted,#6b7280)" }}>{L("SAR / day", "ر.س / يوم")}</span>
-          </div>
-        </label>
-        {error && <p className="mt-2 text-[12.5px] font-semibold" style={{ color: "#dc2626" }}>{error}</p>}
-        <div className="mt-5 flex gap-2.5">
-          <button className="flex-1 rounded-[10px] border px-4 py-2.5 text-[13px] font-bold disabled:opacity-50" style={{ borderColor: "var(--border,#e5e7eb)", color: "var(--navy,#0f1e2e)" }} disabled={busy} onClick={onClose}>{L("Cancel", "إلغاء")}</button>
-          <button className="flex-1 rounded-[10px] px-4 py-2.5 text-[13px] font-bold text-white disabled:opacity-50" style={{ background: "var(--action,#f7900a)" }} disabled={busy || !valid} onClick={() => onSubmit(rate)}>{busy ? L("Sending…", "جارٍ الإرسال…") : L("Send counter", "إرسال العرض")}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function AcceptModal({ ar, L, busy, rate, periods, units, grand, onClose, onConfirm }: { ar: boolean; L: (en: string, arr: string) => string; busy: boolean; rate: number; periods: number; units: number; grand: number; onClose: () => void; onConfirm: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" dir={ar ? "rtl" : "ltr"} onClick={onClose}>
