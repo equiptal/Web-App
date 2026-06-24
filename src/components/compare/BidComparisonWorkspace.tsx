@@ -203,7 +203,7 @@ export function BidComparisonWorkspace() {
     const tagged = mockEnabled ? tagSharedLinkBids(bids) : bids;
     return [...tagged, ...uploaded];
   }, [bids, uploaded, mockEnabled]);
-  const comparison = useMemo(() => (raw ? buildItemComparison(raw, { renterCosts, requestDurationDays: reqDurationDays }) : null), [raw, renterCosts, reqDurationDays]);
+  const comparison = useMemo(() => (raw ? buildItemComparison(raw, { renterCosts, requestDurationDays: reqDurationDays, requestResponsibilities: raw[0]?.requestResponsibilities ?? {} }) : null), [raw, renterCosts, reqDurationDays]);
   useEffect(() => {
     if (!comparison) return;
     const all = comparison.columns.map((c) => c.bid.id);
@@ -249,7 +249,29 @@ export function BidComparisonWorkspace() {
   // A cost the renter adds counts toward their total unless the supplier already covers it (AC-12).
   // (Matches the chips: you can only add a cost where bidSide !== "supplier".)
   const renterAddBid = (c: BidColumn) => c.costResponsibilities.reduce((s, x) => (x.renterCost && x.bidSide !== "supplier" ? s + x.renterCost : s), 0) + (renterMob[c.bid.id] ?? 0);
-  const supplierStated = (c: BidColumn) => (c.rental.stated ? c.rental.value : 0) + (c.mob.stated ? c.mob.value : 0) + (c.demob.stated ? c.demob.value : 0);
+  // Mob/demob are PER-UNIT when the supplier handles them (× quantity, like the rate) — not one-time.
+  const mobDemobUnit = (c: BidColumn) => (c.mob.stated ? c.mob.value : 0) + (c.demob.stated ? c.demob.value : 0);
+  const mobDemobTotal = (c: BidColumn) => mobDemobUnit(c) * units;
+  const supplierStated = (c: BidColumn) => (c.rental.stated ? c.rental.value : 0) + mobDemobTotal(c);
+  // L1 company documents (real compliance fields) — shown in the column identity. Present → ✓, required-
+  // but-missing (LC/SASO when the request requires it) → ✗, otherwise hidden.
+  const companyDocChips = (bid: BidColumn["bid"]) => {
+    const k = bid.compliance;
+    return [
+      { lbl: L("CR", "السجل التجاري"), has: k.activityLicense, req: false },
+      { lbl: L("VAT", "الرقم الضريبي"), has: k.taxNumber, req: false },
+      { lbl: L("National address", "العنوان الوطني"), has: k.nationalAddress, req: false },
+      { lbl: L("Local Content", "المحتوى المحلي"), has: k.localContent, req: bid.requiredCerts.includes("LC") },
+      { lbl: L("SASO registration", "تسجيل ساسو"), has: k.saso, req: bid.requiredCerts.includes("SASO") },
+    ].filter((d) => d.has || d.req);
+  };
+  // Equipment/operator terms are ACKNOWLEDGED from the request today (not yet supplier-declared) — a
+  // seamless prompt to confirm them with that supplier in the deal room (only when a room exists).
+  const verifyLink = (c: BidColumn) => c.bid.dealRoomId ? (
+    <button type="button" onClick={() => router.push(`/deal-room/${c.bid.dealRoomId}`)} className="mt-1 inline-flex items-center gap-0.5 text-[10px] font-bold" style={{ color: C.rentee }}>
+      {L("verify in deal room", "تحقّق في غرفة الصفقة")}<span className="material-icons-outlined" style={{ fontSize: 12, transform: ar ? "scaleX(-1)" : undefined }}>arrow_forward</span>
+    </button>
+  ) : null;
   const grandTotal = (c: BidColumn) => Math.round(supplierStated(c) * (1 + VAT)) + renterAddBid(c);
   const hasCost = (c: BidColumn) => supplierStated(c) > 0 || renterAddBid(c) > 0;
   const grandList = cols.filter(hasCost).map(grandTotal);
@@ -455,7 +477,7 @@ ${pickName ? `<div class="pick">★ ${L("AI pick", "اختيار المساعد"
 <table><thead><tr><th class="lbl"></th>${cols.map((c) => `<th>${esc(c.bid.supplierName)}${c.bid.id === pickId ? ' <span class="star">★</span>' : ""}</th>`).join("")}</tr></thead><tbody>
 ${row(L("Total (incl. VAT & your costs)", "الإجمالي (شامل الضريبة وتكاليفك)"), (c) => hasCost(c) ? `${sar} ${nf(grandTotal(c))}${lowestGrand != null ? (grandTotal(c) === lowestGrand ? ` (${L("lowest", "الأقل")})` : ` (+${Math.round(((grandTotal(c) - lowestGrand) / lowestGrand) * 100)}%)`) : ""}` : c.bid.price != null ? `${sar} ${nf(Math.round(c.bid.price * (1 + VAT)))}/${periodLabel(c.bid.priceUnit)} (${L("rate incl. VAT", "السعر شامل الضريبة")})` : "—")}
 ${row(L("Rental cost", "تكلفة الإيجار"), rental)}
-${row(L("Mobilization + demob", "النقل + الإرجاع"), (c) => m({ value: (c.mob.stated ? c.mob.value : 0) + (c.demob.stated ? c.demob.value : 0), stated: c.mob.stated || c.demob.stated }))}
+${row(L("Mobilization + demob", "النقل + الإرجاع"), (c) => m({ value: mobDemobTotal(c), stated: c.mob.stated || c.demob.stated }))}
 ${row(L("Who handles the costs", "من يتحمّل التكاليف"), resp)}
 ${row(L("Year", "سنة الصنع"), (c) => esc(c.bid.equipment?.year ?? "—"))}
 ${row(L("Distance to site", "المسافة للموقع"), (c) => c.bid.distanceKm != null ? `${Math.round(c.bid.distanceKm)} ${L("km", "كم")}` : "—")}
@@ -800,6 +822,17 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                               <span className="material-icons-outlined" style={{ fontSize: 15 }}>close</span>
                             </button>
                           </div>
+                          {/* identity: verified + company documents (moved from Trust & documents) */}
+                          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold" style={c.bid.verified ? { background: C.successBg, color: C.success } : { background: C.dangerBg, color: C.danger }}>
+                              <span className="material-icons-outlined" style={{ fontSize: 12 }}>{c.bid.verified ? "verified_user" : "gpp_bad"}</span>{c.bid.verified ? L("Verified", "موثّق") : L("Not verified", "غير موثّق")}
+                            </span>
+                            {companyDocChips(c.bid).map((d) => (
+                              <span key={d.lbl} className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={d.has ? { background: C.successBg, color: C.success } : { background: C.dangerBg, color: C.danger }}>
+                                <span className="material-icons-outlined" style={{ fontSize: 11 }}>{d.has ? "check" : "close"}</span>{d.lbl}
+                              </span>
+                            ))}
+                          </div>
                           {isPick && <span className="mt-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-extrabold" style={{ background: C.successBg, color: C.success, borderColor: "rgba(29,175,88,.4)" }}><span className="material-icons-outlined" style={{ fontSize: 13, color: C.success }}>auto_awesome</span>{L("AI pick · best match", "اختيار المساعد · الأنسب")}</span>}
                           {recog && <span className="mt-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-bold" style={{ background: C.renteeDim, color: "#1E4FB8", borderColor: "rgba(37,99,235,.28)" }}><span className="material-icons-outlined" style={{ fontSize: 13, color: C.rentee }}>history</span>{recog}</span>}
                           <div className="mt-2.5">
@@ -867,8 +900,12 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         return (
                           <Td key={c.bid.id} ok={!conflict} fail={conflict}>
                             {stated ? (<>
-                              <span className="text-[13px] font-bold">{sar} {nf((c.mob.stated ? c.mob.value : 0) + (c.demob.stated ? c.demob.value : 0))}</span>
-                              <Sub>{`${sar} ${nf(c.mob.value)} ${L("mob", "نقل")} + ${sar} ${nf(c.demob.value)} ${L("demob", "إرجاع")}`}</Sub>
+                              {/* per-unit → × units, mirroring the rental row */}
+                              <span className="inline-flex flex-wrap items-center gap-1.5">
+                                <span className="font-mono font-bold" style={{ color: C.navyMid }}>{sar} {nf(mobDemobUnit(c))}{units > 1 ? <small style={{ fontSize: 10.5, color: C.muted }}>/{L("unit", "وحدة")}</small> : null}</span>
+                                {units > 1 && <><span style={{ color: C.action, fontWeight: 800, transform: ar ? "scaleX(-1)" : undefined }}>→</span><span className="font-mono font-extrabold" style={{ color: C.navy }}>{sar} {nf(mobDemobTotal(c))}</span></>}
+                              </span>
+                              <Sub>{`${sar} ${nf(c.mob.value)} ${L("mob", "نقل")} + ${sar} ${nf(c.demob.value)} ${L("demob", "إرجاع")}${units > 1 ? ` · × ${units} ${L("units", "وحدة")}` : ""}`}</Sub>
                             </>) : rm ? (<>
                               <span className="inline-flex items-center gap-1.5 text-[13px] font-bold">{sar} {nf(rm)}
                                 <button onClick={() => addMobCost(c.bid.id, L("Delivery + pickup", "النقل والإرجاع"))} className="text-[10px] font-bold underline" style={{ color: C.rentee }}>{L("edit", "تعديل")}</button>
@@ -891,12 +928,13 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                           <div className="flex flex-wrap gap-1.5">
                             {RESP_META.map((m) => {
                               const cr = c.costResponsibilities.find((x) => x.key === m.key)!;
-                              // RED only on a real conflict: your request assigned this to the supplier but the bid puts it on you.
-                              // Supplier-covered = green; on you (but not required of the supplier) or unknown = neutral.
-                              // Binary: conflicts with your request → red; otherwise green (incl. a cost you
-                              // chose to bear, or one the bid doesn't state). Supplier-covered → green, no add.
-                              const kind = cr.state === "red" ? "n" : "y";
-                              const canAdd = cr.bidSide !== "supplier"; // on you / not stated → let you enter your figure
+                              // Deal-room conflict for the operator FAT costs (fat_food / fat_accommodation_transport):
+                              // a disputed term → red, even if the static request-vs-bid compare is grey.
+                              const fatKey = m.key === "operator_food" ? "fat_food" : m.key === "operator_transport_accommodation" ? "fat_accommodation_transport" : null;
+                              const dealConflict = fatKey ? (c.bid.negotiableTerms ?? []).some((t) => t.key === fatKey && t.state === "conflict") : false;
+                              const kind = cr.state === "red" || dealConflict ? "n" : "y";
+                              // Add-cost only when YOUR REQUEST puts the cost on you (the rentee); never when it's on the supplier.
+                              const canAdd = cr.requestSide === "me";
                               const entered = renterCosts[m.key]; // your estimate for this cost (if any)
                               return <span key={m.key}>{incChip(ar ? m.ar : m.en, kind, canAdd ? () => addCost(m.key, ar ? m.ar : m.en) : undefined, m.icon, entered, entered != null ? () => removeCost(m.key) : undefined)}</span>;
                             })}
@@ -920,7 +958,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                     {/* L2 equipment — ONE field: safety certs (required ✓/✗ + held) + proof-of-ownership
                         docs (istimara / customs / sale_contract / saso_registration), combined per column. */}
                     <tr>
-                      <RowHead title={L("Equipment certificates & ownership", "شهادات وملكية المعدّة")} sub={certReqSub(EQUIP_CERTS)} />
+                      <RowHead title={L("Equipment certificates & ownership", "شهادات وملكية المعدّة")} sub={`${certReqSub(EQUIP_CERTS)} · ${L("acknowledged — confirm with supplier", "مُقَرّ — أكّده مع المؤجّر")}`} />
                       {cols.map((c) => {
                         const eqCerts = c.bid.equipmentCertCodes ?? [];
                         const owned = c.bid.ownershipDocs ?? [];
@@ -938,6 +976,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                                 {owned.map((o) => <span key={o.key}>{incChip(ar ? o.labelAr : o.labelEn, "y", undefined, "check")}</span>)}
                               </div>
                             ) : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}
+                            {verifyLink(c)}
                           </Td>
                         );
                       })}
@@ -948,54 +987,12 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                       <RowHead title={L("Operator certificate", "شهادة المشغّل")} sub={(() => { const r = cols[0]?.bid.operatorCertReq; return r ? `${L("required", "مطلوب")}: ${r}` : L("declared in the deal room", "يُعلن في غرفة الصفقة"); })()} />
                       {cols.map((c) => {
                         const d = c.bid.operatorCertDeclared;
-                        return <Td key={c.bid.id} ok={!!d}>{d ? incChip(d, "muted", undefined, "badge") : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}</Td>;
+                        return <Td key={c.bid.id} ok={!!d}>{d ? incChip(d, "muted", undefined, "badge") : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}{verifyLink(c)}</Td>;
                       })}
                     </tr>
                   </>)}
 
-                  {/* 🛡️ TRUST & DOCUMENTS */}
-                  <SectionRow id="trust" icon="verified_user" title={L("Trust & documents", "الثقة والوثائق")} accent={C.rentee} accentText="#9DC0FF" n={cols.length} collapsed={collapsed.has("trust")} onToggle={() => toggleSection("trust")} />
-                  {!collapsed.has("trust") && (<>
-                    <tr>
-                      <RowHead title={L("Verified supplier", "مؤجر موثّق")} />
-                      {cols.map((c) => (
-                        <Td key={c.bid.id} ok={c.bid.verified} fail={!c.bid.verified}>
-                          <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-extrabold" style={c.bid.verified ? { background: C.successBg, color: C.success } : { background: C.dangerBg, color: C.danger }}>
-                            <span className="material-icons-outlined" style={{ fontSize: 14 }}>{c.bid.verified ? "verified_user" : "gpp_bad"}</span>{c.bid.verified ? L("Verified", "موثّق") : L("Not verified", "غير موثّق")}
-                          </span>
-                          {c.bid.id.startsWith("upload:") && <Sub>{L("off-platform", "خارج المنصة")}</Sub>}
-                        </Td>
-                      ))}
-                    </tr>
-                    <tr>
-                      <RowHead title={L("Company documents", "وثائق الشركة")} sub={L("from supplier verification", "من توثيق المؤجّر")} />
-                      {cols.map((c) => {
-                        const k = c.bid.compliance;
-                        // L1 company verification docs only (CR/VAT/National + Local Content + SASO registration).
-                        // Show a doc ONLY when the supplier ACTUALLY has it (real projected field → green ✓).
-                        // If absent: red ✗ only when the request requires it, otherwise hidden. NOT inferred
-                        // from "verified" — so the row matches the admin panel (a verified supplier may still
-                        // lack a given doc).
-                        const docs = [
-                          { lbl: L("Commercial registration", "السجل التجاري"), has: k.activityLicense, req: false },
-                          { lbl: L("VAT number", "الرقم الضريبي"), has: k.taxNumber, req: false },
-                          { lbl: L("National address", "العنوان الوطني"), has: k.nationalAddress, req: false },
-                          { lbl: L("Local Content", "المحتوى المحلي"), has: k.localContent, req: c.bid.requiredCerts.includes("LC") },
-                          { lbl: L("SASO registration", "تسجيل ساسو"), has: k.saso, req: c.bid.requiredCerts.includes("SASO") },
-                        ].filter((d) => d.has || d.req); // held → show; required-but-missing → show (red); else hide
-                        const anyMissing = docs.some((d) => d.req && !d.has); // only a REQUIRED missing doc reds the cell
-                        return (
-                          <Td key={c.bid.id} ok={docs.length > 0 && !anyMissing} fail={anyMissing}>
-                            {docs.length ? (
-                              <div className="flex flex-wrap gap-1.5">
-                                {docs.map((d) => <span key={d.lbl}>{incChip(d.lbl, d.has ? "y" : "n", undefined, d.has ? "check" : "close")}</span>)}
-                              </div>
-                            ) : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}
-                          </Td>
-                        );
-                      })}
-                    </tr>
-                  </>)}
+                  {/* Verified supplier + company documents now live in each column's identity header (T1). */}
 
                   {/* actions */}
                   <tr>

@@ -4,26 +4,24 @@ import { useState } from "react";
 import type { DealTerm } from "@/lib/contract/deal-room";
 
 type LFn = (en: string, ar: string) => string;
-
-/** A staged decision for one term inside the counter-offer flow (not yet submitted). */
-export type TermChoice = { choice: "accept" | "keep" | "counter"; value?: unknown };
-export type Decisions = Record<string, TermChoice>;
-type DecideFn = (key: string, choice: TermChoice) => void;
+type ResolveFn = (key: string, action: "accept" | "counter", value?: unknown) => void;
 
 /** App parity (term_card.dart): 5 colour-coded states. */
 export const STATE_META: Record<string, { en: string; ar: string; cls: string }> = {
   fixed: { en: "Fixed", ar: "ثابت", cls: "st-fixed" },
   agreed: { en: "Agreed", ar: "متفق عليه", cls: "st-agreed" },
-  soft_accepted: { en: "Soft accepted", ar: "مقبول مبدئياً", cls: "st-soft" },
-  disputed: { en: "Disputed", ar: "متنازع عليه", cls: "st-disputed" },
+  soft_accepted: { en: "Accepted", ar: "مقبول", cls: "st-agreed" },
+  disputed: { en: "Conflict", ar: "تعارض", cls: "st-disputed" },
   pending: { en: "Pending", ar: "قيد الانتظار", cls: "st-pending" },
 };
 
-/** App parity (terms_review_cubit `_classifyTier`): disputed → critical, pending/soft → review, else matched. */
-export function tierOf(state: string): "critical" | "review" | "matched" {
-  if (state === "disputed") return "critical";
-  if (state === "pending" || state === "soft_accepted") return "review";
-  return "matched"; // agreed | fixed
+/** Resolved (matched/accepted) terms collapse to a green row; conflicted/pending stay open. */
+const isResolved = (state: string) => state === "agreed" || state === "fixed" || state === "soft_accepted";
+/** Sort order on the single screen: conflicts first (open/red), then pending, then resolved (collapsed/green). */
+function order(state: string): number {
+  if (state === "disputed") return 0;
+  if (state === "pending") return 1;
+  return 2;
 }
 
 export function valText(v: unknown, L: LFn): string {
@@ -38,7 +36,6 @@ export function valText(v: unknown, L: LFn): string {
 }
 
 const isPriceKey = (k: string) => /mob|demob|pricing|rate/i.test(k);
-/** App parity (terms_review_sheet `_isBinaryTerm`): scalar (non-list) supplier + rentee values. */
 function isBinary(t: DealTerm): boolean {
   const a = t.supplierDeclared, b = t.renteePreference;
   if (a == null || b == null) return false;
@@ -52,7 +49,7 @@ function CounterEditor({ term, ar, L, onSubmit, onCancel }: { term: DealTerm; ar
   const acts = (disabled: boolean, v: () => unknown) => (
     <div className="tc-counter-acts">
       <button className="tc-btn ghost" type="button" onClick={onCancel}>{L("Cancel", "إلغاء")}</button>
-      <button className="tc-btn solid" type="button" disabled={disabled} onClick={() => onSubmit(v())}>{L("Set counter", "تعيين العرض المضاد")}</button>
+      <button className="tc-btn solid" type="button" disabled={disabled} onClick={() => onSubmit(v())}>{L("Send counter", "إرسال العرض المضاد")}</button>
     </div>
   );
   if (isPriceKey(term.key)) {
@@ -95,13 +92,36 @@ function CounterEditor({ term, ar, L, onSubmit, onCancel }: { term: DealTerm; ar
   );
 }
 
-/** Critical (disputed) term card with staged accept / keep-mine / counter. */
-function CriticalCard({ term, ar, L, decision, onDecide }: { term: DealTerm; ar: boolean; L: LFn; decision?: TermChoice; onDecide: DecideFn }) {
-  const [countering, setCountering] = useState(false);
+/** One term card. Resolved → collapsed green row. Conflict/pending → open card with inline resolve. */
+function TermCard({ term, ar, L, busy, onResolve }: { term: DealTerm; ar: boolean; L: LFn; busy: boolean; onResolve: ResolveFn }) {
   const st = STATE_META[term.state] ?? STATE_META.pending;
-  const chosen = decision?.choice;
+  const disputed = term.state === "disputed";
+  const [open, setOpen] = useState(false); // resolved rows can be expanded on demand
+  const [countering, setCountering] = useState(false);
+
+  // Resolved (matched / accepted) → collapsed green row, tap to peek.
+  if (isResolved(term.state)) {
+    return (
+      <div className="tcard tcard-resolved">
+        <button type="button" className="tcard-resolved-h" onClick={() => setOpen((o) => !o)}>
+          <span className="material-icons-outlined ok-tick">check_circle</span>
+          <span className="tcard-lab">{ar ? term.labelAr : term.label}{term.itemLabel ? <em> · {term.itemLabel}</em> : null}</span>
+          <span className="tcard-val">{valText(term.value ?? term.supplierDeclared ?? term.renteePreference, L)}</span>
+          <span className={`tcard-state ${st.cls}`}>{ar ? st.ar : st.en}</span>
+        </button>
+        {open && (
+          <div className="tcard-peek">
+            <span>{L("Supplier", "المؤجّر")}: <b>{valText(term.supplierDeclared, L)}</b></span>
+            <span>{L("You", "أنت")}: <b>{valText(term.renteePreference, L)}</b></span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Conflict / pending → open card with actions.
   return (
-    <div className={`tcard tcard-critical${chosen ? " decided" : ""}`}>
+    <div className={`tcard ${disputed ? "tcard-critical" : "tcard-pending"}`}>
       <div className="tcard-h">
         <span className="tcard-lab">{ar ? term.labelAr : term.label}{term.itemLabel ? <em> · {term.itemLabel}</em> : null}</span>
         <span className={`tcard-state ${st.cls}`}>{ar ? st.ar : st.en}</span>
@@ -110,21 +130,13 @@ function CriticalCard({ term, ar, L, decision, onDecide }: { term: DealTerm; ar:
         <div className="tcard-v"><span className="k">{L("Supplier", "المؤجّر")}</span><b>{valText(term.supplierDeclared, L)}</b></div>
         <div className="tcard-v mine"><span className="k">{L("You", "أنت")}</span><b>{valText(term.renteePreference, L)}</b></div>
       </div>
-      {chosen && !countering && (
-        <div className="tcard-chosen">
-          <span className="material-icons-outlined">check_circle</span>
-          {chosen === "accept" ? L("Accepting supplier’s", "قبول عرض المؤجّر")
-            : chosen === "keep" ? L("Keeping yours", "الإبقاء على عرضك")
-            : `${L("Countering with", "عرض مضاد بـ")}: ${valText(decision?.value, L)}`}
-        </div>
-      )}
       {countering ? (
-        <CounterEditor term={term} ar={ar} L={L} onCancel={() => setCountering(false)} onSubmit={(v) => { setCountering(false); onDecide(term.key, { choice: "counter", value: v }); }} />
+        <CounterEditor term={term} ar={ar} L={L} onCancel={() => setCountering(false)} onSubmit={(v) => { setCountering(false); onResolve(term.key, "counter", v); }} />
       ) : (
         <div className="tcard-acts">
-          <button className={`tc-btn ghost${chosen === "keep" ? " on" : ""}`} type="button" onClick={() => onDecide(term.key, { choice: "keep", value: term.renteePreference })}>{L("Keep mine", "الإبقاء على عرضي")}</button>
-          <button className={`tc-btn outline${chosen === "counter" ? " on" : ""}`} type="button" onClick={() => setCountering(true)}>{L("Counter", "عرض مضاد")}</button>
-          <button className={`tc-btn solid${chosen === "accept" ? " on" : ""}`} type="button" onClick={() => onDecide(term.key, { choice: "accept" })}>{L("Accept supplier’s", "قبول عرض المؤجّر")}</button>
+          {disputed && <button className="tc-btn ghost" type="button" disabled={busy} onClick={() => onResolve(term.key, "counter", term.renteePreference)}>{L("Keep mine", "الإبقاء على عرضي")}</button>}
+          <button className="tc-btn outline" type="button" disabled={busy} onClick={() => setCountering(true)}>{L("Counter", "عرض مضاد")}</button>
+          <button className="tc-btn solid" type="button" disabled={busy} onClick={() => onResolve(term.key, "accept")}>{disputed ? L("Accept supplier’s", "قبول عرض المؤجّر") : L("Accept", "قبول")}</button>
         </div>
       )}
     </div>
@@ -132,62 +144,16 @@ function CriticalCard({ term, ar, L, decision, onDecide }: { term: DealTerm; ar:
 }
 
 /**
- * Counter-offer Terms page (app parity — terms_review): tiered Critical / Review / Matched, each a
- * colour-coded state card. Decisions are STAGED here (not submitted) and applied together on the flow's
- * summary step.
+ * Deal-room terms — ALL on one screen (app parity, term_card.dart): conflicted terms are open/red with
+ * inline resolve (Accept / Keep mine / Counter); matched & accepted terms collapse to a green row.
+ * Sorted conflicts → pending → resolved. Resolve is immediate (per term), not staged.
  */
-export function DealRoomTerms({ terms, ar, L, decisions, onDecide }: { terms: DealTerm[]; ar: boolean; L: LFn; decisions: Decisions; onDecide: DecideFn }) {
-  const [matchedOpen, setMatchedOpen] = useState(false);
-  if (terms.length === 0) return <p className="co-empty">{L("No terms to review.", "لا توجد شروط للمراجعة.")}</p>;
-  const critical = terms.filter((t) => tierOf(t.state) === "critical");
-  const review = terms.filter((t) => tierOf(t.state) === "review");
-  const matched = terms.filter((t) => tierOf(t.state) === "matched");
-
+export function DealRoomTerms({ terms, ar, L, busy, onResolve }: { terms: DealTerm[]; ar: boolean; L: LFn; busy: boolean; onResolve: ResolveFn }) {
+  if (terms.length === 0) return null;
+  const sorted = [...terms].sort((a, b) => order(a.state) - order(b.state));
   return (
-    <div className="terms-review">
-      {critical.length > 0 && (
-        <div className="tier tier-critical">
-          <div className="tier-h"><span className="material-icons-outlined">priority_high</span>{critical.length} {L("critical", "حرجة")}</div>
-          {critical.map((t) => <CriticalCard key={t.key + (t.itemLabel ?? "")} term={t} ar={ar} L={L} decision={decisions[t.key]} onDecide={onDecide} />)}
-        </div>
-      )}
-      {review.length > 0 && (
-        <div className="tier tier-review">
-          <div className="tier-h"><span className="material-icons-outlined">rule</span>{review.length} {L("review", "مراجعة")}</div>
-          {review.map((t) => {
-            const st = STATE_META[t.state] ?? STATE_META.pending;
-            const chosen = decisions[t.key]?.choice === "accept";
-            return (
-              <div className="tcard tcard-review" key={t.key + (t.itemLabel ?? "")}>
-                <div className="tcard-main">
-                  <span className="tcard-lab">{ar ? t.labelAr : t.label}{t.itemLabel ? <em> · {t.itemLabel}</em> : null}</span>
-                  <span className="tcard-val">{valText(t.value ?? t.supplierDeclared ?? t.renteePreference, L)}</span>
-                </div>
-                <span className={`tcard-state ${st.cls}`}>{ar ? st.ar : st.en}</span>
-                <button className={`tc-btn solid sm${chosen ? " on" : ""}`} type="button" onClick={() => onDecide(t.key, { choice: "accept" })}>{chosen ? L("Accepted", "تم القبول") : L("Accept", "قبول")}</button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {matched.length > 0 && (
-        <div className="tier tier-matched">
-          <button type="button" className="tier-h tier-toggle" aria-expanded={matchedOpen} onClick={() => setMatchedOpen((o) => !o)}>
-            <span className="material-icons-outlined">check_circle</span>{matched.length} {L("matched", "متوافقة")}
-            <span className="material-icons-outlined tier-chev" style={{ transform: matchedOpen ? "rotate(180deg)" : "none" }}>expand_more</span>
-          </button>
-          {matchedOpen && matched.map((t) => {
-            const st = STATE_META[t.state] ?? STATE_META.agreed;
-            return (
-              <div className="tcard tcard-matched" key={t.key + (t.itemLabel ?? "")}>
-                <span className="tcard-lab">{ar ? t.labelAr : t.label}{t.itemLabel ? <em> · {t.itemLabel}</em> : null}</span>
-                <span className="tcard-val">{valText(t.value ?? t.supplierDeclared ?? t.renteePreference, L)}</span>
-                <span className={`tcard-state ${st.cls}`}>{ar ? st.ar : st.en}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
+    <div className="terms-list">
+      {sorted.map((tm) => <TermCard key={tm.key + (tm.itemLabel ?? "")} term={tm} ar={ar} L={L} busy={busy} onResolve={onResolve} />)}
     </div>
   );
 }

@@ -133,6 +133,9 @@ export interface BidCard {
   /** Web comparison-only: the full deal-room negotiable + acknowledge terms (overlaid live). Feeds the
    *  side-by-side "Negotiable terms" section; NOT shown on the bid card so the card matches the app. */
   negotiableTerms?: TermRow[];
+  /** Who the RENTEE asked to bear each cost (from the request) — drives the comparison's add-cost
+   *  gating (add only when it's on the rentee) and conflict colouring. supplier / me. */
+  requestResponsibilities?: Partial<Record<"fuel" | "maintenance" | "overtime" | "operator_food" | "operator_transport_accommodation", "supplier" | "me">>;
   /** The renter's RFQ term values (raw) — rendered as Equipment-terms + Contract-terms cards in the
    *  generated quotation. Request-level (payment/maintenance) + first-item operator/fuel. */
   requestTerms: {
@@ -362,6 +365,26 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   const hasNationalAddr = docKey("nationalAddressDocKey", "national_address_doc_key", "nationalId", "national_id", "companyAddress", "company_address", "companyCity", "shortAddress", "short_address", "postalCode", "postal_code", "buildingNumber", "building_number", "district");
   const rq = (raw.request ?? {}) as Record<string, unknown>;
   const rqItem = (Array.isArray(rq.equipmentItems) ? (rq.equipmentItems as Record<string, unknown>[]) : [])[0] ?? {};
+  // Who the RENTEE asked to bear each cost (request side): diesel-included / FAT split → supplier|me.
+  const respSide = (v: unknown): "supplier" | "me" | undefined => {
+    if (v === true) return "supplier";
+    if (v === false) return "me";
+    const sv = typeof v === "string" ? v.toLowerCase() : "";
+    if (sv === "supplier") return "supplier";
+    if (sv === "rentee" || sv === "me") return "me";
+    return undefined;
+  };
+  const requestResponsibilities: NonNullable<BidCard["requestResponsibilities"]> = {};
+  {
+    const fuel = respSide(rqItem.dieselIncluded ?? rqItem.diesel_included);
+    const food = respSide(rqItem.fatFood ?? rqItem.fat_food);
+    const trans = respSide(rqItem.fatAccommodationTransport ?? rqItem.fat_accommodation_transport);
+    const m = s(rq.maintenanceResponsibility)?.toLowerCase();
+    if (fuel) requestResponsibilities.fuel = fuel;
+    if (m) requestResponsibilities.maintenance = m.includes("supplier") || m.includes("مؤجّر") ? "supplier" : "me";
+    if (food) requestResponsibilities.operator_food = food;
+    if (trans) requestResponsibilities.operator_transport_accommodation = trans;
+  }
   // The safety-cert requirement (TUV/SPSP/SASO) lives in the item's `safetyCertifications`; request-level
   // `requiredCerts` carries LC / SASO-registration etc. Union both so the cert rows reflect what the
   // request actually asks for (new web/agent requests put safety certs only in safetyCertifications).
@@ -455,6 +478,7 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     expired: expired || raw.isExpired === true || raw.status === "EXPIRED",
     note: s(raw.note),
     requiredCerts,
+    requestResponsibilities,
     heldCertCodes: held,
     companyCertCodes,
     equipmentCertCodes,

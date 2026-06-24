@@ -252,3 +252,14 @@
 /* turn chip variants on the price card */
 .dlproto .turn-chip.mine { background: rgba(247,144,9,.14); color: #8a5a06; }
 .dlproto .turn-chip.done { background: var(--success-bg,#e7f7ee); color: var(--success,#1daf58); }
+
+/* ── One-screen deal-room terms (DealRoomTerms): conflicts open/red, matched collapsed/green ── */
+.dlproto .terms-list { display: flex; flex-direction: column; gap: 8px; padding: 4px 2px 2px; }
+.dlproto .tcard-pending { border-inline-start: 3px solid var(--warning,#d4780a); }
+/* resolved (matched / accepted) → collapsed green row, tap to peek */
+.dlproto .tcard-resolved { padding: 0; background: var(--success-bg,#e7f7ee); border-color: rgba(29,175,88,.28); }
+.dlproto .tcard-resolved-h { display: flex; align-items: center; gap: 9px; width: 100%; background: none; border: 0; cursor: pointer; padding: 10px 14px; font: inherit; text-align: start; }
+.dlproto .tcard-resolved-h .ok-tick { color: var(--success,#1daf58); font-size: 18px; flex: 0 0 auto; }
+.dlproto .tcard-resolved .tcard-val { margin-inline-start: auto; color: var(--navy-mid,#2a4f72); font-weight: 700; }
+.dlproto .tcard-peek { display: flex; flex-wrap: wrap; gap: 18px; padding: 0 14px 11px 38px; font-size: 12px; color: var(--muted,#6b8fa8); }
+.dlproto .tcard-peek b { color: var(--navy,#1c3550); }
