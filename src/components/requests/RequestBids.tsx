@@ -9,7 +9,7 @@ import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { CredentialPills } from "@/components/requests/CredentialPills";
 import { TermsPanel } from "@/components/requests/TermsPanel";
 import { TermClassBadges } from "@/components/requests/TermClassBadges";
-import { DealRoomBanner, SupplierDocs } from "@/components/requests/BidCardExtras";
+import { DealRoomBanner, SupplierDocs, EquipmentDocs } from "@/components/requests/BidCardExtras";
 import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
 import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
@@ -246,8 +246,8 @@ export function RequestBids({ requestId }: { requestId: string }) {
                   {b.rating != null && <span className="credpill cp-ok"><span className="material-icons-outlined">star</span>{b.rating.toFixed(1)}</span>}
                   <CredentialPills required={b.requiredCerts} held={b.heldCertCodes} ar={ar} />
                 </div>
-                {/* supplier credentials on file — identity docs (CR / VAT / National address) + held certs */}
-                <SupplierDocs compliance={b.compliance} heldCerts={b.heldCertCodes} requiredCerts={b.requiredCerts} ar={ar} />
+                {/* Company documents on file (Level 1) — CR / VAT / National address + LC / SASO registration */}
+                <SupplierDocs compliance={b.compliance} companyCerts={b.companyCertCodes ?? []} ar={ar} />
               </div>
               <div className={`bid-check${isSel ? " on" : ""}`} onClick={() => toggleSelect(b.id)} title={L("Select for quotation", "حدّد لعرض السعر")}>
                 <span className="material-icons-outlined">check</span>
@@ -282,6 +282,8 @@ export function RequestBids({ requestId }: { requestId: string }) {
               <div className="el">
                 <div className="elab">{L("Equipment", "المعدة")}{b.eqVerified && <span className="material-icons-outlined vt">verified</span>}{units > 1 && <span className="qty-badge">× {units}</span>}</div>
                 <div className="esub">{b.distanceKm != null ? `${Math.round(b.distanceKm)} ${L("km from the project", "كم من المشروع")}` : L("Distance not shared", "المسافة غير محددة")}</div>
+                {/* Equipment certs + proof-of-ownership docs on file (Level 2) */}
+                <EquipmentDocs equipmentCerts={b.equipmentCertCodes ?? []} ownershipDocs={b.ownershipDocs} ar={ar} />
               </div>
               {b.equipment?.id && (
                 <span className="equip-view">

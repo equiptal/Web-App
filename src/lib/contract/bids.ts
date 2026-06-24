@@ -353,13 +353,14 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   // flag is set OR it reached verification status 2. Read `isVerified` first — it's the signal the
   // app's bid card trusts; `supplierStatus === 2` is kept as a fallback for older projections.
   const supVerified = sup.isVerified === true || sup.supplierStatus === 2 || prof.verified === true;
-  // App parity (counterparty_identity_row): a company doc is "held" only when the supplier ACTUALLY
-  // uploaded it in their verification submission — check the document keys that submission stores
-  // (crDocKey / vatDocKey / nationalAddressDocKey), with the raw values as fallbacks. No static
-  // "verified ⇒ has all docs" assumption.
-  const hasCr = docKey("crDocKey", "cr_doc_key", "crNumber", "commercialRegistrationNumber", "commercial_registration_number", "crFileKey");
-  const hasVat = docKey("vatDocKey", "vat_doc_key", "vatNumber", "taxNumber", "tax_number", "vatFileKey");
-  const hasNationalAddr = docKey("nationalAddressDocKey", "national_address_doc_key", "nationalId", "national_id", "companyAddress", "company_address", "shortAddress", "short_address", "postalCode", "postal_code", "buildingNumber", "building_number");
+  // Company docs: prefer the actual uploaded doc keys (crDocKey / vatDocKey / nationalAddressDocKey),
+  // with the raw numbers as fallbacks. BUT the bid-list projection often omits these keys, so a
+  // VERIFIED supplier (which by definition passed company verification — CR + VAT + national address
+  // are required to verify) reads as holding them. This mirrors the comparison's Company-documents row
+  // so the card and the matrix agree with the admin panel. LC / SASO stay doc-key-only (optional certs).
+  const hasCr = supVerified || docKey("crDocKey", "cr_doc_key", "crNumber", "commercialRegistrationNumber", "commercial_registration_number", "crFileKey");
+  const hasVat = supVerified || docKey("vatDocKey", "vat_doc_key", "vatNumber", "taxNumber", "tax_number", "vatFileKey");
+  const hasNationalAddr = supVerified || docKey("nationalAddressDocKey", "national_address_doc_key", "nationalId", "national_id", "companyAddress", "company_address", "shortAddress", "short_address", "postalCode", "postal_code", "buildingNumber", "building_number");
   const rq = (raw.request ?? {}) as Record<string, unknown>;
   const rqItem = (Array.isArray(rq.equipmentItems) ? (rq.equipmentItems as Record<string, unknown>[]) : [])[0] ?? {};
   // The safety-cert requirement (TUV/SPSP/SASO) lives in the item's `safetyCertifications`; request-level

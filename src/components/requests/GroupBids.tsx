@@ -7,7 +7,7 @@ import { fetchBids, startDealRoom } from "@/lib/api/client";
 import { CredentialPills } from "@/components/requests/CredentialPills";
 import { TermsPanel } from "@/components/requests/TermsPanel";
 import { TermClassBadges } from "@/components/requests/TermClassBadges";
-import { DealRoomBanner, SupplierDocs } from "@/components/requests/BidCardExtras";
+import { DealRoomBanner, SupplierDocs, EquipmentDocs } from "@/components/requests/BidCardExtras";
 import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
 import { useSharedLinkMock, tagSharedLinkBids } from "@/lib/mock/shared-link-bids";
@@ -361,11 +361,20 @@ export function GroupBids({ group }: { group: RequestGroup }) {
         <div class="q-body">
           <div class="parties">
             <div class="party"><div class="plabel">${esc(L("Supplier", "المؤجّر"))}</div><div class="pname">${esc(sup.supplierName)}</div><div class="pmeta">${[sup.verified ? esc(L("Verified supplier", "مؤجّر موثّق")) : "", sup.rating != null ? "★ " + sup.rating.toFixed(1) : ""].filter(Boolean).join(" · ")}</div>${(() => {
+              // Company / business documents the supplier holds — same set as the comparison's
+              // Company-documents row: CR / VAT / National address + Local Content + SASO registration.
               const c = sup.compliance;
-              const docs = [c.activityLicense && L("CR", "السجل التجاري"), c.taxNumber && L("VAT", "الرقم الضريبي"), c.nationalAddress && L("National address", "العنوان الوطني")].filter(Boolean) as string[];
+              const cc = sup.companyCertCodes ?? [];
+              const docs = [
+                c.activityLicense && L("CR", "السجل التجاري"),
+                c.taxNumber && L("VAT", "الرقم الضريبي"),
+                c.nationalAddress && L("National address", "العنوان الوطني"),
+                cc.includes("LC") && L("Local content", "المحتوى المحلي"),
+                cc.includes("SASO") && L("SASO registration", "تسجيل ساسو"),
+              ].filter(Boolean) as string[];
               return docs.length ? `<div class="docs">${docs.map((d) => `<span class="doc-ok">✓ ${esc(d)}</span>`).join("")}</div>` : "";
             })()}</div>
-            <div class="party"><div class="plabel">${esc(L("Rentee", "المستأجر"))}</div><div class="pname">${esc(rentee.name)}</div><div class="pmeta">${esc(rentee.org)}${rentee.city ? " · " + esc(rentee.city) : ""}</div></div>
+            <div class="party"><div class="plabel">${esc(L("Rentee", "المستأجر"))}</div><div class="pname">${esc(rentee.name)}</div><div class="pmeta">${[verified ? esc(L("Verified renter", "مستأجر موثّق")) : "", esc(rentee.org), rentee.city ? esc(rentee.city) : ""].filter(Boolean).join(" · ")}</div></div>
           </div>
           <div class="metastrip">
             <div><span>${esc(L("Request #", "رقم الطلب"))}</span><b>${esc(reqLabel)}</b></div>
@@ -565,8 +574,8 @@ export function GroupBids({ group }: { group: RequestGroup }) {
                   {b.rating != null && <><span className="dotsep">·</span><span className="star"><span className="material-icons-outlined">star</span>{b.rating.toFixed(1)}</span></>}
                 </div>
                 <CredentialPills required={b.requiredCerts} held={b.heldCertCodes} ar={ar} />
-                {/* supplier credentials on file — identity docs (CR / VAT / National address) + held certs */}
-                <SupplierDocs compliance={b.compliance} heldCerts={b.heldCertCodes} requiredCerts={b.requiredCerts} ar={ar} />
+                {/* Company documents on file (Level 1) — CR / VAT / National address + LC / SASO registration */}
+                <SupplierDocs compliance={b.compliance} companyCerts={b.companyCertCodes ?? []} ar={ar} />
               </div>
               <div className={`bid-check${isSel ? " on" : ""}`} onClick={() => toggleSelect(b.id)} title={L("Select for quotation", "حدّد لعرض السعر")}>
                 <span className="material-icons-outlined">check</span>
@@ -585,6 +594,8 @@ export function GroupBids({ group }: { group: RequestGroup }) {
               <div className="el">
                 <div className="elab">{L("Equipment", "المعدة")}{b.eqVerified && <span className="material-icons-outlined vt">verified</span>}</div>
                 <div className="esub">{b.distanceKm != null ? `${Math.round(b.distanceKm)} ${L("km from the project", "كم من المشروع")}` : L("Distance not shared", "المسافة غير محددة")}</div>
+                {/* Equipment certs + proof-of-ownership docs on file (Level 2) */}
+                <EquipmentDocs equipmentCerts={b.equipmentCertCodes ?? []} ownershipDocs={b.ownershipDocs} ar={ar} />
               </div>
               {b.equipment?.id && (
                 <span className="equip-view">

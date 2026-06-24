@@ -31,22 +31,6 @@ const RESP_META: { key: CostResponsibility["key"]; en: string; ar: string; icon:
   { key: "operator_transport_accommodation", en: "Operator transport & accom", ar: "تنقّل وإقامة المشغّل", icon: "card_travel" },
 ];
 
-/** Negotiable / acknowledge terms shown live in the matrix (keys = canonical deal-room term keys, so
- *  each row reflects the deal room: locked→agreed, counter→negotiating, deviation→conflict). */
-const TERM_ROWS: { key: string; en: string; ar: string }[] = [
-  { key: "payment_terms", en: "Payment terms", ar: "شروط الدفع" },
-  { key: "breakdown_response_sla", en: "Breakdown response", ar: "زمن الاستجابة للأعطال" },
-  { key: "overtime_rate", en: "Overtime rate", ar: "معدل العمل الإضافي" },
-  { key: "maintenance_responsibility", en: "Maintenance", ar: "الصيانة" },
-  { key: "operator_included", en: "Operator included", ar: "تشمل مشغّل" },
-  { key: "operator_nationality", en: "Operator nationality", ar: "جنسية المشغّل" },
-  { key: "fat_food", en: "Operator FAT — Food", ar: "الإعاشة — الطعام" },
-  { key: "fat_accommodation_transport", en: "Operator FAT — Accom/Transport", ar: "الإعاشة — الإقامة/النقل" },
-  { key: "fuel_responsibility", en: "Fuel responsibility", ar: "مسؤولية الوقود" },
-  { key: "mobilization_pricing", en: "Mobilization pricing", ar: "تسعير النقل" },
-  { key: "demobilization_pricing", en: "Demobilization pricing", ar: "تسعير الإرجاع" },
-];
-
 interface LocationNode { key: string; label: string; groups: RequestGroup[]; itemCount: number; bidCount: number }
 interface ChatMsg { role: "mansour" | "user"; text: string }
 
@@ -458,7 +442,6 @@ export function BidComparisonWorkspace() {
     const m = (x: { value: number; stated: boolean }) => (x.stated ? `${sar} ${nf(x.value)}` : "—");
     const certsOf = (c: BidColumn, pick: CertCode[], held: CertCode[] = c.bid.heldCertCodes) => { const h = held.filter((x) => pick.includes(x)).map(certLabel); return h.length ? esc(h.join(", ")) : "—"; };
     const ownedOf = (c: BidColumn) => { const o = (c.bid.ownershipDocs ?? []).map((x) => (ar ? x.labelAr : x.labelEn)); return o.length ? esc(o.join(", ")) : "—"; };
-    const termTextOf = (c: BidColumn, key: string) => { const st = (c.bid.negotiableTerms ?? []).find((r) => r.key === key)?.state; const map: Record<string, [string, string]> = { agreed: ["Agreed", "متفق"], matched: ["Matches", "مطابق"], negotiating: ["Negotiating", "قيد التفاوض"], conflict: ["Conflict", "تعارض"] }; const v = st ? map[st] : undefined; return v ? esc(L(v[0], v[1])) : "—"; };
     const docsOf = (c: BidColumn) => { const d: string[] = []; const k = c.bid.compliance; if (k.localContent) d.push(L("Local Content", "المحتوى المحلي")); if (k.saso) d.push("SASO"); if (k.activityLicense) d.push(L("Activity license", "رخصة النشاط")); if (k.taxNumber) d.push(L("Tax number", "الرقم الضريبي")); if (k.nationalAddress) d.push(L("National address", "العنوان الوطني")); return d.length ? esc(d.join(", ")) : "—"; };
     const rental = (c: BidColumn) => c.bid.price == null ? "—" : c.rental.stated ? `${sar} ${nf(c.bid.price)}/${periodLabel(c.bid.priceUnit)} → ${sar} ${nf(c.rental.value)}` : `${sar} ${nf(c.bid.price)}/${periodLabel(c.bid.priceUnit)}`;
     const resp = (c: BidColumn) => c.costResponsibilities.map((r) => `${esc(ar ? r.labelAr : r.labelEn)}: ${r.bidSide === "supplier" ? sup : r.bidSide === "me" ? you : "—"}`).join("<br>");
@@ -479,7 +462,6 @@ ${row(L("Distance to site", "المسافة للموقع"), (c) => c.bid.distanc
 ${row(L("Equipment certificates", "شهادات المعدّة"), (c) => certsOf(c, EQUIP_CERTS, c.bid.equipmentCertCodes ?? []))}
 ${row(L("Equipment ownership", "ملكية المعدّة"), ownedOf)}
 ${row(L("Operator certificate", "شهادة المشغّل"), (c) => esc(c.bid.operatorCertDeclared ?? "—"))}
-${TERM_ROWS.map((tr) => row(L(tr.en, tr.ar), (c) => termTextOf(c, tr.key))).join("")}
 ${row(L("Verified supplier", "مؤجّر موثّق"), (c) => (c.bid.verified ? yes : no))}
 ${row(L("Company documents", "وثائق الشركة"), docsOf)}
 </tbody></table>
@@ -508,21 +490,6 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
         ) : onAdd ? <button onClick={onAdd} className="inline-flex items-center gap-0.5 rounded-full border px-1.5 text-[9.5px] font-extrabold" style={{ color: C.rentee, borderColor: "rgba(37,99,235,.4)", background: "#fff" }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>add</span>{L("cost", "تكلفة")}</button> : null}
       </span>
     );
-  };
-  // A term's live state for one bid — from the comparison-only expanded negotiable set (deal-room
-  // overlaid). Kept separate from the bid-card buckets so the card stays app-faithful.
-  const termState = (c: BidColumn, key: string): string => (c.bid.negotiableTerms ?? []).find((r) => r.key === key)?.state ?? "grey";
-  // Term-state chip: deal-room-aware (agreed=locked, negotiating=open counter, conflict=deviation).
-  const termChip = (st: string) => {
-    const m: Record<string, { bg: string; fg: string; label: string; icon: string }> = {
-      agreed: { bg: C.successBg, fg: C.success, label: L("Agreed", "متفق"), icon: "lock" },
-      matched: { bg: C.successBg, fg: C.success, label: L("Matches", "مطابق"), icon: "check" },
-      negotiating: { bg: "#FFF4E5", fg: "#8A5A06", label: L("Negotiating", "قيد التفاوض"), icon: "sync" },
-      conflict: { bg: C.dangerBg, fg: C.danger, label: L("Conflict", "تعارض"), icon: "priority_high" },
-    };
-    const v = m[st];
-    if (!v) return <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>;
-    return <span className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold" style={{ background: v.bg, color: v.fg }}><span className="material-icons-outlined" style={{ fontSize: 13 }}>{v.icon}</span>{v.label}</span>;
   };
   // Sub-label for a cert row = the request's actual required certs in that class ("TÜV required").
   const certReqSub = (pick: CertCode[]) => {
@@ -979,15 +946,6 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                       })}
                     </tr>
                   </>)}
-
-                  {/* 📝 NEGOTIABLE TERMS — live with the deal room (locked→agreed, counter→negotiating, deviation→conflict). */}
-                  <SectionRow id="terms" icon="gavel" title={L("Negotiable terms", "الشروط القابلة للتفاوض") + (hasActiveDealRoom ? L(" · live", " · مباشر") : "")} accent={C.rentee} accentText="#9DC0FF" n={cols.length} collapsed={collapsed.has("terms")} onToggle={() => toggleSection("terms")} />
-                  {!collapsed.has("terms") && TERM_ROWS.map((tr) => (
-                    <tr key={tr.key}>
-                      <RowHead title={L(tr.en, tr.ar)} />
-                      {cols.map((c) => { const st = termState(c, tr.key); return <Td key={c.bid.id} ok={st === "matched" || st === "agreed"} fail={st === "conflict"}>{termChip(st)}</Td>; })}
-                    </tr>
-                  ))}
 
                   {/* 🛡️ TRUST & DOCUMENTS */}
                   <SectionRow id="trust" icon="verified_user" title={L("Trust & documents", "الثقة والوثائق")} accent={C.rentee} accentText="#9DC0FF" n={cols.length} collapsed={collapsed.has("trust")} onToggle={() => toggleSection("trust")} />

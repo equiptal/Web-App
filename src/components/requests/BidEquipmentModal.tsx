@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocale } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
-import type { BidCard, CertCode } from "@/lib/contract/bids";
+import { CERT_LABEL, type BidCard, type CertCode } from "@/lib/contract/bids";
 import type { EquipmentDetail } from "@/lib/contract/stores";
 
 /** Cert thumbnails shown in the strip (013 AC-07): SASO, Local content, TÜV+SPSP — grouped. */
@@ -58,7 +58,10 @@ export function BidEquipmentModal({
   }, [equipmentId]);
 
   const photos = eq?.photos ?? [];
-  const slots = useMemo(() => certSlots(bid.heldCertCodes), [bid.heldCertCodes]);
+  // Equipment-level certs only (TÜV/SPSP/SASO) — company LC/SASO registration belong to the supplier docs.
+  const slots = useMemo(() => certSlots(bid.equipmentCertCodes ?? []), [bid.equipmentCertCodes]);
+  const ownership = bid.ownershipDocs ?? [];
+  const eqCerts = bid.equipmentCertCodes ?? [];
   const title = eq ? (ar ? eq.category : eq.category) || (ar ? eq.subcategory : eq.subcategory) || "—" : "—";
   const measurement = eq ? (ar ? eq.measurementAr : eq.measurement) : null;
   const subtitle = eq ? [eq.manufacturer, eq.modelName, eq.year != null ? String(eq.year) : null].filter(Boolean).join(" · ") : "";
@@ -159,6 +162,25 @@ export function BidEquipmentModal({
                   <div className="mt-1 text-[15px] font-bold text-navy">{measurement || "—"}</div>
                 </div>
               </div>
+
+              {/* Equipment certificates + proof-of-ownership docs on file (Level 2) */}
+              {(eqCerts.length > 0 || ownership.length > 0) && (
+                <div>
+                  <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-muted">{L("Certificates & ownership on file", "الشهادات والملكية المتوفّرة")}</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {eqCerts.map((c) => (
+                      <span key={c} className="inline-flex items-center gap-1 rounded-full border border-ok/30 bg-ok-soft px-2.5 py-1 text-[12px] font-bold text-navy">
+                        <Icon name="check" size={13} className="text-ok" />{ar ? CERT_LABEL[c].ar : CERT_LABEL[c].en}
+                      </span>
+                    ))}
+                    {ownership.map((o) => (
+                      <span key={o.key} className="inline-flex items-center gap-1 rounded-full border border-ok/30 bg-ok-soft px-2.5 py-1 text-[12px] font-bold text-navy">
+                        <Icon name="check" size={13} className="text-ok" />{ar ? o.labelAr : o.labelEn}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

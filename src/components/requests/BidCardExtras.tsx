@@ -38,36 +38,69 @@ export function DealRoomBanner({ bid, ar }: { bid: BidCard; ar: boolean }) {
 }
 
 /**
- * Supplier credentials on the card face — what the supplier actually has on file: identity documents
- * (Commercial registration / VAT / National address) plus the safety certificates they hold
- * (TÜV / SASO / SPSP / Local content). Certs already shown as required-vs-held pills are excluded to
- * avoid duplication. Renders nothing when there's nothing on file (so a sparse supplier shows no
- * false credentials). The identity docs depend on the backend exposing the doc keys.
+ * COMPANY documents on file (Level 1 — supplier verification), shown beside the supplier/company name:
+ * Commercial registration / VAT / National address + Local Content + SASO registration. These are
+ * company-level docs; equipment certs/ownership are shown separately by `EquipmentDocs`. Renders
+ * nothing when the supplier has none on file.
  */
 export function SupplierDocs({
   compliance,
-  heldCerts,
-  requiredCerts,
+  companyCerts,
   ar,
 }: {
   compliance: BidCard["compliance"];
-  heldCerts: CertCode[];
-  requiredCerts: CertCode[];
+  companyCerts: CertCode[];
   ar: boolean;
 }) {
   const L: LFn = (en, arr) => (ar ? arr : en);
-  const reqSet = new Set(requiredCerts);
   const docs: string[] = [
     compliance.activityLicense && L("CR", "السجل التجاري"),
     compliance.taxNumber && L("VAT", "الرقم الضريبي"),
     compliance.nationalAddress && L("National address", "العنوان الوطني"),
-    ...heldCerts.filter((c) => !reqSet.has(c)).map((c) => (ar ? CERT_LABEL[c].ar : CERT_LABEL[c].en)),
+    companyCerts.includes("LC") && L("Local content", "المحتوى المحلي"),
+    companyCerts.includes("SASO") && L("SASO registration", "تسجيل ساسو"),
   ].filter(Boolean) as string[];
   if (docs.length === 0) return null;
   return (
     <div className="sup-docs">
-      <span className="sd-lab">{L("On file", "موثّق")}</span>
+      <span className="sd-lab">{L("Company docs", "وثائق الشركة")}</span>
       {docs.map((d) => (
+        <span key={d} className="sd-chip">
+          <span className="material-icons-outlined">check</span>
+          {d}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * EQUIPMENT certificates + proof-of-ownership docs (Level 2) the listing carries: safety certs
+ * (TÜV / SPSP / SASO) and ownership docs (istimara / customs / sale contract / SASO registration).
+ * Shown beside the equipment row on the card and inside the equipment-details modal. Renders nothing
+ * when the listing carries none.
+ */
+export function EquipmentDocs({
+  equipmentCerts,
+  ownershipDocs,
+  ar,
+  showLabel = true,
+}: {
+  equipmentCerts: CertCode[];
+  ownershipDocs: BidCard["ownershipDocs"];
+  ar: boolean;
+  showLabel?: boolean;
+}) {
+  const L: LFn = (en, arr) => (ar ? arr : en);
+  const items: string[] = [
+    ...equipmentCerts.map((c) => (ar ? CERT_LABEL[c].ar : CERT_LABEL[c].en)),
+    ...(ownershipDocs ?? []).map((o) => (ar ? o.labelAr : o.labelEn)),
+  ];
+  if (items.length === 0) return null;
+  return (
+    <div className="sup-docs">
+      {showLabel && <span className="sd-lab">{L("On file", "متوفّر")}</span>}
+      {items.map((d) => (
         <span key={d} className="sd-chip">
           <span className="material-icons-outlined">check</span>
           {d}
