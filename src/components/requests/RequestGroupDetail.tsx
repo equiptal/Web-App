@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Fragment, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchRequestGroup, fetchRequestDetail } from "@/lib/api/client";
@@ -110,19 +110,27 @@ export function RequestGroupDetail({ groupId, onTitle }: { groupId: string; onTi
         </div>
       </div>
 
-      {/* shared preferences (identical across the group) */}
-      <div className="dsec">
-        <div className="dsec-h"><span className="material-icons-outlined">tune</span>{L("Preferences", "التفضيلات")}</div>
-        <div className="dcard">
-          <div className="kv">
-            <span className="k">{L("Rental basis", "أساس الإيجار")}</span><span className="v">{first.rentalType ?? "—"}</span>
-            <span className="k">{L("Payment terms", "شروط الدفع")}</span><span className="v">{first.paymentTerms ?? "—"}</span>
-            <span className="k">{L("Working hours", "ساعات العمل")}</span><span className="v">{first.workingHoursPerDay ? `${first.workingHoursPerDay} ${L("hrs/day", "ساعة/يوم")}` : "—"}</span>
-            <span className="k">{L("Maintenance", "الصيانة")}</span><span className="v">{first.maintenanceResponsibility ?? "—"}</span>
-            <span className="k">{L("Budget", "الميزانية")}</span><span className="v">{first.budgetCeiling ? `${Number(first.budgetCeiling).toLocaleString(ar ? "ar-SA" : "en-US")} ${L("SAR", "ر.س")}` : "—"}</span>
+      {/* shared preferences (identical across the group) — only fields that have a value */}
+      {(() => {
+        const prefs = ([
+          [L("Rental basis", "أساس الإيجار"), first.rentalType],
+          [L("Payment terms", "شروط الدفع"), first.paymentTerms],
+          [L("Working hours", "ساعات العمل"), first.workingHoursPerDay ? `${first.workingHoursPerDay} ${L("hrs/day", "ساعة/يوم")}` : null],
+          [L("Maintenance", "الصيانة"), first.maintenanceResponsibility],
+          [L("Budget", "الميزانية"), first.budgetCeiling ? `${Number(first.budgetCeiling).toLocaleString(ar ? "ar-SA" : "en-US")} ${L("SAR", "ر.س")}` : null],
+        ] as [string, ReactNode][]).filter(([, v]) => v != null && v !== "");
+        if (!prefs.length) return null;
+        return (
+          <div className="dsec">
+            <div className="dsec-h"><span className="material-icons-outlined">tune</span>{L("Preferences", "التفضيلات")}</div>
+            <div className="dcard">
+              <div className="kv">
+                {prefs.map(([k, v]) => <Fragment key={k}><span className="k">{k}</span><span className="v">{v}</span></Fragment>)}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* every item's FULL details inline — all on one screen (no per-item navigation) */}
       <div className="dsec">

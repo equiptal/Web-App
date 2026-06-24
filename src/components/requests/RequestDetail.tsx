@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, Fragment, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchRequestDetail, cancelRequest, updateRequest } from "@/lib/api/client";
@@ -106,12 +106,18 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
         </div>
       )}
 
-      {/* infostrip */}
+      {/* infostrip — only fields that actually have a value */}
       <div className="infostrip">
-        <div className="ic"><div className="lab">{L("Location", "الموقع")}</div><div className="val">{r.projectAddressLabel ?? "—"}</div></div>
-        <div className="ic"><div className="lab">{L("Period", "الفترة")}</div><div className="val">{period}</div></div>
-        <div className="ic"><div className="lab">{L("Duration", "المدة")}</div><div className="val mono">{r.estimatedDurationDays ? `${r.estimatedDurationDays} ${L("days", "يوم")}` : "—"}</div></div>
-        <div className="ic"><div className="lab">{L("Urgency", "الإلحاح")}</div><div className="val">{urgency}</div></div>
+        {([
+          [L("Location", "الموقع"), r.projectAddressLabel, false],
+          [L("Period", "الفترة"), r.startDate ? period : null, false],
+          [L("Duration", "المدة"), r.estimatedDurationDays ? `${r.estimatedDurationDays} ${L("days", "يوم")}` : null, true],
+          [L("Urgency", "الإلحاح"), urgency, false],
+        ] as [string, ReactNode, boolean][])
+          .filter(([, v]) => v != null && v !== "" && v !== "—")
+          .map(([lab, v, mono]) => (
+            <div className="ic" key={lab}><div className="lab">{lab}</div><div className={mono ? "val mono" : "val"}>{v}</div></div>
+          ))}
       </div>
 
       {view === "bids" ? (
@@ -141,19 +147,27 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
             </div>
           </div>
 
-          {/* preferences */}
-          <div className="dsec">
-            <div className="dsec-h"><span className="material-icons-outlined">tune</span>{L("Preferences", "التفضيلات")}</div>
-            <div className="dcard">
-              <div className="kv">
-                <span className="k">{L("Rental basis", "أساس الإيجار")}</span><span className="v">{r.rentalType ?? "—"}</span>
-                <span className="k">{L("Payment terms", "شروط الدفع")}</span><span className="v">{r.paymentTerms ?? "—"}</span>
-                <span className="k">{L("Working hours", "ساعات العمل")}</span><span className="v">{r.workingHoursPerDay ? `${r.workingHoursPerDay} ${L("hrs/day", "ساعة/يوم")}` : "—"}</span>
-                <span className="k">{L("Maintenance", "الصيانة")}</span><span className="v">{r.maintenanceResponsibility ?? "—"}</span>
-                <span className="k">{L("Budget", "الميزانية")}</span><span className="v">{r.budgetCeiling ? `${Number(r.budgetCeiling).toLocaleString(ar ? "ar-SA" : "en-US")} ${L("SAR", "ر.س")}` : "—"}</span>
+          {/* preferences — only fields that have a value; the whole section hides if all are empty */}
+          {(() => {
+            const prefs = ([
+              [L("Rental basis", "أساس الإيجار"), r.rentalType],
+              [L("Payment terms", "شروط الدفع"), r.paymentTerms],
+              [L("Working hours", "ساعات العمل"), r.workingHoursPerDay ? `${r.workingHoursPerDay} ${L("hrs/day", "ساعة/يوم")}` : null],
+              [L("Maintenance", "الصيانة"), r.maintenanceResponsibility],
+              [L("Budget", "الميزانية"), r.budgetCeiling ? `${Number(r.budgetCeiling).toLocaleString(ar ? "ar-SA" : "en-US")} ${L("SAR", "ر.س")}` : null],
+            ] as [string, ReactNode][]).filter(([, v]) => v != null && v !== "");
+            if (!prefs.length) return null;
+            return (
+              <div className="dsec">
+                <div className="dsec-h"><span className="material-icons-outlined">tune</span>{L("Preferences", "التفضيلات")}</div>
+                <div className="dcard">
+                  <div className="kv">
+                    {prefs.map(([k, v]) => <Fragment key={k}><span className="k">{k}</span><span className="v">{v}</span></Fragment>)}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            );
+          })()}
 
           {/* notes */}
           {r.additionalNotes && (

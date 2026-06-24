@@ -458,7 +458,7 @@ export function BidComparisonWorkspace() {
     const m = (x: { value: number; stated: boolean }) => (x.stated ? `${sar} ${nf(x.value)}` : "—");
     const certsOf = (c: BidColumn, pick: CertCode[], held: CertCode[] = c.bid.heldCertCodes) => { const h = held.filter((x) => pick.includes(x)).map(certLabel); return h.length ? esc(h.join(", ")) : "—"; };
     const ownedOf = (c: BidColumn) => { const o = (c.bid.ownershipDocs ?? []).map((x) => (ar ? x.labelAr : x.labelEn)); return o.length ? esc(o.join(", ")) : "—"; };
-    const termTextOf = (c: BidColumn, key: string) => { const st = [...c.equipment, ...c.cost].find((r) => r.key === key)?.state; const map: Record<string, [string, string]> = { agreed: ["Agreed", "متفق"], matched: ["Matches", "مطابق"], negotiating: ["Negotiating", "قيد التفاوض"], conflict: ["Conflict", "تعارض"] }; const v = st ? map[st] : undefined; return v ? esc(L(v[0], v[1])) : "—"; };
+    const termTextOf = (c: BidColumn, key: string) => { const st = (c.bid.negotiableTerms ?? []).find((r) => r.key === key)?.state; const map: Record<string, [string, string]> = { agreed: ["Agreed", "متفق"], matched: ["Matches", "مطابق"], negotiating: ["Negotiating", "قيد التفاوض"], conflict: ["Conflict", "تعارض"] }; const v = st ? map[st] : undefined; return v ? esc(L(v[0], v[1])) : "—"; };
     const docsOf = (c: BidColumn) => { const d: string[] = []; const k = c.bid.compliance; if (k.localContent) d.push(L("Local Content", "المحتوى المحلي")); if (k.saso) d.push("SASO"); if (k.activityLicense) d.push(L("Activity license", "رخصة النشاط")); if (k.taxNumber) d.push(L("Tax number", "الرقم الضريبي")); if (k.nationalAddress) d.push(L("National address", "العنوان الوطني")); return d.length ? esc(d.join(", ")) : "—"; };
     const rental = (c: BidColumn) => c.bid.price == null ? "—" : c.rental.stated ? `${sar} ${nf(c.bid.price)}/${periodLabel(c.bid.priceUnit)} → ${sar} ${nf(c.rental.value)}` : `${sar} ${nf(c.bid.price)}/${periodLabel(c.bid.priceUnit)}`;
     const resp = (c: BidColumn) => c.costResponsibilities.map((r) => `${esc(ar ? r.labelAr : r.labelEn)}: ${r.bidSide === "supplier" ? sup : r.bidSide === "me" ? you : "—"}`).join("<br>");
@@ -509,8 +509,9 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
       </span>
     );
   };
-  // A term's live state for one bid — search both buckets (equipment terms + contract/project terms).
-  const termState = (c: BidColumn, key: string): string => [...c.equipment, ...c.cost].find((r) => r.key === key)?.state ?? "grey";
+  // A term's live state for one bid — from the comparison-only expanded negotiable set (deal-room
+  // overlaid). Kept separate from the bid-card buckets so the card stays app-faithful.
+  const termState = (c: BidColumn, key: string): string => (c.bid.negotiableTerms ?? []).find((r) => r.key === key)?.state ?? "grey";
   // Term-state chip: deal-room-aware (agreed=locked, negotiating=open counter, conflict=deviation).
   const termChip = (st: string) => {
     const m: Record<string, { bg: string; fg: string; label: string; icon: string }> = {

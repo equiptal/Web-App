@@ -126,10 +126,13 @@ export interface BidCard {
   /** Lead times for the price breakdown's mobilization/return rows (013 AC-11 inline tags). */
   mobLeadTime: string | null;
   demobLeadTime: string | null;
-  /** Per-class term status for the card badges + Terms modal (app parity — Equipment / Project /
-   *  Supplier). Equipment + contract(=Project) are the request-vs-offer compare (deal-room-overlaid);
-   *  supplier = the verification docs held (CR / VAT / National address). */
+  /** Per-class term status for the card badges + Terms modal — MIRRORS THE MOBILE APP'S BID CARD:
+   *  Equipment (6), Project/contract (4), Supplier (CR + VAT, 2). Equipment + contract are the
+   *  request-vs-offer compare (deal-room-overlaid). */
   terms: { equipment: TermRow[]; contract: TermRow[]; supplier: TermRow[] };
+  /** Web comparison-only: the full deal-room negotiable + acknowledge terms (overlaid live). Feeds the
+   *  side-by-side "Negotiable terms" section; NOT shown on the bid card so the card matches the app. */
+  negotiableTerms?: TermRow[];
   /** The renter's RFQ term values (raw) — rendered as Equipment-terms + Contract-terms cards in the
    *  generated quotation. Request-level (payment/maintenance) + first-item operator/fuel. */
   requestTerms: {
@@ -208,7 +211,7 @@ const normKey = (k: string) => k.toLowerCase().replace(/[^a-z0-9]/g, "");
  *  - red   → declared and conflicts (capacity/year/fuel mismatch, missing cert, or a deviation key)
  *  - green → declared and matches
  */
-function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requiredCerts: CertCode[], heldCertCodes: CertCode[]): { equipment: TermRow[]; contract: TermRow[] } {
+function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requiredCerts: CertCode[], heldCertCodes: CertCode[]): { equipment: TermRow[]; contract: TermRow[]; negotiable: TermRow[] } {
   const req = (raw.request ?? {}) as Record<string, unknown>;
   const reqItems = Array.isArray(req.equipmentItems) ? (req.equipmentItems as Record<string, unknown>[]) : [];
   const reqItem = reqItems[0] ?? {};
@@ -256,31 +259,38 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
   const bidMaint = s(t3.maintenance_responsibility)?.toLowerCase();
   const maintenance: TermState = !reqMaint ? "grey" : !bidMaint ? "grey" : reqMaint === bidMaint ? "matched" : "conflict";
 
+  // Single "operator" row for the BID CARD's equipment bucket (mobile app parity): conflict on a
+  // nationality deviation or when the RFQ needs an operator the bid omits; matched when included.
+  const operator: TermState = !reqOperator ? "grey" : deviationKeys.has("operator_nationality") || !bidOperator ? "conflict" : "matched";
+
+  // Project rows reused by both the bid-card "Project" bucket and the comparison's negotiable set.
+  const rPayment: TermRow = { key: "payment_terms", labelEn: "Payment terms", labelAr: "شروط الدفع", state: contractState("payment_terms", s(req.paymentTerms)) };
+  const rSla: TermRow = { key: "breakdown_response_sla", labelEn: "Breakdown response", labelAr: "زمن الاستجابة للأعطال", state: contractState("breakdown_response_sla", s(req.breakdownResponseSla)) };
+  const rOvertime: TermRow = { key: "overtime_rate", labelEn: "Overtime", labelAr: "العمل الإضافي", state: contractState("overtime_rate", s(req.overtimeRate)) };
+  const rMaint: TermRow = { key: "maintenance_responsibility", labelEn: "Maintenance", labelAr: "الصيانة", state: maintenance };
+
   return {
+    // BID-CARD buckets — mirror the mobile app's bid card exactly: Equipment 6 · Project 4. Operator is
+    // ONE row (nationality/FAT are informational, not separate counted terms). Keys stay canonical so
+    // the deal-room overlay still matches.
     equipment: [
       { key: "measurement", labelEn: "Measurement", labelAr: "القياس", state: measurement },
       { key: "certs", labelEn: "Certificates", labelAr: "الشهادات", state: certs },
       { key: "year", labelEn: "Year of manufacture", labelAr: "سنة الصنع", state: year },
       { key: "fuel", labelEn: "Fuel type", labelAr: "نوع الوقود", state: fuel },
-      // Operator split: included (acknowledge) + nationality (conflict-eligible). Keys are the
-      // canonical deal-room term keys so the overlay (agreed/negotiating/conflict) matches live.
+      { key: "attachments", labelEn: "Attachments", labelAr: "الملحقات", state: "grey" },
+      { key: "operator", labelEn: "Operator", labelAr: "المشغّل", state: operator },
+    ],
+    contract: [rPayment, rSla, rOvertime, rMaint],
+    // COMPARISON-only expanded set (the web side-by-side "Negotiable terms" section) — NOT on the bid
+    // card. Carries the full deal-room negotiable + acknowledge terms with live overlay states.
+    negotiable: [
       { key: "operator_included", labelEn: "Operator included", labelAr: "تشمل مشغّل", state: operatorIncluded },
       { key: "operator_nationality", labelEn: "Operator nationality", labelAr: "جنسية المشغّل", state: contractState("operator_nationality", opNat) },
       { key: "fat_food", labelEn: "Operator FAT — Food", labelAr: "الإعاشة (F.A.T) — الطعام", state: contractState("fat_food", fatFood) },
       { key: "fat_accommodation_transport", labelEn: "Operator FAT — Accommodation/Transport", labelAr: "الإعاشة (F.A.T) — الإقامة/النقل", state: contractState("fat_accommodation_transport", fatAccom) },
       { key: "fuel_responsibility", labelEn: "Fuel responsibility", labelAr: "مسؤولية الوقود", state: fuelResp ? "matched" : "grey" },
-      { key: "attachments", labelEn: "Attachments", labelAr: "الملحقات", state: "grey" },
-    ],
-    contract: [
-      // Keys MUST be the canonical deal-room term keys (term-matching.ts) so the deal-room overlay
-      // (lockedTerms → agreed, unreadTerms → negotiating) and conflict deviations match live. Note
-      // overtime_rate / maintenance_responsibility, NOT "overtime" / "maintenance".
-      { key: "payment_terms", labelEn: "Payment terms", labelAr: "شروط الدفع", state: contractState("payment_terms", s(req.paymentTerms)) },
-      { key: "breakdown_response_sla", labelEn: "Breakdown response", labelAr: "زمن الاستجابة للأعطال", state: contractState("breakdown_response_sla", s(req.breakdownResponseSla)) },
-      { key: "overtime_rate", labelEn: "Overtime", labelAr: "العمل الإضافي", state: contractState("overtime_rate", s(req.overtimeRate)) },
-      { key: "maintenance_responsibility", labelEn: "Maintenance", labelAr: "الصيانة", state: maintenance },
-      // Always-negotiate (ALWAYS_NEGOTIATE_KEYS): static grey; the deal-room overlay drives them to
-      // negotiating (open counter) or agreed (locked). No static request-vs-offer match for pricing.
+      rPayment, rSla, rOvertime, rMaint,
       { key: "mobilization_pricing", labelEn: "Mobilization pricing", labelAr: "تسعير النقل", state: "grey" },
       { key: "demobilization_pricing", labelEn: "Demobilization pricing", labelAr: "تسعير الإرجاع", state: "grey" },
     ],
@@ -451,13 +461,16 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     terms: {
       equipment: overlayLocked(baseTerms.equipment),
       contract: overlayLocked(baseTerms.contract),
-      // Supplier verification docs the supplier holds (CR / VAT / National address) — informational.
+      // Supplier identity bucket — CR + VAT only, matching the mobile app's bid card (2 informational
+      // rows). National address / LC / SASO are surfaced in the web comparison's Company-documents row,
+      // not on the bid card.
       supplier: [
         { key: "cr", labelEn: "Commercial registration", labelAr: "السجل التجاري", state: (hasCr ? "matched" : "grey") as TermState },
         { key: "vat", labelEn: "VAT registration", labelAr: "الرقم الضريبي", state: (hasVat ? "matched" : "grey") as TermState },
-        { key: "national_address", labelEn: "National address", labelAr: "العنوان الوطني", state: (hasNationalAddr ? "matched" : "grey") as TermState },
       ],
     },
+    // Comparison-only expanded negotiable/acknowledge terms (live deal-room overlay) — not on the bid card.
+    negotiableTerms: overlayLocked(baseTerms.negotiable),
     requestTerms: {
       operatorIncluded: s(rqItem.operatorIncluded),
       operatorNationality: lockedVal((k) => k.includes("nationality")) ?? s(rqItem.operatorNationality),
