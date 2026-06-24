@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
-import { fetchMyRequests, fetchBids, startDealRoom, recommendBids, askBids, parseBid, captureBidEvents } from "@/lib/api/client";
+import { fetchMyRequests, fetchBids, startDealRoom, recommendBids, askBids, parseBid, captureBidEvents, fetchDealRoomDocuments } from "@/lib/api/client";
 import { groupRequests, type RequestGroup } from "@/lib/contract/requests";
 import { CERT_LABEL, type BidCard, type CertCode } from "@/lib/contract/bids";
 import { buildItemComparison, sortByPreset, type BidColumn, type Preset, type CostResponsibility } from "@/lib/contract/comparison";
@@ -258,15 +258,38 @@ export function BidComparisonWorkspace() {
   const companyDocChips = (bid: BidColumn["bid"]) => {
     const k = bid.compliance;
     return [
-      { lbl: L("CR", "السجل التجاري"), has: k.activityLicense, req: false },
-      { lbl: L("VAT", "الرقم الضريبي"), has: k.taxNumber, req: false },
-      { lbl: L("National address", "العنوان الوطني"), has: k.nationalAddress, req: false },
-      { lbl: L("Local Content", "المحتوى المحلي"), has: k.localContent, req: bid.requiredCerts.includes("LC") },
-      { lbl: L("SASO registration", "تسجيل ساسو"), has: k.saso, req: bid.requiredCerts.includes("SASO") },
+      { lbl: L("CR", "السجل التجاري"), has: k.activityLicense, req: false, hint: "commercial" },
+      { lbl: L("VAT", "الرقم الضريبي"), has: k.taxNumber, req: false, hint: "vat" },
+      { lbl: L("National address", "العنوان الوطني"), has: k.nationalAddress, req: false, hint: "national" },
+      { lbl: L("Local Content", "المحتوى المحلي"), has: k.localContent, req: bid.requiredCerts.includes("LC"), hint: "local" },
+      { lbl: L("SASO registration", "تسجيل ساسو"), has: k.saso, req: bid.requiredCerts.includes("SASO"), hint: "saso" },
     ].filter((d) => d.has || d.req);
   };
   // Equipment/operator terms are ACKNOWLEDGED from the request today (not yet supplier-declared) — a
   // seamless prompt to confirm them with that supplier in the deal room (only when a room exists).
+  // Open the actual document file for a chip. Real files live in the supplier's deal room (presigned
+  // URLs) — fetch them, open the one matching the chip; fall back to the deal-room documents view.
+  // (Without a deal room there are no viewable files in the bid payload — see the T6-B/doc-URL backend note.)
+  const openDoc = async (c: BidColumn, hint: string) => {
+    if (!c.bid.dealRoomId) return;
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z]/g, "");
+    const h = norm(hint);
+    try {
+      const d = await fetchDealRoomDocuments(c.bid.dealRoomId);
+      const all = [...d.companyDocuments, ...d.equipmentDocuments];
+      const m = all.find((x) => { const t = norm(x.type), l = norm(x.label); return t.includes(h) || l.includes(h) || h.includes(t); });
+      if (m?.url) { window.open(m.url, "_blank", "noopener"); return; }
+    } catch { /* fall through */ }
+    router.push(`/deal-room/${c.bid.dealRoomId}`);
+  };
+  /** A clickable doc chip — opens the actual file when the bid has a deal room (else static). */
+  const docChip = (c: BidColumn, label: string, has: boolean, hint: string) => {
+    const style = has ? { background: C.successBg, color: C.success } : { background: C.dangerBg, color: C.danger };
+    const inner = <><span className="material-icons-outlined" style={{ fontSize: 11 }}>{has ? "check" : "close"}</span>{label}{c.bid.dealRoomId && has && <span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>open_in_new</span>}</>;
+    return c.bid.dealRoomId && has
+      ? <button type="button" onClick={() => openDoc(c, hint)} title={L("Open document", "افتح المستند")} className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={style}>{inner}</button>
+      : <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={style}>{inner}</span>;
+  };
   const verifyLink = (c: BidColumn) => c.bid.dealRoomId ? (
     <button type="button" onClick={() => router.push(`/deal-room/${c.bid.dealRoomId}`)} className="mt-1 inline-flex items-center gap-0.5 text-[10px] font-bold" style={{ color: C.rentee }}>
       {L("verify in deal room", "تحقّق في غرفة الصفقة")}<span className="material-icons-outlined" style={{ fontSize: 12, transform: ar ? "scaleX(-1)" : undefined }}>arrow_forward</span>
@@ -798,11 +821,6 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                       const isPick = c.bid.id === pickId;
                       const isUpload = c.bid.id.startsWith("upload:");
                       const recog = rec?.ranking.find((r) => r.bid_id === c.bid.id)?.recognition ?? null;
-                      const fuelOnMe = c.costResponsibilities.find((x) => x.key === "fuel" && (x.bidSide === "me" || (x.bidSide == null && x.requestSide === "me")));
-                      const yourCosts = renterAddBid(c);
-                      const total = grandTotal(c);
-                      const partial = !c.rental.stated && c.bid.price != null; // a rate exists but no duration → rental not in the total yet
-                      const rateInclVat = c.bid.price != null ? Math.round(c.bid.price * (1 + VAT)) : null; // per-period rate incl. VAT (shown when no full total)
                       return (
                         <th key={c.bid.id} className="p-3 text-start align-top transition-colors" style={{ minWidth: 215, background: isPick ? "linear-gradient(180deg,#E7F7EE,#fff)" : "#fff", borderBottom: `1px solid ${C.line}`, boxShadow: isPick ? `inset 0 4px 0 ${C.success}` : undefined }}>
                           <div className="flex items-start gap-2.5">
@@ -811,7 +829,10 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                               {cols.length > 1 && agentLive && <span className="absolute -top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 font-mono text-[10px] font-black text-white" style={{ background: idx === 0 ? C.success : C.navyMid, insetInlineStart: "-6px" }}>#{idx + 1}</span>}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <b className="block text-[14px] leading-tight" style={{ color: C.navy }}>{c.bid.supplierName}</b>
+                              <b className="flex items-center gap-1 text-[14px] leading-tight" style={{ color: C.navy }}>
+                                <span className="truncate">{c.bid.supplierName}</span>
+                                <span className="material-icons-outlined flex-none" style={{ fontSize: 15, color: c.bid.verified ? C.success : C.danger }} title={c.bid.verified ? L("Verified supplier", "مؤجّر موثّق") : L("Not verified", "غير موثّق")}>{c.bid.verified ? "verified" : "gpp_bad"}</span>
+                              </b>
                               <span className="mt-0.5 inline-flex items-center gap-1 text-[10.5px] font-bold" style={{ color: c.bid.viaSharedLink ? C.action : C.muted }}>
                                 <span className="material-icons-outlined" style={{ fontSize: 13 }}>{isUpload ? "description" : c.bid.viaSharedLink ? "link" : "smartphone"}</span>
                                 {isUpload ? L("From uploaded file", "من ملف مرفوع") : c.bid.viaSharedLink ? L("via shared link", "عبر الرابط") : L("via Moedatech app", "عبر تطبيق معداتك")}
@@ -822,36 +843,12 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                               <span className="material-icons-outlined" style={{ fontSize: 15 }}>close</span>
                             </button>
                           </div>
-                          {/* identity: verified + company documents (moved from Trust & documents) */}
+                          {/* identity: company documents below the name (verified is the tick beside the name) — clickable to open the file */}
                           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold" style={c.bid.verified ? { background: C.successBg, color: C.success } : { background: C.dangerBg, color: C.danger }}>
-                              <span className="material-icons-outlined" style={{ fontSize: 12 }}>{c.bid.verified ? "verified_user" : "gpp_bad"}</span>{c.bid.verified ? L("Verified", "موثّق") : L("Not verified", "غير موثّق")}
-                            </span>
-                            {companyDocChips(c.bid).map((d) => (
-                              <span key={d.lbl} className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={d.has ? { background: C.successBg, color: C.success } : { background: C.dangerBg, color: C.danger }}>
-                                <span className="material-icons-outlined" style={{ fontSize: 11 }}>{d.has ? "check" : "close"}</span>{d.lbl}
-                              </span>
-                            ))}
+                            {companyDocChips(c.bid).map((d) => <span key={d.lbl}>{docChip(c, d.lbl, d.has, d.hint)}</span>)}
                           </div>
                           {isPick && <span className="mt-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-extrabold" style={{ background: C.successBg, color: C.success, borderColor: "rgba(29,175,88,.4)" }}><span className="material-icons-outlined" style={{ fontSize: 13, color: C.success }}>auto_awesome</span>{L("AI pick · best match", "اختيار المساعد · الأنسب")}</span>}
                           {recog && <span className="mt-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-bold" style={{ background: C.renteeDim, color: "#1E4FB8", borderColor: "rgba(37,99,235,.28)" }}><span className="material-icons-outlined" style={{ fontSize: 13, color: C.rentee }}>history</span>{recog}</span>}
-                          <div className="mt-2.5">
-                            {hasCost(c) ? (<>
-                              <span className="font-mono text-[19px] font-extrabold" style={{ color: C.navy }}>{sar} {nf(total)}</span>
-                              {cols.length > 1 && lowestGrand != null && <span className="ms-1.5 rounded-full px-2 py-0.5 font-mono text-[10.5px] font-extrabold" style={total === lowestGrand ? { background: C.successBg, color: C.success } : { background: C.warningBg, color: C.warning }}>{total === lowestGrand ? L("lowest", "الأقل") : `+${Math.round(((total - lowestGrand) / lowestGrand) * 100)}%`}</span>}
-                              <div className="text-[10.5px] font-bold uppercase" style={{ color: C.muted, letterSpacing: ".3px" }}>{L("Total · incl. VAT & your costs", "الإجمالي · شامل الضريبة وتكاليفك")}</div>
-                              <div className="mt-1.5 h-[7px] max-w-[175px] overflow-hidden rounded" style={{ background: C.surface3 }}><i className="block h-full rounded" style={{ width: `${Math.round((total / maxGrand) * 100)}%`, background: total === lowestGrand ? C.success : total === maxGrand ? C.warning : C.navyMid }} /></div>
-                              {partial && <div className="mt-1 text-[10.5px] font-bold" style={{ color: C.warning }}>{L("rental rate not totaled — set a duration", "لم تُحتسب المدة — حدّد مدة")}</div>}
-                              {c.cashUpfront.stated && <div className="mt-1 text-[11px]" style={{ color: C.muted }}>{L("Cash upfront", "مقدّم")} ~{nf(c.cashUpfront.value)}{fuelOnMe ? L(" · fuel on you", " · الوقود عليك") : ""}</div>}
-                              {yourCosts > 0 && <div className="mt-1.5 rounded border px-2 py-1 text-[10.5px] font-extrabold" style={{ background: C.renteeDim, borderColor: "rgba(37,99,235,.22)", color: C.rentee }}>{L(`incl. ${sar} ${nf(yourCosts)} of your estimates`, `يشمل ${sar} ${nf(yourCosts)} من تقديراتك`)}</div>}
-                            </>) : rateInclVat != null ? (<>
-                              <span className="font-mono text-[19px] font-extrabold" style={{ color: C.navy }}>{sar} {nf(rateInclVat)}<small className="text-[11px] font-bold" style={{ color: C.muted }}>/{periodLabel(c.bid.priceUnit)}</small></span>
-                              <div className="text-[10.5px] font-bold uppercase" style={{ color: C.muted, letterSpacing: ".3px" }}>{L("incl. VAT · rate only", "شامل الضريبة · السعر فقط")}</div>
-                              <div className="mt-1 text-[10.5px] font-bold" style={{ color: C.warning }}>{L("set a duration for the full total", "حدّد مدة للإجمالي الكامل")}</div>
-                            </>) : (
-                              <span className="font-mono text-[15px] font-bold" style={{ color: C.muted }}>{L("not stated", "غير محدد")}</span>
-                            )}
-                          </div>
                         </th>
                       );
                     })}
@@ -861,6 +858,31 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                   {/* 💰 COST */}
                   <SectionRow id="cost" icon="payments" title={L("Cost", "التكلفة")} accent={C.action} accentText="#FFC97A" n={cols.length} collapsed={collapsed.has("cost")} onToggle={() => toggleSection("cost")} />
                   {!collapsed.has("cost") && (<>
+                    {/* Grand total — moved out of the identity header into its own Cost row. */}
+                    <tr>
+                      <RowHead title={L("Grand total", "الإجمالي")} sub={L("incl. VAT & your costs", "شامل الضريبة وتكاليفك")} />
+                      {cols.map((c) => {
+                        const total = grandTotal(c);
+                        const yourCosts = renterAddBid(c);
+                        const partial = !c.rental.stated && c.bid.price != null;
+                        const rateInclVat = c.bid.price != null ? Math.round(c.bid.price * (1 + VAT)) : null;
+                        const isLow = lowestGrand != null && total === lowestGrand;
+                        return (
+                          <Td key={c.bid.id} ok={hasCost(c) && isLow} fail={false}>
+                            {hasCost(c) ? (<>
+                              <span className="font-mono text-[17px] font-extrabold" style={{ color: C.navy }}>{sar} {nf(total)}</span>
+                              {cols.length > 1 && lowestGrand != null && <span className="ms-1.5 rounded-full px-2 py-0.5 font-mono text-[10px] font-extrabold" style={isLow ? { background: C.successBg, color: C.success } : { background: C.warningBg, color: C.warning }}>{isLow ? L("lowest", "الأقل") : `+${Math.round(((total - lowestGrand) / lowestGrand) * 100)}%`}</span>}
+                              <div className="mt-1.5 h-[6px] max-w-[160px] overflow-hidden rounded" style={{ background: C.surface3 }}><i className="block h-full rounded" style={{ width: `${Math.round((total / maxGrand) * 100)}%`, background: isLow ? C.success : total === maxGrand ? C.warning : C.navyMid }} /></div>
+                              {partial && <Sub>{L("rental not totaled — set a duration", "لم تُحتسب المدة — حدّد مدة")}</Sub>}
+                              {yourCosts > 0 && <Sub>{L(`incl. ${sar} ${nf(yourCosts)} of your estimates`, `يشمل ${sar} ${nf(yourCosts)} من تقديراتك`)}</Sub>}
+                            </>) : rateInclVat != null ? (<>
+                              <span className="font-mono text-[15px] font-bold" style={{ color: C.navy }}>{sar} {nf(rateInclVat)}<small style={{ fontSize: 10.5, color: C.muted }}>/{periodLabel(c.bid.priceUnit)}</small></span>
+                              <Sub>{L("rate only · set a duration for the total", "السعر فقط · حدّد مدة للإجمالي")}</Sub>
+                            </>) : <span style={{ color: C.muted }}>{L("not stated", "غير محدد")}</span>}
+                          </Td>
+                        );
+                      })}
+                    </tr>
                     <tr>
                       <RowHead title={L("Rental cost", "تكلفة الإيجار")} sub={L("rate × days × units", "السعر × الأيام × الوحدات")} />
                       {cols.map((c) => {
@@ -947,6 +969,15 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                   {/* 🚜 EQUIPMENT */}
                   <SectionRow id="equip" icon="construction" title={L("Equipment", "المعدّة")} accent={C.supplier} accentText="#7BE0C2" n={cols.length} collapsed={collapsed.has("equip")} onToggle={() => toggleSection("equip")} />
                   {!collapsed.has("equip") && (<>
+                    {/* Equipment + operator terms are ACKNOWLEDGED from the request today, not yet supplier-declared. */}
+                    <tr>
+                      <td colSpan={cols.length + 1} style={{ padding: "8px 14px", background: C.warningBg, borderTop: `1px solid ${C.line}` }}>
+                        <span className="inline-flex items-center gap-1.5 text-[11.5px] font-bold" style={{ color: C.warning }}>
+                          <span className="material-icons-outlined" style={{ fontSize: 15 }}>warning_amber</span>
+                          {L("These are acknowledged by the supplier — verify them with each supplier in the deal room (links below).", "هذه مُقَرّة من المؤجّر — تحقّق منها مع كل مؤجّر في غرفة الصفقة (الروابط أدناه).")}
+                        </span>
+                      </td>
+                    </tr>
                     <tr>
                       <RowHead title={L("Year", "سنة الصنع")} sub={(() => { const my = cols[0]?.bid.reqMinYear; return my == null ? undefined : my >= 1990 ? `${L("min year", "أدنى سنة")} ${my}` : `${L("max age", "أقصى عمر")} ${my} ${L("yrs", "سنة")}`; })()} />
                       {cols.map((c) => { const yr = c.equipment.find((r) => r.key === "year"); const isNewest = (c.bid.equipment?.year ?? 0) > 0 && c.bid.equipment?.year === Math.max(...cols.map((x) => x.bid.equipment?.year ?? 0)); return <Td key={c.bid.id} ok={yr?.state !== "conflict"} fail={yr?.state === "conflict"}><span className="text-[13px] font-bold">{c.bid.equipment?.year ?? "—"}</span>{isNewest && cols.length > 1 && <Sub>{L("newest", "الأحدث")}</Sub>}</Td>; })}
@@ -971,9 +1002,9 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                           <Td key={c.bid.id} ok={hasAny && !anyMissing} fail={anyMissing}>
                             {hasAny ? (
                               <div className="flex flex-wrap gap-1.5">
-                                {required.map((x) => <span key={x}>{incChip(certLabel(x), has(x) ? "y" : "n", undefined, has(x) ? "check" : "close")}</span>)}
-                                {heldExtra.map((x) => <span key={x}>{incChip(certLabel(x), "muted", undefined, "check")}</span>)}
-                                {owned.map((o) => <span key={o.key}>{incChip(ar ? o.labelAr : o.labelEn, "y", undefined, "check")}</span>)}
+                                {required.map((x) => <span key={x}>{docChip(c, certLabel(x), has(x), x)}</span>)}
+                                {heldExtra.map((x) => <span key={x}>{docChip(c, certLabel(x), true, x)}</span>)}
+                                {owned.map((o) => <span key={o.key}>{docChip(c, ar ? o.labelAr : o.labelEn, true, o.key)}</span>)}
                               </div>
                             ) : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}
                             {verifyLink(c)}
