@@ -830,6 +830,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                             </div>
                             <div className="min-w-0 flex-1">
                               <b className="flex items-center gap-1 text-[14px] leading-tight" style={{ color: C.navy }}>
+                                {isPick && <span className="grid h-[18px] w-[18px] flex-none place-items-center rounded-md" style={{ background: `linear-gradient(135deg,${C.action},#FFA733)` }} title={L("AI pick · best match", "اختيار المساعد · الأنسب")}><span className="material-icons-outlined" style={{ fontSize: 12, color: "#fff" }}>auto_awesome</span></span>}
                                 <span className="truncate">{c.bid.supplierName}</span>
                                 <span className="material-icons-outlined flex-none" style={{ fontSize: 15, color: c.bid.verified ? C.success : C.danger }} title={c.bid.verified ? L("Verified supplier", "مؤجّر موثّق") : L("Not verified", "غير موثّق")}>{c.bid.verified ? "verified" : "gpp_bad"}</span>
                               </b>
@@ -847,8 +848,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                           <div className="mt-2 flex flex-wrap items-center gap-1.5">
                             {companyDocChips(c.bid).map((d) => <span key={d.lbl}>{docChip(c, d.lbl, d.has, d.hint)}</span>)}
                           </div>
-                          {isPick && <span className="mt-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-extrabold" style={{ background: C.successBg, color: C.success, borderColor: "rgba(29,175,88,.4)" }}><span className="material-icons-outlined" style={{ fontSize: 13, color: C.success }}>auto_awesome</span>{L("AI pick · best match", "اختيار المساعد · الأنسب")}</span>}
-                          {recog && <span className="mt-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-bold" style={{ background: C.renteeDim, color: "#1E4FB8", borderColor: "rgba(37,99,235,.28)" }}><span className="material-icons-outlined" style={{ fontSize: 13, color: C.rentee }}>history</span>{recog}</span>}
+                          {recog &&<span className="mt-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-bold" style={{ background: C.renteeDim, color: "#1E4FB8", borderColor: "rgba(37,99,235,.28)" }}><span className="material-icons-outlined" style={{ fontSize: 13, color: C.rentee }}>history</span>{recog}</span>}
                         </th>
                       );
                     })}
@@ -858,31 +858,6 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                   {/* 💰 COST */}
                   <SectionRow id="cost" icon="payments" title={L("Cost", "التكلفة")} accent={C.action} accentText="#FFC97A" n={cols.length} collapsed={collapsed.has("cost")} onToggle={() => toggleSection("cost")} />
                   {!collapsed.has("cost") && (<>
-                    {/* Grand total — moved out of the identity header into its own Cost row. */}
-                    <tr>
-                      <RowHead title={L("Grand total", "الإجمالي")} sub={L("incl. VAT & your costs", "شامل الضريبة وتكاليفك")} />
-                      {cols.map((c) => {
-                        const total = grandTotal(c);
-                        const yourCosts = renterAddBid(c);
-                        const partial = !c.rental.stated && c.bid.price != null;
-                        const rateInclVat = c.bid.price != null ? Math.round(c.bid.price * (1 + VAT)) : null;
-                        const isLow = lowestGrand != null && total === lowestGrand;
-                        return (
-                          <Td key={c.bid.id} ok={hasCost(c) && isLow} fail={false}>
-                            {hasCost(c) ? (<>
-                              <span className="font-mono text-[17px] font-extrabold" style={{ color: C.navy }}>{sar} {nf(total)}</span>
-                              {cols.length > 1 && lowestGrand != null && <span className="ms-1.5 rounded-full px-2 py-0.5 font-mono text-[10px] font-extrabold" style={isLow ? { background: C.successBg, color: C.success } : { background: C.warningBg, color: C.warning }}>{isLow ? L("lowest", "الأقل") : `+${Math.round(((total - lowestGrand) / lowestGrand) * 100)}%`}</span>}
-                              <div className="mt-1.5 h-[6px] max-w-[160px] overflow-hidden rounded" style={{ background: C.surface3 }}><i className="block h-full rounded" style={{ width: `${Math.round((total / maxGrand) * 100)}%`, background: isLow ? C.success : total === maxGrand ? C.warning : C.navyMid }} /></div>
-                              {partial && <Sub>{L("rental not totaled — set a duration", "لم تُحتسب المدة — حدّد مدة")}</Sub>}
-                              {yourCosts > 0 && <Sub>{L(`incl. ${sar} ${nf(yourCosts)} of your estimates`, `يشمل ${sar} ${nf(yourCosts)} من تقديراتك`)}</Sub>}
-                            </>) : rateInclVat != null ? (<>
-                              <span className="font-mono text-[15px] font-bold" style={{ color: C.navy }}>{sar} {nf(rateInclVat)}<small style={{ fontSize: 10.5, color: C.muted }}>/{periodLabel(c.bid.priceUnit)}</small></span>
-                              <Sub>{L("rate only · set a duration for the total", "السعر فقط · حدّد مدة للإجمالي")}</Sub>
-                            </>) : <span style={{ color: C.muted }}>{L("not stated", "غير محدد")}</span>}
-                          </Td>
-                        );
-                      })}
-                    </tr>
                     <tr>
                       <RowHead title={L("Rental cost", "تكلفة الإيجار")} sub={L("rate × days × units", "السعر × الأيام × الوحدات")} />
                       {cols.map((c) => {
@@ -964,19 +939,50 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         </Td>
                       ))}
                     </tr>
+                    {/* Grand total — the LAST cost row (sum of everything above + VAT + your estimates). */}
+                    <tr>
+                      <RowHead title={L("Grand total", "الإجمالي")} sub={L("incl. VAT & your costs", "شامل الضريبة وتكاليفك")} />
+                      {cols.map((c) => {
+                        const total = grandTotal(c);
+                        const yourCosts = renterAddBid(c);
+                        const partial = !c.rental.stated && c.bid.price != null;
+                        const rateInclVat = c.bid.price != null ? Math.round(c.bid.price * (1 + VAT)) : null;
+                        const isLow = lowestGrand != null && total === lowestGrand;
+                        return (
+                          <Td key={c.bid.id} ok={hasCost(c) && isLow} fail={false}>
+                            {hasCost(c) ? (<>
+                              <span className="font-mono text-[17px] font-extrabold" style={{ color: C.navy }}>{sar} {nf(total)}</span>
+                              {cols.length > 1 && lowestGrand != null && <span className="ms-1.5 rounded-full px-2 py-0.5 font-mono text-[10px] font-extrabold" style={isLow ? { background: C.successBg, color: C.success } : { background: C.warningBg, color: C.warning }}>{isLow ? L("lowest", "الأقل") : `+${Math.round(((total - lowestGrand) / lowestGrand) * 100)}%`}</span>}
+                              <div className="mt-1.5 h-[6px] max-w-[160px] overflow-hidden rounded" style={{ background: C.surface3 }}><i className="block h-full rounded" style={{ width: `${Math.round((total / maxGrand) * 100)}%`, background: isLow ? C.success : total === maxGrand ? C.warning : C.navyMid }} /></div>
+                              {partial && <Sub>{L("rental not totaled — set a duration", "لم تُحتسب المدة — حدّد مدة")}</Sub>}
+                              {yourCosts > 0 && <Sub>{L(`incl. ${sar} ${nf(yourCosts)} of your estimates`, `يشمل ${sar} ${nf(yourCosts)} من تقديراتك`)}</Sub>}
+                            </>) : rateInclVat != null ? (<>
+                              <span className="font-mono text-[15px] font-bold" style={{ color: C.navy }}>{sar} {nf(rateInclVat)}<small style={{ fontSize: 10.5, color: C.muted }}>/{periodLabel(c.bid.priceUnit)}</small></span>
+                              <Sub>{L("rate only · set a duration for the total", "السعر فقط · حدّد مدة للإجمالي")}</Sub>
+                            </>) : <span style={{ color: C.muted }}>{L("not stated", "غير محدد")}</span>}
+                          </Td>
+                        );
+                      })}
+                    </tr>
                   </>)}
 
                   {/* 🚜 EQUIPMENT */}
                   <SectionRow id="equip" icon="construction" title={L("Equipment", "المعدّة")} accent={C.supplier} accentText="#7BE0C2" n={cols.length} collapsed={collapsed.has("equip")} onToggle={() => toggleSection("equip")} />
                   {!collapsed.has("equip") && (<>
-                    {/* Equipment + operator terms are ACKNOWLEDGED from the request today, not yet supplier-declared. */}
+                    {/* Equipment + operator terms are ACKNOWLEDGED from the request today, not yet supplier-declared.
+                        Warning in the label cell; the per-supplier "verify in deal room" link sits under each column. */}
                     <tr>
-                      <td colSpan={cols.length + 1} style={{ padding: "8px 14px", background: C.warningBg, borderTop: `1px solid ${C.line}` }}>
-                        <span className="inline-flex items-center gap-1.5 text-[11.5px] font-bold" style={{ color: C.warning }}>
+                      <th className="sticky start-0 z-[2] p-2.5 text-start align-top" style={{ background: C.warningBg, borderTop: `1px solid ${C.line}` }}>
+                        <span className="inline-flex items-start gap-1.5 text-[11px] font-bold leading-snug" style={{ color: C.warning }}>
                           <span className="material-icons-outlined" style={{ fontSize: 15 }}>warning_amber</span>
-                          {L("These are acknowledged by the supplier — verify them with each supplier in the deal room (links below).", "هذه مُقَرّة من المؤجّر — تحقّق منها مع كل مؤجّر في غرفة الصفقة (الروابط أدناه).")}
+                          {L("Acknowledged by the supplier — verify in the deal room →", "مُقَرّة من المؤجّر — تحقّق في غرفة الصفقة ←")}
                         </span>
-                      </td>
+                      </th>
+                      {cols.map((c) => (
+                        <td key={c.bid.id} className="p-2.5 align-top" style={{ background: C.warningBg, borderTop: `1px solid ${C.line}` }}>
+                          {c.bid.dealRoomId ? verifyLink(c) : <span className="text-[10px] font-bold" style={{ color: C.muted }}>{L("no deal room yet", "لا توجد غرفة بعد")}</span>}
+                        </td>
+                      ))}
                     </tr>
                     <tr>
                       <RowHead title={L("Year", "سنة الصنع")} sub={(() => { const my = cols[0]?.bid.reqMinYear; return my == null ? undefined : my >= 1990 ? `${L("min year", "أدنى سنة")} ${my}` : `${L("max age", "أقصى عمر")} ${my} ${L("yrs", "سنة")}`; })()} />
@@ -1007,7 +1013,6 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                                 {owned.map((o) => <span key={o.key}>{docChip(c, ar ? o.labelAr : o.labelEn, true, o.key)}</span>)}
                               </div>
                             ) : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}
-                            {verifyLink(c)}
                           </Td>
                         );
                       })}
@@ -1018,31 +1023,34 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                       <RowHead title={L("Operator certificate", "شهادة المشغّل")} sub={(() => { const r = cols[0]?.bid.operatorCertReq; return r ? `${L("required", "مطلوب")}: ${r}` : L("declared in the deal room", "يُعلن في غرفة الصفقة"); })()} />
                       {cols.map((c) => {
                         const d = c.bid.operatorCertDeclared;
-                        return <Td key={c.bid.id} ok={!!d}>{d ? incChip(d, "muted", undefined, "badge") : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}{verifyLink(c)}</Td>;
+                        return <Td key={c.bid.id} ok={!!d}>{d ? incChip(d, "muted", undefined, "badge") : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}</Td>;
                       })}
                     </tr>
                   </>)}
 
                   {/* Verified supplier + company documents now live in each column's identity header (T1). */}
 
-                  {/* actions */}
+                  {/* DECIDE — its own band, clearly separated from the equipment section. Award/Negotiate use
+                      the SAME colours for every supplier (Award = green solid, Negotiate = navy outline). */}
                   <tr>
-                    <th className="sticky start-0 z-[2] p-3.5 text-start align-top text-[12.5px] font-bold" style={{ background: C.surface2, color: C.navyMid, borderTop: `1px solid ${C.line}` }}>
-                      {L("Decide", "القرار")}<span className="block text-[11px] font-semibold" style={{ color: C.muted }}>{L("opens the deal room", "يفتح غرفة الصفقة")}</span>
+                    <th className="sticky start-0 z-[2] p-3.5 text-start align-top text-[12.5px] font-extrabold" style={{ background: C.navy, color: "#fff", borderTop: `3px solid ${C.navy}` }}>
+                      <span className="inline-flex items-center gap-1.5"><span className="material-icons-outlined" style={{ fontSize: 16 }}>gavel</span>{L("Decide", "القرار")}</span>
+                      <span className="block text-[11px] font-semibold" style={{ color: "rgba(255,255,255,.7)" }}>{L("opens the deal room", "يفتح غرفة الصفقة")}</span>
                     </th>
                     {cols.map((c) => {
                       const isAwardedBid = !!awarded && (awarded.id === c.bid.id || (awarded.supplierId != null && awarded.supplierId === c.bid.supplierId));
-                      const isPick = c.bid.id === pickId;
                       return (
-                        <td key={c.bid.id} className="p-3.5 align-top" style={{ borderTop: `1px solid ${C.line}` }}>
+                        <td key={c.bid.id} className="p-3.5 align-top" style={{ borderTop: `3px solid ${C.navy}`, background: "rgba(28,53,80,0.04)" }}>
                           {awarded ? (
                             <span className="inline-flex rounded-full px-3 py-1.5 text-[11.5px] font-bold" style={isAwardedBid ? { background: C.successBg, color: C.success } : { background: C.surface2, color: C.muted }}>{isAwardedBid ? `${L("Awarded", "تمت الترسية")} ✓` : L("Item awarded", "مُرسى")}</span>
                           ) : (
                             <div className="flex flex-col gap-2">
-                              <button onClick={() => goDealRoom(c.bid, "award")} disabled={busy} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-bold disabled:opacity-60" style={isPick ? { background: C.action, color: "#fff" } : { background: "#fff", border: `1px solid ${C.border}`, color: C.navy }}>
+                              <button onClick={() => goDealRoom(c.bid, "award")} disabled={busy} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-extrabold text-white disabled:opacity-60" style={{ background: C.success }}>
                                 <span className="material-icons-outlined" style={{ fontSize: 16 }}>gavel</span>{L("Award", "ترسية")}
                               </button>
-                              <button onClick={() => goDealRoom(c.bid, "negotiate")} disabled={busy} className="inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-[12.5px] font-bold disabled:opacity-60" style={{ background: C.surface2, color: C.navy }}>{L("Negotiate", "تفاوض")}</button>
+                              <button onClick={() => goDealRoom(c.bid, "negotiate")} disabled={busy} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-bold disabled:opacity-60" style={{ background: "#fff", border: `1.5px solid ${C.navy}`, color: C.navy }}>
+                                <span className="material-icons-outlined" style={{ fontSize: 15 }}>swap_horiz</span>{L("Negotiate", "تفاوض")}
+                              </button>
                             </div>
                           )}
                         </td>
