@@ -13,7 +13,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     try {
       const raw = (await call(`/marketplace/bids/${encodeURIComponent(id)}`)) as Record<string, unknown>;
       const eq = (raw?.equipment ?? {}) as Record<string, unknown>;
-      const docs = Array.isArray(eq.documentKeys) ? eq.documentKeys : [];
+      // `toSignedStructured` returns each entry as `{ type, key: <presigned-url> }` — the signed URL
+      // lives under `key`, not `url`. Normalize to `{ type, url }` so the comparison's viewer can read it.
+      const list = Array.isArray(eq.documentKeys) ? (eq.documentKeys as unknown[]) : [];
+      const docs = list
+        .map((d) => {
+          const o = (d ?? {}) as Record<string, unknown>;
+          const url = typeof o.url === "string" ? o.url : typeof o.key === "string" ? o.key : null;
+          return { type: typeof o.type === "string" ? o.type : undefined, url };
+        })
+        .filter((d) => !!d.url);
       return NextResponse.json({ documents: docs });
     } catch (err) {
       return appAuthErrorResponse(err);

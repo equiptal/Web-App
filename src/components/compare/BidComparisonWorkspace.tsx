@@ -299,11 +299,6 @@ export function BidComparisonWorkspace() {
       ? <button type="button" onClick={() => openDoc(c, hint, label)} title={L("View document", "عرض المستند")} className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={style}>{inner}</button>
       : <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={style}>{inner}</span>;
   };
-  const verifyLink = (c: BidColumn) => c.bid.dealRoomId ? (
-    <button type="button" onClick={() => router.push(`/deal-room/${c.bid.dealRoomId}`)} className="mt-1 inline-flex items-center gap-0.5 text-[10px] font-bold" style={{ color: C.rentee }}>
-      {L("verify in deal room", "تحقّق في غرفة الصفقة")}<span className="material-icons-outlined" style={{ fontSize: 12, transform: ar ? "scaleX(-1)" : undefined }}>arrow_forward</span>
-    </button>
-  ) : null;
   const grandTotal = (c: BidColumn) => Math.round(supplierStated(c) * (1 + VAT)) + renterAddBid(c);
   const hasCost = (c: BidColumn) => supplierStated(c) > 0 || renterAddBid(c) > 0;
   const grandList = cols.filter(hasCost).map(grandTotal);
@@ -970,7 +965,6 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                               {yourCosts > 0 && <Sub>{L(`incl. ${sar} ${nf(yourCosts)} of your estimates`, `يشمل ${sar} ${nf(yourCosts)} من تقديراتك`)}</Sub>}
                             </>) : rateInclVat != null ? (<>
                               <span className="font-mono text-[15px] font-bold" style={{ color: C.navy }}>{sar} {nf(rateInclVat)}<small style={{ fontSize: 10.5, color: C.muted }}>/{periodLabel(c.bid.priceUnit)}</small></span>
-                              <Sub>{L("rate only · set a duration for the total", "السعر فقط · حدّد مدة للإجمالي")}</Sub>
                             </>) : <span style={{ color: C.muted }}>{L("not stated", "غير محدد")}</span>}
                           </Td>
                         );
@@ -985,9 +979,14 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         Full-width banner; the per-supplier "verify in deal room" link sits in each cell below. */}
                     <tr>
                       <td colSpan={cols.length + 1} style={{ padding: "8px 14px", background: C.warningBg, borderTop: `1px solid ${C.line}` }}>
-                        <span className="inline-flex items-center gap-1.5 text-[11.5px] font-bold" style={{ color: C.warning }}>
+                        <span className="inline-flex flex-wrap items-center gap-1.5 text-[11.5px] font-bold" style={{ color: C.warning }}>
                           <span className="material-icons-outlined" style={{ fontSize: 15 }}>warning_amber</span>
-                          {L("These are acknowledged by the supplier — verify each one in the deal room (links below).", "هذه مُقَرّة من المؤجّر — تحقّق من كلٍّ منها في غرفة الصفقة (الروابط أدناه).")}
+                          {L("These are acknowledged by the supplier — verify each one in the deal room.", "هذه مُقَرّة من المؤجّر — تحقّق من كلٍّ منها في غرفة الصفقة.")}
+                          {(() => { const drId = cols.find((c) => c.bid.dealRoomId)?.bid.dealRoomId; return drId ? (
+                            <button type="button" onClick={() => router.push(`/deal-room/${drId}`)} className="inline-flex items-center gap-0.5 font-extrabold underline" style={{ color: C.warning }}>
+                              {L("verify in deal room", "تحقّق في غرفة الصفقة")}<span className="material-icons-outlined" style={{ fontSize: 13, transform: ar ? "scaleX(-1)" : undefined }}>arrow_forward</span>
+                            </button>
+                          ) : null; })()}
                         </span>
                       </td>
                     </tr>
@@ -1020,7 +1019,6 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                                 {owned.map((o) => <span key={o.key}>{docChip(c, ar ? o.labelAr : o.labelEn, true, o.key)}</span>)}
                               </div>
                             ) : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}
-                            {verifyLink(c)}
                           </Td>
                         );
                       })}
@@ -1031,7 +1029,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                       <RowHead title={L("Operator certificate", "شهادة المشغّل")} sub={(() => { const r = cols[0]?.bid.operatorCertReq; return r ? `${L("required", "مطلوب")}: ${r}` : L("declared in the deal room", "يُعلن في غرفة الصفقة"); })()} />
                       {cols.map((c) => {
                         const d = c.bid.operatorCertDeclared;
-                        return <Td key={c.bid.id} ok={!!d}>{d ? incChip(d, "muted", undefined, "badge") : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}{verifyLink(c)}</Td>;
+                        return <Td key={c.bid.id} ok={!!d}>{d ? incChip(d, "muted", undefined, "badge") : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}</Td>;
                       })}
                     </tr>
                   </>)}

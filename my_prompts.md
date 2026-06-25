@@ -6,3 +6,14 @@ these are the changes :
 5-equipment tersm are acknowledged but must be checked with supplier , this note must be somehwhere in the ui make it very seamless ux with samll link to deal room so he verifies it there with supplier ,
 5- same for equipment part the equipment "safety" certificates and ownership + operator cert must be from the deak room terms according to this 🔀 Moving to Negotiable: Operator included, Operator certification, and Equipment safety certifications are acknowledge-only today, but are planned to become supplier-declarable terms — the supplier will pick a value and they'll be able to conflict in the deal room.
 check this file http://moedatech-api-docs.s3-website.eu-central-1.amazonaws.com/terms-journey.html 
+
+----
+
+sharable link same as spec 006 of web app but with expanded scope :
+1- after request submission a unique link per request will be created and able to shared or copied , the link must contain the renter name if possible , 
+for this part follow this prorotype: 
+2- then the link submission will open the supplier bid form that have fields to fill and submit the bid so here we will store and collect these bid submissions in a new table with the fields of the form and user info, no write to existing tables in this step it is indepenent bid storage
+for this part follow this prorotype:
+3- then in my bids view cards the bids submitted from the form will appear here as well with the current app bids but with a label to indicate its source . also a filter will be avaialble for filtering 
+
+
