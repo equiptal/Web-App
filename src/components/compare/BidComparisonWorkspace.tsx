@@ -302,13 +302,18 @@ export function BidComparisonWorkspace() {
   const openDoc = async (c: BidColumn, hint: string, label: string) => {
     setDocView({ label, url: null, loading: true });
     const pred = docMatches(hint);
-    let docs = bidDocs[c.bid.id];
-    if (!docs) {
-      try { docs = await fetchBidDocuments(c.bid.id); setBidDocs((p) => ({ ...p, [c.bid.id]: docs! })); } catch { /* leave undefined */ }
+    const findUrl = (d?: DealRoomDocuments) =>
+      d ? [...d.companyDocuments, ...d.equipmentDocuments].find((x) => x.url && pred(x))?.url ?? null : null;
+    let url = findUrl(bidDocs[c.bid.id]);
+    // Always (re)fetch when the cached set has no match — the cache may be empty from a transient
+    // error (e.g. the endpoint was briefly down) or simply not loaded yet. This self-heals on click.
+    if (!url) {
+      try {
+        const fresh = await fetchBidDocuments(c.bid.id);
+        setBidDocs((p) => ({ ...p, [c.bid.id]: fresh }));
+        url = findUrl(fresh);
+      } catch { /* leave null */ }
     }
-    let url: string | null = docs
-      ? [...docs.companyDocuments, ...docs.equipmentDocuments].find((x) => x.url && pred(x))?.url ?? null
-      : null;
     // Fallback: the supplier's deal room (if one exists) also signs these docs.
     if (!url && c.bid.dealRoomId) {
       try {
