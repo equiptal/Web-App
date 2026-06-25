@@ -85,11 +85,12 @@ function computeRental(bid: BidCard, fallbackDays?: number | null): Money {
   const units = bid.numberOfUnits || 1;
   if (rate == null) return { value: 0, stated: false };
   const dpp = daysPerPeriod(bid.priceUnit);
-  if (dpp === 0) return { value: rate * units, stated: true }; // PER_JOB
-  // The bid's own duration, else the duration the request asked for; if neither, default to ONE rental
-  // period (rate × units) — same fallback as the deal room (periods ?? 1) so the totals stay consistent.
+  if (dpp === 0) return { value: rate * units, stated: true }; // PER_JOB (no duration concept)
+  // The bid's own duration, else the duration the request asked for. With NEITHER we do NOT assume a
+  // period — the rental is "not stated" so the UI shows the rate only (no fabricated 1-day total).
   const fb = num(fallbackDays);
-  const days = num(bid.duration) ?? (fb != null && fb > 0 ? fb : null) ?? dpp;
+  const days = num(bid.duration) ?? (fb != null && fb > 0 ? fb : null);
+  if (days == null) return { value: 0, stated: false };
   return { value: (rate / dpp) * days * units, stated: true };
 }
 

@@ -53,10 +53,10 @@ describe("buildItemComparison — all-in (AC-09/10/35)", () => {
     expect(columns[0].allIn.stated).toBe(false);
   });
 
-  it("open-ended (no duration) → defaults to one rental period (matches the deal room's periods ?? 1)", () => {
-    // PER_DAY, no duration anywhere → 1 day × 1 unit = 200 (one period), not "not stated".
+  it("open-ended (no duration) → rental NOT stated (show the rate only, no assumed 1-day total)", () => {
+    // PER_DAY, no duration anywhere → don't fabricate a 1-period total; the UI shows just the rate.
     const { columns } = buildItemComparison([bc({ id: "a", supplierId: "1", price: 200, priceUnit: "PER_DAY", duration: null })]);
-    expect(columns[0].rental).toEqual({ value: 200, stated: true });
+    expect(columns[0].rental).toEqual({ value: 0, stated: false });
   });
 
   it("monthly rate is prorated over 26 working days, not raw calendar days", () => {

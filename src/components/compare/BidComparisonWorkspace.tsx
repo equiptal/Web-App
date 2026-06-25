@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
-import { fetchMyRequests, fetchBids, startDealRoom, recommendBids, askBids, parseBid, captureBidEvents, fetchDealRoomDocuments } from "@/lib/api/client";
+import { fetchMyRequests, fetchBids, startDealRoom, recommendBids, askBids, parseBid, captureBidEvents, fetchDealRoomDocuments, fetchBidDocuments } from "@/lib/api/client";
 import { groupRequests, type RequestGroup } from "@/lib/contract/requests";
 import { CERT_LABEL, type BidCard, type CertCode } from "@/lib/contract/bids";
 import { buildItemComparison, sortByPreset, type BidColumn, type Preset, type CostResponsibility } from "@/lib/contract/comparison";
@@ -90,6 +90,7 @@ export function BidComparisonWorkspace() {
   const [costAsk, setCostAsk] = useState<{ type: "resp"; key: CostResponsibility["key"]; label: string } | { type: "mob"; bidId: string; label: string } | null>(null);
   const [costInput, setCostInput] = useState("");
   const [renterMob, setRenterMob] = useState<Record<string, number>>({}); // renter's own delivery (mob/demob) estimate per bid
+  const [docView, setDocView] = useState<{ label: string; url: string | null; loading: boolean } | null>(null); // in-app document viewer
   // A parsed quote the agent flagged (match.needs_confirmation) — added to the comparison only on confirm.
   const [confirmAdd, setConfirmAdd] = useState<{ card: BidCard; warnings: string[] } | null>(null);
   const prevRankRef = useRef<RecommendResult["ranking"] | null>(null);
@@ -270,24 +271,32 @@ export function BidComparisonWorkspace() {
   // Open the actual document file for a chip. Real files live in the supplier's deal room (presigned
   // URLs) — fetch them, open the one matching the chip; fall back to the deal-room documents view.
   // (Without a deal room there are no viewable files in the bid payload — see the T6-B/doc-URL backend note.)
-  const openDoc = async (c: BidColumn, hint: string) => {
-    if (!c.bid.dealRoomId) return;
+  const openDoc = async (c: BidColumn, hint: string, label: string) => {
+    setDocView({ label, url: null, loading: true });
     const norm = (s: string) => s.toLowerCase().replace(/[^a-z]/g, "");
     const h = norm(hint);
+    const match = (t?: string, l?: string) => { const tn = norm(t ?? ""), ln = norm(l ?? ""); return (!!tn && (tn.includes(h) || h.includes(tn))) || (!!ln && (ln.includes(h) || h.includes(ln))); };
+    let url: string | null = null;
+    // 1) Equipment certs / ownership — getBidDetail presigns equipment.documentKeys (NO deal room needed).
     try {
-      const d = await fetchDealRoomDocuments(c.bid.dealRoomId);
-      const all = [...d.companyDocuments, ...d.equipmentDocuments];
-      const m = all.find((x) => { const t = norm(x.type), l = norm(x.label); return t.includes(h) || l.includes(h) || h.includes(t); });
-      if (m?.url) { window.open(m.url, "_blank", "noopener"); return; }
-    } catch { /* fall through */ }
-    router.push(`/deal-room/${c.bid.dealRoomId}`);
+      const { documents } = await fetchBidDocuments(c.bid.id);
+      url = documents.find((x) => x.url && match(x.type))?.url ?? null;
+    } catch { /* leave null */ }
+    // 2) Company docs (CR/VAT/national) — only the deal-room documents endpoint signs those.
+    if (!url && c.bid.dealRoomId) {
+      try {
+        const d = await fetchDealRoomDocuments(c.bid.dealRoomId);
+        url = [...d.companyDocuments, ...d.equipmentDocuments].find((x) => match(x.type, x.label))?.url ?? null;
+      } catch { /* leave null */ }
+    }
+    setDocView({ label, url, loading: false });
   };
-  /** A clickable doc chip — opens the actual file when the bid has a deal room (else static). */
+  /** A clickable doc chip — opens the actual file in an in-app viewer modal (no redirect). */
   const docChip = (c: BidColumn, label: string, has: boolean, hint: string) => {
     const style = has ? { background: C.successBg, color: C.success } : { background: C.dangerBg, color: C.danger };
-    const inner = <><span className="material-icons-outlined" style={{ fontSize: 11 }}>{has ? "check" : "close"}</span>{label}{c.bid.dealRoomId && has && <span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>open_in_new</span>}</>;
-    return c.bid.dealRoomId && has
-      ? <button type="button" onClick={() => openDoc(c, hint)} title={L("Open document", "افتح المستند")} className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={style}>{inner}</button>
+    const inner = <><span className="material-icons-outlined" style={{ fontSize: 11 }}>{has ? "check" : "close"}</span>{label}{has && <span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>visibility</span>}</>;
+    return has
+      ? <button type="button" onClick={() => openDoc(c, hint, label)} title={L("View document", "عرض المستند")} className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={style}>{inner}</button>
       : <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={style}>{inner}</span>;
   };
   const verifyLink = (c: BidColumn) => c.bid.dealRoomId ? (
@@ -867,6 +876,9 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                           <Td key={c.bid.id} ok={c.bid.price != null}>
                             {c.bid.price == null ? (
                               <span style={{ color: C.muted }}>{L("not stated", "غير محدد")}</span>
+                            ) : !c.rental.stated ? (
+                              /* No rental duration → show the rate only; don't fabricate an assumed total. */
+                              <span className="font-mono font-bold" style={{ color: C.navy }}>{sar} {nf(c.bid.price)}<small style={{ fontSize: 10.5, color: C.muted }}>/{per}{units > 1 ? ` · ${L("unit", "وحدة")}` : ""}</small></span>
                             ) : (<>
                               {/* per-unit rate (basis) → comparable total = rate × duration × units */}
                               <span className="inline-flex flex-wrap items-center gap-1.5">
@@ -874,9 +886,9 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                                 <span style={{ color: C.action, fontWeight: 800, transform: ar ? "scaleX(-1)" : undefined }}>→</span>
                                 <span className="font-mono font-extrabold" style={{ color: C.navy }}>{sar} {nf(c.rental.value)}</span>
                               </span>
-                              <Sub>{realDays != null
+                              {(realDays != null || units > 1) && <Sub>{realDays != null
                                 ? L(`× ${realDays} days${units > 1 ? ` × ${units} units` : ""}`, `× ${realDays} يوم${units > 1 ? ` × ${units} وحدة` : ""}`)
-                                : L(`× 1 ${per} (assumed)${units > 1 ? ` × ${units} units` : ""}`, `× ${per} واحد (مفترض)${units > 1 ? ` × ${units} وحدة` : ""}`)}</Sub>
+                                : L(`× ${units} units`, `× ${units} وحدة`)}</Sub>}
                             </>)}
                           </Td>
                         );
@@ -970,19 +982,14 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                   <SectionRow id="equip" icon="construction" title={L("Equipment", "المعدّة")} accent={C.supplier} accentText="#7BE0C2" n={cols.length} collapsed={collapsed.has("equip")} onToggle={() => toggleSection("equip")} />
                   {!collapsed.has("equip") && (<>
                     {/* Equipment + operator terms are ACKNOWLEDGED from the request today, not yet supplier-declared.
-                        Warning in the label cell; the per-supplier "verify in deal room" link sits under each column. */}
+                        Full-width banner; the per-supplier "verify in deal room" link sits in each cell below. */}
                     <tr>
-                      <th className="sticky start-0 z-[2] p-2.5 text-start align-top" style={{ background: C.warningBg, borderTop: `1px solid ${C.line}` }}>
-                        <span className="inline-flex items-start gap-1.5 text-[11px] font-bold leading-snug" style={{ color: C.warning }}>
+                      <td colSpan={cols.length + 1} style={{ padding: "8px 14px", background: C.warningBg, borderTop: `1px solid ${C.line}` }}>
+                        <span className="inline-flex items-center gap-1.5 text-[11.5px] font-bold" style={{ color: C.warning }}>
                           <span className="material-icons-outlined" style={{ fontSize: 15 }}>warning_amber</span>
-                          {L("Acknowledged by the supplier — verify in the deal room →", "مُقَرّة من المؤجّر — تحقّق في غرفة الصفقة ←")}
+                          {L("These are acknowledged by the supplier — verify each one in the deal room (links below).", "هذه مُقَرّة من المؤجّر — تحقّق من كلٍّ منها في غرفة الصفقة (الروابط أدناه).")}
                         </span>
-                      </th>
-                      {cols.map((c) => (
-                        <td key={c.bid.id} className="p-2.5 align-top" style={{ background: C.warningBg, borderTop: `1px solid ${C.line}` }}>
-                          {c.bid.dealRoomId ? verifyLink(c) : <span className="text-[10px] font-bold" style={{ color: C.muted }}>{L("no deal room yet", "لا توجد غرفة بعد")}</span>}
-                        </td>
-                      ))}
+                      </td>
                     </tr>
                     <tr>
                       <RowHead title={L("Year", "سنة الصنع")} sub={(() => { const my = cols[0]?.bid.reqMinYear; return my == null ? undefined : my >= 1990 ? `${L("min year", "أدنى سنة")} ${my}` : `${L("max age", "أقصى عمر")} ${my} ${L("yrs", "سنة")}`; })()} />
@@ -1013,6 +1020,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                                 {owned.map((o) => <span key={o.key}>{docChip(c, ar ? o.labelAr : o.labelEn, true, o.key)}</span>)}
                               </div>
                             ) : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}
+                            {verifyLink(c)}
                           </Td>
                         );
                       })}
@@ -1023,7 +1031,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                       <RowHead title={L("Operator certificate", "شهادة المشغّل")} sub={(() => { const r = cols[0]?.bid.operatorCertReq; return r ? `${L("required", "مطلوب")}: ${r}` : L("declared in the deal room", "يُعلن في غرفة الصفقة"); })()} />
                       {cols.map((c) => {
                         const d = c.bid.operatorCertDeclared;
-                        return <Td key={c.bid.id} ok={!!d}>{d ? incChip(d, "muted", undefined, "badge") : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}</Td>;
+                        return <Td key={c.bid.id} ok={!!d}>{d ? incChip(d, "muted", undefined, "badge") : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}{verifyLink(c)}</Td>;
                       })}
                     </tr>
                   </>)}
@@ -1033,14 +1041,14 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                   {/* DECIDE — its own band, clearly separated from the equipment section. Award/Negotiate use
                       the SAME colours for every supplier (Award = green solid, Negotiate = navy outline). */}
                   <tr>
-                    <th className="sticky start-0 z-[2] p-3.5 text-start align-top text-[12.5px] font-extrabold" style={{ background: C.navy, color: "#fff", borderTop: `3px solid ${C.navy}` }}>
+                    <th className="sticky start-0 z-[2] p-3.5 text-start align-top text-[12.5px] font-extrabold" style={{ background: C.surface2, color: C.navyMid, borderTop: `2px solid ${C.border}` }}>
                       <span className="inline-flex items-center gap-1.5"><span className="material-icons-outlined" style={{ fontSize: 16 }}>gavel</span>{L("Decide", "القرار")}</span>
-                      <span className="block text-[11px] font-semibold" style={{ color: "rgba(255,255,255,.7)" }}>{L("opens the deal room", "يفتح غرفة الصفقة")}</span>
+                      <span className="block text-[11px] font-semibold" style={{ color: C.muted }}>{L("opens the deal room", "يفتح غرفة الصفقة")}</span>
                     </th>
                     {cols.map((c) => {
                       const isAwardedBid = !!awarded && (awarded.id === c.bid.id || (awarded.supplierId != null && awarded.supplierId === c.bid.supplierId));
                       return (
-                        <td key={c.bid.id} className="p-3.5 align-top" style={{ borderTop: `3px solid ${C.navy}`, background: "rgba(28,53,80,0.04)" }}>
+                        <td key={c.bid.id} className="p-3.5 align-top" style={{ borderTop: `2px solid ${C.border}` }}>
                           {awarded ? (
                             <span className="inline-flex rounded-full px-3 py-1.5 text-[11.5px] font-bold" style={isAwardedBid ? { background: C.successBg, color: C.success } : { background: C.surface2, color: C.muted }}>{isAwardedBid ? `${L("Awarded", "تمت الترسية")} ✓` : L("Item awarded", "مُرسى")}</span>
                           ) : (
@@ -1048,7 +1056,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                               <button onClick={() => goDealRoom(c.bid, "award")} disabled={busy} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-extrabold text-white disabled:opacity-60" style={{ background: C.success }}>
                                 <span className="material-icons-outlined" style={{ fontSize: 16 }}>gavel</span>{L("Award", "ترسية")}
                               </button>
-                              <button onClick={() => goDealRoom(c.bid, "negotiate")} disabled={busy} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-bold disabled:opacity-60" style={{ background: "#fff", border: `1.5px solid ${C.navy}`, color: C.navy }}>
+                              <button onClick={() => goDealRoom(c.bid, "negotiate")} disabled={busy} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-extrabold text-white disabled:opacity-60" style={{ background: C.rentee }}>
                                 <span className="material-icons-outlined" style={{ fontSize: 15 }}>swap_horiz</span>{L("Negotiate", "تفاوض")}
                               </button>
                             </div>
@@ -1148,6 +1156,34 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
       {toastMsg && (
         <div className="fixed inset-x-0 bottom-6 z-[500] mx-auto flex w-max max-w-[90%] items-center gap-2 rounded-lg px-4 py-3 text-[13px] font-bold text-white" style={{ background: C.navy, boxShadow: "0 14px 30px rgba(28,53,80,.35)" }}>
           <span className="material-icons-outlined" style={{ fontSize: 18, color: "#7BE0A5" }}>check_circle</span>{toastMsg}
+        </div>
+      )}
+
+      {/* In-app document viewer — renders the actual file (presigned S3) in a modal, no redirect. */}
+      {docView && (
+        <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/55 p-3 sm:p-6" onClick={() => setDocView(null)}>
+          <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-[14px] bg-white" onClick={(e) => e.stopPropagation()} dir={ar ? "rtl" : "ltr"}>
+            <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: C.border }}>
+              <span className="inline-flex items-center gap-2 text-[14px] font-extrabold" style={{ color: C.navy }}><span className="material-icons-outlined" style={{ fontSize: 18, color: C.navyMid }}>description</span>{docView.label}</span>
+              <div className="flex items-center gap-1">
+                {docView.url && <a href={docView.url} target="_blank" rel="noopener noreferrer" title={L("Open in new tab", "فتح في تبويب جديد")} className="grid h-8 w-8 place-items-center rounded-full" style={{ color: C.muted }}><span className="material-icons-outlined" style={{ fontSize: 18 }}>open_in_new</span></a>}
+                <button onClick={() => setDocView(null)} className="grid h-8 w-8 place-items-center rounded-full" style={{ color: C.muted }} aria-label={L("Close", "إغلاق")}><span className="material-icons-outlined" style={{ fontSize: 18 }}>close</span></button>
+              </div>
+            </div>
+            <div className="grid min-h-[60vh] flex-1 place-items-center" style={{ background: C.surface2 }}>
+              {docView.loading ? (
+                <span className="material-icons-outlined animate-spin" style={{ fontSize: 30, color: C.muted }}>progress_activity</span>
+              ) : docView.url ? (
+                <iframe src={docView.url} title={docView.label} className="h-full w-full" style={{ minHeight: "60vh", border: 0 }} />
+              ) : (
+                <div className="max-w-sm px-6 py-10 text-center">
+                  <span className="material-icons-outlined" style={{ fontSize: 36, color: C.muted }}>lock</span>
+                  <p className="mt-2 text-[13.5px] font-bold" style={{ color: C.navy }}>{L("Document not available to view", "المستند غير متاح للعرض")}</p>
+                  <p className="mt-1 text-[12.5px]" style={{ color: C.muted }}>{L("This supplier hasn’t shared this file, or it isn’t viewable yet. Company docs (CR/VAT) open once a deal room is started.", "لم يشارك المؤجّر هذا الملف، أو أنه غير متاح للعرض بعد. تُفتح وثائق الشركة (السجل/الضريبة) بعد بدء غرفة الصفقة.")}</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
