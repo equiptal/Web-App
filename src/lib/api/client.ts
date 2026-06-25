@@ -206,9 +206,10 @@ export function fetchDealRoomDocuments(id: string): Promise<DealRoomDocuments> {
   return getJson<DealRoomDocuments>(`/api/me/deal-rooms/${encodeURIComponent(id)}/documents`);
 }
 
-/** A bid's equipment documents as presigned `{ type, url }` entries (getBidDetail) — no deal room needed. */
-export function fetchBidDocuments(id: string): Promise<{ documents: { type?: string; url?: string }[] }> {
-  return getJson<{ documents: { type?: string; url?: string }[] }>(`/api/me/bids/${encodeURIComponent(id)}/documents`);
+/** A bid's documents (company verification + equipment) as presigned entries — no deal room needed.
+ *  Proxies the backend `GET /marketplace/bids/{id}/documents`; same shape as the deal-room docs sheet. */
+export function fetchBidDocuments(id: string): Promise<DealRoomDocuments> {
+  return getJson<DealRoomDocuments>(`/api/me/bids/${encodeURIComponent(id)}/documents`);
 }
 
 /** The official quotation PDF for a closed deal (app parity — backend-generated from the template). */

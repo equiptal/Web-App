@@ -1,31 +1,42 @@
 import { NextResponse } from "next/server";
-import { withAuthedBackend, appAuthErrorResponse } from "@/lib/api/app-backend-authed";
+import { cookies } from "next/headers";
+import { serverEnv } from "@/lib/config/env";
+import { agentsGet, AgentsBackendError } from "@/lib/api/agents-backend";
+import { USER_COOKIE } from "@/lib/api/auth-server";
+import { mapDealRoomDocuments } from "@/lib/contract/deal-room";
+import type { RenterUser } from "@/lib/contract/auth";
 
 /**
- * GET /api/me/bids/:id/documents — the bid's equipment documents as PRESIGNED URLs, so the comparison
- * can view certs / ownership files WITHOUT a deal room. Proxies `GET /marketplace/bids/{bidId}`
- * (getBidDetail), which signs `equipment.documentKeys` into `{ type, url }` entries. Company docs
- * (CR/VAT/national) aren't signed here — those still come from the deal-room documents endpoint.
+ * GET /api/me/bids/:id/documents — ALL of a bid's documents (supplier company verification + equipment)
+ * as PRESIGNED URLs, so the comparison can show "has doc" chips and view the actual files WITHOUT a
+ * deal room. Proxies the agents backend `GET /agents/bids/{bidId}/documents` (service-token authed),
+ * forwarding the signed-in renter's id so the backend can enforce the bid/request-owner guard.
+ *
+ * Response → `{ companyDocuments, equipmentDocuments }`, mapped via `mapDealRoomDocuments`.
  */
-export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+
+/** The signed-in renter's real backend id (web-app/001), or null when there's no session. */
+async function sessionUserId(): Promise<string | null> {
+  try {
+    const raw = (await cookies()).get(USER_COOKIE)?.value;
+    if (!raw) return null;
+    const user = JSON.parse(raw) as RenterUser;
+    return typeof user.id === "number" ? String(user.id) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return withAuthedBackend(req, async (call) => {
-    try {
-      const raw = (await call(`/marketplace/bids/${encodeURIComponent(id)}`)) as Record<string, unknown>;
-      const eq = (raw?.equipment ?? {}) as Record<string, unknown>;
-      // `toSignedStructured` returns each entry as `{ type, key: <presigned-url> }` — the signed URL
-      // lives under `key`, not `url`. Normalize to `{ type, url }` so the comparison's viewer can read it.
-      const list = Array.isArray(eq.documentKeys) ? (eq.documentKeys as unknown[]) : [];
-      const docs = list
-        .map((d) => {
-          const o = (d ?? {}) as Record<string, unknown>;
-          const url = typeof o.url === "string" ? o.url : typeof o.key === "string" ? o.key : null;
-          return { type: typeof o.type === "string" ? o.type : undefined, url };
-        })
-        .filter((d) => !!d.url);
-      return NextResponse.json({ documents: docs });
-    } catch (err) {
-      return appAuthErrorResponse(err);
-    }
-  });
+  const userId = (await sessionUserId()) ?? serverEnv.agentsTestUserId;
+  const qs = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+  try {
+    const raw = await agentsGet<unknown>(`/agents/bids/${encodeURIComponent(id)}/documents${qs}`);
+    return NextResponse.json(mapDealRoomDocuments(raw));
+  } catch (err) {
+    // Degrade gracefully — the comparison falls back to the bid-list flags when docs don't load.
+    const status = err instanceof AgentsBackendError ? err.status || 502 : 500;
+    return NextResponse.json({ companyDocuments: [], equipmentDocuments: [] }, { status });
+  }
 }

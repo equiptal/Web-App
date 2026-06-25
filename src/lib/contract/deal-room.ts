@@ -87,7 +87,8 @@ function mapDoc(raw: Record<string, unknown>): DealRoomDocument {
     type: s(raw.type) ?? "",
     label: s(raw.label) ?? s(raw.type) ?? "Document",
     labelAr: s(raw.labelAr),
-    url: s(raw.url) ?? "",
+    // The signed link is normally `url`; `toSignedStructured`-based payloads put it under `key`.
+    url: s(raw.url) ?? s(raw.key) ?? "",
     fileType: s(raw.fileType) ?? "pdf",
   };
 }

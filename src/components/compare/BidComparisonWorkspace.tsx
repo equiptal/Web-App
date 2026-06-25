@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchMyRequests, fetchBids, startDealRoom, recommendBids, askBids, parseBid, captureBidEvents, fetchDealRoomDocuments, fetchBidDocuments } from "@/lib/api/client";
 import { groupRequests, type RequestGroup } from "@/lib/contract/requests";
+import type { DealRoomDocuments } from "@/lib/contract/deal-room";
 import { CERT_LABEL, type BidCard, type CertCode } from "@/lib/contract/bids";
 import { buildItemComparison, sortByPreset, type BidColumn, type Preset, type CostResponsibility } from "@/lib/contract/comparison";
 import { bidColumnToComputed, normalizedBidToBidCard, presetToAgent, type RecommendResult } from "@/lib/contract/agent-bids";
@@ -91,6 +92,9 @@ export function BidComparisonWorkspace() {
   const [costInput, setCostInput] = useState("");
   const [renterMob, setRenterMob] = useState<Record<string, number>>({}); // renter's own delivery (mob/demob) estimate per bid
   const [docView, setDocView] = useState<{ label: string; url: string | null; loading: boolean } | null>(null); // in-app document viewer
+  // Presigned documents (company verification + equipment) per bid, fetched on demand from
+  // /api/me/bids/:id/documents — drives the "green if the doc exists" chips and the in-app viewer.
+  const [bidDocs, setBidDocs] = useState<Record<string, DealRoomDocuments>>({});
   // A parsed quote the agent flagged (match.needs_confirmation) — added to the comparison only on confirm.
   const [confirmAdd, setConfirmAdd] = useState<{ card: BidCard; warnings: string[] } | null>(null);
   const prevRankRef = useRef<RecommendResult["ranking"] | null>(null);
@@ -232,6 +236,20 @@ export function BidComparisonWorkspace() {
     }
     return detCols;
   }, [baseCols, detCols, agentLive, rec]);
+  // Fetch each visible bid's documents once (company + equipment, presigned) so the company-doc
+  // chips reflect what's actually uploaded and open the real file — no deal room needed. Best-effort:
+  // if the endpoint isn't available the chips fall back to the bid-list compliance flags.
+  useEffect(() => {
+    const missing = cols.map((c) => c.bid.id).filter((id) => id && !(id in bidDocs));
+    if (!missing.length) return;
+    let alive = true;
+    Promise.all(
+      missing.map(async (id) => {
+        try { return [id, await fetchBidDocuments(id)] as const; } catch { return [id, { companyDocuments: [], equipmentDocuments: [] }] as const; }
+      }),
+    ).then((entries) => { if (alive) setBidDocs((p) => ({ ...p, ...Object.fromEntries(entries) })); });
+    return () => { alive = false; };
+  }, [cols, bidDocs]);
   // The pick = the agent's pick when it maps to a visible column, else the top-ranked column. Either way it
   // tracks the current order, so the highlight moves when you re-rank.
   const pickIdRaw = rec?.recommendation.pick_bid_id != null ? String(rec.recommendation.pick_bid_id) : null;
@@ -254,39 +272,48 @@ export function BidComparisonWorkspace() {
   const mobDemobUnit = (c: BidColumn) => (c.mob.stated ? c.mob.value : 0) + (c.demob.stated ? c.demob.value : 0);
   const mobDemobTotal = (c: BidColumn) => mobDemobUnit(c) * units;
   const supplierStated = (c: BidColumn) => (c.rental.stated ? c.rental.value : 0) + mobDemobTotal(c);
-  // L1 company documents (real compliance fields) — shown in the column identity. Present → ✓, required-
-  // but-missing (LC/SASO when the request requires it) → ✗, otherwise hidden.
+  // Match a presigned doc ({type,label}) to a chip's hint, by fuzzy substring on type or label.
+  const norm = (str: string) => str.toLowerCase().replace(/[^a-z]/g, "");
+  const docMatches = (hint: string) => {
+    const h = norm(hint);
+    return (x: { type?: string; label?: string }) => {
+      const tn = norm(x.type ?? ""), ln = norm(x.label ?? "");
+      return (!!tn && (tn.includes(h) || h.includes(tn))) || (!!ln && (ln.includes(h) || h.includes(ln)));
+    };
+  };
+  // L1 company documents — a chip is GREEN when the supplier actually uploaded that doc (presigned in
+  // bidDocs) OR the bid's compliance flag is set; required-but-missing (LC/SASO) → ✗; otherwise hidden.
+  // The OR keeps CR/VAT green from the numbers and means a missing /documents endpoint degrades to flags.
   const companyDocChips = (bid: BidColumn["bid"]) => {
     const k = bid.compliance;
+    const company = bidDocs[bid.id]?.companyDocuments;
+    const hasDoc = (hint: string) => !!company && company.some((x) => x.url && docMatches(hint)(x));
     return [
-      { lbl: L("CR", "السجل التجاري"), has: k.activityLicense, req: false, hint: "commercial" },
-      { lbl: L("VAT", "الرقم الضريبي"), has: k.taxNumber, req: false, hint: "vat" },
-      { lbl: L("National address", "العنوان الوطني"), has: k.nationalAddress, req: false, hint: "national" },
-      { lbl: L("Local Content", "المحتوى المحلي"), has: k.localContent, req: bid.requiredCerts.includes("LC"), hint: "local" },
-      { lbl: L("SASO registration", "تسجيل ساسو"), has: k.saso, req: bid.requiredCerts.includes("SASO"), hint: "saso" },
+      { lbl: L("CR", "السجل التجاري"), has: hasDoc("commercial") || k.activityLicense, req: false, hint: "commercial" },
+      { lbl: L("VAT", "الرقم الضريبي"), has: hasDoc("vat") || k.taxNumber, req: false, hint: "vat" },
+      { lbl: L("National address", "العنوان الوطني"), has: hasDoc("national") || k.nationalAddress, req: false, hint: "national" },
+      { lbl: L("Local Content", "المحتوى المحلي"), has: hasDoc("local") || k.localContent, req: bid.requiredCerts.includes("LC"), hint: "local" },
+      { lbl: L("SASO registration", "تسجيل ساسو"), has: hasDoc("saso") || k.saso, req: bid.requiredCerts.includes("SASO"), hint: "saso" },
     ].filter((d) => d.has || d.req);
   };
-  // Equipment/operator terms are ACKNOWLEDGED from the request today (not yet supplier-declared) — a
-  // seamless prompt to confirm them with that supplier in the deal room (only when a room exists).
-  // Open the actual document file for a chip. Real files live in the supplier's deal room (presigned
-  // URLs) — fetch them, open the one matching the chip; fall back to the deal-room documents view.
-  // (Without a deal room there are no viewable files in the bid payload — see the T6-B/doc-URL backend note.)
+  // Open the actual document file for a chip in the in-app viewer. The bid's documents (company
+  // verification + equipment, presigned) come from /api/me/bids/:id/documents — NO deal room needed.
+  // Use the cached set if we have it, else fetch on the fly; fall back to the deal-room docs endpoint.
   const openDoc = async (c: BidColumn, hint: string, label: string) => {
     setDocView({ label, url: null, loading: true });
-    const norm = (s: string) => s.toLowerCase().replace(/[^a-z]/g, "");
-    const h = norm(hint);
-    const match = (t?: string, l?: string) => { const tn = norm(t ?? ""), ln = norm(l ?? ""); return (!!tn && (tn.includes(h) || h.includes(tn))) || (!!ln && (ln.includes(h) || h.includes(ln))); };
-    let url: string | null = null;
-    // 1) Equipment certs / ownership — getBidDetail presigns equipment.documentKeys (NO deal room needed).
-    try {
-      const { documents } = await fetchBidDocuments(c.bid.id);
-      url = documents.find((x) => x.url && match(x.type))?.url ?? null;
-    } catch { /* leave null */ }
-    // 2) Company docs (CR/VAT/national) — only the deal-room documents endpoint signs those.
+    const pred = docMatches(hint);
+    let docs = bidDocs[c.bid.id];
+    if (!docs) {
+      try { docs = await fetchBidDocuments(c.bid.id); setBidDocs((p) => ({ ...p, [c.bid.id]: docs! })); } catch { /* leave undefined */ }
+    }
+    let url: string | null = docs
+      ? [...docs.companyDocuments, ...docs.equipmentDocuments].find((x) => x.url && pred(x))?.url ?? null
+      : null;
+    // Fallback: the supplier's deal room (if one exists) also signs these docs.
     if (!url && c.bid.dealRoomId) {
       try {
         const d = await fetchDealRoomDocuments(c.bid.dealRoomId);
-        url = [...d.companyDocuments, ...d.equipmentDocuments].find((x) => match(x.type, x.label))?.url ?? null;
+        url = [...d.companyDocuments, ...d.equipmentDocuments].find(pred)?.url ?? null;
       } catch { /* leave null */ }
     }
     setDocView({ label, url, loading: false });

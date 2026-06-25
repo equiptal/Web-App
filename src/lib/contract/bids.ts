@@ -352,10 +352,11 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   for (const c of companyCertCodes) push(held, c);
   for (const c of equipmentCertCodes) push(held, c);
   const eqVerified = eq ? eq.verificationStatus === "VERIFIED" || eq.isVerified === true || eq.verified === true : false;
-  // App parity (marketplace_models bid-card identity): a supplier is verified when its `isVerified`
-  // flag is set OR it reached verification status 2. Read `isVerified` first — it's the signal the
-  // app's bid card trusts; `supplierStatus === 2` is kept as a fallback for older projections.
-  const supVerified = sup.isVerified === true || sup.supplierStatus === 2 || prof.verified === true;
+  // CANONICAL verified signal across the platform (bid card / profile / limits): supplierStatus === 2
+  // (1=pending, 2=verified/approved, 3=rejected — see onboarding.ts supplierStatusToVerification).
+  // `isVerified` is an INDEPENDENT column that can diverge from the verification tier, so we do NOT
+  // OR it in here — that produced false "Verified" badges. A supplier is verified iff status === 2.
+  const supVerified = n(sup.supplierStatus) === 2;
   // Company docs are read from the supplier's REAL verification fields projected in the bid list
   // (crNumber / vatNumber / national-address parts / localContentDocKey / sasoHeavyEquipDocKey). Show a
   // doc ONLY when its actual field is present — NEVER inferred from "verified" (a verified supplier can
