@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
-import { fetchBids, startDealRoom } from "@/lib/api/client";
+import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/client";
 import type { BidCard } from "@/lib/contract/bids";
+import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { CredentialPills } from "@/components/requests/CredentialPills";
 import { TermsPanel } from "@/components/requests/TermsPanel";
@@ -14,7 +15,6 @@ import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
 import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
-import { useSharedLinkMock, tagSharedLinkBids } from "@/lib/mock/shared-link-bids";
 
 /** Lifecycle pill (matches the prototype SPILL). */
 const SPILL: Record<string, { cls: string; dot: boolean; en: string; ar: string }> = {
@@ -69,8 +69,9 @@ export function RequestBids({ requestId }: { requestId: string }) {
   const [openTermsId, setOpenTermsId] = useState<string | null>(null);
   const { tier } = useSession();
   const [quoteGate, setQuoteGate] = useState(false); // unverified → confirm before issuing the quotation
-  // web-app/006 demo (staging only) — relabel real bids as off-platform "via shared link".
-  const mockEnabled = useSharedLinkMock();
+  // web-app/006 (expanded) — real off-platform submissions via the request's shared link.
+  const [submissions, setSubmissions] = useState<LinkBidSubmission[]>([]);
+  const [src, setSrc] = useState<"all" | "app" | "link">("all"); // source filter
   const [submissionBid, setSubmissionBid] = useState<BidCard | null>(null);
 
   const toggleSelect = (id: string) =>
@@ -151,6 +152,11 @@ export function RequestBids({ requestId }: { requestId: string }) {
     fetchBids(requestId)
       .then((d) => active && setBids(d.bids))
       .catch(() => active && setError(true));
+    // Off-platform shared-link submissions (independent of the app bids; best-effort).
+    setSubmissions([]);
+    fetchRequestSubmissions(requestId)
+      .then((r) => active && setSubmissions(r.submissions))
+      .catch(() => {});
     return () => {
       active = false;
     };
@@ -177,9 +183,13 @@ export function RequestBids({ requestId }: { requestId: string }) {
 
   if (error) return <div className="rempty">{L("Couldn’t load the bids.", "تعذّر تحميل العروض.")}</div>;
   if (!bids) return <div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 26 }}>progress_activity</span></div>;
-  // Staging demo: relabel the first couple of real bids as off-platform shared-link submissions.
-  const allBids = mockEnabled ? tagSharedLinkBids(bids) : bids;
-  if (allBids.length === 0) return <div className="rempty">{L("No bids yet — suppliers' offers will appear here.", "لا توجد عروض بعد — ستظهر عروض المؤجّرين هنا.")}</div>;
+  // Merge on-platform app bids with off-platform shared-link submissions (mapped to a BidCard shape).
+  const linkCards = submissions.map((s) => submissionToBidCard(s));
+  const merged = [...bids, ...linkCards];
+  const linkCount = linkCards.length;
+  const appCount = bids.length;
+  const allBids = merged.filter((b) => (src === "all" ? true : src === "link" ? b.viaSharedLink : !b.viaSharedLink));
+  if (merged.length === 0) return <div className="rempty">{L("No bids yet — suppliers' offers will appear here.", "لا توجد عروض بعد — ستظهر عروض المؤجّرين هنا.")}</div>;
 
   return (
     <div>
@@ -190,6 +200,22 @@ export function RequestBids({ requestId }: { requestId: string }) {
       </button>
       <div className="bids-bar">
         <span className="count">{allBids.length} {L("bids", "عروض")}</span>
+        {linkCount > 0 && (
+          <div className="bids-srcfilter" style={{ display: "flex", gap: 6, marginInlineStart: "auto" }}>
+            {([
+              ["all", L("All", "الكل"), appCount + linkCount],
+              ["app", L("In-app", "داخل التطبيق"), appCount],
+              ["link", L("Via shared link", "عبر الرابط"), linkCount],
+            ] as const).map(([k, lbl, n]) => (
+              <button key={k} type="button" onClick={() => setSrc(k)}
+                className="srcchip"
+                style={{ border: "1px solid", borderRadius: 999, padding: "3px 10px", fontSize: 11.5, fontWeight: 700,
+                  ...(src === k ? { background: "#0f172a", color: "#fff", borderColor: "#0f172a" } : { background: "#fff", color: "#475569", borderColor: "#e2e8f0" }) }}>
+                {lbl} <span style={{ opacity: 0.7 }}>{n}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       {allBids.map((b) => {
         if (b.viaSharedLink) {
@@ -363,10 +389,11 @@ export function RequestBids({ requestId }: { requestId: string }) {
         />
       )}
 
-      {/* web-app/006 demo — read-only viewer of an off-platform shared-link submission */}
+      {/* web-app/006 — read-only viewer of an off-platform shared-link submission (real answers) */}
       {submissionBid && (
         <SharedBidSubmissionModal
           bid={submissionBid}
+          submission={submissions.find((s) => `link-${s.id}` === submissionBid.id) ?? null}
           ar={ar}
           L={L}
           onClose={() => setSubmissionBid(null)}

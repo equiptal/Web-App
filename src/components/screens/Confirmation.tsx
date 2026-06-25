@@ -5,6 +5,7 @@ import { useT, fmt, useLocale } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { Button, Icon } from "@/components/ui";
 import { postableItems } from "@/lib/contract";
+import { fetchRequestSubmissions, bidShareUrl, setBidDeadline } from "@/lib/api/client";
 
 /** AC-42: web confirmation; renter stays on web (no bid-tracking surface). Matches the prototype.
  *  web-app/006 (frontend prototype): "share for bids" — invite off-platform suppliers via a link that
@@ -29,8 +30,18 @@ export function Confirmation() {
   const [deadline, setDeadline] = useState("");
   useEffect(() => { if (typeof window !== "undefined") setOrigin(window.location.origin); }, []);
 
-  const shareUrl = `${origin}/supplier-bid-v2.html${reqId ? `?req=${encodeURIComponent(reqId)}` : ""}`;
-  const formUrl = `${origin}/supplier-bid-v2.html?preview=1`;
+  // web-app/006 (expanded) — the per-request share link `/bid/{slug}-{requestId}`. The request id IS
+  // the link token, so the link is available immediately; we only fetch the renter name for the slug.
+  const [renterName, setRenterName] = useState<string | null>(null);
+  useEffect(() => {
+    if (!reqId) return;
+    let alive = true;
+    fetchRequestSubmissions(reqId).then((r) => alive && setRenterName(r.renterName)).catch(() => {});
+    return () => { alive = false; };
+  }, [reqId]);
+
+  const shareUrl = origin && reqId ? bidShareUrl(origin, reqId, renterName) : "";
+  const formUrl = shareUrl || `${origin}/supplier-bid-v2.html?preview=1`;
   const message = L(`Submit your bid on Moedatech: ${shareUrl}`, `قدّم عرضك على مؤيداتك: ${shareUrl}`);
 
   function copyLink() {
@@ -45,6 +56,12 @@ export function Confirmation() {
     else if (kind === "SMS") window.location.href = `sms:?&body=${enc}`;
     else if (navigator.share) navigator.share({ url: shareUrl, text: message }).catch(() => {});
     else copyLink();
+  }
+  // AC-04/05 — persist the optional bid-submission deadline (ISO, or null to clear → no expiry).
+  function saveDeadline(value: string, on: boolean) {
+    if (!reqId) return;
+    const iso = on && value ? new Date(value).toISOString() : null;
+    setBidDeadline(reqId, iso).catch(() => {});
   }
 
   return (
@@ -145,13 +162,13 @@ export function Confirmation() {
                     <b className="block text-[13px] text-navy">{L("Set a deadline", "حدّد موعداً نهائياً")}</b>
                     <span className="text-[11.5px] text-muted">{L("When the link stops accepting bids", "متى يتوقف الرابط عن استقبال العروض")}</span>
                   </div>
-                  <button onClick={() => setDeadlineOn((v) => !v)} className="relative h-6 w-11 flex-none rounded-full transition" style={{ background: deadlineOn ? "var(--brand, #F79009)" : "#cbd5e1" }} aria-pressed={deadlineOn}>
+                  <button onClick={() => setDeadlineOn((v) => { const next = !v; saveDeadline(deadline, next); return next; })} className="relative h-6 w-11 flex-none rounded-full transition" style={{ background: deadlineOn ? "var(--brand, #F79009)" : "#cbd5e1" }} aria-pressed={deadlineOn}>
                     <span className="absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all" style={{ insetInlineStart: deadlineOn ? "1.5rem" : "0.125rem" }} />
                   </button>
                 </div>
                 {deadlineOn ? (
                   <div className="mt-2">
-                    <input type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="h-11 w-full rounded-[10px] border border-border bg-surface2 px-3 text-[14px] text-navy outline-0" />
+                    <input type="datetime-local" value={deadline} onChange={(e) => { setDeadline(e.target.value); saveDeadline(e.target.value, true); }} className="h-11 w-full rounded-[10px] border border-border bg-surface2 px-3 text-[14px] text-navy outline-0" />
                     <div className="mt-2 flex items-start gap-1.5 text-[11.5px] text-muted"><Icon name="schedule" size={15} className="mt-px flex-none" />{L("The link expires at the deadline; suppliers see a countdown.", "ينتهي الرابط عند الموعد النهائي؛ يرى المؤجرون عدّاً تنازلياً.")}</div>
                   </div>
                 ) : (

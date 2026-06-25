@@ -3,12 +3,11 @@
 import { useEffect, useState, Fragment, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
-import { fetchRequestDetail, cancelRequest, updateRequest } from "@/lib/api/client";
+import { fetchRequestDetail, cancelRequest, updateRequest, fetchRequestSubmissions, bidShareUrl, setBidDeadline } from "@/lib/api/client";
 import { publicTaxonomyUrl, type RequestItem, type RequestRecord } from "@/lib/contract/requests";
 import { RequestBids } from "@/components/requests/RequestBids";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { LocationMap } from "@/components/requests/LocationMap";
-import { useSharedLinkMock, sharedLinkStatsFor } from "@/lib/mock/shared-link-bids";
 import "@/components/requests/requests-proto.css";
 
 const STATUS_CLS: Record<string, string> = { OPEN: "st-open", ACTIVE: "st-active", ACCEPTED: "st-accepted", EXPIRED: "st-expired", CLOSED: "st-closed", ABANDONED: "st-closed" };
@@ -31,11 +30,34 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
   const [showEdit, setShowEdit] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
   const [copied, setCopied] = useState(false);
-  // web-app/006 demo (staging only) — shared-link reach tracker on the request detail.
-  const showLinkTracker = useSharedLinkMock();
+  // web-app/006 (expanded) — shared-link tracker (real submitted count) + the live link. The request
+  // id IS the link token, so the link is always available; we fetch the submitted count + renter name.
+  const [link, setLink] = useState<{ renterName: string | null; openedCount: number; submittedCount: number; bidDeadline: string | null } | null>(null);
+  useEffect(() => {
+    let active = true;
+    fetchRequestSubmissions(id).then((r) => active && setLink(r)).catch(() => {});
+    return () => { active = false; };
+  }, [id]);
+  // AC-06 — set / adjust / clear the bid-submission deadline from the request header.
+  const [dlEdit, setDlEdit] = useState(false);
+  const [dlInput, setDlInput] = useState("");
+  const toLocalInput = (iso: string | null) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const openDl = () => { setDlInput(toLocalInput(link?.bidDeadline ?? null)); setDlEdit(true); };
+  const saveDl = async (clear?: boolean) => {
+    const iso = clear || !dlInput ? null : new Date(dlInput).toISOString();
+    try { await setBidDeadline(id, iso); setLink((p) => (p ? { ...p, bidDeadline: iso } : p)); } catch { /* ignore */ }
+    setDlEdit(false);
+  };
+  const shareUrl = typeof window !== "undefined" ? bidShareUrl(window.location.origin, id, link?.renterName) : "";
   function copyShareLink() {
-    const url = `${window.location.origin}/supplier-bid-v2.html?req=${encodeURIComponent(r?.displayId ?? r?.id ?? "")}`;
-    navigator.clipboard?.writeText(url).then(() => {
+    if (!shareUrl) return;
+    navigator.clipboard?.writeText(shareUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     }).catch(() => {});
@@ -81,8 +103,6 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
   const item = r.equipmentItems?.[0];
   const period = r.startDate ? (r.endDate ? `${fmtDate(r.startDate, ar)} – ${fmtDate(r.endDate, ar)}` : fmtDate(r.startDate, ar)) : "—";
   const urgency = r.urgency === "ASAP" ? L("ASAP", "فوري") : r.urgency === "SOON" ? L("Soon", "قريباً") : L("Scheduled", "مجدول");
-  const linkStats = sharedLinkStatsFor(r.id, r.bidCount ?? 0); // per-request shared-link mock
-
   return (
     <div className="rproto" dir={ar ? "rtl" : "ltr"}>
       {/* status */}
@@ -93,16 +113,44 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
         {(r.bidCount ?? 0) > 0 && <span className="stbadge st-active" style={{ marginInlineStart: "auto" }}><span className="material-icons-outlined" style={{ fontSize: 13 }}>gavel</span>{r.bidCount} {L("bids", "عروض")}</span>}
       </div>
 
-      {/* web-app/006 demo — shared-link reach tracker (staging only) */}
-      {showLinkTracker && (
+      {/* web-app/006 — shared-link tracker (real submitted count + live link) */}
+      {r.type === "BROADCAST" && (
         <div className="rd-track">
           <span className="material-icons-outlined">link</span>
           <span className="rt-lbl">{L("Shared link", "الرابط المشترك")}</span>
-          <span className="rt-stat"><span className="material-icons-outlined">visibility</span><b>{linkStats.opened}</b> {L("opened", "فتحة")}</span>
-          <span className="rt-stat sub"><span className="material-icons-outlined">gavel</span><b>{linkStats.submitted}</b> {L("submitted", "عرض")}</span>
+          <span className="rt-stat"><span className="material-icons-outlined">visibility</span><b>{link?.openedCount ?? 0}</b> {L("opened", "فتحة")}</span>
+          <span className="rt-stat sub"><span className="material-icons-outlined">gavel</span><b>{link?.submittedCount ?? 0}</b> {L("submitted", "عرض")}</span>
           <button className="rt-copy" onClick={copyShareLink}>
             <span className="material-icons-outlined">{copied ? "check" : "content_copy"}</span>{copied ? L("Copied", "تم النسخ") : L("Copy link", "نسخ الرابط")}
           </button>
+        </div>
+      )}
+
+      {/* AC-06 — bid-submission deadline (set / adjust / clear) */}
+      {r.type === "BROADCAST" && (
+        <div className="rd-track" style={{ marginTop: 8 }}>
+          <span className="material-icons-outlined">schedule</span>
+          <span className="rt-lbl">{L("Bid deadline", "الموعد النهائي")}</span>
+          {!dlEdit ? (
+            <>
+              <span className="rt-stat sub">
+                {link?.bidDeadline
+                  ? new Date(link.bidDeadline).toLocaleString(ar ? "ar-SA" : "en-GB", { dateStyle: "medium", timeStyle: "short" })
+                  : L("No deadline", "بدون موعد")}
+              </span>
+              <button className="rt-copy" onClick={openDl}>
+                <span className="material-icons-outlined">edit</span>{link?.bidDeadline ? L("Adjust", "تعديل") : L("Set deadline", "تحديد موعد")}
+              </button>
+            </>
+          ) : (
+            <span style={{ display: "inline-flex", gap: 6, alignItems: "center", marginInlineStart: "auto", flexWrap: "wrap" }}>
+              <input type="datetime-local" value={dlInput} onChange={(e) => setDlInput(e.target.value)}
+                style={{ border: "1px solid var(--border)", borderRadius: 8, padding: "4px 8px", fontSize: 12.5 }} />
+              <button className="rt-copy" onClick={() => saveDl(false)}><span className="material-icons-outlined">check</span>{L("Save", "حفظ")}</button>
+              {link?.bidDeadline && <button className="rt-copy" onClick={() => saveDl(true)}>{L("Clear", "مسح")}</button>}
+              <button className="rt-copy" onClick={() => setDlEdit(false)}>{L("Cancel", "إلغاء")}</button>
+            </span>
+          )}
         </div>
       )}
 

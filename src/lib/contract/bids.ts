@@ -159,14 +159,15 @@ export interface BidCard {
    *  `new` = just submitted, `fresh` = updated, `your-turn` = supplier countered (renter acts),
    *  `waiting` = renter countered (awaiting supplier). null when no room/derivation. */
   uiState: "new" | "fresh" | "your-turn" | "waiting" | null;
-  /* ── web-app/006 shared-link demo (STAGING MOCK ONLY — never set by the real backend mapper) ──
-   * An off-platform bid a supplier submitted through the renter's shared link (no account). These
-   * render as a distinct "via shared link" card (no deal room) with a flat quoted total and a
-   * read-only "view submission" viewer instead of the negotiate footer. See lib/mock/shared-link-bids. */
+  /* ── web-app/006 (expanded) shared-link bids ──
+   * An off-platform bid a supplier submitted through the renter's shared link (no account). Mapped
+   * from a real `LinkBidSubmission` via `submissionToBidCard` (lib/contract/link-bids). Renders as a
+   * distinct "via shared link" card (no deal room) with a flat quoted total and a read-only
+   * "view submission" viewer instead of the negotiate footer. */
   viaSharedLink?: boolean;
   /** Flat quoted total (incl VAT) for a link bid — shown instead of the rate/period breakdown. */
   quotedTotal?: number | null;
-  /** Which sample submission the read-only viewer opens (off-platform supplier key). */
+  /** The submission id the read-only viewer opens (off-platform supplier submission). */
   submissionKey?: string;
   /** "submitted N days ago" for the link-bid card (avoids non-deterministic date math). */
   agoDays?: number;

@@ -3,6 +3,7 @@ import type { RequestListItem, RequestRecord } from "@/lib/contract/requests";
 import type { BidCard } from "@/lib/contract/bids";
 import type { DealRoomView, DealRoomDocuments, QuotationView } from "@/lib/contract/deal-room";
 import type { ComputedBid, RecommendResult, BidAskResult, BidParseResult, AwardNudgeResult, PreferencePreset, RankingPreference, RankedBid, BidEventInput } from "@/lib/contract/agent-bids";
+import { mapBidFormData, mapLinkSubmissions, type BidFormData, type LinkBidSubmission, type SubmitBidFormPayload } from "@/lib/contract/link-bids";
 
 /** Body of POST /api/me/bids/recommend. user_id is attached server-side. */
 export interface RecommendPayload {
@@ -321,4 +322,44 @@ export async function fetchTaxonomy(): Promise<Taxonomy> {
     if (e instanceof ApiError) throw e;
     throw new ApiError("network");
   }
+}
+
+// ── web-app/006 (expanded) — shared-link bids ──────────────────────────────────────────────────
+
+/** Public: bid-form render data for a shared-link token (request items + terms + renter name). */
+export async function fetchBidFormData(token: string): Promise<BidFormData> {
+  return mapBidFormData(await getJson<unknown>(`/api/bid-form/${encodeURIComponent(token)}`));
+}
+
+/** Public: submit an off-platform bid through the shared link. */
+export async function submitBidForm(token: string, payload: SubmitBidFormPayload): Promise<{ id: string }> {
+  return postJson<{ id: string }>(`/api/bid-form/${encodeURIComponent(token)}/submissions`, payload);
+}
+
+/** Authed (renter): a request's off-platform submissions + link tracker (opened/submitted + token). */
+export async function fetchRequestSubmissions(
+  requestId: string,
+): Promise<{ renterName: string | null; openedCount: number; submittedCount: number; bidDeadline: string | null; submissions: LinkBidSubmission[] }> {
+  const raw = await getJson<{ renterName?: string | null; openedCount?: number; submittedCount?: number; bidDeadline?: string | null }>(
+    `/api/me/requests/${encodeURIComponent(requestId)}/submissions`,
+  );
+  return {
+    renterName: raw.renterName ?? null,
+    openedCount: raw.openedCount ?? 0,
+    submittedCount: raw.submittedCount ?? 0,
+    bidDeadline: raw.bidDeadline ?? null,
+    submissions: mapLinkSubmissions(raw),
+  };
+}
+
+/** Set / clear the request's optional bid-submission deadline (AC-04/05/06). `deadline` = ISO or null. */
+export async function setBidDeadline(requestId: string, deadline: string | null): Promise<{ deadline: string | null }> {
+  return postJsonMethod<{ deadline: string | null }>(`/api/me/requests/${encodeURIComponent(requestId)}/share-link`, { deadline }, "PUT");
+}
+
+/** Build a request's public share link. The token IS the request's UUID; the renter-name slug is a
+ *  cosmetic prefix. The /bid page extracts the trailing UUID, so a slug with dashes is safe. */
+export function bidShareUrl(origin: string, requestId: string, renterName?: string | null): string {
+  const slug = renterName ? renterName.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) : "";
+  return `${origin}/bid/${slug ? `${slug}-` : ""}${requestId}`;
 }

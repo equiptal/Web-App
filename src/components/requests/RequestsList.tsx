@@ -7,7 +7,6 @@ import { fetchMyRequests } from "@/lib/api/client";
 import { groupRequests, pinAirportFirst, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
 import { GroupBids } from "@/components/requests/GroupBids";
 import { EquipImg } from "@/components/requests/EquipImg";
-import { useSharedLinkMock, sharedLinkStatsFor } from "@/lib/mock/shared-link-bids";
 import "@/components/requests/requests-proto.css";
 
 const STATUS: Record<string, { cls: string; en: string; ar: string }> = {
@@ -183,16 +182,6 @@ export function GroupStrip({ group, ar, L, router }: { group: RequestGroup; ar: 
   const leadBase = (ar ? lead?.nameAr : lead?.name) || group.locationLabel;
   const leadName = lead ? `${leadBase} · ${lead.qty} ${lead.qty === 1 ? L("unit", "وحدة") : L("units", "وحدات")}` : leadBase;
   const more = group.items.length - 1;
-  // web-app/006 demo (staging) — shared-link reach tracker, embedded in this card (not a 2nd card).
-  const showTracker = useSharedLinkMock();
-  const stats = sharedLinkStatsFor(group.id, group.totalBids); // per-project mock
-  const [copied, setCopied] = useState(false);
-  const copyShareLink = () => {
-    const code = group.items[0]?.displayId ?? group.id;
-    navigator.clipboard?.writeText(`${window.location.origin}/supplier-bid-v2.html?req=${encodeURIComponent(code)}`)
-      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); })
-      .catch(() => {});
-  };
   return (
     <div className="gctx">
       <div className="gx-row">
@@ -214,17 +203,6 @@ export function GroupStrip({ group, ar, L, router }: { group: RequestGroup; ar: 
           <span className="gx-bids"><span className="material-icons-outlined">gavel</span>{group.totalBids} {L("bids", "عروض")}</span>
         </div>
       </div>
-      {showTracker && (
-        <div className="gx-track">
-          <span className="material-icons-outlined gx-tk-ic">link</span>
-          <span className="rt-lbl">{L("Shared link", "الرابط المشترك")}</span>
-          <span className="rt-stat"><span className="material-icons-outlined">visibility</span><b>{stats.opened}</b> {L("opened", "فتحة")}</span>
-          <span className="rt-stat sub"><span className="material-icons-outlined">gavel</span><b>{stats.submitted}</b> {L("submitted", "عرض")}</span>
-          <button className="rt-copy" onClick={copyShareLink}>
-            <span className="material-icons-outlined">{copied ? "check" : "content_copy"}</span>{copied ? L("Copied", "تم النسخ") : L("Copy link", "نسخ الرابط")}
-          </button>
-        </div>
-      )}
     </div>
   );
 }

@@ -3,14 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
-import { fetchMyRequests, fetchBids, startDealRoom, recommendBids, askBids, parseBid, captureBidEvents, fetchDealRoomDocuments, fetchBidDocuments } from "@/lib/api/client";
+import { fetchMyRequests, fetchBids, fetchRequestSubmissions, startDealRoom, recommendBids, askBids, parseBid, captureBidEvents, fetchDealRoomDocuments, fetchBidDocuments } from "@/lib/api/client";
+import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { groupRequests, type RequestGroup } from "@/lib/contract/requests";
 import type { DealRoomDocuments } from "@/lib/contract/deal-room";
 import { CERT_LABEL, type BidCard, type CertCode } from "@/lib/contract/bids";
 import { buildItemComparison, sortByPreset, type BidColumn, type Preset, type CostResponsibility } from "@/lib/contract/comparison";
 import { bidColumnToComputed, normalizedBidToBidCard, presetToAgent, type RecommendResult } from "@/lib/contract/agent-bids";
 import { EquipImg } from "@/components/requests/EquipImg";
-import { useSharedLinkMock, tagSharedLinkBids } from "@/lib/mock/shared-link-bids";
 
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
 
@@ -67,7 +67,7 @@ export function BidComparisonWorkspace() {
   const [activeItem, setActiveItem] = useState<string | null>(null);
   const [bids, setBids] = useState<BidCard[] | null>(null);
   const [bidsLoading, setBidsLoading] = useState(false);
-  const mockEnabled = useSharedLinkMock(); // staging demo: label one bid "via shared link"
+  const [submissions, setSubmissions] = useState<LinkBidSubmission[]>([]); // off-platform shared-link bids for the active item
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [preset, setPreset] = useState<Preset>("best");
   const [busy, setBusy] = useState(false);
@@ -176,6 +176,9 @@ export function BidComparisonWorkspace() {
       .then((d) => active && setBids(d.bids))
       .catch(() => active && setBids([]))
       .finally(() => active && setBidsLoading(false));
+    // Off-platform shared-link submissions for this item (selectable alongside app bids).
+    setSubmissions([]);
+    fetchRequestSubmissions(activeItem).then((r) => active && setSubmissions(r.submissions)).catch(() => {});
     return () => { active = false; };
   }, [activeItem]);
 
@@ -205,9 +208,10 @@ export function BidComparisonWorkspace() {
   // Staging demo: tag the first real bid as off-platform "via shared link" (rest = via Moedatech app).
   const raw = useMemo<BidCard[] | null>(() => {
     if (!bids) return null;
-    const tagged = mockEnabled ? tagSharedLinkBids(bids) : bids;
-    return [...tagged, ...uploaded];
-  }, [bids, uploaded, mockEnabled]);
+    // App bids + off-platform shared-link submissions (mapped to a BidCard) + any uploaded quotes.
+    const linkCards = submissions.map((s) => submissionToBidCard(s));
+    return [...bids, ...linkCards, ...uploaded];
+  }, [bids, uploaded, submissions]);
   const comparison = useMemo(() => (raw ? buildItemComparison(raw, { renterCosts, requestDurationDays: reqDurationDays, requestResponsibilities: raw[0]?.requestResponsibilities ?? {} }) : null), [raw, renterCosts, reqDurationDays]);
   useEffect(() => {
     if (!comparison) return;

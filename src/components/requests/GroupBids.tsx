@@ -3,17 +3,17 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
-import { fetchBids, startDealRoom } from "@/lib/api/client";
+import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/client";
 import { CredentialPills } from "@/components/requests/CredentialPills";
 import { TermsPanel } from "@/components/requests/TermsPanel";
 import { TermClassBadges } from "@/components/requests/TermClassBadges";
 import { DealRoomBanner, SupplierDocs, EquipmentDocs } from "@/components/requests/BidCardExtras";
 import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
-import { useSharedLinkMock, tagSharedLinkBids } from "@/lib/mock/shared-link-bids";
 import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
 import { bidSuppliers, CERT_LABEL, type BidCard } from "@/lib/contract/bids";
+import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import type { RequestGroup } from "@/lib/contract/requests";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { EquipImg } from "@/components/requests/EquipImg";
@@ -143,7 +143,7 @@ export function GroupBids({ group }: { group: RequestGroup }) {
   const verified = tier === "verified";
   const [quoteGate, setQuoteGate] = useState(false); // unverified → confirm before issuing the quotation
   // web-app/006 demo (staging only) — relabel real bids as off-platform "via shared link".
-  const mockEnabled = useSharedLinkMock();
+  const [submissions, setSubmissions] = useState<LinkBidSubmission[]>([]); // real off-platform submissions (all group items)
   const [submissionBid, setSubmissionBid] = useState<GroupBid | null>(null);
   // Bid filter (source + refine), matching the bids-by-supplier prototype.
   const [filterOpen, setFilterOpen] = useState(false);
@@ -189,6 +189,10 @@ export function GroupBids({ group }: { group: RequestGroup }) {
     )
       .then((lists) => active && setBids(lists.flat()))
       .catch(() => active && setError(true));
+    // Off-platform shared-link submissions across every item/request in the group (best-effort).
+    setSubmissions([]);
+    Promise.all(group.items.map((it) => fetchRequestSubmissions(it.id).then((r) => r.submissions).catch(() => [] as LinkBidSubmission[])))
+      .then((lists) => active && setSubmissions(lists.flat()));
     return () => {
       active = false;
     };
@@ -436,8 +440,20 @@ export function GroupBids({ group }: { group: RequestGroup }) {
 
   if (error) return <div className="rempty">{L("Couldn’t load the bids.", "تعذّر تحميل العروض.")}</div>;
   if (!bids) return <div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 26 }}>progress_activity</span></div>;
-  // Staging demo: relabel the first couple of real bids as off-platform shared-link submissions.
-  const allBids = mockEnabled ? tagSharedLinkBids(bids) : bids;
+  // Merge on-platform app bids with off-platform shared-link submissions (mapped to a GroupBid).
+  const gItemMap = new Map(group.items.map((it) => [it.id, it]));
+  const subCards: GroupBid[] = submissions.map((s) => {
+    const it = gItemMap.get(s.requestId);
+    return {
+      ...submissionToBidCard(s),
+      requestId: s.requestId,
+      itemLabel: it?.item?.name ?? it?.displayId ?? "",
+      itemLabelAr: it?.item?.nameAr ?? it?.displayId ?? "",
+      categoryId: it?.item?.categoryId ?? null,
+      itemImage: it?.item?.imageUrl ?? null,
+    };
+  });
+  const allBids = [...bids, ...subCards];
   if (allBids.length === 0) return <div className="rempty">{L("No bids yet for this request.", "لا توجد عروض بعد لهذا الطلب.")}</div>;
 
   const suppliers = bidSuppliers(allBids);
@@ -730,10 +746,11 @@ export function GroupBids({ group }: { group: RequestGroup }) {
         />
       )}
 
-      {/* web-app/006 demo — read-only viewer of an off-platform shared-link submission */}
+      {/* web-app/006 — read-only viewer of an off-platform shared-link submission (real answers) */}
       {submissionBid && (
         <SharedBidSubmissionModal
           bid={submissionBid}
+          submission={submissions.find((s) => `link-${s.id}` === submissionBid.id) ?? null}
           ar={ar}
           L={L}
           onClose={() => setSubmissionBid(null)}
