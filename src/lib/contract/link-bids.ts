@@ -19,6 +19,8 @@ export interface LinkBidConfirmations {
 
 export interface LinkBidItem {
   requestItemId: string;
+  /** The request (fan-out) this item belongs to — used to pick the right item in the per-item comparison. */
+  requestId?: string | null;
   label?: string | null;
   numberOfUnits?: number;
   /** Rental basis carried from the request (PER_DAY/PER_WEEK/PER_MONTH/PER_JOB) so totals normalize. */
@@ -119,6 +121,7 @@ export function mapLinkSubmissions(raw: unknown): LinkBidSubmission[] {
         const c = (i.confirmations ?? {}) as Record<string, unknown>;
         return {
           requestItemId: s(i.requestItemId) ?? "",
+          requestId: s(i.requestId),
           label: s(i.label),
           numberOfUnits: n(i.numberOfUnits) ?? 1,
           priceUnit: s(i.priceUnit),

@@ -208,10 +208,11 @@ export function BidComparisonWorkspace() {
   // Staging demo: tag the first real bid as off-platform "via shared link" (rest = via Moedatech app).
   const raw = useMemo<BidCard[] | null>(() => {
     if (!bids) return null;
-    // App bids + off-platform shared-link submissions (mapped to a BidCard) + any uploaded quotes.
-    const linkCards = submissions.map((s) => submissionToBidCard(s));
+    // App bids + off-platform submissions + any uploaded quotes. A group submission covers all items,
+    // so map it to THIS active item's pricing (match the submission item to the active request).
+    const linkCards = submissions.map((s) => submissionToBidCard(s, s.items.find((i) => i.requestId === activeItem) ?? undefined));
     return [...bids, ...linkCards, ...uploaded];
-  }, [bids, uploaded, submissions]);
+  }, [bids, uploaded, submissions, activeItem]);
   const comparison = useMemo(() => (raw ? buildItemComparison(raw, { renterCosts, requestDurationDays: reqDurationDays, requestResponsibilities: raw[0]?.requestResponsibilities ?? {} }) : null), [raw, renterCosts, reqDurationDays]);
   useEffect(() => {
     if (!comparison) return;
