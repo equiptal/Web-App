@@ -10,6 +10,7 @@ import type { BidCard, TermRow, TermState } from "@/lib/contract/bids";
 export interface LinkBidConfirmations {
   /** Each is the supplier's Yes/No answer to a required term; undefined = not asked for this item. */
   operator?: boolean;
+  fat?: boolean;
   fuel?: boolean;
   year?: boolean;
   operatorCert?: boolean;
@@ -52,7 +53,18 @@ export interface BidFormItem {
   /** Rental basis (PER_DAY/PER_WEEK/PER_MONTH/PER_JOB) shown read-only + carried into the submission. */
   priceUnit: string | null;
   /** The required terms the supplier confirms Yes/No (value = what the request asks for, or null). */
-  requiredTerms: { operator?: string | null; fuel?: string | null; year?: string | null; operatorCert?: string | null; equipmentCert?: string | null };
+  requiredTerms: { operator?: string | null; fat?: string | null; fuel?: string | null; year?: string | null; operatorCert?: string | null; equipmentCert?: string | null };
+}
+/** Read-only project context shown above the items (Layout B "Project terms"). */
+export interface BidFormProjectTerms {
+  location: string | null;
+  lat: number | null;
+  lng: number | null;
+  rentalBasis: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  hoursPerDay: number | null;
+  workingDaysPerWeek: number | null;
 }
 export interface BidFormData {
   token: string;
@@ -63,6 +75,9 @@ export interface BidFormData {
   deadline: string | null;
   /** Renter identity shown on the form (AC-09) — each field only when present. */
   renter: { name: string | null; contactName: string | null; city: string | null; verified: boolean };
+  /** Read-only project terms + contract terms (for-all-items), from the request. */
+  projectTerms: BidFormProjectTerms | null;
+  contractTerms: { key: string; label: string; value: string }[];
   items: BidFormItem[];
 }
 
@@ -122,14 +137,20 @@ export function mapLinkSubmissions(raw: unknown): LinkBidSubmission[] {
 export function mapBidFormData(raw: unknown): BidFormData {
   const r = (raw ?? {}) as Record<string, unknown>;
   const items = Array.isArray(r.items) ? (r.items as Record<string, unknown>[]) : [];
-  const rt = (r.renter ?? {}) as Record<string, unknown>;
+  const renter = (r.renter ?? {}) as Record<string, unknown>;
   const reason = s(r.closedReason);
+  const pt = r.projectTerms ? (r.projectTerms as Record<string, unknown>) : null;
+  const ct = Array.isArray(r.contractTerms) ? (r.contractTerms as Record<string, unknown>[]) : [];
   return {
     token: s(r.token) ?? "",
     status: r.status === "closed" ? "closed" : "open",
     closedReason: reason === "deadline" || reason === "closed_request" ? reason : null,
     deadline: s(r.deadline),
-    renter: { name: s(rt.name), contactName: s(rt.contactName), city: s(rt.city), verified: rt.verified === true },
+    renter: { name: s(renter.name), contactName: s(renter.contactName), city: s(renter.city), verified: renter.verified === true },
+    projectTerms: pt
+      ? { location: s(pt.location), lat: n(pt.lat), lng: n(pt.lng), rentalBasis: s(pt.rentalBasis), startDate: s(pt.startDate), endDate: s(pt.endDate), hoursPerDay: n(pt.hoursPerDay), workingDaysPerWeek: n(pt.workingDaysPerWeek) }
+      : null,
+    contractTerms: ct.map((c) => ({ key: s(c.key) ?? "", label: s(c.label) ?? "", value: s(c.value) ?? "" })).filter((c) => c.key && c.value),
     items: items.map((i) => {
       const rt = (i.requiredTerms ?? {}) as Record<string, unknown>;
       return {
@@ -138,7 +159,7 @@ export function mapBidFormData(raw: unknown): BidFormData {
         labelAr: s(i.labelAr),
         numberOfUnits: n(i.numberOfUnits) ?? 1,
         priceUnit: s(i.priceUnit),
-        requiredTerms: { operator: s(rt.operator), fuel: s(rt.fuel), year: s(rt.year), operatorCert: s(rt.operatorCert), equipmentCert: s(rt.equipmentCert) },
+        requiredTerms: { operator: s(rt.operator), fat: s(rt.fat), fuel: s(rt.fuel), year: s(rt.year), operatorCert: s(rt.operatorCert), equipmentCert: s(rt.equipmentCert) },
       };
     }),
   };
