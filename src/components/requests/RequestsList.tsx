@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
-import { fetchMyRequests } from "@/lib/api/client";
+import { fetchMyRequests, fetchRequestSubmissions, bidShareUrl } from "@/lib/api/client";
 import { groupRequests, pinAirportFirst, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
 import { GroupBids } from "@/components/requests/GroupBids";
 import { EquipImg } from "@/components/requests/EquipImg";
@@ -182,6 +182,17 @@ export function GroupStrip({ group, ar, L, router }: { group: RequestGroup; ar: 
   const leadBase = (ar ? lead?.nameAr : lead?.name) || group.locationLabel;
   const leadName = lead ? `${leadBase} · ${lead.qty} ${lead.qty === 1 ? L("unit", "وحدة") : L("units", "وحدات")}` : leadBase;
   const more = group.items.length - 1;
+  // web-app/006 — shared-link tracker for this group (copy link + opened/submitted, keyed by group id).
+  const [link, setLink] = useState<{ openedCount: number; submittedCount: number; renterName: string | null; bidDeadline: string | null } | null>(null);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    let active = true;
+    fetchRequestSubmissions(group.id).then((r) => active && setLink(r)).catch(() => {});
+    return () => { active = false; };
+  }, [group.id]);
+  const shareUrl = typeof window !== "undefined" ? bidShareUrl(window.location.origin, group.id, link?.renterName) : "";
+  const copyLink = () => { if (shareUrl) navigator.clipboard?.writeText(shareUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); }).catch(() => {}); };
+  const isBroadcast = group.type !== "DIRECT";
   return (
     <div className="gctx">
       <div className="gx-row">
@@ -203,6 +214,18 @@ export function GroupStrip({ group, ar, L, router }: { group: RequestGroup; ar: 
           <span className="gx-bids"><span className="material-icons-outlined">gavel</span>{group.totalBids} {L("bids", "عروض")}</span>
         </div>
       </div>
+      {/* shared-link tracker — copy the per-group link + see opened/submitted (off-platform bids) */}
+      {isBroadcast && (
+        <div className="gx-track">
+          <span className="material-icons-outlined gx-tk-ic">link</span>
+          <span className="rt-lbl">{L("Shared link", "الرابط المشترك")}</span>
+          <span className="rt-stat"><span className="material-icons-outlined">visibility</span><b>{link?.openedCount ?? 0}</b> {L("opened", "فتحة")}</span>
+          <span className="rt-stat sub"><span className="material-icons-outlined">gavel</span><b>{link?.submittedCount ?? 0}</b> {L("submitted", "عرض")}</span>
+          <button className="rt-copy" onClick={copyLink}>
+            <span className="material-icons-outlined">{copied ? "check" : "content_copy"}</span>{copied ? L("Copied", "تم النسخ") : L("Copy link", "نسخ الرابط")}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
