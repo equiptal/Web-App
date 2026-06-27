@@ -389,6 +389,11 @@
 .rproto .slb-badge.ok { background: var(--success-bg); color: var(--success); border-color: rgba(29, 175, 88, 0.25); }
 .rproto .slb-badge .material-icons-outlined { font-size: 12px; }
 .rproto .slb-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 12px; margin-top: 12px; border-top: 1px solid var(--surface3); }
+/* Tappable "Terms match" row → expands the inline TermsPanel (parity with on-platform bid cards). */
+.rproto button.slb-row { width: 100%; background: none; border: 0; border-top: 1px solid var(--surface3); font: inherit; text-align: inherit; cursor: pointer; }
+.rproto .slb-row.tappable:hover { background: var(--surface1); }
+.rproto .slb-row .chev { flex: 0 0 auto; font-size: 20px; color: var(--muted); transition: transform 0.2s; }
+.rproto .slb-row.open .chev { transform: rotate(180deg); }
 .rproto .slb-left { min-width: 0; }
 .rproto .slb-lbl { font-size: 12px; font-weight: 800; color: var(--navy-mid); }
 .rproto .slb-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }

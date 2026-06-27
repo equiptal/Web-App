@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import type { BidCard } from "@/lib/contract/bids";
 import { TermClassBadges } from "@/components/requests/TermClassBadges";
+import { TermsPanel } from "@/components/requests/TermsPanel";
 import { EquipImg } from "@/components/requests/EquipImg";
 
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
@@ -33,6 +35,7 @@ export function SharedLinkBidCard({
   itemImage?: string | null;
   categoryId?: string | null;
 }) {
+  const [termsOpen, setTermsOpen] = useState(false);
   const units = bid.numberOfUnits || 1;
   const eq = bid.equipment;
   const eqLine = eq ? [eq.make, eq.model, eq.year].filter(Boolean).join(" · ") : null;
@@ -78,11 +81,18 @@ export function SharedLinkBidCard({
           </div>
         </div>
 
-        {/* terms match (static — no deal room to negotiate) */}
-        <div className="slb-row">
+        {/* terms match — tap to expand the per-term breakdown (no deal room to negotiate) */}
+        <button
+          type="button"
+          className={`slb-row slb-terms tappable${termsOpen ? " open" : ""}`}
+          aria-expanded={termsOpen}
+          onClick={() => setTermsOpen((o) => !o)}
+        >
           <span className="slb-lbl">{L("Terms match", "مطابقة الشروط")}</span>
           <TermClassBadges terms={bid.terms} ar={ar} />
-        </div>
+          <span className="material-icons-outlined chev">expand_more</span>
+        </button>
+        {termsOpen && <TermsPanel terms={bid.terms} ar={ar} L={L} />}
 
         {/* quoted total — flat (incl VAT), not a rate breakdown */}
         <div className="slb-row">

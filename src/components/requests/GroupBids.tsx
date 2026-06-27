@@ -440,20 +440,24 @@ export function GroupBids({ group }: { group: RequestGroup }) {
 
   if (error) return <div className="rempty">{L("Couldn’t load the bids.", "تعذّر تحميل العروض.")}</div>;
   if (!bids) return <div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 26 }}>progress_activity</span></div>;
-  // Off-platform submissions are one bid PER GROUP covering all items. Label the card by the items
-  // the supplier priced (from the submission itself, since its requestId is now the group id).
-  const subCards: GroupBid[] = submissions.map((s) => {
-    const labels = s.items.map((i) => i.label).filter(Boolean) as string[];
-    const label = labels.length > 1 ? `${labels.length} items` : labels[0] ?? L("All items", "كل الأصناف");
-    return {
-      ...submissionToBidCard(s),
-      requestId: s.requestId,
-      itemLabel: label,
-      itemLabelAr: labels.length > 1 ? `${labels.length} أصناف` : labels[0] ?? "كل الأصناف",
-      categoryId: null,
-      itemImage: null,
-    };
-  });
+  // An off-platform submission is stored once per GROUP but covers several items. Show ONE card per
+  // item (parity with on-platform bids) — each scoped to that item's terms + price + total, and
+  // matched to its request in the group so we can show the real equipment icon/image.
+  const subCards: GroupBid[] = submissions.flatMap((s) =>
+    s.items.map((it): GroupBid => {
+      const gi = group.items.find((g) => g.id === it.requestId);
+      return {
+        ...submissionToBidCard(s, it),
+        // Unique per item-card so selection + React keys don't collide across a submission's items.
+        id: `link-${s.id}-${it.requestItemId}`,
+        requestId: it.requestId ?? s.requestId,
+        itemLabel: gi?.item?.name ?? it.label ?? L("Equipment", "المعدة"),
+        itemLabelAr: gi?.item?.nameAr ?? it.label ?? "المعدة",
+        categoryId: gi?.item?.categoryId ?? null,
+        itemImage: gi?.item?.imageUrl ?? null,
+      };
+    }),
+  );
   const allBids = [...bids, ...subCards];
   if (allBids.length === 0) return <div className="rempty">{L("No bids yet for this request.", "لا توجد عروض بعد لهذا الطلب.")}</div>;
 
@@ -523,7 +527,7 @@ export function GroupBids({ group }: { group: RequestGroup }) {
         <div className="flab"><span className="material-icons-outlined">storefront</span>{L("Supplier", "المؤجّر")}</div>
         <div className="chips-row">
           <button className={`req-chip${supplierKey === "all" ? " on" : ""}`} onClick={() => setSupplierKey("all")}>
-            {L("All suppliers", "كل المؤجّرين")} <span className="ct">{bids.length}</span>
+            {L("All suppliers", "كل المؤجّرين")} <span className="ct">{allBids.length}</span>
           </button>
           {suppliers.map((s) => (
             <button key={s.key} className={`req-chip sup-chip${supplierKey === s.key ? " on" : ""}`} onClick={() => setSupplierKey(s.key)}>
@@ -751,7 +755,7 @@ export function GroupBids({ group }: { group: RequestGroup }) {
       {submissionBid && (
         <SharedBidSubmissionModal
           bid={submissionBid}
-          submission={submissions.find((s) => `link-${s.id}` === submissionBid.id) ?? null}
+          submission={submissions.find((s) => s.id === submissionBid.submissionKey) ?? null}
           ar={ar}
           L={L}
           onClose={() => setSubmissionBid(null)}

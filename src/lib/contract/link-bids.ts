@@ -248,7 +248,8 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
     round: 1,
     uiState: null,
     viaSharedLink: true,
-    quotedTotal: sub.grandTotal ?? null,
+    // Per-item card → that item's total (incl VAT); whole-submission card → the grand total.
+    quotedTotal: item ? (it?.total ?? null) : (sub.grandTotal ?? null),
     submissionKey: sub.id,
   };
 }

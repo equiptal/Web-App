@@ -184,7 +184,15 @@ export function RequestBids({ requestId }: { requestId: string }) {
   if (error) return <div className="rempty">{L("Couldn’t load the bids.", "تعذّر تحميل العروض.")}</div>;
   if (!bids) return <div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 26 }}>progress_activity</span></div>;
   // Merge on-platform app bids with off-platform shared-link submissions (mapped to a BidCard shape).
-  const linkCards = submissions.map((s) => submissionToBidCard(s));
+  // A submission covers the whole group; on a single request, show only THIS request's item (one card).
+  const linkLabels = new Map<string, string | null>(); // card id → item label (for the card title)
+  const linkCards = submissions.flatMap((s) => {
+    const it = s.items.find((i) => i.requestId === requestId) ?? (s.items.length === 1 ? s.items[0] : null);
+    if (!it) return [];
+    const id = `link-${s.id}-${it.requestItemId}`;
+    linkLabels.set(id, it.label ?? null);
+    return [{ ...submissionToBidCard(s, it), id }];
+  });
   const merged = [...bids, ...linkCards];
   const linkCount = linkCards.length;
   const appCount = bids.length;
@@ -228,6 +236,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
               isSel={selected.has(b.id)}
               onToggleSelect={() => toggleSelect(b.id)}
               onViewSubmission={() => setSubmissionBid(b)}
+              itemLabel={linkLabels.get(b.id) ?? null}
             />
           );
         }
@@ -393,7 +402,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
       {submissionBid && (
         <SharedBidSubmissionModal
           bid={submissionBid}
-          submission={submissions.find((s) => `link-${s.id}` === submissionBid.id) ?? null}
+          submission={submissions.find((s) => s.id === submissionBid.submissionKey) ?? null}
           ar={ar}
           L={L}
           onClose={() => setSubmissionBid(null)}

@@ -209,8 +209,13 @@ export function BidComparisonWorkspace() {
   const raw = useMemo<BidCard[] | null>(() => {
     if (!bids) return null;
     // App bids + off-platform submissions + any uploaded quotes. A group submission covers all items,
-    // so map it to THIS active item's pricing (match the submission item to the active request).
-    const linkCards = submissions.map((s) => submissionToBidCard(s, s.items.find((i) => i.requestId === activeItem) ?? undefined));
+    // so map it to THIS active item's pricing (match the submission item to the active request). The id
+    // is per-item (`link-<sub>-<item>`) to match the My Bids card ids the Compare button preselects.
+    const linkCards = submissions.flatMap((s) => {
+      const it = s.items.find((i) => i.requestId === activeItem);
+      if (!it) return [];
+      return [{ ...submissionToBidCard(s, it), id: `link-${s.id}-${it.requestItemId}` }];
+    });
     return [...bids, ...linkCards, ...uploaded];
   }, [bids, uploaded, submissions, activeItem]);
   const comparison = useMemo(() => (raw ? buildItemComparison(raw, { renterCosts, requestDurationDays: reqDurationDays, requestResponsibilities: raw[0]?.requestResponsibilities ?? {} }) : null), [raw, renterCosts, reqDurationDays]);
