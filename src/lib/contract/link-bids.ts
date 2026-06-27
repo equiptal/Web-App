@@ -126,7 +126,7 @@ export function mapLinkSubmissions(raw: unknown): LinkBidSubmission[] {
           deliveryPrice: n(i.deliveryPrice),
           returnPrice: n(i.returnPrice),
           total: n(i.total),
-          confirmations: { operator: b(c.operator), fuel: b(c.fuel), year: b(c.year), operatorCert: b(c.operatorCert), equipmentCert: b(c.equipmentCert) },
+          confirmations: { operator: b(c.operator), fat: b(c.fat), fuel: b(c.fuel), year: b(c.year), operatorCert: b(c.operatorCert), equipmentCert: b(c.equipmentCert) },
         };
       }),
     };
@@ -229,6 +229,7 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
       ],
       contract: [
         termRow("operator_included", "Operator", "المشغّل", c.operator),
+        termRow("fat", "F.A.T", "الإعاشة والسكن", c.fat),
         termRow("fuel_responsibility", "Fuel responsibility", "مسؤولية الوقود", c.fuel),
       ],
       supplier: [

@@ -40,6 +40,7 @@ export function SharedBidSubmissionModal({
   const sar = L("SAR", "ر.س");
   const TERMS: { key: keyof NonNullable<LinkBidSubmission["items"][number]["confirmations"]>; en: string; ar: string }[] = [
     { key: "operator", en: "Operator", ar: "المشغّل" },
+    { key: "fat", en: "F.A.T", ar: "الإعاشة والسكن" },
     { key: "fuel", en: "Fuel responsibility", ar: "مسؤولية الوقود" },
     { key: "year", en: "Equipment year", ar: "سنة الصنع" },
     { key: "operatorCert", en: "Operator certificate", ar: "شهادة المشغّل" },
