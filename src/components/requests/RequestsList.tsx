@@ -43,6 +43,9 @@ export function RequestsList() {
   // honor ?tab=bids after mount instead of reading window during render.
   const [seg, setSeg] = useState<"requests" | "bids">("requests");
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  // web-app/006 — off-platform shared-link bids per group (keyed by group id). Fetched up front so My
+  // Bids lists a group whose ONLY bid came through the link (those don't count toward on-platform totalBids).
+  const [linkBids, setLinkBids] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "bids") setSeg("bids");
@@ -58,10 +61,33 @@ export function RequestsList() {
     };
   }, []);
 
+  // Once requests load, fetch each group's off-platform submission count. Only broadcast groups carry a
+  // shared link, so limit the fan-out to those. Best-effort — a failure just leaves the count at 0.
+  useEffect(() => {
+    if (!items) return;
+    let active = true;
+    const targets = groupRequests(items).filter((g) => g.type !== "DIRECT");
+    Promise.all(
+      targets.map((g) =>
+        fetchRequestSubmissions(g.id)
+          .then((r) => [g.id, r.submittedCount] as const)
+          .catch(() => [g.id, 0] as const),
+      ),
+    ).then((pairs) => {
+      if (!active) return;
+      const map: Record<string, number> = {};
+      for (const [id, n] of pairs) if (n > 0) map[id] = n;
+      setLinkBids(map);
+    });
+    return () => { active = false; };
+  }, [items]);
+
   // Cluster the fanned-out requests into submission groups (Airport project pinned first).
   const groups = pinAirportFirst(groupRequests(items ?? []));
-  const bidGroups = groups.filter((g) => g.totalBids > 0); // only groups with received bids
-  const totalBids = groups.reduce((s, g) => s + g.totalBids, 0);
+  const linkCountOf = (g: RequestGroup) => linkBids[g.id] ?? 0;
+  // Show a group in My Bids if it received an on-platform bid OR an off-platform shared-link bid.
+  const bidGroups = groups.filter((g) => g.totalBids > 0 || linkCountOf(g) > 0);
+  const totalBids = groups.reduce((s, g) => s + g.totalBids + linkCountOf(g), 0);
 
   const activeGroup = groups.find((g) => g.id === activeGroupId) ?? groups[0] ?? null;
   const activeBidGroup = bidGroups.find((g) => g.id === activeGroupId) ?? bidGroups[0] ?? null;
@@ -211,7 +237,7 @@ export function GroupStrip({ group, ar, L, router }: { group: RequestGroup; ar: 
           {group.asap && <span className="asap"><span className="material-icons-outlined">flash_on</span>{L("ASAP", "فوري")}</span>}
           <span className={`stbadge ${ov.cls}`}><span className="dot" />{ar ? ov.ar : ov.en}</span>
           {gty && <span className={`typebadge ${gty.cls}`}><span className="material-icons-outlined">{gty.icon}</span>{ar ? gty.ar : gty.en}</span>}
-          <span className="gx-bids"><span className="material-icons-outlined">gavel</span>{group.totalBids} {L("bids", "عروض")}</span>
+          <span className="gx-bids"><span className="material-icons-outlined">gavel</span>{group.totalBids + (link?.submittedCount ?? 0)} {L("bids", "عروض")}</span>
         </div>
       </div>
       {/* shared-link tracker — copy the per-group link + see opened/submitted (off-platform bids) */}
