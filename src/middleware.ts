@@ -11,9 +11,16 @@ import type { NextRequest } from "next/server";
  *
  * The matcher excludes `/api/*`, Next internals and static files, so the auth API stays reachable
  * while signed out and assets aren't gated.
+ *
+ * Public pages (no account required) are allow-listed in PUBLIC_PREFIXES and bypass the gate — the
+ * shared supplier bid form `/bid/<token>` (web-app/006) is opened by suppliers who have no login.
  */
 const REFRESH_COOKIE = "mt_refresh";
 const ID_COOKIE = "mt_id";
+
+// Pages that must load while signed out. Keep in sync with any new public (account-less) routes.
+// Matched as exact path or `<prefix>/…` so a future `/bidsomething` route can't inherit access.
+const PUBLIC_PREFIXES = ["/bid"];
 
 function safeNext(next: string | null): string {
   // Only allow same-origin relative paths (block protocol-relative `//host`).
@@ -32,6 +39,11 @@ export function middleware(req: NextRequest) {
     dest.pathname = "/api/auth/handoff";
     dest.search = `?token=${encodeURIComponent(handoff)}`;
     return NextResponse.redirect(dest);
+  }
+
+  // Public (account-less) pages bypass the gate — e.g. the shared supplier bid form `/bid/<token>`.
+  if (PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+    return NextResponse.next();
   }
 
   // A refresh token (normal sign-in) OR an idToken (handoff session, no refresh) counts as authed.
