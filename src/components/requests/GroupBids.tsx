@@ -189,10 +189,10 @@ export function GroupBids({ group }: { group: RequestGroup }) {
     )
       .then((lists) => active && setBids(lists.flat()))
       .catch(() => active && setError(true));
-    // Off-platform shared-link submissions across every item/request in the group (best-effort).
+    // Off-platform shared-link submissions are stored once per GROUP (a single bid covers all items),
+    // so fetch them once by the group id — not per item (which would duplicate them). Best-effort.
     setSubmissions([]);
-    Promise.all(group.items.map((it) => fetchRequestSubmissions(it.id).then((r) => r.submissions).catch(() => [] as LinkBidSubmission[])))
-      .then((lists) => active && setSubmissions(lists.flat()));
+    fetchRequestSubmissions(group.id).then((r) => active && setSubmissions(r.submissions)).catch(() => {});
     return () => {
       active = false;
     };
@@ -440,17 +440,18 @@ export function GroupBids({ group }: { group: RequestGroup }) {
 
   if (error) return <div className="rempty">{L("Couldn’t load the bids.", "تعذّر تحميل العروض.")}</div>;
   if (!bids) return <div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 26 }}>progress_activity</span></div>;
-  // Merge on-platform app bids with off-platform shared-link submissions (mapped to a GroupBid).
-  const gItemMap = new Map(group.items.map((it) => [it.id, it]));
+  // Off-platform submissions are one bid PER GROUP covering all items. Label the card by the items
+  // the supplier priced (from the submission itself, since its requestId is now the group id).
   const subCards: GroupBid[] = submissions.map((s) => {
-    const it = gItemMap.get(s.requestId);
+    const labels = s.items.map((i) => i.label).filter(Boolean) as string[];
+    const label = labels.length > 1 ? `${labels.length} items` : labels[0] ?? L("All items", "كل الأصناف");
     return {
       ...submissionToBidCard(s),
       requestId: s.requestId,
-      itemLabel: it?.item?.name ?? it?.displayId ?? "",
-      itemLabelAr: it?.item?.nameAr ?? it?.displayId ?? "",
-      categoryId: it?.item?.categoryId ?? null,
-      itemImage: it?.item?.imageUrl ?? null,
+      itemLabel: label,
+      itemLabelAr: labels.length > 1 ? `${labels.length} أصناف` : labels[0] ?? "كل الأصناف",
+      categoryId: null,
+      itemImage: null,
     };
   });
   const allBids = [...bids, ...subCards];
