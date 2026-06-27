@@ -22,7 +22,9 @@ export function Confirmation() {
   const start = draft?.project.timing.startDate;
   const summary = [fmt(t.confirmation.itemsSummary, { count }), loc, start].filter(Boolean).join(" · ");
 
-  const reqId = state.requestIds[0] ?? "";
+  const reqId = state.requestIds[0] ?? ""; // short code — for DISPLAY only
+  // The bid link + submissions/deadline calls resolve a request by its UUID, never the short code.
+  const reqUuid = state.requestUuids[0] ?? reqId;
   const [origin, setOrigin] = useState("");
   const [shareOpen, setShareOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -34,13 +36,13 @@ export function Confirmation() {
   // the link token, so the link is available immediately; we only fetch the renter name for the slug.
   const [renterName, setRenterName] = useState<string | null>(null);
   useEffect(() => {
-    if (!reqId) return;
+    if (!reqUuid) return;
     let alive = true;
-    fetchRequestSubmissions(reqId).then((r) => alive && setRenterName(r.renterName)).catch(() => {});
+    fetchRequestSubmissions(reqUuid).then((r) => alive && setRenterName(r.renterName)).catch(() => {});
     return () => { alive = false; };
-  }, [reqId]);
+  }, [reqUuid]);
 
-  const shareUrl = origin && reqId ? bidShareUrl(origin, reqId, renterName) : "";
+  const shareUrl = origin && reqUuid ? bidShareUrl(origin, reqUuid, renterName) : "";
   const formUrl = shareUrl || `${origin}/supplier-bid-v2.html?preview=1`;
   const message = L(`Submit your bid on Moedatech: ${shareUrl}`, `قدّم عرضك على مؤيداتك: ${shareUrl}`);
 
@@ -59,9 +61,9 @@ export function Confirmation() {
   }
   // AC-04/05 — persist the optional bid-submission deadline (ISO, or null to clear → no expiry).
   function saveDeadline(value: string, on: boolean) {
-    if (!reqId) return;
+    if (!reqUuid) return;
     const iso = on && value ? new Date(value).toISOString() : null;
-    setBidDeadline(reqId, iso).catch(() => {});
+    setBidDeadline(reqUuid, iso).catch(() => {});
   }
 
   return (

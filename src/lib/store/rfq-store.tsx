@@ -63,6 +63,8 @@ export interface RfqState {
   requestId: string | null;
   /** Every short code from the fan-out (one per equipment item); requestId is the first. */
   requestIds: string[];
+  /** The fan-out request UUIDs (parallel to requestIds) — the bid-link token resolves by UUID. */
+  requestUuids: string[];
   multiLocationDismissed: boolean;
   seq: number;
   /** web-app/002: the project + items exactly as the agent first returned them — used to mark
@@ -86,6 +88,7 @@ const initialState: RfqState = {
   errorDetail: null,
   requestId: null,
   requestIds: [],
+  requestUuids: [],
   multiLocationDismissed: false,
   seq: 100,
   agentOrigin: null,
@@ -125,7 +128,7 @@ type Action =
   | { t: "REMOVE_ITEM"; id: string }
   | { t: "PATCH_PREFERENCES"; patch: DeepPrefPatch }
   | { t: "SUBMIT_START" }
-  | { t: "SUBMIT_SUCCESS"; requestId: string; requestIds: string[] }
+  | { t: "SUBMIT_SUCCESS"; requestId: string; requestIds: string[]; requestUuids: string[] }
   | { t: "SUBMIT_ERROR"; kind: ApiErrorKind; detail?: RfqState["errorDetail"] }
   | { t: "HYDRATE"; saved: Partial<RfqState> }
   | { t: "RESET" };
@@ -330,7 +333,7 @@ function reducer(state: RfqState, a: Action): RfqState {
     case "SUBMIT_START":
       return { ...state, busy: true, error: null, errorDetail: null };
     case "SUBMIT_SUCCESS":
-      return { ...state, busy: false, phase: "confirmation", requestId: a.requestId, requestIds: a.requestIds };
+      return { ...state, busy: false, phase: "confirmation", requestId: a.requestId, requestIds: a.requestIds, requestUuids: a.requestUuids };
     case "SUBMIT_ERROR":
       return { ...state, busy: false, error: a.kind, errorDetail: a.detail ?? null };
     case "RESET":
@@ -403,13 +406,13 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
       if (!s.draft) return;
       dispatch({ t: "SUBMIT_START" });
       try {
-        const { requestId, requestIds } = await submitRequest({
+        const { requestId, requestIds, requestUuids } = await submitRequest({
           project: s.draft.project,
           items: postableItems(s.draft.items), // AC-33/34: exclude no-match/removed
           preferences: s.draft.preferences,
           simulateError: s.simulateError,
         });
-        dispatch({ t: "SUBMIT_SUCCESS", requestId, requestIds: requestIds ?? (requestId ? [requestId] : []) });
+        dispatch({ t: "SUBMIT_SUCCESS", requestId, requestIds: requestIds ?? (requestId ? [requestId] : []), requestUuids: requestUuids ?? [] });
       } catch (e) {
         const detail =
           e instanceof ApiError

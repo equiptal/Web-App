@@ -240,8 +240,8 @@ export function resolveTerm(id: string, key: string, action: "accept" | "counter
 
 export function submitRequest(
   payload: RfqRequestPayload & { simulateError?: boolean },
-): Promise<{ requestId: string; requestIds?: string[] }> {
-  return postJson<{ requestId: string; requestIds?: string[] }>("/api/requests", payload);
+): Promise<{ requestId: string; requestIds?: string[]; requestUuids?: string[] }> {
+  return postJson<{ requestId: string; requestIds?: string[]; requestUuids?: string[] }>("/api/requests", payload);
 }
 
 /* ----------------- web-app/007: Mansour judgement layer (soft) ----------------- */
