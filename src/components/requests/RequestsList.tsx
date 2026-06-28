@@ -138,7 +138,7 @@ export function RequestsList() {
                   const asap = r.urgency === "ASAP";
                   const title = (ar ? r.item?.nameAr : r.item?.name) || L("Request", "طلب");
                   return (
-                    <button className={`rq${asap ? " asap" : ""}`} key={r.id} onClick={() => router.push(`/requests/${r.id}`)}>
+                    <button className={`rq${asap ? " asap" : ""}`} key={r.id} onClick={() => router.push(`/requests/group/${encodeURIComponent(activeGroup.id)}`)}>
                       <span className="accent" />
                       <div className="rq-in">
                         <div className="rq-head">

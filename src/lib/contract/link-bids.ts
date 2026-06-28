@@ -1,4 +1,4 @@
-import type { BidCard, TermRow, TermState } from "@/lib/contract/bids";
+import type { BidCard, CertCode, TermRow, TermState } from "@/lib/contract/bids";
 
 /**
  * web-app/006 (expanded) — off-platform bid submissions captured through a request's shared link.
@@ -232,6 +232,13 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
   const c = it?.confirmations ?? {};
   const rt = (it?.requiredTerms ?? {}) as Record<string, string | null>;
   const up = (v: string | null | undefined) => (v ? v.toUpperCase() : v ?? null); // cert acronyms (TUV/SASO)
+  // Equipment-section enrichment for the comparison matrix. Off-platform bids have no equipment listing
+  // or docs — only the supplier's Yes/No confirmations — so populate Year / Equipment certs / Operator
+  // cert from those (showing the requested VALUE the supplier confirmed, e.g. TÜV), not blanks.
+  const toCertCode = (raw: string): CertCode | null => { const u = raw.toUpperCase(); return u.includes("TUV") || u.includes("TÜV") ? "TUV" : u.includes("SPSP") ? "SPSP" : u.includes("SASO") ? "SASO" : u.includes("LC") || u.includes("LOCAL") ? "LC" : null; };
+  const reqEqCertCodes = (rt.equipmentCert ? String(rt.equipmentCert).split(/[,/]/) : []).map((x) => toCertCode(x.trim())).filter((x): x is CertCode => !!x);
+  const eqCertConfirmed = c.equipmentCert === true ? reqEqCertCodes : [];
+  const reqYearNum = rt.year ? Number(rt.year) || null : null;
   return {
     id: `link-${sub.id}`,
     status: "PENDING",
@@ -249,7 +256,7 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
     priceUnit: it?.priceUnit ?? null,
     duration: null, // open-ended; the comparison falls back to the request duration
     numberOfUnits: it?.numberOfUnits ?? 1,
-    reqMinYear: null,
+    reqMinYear: reqYearNum,
     equipment: null, // the form confirms "meets the requested year", not a specific make/model/year
     eqVerified: false,
     compliance: {
@@ -266,11 +273,13 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
     dealRoomId: null,
     expired: false,
     note: sub.notes ?? null,
-    requiredCerts: [],
-    heldCertCodes: [],
+    requiredCerts: reqEqCertCodes,
+    heldCertCodes: eqCertConfirmed,
+    equipmentCertCodes: eqCertConfirmed,
     ownershipDocs: [],
-    operatorCertReq: null,
-    operatorCertDeclared: c.operatorCert == null ? null : c.operatorCert ? "Confirmed" : "Not confirmed",
+    operatorCertReq: up(rt.operatorCert) ?? null,
+    // Show the confirmed VALUE (e.g. the requested license level) when the supplier said Yes, else "Not confirmed".
+    operatorCertDeclared: c.operatorCert == null ? null : c.operatorCert ? (up(rt.operatorCert) ?? "Confirmed") : "Not confirmed",
     mobLeadTime: null,
     demobLeadTime: null,
     terms: {

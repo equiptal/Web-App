@@ -145,8 +145,13 @@ export function BidComparisonWorkspace() {
     if (!groups) return [];
     const map = new Map<string, LocationNode>();
     for (const g of groups) {
-      const key = g.locationLabel || g.city || g.id;
-      const node = map.get(key) ?? { key, label: g.locationLabel || g.city || L("Location", "الموقع"), groups: [], itemCount: 0, bidCount: 0 };
+      // One tab per REQUEST group (key by group id) — not per coarse location label, which merged
+      // unrelated requests that share a city and showed their items together. Matches My Bids.
+      const key = g.id;
+      const place = g.locationLabel || g.city || L("Location", "الموقع");
+      const lead = g.items[0]?.item;
+      const leadName = lead ? (ar ? lead.nameAr : lead.name) || lead.name : null;
+      const node = map.get(key) ?? { key, label: leadName ? `${place} · ${leadName}` : place, groups: [], itemCount: 0, bidCount: 0 };
       node.groups.push(g);
       node.itemCount += g.items.length;
       node.bidCount += effGroupBids(g);
@@ -1068,7 +1073,16 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                     </tr>
                     <tr>
                       <RowHead title={L("Year", "سنة الصنع")} sub={(() => { const my = cols[0]?.bid.reqMinYear; return my == null ? undefined : my >= 1990 ? `${L("min year", "أدنى سنة")} ${my}` : `${L("max age", "أقصى عمر")} ${my} ${L("yrs", "سنة")}`; })()} />
-                      {cols.map((c) => { const yr = c.equipment.find((r) => r.key === "year"); const isNewest = (c.bid.equipment?.year ?? 0) > 0 && c.bid.equipment?.year === Math.max(...cols.map((x) => x.bid.equipment?.year ?? 0)); return <Td key={c.bid.id} ok={yr?.state !== "conflict"} fail={yr?.state === "conflict"}><span className="text-[13px] font-bold">{c.bid.equipment?.year ?? "—"}</span>{isNewest && cols.length > 1 && <Sub>{L("newest", "الأحدث")}</Sub>}</Td>; })}
+                      {cols.map((c) => {
+                        const yr = c.equipment.find((r) => r.key === "year");
+                        // Off-platform: no equipment record — show the confirmed year requirement (e.g. "≥ 2018").
+                        if (c.bid.viaSharedLink) {
+                          const v = yr ? (c.bid.reqMinYear != null ? `≥ ${c.bid.reqMinYear}` : yr.state === "conflict" ? L("Not met", "غير مطابق") : L("Confirmed", "مؤكّد")) : null;
+                          return <Td key={c.bid.id} ok={!!yr && yr.state !== "conflict"} fail={yr?.state === "conflict"}>{v ? <span className="text-[13px] font-bold">{v}</span> : <span style={{ color: C.muted }}>—</span>}</Td>;
+                        }
+                        const isNewest = (c.bid.equipment?.year ?? 0) > 0 && c.bid.equipment?.year === Math.max(...cols.map((x) => x.bid.equipment?.year ?? 0));
+                        return <Td key={c.bid.id} ok={yr?.state !== "conflict"} fail={yr?.state === "conflict"}><span className="text-[13px] font-bold">{c.bid.equipment?.year ?? "—"}</span>{isNewest && cols.length > 1 && <Sub>{L("newest", "الأحدث")}</Sub>}</Td>;
+                      })}
                     </tr>
                     <tr>
                       <RowHead title={L("Distance to site", "المسافة للموقع")} />
