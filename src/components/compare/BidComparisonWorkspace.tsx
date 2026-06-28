@@ -149,9 +149,7 @@ export function BidComparisonWorkspace() {
       // unrelated requests that share a city and showed their items together. Matches My Bids.
       const key = g.id;
       const place = g.locationLabel || g.city || L("Location", "الموقع");
-      const lead = g.items[0]?.item;
-      const leadName = lead ? (ar ? lead.nameAr : lead.name) || lead.name : null;
-      const node = map.get(key) ?? { key, label: leadName ? `${place} · ${leadName}` : place, groups: [], itemCount: 0, bidCount: 0 };
+      const node = map.get(key) ?? { key, label: place, groups: [], itemCount: 0, bidCount: 0 };
       node.groups.push(g);
       node.itemCount += g.items.length;
       node.bidCount += effGroupBids(g);
@@ -375,8 +373,11 @@ export function BidComparisonWorkspace() {
     const style = has ? { background: C.successBg, color: C.success } : { background: C.dangerBg, color: C.danger };
     // Off-platform bids captured a VALUE (CR/VAT/national text), not a file — show the value, not a doc.
     const linkVal = c.bid.viaSharedLink ? c.bid.linkDocs?.[hint] : undefined;
-    const inner = <><span className="material-icons-outlined" style={{ fontSize: 11 }}>{has ? "check" : "close"}</span>{label}{has && <span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>visibility</span>}</>;
-    if (!has) return <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={style}>{inner}</span>;
+    // Viewable only when there's something to open: a captured value (link bid) or a real file (app bid).
+    // Off-platform certs are acknowledged Yes/No — no file, no value — so no eye icon / no click.
+    const viewable = has && (linkVal != null || !c.bid.viaSharedLink);
+    const inner = <><span className="material-icons-outlined" style={{ fontSize: 11 }}>{has ? "check" : "close"}</span>{label}{viewable && <span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>visibility</span>}</>;
+    if (!viewable) return <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={style}>{inner}</span>;
     const onClick = linkVal ? () => setDocView({ label, url: null, value: linkVal, loading: false }) : () => openDoc(c, hint, label);
     return <button type="button" onClick={onClick} title={linkVal ? L("View value", "عرض القيمة") : L("View document", "عرض المستند")} className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={style}>{inner}</button>;
   };
