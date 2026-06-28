@@ -62,6 +62,8 @@ export function BidComparisonWorkspace() {
   };
 
   const [groups, setGroups] = useState<RequestGroup[] | null>(null);
+  const [linkByRequest, setLinkByRequest] = useState<Record<string, number>>({}); // off-platform link-bid count per request id — folded into selector gating so link-only requests aren't hidden
+  const [linkLoaded, setLinkLoaded] = useState(false); // off-platform counts fetched (so default selection can wait for link-only groups)
   const [error, setError] = useState(false);
   const [activeLoc, setActiveLoc] = useState<string | null>(null);
   const [activeItem, setActiveItem] = useState<string | null>(null);
@@ -116,6 +118,29 @@ export function BidComparisonWorkspace() {
     return () => { active = false; };
   }, []);
 
+  // Off-platform (shared-link form) bids don't appear in fetchMyRequests' bidCount. Fetch each
+  // broadcast group's submissions and count them per request, so a request that received ONLY form
+  // bids still surfaces in the location/item selector (mirrors RequestsList). Best-effort.
+  useEffect(() => {
+    if (!groups) return;
+    let active = true;
+    const targets = groups.filter((g) => g.type !== "DIRECT");
+    Promise.all(
+      targets.map((g) => fetchRequestSubmissions(g.id).then((r) => r.submissions).catch(() => [] as LinkBidSubmission[])),
+    ).then((all) => {
+      if (!active) return;
+      const rmap: Record<string, number> = {};
+      for (const subs of all) for (const sub of subs) for (const it of sub.items) if (it.requestId) rmap[it.requestId] = (rmap[it.requestId] ?? 0) + 1;
+      setLinkByRequest(rmap);
+      setLinkLoaded(true);
+    });
+    return () => { active = false; };
+  }, [groups]);
+
+  // "Effective" bid count = app bids + off-platform link bids — the basis for selector gating.
+  const effItemBids = (it: RequestGroup["items"][number]) => it.bidCount + (linkByRequest[it.id] ?? 0);
+  const effGroupBids = (g: RequestGroup) => g.items.reduce((s, it) => s + effItemBids(it), 0);
+
   const locations = useMemo<LocationNode[]>(() => {
     if (!groups) return [];
     const map = new Map<string, LocationNode>();
@@ -124,7 +149,7 @@ export function BidComparisonWorkspace() {
       const node = map.get(key) ?? { key, label: g.locationLabel || g.city || L("Location", "الموقع"), groups: [], itemCount: 0, bidCount: 0 };
       node.groups.push(g);
       node.itemCount += g.items.length;
-      node.bidCount += g.totalBids;
+      node.bidCount += effGroupBids(g);
       map.set(key, node);
     }
     // Only surface locations that actually have bids to compare (fall back to all if none do).
@@ -134,7 +159,7 @@ export function BidComparisonWorkspace() {
     // Demo ordering: Airport project first.
     const isAir = (n: LocationNode) => /airport|مطار/i.test(n.label || "");
     return [...ranked.filter(isAir), ...ranked.filter((n) => !isAir(n))];
-  }, [groups, ar]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [groups, ar, linkByRequest]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!locations.length || activeLoc) return;
@@ -148,21 +173,24 @@ export function BidComparisonWorkspace() {
       if (node) {
         setActiveLoc(node.key);
         const g = node.groups.find((gg) => gg.id === groupId);
-        const target = (itemId && g?.items.find((i) => i.id === itemId)) || g?.items.find((i) => i.bidCount > 0) || g?.items[0];
+        const target = (itemId && g?.items.find((i) => i.id === itemId)) || g?.items.find((i) => effItemBids(i) > 0) || g?.items[0];
         if (target) setActiveItem(target.id);
         return;
       }
+      // groupId points to a link-only group still filtered out — wait for off-platform counts before
+      // falling back, so we don't default to the wrong location and miss it.
+      if (!linkLoaded) return;
     }
     setActiveLoc(locations[0].key);
-  }, [locations, activeLoc]);
+  }, [locations, activeLoc, linkLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loc = locations.find((l) => l.key === activeLoc) ?? locations[0];
-  const group = loc?.groups.find((g) => g.totalBids > 0) ?? loc?.groups[0];
+  const group = loc?.groups.find((g) => effGroupBids(g) > 0) ?? loc?.groups[0];
   const items = loc ? loc.groups.flatMap((g) => g.items) : [];
 
   useEffect(() => {
     if (items.length && !items.some((i) => i.id === activeItem)) {
-      const firstWithBids = items.find((i) => i.bidCount > 0) ?? items[0];
+      const firstWithBids = items.find((i) => effItemBids(i) > 0) ?? items[0];
       setActiveItem(firstWithBids?.id ?? null);
     }
   }, [loc?.key]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -212,7 +240,11 @@ export function BidComparisonWorkspace() {
     // so map it to THIS active item's pricing (match the submission item to the active request). The id
     // is per-item (`link-<sub>-<item>`) to match the My Bids card ids the Compare button preselects.
     const linkCards = submissions.flatMap((s) => {
-      const it = s.items.find((i) => i.requestId === activeItem);
+      // Match the submission's item to the active request (a group submission covers several items).
+      // Mirror My Bids: fall back to the sole item when the per-item `requestId` link is missing/unset
+      // (older submissions, or an item id not in the group map) so a single-item submission still shows
+      // instead of being silently dropped — and its card id matches the My Bids → Compare preselection.
+      const it = s.items.find((i) => i.requestId === activeItem) ?? (s.items.length === 1 ? s.items[0] : null);
       if (!it) return [];
       return [{ ...submissionToBidCard(s, it), id: `link-${s.id}-${it.requestItemId}` }];
     });

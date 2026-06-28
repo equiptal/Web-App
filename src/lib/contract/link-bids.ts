@@ -46,6 +46,10 @@ export interface LinkBidItem {
 export interface LinkBidSubmission {
   id: string;
   requestId: string;
+  /** Human-citable quotation number (Q-YYYY-<reqShortCode>-<hash>) — same format as app bids. */
+  quotationRef?: string | null;
+  /** The RFQ this quotation answers (REQ-XXXXX). */
+  rfqRef?: string | null;
   createdAt: string | null;
   companyName: string;
   crNumber?: string | null;
@@ -53,6 +57,9 @@ export interface LinkBidSubmission {
   nationalAddress?: string | null;
   contactInfo?: string | null;
   notes?: string | null;
+  /** Supplier-set quote expiry (ISO) — how long THEIR price holds. Separate from the renter's bid
+   *  deadline. Drives the quotation's "Valid until" when present. */
+  validUntil?: string | null;
   items: LinkBidItem[];
   grandTotal?: number | null;
 }
@@ -111,6 +118,8 @@ export interface SubmitBidFormPayload {
   nationalAddress: string;
   contactInfo: string;
   notes?: string;
+  /** Supplier-set quote expiry (ISO) — optional. */
+  validUntil?: string;
   items: { requestItemId: string; confirmations: LinkBidConfirmations; rentalRate: number; deliveryPrice?: number; returnPrice?: number }[];
 }
 
@@ -129,6 +138,8 @@ export function mapLinkSubmissions(raw: unknown): LinkBidSubmission[] {
     return {
       id: s(o.id) ?? "",
       requestId: s(o.requestId) ?? "",
+      quotationRef: s(o.quotationRef),
+      rfqRef: s(o.rfqRef),
       createdAt: s(o.createdAt),
       companyName: s(o.companyName) ?? "Supplier",
       crNumber: s(o.crNumber),
@@ -136,6 +147,7 @@ export function mapLinkSubmissions(raw: unknown): LinkBidSubmission[] {
       nationalAddress: s(o.nationalAddress),
       contactInfo: s(o.contactInfo),
       notes: s(o.notes),
+      validUntil: s(o.validUntil),
       grandTotal: n(o.grandTotal),
       items: items.map((i) => {
         const c = (i.confirmations ?? {}) as Record<string, unknown>;

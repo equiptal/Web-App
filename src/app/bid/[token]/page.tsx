@@ -4,6 +4,7 @@ import { use, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { fetchBidFormData, submitBidForm } from "@/lib/api/client";
 import type { BidFormData, BidFormItem } from "@/lib/contract/link-bids";
+import { BID_FORM_CSS } from "@/components/bid/bidFormStyles";
 
 /**
  * web-app/006 — PUBLIC supplier bid form (spec "Layout B": supplier-bid-v2.html). An off-platform
@@ -30,6 +31,10 @@ const UNIT_LABEL: Record<string, [string, string]> = {
 };
 const num = (v: string) => (v.trim() && Number.isFinite(Number(v)) ? Number(v) : 0);
 
+// Hide the supplier "Quote valid until" field until the link_bid_submissions.valid_until migration is
+// applied + the agents backend redeployed. All wiring stays; flip to true once that's live.
+const QUOTE_EXPIRY_ENABLED = false;
+
 type Answer = {
   confirmations: Partial<Record<TermKey, boolean>>;
   rentalRate: string;
@@ -53,13 +58,11 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
   const [notFound, setNotFound] = useState(false);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [contract, setContract] = useState<Record<string, boolean>>({});
-  const [company, setCompany] = useState({ companyName: "", crNumber: "", vatNumber: "", nationalAddress: "", contactInfo: "", notes: "" });
+  const [company, setCompany] = useState({ companyName: "", crNumber: "", vatNumber: "", nationalAddress: "", contactInfo: "", notes: "", validUntil: "" });
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
-  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
-  const subKey = `mt-bid-submitted-${token}`;
-  useEffect(() => { try { if (sessionStorage.getItem(subKey)) setAlreadySubmitted(true); } catch { /* ignore */ } }, [subKey]);
+  // Suppliers may submit more than one bid per request (e.g. alternative options) — no single-submission lock.
 
   useEffect(() => {
     let alive = true;
@@ -83,6 +86,41 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
   const itemTerms = (it: BidFormItem) => TERM_KEYS.filter((k) => it.requiredTerms[k] != null);
   const setConf = (id: string, k: TermKey, v: boolean) => setAnswers((p) => ({ ...p, [id]: { ...p[id], confirmations: { ...p[id].confirmations, [k]: v } } }));
   const setPrice = (id: string, field: "rentalRate" | "deliveryPrice" | "returnPrice", v: string) => setAnswers((p) => ({ ...p, [id]: { ...p[id], [field]: v } }));
+
+  // "Confirm all as Yes" — set every shown term (per-item + contract) to Yes in one tap. The supplier
+  // can still change any individual answer afterwards.
+  const totalTerms = (data?.items ?? []).reduce((n, it) => n + itemTerms(it).length, 0) + (data?.contractTerms?.length ?? 0);
+  const confirmAllYes = () => {
+    if (!data) return;
+    setAnswers((p) => {
+      const next = { ...p };
+      for (const it of data.items) {
+        const conf = { ...(next[it.requestItemId]?.confirmations ?? {}) };
+        for (const k of itemTerms(it)) conf[k] = true;
+        next[it.requestItemId] = { ...next[it.requestItemId], confirmations: conf };
+      }
+      return next;
+    });
+    setContract((p) => {
+      const next = { ...p };
+      for (const c of data.contractTerms) next[c.key] = true;
+      return next;
+    });
+  };
+
+  // Reset for "Submit another bid" — clear terms/prices for a fresh quotation (keep company details,
+  // since it's the same supplier sending another option).
+  const resetForm = () => {
+    if (!data) return;
+    const init: Record<string, Answer> = {};
+    for (const it of data.items) init[it.requestItemId] = { confirmations: {}, rentalRate: "", deliveryPrice: "", returnPrice: "" };
+    setAnswers(init);
+    setContract({});
+    setShowErrors(false);
+    setSubmitting(false);
+    setSubmitted(false);
+    window.scrollTo(0, 0);
+  };
 
   const itemSubtotal = (it: BidFormItem, a?: Answer) => {
     if (!a) return 0;
@@ -114,13 +152,13 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
         nationalAddress: company.nationalAddress.trim(),
         contactInfo: company.contactInfo.trim(),
         notes: company.notes.trim() || undefined,
+        validUntil: company.validUntil ? new Date(company.validUntil).toISOString() : undefined,
         items: data.items.map((it) => {
           const a = answers[it.requestItemId];
           // Merge the project/contract confirmations (apply to all items) into each item's answers.
           return { requestItemId: it.requestItemId, confirmations: { ...a.confirmations, ...contract }, rentalRate: num(a.rentalRate), deliveryPrice: num(a.deliveryPrice), returnPrice: num(a.returnPrice) };
         }),
       });
-      try { sessionStorage.setItem(subKey, "1"); } catch { /* ignore */ }
       setSubmitted(true);
       window.scrollTo(0, 0);
     } catch {
@@ -139,7 +177,7 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=Inter:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
       <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" />
-      <style>{CSS}</style>
+      <style>{BID_FORM_CSS}</style>
 
       {/* Public header bar — renter identity + language toggle */}
       <header className="pubbar">
@@ -179,27 +217,30 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
         </div></div>
       )}
 
-      {/* Already submitted this session (AC-33) */}
-      {!loading && data?.status === "open" && alreadySubmitted && !submitted && (
-        <div className="wrap"><div className="state"><div className="sic"><span className="material-icons-outlined">done_all</span></div><h2>{L("Bid already submitted", "تم إرسال العرض مسبقاً")}</h2><p>{L("You've already submitted a bid for this request from this device.", "لقد أرسلت عرضاً لهذا الطلب من هذا الجهاز.")}</p></div></div>
-      )}
-
-      {/* Success (AC-29) */}
+      {/* Success (AC-29) — suppliers may submit another bid (e.g. an alternative option). */}
       {submitted && (
         <div className="wrap"><div className="state"><div className="sic"><span className="material-icons-outlined">check_circle</span></div>
           <h2>{L("Bid submitted", "تم إرسال العرض")}</h2>
           <p>{L("Your bid is now with the renter on the Moedatech platform — they can view it and compare it side by side with the other bids.", "عرضك الآن لدى المستأجر على منصة معداتك — يمكنه عرضه ومقارنته جنباً إلى جنب مع بقية العروض.")}</p>
           <span className="recap"><span className="material-icons-outlined">payments</span>{sar} {nf(grand)}</span>
+          <div className="state-actions"><button className="btn" onClick={resetForm}><span className="material-icons-outlined">add</span>{L("Submit another bid", "إرسال عرض آخر")}</button></div>
         </div></div>
       )}
 
       {/* The form */}
-      {!loading && data?.status === "open" && !alreadySubmitted && !submitted && (
+      {!loading && data?.status === "open" && !submitted && (
         <div className="wrap">
           <div className="intro">
             <h1>{L("Submit your bid", "قدّم عرضك")}</h1>
             <p>{L("For each item, confirm its terms in the table, then price it below.", "لكل بند، أكّد شروطه في الجدول ثم سعّره بالأسفل.")}</p>
           </div>
+
+          {totalTerms > 0 && (
+            <div className="confirm-all">
+              <div className="ca-tx"><span className="material-icons-outlined">done_all</span>{L("Can you meet every term the renter set?", "هل يمكنك الالتزام بكل الشروط التي حدّدها المستأجر؟")}</div>
+              <button type="button" className="btn ca-btn" onClick={confirmAllYes}>{L("Confirm all as Yes", "تأكيد الكل بنعم")}</button>
+            </div>
+          )}
 
           {data.deadline && <Countdown iso={data.deadline} L={L} fmtDate={fmtDate} />}
 
@@ -336,6 +377,7 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
             </div>
             <Field label={L("National address", "العنوان الوطني")} req invalid={showErrors && !company.nationalAddress.trim()} L={L}><input value={company.nationalAddress} onChange={(e) => setCompany({ ...company, nationalAddress: e.target.value })} /></Field>
             <Field label={L("Contact info", "بيانات التواصل")} req invalid={showErrors && !company.contactInfo.trim()} L={L}><input value={company.contactInfo} onChange={(e) => setCompany({ ...company, contactInfo: e.target.value })} placeholder={L("Phone or email so the renter can reach you", "هاتف أو بريد ليتواصل معك المستأجر")} /></Field>
+            {QUOTE_EXPIRY_ENABLED && <Field label={L("Quote valid until (optional)", "صلاحية العرض حتى (اختياري)")} L={L}><input type="date" value={company.validUntil} onChange={(e) => setCompany({ ...company, validUntil: e.target.value })} /></Field>}
             <div className="notes-field"><label>{L("Notes (optional) — for the whole quotation", "ملاحظات (اختياري) — لكامل عرض السعر")}</label><textarea value={company.notes} onChange={(e) => setCompany({ ...company, notes: e.target.value })} /></div>
           </div>
 
@@ -409,156 +451,3 @@ function rentalBasisLabel(v: string, L: (e: string, a: string) => string) {
   const e = m[String(v).toUpperCase()];
   return e ? L(e[0], e[1]) : v;
 }
-
-const CSS = `
-.bidpage{--navy:#1C3550;--navy-deep:#12263A;--navy-mid:#2A4F72;--action:#F79009;--action-dim:#FFF4E5;--rentee:#2563EB;--success:#1DAF58;--success-bg:#E7F7EE;--danger:#D9362A;--danger-bg:#FCEBEA;--muted:#6B8FA8;--surface1:#fff;--surface2:#EFF4F9;--border:#D4E0EC;--line:#E4EDF5;--r-md:10px;--r-lg:14px;--r-full:100px;
-  min-height:100vh;background:var(--surface2);color:var(--navy);font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
-.bidpage.rtl{font-family:"Tajawal","Inter",sans-serif}
-.bidpage *{box-sizing:border-box}
-.bidpage .material-icons-outlined{font-family:'Material Icons Outlined';line-height:1}
-.pubbar{background:var(--surface1);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50}
-.pubbar-in{max-width:1060px;margin:0 auto;display:flex;align-items:center;gap:13px;padding:12px 24px}
-.rlogo{width:44px;height:44px;border-radius:10px;flex:0 0 auto;background:linear-gradient(135deg,var(--rentee),#1E40AF);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
-.rlogo.rlogo-img{background:#fff;border:1px solid var(--border);overflow:hidden;padding:3px}
-.rlogo.rlogo-img img{width:100%;height:100%;object-fit:contain}
-.rmeta .rlabel{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.rmeta .rname{font-size:18.5px;font-weight:800;letter-spacing:-.3px;line-height:1.15}
-.rmeta .rsub{font-size:11.5px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:5px;margin-top:2px}
-.rmeta .rsub .material-icons-outlined{font-size:13px;color:var(--success)}
-.pubbar .spacer{flex:1}
-.langtog{display:inline-flex;border:1px solid var(--border);border-radius:7px;overflow:hidden}
-.langtog button{border:0;background:var(--surface1);color:var(--muted);padding:6px 12px;font:inherit;font-weight:700;font-size:12px;cursor:pointer}
-.langtog button.on{background:var(--navy);color:#fff}
-.wrap{max-width:1060px;margin:0 auto;padding:22px 24px 90px}
-.intro{margin:4px 0 18px}
-.intro h1{margin:0 0 5px;font-size:22px;font-weight:800;letter-spacing:-.4px}
-.intro p{margin:0;font-size:13.5px;color:var(--muted)}
-.countdown{background:linear-gradient(135deg,var(--navy),var(--navy-deep));color:#fff;border-radius:var(--r-lg);padding:18px;margin-bottom:18px;text-align:center}
-.cd-label{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#FCD9A0;margin-bottom:13px}
-.cd-label .material-icons-outlined{font-size:17px}
-.cd-boxes{display:flex;align-items:center;justify-content:center;gap:10px}
-.cd-box{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);border-radius:var(--r-md);padding:10px 0;width:74px}
-.cd-box b{display:block;font-family:"IBM Plex Sans",monospace;font-size:28px;font-weight:700;line-height:1}
-.cd-box span{font-size:10.5px;font-weight:700;color:rgba(255,255,255,.6);text-transform:uppercase;margin-top:5px;display:block}
-.cd-sep{font-size:24px;color:rgba(255,255,255,.4)}
-.cd-deadline{margin-top:13px;font-size:12.5px;color:rgba(255,255,255,.72);font-weight:600}
-.cd-deadline b{color:#fff}
-.sec{background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 18px;margin-bottom:14px}
-.sec-h{display:flex;align-items:center;gap:9px;margin:0 0 14px}
-.sec-h h3{margin:0;font-size:15px;font-weight:800;letter-spacing:-.2px}
-.sec-h .hdic{font-size:19px;color:var(--navy-mid)}
-.sec-h .ro-tag{margin-inline-start:auto;font-size:10.5px;font-weight:800;text-transform:uppercase;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-full);padding:3px 10px}
-.subhead{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--navy-mid);margin:16px 0 9px}
-.subhead .material-icons-outlined{font-size:15px;color:var(--navy-mid)}
-.ro-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
-.ro-cell{background:var(--surface2);padding:11px 13px}
-.ro-cell .k{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:3px}
-.ro-cell .v{font-size:13.5px;font-weight:700}
-.maplink{display:inline-flex;align-items:center;gap:4px;color:var(--rentee);text-decoration:none}
-.maplink .material-icons-outlined{font-size:15px}
-.ro-hint{font-size:11.5px;color:var(--muted);font-style:italic;margin-top:9px}
-.rnote{font-size:13.5px;color:var(--navy);line-height:1.6;white-space:pre-wrap;margin:0}
-.iteminfo{display:flex;flex-wrap:wrap;gap:7px 18px;margin:0 0 4px;font-size:12.5px;color:var(--navy-mid)}
-.iteminfo .ii b{color:var(--muted);font-weight:700}
-.iteminfo .ii.note{display:inline-flex;align-items:center;gap:5px;color:var(--muted);font-style:italic}
-.iteminfo .ii.note .material-icons-outlined{font-size:14px}
-.item-hd{display:flex;align-items:center;gap:12px;margin:-16px -18px 14px;padding:14px 18px;background:linear-gradient(135deg,var(--navy),var(--navy-deep));color:#fff;border-radius:var(--r-lg) var(--r-lg) 0 0}
-.item-hd > .material-icons-outlined{font-size:24px;color:#FCD9A0;flex:0 0 auto}
-.item-hd .inm-wrap{flex:1;min-width:0}
-.item-hd .inm{font-size:18px;font-weight:800;letter-spacing:-.2px}
-.item-hd .imeta{font-size:12.5px;color:rgba(255,255,255,.75);font-weight:600}
-.item-hd .ibadge{margin-inline-start:auto;font-size:11px;font-weight:800;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:var(--r-full);padding:4px 11px;white-space:nowrap}
-.tmtx-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-md)}
-.tmtx{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed}
-.tmtx th{background:var(--surface2);color:var(--navy-mid);font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:10px;border-bottom:1px solid var(--border);text-align:start}
-.tmtx td{padding:12px 10px;border-inline-start:1px solid var(--line);vertical-align:top}
-.tmtx td:first-child,.tmtx th:first-child{border-inline-start:0}
-.tmtx .cval{font-size:12.5px;font-weight:700;margin-bottom:9px;line-height:1.4}
-.tmtx .cval i{font-style:normal;color:var(--rentee)}
-.tmtx .cval .cval-q{font-size:11px;font-weight:600;color:var(--muted);text-transform:none}
-.tmtx .sval{margin-top:9px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.tmtx .sval .sval-q{font-size:11px;font-weight:700;color:var(--navy-mid);text-transform:none}
-/* Responsive term grid — cells wrap into as many rows as needed (no cramped wide table). */
-.treqgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:8px}
-.treqcell{border:1px solid var(--line);border-radius:var(--r-md);padding:11px 13px;background:var(--surface1);min-width:0}
-.treqcell.declined{background:var(--danger-bg);border-color:rgba(217,54,42,.28)}
-.treqcell.needpick{background:#EAF1FE;box-shadow:inset 0 0 0 2px rgba(37,99,235,.4)}
-.treqcell .tc-name{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--navy-mid);margin-bottom:8px;line-height:1.3;overflow-wrap:anywhere}
-.treqcell .tc-rw{font-size:12px;margin-bottom:8px;overflow-wrap:anywhere}
-.treqcell .tc-rw .q{color:var(--muted);font-weight:600}
-.treqcell .tc-rw i{font-style:normal;color:var(--rentee);font-weight:700}
-.treqcell .tc-sw .q{display:block;font-size:11px;font-weight:700;color:var(--navy-mid);margin-bottom:5px}
-.tmtx td.declined{background:var(--danger-bg)}
-.tmtx td.needpick{background:#EAF1FE;box-shadow:inset 0 0 0 2px rgba(37,99,235,.4)}
-.celllbl{display:none}
-.miniseg{display:inline-flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;width:fit-content}
-.miniseg button{border:0;background:var(--surface1);color:var(--navy-mid);font:inherit;font-weight:700;font-size:11.5px;padding:6px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
-.miniseg button .material-icons-outlined{font-size:14px}
-.miniseg button.ok.on{background:var(--success);color:#fff}
-.miniseg button.no.on{background:var(--danger);color:#fff}
-.treqs{display:flex;flex-direction:column;gap:8px}
-.treq{display:flex;align-items:center;justify-content:space-between;gap:14px;border:1px solid var(--line);border-radius:var(--r-md);padding:12px 14px;background:var(--surface1)}
-.treq.no{background:var(--danger-bg);border-color:rgba(217,54,42,.28)}
-.treq-tx{min-width:0}
-.treq-q{font-size:13.5px;font-weight:700;color:var(--navy);line-height:1.45}
-.treq-q .treq-v{color:var(--rentee)}
-.treq-req{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.4}
-.treq .miniseg{flex:0 0 auto}
-@media(max-width:560px){.treq{flex-wrap:wrap}.treq .miniseg{margin-inline-start:auto}}
-.ptbl{width:100%;border-collapse:collapse;font-size:12.5px}
-.ptbl th{background:var(--surface2);color:var(--navy-mid);font-size:10px;font-weight:800;text-transform:uppercase;padding:8px 10px;border-bottom:1px solid var(--border);text-align:start}
-.ptbl th.num,.ptbl td.num{text-align:end}
-.ptbl td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
-.ptbl tbody tr:last-child td{border-bottom:0}
-.ptbl .it-lbl{font-weight:700}
-.ptbl .it-sub2{font-size:10.5px;color:var(--muted);margin-top:2px}
-.ptbl-in{width:120px;text-align:end;border:1px solid var(--border);border-radius:6px;height:36px;padding:0 9px;font:inherit;font-size:13.5px;font-weight:700;color:var(--navy);background:var(--surface1);outline:0}
-.ptbl-in:focus{border-color:var(--action);box-shadow:0 0 0 3px rgba(247,144,9,.12)}
-.ptbl-in.invalid{border-color:var(--danger);background:var(--danger-bg)}
-.ptbl .tot{font-family:"IBM Plex Sans",monospace;font-weight:700}
-.itot{margin-top:10px;display:flex;justify-content:flex-end;gap:24px;flex-wrap:wrap}
-.itot .r{font-size:12.5px;color:var(--muted);font-weight:600}
-.itot .r b{font-family:"IBM Plex Sans",monospace;color:var(--navy);margin-inline-start:6px}
-.itot .r.t{font-size:14px;font-weight:800;color:var(--navy)}
-.itot .r.t b{color:var(--action);font-size:16px}
-.grand{display:flex;align-items:center;justify-content:space-between;background:var(--action-dim);border:1px solid rgba(247,144,9,.3);border-radius:var(--r-md);padding:18px 20px;margin:0 0 16px}
-.grand .gk{font-size:14px;font-weight:800}
-.grand .gv{font-family:"IBM Plex Sans",monospace;font-size:24px;font-weight:800;color:var(--action)}
-.notes-field{margin-top:14px}
-.notes-field label{display:block;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
-.notes-field textarea{width:100%;min-height:64px;border:1px solid var(--border);border-radius:var(--r-md);padding:11px 13px;font:inherit;font-size:14px;color:var(--navy);outline:0;resize:vertical}
-.field{margin-bottom:14px}
-.field label{display:block;font-size:12.5px;font-weight:700;color:var(--navy-mid);margin-bottom:7px}
-.field label .reqx{color:var(--danger)}
-.field input{width:100%;height:46px;border:1px solid var(--border);border-radius:var(--r-md);padding:0 13px;font:inherit;font-size:14px;color:var(--navy);outline:0}
-.field input:focus{border-color:var(--action);box-shadow:0 0 0 3px rgba(247,144,9,.12)}
-.field.invalid input{border-color:var(--danger);background:var(--danger-bg)}
-.field .err{display:none;font-size:11.5px;color:var(--danger);font-weight:700;margin-top:6px}
-.field.invalid .err{display:block}
-.frow{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.btn{border:1px solid var(--border);background:var(--surface1);border-radius:var(--r-md);padding:11px 18px;font:inherit;font-weight:700;font-size:13.5px;color:var(--navy);display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer}
-.btn.primary{background:var(--action);border-color:var(--action);color:#fff}
-.btn.lg{font-size:15px;padding:14px 26px}
-.btn[disabled]{opacity:.6;cursor:not-allowed}
-.btn .material-icons-outlined{font-size:18px}
-.submit-err{display:flex;align-items:center;gap:8px;background:var(--danger-bg);border:1px solid rgba(217,54,42,.3);color:var(--danger);border-radius:var(--r-md);padding:11px 14px;font-size:12.5px;font-weight:700;margin-bottom:12px}
-.submit-err .material-icons-outlined{font-size:17px}
-.submit-bar .btn{width:100%}
-.submit-note{text-align:center;font-size:11.5px;color:var(--muted);margin-top:10px}
-.footer-note{text-align:center;color:var(--muted);font-size:12px;margin-top:30px}
-.pb-powered{text-align:center;color:var(--muted);font-size:11.5px;font-weight:600;padding:22px 0 28px;letter-spacing:.02em}
-.pb-powered b{color:var(--navy-mid);font-weight:800}
-.state{max-width:560px;margin:60px auto;text-align:center;background:var(--surface1);border:1px solid var(--border);border-radius:20px;padding:44px 34px}
-.state .sic{width:78px;height:78px;border-radius:50%;margin:0 auto 20px;display:flex;align-items:center;justify-content:center;background:var(--success-bg);color:var(--success)}
-.state .sic.neutral{background:var(--surface2);color:var(--muted)}
-.state .sic.err{background:var(--danger-bg);color:var(--danger)}
-.state .sic .material-icons-outlined{font-size:44px}
-.state h2{margin:0 0 9px;font-size:21px;font-weight:800}
-.state p{margin:0 auto;max-width:42ch;font-size:14px;color:var(--muted)}
-.state .recap{display:inline-flex;align-items:center;gap:8px;margin-top:18px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-full);padding:8px 16px;font-size:13px;font-weight:700;font-family:"IBM Plex Sans",monospace}
-.state .recap .material-icons-outlined{font-size:16px;color:var(--muted)}
-.state-msg{text-align:center;color:var(--muted);padding:50px}
-@media (max-width:680px){.ro-grid{grid-template-columns:1fr 1fr}}
-@media (max-width:600px){.wrap{padding:16px 14px 80px}.pubbar-in{padding:10px 14px;gap:10px}.rmeta .rname{font-size:16px}.rlogo{width:40px;height:40px}.intro h1{font-size:19px}.sec{padding:14px}.item-hd{margin:-14px -14px 12px;padding:12px 14px}.item-hd .ibadge{display:none}
-.tmtx-wrap{border:0;overflow:visible}.tmtx,.tmtx tbody{display:block;width:100%}.tmtx thead{display:none}.tmtx tr{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:10px;overflow:hidden}.tmtx td{display:block;border-bottom:1px solid var(--line);border-inline-start:1px solid var(--line);padding:11px 13px}.tmtx td:nth-child(odd){border-inline-start:0}.celllbl{display:block;font-size:10.5px;font-weight:800;text-transform:uppercase;color:var(--navy-mid);margin-bottom:5px}.cd-box{width:60px}.cd-box b{font-size:23px}.ptbl-in{width:90px}.frow{grid-template-columns:1fr}}
-`;
