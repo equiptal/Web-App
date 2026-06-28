@@ -12,6 +12,10 @@ import type { VerificationStatus } from "@/lib/contract/onboarding";
 const MapPicker = dynamic(() => import("@/components/shared/GoogleMapLocationPicker"), { ssr: false });
 
 const ACCEPT = "image/jpeg,image/png,image/webp,application/pdf";
+// Hide the company-logo uploader until apps/backend ships companyLogoKey support
+// (POST /users/me/company accepts it + profile-status returns companyLogoKey/companyLogoUrl).
+// All the wiring stays in place — flip to true once that deploy is live.
+const LOGO_UPLOAD_ENABLED = false;
 const inputCls =
   "h-[46px] w-full rounded-[10px] border border-border bg-surface px-[14px] text-[14px] outline-0 focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)]";
 const labelCls = "mb-[6px] block text-[12.5px] font-bold text-navy-mid";
@@ -352,7 +356,9 @@ export function VerificationFlow() {
           </div>
         </div>
 
-        {/* Company logo (optional) — shown at the top of the bid form suppliers see. */}
+        {/* Company logo (optional) — shown at the top of the bid form suppliers see.
+            Hidden behind LOGO_UPLOAD_ENABLED until apps/backend supports companyLogoKey. */}
+        {LOGO_UPLOAD_ENABLED && (
         <div>
           <label className={labelCls}>{L("Company logo", "شعار الشركة")} <span className="text-[11px] font-medium text-muted">— {L("optional", "اختياري")}</span></label>
           <div className="flex items-center gap-3 rounded-[10px] border border-border bg-surface px-[14px] py-3">
@@ -370,6 +376,7 @@ export function VerificationFlow() {
             {(companyLogoKey || logoPreview) && !logoBusy && <button type="button" onClick={() => { setCompanyLogoKey(null); setLogoPreview(null); }} className="flex-none rounded-lg border border-border px-3 py-1.5 text-[12.5px] font-bold text-danger">{L("Remove", "إزالة")}</button>}
           </div>
         </div>
+        )}
 
         {/* Company documents — CR, VAT, National Address are required (AC-09/10). */}
         <div className="mt-1 border-t border-border pt-[14px] text-[11px] font-bold uppercase tracking-wide text-muted">
