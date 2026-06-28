@@ -91,7 +91,7 @@ export function BidComparisonWorkspace() {
   const [costAsk, setCostAsk] = useState<{ type: "resp"; key: CostResponsibility["key"]; label: string } | { type: "mob"; bidId: string; label: string } | null>(null);
   const [costInput, setCostInput] = useState("");
   const [renterMob, setRenterMob] = useState<Record<string, number>>({}); // renter's own delivery (mob/demob) estimate per bid
-  const [docView, setDocView] = useState<{ label: string; url: string | null; loading: boolean } | null>(null); // in-app document viewer
+  const [docView, setDocView] = useState<{ label: string; url: string | null; value?: string | null; loading: boolean } | null>(null); // in-app document viewer (url = uploaded file; value = captured form text)
   // Presigned documents (company verification + equipment) per bid, fetched on demand from
   // /api/me/bids/:id/documents — drives the "green if the doc exists" chips and the in-app viewer.
   const [bidDocs, setBidDocs] = useState<Record<string, DealRoomDocuments>>({});
@@ -336,10 +336,12 @@ export function BidComparisonWorkspace() {
   /** A clickable doc chip — opens the actual file in an in-app viewer modal (no redirect). */
   const docChip = (c: BidColumn, label: string, has: boolean, hint: string) => {
     const style = has ? { background: C.successBg, color: C.success } : { background: C.dangerBg, color: C.danger };
+    // Off-platform bids captured a VALUE (CR/VAT/national text), not a file — show the value, not a doc.
+    const linkVal = c.bid.viaSharedLink ? c.bid.linkDocs?.[hint] : undefined;
     const inner = <><span className="material-icons-outlined" style={{ fontSize: 11 }}>{has ? "check" : "close"}</span>{label}{has && <span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>visibility</span>}</>;
-    return has
-      ? <button type="button" onClick={() => openDoc(c, hint, label)} title={L("View document", "عرض المستند")} className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={style}>{inner}</button>
-      : <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={style}>{inner}</span>;
+    if (!has) return <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={style}>{inner}</span>;
+    const onClick = linkVal ? () => setDocView({ label, url: null, value: linkVal, loading: false }) : () => openDoc(c, hint, label);
+    return <button type="button" onClick={onClick} title={linkVal ? L("View value", "عرض القيمة") : L("View document", "عرض المستند")} className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={style}>{inner}</button>;
   };
   const grandTotal = (c: BidColumn) => Math.round(supplierStated(c) * (1 + VAT)) + renterAddBid(c);
   const hasCost = (c: BidColumn) => supplierStated(c) > 0 || renterAddBid(c) > 0;
@@ -1213,6 +1215,13 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
             <div className="grid min-h-[60vh] flex-1 place-items-center" style={{ background: C.surface2 }}>
               {docView.loading ? (
                 <span className="material-icons-outlined animate-spin" style={{ fontSize: 30, color: C.muted }}>progress_activity</span>
+              ) : docView.value ? (
+                <div className="max-w-sm px-6 py-10 text-center">
+                  <span className="material-icons-outlined" style={{ fontSize: 34, color: C.navyMid }}>badge</span>
+                  <p className="mt-3 text-[11px] font-bold uppercase tracking-wide" style={{ color: C.muted }}>{docView.label}</p>
+                  <p className="mt-1 select-text break-words text-[18px] font-extrabold" style={{ color: C.navy }}>{docView.value}</p>
+                  <p className="mt-2 text-[12px]" style={{ color: C.muted }}>{L("Captured from the supplier's bid form — no uploaded document.", "مُلتقط من نموذج عرض المؤجّر — لا يوجد مستند مرفوع.")}</p>
+                </div>
               ) : docView.url ? (
                 <iframe src={docView.url} title={docView.label} className="h-full w-full" style={{ minHeight: "60vh", border: 0 }} />
               ) : (

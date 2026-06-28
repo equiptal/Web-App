@@ -16,6 +16,8 @@ interface BackendProfileStatus {
   nationalAddressDocKey?: string | null;
   localContentDocKey?: string | null;
   sasoHeavyEquipDocKey?: string | null;
+  companyLogoKey?: string | null;
+  companyLogoUrl?: string | null;
 }
 
 /**
@@ -42,6 +44,9 @@ export async function GET(req: Request) {
           nationalAddressDocKey: s.nationalAddressDocKey ?? null,
           localContentDocKey: s.localContentDocKey ?? null,
           sasoHeavyEquipDocKey: s.sasoHeavyEquipDocKey ?? null,
+          // Logo: the key (to re-submit unchanged) + a presigned URL (to show the existing one).
+          companyLogoKey: s.companyLogoKey ?? null,
+          companyLogoUrl: s.companyLogoUrl ?? null,
         },
       });
     } catch (err) {

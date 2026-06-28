@@ -356,6 +356,8 @@ export const en = {
   preview: {
     title: "Review and send",
     subtitle: "Here's your full request. Send it once and every supplier can bid — you'll get one quotation covering all items.",
+    shareTeaserTitle: "Invite suppliers you already know",
+    shareTeaserBody: "Once you send this, you'll get a shareable link to invite suppliers to bid — even ones off Moedatech. Their bids land right here for you to compare.",
     post: "Post request",
     send: "Send request",
     edit: "Edit",

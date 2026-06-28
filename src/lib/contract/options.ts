@@ -18,7 +18,10 @@ export const SAFETY_CERTIFICATES: SafetyCertificate[] = ["tuv", "spsp", "saso-te
 export const OPERATOR_CERTIFICATES: SafetyCertificate[] = ["tuv", "spsp", "saso-technical"];
 
 export type OtherCertificate = "local-content" | "saso-registration"; // AC-50
-export const OTHER_CERTIFICATES: OtherCertificate[] = ["local-content", "saso-registration"];
+// `saso-registration` is intentionally NOT offered: request-level requiredCerts was removed in the
+// terms-field cleanup (terms-journey doc), so the backend drops it. Only local-content (its own boolean
+// column) is a live request term. The type keeps the value for back-compat with existing adapters.
+export const OTHER_CERTIFICATES: OtherCertificate[] = ["local-content"];
 
 /** me / supplier — delivery, return, fuel responsibility (AC-25/26). */
 export type Party = "me" | "supplier";

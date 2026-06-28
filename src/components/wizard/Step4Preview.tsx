@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
-import { useT, fmt } from "@/lib/i18n";
+import { useState, useEffect, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useT, fmt, useLocale } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { useSession } from "@/lib/session";
 import { Button, Icon } from "@/components/ui";
@@ -11,10 +12,18 @@ import { postableItems } from "@/lib/contract";
 
 export function Step4Preview() {
   const t = useT();
+  const { locale } = useLocale();
+  const ar = locale === "ar";
+  const L = (e: string, a: string) => (ar ? a : e);
+  const router = useRouter();
   const { state, actions } = useRfq();
   const { tier } = useSession();
   const [showAccount, setShowAccount] = useState(false);
   const { draft, taxonomy, busy, error, errorDetail } = state;
+  // Basic-account request cap (backend E8009 / 403) — surfaced as a verify popup, not inline red text.
+  const isLimit = errorDetail?.backendCode === "E8009";
+  const [showLimit, setShowLimit] = useState(false);
+  useEffect(() => { if (error && isLimit) setShowLimit(true); }, [error, isLimit]);
   if (!draft) return null;
 
   // Guests run the whole flow; the account gate lands here. Guest → account popup, then auto-post.
@@ -144,7 +153,7 @@ export function Step4Preview() {
         />
       </RC>
 
-      {error && (
+      {error && !isLimit && (
         <div className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">
           <p>{t.errors.networkBody}</p>
           {(errorDetail?.detail || errorDetail?.backendCode || errorDetail?.backendStatus) && (
@@ -156,6 +165,15 @@ export function Step4Preview() {
           )}
         </div>
       )}
+
+      {/* web-app/006 — nudge: a shareable bid link comes after submit (encourages sending). */}
+      <div className="flex items-start gap-2.5 rounded-xl border border-info/30 bg-info-soft/40 px-[18px] py-3">
+        <Icon name="ios_share" size={18} className="mt-0.5 flex-none text-info" />
+        <div className="text-[13px] leading-relaxed text-navy">
+          <b className="font-bold">{t.preview.shareTeaserTitle}</b>
+          <span className="text-navy-mid"> — {t.preview.shareTeaserBody}</span>
+        </div>
+      </div>
 
       {/* AC-42/43: send one broadcast covering all items. Rental basis is required to submit. */}
       <div className="flex flex-col items-end gap-1.5">
@@ -173,6 +191,37 @@ export function Step4Preview() {
           void actions.submit(); // account created (now basic) → post the request
         }}
       />
+
+      {/* Basic-account request cap (backend E8009) — verify popup instead of an inline error. */}
+      {showLimit && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 sm:items-center" dir={ar ? "rtl" : "ltr"} onClick={(e) => e.target === e.currentTarget && setShowLimit(false)}>
+          <div className="w-full max-w-[440px] rounded-t-2xl bg-surface p-5 shadow-xl sm:rounded-2xl">
+            <div className="flex items-start gap-3">
+              <span className="grid h-11 w-11 flex-none place-items-center rounded-full bg-warn-soft text-warn">
+                <Icon name="verified_user" size={24} />
+              </span>
+              <div className="flex-1">
+                <h3 className="text-[17px] font-extrabold text-navy">{L("Request limit reached", "بلغت الحد الأقصى للطلبات")}</h3>
+                <p className="mt-1.5 text-[13.5px] leading-relaxed text-muted">
+                  {L(
+                    "Basic accounts can post a limited number of requests. Get verified to post unlimited requests and unlock the full marketplace.",
+                    "تستطيع الحسابات الأساسية إرسال عدد محدود من الطلبات. وثّق حسابك لإرسال طلبات غير محدودة والاستفادة من المنصة بالكامل.",
+                  )}
+                </p>
+              </div>
+              <button onClick={() => setShowLimit(false)} className="grid h-8 w-8 flex-none place-items-center rounded-full text-muted hover:bg-surface2"><Icon name="close" size={18} /></button>
+            </div>
+            <div className="mt-5 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+              <button onClick={() => setShowLimit(false)} className="rounded-[10px] border border-border bg-surface px-4 py-2.5 text-[13.5px] font-bold text-navy-mid transition hover:bg-surface2">
+                {L("Not now", "ليس الآن")}
+              </button>
+              <button onClick={() => { setShowLimit(false); router.push("/verify"); }} className="inline-flex items-center justify-center gap-1.5 rounded-[10px] bg-brand px-5 py-2.5 text-[13.5px] font-bold text-white">
+                <Icon name="verified_user" size={17} /> {L("Get verified", "وثّق حسابك")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

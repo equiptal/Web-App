@@ -36,7 +36,21 @@ export function SharedLinkBidCard({
   categoryId?: string | null;
 }) {
   const [termsOpen, setTermsOpen] = useState(false);
+  const [priceOpen, setPriceOpen] = useState(false);
   const units = bid.numberOfUnits || 1;
+  // App-style price breakdown (rate × qty + delivery×qty + return×qty → subtotal + 15% VAT → item total).
+  const rate = bid.price ?? 0, del = bid.mobPrice ?? 0, ret = bid.demobPrice ?? 0;
+  const subtotal = (rate + del + ret) * units;
+  const vat = Math.round(subtotal * 0.15);
+  const total = bid.quotedTotal ?? Math.round(subtotal * 1.15);
+  const periodOf = (u: string | null) => {
+    switch ((u ?? "PER_DAY").toUpperCase()) {
+      case "PER_WEEK": return L("week", "أسبوع");
+      case "PER_MONTH": return L("month", "شهر");
+      case "PER_JOB": return L("job", "مهمة");
+      default: return L("day", "يوم");
+    }
+  };
   const eq = bid.equipment;
   const eqLine = eq ? [eq.make, eq.model, eq.year].filter(Boolean).join(" · ") : null;
   const title = itemLabel || eqLine || L("Equipment", "المعدة");
@@ -94,13 +108,22 @@ export function SharedLinkBidCard({
         </button>
         {termsOpen && <TermsPanel terms={bid.terms} ar={ar} L={L} />}
 
-        {/* quoted total — flat (incl VAT), not a rate breakdown */}
-        <div className="slb-row">
-          <div className="slb-left">
-            <div className="slb-lbl">{L("Quoted total", "الإجمالي المُسعّر")}</div>
-            <div className="slb-sub">{L("incl 15% VAT · per-item", "شامل ١٥٪ ضريبة · لكل صنف")}</div>
+        {/* price — app-style breakdown (tap to expand): rate × qty · delivery · return · subtotal · VAT · total */}
+        <div className={`price-row${priceOpen ? " open" : ""}`}>
+          <div className="price-collapsed" onClick={() => setPriceOpen((o) => !o)}>
+            <span className="pl">{L("Quoted total", "الإجمالي المُسعّر")}</span>
+            <span className="pr">{L("SAR", "ر.س")} {nf(total)}<span className="material-icons-outlined chev">expand_more</span></span>
           </div>
-          <div className="slb-total">{L("SAR", "ر.س")} {nf(bid.quotedTotal ?? 0)}</div>
+          {priceOpen && (
+            <div className="price-body">
+              <div className="prow"><span className="pl2">{L("Rental", "الإيجار")} ({nf(rate)} {L("SAR", "ر.س")}/{periodOf(bid.priceUnit)}{units > 1 ? ` × ${units}` : ""})</span><span className="pv">{nf(rate * units)}</span></div>
+              {del > 0 && <div className="prow"><span className="pl2">{L("Delivery to site", "النقل إلى الموقع")}{units > 1 ? ` × ${units}` : ""}</span><span className="pv">{nf(del * units)}</span></div>}
+              {ret > 0 && <div className="prow"><span className="pl2">{L("Return from site", "النقل من الموقع")}{units > 1 ? ` × ${units}` : ""}</span><span className="pv">{nf(ret * units)}</span></div>}
+              <div className="prow"><span className="pl2">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="pv">{nf(subtotal)}</span></div>
+              <div className="prow"><span className="pl2">{L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)")}</span><span className="pv">{nf(vat)}</span></div>
+              <div className="grandcard"><span className="gl">{L("Item total", "إجمالي البند")}</span><span className="gv">{nf(total)} {L("SAR", "ر.س")}</span></div>
+            </div>
+          )}
         </div>
 
         {/* foot */}

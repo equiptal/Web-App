@@ -40,18 +40,26 @@ export function SharedBidSubmissionModal({
   const sar = L("SAR", "ر.س");
   const TERMS: { key: keyof NonNullable<LinkBidSubmission["items"][number]["confirmations"]>; en: string; ar: string }[] = [
     { key: "operator", en: "Operator", ar: "المشغّل" },
-    { key: "fat", en: "F.A.T", ar: "الإعاشة والسكن" },
+    { key: "nationality", en: "Operator nationality", ar: "جنسية المشغّل" },
+    { key: "fatFood", en: "Food (F.A.T)", ar: "الطعام" },
+    { key: "fatTransport", en: "Accommodation & transport", ar: "السكن والمواصلات" },
     { key: "fuel", en: "Fuel responsibility", ar: "مسؤولية الوقود" },
+    { key: "fuelType", en: "Fuel type", ar: "نوع الوقود" },
     { key: "year", en: "Equipment year", ar: "سنة الصنع" },
     { key: "operatorCert", en: "Operator certificate", ar: "شهادة المشغّل" },
     { key: "equipmentCert", en: "Equipment certificate", ar: "شهادة المعدة" },
+    { key: "payment", en: "Payment type", ar: "نوع الدفع" },
+    { key: "overtime", en: "Overtime rate", ar: "أجر العمل الإضافي" },
+    { key: "breakdownSla", en: "Breakdown response", ar: "زمن الاستجابة للأعطال" },
+    { key: "maintenance", en: "Maintenance", ar: "الصيانة" },
   ];
 
-  const row = (label: string, value: string | null | undefined) =>
+  // Company-details grid cell (matches the prototype's company-grid). `full` spans both columns.
+  const cd = (label: string, value: string | null | undefined, mono = false, full = false) =>
     value ? (
-      <div className="flex items-start justify-between gap-3 py-1.5">
-        <span className="text-[12.5px] text-slate-500">{label}</span>
-        <span className="text-end text-[13px] font-semibold text-slate-800">{value}</span>
+      <div className={full ? "col-span-2" : ""}>
+        <div className="text-[11px] text-slate-400">{label}</div>
+        <div className={`text-[13px] font-semibold text-slate-800${mono ? " font-mono" : ""}`}>{value}</div>
       </div>
     ) : null;
 
@@ -74,55 +82,75 @@ export function SharedBidSubmissionModal({
           {L("Submitted bid — exactly what the supplier submitted", "العرض المُقدَّم — تمامًا كما أرسله المؤجّر")}
         </div>
 
-        <div style={{ maxHeight: "62vh", overflowY: "auto", padding: "12px 16px" }}>
+        <div style={{ maxHeight: "66vh", overflowY: "auto", padding: "14px 16px" }}>
           {!submission ? (
             <p className="py-8 text-center text-[13px] text-slate-500">{L("Submission details aren't available.", "تفاصيل العرض غير متاحة.")}</p>
           ) : (
             <>
-              {/* Company details */}
-              <div className="rounded-xl border border-slate-200 p-3.5">
-                <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">{L("Company", "الشركة")}</p>
-                {row(L("Company name", "اسم الشركة"), submission.companyName)}
-                {row(L("CR number", "رقم السجل التجاري"), submission.crNumber)}
-                {row(L("VAT number", "الرقم الضريبي"), submission.vatNumber)}
-                {row(L("National address", "العنوان الوطني"), submission.nationalAddress)}
-                {row(L("Contact", "التواصل"), submission.contactInfo)}
-                {row(L("Notes", "ملاحظات"), submission.notes)}
+              {/* Company details — grid (matches the prototype) */}
+              <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400"><span className="material-icons-outlined" style={{ fontSize: 15 }}>business</span>{L("Company details (captured with the bid)", "بيانات الشركة (مُلتقطة مع العرض)")}</div>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 rounded-xl border border-slate-200 p-3.5">
+                {cd(L("Company", "الشركة"), submission.companyName)}
+                {cd(L("Contact", "التواصل"), submission.contactInfo)}
+                {cd(L("CR number", "رقم السجل التجاري"), submission.crNumber, true)}
+                {cd(L("VAT number", "الرقم الضريبي"), submission.vatNumber, true)}
+                {cd(L("National address", "العنوان الوطني"), submission.nationalAddress, false, true)}
+                {submission.notes ? cd(L("Notes", "ملاحظات"), submission.notes, false, true) : null}
               </div>
 
-              {/* Per-item answers */}
+              {/* Pricing — per-item table (matches the prototype) */}
+              <div className="mb-1.5 mt-4 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400"><span className="material-icons-outlined" style={{ fontSize: 15 }}>request_quote</span>{L("Pricing — per item", "التسعير — لكل صنف")}</div>
+              <div className="overflow-x-auto rounded-xl border border-slate-200">
+                <table className="w-full border-collapse text-[12.5px]">
+                  <thead><tr className="bg-slate-50 text-[10.5px] font-bold uppercase tracking-wide text-slate-400">
+                    <th className="p-2.5 text-start">{L("Item", "الصنف")}</th>
+                    <th className="p-2.5 text-end">{L("Rate × qty", "السعر × العدد")}</th>
+                    <th className="p-2.5 text-end">{L("Delivery/return", "توصيل/إرجاع")}</th>
+                    <th className="p-2.5 text-end">{L("Item total", "إجمالي الصنف")}</th>
+                  </tr></thead>
+                  <tbody>
+                    {submission.items.map((it, i) => {
+                      const units = it.numberOfUnits || 1;
+                      const rq = (it.rentalRate ?? 0) * units;
+                      const dr = ((it.deliveryPrice ?? 0) + (it.returnPrice ?? 0)) * units;
+                      const tot = it.total ?? Math.round(((it.rentalRate ?? 0) + (it.deliveryPrice ?? 0) + (it.returnPrice ?? 0)) * units * 1.15);
+                      const priced = (it.rentalRate ?? 0) > 0;
+                      return (
+                        <tr key={it.requestItemId || i} className="border-t border-slate-100">
+                          <td className="p-2.5 font-semibold text-slate-800">{it.label || L("Equipment", "المعدة")}{units > 1 ? ` ×${units}` : ""}</td>
+                          <td className="p-2.5 text-end font-mono">{priced ? nf(rq) : "—"}</td>
+                          <td className="p-2.5 text-end font-mono">{dr ? nf(dr) : "—"}</td>
+                          <td className="p-2.5 text-end font-mono font-bold text-slate-800">{priced ? nf(tot) : L("not quoted", "غير مُسعّر")}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot><tr className="border-t border-slate-200 bg-slate-50 text-[12.5px] font-bold text-slate-800">
+                    <td className="p-2.5" colSpan={3}>{L("Grand total (incl 15% VAT)", "الإجمالي (شامل ١٥٪ ضريبة)")}</td>
+                    <td className="p-2.5 text-end font-mono">{sar} {nf(submission.grandTotal ?? 0)}</td>
+                  </tr></tfoot>
+                </table>
+              </div>
+
+              {/* Terms — per-item answers (green = met, red = declined) */}
               {submission.items.map((it, i) => {
-                const units = it.numberOfUnits || 1;
-                const total = it.total ?? (it.rentalRate ?? 0) * units + (it.deliveryPrice ?? 0) + (it.returnPrice ?? 0);
                 const c = it.confirmations ?? {};
                 const shown = TERMS.filter((t) => c[t.key] != null);
+                if (!shown.length) return null;
                 return (
-                  <div key={it.requestItemId || i} className="mt-3 rounded-xl border border-slate-200 p-3.5">
-                    <p className="mb-1.5 text-[13px] font-bold text-slate-800">{it.label || L("Equipment", "المعدة")}{units > 1 && <span className="ms-1.5 text-[11px] font-semibold text-slate-400">× {units}</span>}</p>
-                    {shown.length > 0 && (
-                      <div className="mb-2 flex flex-wrap gap-1.5">
-                        {shown.map((t) => (
-                          <span key={t.key} className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[11px] font-bold"
-                            style={c[t.key] ? { background: "#dcfce7", color: "#16a34a" } : { background: "#ffe4e6", color: "#e11d48" }}>
-                            <span className="material-icons-outlined" style={{ fontSize: 12 }}>{c[t.key] ? "check" : "close"}</span>{ar ? t.ar : t.en}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    {row(`${L("Rental rate", "سعر الإيجار")}${it.priceUnit ? ` (${it.priceUnit})` : ""}`, it.rentalRate != null ? `${sar} ${nf(it.rentalRate)}` : null)}
-                    {row(L("Delivery to site", "النقل إلى الموقع"), it.deliveryPrice ? `${sar} ${nf(it.deliveryPrice)}` : null)}
-                    {row(L("Return from site", "النقل من الموقع"), it.returnPrice ? `${sar} ${nf(it.returnPrice)}` : null)}
-                    <div className="mt-1 flex justify-between border-t border-slate-100 pt-1.5 text-[13px] font-bold text-slate-800"><span>{L("Item total", "إجمالي البند")}</span><span>{sar} {nf(total)}</span></div>
+                  <div key={`t-${it.requestItemId || i}`} className="mt-4">
+                    <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">{(it.label || L("Equipment", "المعدة"))} — {L("terms", "الشروط")}</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {shown.map((t) => (
+                        <span key={t.key} className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[11px] font-bold"
+                          style={c[t.key] ? { background: "#dcfce7", color: "#16a34a" } : { background: "#ffe4e6", color: "#e11d48" }}>
+                          <span className="material-icons-outlined" style={{ fontSize: 12 }}>{c[t.key] ? "check" : "close"}</span>{ar ? t.ar : t.en}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 );
               })}
-
-              {submission.grandTotal != null && (
-                <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-900 px-4 py-3 text-white">
-                  <span className="text-[12.5px] font-semibold opacity-80">{L("Quoted total", "الإجمالي المُسعّر")}</span>
-                  <span className="font-mono text-[16px] font-extrabold">{sar} {nf(submission.grandTotal)}</span>
-                </div>
-              )}
             </>
           )}
         </div>

@@ -11,9 +11,27 @@ check this file http://moedatech-api-docs.s3-website.eu-central-1.amazonaws.com/
 
 sharable link same as spec 006 of web app but with expanded scope :
 1- after request submission a unique link per request will be created and able to shared or copied , the link must contain the renter name if possible , 
-for this part follow this prorotype: 
+for this part follow this prototype: 
+
 2- then the link submission will open the supplier bid form that have fields to fill and submit the bid so here we will store and collect these bid submissions in a new table with the fields of the form and user info, no write to existing tables in this step it is indepenent bid storage
-for this part follow this prorotype:
-3- then in my bids view cards the bids submitted from the form will appear here as well with the current app bids but with a label to indicate its source . also a filter will be avaialble for filtering 
+for this part follow this prototype:
+
+3- then in my bids view cards the bids submitted from the form will appear here as well with the current app bids but with a label to indicate its source . also a filter will be avaialble for filtering the bids 
+for this part follow this prototype: 
+
+4- clicking view submission on the bid card will open the answers of the submissions of that supplier just as view 
+for this part follow this prototype:
+
+5- for the request header in my bids show the tracking part of the link 
+for this part follow this prototype 
+
+5- in the bid comparison table supplier will be able to select and compare between these submitted bids from the link with in app bids or any others so check each field in the table if it can be got from the form or not and vica versa if the submissions has some fields to compare but didnt appear in the compairson table also we'll review it
+for this part follow this prototype 
 
 
+
+--- 
+operator cert
+equipment cert 
+if none confirmed in deal room then show "need supplier confirmation in deal room "
+otherwize their values are reflected from deal room + cert endpoint for rendering

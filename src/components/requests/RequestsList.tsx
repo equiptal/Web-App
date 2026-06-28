@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
-import { fetchMyRequests, fetchRequestSubmissions, bidShareUrl } from "@/lib/api/client";
+import { fetchMyRequests, fetchRequestSubmissions, bidShareUrl, setBidDeadline, setShareLinkLogo } from "@/lib/api/client";
 import { groupRequests, pinAirportFirst, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
 import { GroupBids } from "@/components/requests/GroupBids";
+import { ShareForBidsSheet } from "@/components/requests/ShareForBidsSheet";
 import { EquipImg } from "@/components/requests/EquipImg";
 import "@/components/requests/requests-proto.css";
 
@@ -46,6 +47,9 @@ export function RequestsList() {
   // web-app/006 — off-platform shared-link bids per group (keyed by group id). Fetched up front so My
   // Bids lists a group whose ONLY bid came through the link (those don't count toward on-platform totalBids).
   const [linkBids, setLinkBids] = useState<Record<string, number>>({});
+  // Off-platform bid count per individual request (requestId → count) so a request card's "N bids"
+  // includes shared-link bids, not just on-platform ones.
+  const [linkByRequest, setLinkByRequest] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "bids") setSeg("bids");
@@ -70,14 +74,20 @@ export function RequestsList() {
     Promise.all(
       targets.map((g) =>
         fetchRequestSubmissions(g.id)
-          .then((r) => [g.id, r.submittedCount] as const)
-          .catch(() => [g.id, 0] as const),
+          .then((r) => ({ gid: g.id, count: r.submittedCount, subs: r.submissions }))
+          .catch(() => ({ gid: g.id, count: 0, subs: [] })),
       ),
-    ).then((pairs) => {
+    ).then((res) => {
       if (!active) return;
-      const map: Record<string, number> = {};
-      for (const [id, n] of pairs) if (n > 0) map[id] = n;
-      setLinkBids(map);
+      const gmap: Record<string, number> = {};
+      const rmap: Record<string, number> = {};
+      for (const { gid, count, subs } of res) {
+        if (count > 0) gmap[gid] = count;
+        // Each submission item carries its parent requestId → count submissions covering that request.
+        for (const s of subs) for (const it of s.items) if (it.requestId) rmap[it.requestId] = (rmap[it.requestId] ?? 0) + 1;
+      }
+      setLinkBids(gmap);
+      setLinkByRequest(rmap);
     });
     return () => { active = false; };
   }, [items]);
@@ -149,7 +159,7 @@ export function RequestsList() {
                         <div className="rq-grid">
                           <div className="rq-cell"><span className="ci"><span className="material-icons-outlined">schedule</span></span><span className="tx">{r.rentalType ?? "—"}</span></div>
                           <div className="rq-cell"><span className="ci"><span className="material-icons-outlined">calendar_today</span></span><span className="tx">{r.durationDays ? `${r.durationDays} ${L("days", "يوم")}` : fmtDate(r.startDate, ar)}</span></div>
-                          <div className="rq-cell bids"><span className="ci"><span className="material-icons-outlined">gavel</span></span><span className="tx"><b>{r.bidCount}</b> {L("bids", "عروض")}</span></div>
+                          <div className="rq-cell bids"><span className="ci"><span className="material-icons-outlined">gavel</span></span><span className="tx"><b>{r.bidCount + (linkByRequest[r.id] ?? 0)}</b> {L("bids", "عروض")}</span></div>
                           <div className="rq-cell"><span className="ci"><span className="material-icons-outlined">{asap ? "flash_on" : "inventory_2"}</span></span><span className="tx">{r.displayId}</span></div>
                         </div>
                       </div>
@@ -209,8 +219,16 @@ export function GroupStrip({ group, ar, L, router }: { group: RequestGroup; ar: 
   const leadName = lead ? `${leadBase} · ${lead.qty} ${lead.qty === 1 ? L("unit", "وحدة") : L("units", "وحدات")}` : leadBase;
   const more = group.items.length - 1;
   // web-app/006 — shared-link tracker for this group (copy link + opened/submitted, keyed by group id).
-  const [link, setLink] = useState<{ openedCount: number; submittedCount: number; renterName: string | null; bidDeadline: string | null } | null>(null);
+  const [link, setLink] = useState<{ openedCount: number; submittedCount: number; renterName: string | null; bidDeadline: string | null; logoUrl: string | null } | null>(null);
   const [copied, setCopied] = useState(false);
+  // Share + deadline both happen in the shared sheet (same UI as the post-submit confirmation).
+  const [shareOpen, setShareOpen] = useState(false);
+  const saveDeadline = (iso: string | null) => {
+    setBidDeadline(group.id, iso).then(() => setLink((p) => (p ? { ...p, bidDeadline: iso } : p))).catch(() => {});
+  };
+  const saveLogo = (url: string | null) => {
+    setShareLinkLogo(group.id, url).then(() => setLink((p) => (p ? { ...p, logoUrl: url } : p))).catch(() => {});
+  };
   useEffect(() => {
     let active = true;
     fetchRequestSubmissions(group.id).then((r) => active && setLink(r)).catch(() => {});
@@ -240,18 +258,41 @@ export function GroupStrip({ group, ar, L, router }: { group: RequestGroup; ar: 
           <span className="gx-bids"><span className="material-icons-outlined">gavel</span>{group.totalBids + (link?.submittedCount ?? 0)} {L("bids", "عروض")}</span>
         </div>
       </div>
-      {/* shared-link tracker — copy the per-group link + see opened/submitted (off-platform bids) */}
+      {/* shared-link tracker — opened/submitted + deadline status, with Share · Copy · Set-deadline inline */}
       {isBroadcast && (
         <div className="gx-track">
           <span className="material-icons-outlined gx-tk-ic">link</span>
           <span className="rt-lbl">{L("Shared link", "الرابط المشترك")}</span>
           <span className="rt-stat"><span className="material-icons-outlined">visibility</span><b>{link?.openedCount ?? 0}</b> {L("opened", "فتحة")}</span>
           <span className="rt-stat sub"><span className="material-icons-outlined">gavel</span><b>{link?.submittedCount ?? 0}</b> {L("submitted", "عرض")}</span>
-          <button className="rt-copy" onClick={copyLink}>
-            <span className="material-icons-outlined">{copied ? "check" : "content_copy"}</span>{copied ? L("Copied", "تم النسخ") : L("Copy link", "نسخ الرابط")}
-          </button>
+          <span className="rt-stat"><span className="material-icons-outlined">schedule</span>{link?.bidDeadline
+            ? new Date(link.bidDeadline).toLocaleString(ar ? "ar-SA" : "en-GB", { dateStyle: "medium", timeStyle: "short" })
+            : L("No deadline", "بدون موعد")}</span>
+          <span className="gx-acts">
+            <button className="rt-share" onClick={() => setShareOpen(true)}>
+              <span className="material-icons-outlined">ios_share</span>{L("Share", "مشاركة")}
+            </button>
+            <button className="rt-copy" onClick={copyLink}>
+              <span className="material-icons-outlined">{copied ? "check" : "content_copy"}</span>{copied ? L("Copied", "تم النسخ") : L("Copy link", "نسخ الرابط")}
+            </button>
+            <button className="rt-copy" onClick={() => setShareOpen(true)}>
+              <span className="material-icons-outlined">tune</span>{L("Edit", "تعديل")}
+            </button>
+          </span>
         </div>
       )}
+      <ShareForBidsSheet
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        shareUrl={shareUrl}
+        renterName={link?.renterName}
+        deadline={link?.bidDeadline ?? null}
+        onSaveDeadline={saveDeadline}
+        logoUrl={link?.logoUrl ?? null}
+        onSaveLogo={saveLogo}
+        ar={ar}
+        L={L}
+      />
     </div>
   );
 }

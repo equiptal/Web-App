@@ -37,7 +37,10 @@ export function TermsPanel({
           const st = STATE[r.state];
           return (
             <div key={r.key} className="tp-row">
-              <span className="tp-lab">{ar ? r.labelAr : r.labelEn}</span>
+              <span className="tp-lab">
+                {ar ? r.labelAr : r.labelEn}
+                {r.state === "conflict" && r.detail && <span className="tp-detail">· {ar ? r.detail.ar : r.detail.en}</span>}
+              </span>
               <span className={`tp-state ${st.cls}`}>
                 <span className="material-icons-outlined">{st.icon}</span>
                 {ar ? st.ar : st.en}
@@ -52,7 +55,7 @@ export function TermsPanel({
     <div className="terms-panel row-sep">
       {bucket(L("Equipment terms", "شروط المعدة"), terms.equipment)}
       {bucket(L("Project terms", "شروط المشروع"), terms.contract)}
-      {bucket(L("Supplier documents", "مستندات المؤجّر"), terms.supplier)}
+      {bucket(L("Documents", "المستندات"), terms.supplier)}
     </div>
   );
 }

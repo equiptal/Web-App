@@ -171,6 +171,9 @@ export interface BidCard {
   submissionKey?: string;
   /** "submitted N days ago" for the link-bid card (avoids non-deterministic date math). */
   agoDays?: number;
+  /** Off-platform bids capture company-doc VALUES (not files) — keyed by the comparison's doc hint
+   *  ("commercial"/"vat"/"national"). The comparison shows the value instead of opening a document. */
+  linkDocs?: Record<string, string> | null;
 }
 
 /** A Terms-modal row state: green (matches RFQ) / red (conflicts) / grey (unverified or undeclared). */
@@ -185,6 +188,8 @@ export interface TermRow {
   labelEn: string;
   labelAr: string;
   state: TermState;
+  /** Optional one-line explainer shown under the term (e.g. the supplier's answer vs the renter's request). */
+  detail?: { en: string; ar: string };
 }
 
 const n = (v: unknown): number | null => {
@@ -231,16 +236,18 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
   const heldSet = new Set(heldCertCodes);
   const certs: TermState = requiredCerts.length === 0 ? "grey" : requiredCerts.every((c) => heldSet.has(c)) ? "matched" : "conflict";
 
-  const maxAge = n(reqItem.maxEquipmentAge);
+  // The column holds a MINIMUM MANUFACTURE YEAR (e.g. 2018), not an age — match by comparing years
+  // directly (terms-journey doc). Read `minimumEquipmentYear` (the renamed/exposed field); fall back to
+  // the legacy `maxEquipmentAge` key only for old payloads. Conflict = bid older than the minimum year.
+  const minYear = n(reqItem.minimumEquipmentYear) ?? n(reqItem.maxEquipmentAge);
   const bidYear = n(eq.year) ?? 0;
-  const year: TermState = maxAge == null || bidYear === 0 ? "grey" : unverified ? "grey" : new Date().getFullYear() - bidYear > maxAge ? "conflict" : "matched";
+  const year: TermState = minYear == null || bidYear === 0 ? "grey" : unverified ? "grey" : bidYear < minYear ? "conflict" : "matched";
 
   const reqFuel = s(reqItem.fuelTypePreference)?.toUpperCase();
   const bidFuel = s(eq.fuelType)?.toUpperCase();
   const fuel: TermState = !reqFuel || !bidFuel ? "grey" : unverified ? "grey" : reqFuel === bidFuel ? "matched" : "conflict";
 
   const contractState = (key: string, reqVal: string | null): TermState => (!reqVal ? "grey" : deviationKeys.has(key) ? "conflict" : "matched");
-  const t3 = (raw.t3Declarations ?? {}) as Record<string, unknown>;
 
   // Operator (spec 128). operator_included is an ACKNOWLEDGE term (matched, or conflict only when the
   // RFQ needs an operator the bid omits); operator_nationality is its own CONFLICT_ELIGIBLE term.
@@ -252,20 +259,28 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
     : null;
 
   // FAT split + fuel responsibility — request prefs map to supplier/rentee (term-matching.ts parity).
-  // fat_food / fat_accommodation_transport are CONFLICT_ELIGIBLE; fuel_responsibility is B2/ACKNOWLEDGE
-  // (pre-resolved at bid), so it only ever reads matched/grey — never conflict or negotiating.
+  // fat_food / fat_accommodation_transport AND fuel_responsibility are all CONFLICT_ELIGIBLE / Negotiable
+  // (terms-journey doc + CONFLICT_ELIGIBLE_KEYS): the supplier declares them and they can dispute.
   const toResp = (camel: string, snake: string): string | null => { const v = reqItem[camel] ?? reqItem[snake]; return v === true ? "supplier" : v === false ? "rentee" : null; };
   const fatFood = toResp("fatFood", "fat_food");
   const fatAccom = toResp("fatAccommodationTransport", "fat_accommodation_transport");
   const fuelResp = toResp("dieselIncluded", "diesel_included");
 
+  // maintenance_responsibility is ACKNOWLEDGE → fixed (terms-journey doc; NOT in CONFLICT_ELIGIBLE_KEYS):
+  // the supplier accepts it by bidding, it never disputes. Matched once the rentee set it, else grey.
   const reqMaint = s(req.maintenanceResponsibility)?.toLowerCase();
-  const bidMaint = s(t3.maintenance_responsibility)?.toLowerCase();
-  const maintenance: TermState = !reqMaint ? "grey" : !bidMaint ? "grey" : reqMaint === bidMaint ? "matched" : "conflict";
+  const maintenance: TermState = !reqMaint ? "grey" : "matched";
 
   // Single "operator" row for the BID CARD's equipment bucket (mobile app parity): conflict on a
   // nationality deviation or when the RFQ needs an operator the bid omits; matched when included.
   const operator: TermState = !reqOperator ? "grey" : deviationKeys.has("operator_nationality") || !bidOperator ? "conflict" : "matched";
+
+  // operator_certification & safety_certifications — CONFLICT_ELIGIBLE / Negotiable in the app
+  // (term-matching.ts: "Moved Acknowledge → Negotiable"). They live in the comparison's negotiable
+  // set ONLY (never the bid card), so deal-room agreements overlay them live via overlayLocked().
+  const reqOpCert = s(reqItem.operatorLicenseLevel) ?? s(req.operatorLicenseLevel);
+  const operatorCertState: TermState = !reqOpCert ? "grey" : deviationKeys.has("operator_certification") ? "conflict" : "matched";
+  const safetyCertState: TermState = requiredCerts.length === 0 ? "grey" : deviationKeys.has("safety_certifications") ? "conflict" : certs;
 
   // Project rows reused by both the bid-card "Project" bucket and the comparison's negotiable set.
   const rPayment: TermRow = { key: "payment_terms", labelEn: "Payment terms", labelAr: "شروط الدفع", state: contractState("payment_terms", s(req.paymentTerms)) };
@@ -291,9 +306,11 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
     negotiable: [
       { key: "operator_included", labelEn: "Operator included", labelAr: "تشمل مشغّل", state: operatorIncluded },
       { key: "operator_nationality", labelEn: "Operator nationality", labelAr: "جنسية المشغّل", state: contractState("operator_nationality", opNat) },
+      { key: "operator_certification", labelEn: "Operator certification", labelAr: "شهادة المشغّل", state: operatorCertState },
+      { key: "safety_certifications", labelEn: "Equipment safety certificates", labelAr: "شهادات سلامة المعدة", state: safetyCertState },
       { key: "fat_food", labelEn: "Operator FAT — Food", labelAr: "الإعاشة (F.A.T) — الطعام", state: contractState("fat_food", fatFood) },
       { key: "fat_accommodation_transport", labelEn: "Operator FAT — Accommodation/Transport", labelAr: "الإعاشة (F.A.T) — الإقامة/النقل", state: contractState("fat_accommodation_transport", fatAccom) },
-      { key: "fuel_responsibility", labelEn: "Fuel responsibility", labelAr: "مسؤولية الوقود", state: fuelResp ? "matched" : "grey" },
+      { key: "fuel_responsibility", labelEn: "Fuel responsibility", labelAr: "مسؤولية الوقود", state: contractState("fuel_responsibility", fuelResp) },
       rPayment, rSla, rOvertime, rMaint,
       { key: "mobilization_pricing", labelEn: "Mobilization pricing", labelAr: "تسعير النقل", state: "grey" },
       { key: "demobilization_pricing", labelEn: "Demobilization pricing", labelAr: "تسعير الإرجاع", state: "grey" },

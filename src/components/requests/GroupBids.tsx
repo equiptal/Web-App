@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/client";
@@ -206,9 +206,32 @@ export function GroupBids({ group }: { group: RequestGroup }) {
       return next;
     });
 
+  // An off-platform submission is stored once per GROUP but covers several items. Show ONE card per
+  // item (parity with on-platform bids) — scoped to that item's terms + price + total, matched to its
+  // request so we can show the real equipment icon/image. Memoized so goCompare can include them too.
+  const subCards: GroupBid[] = useMemo(
+    () =>
+      submissions.flatMap((s) =>
+        s.items.map((it): GroupBid => {
+          const gi = group.items.find((g) => g.id === it.requestId);
+          return {
+            ...submissionToBidCard(s, it),
+            id: `link-${s.id}-${it.requestItemId}`, // unique per item-card (no key/selection collisions)
+            requestId: it.requestId ?? s.requestId,
+            itemLabel: gi?.item?.name ?? it.label ?? L("Equipment", "المعدة"),
+            itemLabelAr: gi?.item?.nameAr ?? it.label ?? "المعدة",
+            categoryId: gi?.item?.categoryId ?? null,
+            itemImage: gi?.item?.imageUrl ?? null,
+          };
+        }),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [submissions, group.items, ar],
+  );
+
   // web-app/007 — open the comparison workspace pre-selected to the chosen bids (and their item).
   function goCompare() {
-    const chosen = (bids ?? []).filter((b) => selected.has(b.id));
+    const chosen = [...(bids ?? []), ...subCards].filter((b) => selected.has(b.id));
     if (chosen.length < 1) return;
     const params = new URLSearchParams({ group: group.id });
     const itemId = chosen[0]?.requestId;
@@ -440,24 +463,6 @@ export function GroupBids({ group }: { group: RequestGroup }) {
 
   if (error) return <div className="rempty">{L("Couldn’t load the bids.", "تعذّر تحميل العروض.")}</div>;
   if (!bids) return <div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 26 }}>progress_activity</span></div>;
-  // An off-platform submission is stored once per GROUP but covers several items. Show ONE card per
-  // item (parity with on-platform bids) — each scoped to that item's terms + price + total, and
-  // matched to its request in the group so we can show the real equipment icon/image.
-  const subCards: GroupBid[] = submissions.flatMap((s) =>
-    s.items.map((it): GroupBid => {
-      const gi = group.items.find((g) => g.id === it.requestId);
-      return {
-        ...submissionToBidCard(s, it),
-        // Unique per item-card so selection + React keys don't collide across a submission's items.
-        id: `link-${s.id}-${it.requestItemId}`,
-        requestId: it.requestId ?? s.requestId,
-        itemLabel: gi?.item?.name ?? it.label ?? L("Equipment", "المعدة"),
-        itemLabelAr: gi?.item?.nameAr ?? it.label ?? "المعدة",
-        categoryId: gi?.item?.categoryId ?? null,
-        itemImage: gi?.item?.imageUrl ?? null,
-      };
-    }),
-  );
   const allBids = [...bids, ...subCards];
   if (allBids.length === 0) return <div className="rempty">{L("No bids yet for this request.", "لا توجد عروض بعد لهذا الطلب.")}</div>;
 
@@ -494,7 +499,6 @@ export function GroupBids({ group }: { group: RequestGroup }) {
                 ["all", L("All sources", "كل المصادر"), null, ""],
                 ["link", L("Off your request link", "من رابط طلبك"), "link", "var(--action)"],
                 ["platform", L("On platform", "على المنصة"), "verified", "var(--success)"],
-                ["file", L("Uploaded file", "ملف مرفوع"), "description", "var(--rentee)"],
               ] as const).map(([key, label, icon, color]) => (
                 <div key={key} className={`fp-opt${fSource === key ? " on" : ""}`} onClick={() => setFSource(key)}>
                   <span className="radio" />

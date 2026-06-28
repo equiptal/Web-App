@@ -339,8 +339,8 @@ export async function submitBidForm(token: string, payload: SubmitBidFormPayload
 /** Authed (renter): a request's off-platform submissions + link tracker (opened/submitted + token). */
 export async function fetchRequestSubmissions(
   requestId: string,
-): Promise<{ renterName: string | null; openedCount: number; submittedCount: number; bidDeadline: string | null; submissions: LinkBidSubmission[] }> {
-  const raw = await getJson<{ renterName?: string | null; openedCount?: number; submittedCount?: number; bidDeadline?: string | null }>(
+): Promise<{ renterName: string | null; openedCount: number; submittedCount: number; bidDeadline: string | null; logoUrl: string | null; submissions: LinkBidSubmission[] }> {
+  const raw = await getJson<{ renterName?: string | null; openedCount?: number; submittedCount?: number; bidDeadline?: string | null; logoUrl?: string | null }>(
     `/api/me/requests/${encodeURIComponent(requestId)}/submissions`,
   );
   return {
@@ -348,6 +348,7 @@ export async function fetchRequestSubmissions(
     openedCount: raw.openedCount ?? 0,
     submittedCount: raw.submittedCount ?? 0,
     bidDeadline: raw.bidDeadline ?? null,
+    logoUrl: raw.logoUrl ?? null,
     submissions: mapLinkSubmissions(raw),
   };
 }
@@ -355,6 +356,11 @@ export async function fetchRequestSubmissions(
 /** Set / clear the request's optional bid-submission deadline (AC-04/05/06). `deadline` = ISO or null. */
 export async function setBidDeadline(requestId: string, deadline: string | null): Promise<{ deadline: string | null }> {
   return postJsonMethod<{ deadline: string | null }>(`/api/me/requests/${encodeURIComponent(requestId)}/share-link`, { deadline }, "PUT");
+}
+
+/** Set / clear the renter's company logo on the request's shared bid form. `logoUrl` = data URL or null. */
+export async function setShareLinkLogo(requestId: string, logoUrl: string | null): Promise<unknown> {
+  return postJsonMethod(`/api/me/requests/${encodeURIComponent(requestId)}/share-link`, { logoUrl }, "PUT");
 }
 
 /** Build a request's public share link. The token IS the request's UUID; the renter-name slug is a

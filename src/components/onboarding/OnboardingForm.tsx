@@ -208,18 +208,20 @@ export function OnboardingForm({
           <input className={inputCls} value={companyName} onChange={(e) => setCompanyName(e.target.value)} maxLength={200} placeholder={o.companyNamePlaceholder} />
         </div>
 
-        <div>
-          <label className={labelCls}>
-            {o.email} <span className="text-[11px] font-medium text-muted">— {o.optional}</span>
-          </label>
-          <input className={inputCls} type="email" value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" />
-        </div>
-        <div>
-          <label className={labelCls}>
-            {o.whatsapp} <span className="text-[11px] font-medium text-muted">— {o.optional}</span>
-          </label>
-          <input className={inputCls} inputMode="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+9665XXXXXXXX" dir="ltr" />
-          {fe.whatsapp && <p className="mt-1 text-[12px] text-danger">{fe.whatsapp}</p>}
+        <div className="grid grid-cols-1 gap-[12px] sm:grid-cols-2">
+          <div>
+            <label className={labelCls}>
+              {o.email} <span className="text-[11px] font-medium text-muted">— {o.optional}</span>
+            </label>
+            <input className={inputCls} type="email" value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" />
+          </div>
+          <div>
+            <label className={labelCls}>
+              {o.whatsapp} <span className="text-[11px] font-medium text-muted">— {o.optional}</span>
+            </label>
+            <input className={inputCls} inputMode="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+9665XXXXXXXX" dir="ltr" />
+            {fe.whatsapp && <p className="mt-1 text-[12px] text-danger">{fe.whatsapp}</p>}
+          </div>
         </div>
 
         {err && <p className="text-[13px] font-semibold text-danger">{err}</p>}

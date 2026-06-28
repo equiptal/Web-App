@@ -10,11 +10,19 @@ import type { BidCard, TermRow, TermState } from "@/lib/contract/bids";
 export interface LinkBidConfirmations {
   /** Each is the supplier's Yes/No answer to a required term; undefined = not asked for this item. */
   operator?: boolean;
-  fat?: boolean;
+  nationality?: boolean;
+  fatFood?: boolean;
+  fatTransport?: boolean;
   fuel?: boolean;
+  fuelType?: boolean;
   year?: boolean;
   operatorCert?: boolean;
   equipmentCert?: boolean;
+  // Project terms (merged into each item's confirmations by the form — they apply to all items).
+  payment?: boolean;
+  overtime?: boolean;
+  breakdownSla?: boolean;
+  maintenance?: boolean;
 }
 
 export interface LinkBidItem {
@@ -30,6 +38,9 @@ export interface LinkBidItem {
   returnPrice?: number | null;
   total?: number | null;
   confirmations?: LinkBidConfirmations;
+  /** The renter's required VALUE per term (operator, nationality, fatFood, fuel, fuelType, year, certs,
+   *  payment, overtime, breakdownSla) — drives the "Renter: X · Supplier: Y" conflict detail. */
+  requiredTerms?: Record<string, string | null> | null;
 }
 
 export interface LinkBidSubmission {
@@ -51,11 +62,18 @@ export interface BidFormItem {
   requestItemId: string;
   label: string | null;
   labelAr?: string | null;
+  /** Equipment size/capacity (e.g. "30 ton") — shown next to the item name. */
+  size?: string | null;
+  sizeAr?: string | null;
   numberOfUnits: number;
   /** Rental basis (PER_DAY/PER_WEEK/PER_MONTH/PER_JOB) shown read-only + carried into the submission. */
   priceUnit: string | null;
+  /** Read-only context: who handles delivery / return + the renter's per-item note. */
+  deliveryBy?: string | null;
+  returnBy?: string | null;
+  notes?: string | null;
   /** The required terms the supplier confirms Yes/No (value = what the request asks for, or null). */
-  requiredTerms: { operator?: string | null; fat?: string | null; fuel?: string | null; year?: string | null; operatorCert?: string | null; equipmentCert?: string | null };
+  requiredTerms: { operator?: string | null; nationality?: string | null; fatFood?: string | null; fatTransport?: string | null; fuel?: string | null; fuelType?: string | null; year?: string | null; operatorCert?: string | null; equipmentCert?: string | null };
 }
 /** Read-only project context shown above the items (Layout B "Project terms"). */
 export interface BidFormProjectTerms {
@@ -76,10 +94,12 @@ export interface BidFormData {
   /** ISO bid-submission deadline (AC-04/10); null = no expiry (AC-05). */
   deadline: string | null;
   /** Renter identity shown on the form (AC-09) — each field only when present. */
-  renter: { name: string | null; contactName: string | null; city: string | null; verified: boolean };
+  renter: { name: string | null; contactName: string | null; city: string | null; verified: boolean; logoUrl: string | null };
   /** Read-only project terms + contract terms (for-all-items), from the request. */
   projectTerms: BidFormProjectTerms | null;
   contractTerms: { key: string; label: string; value: string }[];
+  /** The renter's free-text notes for the whole request (read-only). */
+  notes: string | null;
   items: BidFormItem[];
 }
 
@@ -129,7 +149,8 @@ export function mapLinkSubmissions(raw: unknown): LinkBidSubmission[] {
           deliveryPrice: n(i.deliveryPrice),
           returnPrice: n(i.returnPrice),
           total: n(i.total),
-          confirmations: { operator: b(c.operator), fat: b(c.fat), fuel: b(c.fuel), year: b(c.year), operatorCert: b(c.operatorCert), equipmentCert: b(c.equipmentCert) },
+          requiredTerms: i.requiredTerms && typeof i.requiredTerms === "object" ? (i.requiredTerms as Record<string, string | null>) : null,
+          confirmations: { operator: b(c.operator), nationality: b(c.nationality), fatFood: b(c.fatFood), fatTransport: b(c.fatTransport), fuel: b(c.fuel), fuelType: b(c.fuelType), year: b(c.year), operatorCert: b(c.operatorCert), equipmentCert: b(c.equipmentCert), payment: b(c.payment), overtime: b(c.overtime), breakdownSla: b(c.breakdownSla), maintenance: b(c.maintenance) },
         };
       }),
     };
@@ -149,31 +170,44 @@ export function mapBidFormData(raw: unknown): BidFormData {
     status: r.status === "closed" ? "closed" : "open",
     closedReason: reason === "deadline" || reason === "closed_request" ? reason : null,
     deadline: s(r.deadline),
-    renter: { name: s(renter.name), contactName: s(renter.contactName), city: s(renter.city), verified: renter.verified === true },
+    renter: { name: s(renter.name), contactName: s(renter.contactName), city: s(renter.city), verified: renter.verified === true, logoUrl: s(renter.logoUrl) },
     projectTerms: pt
       ? { location: s(pt.location), lat: n(pt.lat), lng: n(pt.lng), rentalBasis: s(pt.rentalBasis), startDate: s(pt.startDate), endDate: s(pt.endDate), hoursPerDay: n(pt.hoursPerDay), workingDaysPerWeek: n(pt.workingDaysPerWeek) }
       : null,
-    contractTerms: ct.map((c) => ({ key: s(c.key) ?? "", label: s(c.label) ?? "", value: s(c.value) ?? "" })).filter((c) => c.key && c.value),
+    // Exclude `maintenance` (not a supplier-confirmed term here) + `overtime` when it's effectively none (0).
+    contractTerms: ct.map((c) => ({ key: s(c.key) ?? "", label: s(c.label) ?? "", value: s(c.value) ?? "" }))
+      .filter((c) => c.key && c.value && c.key !== "maintenance" && !(c.key === "overtime" && ["0", "0×", "none", "without"].includes(c.value.toLowerCase()))),
+    notes: s(r.notes),
     items: items.map((i) => {
       const rt = (i.requiredTerms ?? {}) as Record<string, unknown>;
       return {
         requestItemId: s(i.requestItemId) ?? "",
         label: s(i.label),
         labelAr: s(i.labelAr),
+        size: s(i.size),
+        sizeAr: s(i.sizeAr),
         numberOfUnits: n(i.numberOfUnits) ?? 1,
         priceUnit: s(i.priceUnit),
-        requiredTerms: { operator: s(rt.operator), fat: s(rt.fat), fuel: s(rt.fuel), year: s(rt.year), operatorCert: s(rt.operatorCert), equipmentCert: s(rt.equipmentCert) },
+        deliveryBy: s(i.deliveryBy),
+        returnBy: s(i.returnBy),
+        notes: s(i.notes),
+        requiredTerms: { operator: s(rt.operator), nationality: s(rt.nationality), fatFood: s(rt.fatFood), fatTransport: s(rt.fatTransport), fuel: s(rt.fuel), fuelType: s(rt.fuelType), year: s(rt.year), operatorCert: s(rt.operatorCert), equipmentCert: s(rt.equipmentCert) },
       };
     }),
   };
 }
 
-const termRow = (key: string, en: string, ar: string, ok?: boolean): TermRow => ({
+const termRow = (key: string, en: string, ar: string, ok?: boolean, reqVal?: string | null): TermRow => ({
   key,
   labelEn: en,
   labelAr: ar,
   // Yes → matches the request, No → conflict, undefined (not asked) → grey.
   state: (ok == null ? "grey" : ok ? "matched" : "conflict") as TermState,
+  // What the renter required vs what the supplier answered (shown on conflicts in the terms panel).
+  detail:
+    ok == null
+      ? undefined
+      : { en: `Renter: ${reqVal || "—"} · Supplier: ${ok ? "Yes" : "No"}`, ar: `المستأجر: ${reqVal || "—"} · المؤجّر: ${ok ? "نعم" : "لا"}` },
 });
 
 /**
@@ -184,6 +218,8 @@ const termRow = (key: string, en: string, ar: string, ok?: boolean): TermRow => 
 export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem): BidCard {
   const it = item ?? sub.items[0] ?? null;
   const c = it?.confirmations ?? {};
+  const rt = (it?.requiredTerms ?? {}) as Record<string, string | null>;
+  const up = (v: string | null | undefined) => (v ? v.toUpperCase() : v ?? null); // cert acronyms (TUV/SASO)
   return {
     id: `link-${sub.id}`,
     status: "PENDING",
@@ -226,15 +262,24 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
     mobLeadTime: null,
     demobLeadTime: null,
     terms: {
+      // Only include terms the renter actually asked (undefined = not asked → omitted, keeping it dynamic).
       equipment: [
-        termRow("year", "Equipment year", "سنة الصنع", c.year),
-        termRow("certs", "Equipment certificate", "شهادة المعدة", c.equipmentCert),
-      ],
+        c.year != null && termRow("year", "Equipment year", "سنة الصنع", c.year, rt.year),
+        c.equipmentCert != null && termRow("certs", "Equipment certificate", "شهادة المعدة", c.equipmentCert, up(rt.equipmentCert)),
+      ].filter(Boolean) as TermRow[],
       contract: [
-        termRow("operator_included", "Operator", "المشغّل", c.operator),
-        termRow("fat", "F.A.T", "الإعاشة والسكن", c.fat),
-        termRow("fuel_responsibility", "Fuel responsibility", "مسؤولية الوقود", c.fuel),
-      ],
+        c.operator != null && termRow("operator_included", "Operator", "المشغّل", c.operator, rt.operator),
+        c.nationality != null && termRow("nationality", "Operator nationality", "جنسية المشغّل", c.nationality, rt.nationality),
+        c.fatFood != null && termRow("fat_food", "Food (F.A.T)", "الطعام", c.fatFood, rt.fatFood),
+        c.fatTransport != null && termRow("fat_transport", "Accommodation & transport", "السكن والمواصلات", c.fatTransport, rt.fatTransport),
+        c.fuel != null && termRow("fuel_responsibility", "Fuel responsibility", "مسؤولية الوقود", c.fuel, rt.fuel),
+        c.fuelType != null && termRow("fuel_type", "Fuel type", "نوع الوقود", c.fuelType, rt.fuelType),
+        c.operatorCert != null && termRow("operator_cert", "Operator certificate", "شهادة المشغّل", c.operatorCert, up(rt.operatorCert)),
+        c.payment != null && termRow("payment", "Payment type", "نوع الدفع", c.payment, rt.payment),
+        c.overtime != null && termRow("overtime", "Overtime rate", "أجر العمل الإضافي", c.overtime, rt.overtime),
+        c.breakdownSla != null && termRow("breakdown_sla", "Breakdown response", "زمن الاستجابة للأعطال", c.breakdownSla, rt.breakdownSla),
+        c.maintenance != null && termRow("maintenance", "Maintenance", "الصيانة", c.maintenance, rt.maintenance),
+      ].filter(Boolean) as TermRow[],
       supplier: [
         termRow("cr", "CR", "السجل التجاري", has(sub.crNumber)),
         termRow("vat", "VAT", "الرقم الضريبي", has(sub.vatNumber)),
@@ -251,5 +296,11 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
     // Per-item card → that item's total (incl VAT); whole-submission card → the grand total.
     quotedTotal: item ? (it?.total ?? null) : (sub.grandTotal ?? null),
     submissionKey: sub.id,
+    // Captured company-doc VALUES (off-platform has no files) — keyed by the comparison's doc hints.
+    linkDocs: {
+      ...(has(sub.crNumber) ? { commercial: sub.crNumber as string } : {}),
+      ...(has(sub.vatNumber) ? { vat: sub.vatNumber as string } : {}),
+      ...(has(sub.nationalAddress) ? { national: sub.nationalAddress as string } : {}),
+    },
   };
 }
