@@ -231,6 +231,8 @@ export function normalizedBidToBidCard(nb: NormalizedBid, ctx: { duration: numbe
     priceUnit: nb.price_unit,
     duration: ctx.duration,
     numberOfUnits: ctx.units || 1,
+    unitsOffered: ctx.units || 1, // uploaded quotes cover the full quantity
+
     reqMinYear: null,
     equipment: { id: null, make: null, model: nb.equipment_subtype, year: nb.equipment_year, imageUrl: null },
     eqVerified: false,

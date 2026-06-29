@@ -41,9 +41,12 @@ export const en = {
     requests: "Requests",
     compare: "Compare bids",
     dashboard: "Dashboard",
+    surveys: "Surveys",
     request: "Request",
     account: "Account",
     welcome: "Welcome",
+    collapseSidebar: "Collapse sidebar",
+    expandSidebar: "Expand sidebar",
     tierGuest: "Guest",
     tierBasic: "Basic rentee",
     tierVerified: "Verified",
@@ -554,6 +557,27 @@ export const en = {
       submit: "We couldn't submit. Please try again.",
       offline: "You appear to be offline. Your input is kept — try again.", // AC-23
     },
+  },
+  survey: {
+    navTitle: "Surveys",
+    badgeAria: "You have a survey waiting",
+    emptyTitle: "No surveys right now",
+    emptyBody: "When one of your requests wraps up, we'll ask what happened here.",
+    // Q1 — who did you rent from? (doc §8)
+    q1Title: "How did your request go?",
+    q1Question: "You requested {equipment}. Who did you end up renting from, and for how much?",
+    someoneElse: "Someone else (not listed)",
+    noOne: "No one — I didn't rent",
+    priceLabel: "How much did you pay {unit}?",
+    reasonNoOne: "If you don't mind, what happened?",
+    reasonSomeoneElse: "Tell us more (optional)",
+    confirm: "Confirm",
+    skip: "Skip for now",
+    // Q2 — still need this? (no bids)
+    q2Title: "Your request hasn't received any bids yet",
+    q2Body: "Try loosening your requirements so more suppliers can take part — otherwise we'll close this request for you.",
+    edit: "Edit my requirements",
+    close: "Close the request",
   },
 };
 

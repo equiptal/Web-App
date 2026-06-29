@@ -62,6 +62,8 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
+  const [yesItem, setYesItem] = useState<Record<string, boolean>>({}); // per-item "Yes to all this item's terms"
+  const [yesContract, setYesContract] = useState(false); // "Yes to all" for the for-all-items contract terms
   // Suppliers may submit more than one bid per request (e.g. alternative options) — no single-submission lock.
 
   useEffect(() => {
@@ -87,25 +89,25 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
   const setConf = (id: string, k: TermKey, v: boolean) => setAnswers((p) => ({ ...p, [id]: { ...p[id], confirmations: { ...p[id].confirmations, [k]: v } } }));
   const setPrice = (id: string, field: "rentalRate" | "deliveryPrice" | "returnPrice", v: string) => setAnswers((p) => ({ ...p, [id]: { ...p[id], [field]: v } }));
 
-  // "Confirm all as Yes" — set every shown term (per-item + contract) to Yes in one tap. The supplier
-  // can still change any individual answer afterwards.
-  const totalTerms = (data?.items ?? []).reduce((n, it) => n + itemTerms(it).length, 0) + (data?.contractTerms?.length ?? 0);
-  const confirmAllYes = () => {
-    if (!data) return;
+  // Per-item "Yes to all" — toggles all of THIS item's terms Yes; off clears them so they can answer
+  // individually. Lives below each item header (next to its Terms subhead).
+  const toggleItemYes = (it: BidFormItem) => {
+    const on = !yesItem[it.requestItemId];
+    setYesItem((p) => ({ ...p, [it.requestItemId]: on }));
     setAnswers((p) => {
-      const next = { ...p };
-      for (const it of data.items) {
-        const conf = { ...(next[it.requestItemId]?.confirmations ?? {}) };
-        for (const k of itemTerms(it)) conf[k] = true;
-        next[it.requestItemId] = { ...next[it.requestItemId], confirmations: conf };
-      }
-      return next;
+      const conf = { ...(p[it.requestItemId]?.confirmations ?? {}) };
+      for (const k of itemTerms(it)) conf[k] = on ? true : undefined;
+      return { ...p, [it.requestItemId]: { ...p[it.requestItemId], confirmations: conf } };
     });
-    setContract((p) => {
-      const next = { ...p };
-      for (const c of data.contractTerms) next[c.key] = true;
-      return next;
-    });
+  };
+  // "Yes to all" for the for-all-items contract terms (same pattern).
+  const toggleContractYes = () => {
+    if (!data) return;
+    const on = !yesContract;
+    setYesContract(on);
+    const next: Record<string, boolean> = {};
+    if (on) for (const c of data.contractTerms) next[c.key] = true;
+    setContract(next);
   };
 
   // Reset for "Submit another bid" — clear terms/prices for a fresh quotation (keep company details,
@@ -116,6 +118,8 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
     for (const it of data.items) init[it.requestItemId] = { confirmations: {}, rentalRate: "", deliveryPrice: "", returnPrice: "" };
     setAnswers(init);
     setContract({});
+    setYesItem({});
+    setYesContract(false);
     setShowErrors(false);
     setSubmitting(false);
     setSubmitted(false);
@@ -235,13 +239,6 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
             <p>{L("For each item, confirm its terms in the table, then price it below.", "لكل بند، أكّد شروطه في الجدول ثم سعّره بالأسفل.")}</p>
           </div>
 
-          {totalTerms > 0 && (
-            <div className="confirm-all">
-              <div className="ca-tx"><span className="material-icons-outlined">done_all</span>{L("Can you meet every term the renter set?", "هل يمكنك الالتزام بكل الشروط التي حدّدها المستأجر؟")}</div>
-              <button type="button" className="btn ca-btn" onClick={confirmAllYes}>{L("Confirm all as Yes", "تأكيد الكل بنعم")}</button>
-            </div>
-          )}
-
           {data.deadline && <Countdown iso={data.deadline} L={L} fmtDate={fmtDate} />}
 
           {/* Project terms */}
@@ -260,7 +257,9 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
 
               {data.contractTerms.length > 0 && (
                 <>
-                  <div className="subhead"><span className="material-icons-outlined">gavel</span>{L("Contract terms — for all items", "شروط العقد — لكل البنود")}</div>
+                  <div className="subhead"><span className="material-icons-outlined">gavel</span>{L("Contract terms — for all items", "شروط العقد — لكل البنود")}
+                    <button type="button" className={`yall${yesContract ? " on" : ""}`} onClick={toggleContractYes}><span className="yall-sw"></span>{L("Yes to all", "نعم للكل")}</button>
+                  </div>
                   <div className="treqgrid">
                     {data.contractTerms.map((c) => {
                       const ans = contract[c.key];
@@ -296,13 +295,24 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
             const unit = it.priceUnit ? (ar ? UNIT_LABEL[it.priceUnit]?.[1] : UNIT_LABEL[it.priceUnit]?.[0]) ?? it.priceUnit : L("unit", "وحدة");
             const sub = itemSubtotal(it, a);
             const line = (v: string) => (num(v) ? num(v) * q : 0);
+            // Supplier prices delivery/return ONLY when they handle it; if the renter does, no price row.
+            const delBySup = (it.deliveryBy || "").toLowerCase() === "supplier";
+            const retBySup = (it.returnBy || "").toLowerCase() === "supplier";
             return (
               <div className="sec" key={it.requestItemId}>
                 <div className="item-hd">
                   <span className="material-icons-outlined">construction</span>
-                  <div className="inm-wrap"><span className="inm">{label}</span><span className="imeta">{size ? ` · ${size}` : ""} · {q} {q === 1 ? L("unit", "وحدة") : L("units", "وحدات")}</span></div>
+                  <div className="inm-wrap"><span className="inm">{label}</span>{size && <span className="imeta">· {size}</span>}
+                    <span className={`units-chip${q > 1 ? " multi" : ""}`}><span className="material-icons-outlined">{q > 1 ? "layers" : "package_2"}</span>×{q} {q === 1 ? L("unit", "وحدة") : L("units", "وحدات")}</span></div>
                   <span className="ibadge">{L(`Item ${idx + 1} of ${data.items.length}`, `البند ${idx + 1} من ${data.items.length}`)}</span>
                 </div>
+
+                {q > 1 && (
+                  <div className="units-note">
+                    <span className="material-icons-outlined un-lead">layers</span>
+                    <span className="un-tx">{L(`Multi-unit item — the renter needs ${q} units, and your bid covers all ${q}.`, `بند متعدد الوحدات — يحتاج المستأجر ${q} وحدات، ويشمل عرضك كل الـ ${q}.`)}</span>
+                  </div>
+                )}
 
                 {(it.deliveryBy || it.returnBy || it.notes) && (
                   <div className="iteminfo">
@@ -314,7 +324,9 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
 
                 {terms.length > 0 && (
                   <>
-                    <div className="subhead"><span className="material-icons-outlined">fact_check</span>{L("Terms — can you meet each?", "الشروط — هل يمكنك الالتزام بكلٍّ منها؟")}</div>
+                    <div className="subhead"><span className="material-icons-outlined">fact_check</span>{L("Terms — can you meet each?", "الشروط — هل يمكنك الالتزام بكلٍّ منها؟")}
+                      <button type="button" className={`yall${yesItem[it.requestItemId] ? " on" : ""}`} onClick={() => toggleItemYes(it)}><span className="yall-sw"></span>{L("Yes to all", "نعم للكل")}</button>
+                    </div>
                     <div className="treqgrid">
                       {terms.map((k) => {
                         const ans = a?.confirmations[k];
@@ -341,18 +353,22 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                       <td className="num"><input className={`ptbl-in${showErrors && num(a?.rentalRate ?? "") <= 0 ? " invalid" : ""}`} inputMode="numeric" value={a?.rentalRate ?? ""} onChange={(e) => setPrice(it.requestItemId, "rentalRate", e.target.value)} placeholder="0" /></td>
                       <td className="num tot">{num(a?.rentalRate ?? "") ? nf(line(a!.rentalRate)) : "—"}</td>
                     </tr>
+                    {delBySup && (
                     <tr>
                       <td><div className="it-lbl">{L("Delivery to site", "النقل إلى الموقع")}</div><div className="it-sub2">{L("price × qty", "السعر × العدد")}</div></td>
                       <td className="num">{L("Trip", "رحلة")}</td><td className="num">{q}</td>
                       <td className="num"><input className="ptbl-in" inputMode="numeric" value={a?.deliveryPrice ?? ""} onChange={(e) => setPrice(it.requestItemId, "deliveryPrice", e.target.value)} placeholder="0" /></td>
                       <td className="num tot">{num(a?.deliveryPrice ?? "") ? nf(line(a!.deliveryPrice)) : "—"}</td>
                     </tr>
+                    )}
+                    {retBySup && (
                     <tr>
                       <td><div className="it-lbl">{L("Return from site", "النقل من الموقع")}</div><div className="it-sub2">{L("price × qty", "السعر × العدد")}</div></td>
                       <td className="num">{L("Trip", "رحلة")}</td><td className="num">{q}</td>
                       <td className="num"><input className="ptbl-in" inputMode="numeric" value={a?.returnPrice ?? ""} onChange={(e) => setPrice(it.requestItemId, "returnPrice", e.target.value)} placeholder="0" /></td>
                       <td className="num tot">{num(a?.returnPrice ?? "") ? nf(line(a!.returnPrice)) : "—"}</td>
                     </tr>
+                    )}
                   </tbody>
                 </table>
                 <div className="itot">

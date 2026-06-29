@@ -1,6 +1,10 @@
 /* Exact port of rentee-requests.html styles (list + detail + bids), scoped under .rproto so the
    semantic class names can't leak into the rest of the app. Colors/sizes are verbatim from the
    prototype. Real data is rendered into this exact markup by the requests components. */
+
+/* Hide the scrollbar on horizontally-scrollable chip rows (chips never wrap; they scroll if long). */
+.no-sb { scrollbar-width: none; -ms-overflow-style: none; }
+.no-sb::-webkit-scrollbar { display: none; }
 .rproto {
   --navy: #1c3550;
   --navy-deep: #12263a;
@@ -176,7 +180,25 @@
 .rproto .gctx .gx-link .material-icons-outlined { font-size: 14px; }
 .rproto[dir="rtl"] .gctx .gx-link .material-icons-outlined { transform: scaleX(-1); }
 .rproto .st-mixed { background: rgba(28,53,80,0.07); color: var(--navy-mid); } .rproto .st-mixed .dot { background: var(--navy-mid); }
+/* fulfillment tracking grid (one tile per equipment line, color-coded by coverage) */
+.rproto .ffwrap { margin-bottom: 16px; }
+.rproto .ffgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(224px, 1fr)); gap: 10px; }
+.rproto .fftile { background: var(--surface1); border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 13px; }
+.rproto .fftile .ff-tt { display: flex; align-items: center; gap: 10px; }
+.rproto .fftile .ff-th { width: 38px; height: 38px; border-radius: 9px; flex: 0 0 auto; background: var(--surface2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--navy-mid); overflow: hidden; }
+.rproto .fftile .ff-meta { min-width: 0; }
+.rproto .fftile .ff-nm { font-size: 13px; font-weight: 800; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rproto .fftile .ff-fr { font-size: 11.5px; color: var(--muted); font-weight: 600; margin-top: 1px; }
+.rproto .fftile .ff-fr b { font-family: "IBM Plex Sans", monospace; color: var(--navy); font-weight: 800; }
+.rproto .fftile .ff-bar { height: 8px; border-radius: var(--r-full); background: var(--surface3); overflow: hidden; margin-top: 11px; }
+.rproto .fftile .ff-fill { height: 100%; border-radius: var(--r-full); transition: width .3s; }
+.rproto .fftile.low .ff-fill { background: var(--danger); }
+.rproto .fftile.part .ff-fill { background: var(--action); }
+.rproto .fftile.full .ff-fill { background: var(--success); }
+.rproto .fftile.full { border-color: rgba(29, 175, 88, 0.4); }
 .rproto .contentbar { display: flex; align-items: center; gap: 10px; margin: 2px 0 12px; }
+.rproto .rq-expand { display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--navy-mid); background: none; border: 0; cursor: pointer; padding: 0; }
+.rproto .rq-expand .material-icons-outlined { font-size: 18px; }
 .rproto .contentbar .count { font-size: 13px; font-weight: 700; color: var(--muted); }
 /* mobile: let the group strip's badges wrap to their own row instead of squeezing the title */
 @media (max-width: 640px) {
@@ -185,6 +207,10 @@
   .rproto .gctx .gx-badges { width: 100%; justify-content: flex-start; margin-top: 6px; }
 }
 
+/* Screen 2 — horizontal snap bid cards (~2.5 visible, scroll for more) */
+.rproto .bids-snap { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 10px; align-items: flex-start; -webkit-overflow-scrolling: touch; }
+.rproto .bids-snap > * { flex: 0 0 clamp(300px, 82vw, 356px); scroll-snap-align: start; margin-bottom: 0; }
+@media (min-width: 900px) { .rproto .bids-snap > * { flex-basis: 41%; } }
 .rproto .bids-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .rproto .bids-bar .count { font-size: 13px; font-weight: 700; color: var(--muted); }
 

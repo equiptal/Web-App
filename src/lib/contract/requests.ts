@@ -260,6 +260,12 @@ export function prettyLocation(s: string): string {
   return /king\s*khalid/i.test(s) ? s : s.replace(/\bairport\b/gi, "King Khalid Airport");
 }
 
+/** Fulfillment math: units covered for an equipment line = supplier-offered (on-platform) + off-platform
+ *  covered units, never below 0 or above what the line needs. Drives the "X / total" tracking bar. */
+export function cappedFilled(needed: number, onUnits: number, offUnits: number): number {
+  return Math.max(0, Math.min(needed, (onUnits || 0) + (offUnits || 0)));
+}
+
 /** Demo ordering: pin the Airport project's group(s) to the front, keeping the rest in order. */
 export function pinAirportFirst(groups: RequestGroup[]): RequestGroup[] {
   const isAir = (g: RequestGroup) => /airport|مطار/i.test(g.locationLabel || g.city || "");

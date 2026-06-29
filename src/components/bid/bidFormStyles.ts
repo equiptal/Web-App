@@ -26,12 +26,34 @@ export const BID_FORM_CSS = `
 .intro{margin:4px 0 18px}
 .intro h1{margin:0 0 5px;font-size:22px;font-weight:800;letter-spacing:-.4px}
 .intro p{margin:0;font-size:13.5px;color:var(--muted)}
-.confirm-all{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--success-bg);border:1px solid rgba(29,175,88,.3);border-radius:var(--r-lg);padding:12px 16px;margin-bottom:14px}
-.confirm-all .ca-tx{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--navy)}
+.confirm-all{display:flex;align-items:center;gap:12px;background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-lg);padding:11px 15px;margin-bottom:14px;cursor:pointer}
+.confirm-all.on{background:var(--success-bg);border-color:rgba(29,175,88,.35)}
+.confirm-all .ca-tx{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:800;color:var(--navy)}
 .confirm-all .ca-tx .material-icons-outlined{font-size:18px;color:var(--success)}
-.confirm-all .ca-btn{margin-inline-start:auto;background:var(--success);border-color:var(--success);color:#fff;font-size:13px;padding:9px 16px}
-.confirm-all .ca-btn:hover{filter:brightness(.96)}
-@media(max-width:600px){.confirm-all .ca-btn{margin-inline-start:0;width:100%}}
+.confirm-all .ca-sw{margin-inline-start:auto;position:relative;width:46px;height:26px;border-radius:100px;background:var(--border);border:0;cursor:pointer;flex:0 0 auto;transition:background .15s}
+.confirm-all .ca-sw.on{background:var(--success)}
+.confirm-all .ca-sw::after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:inset-inline-start .15s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.confirm-all .ca-sw.on::after{inset-inline-start:23px}
+/* multi-unit confirmation note */
+.units-note{display:flex;align-items:flex-start;gap:10px;background:var(--action-dim);border:1px solid rgba(247,144,9,.3);border-radius:var(--r-md);padding:11px 13px;margin:-4px 0 12px}
+.units-note.on{background:var(--success-bg);border-color:rgba(29,175,88,.35)}
+.units-note.needpick{box-shadow:inset 0 0 0 2px rgba(37,99,235,.4)}
+.units-note > .un-lead{font-size:18px;color:var(--action);flex:0 0 auto;margin-top:1px}
+.units-note.on > .un-lead{color:var(--success)}
+.units-note .un-tx{flex:1;font-size:12.5px;color:var(--navy);line-height:1.5}
+.units-note .un-tx b{font-weight:800}
+.units-note .un-box{flex:0 0 auto;width:22px;height:22px;border-radius:6px;border:2px solid var(--border);display:grid;place-items:center;background:var(--surface1)}
+.units-note.on .un-box{background:var(--success);border-color:var(--success)}
+.units-note .un-box .material-icons-outlined{font-size:15px;color:#fff;opacity:0}
+.units-note.on .un-box .material-icons-outlined{opacity:1}
+.units-note input{display:none}
+/* per-item / contract "Yes to all" toggle on a Terms subhead */
+.subhead .yall{margin-inline-start:auto;display:inline-flex;align-items:center;gap:7px;font:inherit;font-size:11px;font-weight:800;text-transform:none;letter-spacing:0;color:var(--navy-mid);background:none;border:0;cursor:pointer}
+.subhead .yall.on{color:var(--success)}
+.subhead .yall .yall-sw{position:relative;width:34px;height:19px;border-radius:100px;background:var(--border);transition:background .15s;flex:0 0 auto}
+.subhead .yall.on .yall-sw{background:var(--success)}
+.subhead .yall .yall-sw::after{content:"";position:absolute;top:2.5px;inset-inline-start:2.5px;width:14px;height:14px;border-radius:50%;background:#fff;transition:inset-inline-start .15s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.subhead .yall.on .yall-sw::after{inset-inline-start:17.5px}
 .countdown{background:linear-gradient(135deg,var(--navy),var(--navy-deep));color:#fff;border-radius:var(--r-lg);padding:18px;margin-bottom:18px;text-align:center}
 .cd-label{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#FCD9A0;margin-bottom:13px}
 .cd-label .material-icons-outlined{font-size:17px}
@@ -63,9 +85,12 @@ export const BID_FORM_CSS = `
 .iteminfo .ii.note .material-icons-outlined{font-size:14px}
 .item-hd{display:flex;align-items:center;gap:12px;margin:-16px -18px 14px;padding:14px 18px;background:linear-gradient(135deg,var(--navy),var(--navy-deep));color:#fff;border-radius:var(--r-lg) var(--r-lg) 0 0}
 .item-hd > .material-icons-outlined{font-size:24px;color:#FCD9A0;flex:0 0 auto}
-.item-hd .inm-wrap{flex:1;min-width:0}
+.item-hd .inm-wrap{flex:1;min-width:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .item-hd .inm{font-size:18px;font-weight:800;letter-spacing:-.2px}
-.item-hd .imeta{font-size:12.5px;color:rgba(255,255,255,.75);font-weight:600}
+.item-hd .imeta{font-size:13.5px;color:#fff;font-weight:700}
+.item-hd .units-chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:800;color:var(--navy-deep);background:#FCD9A0;border-radius:var(--r-full);padding:3px 11px}
+.item-hd .units-chip .material-icons-outlined{font-size:14px}
+.item-hd .units-chip.multi{background:var(--action);color:#fff}
 .item-hd .ibadge{margin-inline-start:auto;font-size:11px;font-weight:800;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:var(--r-full);padding:4px 11px;white-space:nowrap}
 .tmtx-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-md)}
 .tmtx{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed}

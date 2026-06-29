@@ -4,6 +4,7 @@ import type { BidCard } from "@/lib/contract/bids";
 import type { DealRoomView, DealRoomDocuments, QuotationView } from "@/lib/contract/deal-room";
 import type { ComputedBid, RecommendResult, BidAskResult, BidParseResult, AwardNudgeResult, PreferencePreset, RankingPreference, RankedBid, BidEventInput } from "@/lib/contract/agent-bids";
 import { mapBidFormData, mapLinkSubmissions, type BidFormData, type LinkBidSubmission, type SubmitBidFormPayload } from "@/lib/contract/link-bids";
+import type { PendingResponse, RespondBody, RespondResult } from "@/lib/contract/survey";
 
 /** Body of POST /api/me/bids/recommend. user_id is attached server-side. */
 export interface RecommendPayload {
@@ -242,6 +243,18 @@ export function submitRequest(
   payload: RfqRequestPayload & { simulateError?: boolean },
 ): Promise<{ requestId: string; requestIds?: string[]; requestUuids?: string[] }> {
   return postJson<{ requestId: string; requestIds?: string[]; requestUuids?: string[] }>("/api/requests", payload);
+}
+
+/* ----------------- Outcome Survey (renter) ----------------- */
+
+/** The next pending outcome survey for the renter (one unit at a time; null when none due). */
+export function fetchPendingSurvey(): Promise<PendingResponse> {
+  return getJson<PendingResponse>("/api/me/surveys/pending");
+}
+
+/** Submit the renter's answer to one survey. Idempotent server-side on already-resolved surveys. */
+export function respondSurvey(surveyId: string, body: RespondBody): Promise<RespondResult> {
+  return postJson<RespondResult>(`/api/me/surveys/${encodeURIComponent(surveyId)}/respond`, body);
 }
 
 /* ----------------- web-app/007: Mansour judgement layer (soft) ----------------- */

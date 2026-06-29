@@ -256,6 +256,8 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
     priceUnit: it?.priceUnit ?? null,
     duration: null, // open-ended; the comparison falls back to the request duration
     numberOfUnits: it?.numberOfUnits ?? 1,
+    // Shared-link bids cover the full quantity (no partial-units picker on the public form yet).
+    unitsOffered: it?.numberOfUnits ?? 1,
     reqMinYear: reqYearNum,
     equipment: null, // the form confirms "meets the requested year", not a specific make/model/year
     eqVerified: false,

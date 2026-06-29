@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Moedatech — RFQ & Bids redesign (interactive prototype)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@500;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" />
+<style>
+.rproto{--navy:#1c3550;--navy-deep:#12263a;--navy-mid:#2a4f72;--action:#f79009;--action-dim:#fff4e5;--rentee:#2563eb;--rentee-dim:#eaf1fe;--success:#1daf58;--success-bg:#e7f7ee;--warning:#d4780a;--warning-bg:#fff3e0;--danger:#d9362a;--danger-bg:#fcebea;--info:#1a7ec8;--info-bg:#e6f2fb;--muted:#6b8fa8;--surface1:#fff;--surface2:#eff4f9;--surface3:#e4edf5;--border:#d4e0ec;--line:#e4edf5;--text-disabled:#9bb3c8;--shadow:rgba(28,53,80,0.06);--r-sm:8px;--r-md:10px;--r-lg:14px;--r-full:100px;max-width:1060px;margin:0 auto;color:var(--navy);font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.rproto *{box-sizing:border-box}
+.rproto .mono{font-family:"IBM Plex Sans",monospace}
+.rproto .material-icons-outlined{font-family:"Material Icons Outlined";line-height:1;vertical-align:middle}
+.rproto .btn{border:1px solid var(--border);background:var(--surface1);border-radius:var(--r-md);padding:11px 18px;font:inherit;font-weight:700;font-size:13.5px;color:var(--navy);display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;transition:filter .12s}
+.rproto .btn:hover{filter:brightness(.98)}
+.rproto .btn .material-icons-outlined{font-size:18px}
+.rproto .btn.primary{background:var(--action);border-color:var(--action);color:#fff}
+.rproto .btn.sm{padding:9px 14px;font-size:12.5px}
+.rproto .stbadge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;padding:3px 9px;border-radius:var(--r-full)}
+.rproto .stbadge .dot{width:6px;height:6px;border-radius:50%}
+.rproto .typebadge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;padding:3px 9px;border-radius:var(--r-full)}
+.rproto .typebadge .material-icons-outlined{font-size:13px}
+.rproto .tb-broadcast{background:rgba(28,53,80,0.07);color:var(--navy-mid)}
+/* request card */
+.rproto .rq{position:relative;overflow:hidden;background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:12px;width:100%;display:block;text-align:start}
+.rproto .rq .accent{position:absolute;inset-block:0;inset-inline-start:0;width:4px;background:linear-gradient(var(--navy),var(--navy-mid))}
+.rproto .rq-in{padding:15px 16px 15px 19px}
+.rproto .rq-head{display:flex;gap:14px;align-items:flex-start}
+.rproto .rq-thumb{width:54px;height:54px;border-radius:12px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;background:var(--surface2);border:1px solid var(--border);color:var(--navy-mid)}
+.rproto .rq-thumb .material-icons-outlined{font-size:28px}
+.rproto .rq-h{flex:1;min-width:0}
+.rproto .rq-title{font-size:15.5px;font-weight:800;color:var(--navy);letter-spacing:-0.2px}
+.rproto .rq-created{font-size:11.5px;color:var(--muted);font-weight:600;margin-top:2px}
+.rproto .rq-arrow{color:var(--text-disabled)}
+/* group header */
+.rproto .flevel{margin-bottom:14px}
+.rproto .flab{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;color:var(--muted);margin:0 2px 8px}
+.rproto .flab .material-icons-outlined{font-size:14px}
+.rproto .chips-row{display:flex;gap:9px;overflow-x:auto;padding-bottom:4px}
+.rproto .gctx{display:flex;flex-direction:column;gap:13px;background:linear-gradient(135deg,var(--navy),var(--navy-deep));color:#fff;border-radius:var(--r-lg);padding:14px 16px;margin-bottom:14px}
+.rproto .gctx .gx-row{display:flex;align-items:center;gap:13px}
+.rproto .gctx .gx-track{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-top:12px;border-top:1px solid rgba(255,255,255,0.14)}
+.rproto .gctx .rt-stat{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:rgba(255,255,255,0.7)}
+.rproto .gctx .rt-stat .material-icons-outlined{font-size:15px;color:rgba(255,255,255,0.7)}
+.rproto .gctx .rt-stat b{font-family:"IBM Plex Sans",monospace;font-size:16px;font-weight:800;color:#fff}
+.rproto .gctx .rt-stat.sub b{color:#ffc97a}
+.rproto .gctx .gx-acts{margin-inline-start:auto;display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rproto .gctx .rt-share{display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:11.5px;font-weight:800;color:var(--navy-deep);background:#ffc97a;border:0;border-radius:var(--r-sm);padding:6px 12px;cursor:pointer}
+.rproto .gctx .rt-copy{display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:11.5px;font-weight:700;color:#fff;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);border-radius:var(--r-sm);padding:6px 12px;cursor:pointer}
+.rproto .gctx .rt-share .material-icons-outlined,.rproto .gctx .rt-copy .material-icons-outlined{font-size:14px}
+.rproto .gctx .gx-ic{position:relative;width:40px;height:40px;border-radius:10px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;background:#fff}
+.rproto .gctx .gx-ic .material-icons-outlined{color:var(--navy-mid);font-size:24px}
+.rproto .gctx .gx-ic .gx-more-badge{position:absolute;bottom:-5px;inset-inline-end:-5px;min-width:17px;height:17px;padding:0 4px;border-radius:var(--r-full);background:var(--action);color:#fff;font-size:9.5px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid var(--navy-deep)}
+.rproto .gctx .gx-main{flex:1;min-width:0}
+.rproto .gctx .gx-title{font-size:14.5px;font-weight:900;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rproto .gctx .gx-count{font-size:10.5px;font-weight:800;background:rgba(255,255,255,0.18);border-radius:var(--r-full);padding:2px 9px}
+.rproto .gctx .gx-meta{font-size:11.5px;font-weight:600;color:rgba(255,255,255,0.62);margin-top:4px}
+.rproto .gctx .gx-badges{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.rproto .gctx .gx-bids{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:#79e0a6}
+.rproto .gctx .gx-bids .material-icons-outlined{font-size:15px;color:#79e0a6}
+.rproto .gctx .typebadge{background:rgba(255,255,255,0.14);color:#fff}
+.rproto .contentbar{display:flex;align-items:center;gap:10px;margin:2px 0 12px}
+.rproto .contentbar .count{font-size:13px;font-weight:700;color:var(--muted)}
+/* RFQ tabs */
+.rproto .rfqchip{flex:0 0 auto;border:1.5px solid var(--border);background:var(--surface1);border-radius:var(--r-md);padding:9px 14px;cursor:pointer;min-width:158px}
+.rproto .rfqchip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.rproto .rfqchip .l{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--action)}
+.rproto .rfqchip.on .l{color:#ffc97a}
+.rproto .rfqchip .n{font-size:13.5px;font-weight:800;margin-top:1px}
+.rproto .rfqchip .m{font-size:11px;color:var(--muted);margin-top:2px}
+.rproto .rfqchip.on .m{color:rgba(255,255,255,.7)}
+/* header mini fulfillment strip */
+.rproto .ffmini-wrap{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding-top:12px;border-top:1px solid rgba(255,255,255,0.14)}
+.rproto .ffmini-lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:rgba(255,255,255,.55)}
+.rproto .ffmini{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:var(--r-sm);padding:5px 9px 5px 6px;cursor:pointer}
+.rproto .ffmini:hover{background:rgba(255,255,255,0.14)}
+.rproto .ffmini .mi-ic{position:relative;width:26px;height:26px;border-radius:7px;background:#fff;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.rproto .ffmini .mi-ic .material-icons-outlined{font-size:16px;color:var(--navy-mid)}
+.rproto .ffmini .mi-badge{position:absolute;top:-6px;inset-inline-end:-6px;min-width:16px;height:16px;padding:0 3px;border-radius:var(--r-full);background:var(--action);color:#fff;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--navy-deep)}
+.rproto .ffmini .mi-bar{width:52px;height:6px;border-radius:var(--r-full);background:rgba(255,255,255,0.2);overflow:hidden}
+.rproto .ffmini .mi-fill{height:100%;border-radius:var(--r-full);background:#79e0a6}
+.rproto .ffmini .mi-fill.partial{background:#ffc97a}
+.rproto .ffmini .mi-fill.none{background:rgba(255,255,255,.28)}
+.rproto .ffmini .mi-n{font-family:"IBM Plex Sans",monospace;font-size:11px;font-weight:800;color:#fff}
+.rproto .ffmini-more{font:inherit;font-size:11px;font-weight:800;color:var(--navy-deep);background:#ffc97a;border:0;border-radius:var(--r-sm);padding:6px 11px;cursor:pointer}
+/* expanded all-items fulfillment panel */
+.rproto .fftrack{display:flex;flex-direction:column;gap:9px;margin-bottom:18px}
+.rproto .ffrow{display:flex;align-items:center;gap:13px;background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-md);padding:11px 14px}
+.rproto .ff-ic{position:relative;width:44px;height:44px;border-radius:var(--r-md);background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--navy-mid);flex:0 0 auto}
+.rproto .ff-ic .material-icons-outlined{font-size:24px}
+.rproto .ff-badge{position:absolute;top:-7px;inset-inline-end:-7px;min-width:20px;height:20px;padding:0 5px;border-radius:var(--r-full);background:var(--action);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid var(--surface1)}
+.rproto .ff-body{flex:1;min-width:0}
+.rproto .ff-name{font-size:14px;font-weight:800;color:var(--navy)}
+.rproto .ff-name span{color:var(--muted);font-weight:600;font-size:12.5px}
+.rproto .ff-bar{height:8px;border-radius:var(--r-full);background:var(--surface3);margin-top:7px;overflow:hidden}
+.rproto .ff-fill{height:100%;border-radius:var(--r-full);background:var(--success)}
+.rproto .ff-fill.partial{background:var(--action)}.rproto .ff-fill.none{background:var(--surface3)}
+.rproto .ff-meta{text-align:end;font-size:11px;color:var(--muted);min-width:92px}
+.rproto .ff-meta .u{font-family:"IBM Plex Sans",monospace;font-size:14px;font-weight:800;color:var(--navy);display:block}
+.rproto .ff-meta b{color:var(--success)}
+.rproto .ff-go{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;font:inherit;font-size:11.5px;font-weight:800;color:#fff;background:var(--navy);border:0;border-radius:var(--r-sm);padding:8px 12px;cursor:pointer}
+.rproto .ff-go .material-icons-outlined{font-size:15px}
+/* item card bar + actions */
+.rproto .rq-ff{display:flex;align-items:center;gap:11px;margin-top:11px}
+.rproto .rq-ff .bar{flex:1;height:7px;border-radius:var(--r-full);background:var(--surface3);overflow:hidden}
+.rproto .rq-ff .fill{height:100%;border-radius:var(--r-full);background:var(--success)}
+.rproto .rq-ff .fill.partial{background:var(--action)}.rproto .rq-ff .fill.none{background:var(--surface3)}
+.rproto .rq-ff .meta{font-size:11.5px;font-weight:700;color:var(--muted);white-space:nowrap}
+.rproto .rq-ff .meta b{color:var(--navy)}.rproto .rq-ff .meta .bd{color:var(--success)}
+.rproto .rq-acts{display:flex;gap:8px;margin-top:13px;padding-top:13px;border-top:1px solid var(--line)}
+.rproto .rq-acts .btn{flex:1}
+/* view toggle + item chips */
+.rproto .vseg{display:inline-flex;background:var(--surface3);border-radius:var(--r-md);padding:3px;margin-bottom:14px}
+.rproto .vseg button{font:inherit;font-size:12.5px;font-weight:800;border:0;background:transparent;color:var(--navy-mid);padding:8px 15px;border-radius:var(--r-sm);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.rproto .vseg button.on{background:var(--surface1);color:var(--navy);box-shadow:0 1px 3px var(--shadow)}
+.rproto .vseg .material-icons-outlined{font-size:16px}
+.rproto .req-chips{display:flex;gap:9px;overflow-x:auto;padding-bottom:6px;margin-bottom:16px}
+.rproto .req-chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1.5px solid var(--border);background:var(--surface1);border-radius:var(--r-full);padding:8px 14px;font-size:12.5px;font-weight:700;color:var(--navy-mid);cursor:pointer}
+.rproto .req-chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.rproto .req-chip .ct{display:inline-flex;align-items:center;justify-content:center;min-width:19px;height:19px;padding:0 6px;border-radius:var(--r-full);background:var(--surface2);color:var(--navy-mid);font-family:"IBM Plex Sans",monospace;font-size:11px;font-weight:800}
+.rproto .req-chip.on .ct{background:rgba(255,255,255,0.22);color:#fff}
+/* bid grid 2-up */
+.rproto .bidscroll{overflow-x:auto;padding-bottom:6px}
+.rproto .bidgrid{display:grid;grid-template-columns:repeat(2,minmax(345px,1fr));gap:14px}
+@media(max-width:780px){.rproto .bidgrid{grid-template-columns:minmax(300px,1fr)}}
+/* bid card */
+.rproto .bid{background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;position:relative;display:flex;flex-direction:column}
+.rproto .bid.sel{border-color:var(--navy);border-width:2px;box-shadow:0 8px 24px rgba(19,36,59,.1)}
+.rproto .bid-link{border-color:rgba(247,144,9,0.4)}
+.rproto .slb-strip{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:800;padding:7px 14px;background:var(--action-dim);color:#8a5a06;border-bottom:1px solid rgba(247,144,9,0.28)}
+.rproto .slb-strip .material-icons-outlined{font-size:14px;color:var(--action)}
+.rproto .best-strip{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:800;padding:7px 14px;background:var(--success-bg);color:var(--success)}
+.rproto .best-strip .material-icons-outlined{font-size:14px}
+.rproto .bid-head{display:flex;align-items:flex-start;gap:10px;padding:11px 14px 8px}
+.rproto .bid-eq{width:44px;height:44px;border-radius:11px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--navy-mid);flex:0 0 auto}
+.rproto .bid-eq .material-icons-outlined{font-size:23px}
+.rproto .bid-av{width:44px;height:44px;border-radius:50%;background:#e8dec0;border:1.5px solid var(--navy);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:var(--navy);flex:0 0 auto}
+.rproto .bid-hh{flex:1;min-width:0}
+.rproto .bid-hh .r1{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rproto .bid-hh .sname{font-size:14px;font-weight:800;color:var(--navy)}
+.rproto .bid-hh .qty-badge{display:inline-flex;align-items:center;padding:1px 7px;border-radius:var(--r-full);background:var(--action-dim);color:var(--action);font-size:11px;font-weight:800}
+.rproto .bid-by{display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:11.5px;font-weight:700;color:var(--navy-mid);margin-top:5px}
+.rproto .bid-by>.material-icons-outlined{font-size:13px;color:var(--muted)}
+.rproto .bid-by .vf{color:var(--success)}
+.rproto .bid-by .dotsep{color:var(--text-disabled)}
+.rproto .bid-by .rate{display:inline-flex;align-items:center;gap:2px;color:var(--action)}
+.rproto .bid-by .rate .material-icons-outlined{font-size:13px;color:var(--action)}
+.rproto .cred-pills{display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px}
+.rproto .cred-pill{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;padding:2px 8px;border-radius:var(--r-full)}
+.rproto .cred-pill .material-icons-outlined{font-size:12px}
+.rproto .cred-pill.ok{background:var(--success-bg);color:var(--success)}
+.rproto .cred-pill.no{background:var(--danger-bg);color:var(--danger)}
+.rproto .bid-ff{display:flex;align-items:center;gap:9px;padding:8px 14px;background:var(--surface2);border-top:1px solid var(--line);font-size:11.5px;font-weight:700;color:var(--navy-mid)}
+.rproto .bid-ff>.material-icons-outlined{font-size:15px;color:var(--action)}
+.rproto .bid-ff .bar{flex:1;max-width:130px;height:6px;border-radius:var(--r-full);background:var(--surface3);overflow:hidden}
+.rproto .bid-ff .fill{height:100%;border-radius:var(--r-full);background:var(--action)}
+.rproto .bid-ff .fill.full{background:var(--success)}
+.rproto .bid-ff .n{margin-inline-start:auto;white-space:nowrap}.rproto .bid-ff .n b{color:var(--navy)}
+.rproto .terms-row{display:flex;align-items:center;gap:12px;padding:10px 14px;width:100%;background:none;border:0;border-top:1px solid var(--line);font:inherit;text-align:inherit;cursor:pointer}
+.rproto .terms-row .tlab{font-size:12.5px;font-weight:800;color:var(--navy);flex:0 0 auto}
+.rproto .term-classes{display:flex;gap:6px;flex-wrap:wrap;flex:1;justify-content:flex-end;min-width:0}
+.rproto .tcls{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:var(--r-full);font-size:11px;font-weight:800}
+.rproto .tcls .material-icons-outlined{font-size:14px}
+.rproto .tcls-ok{background:var(--success-bg);color:var(--success)}
+.rproto .tcls-warn{background:var(--action-dim);color:var(--action)}
+.rproto .tcls-bad{background:#fdecea;color:var(--danger)}
+.rproto .terms-row .chev{flex:0 0 auto;font-size:20px;color:var(--muted)}
+.rproto .price-row{border-top:1px solid var(--line);margin-top:auto}
+.rproto .price-collapsed{display:flex;align-items:center;padding:11px 14px}
+.rproto .price-collapsed .pl{font-size:12.5px;font-weight:800;color:var(--navy)}
+.rproto .price-collapsed .pr{margin-inline-start:auto;display:flex;align-items:center;gap:6px;font-family:"IBM Plex Sans",monospace;font-size:17px;font-weight:700;color:var(--action)}
+.rproto .bid-foot{display:flex;gap:8px;padding:11px 14px;border-top:1px solid var(--line)}
+.rproto .bid-foot .btn{flex:1}
+.rproto .slb-view-btn{flex:1;border:0;border-radius:var(--r-md);background:var(--rentee);color:#fff;font:inherit;font-weight:800;font-size:13px;padding:11px;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer}
+.rproto .slb-view-btn .material-icons-outlined{font-size:17px}
+/* by-supplier card */
+.rproto .supitem{display:flex;align-items:center;gap:11px;padding:11px 14px;border-top:1px solid var(--line);font-size:12.5px}
+.rproto .supitem>.material-icons-outlined{color:var(--navy-mid);font-size:20px}
+.rproto .supitem .si-nm{font-weight:700}
+.rproto .supitem .si-units{font-size:11px;color:var(--muted)}
+.rproto .supitem .si-price{margin-inline-start:auto;font-family:"IBM Plex Sans",monospace;font-weight:700}
+.rproto .supitem .si-st{font-size:9.5px;font-weight:800;text-transform:uppercase;border-radius:var(--r-full);padding:2px 8px}
+.rproto .si-st.ok{background:var(--success-bg);color:var(--success)}
+.rproto .si-st.part{background:var(--warning-bg);color:var(--warning)}
+.rproto .si-st.none{background:var(--surface2);color:var(--muted)}
+.rproto .sup-tot{text-align:end}
+.rproto .sup-tot .l{font-size:9.5px;font-weight:800;text-transform:uppercase;color:var(--muted)}
+.rproto .sup-tot .v{font-family:"IBM Plex Sans",monospace;font-size:17px;font-weight:800}
+/* create-request */
+.rproto .flbl{font-size:12.5px;font-weight:800;color:var(--navy-mid);margin:0 0 9px;display:flex;align-items:center;gap:6px}
+.rproto .flbl .material-icons-outlined{font-size:16px;color:var(--navy-mid)}
+.rproto .optrow{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+.rproto .opt{font:inherit;font-size:13px;font-weight:700;border:1.5px solid var(--border);background:var(--surface1);color:var(--navy);border-radius:var(--r-md);padding:10px 15px;cursor:pointer}
+.rproto .opt.on{border-color:var(--action);background:var(--action-dim);color:var(--warning);box-shadow:inset 0 0 0 1px var(--action)}
+.rproto .opt small{display:block;font-size:10.5px;color:var(--muted);font-weight:600;margin-top:1px}
+.rproto .opt.on small{color:var(--warning)}
+.rproto .dcard{background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+.rproto .review-sh{display:flex;align-items:center;gap:8px;padding:11px 15px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--navy-mid);background:var(--surface2);border-bottom:1px solid var(--line)}
+.rproto .review-sh .material-icons-outlined{font-size:15px}
+.rproto .review-sh .edit{margin-inline-start:auto;font:inherit;font-size:11px;font-weight:800;color:var(--rentene,var(--rentee));text-transform:none;letter-spacing:0;background:0;border:0;cursor:pointer}
+.rproto .kv{display:grid;grid-template-columns:170px 1fr;row-gap:11px;padding:15px;font-size:13px}
+.rproto .kv .k{color:var(--muted);font-weight:600}.rproto .kv .v{font-weight:700}
+@media(max-width:560px){.rproto .kv{grid-template-columns:1fr;row-gap:3px}.rproto .kv .v{margin-bottom:7px}}
+/* share */
+.rproto .share-hero{background:linear-gradient(135deg,var(--navy),var(--navy-deep));color:#fff;border-radius:var(--r-lg);padding:24px 28px}
+.rproto .share-hero h3{margin:0 0 4px;font-size:18px;font-weight:800}
+.rproto .share-hero p{margin:0;font-size:13px;color:rgba(255,255,255,.72)}
+.rproto .howrow{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}
+.rproto .howstep{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:var(--r-md);padding:15px}
+.rproto .howstep .n{width:26px;height:26px;border-radius:50%;background:#ffc97a;color:var(--navy-deep);font-weight:800;display:flex;align-items:center;justify-content:center;font-size:13px;margin-bottom:9px}
+.rproto .howstep.hl{background:#ffc97a;color:var(--navy-deep)}.rproto .howstep.hl .n{background:var(--navy-deep);color:#ffc97a}
+.rproto .howstep h4{margin:0 0 3px;font-size:13.5px;font-weight:800}
+.rproto .howstep p{margin:0;font-size:12px;color:rgba(255,255,255,.7)}.rproto .howstep.hl p{color:rgba(18,38,58,.72)}
+.rproto .sharelink{display:flex;align-items:center;gap:10px;margin-top:18px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);border-radius:var(--r-md);padding:12px 14px}
+.rproto .sharelink .url{flex:1;font-family:"IBM Plex Sans",monospace;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rproto .sharelink button{font:inherit;font-size:12.5px;font-weight:800;background:#ffc97a;color:var(--navy-deep);border:0;border-radius:var(--r-sm);padding:9px 14px;cursor:pointer}
+@media(max-width:720px){.rproto .howrow{grid-template-columns:1fr}}
+.rproto .crumb{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--rentee);background:none;border:0;cursor:pointer;margin-bottom:14px}
+.rproto .crumb .material-icons-outlined{font-size:17px}
+/* header: meta left, fulfillment bars stacked on the right */
+.rproto .gctx .gx-top{display:flex;gap:18px;align-items:stretch}
+.rproto .gctx .gx-left{flex:1;min-width:0;display:flex;flex-direction:column;gap:13px}
+.rproto .gctx .gx-right{flex:0 0 310px;display:flex;flex-direction:column;gap:7px;border-inline-start:1px solid rgba(255,255,255,.14);padding-inline-start:16px}
+.rproto .ffstack-lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:rgba(255,255,255,.55);margin-bottom:1px}
+.rproto .ffstack{display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:6px 10px 6px 8px;cursor:pointer}
+.rproto .ffstack:hover{background:rgba(255,255,255,.14)}
+.rproto .ffstack .si{position:relative;width:26px;height:26px;border-radius:7px;background:#fff;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.rproto .ffstack .si .material-icons-outlined{font-size:16px;color:var(--navy-mid)}
+.rproto .ffstack .sb{position:absolute;top:-6px;inset-inline-end:-6px;min-width:15px;height:15px;padding:0 3px;border-radius:var(--r-full);background:var(--action);color:#fff;font-size:8.5px;font-weight:800;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--navy-deep)}
+.rproto .ffstack .sbar{flex:1;height:6px;border-radius:var(--r-full);background:rgba(255,255,255,.2);overflow:hidden}
+.rproto .ffstack .sfill{height:100%;border-radius:var(--r-full);background:#79e0a6}
+.rproto .ffstack .sfill.partial{background:#ffc97a}.rproto .ffstack .sfill.none{background:rgba(255,255,255,.28)}
+.rproto .ffstack .sn{font-family:"IBM Plex Sans",monospace;font-size:11px;font-weight:800;color:#fff;white-space:nowrap}
+.rproto .ffstack .sbd{font-size:10px;color:rgba(255,255,255,.6);white-space:nowrap}
+.rproto .ffstack-more{font:inherit;font-size:11px;font-weight:800;color:#ffc97a;background:rgba(255,255,255,.1);border:0;border-radius:var(--r-sm);padding:7px;cursor:pointer;margin-top:1px}
+.rproto .viewall{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:12.5px;font-weight:800;color:#fff;background:var(--navy);border:0;border-radius:var(--r-md);padding:8px 14px;cursor:pointer}
+.rproto .viewall .material-icons-outlined{font-size:16px}
+/* item card: thumb + meta + bar, two actions on the right */
+.rproto .rq-row{display:flex;gap:14px;align-items:center}
+.rproto .rq-side{display:flex;flex-direction:column;gap:8px;flex:0 0 auto;width:158px}
+.rproto .rq-side .btn{width:100%}
+@media(max-width:780px){.rproto .gctx .gx-top{flex-direction:column}.rproto .gctx .gx-right{flex-basis:auto;border-inline-start:0;border-top:1px solid rgba(255,255,255,.14);padding-inline-start:0;padding-top:12px}.rproto .rq-row{flex-wrap:wrap}.rproto .rq-side{width:100%;flex-direction:row}}
+/* v2 — clean header CTA + item cards */
+.rproto .gctx .gx-iconbtn{width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;cursor:pointer}
+.rproto .gctx .gx-iconbtn:hover{background:rgba(255,255,255,.2)}
+.rproto .gctx .gx-iconbtn .material-icons-outlined{font-size:17px}
+.rproto .gctx .gx-cta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-top:12px;border-top:1px solid rgba(255,255,255,.14)}
+.rproto .gctx .gx-fulfil{display:flex;align-items:center;gap:10px;font-size:12.5px;font-weight:700;color:rgba(255,255,255,.85)}
+.rproto .gctx .gx-fulfil .material-icons-outlined{font-size:16px;color:#ffc97a}
+.rproto .gctx .gx-fulfil b{font-family:"IBM Plex Sans",monospace;color:#fff}
+.rproto .gctx .gx-fulfil .ovbar{width:130px;height:7px;border-radius:100px;background:rgba(255,255,255,.18);overflow:hidden}
+.rproto .gctx .gx-fulfil .ovfill{height:100%;border-radius:100px;background:#79e0a6}
+.rproto .gctx .gx-compare{margin-inline-start:auto;display:inline-flex;align-items:center;gap:7px;font:inherit;font-size:13px;font-weight:800;color:var(--navy-deep);background:#ffc97a;border:0;border-radius:var(--r-md);padding:10px 17px;cursor:pointer}
+.rproto .gctx .gx-compare:hover{filter:brightness(1.05)}
+.rproto .gctx .gx-compare .material-icons-outlined{font-size:18px}
+.rproto .gctx .dl-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;background:rgba(255,255,255,.14);color:#fff;border-radius:var(--r-full);padding:3px 10px}
+.rproto .gctx .dl-chip .material-icons-outlined{font-size:13px;color:#ffc97a}
+.rproto .icard{display:flex;align-items:center;gap:15px;background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-lg);padding:14px 16px;margin-bottom:10px;transition:box-shadow .14s,transform .14s}
+.rproto .icard:hover{box-shadow:0 8px 20px var(--shadow);transform:translateY(-1px)}
+.rproto .ic-thumb{position:relative;width:52px;height:52px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--navy-mid);flex:0 0 auto}
+.rproto .ic-thumb .material-icons-outlined{font-size:27px}
+.rproto .ic-badge{position:absolute;top:-7px;inset-inline-end:-7px;min-width:20px;height:20px;padding:0 5px;border-radius:100px;background:var(--action);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid var(--surface1)}
+.rproto .ic-mid{flex:1;min-width:0}
+.rproto .ic-nm{font-size:14.5px;font-weight:800;color:var(--navy)}
+.rproto .ic-nm .sz{color:var(--muted);font-weight:600;font-size:12.5px}
+.rproto .ic-prog{display:flex;align-items:center;gap:11px;margin-top:9px}
+.rproto .ic-bar{flex:1;max-width:230px;height:8px;border-radius:100px;background:var(--surface3);overflow:hidden}
+.rproto .ic-fill{height:100%;border-radius:100px;background:var(--success)}
+.rproto .ic-fill.partial{background:var(--action)}.rproto .ic-fill.none{background:var(--surface3)}
+.rproto .ic-prog .pmeta{font-size:11.5px;font-weight:700;color:var(--muted);white-space:nowrap}
+.rproto .ic-prog .pmeta b{color:var(--navy)}
+.rproto .ic-detail{font-size:11.5px;color:var(--muted);margin-top:6px}
+.rproto .ic-detail b{color:var(--success);font-family:"IBM Plex Sans",monospace}
+.rproto .ic-actions{display:flex;flex-direction:column;gap:7px;flex:0 0 auto;width:152px}
+.rproto .ic-actions .btn{width:100%}
+@media(max-width:680px){.rproto .icard{flex-wrap:wrap}.rproto .ic-actions{width:100%;flex-direction:row}.rproto .ic-bar{max-width:none}}
+/* v3 — per-type fulfillment in header + compact item tiles */
+.rproto .gctx .gx-ffhead{display:flex;align-items:center;gap:10px;padding-top:12px;border-top:1px solid rgba(255,255,255,.14)}
+.rproto .gctx .gx-ffhead .lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:rgba(255,255,255,.55)}
+.rproto .gctx .gx-viewall{margin-inline-start:auto;display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:12.5px;font-weight:800;color:var(--navy-deep);background:#ffc97a;border:0;border-radius:var(--r-md);padding:8px 15px;cursor:pointer}
+.rproto .gctx .gx-viewall:hover{filter:brightness(1.05)}
+.rproto .gctx .gx-viewall .material-icons-outlined{font-size:16px}
+.rproto .gctx .gx-fftrack{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.rproto .gctx .gx-ffrow{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:var(--r-md);padding:8px 12px;cursor:pointer}
+.rproto .gctx .gx-ffrow:hover{background:rgba(255,255,255,.14)}
+.rproto .gctx .gx-ffrow .fi{position:relative;width:34px;height:34px;border-radius:9px;background:#fff;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.rproto .gctx .gx-ffrow .fi .material-icons-outlined{font-size:19px;color:var(--navy-mid)}
+.rproto .gctx .gx-ffrow .fb{position:absolute;top:-6px;inset-inline-end:-6px;min-width:17px;height:17px;padding:0 4px;border-radius:100px;background:var(--action);color:#fff;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--navy-deep)}
+.rproto .gctx .gx-ffrow .fn{flex:0 0 168px;font-size:12.5px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rproto .gctx .gx-ffrow .fn span{color:rgba(255,255,255,.6);font-weight:600}
+.rproto .gctx .gx-ffrow .fbar{flex:1;height:7px;border-radius:100px;background:rgba(255,255,255,.18);overflow:hidden;min-width:60px}
+.rproto .gctx .gx-ffrow .ffl{height:100%;border-radius:100px;background:#79e0a6}
+.rproto .gctx .gx-ffrow .ffl.partial{background:#ffc97a}.rproto .gctx .gx-ffrow .ffl.none{background:rgba(255,255,255,.28)}
+.rproto .gctx .gx-ffrow .fm{flex:0 0 auto;font-size:11px;font-weight:700;color:rgba(255,255,255,.78);white-space:nowrap}
+.rproto .gctx .gx-ffrow .fm b{font-family:"IBM Plex Sans",monospace;color:#fff}
+.rproto .gctx .gx-ffrow .fm .fbd{color:#79e0a6}
+.rproto .gctx .gx-ffrow .fgo{flex:0 0 auto;color:rgba(255,255,255,.55);font-size:20px}
+.rproto .gctx .gx-ffmore{align-self:flex-start;font:inherit;font-size:11.5px;font-weight:800;color:#ffc97a;background:rgba(255,255,255,.1);border:0;border-radius:var(--r-sm);padding:7px 11px;cursor:pointer;margin-top:2px}
+/* compact item tiles, horizontal scroll */
+.rproto .items-scroll{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px}
+.rproto .itile{flex:0 0 264px;background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-lg);padding:14px;display:flex;flex-direction:column;gap:12px}
+.rproto .itile-h{display:flex;align-items:center;gap:11px}
+.rproto .itile-th{position:relative;width:46px;height:46px;border-radius:11px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--navy-mid);flex:0 0 auto}
+.rproto .itile-th .material-icons-outlined{font-size:25px}
+.rproto .itile-badge{position:absolute;top:-7px;inset-inline-end:-7px;min-width:20px;height:20px;padding:0 5px;border-radius:100px;background:var(--action);color:#fff;font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid var(--surface1)}
+.rproto .itile-nm{font-size:13.5px;font-weight:800;color:var(--navy);line-height:1.25}
+.rproto .itile-nm .sz{display:block;color:var(--muted);font-weight:600;font-size:11.5px;margin-top:1px}
+.rproto .itile-bids{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--navy-mid)}
+.rproto .itile-bids .material-icons-outlined{font-size:16px;color:var(--success)}
+.rproto .itile-bids b{color:var(--success)}
+.rproto .itile-bids .sep{color:var(--border)}
+.rproto .itile-acts{display:flex;gap:7px}
+.rproto .itile-acts .btn{flex:1}
+/* page chrome */
+body{margin:0;background:#dde7f0;font-family:"Inter",sans-serif}
+.topnav{position:sticky;top:0;z-index:30;background:#12263a;color:#fff;display:flex;align-items:center;gap:4px;padding:11px 22px;flex-wrap:wrap}
+.topnav .brand{font-weight:800;margin-inline-end:14px;display:flex;align-items:center;gap:8px}
+.topnav .brand .dot{width:9px;height:9px;border-radius:50%;background:#f79009}
+.topnav .tb{font-size:12.5px;font-weight:700;color:#9fb6cc;background:none;border:0;cursor:pointer;padding:8px 13px;border-radius:8px}
+.topnav .tb:hover,.topnav .tb.on{background:rgba(255,255,255,.1);color:#fff}
+.topnav .sp{flex:1}.topnav .note{font-size:11.5px;color:#7f9bb5}
+.page{padding:24px 22px 50px}
+.phint{max-width:1060px;margin:0 auto 14px;font-size:12.5px;color:#5b748a;background:#fff;border:1px solid #d4e0ec;border-radius:10px;padding:10px 14px}
+.phint b{color:#1c3550}
+</style>
+</head>
+<body>
+<div class="topnav">
+  <span class="brand"><span class="dot"></span>Moedatech</span>
+  <button class="tb on" data-page="requests">Requests &amp; Bids</button>
+  <button class="tb" data-page="create">Create request</button>
+  <button class="tb" data-page="share">Share form</button>
+  <span class="sp"></span><span class="note">Interactive prototype · sample data</span>
+</div>
+<div class="page"><div id="app" class="rproto"></div></div>
+
+<script>
+const RFQS=[
+ {id:"REQ-00182",place:"Ar Rahmaniyyah, Riyadh",created:"28 Jun 2026",type:"Broadcast",opened:14,submitted:8,deadline:"2d 6h",
+  items:[
+   {id:"ac",name:"Air Compressor",size:"1800 cfm",icon:"hvac",units:3,fulfilled:2},
+   {id:"ce",name:"Crawler Excavator",size:"35 ton",icon:"agriculture",units:2,fulfilled:2},
+   {id:"gn",name:"Generator",size:"500 kVA",icon:"bolt",units:2,fulfilled:0},
+   {id:"fk",name:"Forklift",size:"12 ton",icon:"forklift",units:1,fulfilled:0},
+   {id:"lt",name:"Light Tower",size:"9 m",icon:"wb_incandescent",units:1,fulfilled:1},
+   {id:"wp",name:"Water Pump",size:"6 in",icon:"water_drop",units:1,fulfilled:0},
+  ],
+  bids:[
+   {sup:"Gulf Heavy Equipment",rating:4.8,verified:true,via:"app",dist:"12 km",item:"ac",units:3,price:14260,best:true,terms:[["Equip","ok","4/4"],["Project","warn","3/4"]],creds:[["TÜV",1],["≥2018",1]]},
+   {sup:"Al-Faisal Contracting",rating:null,verified:false,via:"link",item:"ac",units:2,price:9890,terms:[["Equip","ok","3/3"],["Project","bad","1/3"]],creds:[["TÜV",1],["Operator",0]]},
+   {sup:"Rashid Rentals",rating:4.2,verified:true,via:"app",dist:"28 km",item:"ac",units:1,price:5175,terms:[["Equip","warn","2/3"]],creds:[["Operator",1]]},
+   {sup:"Najd Machinery",rating:4.5,verified:true,via:"app",dist:"19 km",item:"ac",units:2,price:10400,terms:[["Equip","ok","3/3"],["Project","ok","4/4"]],creds:[["TÜV",1]]},
+   {sup:"Hail Rentals",rating:3.9,verified:false,via:"link",item:"ac",units:1,price:5400,terms:[["Equip","bad","1/3"]],creds:[["TÜV",0]]},
+   {sup:"Gulf Heavy Equipment",rating:4.8,verified:true,via:"app",dist:"12 km",item:"ce",units:2,price:23920,best:true,terms:[["Equip","ok","4/4"]],creds:[["Operator",1]]},
+   {sup:"Najd Machinery",rating:4.5,verified:true,via:"app",item:"ce",units:1,price:11800,terms:[["Equip","ok","4/4"]],creds:[["Operator",1]]},
+   {sup:"Al-Faisal Contracting",rating:null,verified:false,via:"link",item:"ce",units:1,price:8650,terms:[["Equip","warn","2/3"]],creds:[["Operator",0]]},
+   {sup:"Gulf Heavy Equipment",rating:4.8,verified:true,via:"app",item:"fk",units:1,price:4000,terms:[["Equip","ok","3/3"]],creds:[]},
+  ]},
+ {id:"REQ-00190",place:"As Sulimaniyah, Riyadh",created:"27 Jun 2026",type:"Broadcast",opened:6,submitted:3,deadline:"1d 2h",
+  items:[
+   {id:"bd",name:"Bulldozer",size:"D8",icon:"agriculture",units:2,fulfilled:1},
+   {id:"tt",name:"Tipper Truck",size:"30 ton",icon:"local_shipping",units:1,fulfilled:0},
+  ],
+  bids:[
+   {sup:"Najd Machinery",rating:4.5,verified:true,via:"app",dist:"9 km",item:"bd",units:2,price:30000,best:true,terms:[["Equip","ok","4/4"]],creds:[["Operator",1]]},
+   {sup:"Gulf Heavy Equipment",rating:4.8,verified:true,via:"app",item:"bd",units:1,price:16200,terms:[["Equip","ok","4/4"]],creds:[]},
+  ]},
+ {id:"REQ-00171",place:"Al Hamra, Jeddah",created:"25 Jun 2026",type:"Broadcast",opened:2,submitted:0,deadline:"4d",
+  items:[{id:"cr",name:"Mobile Crane",size:"80 ton",icon:"precision_manufacturing",units:1,fulfilled:0}],bids:[]},
+];
+const money=n=>n.toLocaleString("en-US");
+const itemBids=(r,id)=>r.bids.filter(b=>b.item===id);
+const totalBids=r=>r.bids.length;
+const fillClass=it=>it.units?(it.fulfilled>=it.units?"":it.fulfilled>0?"partial":"none"):"none";
+const pct=it=>it.units?Math.round(it.fulfilled/it.units*100):0;
+function suppliers(r){const m={};r.bids.forEach(b=>{(m[b.sup]=m[b.sup]||{sup:b.sup,rating:b.rating,verified:b.verified,via:b.via,rows:[],total:0}).rows.push(b);m[b.sup].total+=b.price;});return Object.values(m).sort((a,b)=>b.rows.length-a.rows.length||b.total-a.total);}
+
+let S={page:"requests",rfq:0,view:"rfq",item:null,mode:"item",expanded:false};
+const app=document.getElementById("app");
+
+function render(){
+  document.querySelectorAll(".topnav .tb").forEach(b=>b.classList.toggle("on",b.dataset.page===S.page));
+  if(S.page==="create")return app.innerHTML=createView();
+  if(S.page==="share")return app.innerHTML=shareView();
+  app.innerHTML = S.view==="rfq" ? rfqView() : bidsView();
+  bind();
+}
+
+/* ---- RFQ workspace ---- */
+function rfqHeader(r){
+  const tU=r.items.reduce((s,i)=>s+i.units,0);
+  const sorted=[...r.items].sort((a,b)=>b.units-a.units);
+  const shown=S.expanded?sorted:sorted.slice(0,4), hidden=r.items.length-shown.length;
+  const rows=shown.map(it=>{const nb=itemBids(r,it.id).length;return `<div class="gx-ffrow" data-go="${it.id}">
+      <span class="fi"><span class="material-icons-outlined">${it.icon}</span><span class="fb">×${it.units}</span></span>
+      <span class="fn">${it.name} <span>· ${it.size}</span></span>
+      <span class="fbar"><span class="ffl ${fillClass(it)}" style="width:${pct(it)}%"></span></span>
+      <span class="fm"><b>${it.fulfilled}/${it.units}</b> units · <span class="fbd">${nb} bid${nb===1?"":"s"}</span></span>
+      <span class="material-icons-outlined fgo">chevron_right</span></div>`;}).join("");
+  return `<div class="gctx">
+    <div class="gx-row">
+      <div class="gx-ic"><span class="material-icons-outlined">${r.items[0].icon}</span>${r.items.length>1?`<span class="gx-more-badge">+${r.items.length-1}</span>`:""}</div>
+      <div class="gx-main"><div class="gx-title">${r.place} <span class="gx-count">${r.id}</span></div>
+        <div class="gx-meta">${r.items.length} items · ${tU} units · created ${r.created}</div></div>
+      <div class="gx-badges">
+        <span class="typebadge tb-broadcast"><span class="material-icons-outlined">campaign</span>${r.type}</span>
+        <button class="gx-iconbtn" title="Share"><span class="material-icons-outlined">ios_share</span></button>
+        <button class="gx-iconbtn" title="Copy link"><span class="material-icons-outlined">content_copy</span></button>
+        <button class="gx-iconbtn" title="Edit request"><span class="material-icons-outlined">tune</span></button>
+      </div>
+    </div>
+    <div class="gx-track">
+      <span class="rt-stat"><span class="material-icons-outlined">link</span> Shared link</span>
+      <span class="rt-stat"><span class="material-icons-outlined">visibility</span> <b>${r.opened}</b> opened</span>
+      <span class="rt-stat sub"><span class="material-icons-outlined">inbox</span> <b>${r.submitted}</b> submitted</span>
+      <span class="dl-chip"><span class="material-icons-outlined">schedule</span> closes ${r.deadline}</span>
+    </div>
+    <div class="gx-ffhead"><span class="lbl">Fulfillment by item type</span>
+      <button class="gx-viewall" data-viewall><span class="material-icons-outlined">gavel</span>View all ${totalBids(r)} bids</button></div>
+    <div class="gx-fftrack">${rows}
+      ${r.items.length>4?`<button class="gx-ffmore" data-expand>${S.expanded?"Show less ▴":`+${hidden} more item${hidden===1?"":"s"} ▾`}</button>`:""}</div>
+  </div>`;
+}
+function rfqView(){
+  const r=RFQS[S.rfq];
+  const tabs=RFQS.map((x,i)=>`<div class="rfqchip ${i===S.rfq?"on":""}" data-rfq="${i}"><div class="l">RFQ · ${x.place.split(",").pop().trim()}</div><div class="n">${x.place.split(",")[0]}</div><div class="m">${x.items.length} items · ${totalBids(x)} bids</div></div>`).join("");
+  const tiles=r.items.map(it=>{const nb=itemBids(r,it.id).length;return `<div class="itile">
+      <div class="itile-h"><span class="itile-th"><span class="material-icons-outlined">${it.icon}</span><span class="itile-badge">×${it.units}</span></span>
+        <div class="itile-nm">${it.name}<span class="sz">${it.size}</span></div></div>
+      <div class="itile-bids"><span class="material-icons-outlined">gavel</span> ${nb?`<b>${nb}</b> ${nb===1?"bid":"bids"}`:"No bids"} <span class="sep">·</span> ${it.fulfilled}/${it.units} units</div>
+      <div class="itile-acts"><button class="btn sm primary" data-go="${it.id}"><span class="material-icons-outlined">gavel</span>View bids</button>
+        <button class="btn sm" data-details="${it.id}"><span class="material-icons-outlined">description</span>Details</button></div>
+    </div>`;}).join("");
+  return `<div class="flevel"><div class="flab"><span class="material-icons-outlined">folder_open</span>Your RFQs</div><div class="chips-row">${tabs}</div></div>
+    ${rfqHeader(r)}
+    <div class="contentbar"><span class="count">Items · ${r.items.length}</span><span style="flex:1"></span><span style="font-size:11.5px;color:var(--muted)"><span class="material-icons-outlined" style="font-size:14px;vertical-align:-2px">swipe</span> scroll for more</span></div>
+    <div class="items-scroll">${tiles}</div>`;
+}
+
+/* ---- Bid view ---- */
+function bidCard(b){
+  const stars=b.rating?`<span class="rate"><span class="material-icons-outlined">star</span>${b.rating}</span>`:"";
+  const fffull=b.units>=(itemOf(b).units);
+  return `<div class="bid ${b.best?"sel":""} ${b.via==="link"?"bid-link":""}">
+    ${b.best?`<div class="best-strip"><span class="material-icons-outlined">workspace_premium</span>Best value for this item</div>`:""}
+    ${b.via==="link"?`<div class="slb-strip"><span class="material-icons-outlined">link</span>Off-platform · via shared link</div>`:""}
+    <div class="bid-head"><span class="${b.via==="link"||true?"bid-eq":""}"><span class="material-icons-outlined">${itemOf(b).icon}</span></span>
+      <div class="bid-hh"><div class="r1"><span class="sname">${b.sup}</span><span class="qty-badge">${itemOf(b).name.split(" ")[0]} ×${b.units}</span></div>
+        <div class="bid-by">${b.verified?`<span class="material-icons-outlined">verified</span><span class="vf">Verified</span><span class="dotsep">·</span>`:""}${stars}${stars?`<span class="dotsep">·</span>`:""}${b.via==="link"?"off-platform":"via app"}${b.dist?`<span class="dotsep">·</span>${b.dist}`:""}</div>
+        ${b.creds&&b.creds.length?`<div class="cred-pills">${b.creds.map(c=>`<span class="cred-pill ${c[1]?"ok":"no"}"><span class="material-icons-outlined">${c[1]?"check":"close"}</span>${c[0]}</span>`).join("")}</div>`:""}
+      </div></div>
+    <div class="bid-ff"><span class="material-icons-outlined">inventory_2</span>Units fulfilled<div class="bar"><div class="fill ${fffull?"full":""}" style="width:${Math.round(b.units/itemOf(b).units*100)}%"></div></div><span class="n"><b>${b.units} of ${itemOf(b).units}</b></span></div>
+    <button class="terms-row"><span class="tlab">Terms</span><span class="term-classes">${b.terms.map(t=>`<span class="tcls tcls-${t[1]}">${t[1]==="ok"?'<span class="material-icons-outlined">check_circle</span>':""}${t[0]} ${t[2]}</span>`).join("")}</span><span class="material-icons-outlined chev">expand_more</span></button>
+    <div class="price-row"><div class="price-collapsed"><span class="pl">Quoted total · incl VAT</span><span class="pr">${money(b.price)} <span style="font-size:12px;color:var(--muted)">SAR</span></span></div></div>
+    <div class="bid-foot">${b.via==="link"?`<button class="slb-view-btn"><span class="material-icons-outlined">visibility</span>View quotation</button>`:`<button class="btn sm"><span class="material-icons-outlined">visibility</span>View</button><button class="btn sm primary"><span class="material-icons-outlined">forum</span>Deal room</button>`}</div>
+  </div>`;
+}
+let _curRfq=null;
+function itemOf(b){return _curRfq.items.find(i=>i.id===b.item);}
+function bidsView(){
+  const r=RFQS[S.rfq];_curRfq=r;
+  const active=S.item||r.items[0].id;
+  const it=r.items.find(i=>i.id===active);
+  const head=`<button class="crumb" data-back><span class="material-icons-outlined">arrow_back</span>${r.place} · ${r.id}</button>
+    <div class="gctx" style="padding:11px 16px"><div class="gx-row">
+      <div class="gx-ic"><span class="material-icons-outlined">${it.icon}</span></div>
+      <div class="gx-main"><div class="gx-title" style="font-size:13.5px">${r.place} · ${r.id}</div><div class="gx-meta">${S.mode==="item"?`${it.name} · ${it.size} · ×${it.units}`:`${suppliers(r).length} suppliers · ${totalBids(r)} bids across ${r.items.length} items`}</div></div>
+      <div class="gx-badges"><span class="gx-bids"><span class="material-icons-outlined">gavel</span> ${totalBids(r)} bids</span></div></div></div>
+    <div class="vseg"><button class="${S.mode==="item"?"on":""}" data-mode="item"><span class="material-icons-outlined">view_agenda</span>This item · ${itemBids(r,active).length} bids</button>
+      <button class="${S.mode==="supplier"?"on":""}" data-mode="supplier"><span class="material-icons-outlined">groups</span>By supplier · whole RFQ</button></div>`;
+  if(S.mode==="supplier"){
+    const sups=suppliers(r).map(s=>{
+      const init=s.sup.split(" ").slice(0,2).map(w=>w[0]).join("");
+      const rows=r.items.map(it=>{const b=s.rows.find(x=>x.item===it.id);
+        const st=b?(b.units>=it.units?["ok","full"]:["part","partial"]):["none","no bid"];
+        return `<div class="supitem" ${b?"":'style="opacity:.5"'}><span class="material-icons-outlined">${it.icon}</span>
+          <div><div class="si-nm">${it.name} · ${it.size}</div><div class="si-units">${b?`${b.units} of ${it.units} units`:"no bid"}</div></div>
+          <span class="si-st ${st[0]}">${st[1]}</span><span class="si-price">${b?money(b.price):"—"}</span></div>`;}).join("");
+      return `<div class="bid ${s.via==="link"?"bid-link":""}">${s.via==="link"?`<div class="slb-strip"><span class="material-icons-outlined">link</span>Off-platform · via shared link</div>`:""}
+        <div class="bid-head"><span class="bid-av">${init}</span><div class="bid-hh"><div class="r1"><span class="sname">${s.sup}</span>${s.verified?`<span class="material-icons-outlined" style="color:var(--success);font-size:16px">verified</span>`:""}</div>
+          <div class="bid-by">Bid on ${s.rows.length} of ${r.items.length} items${s.rating?` · ★ ${s.rating}`:""} · ${s.via==="link"?"off-platform":"via app"}</div></div>
+          <div class="sup-tot"><div class="l">RFQ total</div><div class="v">${money(s.total)} <span style="font-size:11px;color:var(--muted)">SAR</span></div></div></div>
+        ${rows}</div>`;}).join("");
+    return head+sups;
+  }
+  const chips=r.items.map(i=>`<span class="req-chip ${i.id===active?"on":""}" data-item="${i.id}">${i.name} · ${i.size} <span class="ct">${itemBids(r,i.id).length}</span></span>`).join("");
+  const bids=itemBids(r,active);
+  const grid=bids.length?`<div class="bidscroll"><div class="bidgrid">${bids.map(bidCard).join("")}</div></div>`
+    :`<div style="border:1px dashed var(--border);border-radius:var(--r-lg);padding:36px;text-align:center;color:var(--muted);font-size:13.5px">No bids on this item yet.</div>`;
+  return head+`<div class="req-chips">${chips}</div>`+grid;
+}
+
+/* ---- Create + Share ---- */
+function createView(){return `<button class="crumb" data-page="requests"><span class="material-icons-outlined">arrow_back</span>Back</button>
+  <div class="flbl"><span class="material-icons-outlined">payments</span>Payment terms</div>
+  <div class="optrow" data-single><button class="opt">Upfront</button><button class="opt on">Net 30<small>30 days</small></button><button class="opt">Net 60</button><button class="opt">Net 90</button><button class="opt">End of job</button></div>
+  <div class="flbl"><span class="material-icons-outlined">bolt</span>Breakdown response time (SLA)</div>
+  <div class="optrow" data-single><button class="opt on">24 hours</button><button class="opt">48 hours</button><button class="opt">72 hours</button></div>
+  <div class="flbl"><span class="material-icons-outlined">fact_check</span>Review &amp; send — all parameters</div>
+  <div class="dcard">
+    <div class="review-sh"><span class="material-icons-outlined">place</span>Project<button class="edit">Edit</button></div>
+    <div class="kv"><div class="k">Location</div><div class="v">Ar Rahmaniyyah, Riyadh</div><div class="k">Rental basis</div><div class="v">Daily · 15 Jun → 14 Jul</div><div class="k">Hours / days</div><div class="v">10 h/day · 6 days/wk · OT 1.5×</div></div>
+    <div class="review-sh"><span class="material-icons-outlined">construction</span>Equipment · 3 items<button class="edit">Edit</button></div>
+    <div class="kv"><div class="k">Air Compressor 1800 cfm</div><div class="v">×3 · Diesel · TÜV · ≥2018</div><div class="k">Crawler Excavator 35 ton</div><div class="v">×2 · Operator · Saudi</div><div class="k">Delivery / return</div><div class="v">Supplier · Supplier</div></div>
+    <div class="review-sh"><span class="material-icons-outlined">gavel</span>Preferences<button class="edit">Edit</button></div>
+    <div class="kv"><div class="k">Payment terms</div><div class="v">Net 30</div><div class="k">Breakdown SLA</div><div class="v">24 hours</div><div class="k">Maintenance</div><div class="v">Supplier</div><div class="k">Budget · window</div><div class="v">60,000 SAR · 72h</div></div>
+  </div>
+  <div style="display:flex;justify-content:flex-end;margin-top:16px"><button class="btn primary"><span class="material-icons-outlined">send</span>Send request</button></div>`;}
+function shareView(){return `<button class="crumb" data-page="requests"><span class="material-icons-outlined">arrow_back</span>Back</button>
+  <div class="share-hero"><h3>Want bids from suppliers you already know?</h3>
+    <p>Share this link with any supplier — they bid on a simple form, no account needed, and their offer lands right here beside your app bids.</p>
+    <div class="howrow"><div class="howstep"><div class="n">1</div><h4>Share the link</h4><p>Send by WhatsApp, email or SMS to suppliers you trust.</p></div>
+      <div class="howstep"><div class="n">2</div><h4>They submit a bid</h4><p>They price each item and confirm your terms on the form.</p></div>
+      <div class="howstep hl"><div class="n">3</div><h4>You compare here</h4><p>Every off-platform bid shows up beside your app bids.</p></div></div>
+    <div class="sharelink"><span class="url">https://moedatech.app/bid/ar-rahmaniyyah-9f3a-…</span><button>Copy link</button></div></div>`;}
+
+/* ---- events ---- */
+function bind(){
+  app.querySelectorAll("[data-rfq]").forEach(e=>e.onclick=()=>{S.rfq=+e.dataset.rfq;S.expanded=false;render();});
+  app.querySelectorAll("[data-expand]").forEach(e=>e.onclick=()=>{S.expanded=!S.expanded;render();});
+  app.querySelectorAll("[data-go]").forEach(e=>e.onclick=()=>{S.item=e.dataset.go;S.view="bids";S.mode="item";render();window.scrollTo(0,0);});
+  app.querySelectorAll("[data-viewall]").forEach(e=>e.onclick=()=>{S.item=RFQS[S.rfq].items[0].id;S.view="bids";S.mode="supplier";render();window.scrollTo(0,0);});
+  app.querySelectorAll("[data-details]").forEach(e=>e.onclick=()=>alert("→ Request details for item "+e.dataset.details+" (whole-group or per-item view)"));
+  app.querySelectorAll("[data-back]").forEach(e=>e.onclick=()=>{S.view="rfq";render();window.scrollTo(0,0);});
+  app.querySelectorAll("[data-mode]").forEach(e=>e.onclick=()=>{S.mode=e.dataset.mode;render();});
+  app.querySelectorAll("[data-item]").forEach(e=>e.onclick=()=>{S.item=e.dataset.item;render();});
+  app.querySelectorAll(".optrow[data-single] .opt").forEach(o=>o.onclick=()=>{o.parentElement.querySelectorAll(".opt").forEach(x=>x.classList.remove("on"));o.classList.add("on");});
+}
+document.querySelectorAll(".topnav .tb").forEach(b=>b.onclick=()=>{S.page=b.dataset.page;if(S.page==="requests")S.view="rfq";render();});
+render();
+</script>
+</body>
+</html>

@@ -84,6 +84,9 @@ export interface BidCard {
   /** Units the RFQ asked for (request.equipmentItems[0].numberOfUnits). The bid price is PER-UNIT, so
    *  totals on the card + quotation multiply by this (app parity: v3_bid_card.dart). */
   numberOfUnits: number;
+  /** Units THIS supplier offered to cover (bid.units_offered length). ≤ numberOfUnits. Drives
+   *  fulfillment ("covers X of Y units"); defaults to numberOfUnits when the bid doesn't specify. */
+  unitsOffered: number;
   /** The request's equipment-year requirement (raw maxEquipmentAge — a min year like 2020, or an age). */
   reqMinYear: number | null;
   equipment: { id: string | null; make: string | null; model: string | null; year: number | null; imageUrl: string | null } | null;
@@ -477,6 +480,8 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     priceUnit: s(raw.priceUnit),
     duration: n(raw.duration),
     numberOfUnits: n(rqItem.numberOfUnits) ?? 1,
+    // Supplier's chosen quantity (bid.units_offered is an array; its length = offered unit count).
+    unitsOffered: Array.isArray(raw.unitsOffered) ? raw.unitsOffered.length : (n(raw.unitsOffered) ?? n(rqItem.numberOfUnits) ?? 1),
     reqMinYear: n(rqItem.maxEquipmentAge),
     equipment: eq
       ? { id: s(eq.id) ?? s(eq.equipmentId), make: s(eq.manufacturer) ?? s(eq.make), model: s(eq.model), year: n(eq.year), imageUrl: s(eq.imageUrl) ?? s(eq.primaryPhotoUrl) }

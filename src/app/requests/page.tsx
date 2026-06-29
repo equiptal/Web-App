@@ -8,7 +8,7 @@ import { RequestsList } from "@/components/requests/RequestsList";
 export default function RequestsPage() {
   const { locale } = useLocale();
   return (
-    <AppShell title={locale === "ar" ? "طلباتي" : "My Requests"}>
+    <AppShell title={locale === "ar" ? "طلباتي" : "My Requests"} wide>
       <RequestsList />
     </AppShell>
   );

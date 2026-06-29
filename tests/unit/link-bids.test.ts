@@ -84,9 +84,11 @@ describe("submissionToBidCard", () => {
     expect(operator.state).toBe("matched");
   });
 
-  it("undefined confirmation → grey (not asked for this item)", () => {
+  it("undefined confirmation → term omitted (not asked for this item)", () => {
+    // submissionToBidCard only emits terms the renter actually asked: an undefined confirmation
+    // is dropped entirely (kept dynamic), rather than shown as a grey "not documented" row.
     const c = submissionToBidCard(sub({ items: [{ requestItemId: "i1", rentalRate: 100 }] }));
-    expect(c.terms.equipment.find((t) => t.key === "year")!.state).toBe("grey");
+    expect(c.terms.equipment.find((t) => t.key === "year")).toBeUndefined();
   });
 
   it("scopes to a passed item for the per-item comparison", () => {

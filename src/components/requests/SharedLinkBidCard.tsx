@@ -2,23 +2,25 @@
 
 import { useState } from "react";
 import type { BidCard } from "@/lib/contract/bids";
-import { TermClassBadges } from "@/components/requests/TermClassBadges";
-import { TermsPanel } from "@/components/requests/TermsPanel";
+import { CERT_LABEL } from "@/lib/contract/bids";
+import { BidTermsModal } from "@/components/requests/BidTermsModal";
 import { EquipImg } from "@/components/requests/EquipImg";
 
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
 
 /**
- * web-app/006 demo — an off-platform bid submitted through the renter's shared link (no account).
- * Distinct from a normal bid card: an orange "via shared link" strip, a flat quoted total (no
- * rate/period breakdown), and a "View bid submission" footer (read-only viewer) instead of negotiate
- * — there is no deal room for an off-platform supplier. Matches the 007 bids-by-supplier prototype.
+ * web-app/006 — an off-platform bid submitted through the renter's shared link (no account). Same
+ * prototype card shell as an on-platform bid, but the status pill is replaced by an "off-platform"
+ * link chip, the footer CTA opens the read-only submission viewer (no deal room to negotiate), and a
+ * "submitted N days ago" line sits above it. Selection works in the parent's select mode.
  */
 export function SharedLinkBidCard({
   bid,
   ar,
   L,
   isSel,
+  selectMode,
+  cardFlex,
   onToggleSelect,
   onViewSubmission,
   itemLabel,
@@ -29,20 +31,24 @@ export function SharedLinkBidCard({
   ar: boolean;
   L: (en: string, arr: string) => string;
   isSel: boolean;
+  /** Grouped My-Bids select flow: true = picking (whole-card select), false = resting. Omit for the
+   *  legacy single-request view, which keeps an always-visible checkbox + the full card. */
+  selectMode?: boolean;
+  /** Card flex (count-dynamic width) from the parent; defaults to the fixed peek width. */
+  cardFlex?: string;
   onToggleSelect: () => void;
   onViewSubmission: () => void;
   itemLabel?: string | null;
   itemImage?: string | null;
   categoryId?: string | null;
 }) {
-  const [termsOpen, setTermsOpen] = useState(false);
   const [priceOpen, setPriceOpen] = useState(false);
-  const units = bid.numberOfUnits || 1;
-  // App-style price breakdown (rate × qty + delivery×qty + return×qty → subtotal + 15% VAT → item total).
-  const rate = bid.price ?? 0, del = bid.mobPrice ?? 0, ret = bid.demobPrice ?? 0;
-  const subtotal = (rate + del + ret) * units;
-  const vat = Math.round(subtotal * 0.15);
-  const total = bid.quotedTotal ?? Math.round(subtotal * 1.15);
+  const [perUnit, setPerUnit] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
+  const [eqInfoOpen, setEqInfoOpen] = useState(false); // "acknowledged in the form only" disclaimer
+  const picking = selectMode === true; // grouped select flow: whole-card select, hide actions
+  const legacy = selectMode === undefined; // single-request view: always-on checkbox + full card
+
   const periodOf = (u: string | null) => {
     switch ((u ?? "PER_DAY").toUpperCase()) {
       case "PER_WEEK": return L("week", "أسبوع");
@@ -51,96 +57,201 @@ export function SharedLinkBidCard({
       default: return L("day", "يوم");
     }
   };
+
+  const offered = bid.unitsOffered || 1;
+  const needed = bid.numberOfUnits || offered;
+  const cover = needed ? Math.min(100, Math.round((offered / needed) * 100)) : 0;
+  const u = priceOpen && perUnit ? 1 : offered;
+  const rental = (bid.price ?? 0) * u;
+  const deliv = bid.mobPrice ? (perUnit && offered > 1 ? Math.round(bid.mobPrice / offered) : bid.mobPrice) : 0;
+  const ret = bid.demobPrice ? (perUnit && offered > 1 ? Math.round(bid.demobPrice / offered) : bid.demobPrice) : 0;
+  const sub = rental + deliv + ret;
+  const vat = Math.round(sub * 0.15);
+  const grand = bid.quotedTotal && !perUnit ? bid.quotedTotal : sub + vat;
+
   const eq = bid.equipment;
   const eqLine = eq ? [eq.make, eq.model, eq.year].filter(Boolean).join(" · ") : null;
   const title = itemLabel || eqLine || L("Equipment", "المعدة");
-  const ago =
-    bid.agoDays === 1
-      ? L("submitted 1 day ago", "قُدّم قبل يوم")
-      : `${L("submitted", "قُدّم")} ${bid.agoDays ?? 2} ${L("days ago", "أيام مضت")}`;
+  const agoShort = bid.agoDays === 1 ? L("1 day ago", "قبل يوم") : `${bid.agoDays ?? 2} ${L("days ago", "أيام مضت")}`;
+
+  const okCount = (rows: typeof bid.terms.equipment) => rows.filter((r) => r.state === "matched" || r.state === "agreed").length;
+  const termChips = [
+    { label: L("Equipment", "المعدة"), rows: bid.terms.equipment },
+    { label: L("Project", "المشروع"), rows: bid.terms.contract },
+    { label: L("Documents", "المستندات"), rows: bid.terms.supplier },
+  ].filter((t) => t.rows.length > 0).map((t) => {
+    const ok = okCount(t.rows), total = t.rows.length;
+    const tone = total && ok === total ? { bg: "#e7f7ee", c: "#1daf58" } : ok > 0 ? { bg: "#fff3e0", c: "#d4780a" } : { bg: "#eff4f9", c: "#6b8fa8" };
+    return { label: t.label, ok, total, tone };
+  });
+  const certChips = (bid.equipmentCertCodes ?? []).map((c) => (ar ? CERT_LABEL[c]?.ar : CERT_LABEL[c]?.en) || c).slice(0, 2);
+
+  const rowSep = { borderTop: "1px solid #EFF2F6" } as const;
+  const iconBox = { width: 40, height: 40, borderRadius: 11, background: "#eff4f9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } as const;
+  const blueLink = { background: "none", border: "none", color: "#1a7ec8", fontWeight: 800, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" } as const;
 
   return (
-    <div className={`bid bid-link${isSel ? " sel" : ""}`}>
-      {/* off-platform / shared-link strip */}
-      <div className="slb-strip">
-        <span className="material-icons-outlined">link</span>
-        {L("Submitted via your request shared link", "مُقدّم عبر رابط طلبك المشترك")}
+    <div
+      onClick={picking ? onToggleSelect : undefined}
+      style={{ flex: cardFlex ?? "0 0 calc(44% - 8px)", minWidth: 320, scrollSnapAlign: "start", alignSelf: "stretch", display: "flex", flexDirection: "column", position: "relative", background: "#fff", border: `1px solid ${isSel ? "#f79009" : "#d4e0ec"}`, borderRadius: 18, overflow: "hidden", boxShadow: "0 1px 2px rgba(20,40,70,.04)", outline: isSel ? "2px solid #f79009" : "none", outlineOffset: 2, cursor: picking ? "pointer" : "default" }}
+    >
+      <div style={{ height: 4, background: "#f79009" }} />
+      {/* off-platform banner — replaces a status pill + the old "submitted" footer line */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 14px", background: "#fff4e5", borderBottom: "1px solid #f7e4c6" }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 800, color: "#d4780a", minWidth: 0 }}>
+          <span className="material-icons-outlined" style={{ fontSize: 15, flexShrink: 0 }}>link</span>
+          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{L("Submitted via your request shared link", "مُقدّم عبر رابط طلبك")}</span>
+        </span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: "#b07a3a", whiteSpace: "nowrap", flexShrink: 0 }}>{agoShort}</span>
+      </div>
+      {(picking || legacy) && (
+        <div
+          onClick={legacy ? (e) => { e.stopPropagation(); onToggleSelect(); } : undefined}
+          title={legacy ? L("Select for quotation", "حدّد لعرض السعر") : undefined}
+          style={{ position: "absolute", top: 12, insetInlineEnd: 12, width: 26, height: 26, borderRadius: "50%", background: isSel ? "#f79009" : "#fff", border: `2px solid ${isSel ? "#f79009" : "#d4e0ec"}`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(20,40,70,.18)", zIndex: 5, cursor: legacy ? "pointer" : "default", pointerEvents: legacy ? "auto" : "none" }}
+        >
+          {isSel && <span className="material-icons-outlined" style={{ fontSize: 16 }}>check</span>}
+        </div>
+      )}
+
+      {/* header */}
+      <div style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "16px 16px 12px" }}>
+        <div style={{ width: 56, height: 56, borderRadius: 14, background: "#eff4f9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <EquipImg src={itemImage ?? null} categoryId={categoryId ?? null} name={title} box="" img="h-10 w-10 object-contain" iconSize={36} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 8, minWidth: 0 }}>
+            <span style={{ flex: "0 1 auto", minWidth: 0, fontSize: 14.5, fontWeight: 900, color: "#1c3550", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.25 }} title={title}>{title}</span>
+            <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 800, color: "#d4780a", background: "#fff3e0", padding: "1px 8px", borderRadius: 20 }}>×{offered}</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 6 }}>
+            <span style={{ width: 22, height: 22, borderRadius: "50%", background: "#1c3550", color: "#fff", fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{(bid.supplierName || "S").charAt(0).toUpperCase()}</span>
+            <span style={{ fontSize: 13.5, fontWeight: 800, color: "#1c3550" }}>{bid.supplierName}</span>
+            {bid.verified && <span className="material-icons-outlined" style={{ fontSize: 16, color: "#1daf58" }}>verified</span>}
+          </div>
+        </div>
       </div>
 
-      <div className="slb-body">
-        {/* header */}
-        <div className="bid-head">
-          <div className="bid-eq">
-            <EquipImg src={itemImage ?? null} categoryId={categoryId ?? null} name={title} box="" img="h-7 w-7 object-contain" iconSize={24} />
-          </div>
-          <div className="bid-hh">
-            <div className="r1">
-              <span className="sname">{title}</span>
-              {units > 1 && <span className="qty-badge">× {units}</span>}
-            </div>
-            <div className="bid-by">
-              <span className="material-icons-outlined">storefront</span>{bid.supplierName}
-              <span className="slb-pill"><span className="material-icons-outlined">link</span>{L("via shared link", "عبر الرابط")}</span>
-            </div>
-            <div className="slb-badges">
-              {eqLine && <span className="slb-badge">{eqLine}</span>}
-              {bid.heldCertCodes.includes("TUV") && <span className="slb-badge ok"><span className="material-icons-outlined">check</span>TÜV</span>}
-              {bid.compliance.activityLicense && bid.compliance.taxNumber && (
-                <span className="slb-badge"><span className="material-icons-outlined">badge</span>{L("CR + VAT captured", "السجل والضريبة مُلتقطان")}</span>
+      {/* fulfillment band */}
+      <div style={{ margin: "0 16px 14px", padding: "10px 14px", borderRadius: 12, background: "#fff4e5", display: "flex", alignItems: "center", gap: 12 }}>
+        <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550", whiteSpace: "nowrap" }}>{L(`Covers ${offered} of ${needed} units`, `يغطّي ${offered} من ${needed} وحدات`)}</span>
+        <div style={{ flex: 1, height: 8, borderRadius: 6, background: "rgba(247,144,9,.18)", overflow: "hidden" }}>
+          <div style={{ height: "100%", borderRadius: 6, background: "#f79009", width: `${cover}%` }} />
+        </div>
+        {bid.distanceKm != null && <span style={{ fontSize: 12, color: "#6b8fa8", fontWeight: 700, whiteSpace: "nowrap" }}>{Math.round(bid.distanceKm)} km</span>}
+      </div>
+
+      {/* Equipment row */}
+      <div style={{ ...rowSep, display: "flex", alignItems: "center", gap: 12, padding: "13px 16px", position: "relative" }}>
+        <div style={iconBox}>
+          <EquipImg src={itemImage ?? null} categoryId={categoryId ?? null} name={title} box="" img="h-5 w-5 object-contain" iconSize={20} />
+        </div>
+        <span style={{ fontSize: 14, fontWeight: 800, color: "#1c3550" }}>{L("Equipment", "المعدة")}</span>
+        <div style={{ display: "flex", gap: 6, flexWrap: "nowrap", flex: 1, minWidth: 0, overflowX: "auto" }} className="no-sb">
+          {certChips.map((c, i) => (
+            <span key={i} style={{ fontSize: 12, fontWeight: 800, color: "#1daf58", background: "#e7f7ee", padding: "2px 9px", borderRadius: 20, whiteSpace: "nowrap" }}>✓ {c}</span>
+          ))}
+        </div>
+        {/* self-declared disclaimer — these were only acknowledged by the supplier in the form */}
+        <button
+          onClick={() => setEqInfoOpen((o) => !o)}
+          aria-label={L("About these details", "حول هذه التفاصيل")}
+          style={{ flexShrink: 0, width: 24, height: 24, borderRadius: "50%", border: "1.5px solid #d9362a", background: eqInfoOpen ? "#fcebea" : "#fff", color: "#d9362a", fontWeight: 900, fontSize: 14, lineHeight: 1, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit" }}
+        >
+          !
+        </button>
+        {eqInfoOpen && (
+          <>
+            <div onClick={() => setEqInfoOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 20 }} />
+            <div style={{ position: "absolute", zIndex: 30, top: "100%", insetInlineEnd: 12, marginTop: 4, width: 250, background: "#1c3550", color: "#fff", borderRadius: 12, padding: "11px 13px", boxShadow: "0 12px 30px rgba(16,38,63,.35)", fontSize: 12, fontWeight: 600, lineHeight: 1.5 }}>
+              {L(
+                "These certificates were acknowledged by the supplier in your shared-link form only — they haven’t been verified.",
+                "أقرّ المؤجّر بهذه الشهادات في نموذج الرابط فقط — ولم يتم التحقق منها.",
               )}
             </div>
-          </div>
-          <div className={`bid-check${isSel ? " on" : ""}`} onClick={onToggleSelect} title={L("Select to compare", "حدّد للمقارنة")}>
-            <span className="material-icons-outlined">check</span>
-          </div>
+          </>
+        )}
+      </div>
+
+      {/* Terms row */}
+      <div style={{ ...rowSep, display: "flex", alignItems: "center", gap: 12, padding: "13px 16px" }}>
+        <div style={iconBox}><span className="material-icons-outlined" style={{ fontSize: 20, color: "#6b8fa8" }}>description</span></div>
+        <span style={{ fontSize: 14, fontWeight: 800, color: "#1c3550" }}>{L("Terms", "الشروط")}</span>
+        <div style={{ display: "flex", gap: 6, flexWrap: "nowrap", flex: 1, minWidth: 0, overflowX: "auto" }} className="no-sb">
+          {termChips.map((t) => (
+            <span key={t.label} style={{ fontSize: 12, fontWeight: 800, color: t.tone.c, background: t.tone.bg, padding: "2px 9px", borderRadius: 20, whiteSpace: "nowrap" }}>{t.label} {t.ok}/{t.total}</span>
+          ))}
         </div>
+        {!picking && <button onClick={() => setTermsOpen(true)} style={blueLink}>{L("View", "عرض")} ›</button>}
+      </div>
 
-        {/* terms match — tap to expand the per-term breakdown (no deal room to negotiate) */}
-        <button
-          type="button"
-          className={`slb-row slb-terms tappable${termsOpen ? " open" : ""}`}
-          aria-expanded={termsOpen}
-          onClick={() => setTermsOpen((o) => !o)}
-        >
-          <span className="slb-lbl">{L("Terms match", "مطابقة الشروط")}</span>
-          <TermClassBadges terms={bid.terms} ar={ar} />
-          <span className="material-icons-outlined chev">expand_more</span>
-        </button>
-        {termsOpen && <TermsPanel terms={bid.terms} ar={ar} L={L} />}
-
-        {/* price — app-style breakdown (tap to expand): rate × qty · delivery · return · subtotal · VAT · total */}
-        <div className={`price-row${priceOpen ? " open" : ""}`}>
-          <div className="price-collapsed" onClick={() => setPriceOpen((o) => !o)}>
-            <span className="pl">{L("Quoted total", "الإجمالي المُسعّر")}</span>
-            <span className="pr">{L("SAR", "ر.س")} {nf(total)}<span className="material-icons-outlined chev">expand_more</span></span>
-          </div>
-          {priceOpen && (
-            <div className="price-body">
-              <div className="prow"><span className="pl2">{L("Rental", "الإيجار")} ({nf(rate)} {L("SAR", "ر.س")}/{periodOf(bid.priceUnit)}{units > 1 ? ` × ${units}` : ""})</span><span className="pv">{nf(rate * units)}</span></div>
-              {del > 0 && <div className="prow"><span className="pl2">{L("Delivery to site", "النقل إلى الموقع")}{units > 1 ? ` × ${units}` : ""}</span><span className="pv">{nf(del * units)}</span></div>}
-              {ret > 0 && <div className="prow"><span className="pl2">{L("Return from site", "النقل من الموقع")}{units > 1 ? ` × ${units}` : ""}</span><span className="pv">{nf(ret * units)}</span></div>}
-              <div className="prow"><span className="pl2">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="pv">{nf(subtotal)}</span></div>
-              <div className="prow"><span className="pl2">{L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)")}</span><span className="pv">{nf(vat)}</span></div>
-              <div className="grandcard"><span className="gl">{L("Item total", "إجمالي البند")}</span><span className="gv">{nf(total)} {L("SAR", "ر.س")}</span></div>
-            </div>
+      {/* Rate row */}
+      <div style={{ ...rowSep, padding: "13px 16px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ ...iconBox, background: "#fff4e5" }}><span className="material-icons-outlined" style={{ fontSize: 20, color: "#f79009" }}>payments</span></div>
+          <span style={{ fontSize: 14, fontWeight: 800, color: "#1c3550" }}>{L("Rate", "السعر")}</span>
+          <div style={{ flex: 1 }} />
+          <span style={{ fontSize: 19, fontWeight: 900, color: "#f79009" }}>{nf(bid.price ?? 0)} {L("SAR", "ر.س")}</span>
+          <span style={{ fontSize: 13, color: "#6b8fa8", fontWeight: 700 }}>/ {periodOf(bid.priceUnit)}</span>
+          {!picking && (
+            <button onClick={() => { setPriceOpen((o) => !o); setPerUnit(false); }} style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #d4e0ec", background: "#F7FAFC", color: "#6b8fa8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <span className="material-icons-outlined" style={{ fontSize: 18 }}>{priceOpen ? "expand_less" : "expand_more"}</span>
+            </button>
           )}
         </div>
-
-        {/* foot */}
-        <div className="slb-foot-meta">
-          <span className="slb-chip"><span className="material-icons-outlined">schedule</span>{ago}</span>
-          <button type="button" className="slb-link" onClick={onViewSubmission}>
-            {L("View bid & company", "عرض العرض والشركة")}<span className="material-icons-outlined">chevron_right</span>
-          </button>
-        </div>
-
-        {/* view submission (read-only) — replaces the negotiate footer */}
-        <button className="slb-view-btn" onClick={onViewSubmission}>
-          <span className="material-icons-outlined">visibility</span>
-          {L("View bid submission", "عرض العرض المُقدَّم")}
-        </button>
-        <p className="slb-offnote">{L("Off-platform supplier — no deal room. View their submitted bid.", "مؤجّر خارج المنصة — لا توجد غرفة صفقة. اعرض عرضه المُقدَّم.")}</p>
+        {priceOpen && !picking && (
+          <div style={{ marginTop: 12 }}>
+            {offered > 1 && (
+              <div style={{ display: "inline-flex", background: "#eff4f9", borderRadius: 10, padding: 3, marginBottom: 12 }}>
+                {([[false, L(`All ${offered} units`, `كل ${offered} وحدات`)], [true, L("Per unit", "لكل وحدة")]] as [boolean, string][]).map(([v, lab]) => (
+                  <button key={String(v)} onClick={() => setPerUnit(v)} style={{ padding: "6px 13px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12.5, fontFamily: "inherit", background: perUnit === v ? "#1c3550" : "transparent", color: perUnit === v ? "#fff" : "#6b8fa8" }}>{lab}</button>
+                ))}
+              </div>
+            )}
+            {([
+              [L(`Rental (${nf(bid.price ?? 0)}/${periodOf(bid.priceUnit)} × ${u} unit${u > 1 ? "s" : ""})`, `الإيجار (${nf(bid.price ?? 0)}/${periodOf(bid.priceUnit)} × ${u})`), rental],
+              ...(deliv ? [[L("Delivery to site", "النقل إلى الموقع"), deliv]] as [string, number][] : []),
+              ...(ret ? [[L("Return from site", "الإرجاع من الموقع"), ret]] as [string, number][] : []),
+              [L("Subtotal before VAT", "المجموع قبل الضريبة"), sub],
+              [L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"), vat],
+            ] as [string, number][]).map(([lab, val], i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 0", borderBottom: "1px solid #F2F5F8" }}>
+                <span style={{ fontSize: 13.5, color: "#2a4f72", fontWeight: 600 }}>{lab}</span>
+                <span style={{ fontSize: 14.5, fontWeight: 800, color: "#1c3550", fontVariantNumeric: "tabular-nums" }}>{nf(val)}</span>
+              </div>
+            ))}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, padding: "12px 14px", borderRadius: 12, background: "#fff4e5" }}>
+              <span style={{ fontSize: 13.5, fontWeight: 800, color: "#1c3550" }}>{L("Quoted total", "الإجمالي المُسعّر")}</span>
+              <span style={{ fontSize: 16, fontWeight: 900, color: "#f79009" }}>{nf(grand)} {L("SAR", "ر.س")}</span>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* CTA — read-only submission viewer (no deal room for an off-platform supplier) */}
+      {!picking && (
+        <div style={{ marginTop: "auto", padding: "12px 16px 16px" }}>
+          <button onClick={onViewSubmission} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "14px", borderRadius: 14, border: "none", background: "#1c3550", color: "#fff", fontWeight: 800, fontSize: 15, cursor: "pointer", fontFamily: "inherit" }}>
+            <span className="material-icons-outlined" style={{ fontSize: 18 }}>visibility</span>{L("View bid submission", "عرض العرض المُقدَّم")}
+          </button>
+          <p style={{ fontSize: 11.5, color: "#9AA7B8", fontWeight: 600, textAlign: "center", margin: "9px 0 0" }}>
+            {L("Off-platform supplier — no deal room. View their submitted bid.", "مؤجّر خارج المنصة — لا توجد غرفة صفقة. اعرض عرضه المُقدَّم.")}
+          </p>
+        </div>
+      )}
+
+      {termsOpen && (
+        <BidTermsModal
+          supplier={bid.supplierName}
+          terms={bid.terms}
+          ar={ar}
+          L={L}
+          busy={false}
+          negotiateLabel={L("View bid submission", "عرض العرض المُقدَّم")}
+          onNegotiate={() => { setTermsOpen(false); onViewSubmission(); }}
+          onClose={() => setTermsOpen(false)}
+        />
+      )}
     </div>
   );
 }
