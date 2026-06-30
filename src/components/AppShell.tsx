@@ -9,6 +9,7 @@ import { Icon } from "@/components/ui";
 import type { Locale } from "@/lib/i18n/config";
 import { SurveyProvider } from "@/components/surveys/SurveyProvider";
 import { fetchDealRoomUnread } from "@/lib/api/client";
+import { canSeeProcurementDashboard } from "@/lib/access/dashboard";
 
 /**
  * App shell for the renter web app (web-app/004, AC-01/02/03/09/25). Navy sidebar (brand, a Request
@@ -40,7 +41,7 @@ export function AppShell(props: AppShellProps) {
 function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
   const { locale, setLocale } = useLocale();
   const t = useT();
-  const { tier, status, signOut } = useSession();
+  const { tier, status, signOut, user } = useSession();
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -91,7 +92,8 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
     { key: "home", icon: "home", label: t.shell.home, href: "/" },
     { key: "requests", icon: "grid_view", label: t.shell.requests, href: "/requests" },
     { key: "compare", icon: "compare_arrows", label: t.shell.compare, href: "/compare" },
-    { key: "dashboard", icon: "dashboard", label: t.shell.dashboard, href: "/dashboard" },
+    // Procurement dashboard is a demo surface — only the CCC mock account sees it.
+    ...(canSeeProcurementDashboard(user) ? [{ key: "dashboard", icon: "dashboard", label: t.shell.dashboard, href: "/dashboard" }] : []),
     { key: "inbox", icon: "inbox", label: t.shell.inbox, href: "/inbox" },
     { key: "profile", icon: "person", label: t.shell.profile, href: "/profile" },
   ];

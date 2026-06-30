@@ -408,6 +408,7 @@ export function BidComparisonWorkspace() {
   const hasDuration = durationDays != null && durationDays > 0; // request has a start+end → show the duration-based rental row
   const rentalWin = rowWinners(cols.map((c) => (c.bid.price != null ? dq(c).rentalForPeriod : null)), "min");
   const durationWin = rowWinners(cols.map((c) => dq(c).durationRental), "min");
+  const mobWin = rowWinners(cols.map((c) => (c.mob.stated || c.demob.stated ? mobDemobTotal(c) : null)), "min");
   const distanceWin = rowWinners(cols.map((c) => c.bid.distanceKm ?? null), "min");
   const yearWin = rowWinners(cols.map((c) => c.bid.equipment?.year ?? null), "max");
   // §6 rule: one equipment-cert row per REQUIRED cert (not required → not shown).
@@ -680,20 +681,25 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
         <b style={{ color: C.navy, fontSize: 18 }}>{L("Compare bids", "مقارنة العروض")}</b>
       </div>
 
-      {/* ── Level 1 — location tabs ── */}
-      <div className="flex items-center gap-1.5 text-[11px] font-extrabold" style={{ color: C.muted, letterSpacing: ".4px" }}>
-        <span className="material-icons-outlined" style={{ fontSize: 15 }}>location_on</span>{L("Location", "الموقع")}
-      </div>
+      {/* ── Level 1 — RFQ tabs (§1: replace location grouping; same pill style as My Requests) ── */}
+      <div className="text-[11px] font-extrabold" style={{ color: C.muted, letterSpacing: ".4px" }}>{L("REQUESTS FOR QUOTE", "طلبات التسعير")}</div>
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {locations.map((l) => (
-          <button key={l.key} onClick={() => setActiveLoc(l.key)}
-            className="inline-flex flex-none items-center gap-2 rounded-full border px-4 py-2.5 text-[12.5px] font-bold transition"
-            style={l.key === loc?.key ? { background: C.navy, borderColor: C.navy, color: "#fff" } : { background: "#fff", borderColor: C.border, color: C.navyMid }}>
-            {l.label}
-            <span className="rounded-full px-2 text-[11px] font-bold" style={l.key === loc?.key ? { background: "rgba(255,255,255,.2)", color: "#fff" } : { background: C.surface3, color: C.navy }}>{l.itemCount} {L("items", "أصناف")}</span>
-            {l.bidCount > 0 && <span className="rounded-full px-2 text-[11px] font-bold" style={{ background: C.successBg, color: C.success }}>{l.bidCount} {L("bids", "عروض")}</span>}
-          </button>
-        ))}
+        {locations.map((l) => {
+          const on = l.key === loc?.key;
+          const rfqId = l.groups[0]?.items[0]?.displayId ?? "RFQ";
+          return (
+            <button key={l.key} onClick={() => setActiveLoc(l.key)}
+              className="inline-flex flex-none flex-col items-start gap-0.5 rounded-xl border px-4 py-2.5 text-start transition"
+              style={{ minWidth: 180, ...(on ? { background: C.navy, borderColor: C.navy } : { background: "#fff", borderColor: C.border }) }}>
+              <span className="flex items-center gap-2">
+                <span className="text-[13.5px] font-extrabold" style={{ color: on ? "#fff" : C.navy }}>{rfqId}</span>
+                <span className="rounded-full px-2 text-[10.5px] font-bold" style={on ? { background: "rgba(255,255,255,.2)", color: "#fff" } : { background: C.surface3, color: C.navy }}>{l.itemCount} {L("items", "أصناف")}</span>
+                {l.bidCount > 0 && <span className="rounded-full px-2 text-[10.5px] font-bold" style={on ? { background: "rgba(255,255,255,.16)", color: "#fff" } : { background: C.successBg, color: C.success }}>{l.bidCount} {L("bids", "عروض")}</span>}
+              </span>
+              <span className="text-[11.5px] font-semibold" style={{ color: on ? "rgba(255,255,255,.7)" : C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 220 }}>{l.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* ── request header card ── */}
@@ -1044,13 +1050,12 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                             {c.bid.price == null ? (
                               <span style={{ color: C.muted }}>{L("not stated", "غير محدد")}</span>
                             ) : (<>
-                              {/* the rate in the chosen RATE PERIOD × units — NOT the duration total (that's its own row) */}
+                              {/* total prominent (rate × units); the rate × units breakdown is the sub-line */}
                               <span className="inline-flex flex-wrap items-center gap-1.5">
-                                <span className="font-mono font-bold" style={{ color: C.navyMid }}>{sar} {nf(dq(c).ratePerPeriod)}<small style={{ fontSize: 10.5, color: C.muted }}>/{per}{shownUnits > 1 ? ` · ${L("unit", "وحدة")}` : ""}</small></span>
-                                {shownUnits > 1 && <><span style={{ color: C.action, fontWeight: 800, transform: ar ? "scaleX(-1)" : undefined }}>→</span><span className="font-mono font-extrabold" style={{ color: C.navy }}>{sar} {nf(dq(c).rentalForPeriod)}</span></>}
+                                <span className="font-mono font-extrabold" style={{ color: C.navy }}>{sar} {nf(dq(c).rentalForPeriod)}</span>
                                 {rentalWin.has(idx) && bestTag}
                               </span>
-                              {shownUnits > 1 && <Sub>{L(`× ${shownUnits} units`, `× ${shownUnits} وحدة`)}</Sub>}
+                              <Sub>{`${nf(dq(c).ratePerPeriod)}/${per} × ${shownUnits} ${shownUnits > 1 ? L("units", "وحدة") : L("unit", "وحدة")}`}</Sub>
                             </>)}
                           </Td>
                         );
@@ -1058,7 +1063,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                     </tr>
                     <tr>
                       <RowHead title={L("Mobilization + demob", "النقل + الإرجاع")} sub={mobByRentee === true ? L("you bear delivery", "النقل عليك") : mobByRentee === false ? L("required from the supplier", "مطلوب من المؤجّر") : L("one-time, whole job", "لمرة واحدة، لكامل العمل")} />
-                      {cols.map((c) => {
+                      {cols.map((c, idx) => {
                         const stated = c.mob.stated || c.demob.stated;
                         const rm = renterMob[c.bid.id];
                         // From YOUR request: who bears delivery. Supplier-required but the bid didn't price it → conflict (red).
@@ -1071,12 +1076,13 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         return (
                           <Td key={c.bid.id} ok={!conflict} fail={conflict}>
                             {stated ? (<>
-                              {/* per-unit → × units, mirroring the rental row */}
+                              {/* total prominent + a small distance chip; per-unit (mob+demob) breakdown is the sub */}
                               <span className="inline-flex flex-wrap items-center gap-1.5">
-                                <span className="font-mono font-bold" style={{ color: C.navyMid }}>{sar} {nf(mobDemobUnit(c))}{shownUnits > 1 ? <small style={{ fontSize: 10.5, color: C.muted }}>/{L("unit", "وحدة")}</small> : null}</span>
-                                {shownUnits > 1 && <><span style={{ color: C.action, fontWeight: 800, transform: ar ? "scaleX(-1)" : undefined }}>→</span><span className="font-mono font-extrabold" style={{ color: C.navy }}>{sar} {nf(mobDemobTotal(c))}</span></>}
+                                <span className="font-mono font-extrabold" style={{ color: C.navy }}>{sar} {nf(mobDemobTotal(c))}</span>
+                                {c.bid.distanceKm != null && <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={{ background: C.surface2, color: C.navyMid }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>place</span>{Math.round(c.bid.distanceKm)} {L("km", "كم")}</span>}
+                                {mobWin.has(idx) && bestTag}
                               </span>
-                              <Sub>{`${sar} ${nf(c.mob.value)} ${L("mob", "نقل")} + ${sar} ${nf(c.demob.value)} ${L("demob", "إرجاع")}${shownUnits > 1 ? ` · × ${shownUnits} ${L("units", "وحدة")}` : ""}`}</Sub>
+                              <Sub>{`${sar} ${nf(mobDemobUnit(c))}/${L("unit", "وحدة")} (${L("mob", "نقل")} ${nf(c.mob.value)} + ${L("demob", "إرجاع")} ${nf(c.demob.value)}) × ${shownUnits} ${shownUnits > 1 ? L("units", "وحدة") : L("unit", "وحدة")}`}</Sub>
                             </>) : rm ? (<>
                               <span className="inline-flex items-center gap-1.5 text-[13px] font-bold">{sar} {nf(rm)}
                                 <button onClick={() => addMobCost(c.bid.id, L("Delivery + pickup", "النقل والإرجاع"))} className="text-[10px] font-bold underline" style={{ color: C.rentee }}>{L("edit", "تعديل")}</button>
@@ -1105,7 +1111,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                                 <span className="font-mono font-extrabold" style={{ color: C.navy }}>{sar} {nf(drv)}</span>
                                 {durationWin.has(idx) && bestTag}
                               </span>
-                              <Sub>{L(`${durationDays} days${shownUnits > 1 ? ` × ${shownUnits} units` : ""}`, `${durationDays} يوم${shownUnits > 1 ? ` × ${shownUnits} وحدة` : ""}`)}</Sub>
+                              <Sub>{`${nf(Math.round(drv / ((durationDays || 1) * shownUnits)))}/${L("day", "يوم")} × ${durationDays} ${L("days", "يوم")} × ${shownUnits} ${shownUnits > 1 ? L("units", "وحدة") : L("unit", "وحدة")}`}</Sub>
                             </>) : <span style={{ color: C.muted }}>{L("not stated", "غير محدد")}</span>}
                           </Td>
                         );
@@ -1131,11 +1137,18 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                               const cr = c.costResponsibilities.find((x) => x.key === m.key)!;
                               const fatKey = m.key === "operator_food" ? "fat_food" : m.key === "operator_transport_accommodation" ? "fat_accommodation_transport" : null;
                               const dealConflict = fatKey ? (c.bid.negotiableTerms ?? []).some((t) => t.key === fatKey && t.state === "conflict") : false;
-                              // §6 chip tone: supplier-covered=green, you-handle=blue, conflict=red, unknown=grey.
+                              // §6 chip: "{term} · {owner}" coloured by tone — supplier=green, you=blue, conflict=red.
                               const tone = dealConflict ? "red" : responsibilityTone(cr);
-                              const kind = tone === "green" ? "y" : tone === "red" ? "n" : tone === "blue" ? "you" : "muted";
-                              const entered = renterCosts[m.key]; // your estimate shows on the chip ("· SAR X")
-                              return <span key={m.key}>{incChip(ar ? m.ar : m.en, kind, undefined, m.icon, entered, undefined)}</span>;
+                              const bg = tone === "green" ? C.successBg : tone === "red" ? C.dangerBg : tone === "blue" ? C.renteeDim : C.surface3;
+                              const fg = tone === "green" ? C.success : tone === "red" ? C.danger : tone === "blue" ? C.rentee : C.muted;
+                              const owner = tone === "green" ? L("supplier", "المؤجّر") : tone === "blue" ? L("you", "أنت") : tone === "red" ? L("conflict", "تعارض") : L("—", "—");
+                              const entered = renterCosts[m.key];
+                              return (
+                                <span key={m.key} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold" style={{ background: bg, color: fg }}>
+                                  {tone === "red" && <span className="material-icons-outlined" style={{ fontSize: 13 }}>warning_amber</span>}
+                                  {ar ? m.ar : m.en} · {owner}{entered != null ? ` · ~${sar} ${nf(entered)}` : ""}
+                                </span>
+                              );
                             })}
                           </div>
                         </Td>
@@ -1195,12 +1208,12 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                           const v = yr ? (c.bid.reqMinYear != null ? `≥ ${c.bid.reqMinYear}` : yr.state === "conflict" ? L("Not met", "غير مطابق") : L("Confirmed", "مؤكّد")) : null;
                           return <Td key={c.bid.id} ok={!!yr && yr.state !== "conflict"} fail={yr?.state === "conflict"}>{v ? <span className="text-[13px] font-bold">{v}</span> : <span style={{ color: C.muted }}>—</span>}</Td>;
                         }
-                        return <Td key={c.bid.id} ok={yr?.state !== "conflict"} fail={yr?.state === "conflict"}><span className="text-[13px] font-bold">{c.bid.equipment?.year ?? "—"}</span>{yearWin.has(idx) && bestTag}</Td>;
+                        return <Td key={c.bid.id} ok={yr?.state !== "conflict"} fail={yr?.state === "conflict"}><span className="text-[13px] font-bold">{c.bid.equipment?.year ?? "—"}</span>{yearWin.has(idx) && <Sub>{L("newest", "الأحدث")}</Sub>}</Td>;
                       })}
                     </tr>
                     <tr>
                       <RowHead title={L("Distance to site", "المسافة للموقع")} />
-                      {cols.map((c, idx) => <Td key={c.bid.id} ok><span className="text-[13px] font-bold">{c.bid.distanceKm != null ? `${Math.round(c.bid.distanceKm)} ${L("km", "كم")}` : <span style={{ color: C.muted }}>—</span>}</span>{distanceWin.has(idx) && bestTag}</Td>)}
+                      {cols.map((c, idx) => <Td key={c.bid.id} ok><span className="text-[13px] font-bold">{c.bid.distanceKm != null ? `${Math.round(c.bid.distanceKm)} ${L("km", "كم")}` : <span style={{ color: C.muted }}>—</span>}</span>{distanceWin.has(idx) && <Sub>{L("closest", "الأقرب")}</Sub>}</Td>)}
                     </tr>
                     {/* L2 equipment — ONE field: safety certs (required ✓/✗ + held) + proof-of-ownership
                         docs (istimara / customs / sale_contract / saso_registration), combined per column. */}
