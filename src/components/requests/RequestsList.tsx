@@ -159,7 +159,7 @@ export function RequestsList() {
                   </button>
                 </div>
                 {/* 2-column item cards */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 14 }}>
+                <div className="rq-item-grid">
                   {activeGroup.items.map((r) => {
                     const title = (ar ? r.item?.nameAr : r.item?.name) || L("Request", "طلب");
                     const qty = r.item?.qty ?? 1;

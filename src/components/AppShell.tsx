@@ -7,7 +7,7 @@ import { useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import type { Locale } from "@/lib/i18n/config";
-import { SurveyProvider, useSurvey } from "@/components/surveys/SurveyProvider";
+import { SurveyProvider } from "@/components/surveys/SurveyProvider";
 import { fetchDealRoomUnread } from "@/lib/api/client";
 
 /**
@@ -41,7 +41,6 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
   const { locale, setLocale } = useLocale();
   const t = useT();
   const { tier, status, signOut } = useSession();
-  const { hasPending, openSurvey } = useSurvey();
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -94,7 +93,6 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
     { key: "compare", icon: "compare_arrows", label: t.shell.compare, href: "/compare" },
     { key: "dashboard", icon: "dashboard", label: t.shell.dashboard, href: "/dashboard" },
     { key: "inbox", icon: "inbox", label: t.shell.inbox, href: "/inbox" },
-    { key: "surveys", icon: "assignment", label: t.shell.surveys, href: "/surveys" },
     { key: "profile", icon: "person", label: t.shell.profile, href: "/profile" },
   ];
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
@@ -197,18 +195,6 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                 {unread > 0 && (
                   <span className="absolute -end-0.5 -top-0.5 grid h-[17px] min-w-[17px] place-items-center rounded-full bg-brand px-1 text-[10px] font-extrabold text-white ring-2 ring-surface">{unread > 99 ? "99+" : unread}</span>
                 )}
-              </button>
-            )}
-
-            {status === "authed" && (
-              <button
-                onClick={() => (hasPending ? openSurvey() : router.push("/surveys"))}
-                className="relative grid h-9 w-9 place-items-center rounded-full text-navy-mid transition hover:bg-surface2"
-                aria-label={t.survey.badgeAria}
-                title={t.survey.navTitle}
-              >
-                <Icon name="assignment" size={20} />
-                {hasPending && <span className="absolute end-1.5 top-1.5 h-2 w-2 rounded-full bg-brand ring-2 ring-surface" />}
               </button>
             )}
 
