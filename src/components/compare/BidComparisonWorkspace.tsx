@@ -95,6 +95,8 @@ export function BidComparisonWorkspace() {
   const [chatInput, setChatInput] = useState("");
   const [costAsk, setCostAsk] = useState<{ type: "resp"; key: CostResponsibility["key"]; label: string } | { type: "mob"; bidId: string; label: string } | null>(null);
   const [costInput, setCostInput] = useState("");
+  const [estimateOpen, setEstimateOpen] = useState(false); // §6: one multi-field "Estimate your own costs" popup
+  const [estDraft, setEstDraft] = useState<Record<string, string>>({});
   const [renterMob, setRenterMob] = useState<Record<string, number>>({}); // renter's own delivery (mob/demob) estimate per bid
   const [docView, setDocView] = useState<{ label: string; url: string | null; value?: string | null; loading: boolean } | null>(null); // in-app document viewer (url = uploaded file; value = captured form text)
   // Presigned documents (company verification + equipment) per bid, fetched on demand from
@@ -403,10 +405,30 @@ export function BidComparisonWorkspace() {
   const lowestGrand = grandList.length ? Math.min(...grandList) : null;
   const maxGrand = grandList.length ? Math.max(...grandList) : 1;
   // §6 per-row winners — single leader only (ties unhighlighted), shown as a "✓ BEST" tag on the cell.
-  const rentalWin = rowWinners(cols.map((c) => (c.rental.stated ? (dq(c).durationRental ?? dq(c).rentalForPeriod) : null)), "min");
+  const hasDuration = durationDays != null && durationDays > 0; // request has a start+end → show the duration-based rental row
+  const rentalWin = rowWinners(cols.map((c) => (c.bid.price != null ? dq(c).rentalForPeriod : null)), "min");
+  const durationWin = rowWinners(cols.map((c) => dq(c).durationRental), "min");
   const distanceWin = rowWinners(cols.map((c) => c.bid.distanceKm ?? null), "min");
   const yearWin = rowWinners(cols.map((c) => c.bid.equipment?.year ?? null), "max");
+  // §6 rule: one equipment-cert row per REQUIRED cert (not required → not shown).
+  const requiredEquipCerts = EQUIP_CERTS.filter((x) => cols.some((c) => c.bid.requiredCerts.includes(x)));
   const bestTag = <span className="ms-1 inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 align-middle text-[9px] font-extrabold" style={{ background: C.successBg, color: C.success }}>✓ {L("BEST", "الأفضل")}</span>;
+  // §6 rule: only show cost responsibilities the REQUEST assigned (requestSide set) — not required → not shown.
+  const requiredResp = RESP_META.filter((m) => cols.some((c) => c.costResponsibilities.find((x) => x.key === m.key)?.requestSide != null));
+  // The responsibilities the request put on the RENTER → the fields of the "Estimate your own costs" popup.
+  const youTerms = requiredResp.filter((m) => cols.some((c) => c.costResponsibilities.find((x) => x.key === m.key)?.requestSide === "me"));
+  const estTotal = youTerms.reduce((s, m) => s + (renterCosts[m.key] ?? 0), 0);
+  const openEstimate = () => { const d: Record<string, string> = {}; for (const m of youTerms) { const v = renterCosts[m.key]; if (v != null) d[m.key] = String(v); } setEstDraft(d); setEstimateOpen(true); };
+  const saveEstimate = () => {
+    setRenterCosts((p) => {
+      const next = { ...p };
+      for (const m of youTerms) { const n = parseInt((estDraft[m.key] ?? "").replace(/[^0-9]/g, ""), 10); if (n > 0) next[m.key] = n; else delete next[m.key]; }
+      return next;
+    });
+    setEstimateOpen(false);
+  };
+  // §6 rule: the operator row appears only when the request requires an operator certificate.
+  const operatorRequired = cols.some((c) => !!c.bid.operatorCertReq);
 
   // Ask Mansour to rank + recommend whenever the candidate set / preset / free text / costs change.
   const recKey = useMemo(() => baseCols.map((c) => c.bid.id).join(","), [baseCols]);
@@ -484,18 +506,11 @@ export function BidComparisonWorkspace() {
     toast(L("Re-ranked the bids", "أُعيد ترتيب العروض"));
   }
 
-  function addCost(key: CostResponsibility["key"], label: string) {
-    setCostInput("");
-    setCostAsk({ type: "resp", key, label });
-  }
+  // Cost-responsibility estimates are entered together in the §6 "Estimate your own costs" popup
+  // (openEstimate/saveEstimate) — not per-term. addMobCost is the separate per-bid delivery estimate.
   function addMobCost(bidId: string, label: string) {
     setCostInput("");
     setCostAsk({ type: "mob", bidId, label });
-  }
-  // Undo a renter-entered estimate → back to the supplier-only view.
-  function removeCost(key: CostResponsibility["key"]) {
-    setRenterCosts((p) => { const n = { ...p }; delete n[key]; return n; });
-    toast(L("Removed your estimate", "أُزيل تقديرك"));
   }
   function removeMobCost(bidId: string) {
     setRenterMob((p) => { const n = { ...p }; delete n[bidId]; return n; });
@@ -641,11 +656,6 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
         ) : onAdd ? <button onClick={onAdd} className="inline-flex items-center gap-0.5 rounded-full border px-1.5 text-[9.5px] font-extrabold" style={{ color: C.rentee, borderColor: "rgba(37,99,235,.4)", background: "#fff" }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>add</span>{L("cost", "تكلفة")}</button> : null}
       </span>
     );
-  };
-  // Sub-label for a cert row = the request's actual required certs in that class ("TÜV required").
-  const certReqSub = (pick: CertCode[]) => {
-    const req = pick.filter((x) => cols.some((c) => c.bid.requiredCerts.includes(x)));
-    return req.length ? `${req.map(certLabel).join(" · ")} ${L("required", "مطلوبة")}` : L("none required", "غير مطلوبة");
   };
   const presetDefs: [Preset, string, string, string][] = [
     ["best", "workspace_premium", "Best overall", "الأفضل إجمالاً"],
@@ -1006,29 +1016,41 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         </div>
                       </td>
                     </tr>
+                    {/* §6: Units fulfilled — multi-unit only, FIRST (every price multiplies by the units a bid covers) */}
+                    {units > 1 && (
                     <tr>
-                      <RowHead title={L("Rental cost", "تكلفة الإيجار")} sub={L("rate × days × units", "السعر × الأيام × الوحدات")} />
+                      <RowHead title={L("Units fulfilled", "الوحدات المغطاة")} sub={L("price multiplies by this", "السعر يتضاعف بهذا")} />
+                      {cols.map((c) => {
+                        const off = c.bid.unitsOffered || 1;
+                        const pct = Math.min(100, Math.round((off / units) * 100));
+                        const bc = pct >= 50 ? C.success : pct > 0 ? C.warning : C.danger;
+                        const short = units - off;
+                        return (
+                          <Td key={c.bid.id} ok={off >= units}>
+                            <div className="flex items-center justify-between gap-2"><span className="text-[13px] font-extrabold" style={{ color: bc }}>{off}/{units}</span><span className="text-[10.5px] font-bold" style={{ color: C.muted }}>{L("units", "وحدة")}</span></div>
+                            <div className="mt-1 h-[7px] max-w-[160px] overflow-hidden rounded" style={{ background: C.surface3 }}><i className="block h-full rounded" style={{ width: `${pct}%`, background: bc }} /></div>
+                            <Sub>{off >= units ? L("covers full request", "يغطي كامل الطلب") : L(`${short} short`, `ناقص ${short}`)}</Sub>
+                          </Td>
+                        );
+                      })}
+                    </tr>
+                    )}
+                    <tr>
+                      <RowHead title={L("Rental cost", "تكلفة الإيجار")} sub={`${periodLabel(period)} ${L("rate", "سعر")}`} />
                       {cols.map((c, idx) => {
-                        const realDays = c.bid.duration ?? durationDays; // actual rental length (days); null → defaulted to 1 period
-                        const per = periodLabel(c.bid.priceUnit);
+                        const per = periodLabel(period);
                         return (
                           <Td key={c.bid.id} ok={c.bid.price != null}>
                             {c.bid.price == null ? (
                               <span style={{ color: C.muted }}>{L("not stated", "غير محدد")}</span>
-                            ) : !c.rental.stated ? (
-                              /* No rental duration → show the rate only; don't fabricate an assumed total. */
-                              <span className="font-mono font-bold" style={{ color: C.navy }}>{sar} {nf(c.bid.price)}<small style={{ fontSize: 10.5, color: C.muted }}>/{per}{units > 1 ? ` · ${L("unit", "وحدة")}` : ""}</small></span>
                             ) : (<>
-                              {/* rate in the chosen RATE PERIOD (basis) → toggle-scaled comparable total */}
+                              {/* the rate in the chosen RATE PERIOD × units — NOT the duration total (that's its own row) */}
                               <span className="inline-flex flex-wrap items-center gap-1.5">
-                                <span className="font-mono font-bold" style={{ color: C.navyMid }}>{sar} {nf(dq(c).ratePerPeriod)}<small style={{ fontSize: 10.5, color: C.muted }}>/{periodLabel(period)}{shownUnits > 1 ? ` · ${L("unit", "وحدة")}` : ""}</small></span>
-                                <span style={{ color: C.action, fontWeight: 800, transform: ar ? "scaleX(-1)" : undefined }}>→</span>
-                                <span className="font-mono font-extrabold" style={{ color: C.navy }}>{sar} {nf(dq(c).durationRental ?? dq(c).rentalForPeriod)}</span>
+                                <span className="font-mono font-bold" style={{ color: C.navyMid }}>{sar} {nf(dq(c).ratePerPeriod)}<small style={{ fontSize: 10.5, color: C.muted }}>/{per}{shownUnits > 1 ? ` · ${L("unit", "وحدة")}` : ""}</small></span>
+                                {shownUnits > 1 && <><span style={{ color: C.action, fontWeight: 800, transform: ar ? "scaleX(-1)" : undefined }}>→</span><span className="font-mono font-extrabold" style={{ color: C.navy }}>{sar} {nf(dq(c).rentalForPeriod)}</span></>}
                                 {rentalWin.has(idx) && bestTag}
                               </span>
-                              {(realDays != null || shownUnits > 1) && <Sub>{realDays != null
-                                ? L(`× ${realDays} days${shownUnits > 1 ? ` × ${shownUnits} units` : ""}`, `× ${realDays} يوم${shownUnits > 1 ? ` × ${shownUnits} وحدة` : ""}`)
-                                : L(`× ${shownUnits} units`, `× ${shownUnits} وحدة`)}</Sub>}
+                              {shownUnits > 1 && <Sub>{L(`× ${shownUnits} units`, `× ${shownUnits} وحدة`)}</Sub>}
                             </>)}
                           </Td>
                         );
@@ -1070,29 +1092,56 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         );
                       })}
                     </tr>
+                    {/* §6: Estimated rental — shown ONLY when the request has a duration (start + end) */}
+                    {hasDuration && (
                     <tr>
-                      <RowHead title={L("Who handles the costs", "من يتحمّل التكاليف")} sub={L("colours explained above", "الألوان موضّحة أعلاه")} />
+                      <RowHead title={L("Estimated rental", "الإيجار التقديري")} sub={L(`${durationDays}-day duration`, `مدة ${durationDays} يوم`)} />
+                      {cols.map((c, idx) => {
+                        const drv = dq(c).durationRental;
+                        return (
+                          <Td key={c.bid.id} ok={drv != null}>
+                            {drv != null ? (<>
+                              <span className="inline-flex flex-wrap items-center gap-1.5">
+                                <span className="font-mono font-extrabold" style={{ color: C.navy }}>{sar} {nf(drv)}</span>
+                                {durationWin.has(idx) && bestTag}
+                              </span>
+                              <Sub>{L(`${durationDays} days${shownUnits > 1 ? ` × ${shownUnits} units` : ""}`, `${durationDays} يوم${shownUnits > 1 ? ` × ${shownUnits} وحدة` : ""}`)}</Sub>
+                            </>) : <span style={{ color: C.muted }}>{L("not stated", "غير محدد")}</span>}
+                          </Td>
+                        );
+                      })}
+                    </tr>
+                    )}
+                    {requiredResp.length > 0 && (
+                    <tr>
+                      {/* §6: label cell carries ONE "Estimate your costs" popup button (not per-term add) */}
+                      <td className="sticky start-0 z-[1] p-3.5 align-top text-[12.5px] font-bold" style={{ background: C.surface2, color: C.navyMid, width: 190, minWidth: 190 }}>
+                        {L("Cost terms", "شروط التكلفة")}
+                        <span className="block text-[11px] font-semibold" style={{ color: C.muted }}>{L("who handles what", "من يتحمّل ماذا")}</span>
+                        {youTerms.length > 0 && (
+                          <button onClick={openEstimate} className="mt-2 inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-extrabold" style={{ borderColor: "rgba(37,99,235,.4)", color: C.rentee, background: C.renteeDim, borderStyle: "dashed" }}>
+                            🧮 {estTotal > 0 ? L(`Your est. ~${sar} ${nf(estTotal)}`, `تقديرك ~${sar} ${nf(estTotal)}`) : L("Estimate your costs", "قدّر تكاليفك")}
+                          </button>
+                        )}
+                      </td>
                       {cols.map((c) => (
                         <Td key={c.bid.id}>
                           <div className="flex flex-wrap gap-1.5">
-                            {RESP_META.map((m) => {
+                            {requiredResp.map((m) => {
                               const cr = c.costResponsibilities.find((x) => x.key === m.key)!;
-                              // Deal-room conflict for the operator FAT costs (fat_food / fat_accommodation_transport):
-                              // a disputed term → red, even if the static request-vs-bid compare is grey.
                               const fatKey = m.key === "operator_food" ? "fat_food" : m.key === "operator_transport_accommodation" ? "fat_accommodation_transport" : null;
                               const dealConflict = fatKey ? (c.bid.negotiableTerms ?? []).some((t) => t.key === fatKey && t.state === "conflict") : false;
                               // §6 chip tone: supplier-covered=green, you-handle=blue, conflict=red, unknown=grey.
                               const tone = dealConflict ? "red" : responsibilityTone(cr);
                               const kind = tone === "green" ? "y" : tone === "red" ? "n" : tone === "blue" ? "you" : "muted";
-                              // Add-cost only when YOUR REQUEST puts the cost on you (the rentee); never when it's on the supplier.
-                              const canAdd = cr.requestSide === "me";
-                              const entered = renterCosts[m.key]; // your estimate for this cost (if any)
-                              return <span key={m.key}>{incChip(ar ? m.ar : m.en, kind, canAdd ? () => addCost(m.key, ar ? m.ar : m.en) : undefined, m.icon, entered, entered != null ? () => removeCost(m.key) : undefined)}</span>;
+                              const entered = renterCosts[m.key]; // your estimate shows on the chip ("· SAR X")
+                              return <span key={m.key}>{incChip(ar ? m.ar : m.en, kind, undefined, m.icon, entered, undefined)}</span>;
                             })}
                           </div>
                         </Td>
                       ))}
                     </tr>
+                    )}
                     {/* Grand total — the LAST cost row (sum of everything above + VAT + your estimates). */}
                     <tr>
                       <RowHead title={L("Grand total", "الإجمالي")} sub={L("incl. VAT & your costs", "شامل الضريبة وتكاليفك")} />
@@ -1155,38 +1204,37 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                     </tr>
                     {/* L2 equipment — ONE field: safety certs (required ✓/✗ + held) + proof-of-ownership
                         docs (istimara / customs / sale_contract / saso_registration), combined per column. */}
-                    <tr>
-                      <RowHead title={L("Equipment certificates & ownership", "شهادات وملكية المعدّة")} sub={`${certReqSub(EQUIP_CERTS)} · ${L("acknowledged — confirm with supplier", "مُقَرّ — أكّده مع المؤجّر")}`} />
-                      {cols.map((c) => {
-                        const eqCerts = c.bid.equipmentCertCodes ?? [];
-                        const owned = c.bid.ownershipDocs ?? [];
-                        const required = EQUIP_CERTS.filter((x) => cols.some((cc) => cc.bid.requiredCerts.includes(x)));
-                        const has = (x: CertCode) => eqCerts.includes(x);
-                        const heldExtra = eqCerts.filter((x) => !required.includes(x));
-                        const anyMissing = required.some((x) => !has(x)); // a required cert not held → red
-                        const hasAny = required.length > 0 || heldExtra.length > 0 || owned.length > 0;
-                        return (
-                          <Td key={c.bid.id} ok={hasAny && !anyMissing} fail={anyMissing}>
-                            {hasAny ? (
-                              <div className="flex flex-wrap gap-1.5">
-                                {required.map((x) => <span key={x}>{docChip(c, certLabel(x), has(x), x)}</span>)}
-                                {heldExtra.map((x) => <span key={x}>{docChip(c, certLabel(x), true, x)}</span>)}
-                                {owned.map((o) => <span key={o.key}>{docChip(c, ar ? o.labelAr : o.labelEn, true, o.key)}</span>)}
-                              </div>
-                            ) : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}
-                          </Td>
-                        );
-                      })}
-                    </tr>
+                    {/* §6: ONE row per required equipment cert ("TÜV certificate", …) — not required → not shown */}
+                    {requiredEquipCerts.map((cert) => (
+                      <tr key={cert}>
+                        <RowHead title={`${certLabel(cert)} ${L("certificate", "شهادة")}`} sub={`${L("required", "مطلوبة")} · ${L("acknowledged — confirm with supplier", "مُقَرّ — أكّده مع المؤجّر")}`} />
+                        {cols.map((c) => {
+                          const held = (c.bid.equipmentCertCodes ?? []).includes(cert);
+                          return <Td key={c.bid.id} ok={held} fail={!held}>{docChip(c, certLabel(cert), held, cert)}</Td>;
+                        })}
+                      </tr>
+                    ))}
+                    {/* Ownership proof (Istimara / customs / sale contract) — its own row when any supplier filed one */}
+                    {cols.some((c) => (c.bid.ownershipDocs ?? []).length > 0) && (
+                      <tr>
+                        <RowHead title={L("Ownership proof", "إثبات الملكية")} sub={L("on file", "متوفّر")} />
+                        {cols.map((c) => {
+                          const owned = c.bid.ownershipDocs ?? [];
+                          return <Td key={c.bid.id} ok={owned.length > 0}>{owned.length ? <div className="flex flex-wrap gap-1.5">{owned.map((o) => <span key={o.key}>{docChip(c, ar ? o.labelAr : o.labelEn, true, o.key)}</span>)}</div> : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}</Td>;
+                        })}
+                      </tr>
+                    )}
                     {/* L3 operator certificate — a DECLARED deal-room term, never a verified pill. Sub shows the
                         rentee's required license level; each cell the supplier's declared position (t3Declarations). */}
+                    {operatorRequired && (
                     <tr>
-                      <RowHead title={L("Operator certificate", "شهادة المشغّل")} sub={(() => { const r = cols[0]?.bid.operatorCertReq; return r ? `${L("required", "مطلوب")}: ${r}` : L("declared in the deal room", "يُعلن في غرفة الصفقة"); })()} />
+                      <RowHead title={L("Operator certificate", "شهادة المشغّل")} sub={`${L("required", "مطلوب")}${cols[0]?.bid.operatorCertReq ? `: ${cols[0]?.bid.operatorCertReq}` : ""}`} />
                       {cols.map((c) => {
                         const d = c.bid.operatorCertDeclared;
                         return <Td key={c.bid.id} ok={!!d}>{d ? incChip(d, "muted", undefined, "badge") : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}</Td>;
                       })}
                     </tr>
+                    )}
                   </>)}
 
                   {/* Verified supplier + company documents now live in each column's identity header (T1). */}
@@ -1308,6 +1356,41 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
               <div className="flex gap-2.5">
                 <button onClick={() => setCostAsk(null)} className="rounded-lg border px-4 py-2 text-[13px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>{L("Cancel", "إلغاء")}</button>
                 <button onClick={submitCost} className="rounded-lg px-5 py-2 text-[13px] font-bold text-white" style={{ background: C.rentee }}>{L("Save estimate", "حفظ التقدير")}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* §6 — one private "Estimate your own costs" popup (multi-field, all your terms at once) */}
+      {estimateOpen && (
+        <div className="fixed inset-0 z-[420] grid place-items-center p-6" style={{ background: "rgba(28,53,80,.42)", backdropFilter: "blur(3px)" }} onClick={() => setEstimateOpen(false)}>
+          <div className="flex max-h-[86vh] w-[440px] max-w-full flex-col overflow-hidden rounded-2xl" style={{ background: "#fff" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start gap-3 border-b px-6 py-5" style={{ borderColor: C.line }}>
+              <div className="grid h-11 w-11 flex-none place-items-center rounded-lg text-[22px]" style={{ background: C.renteeDim }}>🧮</div>
+              <div className="flex-1"><h3 className="m-0 text-[17px] font-extrabold">{L("Estimate your own costs", "قدّر تكاليفك")}</h3><p className="m-0 text-[12.5px]" style={{ color: C.muted }}>{(ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? ""} · {L("the items you said you'll handle", "البنود التي ستتحمّلها")}</p></div>
+              <button onClick={() => setEstimateOpen(false)} className="grid h-8 w-8 flex-none place-items-center rounded-full border" style={{ borderColor: C.border, color: C.muted }}><span className="material-icons-outlined" style={{ fontSize: 18 }}>close</span></button>
+            </div>
+            <div className="flex items-start gap-2.5 px-6 py-3.5" style={{ background: C.warningBg, borderBottom: `1px solid ${C.line}` }}>
+              <span className="flex-none text-[15px]">🔒</span>
+              <span className="text-[12px] font-bold leading-relaxed" style={{ color: "#9A6A1E" }}>{L("Rough estimates for your own planning only — not real costs, not part of the bid, and never shown to the supplier.", "تقديرات تقريبية لتخطيطك أنت فقط — ليست تكاليف فعلية، وليست جزءًا من العرض، ولا تظهر للمؤجّر أبدًا.")}</span>
+            </div>
+            <div className="flex flex-col gap-3.5 overflow-y-auto px-6 py-5">
+              {youTerms.map((m) => (
+                <div key={m.key}>
+                  <label className="mb-1.5 block text-[12.5px] font-extrabold" style={{ color: C.navy }}>{ar ? m.ar : m.en}</label>
+                  <div className="flex h-[48px] items-center gap-2.5 rounded-lg border px-4" style={{ background: C.surface2, borderColor: C.border }}>
+                    <span className="text-[13px] font-extrabold" style={{ color: C.muted }}>{sar}</span>
+                    <input type="number" inputMode="numeric" min={0} value={estDraft[m.key] ?? ""} onChange={(e) => setEstDraft((p) => ({ ...p, [m.key]: e.target.value }))} placeholder="0" className="min-w-0 flex-1 bg-transparent text-[15px] font-bold outline-none" style={{ color: C.navy }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between gap-3 border-t px-6 py-4" style={{ borderColor: C.line }}>
+              <span className="text-[13px] font-extrabold" style={{ color: C.navy }}>{L("Your total est.", "إجمالي تقديرك")} <span style={{ color: C.rentee }}>{sar} {nf(youTerms.reduce((s, m) => s + (parseInt((estDraft[m.key] ?? "").replace(/[^0-9]/g, ""), 10) || 0), 0))}</span></span>
+              <div className="flex gap-2.5">
+                <button onClick={() => setEstimateOpen(false)} className="rounded-lg border px-4 py-2 text-[13px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>{L("Cancel", "إلغاء")}</button>
+                <button onClick={saveEstimate} className="rounded-lg px-5 py-2 text-[13px] font-bold text-white" style={{ background: C.rentee }}>{L("Save estimate", "حفظ التقدير")}</button>
               </div>
             </div>
           </div>
