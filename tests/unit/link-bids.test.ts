@@ -100,4 +100,19 @@ describe("submissionToBidCard", () => {
     expect(c2.price).toBe(500);
     expect(c2.terms.equipment.find((t) => t.key === "year")!.state).toBe("conflict");
   });
+
+  it("carries the supplier's quote expiry (validUntil) through to the bid card", () => {
+    // The supplier-set quote expiry must reach the card (drives the "Valid until" chip + quotation).
+    expect(submissionToBidCard(sub({ validUntil: "2026-07-12T00:00:00.000Z" })).validUntil).toBe("2026-07-12T00:00:00.000Z");
+    expect(submissionToBidCard(sub()).validUntil).toBeNull(); // none set → null
+  });
+});
+
+describe("mapLinkSubmissions — validUntil", () => {
+  it("parses the supplier quote expiry from the agents payload", () => {
+    const out = mapLinkSubmissions({
+      submissions: [{ id: "s1", requestId: "r1", companyName: "Co", validUntil: "2026-07-12T00:00:00.000Z", items: [] }],
+    });
+    expect(out[0].validUntil).toBe("2026-07-12T00:00:00.000Z");
+  });
 });

@@ -54,6 +54,9 @@ export interface DealRoomView {
   terms: DealTerm[];
   /** True when a non-PRICE term is still disputed — the backend blocks accept-all until resolved. */
   hasDisputedTerms: boolean;
+  /** True when the supplier opened the room first (chatted before the renter entered) — drives the
+   *  "Supplier started this conversation" banner. Pairs with status==="OPEN" before the renter enters. */
+  supplierFirstEntry: boolean;
 }
 
 const n = (v: unknown): number | null => {
@@ -179,5 +182,6 @@ export function mapDealRoom(raw: unknown): DealRoomView {
     myTurn,
     terms,
     hasDisputedTerms,
+    supplierFirstEntry: d.supplierFirstEntry === true,
   };
 }

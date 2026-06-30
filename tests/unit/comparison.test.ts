@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildItemComparison, daysPerPeriod, sortByPreset } from "@/lib/contract/comparison";
+import { buildItemComparison, computeBidQuote, daysPerPeriod, sortByPreset, displayQuote, responsibilityTone, rowWinners, type CostResponsibility } from "@/lib/contract/comparison";
 import type { BidCard, TermRow } from "@/lib/contract/bids";
 
 const bc = (p: Partial<BidCard>): BidCard => ({
@@ -24,6 +24,42 @@ describe("daysPerPeriod", () => {
     expect(daysPerPeriod("PER_MONTH")).toBe(26); // 26 working days per month, not 30 calendar
     expect(daysPerPeriod("PER_JOB")).toBe(0);
     expect(daysPerPeriod(null)).toBe(1);
+  });
+});
+
+describe("computeBidQuote (shared quote math — comparison ↔ quotation parity)", () => {
+  it("weekly rate ÷7 × duration × units", () => {
+    const q = computeBidQuote(bc({ price: 700, priceUnit: "PER_WEEK", duration: 14, numberOfUnits: 2 }));
+    expect(q.perUnitRental).toBe(1400); // 700 / 7 × 14
+    expect(q.rentalSubtotal).toBe(2800); // × 2 units
+  });
+
+  it("monthly rate uses 26 working days", () => {
+    const q = computeBidQuote(bc({ price: 2600, priceUnit: "PER_MONTH", duration: 26, numberOfUnits: 1 }));
+    expect(q.perUnitRental).toBe(2600); // 2600 / 26 × 26
+  });
+
+  it("PER_JOB is a flat rate (no duration), × units", () => {
+    const q = computeBidQuote(bc({ price: 5000, priceUnit: "PER_JOB", duration: 30, numberOfUnits: 2 }));
+    expect(q.perUnitRental).toBe(5000);
+    expect(q.rentalSubtotal).toBe(10000);
+  });
+
+  it("mobilization/demobilization are per-unit (× units); VAT is 15% of the pre-VAT subtotal", () => {
+    const q = computeBidQuote(bc({ price: 100, priceUnit: "PER_DAY", duration: 10, numberOfUnits: 2, mobPrice: 800, demobPrice: 800 }));
+    expect(q.rentalSubtotal).toBe(2000); // 100 × 10 × 2
+    expect(q.mobTotal).toBe(1600); // 800 × 2
+    expect(q.demobTotal).toBe(1600);
+    expect(q.subtotalPreVat).toBe(5200);
+    expect(q.vat).toBeCloseTo(780); // 15%
+    expect(q.total).toBeCloseTo(5980);
+  });
+
+  it("a units override and a duration fallback are honored", () => {
+    const q = computeBidQuote(bc({ price: 100, priceUnit: "PER_DAY", duration: null, numberOfUnits: 5 }), { units: 1, fallbackDays: 7 });
+    expect(q.units).toBe(1); // override beats numberOfUnits
+    expect(q.days).toBe(7); // fallback used when the bid states no duration
+    expect(q.rentalSubtotal).toBe(700); // 100 × 7 × 1
   });
 });
 
@@ -133,4 +169,49 @@ describe("sortByPreset (AC-20 web side)", () => {
     ]);
     expect(sortByPreset(columns, "lowest").map((c) => c.bid.id)).toEqual(["lo", "hi"]);
   });
+});
+
+/* ---------------------------- §6 redesign display helpers ---------------------------- */
+
+describe("displayQuote (RATE PERIOD + PRICES FOR toggles)", () => {
+  it("re-expresses a day-rate into week (×7) and month (×26) for all units", () => {
+    const b = bc({ price: 445, priceUnit: "PER_DAY", numberOfUnits: 3 });
+    expect(displayQuote(b, "PER_DAY", "all").ratePerPeriod).toBe(445);
+    expect(displayQuote(b, "PER_WEEK", "all").ratePerPeriod).toBe(445 * 7);
+    expect(displayQuote(b, "PER_MONTH", "all").ratePerPeriod).toBe(445 * 26);
+    expect(displayQuote(b, "PER_DAY", "all").rentalForPeriod).toBe(445 * 3); // × units
+  });
+  it("PRICES FOR = unit prices one unit; mob+demob scale with the basis", () => {
+    const b = bc({ price: 445, priceUnit: "PER_DAY", numberOfUnits: 3, mobPrice: 100, demobPrice: 50 });
+    expect(displayQuote(b, "PER_DAY", "unit").rentalForPeriod).toBe(445); // 1 unit
+    expect(displayQuote(b, "PER_DAY", "unit").mobDemob).toBe(150);
+    expect(displayQuote(b, "PER_DAY", "all").mobDemob).toBe(150 * 3);
+  });
+  it("duration-based rental shows only when a duration is known (else null)", () => {
+    const noDur = bc({ price: 445, priceUnit: "PER_DAY", numberOfUnits: 1 });
+    expect(displayQuote(noDur, "PER_DAY", "all").durationRental).toBeNull();
+    const withDur = displayQuote(bc({ price: 445, priceUnit: "PER_DAY", numberOfUnits: 2 }), "PER_DAY", "all", 10);
+    expect(withDur.durationRental).toBe(445 * 10 * 2);
+  });
+  it("PER_JOB is a flat rate — no period conversion", () => {
+    const q = displayQuote(bc({ price: 5000, priceUnit: "PER_JOB", numberOfUnits: 2 }), "PER_WEEK", "all");
+    expect(q.ratePerPeriod).toBe(5000);
+    expect(q.durationRental).toBeNull();
+  });
+});
+
+describe("responsibilityTone (green=supplier / blue=you / red=conflict)", () => {
+  const cr = (p: Partial<CostResponsibility>): CostResponsibility => ({ key: "fuel", labelEn: "Fuel", labelAr: "وقود", bidSide: null, requestSide: null, state: "grey", ...p });
+  it("supplier-covered → green", () => expect(responsibilityTone(cr({ bidSide: "supplier", state: "green" }))).toBe("green"));
+  it("renter-handled → blue", () => expect(responsibilityTone(cr({ bidSide: "me", requestSide: "me", state: "green" }))).toBe("blue"));
+  it("conflict → red", () => expect(responsibilityTone(cr({ bidSide: "me", requestSide: "supplier", state: "red" }))).toBe("red"));
+  it("not provided → grey", () => expect(responsibilityTone(cr({}))).toBe("grey"));
+});
+
+describe("rowWinners (lowest/highest, ties not highlighted)", () => {
+  it("flags the single lowest", () => expect([...rowWinners([300, 100, 200], "min")]).toEqual([1]));
+  it("flags the single highest", () => expect([...rowWinners([2, 5, 3], "max")]).toEqual([1]));
+  it("ignores nulls", () => expect([...rowWinners([null, 100, 200], "min")]).toEqual([1]));
+  it("no highlight on a tie", () => expect(rowWinners([100, 100, 200], "min").size).toBe(0));
+  it("no highlight with <2 comparable values", () => expect(rowWinners([null, 100], "min").size).toBe(0));
 });

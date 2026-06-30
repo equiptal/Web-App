@@ -316,6 +316,17 @@ export function ItemRow({
                     options={opt(OPERATOR_CERTIFICATES, t.options.safetyCert)}
                   />
                 </ChipField>
+                {/* Free-text operator certificate when "Other" is selected (app parity) */}
+                {item.operator.certificate.includes("other") && (
+                  <ChipField label={t.step2.perItem.certificateOther}>
+                    <TextInput
+                      maxLength={100}
+                      value={item.operator.certificateOther ?? ""}
+                      placeholder={t.step2.perItem.certificateOtherPlaceholder}
+                      onChange={(e) => actions.patchItemOperator(item.id, { certificateOther: e.target.value })}
+                    />
+                  </ChipField>
+                )}
                 {/* Part 2: F.A.T split into two who-covers controls — Food, and Accommodation & transport. */}
                 <ChipField label={t.step2.perItem.fatFood} agent={agentMatches(item.operator.fatFood, ai?.operator.fatFood)} note={fn("operator_accommodation_by_rentee")}>
                   <Pchips<Party> value={item.operator.fatFood} onChange={(v) => actions.patchItemOperator(item.id, { fatFood: v })} onClear={() => actions.patchItemOperator(item.id, { fatFood: null })} options={opt(PARTIES, t.options.party)} />

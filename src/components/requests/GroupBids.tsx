@@ -11,6 +11,7 @@ import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
 import { bidSuppliers, CERT_LABEL, type BidCard } from "@/lib/contract/bids";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
+import { computeBidQuote } from "@/lib/contract/comparison";
 import type { RequestGroup } from "@/lib/contract/requests";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { EquipImg } from "@/components/requests/EquipImg";
@@ -37,6 +38,16 @@ function pillLabel(status: string, L: (en: string, ar: string) => string): strin
     case "EXPIRED": return L("Expired", "منتهٍ");
     case "WITHDRAWN": return L("Withdrawn", "مسحوب");
     default: return L("Start negotiation on this bid", "بدء التفاوض على هذا العرض");
+  }
+}
+
+/** Offer-state suffix for the deal-room CTA (uiState) — new / updated offer / whose move it is. */
+function offerSuffix(uiState: string | null, L: (en: string, ar: string) => string): string | null {
+  switch (uiState) {
+    case "new": return L("New offer", "عرض جديد");
+    case "fresh": return L("Updated offer", "عرض مُحدّث");
+    case "your-turn": return L("Your turn", "دورك");
+    default: return null;
   }
 }
 
@@ -96,8 +107,9 @@ const QSTYLE = `
   .words .wl{font-size:10px;font-weight:800;text-transform:uppercase;margin-bottom:4px;}
   .card{border:1px solid #e4edf5;border-radius:10px;overflow:hidden;margin-bottom:18px;}
   .card-h{background:#fbeeea;padding:11px 15px;font-size:13.5px;font-weight:800;}
-  .kv{display:flex;justify-content:space-between;gap:14px;padding:10px 15px;border-top:1px solid #f0f4f8;font-size:13px;}
-  .kv span{color:#6b8fa8;font-weight:600;}.kv b{font-weight:800;text-align:end;}
+  .kv{display:flex;align-items:center;gap:8px;padding:9px 15px;border-top:1px solid #f0f4f8;font-size:13px;}
+  .kv::before{content:"";width:6px;height:6px;border-radius:50%;background:#1daf58;flex:0 0 auto;}
+  .kv span{color:#6b8fa8;font-weight:600;}.kv b{font-weight:800;margin-inline-start:auto;text-align:end;}
   .tc{margin:0 0 18px;padding-inline-start:20px;font-size:11.5px;color:#2a4f72;line-height:1.7;}
   .tc li{margin-bottom:5px;}
   .signed{background:#eef7f1;border-radius:10px;padding:13px 15px;font-size:12px;}
@@ -302,7 +314,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       const labelOf = (b: GroupBid) => (ar ? b.itemLabelAr : b.itemLabel) || (itemMap.get(b.requestId)?.displayId ?? b.requestId);
       // App rule (014 CR #141): the bid is priced per billing period; the unit count is NOT multiplied
       // into the price (it's shown for information only). Open-ended → ∞ qty + one-period "as operated".
-      const daysPerPeriod = (u: string | null) => { switch ((u ?? "PER_DAY").toUpperCase()) { case "PER_WEEK": return 7; case "PER_MONTH": return 30; case "PER_JOB": return 0; default: return 1; } };
+      const daysPerPeriod = (u: string | null) => { switch ((u ?? "PER_DAY").toUpperCase()) { case "PER_WEEK": return 7; case "PER_MONTH": return 26; case "PER_JOB": return 0; default: return 1; } };
       const periodLabel = (u: string | null) => { switch ((u ?? "PER_DAY").toUpperCase()) { case "PER_WEEK": return L("week", "أسبوع"); case "PER_MONTH": return L("month", "شهر"); case "PER_JOB": return L("job", "مهمة"); default: return L("day", "يوم"); } };
 
       // Pricing rows across every selected equipment for this supplier.
@@ -334,10 +346,14 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           desc = `${unitsPart}${ratePart}`;
           amountCell = nf(lineSub);
         }
-        sub += lineSub + (b.mobPrice ?? 0) + (b.demobPrice ?? 0);
+        // Mobilization/demobilization are PER-UNIT (× quantity) so the total reconciles with the backend + card.
+        const mobTotal = (b.mobPrice ?? 0) * units;
+        const demobTotal = (b.demobPrice ?? 0) * units;
+        const tripLabel = `(${units} ${esc(units === 1 ? L("trip", "رحلة") : L("trips", "رحلات"))})`;
+        sub += lineSub + mobTotal + demobTotal;
         let r = `<tr><td><b>${esc(labelOf(b))}</b><div class="sm">${esc(eqLine(b))} · ${desc}</div></td><td class="num">${amountCell}</td></tr>`;
-        if (b.mobPrice) r += `<tr><td><b>${esc(L("Mobilization to site", "النقل إلى الموقع"))}</b> <span class="sm">(1 ${esc(L("trip", "رحلة"))})</span><div class="sm">${esc(labelOf(b))}</div></td><td class="num">${nf(b.mobPrice)}</td></tr>`;
-        if (b.demobPrice) r += `<tr><td><b>${esc(L("Return from site", "الإرجاع من الموقع"))}</b> <span class="sm">(1 ${esc(L("trip", "رحلة"))})</span><div class="sm">${esc(labelOf(b))}</div></td><td class="num">${nf(b.demobPrice)}</td></tr>`;
+        if (b.mobPrice) r += `<tr><td><b>${esc(L("Mobilization to site", "النقل إلى الموقع"))}</b> <span class="sm">${tripLabel}</span><div class="sm">${esc(labelOf(b))}</div></td><td class="num">${nf(mobTotal)}</td></tr>`;
+        if (b.demobPrice) r += `<tr><td><b>${esc(L("Return from site", "الإرجاع من الموقع"))}</b> <span class="sm">${tripLabel}</span><div class="sm">${esc(labelOf(b))}</div></td><td class="num">${nf(demobTotal)}</td></tr>`;
         return r;
       }).join("");
       const vat = Math.round(sub * 0.15);
@@ -391,20 +407,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         <div class="q-head"><div class="q-title">${esc(L("Equipment rental quotation", "عرض سعر تأجير معدات"))}</div><div class="q-sub"><span class="qn">${esc(qnum)}</span><span>${esc(dateStr)}</span></div></div>
         <div class="q-body">
           <div class="parties">
-            <div class="party"><div class="plabel">${esc(L("Supplier", "المؤجّر"))}</div><div class="pname">${esc(sup.supplierName)}</div><div class="pmeta">${[sup.verified ? esc(L("Verified supplier", "مؤجّر موثّق")) : "", sup.rating != null ? "★ " + sup.rating.toFixed(1) : ""].filter(Boolean).join(" · ")}</div>${(() => {
-              // Company / business documents the supplier holds — same set as the comparison's
-              // Company-documents row: CR / VAT / National address + Local Content + SASO registration.
-              const c = sup.compliance;
-              const cc = sup.companyCertCodes ?? [];
-              const docs = [
-                c.activityLicense && L("CR", "السجل التجاري"),
-                c.taxNumber && L("VAT", "الرقم الضريبي"),
-                c.nationalAddress && L("National address", "العنوان الوطني"),
-                cc.includes("LC") && L("Local content", "المحتوى المحلي"),
-                cc.includes("SASO") && L("SASO registration", "تسجيل ساسو"),
-              ].filter(Boolean) as string[];
-              return docs.length ? `<div class="docs">${docs.map((d) => `<span class="doc-ok">✓ ${esc(d)}</span>`).join("")}</div>` : "";
-            })()}</div>
+            <div class="party"><div class="plabel">${esc(L("Supplier", "المؤجّر"))}</div><div class="pname">${esc(sup.supplierName)}</div><div class="pmeta">${[sup.verified ? esc(L("Verified supplier", "مؤجّر موثّق")) : "", sup.rating != null ? "★ " + sup.rating.toFixed(1) : ""].filter(Boolean).join(" · ")}</div></div>
             <div class="party"><div class="plabel">${esc(L("Rentee", "المستأجر"))}</div><div class="pname">${esc(rentee.name)}</div><div class="pmeta">${[verified ? esc(L("Verified renter", "مستأجر موثّق")) : "", esc(rentee.org), rentee.city ? esc(rentee.city) : ""].filter(Boolean).join(" · ")}</div></div>
           </div>
           <div class="metastrip">
@@ -660,14 +663,16 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         const cover = needed ? Math.min(100, Math.round((offered / needed) * 100)) : 0;
         const priceOpen = openPrice === b.id;
         const isSel = selected.has(b.id);
-        // Card price (prototype): per-period rate × offered units (+ delivery/return when priced) + VAT.
+        // Card price — canonical quote: rate ÷ period-days × duration (weekly ÷7, monthly ÷26),
+        // mob/demob × units, VAT 15%. "Per unit" toggle prices one unit; else all offered units.
         const u = priceOpen && perUnit ? 1 : offered;
-        const rental = (b.price ?? 0) * u;
-        const deliv = b.mobPrice ? (perUnit && offered > 1 ? Math.round(b.mobPrice / offered) : b.mobPrice) : 0;
-        const ret = b.demobPrice ? (perUnit && offered > 1 ? Math.round(b.demobPrice / offered) : b.demobPrice) : 0;
-        const sub = rental + deliv + ret;
-        const vat = Math.round(sub * 0.15);
-        const grand = sub + vat;
+        const cq = computeBidQuote(b, { units: u, fallbackDays: group.items.find((it) => it.id === b.requestId)?.durationDays ?? null });
+        const rental = cq.rentalSubtotal;
+        const deliv = cq.mobTotal;
+        const ret = cq.demobTotal;
+        const sub = cq.subtotalPreVat;
+        const vat = Math.round(cq.vat);
+        const grand = Math.round(cq.total);
         const okCount = (rows: typeof b.terms.equipment) => rows.filter((r) => r.state === "matched" || r.state === "agreed").length;
         const termChips = [
           { label: L("Equipment", "المعدة"), rows: b.terms.equipment },
@@ -675,7 +680,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           { label: L("Documents", "المستندات"), rows: b.terms.supplier },
         ].filter((t) => t.rows.length > 0).map((t) => {
           const ok = okCount(t.rows), total = t.rows.length;
-          const tone = total && ok === total ? { bg: "#e7f7ee", c: "#1daf58" } : ok > 0 ? { bg: "#fff3e0", c: "#d4780a" } : { bg: "#eff4f9", c: "#6b8fa8" };
+          const tone = total && ok === total ? { bg: "#e7f7ee", c: "#1daf58" } : ok > 0 ? { bg: "#fff3e0", c: "#d4780a" } : { bg: "#e6f2fb", c: "#1a7ec8" };
           return { label: t.label, ok, total, tone };
         });
         const certChips = [
@@ -684,14 +689,34 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         ].slice(0, 3);
         const rowSep = { borderTop: "1px solid #EFF2F6" } as const;
         const iconBox = { width: 40, height: 40, borderRadius: 11, background: "#eff4f9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } as const;
-        const blueLink = { background: "none", border: "none", color: "#1a7ec8", fontWeight: 800, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" } as const;
+        const blueLink = { background: "none", border: "none", color: "#1a7ec8", fontWeight: 800, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" } as const;
+        // Top banner — every card carries one so the rows line up across cards (parity with the off-platform banner).
+        const banner =
+          b.unreadTerms.length > 0
+            ? { icon: "bolt", text: L(`Updated offer · ${b.unreadTerms.length} new`, `عرض مُحدّث · ${b.unreadTerms.length} جديد`), bg: "#fff4e5", c: "#d4780a", bd: "#f7e4c6" }
+            : b.status === "COUNTER_OFFERED"
+              ? { icon: "bolt", text: L("Updated offer", "عرض مُحدّث"), bg: "#fff4e5", c: "#d4780a", bd: "#f7e4c6" }
+              : b.status === "ACCEPTED"
+                ? { icon: "verified", text: L("Accepted — order placed", "مقبول — تم الطلب"), bg: "#e7f7ee", c: "#1daf58", bd: "#cdebd9" }
+                : b.status === "OPEN_FOR_NEGOTIATION"
+                  ? { icon: "forum", text: L("In negotiation", "قيد التفاوض"), bg: "#fff3e0", c: "#d4780a", bd: "#f7e4c6" }
+                  : b.status === "EXPIRED"
+                    ? { icon: "schedule", text: L("Offer expired", "انتهى العرض"), bg: "#eff4f9", c: "#6b8fa8", bd: "#e1e8f0" }
+                    : b.status === "WITHDRAWN"
+                      ? { icon: "block", text: L("Offer withdrawn", "عرض مسحوب"), bg: "#eff4f9", c: "#6b8fa8", bd: "#e1e8f0" }
+                      : { icon: "auto_awesome", text: L("New offer", "عرض جديد"), bg: "#e6f2fb", c: "#1a7ec8", bd: "#cfe6f7" };
         return (
           <div
             key={b.id}
             onClick={selectMode ? () => toggleSelect(b.id) : undefined}
             style={{ flex: cardFlex, minWidth: 320, scrollSnapAlign: "start", alignSelf: "stretch", display: "flex", flexDirection: "column", position: "relative", background: "#fff", border: `1px solid ${isSel ? "#f79009" : "#d4e0ec"}`, borderRadius: 18, overflow: "hidden", boxShadow: "0 1px 2px rgba(20,40,70,.04)", outline: isSel ? "2px solid #f79009" : "none", outlineOffset: 2, cursor: selectMode ? "pointer" : "default" }}
           >
-            <div style={{ height: 4, background: "#f79009" }} />
+            <div style={{ height: 4, background: banner.c }} />
+            {banner && (
+              <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", background: banner.bg, borderBottom: `1px solid ${banner.bd}`, fontSize: 11.5, fontWeight: 800, color: banner.c }}>
+                <span className="material-icons-outlined" style={{ fontSize: 16 }}>{banner.icon}</span>{banner.text}
+              </div>
+            )}
             {selectMode && (
               <div style={{ position: "absolute", top: 12, insetInlineEnd: 12, width: 26, height: 26, borderRadius: "50%", background: isSel ? "#f79009" : "#fff", border: `2px solid ${isSel ? "#f79009" : "#d4e0ec"}`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(20,40,70,.18)", zIndex: 5, pointerEvents: "none" }}>
                 {isSel && <span className="material-icons-outlined" style={{ fontSize: 16 }}>check</span>}
@@ -705,17 +730,20 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 8, minWidth: 0 }}>
-                  <span style={{ flex: "0 1 auto", minWidth: 0, fontSize: 14.5, fontWeight: 900, color: "#1c3550", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.25 }} title={ar ? b.itemLabelAr : b.itemLabel}>{ar ? b.itemLabelAr : b.itemLabel}</span>
-                  <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 800, color: "#d4780a", background: "#fff3e0", padding: "1px 8px", borderRadius: 20 }}>×{offered}</span>
+                  <span style={{ flex: "0 1 auto", minWidth: 0, fontSize: 13.5, fontWeight: 900, color: "#1c3550", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.25 }} title={ar ? b.itemLabelAr : b.itemLabel}>{ar ? b.itemLabelAr : b.itemLabel}</span>
+                  <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, color: "#d4780a", background: "#fff3e0", padding: "1px 8px", borderRadius: 20 }}>×{offered}</span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 6 }}>
                   <span style={{ width: 22, height: 22, borderRadius: "50%", background: "#1c3550", color: "#fff", fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{(b.supplierName || "S").charAt(0).toUpperCase()}</span>
-                  <span style={{ fontSize: 13.5, fontWeight: 800, color: "#1c3550" }}>{b.supplierName}</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550" }}>{b.supplierName}</span>
                   {b.verified && <span className="material-icons-outlined" style={{ fontSize: 16, color: "#1daf58" }}>verified</span>}
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 10, fontWeight: 800, padding: "2px 7px", borderRadius: 100, background: "#e6f2fb", color: "#1a7ec8" }}>
+                    <span className="material-icons-outlined" style={{ fontSize: 12 }}>verified_user</span>{L("via Moedatech app", "عبر تطبيق معداتك")}
+                  </span>
                 </div>
               </div>
               {!selectMode && (
-                <span style={{ whiteSpace: "nowrap", fontSize: 12, fontWeight: 800, padding: "5px 11px", borderRadius: 20, background: sc.bg, color: sc.c, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <span style={{ whiteSpace: "nowrap", fontSize: 11, fontWeight: 800, padding: "5px 11px", borderRadius: 20, background: sc.bg, color: sc.c, display: "inline-flex", alignItems: "center", gap: 6 }}>
                   {sc.dot && <span style={{ width: 6, height: 6, borderRadius: "50%", background: sc.c }} />}{ar ? sp.ar : sp.en}
                 </span>
               )}
@@ -723,7 +751,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
 
             {/* fulfillment band */}
             <div style={{ margin: "0 16px 14px", padding: "10px 14px", borderRadius: 12, background: "#fff4e5", display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550", whiteSpace: "nowrap" }}>{L(`Covers ${offered} of ${needed} units`, `يغطّي ${offered} من ${needed} وحدات`)}</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: "#1c3550", whiteSpace: "nowrap" }}>{L(`Covers ${offered} of ${needed} units`, `يغطّي ${offered} من ${needed} وحدات`)}</span>
               <div style={{ flex: 1, height: 8, borderRadius: 6, background: "rgba(247,144,9,.18)", overflow: "hidden" }}>
                 <div style={{ height: "100%", borderRadius: 6, background: "#f79009", width: `${cover}%` }} />
               </div>
@@ -735,10 +763,10 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
               <div style={iconBox}>
                 <EquipImg src={b.itemImage} categoryId={b.categoryId} name={ar ? b.itemLabelAr : b.itemLabel} box="" img="h-5 w-5 object-contain" iconSize={20} />
               </div>
-              <span style={{ fontSize: 14, fontWeight: 800, color: "#1c3550" }}>{L("Equipment", "المعدة")}</span>
-              <div style={{ display: "flex", gap: 6, flexWrap: "nowrap", flex: 1, minWidth: 0, overflowX: "auto" }} className="no-sb">
+              <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Equipment", "المعدة")}</span>
+              <div style={{ display: "flex", gap: 4, flexWrap: "nowrap", flex: 1, minWidth: 0, overflowX: "auto" }} className="no-sb">
                 {certChips.map((c, i) => (
-                  <span key={i} style={{ fontSize: 12, fontWeight: 800, color: "#1daf58", background: "#e7f7ee", padding: "2px 9px", borderRadius: 20, whiteSpace: "nowrap" }}>✓ {c}</span>
+                  <span key={i} style={{ fontSize: 11, fontWeight: 800, color: "#1daf58", background: "#e7f7ee", padding: "2px 9px", borderRadius: 20, whiteSpace: "nowrap" }}>✓ {c}</span>
                 ))}
               </div>
               {b.equipment?.id && !selectMode && (
@@ -749,22 +777,23 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
             {/* Terms row */}
             <div style={{ ...rowSep, display: "flex", alignItems: "center", gap: 12, padding: "13px 16px" }}>
               <div style={iconBox}><span className="material-icons-outlined" style={{ fontSize: 20, color: "#6b8fa8" }}>description</span></div>
-              <span style={{ fontSize: 14, fontWeight: 800, color: "#1c3550" }}>{L("Terms", "الشروط")}</span>
-              <div style={{ display: "flex", gap: 6, flexWrap: "nowrap", flex: 1, minWidth: 0, overflowX: "auto" }} className="no-sb">
+              <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Terms", "الشروط")}</span>
+              <div style={{ display: "flex", gap: 4, flexWrap: "nowrap", flex: 1, minWidth: 0, overflowX: "auto" }} className="no-sb">
                 {termChips.map((t) => (
-                  <span key={t.label} style={{ fontSize: 12, fontWeight: 800, color: t.tone.c, background: t.tone.bg, padding: "2px 9px", borderRadius: 20, whiteSpace: "nowrap" }}>{t.label} {t.ok}/{t.total}</span>
+                  <span key={t.label} style={{ fontSize: 10, fontWeight: 800, color: t.tone.c, background: t.tone.bg, padding: "2px 7px", borderRadius: 20, whiteSpace: "nowrap" }}>{t.label} {t.ok}/{t.total}</span>
                 ))}
               </div>
               {!selectMode && <button onClick={() => setTermsBid(b)} style={blueLink}>{L("View", "عرض")} ›</button>}
             </div>
 
+
             {/* Rate row */}
             <div style={{ ...rowSep, padding: "13px 16px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ ...iconBox, background: "#fff4e5" }}><span className="material-icons-outlined" style={{ fontSize: 20, color: "#f79009" }}>payments</span></div>
-                <span style={{ fontSize: 14, fontWeight: 800, color: "#1c3550" }}>{L("Rate", "السعر")}</span>
+                <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Rate", "السعر")}</span>
                 <div style={{ flex: 1 }} />
-                <span style={{ fontSize: 19, fontWeight: 900, color: "#f79009" }}>{nf(b.price ?? 0)} {L("SAR", "ر.س")}</span>
+                <span style={{ fontSize: 17, fontWeight: 900, color: "#f79009" }}>{nf(b.price ?? 0)} {L("SAR", "ر.س")}</span>
                 <span style={{ fontSize: 13, color: "#6b8fa8", fontWeight: 700 }}>/ {periodOf(b.priceUnit)}</span>
                 {!selectMode && (
                   <button onClick={() => { setOpenPrice(priceOpen ? null : b.id); setPerUnit(false); }} style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #d4e0ec", background: "#F7FAFC", color: "#6b8fa8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -782,7 +811,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                     </div>
                   )}
                   {([
-                    [L(`Rental (${nf(b.price ?? 0)}/${periodOf(b.priceUnit)} × ${u} unit${u > 1 ? "s" : ""})`, `الإيجار (${nf(b.price ?? 0)}/${periodOf(b.priceUnit)} × ${u})`), rental, null],
+                    [L(`Rental (${nf(b.price ?? 0)}/${periodOf(b.priceUnit)} × ${Number.isInteger(cq.periods) ? cq.periods : cq.periods.toFixed(2)}${u > 1 ? ` × ${u}` : ""})`, `الإيجار (${nf(b.price ?? 0)}/${periodOf(b.priceUnit)} × ${Number.isInteger(cq.periods) ? cq.periods : cq.periods.toFixed(2)}${u > 1 ? ` × ${u}` : ""})`), rental, null],
                     ...(deliv ? [[L("Delivery to site", "النقل إلى الموقع"), deliv, b.mobLeadTime]] as [string, number, string | null][] : []),
                     ...(ret ? [[L("Return from site", "الإرجاع من الموقع"), ret, b.demobLeadTime]] as [string, number, string | null][] : []),
                     [L("Subtotal before VAT", "المجموع قبل الضريبة"), sub, null],
@@ -790,11 +819,11 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                   ] as [string, number, string | null][]).map(([lab, val, note], i) => (
                     <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 0", borderBottom: "1px solid #F2F5F8" }}>
                       <span style={{ fontSize: 13.5, color: "#2a4f72", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>{lab}{note ? <span style={{ fontSize: 11, color: "#6b8fa8", background: "#eff4f9", padding: "1px 7px", borderRadius: 20, whiteSpace: "nowrap" }}>{note}</span> : null}</span>
-                      <span style={{ fontSize: 14.5, fontWeight: 800, color: "#1c3550", fontVariantNumeric: "tabular-nums" }}>{nf(val)}</span>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550", fontVariantNumeric: "tabular-nums" }}>{nf(val)}</span>
                     </div>
                   ))}
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, padding: "12px 14px", borderRadius: 12, background: "#fff4e5" }}>
-                    <span style={{ fontSize: 13.5, fontWeight: 800, color: "#1c3550" }}>{L("Estimated total", "الإجمالي التقديري")}</span>
+                    <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550" }}>{L("Estimated total", "الإجمالي التقديري")}</span>
                     <span style={{ fontSize: 16, fontWeight: 900, color: "#f79009" }}>{nf(grand)} {L("SAR", "ر.س")}</span>
                   </div>
                 </div>
@@ -813,7 +842,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
             {!selectMode && (
               <div style={{ marginTop: "auto", padding: "12px 16px 16px" }}>
                 <button disabled={disabled || busyId === b.id} onClick={() => startNegotiation(b)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "14px", borderRadius: 14, border: "none", background: disabled ? "#9AA7B8" : "#1c3550", color: "#fff", fontWeight: 800, fontSize: 15, cursor: disabled ? "default" : "pointer", fontFamily: "inherit", opacity: busyId === b.id ? 0.7 : 1 }}>
-                  <span className="material-icons-outlined" style={{ fontSize: 18 }}>{b.status === "ACCEPTED" ? "receipt_long" : "forum"}</span>{pillLabel(b.status, L)}
+                  <span className="material-icons-outlined" style={{ fontSize: 18 }}>{b.status === "ACCEPTED" ? "receipt_long" : "forum"}</span>{pillLabel(b.status, L)}{offerSuffix(b.uiState, L) ? ` · ${offerSuffix(b.uiState, L)}` : ""}
                 </button>
               </div>
             )}

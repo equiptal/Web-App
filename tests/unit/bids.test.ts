@@ -12,6 +12,11 @@ describe("mapBidList — unitsOffered (supplier's chosen quantity)", () => {
     const out = mapBidList({ activeBids: [{ id: "b1", ...req }] });
     expect(out[0].unitsOffered).toBe(10);
   });
+  it("treats an EMPTY units_offered array as 'bid the request as posted' (not 0)", () => {
+    // Regression: empty array → 0 made the header tile read 0/N while the card said 'covers N of N'.
+    const out = mapBidList({ activeBids: [{ id: "b1", unitsOffered: [], ...req }] });
+    expect(out[0].unitsOffered).toBe(10);
+  });
 });
 
 describe("mapBidList — supplierId", () => {

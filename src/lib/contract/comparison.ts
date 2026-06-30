@@ -94,6 +94,41 @@ function computeRental(bid: BidCard, fallbackDays?: number | null): Money {
   return { value: (rate / dpp) * days * units, stated: true };
 }
 
+/**
+ * Canonical quote math shared by the comparison and the quotation so they never disagree.
+ * Rental: PER_JOB → flat rate; else `rate / daysPerPeriod × durationDays` (weekly ÷7, monthly ÷26).
+ * `periods` is the period multiplier shown in the breakdown (weeks/months/days; 1 for a job).
+ * Mobilization/demobilization are **per-unit** (× units, app/backend parity). VAT 15%.
+ * `durationDays` = the bid's own duration, else `fallbackDays`, else 1.
+ */
+export interface BidQuote {
+  units: number;
+  days: number;
+  periods: number;
+  perUnitRental: number;
+  rentalSubtotal: number;
+  mobTotal: number;
+  demobTotal: number;
+  subtotalPreVat: number;
+  vat: number;
+  total: number;
+}
+export function computeBidQuote(bid: BidCard, opts?: { fallbackDays?: number | null; units?: number }): BidQuote {
+  const rate = num(bid.price) ?? 0;
+  const units = opts?.units ?? (bid.numberOfUnits || 1);
+  const dpp = daysPerPeriod(bid.priceUnit);
+  const fb = num(opts?.fallbackDays);
+  const days = num(bid.duration) ?? (fb != null && fb > 0 ? fb : 1);
+  const periods = dpp === 0 ? 1 : days / dpp;
+  const perUnitRental = dpp === 0 ? rate : (rate / dpp) * days;
+  const rentalSubtotal = perUnitRental * units;
+  const mobTotal = (num(bid.mobPrice) ?? 0) * units;
+  const demobTotal = (num(bid.demobPrice) ?? 0) * units;
+  const subtotalPreVat = rentalSubtotal + mobTotal + demobTotal;
+  const vat = subtotalPreVat * 0.15;
+  return { units, days, periods, perUnitRental, rentalSubtotal, mobTotal, demobTotal, subtotalPreVat, vat, total: subtotalPreVat + vat };
+}
+
 /** Cash due upfront from the bid's payment terms + stated data (deterministic, AC-09). */
 function computeCashUpfront(bid: BidCard, rental: Money, mob: Money): Money {
   const terms = (bid.requestTerms.paymentTerms ?? "").toLowerCase();
@@ -241,6 +276,76 @@ export function buildItemComparison(rawBids: BidCard[], opts: BuildOptions = {})
 /** The at-a-glance verdict label inputs (AC-06) — the UI renders the string with its own i18n. */
 export function verdictConflicts(col: BidColumn): number {
   return col.conflicts;
+}
+
+/* ---------------------------------------------------------------------------------------------- *
+ * Bid-comparison redesign (§6) — display-only helpers. The deterministic quote engine above is
+ * unchanged (Week = 7, Month = 26). These shape how a column is *shown* under the RATE-PERIOD and
+ * PRICES-FOR toggles, the cost-responsibility chip tone, and per-row winners. No fabricated data.
+ * ---------------------------------------------------------------------------------------------- */
+
+/** RATE PERIOD toggle — re-expresses the bid's day-rate in the chosen period (display only). */
+export type RatePeriod = "PER_DAY" | "PER_WEEK" | "PER_MONTH";
+/** PRICES FOR toggle — show figures for one unit or all the units the supplier bid on. */
+export type PricesFor = "unit" | "all";
+
+/**
+ * Cost-responsibility chip tone for the comparison (§6 Terms): the supplier covering the term reads
+ * green; the renter handling it reads **blue** (informational — your responsibility, not "bad"); a
+ * disagreement reads red. Grey = not provided. Distinct from the engine's green/red/grey `state`.
+ */
+export function responsibilityTone(cr: CostResponsibility): "green" | "blue" | "red" | "grey" {
+  if (cr.state === "red") return "red";
+  if (cr.bidSide === "supplier") return "green";
+  if (cr.requestSide === "me" || cr.bidSide === "me") return "blue";
+  return cr.state === "green" ? "green" : "grey";
+}
+
+export interface DisplayQuote {
+  /** Units the figures are priced for (1 when prices-for = unit, else the bid's unit count). */
+  units: number;
+  /** The bid's day-rate re-expressed in the chosen RATE PERIOD (PER_JOB → flat rate, no conversion). */
+  ratePerPeriod: number;
+  /** ratePerPeriod × units — the headline "Rental cost" row. */
+  rentalForPeriod: number;
+  /** (mob + demob) × units. */
+  mobDemob: number;
+  /** Duration-based rental × units, or null when the request has no duration (§6: shown only then). */
+  durationRental: number | null;
+  /** durationRental ?? rentalForPeriod, + mobDemob. */
+  subtotal: number;
+  vat: number;
+  total: number;
+}
+
+/** Display figures for one bid under the chosen rate-period + prices-for basis (Week 7 / Month 26). */
+export function displayQuote(bid: BidCard, period: RatePeriod, pricesFor: PricesFor, fallbackDays?: number | null): DisplayQuote {
+  const rate = num(bid.price) ?? 0;
+  const units = pricesFor === "all" ? (bid.numberOfUnits || 1) : 1;
+  const dppBid = daysPerPeriod(bid.priceUnit);
+  const perDay = dppBid === 0 ? rate : rate / dppBid; // bid rate → per-day basis
+  const ratePerPeriod = dppBid === 0 ? rate : perDay * daysPerPeriod(period); // → chosen display period
+  const rentalForPeriod = ratePerPeriod * units;
+  const mobDemob = ((num(bid.mobPrice) ?? 0) + (num(bid.demobPrice) ?? 0)) * units;
+  const fb = num(fallbackDays);
+  const durDays = num(bid.duration) ?? (fb != null && fb > 0 ? fb : null);
+  const durationRental = durDays != null && dppBid !== 0 ? perDay * durDays * units : null;
+  const base = durationRental ?? rentalForPeriod;
+  const subtotal = base + mobDemob;
+  const vat = subtotal * 0.15;
+  return { units, ratePerPeriod, rentalForPeriod, mobDemob, durationRental, subtotal, vat, total: subtotal + vat };
+}
+
+/**
+ * Indices of the winning column(s) for a metric. dir "min" = lowest wins (cost/distance), "max" =
+ * highest wins (units/year/rating). Nulls are ignored; a tie for the lead → no highlight (§6).
+ */
+export function rowWinners(values: (number | null | undefined)[], dir: "min" | "max"): Set<number> {
+  const valid = values.map((v, i) => ({ v, i })).filter((x): x is { v: number; i: number } => typeof x.v === "number" && !Number.isNaN(x.v));
+  if (valid.length < 2) return new Set();
+  const best = dir === "min" ? Math.min(...valid.map((x) => x.v)) : Math.max(...valid.map((x) => x.v));
+  const winners = valid.filter((x) => x.v === best);
+  return winners.length === 1 ? new Set([winners[0].i]) : new Set(); // ties not highlighted
 }
 
 /** Deterministic preset sort (AC-20 web side) — no agent scoring. */

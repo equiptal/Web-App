@@ -243,7 +243,13 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
         // Web chips are tuv/spsp (the web has no CERTIFIED chip — fine, the app's set is a superset).
         // saso-technical is an EQUIPMENT cert with no operator-license equivalent → routed to safety below.
         operatorLicenseLevel: operatorIncluded
-          ? i.operator.certificate.map((c) => (({ tuv: "TUV", spsp: "SPSP" }) as Record<string, string>)[c]).filter(Boolean).join(",") || undefined
+          ? (() => {
+              const parts = i.operator.certificate.map((c) => (({ tuv: "TUV", spsp: "SPSP" }) as Record<string, string>)[c]).filter(Boolean);
+              // Free-text "other" cert → appended (commas→spaces so they don't corrupt the join), app parity.
+              const other = i.operator.certificate.includes("other") ? i.operator.certificateOther?.trim().replace(/\s*,\s*/g, " ") : "";
+              if (other) parts.push(other);
+              return parts.join(",") || undefined;
+            })()
           : undefined,
         // Equipment safety certs (gating) — the project safety list PLUS an operator-picked saso-technical
         // (no operatorLicenseLevel equivalent, so don't drop it), all as canonical doc-type tokens.

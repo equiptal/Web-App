@@ -8,6 +8,7 @@ import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import type { Locale } from "@/lib/i18n/config";
 import { SurveyProvider, useSurvey } from "@/components/surveys/SurveyProvider";
+import { fetchDealRoomUnread } from "@/lib/api/client";
 
 /**
  * App shell for the renter web app (web-app/004, AC-01/02/03/09/25). Navy sidebar (brand, a Request
@@ -72,6 +73,15 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
       .catch(() => setName(""));
   }, [status]);
 
+  // Unread deal-room messages (inbox badge) — role-scoped total from the app-backend.
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    if (status !== "authed") return;
+    let active = true;
+    fetchDealRoomUnread().then((r) => active && setUnread(r.total)).catch(() => {});
+    return () => { active = false; };
+  }, [status]);
+
   const handleSignOut = async () => {
     setMenuOpen(false);
     await signOut(); // AC-09
@@ -83,6 +93,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
     { key: "requests", icon: "grid_view", label: t.shell.requests, href: "/requests" },
     { key: "compare", icon: "compare_arrows", label: t.shell.compare, href: "/compare" },
     { key: "dashboard", icon: "dashboard", label: t.shell.dashboard, href: "/dashboard" },
+    { key: "inbox", icon: "inbox", label: t.shell.inbox, href: "/inbox" },
     { key: "surveys", icon: "assignment", label: t.shell.surveys, href: "/surveys" },
     { key: "profile", icon: "person", label: t.shell.profile, href: "/profile" },
   ];
@@ -173,6 +184,20 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
 
             {status === "authed" && (
               <span className={`hidden rounded-full border px-2.5 py-1 text-[11px] font-bold sm:inline-flex ${badge.cls}`}>{badge.label}</span>
+            )}
+
+            {status === "authed" && (
+              <button
+                onClick={() => router.push("/inbox")}
+                className="relative grid h-9 w-9 place-items-center rounded-full text-navy-mid transition hover:bg-surface2"
+                aria-label={t.shell.inbox}
+                title={t.shell.inbox}
+              >
+                <Icon name="inbox" size={20} />
+                {unread > 0 && (
+                  <span className="absolute -end-0.5 -top-0.5 grid h-[17px] min-w-[17px] place-items-center rounded-full bg-brand px-1 text-[10px] font-extrabold text-white ring-2 ring-surface">{unread > 99 ? "99+" : unread}</span>
+                )}
+              </button>
             )}
 
             {status === "authed" && (

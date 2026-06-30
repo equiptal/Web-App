@@ -78,6 +78,8 @@ export interface OperatorDetails {
    *  Sent as operatorNationalityCustom (≤100). */
   nationalityCustom?: string | null;
   certificate: OperatorCertificate[]; // multi-select; defaulted from project Safety certs (AC-24/50)
+  /** Free-text operator certificate when "other" is selected — appended to operatorLicenseLevel (app parity). */
+  certificateOther?: string | null;
   /** AC-50: true when the agent set the cert per-item from the RFQ — the project-level Safety cert
    *  then leaves it untouched (only fills items the agent didn't mention). */
   certByAgent?: boolean;
@@ -245,7 +247,7 @@ export function defaultPreferences(): Preferences {
 }
 
 export function defaultOperatorDetails(): OperatorDetails {
-  return { nightShift: false, nationality: null, nationalityCustom: null, certificate: [], fatFood: "me", fatAccommodationTransport: "me" };
+  return { nightShift: false, nationality: null, nationalityCustom: null, certificate: [], certificateOther: null, fatFood: "me", fatAccommodationTransport: "me" };
 }
 
 /** Build a blank item (used when the renter adds a missed item — AC-22). */

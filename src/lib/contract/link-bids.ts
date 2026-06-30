@@ -249,7 +249,7 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
     rating: null,
     distanceKm: null, // the form captures no supplier location
     submittedAt: sub.createdAt,
-    validUntil: null,
+    validUntil: sub.validUntil ?? null, // supplier-set quote expiry → bid-card chip + quotation "Valid until"
     price: it?.rentalRate ?? null,
     mobPrice: it?.deliveryPrice ?? null,
     demobPrice: it?.returnPrice ?? null,

@@ -95,6 +95,16 @@
 .dlproto .msg.them { align-self: flex-start; background: var(--surface1); border: 1px solid var(--border); border-start-start-radius: 5px; color: var(--navy); }
 .dlproto .msg.mine { align-self: flex-end; background: var(--rentee); color: #fff; border-start-end-radius: 5px; }
 .dlproto .msg.mine .meta { text-align: end; }
+/* supplier-started banner */
+.dlproto .started-banner { display: flex; align-items: center; gap: 8px; margin: 10px 0; padding: 10px 13px; border-radius: 10px; background: var(--info-bg); color: var(--info); font-size: 12.5px; font-weight: 700; }
+.dlproto .started-banner .material-icons-outlined { font-size: 17px; flex: 0 0 auto; }
+/* chat attachments (images / files) */
+.dlproto .msg-att-img { display: block; margin-top: 6px; }
+.dlproto .msg-att-img img { max-width: 220px; max-height: 220px; border-radius: 10px; display: block; }
+.dlproto .msg-att-file { display: inline-flex; align-items: center; gap: 7px; margin-top: 6px; padding: 8px 11px; border-radius: 10px; background: rgba(0,0,0,.06); color: inherit; text-decoration: none; font-size: 12.5px; font-weight: 700; max-width: 240px; }
+.dlproto .msg.mine .msg-att-file { background: rgba(255,255,255,.18); }
+.dlproto .msg-att-file .material-icons-outlined { font-size: 18px; flex: 0 0 auto; }
+.dlproto .msg-att-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* composer */
 .dlproto .composer { position: sticky; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 12px 0; background: var(--surface1); border-top: 1px solid var(--border); }

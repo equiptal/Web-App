@@ -31,9 +31,9 @@ const UNIT_LABEL: Record<string, [string, string]> = {
 };
 const num = (v: string) => (v.trim() && Number.isFinite(Number(v)) ? Number(v) : 0);
 
-// Hide the supplier "Quote valid until" field until the link_bid_submissions.valid_until migration is
-// applied + the agents backend redeployed. All wiring stays; flip to true once that's live.
-const QUOTE_EXPIRY_ENABLED = false;
+// The supplier "Quote valid until" field. Enabled now that the link_bid_submissions.valid_until
+// migration (20260629000000) is on staging and the submit handler persists it end-to-end.
+const QUOTE_EXPIRY_ENABLED = true;
 
 type Answer = {
   confirmations: Partial<Record<TermKey, boolean>>;

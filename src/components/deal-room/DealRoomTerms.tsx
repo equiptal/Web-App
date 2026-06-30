@@ -26,6 +26,7 @@ function order(state: string): number {
 
 export function valText(v: unknown, L: LFn): string {
   if (v == null || v === "") return "—";
+  if (Array.isArray(v)) return v.length ? v.map((x) => String(x)).join(", ") : "—";
   if (typeof v === "boolean") return v ? L("Yes", "نعم") : L("No", "لا");
   const str = String(v);
   if (str === "supplier") return L("Supplier", "المؤجّر");
@@ -36,6 +37,9 @@ export function valText(v: unknown, L: LFn): string {
 }
 
 const isPriceKey = (k: string) => /mob|demob|pricing|rate/i.test(k);
+/** Cert-list terms are multi-value (a set of cert codes) — countered as a checkable multi-select. */
+const CERT_LIST_KEYS = new Set(["operator_certification", "safety_certifications"]);
+const isCertListKey = (k: string) => CERT_LIST_KEYS.has(k);
 function isBinary(t: DealTerm): boolean {
   const a = t.supplierDeclared, b = t.renteePreference;
   if (a == null || b == null) return false;
@@ -46,6 +50,13 @@ function isBinary(t: DealTerm): boolean {
 /** Inline counter editor — typed by term (price number / option pills / binary toggle / free value). */
 function CounterEditor({ term, ar, L, onSubmit, onCancel }: { term: DealTerm; ar: boolean; L: LFn; onSubmit: (v: unknown) => void; onCancel: () => void }) {
   const [val, setVal] = useState<string>("");
+  // Multi-select state for cert-list terms — seeded from the renter's current value.
+  const [multi, setMulti] = useState<string[]>(() => {
+    const cur = term.renteePreference ?? term.value;
+    if (Array.isArray(cur)) return cur.map(String);
+    if (typeof cur === "string" && cur.trim()) return cur.split(/[,/]/).map((s) => s.trim()).filter(Boolean);
+    return [];
+  });
   const acts = (disabled: boolean, v: () => unknown) => (
     <div className="tc-counter-acts">
       <button className="tc-btn ghost" type="button" onClick={onCancel}>{L("Cancel", "إلغاء")}</button>
@@ -60,6 +71,18 @@ function CounterEditor({ term, ar, L, onSubmit, onCancel }: { term: DealTerm; ar
           <span className="tc-unit">{L("SAR", "ر.س")}</span>
         </div>
         {acts(val === "" || Number.isNaN(Number(val)), () => Number(val))}
+      </div>
+    );
+  }
+  // Cert-list terms (operator_certification / safety_certifications): multi-select set of cert codes.
+  if (isCertListKey(term.key) && (term.options?.length ?? 0) > 0) {
+    const toggle = (v: string) => setMulti((m) => (m.includes(v) ? m.filter((x) => x !== v) : [...m, v]));
+    return (
+      <div className="tc-counter">
+        <div className="tc-pills">
+          {term.options.map((o) => <button key={o.value} type="button" className={`tc-pill${multi.includes(o.value) ? " on" : ""}`} onClick={() => toggle(o.value)}>{ar ? o.labelAr : o.labelEn}</button>)}
+        </div>
+        {acts(multi.length === 0, () => multi)}
       </div>
     );
   }

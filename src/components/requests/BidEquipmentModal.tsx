@@ -5,6 +5,8 @@ import { useLocale } from "@/lib/i18n";
 import { CERT_LABEL, type BidCard, type CertCode } from "@/lib/contract/bids";
 import { EquipImg } from "@/components/requests/EquipImg";
 import type { EquipmentDetail } from "@/lib/contract/stores";
+import type { DealRoomDocument } from "@/lib/contract/deal-room";
+import { fetchBidDocuments } from "@/lib/api/client";
 
 const periodOf = (u: string | null, ar: boolean) => {
   switch ((u ?? "PER_DAY").toUpperCase()) {
@@ -38,6 +40,8 @@ export function BidEquipmentModal({
   const equipmentId = bid.equipment?.id ?? null;
 
   const [eq, setEq] = useState<EquipmentDetail | null>(null);
+  // The supplier's equipment documents (presigned) — shown as openable rows, like the app's docs sheet.
+  const [docs, setDocs] = useState<DealRoomDocument[]>([]);
 
   useEffect(() => {
     if (!equipmentId) return;
@@ -48,6 +52,16 @@ export function BidEquipmentModal({
       .catch(() => {});
     return () => ctrl.abort();
   }, [equipmentId]);
+
+  useEffect(() => {
+    // Off-platform (shared-link) bids have no real bid-documents endpoint — skip.
+    if (bid.viaSharedLink || !bid.id) return;
+    let active = true;
+    fetchBidDocuments(bid.id)
+      .then((d) => { if (active) setDocs(d.equipmentDocuments ?? []); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [bid.id, bid.viaSharedLink]);
 
   const eqCerts: CertCode[] = bid.equipmentCertCodes ?? [];
   const ownership = bid.ownershipDocs ?? [];
@@ -149,7 +163,24 @@ export function BidEquipmentModal({
               {tile(L("RATE", "السعر"), <>{nf(bid.price ?? 0)} {L("SAR", "ر.س")} <span style={{ fontSize: 12, fontWeight: 700, color: "#C98A4B" }}>/ {periodOf(bid.priceUnit, ar)}</span></>, true)}
             </div>
 
-            {certChips.length > 0 && (
+            {/* Equipment documents (presigned) — openable rows, mirroring the app's documents sheet. */}
+            {docs.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".05em", color: "#6b8fa8", marginBottom: 4 }}>{L("EQUIPMENT DOCUMENTS", "مستندات المعدة")}</div>
+                {docs.map((d, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "1px solid #EFF2F6" }}>
+                    <span className="material-icons-outlined" style={{ fontSize: 19, color: "#1daf58" }}>{d.fileType === "pdf" ? "picture_as_pdf" : "image"}</span>
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: "#1c3550" }}>{(ar ? d.labelAr : d.label) || d.label}</span>
+                    <a href={d.url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12.5, fontWeight: 800, color: "#1a7ec8", textDecoration: "none" }}>
+                      <span className="material-icons-outlined" style={{ fontSize: 16 }}>visibility</span>{L("View", "عرض")}
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Fallback: cert/ownership summary chips when no document files are on file. */}
+            {docs.length === 0 && certChips.length > 0 && (
               <div style={{ marginTop: 16 }}>
                 <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".05em", color: "#6b8fa8", marginBottom: 8 }}>{L("CERTIFICATES & OWNERSHIP ON FILE", "الشهادات والملكية المتوفّرة")}</div>
                 <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>

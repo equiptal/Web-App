@@ -133,6 +133,21 @@ describe("draftToCreateRequest — ALIGNMENT rules", () => {
     expect(c.operatorLicenseLevel).toBeUndefined();
   });
 
+  it("operator cert 'other' free-text → appended to operatorLicenseLevel (commas→spaces)", () => {
+    const a = draftToCreateRequest(
+      makeDraft({ items: [makeItem({ operatorNeeded: "yes", operator: { ...defaultOperatorDetails(), certificate: ["tuv", "other"], certificateOther: "Crane Op Level 3, IPAF" } })] }),
+      "46",
+    ).equipmentItems[0];
+    expect(a.operatorLicenseLevel).toBe("TUV,Crane Op Level 3 IPAF");
+
+    // "other" selected but blank text → nothing appended
+    const b = draftToCreateRequest(
+      makeDraft({ items: [makeItem({ operatorNeeded: "yes", operator: { ...defaultOperatorDetails(), certificate: ["other"], certificateOther: "  " } })] }),
+      "46",
+    ).equipmentItems[0];
+    expect(b.operatorLicenseLevel).toBeUndefined();
+  });
+
   it("rule 6: sends extendable + per-item additionalNotes", () => {
     const project = defaultProjectDetails();
     project.timing.extendable = true;

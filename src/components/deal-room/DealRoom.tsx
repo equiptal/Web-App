@@ -8,7 +8,8 @@ import type { DealRoomView, DealRoomDocument, DealRoomDocuments } from "@/lib/co
 import { DealRoomTerms } from "@/components/deal-room/DealRoomTerms";
 import "@/components/deal-room/deal-room-proto.css";
 
-type ChatMsg = { id: string; text?: string; user?: { id?: string }; created_at?: string | Date };
+type StreamAttachment = { type?: string; image_url?: string; thumb_url?: string; asset_url?: string; title?: string; mime_type?: string; file_size?: number; fallback?: string };
+type ChatMsg = { id: string; text?: string; user?: { id?: string }; created_at?: string | Date; attachments?: StreamAttachment[] };
 
 const STREAM_KEY = process.env.NEXT_PUBLIC_STREAM_API_KEY ?? "";
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
@@ -28,6 +29,8 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const [showDocs, setShowDocs] = useState(false);
   const [quoteBusy, setQuoteBusy] = useState(false);
   const [quoteErr, setQuoteErr] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [termsOpen, setTermsOpen] = useState(true);
   const termsToggled = useRef(false);
 
@@ -123,6 +126,32 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
       await channelRef.current.sendMessage({ text: body });
     } catch {
       setText(body);
+    }
+  }
+
+  /** Upload + send any media (image/pdf/file/video) via GetStream; backend sets no type restriction. */
+  async function sendFiles(files: FileList | null) {
+    const ch = channelRef.current;
+    if (!ch || !files || !files.length) return;
+    setUploading(true);
+    try {
+      const attachments: StreamAttachment[] = [];
+      for (const file of Array.from(files)) {
+        const isImg = file.type.startsWith("image/");
+        const res = isImg ? await ch.sendImage(file) : await ch.sendFile(file);
+        attachments.push(
+          isImg
+            ? { type: "image", image_url: res.file, fallback: file.name }
+            : { type: "file", asset_url: res.file, title: file.name, mime_type: file.type, file_size: file.size },
+        );
+      }
+      const body = text.trim();
+      await ch.sendMessage({ text: body || undefined, attachments });
+      setText("");
+    } catch {
+      /* upload/send failed — leave the composer untouched so the renter can retry */
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -267,6 +296,14 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
         )}
       </div>
 
+      {/* the supplier opened this room first (chatted before the renter entered) — app-parity prompt */}
+      {room.supplierFirstEntry && room.status !== "CLOSED" && room.status !== "ABANDONED" && (
+        <div className="started-banner">
+          <span className="material-icons-outlined">forum</span>
+          {L("The supplier started this conversation — reply to negotiate.", "بدأ المؤجّر هذه المحادثة — ردّ للتفاوض.")}
+        </div>
+      )}
+
       {/* terms — show negotiable terms; the renter resolves any DIFFERING (disputed) one before accept */}
       {room.terms.length > 0 && (
         <div className="terms-card">
@@ -294,6 +331,19 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
             return (
               <div className={`msg ${mine ? "mine" : "them"}`} key={m.id}>
                 {m.text}
+                {m.attachments?.map((a, i) =>
+                  a.type === "image" ? (
+                    <a key={i} href={a.image_url || a.thumb_url} target="_blank" rel="noopener noreferrer" className="msg-att-img">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={a.thumb_url || a.image_url} alt={a.fallback || ""} />
+                    </a>
+                  ) : (
+                    <a key={i} href={a.asset_url} target="_blank" rel="noopener noreferrer" className="msg-att-file">
+                      <span className="material-icons-outlined">{(a.mime_type || "").includes("pdf") ? "picture_as_pdf" : "insert_drive_file"}</span>
+                      <span className="msg-att-name">{a.title || L("Attachment", "مرفق")}</span>
+                    </a>
+                  ),
+                )}
                 <div className="meta">{m.created_at ? new Date(m.created_at as string).toLocaleTimeString(ar ? "ar-SA" : "en-GB", { hour: "2-digit", minute: "2-digit" }) : ""}</div>
               </div>
             );
@@ -315,7 +365,10 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
         <div className="composer ro"><span className="ro-note">{L("Deal room has been cancelled", "تم إلغاء غرفة الصفقة")}</span></div>
       ) : (
         <div className="composer">
-          <span className="ib"><span className="material-icons-outlined">attach_file</span></span>
+          <button type="button" className="ib" disabled={!chatReady || uploading} onClick={() => fileInputRef.current?.click()} aria-label={L("Attach a file", "إرفاق ملف")}>
+            <span className="material-icons-outlined">{uploading ? "hourglass_top" : "attach_file"}</span>
+          </button>
+          <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => { void sendFiles(e.target.files); e.target.value = ""; }} />
           <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} disabled={!chatReady} placeholder={L("Type a message…", "اكتب رسالة…")} />
           <span className="ib send" onClick={send}><span className="material-icons-outlined">send</span></span>
         </div>

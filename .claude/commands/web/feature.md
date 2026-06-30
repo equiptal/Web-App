@@ -1,3 +1,4 @@
+
 ---
 description: Web implementation planner — prompt or GitHub spec → plan → questions → tickets → build (Next.js BFF web app)
 argument-hint: <free-form feature prompt> | gh:<repo>#<issue> | spec:<epic-path>

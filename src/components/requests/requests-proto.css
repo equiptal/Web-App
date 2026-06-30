@@ -391,6 +391,15 @@
 .rproto .lc-chips { display: flex; gap: 7px; padding: 8px 14px 4px; flex-wrap: wrap; }
 .rproto .lc-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--navy-mid); background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-full); padding: 4px 10px; }
 .rproto .lc-chip .material-icons-outlined { font-size: 13px; color: var(--muted); }
+/* Bid source chip: blue = on-platform (via Moedatech app), orange = off-platform (shared link). */
+.rproto .src-chip { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: var(--r-full); white-space: nowrap; }
+.rproto .src-chip .material-icons-outlined { font-size: 12px; }
+.rproto .src-chip.src-app { background: var(--info-bg); color: var(--info); }
+.rproto .src-chip.src-link { background: var(--action-dim); color: var(--warning); }
+/* Price-negotiable hint (app parity): tappable blue row above the price → opens the deal room. */
+.rproto .neg-hint { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; border-top: 1px solid var(--line); background: var(--info-bg); color: var(--info); font: inherit; font-weight: 700; font-size: 12px; text-align: start; padding: 9px 14px; cursor: pointer; }
+.rproto .neg-hint:disabled { cursor: default; opacity: .6; }
+.rproto .neg-hint .material-icons-outlined { font-size: 16px; flex: 0 0 auto; }
 .rproto .neg-footer { border-top: 1px solid var(--border); padding: 10px 14px 12px; }
 .rproto .neg-footer.turn { background: var(--action-dim); }
 .rproto .nf-r1 { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }

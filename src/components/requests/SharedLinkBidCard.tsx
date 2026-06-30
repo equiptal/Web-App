@@ -81,26 +81,26 @@ export function SharedLinkBidCard({
     { label: L("Documents", "المستندات"), rows: bid.terms.supplier },
   ].filter((t) => t.rows.length > 0).map((t) => {
     const ok = okCount(t.rows), total = t.rows.length;
-    const tone = total && ok === total ? { bg: "#e7f7ee", c: "#1daf58" } : ok > 0 ? { bg: "#fff3e0", c: "#d4780a" } : { bg: "#eff4f9", c: "#6b8fa8" };
+    const tone = total && ok === total ? { bg: "#e7f7ee", c: "#1daf58" } : ok > 0 ? { bg: "#fff3e0", c: "#d4780a" } : { bg: "#e6f2fb", c: "#1a7ec8" };
     return { label: t.label, ok, total, tone };
   });
   const certChips = (bid.equipmentCertCodes ?? []).map((c) => (ar ? CERT_LABEL[c]?.ar : CERT_LABEL[c]?.en) || c).slice(0, 2);
 
   const rowSep = { borderTop: "1px solid #EFF2F6" } as const;
   const iconBox = { width: 40, height: 40, borderRadius: 11, background: "#eff4f9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } as const;
-  const blueLink = { background: "none", border: "none", color: "#1a7ec8", fontWeight: 800, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" } as const;
+  const blueLink = { background: "none", border: "none", color: "#1a7ec8", fontWeight: 800, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" } as const;
 
   return (
     <div
       onClick={picking ? onToggleSelect : undefined}
       style={{ flex: cardFlex ?? "0 0 calc(44% - 8px)", minWidth: 320, scrollSnapAlign: "start", alignSelf: "stretch", display: "flex", flexDirection: "column", position: "relative", background: "#fff", border: `1px solid ${isSel ? "#f79009" : "#d4e0ec"}`, borderRadius: 18, overflow: "hidden", boxShadow: "0 1px 2px rgba(20,40,70,.04)", outline: isSel ? "2px solid #f79009" : "none", outlineOffset: 2, cursor: picking ? "pointer" : "default" }}
     >
-      <div style={{ height: 4, background: "#f79009" }} />
+      <div style={{ height: 4, background: "#d4780a" }} />
       {/* off-platform banner — replaces a status pill + the old "submitted" footer line */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 14px", background: "#fff4e5", borderBottom: "1px solid #f7e4c6" }}>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 800, color: "#d4780a", minWidth: 0 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 11.5, fontWeight: 800, color: "#d4780a", minWidth: 0 }}>
           <span className="material-icons-outlined" style={{ fontSize: 15, flexShrink: 0 }}>link</span>
-          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{L("Submitted via your request shared link", "مُقدّم عبر رابط طلبك")}</span>
+          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{L("Off-platform · via shared link", "خارج المنصة · عبر الرابط")}</span>
         </span>
         <span style={{ fontSize: 12, fontWeight: 700, color: "#b07a3a", whiteSpace: "nowrap", flexShrink: 0 }}>{agoShort}</span>
       </div>
@@ -121,12 +121,12 @@ export function SharedLinkBidCard({
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 8, minWidth: 0 }}>
-            <span style={{ flex: "0 1 auto", minWidth: 0, fontSize: 14.5, fontWeight: 900, color: "#1c3550", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.25 }} title={title}>{title}</span>
-            <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 800, color: "#d4780a", background: "#fff3e0", padding: "1px 8px", borderRadius: 20 }}>×{offered}</span>
+            <span style={{ flex: "0 1 auto", minWidth: 0, fontSize: 13.5, fontWeight: 900, color: "#1c3550", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.25 }} title={title}>{title}</span>
+            <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, color: "#d4780a", background: "#fff3e0", padding: "1px 8px", borderRadius: 20 }}>×{offered}</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 6 }}>
             <span style={{ width: 22, height: 22, borderRadius: "50%", background: "#1c3550", color: "#fff", fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{(bid.supplierName || "S").charAt(0).toUpperCase()}</span>
-            <span style={{ fontSize: 13.5, fontWeight: 800, color: "#1c3550" }}>{bid.supplierName}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550" }}>{bid.supplierName}</span>
             {bid.verified && <span className="material-icons-outlined" style={{ fontSize: 16, color: "#1daf58" }}>verified</span>}
           </div>
         </div>
@@ -134,7 +134,7 @@ export function SharedLinkBidCard({
 
       {/* fulfillment band */}
       <div style={{ margin: "0 16px 14px", padding: "10px 14px", borderRadius: 12, background: "#fff4e5", display: "flex", alignItems: "center", gap: 12 }}>
-        <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550", whiteSpace: "nowrap" }}>{L(`Covers ${offered} of ${needed} units`, `يغطّي ${offered} من ${needed} وحدات`)}</span>
+        <span style={{ fontSize: 12, fontWeight: 800, color: "#1c3550", whiteSpace: "nowrap" }}>{L(`Covers ${offered} of ${needed} units`, `يغطّي ${offered} من ${needed} وحدات`)}</span>
         <div style={{ flex: 1, height: 8, borderRadius: 6, background: "rgba(247,144,9,.18)", overflow: "hidden" }}>
           <div style={{ height: "100%", borderRadius: 6, background: "#f79009", width: `${cover}%` }} />
         </div>
@@ -146,10 +146,10 @@ export function SharedLinkBidCard({
         <div style={iconBox}>
           <EquipImg src={itemImage ?? null} categoryId={categoryId ?? null} name={title} box="" img="h-5 w-5 object-contain" iconSize={20} />
         </div>
-        <span style={{ fontSize: 14, fontWeight: 800, color: "#1c3550" }}>{L("Equipment", "المعدة")}</span>
-        <div style={{ display: "flex", gap: 6, flexWrap: "nowrap", flex: 1, minWidth: 0, overflowX: "auto" }} className="no-sb">
+        <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Equipment", "المعدة")}</span>
+        <div style={{ display: "flex", gap: 4, flexWrap: "nowrap", flex: 1, minWidth: 0, overflowX: "auto" }} className="no-sb">
           {certChips.map((c, i) => (
-            <span key={i} style={{ fontSize: 12, fontWeight: 800, color: "#1daf58", background: "#e7f7ee", padding: "2px 9px", borderRadius: 20, whiteSpace: "nowrap" }}>✓ {c}</span>
+            <span key={i} style={{ fontSize: 11, fontWeight: 800, color: "#1daf58", background: "#e7f7ee", padding: "2px 9px", borderRadius: 20, whiteSpace: "nowrap" }}>✓ {c}</span>
           ))}
         </div>
         {/* self-declared disclaimer — these were only acknowledged by the supplier in the form */}
@@ -176,10 +176,10 @@ export function SharedLinkBidCard({
       {/* Terms row */}
       <div style={{ ...rowSep, display: "flex", alignItems: "center", gap: 12, padding: "13px 16px" }}>
         <div style={iconBox}><span className="material-icons-outlined" style={{ fontSize: 20, color: "#6b8fa8" }}>description</span></div>
-        <span style={{ fontSize: 14, fontWeight: 800, color: "#1c3550" }}>{L("Terms", "الشروط")}</span>
-        <div style={{ display: "flex", gap: 6, flexWrap: "nowrap", flex: 1, minWidth: 0, overflowX: "auto" }} className="no-sb">
+        <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Terms", "الشروط")}</span>
+        <div style={{ display: "flex", gap: 4, flexWrap: "nowrap", flex: 1, minWidth: 0, overflowX: "auto" }} className="no-sb">
           {termChips.map((t) => (
-            <span key={t.label} style={{ fontSize: 12, fontWeight: 800, color: t.tone.c, background: t.tone.bg, padding: "2px 9px", borderRadius: 20, whiteSpace: "nowrap" }}>{t.label} {t.ok}/{t.total}</span>
+            <span key={t.label} style={{ fontSize: 10, fontWeight: 800, color: t.tone.c, background: t.tone.bg, padding: "2px 7px", borderRadius: 20, whiteSpace: "nowrap" }}>{t.label} {t.ok}/{t.total}</span>
           ))}
         </div>
         {!picking && <button onClick={() => setTermsOpen(true)} style={blueLink}>{L("View", "عرض")} ›</button>}
@@ -189,9 +189,9 @@ export function SharedLinkBidCard({
       <div style={{ ...rowSep, padding: "13px 16px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ ...iconBox, background: "#fff4e5" }}><span className="material-icons-outlined" style={{ fontSize: 20, color: "#f79009" }}>payments</span></div>
-          <span style={{ fontSize: 14, fontWeight: 800, color: "#1c3550" }}>{L("Rate", "السعر")}</span>
+          <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Rate", "السعر")}</span>
           <div style={{ flex: 1 }} />
-          <span style={{ fontSize: 19, fontWeight: 900, color: "#f79009" }}>{nf(bid.price ?? 0)} {L("SAR", "ر.س")}</span>
+          <span style={{ fontSize: 17, fontWeight: 900, color: "#f79009" }}>{nf(bid.price ?? 0)} {L("SAR", "ر.س")}</span>
           <span style={{ fontSize: 13, color: "#6b8fa8", fontWeight: 700 }}>/ {periodOf(bid.priceUnit)}</span>
           {!picking && (
             <button onClick={() => { setPriceOpen((o) => !o); setPerUnit(false); }} style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #d4e0ec", background: "#F7FAFC", color: "#6b8fa8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -217,11 +217,11 @@ export function SharedLinkBidCard({
             ] as [string, number][]).map(([lab, val], i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 0", borderBottom: "1px solid #F2F5F8" }}>
                 <span style={{ fontSize: 13.5, color: "#2a4f72", fontWeight: 600 }}>{lab}</span>
-                <span style={{ fontSize: 14.5, fontWeight: 800, color: "#1c3550", fontVariantNumeric: "tabular-nums" }}>{nf(val)}</span>
+                <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550", fontVariantNumeric: "tabular-nums" }}>{nf(val)}</span>
               </div>
             ))}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, padding: "12px 14px", borderRadius: 12, background: "#fff4e5" }}>
-              <span style={{ fontSize: 13.5, fontWeight: 800, color: "#1c3550" }}>{L("Quoted total", "الإجمالي المُسعّر")}</span>
+              <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550" }}>{L("Quoted total", "الإجمالي المُسعّر")}</span>
               <span style={{ fontSize: 16, fontWeight: 900, color: "#f79009" }}>{nf(grand)} {L("SAR", "ر.س")}</span>
             </div>
           </div>

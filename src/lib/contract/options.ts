@@ -14,8 +14,8 @@ export const EQUIPMENT_YEARS = ["2015+", "2018+", "2020+", "2022+", "any"] as co
 
 export type SafetyCertificate = "tuv" | "spsp" | "saso-technical" | "other"; // AC-50 (+ web-app/002 free-text "other")
 export const SAFETY_CERTIFICATES: SafetyCertificate[] = ["tuv", "spsp", "saso-technical", "other"];
-/** Operator per-item certificate options — the fixed safety certs WITHOUT the free-text "other". */
-export const OPERATOR_CERTIFICATES: SafetyCertificate[] = ["tuv", "spsp", "saso-technical"];
+/** Operator per-item certificate options — the safety certs PLUS a free-text "other" (app parity). */
+export const OPERATOR_CERTIFICATES: SafetyCertificate[] = ["tuv", "spsp", "saso-technical", "other"];
 
 export type OtherCertificate = "local-content" | "saso-registration"; // AC-50
 // `saso-registration` is intentionally NOT offered: request-level requiredCerts was removed in the

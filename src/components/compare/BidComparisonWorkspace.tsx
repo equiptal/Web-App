@@ -8,7 +8,7 @@ import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link
 import { groupRequests, type RequestGroup } from "@/lib/contract/requests";
 import type { DealRoomDocuments } from "@/lib/contract/deal-room";
 import { CERT_LABEL, type BidCard, type CertCode } from "@/lib/contract/bids";
-import { buildItemComparison, sortByPreset, type BidColumn, type Preset, type CostResponsibility } from "@/lib/contract/comparison";
+import { buildItemComparison, sortByPreset, displayQuote, responsibilityTone, rowWinners, type BidColumn, type Preset, type CostResponsibility, type RatePeriod, type PricesFor } from "@/lib/contract/comparison";
 import { bidColumnToComputed, normalizedBidToBidCard, presetToAgent, type RecommendResult } from "@/lib/contract/agent-bids";
 import { EquipImg } from "@/components/requests/EquipImg";
 
@@ -72,6 +72,8 @@ export function BidComparisonWorkspace() {
   const [submissions, setSubmissions] = useState<LinkBidSubmission[]>([]); // off-platform shared-link bids for the active item
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [preset, setPreset] = useState<Preset>("best");
+  const [period, setPeriod] = useState<RatePeriod>("PER_DAY"); // RATE PERIOD toggle (Day/Week/Month) — display + totals
+  const [pricesFor, setPricesFor] = useState<PricesFor>("all"); // PRICES FOR toggle (per-unit / all-units)
   const [busy, setBusy] = useState(false);
   const [renterCosts, setRenterCosts] = useState<Partial<Record<CostResponsibility["key"], number>>>({});
   // Mansour judgement layer (live when connected; deterministic fallback otherwise).
@@ -85,6 +87,7 @@ export function BidComparisonWorkspace() {
   // UI chrome state to mirror the prototype.
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selectorOpen, setSelectorOpen] = useState(true);
+  const [itemMenuOpen, setItemMenuOpen] = useState(false); // §6 item icon-dropdown (replaces the item pill bar)
   const [chatOpen, setChatOpen] = useState(false); // the AI chat is a side drawer (the re-rank bar stays inline)
   const [uploadOpen, setUploadOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -213,6 +216,15 @@ export function BidComparisonWorkspace() {
     return () => { active = false; };
   }, [activeItem]);
 
+  // The renter's private cost estimates persist locally ("saved for next time", Q2) — these are the
+  // renter's own rough planning numbers for responsibilities that land on them; never sent anywhere.
+  useEffect(() => {
+    try { const raw = localStorage.getItem("cmp-renter-costs"); if (raw) setRenterCosts(JSON.parse(raw)); } catch {}
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem("cmp-renter-costs", JSON.stringify(renterCosts)); } catch {}
+  }, [renterCosts]);
+
   // Auto-refresh: while any compared bid has an active deal room, poll its live term state (locked →
   // agreed, counter → negotiating, deviation → conflict) so the matrix + Terms stay in sync without a
   // manual reload. Refreshes ONLY `bids` — the renter's working state (costs, selection, uploads, AI
@@ -313,10 +325,14 @@ export function BidComparisonWorkspace() {
   // A cost the renter adds counts toward their total unless the supplier already covers it (AC-12).
   // (Matches the chips: you can only add a cost where bidSide !== "supplier".)
   const renterAddBid = (c: BidColumn) => c.costResponsibilities.reduce((s, x) => (x.renterCost && x.bidSide !== "supplier" ? s + x.renterCost : s), 0) + (renterMob[c.bid.id] ?? 0);
+  // §6 toggles drive the totals: displayQuote re-expresses rate for the chosen RATE PERIOD and scales
+  // every figure by PRICES-FOR (1 unit vs all). shownUnits is the unit basis the cells label with.
+  const shownUnits = pricesFor === "all" ? units : 1;
+  const dq = (c: BidColumn) => displayQuote(c.bid, period, pricesFor, durationDays);
   // Mob/demob are PER-UNIT when the supplier handles them (× quantity, like the rate) — not one-time.
   const mobDemobUnit = (c: BidColumn) => (c.mob.stated ? c.mob.value : 0) + (c.demob.stated ? c.demob.value : 0);
-  const mobDemobTotal = (c: BidColumn) => mobDemobUnit(c) * units;
-  const supplierStated = (c: BidColumn) => (c.rental.stated ? c.rental.value : 0) + mobDemobTotal(c);
+  const mobDemobTotal = (c: BidColumn) => mobDemobUnit(c) * shownUnits;
+  const supplierStated = (c: BidColumn) => dq(c).subtotal;
   // Match a presigned doc ({type,label}) to a chip's hint, by fuzzy substring on type or label.
   const norm = (str: string) => str.toLowerCase().replace(/[^a-z]/g, "");
   const docMatches = (hint: string) => {
@@ -386,6 +402,11 @@ export function BidComparisonWorkspace() {
   const grandList = cols.filter(hasCost).map(grandTotal);
   const lowestGrand = grandList.length ? Math.min(...grandList) : null;
   const maxGrand = grandList.length ? Math.max(...grandList) : 1;
+  // §6 per-row winners — single leader only (ties unhighlighted), shown as a "✓ BEST" tag on the cell.
+  const rentalWin = rowWinners(cols.map((c) => (c.rental.stated ? (dq(c).durationRental ?? dq(c).rentalForPeriod) : null)), "min");
+  const distanceWin = rowWinners(cols.map((c) => c.bid.distanceKm ?? null), "min");
+  const yearWin = rowWinners(cols.map((c) => c.bid.equipment?.year ?? null), "max");
+  const bestTag = <span className="ms-1 inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 align-middle text-[9px] font-extrabold" style={{ background: C.successBg, color: C.success }}>✓ {L("BEST", "الأفضل")}</span>;
 
   // Ask Mansour to rank + recommend whenever the candidate set / preset / free text / costs change.
   const recKey = useMemo(() => baseCols.map((c) => c.bid.id).join(","), [baseCols]);
@@ -606,9 +627,9 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
   if (!locations.length) return <Box>{L("No requests to compare yet.", "لا توجد طلبات للمقارنة بعد.")}</Box>;
 
   /* ── small renderers ── */
-  const incChip = (label: string, kind: "y" | "n" | "muted", onAdd?: () => void, icon?: string, value?: number, onRemove?: () => void) => {
-    const bg = kind === "y" ? C.successBg : kind === "n" ? C.dangerBg : C.surface3;
-    const fg = kind === "y" ? C.success : kind === "n" ? C.danger : C.muted;
+  const incChip = (label: string, kind: "y" | "n" | "you" | "muted", onAdd?: () => void, icon?: string, value?: number, onRemove?: () => void) => {
+    const bg = kind === "y" ? C.successBg : kind === "n" ? C.dangerBg : kind === "you" ? C.renteeDim : C.surface3;
+    const fg = kind === "y" ? C.success : kind === "n" ? C.danger : kind === "you" ? C.rentee : C.muted;
     const entered = value != null;
     return (
       <span className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold" style={{ background: bg, color: fg }}>
@@ -693,17 +714,35 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
         </div>
       )}
 
-      {/* ── Level 2 — item tabs + actions ── */}
+      {/* ── Level 2 — item icon-dropdown + actions (§6) ── */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex flex-wrap gap-2">
-          {items.map((it) => (
-            <button key={it.id} onClick={() => setActiveItem(it.id)}
-              className="inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-[13px] font-bold transition"
-              style={it.id === activeItem ? { background: C.action, borderColor: C.action, color: "#fff" } : { background: "#fff", borderColor: C.border, color: C.navyMid, opacity: it.bidCount === 0 ? 0.6 : 1 }}>
-              {ar ? it.item?.nameAr : it.item?.name}
-              <span className="rounded-full px-1.5 text-[11px] font-bold" style={it.id === activeItem ? { background: "rgba(255,255,255,.25)", color: "#fff" } : { background: C.surface3, color: C.navy }}>{it.bidCount > 0 ? `${it.bidCount} ${L("bids", "عروض")}` : L("no bids", "بلا عروض")}</span>
-            </button>
-          ))}
+        <div className="flex items-center gap-2 text-[11px] font-extrabold" style={{ color: C.muted, letterSpacing: ".3px" }}>
+          <span className="material-icons-outlined" style={{ fontSize: 15 }}>category</span>{L("Item", "الصنف")}
+        </div>
+        <div className="relative">
+          <button onClick={() => setItemMenuOpen((o) => !o)} title={L("Switch item", "تبديل الصنف")} className="inline-flex items-center gap-2 rounded-xl border py-1.5 ps-1.5 pe-3 text-[13px] font-bold" style={{ borderColor: C.navy, background: C.navy, color: "#fff" }}>
+            <span className="grid h-8 w-8 place-items-center rounded-lg" style={{ background: "#fff" }}>
+              <EquipImg src={activeItemObj?.item?.imageUrl ?? null} categoryId={activeItemObj?.item?.categoryId ?? null} name={(ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? ""} box="" img="h-6 w-6 object-contain" iconSize={22} />
+            </span>
+            <span className="rounded-full px-2 py-0.5 text-[11px] font-extrabold" style={{ background: "rgba(255,255,255,.16)", color: "#FFC97A" }}>{activeItemObj?.bidCount ?? 0}</span>
+            <span className="material-icons-outlined" style={{ fontSize: 16, color: "rgba(255,255,255,.7)" }}>expand_more</span>
+          </button>
+          {itemMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-20" onClick={() => setItemMenuOpen(false)} />
+              <div className="absolute z-30 mt-1.5 w-[300px] rounded-xl border p-1.5" style={{ insetInlineStart: 0, background: "#fff", borderColor: C.border, boxShadow: "0 16px 40px rgba(20,40,70,.2)" }}>
+                <div className="px-2.5 py-1.5 text-[10px] font-extrabold" style={{ color: C.muted, letterSpacing: ".06em" }}>{L("VIEWING ITEM", "الصنف المعروض")}</div>
+                {items.map((it) => (
+                  <button key={it.id} onClick={() => { setActiveItem(it.id); setItemMenuOpen(false); }} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start text-[13px] font-bold" style={{ background: it.id === activeItem ? C.surface2 : "transparent", color: C.navy, opacity: it.bidCount === 0 ? 0.6 : 1 }}>
+                    <EquipImg src={it.item?.imageUrl ?? null} categoryId={it.item?.categoryId ?? null} name={(ar ? it.item?.nameAr : it.item?.name) ?? ""} box="" img="h-5 w-5 object-contain" iconSize={18} />
+                    <span className="flex-1 truncate">{ar ? it.item?.nameAr : it.item?.name}</span>
+                    {(it.item?.qty ?? 1) > 1 && <span className="rounded-full px-1.5 text-[10px] font-extrabold" style={{ background: C.actionDim, color: C.action }}>×{it.item?.qty}</span>}
+                    <span className="rounded-full px-2 text-[11px] font-bold" style={{ background: C.surface3, color: C.muted }}>{it.bidCount > 0 ? it.bidCount : L("0", "٠")}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
         <div className="ms-auto flex gap-2">
           <button onClick={() => setUploadOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[12.5px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>
@@ -942,11 +981,34 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                 </thead>
                 <tbody>
                   {/* 💰 COST */}
-                  <SectionRow id="cost" icon="payments" title={L("Cost", "التكلفة")} accent={C.action} accentText="#FFC97A" n={cols.length} collapsed={collapsed.has("cost")} onToggle={() => toggleSection("cost")} />
+                  <SectionRow id="cost" icon="payments" title={L("Cost", "التكلفة")} accent={C.action} accentText="#fff" n={cols.length} collapsed={collapsed.has("cost")} onToggle={() => toggleSection("cost")} />
                   {!collapsed.has("cost") && (<>
+                    {/* §6 controls strip — RATE PERIOD (Day/Week/Month) + PRICES FOR (per-unit/all) */}
+                    <tr>
+                      <td colSpan={cols.length + 1} style={{ padding: "9px 16px", background: C.surface2, borderBottom: `1px solid ${C.line}` }}>
+                        <div className="flex flex-wrap items-end gap-5">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[9px] font-extrabold" style={{ color: C.muted, letterSpacing: ".08em" }}>{L("RATE PERIOD", "أساس السعر")}</span>
+                            <div className="inline-flex rounded-lg p-0.5" style={{ background: C.surface3 }}>
+                              {([["PER_DAY", L("Day", "يوم")], ["PER_WEEK", L("Week", "أسبوع")], ["PER_MONTH", L("Month", "شهر")]] as [RatePeriod, string][]).map(([p, lab]) => (
+                                <button key={p} onClick={() => setPeriod(p)} className="rounded-md px-3 py-1 text-[11.5px] font-extrabold transition" style={period === p ? { background: "#fff", color: C.navy, boxShadow: "0 1px 3px rgba(20,40,70,.12)" } : { background: "transparent", color: C.muted }}>{lab}</button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[9px] font-extrabold" style={{ color: C.muted, letterSpacing: ".08em" }}>{L("PRICES FOR", "الأسعار لـ")}</span>
+                            <div className="inline-flex rounded-lg p-0.5" style={{ background: C.surface3 }}>
+                              {([["unit", L("Per unit", "لكل وحدة")], ["all", units > 1 ? L(`All ${units} units`, `كل ${units} وحدة`) : L("All units", "كل الوحدات")]] as [PricesFor, string][]).map(([p, lab]) => (
+                                <button key={p} onClick={() => setPricesFor(p)} className="rounded-md px-3 py-1 text-[11.5px] font-extrabold transition" style={pricesFor === p ? { background: "#fff", color: C.navy, boxShadow: "0 1px 3px rgba(20,40,70,.12)" } : { background: "transparent", color: C.muted }}>{lab}</button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
                     <tr>
                       <RowHead title={L("Rental cost", "تكلفة الإيجار")} sub={L("rate × days × units", "السعر × الأيام × الوحدات")} />
-                      {cols.map((c) => {
+                      {cols.map((c, idx) => {
                         const realDays = c.bid.duration ?? durationDays; // actual rental length (days); null → defaulted to 1 period
                         const per = periodLabel(c.bid.priceUnit);
                         return (
@@ -957,15 +1019,16 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                               /* No rental duration → show the rate only; don't fabricate an assumed total. */
                               <span className="font-mono font-bold" style={{ color: C.navy }}>{sar} {nf(c.bid.price)}<small style={{ fontSize: 10.5, color: C.muted }}>/{per}{units > 1 ? ` · ${L("unit", "وحدة")}` : ""}</small></span>
                             ) : (<>
-                              {/* per-unit rate (basis) → comparable total = rate × duration × units */}
+                              {/* rate in the chosen RATE PERIOD (basis) → toggle-scaled comparable total */}
                               <span className="inline-flex flex-wrap items-center gap-1.5">
-                                <span className="font-mono font-bold" style={{ color: C.navyMid }}>{sar} {nf(c.bid.price)}<small style={{ fontSize: 10.5, color: C.muted }}>/{per}{units > 1 ? ` · ${L("unit", "وحدة")}` : ""}</small></span>
+                                <span className="font-mono font-bold" style={{ color: C.navyMid }}>{sar} {nf(dq(c).ratePerPeriod)}<small style={{ fontSize: 10.5, color: C.muted }}>/{periodLabel(period)}{shownUnits > 1 ? ` · ${L("unit", "وحدة")}` : ""}</small></span>
                                 <span style={{ color: C.action, fontWeight: 800, transform: ar ? "scaleX(-1)" : undefined }}>→</span>
-                                <span className="font-mono font-extrabold" style={{ color: C.navy }}>{sar} {nf(c.rental.value)}</span>
+                                <span className="font-mono font-extrabold" style={{ color: C.navy }}>{sar} {nf(dq(c).durationRental ?? dq(c).rentalForPeriod)}</span>
+                                {rentalWin.has(idx) && bestTag}
                               </span>
-                              {(realDays != null || units > 1) && <Sub>{realDays != null
-                                ? L(`× ${realDays} days${units > 1 ? ` × ${units} units` : ""}`, `× ${realDays} يوم${units > 1 ? ` × ${units} وحدة` : ""}`)
-                                : L(`× ${units} units`, `× ${units} وحدة`)}</Sub>}
+                              {(realDays != null || shownUnits > 1) && <Sub>{realDays != null
+                                ? L(`× ${realDays} days${shownUnits > 1 ? ` × ${shownUnits} units` : ""}`, `× ${realDays} يوم${shownUnits > 1 ? ` × ${shownUnits} وحدة` : ""}`)
+                                : L(`× ${shownUnits} units`, `× ${shownUnits} وحدة`)}</Sub>}
                             </>)}
                           </Td>
                         );
@@ -988,10 +1051,10 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                             {stated ? (<>
                               {/* per-unit → × units, mirroring the rental row */}
                               <span className="inline-flex flex-wrap items-center gap-1.5">
-                                <span className="font-mono font-bold" style={{ color: C.navyMid }}>{sar} {nf(mobDemobUnit(c))}{units > 1 ? <small style={{ fontSize: 10.5, color: C.muted }}>/{L("unit", "وحدة")}</small> : null}</span>
-                                {units > 1 && <><span style={{ color: C.action, fontWeight: 800, transform: ar ? "scaleX(-1)" : undefined }}>→</span><span className="font-mono font-extrabold" style={{ color: C.navy }}>{sar} {nf(mobDemobTotal(c))}</span></>}
+                                <span className="font-mono font-bold" style={{ color: C.navyMid }}>{sar} {nf(mobDemobUnit(c))}{shownUnits > 1 ? <small style={{ fontSize: 10.5, color: C.muted }}>/{L("unit", "وحدة")}</small> : null}</span>
+                                {shownUnits > 1 && <><span style={{ color: C.action, fontWeight: 800, transform: ar ? "scaleX(-1)" : undefined }}>→</span><span className="font-mono font-extrabold" style={{ color: C.navy }}>{sar} {nf(mobDemobTotal(c))}</span></>}
                               </span>
-                              <Sub>{`${sar} ${nf(c.mob.value)} ${L("mob", "نقل")} + ${sar} ${nf(c.demob.value)} ${L("demob", "إرجاع")}${units > 1 ? ` · × ${units} ${L("units", "وحدة")}` : ""}`}</Sub>
+                              <Sub>{`${sar} ${nf(c.mob.value)} ${L("mob", "نقل")} + ${sar} ${nf(c.demob.value)} ${L("demob", "إرجاع")}${shownUnits > 1 ? ` · × ${shownUnits} ${L("units", "وحدة")}` : ""}`}</Sub>
                             </>) : rm ? (<>
                               <span className="inline-flex items-center gap-1.5 text-[13px] font-bold">{sar} {nf(rm)}
                                 <button onClick={() => addMobCost(c.bid.id, L("Delivery + pickup", "النقل والإرجاع"))} className="text-[10px] font-bold underline" style={{ color: C.rentee }}>{L("edit", "تعديل")}</button>
@@ -1018,7 +1081,9 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                               // a disputed term → red, even if the static request-vs-bid compare is grey.
                               const fatKey = m.key === "operator_food" ? "fat_food" : m.key === "operator_transport_accommodation" ? "fat_accommodation_transport" : null;
                               const dealConflict = fatKey ? (c.bid.negotiableTerms ?? []).some((t) => t.key === fatKey && t.state === "conflict") : false;
-                              const kind = cr.state === "red" || dealConflict ? "n" : "y";
+                              // §6 chip tone: supplier-covered=green, you-handle=blue, conflict=red, unknown=grey.
+                              const tone = dealConflict ? "red" : responsibilityTone(cr);
+                              const kind = tone === "green" ? "y" : tone === "red" ? "n" : tone === "blue" ? "you" : "muted";
                               // Add-cost only when YOUR REQUEST puts the cost on you (the rentee); never when it's on the supplier.
                               const canAdd = cr.requestSide === "me";
                               const entered = renterCosts[m.key]; // your estimate for this cost (if any)
@@ -1055,7 +1120,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                   </>)}
 
                   {/* 🚜 EQUIPMENT */}
-                  <SectionRow id="equip" icon="construction" title={L("Equipment", "المعدّة")} accent={C.supplier} accentText="#7BE0C2" n={cols.length} collapsed={collapsed.has("equip")} onToggle={() => toggleSection("equip")} />
+                  <SectionRow id="equip" icon="construction" title={L("Equipment", "المعدّة")} accent={C.action} accentText="#fff" n={cols.length} collapsed={collapsed.has("equip")} onToggle={() => toggleSection("equip")} />
                   {!collapsed.has("equip") && (<>
                     {/* Equipment + operator terms are ACKNOWLEDGED from the request today, not yet supplier-declared.
                         Full-width banner; the per-supplier "verify in deal room" link sits in each cell below. */}
@@ -1074,20 +1139,19 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                     </tr>
                     <tr>
                       <RowHead title={L("Year", "سنة الصنع")} sub={(() => { const my = cols[0]?.bid.reqMinYear; return my == null ? undefined : my >= 1990 ? `${L("min year", "أدنى سنة")} ${my}` : `${L("max age", "أقصى عمر")} ${my} ${L("yrs", "سنة")}`; })()} />
-                      {cols.map((c) => {
+                      {cols.map((c, idx) => {
                         const yr = c.equipment.find((r) => r.key === "year");
                         // Off-platform: no equipment record — show the confirmed year requirement (e.g. "≥ 2018").
                         if (c.bid.viaSharedLink) {
                           const v = yr ? (c.bid.reqMinYear != null ? `≥ ${c.bid.reqMinYear}` : yr.state === "conflict" ? L("Not met", "غير مطابق") : L("Confirmed", "مؤكّد")) : null;
                           return <Td key={c.bid.id} ok={!!yr && yr.state !== "conflict"} fail={yr?.state === "conflict"}>{v ? <span className="text-[13px] font-bold">{v}</span> : <span style={{ color: C.muted }}>—</span>}</Td>;
                         }
-                        const isNewest = (c.bid.equipment?.year ?? 0) > 0 && c.bid.equipment?.year === Math.max(...cols.map((x) => x.bid.equipment?.year ?? 0));
-                        return <Td key={c.bid.id} ok={yr?.state !== "conflict"} fail={yr?.state === "conflict"}><span className="text-[13px] font-bold">{c.bid.equipment?.year ?? "—"}</span>{isNewest && cols.length > 1 && <Sub>{L("newest", "الأحدث")}</Sub>}</Td>;
+                        return <Td key={c.bid.id} ok={yr?.state !== "conflict"} fail={yr?.state === "conflict"}><span className="text-[13px] font-bold">{c.bid.equipment?.year ?? "—"}</span>{yearWin.has(idx) && bestTag}</Td>;
                       })}
                     </tr>
                     <tr>
                       <RowHead title={L("Distance to site", "المسافة للموقع")} />
-                      {cols.map((c) => <Td key={c.bid.id} ok><span className="text-[13px] font-bold">{c.bid.distanceKm != null ? `${Math.round(c.bid.distanceKm)} ${L("km", "كم")}` : <span style={{ color: C.muted }}>—</span>}</span></Td>)}
+                      {cols.map((c, idx) => <Td key={c.bid.id} ok><span className="text-[13px] font-bold">{c.bid.distanceKm != null ? `${Math.round(c.bid.distanceKm)} ${L("km", "كم")}` : <span style={{ color: C.muted }}>—</span>}</span>{distanceWin.has(idx) && bestTag}</Td>)}
                     </tr>
                     {/* L2 equipment — ONE field: safety certs (required ✓/✗ + held) + proof-of-ownership
                         docs (istimara / customs / sale_contract / saso_registration), combined per column. */}
@@ -1223,19 +1287,28 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
         <div className="fixed inset-0 z-[420] grid place-items-center p-6" style={{ background: "rgba(28,53,80,.42)", backdropFilter: "blur(3px)" }} onClick={() => setCostAsk(null)}>
           <div className="w-[420px] max-w-full overflow-hidden rounded-2xl" style={{ background: "#fff" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start gap-3 border-b px-6 py-5" style={{ borderColor: C.line }}>
-              <div className="grid h-11 w-11 flex-none place-items-center rounded-lg" style={{ background: C.renteeDim, color: C.rentee }}><span className="material-icons-outlined" style={{ fontSize: 24 }}>add_card</span></div>
-              <div className="flex-1"><h3 className="m-0 text-[17px] font-extrabold">{L(`Your estimate — ${costAsk.label}`, `تقديرك — ${costAsk.label}`)}</h3><p className="m-0 text-[12.5px]" style={{ color: C.muted }}>{L("Your own estimate — added to the total so you get a sense of the real cost.", "تقديرك أنت — يُضاف للإجمالي لتتكوّن لديك صورة عن التكلفة الحقيقية.")}</p></div>
+              <div className="grid h-11 w-11 flex-none place-items-center rounded-lg text-[22px]" style={{ background: C.renteeDim }}>🧮</div>
+              <div className="flex-1"><h3 className="m-0 text-[17px] font-extrabold">{L("Estimate your own costs", "قدّر تكاليفك")}</h3><p className="m-0 text-[12.5px]" style={{ color: C.muted }}>{costAsk.label} · {L("a cost you said you'll handle", "تكلفة ستتحمّلها أنت")}</p></div>
               <button onClick={() => setCostAsk(null)} className="grid h-8 w-8 flex-none place-items-center rounded-full border" style={{ borderColor: C.border, color: C.muted }}><span className="material-icons-outlined" style={{ fontSize: 18 }}>close</span></button>
             </div>
+            {/* privacy note — these estimates are the renter's own, never shown to the supplier */}
+            <div className="flex items-start gap-2.5 px-6 py-3.5" style={{ background: C.warningBg, borderBottom: `1px solid ${C.line}` }}>
+              <span className="flex-none text-[15px]">🔒</span>
+              <span className="text-[12px] font-bold leading-relaxed" style={{ color: "#9A6A1E" }}>{L("Rough estimates for your own planning only — not real costs, not part of the bid, and never shown to the supplier.", "تقديرات تقريبية لتخطيطك أنت فقط — ليست تكاليف فعلية، وليست جزءًا من العرض، ولا تظهر للمؤجّر أبدًا.")}</span>
+            </div>
             <div className="px-6 py-5">
+              <label className="mb-1.5 block text-[12.5px] font-extrabold" style={{ color: C.navy }}>{costAsk.label}</label>
               <div className="flex h-[50px] items-center gap-2.5 rounded-lg border px-4" style={{ background: C.surface2, borderColor: C.border }}>
                 <span className="text-[14px] font-extrabold" style={{ color: C.muted }}>{sar}</span>
                 <input autoFocus type="number" inputMode="numeric" min={0} value={costInput} onChange={(e) => setCostInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") submitCost(); }} placeholder="0" className="min-w-0 flex-1 bg-transparent text-[16px] font-bold outline-none" style={{ color: C.navy }} />
               </div>
             </div>
-            <div className="flex justify-end gap-2.5 border-t px-6 py-4" style={{ borderColor: C.line }}>
-              <button onClick={() => setCostAsk(null)} className="rounded-lg border px-4 py-2 text-[13px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>{L("Cancel", "إلغاء")}</button>
-              <button onClick={submitCost} className="rounded-lg px-4 py-2 text-[13px] font-bold text-white" style={{ background: C.rentee }}>{L("Add to total", "أضِف للإجمالي")}</button>
+            <div className="flex items-center justify-between gap-3 border-t px-6 py-4" style={{ borderColor: C.line }}>
+              <span className="text-[13px] font-extrabold" style={{ color: C.navy }}>{L("Your total est.", "إجمالي تقديرك")} <span style={{ color: C.rentee }}>{sar} {nf(Object.values(renterCosts).reduce((a, b) => a + (b ?? 0), 0) + Object.values(renterMob).reduce((a, b) => a + (b ?? 0), 0))}</span></span>
+              <div className="flex gap-2.5">
+                <button onClick={() => setCostAsk(null)} className="rounded-lg border px-4 py-2 text-[13px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>{L("Cancel", "إلغاء")}</button>
+                <button onClick={submitCost} className="rounded-lg px-5 py-2 text-[13px] font-bold text-white" style={{ background: C.rentee }}>{L("Save estimate", "حفظ التقدير")}</button>
+              </div>
             </div>
           </div>
         </div>

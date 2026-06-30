@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/client";
 import type { BidCard } from "@/lib/contract/bids";
+import { computeBidQuote } from "@/lib/contract/comparison";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { CredentialPills } from "@/components/requests/CredentialPills";
@@ -42,6 +43,16 @@ function pillLabel(status: string, L: (en: string, ar: string) => string): strin
       return L("Withdrawn", "مسحوب");
     default:
       return L("Start negotiation on this bid", "بدء التفاوض على هذا العرض");
+  }
+}
+
+/** Offer-state suffix for the deal-room CTA (uiState) — new / updated offer / whose move it is. */
+function offerSuffix(uiState: string | null, L: (en: string, ar: string) => string): string | null {
+  switch (uiState) {
+    case "new": return L("New offer", "عرض جديد");
+    case "fresh": return L("Updated offer", "عرض مُحدّث");
+    case "your-turn": return L("Your turn", "دورك");
+    default: return null; // waiting / null → no suffix
   }
 }
 
@@ -243,12 +254,14 @@ export function RequestBids({ requestId }: { requestId: string }) {
         const sp = SPILL[b.status] ?? SPILL.PENDING;
         const accepted = b.status === "ACCEPTED";
         const disabled = b.status === "EXPIRED" || b.status === "WITHDRAWN" || b.expired;
-        const periods = b.duration ?? 1;
-        const units = b.numberOfUnits || 1; // bid price is per-unit → × units (app parity)
-        const rentalTotal = (b.price ?? 0) * periods * units;
-        const sub = rentalTotal + (b.mobPrice ?? 0) + (b.demobPrice ?? 0);
-        const vat = Math.round(sub * 0.15);
-        const grand = sub + vat;
+        // Canonical quote: rate ÷ period-days × duration (weekly ÷7, monthly ÷26), mob/demob × units, VAT 15%.
+        const q = computeBidQuote(b);
+        const units = q.units;
+        const periods = q.periods;
+        const rentalTotal = q.rentalSubtotal;
+        const sub = q.subtotalPreVat;
+        const vat = Math.round(q.vat);
+        const grand = Math.round(q.total);
         const evt =
           b.status === "COUNTER_OFFERED" ? L("Countered", "قدّم عرضاً مقابلاً")
           : b.status === "ACCEPTED" ? L("Accepted", "مقبول")
@@ -270,6 +283,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
                 <div className="r1">
                   <span className="sname">{b.supplierName}</span>
                   <span className={`spill ${sp.cls}`}>{sp.dot && <span className="d" />}{ar ? sp.ar : sp.en}</span>
+                  <span className="src-chip src-app"><span className="material-icons-outlined">verified_user</span>{L("via Moedatech app", "عبر تطبيق معداتك")}</span>
                 </div>
                 <div className="bid-evt">{evt}</div>
                 <div className="credrow">
@@ -336,6 +350,12 @@ export function RequestBids({ requestId }: { requestId: string }) {
               </div>
             )}
 
+            {/* price-negotiable hint (app parity — unconditional on on-platform cards; opens the deal room) */}
+            <button type="button" className="neg-hint" disabled={busyId === b.id} onClick={() => startNegotiation(b)}>
+              <span className="material-icons-outlined">forum</span>
+              {L("This price is negotiable — open the deal room to chat", "هذا السعر قابل للتفاوض — افتح غرفة الصفقة للتحدث")}
+            </button>
+
             {/* price expandable */}
             <div className={`price-row${priceOpen ? " open" : ""}`}>
               <div className="price-collapsed" onClick={() => setOpenPrice(priceOpen ? null : b.id)}>
@@ -344,7 +364,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
               </div>
               {priceOpen && (
                 <div className="price-body">
-                  <div className="prow"><span className="pl2">{L("Rental", "الإيجار")} ({nf(b.price ?? 0)} × {periods}{units > 1 ? ` × ${units}` : ""})</span><span className="pv">{nf(rentalTotal)}</span></div>
+                  <div className="prow"><span className="pl2">{L("Rental", "الإيجار")} ({nf(b.price ?? 0)} × {Number.isInteger(periods) ? periods : periods.toFixed(2)}{units > 1 ? ` × ${units}` : ""})</span><span className="pv">{nf(rentalTotal)}</span></div>
                   {b.mobPrice ? <div className="prow"><span className="pl2">{L("Delivery to site", "النقل إلى الموقع")}{b.mobLeadTime && <span className="lead">{L("delivery within", "تسليم خلال")} {b.mobLeadTime}</span>}</span><span className="pv">{nf(b.mobPrice)}</span></div> : null}
                   {b.demobPrice ? <div className="prow"><span className="pl2">{L("Return from site", "النقل من الموقع")}{b.demobLeadTime && <span className="lead">{L("return within", "إرجاع خلال")} {b.demobLeadTime}</span>}</span><span className="pv">{nf(b.demobPrice)}</span></div> : null}
                   <div className="prow"><span className="pl2">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="pv">{nf(sub)}</span></div>
@@ -365,7 +385,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
                 EXPIRED/WITHDRAWN are disabled. The CTA always routes into the deal room. */}
             <div className="neg-footer">
               <button className="neg-pill" disabled={disabled || busyId === b.id} onClick={() => startNegotiation(b)}>
-                {pillLabel(b.status, L)}
+                {pillLabel(b.status, L)}{offerSuffix(b.uiState, L) ? ` · ${offerSuffix(b.uiState, L)}` : ""}
                 {!disabled && <span className="material-icons-outlined">arrow_forward</span>}
               </button>
               <p className="nf-hint">

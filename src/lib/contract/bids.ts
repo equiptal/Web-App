@@ -481,7 +481,9 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     duration: n(raw.duration),
     numberOfUnits: n(rqItem.numberOfUnits) ?? 1,
     // Supplier's chosen quantity (bid.units_offered is an array; its length = offered unit count).
-    unitsOffered: Array.isArray(raw.unitsOffered) ? raw.unitsOffered.length : (n(raw.unitsOffered) ?? n(rqItem.numberOfUnits) ?? 1),
+    // An EMPTY array means the supplier didn't pick a subset → they bid the request as posted (covers
+    // its full unit count), NOT 0 — otherwise the header tile reads 0/1 while the card says "covers 1 of 1".
+    unitsOffered: Array.isArray(raw.unitsOffered) && raw.unitsOffered.length > 0 ? raw.unitsOffered.length : (n(raw.unitsOffered) ?? n(rqItem.numberOfUnits) ?? 1),
     reqMinYear: n(rqItem.maxEquipmentAge),
     equipment: eq
       ? { id: s(eq.id) ?? s(eq.equipmentId), make: s(eq.manufacturer) ?? s(eq.make), model: s(eq.model), year: n(eq.year), imageUrl: s(eq.imageUrl) ?? s(eq.primaryPhotoUrl) }

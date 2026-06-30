@@ -5,6 +5,7 @@ import type { DealRoomView, DealRoomDocuments, QuotationView } from "@/lib/contr
 import type { ComputedBid, RecommendResult, BidAskResult, BidParseResult, AwardNudgeResult, PreferencePreset, RankingPreference, RankedBid, BidEventInput } from "@/lib/contract/agent-bids";
 import { mapBidFormData, mapLinkSubmissions, type BidFormData, type LinkBidSubmission, type SubmitBidFormPayload } from "@/lib/contract/link-bids";
 import type { PendingResponse, RespondBody, RespondResult } from "@/lib/contract/survey";
+import type { InboxBid } from "@/lib/contract/inbox";
 
 /** Body of POST /api/me/bids/recommend. user_id is attached server-side. */
 export interface RecommendPayload {
@@ -255,6 +256,23 @@ export function fetchPendingSurvey(): Promise<PendingResponse> {
 /** Submit the renter's answer to one survey. Idempotent server-side on already-resolved surveys. */
 export function respondSurvey(surveyId: string, body: RespondBody): Promise<RespondResult> {
   return postJson<RespondResult>(`/api/me/surveys/${encodeURIComponent(surveyId)}/respond`, body);
+}
+
+/* ----------------- Inbox / deal-room-per-bid (renter) ----------------- */
+
+/** Every bid offered to the renter (across all RFQs) + per-bid deal-room status & unread count. */
+export function fetchReceivedBids(filter?: { status?: string; page?: number; limit?: number }): Promise<{ bids: InboxBid[] }> {
+  const qs = new URLSearchParams();
+  if (filter?.status) qs.set("status", filter.status);
+  if (filter?.page) qs.set("page", String(filter.page));
+  if (filter?.limit) qs.set("limit", String(filter.limit));
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return getJson<{ bids: InboxBid[] }>(`/api/me/received-bids${suffix}`);
+}
+
+/** Total unread deal-room messages for the renter (role-scoped) — drives the inbox badge. */
+export function fetchDealRoomUnread(): Promise<{ total: number }> {
+  return getJson<{ total: number }>("/api/me/deal-rooms/unread-count");
 }
 
 /* ----------------- web-app/007: Mansour judgement layer (soft) ----------------- */
