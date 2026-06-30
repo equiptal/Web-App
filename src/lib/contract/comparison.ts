@@ -321,7 +321,9 @@ export interface DisplayQuote {
 /** Display figures for one bid under the chosen rate-period + prices-for basis (Week 7 / Month 26). */
 export function displayQuote(bid: BidCard, period: RatePeriod, pricesFor: PricesFor, fallbackDays?: number | null): DisplayQuote {
   const rate = num(bid.price) ?? 0;
-  const units = pricesFor === "all" ? (bid.numberOfUnits || 1) : 1;
+  // "All units" basis = the units THIS supplier offered (unitsOffered), so every cost reflects his chosen
+  // quantity (e.g. 5 units → ×5). "Per unit" = ×1. Falls back to the request's units when not stated.
+  const units = pricesFor === "all" ? (bid.unitsOffered || bid.numberOfUnits || 1) : 1;
   const dppBid = daysPerPeriod(bid.priceUnit);
   const perDay = dppBid === 0 ? rate : rate / dppBid; // bid rate → per-day basis
   const ratePerPeriod = dppBid === 0 ? rate : perDay * daysPerPeriod(period); // → chosen display period

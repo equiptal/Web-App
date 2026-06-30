@@ -174,27 +174,34 @@ describe("sortByPreset (AC-20 web side)", () => {
 /* ---------------------------- §6 redesign display helpers ---------------------------- */
 
 describe("displayQuote (RATE PERIOD + PRICES FOR toggles)", () => {
+  // "All units" multiplies by the units THIS supplier OFFERED (unitsOffered), not the request's needed count.
   it("re-expresses a day-rate into week (×7) and month (×26) for all units", () => {
-    const b = bc({ price: 445, priceUnit: "PER_DAY", numberOfUnits: 3 });
+    const b = bc({ price: 445, priceUnit: "PER_DAY", numberOfUnits: 3, unitsOffered: 3 });
     expect(displayQuote(b, "PER_DAY", "all").ratePerPeriod).toBe(445);
     expect(displayQuote(b, "PER_WEEK", "all").ratePerPeriod).toBe(445 * 7);
     expect(displayQuote(b, "PER_MONTH", "all").ratePerPeriod).toBe(445 * 26);
-    expect(displayQuote(b, "PER_DAY", "all").rentalForPeriod).toBe(445 * 3); // × units
+    expect(displayQuote(b, "PER_DAY", "all").rentalForPeriod).toBe(445 * 3); // × units offered
   });
-  it("PRICES FOR = unit prices one unit; mob+demob scale with the basis", () => {
-    const b = bc({ price: 445, priceUnit: "PER_DAY", numberOfUnits: 3, mobPrice: 100, demobPrice: 50 });
+  it("PRICES FOR = unit prices one unit; mob+demob scale with the offered units", () => {
+    const b = bc({ price: 445, priceUnit: "PER_DAY", numberOfUnits: 3, unitsOffered: 3, mobPrice: 100, demobPrice: 50 });
     expect(displayQuote(b, "PER_DAY", "unit").rentalForPeriod).toBe(445); // 1 unit
     expect(displayQuote(b, "PER_DAY", "unit").mobDemob).toBe(150);
     expect(displayQuote(b, "PER_DAY", "all").mobDemob).toBe(150 * 3);
   });
+  it("scales every cost by the supplier's offered units (e.g. 5 units → ×5)", () => {
+    const five = bc({ price: 445, priceUnit: "PER_DAY", numberOfUnits: 3, unitsOffered: 5, mobPrice: 100, demobPrice: 50 });
+    expect(displayQuote(five, "PER_DAY", "all").rentalForPeriod).toBe(445 * 5);
+    expect(displayQuote(five, "PER_DAY", "all").mobDemob).toBe(150 * 5);
+    expect(displayQuote(five, "PER_DAY", "all", 10).durationRental).toBe(445 * 10 * 5);
+  });
   it("duration-based rental shows only when a duration is known (else null)", () => {
-    const noDur = bc({ price: 445, priceUnit: "PER_DAY", numberOfUnits: 1 });
+    const noDur = bc({ price: 445, priceUnit: "PER_DAY", numberOfUnits: 1, unitsOffered: 1 });
     expect(displayQuote(noDur, "PER_DAY", "all").durationRental).toBeNull();
-    const withDur = displayQuote(bc({ price: 445, priceUnit: "PER_DAY", numberOfUnits: 2 }), "PER_DAY", "all", 10);
+    const withDur = displayQuote(bc({ price: 445, priceUnit: "PER_DAY", numberOfUnits: 2, unitsOffered: 2 }), "PER_DAY", "all", 10);
     expect(withDur.durationRental).toBe(445 * 10 * 2);
   });
   it("PER_JOB is a flat rate — no period conversion", () => {
-    const q = displayQuote(bc({ price: 5000, priceUnit: "PER_JOB", numberOfUnits: 2 }), "PER_WEEK", "all");
+    const q = displayQuote(bc({ price: 5000, priceUnit: "PER_JOB", numberOfUnits: 2, unitsOffered: 2 }), "PER_WEEK", "all");
     expect(q.ratePerPeriod).toBe(5000);
     expect(q.durationRental).toBeNull();
   });

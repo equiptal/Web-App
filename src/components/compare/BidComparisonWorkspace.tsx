@@ -327,12 +327,12 @@ export function BidComparisonWorkspace() {
   // (Matches the chips: you can only add a cost where bidSide !== "supplier".)
   const renterAddBid = (c: BidColumn) => c.costResponsibilities.reduce((s, x) => (x.renterCost && x.bidSide !== "supplier" ? s + x.renterCost : s), 0) + (renterMob[c.bid.id] ?? 0);
   // §6 toggles drive the totals: displayQuote re-expresses rate for the chosen RATE PERIOD and scales
-  // every figure by PRICES-FOR (1 unit vs all). shownUnits is the unit basis the cells label with.
-  const shownUnits = pricesFor === "all" ? units : 1;
+  // every figure by PRICES-FOR. unitsOf is PER COLUMN = the units that supplier offered (1 when "Per unit").
   const dq = (c: BidColumn) => displayQuote(c.bid, period, pricesFor, durationDays);
+  const unitsOf = (c: BidColumn) => dq(c).units; // = pricesFor === "all" ? (bid.unitsOffered || …) : 1
   // Mob/demob are PER-UNIT when the supplier handles them (× quantity, like the rate) — not one-time.
   const mobDemobUnit = (c: BidColumn) => (c.mob.stated ? c.mob.value : 0) + (c.demob.stated ? c.demob.value : 0);
-  const mobDemobTotal = (c: BidColumn) => mobDemobUnit(c) * shownUnits;
+  const mobDemobTotal = (c: BidColumn) => mobDemobUnit(c) * unitsOf(c);
   const supplierStated = (c: BidColumn) => dq(c).subtotal;
   // Match a presigned doc ({type,label}) to a chip's hint, by fuzzy substring on type or label.
   const norm = (str: string) => str.toLowerCase().replace(/[^a-z]/g, "");
@@ -408,7 +408,7 @@ export function BidComparisonWorkspace() {
   const maxGrand = grandList.length ? Math.max(...grandList) : 1;
   // §6 per-row winners — single leader only (ties unhighlighted), shown as a "✓ BEST" tag on the cell.
   const hasDuration = durationDays != null && durationDays > 0; // request has a start+end → show the duration-based rental row
-  const rentalWin = rowWinners(cols.map((c) => (c.bid.price != null ? dq(c).ratePerPeriod : null)), "min");
+  const rentalWin = rowWinners(cols.map((c) => (c.bid.price != null ? dq(c).rentalForPeriod : null)), "min");
   const durationWin = rowWinners(cols.map((c) => dq(c).durationRental), "min");
   const mobWin = rowWinners(cols.map((c) => (c.mob.stated || c.demob.stated ? mobDemobTotal(c) : null)), "min");
   const distanceWin = rowWinners(cols.map((c) => c.bid.distanceKm ?? null), "min");
@@ -973,7 +973,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                           <div className="flex flex-col gap-1">
                             <span className="text-[9px] font-extrabold" style={{ color: C.muted, letterSpacing: ".08em" }}>{L("PRICES FOR", "الأسعار لـ")}</span>
                             <div className="inline-flex rounded-lg p-0.5" style={{ background: C.surface3 }}>
-                              {([["unit", L("Per unit", "لكل وحدة")], ["all", units > 1 ? L(`All ${units} units`, `كل ${units} وحدة`) : L("All units", "كل الوحدات")]] as [PricesFor, string][]).map(([p, lab]) => (
+                              {([["unit", L("Per unit", "لكل وحدة")], ["all", L("All units offered", "كل الوحدات المعروضة")]] as [PricesFor, string][]).map(([p, lab]) => (
                                 <button key={p} onClick={() => setPricesFor(p)} className="rounded-md px-3 py-1 text-[11.5px] font-extrabold transition" style={pricesFor === p ? { background: "#fff", color: C.navy, boxShadow: "0 1px 3px rgba(20,40,70,.12)" } : { background: "transparent", color: C.muted }}>{lab}</button>
                               ))}
                             </div>
@@ -1001,7 +1001,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                     </tr>
                     )}
                     <tr>
-                      <RowHead title={L("Rental cost", "تكلفة الإيجار")} sub={L("rental rate", "سعر الإيجار")} />
+                      <RowHead title={L("Rental cost", "تكلفة الإيجار")} sub={`${periodLabel(period)} ${L("rate", "سعر")} × ${L("units", "الوحدات")}`} />
                       {cols.map((c, idx) => {
                         const per = periodLabel(period);
                         return (
@@ -1009,12 +1009,12 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                             {c.bid.price == null ? (
                               <span style={{ color: C.muted }}>{L("not stated", "غير محدد")}</span>
                             ) : (<>
-                              {/* the RATE is the headline (per period, per unit); the × units breakdown is the sub-line. Real rental spend = Estimated rental. */}
+                              {/* headline = the multiplication result (rate × the units this supplier offered); breakdown below */}
                               <span className="inline-flex flex-wrap items-center gap-1.5">
-                                <span className="font-mono text-[15px] font-extrabold" style={{ color: C.navy, fontWeight: 900 }}>{sar} {nf(dq(c).ratePerPeriod)}/{per}</span>
+                                <span className="font-mono text-[15px] font-extrabold" style={{ color: C.navy, fontWeight: 900 }}>{sar} {nf(dq(c).rentalForPeriod)}</span>
                                 {rentalWin.has(idx) && bestTag}
                               </span>
-                              <Sub>{`${nf(dq(c).ratePerPeriod)}/${per} × ${shownUnits} ${shownUnits > 1 ? L("units", "وحدة") : L("unit", "وحدة")}`}</Sub>
+                              <Sub>{`${nf(dq(c).ratePerPeriod)}/${per} × ${unitsOf(c)} ${unitsOf(c) > 1 ? L("units", "وحدة") : L("unit", "وحدة")}`}</Sub>
                             </>)}
                           </Td>
                         );
@@ -1041,7 +1041,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                                 {c.bid.distanceKm != null && <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={{ background: C.surface2, color: C.navyMid }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>place</span>{Math.round(c.bid.distanceKm)} {L("km", "كم")}</span>}
                                 {mobWin.has(idx) && bestTag}
                               </span>
-                              <Sub>{`${sar} ${nf(mobDemobUnit(c))}/${L("unit", "وحدة")} (${L("mob", "نقل")} ${nf(c.mob.value)} + ${L("demob", "إرجاع")} ${nf(c.demob.value)}) × ${shownUnits} ${shownUnits > 1 ? L("units", "وحدة") : L("unit", "وحدة")}`}</Sub>
+                              <Sub>{`${sar} ${nf(mobDemobUnit(c))}/${L("unit", "وحدة")} (${L("mob", "نقل")} ${nf(c.mob.value)} + ${L("demob", "إرجاع")} ${nf(c.demob.value)}) × ${unitsOf(c)} ${unitsOf(c) > 1 ? L("units", "وحدة") : L("unit", "وحدة")}`}</Sub>
                             </>) : rm ? (<>
                               <span className="inline-flex items-center gap-1.5 text-[13px] font-bold">{sar} {nf(rm)}
                                 <button onClick={() => addMobCost(c.bid.id, L("Delivery + pickup", "النقل والإرجاع"))} className="text-[10px] font-bold underline" style={{ color: C.rentee }}>{L("edit", "تعديل")}</button>
@@ -1070,7 +1070,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                                 <span className="font-mono text-[15px] font-extrabold" style={{ color: C.navy, fontWeight: 900 }}>{sar} {nf(drv)}</span>
                                 {durationWin.has(idx) && bestTag}
                               </span>
-                              <Sub>{`${nf(Math.round(drv / ((durationDays || 1) * shownUnits)))}/${L("day", "يوم")} × ${durationDays} ${L("days", "يوم")} × ${shownUnits} ${shownUnits > 1 ? L("units", "وحدة") : L("unit", "وحدة")}`}</Sub>
+                              <Sub>{`${nf(Math.round(drv / ((durationDays || 1) * unitsOf(c))))}/${L("day", "يوم")} × ${durationDays} ${L("days", "يوم")} × ${unitsOf(c)} ${unitsOf(c) > 1 ? L("units", "وحدة") : L("unit", "وحدة")}`}</Sub>
                             </>) : <span style={{ color: C.muted }}>{L("not stated", "غير محدد")}</span>}
                           </Td>
                         );
