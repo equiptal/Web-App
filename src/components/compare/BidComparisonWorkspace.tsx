@@ -386,17 +386,20 @@ export function BidComparisonWorkspace() {
     setDocView({ label, url, loading: false });
   };
   /** A clickable doc chip — opens the actual file in an in-app viewer modal (no redirect). */
-  const docChip = (c: BidColumn, label: string, has: boolean, hint: string) => {
-    const style = has ? { background: C.successBg, color: C.success } : { background: C.dangerBg, color: C.danger };
+  const docChip = (c: BidColumn, label: string, has: boolean, hint: string, big = false) => {
+    // small = supplier-header chip (10px); big = cert/ownership row chip (prototype 11.5px/800, pad 5px 10px, r8, bordered).
+    const base = has ? { background: C.successBg, color: C.success } : { background: C.dangerBg, color: C.danger };
+    const style = big ? { ...base, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: `1px solid ${has ? "rgba(29,175,88,.3)" : "rgba(217,54,42,.3)"}` } : base;
+    const cls = big ? "inline-flex items-center gap-1 text-[11.5px]" : "inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold";
     // Off-platform bids captured a VALUE (CR/VAT/national text), not a file — show the value, not a doc.
     const linkVal = c.bid.viaSharedLink ? c.bid.linkDocs?.[hint] : undefined;
     // Viewable only when there's something to open: a captured value (link bid) or a real file (app bid).
     // Off-platform certs are acknowledged Yes/No — no file, no value — so no eye icon / no click.
     const viewable = has && (linkVal != null || !c.bid.viaSharedLink);
     const inner = <><span className="material-icons-outlined" style={{ fontSize: 11 }}>{has ? "check" : "close"}</span>{label}{viewable && <span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>visibility</span>}</>;
-    if (!viewable) return <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={style}>{inner}</span>;
+    if (!viewable) return <span className={cls} style={style}>{inner}</span>;
     const onClick = linkVal ? () => setDocView({ label, url: null, value: linkVal, loading: false }) : () => openDoc(c, hint, label);
-    return <button type="button" onClick={onClick} title={linkVal ? L("View value", "عرض القيمة") : L("View document", "عرض المستند")} className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={style}>{inner}</button>;
+    return <button type="button" onClick={onClick} title={linkVal ? L("View value", "عرض القيمة") : L("View document", "عرض المستند")} className={cls} style={style}>{inner}</button>;
   };
   const grandTotal = (c: BidColumn) => Math.round(supplierStated(c) * (1 + VAT)) + renterAddBid(c);
   const hasCost = (c: BidColumn) => supplierStated(c) > 0 || renterAddBid(c) > 0;
@@ -419,7 +422,7 @@ export function BidComparisonWorkspace() {
     cols.forEach((c) => (c.bid.ownershipDocs ?? []).forEach((o) => { if (!seen.has(o.key)) seen.set(o.key, o); }));
     return [...seen.values()];
   })();
-  const bestTag = <span className="ms-1 inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 align-middle text-[9px] font-extrabold" style={{ background: C.successBg, color: C.success }}>✓ {L("BEST", "الأفضل")}</span>;
+  const bestTag = <span className="ms-1 inline-flex items-center gap-0.5 rounded-full px-[7px] py-0.5 align-middle text-[9.5px]" style={{ background: C.successBg, color: C.success, fontWeight: 900, letterSpacing: ".03em" }}>✓ {L("BEST", "الأفضل")}</span>;
   // §6 rule: only show cost responsibilities the REQUEST assigned (requestSide set) — not required → not shown.
   const requiredResp = RESP_META.filter((m) => cols.some((c) => c.costResponsibilities.find((x) => x.key === m.key)?.requestSide != null));
   // The responsibilities the request put on the RENTER → the fields of the "Estimate your own costs" popup.
@@ -901,7 +904,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
           </div>
 
           {/* ── comparison table ── */}
-          <div className="overflow-hidden rounded-xl border" style={{ borderColor: C.border, background: "#fff" }}>
+          <div className="overflow-hidden rounded-2xl border" style={{ borderColor: C.border, background: "#fff" }}>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse" style={{ minWidth: 320 + cols.length * 215 }}>
                 {/* tint the whole rank-winning column green (cells' own red/green layer on top) */}
@@ -1008,7 +1011,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                             ) : (<>
                               {/* the RATE is the headline (per period, per unit); the × units breakdown is the sub-line. Real rental spend = Estimated rental. */}
                               <span className="inline-flex flex-wrap items-center gap-1.5">
-                                <span className="font-mono font-extrabold" style={{ color: C.navy }}>{sar} {nf(dq(c).ratePerPeriod)}/{per}</span>
+                                <span className="font-mono text-[15px] font-extrabold" style={{ color: C.navy, fontWeight: 900 }}>{sar} {nf(dq(c).ratePerPeriod)}/{per}</span>
                                 {rentalWin.has(idx) && bestTag}
                               </span>
                               <Sub>{`${nf(dq(c).ratePerPeriod)}/${per} × ${shownUnits} ${shownUnits > 1 ? L("units", "وحدة") : L("unit", "وحدة")}`}</Sub>
@@ -1034,7 +1037,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                             {stated ? (<>
                               {/* total prominent + a small distance chip; per-unit (mob+demob) breakdown is the sub */}
                               <span className="inline-flex flex-wrap items-center gap-1.5">
-                                <span className="font-mono font-extrabold" style={{ color: C.navy }}>{sar} {nf(mobDemobTotal(c))}</span>
+                                <span className="font-mono text-[15px] font-extrabold" style={{ color: C.navy, fontWeight: 900 }}>{sar} {nf(mobDemobTotal(c))}</span>
                                 {c.bid.distanceKm != null && <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={{ background: C.surface2, color: C.navyMid }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>place</span>{Math.round(c.bid.distanceKm)} {L("km", "كم")}</span>}
                                 {mobWin.has(idx) && bestTag}
                               </span>
@@ -1064,7 +1067,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                           <Td key={c.bid.id} ok={drv != null}>
                             {drv != null ? (<>
                               <span className="inline-flex flex-wrap items-center gap-1.5">
-                                <span className="font-mono font-extrabold" style={{ color: C.navy }}>{sar} {nf(drv)}</span>
+                                <span className="font-mono text-[15px] font-extrabold" style={{ color: C.navy, fontWeight: 900 }}>{sar} {nf(drv)}</span>
                                 {durationWin.has(idx) && bestTag}
                               </span>
                               <Sub>{`${nf(Math.round(drv / ((durationDays || 1) * shownUnits)))}/${L("day", "يوم")} × ${durationDays} ${L("days", "يوم")} × ${shownUnits} ${shownUnits > 1 ? L("units", "وحدة") : L("unit", "وحدة")}`}</Sub>
@@ -1077,9 +1080,9 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                     {requiredResp.length > 0 && (
                     <tr>
                       {/* §6: label cell carries ONE "Estimate your costs" popup button (not per-term add) */}
-                      <td className="sticky start-0 z-[1] p-3.5 align-top text-[12.5px] font-bold" style={{ background: C.surface2, color: C.navyMid, width: 190, minWidth: 190 }}>
+                      <td className="sticky start-0 z-[1] align-top text-[12.5px]" style={{ background: C.surface2, color: C.navy, fontWeight: 900, width: 200, minWidth: 200, padding: "14px 16px" }}>
                         {L("Cost terms", "شروط التكلفة")}
-                        <span className="block text-[11px] font-semibold" style={{ color: C.muted }}>{L("who handles what", "من يتحمّل ماذا")}</span>
+                        <span className="mt-0.5 block text-[10.5px] font-semibold" style={{ color: C.muted }}>{L("who handles what", "من يتحمّل ماذا")}</span>
                         {youTerms.length > 0 && (
                           <button onClick={openEstimate} className="mt-2 inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-extrabold" style={{ borderColor: "rgba(37,99,235,.4)", color: C.rentee, background: C.renteeDim, borderStyle: "dashed" }}>
                             🧮 {estTotal > 0 ? L(`Your est. ~${sar} ${nf(estTotal)}`, `تقديرك ~${sar} ${nf(estTotal)}`) : L("Estimate your costs", "قدّر تكاليفك")}
@@ -1097,10 +1100,11 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                               const tone = dealConflict ? "red" : responsibilityTone(cr);
                               const bg = tone === "green" ? C.successBg : tone === "red" ? C.dangerBg : tone === "blue" ? C.renteeDim : C.surface3;
                               const fg = tone === "green" ? C.success : tone === "red" ? C.danger : tone === "blue" ? C.rentee : C.muted;
+                              const bd = tone === "green" ? "rgba(29,175,88,.3)" : tone === "red" ? "rgba(217,54,42,.3)" : tone === "blue" ? "rgba(37,99,235,.3)" : C.border;
                               const owner = tone === "green" ? L("supplier", "المؤجّر") : tone === "blue" ? L("you", "أنت") : tone === "red" ? L("conflict", "تعارض") : L("—", "—");
                               const entered = renterCosts[m.key];
                               return (
-                                <span key={m.key} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold" style={{ background: bg, color: fg }}>
+                                <span key={m.key} className="inline-flex items-center gap-1 px-[9px] py-1 text-[11px]" style={{ background: bg, color: fg, fontWeight: 800, borderRadius: 7, border: `1px solid ${bd}` }}>
                                   {tone === "red" && <span className="material-icons-outlined" style={{ fontSize: 13 }}>warning_amber</span>}
                                   {ar ? m.ar : m.en} · {owner}{entered != null ? ` · ~${sar} ${nf(entered)}` : ""}
                                 </span>
@@ -1123,8 +1127,8 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         return (
                           <Td key={c.bid.id} ok={hasCost(c) && isLow} fail={false}>
                             {hasCost(c) ? (<>
-                              <span className="font-mono text-[17px] font-extrabold" style={{ color: C.navy }}>{sar} {nf(total)}</span>
-                              {cols.length > 1 && lowestGrand != null && <span className="ms-1.5 rounded-full px-2 py-0.5 font-mono text-[10px] font-extrabold" style={isLow ? { background: C.successBg, color: C.success } : { background: C.warningBg, color: C.warning }}>{isLow ? L("lowest", "الأقل") : `+${Math.round(((total - lowestGrand) / lowestGrand) * 100)}%`}</span>}
+                              <span className="font-mono text-[19px] font-extrabold" style={{ color: C.navy, fontWeight: 900 }}>{sar} {nf(total)}</span>
+                              {cols.length > 1 && lowestGrand != null && <span className="ms-1.5 rounded-full px-2 py-0.5 font-mono text-[10.5px] font-extrabold" style={isLow ? { background: C.successBg, color: C.success } : { background: C.warningBg, color: C.warning }}>{isLow ? L("lowest", "الأقل") : `+${Math.round(((total - lowestGrand) / lowestGrand) * 100)}%`}</span>}
                               <div className="mt-1.5 h-[6px] max-w-[160px] overflow-hidden rounded" style={{ background: C.surface3 }}><i className="block h-full rounded" style={{ width: `${Math.round((total / maxGrand) * 100)}%`, background: isLow ? C.success : total === maxGrand ? C.warning : C.navyMid }} /></div>
                               {partial && <Sub>{L("rental not totaled — set a duration", "لم تُحتسب المدة — حدّد مدة")}</Sub>}
                               {yourCosts > 0 && <Sub>{L(`incl. ${sar} ${nf(yourCosts)} of your estimates`, `يشمل ${sar} ${nf(yourCosts)} من تقديراتك`)}</Sub>}
@@ -1162,14 +1166,14 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         // Off-platform: no equipment record — show the confirmed year requirement (e.g. "≥ 2018").
                         if (c.bid.viaSharedLink) {
                           const v = yr ? (c.bid.reqMinYear != null ? `≥ ${c.bid.reqMinYear}` : yr.state === "conflict" ? L("Not met", "غير مطابق") : L("Confirmed", "مؤكّد")) : null;
-                          return <Td key={c.bid.id} ok={!!yr && yr.state !== "conflict"} fail={yr?.state === "conflict"}>{v ? <span className="text-[13px] font-bold">{v}</span> : <span style={{ color: C.muted }}>—</span>}</Td>;
+                          return <Td key={c.bid.id} ok={!!yr && yr.state !== "conflict"} fail={yr?.state === "conflict"}>{v ? <span className="text-[14px]" style={{ fontWeight: 900 }}>{v}</span> : <span style={{ color: C.muted }}>—</span>}</Td>;
                         }
-                        return <Td key={c.bid.id} ok={yr?.state !== "conflict"} fail={yr?.state === "conflict"}><span className="text-[13px] font-bold">{c.bid.equipment?.year ?? "—"}</span>{yearWin.has(idx) && <Sub>{L("newest", "الأحدث")}</Sub>}</Td>;
+                        return <Td key={c.bid.id} ok={yr?.state !== "conflict"} fail={yr?.state === "conflict"}><span className="text-[14px]" style={{ fontWeight: 900 }}>{c.bid.equipment?.year ?? "—"}</span>{yearWin.has(idx) && <span className="mt-0.5 block text-[11px]" style={{ color: C.success, fontWeight: 800 }}>{L("newest", "الأحدث")}</span>}</Td>;
                       })}
                     </tr>
                     <tr>
                       <RowHead title={L("Distance to site", "المسافة للموقع")} />
-                      {cols.map((c, idx) => <Td key={c.bid.id} ok><span className="text-[13px] font-bold">{c.bid.distanceKm != null ? `${Math.round(c.bid.distanceKm)} ${L("km", "كم")}` : <span style={{ color: C.muted }}>—</span>}</span>{distanceWin.has(idx) && <Sub>{L("closest", "الأقرب")}</Sub>}</Td>)}
+                      {cols.map((c, idx) => <Td key={c.bid.id} ok><span className="text-[14px]" style={{ fontWeight: 900 }}>{c.bid.distanceKm != null ? `${Math.round(c.bid.distanceKm)} ${L("km", "كم")}` : <span style={{ color: C.muted }}>—</span>}</span>{distanceWin.has(idx) && <span className="mt-0.5 block text-[11px]" style={{ color: C.success, fontWeight: 800 }}>{L("closest", "الأقرب")}</span>}</Td>)}
                     </tr>
                     {/* L2 equipment — ONE field: safety certs (required ✓/✗ + held) + proof-of-ownership
                         docs (istimara / customs / sale_contract / saso_registration), combined per column. */}
@@ -1179,7 +1183,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         <RowHead title={`${certLabel(cert)} ${L("certificate", "شهادة")}`} sub={`${L("required", "مطلوبة")} · ${L("acknowledged — confirm with supplier", "مُقَرّ — أكّده مع المؤجّر")}`} />
                         {cols.map((c) => {
                           const held = (c.bid.equipmentCertCodes ?? []).includes(cert);
-                          return <Td key={c.bid.id} ok={held} fail={!held}>{docChip(c, certLabel(cert), held, cert)}</Td>;
+                          return <Td key={c.bid.id} ok={held} fail={!held}>{docChip(c, certLabel(cert), held, cert, true)}</Td>;
                         })}
                       </tr>
                     ))}
@@ -1190,7 +1194,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         <RowHead title={`${ar ? doc.labelAr : doc.labelEn} ${L("certificate", "شهادة")}`} sub={`${L("required", "مطلوبة")} · ${L("acknowledged — confirm with supplier", "مُقَرّ — أكّده مع المؤجّر")}`} />
                         {cols.map((c) => {
                           const held = (c.bid.ownershipDocs ?? []).some((o) => o.key === doc.key);
-                          return <Td key={c.bid.id} ok={held} fail={!held}>{docChip(c, ar ? doc.labelAr : doc.labelEn, held, doc.key)}</Td>;
+                          return <Td key={c.bid.id} ok={held} fail={!held}>{docChip(c, ar ? doc.labelAr : doc.labelEn, held, doc.key, true)}</Td>;
                         })}
                       </tr>
                     ))}
@@ -1212,22 +1216,23 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                   {/* DECIDE — its own band, clearly separated from the equipment section. Award/Negotiate use
                       the SAME colours for every supplier (Award = green solid, Negotiate = navy outline). */}
                   <tr>
-                    <th className="sticky start-0 z-[2] p-3.5 text-start align-top text-[12.5px] font-extrabold" style={{ background: C.surface2, color: C.navyMid, borderTop: `2px solid ${C.border}` }}>
+                    <th className="sticky start-0 z-[2] text-start align-top text-[12.5px]" style={{ background: C.surface2, color: C.navy, fontWeight: 900, width: 200, minWidth: 200, padding: "14px 16px", borderTop: `2px solid ${C.border}` }}>
                       <span className="inline-flex items-center gap-1.5"><span className="material-icons-outlined" style={{ fontSize: 16 }}>gavel</span>{L("Decide", "القرار")}</span>
-                      <span className="block text-[11px] font-semibold" style={{ color: C.muted }}>{L("opens the deal room", "يفتح غرفة الصفقة")}</span>
+                      <span className="mt-0.5 block text-[10.5px] font-semibold" style={{ color: C.muted }}>{L("opens the deal room", "يفتح غرفة الصفقة")}</span>
                     </th>
                     {cols.map((c) => {
                       const isAwardedBid = !!awarded && (awarded.id === c.bid.id || (awarded.supplierId != null && awarded.supplierId === c.bid.supplierId));
                       return (
-                        <td key={c.bid.id} className="p-3.5 align-top" style={{ borderTop: `2px solid ${C.border}` }}>
+                        <td key={c.bid.id} className="align-top" style={{ padding: "14px 15px", borderTop: `2px solid ${C.border}`, borderInlineStart: `1px solid ${C.line}` }}>
                           {awarded ? (
                             <span className="inline-flex rounded-full px-3 py-1.5 text-[11.5px] font-bold" style={isAwardedBid ? { background: C.successBg, color: C.success } : { background: C.surface2, color: C.muted }}>{isAwardedBid ? `${L("Awarded", "تمت الترسية")} ✓` : L("Item awarded", "مُرسى")}</span>
                           ) : (
-                            <div className="flex flex-col gap-2">
-                              <button onClick={() => goDealRoom(c.bid, "award")} disabled={busy} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-extrabold text-white disabled:opacity-60" style={{ background: C.success }}>
+                            <div className="flex flex-col gap-[7px]">
+                              {/* prototype: Award = solid green, Negotiate = white w/ blue border + blue text; both padding 9px / radius 9px / 12.5px/800 */}
+                              <button onClick={() => goDealRoom(c.bid, "award")} disabled={busy} className="inline-flex w-full items-center justify-center gap-1.5 text-[12.5px] text-white disabled:opacity-60" style={{ background: C.success, padding: 9, borderRadius: 9, fontWeight: 800 }}>
                                 <span className="material-icons-outlined" style={{ fontSize: 16 }}>gavel</span>{L("Award", "ترسية")}
                               </button>
-                              <button onClick={() => goDealRoom(c.bid, "negotiate")} disabled={busy} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-extrabold text-white disabled:opacity-60" style={{ background: C.rentee }}>
+                              <button onClick={() => goDealRoom(c.bid, "negotiate")} disabled={busy} className="inline-flex w-full items-center justify-center gap-1.5 text-[12.5px] disabled:opacity-60" style={{ background: "#fff", color: C.rentee, border: `1px solid rgba(37,99,235,.35)`, padding: 9, borderRadius: 9, fontWeight: 800 }}>
                                 <span className="material-icons-outlined" style={{ fontSize: 15 }}>swap_horiz</span>{L("Negotiate", "تفاوض")}
                               </button>
                             </div>
@@ -1243,11 +1248,11 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
 
           {/* table footer — upload an offline quote / export the comparison (§6) */}
           <div className="mt-3 flex flex-wrap items-center gap-2.5">
-            <span className="flex-1 text-[12px] font-semibold" style={{ color: C.muted, minWidth: 160 }}>{L(`Have an offline quote for ${(ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? "this item"}? Add it, or export this comparison.`, "لديك عرض خارج المنصة؟ أضِفه أو صدّر هذه المقارنة.")}</span>
-            <button onClick={() => setUploadOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-[12.5px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>
+            <span className="flex-1 text-[11.5px] font-semibold" style={{ color: C.muted, minWidth: 140 }}>{L(`Have an offline quote for ${(ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? "this item"}? Add it, or export this comparison.`, "لديك عرض خارج المنصة؟ أضِفه أو صدّر هذه المقارنة.")}</span>
+            <button onClick={() => setUploadOpen(true)} className="inline-flex items-center gap-1.5 rounded-[10px] border px-3.5 py-[9px] text-[12.5px] font-extrabold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>
               <span className="material-icons-outlined" style={{ fontSize: 17 }}>upload_file</span>{L("Upload a quote", "رفع عرض سعر")}
             </button>
-            <button onClick={exportPdf} className="inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-[12.5px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>
+            <button onClick={exportPdf} className="inline-flex items-center gap-1.5 rounded-[10px] border px-3.5 py-[9px] text-[12.5px] font-extrabold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>
               <span className="material-icons-outlined" style={{ fontSize: 17 }}>picture_as_pdf</span>{L("Export PDF", "تصدير PDF")}
             </button>
           </div>
@@ -1439,22 +1444,27 @@ function Spinner() {
   return <div className="grid place-items-center py-16" style={{ color: C.muted }}><span className="material-icons-outlined animate-spin" style={{ fontSize: 28 }}>progress_activity</span></div>;
 }
 function SectionRow({ icon, title, accent, accentText, n, collapsed, onToggle }: { id: string; icon: string; title: string; accent: string; accentText: string; n: number; collapsed: boolean; onToggle: () => void }) {
+  // prototype: solid navy bar, padding 12px 16px, label 12.5px/900 letter-spacing .05em, white. No accent stripe.
+  void accent;
   return (
-    <tr><td colSpan={n + 1} style={{ background: `linear-gradient(180deg,${C.navy},${C.navyDeep})`, borderInlineStart: `4px solid ${accent}`, padding: 0 }}>
-      <button onClick={onToggle} className="flex w-full items-center gap-2.5 px-4 py-3 text-start">
+    <tr><td colSpan={n + 1} style={{ background: C.navy, padding: 0 }}>
+      <button onClick={onToggle} className="flex w-full items-center gap-2.5 px-4 py-3 text-start" style={{ paddingTop: 12, paddingBottom: 12 }}>
         <span className="material-icons-outlined" style={{ fontSize: 18, color: accentText }}>{icon}</span>
-        <b className="text-[12.5px] font-extrabold uppercase" style={{ color: accentText, letterSpacing: ".3px" }}>{title}</b>
+        <b className="text-[12.5px] uppercase" style={{ color: accentText, fontWeight: 900, letterSpacing: ".05em" }}>{title}</b>
         <span className="material-icons-outlined ms-auto" style={{ fontSize: 20, color: "rgba(255,255,255,.72)", transform: collapsed ? "rotate(-90deg)" : "" }}>expand_more</span>
       </button>
     </td></tr>
   );
 }
 function RowHead({ title, sub }: { title: string; sub?: string }) {
-  return <td className="sticky start-0 z-[1] p-3.5 align-top text-[12.5px] font-bold" style={{ background: C.surface2, color: C.navyMid, width: 190, minWidth: 190, borderBottom: `1px solid ${C.line}` }}>{title}{sub && <span className="block text-[11px] font-semibold" style={{ color: C.muted }}>{sub}</span>}</td>;
+  // prototype: 200px sticky cell, padding 14px 16px; label 12.5px/900 navy; sub 10.5px/600 margin-top 2px.
+  return <td className="sticky start-0 z-[1] align-top text-[12.5px]" style={{ background: C.surface2, color: C.navy, fontWeight: 900, width: 200, minWidth: 200, padding: "14px 16px", borderBottom: `1px solid ${C.line}` }}>{title}{sub && <span className="mt-0.5 block text-[10.5px] font-semibold" style={{ color: C.muted }}>{sub}</span>}</td>;
 }
 function Td({ children, ok, fail }: { children: React.ReactNode; ok?: boolean; fail?: boolean }) {
-  return <td className="p-3.5 align-top text-[13px] font-bold" style={{ borderBottom: `1px solid ${C.line}`, color: C.navy, background: ok ? "rgba(29,175,88,.06)" : fail ? "rgba(217,54,42,.07)" : undefined }}>{children}</td>;
+  // prototype: data cell padding 14px 15px, 1px left column separator.
+  return <td className="align-top text-[13px] font-bold" style={{ padding: "14px 15px", borderBottom: `1px solid ${C.line}`, borderInlineStart: `1px solid ${C.line}`, color: C.navy, background: ok ? "rgba(29,175,88,.06)" : fail ? "rgba(217,54,42,.07)" : undefined }}>{children}</td>;
 }
 function Sub({ children }: { children: React.ReactNode }) {
-  return <span className="mt-1 block text-[11px] font-semibold" style={{ color: C.muted }}>{children}</span>;
+  // prototype: secondary line 11px/600, margin-top 3px.
+  return <span className="block text-[11px] font-semibold" style={{ color: C.muted, marginTop: 3 }}>{children}</span>;
 }
