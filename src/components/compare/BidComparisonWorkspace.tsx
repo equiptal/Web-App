@@ -86,7 +86,6 @@ export function BidComparisonWorkspace() {
   const [fxEcho, setFxEcho] = useState<string | null>(null);
   // UI chrome state to mirror the prototype.
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [selectorOpen, setSelectorOpen] = useState(true);
   const [itemMenuOpen, setItemMenuOpen] = useState(false); // §6 item icon-dropdown (replaces the item pill bar)
   const [chatOpen, setChatOpen] = useState(false); // the AI chat is a side drawer (the re-rank bar stays inline)
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -406,13 +405,20 @@ export function BidComparisonWorkspace() {
   const maxGrand = grandList.length ? Math.max(...grandList) : 1;
   // §6 per-row winners — single leader only (ties unhighlighted), shown as a "✓ BEST" tag on the cell.
   const hasDuration = durationDays != null && durationDays > 0; // request has a start+end → show the duration-based rental row
-  const rentalWin = rowWinners(cols.map((c) => (c.bid.price != null ? dq(c).rentalForPeriod : null)), "min");
+  const rentalWin = rowWinners(cols.map((c) => (c.bid.price != null ? dq(c).ratePerPeriod : null)), "min");
   const durationWin = rowWinners(cols.map((c) => dq(c).durationRental), "min");
   const mobWin = rowWinners(cols.map((c) => (c.mob.stated || c.demob.stated ? mobDemobTotal(c) : null)), "min");
   const distanceWin = rowWinners(cols.map((c) => c.bid.distanceKm ?? null), "min");
   const yearWin = rowWinners(cols.map((c) => c.bid.equipment?.year ?? null), "max");
   // §6 rule: one equipment-cert row per REQUIRED cert (not required → not shown).
   const requiredEquipCerts = EQUIP_CERTS.filter((x) => cols.some((c) => c.bid.requiredCerts.includes(x)));
+  // Proof-of-ownership docs (Istimara / customs / sale contract …) — one row per type, styled like
+  // the cert rows so they read as required equipment documents (matches the prototype's "Istimara" row).
+  const ownershipDocTypes = (() => {
+    const seen = new Map<string, { key: string; labelEn: string; labelAr: string }>();
+    cols.forEach((c) => (c.bid.ownershipDocs ?? []).forEach((o) => { if (!seen.has(o.key)) seen.set(o.key, o); }));
+    return [...seen.values()];
+  })();
   const bestTag = <span className="ms-1 inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 align-middle text-[9px] font-extrabold" style={{ background: C.successBg, color: C.success }}>✓ {L("BEST", "الأفضل")}</span>;
   // §6 rule: only show cost responsibilities the REQUEST assigned (requestSide set) — not required → not shown.
   const requiredResp = RESP_META.filter((m) => cols.some((c) => c.costResponsibilities.find((x) => x.key === m.key)?.requestSide != null));
@@ -674,14 +680,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
 
   return (
     <div className={`space-y-4 transition-[margin] duration-200 ${chatOpen ? "md:me-[412px]" : ""}`} style={{ color: C.navy }}>
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-[13px] font-bold" style={{ color: C.muted }}>
-        <button onClick={() => router.push("/requests")} className="hover:underline">{L("Requests", "الطلبات")}</button>
-        <span className="material-icons-outlined" style={{ fontSize: 16, transform: ar ? "scaleX(-1)" : undefined }}>chevron_right</span>
-        <b style={{ color: C.navy, fontSize: 18 }}>{L("Compare bids", "مقارنة العروض")}</b>
-      </div>
-
-      {/* ── Level 1 — RFQ tabs (§1: replace location grouping; same pill style as My Requests) ── */}
+      {/* ── RFQ tabs (§1: replace location grouping; same pill style as My Requests) ── */}
       <div className="text-[11px] font-extrabold" style={{ color: C.muted, letterSpacing: ".4px" }}>{L("REQUESTS FOR QUOTE", "طلبات التسعير")}</div>
       <div className="flex gap-2 overflow-x-auto pb-1">
         {locations.map((l) => {
@@ -702,113 +701,70 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
         })}
       </div>
 
-      {/* ── request header card ── */}
-      {group && (
-        <div className="relative overflow-hidden rounded-xl p-4 text-white" style={{ background: `linear-gradient(150deg,${C.navy},${C.navyDeep})` }}>
-          <div className="flex gap-3">
-            <div className="relative grid h-10 w-10 flex-none place-items-center rounded-lg" style={{ background: "#fff", border: "1px solid rgba(255,255,255,.16)" }}>
-              <EquipImg src={activeItemObj?.item?.imageUrl ?? null} categoryId={activeItemObj?.item?.categoryId ?? null} name={(ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? ""} box="" img="h-7 w-7 object-contain" iconSize={22} />
-              {units > 1 && <span className="absolute -end-1.5 -top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-extrabold" style={{ background: C.action }}>×{units}</span>}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[13.5px] font-extrabold leading-tight">
-                {ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name}{units > 1 ? ` · ×${units}` : ""}
-                {items.length > 1 && <span style={{ color: "#FFC97A" }}> + {items.length - 1} {L("more", "غيره")}</span>}
-                <span className="ms-1.5 rounded-full px-2 text-[10px] font-bold" style={{ background: "rgba(255,255,255,.14)" }}>{group.totalUnits} {L("total equipment", "إجمالي المعدات")}</span>
-              </div>
-              <div className="mt-1 flex items-center gap-1.5 text-[11px]" style={{ color: "rgba(255,255,255,.66)" }}>
-                <span className="material-icons-outlined" style={{ fontSize: 13 }}>event</span>
-                {(group.items[0]?.displayId ?? group.id)} · {loc?.label} · {group.createdAt ? new Date(group.createdAt).toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : ""}
-              </div>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {items.length > 1 && <Pill icon={null}>{L("Mixed", "مختلط")}</Pill>}
-                <Pill icon="campaign">{L("Broadcast", "بثّ")}</Pill>
-                <Pill icon="gavel">{group.totalBids} {L("bids", "عروض")}</Pill>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Level 2 — item icon-dropdown + actions (§6) ── */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2 text-[11px] font-extrabold" style={{ color: C.muted, letterSpacing: ".3px" }}>
-          <span className="material-icons-outlined" style={{ fontSize: 15 }}>category</span>{L("Item", "الصنف")}
-        </div>
-        <div className="relative">
-          <button onClick={() => setItemMenuOpen((o) => !o)} title={L("Switch item", "تبديل الصنف")} className="inline-flex items-center gap-2 rounded-xl border py-1.5 ps-1.5 pe-3 text-[13px] font-bold" style={{ borderColor: C.navy, background: C.navy, color: "#fff" }}>
-            <span className="grid h-8 w-8 place-items-center rounded-lg" style={{ background: "#fff" }}>
-              <EquipImg src={activeItemObj?.item?.imageUrl ?? null} categoryId={activeItemObj?.item?.categoryId ?? null} name={(ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? ""} box="" img="h-6 w-6 object-contain" iconSize={22} />
-            </span>
-            <span className="rounded-full px-2 py-0.5 text-[11px] font-extrabold" style={{ background: "rgba(255,255,255,.16)", color: "#FFC97A" }}>{activeItemObj?.bidCount ?? 0}</span>
-            <span className="material-icons-outlined" style={{ fontSize: 16, color: "rgba(255,255,255,.7)" }}>expand_more</span>
-          </button>
-          {itemMenuOpen && (
-            <>
-              <div className="fixed inset-0 z-20" onClick={() => setItemMenuOpen(false)} />
-              <div className="absolute z-30 mt-1.5 w-[300px] rounded-xl border p-1.5" style={{ insetInlineStart: 0, background: "#fff", borderColor: C.border, boxShadow: "0 16px 40px rgba(20,40,70,.2)" }}>
-                <div className="px-2.5 py-1.5 text-[10px] font-extrabold" style={{ color: C.muted, letterSpacing: ".06em" }}>{L("VIEWING ITEM", "الصنف المعروض")}</div>
-                {items.map((it) => (
-                  <button key={it.id} onClick={() => { setActiveItem(it.id); setItemMenuOpen(false); }} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start text-[13px] font-bold" style={{ background: it.id === activeItem ? C.surface2 : "transparent", color: C.navy, opacity: it.bidCount === 0 ? 0.6 : 1 }}>
-                    <EquipImg src={it.item?.imageUrl ?? null} categoryId={it.item?.categoryId ?? null} name={(ar ? it.item?.nameAr : it.item?.name) ?? ""} box="" img="h-5 w-5 object-contain" iconSize={18} />
-                    <span className="flex-1 truncate">{ar ? it.item?.nameAr : it.item?.name}</span>
-                    {(it.item?.qty ?? 1) > 1 && <span className="rounded-full px-1.5 text-[10px] font-extrabold" style={{ background: C.actionDim, color: C.action }}>×{it.item?.qty}</span>}
-                    <span className="rounded-full px-2 text-[11px] font-bold" style={{ background: C.surface3, color: C.muted }}>{it.bidCount > 0 ? it.bidCount : L("0", "٠")}</span>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-        <div className="ms-auto flex gap-2">
-          <button onClick={() => setUploadOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[12.5px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>
-            <span className="material-icons-outlined" style={{ fontSize: 17 }}>upload_file</span>{L("Upload a quote", "رفع عرض سعر")}
-          </button>
-          <button onClick={exportPdf} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[12.5px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>
-            <span className="material-icons-outlined" style={{ fontSize: 17 }}>picture_as_pdf</span>{L("Export PDF", "تصدير PDF")}
-          </button>
-        </div>
-      </div>
-
       {bidsLoading ? (
         <Spinner />
       ) : !comparison || allCols.length === 0 ? (
         <Box title={L("No bids yet", "لا توجد عروض بعد")}>{L("This item has no bids to compare yet — you can re-broadcast the request.", "لا توجد عروض على هذه المعدة بعد — يمكنك إعادة بثّ الطلب.")}</Box>
       ) : (
         <>
-          {/* ── bid selector ── */}
-          <div className="overflow-hidden rounded-xl border" style={{ borderColor: C.border, background: "#fff" }}>
-            <button onClick={() => setSelectorOpen((o) => !o)} className="flex w-full items-center gap-2.5 px-4 py-3 text-start" style={{ background: C.surface2, borderBottom: selectorOpen ? `1px solid ${C.line}` : "none" }}>
-              <span className="material-icons-outlined" style={{ fontSize: 19, color: C.action }}>fact_check</span>
-              <b className="text-[13.5px]">{L("Bids in this comparison", "العروض في هذه المقارنة")}</b>
-              <span className="rounded-full px-2 py-0.5 text-[11.5px] font-bold" style={{ background: C.surface3, color: C.muted }}>{selected.size} {L("shown", "معروضة")}</span>
-              <span className="material-icons-outlined ms-auto" style={{ color: C.muted, transform: selectorOpen ? "" : "rotate(-90deg)" }}>expand_more</span>
-            </button>
-            {selectorOpen && (
-              <div className="px-4 pb-3 pt-2">
-                <div className="mb-1 text-[11px] font-extrabold" style={{ color: C.muted }}>{L("Suppliers — tap to add, or × to remove from the comparison", "المؤجرون — انقر للإضافة، أو × للإزالة من المقارنة")}</div>
-                <div className="flex flex-wrap gap-2">
-                  {comparison.columns.map((c) => {
-                    const on = selected.has(c.bid.id);
-                    return (
-                      <button key={c.bid.id} onClick={() => toggleBid(c.bid.id)} title={on ? L("Remove from comparison", "إزالة من المقارنة") : L("Add to comparison", "إضافة للمقارنة")} className="inline-flex items-center gap-1.5 rounded-full border ps-3.5 pe-2.5 py-2 text-[13px] font-bold transition"
-                        style={on ? { background: C.renteeDim, borderColor: C.rentee, color: C.navy } : { background: "#fff", borderColor: C.border, color: C.muted, borderStyle: "dashed" }}>
-                        {!on && <span className="material-icons-outlined" style={{ fontSize: 16, color: C.muted }}>add</span>}
-                        {c.bid.supplierName}
-                        {c.bid.verified && <span className="material-icons-outlined" style={{ fontSize: 14, color: on ? C.success : C.disabled }}>verified</span>}
-                        {on && <span className="material-icons-outlined grid h-4 w-4 place-items-center rounded-full" style={{ fontSize: 13, background: "rgba(37,99,235,.16)", color: C.rentee }}>close</span>}
-                      </button>
-                    );
-                  })}
-                  {comparison.excluded.map((c) => (
-                    <button key={c.bid.id} onClick={() => goDealRoom(c.bid, "negotiate")} className="inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-[12.5px] font-bold" style={{ background: C.dangerBg, borderColor: "rgba(217,54,42,.35)", color: C.danger, borderStyle: "dashed" }}>
-                      <span className="rounded-full px-2 text-[10px] font-extrabold" style={{ background: "#fff", color: C.danger }}>{L("excluded", "مستبعد")}</span>
-                      {c.bid.supplierName}
-                    </button>
-                  ))}
-                </div>
+          {/* ── item card: icon + name + "N bidding · N in comparison" + item dropdown + supplier chips ── */}
+          <div className="rounded-2xl border" style={{ borderColor: C.border, background: "#fff" }}>
+            <div className="flex items-center gap-3 p-4">
+              <div className="grid h-14 w-14 flex-none place-items-center rounded-xl" style={{ background: C.navy }}>
+                <EquipImg src={activeItemObj?.item?.imageUrl ?? null} categoryId={activeItemObj?.item?.categoryId ?? null} name={(ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? ""} box="" img="h-8 w-8 object-contain" iconSize={30} />
               </div>
-            )}
+              <div className="min-w-0 flex-1">
+                <div className="text-[17px] font-extrabold leading-tight" style={{ color: C.navy }}>{ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name}{units > 1 ? ` · ×${units}` : ""}</div>
+                <div className="mt-0.5 text-[12.5px] font-semibold" style={{ color: C.muted }}>{allCols.length} {L("bidding", "عرض")} · {selected.size} {L("in comparison", "في المقارنة")}</div>
+              </div>
+              {/* item dropdown (icon + name + ▾) */}
+              <div className="relative flex-none">
+                <button onClick={() => setItemMenuOpen((o) => !o)} title={L("Switch item", "تبديل الصنف")} className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-[13px] font-bold" style={{ borderColor: C.border, background: "#fff", color: C.navy }}>
+                  <EquipImg src={activeItemObj?.item?.imageUrl ?? null} categoryId={activeItemObj?.item?.categoryId ?? null} name={(ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? ""} box="" img="h-5 w-5 object-contain" iconSize={18} />
+                  <span className="max-w-[150px] truncate">{ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name}</span>
+                  <span className="material-icons-outlined" style={{ fontSize: 16, color: C.muted }}>expand_more</span>
+                </button>
+                {itemMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-20" onClick={() => setItemMenuOpen(false)} />
+                    <div className="absolute z-30 mt-1.5 w-[300px] rounded-xl border p-1.5" style={{ insetInlineEnd: 0, background: "#fff", borderColor: C.border, boxShadow: "0 16px 40px rgba(20,40,70,.2)" }}>
+                      <div className="px-2.5 py-1.5 text-[10px] font-extrabold" style={{ color: C.muted, letterSpacing: ".06em" }}>{L("VIEWING ITEM", "الصنف المعروض")}</div>
+                      {items.map((it) => (
+                        <button key={it.id} onClick={() => { setActiveItem(it.id); setItemMenuOpen(false); }} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start text-[13px] font-bold" style={{ background: it.id === activeItem ? C.surface2 : "transparent", color: C.navy, opacity: it.bidCount === 0 ? 0.6 : 1 }}>
+                          <EquipImg src={it.item?.imageUrl ?? null} categoryId={it.item?.categoryId ?? null} name={(ar ? it.item?.nameAr : it.item?.name) ?? ""} box="" img="h-5 w-5 object-contain" iconSize={18} />
+                          <span className="flex-1 truncate">{ar ? it.item?.nameAr : it.item?.name}</span>
+                          {(it.item?.qty ?? 1) > 1 && <span className="rounded-full px-1.5 text-[10px] font-extrabold" style={{ background: C.actionDim, color: C.action }}>×{it.item?.qty}</span>}
+                          <span className="rounded-full px-2 text-[11px] font-bold" style={{ background: C.surface3, color: C.muted }}>{it.bidCount > 0 ? it.bidCount : 0}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="border-t px-4 py-3" style={{ borderColor: C.line }}>
+              <div className="mb-2 text-[12px] font-semibold" style={{ color: C.muted }}>{L("Tap a supplier to add or remove it from the comparison columns", "انقر على مؤجّر لإضافته أو إزالته من أعمدة المقارنة")}</div>
+              <div className="flex flex-wrap gap-2">
+                {comparison.columns.map((c) => {
+                  const on = selected.has(c.bid.id);
+                  return (
+                    <button key={c.bid.id} onClick={() => toggleBid(c.bid.id)} title={on ? L("Remove from comparison", "إزالة من المقارنة") : L("Add to comparison", "إضافة للمقارنة")} className="inline-flex items-center gap-2 rounded-full py-1.5 ps-1.5 pe-3 text-[13px] font-bold transition"
+                      style={on ? { background: C.navy, color: "#fff" } : { background: "#fff", color: C.navy, border: `1px solid ${C.border}` }}>
+                      <span className="grid h-6 w-6 place-items-center rounded-full text-[11px] font-black" style={on ? { background: "rgba(255,255,255,.2)", color: "#fff" } : { background: C.navy, color: "#fff" }}>{c.bid.supplierName.slice(0, 1).toUpperCase()}</span>
+                      {c.bid.supplierName}
+                      {c.bid.verified && <span className="material-icons-outlined" style={{ fontSize: 14, color: on ? "#7BE0A5" : C.success }}>verified</span>}
+                      <span className="material-icons-outlined" style={{ fontSize: 15, color: on ? "rgba(255,255,255,.8)" : C.muted }}>{on ? "close" : "add"}</span>
+                    </button>
+                  );
+                })}
+                {comparison.excluded.map((c) => (
+                  <button key={c.bid.id} onClick={() => goDealRoom(c.bid, "negotiate")} className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-bold" style={{ background: C.dangerBg, borderColor: "rgba(217,54,42,.35)", color: C.danger, borderStyle: "dashed" }}>
+                    <span className="rounded-full px-2 text-[10px] font-extrabold" style={{ background: "#fff", color: C.danger }}>{L("excluded", "مستبعد")}</span>
+                    {c.bid.supplierName}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* ── Rank the table by what matters — always visible, inline above the table (AC-20/21) ── */}
@@ -1042,7 +998,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                     </tr>
                     )}
                     <tr>
-                      <RowHead title={L("Rental cost", "تكلفة الإيجار")} sub={`${periodLabel(period)} ${L("rate", "سعر")}`} />
+                      <RowHead title={L("Rental cost", "تكلفة الإيجار")} sub={L("rental rate", "سعر الإيجار")} />
                       {cols.map((c, idx) => {
                         const per = periodLabel(period);
                         return (
@@ -1050,9 +1006,9 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                             {c.bid.price == null ? (
                               <span style={{ color: C.muted }}>{L("not stated", "غير محدد")}</span>
                             ) : (<>
-                              {/* total prominent (rate × units); the rate × units breakdown is the sub-line */}
+                              {/* the RATE is the headline (per period, per unit); the × units breakdown is the sub-line. Real rental spend = Estimated rental. */}
                               <span className="inline-flex flex-wrap items-center gap-1.5">
-                                <span className="font-mono font-extrabold" style={{ color: C.navy }}>{sar} {nf(dq(c).rentalForPeriod)}</span>
+                                <span className="font-mono font-extrabold" style={{ color: C.navy }}>{sar} {nf(dq(c).ratePerPeriod)}/{per}</span>
                                 {rentalWin.has(idx) && bestTag}
                               </span>
                               <Sub>{`${nf(dq(c).ratePerPeriod)}/${per} × ${shownUnits} ${shownUnits > 1 ? L("units", "وحدة") : L("unit", "وحدة")}`}</Sub>
@@ -1227,16 +1183,17 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         })}
                       </tr>
                     ))}
-                    {/* Ownership proof (Istimara / customs / sale contract) — its own row when any supplier filed one */}
-                    {cols.some((c) => (c.bid.ownershipDocs ?? []).length > 0) && (
-                      <tr>
-                        <RowHead title={L("Ownership proof", "إثبات الملكية")} sub={L("on file", "متوفّر")} />
+                    {/* §6: one row per proof-of-ownership doc (Istimara / customs / sale contract …), styled
+                        like the cert rows — ✓ when the supplier carries it, ⚠ otherwise. */}
+                    {ownershipDocTypes.map((doc) => (
+                      <tr key={doc.key}>
+                        <RowHead title={`${ar ? doc.labelAr : doc.labelEn} ${L("certificate", "شهادة")}`} sub={`${L("required", "مطلوبة")} · ${L("acknowledged — confirm with supplier", "مُقَرّ — أكّده مع المؤجّر")}`} />
                         {cols.map((c) => {
-                          const owned = c.bid.ownershipDocs ?? [];
-                          return <Td key={c.bid.id} ok={owned.length > 0}>{owned.length ? <div className="flex flex-wrap gap-1.5">{owned.map((o) => <span key={o.key}>{docChip(c, ar ? o.labelAr : o.labelEn, true, o.key)}</span>)}</div> : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}</Td>;
+                          const held = (c.bid.ownershipDocs ?? []).some((o) => o.key === doc.key);
+                          return <Td key={c.bid.id} ok={held} fail={!held}>{docChip(c, ar ? doc.labelAr : doc.labelEn, held, doc.key)}</Td>;
                         })}
                       </tr>
-                    )}
+                    ))}
                     {/* L3 operator certificate — a DECLARED deal-room term, never a verified pill. Sub shows the
                         rentee's required license level; each cell the supplier's declared position (t3Declarations). */}
                     {operatorRequired && (
@@ -1282,6 +1239,17 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                 </tbody>
               </table>
             </div>
+          </div>
+
+          {/* table footer — upload an offline quote / export the comparison (§6) */}
+          <div className="mt-3 flex flex-wrap items-center gap-2.5">
+            <span className="flex-1 text-[12px] font-semibold" style={{ color: C.muted, minWidth: 160 }}>{L(`Have an offline quote for ${(ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? "this item"}? Add it, or export this comparison.`, "لديك عرض خارج المنصة؟ أضِفه أو صدّر هذه المقارنة.")}</span>
+            <button onClick={() => setUploadOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-[12.5px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>
+              <span className="material-icons-outlined" style={{ fontSize: 17 }}>upload_file</span>{L("Upload a quote", "رفع عرض سعر")}
+            </button>
+            <button onClick={exportPdf} className="inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-[12.5px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>
+              <span className="material-icons-outlined" style={{ fontSize: 17 }}>picture_as_pdf</span>{L("Export PDF", "تصدير PDF")}
+            </button>
           </div>
 
         </>
@@ -1469,9 +1437,6 @@ function Box({ title, children }: { title?: string; children: React.ReactNode })
 }
 function Spinner() {
   return <div className="grid place-items-center py-16" style={{ color: C.muted }}><span className="material-icons-outlined animate-spin" style={{ fontSize: 28 }}>progress_activity</span></div>;
-}
-function Pill({ icon, children }: { icon: string | null; children: React.ReactNode }) {
-  return <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold text-white" style={{ background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.18)" }}>{icon ? <span className="material-icons-outlined" style={{ fontSize: 12 }}>{icon}</span> : <span className="h-1.5 w-1.5 rounded-full" style={{ background: "#FFC97A" }} />}{children}</span>;
 }
 function SectionRow({ icon, title, accent, accentText, n, collapsed, onToggle }: { id: string; icon: string; title: string; accent: string; accentText: string; n: number; collapsed: boolean; onToggle: () => void }) {
   return (
