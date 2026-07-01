@@ -99,12 +99,20 @@ export function jobStatus(raw: unknown): "pending" | "done" | "error" {
   return extractAgentOutput(raw).line_items.length > 0 || a.extraction_empty === true || isObj(a.data) ? "done" : "pending";
 }
 
-/** Pull the human reason out of Mansour's error shape `{ ok:false, error:{ message } }` / `{ message }` (best-effort). */
+/**
+ * Pull the human reason out of Mansour's error shape. It can live top-level (`{ error }`/`{ message }`),
+ * inside the `{ ok, data }` envelope (`data.error` — e.g. "Premature close"), or under `data.result.error`.
+ */
 export function reasonFromBody(b: unknown): string | undefined {
-  const o = (b ?? {}) as { error?: { message?: string } | string; message?: string };
-  if (o && typeof o.error === "object" && o.error?.message) return o.error.message;
-  if (typeof o?.error === "string") return o.error;
-  return typeof o?.message === "string" ? o.message : undefined;
+  const top = (b ?? {}) as Record<string, unknown>;
+  const inner = unwrapEnvelope(b);
+  const result = (inner.result ?? {}) as Record<string, unknown>;
+  const pick = (v: unknown): string | undefined => {
+    if (typeof v === "string" && v.trim()) return v;
+    if (v && typeof v === "object" && typeof (v as { message?: unknown }).message === "string") return (v as { message: string }).message;
+    return undefined;
+  };
+  return pick(top.error) ?? pick(top.message) ?? pick(inner.error) ?? pick(inner.message) ?? pick(result.error);
 }
 
 /** Same, but reads an unread Response body (consumes it). */

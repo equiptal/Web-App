@@ -28,9 +28,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const st = jobStatus(raw);
     if (st === "pending") return NextResponse.json({ status: "pending" });
     if (st === "error") {
-      // The job itself failed inside the agent (LLM error, rate limit, etc.) — forward its real reason.
+      // Mansour sometimes flags a job "error" (e.g. a transient upstream "Premature close") AFTER it has
+      // already produced a usable extraction. Salvage it — the renter reviews everything in the wizard,
+      // so a complete parse shouldn't be thrown away over a post-parse hiccup.
+      const out = extractAgentOutput(raw);
       const reason = reasonFromBody(raw);
-      console.error("[agent] job errored:", reason ?? "");
+      if (out.line_items.length > 0) {
+        console.warn("[agent] job flagged error but has a usable extraction — salvaging. reason:", reason ?? "");
+        return NextResponse.json({ status: "done", draft: agentOutputToDraft(out) });
+      }
+      console.error("[agent] job errored (no extraction):", reason ?? "");
       return NextResponse.json({ status: "error", code: "network", detail: reason });
     }
     if (isExtractionEmpty(raw)) return NextResponse.json({ status: "error", code: "empty" }); // AC-09
