@@ -12,10 +12,10 @@ import type { VerificationStatus } from "@/lib/contract/onboarding";
 const MapPicker = dynamic(() => import("@/components/shared/GoogleMapLocationPicker"), { ssr: false });
 
 const ACCEPT = "image/jpeg,image/png,image/webp,application/pdf";
-// Hide the company-logo uploader until apps/backend ships companyLogoKey support
-// (POST /users/me/company accepts it + profile-status returns companyLogoKey/companyLogoUrl).
-// All the wiring stays in place — flip to true once that deploy is live.
-const LOGO_UPLOAD_ENABLED = false;
+// Company-logo uploader. apps/backend now supports companyLogoKey on staging (companyDetailsSchema
+// accepts it; profile.service persists it + returns a presigned companyLogoUrl), and the agents
+// bid-form already renders the renter's logo from it — so the gate is lifted.
+const LOGO_UPLOAD_ENABLED = true;
 const inputCls =
   "h-[46px] w-full rounded-[10px] border border-border bg-surface px-[14px] text-[14px] outline-0 focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)]";
 const labelCls = "mb-[6px] block text-[12.5px] font-bold text-navy-mid";
