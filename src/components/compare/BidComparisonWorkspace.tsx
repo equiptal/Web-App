@@ -319,6 +319,10 @@ export function BidComparisonWorkspace() {
   const activeItemObj = items.find((i) => i.id === activeItem);
   const durationDays = activeItemObj?.durationDays ?? null;
   const units = activeItemObj?.item?.qty ?? 1;
+  // itemName() joins subtype + capacity with " · " — split so the card shows the name as title, spec (e.g. "1800 cfm") in the sub.
+  const itemFullName = (ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? "";
+  const [itemBaseName, ...itemSpecParts] = itemFullName.split(" · ");
+  const itemSpec = itemSpecParts.join(" · ");
   const mobByRentee = activeItemObj?.mobByRentee ?? null; // who YOUR request assigned delivery to (true = you, false = supplier)
   // Displayed total = the supplier's STATED costs + 15% VAT + the renter's own entered costs (responsibilities
   // on them + their delivery estimate). Always shown as a running total of what's known — never "not stated".
@@ -717,8 +721,8 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                 <EquipImg src={activeItemObj?.item?.imageUrl ?? null} categoryId={activeItemObj?.item?.categoryId ?? null} name={(ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? ""} box="" img="h-8 w-8 object-contain" iconSize={30} />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-[17px] font-extrabold leading-tight" style={{ color: C.navy }}>{ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name}{units > 1 ? ` · ×${units}` : ""}</div>
-                <div className="mt-0.5 text-[12.5px] font-semibold" style={{ color: C.muted }}>{allCols.length} {L("bidding", "عرض")} · {selected.size} {L("in comparison", "في المقارنة")}</div>
+                <div className="text-[17px] font-extrabold leading-tight" style={{ color: C.navy }}>{itemBaseName}{units > 1 ? ` · ×${units}` : ""}</div>
+                <div className="mt-0.5 text-[12.5px] font-semibold" style={{ color: C.muted }}>{itemSpec ? `${itemSpec} · ` : ""}{allCols.length} {L("bidding", "عرض")} · {selected.size} {L("in comparison", "في المقارنة")}</div>
               </div>
               {/* item dropdown (icon + name + ▾) */}
               <div className="relative flex-none">
@@ -1018,12 +1022,12 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                             {c.bid.price == null ? (
                               <span style={{ color: C.muted }}>{L("not stated", "غير محدد")}</span>
                             ) : (<>
-                              {/* headline = the multiplication result (rate × the units this supplier offered); breakdown below */}
+                              {/* per-unit rate → all-units total, e.g. "SAR 100/day → SAR 400/day", breakdown below */}
                               <span className="inline-flex flex-wrap items-center gap-1.5">
-                                <span className="font-mono text-[15px] font-extrabold" style={{ color: C.navy, fontWeight: 900 }}>{sar} {nf(dq(c).rentalForPeriod)}</span>
+                                <span className="font-mono text-[15px] font-extrabold" style={{ color: C.navy, fontWeight: 900 }}>{sar} {nf(dq(c).ratePerPeriod)}/{per}{unitsOf(c) > 1 ? ` → ${sar} ${nf(dq(c).rentalForPeriod)}/${per}` : ""}</span>
                                 {rentalWin.has(idx) && bestTag}
                               </span>
-                              <Sub>{`${nf(dq(c).ratePerPeriod)}/${per} × ${unitsOf(c)} ${unitsOf(c) > 1 ? L("units", "وحدة") : L("unit", "وحدة")}`}</Sub>
+                              {unitsOf(c) > 1 && <Sub>{`(${nf(dq(c).ratePerPeriod)}/${per} × ${unitsOf(c)} ${L("units", "وحدة")})`}</Sub>}
                             </>)}
                           </Td>
                         );
@@ -1046,11 +1050,11 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                             {stated ? (<>
                               {/* total prominent + a small distance chip; per-unit (mob+demob) breakdown is the sub */}
                               <span className="inline-flex flex-wrap items-center gap-1.5">
-                                <span className="font-mono text-[15px] font-extrabold" style={{ color: C.navy, fontWeight: 900 }}>{sar} {nf(mobDemobTotal(c))}</span>
+                                <span className="font-mono text-[15px] font-extrabold" style={{ color: C.navy, fontWeight: 900 }}>{sar} {nf(mobDemobUnit(c))}{unitsOf(c) > 1 ? ` → ${sar} ${nf(mobDemobTotal(c))}` : ""}</span>
                                 {c.bid.distanceKm != null && <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={{ background: C.surface2, color: C.navyMid }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>place</span>{Math.round(c.bid.distanceKm)} {L("km", "كم")}</span>}
                                 {mobWin.has(idx) && bestTag}
                               </span>
-                              <Sub>{`${sar} ${nf(mobDemobUnit(c))}/${L("unit", "وحدة")} (${L("mob", "نقل")} ${nf(c.mob.value)} + ${L("demob", "إرجاع")} ${nf(c.demob.value)}) × ${unitsOf(c)} ${unitsOf(c) > 1 ? L("units", "وحدة") : L("unit", "وحدة")}`}</Sub>
+                              <Sub>{`(${nf(c.mob.value)} ${L("mob", "نقل")} + ${nf(c.demob.value)} ${L("demob", "إرجاع")})${unitsOf(c) > 1 ? ` × ${unitsOf(c)} ${L("units", "وحدة")}` : ""}`}</Sub>
                             </>) : rm ? (<>
                               <span className="inline-flex items-center gap-1.5 text-[13px] font-bold">{sar} {nf(rm)}
                                 <button onClick={() => addMobCost(c.bid.id, L("Delivery + pickup", "النقل والإرجاع"))} className="text-[10px] font-bold underline" style={{ color: C.rentee }}>{L("edit", "تعديل")}</button>
@@ -1100,7 +1104,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                       </td>
                       {cols.map((c) => (
                         <Td key={c.bid.id}>
-                          <div className="flex flex-wrap gap-1.5">
+                          <div className="flex flex-col items-start gap-[5px]">
                             {requiredResp.map((m) => {
                               const cr = c.costResponsibilities.find((x) => x.key === m.key)!;
                               const fatKey = m.key === "operator_food" ? "fat_food" : m.key === "operator_transport_accommodation" ? "fat_accommodation_transport" : null;
@@ -1113,9 +1117,9 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                               const owner = tone === "green" ? L("supplier", "المؤجّر") : tone === "blue" ? L("you", "أنت") : tone === "red" ? L("conflict", "تعارض") : L("—", "—");
                               const entered = renterCosts[m.key];
                               return (
-                                <span key={m.key} className="inline-flex items-center gap-1 px-[9px] py-1 text-[11px]" style={{ background: bg, color: fg, fontWeight: 800, borderRadius: 7, border: `1px solid ${bd}` }}>
+                                <span key={m.key} className="inline-flex items-center gap-1 self-start px-[9px] py-1 text-[11px]" style={{ background: bg, color: fg, fontWeight: 800, borderRadius: 7, border: `1px solid ${bd}` }}>
                                   {tone === "red" && <span className="material-icons-outlined" style={{ fontSize: 13 }}>warning_amber</span>}
-                                  {ar ? m.ar : m.en} · {owner}{entered != null ? ` · ~${sar} ${nf(entered)}` : ""}
+                                  {ar ? m.ar : m.en}<span style={{ fontWeight: 700, opacity: 0.8 }}> · {owner}{entered != null ? ` · ~${sar} ${nf(entered)}` : ""}</span>
                                 </span>
                               );
                             })}
@@ -1189,7 +1193,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                     {/* §6: ONE row per required equipment cert ("TÜV certificate", …) — not required → not shown */}
                     {requiredEquipCerts.map((cert) => (
                       <tr key={cert}>
-                        <RowHead title={`${certLabel(cert)} ${L("certificate", "شهادة")}`} sub={`${L("required", "مطلوبة")} · ${L("acknowledged — confirm with supplier", "مُقَرّ — أكّده مع المؤجّر")}`} />
+                        <RowHead title={`${certLabel(cert)} ${L("certificate", "شهادة")}`} />
                         {cols.map((c) => {
                           const held = (c.bid.equipmentCertCodes ?? []).includes(cert);
                           return <Td key={c.bid.id} ok={held} fail={!held}>{docChip(c, certLabel(cert), held, cert, true)}</Td>;
@@ -1200,7 +1204,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         like the cert rows — ✓ when the supplier carries it, ⚠ otherwise. */}
                     {ownershipDocTypes.map((doc) => (
                       <tr key={doc.key}>
-                        <RowHead title={`${ar ? doc.labelAr : doc.labelEn} ${L("certificate", "شهادة")}`} sub={`${L("required", "مطلوبة")} · ${L("acknowledged — confirm with supplier", "مُقَرّ — أكّده مع المؤجّر")}`} />
+                        <RowHead title={`${ar ? doc.labelAr : doc.labelEn} ${L("certificate", "شهادة")}`} />
                         {cols.map((c) => {
                           const held = (c.bid.ownershipDocs ?? []).some((o) => o.key === doc.key);
                           return <Td key={c.bid.id} ok={held} fail={!held}>{docChip(c, ar ? doc.labelAr : doc.labelEn, held, doc.key, true)}</Td>;
