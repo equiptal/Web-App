@@ -415,7 +415,7 @@ export const ar: Dictionary = {
   },
   errors: {
     emptyTitle: "لم نتمكن من قراءة طلب من ذلك",
-    emptyBody: "حاول مرة أخرى، أو انتقل إلى التبويب اليدوي.",
+    emptyBody: "حاول مرة أخرى، أو عدّل ما لصقته.",
     networkTitle: "مشكلة في الاتصال",
     networkBody: "حدث خطأ ما. تم حفظ مدخلاتك — حاول مرة أخرى.",
     switchManual: "الانتقال إلى اليدوي",

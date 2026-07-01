@@ -4,11 +4,14 @@ import "./globals.css";
 import { LocaleProvider } from "@/lib/i18n";
 import { SessionProvider } from "@/lib/session";
 
-// Nunito is the prototype's brand typeface (weights 400–900) — the default sans for the redesign.
+// Nunito is the prototype's brand typeface (weights 400–900) — the default sans for the redesign, used
+// on every page → preload it. The other three are contextual (Inter on prototype screens, IBM Plex for
+// numerics, Tajawal for Arabic/RTL only), so `preload: false` avoids "preloaded but not used" warnings —
+// they still load on demand via their @font-face when a screen actually references them.
 const nunito = Nunito({ variable: "--font-nunito", subsets: ["latin"], weight: ["400", "500", "600", "700", "800", "900"] });
-const inter = Inter({ variable: "--font-inter", subsets: ["latin"], weight: ["400", "500", "600", "700", "800"] });
-const plex = IBM_Plex_Sans({ variable: "--font-plex", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
-const tajawal = Tajawal({ variable: "--font-tajawal", subsets: ["arabic"], weight: ["400", "500", "700", "800"] });
+const inter = Inter({ variable: "--font-inter", subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], preload: false });
+const plex = IBM_Plex_Sans({ variable: "--font-plex", subsets: ["latin"], weight: ["400", "500", "600", "700"], preload: false });
+const tajawal = Tajawal({ variable: "--font-tajawal", subsets: ["arabic"], weight: ["400", "500", "700", "800"], preload: false });
 
 const siteUrl = "https://web.moedatech.net";
 

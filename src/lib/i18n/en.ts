@@ -414,7 +414,7 @@ export const en = {
   },
   errors: {
     emptyTitle: "We couldn't read a request from that", // AC-09 tentative
-    emptyBody: "Try again, or switch to the Manual tab.",
+    emptyBody: "Try again, or edit what you pasted.",
     networkTitle: "Connection problem", // AC-10 tentative
     networkBody: "Something went wrong. Your input is saved — try again.",
     switchManual: "Switch to Manual",
