@@ -370,8 +370,8 @@ export async function submitBidForm(token: string, payload: SubmitBidFormPayload
 /** Authed (renter): a request's off-platform submissions + link tracker (opened/submitted + token). */
 export async function fetchRequestSubmissions(
   requestId: string,
-): Promise<{ renterName: string | null; openedCount: number; submittedCount: number; bidDeadline: string | null; logoUrl: string | null; submissions: LinkBidSubmission[] }> {
-  const raw = await getJson<{ renterName?: string | null; openedCount?: number; submittedCount?: number; bidDeadline?: string | null; logoUrl?: string | null }>(
+): Promise<{ renterName: string | null; openedCount: number; submittedCount: number; bidDeadline: string | null; logoUrl: string | null; groupRef: string | null; submissions: LinkBidSubmission[] }> {
+  const raw = await getJson<{ renterName?: string | null; openedCount?: number; submittedCount?: number; bidDeadline?: string | null; logoUrl?: string | null; groupRef?: string | null }>(
     `/api/me/requests/${encodeURIComponent(requestId)}/submissions`,
   );
   return {
@@ -380,6 +380,8 @@ export async function fetchRequestSubmissions(
     submittedCount: raw.submittedCount ?? 0,
     bidDeadline: raw.bidDeadline ?? null,
     logoUrl: raw.logoUrl ?? null,
+    // The RFQ group short code (RFQ-NNNNN) — agents `bid-submissions` now returns it; shown in the RFQ tabs.
+    groupRef: raw.groupRef ?? null,
     submissions: mapLinkSubmissions(raw),
   };
 }

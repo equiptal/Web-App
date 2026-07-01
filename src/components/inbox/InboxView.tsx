@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
-import { fetchReceivedBids, startDealRoom } from "@/lib/api/client";
+import { fetchReceivedBids, fetchMyRequests, startDealRoom } from "@/lib/api/client";
 import type { InboxBid } from "@/lib/contract/inbox";
 
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
@@ -23,11 +23,18 @@ export function InboxView() {
   const router = useRouter();
   const [bids, setBids] = useState<InboxBid[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // requestId → requestGroupId, from `my-requests` (same source the requests page groups by). Lets the
+  // inbox cluster a multi-item RFQ's fan-out siblings without any received-bids backend change.
+  const [groupMap, setGroupMap] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     let active = true;
-    fetchReceivedBids()
-      .then((r) => active && setBids(r.bids))
+    Promise.all([fetchReceivedBids(), fetchMyRequests().catch(() => ({ requests: [] }))])
+      .then(([r, req]) => {
+        if (!active) return;
+        setBids(r.bids);
+        setGroupMap(new Map(req.requests.filter((x) => x.requestGroupId).map((x) => [x.id, x.requestGroupId as string])));
+      })
       .catch(() => active && setBids([]));
     return () => { active = false; };
   }, []);
@@ -75,59 +82,78 @@ export function InboxView() {
     );
   }
 
-  // Group by request (displayId/shortCode/id) so the inbox reads as RFQ → bids.
-  const groups = new Map<string, { label: string; rows: InboxBid[] }>();
+  // Two-level grouping: RFQ group (fan-out `requestGroupId`, falling back to the individual request
+  // until the backend projects it) → equipment type (subtype) → bid rows.
+  type Sub = { key: string; label: string; rows: InboxBid[] };
+  type Grp = { key: string; label: string; subs: Map<string, Sub>; count: number };
+  const groups = new Map<string, Grp>();
   for (const b of bids) {
-    const key = b.request.id || b.request.displayId || b.bidId;
-    const label = b.request.displayId || b.request.shortCode || b.request.equipmentSummary || L("Request", "طلب");
-    if (!groups.has(key)) groups.set(key, { label, rows: [] });
-    groups.get(key)!.rows.push(b);
+    const gKey = groupMap.get(b.request.id) ?? b.request.groupId ?? b.request.id ?? b.bidId;
+    const gLabel = b.request.location || b.request.displayId || b.request.shortCode || L("Request", "طلب");
+    let g = groups.get(gKey);
+    if (!g) { g = { key: gKey, label: gLabel, subs: new Map(), count: 0 }; groups.set(gKey, g); }
+    const tKey = b.equipmentType.id || b.request.id || b.bidId;
+    const tLabel = b.equipmentType.name || b.request.equipmentSummary || L("Equipment", "معدة");
+    let sub = g.subs.get(tKey);
+    if (!sub) { sub = { key: tKey, label: tLabel, rows: [] }; g.subs.set(tKey, sub); }
+    sub.rows.push(b);
+    g.count += 1;
   }
+
+  const row = (b: InboxBid) => (
+    <div key={b.bidId} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3">
+      <div className="grid h-11 w-11 flex-none place-items-center overflow-hidden rounded-xl bg-surface2 text-navy-mid">
+        {b.supplierLogoUrl ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={b.supplierLogoUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <Icon name="storefront" size={22} />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-[14px] font-bold text-navy">{b.supplierName}</span>
+          <span className="inline-flex flex-none items-center gap-0.5 rounded-full bg-info-soft px-1.5 py-0.5 text-[9px] font-extrabold text-info">
+            <Icon name="verified_user" size={11} /> {L("via app", "عبر التطبيق")}
+          </span>
+          {b.unreadCount > 0 && <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand px-1 text-[10px] font-extrabold text-white">{b.unreadCount}</span>}
+        </div>
+        <div className="truncate text-[12px] font-semibold text-muted">
+          {b.equipmentName || b.request.equipmentSummary || L("Equipment", "معدة")}
+          {b.currentPrice != null && <> · {nf(b.currentPrice)} {L("SAR", "ر.س")}</>}
+        </div>
+        <div className="mt-1 text-[11px] font-bold" style={{ color: b.supplierStarted ? "var(--brand)" : "var(--muted)" }}>{statusLabel(b)}</div>
+      </div>
+      <button
+        type="button"
+        disabled={busyId === b.bidId}
+        onClick={() => open(b)}
+        className={`flex-none rounded-[10px] px-3.5 py-2 text-[12.5px] font-bold ${b.supplierStarted ? "bg-brand text-white" : "border border-border bg-surface text-navy"} disabled:opacity-50`}
+      >
+        {ctaLabel(b)}
+      </button>
+    </div>
+  );
 
   return (
     <div dir={ar ? "rtl" : "ltr"} className="mx-auto w-full max-w-3xl">
-      {[...groups.values()].map((g, gi) => (
-        <div key={gi} className="mb-6">
-          <div className="mb-2 flex items-center gap-2 px-1 text-[12px] font-extrabold uppercase tracking-wide text-muted">
-            <Icon name="folder_open" size={15} /> {g.label}
-            <span className="font-bold normal-case text-muted/80">· {g.rows.length} {L("bids", "عروض")}</span>
+      {[...groups.values()].map((g) => (
+        <div key={g.key} className="mb-6">
+          {/* Level 1 — the RFQ group */}
+          <div className="mb-2 flex items-center gap-2 px-1 text-[13.5px] font-extrabold text-navy">
+            <Icon name="folder_open" size={16} /> <span className="truncate">{g.label}</span>
+            <span className="flex-none text-[11px] font-bold uppercase tracking-wide text-muted">· {g.count} {L("bids", "عروض")}</span>
           </div>
-          <div className="flex flex-col gap-2">
-            {g.rows.map((b) => (
-              <div key={b.bidId} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3">
-                <div className="grid h-11 w-11 flex-none place-items-center overflow-hidden rounded-xl bg-surface2 text-navy-mid">
-                  {b.supplierLogoUrl ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={b.supplierLogoUrl} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <Icon name="storefront" size={22} />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-[14px] font-bold text-navy">{b.supplierName}</span>
-                    <span className="inline-flex flex-none items-center gap-0.5 rounded-full bg-info-soft px-1.5 py-0.5 text-[9px] font-extrabold text-info">
-                      <Icon name="verified_user" size={11} /> {L("via app", "عبر التطبيق")}
-                    </span>
-                    {b.unreadCount > 0 && <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand px-1 text-[10px] font-extrabold text-white">{b.unreadCount}</span>}
-                  </div>
-                  <div className="truncate text-[12px] font-semibold text-muted">
-                    {b.equipmentName || b.request.equipmentSummary || L("Equipment", "معدة")}
-                    {b.currentPrice != null && <> · {nf(b.currentPrice)} {L("SAR", "ر.س")}</>}
-                  </div>
-                  <div className="mt-1 text-[11px] font-bold" style={{ color: b.supplierStarted ? "var(--brand)" : "var(--muted)" }}>{statusLabel(b)}</div>
-                </div>
-                <button
-                  type="button"
-                  disabled={busyId === b.bidId}
-                  onClick={() => open(b)}
-                  className={`flex-none rounded-[10px] px-3.5 py-2 text-[12.5px] font-bold ${b.supplierStarted ? "bg-brand text-white" : "border border-border bg-surface text-navy"} disabled:opacity-50`}
-                >
-                  {ctaLabel(b)}
-                </button>
+          {[...g.subs.values()].map((sub) => (
+            <div key={sub.key} className="mb-3 ms-2 border-s-2 border-border ps-3">
+              {/* Level 2 — equipment type */}
+              <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wide text-muted">
+                <Icon name="construction" size={13} /> <span className="truncate">{sub.label}</span>
+                <span className="flex-none normal-case text-muted/70">· {sub.rows.length}</span>
               </div>
-            ))}
-          </div>
+              <div className="flex flex-col gap-2">{sub.rows.map(row)}</div>
+            </div>
+          ))}
         </div>
       ))}
     </div>

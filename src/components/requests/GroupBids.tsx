@@ -65,6 +65,38 @@ function numWords(n: number): string {
   return r.charAt(0).toUpperCase() + r.slice(1);
 }
 
+/** Amount-in-words (Arabic tafqīt) — best-effort for currency amounts (0..999,999,999). */
+function numWordsAr(num: number): string {
+  num = Math.round(num);
+  if (num === 0) return "صفر";
+  const ones = ["", "واحد", "اثنان", "ثلاثة", "أربعة", "خمسة", "ستة", "سبعة", "ثمانية", "تسعة", "عشرة", "أحد عشر", "اثنا عشر", "ثلاثة عشر", "أربعة عشر", "خمسة عشر", "ستة عشر", "سبعة عشر", "ثمانية عشر", "تسعة عشر"];
+  const tens = ["", "", "عشرون", "ثلاثون", "أربعون", "خمسون", "ستون", "سبعون", "ثمانون", "تسعون"];
+  const hundreds = ["", "مائة", "مئتان", "ثلاثمائة", "أربعمائة", "خمسمائة", "ستمائة", "سبعمائة", "ثمانمائة", "تسعمائة"];
+  const below1000 = (x: number): string => {
+    const out: string[] = [];
+    const h = Math.floor(x / 100);
+    const rem = x % 100;
+    if (h) out.push(hundreds[h]);
+    if (rem) {
+      if (rem < 20) out.push(ones[rem]);
+      else {
+        const o = rem % 10;
+        if (o) out.push(ones[o]);
+        out.push(tens[Math.floor(rem / 10)]);
+      }
+    }
+    return out.join(" و");
+  };
+  const parts: string[] = [];
+  const millions = Math.floor(num / 1e6);
+  const thousands = Math.floor((num % 1e6) / 1e3);
+  const rest = num % 1e3;
+  if (millions) parts.push(millions === 1 ? "مليون" : millions === 2 ? "مليونان" : `${below1000(millions)} مليون`);
+  if (thousands) parts.push(thousands === 1 ? "ألف" : thousands === 2 ? "ألفان" : `${below1000(thousands)} ألف`);
+  if (rest) parts.push(below1000(rest));
+  return parts.join(" و");
+}
+
 /** Formal quotation PDF stylesheet — ported verbatim from prototypes/requests-grouped.html. */
 const QSTYLE = `
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -84,9 +116,17 @@ const QSTYLE = `
   .docs{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
   .doc-ok{font-size:10.5px;font-weight:800;color:#1daf58;background:#e7f7ee;border-radius:100px;padding:2px 8px;}
   .ver-ok{color:#1daf58;font-weight:800;}
-  .metastrip{display:grid;grid-template-columns:repeat(5,1fr);margin:18px 0;border:1px solid #e4edf5;border-radius:10px;overflow:hidden;}
-  .metastrip>div{padding:11px 13px;border-inline-end:1px solid #e4edf5;}
-  .metastrip>div:last-child{border-inline-end:0;}
+  .metastrip{display:grid;grid-template-columns:repeat(3,1fr);margin:18px 0;border:1px solid #e4edf5;border-radius:10px;overflow:hidden;}
+  .metastrip>div{padding:11px 13px;border-inline-end:1px solid #e4edf5;border-top:1px solid #e4edf5;}
+  .metastrip>div:nth-child(-n+3){border-top:0;}
+  .metastrip>div:nth-child(3n){border-inline-end:0;}
+  /* party identity rows (National address / CR / VAT) + verification chips (app parity) */
+  .pid-row{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;padding:3px 0;}
+  .pid-row span{color:#6b8fa8;font-weight:600;}
+  .pid-row b{font-weight:800;font-family:'IBM Plex Sans',monospace;}
+  .pill-ver{color:#1daf58;font-weight:800;}
+  .pchips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
+  .pchip{font-size:10px;font-weight:800;color:#1daf58;background:#e7f7ee;border-radius:100px;padding:2px 8px;}
   .metastrip span{display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b8fa8;}
   .metastrip b{font-size:12.5px;font-weight:800;margin-top:4px;display:block;}
   .listed{background:#f7fafd;border:1px solid #e4edf5;border-radius:10px;padding:13px 15px;margin-bottom:18px;}
@@ -112,8 +152,9 @@ const QSTYLE = `
   .kv span{color:#6b8fa8;font-weight:600;}.kv b{font-weight:800;margin-inline-start:auto;text-align:end;}
   .tc{margin:0 0 18px;padding-inline-start:20px;font-size:11.5px;color:#2a4f72;line-height:1.7;}
   .tc li{margin-bottom:5px;}
-  .signed{background:#eef7f1;border-radius:10px;padding:13px 15px;font-size:12px;}
-  .signed b{display:block;color:#1c3550;}.signed div{color:#6b8fa8;font-family:'IBM Plex Sans',monospace;margin-top:3px;}
+  .signed{display:flex;align-items:center;gap:12px;background:#eef7f1;border-radius:10px;padding:13px 15px;font-size:12px;}
+  .sig-check{flex:0 0 auto;width:30px;height:30px;border-radius:50%;background:#dcf4e8;color:#1daf58;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center;}
+  .sig-txt b{display:block;color:#1c3550;}.sig-txt>div{color:#6b8fa8;font-family:'IBM Plex Sans',monospace;margin-top:3px;}
   .foot{text-align:center;color:#9bb3c8;font-size:11px;margin-top:16px;}
   @media print{body{background:#fff;}.q-doc{box-shadow:none;margin:0;border-radius:0;}}`;
 
@@ -157,6 +198,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   const [quoteGate, setQuoteGate] = useState(false); // unverified → confirm before issuing the quotation
   // web-app/006 demo (staging only) — relabel real bids as off-platform "via shared link".
   const [submissions, setSubmissions] = useState<LinkBidSubmission[]>([]); // real off-platform submissions (all group items)
+  const [groupRef, setGroupRef] = useState<string | null>(null); // RFQ-NNNNN group short code (agents bid-submissions) — stamped on the quotation
   const [submissionBid, setSubmissionBid] = useState<GroupBid | null>(null);
   // Bid filter (source + refine), matching the bids-by-supplier prototype.
   const [filterOpen, setFilterOpen] = useState(false);
@@ -205,7 +247,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
     // Off-platform shared-link submissions are stored once per GROUP (a single bid covers all items),
     // so fetch them once by the group id — not per item (which would duplicate them). Best-effort.
     setSubmissions([]);
-    fetchRequestSubmissions(group.id).then((r) => active && setSubmissions(r.submissions)).catch(() => {});
+    fetchRequestSubmissions(group.id).then((r) => { if (active) { setSubmissions(r.submissions); setGroupRef(r.groupRef); } }).catch(() => {});
     return () => {
       active = false;
     };
@@ -292,7 +334,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       if (list) list.push(b);
       else bySupplier.set(key, [b]);
     }
-    const reqCode = String(group.items[0]?.displayId ?? group.id).replace(/[^A-Za-z0-9-]/g, "");
+    const reqCode = String(groupRef ?? group.items[0]?.displayId ?? group.id).replace(/[^A-Za-z0-9-]/g, "");
 
     // Render one supplier's quotation in a single language; bilingual output stacks both per supplier.
     const renderSection = (supBids: GroupBid[], si: number, isAr: boolean) => {
@@ -309,6 +351,29 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       const reqIds = [...new Set(supBids.map((b) => itemMap.get(b.requestId)?.displayId ?? b.requestId))];
       const reqLabel = reqIds.length === 1 ? reqIds[0] : `${reqIds[0]} +${reqIds.length - 1}`;
       const rentalBasis = itemMap.get(sup.requestId)?.rentalType ?? "";
+      const reqItem = itemMap.get(sup.requestId);
+      const fmtRefDate = (d: string | null | undefined) => (d ? new Date(d).toLocaleDateString(isAr ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—");
+      const startStr = fmtRefDate(reqItem?.startDate);
+      const endStr = fmtRefDate(reqItem?.endDate);
+      // Supplier identity rows (app parity): off-platform submissions carry real CR/VAT/address VALUES;
+      // on-platform bids carry only verification FLAGS → render the app's value-or-"Verified" pill.
+      const ld = sup.linkDocs ?? {};
+      const idRow = (label: string, value: string | null | undefined, verifiedFlag: boolean) =>
+        value ? `<div class="pid-row"><span>${esc(label)}</span><b>${esc(value)}</b></div>`
+          : verifiedFlag ? `<div class="pid-row"><span>${esc(label)}</span><span class="pill-ver">✓ ${esc(L("Verified", "موثَّق"))}</span></div>`
+            : "";
+      // Value: off-platform link value first, else the on-platform real number (bid-list supplierProfile),
+      // else the app's "Verified" pill when only the presence flag is known.
+      const supIdRows =
+        idRow(L("National address", "العنوان الوطني"), ld.national ?? sup.supplierNationalAddress, sup.compliance.nationalAddress) +
+        idRow(L("CR #", "السجل التجاري"), ld.commercial ?? sup.supplierCrNumber, sup.compliance.activityLicense) +
+        idRow(L("VAT #", "الرقم الضريبي"), ld.vat ?? sup.supplierVatNumber, sup.compliance.taxNumber);
+      const supChipList = [
+        sup.verified ? L("Verified", "موثَّق") : null,
+        (sup.companyCertCodes ?? []).includes("LC") ? L("Local content", "محتوى محلي") : null,
+        (sup.companyCertCodes ?? []).includes("SASO") ? L("SASO certified", "شهادة ساسو") : null,
+      ].filter(Boolean) as string[];
+      const supChips = supChipList.length ? `<div class="pchips">${supChipList.map((c) => `<span class="pchip">✓ ${esc(c)}</span>`).join("")}</div>` : "";
 
       const eqLine = (b: GroupBid) => (b.equipment ? [b.equipment.make, b.equipment.model, b.equipment.year].filter(Boolean).join(" · ") : "—");
       const labelOf = (b: GroupBid) => (ar ? b.itemLabelAr : b.itemLabel) || (itemMap.get(b.requestId)?.displayId ?? b.requestId);
@@ -317,43 +382,42 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       const daysPerPeriod = (u: string | null) => { switch ((u ?? "PER_DAY").toUpperCase()) { case "PER_WEEK": return 7; case "PER_MONTH": return 26; case "PER_JOB": return 0; default: return 1; } };
       const periodLabel = (u: string | null) => { switch ((u ?? "PER_DAY").toUpperCase()) { case "PER_WEEK": return L("week", "أسبوع"); case "PER_MONTH": return L("month", "شهر"); case "PER_JOB": return L("job", "مهمة"); default: return L("day", "يوم"); } };
 
-      // Pricing rows across every selected equipment for this supplier.
+      // Pricing rows — 6-column invoice (# · Item · Unit · Qty · Price · Total), app-parity layout.
+      // Totals keep the web's chosen math: rate ÷ period-days × duration × units, mob/demob × units.
       let sub = 0;
+      let rowNum = 0;
       const rows = supBids.map((b) => {
         const rate = b.price ?? 0;
-        const units = b.numberOfUnits || 1; // bid price is PER-UNIT → × quantity (app parity)
+        const units = b.numberOfUnits || 1;
         const dpp = daysPerPeriod(b.priceUnit);
         const plabel = periodLabel(b.priceUnit);
         const durDays = itemMap.get(b.requestId)?.durationDays ?? null;
-        const unitsPart = units > 1 ? `${units} ${esc(L("units", "وحدات"))} × ` : "";
-        const ratePart = `${nf(rate)} ${esc(sar)}/${esc(plabel)}`;
-        // App-style single rental line ("2 units × 30 days @ 200 SAR/day") — no Qty/Price columns, so the
-        // duration is never mislabelled as a quantity. Matches the bid card, deal room, and mobile app.
-        let lineSub: number, desc: string, amountCell: string;
+        rowNum += 1;
+        let lineSub: number, qtyCell: string, priceCell: string, totalCell: string;
         if (durDays == null) {
-          lineSub = rate * units; // open-ended: one-period preview feeds the estimate; billed "as operated"
-          desc = `${unitsPart}${ratePart} · ${esc(L("as operated", "حسب التشغيل"))}`;
-          amountCell = `<div class="sm">${esc(L("As operated", "حسب التشغيل"))}</div>${nf(lineSub)} / ${esc(plabel)}`;
+          lineSub = rate * units; // open-ended: one-period preview; billed "as operated"
+          qtyCell = "∞";
+          priceCell = `${nf(rate)} / ${esc(plabel)}`;
+          totalCell = `<div class="sm">${esc(L("As operated", "حسب التشغيل"))}</div>${nf(rate)} / ${esc(plabel)}`;
         } else if (dpp > 0) {
           const periods = durDays / dpp;
           const pStr = Number.isInteger(periods) ? String(periods) : periods.toFixed(2);
-          const perWord = isAr || Number(pStr) === 1 ? plabel : `${plabel}s`;
           lineSub = (rate / dpp) * durDays * units;
-          desc = `${unitsPart}${pStr} ${esc(perWord)} @ ${ratePart}`;
-          amountCell = nf(lineSub);
+          qtyCell = `${pStr} ${esc(plabel)}${units > 1 ? ` × ${units}` : ""}`;
+          priceCell = `${nf(rate)} / ${esc(plabel)}`;
+          totalCell = nf(lineSub);
         } else {
           lineSub = rate * units; // PER_JOB
-          desc = `${unitsPart}${ratePart}`;
-          amountCell = nf(lineSub);
+          qtyCell = units > 1 ? String(units) : "1";
+          priceCell = nf(rate);
+          totalCell = nf(lineSub);
         }
-        // Mobilization/demobilization are PER-UNIT (× quantity) so the total reconciles with the backend + card.
         const mobTotal = (b.mobPrice ?? 0) * units;
         const demobTotal = (b.demobPrice ?? 0) * units;
-        const tripLabel = `(${units} ${esc(units === 1 ? L("trip", "رحلة") : L("trips", "رحلات"))})`;
         sub += lineSub + mobTotal + demobTotal;
-        let r = `<tr><td><b>${esc(labelOf(b))}</b><div class="sm">${esc(eqLine(b))} · ${desc}</div></td><td class="num">${amountCell}</td></tr>`;
-        if (b.mobPrice) r += `<tr><td><b>${esc(L("Mobilization to site", "النقل إلى الموقع"))}</b> <span class="sm">${tripLabel}</span><div class="sm">${esc(labelOf(b))}</div></td><td class="num">${nf(mobTotal)}</td></tr>`;
-        if (b.demobPrice) r += `<tr><td><b>${esc(L("Return from site", "الإرجاع من الموقع"))}</b> <span class="sm">${tripLabel}</span><div class="sm">${esc(labelOf(b))}</div></td><td class="num">${nf(demobTotal)}</td></tr>`;
+        let r = `<tr><td class="num">${rowNum}</td><td><b>${esc(L("Rental", "الإيجار"))} — ${esc(labelOf(b))}</b><div class="sm">${esc(eqLine(b))}</div></td><td>${esc(plabel)}</td><td class="num">${qtyCell}</td><td class="num">${priceCell}</td><td class="num">${totalCell}</td></tr>`;
+        if (b.mobPrice) r += `<tr><td></td><td><b>${esc(L("Delivery to site", "النقل إلى الموقع"))}</b><div class="sm">${esc(labelOf(b))}</div></td><td>${esc(L("Trip", "رحلة"))}</td><td class="num">${units}</td><td class="num">${nf(b.mobPrice)}</td><td class="num">${nf(mobTotal)}</td></tr>`;
+        if (b.demobPrice) r += `<tr><td></td><td><b>${esc(L("Return from site", "الإرجاع من الموقع"))}</b><div class="sm">${esc(labelOf(b))}</div></td><td>${esc(L("Trip", "رحلة"))}</td><td class="num">${units}</td><td class="num">${nf(b.demobPrice)}</td><td class="num">${nf(demobTotal)}</td></tr>`;
         return r;
       }).join("");
       const vat = Math.round(sub * 0.15);
@@ -407,27 +471,28 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         <div class="q-head"><div class="q-title">${esc(L("Equipment rental quotation", "عرض سعر تأجير معدات"))}</div><div class="q-sub"><span class="qn">${esc(qnum)}</span><span>${esc(dateStr)}</span></div></div>
         <div class="q-body">
           <div class="parties">
-            <div class="party"><div class="plabel">${esc(L("Supplier", "المؤجّر"))}</div><div class="pname">${esc(sup.supplierName)}</div><div class="pmeta">${[sup.verified ? esc(L("Verified supplier", "مؤجّر موثّق")) : "", sup.rating != null ? "★ " + sup.rating.toFixed(1) : ""].filter(Boolean).join(" · ")}</div></div>
+            <div class="party"><div class="plabel">${esc(L("Supplier", "المؤجّر"))}</div><div class="pname">${esc(sup.supplierName)}</div>${sup.rating != null ? `<div class="pmeta">★ ${sup.rating.toFixed(1)}</div>` : ""}${supIdRows}${supChips}</div>
             <div class="party"><div class="plabel">${esc(L("Rentee", "المستأجر"))}</div><div class="pname">${esc(rentee.name)}</div><div class="pmeta">${[verified ? esc(L("Verified renter", "مستأجر موثّق")) : "", esc(rentee.org), rentee.city ? esc(rentee.city) : ""].filter(Boolean).join(" · ")}</div></div>
           </div>
           <div class="metastrip">
-            <div><span>${esc(L("Request #", "رقم الطلب"))}</span><b>${esc(reqLabel)}</b></div>
+            <div><span>${esc(L("Request #", "رقم الطلب"))}</span><b>${esc(groupRef ?? reqLabel)}</b></div>
             <div><span>${esc(L("Issue date", "تاريخ الإصدار"))}</span><b>${esc(dateStr)}</b></div>
             <div><span>${esc(L("Valid until", "صالح حتى"))}</span><b>${esc(valid)}</b></div>
-            <div><span>${esc(L("Rental basis", "أساس الإيجار"))}</span><b>${esc(rentalBasis || "—")}</b></div>
-            <div><span>${esc(L("Currency", "العملة"))}</span><b>${esc(sar)}</b></div>
+            <div><span>${esc(L("Rental start", "بدء الإيجار"))}</span><b>${esc(startStr)}</b></div>
+            <div><span>${esc(L("Rental end", "نهاية الإيجار"))}</span><b>${esc(endStr)}</b></div>
+            <div><span>${esc(L("Currency", "العملة"))}</span><b>${esc(L("SAR · Saudi Riyal", "SAR · ريال سعودي"))}</b></div>
           </div>
           <div class="listed"><div class="ll">${esc(L("Listed equipment", "المعدات المدرجة"))} (${supBids.length})</div>${listedLines}</div>
           <table class="ptable">
-            <thead><tr><th>${esc(L("Item", "البند"))}</th><th class="num">${esc(L("Amount", "المبلغ"))}</th></tr></thead>
+            <thead><tr><th class="num">#</th><th>${esc(L("Item", "البند"))}</th><th>${esc(L("Unit", "الوحدة"))}</th><th class="num">${esc(L("Qty", "العدد"))}</th><th class="num">${esc(L("Price", "السعر"))}</th><th class="num">${esc(L("Total", "الإجمالي"))}</th></tr></thead>
             <tbody>${rows}</tbody>
           </table>
           <div class="totals">
             <div class="trow"><span>${esc(L("Subtotal before VAT", "الإجمالي قبل الضريبة"))}</span><b>${nf(sub)}</b></div>
             <div class="trow"><span>${esc(L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"))}</span><b>${nf(vat)}</b></div>
-            <div class="trow grand"><span>${esc(L("Estimated total", "الإجمالي التقديري"))}</span><b>${nf(total)} ${esc(sar)}</b></div>
+            <div class="trow grand"><span>${esc(L("Total", "الإجمالي"))}</span><b>${nf(total)} ${esc(sar)}</b></div>
           </div>
-          ${!isAr ? `<div class="words"><div class="wl">Amount in words</div>${esc(numWords(total))} Saudi Riyals · ${supBids.length} ${supBids.length > 1 ? "items" : "item"} · final amount as operated</div>` : ""}
+          <div class="words"><div class="wl">${esc(L("Amount in words", "المبلغ كتابةً"))}</div>${esc(isAr ? `${numWordsAr(total)} ريال سعودي` : `${numWords(total)} Saudi Riyals`)} · ${supBids.length} ${esc(isAr ? (supBids.length > 1 ? "بنود" : "بند") : supBids.length > 1 ? "items" : "item")}</div>
           <div class="card"><div class="card-h">${esc(L("Project terms", "شروط المشروع"))}</div>
             ${scopeRows}
             <div class="kv"><span>${esc(L("Rental basis", "أساس الإيجار"))}</span><b>${esc(rentalBasis || "—")}</b></div>
@@ -437,18 +502,14 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           ${eqTermsCard}
           ${contractTermsCard}
           <ol class="tc">
-            <li>${esc(
-              valid !== "—"
-                ? L(`Valid until ${valid}. After this date the quotation expires automatically unless it is confirmed on the Moedatech platform.`, `صالح حتى ${valid}. ينتهي هذا العرض تلقائيًا بعد هذا التاريخ ما لم يُؤكَّد عبر منصة معداتك.`)
-                : L("This quotation stays valid until it is confirmed on the Moedatech platform.", "يظل هذا العرض ساريًا حتى يتم تأكيده عبر منصة معداتك."),
-            )}</li>
-            <li>${esc(L("Prices cover only the equipment and services listed above; VAT at 15% is added as shown, in line with Saudi tax law.", "تشمل الأسعار المعدات والخدمات المدرجة أعلاه فقط، وتُضاف ضريبة القيمة المضافة ١٥٪ كما هو موضّح وفق النظام الضريبي السعودي."))}</li>
-            <li>${esc(L("The supplier guarantees the equipment is roadworthy and technically safe on the delivery date, and provides the required safety certificates.", "يضمن المؤجّر أن المعدة صالحة وآمنة فنيًا في تاريخ التسليم، ويوفّر شهادات السلامة المطلوبة."))}</li>
-            <li>${esc(L("This quotation is governed by the laws of the Kingdom of Saudi Arabia, and the competent Saudi courts have exclusive jurisdiction over any dispute.", "يخضع هذا العرض لأنظمة المملكة العربية السعودية، وتختص المحاكم السعودية المختصة بالنظر في أي نزاع."))}</li>
-            <li>${esc(L("Issued electronically through the Moedatech platform, this quotation is legally equivalent to a signed document under the Saudi Electronic Transactions Law.", "صدر هذا العرض إلكترونيًا عبر منصة معداتك ويعادل قانونيًا وثيقة موقّعة وفق نظام التعاملات الإلكترونية السعودي."))}</li>
+            <li>${esc(L("This quotation is valid for seven (7) days from the issue date and expires automatically thereafter unless confirmed through the Moedatech platform.", "هذا العرض ساري المفعول لمدة سبعة (٧) أيام من تاريخ الإصدار، وتسقط صلاحيته تلقائيًا بعد ذلك ما لم يتم تأكيده عبر منصة معداتك."))}</li>
+            <li>${esc(L("Prices are inclusive of items explicitly listed in the pricing table above. VAT at 15% applies per Saudi tax law.", "الأسعار شاملة لِما ذُكر صراحةً في جدول التسعير أعلاه، وضريبة القيمة المضافة بنسبة ١٥٪ مفروضة وفقًا للنظام السعودي."))}</li>
+            <li>${esc(L("The supplier is responsible for the equipment's roadworthiness and technical safety on the delivery date, and for satisfying mandated safety certifications.", "المُورِّد مسؤول عن صلاحية المعدة وسلامتها الفنية في تاريخ التسليم، وعن استيفاء شهادات السلامة والوثائق المطلوبة نظامًا."))}</li>
+            <li>${esc(L("This quotation is governed by the laws of the Kingdom of Saudi Arabia; competent Saudi courts have exclusive jurisdiction over any dispute.", "يخضع هذا العرض لأنظمة المملكة العربية السعودية، وتختصُّ المحاكم السعودية المختصة بالفصل في أي نزاع."))}</li>
+            <li>${esc(L("This document is issued electronically via the Moedatech platform and is legally equivalent to a signed document under the Saudi Electronic Transactions Law.", "تَمَّ إصدار هذا المستند إلكترونيًا عبر منصة معداتك، ويُعدّ مكافئًا قانونيًا للمستند الموقَّع وفقًا لنظام التعاملات الإلكترونية السعودي."))}</li>
           </ol>
-          <div class="signed"><b>${esc(L("Electronically signed via the Moedatech platform", "موقّع إلكترونيًا عبر منصة معداتك"))}</b><div>${esc(qnum)} · ${esc(dateStr)}</div></div>
-          <div class="foot">${esc(L("Auto-generated by Moedatech", "مُولّد تلقائيًا بواسطة معداتك"))} · ${esc(L("Comparison code", "رمز المقارنة"))}: ${esc(group.id)}</div>
+          <div class="signed"><span class="sig-check">✓</span><div class="sig-txt"><b>${esc(L("Electronically signed via the Moedatech platform", "موقّع إلكترونيًا عبر منصة معداتك"))}</b><div>${esc(qnum)} · ${esc(dateStr)}</div></div></div>
+          <div class="foot">${esc(L("Auto-generated by Moedatech · support@moedatech.com", "صادر تلقائيًا من منصة معداتك · support@moedatech.com"))}</div>
         </div>
       </section>`;
     };
@@ -673,16 +734,39 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         const sub = cq.subtotalPreVat;
         const vat = Math.round(cq.vat);
         const grand = Math.round(cq.total);
-        const okCount = (rows: typeof b.terms.equipment) => rows.filter((r) => r.state === "matched" || r.state === "agreed").length;
+        // Mobile parity (v3_bid_card): collapsed headline = the PER-UNIT rental total (rate × periods),
+        // excluding units/mob/demob/VAT — so bids compare on the unit rate. All-in lives in the grand total.
+        const perUnitRentalTotal = Math.round((b.price ?? 0) * cq.periods);
+        const rentalTotalLabel = ((): string => {
+          switch ((b.priceUnit ?? "PER_DAY").toUpperCase()) {
+            case "PER_WEEK": return L("Weekly rental total", "إجمالي الإيجار الأسبوعي");
+            case "PER_MONTH": return L("Monthly rental total", "إجمالي الإيجار الشهري");
+            case "PER_JOB": return L("Job total", "إجمالي المهمة");
+            default: return L("Daily rental total", "إجمالي الإيجار اليومي");
+          }
+        })();
+        const isAccepted = (b.status ?? "").toUpperCase() === "ACCEPTED";
+        // Mobile parity (v3_bid_card TermsSectionRow): tally the negotiable terms into Matched / Conflict /
+        // Pending (grey + negotiating fold into Pending) — the same 6 keys the app counts on the bid card.
+        const NEG_KEYS = ["payment_terms", "breakdown_response_sla", "overtime_rate", "fuel_responsibility", "certs", "operator"];
+        const negRows = (() => {
+          const seen = new Set<string>(); const out: typeof b.terms.equipment = [];
+          for (const r of [...b.terms.equipment, ...b.terms.contract, ...(b.negotiableTerms ?? [])]) {
+            if (NEG_KEYS.includes(r.key) && !seen.has(r.key)) { seen.add(r.key); out.push(r); }
+          }
+          return out;
+        })();
+        const termTally = negRows.reduce((t, r) => {
+          if (r.state === "matched" || r.state === "agreed") t.matched++;
+          else if (r.state === "conflict") t.conflict++;
+          else t.pending++;
+          return t;
+        }, { matched: 0, conflict: 0, pending: 0 });
         const termChips = [
-          { label: L("Equipment", "المعدة"), rows: b.terms.equipment },
-          { label: L("Project", "المشروع"), rows: b.terms.contract },
-          { label: L("Documents", "المستندات"), rows: b.terms.supplier },
-        ].filter((t) => t.rows.length > 0).map((t) => {
-          const ok = okCount(t.rows), total = t.rows.length;
-          const tone = total && ok === total ? { bg: "#e7f7ee", c: "#1daf58" } : ok > 0 ? { bg: "#fff3e0", c: "#d4780a" } : { bg: "#e6f2fb", c: "#1a7ec8" };
-          return { label: t.label, ok, total, tone };
-        });
+          { label: L("Matched", "مطابق"), n: termTally.matched, c: "#1daf58" },
+          { label: L("Conflict", "تعارض"), n: termTally.conflict, c: "#d9362a" },
+          { label: L("Pending", "معلّق"), n: termTally.pending, c: "#d4780a" },
+        ];
         const certChips = [
           ...(b.equipmentCertCodes ?? []).map((c) => (ar ? CERT_LABEL[c]?.ar : CERT_LABEL[c]?.en) || c),
           ...(b.ownershipDocs ?? []).map((o) => (ar ? o.labelAr : o.labelEn)),
@@ -780,21 +864,26 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
               <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Terms", "الشروط")}</span>
               <div style={{ display: "flex", gap: 4, flexWrap: "nowrap", flex: 1, minWidth: 0, overflowX: "auto" }} className="no-sb">
                 {termChips.map((t) => (
-                  <span key={t.label} style={{ fontSize: 10, fontWeight: 800, color: t.tone.c, background: t.tone.bg, padding: "2px 7px", borderRadius: 20, whiteSpace: "nowrap" }}>{t.label} {t.ok}/{t.total}</span>
+                  <span key={t.label} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 800, color: t.n > 0 ? t.c : "#9AA7B8", whiteSpace: "nowrap" }}>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: t.n > 0 ? t.c : "#c3d2e0" }} />{t.label} {t.n}
+                  </span>
                 ))}
               </div>
               {!selectMode && <button onClick={() => setTermsBid(b)} style={blueLink}>{L("View", "عرض")} ›</button>}
             </div>
 
 
-            {/* Rate row */}
-            <div style={{ ...rowSep, padding: "13px 16px" }}>
+            {/* Price row — headline is the PER-UNIT rental total (mobile parity); rate shown in the caption */}
+            <div style={{ ...rowSep, padding: "13px 16px", ...(isAccepted ? { background: "#e7f7ee" } : {}) }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ ...iconBox, background: "#fff4e5" }}><span className="material-icons-outlined" style={{ fontSize: 20, color: "#f79009" }}>payments</span></div>
-                <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Rate", "السعر")}</span>
+                <div style={{ minWidth: 0 }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{rentalTotalLabel}</span>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#6b8fa8", marginTop: 1 }}>{nf(b.price ?? 0)}/{periodOf(b.priceUnit)} × {Number.isInteger(cq.periods) ? cq.periods : cq.periods.toFixed(2)} · {L("per unit", "للوحدة")}</div>
+                </div>
                 <div style={{ flex: 1 }} />
-                <span style={{ fontSize: 17, fontWeight: 900, color: "#f79009" }}>{nf(b.price ?? 0)} {L("SAR", "ر.س")}</span>
-                <span style={{ fontSize: 13, color: "#6b8fa8", fontWeight: 700 }}>/ {periodOf(b.priceUnit)}</span>
+                <span style={{ fontSize: 17, fontWeight: 900, color: "#f79009" }}>{nf(perUnitRentalTotal)} {L("SAR", "ر.س")}</span>
+                {isAccepted && <span className="material-icons-outlined" style={{ fontSize: 18, color: "#1daf58" }} title={L("Accepted", "مقبول")}>check_circle</span>}
                 {!selectMode && (
                   <button onClick={() => { setOpenPrice(priceOpen ? null : b.id); setPerUnit(false); }} style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #d4e0ec", background: "#F7FAFC", color: "#6b8fa8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     <span className="material-icons-outlined" style={{ fontSize: 18 }}>{priceOpen ? "expand_less" : "expand_more"}</span>
@@ -812,8 +901,8 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                   )}
                   {([
                     [L(`Rental (${nf(b.price ?? 0)}/${periodOf(b.priceUnit)} × ${Number.isInteger(cq.periods) ? cq.periods : cq.periods.toFixed(2)}${u > 1 ? ` × ${u}` : ""})`, `الإيجار (${nf(b.price ?? 0)}/${periodOf(b.priceUnit)} × ${Number.isInteger(cq.periods) ? cq.periods : cq.periods.toFixed(2)}${u > 1 ? ` × ${u}` : ""})`), rental, null],
-                    ...(deliv ? [[L("Delivery to site", "النقل إلى الموقع"), deliv, b.mobLeadTime]] as [string, number, string | null][] : []),
-                    ...(ret ? [[L("Return from site", "الإرجاع من الموقع"), ret, b.demobLeadTime]] as [string, number, string | null][] : []),
+                    ...(deliv ? [[u > 1 ? L(`Delivery to site (${nf(Math.round(deliv / u))} × ${u} units)`, `النقل إلى الموقع (${nf(Math.round(deliv / u))} × ${u} وحدة)`) : L("Delivery to site", "النقل إلى الموقع"), deliv, b.mobLeadTime]] as [string, number, string | null][] : []),
+                    ...(ret ? [[u > 1 ? L(`Return from site (${nf(Math.round(ret / u))} × ${u} units)`, `الإرجاع من الموقع (${nf(Math.round(ret / u))} × ${u} وحدة)`) : L("Return from site", "الإرجاع من الموقع"), ret, b.demobLeadTime]] as [string, number, string | null][] : []),
                     [L("Subtotal before VAT", "المجموع قبل الضريبة"), sub, null],
                     [L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"), vat, null],
                   ] as [string, number, string | null][]).map(([lab, val, note], i) => (
@@ -822,9 +911,9 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                       <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550", fontVariantNumeric: "tabular-nums" }}>{nf(val)}</span>
                     </div>
                   ))}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, padding: "12px 14px", borderRadius: 12, background: "#fff4e5" }}>
-                    <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550" }}>{L("Estimated total", "الإجمالي التقديري")}</span>
-                    <span style={{ fontSize: 16, fontWeight: 900, color: "#f79009" }}>{nf(grand)} {L("SAR", "ر.س")}</span>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, padding: "12px 14px", borderRadius: 10, background: "#FAFCFE", border: "1.5px solid #1c3550" }}>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Grand total", "الإجمالي الكلي")}</span>
+                    <span style={{ fontSize: 18, fontWeight: 900, color: "#1c3550" }}>{nf(grand)} <span style={{ color: "#f79009" }}>{L("SAR", "ر.س")}</span></span>
                   </div>
                 </div>
               )}

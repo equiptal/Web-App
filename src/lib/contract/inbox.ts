@@ -20,7 +20,10 @@ export interface InboxBid {
   supplierName: string;
   supplierLogoUrl: string | null;
   equipmentName: string | null;
-  request: { id: string; displayId: string | null; shortCode: string | null; equipmentSummary: string | null };
+  /** For 2-level inbox grouping: RFQ group (fan-out `requestGroupId`) then equipment type. `groupId`
+   *  is null until the backend projects it on received-bids — grouping falls back to the request id. */
+  request: { id: string; displayId: string | null; shortCode: string | null; equipmentSummary: string | null; groupId: string | null; location: string | null };
+  equipmentType: { id: string | null; name: string | null };
   createdAt: string | null;
   /** Derived: a supplier opened the room and messaged before the renter entered (OPEN + unread). */
   supplierStarted: boolean;
@@ -62,7 +65,11 @@ function mapRow(raw: Record<string, unknown>): InboxBid {
       displayId: s(req.displayId),
       shortCode: s(req.shortCode),
       equipmentSummary: s(item0.subtypeName) ?? equipmentName,
+      // `requestGroupId` collapses a multi-item RFQ's fan-out siblings — null until the backend adds it.
+      groupId: s(req.requestGroupId) ?? s(req.groupId),
+      location: s(req.projectAddressLabel),
     },
+    equipmentType: { id: s(item0.subtypeId) ?? s(item0.categoryId), name: s(item0.subtypeName) ?? s(item0.categoryName) ?? equipmentName },
     createdAt: s(raw.createdAt) ?? s(raw.lastUpdatedAt),
     supplierStarted: dealRoomStatus === "OPEN" && unreadCount > 0,
   };

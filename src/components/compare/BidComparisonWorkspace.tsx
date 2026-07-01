@@ -316,6 +316,20 @@ export function BidComparisonWorkspace() {
     : cols.length > 1 ? cols[0]?.bid.id ?? null : null;
   const suggestions = rec?.suggestions ?? []; // context-aware what-if chips from Mansour (replace the hardcoded set)
   const awarded = bids?.find((b) => b.status === "ACCEPTED") ?? null;
+  // Award = a per-column toggle that PERSISTS (localStorage): "🔨 Award" → "✓ Awarded". Awarding opens a
+  // prompt to finalize by accepting the terms with the supplier in the deal room; un-clicking removes it.
+  const [awardedIds, setAwardedIds] = useState<Record<string, boolean>>({});
+  const [awardPrompt, setAwardPrompt] = useState<BidCard | null>(null);
+  useEffect(() => { try { const raw = localStorage.getItem("compare-awarded-ids"); if (raw) setAwardedIds(JSON.parse(raw)); } catch {} }, []);
+  useEffect(() => { try { localStorage.setItem("compare-awarded-ids", JSON.stringify(awardedIds)); } catch {} }, [awardedIds]);
+  const toggleAward = (bid: BidCard) => {
+    const was = !!awardedIds[bid.id];
+    setAwardedIds((m) => { const n = { ...m }; if (was) delete n[bid.id]; else n[bid.id] = true; return n; });
+    if (was) toast(L(`Removed award — ${bid.supplierName}`, `أُزيلت الترسية — ${bid.supplierName}`));
+    else setAwardPrompt(bid); // just awarded → offer to finalize in the deal room
+  };
+  // seed once from a backend-accepted bid so a real award shows as ✓ Awarded; then it's a persistent local toggle.
+  useEffect(() => { if (awarded?.id) setAwardedIds((m) => (awarded.id in m ? m : { ...m, [awarded.id]: true })); }, [awarded?.id]);
   const activeItemObj = items.find((i) => i.id === activeItem);
   const durationDays = activeItemObj?.durationDays ?? null;
   const units = activeItemObj?.item?.qty ?? 1;
@@ -405,6 +419,13 @@ export function BidComparisonWorkspace() {
     const onClick = linkVal ? () => setDocView({ label, url: null, value: linkVal, loading: false }) : () => openDoc(c, hint, label);
     return <button type="button" onClick={onClick} title={linkVal ? L("View value", "عرض القيمة") : L("View document", "عرض المستند")} className={cls} style={style}>{inner}</button>;
   };
+  // Green ✓ / red × cert pill WITHOUT a doc-view eye — for declared certs (e.g. the operator's) that
+  // have no file to open. Same visual weight as the big docChip.
+  const certPill = (label: string, held: boolean) => (
+    <span className="inline-flex items-center gap-1 text-[11.5px]" style={{ background: held ? C.successBg : C.dangerBg, color: held ? C.success : C.danger, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: `1px solid ${held ? "rgba(29,175,88,.3)" : "rgba(217,54,42,.3)"}` }}>
+      <span className="material-icons-outlined" style={{ fontSize: 11 }}>{held ? "check" : "close"}</span>{label}
+    </span>
+  );
   const grandTotal = (c: BidColumn) => Math.round(supplierStated(c) * (1 + VAT)) + renterAddBid(c);
   const hasCost = (c: BidColumn) => supplierStated(c) > 0 || renterAddBid(c) > 0;
   const grandList = cols.filter(hasCost).map(grandTotal);
@@ -580,8 +601,9 @@ export function BidComparisonWorkspace() {
     toast(kind === "award" ? L(`Opening ${bid.supplierName} deal room…`, `يتم فتح غرفة صفقة ${bid.supplierName}…`) : L("Opening the deal room…", "يتم فتح غرفة الصفقة…"));
     if (bid.dealRoomId) { router.push(`/deal-room/${bid.dealRoomId}`); return; }
     setBusy(true);
-    try { const { id } = await startDealRoom(bid.id); if (id) router.push(`/deal-room/${id}`); else setBusy(false); }
-    catch { setBusy(false); }
+    const failed = () => { setBusy(false); toast(L("Couldn't open the deal room — try again.", "تعذّر فتح غرفة الصفقة — حاول مجددًا.")); };
+    try { const { id } = await startDealRoom(bid.id); if (id) router.push(`/deal-room/${id}`); else failed(); }
+    catch { failed(); }
   }
 
   // The chat uses /bids/ask (LLM narration) — NOT /recommend. It renders data.reply and applies the
@@ -774,36 +796,6 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
             </div>
           </div>
 
-          {/* ── Rank band — one compact horizontal row (⇅ Rank by · chips · Ask-AI input+Re-rank · AI badge) ── */}
-          <div className="rounded-xl border px-4 py-3" style={{ borderColor: C.border, background: "#fff" }}>
-            <div className="flex flex-wrap items-center gap-2.5">
-              <span className="inline-flex flex-none items-center gap-1.5 text-[12.5px] font-extrabold" style={{ color: C.navy }}>
-                <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>swap_vert</span>{L("Rank by", "رتّب حسب")}
-              </span>
-              {presetDefs.map(([p, ic, en, arl]) => (
-                <button key={p} onClick={() => choosePreset(p, en, arl)} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-bold transition"
-                  style={preset === p && !fxEcho ? { background: C.navy, color: "#fff" } : { background: C.surface2, color: C.navyMid, border: `1px solid ${C.border}` }}>
-                  <span className="material-icons-outlined" style={{ fontSize: 15 }}>{ic}</span>{ar ? arl : en}
-                </button>
-              ))}
-              <div className="flex h-[40px] min-w-[220px] flex-1 items-center gap-2 rounded-full border ps-3.5 pe-1.5" style={{ background: "#fff", borderColor: C.border }}>
-                <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>auto_awesome</span>
-                <input value={freeText} onChange={(e) => setFreeText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") applyFreeText(); }}
-                  placeholder={L("Ask AI — e.g. closest machine, newest with operator…", "اسأل الذكاء — مثلاً أقرب معدّة، الأحدث مع مشغّل…")}
-                  className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold outline-none" style={{ color: C.navy }} />
-                <button onClick={applyFreeText} className="inline-flex flex-none items-center gap-1 rounded-full px-3 py-1.5 text-[12.5px] font-extrabold text-white" style={{ background: C.action }}>
-                  <span className="material-icons-outlined" style={{ fontSize: 15, transform: ar ? "scaleX(-1)" : undefined }}>send</span>{L("Re-rank", "إعادة")}
-                </button>
-              </div>
-              <span className="flex-none">{agentBadge()}</span>
-            </div>
-            {fxEcho && (
-              <div className="mt-3 flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-[12.5px]" style={{ background: C.actionDim, borderColor: "rgba(247,144,9,.3)", color: "#8A5A06" }}>
-                <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>auto_awesome</span>{fxEcho}
-              </div>
-            )}
-          </div>
-
           {/* ── Ask-AI floating button → opens the side chat drawer (ranking above stays visible) ── */}
           <button onClick={() => setChatOpen(true)} className="fixed bottom-6 z-40 inline-flex items-center gap-2 rounded-full px-5 py-3.5 text-[13.5px] font-extrabold text-white"
             style={{ insetInlineEnd: "1.5rem", background: `linear-gradient(135deg,${C.action},#FFA733)`, boxShadow: "0 10px 26px rgba(247,144,9,.4)" }}>
@@ -884,26 +876,6 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
             </>
           )}
 
-          {/* ── how-to-read tip (compact, expandable) ── */}
-          <details className="group rounded-lg border" style={{ borderColor: C.border, background: "#fff" }}>
-            <summary className="flex cursor-pointer list-none items-center gap-2 px-3.5 py-2.5 text-[12.5px] font-bold" style={{ color: C.navyMid }}>
-              <span className="material-icons-outlined" style={{ fontSize: 17, color: C.warning }}>lightbulb</span>
-              {L("How to read this comparison", "كيف تقرأ هذه المقارنة")}
-              <span className="material-icons-outlined ms-auto transition group-open:rotate-180" style={{ fontSize: 18, color: C.muted }}>expand_more</span>
-            </summary>
-            <div className="flex flex-col gap-2 border-t px-3.5 py-3 text-[12px]" style={{ borderColor: C.line, color: C.navyMid }}>
-              <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 flex-none rounded" style={{ background: C.success }} />{L("Good — matches your request, or a cert that's held", "جيد — يطابق طلبك، أو شهادة متوفّرة")}</span>
-              <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 flex-none rounded" style={{ background: C.danger }} />{L("Problem — conflicts with your request, or a required cert is missing", "مشكلة — يتعارض مع طلبك، أو شهادة مطلوبة ناقصة")}</span>
-              <span className="inline-flex items-center gap-1.5" style={{ color: C.rentee }}><span className="material-icons-outlined flex-none" style={{ fontSize: 15 }}>add</span>{L("For a cost that's on you, add your own estimate — it's added to the total so you get a sense of the real cost", "لتكلفة تقع عليك، أضف تقديرك — يُضاف للإجمالي لتتكوّن لديك صورة عن التكلفة الحقيقية")}</span>
-            </div>
-          </details>
-
-          {/* ── table caption + live agent status (call #1 fires on every re-rank) ── */}
-          <div className="flex flex-wrap items-center gap-2 px-1 text-[12.5px] font-bold" style={{ color: C.navyMid }}>
-            <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>auto_awesome</span>
-            {agentLive ? L("Ranked by your AI assistant", "مرتّب بواسطة مساعدك الذكي") : L("Ranked from your stated data", "مرتّب من بياناتك المذكورة")}
-            {agentBadge()}
-          </div>
 
           {/* ── comparison table ── */}
           <div className="overflow-hidden rounded-2xl border" style={{ borderColor: C.border, background: "#fff" }}>
@@ -911,10 +883,41 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
               <table className="w-full border-collapse" style={{ minWidth: 320 + cols.length * 215 }}>
                 {/* tint the whole rank-winning column green (cells' own red/green layer on top) */}
                 <colgroup>
-                  <col style={{ width: 190 }} />
+                  <col style={{ width: 200 }} />
                   {cols.map((c) => <col key={c.bid.id} style={c.bid.id === pickId ? { background: "rgba(29,175,88,0.09)" } : undefined} />)}
                 </colgroup>
                 <thead>
+                  {/* rank band — part of the table (⇅ Rank by · chips · Ask-AI input+Re-rank · AI badge) */}
+                  <tr>
+                    <td colSpan={cols.length + 1} style={{ background: "#FCFDFE", borderBottom: `1px solid ${C.line}`, padding: "12px 16px" }}>
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <span className="inline-flex flex-none items-center gap-1.5 text-[12.5px] font-extrabold" style={{ color: C.navy }}>
+                          <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>swap_vert</span>{L("Rank by", "رتّب حسب")}
+                        </span>
+                        {presetDefs.map(([p, ic, en, arl]) => (
+                          <button key={p} onClick={() => choosePreset(p, en, arl)} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-bold transition"
+                            style={preset === p && !fxEcho ? { background: C.navy, color: "#fff" } : { background: C.surface2, color: C.navyMid, border: `1px solid ${C.border}` }}>
+                            <span className="material-icons-outlined" style={{ fontSize: 15 }}>{ic}</span>{ar ? arl : en}
+                          </button>
+                        ))}
+                        <div className="flex h-[40px] min-w-[220px] flex-1 items-center gap-2 rounded-full border ps-3.5 pe-1.5" style={{ background: "#fff", borderColor: C.border }}>
+                          <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>auto_awesome</span>
+                          <input value={freeText} onChange={(e) => setFreeText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") applyFreeText(); }}
+                            placeholder={L("Ask AI — e.g. closest machine, newest with operator…", "اسأل الذكاء — مثلاً أقرب معدّة، الأحدث مع مشغّل…")}
+                            className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold outline-none" style={{ color: C.navy }} />
+                          <button onClick={applyFreeText} className="inline-flex flex-none items-center gap-1 rounded-full px-3 py-1.5 text-[12.5px] font-extrabold text-white" style={{ background: C.action }}>
+                            <span className="material-icons-outlined" style={{ fontSize: 15, transform: ar ? "scaleX(-1)" : undefined }}>send</span>{L("Re-rank", "إعادة")}
+                          </button>
+                        </div>
+                        <span className="flex-none">{agentBadge()}</span>
+                      </div>
+                      {fxEcho && (
+                        <div className="mt-3 flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-[12.5px]" style={{ background: C.actionDim, borderColor: "rgba(247,144,9,.3)", color: "#8A5A06" }}>
+                          <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>auto_awesome</span>{fxEcho}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
                   <tr>
                     <th className="sticky start-0 z-[3] p-3 text-start align-bottom" style={{ background: C.surface2, width: 200, minWidth: 200, borderBottom: `1px solid ${C.line}` }}>
                       <span className="text-[11px] font-black" style={{ color: C.muted, letterSpacing: ".06em" }}>{L("SUPPLIER", "المؤجّر")}</span>
@@ -1190,16 +1193,25 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                     </tr>
                     {/* L2 equipment — ONE field: safety certs (required ✓/✗ + held) + proof-of-ownership
                         docs (istimara / customs / sale_contract / saso_registration), combined per column. */}
-                    {/* §6: ONE row per required equipment cert ("TÜV certificate", …) — not required → not shown */}
-                    {requiredEquipCerts.map((cert) => (
-                      <tr key={cert}>
-                        <RowHead title={`${certLabel(cert)} ${L("certificate", "شهادة")}`} />
+                    {/* §6: ONE "Equipment certificate" row — shows the required equipment cert(s), ✓ green
+                        when the supplier holds it, ✗ red when not. Not required → row not shown. */}
+                    {requiredEquipCerts.length > 0 && (
+                      <tr>
+                        <RowHead title={L("Equipment certificate", "شهادة المعدة")} sub={`${L("required", "مطلوب")}: ${requiredEquipCerts.map(certLabel).join(", ")}`} />
                         {cols.map((c) => {
-                          const held = (c.bid.equipmentCertCodes ?? []).includes(cert);
-                          return <Td key={c.bid.id} ok={held} fail={!held}>{docChip(c, certLabel(cert), held, cert, true)}</Td>;
+                          const codes = c.bid.equipmentCertCodes ?? [];
+                          const allHeld = requiredEquipCerts.every((cert) => codes.includes(cert));
+                          const noneHeld = requiredEquipCerts.every((cert) => !codes.includes(cert));
+                          return (
+                            <Td key={c.bid.id} ok={allHeld} fail={noneHeld}>
+                              <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
+                                {requiredEquipCerts.map((cert) => <span key={cert}>{docChip(c, certLabel(cert), codes.includes(cert), cert, true)}</span>)}
+                              </span>
+                            </Td>
+                          );
                         })}
                       </tr>
-                    ))}
+                    )}
                     {/* §6: one row per proof-of-ownership doc (Istimara / customs / sale contract …), styled
                         like the cert rows — ✓ when the supplier carries it, ⚠ otherwise. */}
                     {ownershipDocTypes.map((doc) => (
@@ -1217,8 +1229,13 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                     <tr>
                       <RowHead title={L("Operator certificate", "شهادة المشغّل")} sub={`${L("required", "مطلوب")}${cols[0]?.bid.operatorCertReq ? `: ${cols[0]?.bid.operatorCertReq}` : ""}`} />
                       {cols.map((c) => {
-                        const d = c.bid.operatorCertDeclared;
-                        return <Td key={c.bid.id} ok={!!d}>{d ? incChip(d, "muted", undefined, "badge") : <span style={{ color: C.disabled, fontWeight: 600 }}>—</span>}</Td>;
+                        const req = c.bid.operatorCertReq;
+                        // Not required for this bid → neutral dash; else show the required cert ✓ green when the
+                        // supplier's operator confirmed it, ✗ red when not confirmed / missing.
+                        if (!req) return <Td key={c.bid.id}><span style={{ color: C.disabled, fontWeight: 600 }}>—</span></Td>;
+                        const declared = c.bid.operatorCertDeclared;
+                        const held = !!declared && !/not\s*confirmed|غير|لم/i.test(declared);
+                        return <Td key={c.bid.id} ok={held} fail={!held}>{certPill(req, held)}</Td>;
                       })}
                     </tr>
                     )}
@@ -1234,22 +1251,18 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                       <span className="mt-0.5 block text-[10.5px] font-semibold" style={{ color: C.muted }}>{L("opens the deal room", "يفتح غرفة الصفقة")}</span>
                     </th>
                     {cols.map((c) => {
-                      const isAwardedBid = !!awarded && (awarded.id === c.bid.id || (awarded.supplierId != null && awarded.supplierId === c.bid.supplierId));
+                      const isAwarded = !!awardedIds[c.bid.id];
                       return (
                         <td key={c.bid.id} className="align-top" style={{ padding: "14px 15px", borderTop: `2px solid ${C.border}`, borderInlineStart: `1px solid ${C.line}` }}>
-                          {awarded ? (
-                            <span className="inline-flex rounded-full px-3 py-1.5 text-[11.5px] font-bold" style={isAwardedBid ? { background: C.successBg, color: C.success } : { background: C.surface2, color: C.muted }}>{isAwardedBid ? `${L("Awarded", "تمت الترسية")} ✓` : L("Item awarded", "مُرسى")}</span>
-                          ) : (
-                            <div className="flex flex-col gap-[7px]">
-                              {/* prototype: Award = solid green, Negotiate = white w/ blue border + blue text; both padding 9px / radius 9px / 12.5px/800 */}
-                              <button onClick={() => goDealRoom(c.bid, "award")} disabled={busy} className="inline-flex w-full items-center justify-center gap-1.5 text-[12.5px] text-white disabled:opacity-60" style={{ background: C.success, padding: 9, borderRadius: 9, fontWeight: 800 }}>
-                                <span className="material-icons-outlined" style={{ fontSize: 16 }}>gavel</span>{L("Award", "ترسية")}
-                              </button>
-                              <button onClick={() => goDealRoom(c.bid, "negotiate")} disabled={busy} className="inline-flex w-full items-center justify-center gap-1.5 text-[12.5px] disabled:opacity-60" style={{ background: "#fff", color: C.rentee, border: `1px solid rgba(37,99,235,.35)`, padding: 9, borderRadius: 9, fontWeight: 800 }}>
-                                <span className="material-icons-outlined" style={{ fontSize: 15 }}>swap_horiz</span>{L("Negotiate", "تفاوض")}
-                              </button>
-                            </div>
-                          )}
+                          <div className="flex flex-col gap-[7px]">
+                            {/* Award = in-place toggle (prototype): "🔨 Award" (green) ⇄ "✓ Awarded" (dark green). Negotiate = white/blue outline → deal room. */}
+                            <button onClick={() => toggleAward(c.bid)} className="inline-flex w-full items-center justify-center gap-1.5 text-[12.5px] text-white" style={{ background: isAwarded ? "#137C42" : C.success, padding: 9, borderRadius: 9, fontWeight: 800 }}>
+                              <span className="material-icons-outlined" style={{ fontSize: 16 }}>{isAwarded ? "check_circle" : "gavel"}</span>{isAwarded ? L("Awarded", "تمت الترسية") : L("Award", "ترسية")}
+                            </button>
+                            <button onClick={() => goDealRoom(c.bid, "negotiate")} disabled={busy} className="inline-flex w-full items-center justify-center gap-1.5 text-[12.5px] disabled:opacity-60" style={{ background: "#fff", color: C.rentee, border: `1px solid rgba(37,99,235,.35)`, padding: 9, borderRadius: 9, fontWeight: 800 }}>
+                              <span className="material-icons-outlined" style={{ fontSize: 15 }}>swap_horiz</span>{L("Negotiate", "تفاوض")}
+                            </button>
+                          </div>
                         </td>
                       );
                     })}
@@ -1272,6 +1285,40 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
 
         </>
       )}
+
+      {/* ── award prompt → finalize in the deal room (on-platform) or directly (off-platform link bids) ── */}
+      {awardPrompt && (() => {
+        // Off-platform / shared-link bids have no account and no deal room — the deal-room redirect can't work.
+        const offPlatform = !!awardPrompt.viaSharedLink || String(awardPrompt.id).startsWith("link-") || String(awardPrompt.id).startsWith("upload:");
+        return (
+        <div className="fixed inset-0 z-[420] grid place-items-center p-6" style={{ background: "rgba(28,53,80,.42)", backdropFilter: "blur(3px)" }} onClick={() => setAwardPrompt(null)}>
+          <div className="w-[440px] max-w-full overflow-hidden rounded-2xl" style={{ background: "#fff" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start gap-3 border-b px-6 py-5" style={{ borderColor: C.line }}>
+              <div className="grid h-11 w-11 flex-none place-items-center rounded-lg" style={{ background: C.successBg, color: C.success }}><span className="material-icons-outlined" style={{ fontSize: 24 }}>check_circle</span></div>
+              <div className="flex-1"><h3 className="m-0 text-[17px] font-extrabold">{L(`Awarded to ${awardPrompt.supplierName}`, `تمت الترسية لـ ${awardPrompt.supplierName}`)}</h3><p className="m-0 text-[12.5px]" style={{ color: C.muted }}>{offPlatform ? L("Off-platform supplier — finalize directly", "مؤجّر خارج المنصة — أتمِم مباشرة") : L("Finalize by accepting the terms in the deal room", "أتمِم الترسية بقبول الشروط في غرفة الصفقة")}</p></div>
+              <button onClick={() => setAwardPrompt(null)} className="grid h-8 w-8 flex-none place-items-center rounded-full border" style={{ borderColor: C.border, color: C.muted }}><span className="material-icons-outlined" style={{ fontSize: 18 }}>close</span></button>
+            </div>
+            <div className="px-6 py-5 text-[13px] leading-relaxed" style={{ color: C.navyMid }}>
+              {offPlatform
+                ? L("You've marked this supplier as your choice. They bid off-platform via your shared link, so there's no deal room — reach out to them directly with the contact details on their submission to finalize.", "لقد اخترت هذا المؤجّر. قدّم عرضه خارج المنصة عبر رابطك المشترك، لذا لا توجد غرفة صفقة — تواصل معه مباشرةً عبر بيانات التواصل في عرضه لإتمام الترسية.")
+                : L("You've marked this supplier as your choice. To finalize the award, accept the terms with them in the deal room.", "لقد اخترت هذا المؤجّر. لإتمام الترسية، اقبل الشروط معه في غرفة الصفقة.")}
+            </div>
+            <div className="flex justify-end gap-2.5 border-t px-6 py-4" style={{ borderColor: C.line }}>
+              {offPlatform ? (
+                <button onClick={() => setAwardPrompt(null)} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-[13px] font-bold text-white" style={{ background: C.success }}>
+                  <span className="material-icons-outlined" style={{ fontSize: 17 }}>check</span>{L("Got it", "تمام")}
+                </button>
+              ) : (<>
+                <button onClick={() => setAwardPrompt(null)} className="rounded-lg border px-4 py-2 text-[13px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>{L("Stay here", "البقاء هنا")}</button>
+                <button onClick={() => { const b = awardPrompt; setAwardPrompt(null); goDealRoom(b, "award"); }} disabled={busy} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-[13px] font-bold text-white disabled:opacity-60" style={{ background: C.success }}>
+                  <span className="material-icons-outlined" style={{ fontSize: 17 }}>meeting_room</span>{L("Accept in deal room", "القبول في غرفة الصفقة")}
+                </button>
+              </>)}
+            </div>
+          </div>
+        </div>
+        );
+      })()}
 
       {/* ── upload modal ── */}
       {uploadOpen && (

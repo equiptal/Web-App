@@ -73,17 +73,35 @@ export function SharedLinkBidCard({
   const eqLine = eq ? [eq.make, eq.model, eq.year].filter(Boolean).join(" · ") : null;
   const title = itemLabel || eqLine || L("Equipment", "المعدة");
   const agoShort = bid.agoDays === 1 ? L("1 day ago", "قبل يوم") : `${bid.agoDays ?? 2} ${L("days ago", "أيام مضت")}`;
+  // Supplier's quote expiry ("Valid until") — surfaced as a chip so the renter sees how long the price holds.
+  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const validUntil = bid.validUntil ?? null;
+  const daysLeft = validUntil ? Math.ceil((new Date(validUntil).getTime() - Date.now()) / 86400000) : null;
+  const expired = daysLeft != null && daysLeft < 0;
+  const soon = daysLeft != null && daysLeft >= 0 && daysLeft <= 3;
+  const validTone = expired ? { c: "#d9362a", bg: "#fcebea" } : soon ? { c: "#d4780a", bg: "#fff3e0" } : { c: "#1a7ec8", bg: "#e6f2fb" };
 
-  const okCount = (rows: typeof bid.terms.equipment) => rows.filter((r) => r.state === "matched" || r.state === "agreed").length;
+  // Mobile parity (v3_bid_card TermsSectionRow): tally the negotiable terms into Matched / Conflict /
+  // Pending (grey + negotiating fold into Pending) — the same 6 keys the app counts on the bid card.
+  const NEG_KEYS = ["payment_terms", "breakdown_response_sla", "overtime_rate", "fuel_responsibility", "certs", "operator"];
+  const negRows = (() => {
+    const seen = new Set<string>(); const out: typeof bid.terms.equipment = [];
+    for (const r of [...bid.terms.equipment, ...bid.terms.contract, ...(bid.negotiableTerms ?? [])]) {
+      if (NEG_KEYS.includes(r.key) && !seen.has(r.key)) { seen.add(r.key); out.push(r); }
+    }
+    return out;
+  })();
+  const termTally = negRows.reduce((t, r) => {
+    if (r.state === "matched" || r.state === "agreed") t.matched++;
+    else if (r.state === "conflict") t.conflict++;
+    else t.pending++;
+    return t;
+  }, { matched: 0, conflict: 0, pending: 0 });
   const termChips = [
-    { label: L("Equipment", "المعدة"), rows: bid.terms.equipment },
-    { label: L("Project", "المشروع"), rows: bid.terms.contract },
-    { label: L("Documents", "المستندات"), rows: bid.terms.supplier },
-  ].filter((t) => t.rows.length > 0).map((t) => {
-    const ok = okCount(t.rows), total = t.rows.length;
-    const tone = total && ok === total ? { bg: "#e7f7ee", c: "#1daf58" } : ok > 0 ? { bg: "#fff3e0", c: "#d4780a" } : { bg: "#e6f2fb", c: "#1a7ec8" };
-    return { label: t.label, ok, total, tone };
-  });
+    { label: L("Matched", "مطابق"), n: termTally.matched, c: "#1daf58" },
+    { label: L("Conflict", "تعارض"), n: termTally.conflict, c: "#d9362a" },
+    { label: L("Pending", "معلّق"), n: termTally.pending, c: "#d4780a" },
+  ];
   const certChips = (bid.equipmentCertCodes ?? []).map((c) => (ar ? CERT_LABEL[c]?.ar : CERT_LABEL[c]?.en) || c).slice(0, 2);
 
   const rowSep = { borderTop: "1px solid #EFF2F6" } as const;
@@ -129,6 +147,12 @@ export function SharedLinkBidCard({
             <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550" }}>{bid.supplierName}</span>
             {bid.verified && <span className="material-icons-outlined" style={{ fontSize: 16, color: "#1daf58" }}>verified</span>}
           </div>
+          {validUntil && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 7, fontSize: 11, fontWeight: 800, color: validTone.c, background: validTone.bg, padding: "3px 9px", borderRadius: 20, alignSelf: "flex-start" }}>
+              <span className="material-icons-outlined" style={{ fontSize: 13 }}>{expired ? "event_busy" : "schedule"}</span>
+              {expired ? L("Quote expired", "انتهى العرض") : L(`Valid until ${fmtDate(validUntil)}`, `صالح حتى ${fmtDate(validUntil)}`)}
+            </span>
+          )}
         </div>
       </div>
 
@@ -179,7 +203,9 @@ export function SharedLinkBidCard({
         <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Terms", "الشروط")}</span>
         <div style={{ display: "flex", gap: 4, flexWrap: "nowrap", flex: 1, minWidth: 0, overflowX: "auto" }} className="no-sb">
           {termChips.map((t) => (
-            <span key={t.label} style={{ fontSize: 10, fontWeight: 800, color: t.tone.c, background: t.tone.bg, padding: "2px 7px", borderRadius: 20, whiteSpace: "nowrap" }}>{t.label} {t.ok}/{t.total}</span>
+            <span key={t.label} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 800, color: t.n > 0 ? t.c : "#9AA7B8", whiteSpace: "nowrap" }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: t.n > 0 ? t.c : "#c3d2e0" }} />{t.label} {t.n}
+            </span>
           ))}
         </div>
         {!picking && <button onClick={() => setTermsOpen(true)} style={blueLink}>{L("View", "عرض")} ›</button>}

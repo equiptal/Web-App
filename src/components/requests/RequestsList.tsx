@@ -47,6 +47,9 @@ export function RequestsList() {
   // web-app/006 — off-platform shared-link bids per group (keyed by group id). Fetched up front so My
   // Bids lists a group whose ONLY bid came through the link (those don't count toward on-platform totalBids).
   const [linkBids, setLinkBids] = useState<Record<string, number>>({});
+  // RFQ group short code (RFQ-NNNNN) per group id — from the agents bid-submissions `groupRef`. Shown
+  // in the RFQ tabs + header alongside the location. Falls back to the first item's REQ id when absent.
+  const [groupRefs, setGroupRefs] = useState<Record<string, string>>({});
   // Off-platform bid count per individual request (requestId → count) so a request card's "N bids"
   // includes shared-link bids, not just on-platform ones.
   const [linkByRequest, setLinkByRequest] = useState<Record<string, number>>({});
@@ -78,16 +81,18 @@ export function RequestsList() {
     Promise.all(
       targets.map((g) =>
         fetchRequestSubmissions(g.id)
-          .then((r) => ({ gid: g.id, count: r.submittedCount, subs: r.submissions }))
-          .catch(() => ({ gid: g.id, count: 0, subs: [] })),
+          .then((r) => ({ gid: g.id, count: r.submittedCount, subs: r.submissions, gref: r.groupRef as string | null }))
+          .catch(() => ({ gid: g.id, count: 0, subs: [] as Awaited<ReturnType<typeof fetchRequestSubmissions>>["submissions"], gref: null as string | null })),
       ),
     ).then((res) => {
       if (!active) return;
       const gmap: Record<string, number> = {};
       const rmap: Record<string, number> = {};
       const umap: Record<string, number> = {}; // off-platform covered units per request
-      for (const { gid, count, subs } of res) {
+      const grmap: Record<string, string> = {};
+      for (const { gid, count, subs, gref } of res) {
         if (count > 0) gmap[gid] = count;
+        if (gref) grmap[gid] = gref;
         // Each submission item carries its parent requestId → count submissions + sum covered units.
         for (const s of subs) for (const it of s.items) if (it.requestId) {
           rmap[it.requestId] = (rmap[it.requestId] ?? 0) + 1;
@@ -97,6 +102,7 @@ export function RequestsList() {
       setLinkBids(gmap);
       setLinkByRequest(rmap);
       setOffUnitsByRequest(umap);
+      setGroupRefs(grmap);
     });
     return () => { active = false; };
   }, [items]);
@@ -147,7 +153,7 @@ export function RequestsList() {
           <div className="rempty">{L("No requests yet.", "لا توجد طلبات بعد.")}</div>
         ) : (
           <div>
-            <GroupChips groups={groups} activeId={activeGroup?.id ?? null} onPick={setActiveGroupId} L={L} />
+            <GroupChips groups={groups} activeId={activeGroup?.id ?? null} onPick={setActiveGroupId} L={L} groupRefs={groupRefs} />
             {activeGroup && (
               <>
                 <GroupStrip group={activeGroup} ar={ar} L={L} router={router} filledByItem={filledByItem} />
@@ -217,7 +223,7 @@ export function RequestsList() {
           <div className="rempty">{L("No bids yet.", "لا توجد عروض بعد.")}</div>
         ) : (
           <div>
-            <GroupChips groups={bidGroups} activeId={activeBidGroup?.id ?? null} onPick={(id) => { setActiveGroupId(id); setBidsItemId(null); }} L={L} />
+            <GroupChips groups={bidGroups} activeId={activeBidGroup?.id ?? null} onPick={(id) => { setActiveGroupId(id); setBidsItemId(null); }} L={L} groupRefs={groupRefs} />
             {activeBidGroup && (
               <>
                 <GroupStrip group={activeBidGroup} ar={ar} L={L} router={router} filledByItem={filledByItem} />
@@ -233,7 +239,7 @@ export function RequestsList() {
 }
 
 /** Level-1 location chips (one per submission group) — shared by both segments. */
-function GroupChips({ groups, activeId, onPick, L }: { groups: RequestGroup[]; activeId: string | null; onPick: (id: string) => void; L: L }) {
+function GroupChips({ groups, activeId, onPick, L, groupRefs }: { groups: RequestGroup[]; activeId: string | null; onPick: (id: string) => void; L: L; groupRefs: Record<string, string> }) {
   return (
     <div style={{ marginBottom: 4 }}>
       <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".09em", color: "#6b8fa8", marginBottom: 9 }}>{L("REQUESTS FOR QUOTE", "طلبات التسعير")}</div>
@@ -243,7 +249,7 @@ function GroupChips({ groups, activeId, onPick, L }: { groups: RequestGroup[]; a
           return (
             <button key={gr.id} onClick={() => onPick(gr.id)} style={{ flexShrink: 0, textAlign: "start", minWidth: 180, padding: "11px 15px", borderRadius: 14, cursor: "pointer", background: on ? "#1c3550" : "#fff", border: `1px solid ${on ? "#1c3550" : "#d4e0ec"}` }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                <span style={{ fontSize: 14, fontWeight: 900, color: on ? "#fff" : "#1c3550" }}>{gr.items[0]?.displayId ?? "RFQ"}</span>
+                <span style={{ fontSize: 14, fontWeight: 900, color: on ? "#fff" : "#1c3550" }}>{groupRefs[gr.id] ?? gr.items[0]?.displayId ?? "RFQ"}</span>
                 <span style={{ fontSize: 11, fontWeight: 800, padding: "2px 8px", borderRadius: 20, background: on ? "rgba(255,255,255,.16)" : "#eff4f9", color: on ? "#fff" : "#6b8fa8" }}>{gr.items.length} {L("items", "عناصر")}</span>
               </div>
               <div style={{ fontSize: 12, fontWeight: 600, color: on ? "#C7D4E5" : "#6b8fa8", marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 165 }}>{gr.locationLabel}</div>
@@ -262,7 +268,7 @@ export function GroupStrip({ group, ar, L, router, filledByItem = {} }: { group:
   const [ffExpanded, setFfExpanded] = useState(false);
   const barColor = (p: number) => (p >= 50 ? "#1daf58" : p > 0 ? "#FBBF6B" : "#F87171");
   // web-app/006 — shared-link tracker for this group (copy link + opened/submitted, keyed by group id).
-  const [link, setLink] = useState<{ openedCount: number; submittedCount: number; renterName: string | null; bidDeadline: string | null; logoUrl: string | null } | null>(null);
+  const [link, setLink] = useState<{ openedCount: number; submittedCount: number; renterName: string | null; bidDeadline: string | null; logoUrl: string | null; groupRef: string | null } | null>(null);
   const [copied, setCopied] = useState(false);
   // Share + deadline both happen in the shared sheet (same UI as the post-submit confirmation).
   const [shareOpen, setShareOpen] = useState(false);
@@ -292,7 +298,7 @@ export function GroupStrip({ group, ar, L, router, filledByItem = {} }: { group:
             <span style={{ flexShrink: 0, whiteSpace: "nowrap", fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 20, background: "rgba(29,175,88,.16)", color: "#7CE5A6" }}>● {ar ? ov.ar : ov.en}</span>
             {isBroadcast && <span style={{ flexShrink: 0, whiteSpace: "nowrap", fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 20, background: "rgba(255,255,255,.10)", color: "#C7D4E5" }}>📣 {L("Broadcast", "بثّ")}</span>}
           </div>
-          <div style={{ fontSize: 13, color: "#9DAFC6", marginTop: 5, fontWeight: 600 }}>{group.items[0]?.displayId}{group.createdAt ? ` · ${fmtDate(group.createdAt, ar)}` : ""}</div>
+          <div style={{ fontSize: 13, color: "#9DAFC6", marginTop: 5, fontWeight: 600 }}>{link?.groupRef ?? group.items[0]?.displayId}{group.createdAt ? ` · ${fmtDate(group.createdAt, ar)}` : ""}</div>
           <button onClick={() => router.push(`/requests/group/${encodeURIComponent(group.id)}`)} style={{ display: "inline-flex", alignItems: "center", gap: 6, alignSelf: "flex-start", marginTop: 8, padding: "6px 12px", borderRadius: 9, border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.06)", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>{L("View full request details", "عرض تفاصيل الطلب كاملة")} <span className="material-icons-outlined" style={{ fontSize: 15 }}>open_in_new</span></button>
           {isBroadcast && (
             <div style={{ marginTop: "auto", paddingTop: 11, borderTop: "1px solid rgba(255,255,255,.12)" }}>

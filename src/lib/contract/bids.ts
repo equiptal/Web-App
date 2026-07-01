@@ -102,6 +102,11 @@ export interface BidCard {
     saso: boolean;
     localContent: boolean;
   };
+  /** Supplier's real company-doc VALUES (bid-list supplierProfile) — used by the quotation identity
+   *  rows. null when not provided → the quotation shows the app's "Verified" pill instead. */
+  supplierCrNumber?: string | null;
+  supplierVatNumber?: string | null;
+  supplierNationalAddress?: string | null;
   matchCount: number;
   conflictCount: number;
   dealRoomId: string | null;
@@ -385,6 +390,14 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   const hasCr = docKey("crDocKey", "cr_doc_key", "crNumber", "commercialRegistrationNumber", "commercial_registration_number", "crFileKey");
   const hasVat = docKey("vatDocKey", "vat_doc_key", "vatNumber", "taxNumber", "tax_number", "vatFileKey");
   const hasNationalAddr = docKey("nationalAddressDocKey", "national_address_doc_key", "nationalId", "national_id", "companyAddress", "company_address", "companyCity", "shortAddress", "short_address", "postalCode", "postal_code", "buildingNumber", "building_number", "district");
+  // Real company-doc VALUES for the quotation identity rows (first present across the profile shapes).
+  const profVal = (...keys: string[]): string | null => { for (const o of profSources) for (const k of keys) { const v = s(o[k]); if (v) return v; } return null; };
+  const supplierCrNumber = profVal("crNumber", "commercialRegistrationNumber", "commercial_registration_number");
+  const supplierVatNumber = profVal("vatNumber", "taxNumber", "tax_number");
+  // National address: a single field if present, else composed from its Saudi-address parts (app parity).
+  const supplierNationalAddress =
+    profVal("nationalAddress", "national_address", "companyAddress", "company_address") ||
+    ([profVal("buildingNumber", "building_number"), profVal("shortAddress", "short_address"), profVal("district"), profVal("postalCode", "postal_code"), profVal("companyCity", "company_city")].filter(Boolean).join(" ") || null);
   const rq = (raw.request ?? {}) as Record<string, unknown>;
   const rqItem = (Array.isArray(rq.equipmentItems) ? (rq.equipmentItems as Record<string, unknown>[]) : [])[0] ?? {};
   // Who the RENTEE asked to bear each cost (request side): diesel-included / FAT split → supplier|me.
@@ -498,6 +511,9 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
       saso: certs.SASO === true || docKey("sasoHeavyEquipDocKey", "saso_heavy_equip_doc_key") || held.includes("SASO") || heldCerts.some((c) => /saso/i.test(c)),
       localContent: docKey("localContentDocKey", "local_content_doc_key") || held.includes("LC") || heldCerts.some((c) => /local.?content/i.test(c)),
     },
+    supplierCrNumber,
+    supplierVatNumber,
+    supplierNationalAddress,
     matchCount: n(raw.matchCount) ?? 0,
     conflictCount: n(raw.conflictCount) ?? 0,
     dealRoomId: s(raw.dealRoomId),

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { BidCard } from "@/lib/contract/bids";
 import type { BidFormData, BidFormItem, LinkBidSubmission, LinkBidItem } from "@/lib/contract/link-bids";
 import { fetchBidFormData } from "@/lib/api/client";
@@ -8,11 +8,10 @@ import { BID_FORM_CSS } from "@/components/bid/bidFormStyles";
 
 /**
  * web-app/006 — read-only viewer of an off-platform bid submitted through the renter's shared link.
- * Renders the SAME layout the supplier saw on the public bid form (`/bid/[token]`), filled with their
- * submitted answers: per-item term Yes/No, pricing, totals, contract terms + company details. We fetch
- * the request's `BidFormData` for the full request context (project terms, size, delivery/return,
- * renter notes) and overlay the submission's answers; if that's unavailable (e.g. the request closed),
- * we fall back to rendering from the submission alone. No deal room — the supplier has no account.
+ * Redesigned to the app-card visual language (rounded section cards + icon headers + term/price rows,
+ * matching the My-Bids bid card & comparison) instead of the old quotation-PDF look. We fetch the
+ * request's `BidFormData` for full context (project terms, delivery/return, renter notes) and overlay
+ * the submission's answers; if unavailable (request closed), we render from the submission alone.
  */
 
 const TERM_KEYS = ["operator", "nationality", "fatFood", "fatTransport", "fuel", "fuelType", "year", "operatorCert", "equipmentCert"] as const;
@@ -31,6 +30,10 @@ const TERM_LABEL: Record<TermKey, [string, string]> = {
 const UNIT_LABEL: Record<string, [string, string]> = {
   PER_DAY: ["day", "يوم"], PER_WEEK: ["week", "أسبوع"], PER_MONTH: ["month", "شهر"], PER_JOB: ["job", "مهمة"],
 };
+
+// App palette (matches the bid card / comparison).
+const C = { navy: "#1c3550", navyMid: "#2a4f72", muted: "#6b8fa8", border: "#d4e0ec", line: "#eff2f6", surface: "#f7fafc", orange: "#f79009", orangeBg: "#fff4e5", green: "#1daf58", greenBg: "#e7f7ee", danger: "#d9362a", dangerBg: "#fcebea", blue: "#1a7ec8", blueBg: "#e6f2fb", gold: "#d4a840" };
+const card = { background: "#fff", border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden" } as const;
 
 export function SharedBidSubmissionModal({
   bid,
@@ -79,8 +82,7 @@ export function SharedBidSubmissionModal({
     return submission.items.find((i) => i.requestItemId === requestItemId) ?? (submission.items.length === 1 ? submission.items[0] : undefined);
   };
 
-  // Items to render: prefer the live request's items (full context); else synthesize from the
-  // submission so the viewer still works after the request closes.
+  // Items to render: prefer the live request's items (full context); else synthesize from the submission.
   const items: BidFormItem[] = useMemo(() => {
     if (form && form.items.length) return form.items;
     if (!submission) return [];
@@ -102,8 +104,6 @@ export function SharedBidSubmissionModal({
     });
   }, [form, submission]);
 
-  // Contract terms (for-all-items): from the request when available, else synthesized from the
-  // submission's per-item required values. Supplier's answer comes from any item's confirmations.
   const contractAns = submission?.items[0]?.confirmations ?? {};
   const contractTerms = useMemo(() => {
     if (form && form.contractTerms.length) return form.contractTerms;
@@ -122,9 +122,12 @@ export function SharedBidSubmissionModal({
   const subtotal = (submission?.items ?? []).reduce((s, a) => s + itemSubtotal(a), 0);
   const vat = subtotal * 0.15;
   const grandIncl = submission?.grandTotal ?? subtotal + vat;
-  // Two distinct dates: the SUPPLIER's own quote expiry ("Valid until" — how long their price holds)
-  // and the RENTER's bid deadline ("Bids close" — when the renter stops accepting bids). Show each when set.
+  // Supplier's quote expiry ("Valid until") + the renter's bid deadline ("Bids close").
   const validUntil = submission?.validUntil ?? null;
+  const vDaysLeft = validUntil ? Math.ceil((new Date(validUntil).getTime() - Date.now()) / 86400000) : null;
+  const vExpired = vDaysLeft != null && vDaysLeft < 0;
+  const vSoon = vDaysLeft != null && vDaysLeft >= 0 && vDaysLeft <= 3;
+  const vTone = vExpired ? { c: C.danger, bg: C.dangerBg } : vSoon ? { c: "#d4780a", bg: C.orangeBg } : { c: C.blue, bg: C.blueBg };
   const bidsClose = form?.deadline ?? null;
 
   const projectTerms = form?.projectTerms ?? null;
@@ -134,6 +137,8 @@ export function SharedBidSubmissionModal({
   return (
     <div className="slb-overlay" dir={dir} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="slb-modal" role="dialog" aria-modal="true">
+        <style>{BID_FORM_CSS}</style>
+        <style>{`@media print{body *{visibility:hidden!important}.slb-modal,.slb-modal *{visibility:visible!important}.slb-overlay{position:static!important;background:#fff!important;padding:0!important;overflow:visible!important}.slb-modal{position:absolute!important;inset-inline-start:0;top:0;width:100%!important;height:auto!important;max-height:none!important;box-shadow:none!important}.qprint{max-height:none!important;overflow:visible!important;background:#fff!important}.qprint-hide,.slb-head-x{display:none!important}}`}</style>
         <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" />
         <div className="slb-head">
           <span className="slb-head-ic"><span className="material-icons-outlined">link</span></span>
@@ -151,197 +156,172 @@ export function SharedBidSubmissionModal({
           {L("Submitted bid — exactly what the supplier filled in", "العرض المُقدَّم — تمامًا كما ملأه المؤجّر")}
         </div>
 
-        <div style={{ maxHeight: "70vh", overflowY: "auto", padding: "16px" }}>
+        <div className="qprint" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16, background: C.surface }}>
           {!submission ? (
-            <p className="py-8 text-center text-[13px] text-slate-500">{L("Submission details aren't available.", "تفاصيل العرض غير متاحة.")}</p>
+            <p style={{ padding: "40px 0", textAlign: "center", fontSize: 13, color: C.muted }}>{L("Submission details aren't available.", "تفاصيل العرض غير متاحة.")}</p>
           ) : (
-            <div className={`bidpage inview qdoc${ar ? " rtl" : ""}`} dir={dir}>
-              <style>{BID_FORM_CSS}</style>
-              <style>{QUOTE_CSS}</style>
-              <div className="wrap">
-                {/* App-quotation template: navy header bar + ref pill, orange accent line, navy price hero. */}
-                <div className="qbar">
-                  <div className="qbar-l">
-                    <span className="qbar-title">{L("Quotation", "عرض سعر")}</span>
-                    {submission.quotationRef && <span className="qbar-ref">{submission.quotationRef}</span>}
-                  </div>
-                  <div className="qbar-r">
-                    {submission.rfqRef && <div><span>{L("RFQ", "الطلب")}</span><b>{submission.rfqRef}</b></div>}
-                    {submission.createdAt && <div><span>{L("Issued", "التاريخ")}</span><b>{fmtDate(submission.createdAt)}</b></div>}
-                    {validUntil && <div><span>{L("Valid until", "صالح حتى")}</span><b>{fmtDate(validUntil)}</b></div>}
-                    {bidsClose && <div><span>{L("Bids close", "إغلاق العروض")}</span><b>{fmtDate(bidsClose)}</b></div>}
-                  </div>
-                </div>
-                <div className="qaccent" />
-                <div className="qhero">
-                  <div className="qhero-h">{L("Price breakdown", "تفاصيل السعر")}</div>
-                  <div className="qhero-main">
-                    <div className="qhero-tot">
-                      <span className="qhero-lbl">{L("Grand total · incl. VAT", "الإجمالي · شامل الضريبة")}</span>
-                      <span className="qhero-val">{nf(grandIncl)} {sar}</span>
-                    </div>
-                    <div className="qhero-pills">
-                      <span className="qpill">{L("Subtotal", "المجموع")}: {nf(subtotal)}</span>
-                      <span className="qpill">{L("VAT 15%", "الضريبة ١٥٪")}: {nf(vat)}</span>
-                      <span className="qpill">{items.length} {items.length === 1 ? L("item", "بند") : L("items", "بنود")}</span>
-                    </div>
-                  </div>
-                </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }} dir={dir}>
 
-                {/* Project terms + contract terms (read-only, from the request) */}
-                {(projectTerms || contractTerms.length > 0) && (
-                  <div className="sec">
-                    <div className="sec-h"><span className="material-icons-outlined hdic">tune</span><h3>{L("Project terms", "شروط المشروع")}</h3><span className="ro-tag">{L("From request", "من الطلب")}</span></div>
+              {/* ── Summary: meta strip + navy price hero ── */}
+              <div style={card}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 22px", padding: "12px 16px", borderBottom: `1px solid ${C.line}` }}>
+                  {submission.quotationRef && <Meta k={L("Quotation", "عرض سعر")} v={submission.quotationRef} mono />}
+                  {submission.rfqRef && <Meta k={L("RFQ", "الطلب")} v={submission.rfqRef} mono />}
+                  {submission.createdAt && <Meta k={L("Issued", "التاريخ")} v={fmtDate(submission.createdAt)} />}
+                  {validUntil && <Meta k={L("Valid until", "صالح حتى")} v={vExpired ? L("Expired", "منتهٍ") : fmtDate(validUntil)} tone={vTone} />}
+                  {bidsClose && <Meta k={L("Bids close", "إغلاق العروض")} v={fmtDate(bidsClose)} />}
+                </div>
+                <div style={{ padding: 18, background: `linear-gradient(135deg,${C.navy},#12263a)`, color: "#fff" }}>
+                  <div style={{ fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", fontWeight: 800, color: C.gold, marginBottom: 11 }}>{L("Price breakdown", "تفاصيل السعر")}</div>
+                  <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
+                    <div>
+                      <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".05em", color: "#94A3B8", fontWeight: 800, marginBottom: 3 }}>{L("Grand total · incl. VAT", "الإجمالي · شامل الضريبة")}</div>
+                      <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: "-.5px", fontVariantNumeric: "tabular-nums" }}>{nf(grandIncl)} {sar}</div>
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      <HeroPill>{L("Subtotal", "المجموع")}: {nf(subtotal)}</HeroPill>
+                      <HeroPill>{L("VAT 15%", "الضريبة ١٥٪")}: {nf(vat)}</HeroPill>
+                      <HeroPill>{items.length} {items.length === 1 ? L("item", "بند") : L("items", "بنود")}</HeroPill>
+                      {validUntil && <HeroPill danger={vExpired} warn={vSoon}>{vExpired ? L("⏱ Expired", "⏱ منتهٍ") : `⏱ ${fmtDate(validUntil)}`}</HeroPill>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Project + contract terms ── */}
+              {(projectTerms || contractTerms.length > 0) && (
+                <div style={card}>
+                  <CardHead icon="tune" title={L("Project terms", "شروط المشروع")} tag={L("From request", "من الطلب")} />
+                  <div style={{ padding: 16 }}>
                     {projectTerms && (
                       <>
-                        <div className="ro-grid">
-                          {projectTerms.location && <Cell k={L("Location", "الموقع")}>{projectTerms.lat != null && projectTerms.lng != null ? <a className="maplink" href={`https://www.google.com/maps?q=${projectTerms.lat},${projectTerms.lng}`} target="_blank" rel="noopener noreferrer">{projectTerms.location}<span className="material-icons-outlined">place</span></a> : projectTerms.location}</Cell>}
-                          {projectTerms.rentalBasis && <Cell k={L("Rental basis", "أساس الإيجار")}>{rentalBasisLabel(projectTerms.rentalBasis, L)}</Cell>}
-                          {projectTerms.startDate && <Cell k={L("Rental start", "بدء الإيجار")}>{fmtDate(projectTerms.startDate)}</Cell>}
-                          <Cell k={L("Rental end", "نهاية الإيجار")}>{projectTerms.endDate ? fmtDate(projectTerms.endDate) : L("Open-ended", "بدون نهاية محددة")}</Cell>
-                          {projectTerms.hoursPerDay != null && <Cell k={L("Hours per day", "ساعات/يوم")}>{projectTerms.hoursPerDay}</Cell>}
-                          {projectTerms.workingDaysPerWeek != null && <Cell k={L("Working days / week", "أيام العمل/أسبوع")}>{projectTerms.workingDaysPerWeek}</Cell>}
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12 }}>
+                          {projectTerms.location && <KV k={L("Location", "الموقع")}>{projectTerms.lat != null && projectTerms.lng != null ? <a href={`https://www.google.com/maps?q=${projectTerms.lat},${projectTerms.lng}`} target="_blank" rel="noopener noreferrer" style={{ color: C.blue, fontWeight: 700, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3 }}>{projectTerms.location}<span className="material-icons-outlined" style={{ fontSize: 14 }}>place</span></a> : projectTerms.location}</KV>}
+                          {projectTerms.rentalBasis && <KV k={L("Rental basis", "أساس الإيجار")}>{rentalBasisLabel(projectTerms.rentalBasis, L)}</KV>}
+                          {projectTerms.startDate && <KV k={L("Rental start", "بدء الإيجار")}>{fmtDate(projectTerms.startDate)}</KV>}
+                          <KV k={L("Rental end", "نهاية الإيجار")}>{projectTerms.endDate ? fmtDate(projectTerms.endDate) : L("Open-ended", "بدون نهاية محددة")}</KV>
+                          {projectTerms.hoursPerDay != null && <KV k={L("Hours per day", "ساعات/يوم")}>{projectTerms.hoursPerDay}</KV>}
+                          {projectTerms.workingDaysPerWeek != null && <KV k={L("Working days / week", "أيام العمل/أسبوع")}>{projectTerms.workingDaysPerWeek}</KV>}
                         </div>
-                        <div className="ro-hint">{L("Only details the renter set are shown.", "تُعرض فقط التفاصيل التي حدّدها المستأجر.")}</div>
+                        <div style={{ fontSize: 11, color: C.muted, marginTop: 10 }}>{L("Only details the renter set are shown.", "تُعرض فقط التفاصيل التي حدّدها المستأجر.")}</div>
                       </>
                     )}
                     {contractTerms.length > 0 && (
                       <>
-                        <div className="subhead"><span className="material-icons-outlined">gavel</span>{L("Contract terms — for all items", "شروط العقد — لكل البنود")}</div>
-                        <div className="tpills">
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "14px 0 9px", fontSize: 12, fontWeight: 800, color: C.navyMid }}><span className="material-icons-outlined" style={{ fontSize: 16 }}>gavel</span>{L("Contract terms — for all items", "شروط العقد — لكل البنود")}</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                           {contractTerms.map((c) => {
                             const ans = contractAns[c.key as keyof typeof contractAns];
-                            const cls = ans === true ? "yes" : ans === false ? "no" : "na";
-                            const icon = ans === true ? "check" : ans === false ? "close" : "remove";
-                            return (
-                              <span key={c.key} className={`tpill ${cls}`}>
-                                <span className="material-icons-outlined">{icon}</span>{c.label}: {c.value}
-                              </span>
-                            );
+                            const yes = ans === true, no = ans === false;
+                            const tone = yes ? { c: C.green, bg: C.greenBg } : no ? { c: C.danger, bg: C.dangerBg } : { c: C.muted, bg: C.surface };
+                            return <TermChip key={c.key} tone={tone} icon={yes ? "check" : no ? "close" : "remove"}>{c.label}: {c.value}</TermChip>;
                           })}
                         </div>
                       </>
                     )}
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Parties — supplier (gold) → renter (orange), app-quotation style */}
-                <div className="sec qparties">
-                  <div className="qp-col">
-                    <span className="qp-dot gold" />
-                    <div className="qp-lbl">{L("Supplier", "المورّد")}</div>
-                    <div className="qp-name">{submission.companyName}</div>
-                    <div className="qp-sub">{[submission.crNumber ? `CR ${submission.crNumber}` : null, submission.contactInfo].filter(Boolean).join(" · ") || "—"}</div>
+              {/* ── Parties ── */}
+              <div style={card}>
+                <CardHead icon="groups" title={L("Parties", "الأطراف")} />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
+                  <PartyCol dot={C.gold} label={L("Supplier", "المورّد")} name={submission.companyName} sub={[submission.crNumber ? `CR ${submission.crNumber}` : null, submission.contactInfo].filter(Boolean).join(" · ") || "—"} />
+                  <PartyCol dot={C.orange} label={L("Renter", "المستأجر")} name={form?.renter?.name || L("Renter", "المستأجر")} sub={form?.renter?.city ?? null} startBorder />
+                </div>
+              </div>
+
+              {/* ── Renter's notes ── */}
+              {renterNotes && (
+                <div style={card}>
+                  <CardHead icon="sticky_note_2" title={L("Renter's notes", "ملاحظات المستأجر")} tag={L("From request", "من الطلب")} />
+                  <p style={{ margin: 0, padding: 16, fontSize: 13, lineHeight: 1.6, color: C.navyMid }}>{renterNotes}</p>
+                </div>
+              )}
+
+              {/* ── Quoted items — per-item rows (rate/delivery/return are per-unit; amount = ×qty) ── */}
+              {items.length > 0 && (
+                <div style={card}>
+                  <CardHead icon="inventory_2" title={L("Quoted items", "البنود المُسعّرة")} />
+                  <div>
+                    {items.map((it, idx) => {
+                      const a = ansFor(it.requestItemId);
+                      const terms = TERM_KEYS.filter((k) => it.requiredTerms[k] != null);
+                      const label = (ar ? it.labelAr : it.label) || it.label || L("Equipment", "المعدة");
+                      const size = (ar ? it.sizeAr : it.size) || it.size || null;
+                      const q = (a?.numberOfUnits ?? it.numberOfUnits) || 1;
+                      const unit = it.priceUnit ? (ar ? UNIT_LABEL[it.priceUnit]?.[1] : UNIT_LABEL[it.priceUnit]?.[0]) ?? it.priceUnit : L("unit", "وحدة");
+                      const rate = a?.rentalRate ?? 0, del = a?.deliveryPrice ?? 0, ret = a?.returnPrice ?? 0;
+                      const amount = (rate + del + ret) * q;
+                      const conf = a?.confirmations ?? {};
+                      const ctx = [it.deliveryBy ? `${L("Delivery", "التوصيل")}: ${partyLabel(it.deliveryBy, L)}` : null, it.returnBy ? `${L("Return", "الإرجاع")}: ${partyLabel(it.returnBy, L)}` : null].filter(Boolean).join(" · ");
+                      return (
+                        <div key={it.requestItemId || idx} style={{ padding: 16, borderBottom: idx < items.length - 1 ? `1px solid ${C.line}` : "none" }}>
+                          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                            <div style={{ minWidth: 0 }}>
+                              <b style={{ fontSize: 14, fontWeight: 800, color: C.navy }}>{label}</b>
+                              {size && <div style={{ fontSize: 11.5, color: C.muted, fontWeight: 600, marginTop: 2 }}>{size}</div>}
+                              {ctx && <div style={{ fontSize: 11.5, color: C.muted, fontWeight: 600, marginTop: 2 }}>{ctx}</div>}
+                            </div>
+                            <div style={{ textAlign: "end", flexShrink: 0 }}>
+                              <div style={{ fontSize: 15, fontWeight: 900, color: C.orange, fontVariantNumeric: "tabular-nums" }}>{amount ? nf(amount) : "—"} <span style={{ fontSize: 11, color: C.muted }}>{sar}</span></div>
+                              <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginTop: 1 }}>{q} × {unit}</div>
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 9 }}>
+                            <MiniStat k={L("Rate", "السعر")} v={rate ? nf(rate) : "—"} />
+                            {del ? <MiniStat k={L("Delivery", "التوصيل")} v={nf(del)} /> : null}
+                            {ret ? <MiniStat k={L("Return", "الإرجاع")} v={nf(ret)} /> : null}
+                          </div>
+                          {terms.length > 0 && (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+                              {terms.map((k) => {
+                                const ok = conf[k];
+                                const val = (k === "operatorCert" || k === "equipmentCert") ? (it.requiredTerms[k] ?? "").toUpperCase() : it.requiredTerms[k];
+                                const tone = ok ? { c: C.green, bg: C.greenBg } : { c: C.danger, bg: C.dangerBg };
+                                return <TermChip key={k} tone={tone} icon={ok ? "check" : "close"}>{pillText(k, val ?? null, !!ok, L)}</TermChip>;
+                              })}
+                            </div>
+                          )}
+                          {it.notes && (
+                            <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 8, fontSize: 11.5, color: C.muted, fontStyle: "italic" }}>
+                              <span className="material-icons-outlined" style={{ fontSize: 14 }}>sticky_note_2</span>{it.notes}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div className="qp-col">
-                    <span className="qp-dot orange" />
-                    <div className="qp-lbl">{L("Renter", "المستأجر")}</div>
-                    <div className="qp-name">{form?.renter?.name || L("Renter", "المستأجر")}</div>
-                    {form?.renter?.city && <div className="qp-sub">{form.renter.city}</div>}
+                  <div style={{ padding: "12px 16px", borderTop: `1px solid ${C.line}`, background: C.surface }}>
+                    <TotalRow k={L("Subtotal", "المجموع")}>{nf(subtotal)} {sar}</TotalRow>
+                    <TotalRow k={L("VAT 15%", "ضريبة القيمة المضافة ١٥٪")}>{nf(vat)} {sar}</TotalRow>
+                    <TotalRow k={L("Grand total (incl. VAT)", "الإجمالي (شامل الضريبة)")} grand>{nf(grandIncl)} {sar}</TotalRow>
                   </div>
                 </div>
+              )}
 
-                {/* Renter's notes (read-only) */}
-                {renterNotes && (
-                  <div className="sec">
-                    <div className="sec-h"><span className="material-icons-outlined hdic">sticky_note_2</span><h3>{L("Renter's notes", "ملاحظات المستأجر")}</h3><span className="ro-tag">{L("From request", "من الطلب")}</span></div>
-                    <p className="rnote">{renterNotes}</p>
+              {/* ── Supplier's details ── */}
+              <div style={card}>
+                <CardHead icon="badge" title={L("Supplier's details", "بيانات المؤجّر")} />
+                <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                  <Field label={L("Company name", "اسم الشركة")} value={submission.companyName} />
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <Field label={L("CR number", "رقم السجل التجاري")} value={submission.crNumber} />
+                    <Field label={L("VAT number", "الرقم الضريبي")} value={submission.vatNumber} />
                   </div>
-                )}
-
-                {/* Quotation items — formal invoice line-item table (rate/delivery/return are per-unit; amount = ×qty). */}
-                {items.length > 0 && (
-                  <div className="sec" style={{ padding: 0, overflow: "hidden" }}>
-                    <div className="qitbl-wrap">
-                      <table className="qitbl">
-                        <thead>
-                          <tr>
-                            <th className="num">#</th>
-                            <th>{L("Description", "الوصف")}</th>
-                            <th className="num">{L("Unit", "الوحدة")}</th>
-                            <th className="num">{L("Qty", "العدد")}</th>
-                            <th className="num">{L("Rate", "السعر")}</th>
-                            <th className="num">{L("Delivery", "التوصيل")}</th>
-                            <th className="num">{L("Return", "الإرجاع")}</th>
-                            <th className="num">{L("Amount", "المبلغ")}</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {items.map((it, idx) => {
-                            const a = ansFor(it.requestItemId);
-                            const terms = TERM_KEYS.filter((k) => it.requiredTerms[k] != null);
-                            const label = (ar ? it.labelAr : it.label) || it.label || L("Equipment", "المعدة");
-                            const size = (ar ? it.sizeAr : it.size) || it.size || null;
-                            const q = (a?.numberOfUnits ?? it.numberOfUnits) || 1;
-                            const unit = it.priceUnit ? (ar ? UNIT_LABEL[it.priceUnit]?.[1] : UNIT_LABEL[it.priceUnit]?.[0]) ?? it.priceUnit : L("unit", "وحدة");
-                            const rate = a?.rentalRate ?? 0, del = a?.deliveryPrice ?? 0, ret = a?.returnPrice ?? 0;
-                            const amount = (rate + del + ret) * q;
-                            const conf = a?.confirmations ?? {};
-                            const ctx = [it.deliveryBy ? `${L("Delivery", "التوصيل")}: ${partyLabel(it.deliveryBy, L)}` : null, it.returnBy ? `${L("Return", "الإرجاع")}: ${partyLabel(it.returnBy, L)}` : null].filter(Boolean).join(" · ");
-                            return (
-                              <Fragment key={it.requestItemId || idx}>
-                                <tr className="r-main">
-                                  <td className="num mono">{idx + 1}</td>
-                                  <td className="desc"><b>{label}</b>{size && <div className="sz">{size}</div>}{ctx && <div className="sz">{ctx}</div>}</td>
-                                  <td className="num">{unit}</td>
-                                  <td className="num mono">{q}</td>
-                                  <td className="num mono">{rate ? nf(rate) : "—"}</td>
-                                  <td className="num mono">{del ? nf(del) : "—"}</td>
-                                  <td className="num mono">{ret ? nf(ret) : "—"}</td>
-                                  <td className="num mono amt">{amount ? nf(amount) : "—"}</td>
-                                </tr>
-                                {(terms.length > 0 || it.notes) && (
-                                  <tr className="r-terms">
-                                    <td></td>
-                                    <td colSpan={7}>
-                                      {terms.length > 0 && (
-                                        <div className="tpills">
-                                          {terms.map((k) => {
-                                            const ok = conf[k];
-                                            const val = (k === "operatorCert" || k === "equipmentCert") ? (it.requiredTerms[k] ?? "").toUpperCase() : it.requiredTerms[k];
-                                            return (
-                                              <span key={k} className={`tpill ${ok ? "yes" : "no"}`}>
-                                                <span className="material-icons-outlined">{ok ? "check" : "close"}</span>{pillText(k, val ?? null, !!ok, L)}
-                                              </span>
-                                            );
-                                          })}
-                                        </div>
-                                      )}
-                                      {it.notes && <div className="qi-note"><span className="material-icons-outlined">sticky_note_2</span>{it.notes}</div>}
-                                    </td>
-                                  </tr>
-                                )}
-                              </Fragment>
-                            );
-                          })}
-                        </tbody>
-                        <tfoot>
-                          <tr><td colSpan={7} className="lbl">{L("Subtotal", "المجموع")}</td><td className="num mono">{nf(subtotal)} {sar}</td></tr>
-                          <tr><td colSpan={7} className="lbl">{L("VAT 15%", "ضريبة القيمة المضافة ١٥٪")}</td><td className="num mono">{nf(vat)} {sar}</td></tr>
-                          <tr className="g"><td colSpan={7} className="lbl">{L("Grand total (incl. VAT)", "الإجمالي (شامل الضريبة)")}</td><td className="val">{nf(grandIncl)} {sar}</td></tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {/* Supplier's details (read-only) */}
-                <div className="sec">
-                  <div className="sec-h"><span className="material-icons-outlined hdic">badge</span><h3>{L("Supplier's details", "بيانات المؤجّر")}</h3></div>
-                  <RoField label={L("Company name", "اسم الشركة")} value={submission.companyName} />
-                  <div className="frow">
-                    <RoField label={L("CR number", "رقم السجل التجاري")} value={submission.crNumber} />
-                    <RoField label={L("VAT number", "الرقم الضريبي")} value={submission.vatNumber} />
-                  </div>
-                  <RoField label={L("National address", "العنوان الوطني")} value={submission.nationalAddress} />
-                  <RoField label={L("Contact info", "بيانات التواصل")} value={submission.contactInfo} />
+                  <Field label={L("National address", "العنوان الوطني")} value={submission.nationalAddress} />
+                  <Field label={L("Contact info", "بيانات التواصل")} value={submission.contactInfo} />
                   {submission.notes && (
-                    <div className="notes-field"><label>{L("Notes — for the whole quotation", "ملاحظات — لكامل عرض السعر")}</label><p className="notes-ro">{submission.notes}</p></div>
+                    <div>
+                      <div style={{ fontSize: 11.5, fontWeight: 800, color: C.muted, marginBottom: 4 }}>{L("Notes — for the whole quotation", "ملاحظات — لكامل عرض السعر")}</div>
+                      <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: C.navyMid, background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 12px" }}>{submission.notes}</p>
+                    </div>
                   )}
                 </div>
-
-                <div className="qfoot">{L("Powered by", "مُشغّل بواسطة")} <b>Moedatech</b></div>
               </div>
+
+              <div style={{ textAlign: "center", fontSize: 11, fontWeight: 600, color: "#9AA7B8", padding: "4px 0 2px", letterSpacing: ".02em" }}>{L("Powered by", "مُشغّل بواسطة")} <b style={{ color: C.navy, fontWeight: 800 }}>Moedatech</b></div>
             </div>
           )}
         </div>
@@ -362,16 +342,83 @@ export function SharedBidSubmissionModal({
   );
 }
 
-function Cell({ k, children }: { k: string; children: React.ReactNode }) {
-  return <div className="ro-cell"><div className="k">{k}</div><div className="v">{children}</div></div>;
+/** Section card header: icon tile + title + optional "From request" tag. */
+function CardHead({ icon, title, tag }: { icon: string; title: string; tag?: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: `1px solid ${C.line}` }}>
+      <span style={{ width: 32, height: 32, borderRadius: 9, background: C.surface, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><span className="material-icons-outlined" style={{ fontSize: 18, color: C.navy }}>{icon}</span></span>
+      <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: C.navy }}>{title}</h3>
+      {tag && <span style={{ marginInlineStart: "auto", fontSize: 10.5, fontWeight: 800, color: C.blue, background: C.blueBg, padding: "3px 9px", borderRadius: 20 }}>{tag}</span>}
+    </div>
+  );
 }
 
-/** Read-only company field — same look as the form's input, filled and disabled. */
-function RoField({ label, value }: { label: string; value: string | null | undefined }) {
+/** Top meta item (Quotation / RFQ / Issued / Valid until / Bids close). */
+function Meta({ k, v, mono, tone }: { k: string; v: string; mono?: boolean; tone?: { c: string; bg: string } }) {
   return (
-    <div className="field">
-      <label>{label}</label>
-      <input value={value ?? "—"} readOnly />
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <span style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".05em", color: C.muted }}>{k}</span>
+      {tone
+        ? <span style={{ fontSize: 12, fontWeight: 800, color: tone.c, background: tone.bg, padding: "1px 8px", borderRadius: 6, alignSelf: "flex-start" }}>{v}</span>
+        : <b style={{ fontSize: 12.5, fontWeight: 700, color: C.navy, fontFamily: mono ? "ui-monospace, monospace" : undefined }}>{v}</b>}
+    </div>
+  );
+}
+
+/** Navy price-hero pill. */
+function HeroPill({ children, danger, warn }: { children: React.ReactNode; danger?: boolean; warn?: boolean }) {
+  const style = danger
+    ? { background: "rgba(217,54,42,.22)", borderColor: "rgba(255,150,140,.5)", color: "#FFD9D4" }
+    : warn
+    ? { background: "rgba(212,120,10,.28)", borderColor: "rgba(247,190,120,.5)", color: "#FFE3BE" }
+    : { background: "rgba(255,255,255,.08)", borderColor: "rgba(255,255,255,.14)", color: "#E2E8F0" };
+  return <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 6, padding: "4px 9px", border: `1px solid ${style.borderColor}`, background: style.background, color: style.color, fontVariantNumeric: "tabular-nums" }}>{children}</span>;
+}
+
+/** Project-terms key/value. */
+function KV({ k, children }: { k: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div style={{ fontSize: 10.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".03em", color: C.muted, marginBottom: 3 }}>{k}</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: C.navy }}>{children}</div>
+    </div>
+  );
+}
+
+function TermChip({ children, tone, icon }: { children: React.ReactNode; tone: { c: string; bg: string }; icon: string }) {
+  return <span style={{ display: "inline-flex", alignItems: "center", gap: 4, borderRadius: 7, padding: "4px 9px", fontSize: 11, fontWeight: 700, color: tone.c, background: tone.bg }}><span className="material-icons-outlined" style={{ fontSize: 13 }}>{icon}</span>{children}</span>;
+}
+
+function PartyCol({ dot, label, name, sub, startBorder }: { dot: string; label: string; name: string; sub: string | null; startBorder?: boolean }) {
+  return (
+    <div style={{ padding: "14px 16px", borderInlineStart: startBorder ? `1px solid ${C.line}` : undefined }}>
+      <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: dot, marginBottom: 7 }} />
+      <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".05em", color: C.muted, marginBottom: 3 }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 800, color: C.navy, lineHeight: 1.2 }}>{name}</div>
+      {sub && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 3 }}>{sub}</div>}
+    </div>
+  );
+}
+
+function MiniStat({ k, v }: { k: string; v: string }) {
+  return <span style={{ fontSize: 12, color: C.navyMid, fontWeight: 600 }}>{k}: <b style={{ color: C.navy, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{v}</b></span>;
+}
+
+function TotalRow({ k, children, grand }: { k: string; children: React.ReactNode; grand?: boolean }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: grand ? "9px 0 2px" : "5px 0", marginTop: grand ? 4 : 0, borderTop: grand ? `2px solid ${C.border}` : "none" }}>
+      <span style={{ fontSize: grand ? 13.5 : 12.5, fontWeight: grand ? 800 : 600, color: grand ? C.navy : C.muted }}>{k}</span>
+      <span style={{ fontSize: grand ? 16 : 13, fontWeight: grand ? 900 : 700, color: grand ? C.orange : C.navy, fontVariantNumeric: "tabular-nums" }}>{children}</span>
+    </div>
+  );
+}
+
+/** Read-only supplier field — label + boxed value. */
+function Field({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <div>
+      <div style={{ fontSize: 11.5, fontWeight: 800, color: C.muted, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 13.5, fontWeight: 600, color: value ? C.navy : C.muted, background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 12px" }}>{value || "—"}</div>
     </div>
   );
 }
@@ -387,91 +434,9 @@ function rentalBasisLabel(v: string, L: (e: string, a: string) => string) {
   return e ? L(e[0], e[1]) : v;
 }
 
-/** Compact pill text for a term: include the requested value on conflicts (so the gap is clear) and on
- *  value-bearing terms (year/cert/nationality/fuel type); just the label for plain met terms. */
+/** Compact pill text for a term: include the requested value on conflicts + value-bearing terms. */
 function pillText(k: TermKey, reqVal: string | null, ok: boolean, L: (e: string, a: string) => string): string {
   const label = L(TERM_LABEL[k][0], TERM_LABEL[k][1]);
   const withVal = !ok || k === "year" || k === "operatorCert" || k === "equipmentCert" || k === "nationality" || k === "fuelType";
   return withVal && reqVal ? `${label}: ${reqVal}` : label;
 }
-
-/** App-quotation template styling (ported from the deal-room PDF: navy header + orange accent + navy
- *  price hero + striped section cards + Supplier/Renter dots) + print isolation. Scoped to .qdoc so it
- *  recolors only the quotation viewer, not the public form. */
-const QUOTE_CSS = `
-/* Match the PDF palette (cooler grays, ORANGE #E8650A, GOLD #D4A840, SUCCESS #16A34A). */
-.bidpage.inview.qdoc{--action:#E8650A;--success:#16A34A;--danger:#D9362A;--muted:#64748B;--navy:#1C3550;--navy-deep:#12263A;--navy-mid:#1C3550;--surface2:#F1F5F9;--line:#E2E8F0;--border:#E2E8F0}
-/* Header bar + ref pill */
-.qbar{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;background:var(--navy-deep);color:#fff;border-radius:var(--r-lg) var(--r-lg) 0 0;padding:16px 18px}
-.qbar-l{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.qbar-title{font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:#fff}
-.qbar-ref{font-family:"IBM Plex Sans",monospace;font-size:11px;font-weight:700;color:#E2E8F0;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);border-radius:5px;padding:3px 8px}
-.qbar-r{display:flex;flex-wrap:wrap;gap:6px 22px;justify-content:flex-end}
-.qbar-r > div{display:flex;flex-direction:column;gap:1px;text-align:end}
-.qbar-r span{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8}
-.qbar-r b{font-size:12px;font-weight:700;color:#fff;font-family:"IBM Plex Sans",monospace}
-.qaccent{height:3px;background:var(--action)}
-/* Price hero */
-.qhero{background:var(--navy);color:#fff;border-radius:0 0 var(--r-md) var(--r-md);padding:16px 18px;margin-bottom:14px}
-.qhero-h{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#D4A840;margin-bottom:11px}
-.qhero-main{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap}
-.qhero-lbl{display:block;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;margin-bottom:3px}
-.qhero-val{font-family:"IBM Plex Sans",monospace;font-size:26px;font-weight:800;color:#fff;letter-spacing:-.5px}
-.qhero-pills{display:flex;flex-wrap:wrap;gap:6px}
-.qpill{font-size:11px;font-weight:700;color:#E2E8F0;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:5px;padding:4px 9px;font-variant-numeric:tabular-nums}
-/* Section cards: navy top stripe + navy title */
-.qdoc .sec{border-top:3px solid var(--navy)}
-.qdoc .sec-h h3{color:var(--navy)}
-/* Parties card */
-.qdoc .sec.qparties{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:14px 0}
-.qparties .qp-col{padding:2px 18px}
-.qparties .qp-col:first-child{border-inline-end:1px solid var(--line)}
-.qp-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-bottom:7px}
-.qp-dot.gold{background:#D4A840}
-.qp-dot.orange{background:var(--action)}
-.qp-lbl{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:3px}
-.qp-name{font-size:14px;font-weight:800;color:#1E293B;line-height:1.2}
-.qp-sub{font-size:11.5px;color:var(--muted);margin-top:3px}
-/* Footer */
-.qfoot{text-align:center;color:var(--muted);font-size:11px;font-weight:600;padding:18px 0 4px;letter-spacing:.02em}
-.qfoot b{color:var(--navy);font-weight:800}
-@media(max-width:560px){.qdoc .sec.qparties{grid-template-columns:1fr;gap:14px}.qparties .qp-col:first-child{border-inline-end:0;border-bottom:1px solid var(--line);padding-bottom:14px}}
-/* Formal invoice line-item table */
-.qitbl-wrap{overflow-x:auto}
-.qitbl{width:100%;border-collapse:collapse;font-size:13px;min-width:560px}
-.qitbl thead th{background:var(--navy);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:11px 12px;text-align:start;white-space:nowrap}
-.qitbl thead th.num{text-align:end}
-.qitbl .num{text-align:end;font-variant-numeric:tabular-nums}
-.qitbl .mono{font-family:"IBM Plex Sans",monospace;font-weight:700}
-.qitbl tbody td{padding:12px;vertical-align:top}
-.qitbl .r-main td{border-bottom:0;padding-bottom:6px}
-.qitbl .r-main .desc b{font-size:13.5px;font-weight:800}
-.qitbl .r-main .desc .sz{font-size:11.5px;color:var(--muted);font-weight:600;margin-top:2px}
-.qitbl .r-main .amt{font-weight:800}
-.qitbl .r-terms td{padding-top:0;padding-bottom:14px;border-bottom:1px solid var(--line)}
-.qitbl tbody tr:last-child td{border-bottom:0}
-.qi-note{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);font-style:italic;margin-top:7px}
-.qi-note .material-icons-outlined{font-size:14px}
-.qitbl tfoot td{padding:9px 12px;font-size:13px}
-.qitbl tfoot .lbl{text-align:end;color:var(--muted);font-weight:600}
-.qitbl tfoot .num{font-family:"IBM Plex Sans",monospace;font-weight:700;color:var(--navy)}
-.qitbl tfoot .g .lbl{color:var(--navy);font-weight:800;font-size:14px}
-.qitbl tfoot .g td{border-top:2px solid var(--border)}
-.qitbl tfoot .g .val{text-align:end;font-family:"IBM Plex Sans",monospace;font-weight:800;font-size:16px;color:var(--action);white-space:nowrap}
-.tpills{display:flex;flex-wrap:wrap;gap:5px}
-.tpill{display:inline-flex;align-items:center;gap:3px;border-radius:6px;padding:3px 9px;font-size:11px;font-weight:700}
-.tpill .material-icons-outlined{font-size:13px}
-.tpill.yes{background:var(--success-bg);color:var(--success)}
-.tpill.no{background:var(--danger-bg);color:var(--danger)}
-.tpill.na{background:var(--surface2);color:var(--muted);border:1px solid var(--line)}
-@media print{
-  html,body{height:auto!important;overflow:visible!important;background:#fff!important}
-  body *{visibility:hidden!important}
-  .qdoc,.qdoc *{visibility:visible!important}
-  .qdoc{position:absolute!important;left:0;top:0;width:100%!important}
-  .slb-overlay,.slb-modal{position:static!important;max-height:none!important;overflow:visible!important;background:#fff!important;inset:auto!important;padding:0!important;border:0!important;box-shadow:none!important}
-  .slb-modal > div{max-height:none!important;overflow:visible!important}
-  .qprint-hide{display:none!important}
-  .sec,.qhead,.grand{break-inside:avoid}
-}
-`;
