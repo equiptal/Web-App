@@ -770,30 +770,28 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
             </div>
           </div>
 
-          {/* ── Rank the table by what matters — always visible, inline above the table (AC-20/21) ── */}
-          <div className="rounded-xl border px-4 py-3.5" style={{ borderColor: C.border, background: "#fff" }}>
-            <div className="mb-2.5 flex flex-wrap items-center gap-2 text-[12.5px] font-extrabold" style={{ color: C.navyMid }}>
-              <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>tune</span>{L("Rank the table by what matters to you", "رتّب الجدول حسب ما يهمّك")}
-              <span className="ms-auto">{agentBadge()}</span>
-            </div>
-            <div className="mb-3 flex flex-wrap gap-2">
+          {/* ── Rank band — one compact horizontal row (⇅ Rank by · chips · Ask-AI input+Re-rank · AI badge) ── */}
+          <div className="rounded-xl border px-4 py-3" style={{ borderColor: C.border, background: "#fff" }}>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="inline-flex flex-none items-center gap-1.5 text-[12.5px] font-extrabold" style={{ color: C.navy }}>
+                <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>swap_vert</span>{L("Rank by", "رتّب حسب")}
+              </span>
               {presetDefs.map(([p, ic, en, arl]) => (
-                <button key={p} onClick={() => choosePreset(p, en, arl)} className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-bold transition"
-                  style={preset === p && !fxEcho ? { background: C.navy, borderColor: C.navy, color: "#fff" } : { background: C.surface2, borderColor: C.border, color: C.navyMid }}>
-                  <span className="material-icons-outlined" style={{ fontSize: 16 }}>{ic}</span>{ar ? arl : en}
+                <button key={p} onClick={() => choosePreset(p, en, arl)} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-bold transition"
+                  style={preset === p && !fxEcho ? { background: C.navy, color: "#fff" } : { background: C.surface2, color: C.navyMid, border: `1px solid ${C.border}` }}>
+                  <span className="material-icons-outlined" style={{ fontSize: 15 }}>{ic}</span>{ar ? arl : en}
                 </button>
               ))}
-            </div>
-            <div className="flex flex-wrap gap-2.5">
-              <div className="flex h-[46px] flex-1 items-center gap-2.5 rounded-lg border px-3.5" style={{ background: C.surface2, borderColor: C.border }}>
-                <span className="material-icons-outlined" style={{ fontSize: 19, color: C.action }}>auto_awesome</span>
+              <div className="flex h-[40px] min-w-[220px] flex-1 items-center gap-2 rounded-full border ps-3.5 pe-1.5" style={{ background: "#fff", borderColor: C.border }}>
+                <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>auto_awesome</span>
                 <input value={freeText} onChange={(e) => setFreeText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") applyFreeText(); }}
-                  placeholder={L("Tell your assistant what matters — e.g. 'closest machine, fuel must be included'…", "أخبر مساعدك بما يهمّك — مثلاً: 'أقرب معدّة، ويجب أن يكون الوقود مشمولاً'…")}
-                  className="min-w-0 flex-1 bg-transparent text-[14px] outline-none" style={{ color: C.navy }} />
+                  placeholder={L("Ask AI — e.g. closest machine, newest with operator…", "اسأل الذكاء — مثلاً أقرب معدّة، الأحدث مع مشغّل…")}
+                  className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold outline-none" style={{ color: C.navy }} />
+                <button onClick={applyFreeText} className="inline-flex flex-none items-center gap-1 rounded-full px-3 py-1.5 text-[12.5px] font-extrabold text-white" style={{ background: C.action }}>
+                  <span className="material-icons-outlined" style={{ fontSize: 15, transform: ar ? "scaleX(-1)" : undefined }}>send</span>{L("Re-rank", "إعادة")}
+                </button>
               </div>
-              <button onClick={applyFreeText} className="inline-flex items-center gap-1.5 rounded-lg px-4 text-[13.5px] font-bold text-white" style={{ background: C.action }}>
-                <span className="material-icons-outlined" style={{ fontSize: 18 }}>send</span>{L("Re-rank", "إعادة الترتيب")}
-              </button>
+              <span className="flex-none">{agentBadge()}</span>
             </div>
             {fxEcho && (
               <div className="mt-3 flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-[12.5px]" style={{ background: C.actionDim, borderColor: "rgba(247,144,9,.3)", color: "#8A5A06" }}>
@@ -914,41 +912,52 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                 </colgroup>
                 <thead>
                   <tr>
-                    <th className="sticky start-0 z-[3] p-3 text-start align-top text-[12.5px] font-bold" style={{ background: C.surface2, color: C.navyMid, width: 190, minWidth: 190, borderBottom: `1px solid ${C.line}` }}>
-                      {durationDays ? L(`${durationDays}-day rental · ${units} unit${units > 1 ? "s" : ""}`, `إيجار ${durationDays} يوم · ${units} وحدة`) : L("Comparison", "المقارنة")}
+                    <th className="sticky start-0 z-[3] p-3 text-start align-bottom" style={{ background: C.surface2, width: 200, minWidth: 200, borderBottom: `1px solid ${C.line}` }}>
+                      <span className="text-[11px] font-black" style={{ color: C.muted, letterSpacing: ".06em" }}>{L("SUPPLIER", "المؤجّر")}</span>
                     </th>
                     {cols.map((c, idx) => {
                       const isPick = c.bid.id === pickId;
                       const isUpload = c.bid.id.startsWith("upload:");
                       const recog = rec?.ranking.find((r) => r.bid_id === c.bid.id)?.recognition ?? null;
+                      // prototype: rank pill per column — top of the current order = "Recommended" (green), rest = "Rank #N".
+                      const rankWord = idx === 0 ? L("Recommended", "موصى به") : L(`Rank #${idx + 1}`, `المركز #${idx + 1}`);
+                      const rankStyle = idx === 0 ? { background: C.successBg, color: C.success } : { background: C.surface3, color: C.muted };
                       return (
-                        <th key={c.bid.id} className="p-3 text-start align-top transition-colors" style={{ minWidth: 215, background: isPick ? "linear-gradient(180deg,#E7F7EE,#fff)" : "#fff", borderBottom: `1px solid ${C.line}`, boxShadow: isPick ? `inset 0 4px 0 ${C.success}` : undefined }}>
-                          <div className="flex items-start gap-2.5">
-                            <div className="relative flex-none">
-                              <div className="grid h-9 w-9 place-items-center rounded-lg text-[13px] font-extrabold" style={{ background: C.surface3, color: C.navy }}>{c.bid.supplierName.slice(0, 2).toUpperCase()}</div>
-                              {cols.length > 1 && agentLive && <span className="absolute -top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 font-mono text-[10px] font-black text-white" style={{ background: idx === 0 ? C.success : C.navyMid, insetInlineStart: "-6px" }}>#{idx + 1}</span>}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <b className="flex items-center gap-1 text-[14px] leading-tight" style={{ color: C.navy }}>
-                                {isPick && <span className="grid h-[18px] w-[18px] flex-none place-items-center rounded-md" style={{ background: `linear-gradient(135deg,${C.action},#FFA733)` }} title={L("AI pick · best match", "اختيار المساعد · الأنسب")}><span className="material-icons-outlined" style={{ fontSize: 12, color: "#fff" }}>auto_awesome</span></span>}
-                                <span className="truncate">{c.bid.supplierName}</span>
-                                <span className="material-icons-outlined flex-none" style={{ fontSize: 15, color: c.bid.verified ? C.success : C.danger }} title={c.bid.verified ? L("Verified supplier", "مؤجّر موثّق") : L("Not verified", "غير موثّق")}>{c.bid.verified ? "verified" : "gpp_bad"}</span>
-                              </b>
-                              <span className="mt-0.5 inline-flex items-center gap-1 text-[10.5px] font-bold" style={{ color: c.bid.viaSharedLink ? C.action : C.muted }}>
-                                <span className="material-icons-outlined" style={{ fontSize: 13 }}>{isUpload ? "description" : c.bid.viaSharedLink ? "link" : "smartphone"}</span>
-                                {isUpload ? L("From uploaded file", "من ملف مرفوع") : c.bid.viaSharedLink ? L("via shared link", "عبر الرابط") : L("via Moedatech app", "عبر تطبيق معداتك")}
+                        <th key={c.bid.id} className="p-0 text-start align-top transition-colors" style={{ minWidth: 215, background: isPick ? "linear-gradient(180deg,#E7F7EE,#fff)" : "#fff", borderBottom: `1px solid ${C.line}` }}>
+                          <div style={{ height: 4, background: idx === 0 ? C.success : "transparent" }} />
+                          <div className="p-3">
+                            {/* rank pill + remove */}
+                            <div className="mb-2.5 flex items-center justify-between gap-2">
+                              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-extrabold" style={rankStyle}>
+                                <span className="material-icons-outlined" style={{ fontSize: 13 }}>emoji_events</span>{rankWord}
                               </span>
+                              <button onClick={() => toggleBid(c.bid.id)} title={L("Remove from comparison", "إزالة من المقارنة")} className="grid h-[22px] w-[22px] flex-none place-items-center rounded-full" style={{ background: C.surface2, color: C.muted }}>
+                                <span className="material-icons-outlined" style={{ fontSize: 14 }}>close</span>
+                              </button>
                             </div>
-                            {/* remove this bid from the comparison (same as un-ticking it in the selector) */}
-                            <button onClick={() => toggleBid(c.bid.id)} title={L("Remove from comparison", "إزالة من المقارنة")} className="grid h-6 w-6 flex-none place-items-center rounded-full border" style={{ borderColor: C.border, color: C.muted, background: "#fff" }}>
-                              <span className="material-icons-outlined" style={{ fontSize: 15 }}>close</span>
-                            </button>
+                            {/* avatar + name + rating/source */}
+                            <div className="flex items-center gap-2.5">
+                              <div className="grid h-9 w-9 flex-none place-items-center rounded-[10px] text-[14px] font-extrabold text-white" style={{ background: C.navy }}>{c.bid.supplierName.slice(0, 1).toUpperCase()}</div>
+                              <div className="min-w-0 flex-1">
+                                <b className="flex items-center gap-1 text-[14px] leading-tight" style={{ color: C.navy }}>
+                                  <span className="truncate">{c.bid.supplierName}</span>
+                                  <span className="material-icons-outlined flex-none" style={{ fontSize: 15, color: c.bid.verified ? C.success : C.danger }} title={c.bid.verified ? L("Verified supplier", "مؤجّر موثّق") : L("Not verified", "غير موثّق")}>{c.bid.verified ? "verified" : "gpp_bad"}</span>
+                                </b>
+                                <div className="mt-0.5 flex items-center gap-2 whitespace-nowrap text-[10.5px] font-bold">
+                                  {c.bid.rating != null && <span className="inline-flex items-center gap-0.5" style={{ color: C.action }}><span className="material-icons-outlined" style={{ fontSize: 12 }}>star</span>{c.bid.rating}</span>}
+                                  <span className="inline-flex items-center gap-1" style={{ color: c.bid.viaSharedLink ? C.action : C.muted }}>
+                                    <span className="material-icons-outlined" style={{ fontSize: 12 }}>{isUpload ? "description" : c.bid.viaSharedLink ? "link" : "smartphone"}</span>
+                                    {isUpload ? L("uploaded file", "ملف مرفوع") : c.bid.viaSharedLink ? L("shared link", "رابط") : L("Moedatech app", "تطبيق معداتك")}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            {/* company doc chips */}
+                            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                              {companyDocChips(c.bid).map((d) => <span key={d.lbl}>{docChip(c, d.lbl, d.has, d.hint)}</span>)}
+                            </div>
+                            {recog && <span className="mt-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-bold" style={{ background: C.renteeDim, color: "#1E4FB8", borderColor: "rgba(37,99,235,.28)" }}><span className="material-icons-outlined" style={{ fontSize: 13, color: C.rentee }}>history</span>{recog}</span>}
                           </div>
-                          {/* identity: company documents below the name (verified is the tick beside the name) — clickable to open the file */}
-                          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                            {companyDocChips(c.bid).map((d) => <span key={d.lbl}>{docChip(c, d.lbl, d.has, d.hint)}</span>)}
-                          </div>
-                          {recog &&<span className="mt-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-bold" style={{ background: C.renteeDim, color: "#1E4FB8", borderColor: "rgba(37,99,235,.28)" }}><span className="material-icons-outlined" style={{ fontSize: 13, color: C.rentee }}>history</span>{recog}</span>}
                         </th>
                       );
                     })}
