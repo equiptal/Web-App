@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { useRealAgent, serverEnv } from "@/lib/config/env";
-import { unwrapEnvelope } from "@/lib/api/agent-adapters";
+import { unwrapEnvelope, mansourReason } from "@/lib/api/agent-adapters";
 import type { NormalizeRequest } from "@/lib/contract/agent";
 
 /**
@@ -40,16 +40,18 @@ export async function POST(req: Request) {
         cache: "no-store",
       });
       if (!res.ok) {
-        console.error("[agent] /rfq/jobs HTTP", res.status);
-        return NextResponse.json({ code: "network" }, { status: 503 });
+        // Forward the agent's REAL failure reason + status so the UI can show it (not a bare "network").
+        const reason = await mansourReason(res);
+        console.error("[agent] /rfq/jobs HTTP", res.status, reason ?? "");
+        return NextResponse.json({ code: "network", detail: reason, backendStatus: res.status }, { status: 503 });
       }
       const a = unwrapEnvelope(await res.json());
       const jobId = a.job_id ?? a.jobId ?? a.id;
-      if (!jobId) return NextResponse.json({ code: "network" }, { status: 503 });
+      if (!jobId) return NextResponse.json({ code: "network", detail: "The AI assistant did not start a job.", backendStatus: res.status }, { status: 503 });
       return NextResponse.json({ jobId: String(jobId) }, { status: 202 });
     } catch (err) {
       console.error("[agent] start job failed:", err);
-      return NextResponse.json({ code: "network" }, { status: 503 });
+      return NextResponse.json({ code: "network", detail: err instanceof Error ? err.message : undefined }, { status: 503 });
     }
   }
 

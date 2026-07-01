@@ -127,9 +127,9 @@ export async function processRfq(input: ProcessInput): Promise<AgentDraft> {
       throw new ApiError("network");
     }
     if (!res.ok) throw new ApiError("network");
-    const data = (await res.json()) as { status: string; draft?: AgentDraft; code?: ApiErrorKind };
+    const data = (await res.json()) as { status: string; draft?: AgentDraft; code?: ApiErrorKind; detail?: string; messageAr?: string; backendStatus?: number };
     if (data.status === "done" && data.draft) return data.draft;
-    if (data.status === "error") throw new ApiError(data.code ?? "network");
+    if (data.status === "error") throw new ApiError(data.code ?? "network", "agent job error", { detail: data.detail, messageAr: data.messageAr, backendStatus: data.backendStatus });
     await sleep(2000);
   }
   throw new ApiError("network"); // timed out

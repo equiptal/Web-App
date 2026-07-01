@@ -8,7 +8,7 @@ import { Button, Badge, Icon } from "@/components/ui";
 export function Processing() {
   const t = useT();
   const { state, actions } = useRfq();
-  const { busy, error, draft } = state;
+  const { busy, error, draft, errorDetail } = state;
 
   const stages = [t.processing.stage1, t.processing.stage2, t.processing.stage3, t.processing.stage4];
 
@@ -32,6 +32,14 @@ export function Processing() {
   /* ----------------------------- Error (AC-09 / AC-10) — clear modal ----------------------------- */
   if (error) {
     const isEmpty = error === "empty";
+    // Distinguish the agent's real failure (forwarded from Mansour) from a plain connection drop, so the
+    // reason is clear: 429 = busy/rate-limited, 402/403 = unavailable (usage/credits/auth).
+    const bs = errorDetail?.backendStatus;
+    const agentBusy = bs === 429;
+    const agentDown = bs === 402 || bs === 403;
+    const title = isEmpty ? t.errors.emptyTitle : agentBusy ? t.errors.busyTitle : agentDown ? t.errors.unavailableTitle : t.errors.networkTitle;
+    const body = isEmpty ? t.errors.emptyBody : agentBusy ? t.errors.busyBody : agentDown ? t.errors.unavailableBody : t.errors.networkBody;
+    const icon = isEmpty ? "search_off" : agentBusy ? "hourglass_empty" : agentDown ? "cloud_off" : "wifi_off";
     return (
       <div
         className="fixed inset-0 z-[70] flex items-center justify-center bg-navy/45 p-4"
@@ -48,11 +56,14 @@ export function Processing() {
           >
             <Icon name="close" size={18} />
           </button>
-          <div className={`mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full ${isEmpty ? "bg-warn-soft text-warn" : "bg-danger-soft text-danger"}`}>
-            <Icon name={isEmpty ? "search_off" : "wifi_off"} size={34} />
+          <div className={`mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full ${isEmpty || agentBusy ? "bg-warn-soft text-warn" : "bg-danger-soft text-danger"}`}>
+            <Icon name={icon} size={34} />
           </div>
-          <h2 id="proc-err-title" className="text-[19px] font-extrabold tracking-tight text-navy">{isEmpty ? t.errors.emptyTitle : t.errors.networkTitle}</h2>
-          <p className="mx-auto mt-2 max-w-[300px] text-[14px] leading-relaxed text-muted">{isEmpty ? t.errors.emptyBody : t.errors.networkBody}</p>
+          <h2 id="proc-err-title" className="text-[19px] font-extrabold tracking-tight text-navy">{title}</h2>
+          <p className="mx-auto mt-2 max-w-[300px] text-[14px] leading-relaxed text-muted">{body}</p>
+          {errorDetail?.detail && (
+            <p className="mx-auto mt-3 max-w-[320px] break-words rounded-lg bg-surface3 px-3 py-2 text-start font-mono text-[11.5px] leading-snug text-muted">{errorDetail.detail}</p>
+          )}
           <Button className="mt-6 w-full py-3 text-[15px]" onClick={() => actions.process()}>
             <Icon name="refresh" size={19} /> {t.common.retry}
           </Button>

@@ -417,6 +417,10 @@ export const en = {
     emptyBody: "Try again, or edit what you pasted.",
     networkTitle: "Connection problem", // AC-10 tentative
     networkBody: "Something went wrong. Your input is saved — try again.",
+    busyTitle: "The AI assistant is busy",
+    busyBody: "It's handling a lot of requests right now. Your input is saved — try again in a moment.",
+    unavailableTitle: "The AI assistant is unavailable",
+    unavailableBody: "It couldn't process your request right now. Your input is saved — try again shortly.",
     switchManual: "Switch to Manual",
   },
   options: {

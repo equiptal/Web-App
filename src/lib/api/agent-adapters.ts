@@ -99,6 +99,23 @@ export function jobStatus(raw: unknown): "pending" | "done" | "error" {
   return extractAgentOutput(raw).line_items.length > 0 || a.extraction_empty === true || isObj(a.data) ? "done" : "pending";
 }
 
+/** Pull the human reason out of Mansour's error shape `{ ok:false, error:{ message } }` / `{ message }` (best-effort). */
+export function reasonFromBody(b: unknown): string | undefined {
+  const o = (b ?? {}) as { error?: { message?: string } | string; message?: string };
+  if (o && typeof o.error === "object" && o.error?.message) return o.error.message;
+  if (typeof o?.error === "string") return o.error;
+  return typeof o?.message === "string" ? o.message : undefined;
+}
+
+/** Same, but reads an unread Response body (consumes it). */
+export async function mansourReason(res: Response): Promise<string | undefined> {
+  try {
+    return reasonFromBody(await res.json());
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Adapt Mansour's `RFQAgentOutput` → the UI view-model (`AgentDraft`).
  *

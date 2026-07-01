@@ -103,7 +103,7 @@ type Action =
   | { t: "SET_SIMULATE_ERROR"; value: boolean }
   | { t: "PROCESS_START" }
   | { t: "PROCESS_SUCCESS"; draft: AgentDraft }
-  | { t: "PROCESS_ERROR"; kind: ApiErrorKind }
+  | { t: "PROCESS_ERROR"; kind: ApiErrorKind; detail?: RfqState["errorDetail"] }
   | { t: "ENTER_WIZARD" }
   | { t: "RESUME_WIZARD" }
   | { t: "GO_INTAKE" }
@@ -166,7 +166,7 @@ function reducer(state: RfqState, a: Action): RfqState {
     case "SET_SIMULATE_ERROR":
       return { ...state, simulateError: a.value };
     case "PROCESS_START":
-      return { ...state, phase: "processing", busy: true, error: null };
+      return { ...state, phase: "processing", busy: true, error: null, errorDetail: null };
     case "PROCESS_SUCCESS":
       return {
         ...state,
@@ -186,7 +186,7 @@ function reducer(state: RfqState, a: Action): RfqState {
         multiLocationDismissed: false,
       };
     case "PROCESS_ERROR":
-      return { ...state, busy: false, error: a.kind };
+      return { ...state, busy: false, error: a.kind, errorDetail: a.detail ?? null };
     case "ENTER_WIZARD":
       return { ...state, phase: "wizard", step: 1 };
     case "RESUME_WIZARD":
@@ -370,7 +370,11 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
         const draft = await processRfq({ text: s.text, files: s.files, simulateError: s.simulateError });
         dispatch({ t: "PROCESS_SUCCESS", draft });
       } catch (e) {
-        dispatch({ t: "PROCESS_ERROR", kind: e instanceof ApiError ? e.kind : "unknown" });
+        const detail =
+          e instanceof ApiError
+            ? { detail: e.detail, backendCode: e.backendCode, backendStatus: e.backendStatus, status: e.status }
+            : null;
+        dispatch({ t: "PROCESS_ERROR", kind: e instanceof ApiError ? e.kind : "unknown", detail });
       }
     },
     enterWizard: () => dispatch({ t: "ENTER_WIZARD" }),
