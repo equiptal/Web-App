@@ -48,15 +48,48 @@ export function Step4Preview() {
   ];
 
   const exportExcel = () => downloadCsv("rfq-spec-sheet.csv", toCsv(headers, rows.map(cell)));
+  // Drop columns that are empty for every item so the table only shows terms that carry a value.
+  const bodyCells = rows.map(cell);
+  const isEmptyCell = (v: string) => v == null || v === "" || v === "—";
+  const keepCol = headers.map((_, ci) => bodyCells.some((r) => !isEmptyCell(r[ci])));
+  const shownHeaders = headers.filter((_, ci) => keepCol[ci]);
 
   const p = draft.project;
   const pr = draft.preferences;
   const count = postableItems(draft.items).length;
   const notSent = draft.items.filter((i) => !i.removed && i.verdict === "no-match").length;
-  const certs = [...p.certificates.safety.map((c) => t.options.safetyCert[c]), ...p.certificates.other.map((c) => t.options.otherCert[c])].join(", ") || "—";
-  const payment = (pr.payment.terms && t.options.paymentTerm[pr.payment.terms]) || "—";
+  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const certs = [...p.certificates.safety.map((c) => t.options.safetyCert[c]), ...p.certificates.other.map((c) => t.options.otherCert[c])].join(", ");
+  const mResp = (t.options.maintenanceResp as Record<string, string>)[pr.maintenance.responsibility] ?? pr.maintenance.responsibility;
   const suppliers =
-    [pr.supplierFilters.verifiedOnly && t.step3.supplierFilters.verifiedOnly, pr.supplierFilters.bidWindow && t.options.bidWindow[pr.supplierFilters.bidWindow]].filter(Boolean).join(" · ") || "—";
+    [pr.supplierFilters.verifiedOnly && t.step3.supplierFilters.verifiedOnly, pr.supplierFilters.bidWindow && t.options.bidWindow[pr.supplierFilters.bidWindow]].filter(Boolean).join(" · ");
+
+  // Every request term, with the same titles used across the wizard. Empty/unset terms are dropped
+  // entirely (no "—" rows). `keep` builds the tuple only when the value is present.
+  type KVRow = [ReactNode, ReactNode];
+  const keep = (...rows: (KVRow | false | null | undefined)[]): KVRow[] => rows.filter((r): r is KVRow => Array.isArray(r));
+  const projectRows = keep(
+    p.location.label ? [t.step1.location.card, <span key="l" className="inline-flex items-center gap-2">{p.location.label}{p.location.confirmed && <span className="inline-flex items-center gap-1 text-xs font-bold text-ok"><span className="h-[7px] w-[7px] rounded-full bg-ok" /> {t.preview.confirmed}</span>}</span>] as KVRow : null,
+    p.timing.rentalBasis ? [t.step1.timing.rentalBasis, `${t.options.rentalBasis[p.timing.rentalBasis]}${p.timing.extendable ? ` · ${t.step1.timing.extendable}` : ""}`] as KVRow : null,
+    p.timing.startDate ? [t.step1.timing.startDate, fmtDate(p.timing.startDate)] as KVRow : null,
+    p.timing.endDate ? [t.step1.timing.endDate, fmtDate(p.timing.endDate)] as KVRow : null,
+    p.timing.hoursPerDay != null ? [t.step1.timing.hoursPerDay, String(p.timing.hoursPerDay)] as KVRow : null,
+    p.advanced.workingDaysPerWeek != null ? [t.step1.advanced.workingDays, String(p.advanced.workingDaysPerWeek)] as KVRow : null,
+    (p.advanced.overtimeRate && p.advanced.overtimeRate !== "without") ? [t.step1.advanced.overtime, t.options.overtime[p.advanced.overtimeRate]] as KVRow : null,
+    (p.advanced.equipmentYear && p.advanced.equipmentYear !== "any") ? [t.step1.advanced.equipmentYear, p.advanced.equipmentYear] as KVRow : null,
+    certs ? [t.step1.certificates.card, certs] as KVRow : null,
+  );
+  const prefRows = keep(
+    pr.payment.terms ? [t.step3.payment.terms, t.options.paymentTerm[pr.payment.terms]] as KVRow : null,
+    pr.payment.method ? [t.step3.payment.method, t.options.paymentMethod[pr.payment.method]] as KVRow : null,
+    pr.maintenance.responsibility ? [t.step3.maintenance.responsibility, mResp] as KVRow : null,
+    pr.maintenance.sla ? [t.step3.maintenance.sla, t.options.maintenanceSla[pr.maintenance.sla]] as KVRow : null,
+    (p.deliveryToSite || p.returnFromSite) ? [`${t.step1.requestWide.delivery} / ${t.step1.requestWide.return}`, `${p.deliveryToSite ? t.options.party[p.deliveryToSite] : t.preview.perItem} / ${p.returnFromSite ? t.options.party[p.returnFromSite] : t.preview.perItem}`] as KVRow : null,
+    p.fuelResponsibility ? [t.step1.requestWide.fuelResponsibility, t.options.party[p.fuelResponsibility]] as KVRow : null,
+    pr.budgetSar != null ? [t.step3.budget.label, `${new Intl.NumberFormat(ar ? "ar-EG" : "en-US").format(pr.budgetSar)} ${L("SAR", "ر.س")}`] as KVRow : null,
+    pr.additionalNotes ? [t.step3.additionalNotes, pr.additionalNotes] as KVRow : null,
+    suppliers ? [t.step3.supplierFilters.title, suppliers] as KVRow : null,
+  );
 
   return (
     <div className="space-y-4">
@@ -90,14 +123,7 @@ export function Step4Preview() {
 
       {/* Project (AC-41) */}
       <RC icon="place" title={t.preview.projectSummary} onEdit={() => actions.goStep(1)} editLabel={t.preview.edit}>
-        <KV
-          rows={[
-            [t.step1.location.card, <span key="l" className="inline-flex items-center gap-2">{p.location.label ?? "—"}{p.location.confirmed && <span className="inline-flex items-center gap-1 text-xs font-bold text-ok"><span className="h-[7px] w-[7px] rounded-full bg-ok" /> {t.preview.confirmed}</span>}</span>],
-            [t.step1.timing.rentalBasis, p.timing.rentalBasis ? t.options.rentalBasis[p.timing.rentalBasis] : "—"],
-            [t.step1.timing.hoursPerDay, String(p.timing.hoursPerDay)],
-            [t.step1.certificates.card, certs],
-          ]}
-        />
+        <KV rows={projectRows} />
       </RC>
 
       {/* Equipment (AC-52) */}
@@ -119,15 +145,15 @@ export function Step4Preview() {
           <table className="w-full border-collapse text-[12.5px]">
             <thead>
               <tr className="border-b border-border text-start text-[10.5px] uppercase tracking-wide text-muted">
-                {headers.map((h) => (
+                {shownHeaders.map((h) => (
                   <th key={h} className="whitespace-nowrap p-2 text-start font-extrabold">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, i) => (
+              {bodyCells.map((r, i) => (
                 <tr key={i} className="border-b border-border/60">
-                  {cell(r).map((c, j) => (
+                  {r.filter((_, ci) => keepCol[ci]).map((c, j) => (
                     <td key={j} className="whitespace-nowrap p-2">{c}</td>
                   ))}
                 </tr>
@@ -144,13 +170,7 @@ export function Step4Preview() {
 
       {/* Preferences */}
       <RC icon="tune" title={t.preview.preferencesSummary} onEdit={() => actions.goStep(3)} editLabel={t.preview.edit}>
-        <KV
-          rows={[
-            [t.step3.payment.title, payment],
-            [`${t.step1.requestWide.delivery} / ${t.step1.requestWide.return}`, `${p.deliveryToSite ? t.options.party[p.deliveryToSite] : t.preview.perItem} / ${p.returnFromSite ? t.options.party[p.returnFromSite] : t.preview.perItem}`],
-            [t.step3.supplierFilters.title, suppliers],
-          ]}
-        />
+        <KV rows={prefRows} />
       </RC>
 
       {error && !isLimit && (

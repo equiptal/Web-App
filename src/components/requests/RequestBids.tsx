@@ -96,7 +96,8 @@ export function RequestBids({ requestId }: { requestId: string }) {
   // Quotation PDF (matches the app's bid_pdf_builder: supplier + equipment + pricing breakdown).
   // Rendered via the browser's print-to-PDF so Arabic/RTL render correctly without font embedding.
   function downloadQuotation() {
-    const chosen = (bids ?? []).filter((b) => selected.has(b.id));
+    // Include off-platform (shared-link) submissions, not just on-platform bids.
+    const chosen = merged.filter((b) => selected.has(b.id));
     if (!chosen.length) return;
     const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
     const sar = L("SAR", "ر.س");
@@ -426,7 +427,6 @@ export function RequestBids({ requestId }: { requestId: string }) {
           ar={ar}
           L={L}
           onClose={() => setSubmissionBid(null)}
-          onAddToCompare={() => setSelected((prev) => new Set(prev).add(submissionBid.id))}
         />
       )}
 

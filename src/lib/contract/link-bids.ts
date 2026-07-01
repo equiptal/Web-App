@@ -31,6 +31,9 @@ export interface LinkBidItem {
   requestId?: string | null;
   label?: string | null;
   numberOfUnits?: number;
+  /** Units the supplier offered on this line (partial bid) — ≤ numberOfUnits. Backend (PR #465) falls back
+   *  to the requested count; on staging it's absent, so the mapper falls back to numberOfUnits. */
+  offeredUnits?: number;
   /** Rental basis carried from the request (PER_DAY/PER_WEEK/PER_MONTH/PER_JOB) so totals normalize. */
   priceUnit?: string | null;
   rentalRate?: number | null;
@@ -50,6 +53,9 @@ export interface LinkBidSubmission {
   quotationRef?: string | null;
   /** The RFQ this quotation answers (REQ-XXXXX). */
   rfqRef?: string | null;
+  /** Per-group RFQ code shared by all items in the group (RFQ-NNNNN). The backend generates + returns it
+   *  (live-verified on staging, per-submission); shown on the RFQ tabs + quotation. See [[web-groupref-handoff]]. */
+  groupRef?: string | null;
   createdAt: string | null;
   companyName: string;
   crNumber?: string | null;
@@ -120,7 +126,9 @@ export interface SubmitBidFormPayload {
   notes?: string;
   /** Supplier-set quote expiry (ISO) — optional. */
   validUntil?: string;
-  items: { requestItemId: string; confirmations: LinkBidConfirmations; rentalRate: number; deliveryPrice?: number; returnPrice?: number }[];
+  /** `offeredUnits` (partial bid) is optional — omit → backend defaults to the full requested count.
+   *  When sent it must be 1..numberOfUnits (backend 400s otherwise). Ignored by staging until PR #465 lands. */
+  items: { requestItemId: string; confirmations: LinkBidConfirmations; offeredUnits?: number; rentalRate: number; deliveryPrice?: number; returnPrice?: number }[];
 }
 
 const s = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v : typeof v === "number" ? String(v) : null);
@@ -140,6 +148,7 @@ export function mapLinkSubmissions(raw: unknown): LinkBidSubmission[] {
       requestId: s(o.requestId) ?? "",
       quotationRef: s(o.quotationRef),
       rfqRef: s(o.rfqRef),
+      groupRef: s(o.groupRef), // RFQ-NNNNN group short code (backend returns it per-submission); shown on the RFQ tabs + quotation
       createdAt: s(o.createdAt),
       companyName: s(o.companyName) ?? "Supplier",
       crNumber: s(o.crNumber),
@@ -156,6 +165,7 @@ export function mapLinkSubmissions(raw: unknown): LinkBidSubmission[] {
           requestId: s(i.requestId),
           label: s(i.label),
           numberOfUnits: n(i.numberOfUnits) ?? 1,
+          offeredUnits: n(i.offeredUnits) ?? (n(i.numberOfUnits) ?? 1), // partial bid; falls back to the requested count (staging has no offeredUnits yet)
           priceUnit: s(i.priceUnit),
           rentalRate: n(i.rentalRate),
           deliveryPrice: n(i.deliveryPrice),
@@ -256,8 +266,9 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
     priceUnit: it?.priceUnit ?? null,
     duration: null, // open-ended; the comparison falls back to the request duration
     numberOfUnits: it?.numberOfUnits ?? 1,
-    // Shared-link bids cover the full quantity (no partial-units picker on the public form yet).
-    unitsOffered: it?.numberOfUnits ?? 1,
+    // Partial bid: the units this line offered (PR #465). Falls back to the requested count until the
+    // backend + public form carry `offeredUnits` on staging — so today this still reads "covers all".
+    unitsOffered: it?.offeredUnits ?? it?.numberOfUnits ?? 1,
     reqMinYear: reqYearNum,
     equipment: null, // the form confirms "meets the requested year", not a specific make/model/year
     eqVerified: false,

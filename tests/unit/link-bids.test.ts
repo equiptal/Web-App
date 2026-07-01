@@ -116,3 +116,40 @@ describe("mapLinkSubmissions — validUntil", () => {
     expect(out[0].validUntil).toBe("2026-07-12T00:00:00.000Z");
   });
 });
+
+// PR #465 — shared-link partial bids (offeredUnits) + per-group RFQ code (groupRef). End-to-end
+// through the read path: agents wire → mapLinkSubmissions → submissionToBidCard (comparison + card).
+describe("PR #465 — offeredUnits + groupRef round-trip", () => {
+  const wire = (item: Record<string, unknown>, top: Record<string, unknown> = {}) =>
+    mapLinkSubmissions({ submissions: [{ id: "s1", requestId: "r1", companyName: "Co", items: [{ requestItemId: "i1", rentalRate: "200", ...item }], ...top }] })[0];
+
+  it("reads offeredUnits when the (deployed) backend sends a partial bid", () => {
+    const s = wire({ numberOfUnits: 5, offeredUnits: 3 });
+    expect(s.items[0].numberOfUnits).toBe(5);
+    expect(s.items[0].offeredUnits).toBe(3);
+  });
+
+  it("falls back to the requested count when offeredUnits is absent (legacy/full bid)", () => {
+    const s = wire({ numberOfUnits: 5 });
+    expect(s.items[0].offeredUnits).toBe(5); // covers all
+  });
+
+  it("reads groupRef (RFQ-NNNNN) from the submission, null when absent", () => {
+    expect(wire({}, { groupRef: "RFQ-00196" }).groupRef).toBe("RFQ-00196");
+    expect(wire({}).groupRef).toBeNull();
+  });
+
+  it("comparison shows partial coverage: unitsOffered = offeredUnits, numberOfUnits = requested", () => {
+    const s = wire({ numberOfUnits: 5, offeredUnits: 3 });
+    const c = submissionToBidCard(s, s.items[0]);
+    expect(c.unitsOffered).toBe(3); // "offered 3 of 5"
+    expect(c.numberOfUnits).toBe(5);
+  });
+
+  it("full/legacy bid reads as full coverage (offered = requested)", () => {
+    const s = wire({ numberOfUnits: 4 });
+    const c = submissionToBidCard(s, s.items[0]);
+    expect(c.unitsOffered).toBe(4);
+    expect(c.numberOfUnits).toBe(4);
+  });
+});

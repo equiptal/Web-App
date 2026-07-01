@@ -316,8 +316,9 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   }
 
   function downloadQuotation(langIsAr: boolean) {
-    if (!bids) return;
-    const chosen = bids.filter((b) => selected.has(b.id));
+    // Include off-platform (shared-link) bids alongside on-platform ones so a selected supplier
+    // submission can be exported as a quotation just like an app bid.
+    const chosen = [...(bids ?? []), ...subCards].filter((b) => selected.has(b.id));
     if (!chosen.length) return;
     const esc = (str: string) => String(str).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
     const itemMap = new Map(group.items.map((it) => [it.id, it]));
@@ -669,7 +670,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "0 0 14px" }}>
         <span style={{ fontSize: 13, fontWeight: 700, color: "#2a4f72" }}>
           {selectMode
-            ? L("Tap a bid to select · pick 2+ to compare", "اضغط على عرض للتحديد · اختر ٢ أو أكثر للمقارنة")
+            ? L("Tap a bid to select · compare or download a quotation", "اضغط على عرض للتحديد · قارن أو نزّل عرض سعر")
             : `${shown.length} ${L("bids from", "عروض من")} ${shownSuppliers} ${L("suppliers", "مؤجّرين")}${selItem ? ` · ${selItem.name}` : ""}`}
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
@@ -853,7 +854,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                   <span key={i} style={{ fontSize: 11, fontWeight: 800, color: "#1daf58", background: "#e7f7ee", padding: "2px 9px", borderRadius: 20, whiteSpace: "nowrap" }}>✓ {c}</span>
                 ))}
               </div>
-              {b.equipment?.id && !selectMode && (
+              {!selectMode && (
                 <button onClick={() => setEquipBid(b)} style={blueLink}>{L("Details", "التفاصيل")} ›</button>
               )}
             </div>
@@ -945,12 +946,12 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           <span className="qn">{selectedCount} {L("selected", "محدّد")}</span>
           {selectedCount < shown.length && <span className="qclear" onClick={() => setSelected(new Set(shown.map((b) => b.id)))}>{L("Select all", "تحديد الكل")}</span>}
           <span className="qclear" onClick={() => setSelected(new Set())}>{L("Clear", "مسح")}</span>
-          {/* web-app/007 — Compare the selected bids side by side (prototype: pick 2+). */}
+          {/* web-app/007 — Compare the selected bids side by side (works with a single bid too). */}
           <button
             className="qdl"
-            disabled={selectedCount < 2}
-            style={{ background: "var(--navy)", opacity: selectedCount < 2 ? 0.5 : 1 }}
-            title={selectedCount < 2 ? L("Pick 2+ to compare", "اختر ٢ أو أكثر للمقارنة") : L("Compare side by side", "قارن جنبًا إلى جنب")}
+            disabled={selectedCount < 1}
+            style={{ background: "var(--navy)", opacity: selectedCount < 1 ? 0.5 : 1 }}
+            title={L("Compare side by side", "قارن جنبًا إلى جنب")}
             onClick={goCompare}
           >
             <span className="material-icons-outlined">compare_arrows</span> {L("Compare", "قارن")}
@@ -1029,7 +1030,6 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           ar={ar}
           L={L}
           onClose={() => setSubmissionBid(null)}
-          onAddToCompare={() => setSelected((prev) => new Set(prev).add(submissionBid.id))}
         />
       )}
     </div>

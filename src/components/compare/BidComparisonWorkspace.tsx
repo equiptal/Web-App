@@ -64,6 +64,7 @@ export function BidComparisonWorkspace() {
   const [groups, setGroups] = useState<RequestGroup[] | null>(null);
   const [linkByRequest, setLinkByRequest] = useState<Record<string, number>>({}); // off-platform link-bid count per request id — folded into selector gating so link-only requests aren't hidden
   const [linkLoaded, setLinkLoaded] = useState(false); // off-platform counts fetched (so default selection can wait for link-only groups)
+  const [groupRefById, setGroupRefById] = useState<Record<string, string>>({}); // request-group id → RFQ-NNNNN group code (from any submission), shown on the RFQ tabs
   const [error, setError] = useState(false);
   const [activeLoc, setActiveLoc] = useState<string | null>(null);
   const [activeItem, setActiveItem] = useState<string | null>(null);
@@ -134,8 +135,15 @@ export function BidComparisonWorkspace() {
     ).then((all) => {
       if (!active) return;
       const rmap: Record<string, number> = {};
-      for (const subs of all) for (const sub of subs) for (const it of sub.items) if (it.requestId) rmap[it.requestId] = (rmap[it.requestId] ?? 0) + 1;
+      const gref: Record<string, string> = {};
+      all.forEach((subs, i) => {
+        // `all` is aligned with `targets`; the group's RFQ code is the groupRef on any of its submissions.
+        const g = gref[targets[i].id] ? null : subs.find((s) => s.groupRef)?.groupRef;
+        if (g) gref[targets[i].id] = g;
+        for (const sub of subs) for (const it of sub.items) if (it.requestId) rmap[it.requestId] = (rmap[it.requestId] ?? 0) + 1;
+      });
       setLinkByRequest(rmap);
+      setGroupRefById(gref);
       setLinkLoaded(true);
     });
     return () => { active = false; };
@@ -678,21 +686,6 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
   if (!locations.length) return <Box>{L("No requests to compare yet.", "لا توجد طلبات للمقارنة بعد.")}</Box>;
 
   /* ── small renderers ── */
-  const incChip = (label: string, kind: "y" | "n" | "you" | "muted", onAdd?: () => void, icon?: string, value?: number, onRemove?: () => void) => {
-    const bg = kind === "y" ? C.successBg : kind === "n" ? C.dangerBg : kind === "you" ? C.renteeDim : C.surface3;
-    const fg = kind === "y" ? C.success : kind === "n" ? C.danger : kind === "you" ? C.rentee : C.muted;
-    const entered = value != null;
-    return (
-      <span className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold" style={{ background: bg, color: fg }}>
-        {icon && <span className="material-icons-outlined" style={{ fontSize: 13 }}>{icon}</span>}
-        {label}
-        {entered && <span style={{ color: C.rentee }}>· {sar} {nf(value!)}</span>}
-        {entered && onRemove ? (
-          <button onClick={onRemove} title={L("Remove your estimate", "إزالة تقديرك")} className="grid h-4 w-4 place-items-center rounded-full" style={{ background: "#fff", color: C.muted, border: "1px solid rgba(37,99,235,.3)" }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>close</span></button>
-        ) : onAdd ? <button onClick={onAdd} className="inline-flex items-center gap-0.5 rounded-full border px-1.5 text-[9.5px] font-extrabold" style={{ color: C.rentee, borderColor: "rgba(37,99,235,.4)", background: "#fff" }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>add</span>{L("cost", "تكلفة")}</button> : null}
-      </span>
-    );
-  };
   const presetDefs: [Preset, string, string, string][] = [
     ["best", "workspace_premium", "Best overall", "الأفضل إجمالاً"],
     ["lowest", "savings", "Lowest cost", "الأقل تكلفة"],
@@ -715,12 +708,14 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
         {locations.map((l) => {
           const on = l.key === loc?.key;
           const rfqId = l.groups[0]?.items[0]?.displayId ?? "RFQ";
+          const groupRef = groupRefById[l.groups[0]?.id ?? ""] ?? null; // per-group RFQ-NNNNN code (when the group got shared-link submissions)
           return (
             <button key={l.key} onClick={() => setActiveLoc(l.key)}
               className="inline-flex flex-none flex-col items-start gap-0.5 rounded-xl border px-4 py-2.5 text-start transition"
               style={{ minWidth: 180, ...(on ? { background: C.navy, borderColor: C.navy } : { background: "#fff", borderColor: C.border }) }}>
               <span className="flex items-center gap-2">
                 <span className="text-[13.5px] font-extrabold" style={{ color: on ? "#fff" : C.navy }}>{rfqId}</span>
+                {groupRef && <span className="rounded-full px-2 text-[10.5px] font-mono font-bold" style={on ? { background: "rgba(255,255,255,.16)", color: "#fff" } : { background: C.actionDim, color: C.action }} title={L("Shared-link RFQ code", "رمز طلب التسعير عبر الرابط")}>{groupRef}</span>}
                 <span className="rounded-full px-2 text-[10.5px] font-bold" style={on ? { background: "rgba(255,255,255,.2)", color: "#fff" } : { background: C.surface3, color: C.navy }}>{l.itemCount} {L("items", "أصناف")}</span>
                 {l.bidCount > 0 && <span className="rounded-full px-2 text-[10.5px] font-bold" style={on ? { background: "rgba(255,255,255,.16)", color: "#fff" } : { background: C.successBg, color: C.success }}>{l.bidCount} {L("bids", "عروض")}</span>}
               </span>

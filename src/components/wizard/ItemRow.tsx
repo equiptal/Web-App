@@ -480,7 +480,10 @@ function ItemAttachments({ item }: { item: EquipmentItem }) {
   const t = useT();
   const { locale } = useLocale();
   const { actions } = useRfq();
-  const subtypeId = item.ref.subcategoryId;
+  // Attachments are keyed by the app's "subtype" = the SUBCATEGORY id in the 3-level taxonomy, or the
+  // CATEGORY id in the canonical 2-level taxonomy (no subcategory). Mirror the mobile app's `type.key`
+  // fallback so preselected attachments resolve in BOTH taxonomy shapes.
+  const subtypeId = item.ref.subcategoryId || item.ref.categoryId;
   const [avail, setAvail] = useState<SubtypeAttachmentOption[]>([]);
   const initedFor = useRef<string | null>(null);
 

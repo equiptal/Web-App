@@ -374,15 +374,17 @@ export async function fetchRequestSubmissions(
   const raw = await getJson<{ renterName?: string | null; openedCount?: number; submittedCount?: number; bidDeadline?: string | null; logoUrl?: string | null; groupRef?: string | null }>(
     `/api/me/requests/${encodeURIComponent(requestId)}/submissions`,
   );
+  const submissions = mapLinkSubmissions(raw);
   return {
     renterName: raw.renterName ?? null,
     openedCount: raw.openedCount ?? 0,
     submittedCount: raw.submittedCount ?? 0,
     bidDeadline: raw.bidDeadline ?? null,
     logoUrl: raw.logoUrl ?? null,
-    // The RFQ group short code (RFQ-NNNNN) — agents `bid-submissions` now returns it; shown in the RFQ tabs.
-    groupRef: raw.groupRef ?? null,
-    submissions: mapLinkSubmissions(raw),
+    // The RFQ group short code (RFQ-NNNNN). The backend returns it per-submission (and/or top-level) —
+    // surface whichever is present so the RFQ tabs + quotation show it.
+    groupRef: raw.groupRef ?? submissions.find((x) => x.groupRef)?.groupRef ?? null,
+    submissions,
   };
 }
 

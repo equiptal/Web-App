@@ -63,8 +63,10 @@ export function SharedLinkBidCard({
   const cover = needed ? Math.min(100, Math.round((offered / needed) * 100)) : 0;
   const u = priceOpen && perUnit ? 1 : offered;
   const rental = (bid.price ?? 0) * u;
-  const deliv = bid.mobPrice ? (perUnit && offered > 1 ? Math.round(bid.mobPrice / offered) : bid.mobPrice) : 0;
-  const ret = bid.demobPrice ? (perUnit && offered > 1 ? Math.round(bid.demobPrice / offered) : bid.demobPrice) : 0;
+  // Mob/demob are priced PER UNIT in the shared-link form (× qty), so the total scales with the unit
+  // count shown — × offered for the "all units" view, × 1 for "per unit" (mirrors the rental line + form).
+  const deliv = bid.mobPrice ? bid.mobPrice * u : 0;
+  const ret = bid.demobPrice ? bid.demobPrice * u : 0;
   const sub = rental + deliv + ret;
   const vat = Math.round(sub * 0.15);
   const grand = bid.quotedTotal && !perUnit ? bid.quotedTotal : sub + vat;

@@ -21,5 +21,13 @@ Profile + verification, deal room (terms / rate-proposal / accept / documents / 
 3. **Diff** web vs backend into a table: **field/endpoint · web expects · backend returns/accepts · ✅/⚠/❌**. Pay special attention to **projection gaps** — fields that exist in the DB but the bid-list/deal-room `select` omits (this has bitten us before, e.g. supplier doc keys, term declared values/states).
 4. **Classify each gap:** *web-fixable* (mapping/route) vs *backend change needed* (add a field to a `select`, a new endpoint, a new term/enum). For backend changes, draft the exact diff (e.g. add keys to `bidIncludeSupplierProfile.select`), show it, and on approval open a PR / post `[SPEC?]` with `spec-input-needed`. **Never edit Moedatech-App without explicit confirmation.**
 5. **Report**: alignment table + punch list (*Web changes* / *App-backend changes (PR/ticket)*). When run by `/web:feature`, feed web changes into its tickets and backend changes into `**⚠ Backend**` tickets so they're tracked, not lost.
+6. **Hand off to Moedatech-App — only when I say so.** Every run must END by offering the handoff for any *App-backend change* found. If I approve (e.g. "hand it off", "open the PR", "do the backend change"), carry it into the other repo yourself — don't just describe it:
+   - **Locate the repo** — prefer an `equiptal/Moedatech-App` checkout already on disk (check the additional working dirs); else clone or `git worktree`. Work off **`staging`**, never `main`.
+   - **Branch + apply** the drafted change (e.g. add keys to a `select`, a schema/handler edit) on a new branch `web-align/<slug>`.
+   - **Commit** referencing the web driver (which web route/projection needs it), then **push** and **open a PR** with `gh pr create --base staging`. PR body = the alignment-table row(s) + why the web needs it + the exact fields/projection; end with the standard Claude Code trailer.
+   - Report the **PR URL** back here so it rides alongside the web changes.
+   - **Alternative if I don't want a PR:** post a `[SPEC?]` comment on the relevant Moedatech-App issue with the `spec-input-needed` label, or just hand me the diff.
+
+**Guardrails:** never edit, push, or PR **either** repo without my explicit go-ahead; the cross-repo handoff (Step 6) fires **only when I ask**. Never target `main` — PRs go to `staging`. Always confirm before each push.
 
 Known live alignment notes worth re-checking each run: bid-list omits supplier `crDocKey`/`vatDocKey` (numbers/address parts are sent); deal-room terms are `fixed/soft_accepted/disputed/pending/agreed`; some terms are slated to move Acknowledge→Negotiable (operator_included, operator_certification, equipment safety certs).

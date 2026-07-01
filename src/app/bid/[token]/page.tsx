@@ -4,6 +4,7 @@ import { use, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { fetchBidFormData, submitBidForm } from "@/lib/api/client";
 import type { BidFormData, BidFormItem } from "@/lib/contract/link-bids";
+import { buildSubmissionNotes, priceToStore } from "@/lib/contract/vat-inclusive";
 import { BID_FORM_CSS } from "@/components/bid/bidFormStyles";
 
 /**
@@ -40,6 +41,8 @@ type Answer = {
   rentalRate: string;
   deliveryPrice: string;
   returnPrice: string;
+  /** Partial bid: units this supplier offers on this line (1..numberOfUnits). Defaults to the full count. */
+  offeredUnits: string;
 };
 
 export default function BidFormPage({ params }: { params: Promise<{ token: string }> }) {
@@ -64,6 +67,10 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
   const [showErrors, setShowErrors] = useState(false);
   const [yesItem, setYesItem] = useState<Record<string, boolean>>({}); // per-item "Yes to all this item's terms"
   const [yesContract, setYesContract] = useState(false); // "Yes to all" for the for-all-items contract terms
+  // Some suppliers quote prices that ALREADY include 15% VAT. When on, the prices entered below are
+  // treated as VAT-inclusive (gross) — we strip the VAT back out on submit so the stored bid stays
+  // VAT-exclusive like every on-platform bid, and the renter side reproduces the same total.
+  const [vatIncluded, setVatIncluded] = useState(false);
   // Suppliers may submit more than one bid per request (e.g. alternative options) — no single-submission lock.
 
   useEffect(() => {
@@ -75,7 +82,7 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
         const init: Record<string, Answer> = {};
         for (const it of d.items) {
           // No default — the supplier must explicitly answer Yes/No on each term (starts unselected/grey).
-          init[it.requestItemId] = { confirmations: {}, rentalRate: "", deliveryPrice: "", returnPrice: "" };
+          init[it.requestItemId] = { confirmations: {}, rentalRate: "", deliveryPrice: "", returnPrice: "", offeredUnits: String(it.numberOfUnits || 1) };
         }
         setAnswers(init);
         setContract({});
@@ -88,6 +95,9 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
   const itemTerms = (it: BidFormItem) => TERM_KEYS.filter((k) => it.requiredTerms[k] != null);
   const setConf = (id: string, k: TermKey, v: boolean) => setAnswers((p) => ({ ...p, [id]: { ...p[id], confirmations: { ...p[id].confirmations, [k]: v } } }));
   const setPrice = (id: string, field: "rentalRate" | "deliveryPrice" | "returnPrice", v: string) => setAnswers((p) => ({ ...p, [id]: { ...p[id], [field]: v } }));
+  const setOffered = (id: string, v: string) => setAnswers((p) => ({ ...p, [id]: { ...p[id], offeredUnits: v } }));
+  // Units this line offers — parsed + clamped to 1..numberOfUnits; defaults to the full requested count.
+  const offeredQty = (it: BidFormItem, a?: Answer) => { const max = it.numberOfUnits || 1; const nq = Math.round(num(a?.offeredUnits ?? "")); return nq >= 1 && nq <= max ? nq : max; };
 
   // Per-item "Yes to all" — toggles all of THIS item's terms Yes; off clears them so they can answer
   // individually. Lives below each item header (next to its Terms subhead).
@@ -115,7 +125,7 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
   const resetForm = () => {
     if (!data) return;
     const init: Record<string, Answer> = {};
-    for (const it of data.items) init[it.requestItemId] = { confirmations: {}, rentalRate: "", deliveryPrice: "", returnPrice: "" };
+    for (const it of data.items) init[it.requestItemId] = { confirmations: {}, rentalRate: "", deliveryPrice: "", returnPrice: "", offeredUnits: String(it.numberOfUnits || 1) };
     setAnswers(init);
     setContract({});
     setYesItem({});
@@ -126,14 +136,17 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
     window.scrollTo(0, 0);
   };
 
+  // Returns the NET (before-VAT) item subtotal. When the supplier priced VAT-inclusive, strip the 15%
+  // back out so the ×1.15 downstream reproduces exactly the gross they typed.
   const itemSubtotal = (it: BidFormItem, a?: Answer) => {
     if (!a) return 0;
-    const q = it.numberOfUnits || 1;
-    return (num(a.rentalRate) + num(a.deliveryPrice) + num(a.returnPrice)) * q;
+    const q = offeredQty(it, a); // price the units actually offered (partial bid)
+    const gross = (num(a.rentalRate) + num(a.deliveryPrice) + num(a.returnPrice)) * q;
+    return vatIncluded ? gross / 1.15 : gross;
   };
   const grand = useMemo(
     () => (data?.items ?? []).reduce((s, it) => s + itemSubtotal(it, answers[it.requestItemId]) * 1.15, 0),
-    [data, answers],
+    [data, answers, vatIncluded],
   );
 
   const companyValid = company.companyName.trim() && company.crNumber.trim() && company.vatNumber.trim() && company.nationalAddress.trim() && company.contactInfo.trim();
@@ -155,12 +168,16 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
         vatNumber: company.vatNumber.trim(),
         nationalAddress: company.nationalAddress.trim(),
         contactInfo: company.contactInfo.trim(),
-        notes: company.notes.trim() || undefined,
+        // No backend flag for VAT-inclusive pricing — carry it as a tagged line in the notes (which
+        // round-trip to the renter's submission view). The viewer surfaces it as a dedicated note.
+        notes: buildSubmissionNotes(company.notes, vatIncluded),
         validUntil: company.validUntil ? new Date(company.validUntil).toISOString() : undefined,
         items: data.items.map((it) => {
           const a = answers[it.requestItemId];
+          // Store VAT-exclusive prices. If the supplier priced VAT-inclusive, strip the 15% back out so
+          // the renter side — which always adds VAT — lands on the same total.
           // Merge the project/contract confirmations (apply to all items) into each item's answers.
-          return { requestItemId: it.requestItemId, confirmations: { ...a.confirmations, ...contract }, rentalRate: num(a.rentalRate), deliveryPrice: num(a.deliveryPrice), returnPrice: num(a.returnPrice) };
+          return { requestItemId: it.requestItemId, confirmations: { ...a.confirmations, ...contract }, offeredUnits: it.numberOfUnits > 1 ? offeredQty(it, a) : undefined, rentalRate: priceToStore(num(a.rentalRate), vatIncluded), deliveryPrice: priceToStore(num(a.deliveryPrice), vatIncluded), returnPrice: priceToStore(num(a.returnPrice), vatIncluded) };
         }),
       });
       setSubmitted(true);
@@ -285,6 +302,28 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
             </div>
           )}
 
+          {/* Pricing VAT mode — some suppliers quote prices that already include 15% VAT. */}
+          <div className="sec">
+            <div className="sec-h"><span className="material-icons-outlined hdic">receipt_long</span><h3>{L("How did you price?", "كيف سعّرت؟")}</h3></div>
+            <div style={{ display: "inline-flex", border: "1px solid var(--border)", borderRadius: "var(--r-md)", overflow: "hidden", background: "var(--surface1)", flexWrap: "wrap" }}>
+              {([[false, L("Before VAT — add 15%", "قبل الضريبة — تُضاف ١٥٪")], [true, L("VAT included (15%)", "شامل الضريبة ١٥٪")]] as [boolean, string][]).map(([v, lab]) => (
+                <button
+                  key={String(v)}
+                  type="button"
+                  onClick={() => setVatIncluded(v)}
+                  style={{ border: "none", cursor: "pointer", font: "inherit", fontWeight: 800, fontSize: 12.5, padding: "10px 16px", background: vatIncluded === v ? "var(--navy)" : "transparent", color: vatIncluded === v ? "#fff" : "var(--navy-mid)" }}
+                >
+                  {lab}
+                </button>
+              ))}
+            </div>
+            <div className="ro-hint">
+              {vatIncluded
+                ? L("The prices you enter below are treated as VAT-inclusive — we show the VAT breakdown, and your grand total stays exactly what you typed.", "تُعامَل الأسعار التي تُدخلها أدناه على أنها شاملة للضريبة — نعرض تفصيل الضريبة، ويبقى إجماليك كما أدخلته تمامًا.")
+                : L("Enter your prices before VAT — we add 15% automatically. Switch this if your prices already include VAT.", "أدخل أسعارك قبل الضريبة — نضيف ١٥٪ تلقائيًا. بدّل الخيار إذا كانت أسعارك تشمل الضريبة.")}
+            </div>
+          </div>
+
           {/* Per item */}
           {data.items.map((it, idx) => {
             const a = answers[it.requestItemId];
@@ -292,9 +331,10 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
             const label = (ar ? it.labelAr : it.label) || it.label || L("Equipment", "المعدة");
             const size = (ar ? it.sizeAr : it.size) || it.size || null;
             const q = it.numberOfUnits || 1;
+            const oq = offeredQty(it, a); // units this line offers (≤ q)
             const unit = it.priceUnit ? (ar ? UNIT_LABEL[it.priceUnit]?.[1] : UNIT_LABEL[it.priceUnit]?.[0]) ?? it.priceUnit : L("unit", "وحدة");
             const sub = itemSubtotal(it, a);
-            const line = (v: string) => (num(v) ? num(v) * q : 0);
+            const line = (v: string) => (num(v) ? num(v) * oq : 0);
             // Supplier prices delivery/return ONLY when they handle it; if the renter does, no price row.
             const delBySup = (it.deliveryBy || "").toLowerCase() === "supplier";
             const retBySup = (it.returnBy || "").toLowerCase() === "supplier";
@@ -308,9 +348,17 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                 </div>
 
                 {q > 1 && (
-                  <div className="units-note">
+                  <div className="units-note" style={{ flexWrap: "wrap", gap: 10, alignItems: "center" }}>
                     <span className="material-icons-outlined un-lead">layers</span>
-                    <span className="un-tx">{L(`Multi-unit item — the renter needs ${q} units, and your bid covers all ${q}.`, `بند متعدد الوحدات — يحتاج المستأجر ${q} وحدات، ويشمل عرضك كل الـ ${q}.`)}</span>
+                    <span className="un-tx" style={{ flex: 1, minWidth: 180 }}>{L(`Multi-unit item — the renter needs ${q} units. Offer as many as you can supply; prices below multiply by this.`, `بند متعدد الوحدات — يحتاج المستأجر ${q} وحدات. اعرض ما تستطيع توفيره؛ تُضرب الأسعار أدناه بهذا العدد.`)}</span>
+                    <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 800, color: "#1c3550", whiteSpace: "nowrap" }}>
+                      {L("Units you can supply", "الوحدات المتاحة لديك")}
+                      <input type="number" inputMode="numeric" min={1} max={q} step={1} value={a?.offeredUnits ?? String(q)}
+                        onChange={(e) => setOffered(it.requestItemId, e.target.value)}
+                        onBlur={(e) => { const v = Math.min(q, Math.max(1, Math.round(num(e.target.value)) || q)); setOffered(it.requestItemId, String(v)); }}
+                        style={{ width: 68, padding: "8px 10px", borderRadius: 8, border: "1px solid #d4e0ec", fontSize: 14, fontWeight: 800, color: "#1c3550", textAlign: "center", fontFamily: "inherit" }} />
+                      <span style={{ color: "#6b8fa8", fontWeight: 700 }}>/ {q}</span>
+                    </label>
                   </div>
                 )}
 
@@ -372,9 +420,9 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                   </tbody>
                 </table>
                 <div className="itot">
-                  <span className="r">{L("Subtotal", "المجموع")}<b>{sub ? nf(sub) : "—"} {sar}</b></span>
+                  <span className="r">{vatIncluded ? L("Net (before VAT)", "الصافي (قبل الضريبة)") : L("Subtotal", "المجموع")}<b>{sub ? nf(sub) : "—"} {sar}</b></span>
                   <span className="r">{L("VAT 15%", "ضريبة ١٥٪")}<b>{sub ? nf(sub * 0.15) : "—"} {sar}</b></span>
-                  <span className="r t">{L("Item total", "إجمالي البند")}<b>{sub ? nf(sub * 1.15) : "—"} {sar}</b></span>
+                  <span className="r t">{vatIncluded ? L("Item total (incl. VAT)", "إجمالي البند (شامل الضريبة)") : L("Item total", "إجمالي البند")}<b>{sub ? nf(sub * 1.15) : "—"} {sar}</b></span>
                 </div>
               </div>
             );

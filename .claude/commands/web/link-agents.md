@@ -23,5 +23,11 @@ The agents endpoints (Mansour) back the **RFQ create + matching + recommend** pa
    - **Web-fixable** (wrong field name, missing map, casing) → fix in `app-adapters`/contract; note the ticket.
    - **Backend change needed** (the web needs a new field/endpoint/enum the backend doesn't expose) → draft the change for `apps/backend-agents` (schema/handler), show it, and on approval open a PR or post a `[SPEC?]` on the relevant Moedatech-App issue with `spec-input-needed`. **Do not edit Moedatech-App without explicit confirmation.**
 5. **Report**: the alignment table + a punch list split into *Web changes* and *Agents-backend changes (PR/ticket)*. If invoked by `/web:feature`, fold the web changes into its tickets and the backend changes into `**⚠ Backend**` tickets.
+6. **Hand off to Moedatech-App — only when I say so.** Every run must END by offering the handoff for any *Agents-backend change* found. If I approve (e.g. "hand it off", "open the PR", "do the backend change"), carry it into the other repo yourself — don't just describe it:
+   - **Locate the repo** — prefer an `equiptal/Moedatech-App` checkout already on disk (check the additional working dirs); else clone or `git worktree`. Work off **`staging`**, never `main`.
+   - **Branch + apply** the drafted schema/handler change on a new branch `web-align/<slug>`.
+   - **Commit** referencing the web driver (which web route/contract needs it), then **push** and **open a PR** with `gh pr create --base staging`. PR body = the alignment-table row(s) + why the web needs it + the exact fields/enums; end with the standard Claude Code trailer.
+   - Report the **PR URL** back here so it rides alongside the web changes.
+   - **Alternative if I don't want a PR:** post a `[SPEC?]` comment on the relevant Moedatech-App issue with the `spec-input-needed` label, or just hand me the diff.
 
-Never push to either repo without confirmation.
+**Guardrails:** never edit, push, or PR **either** repo without my explicit go-ahead; the cross-repo handoff (Step 6) fires **only when I ask**. Never target `main` — PRs go to `staging`. Always confirm before each push.
