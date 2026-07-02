@@ -59,6 +59,9 @@ export function Confirmation() {
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { if (typeof window !== "undefined") setOrigin(window.location.origin); }, []);
+  // Land at the top of the screen — the wizard/preview swaps out in place, so without this the page
+  // keeps the previous step's scroll position and opens part-way down. (AC-42 "Your request is live".)
+  useEffect(() => { if (typeof window !== "undefined") window.scrollTo(0, 0); }, []);
   useEffect(() => {
     if (!reqUuid) return;
     let alive = true;

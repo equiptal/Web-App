@@ -8,7 +8,7 @@ import { useSession } from "@/lib/session";
 import { Button, Icon } from "@/components/ui";
 import { AccountModal } from "@/components/onboarding/AccountModal";
 import { buildSpecRows, toCsv, downloadCsv, type SpecRow } from "@/lib/export/spec-sheet";
-import { postableItems } from "@/lib/contract";
+import { postableItems, resolveRef, taxName } from "@/lib/contract";
 
 export function Step4Preview() {
   const t = useT();
@@ -91,6 +91,29 @@ export function Step4Preview() {
     suppliers ? [t.step3.supplierFilters.title, suppliers] as KVRow : null,
   );
 
+  // Operator details — shown only for the items that actually require an operator, so the renter can
+  // confirm nationality / certificate / night shift / F.A.T before submit (otherwise buried in the
+  // per-item settings).
+  const operatorItems = postableItems(draft.items)
+    .filter((i) => i.operatorNeeded === "yes")
+    .map((i) => {
+      const { category, subcategory, measurement } = resolveRef(taxonomy, i.ref);
+      const node = subcategory ?? category ?? null;
+      const name = [node ? taxName(node, locale) : i.rawLabel, measurement ? taxName(measurement, locale) : i.rawSize].filter(Boolean).join(" · ") || "—";
+      const opCert = i.operator.certificate;
+      const rows = keep(
+        i.operator.nightShift ? [t.step2.perItem.nightShift, L("Yes", "نعم")] as KVRow : null,
+        i.operator.nationality
+          ? [t.step2.perItem.nationality, i.operator.nationality === "restricted" ? (i.operator.nationalityCustom?.trim() || t.step2.perItem.nationalityRestricted) : t.step2.perItem.nationalityAny] as KVRow
+          : null,
+        opCert.length ? [t.step2.perItem.certificate, opCert.map((c) => t.options.safetyCert[c]).join(", ")] as KVRow : null,
+        i.operator.fatFood ? [t.step2.perItem.fatFood, t.options.party[i.operator.fatFood]] as KVRow : null,
+        i.operator.fatAccommodationTransport ? [t.step2.perItem.fatTransport, t.options.party[i.operator.fatAccommodationTransport]] as KVRow : null,
+      );
+      return { id: i.id, name, rows };
+    })
+    .filter((o) => o.rows.length > 0);
+
   return (
     <div className="space-y-4">
       <div>
@@ -167,6 +190,27 @@ export function Step4Preview() {
           </div>
         )}
       </div>
+
+      {/* Operator details (AC-24) — only for items that need an operator; confirm before submit. */}
+      {operatorItems.length > 0 && (
+        <RC icon="person" title={L("Operator details", "تفاصيل المشغّل")} onEdit={() => actions.goStep(2)} editLabel={t.preview.edit}>
+          <div className="divide-y divide-border">
+            {operatorItems.map((o) => (
+              <div key={o.id} className="px-[18px] py-3">
+                <div className="mb-1.5 text-[13px] font-bold text-navy">{o.name}</div>
+                <dl className="grid grid-cols-[110px_1fr] gap-x-3 gap-y-1.5 text-[13px] sm:grid-cols-[140px_1fr]">
+                  {o.rows.map(([k, v], i) => (
+                    <div key={i} className="contents">
+                      <dt className="font-semibold text-muted">{k}</dt>
+                      <dd>{v}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            ))}
+          </div>
+        </RC>
+      )}
 
       {/* Preferences */}
       <RC icon="tune" title={t.preview.preferencesSummary} onEdit={() => actions.goStep(3)} editLabel={t.preview.edit}>

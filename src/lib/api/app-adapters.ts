@@ -251,10 +251,11 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
               return parts.join(",") || undefined;
             })()
           : undefined,
-        // Equipment safety certs (gating) — the project safety list PLUS an operator-picked saso-technical
-        // (no operatorLicenseLevel equivalent, so don't drop it), all as canonical doc-type tokens.
+        // Equipment safety certs (gating) — PER ITEM: the item's own override, else the request-wide
+        // "settings for all" default. PLUS an operator-picked saso-technical (no operatorLicenseLevel
+        // equivalent, so don't drop it). All as canonical doc-type tokens.
         safetyCertifications: (() => {
-          const base = [...project.certificates.safety];
+          const base = [...(i.safetyCertsOverride ?? project.certificates.safety)];
           if (operatorIncluded && i.operator.certificate.includes("saso-technical")) base.push("saso-technical");
           const tokens = toCertTokens(base);
           return tokens.length ? tokens : undefined;

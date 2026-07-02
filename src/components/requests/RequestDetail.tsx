@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, Fragment, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
-import { fetchRequestDetail, cancelRequest, updateRequest, fetchRequestSubmissions, bidShareUrl, setBidDeadline } from "@/lib/api/client";
+import { fetchRequestDetail, cancelRequest, updateRequest, fetchRequestSubmissions, setBidDeadline } from "@/lib/api/client";
 import { publicTaxonomyUrl, type RequestItem, type RequestRecord } from "@/lib/contract/requests";
 import { RequestBids } from "@/components/requests/RequestBids";
 import { EquipImg } from "@/components/requests/EquipImg";
@@ -78,9 +78,7 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
   const [busy, setBusy] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
-  const [copied, setCopied] = useState(false);
-  // web-app/006 (expanded) — shared-link tracker (real submitted count) + the live link. The request
-  // id IS the link token, so the link is always available; we fetch the submitted count + renter name.
+  // The request id IS the share-link token; we fetch the renter name + bid deadline for the deadline row.
   const [link, setLink] = useState<{ renterName: string | null; openedCount: number; submittedCount: number; bidDeadline: string | null } | null>(null);
   useEffect(() => {
     let active = true;
@@ -103,15 +101,6 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
     try { await setBidDeadline(id, iso); setLink((p) => (p ? { ...p, bidDeadline: iso } : p)); } catch { /* ignore */ }
     setDlEdit(false);
   };
-  const shareUrl = typeof window !== "undefined" ? bidShareUrl(window.location.origin, id, link?.renterName) : "";
-  function copyShareLink() {
-    if (!shareUrl) return;
-    navigator.clipboard?.writeText(shareUrl).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    }).catch(() => {});
-  }
-
   const reload = () => fetchRequestDetail(id).then(setR).catch(() => setError(true));
   useEffect(() => {
     let active = true;
@@ -169,19 +158,6 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
         <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 700 }}>{r.displayId ?? r.shortCode ?? r.id}</span>
         {(r.bidCount ?? 0) > 0 && <span className="stbadge st-active" style={{ marginInlineStart: "auto" }}><span className="material-icons-outlined" style={{ fontSize: 13 }}>gavel</span>{r.bidCount} {L("bids", "عروض")}</span>}
       </div>
-
-      {/* web-app/006 — shared-link tracker (real submitted count + live link) */}
-      {r.type === "BROADCAST" && (
-        <div className="rd-track">
-          <span className="material-icons-outlined">link</span>
-          <span className="rt-lbl">{L("Shared link", "الرابط المشترك")}</span>
-          <span className="rt-stat"><span className="material-icons-outlined">visibility</span><b>{link?.openedCount ?? 0}</b> {L("opened", "فتحة")}</span>
-          <span className="rt-stat sub"><span className="material-icons-outlined">gavel</span><b>{link?.submittedCount ?? 0}</b> {L("submitted", "عرض")}</span>
-          <button className="rt-copy" onClick={copyShareLink}>
-            <span className="material-icons-outlined">{copied ? "check" : "content_copy"}</span>{copied ? L("Copied", "تم النسخ") : L("Copy link", "نسخ الرابط")}
-          </button>
-        </div>
-      )}
 
       {/* AC-06 — bid-submission deadline (set / adjust / clear) */}
       {r.type === "BROADCAST" && (

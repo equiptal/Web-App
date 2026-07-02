@@ -146,6 +146,10 @@ export interface EquipmentItem {
   deliveryOverride: Party | null;
   returnOverride: Party | null;
   fuelResponsibilityOverride: Party | null;
+  /** AC-50: per-item EQUIPMENT safety certs (TÜV/SPSP/SASO). null ⇒ inherit the request-wide
+   *  `project.certificates.safety` (the "settings for all items" default), overridable per item —
+   *  same globalize-with-override model as delivery/return/fuel. Distinct from the OPERATOR cert. */
+  safetyCertsOverride?: SafetyCertificate[] | null;
   /** AC-28: per-item equipment year override. null ⇒ inherit the request-wide year
    *  (`project.advanced.equipmentYear`). Value is "any" | a 4-digit year | "custom:<text>". */
   equipmentYear?: string | null;

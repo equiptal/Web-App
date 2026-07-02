@@ -77,6 +77,10 @@ export function ItemRow({
   // Request-wide equipment year (AC-28) — the per-item year INHERITS this until overridden, matching
   // the "settings for all items" behaviour of fuel/delivery/return above.
   const sharedYear = state.draft?.project?.advanced?.equipmentYear ?? null;
+  // Request-wide EQUIPMENT safety certs (AC-50) — per-item value inherits this until overridden (same
+  // globalize-with-override model). Distinct from the operator cert below.
+  const sharedSafety = state.draft?.project?.certificates?.safety ?? [];
+  const itemSafety = item.safetyCertsOverride ?? sharedSafety;
   // Part 1: the optional free-text "work type" is surfaced only for crane subtypes — mirror the mobile
   // gate (equipment_step.dart `_isCraneSelected`: the subtype's English name contains "crane").
   const isCrane = (subcategory?.name ?? "").toLowerCase().includes("crane");
@@ -377,6 +381,16 @@ export function ItemRow({
               anyLabel={t.options.equipmentYear.any}
               customLabel={t.options.equipmentYear.custom}
               customPlaceholder={t.options.equipmentYear.customPlaceholder}
+            />
+          </ChipField>
+
+          {/* Equipment safety certificate (AC-50) — per-item; inherits the request-wide "settings for all"
+              default until overridden (same model as fuel/delivery/return). NOT the operator cert above. */}
+          <ChipField label={t.step1.certificates.safety} agent={agentMatches(item.safetyCertsOverride, ai?.safetyCertsOverride)}>
+            <SelChips<OperatorCertificate>
+              values={itemSafety}
+              onToggle={(v) => actions.patchItem(item.id, { safetyCertsOverride: toggle(itemSafety, v) })}
+              options={opt(OPERATOR_CERTIFICATES, t.options.safetyCert)}
             />
           </ChipField>
 

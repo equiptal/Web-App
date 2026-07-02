@@ -155,19 +155,19 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
     project.advanced.equipmentYear = years[0];
     for (const i of items) i.equipmentYear = null;
   }
-  // AC-50: equipment-level safety certs the agent detected (per-item safety_certifications, e.g. the
-  // equipment must hold SASO/TÜV) → project-level Safety field. Tolerates single value or array.
-  const equipSafety = (out.line_items ?? []).flatMap((li) => safetyList(li.safety_certifications));
-  // AC-50: if the items that HAVE an agent-set operator certificate all share the same set (e.g. all
-  // TÜV), also reflect it at project level and let that control them. No-operator items (no cert)
-  // don't block this — they just aren't counted.
-  const certLists = items.map((i) => i.operator.certificate).filter((c) => c.length > 0);
-  const certKey = (c: OperatorCertificate[]) => [...c].sort().join(",");
-  const sharedOperatorCerts =
-    certLists.length > 0 && certLists.every((c) => certKey(c) === certKey(certLists[0])) ? certLists[0] : [];
-  if (sharedOperatorCerts.length) for (const i of items) i.operator.certByAgent = false;
-  const projectSafety = [...new Set([...equipSafety, ...sharedOperatorCerts])];
-  if (projectSafety.length) project.certificates.safety = projectSafety;
+  // AC-50: equipment safety certs (TÜV/SPSP/SASO) are PER-ITEM (set in toItem from each line's
+  // safety_certifications), globalized to the request-wide "Certificates" default when every item
+  // shares the same set — the same lift-to-request-wide rule as delivery/return/fuel/year. Distinct
+  // from the OPERATOR cert (item.operator.certificate → operatorLicenseLevel), which stays per-item.
+  const certKey = (c: OperatorCertificate[] | null | undefined) => (c && c.length ? [...c].sort().join(",") : "");
+  const itemSafety = items.map((i) => i.safetyCertsOverride ?? []);
+  const allSameSafety = items.length > 0 && itemSafety.every((c) => certKey(c) === certKey(itemSafety[0]));
+  if (allSameSafety && itemSafety[0].length) {
+    project.certificates.safety = itemSafety[0]; // uniform → globalize + inherit per item
+    for (const i of items) i.safetyCertsOverride = null;
+  } else if (!allSameSafety) {
+    project.certificates.safety = []; // items differ → no request-wide default; per-item overrides kept
+  }
   // Field-keyed agent notes (dotted path → note) for inline rendering beside each field.
   const fieldNotes: Record<string, string> = {};
   for (const fn of out.field_notes ?? []) {
@@ -308,6 +308,8 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
     // AC-28: pre-fill the equipment year from Mansour (minimum_equipment_year, or the legacy
     // max_equipment_age) — a 4-digit year the wizard's YearField renders; null ⇒ "any".
     equipmentYear: (li.minimum_equipment_year ?? li.max_equipment_age) != null ? String(li.minimum_equipment_year ?? li.max_equipment_age) : null,
+    // AC-50: per-item EQUIPMENT safety certs (reconciled to request-wide below when every item agrees).
+    safetyCertsOverride: safetyList(li.safety_certifications),
     operatorNeeded,
     operator: {
       ...defaultOperatorDetails(),
