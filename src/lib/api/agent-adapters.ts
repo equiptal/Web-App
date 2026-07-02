@@ -296,6 +296,9 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
     suggestion: li.capacity_id && li.capacity_match && CAP_NEEDS_CHECK.has(li.capacity_match) ? { measurementId: li.capacity_id } : undefined,
     advisory: li.capacity_advisory ?? null,
     quantity: li.quantity ?? 1,
+    // AC-28: pre-fill the equipment year from Mansour (minimum_equipment_year, or the legacy
+    // max_equipment_age) — a 4-digit year the wizard's YearField renders; null ⇒ "any".
+    equipmentYear: (li.minimum_equipment_year ?? li.max_equipment_age) != null ? String(li.minimum_equipment_year ?? li.max_equipment_age) : null,
     operatorNeeded,
     operator: {
       ...defaultOperatorDetails(),

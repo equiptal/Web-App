@@ -248,7 +248,10 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
   const toCertCode = (raw: string): CertCode | null => { const u = raw.toUpperCase(); return u.includes("TUV") || u.includes("TÜV") ? "TUV" : u.includes("SPSP") ? "SPSP" : u.includes("SASO") ? "SASO" : u.includes("LC") || u.includes("LOCAL") ? "LC" : null; };
   const reqEqCertCodes = (rt.equipmentCert ? String(rt.equipmentCert).split(/[,/]/) : []).map((x) => toCertCode(x.trim())).filter((x): x is CertCode => !!x);
   const eqCertConfirmed = c.equipmentCert === true ? reqEqCertCodes : [];
-  const reqYearNum = rt.year ? Number(rt.year) || null : null;
+  // Extract the required manufacture year from `rt.year` — tolerant of strings like "2018", "≥ 2018",
+  // or "2018 or newer" (a bare Number() fails on those, which is why the comparison used to show
+  // "Confirmed" instead of the year). Grab the first 4-digit year.
+  const reqYearNum = rt.year ? (Number.parseInt(String(rt.year).match(/\d{4}/)?.[0] ?? "", 10) || null) : null;
   return {
     id: `link-${sub.id}`,
     status: "PENDING",
@@ -335,6 +338,7 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
       ...(has(sub.crNumber) ? { commercial: sub.crNumber as string } : {}),
       ...(has(sub.vatNumber) ? { vat: sub.vatNumber as string } : {}),
       ...(has(sub.nationalAddress) ? { national: sub.nationalAddress as string } : {}),
+      ...(has(sub.contactInfo) ? { contact: sub.contactInfo as string } : {}),
     },
   };
 }

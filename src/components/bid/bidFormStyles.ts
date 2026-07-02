@@ -85,13 +85,14 @@ export const BID_FORM_CSS = `
 .iteminfo .ii.note .material-icons-outlined{font-size:14px}
 .item-hd{display:flex;align-items:center;gap:12px;margin:-16px -18px 14px;padding:14px 18px;background:linear-gradient(135deg,var(--navy),var(--navy-deep));color:#fff;border-radius:var(--r-lg) var(--r-lg) 0 0}
 .item-hd > .material-icons-outlined{font-size:24px;color:#FCD9A0;flex:0 0 auto}
-.item-hd .inm-wrap{flex:1;min-width:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.item-hd .inm{font-size:18px;font-weight:800;letter-spacing:-.2px}
-.item-hd .imeta{font-size:13.5px;color:#fff;font-weight:700}
-.item-hd .units-chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:800;color:var(--navy-deep);background:#FCD9A0;border-radius:var(--r-full);padding:3px 11px}
-.item-hd .units-chip .material-icons-outlined{font-size:14px}
-.item-hd .units-chip.multi{background:var(--action);color:#fff}
-.item-hd .ibadge{margin-inline-start:auto;font-size:11px;font-weight:800;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:var(--r-full);padding:4px 11px;white-space:nowrap}
+.item-hd .inm-wrap{flex:1;min-width:0;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.item-hd .inm{font-size:17px;font-weight:800;letter-spacing:-.2px}
+.item-hd .imeta{font-size:13px;color:rgba(255,255,255,.72);font-weight:700}
+/* compact, self-sizing units pill — subtle tinted amber (single) / solid orange (multi); never stretches */
+.item-hd .units-chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;letter-spacing:.01em;color:#FCD9A0;background:rgba(252,217,160,.14);border:1px solid rgba(252,217,160,.32);border-radius:var(--r-full);padding:3px 10px;white-space:nowrap}
+.item-hd .units-chip .material-icons-outlined{font-size:13px}
+.item-hd .units-chip.multi{background:var(--action);border-color:transparent;color:#fff}
+.item-hd .ibadge{margin-inline-start:auto;flex:0 0 auto;font-size:10.5px;font-weight:800;color:rgba(255,255,255,.85);background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:var(--r-full);padding:4px 11px;white-space:nowrap}
 .tmtx-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-md)}
 .tmtx{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed}
 .tmtx th{background:var(--surface2);color:var(--navy-mid);font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:10px;border-bottom:1px solid var(--border);text-align:start}

@@ -39,12 +39,15 @@ export function SharedBidSubmissionModal({
   ar,
   L,
   onClose,
+  onDownloadQuotation,
 }: {
   bid: BidCard;
   submission: LinkBidSubmission | null;
   ar: boolean;
   L: (en: string, arr: string) => string;
   onClose: () => void;
+  /** Export this submission as the app-parity quotation doc (same template as an on-platform bid). */
+  onDownloadQuotation?: () => void;
 }) {
   const nf = (n: number) => new Intl.NumberFormat(ar ? "ar-EG" : "en-US").format(Math.round(n));
   const sar = L("SAR", "ر.س");
@@ -338,7 +341,11 @@ export function SharedBidSubmissionModal({
 
         <div className="slb-foot">
           <button className="btn sm" onClick={onClose}>{L("Close", "إغلاق")}</button>
-          {submission && <button className="btn sm qprint-hide" onClick={() => window.print()}>{L("Download / Print", "تنزيل / طباعة")}</button>}
+          {submission && (
+            onDownloadQuotation
+              ? <button className="btn sm primary qprint-hide" onClick={onDownloadQuotation}>{L("Download quotation", "تنزيل عرض السعر")}</button>
+              : <button className="btn sm qprint-hide" onClick={() => window.print()}>{L("Download / Print", "تنزيل / طباعة")}</button>
+          )}
         </div>
       </div>
     </div>

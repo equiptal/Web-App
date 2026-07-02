@@ -14,7 +14,12 @@ interface BackendMe {
   email?: string | null;
   whatsapp?: string | null;
   tier?: string;
-  supplierProfile?: { companyName?: string | null } | null;
+  crNumber?: string | null;
+  commercialRegistrationNumber?: string | null;
+  vatNumber?: string | null;
+  taxNumber?: string | null;
+  nationalAddress?: string | null;
+  supplierProfile?: { companyName?: string | null; crNumber?: string | null; commercialRegistrationNumber?: string | null; vatNumber?: string | null; taxNumber?: string | null; nationalAddress?: string | null } | null;
 }
 interface BackendStatus {
   supplierStatus?: number | null;
@@ -41,6 +46,11 @@ export async function GET(req: Request) {
         jobTitle: me.jobTitle ?? null,
         email: me.email ?? null,
         whatsapp: me.whatsapp ?? null,
+        // Company identity for the quotation Rentee block — read from either the user or its profile,
+        // tolerant of the backend's field naming. Null when absent (quotation falls back to the pill).
+        crNumber: me.crNumber ?? me.commercialRegistrationNumber ?? me.supplierProfile?.crNumber ?? me.supplierProfile?.commercialRegistrationNumber ?? null,
+        vatNumber: me.vatNumber ?? me.taxNumber ?? me.supplierProfile?.vatNumber ?? me.supplierProfile?.taxNumber ?? null,
+        nationalAddress: me.nationalAddress ?? me.supplierProfile?.nationalAddress ?? null,
       };
       return NextResponse.json({
         user,

@@ -969,6 +969,15 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                   {/* 💰 COST */}
                   <SectionRow id="cost" icon="payments" title={L("Cost", "التكلفة")} accent={C.action} accentText="#fff" n={cols.length} collapsed={collapsed.has("cost")} onToggle={() => toggleSection("cost")} />
                   {!collapsed.has("cost") && (<>
+                    {/* These prices aren't final — the renter negotiates them in the deal room. */}
+                    <tr>
+                      <td colSpan={cols.length + 1} style={{ padding: "8px 14px", background: C.warningBg, borderTop: `1px solid ${C.line}` }}>
+                        <span className="inline-flex flex-wrap items-center gap-1.5 text-[11.5px] font-bold" style={{ color: C.warning }}>
+                          <span className="material-icons-outlined" style={{ fontSize: 15 }}>forum</span>
+                          {L("You can negotiate these prices in the deal room — nothing here is final.", "يمكنك التفاوض على هذه الأسعار في غرفة الصفقة — لا شيء هنا نهائي.")}
+                        </span>
+                      </td>
+                    </tr>
                     {/* §6 controls strip — RATE PERIOD (Day/Week/Month) + PRICES FOR (per-unit/all) */}
                     <tr>
                       <td colSpan={cols.length + 1} style={{ padding: "9px 16px", background: C.surface2, borderBottom: `1px solid ${C.line}` }}>
@@ -981,14 +990,17 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                               ))}
                             </div>
                           </div>
-                          <div className="flex flex-col gap-1">
-                            <span className="text-[9px] font-extrabold" style={{ color: C.muted, letterSpacing: ".08em" }}>{L("PRICES FOR", "الأسعار لـ")}</span>
-                            <div className="inline-flex rounded-lg p-0.5" style={{ background: C.surface3 }}>
-                              {([["unit", L("Per unit", "لكل وحدة")], ["all", L("All units offered", "كل الوحدات المعروضة")]] as [PricesFor, string][]).map(([p, lab]) => (
-                                <button key={p} onClick={() => setPricesFor(p)} className="rounded-md px-3 py-1 text-[11.5px] font-extrabold transition" style={pricesFor === p ? { background: "#fff", color: C.navy, boxShadow: "0 1px 3px rgba(20,40,70,.12)" } : { background: "transparent", color: C.muted }}>{lab}</button>
-                              ))}
+                          {/* Per-unit vs all-units only matters for a multi-unit request (they're identical at 1 unit). */}
+                          {units > 1 && (
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[9px] font-extrabold" style={{ color: C.muted, letterSpacing: ".08em" }}>{L("PRICES FOR", "الأسعار لـ")}</span>
+                              <div className="inline-flex rounded-lg p-0.5" style={{ background: C.surface3 }}>
+                                {([["unit", L("Per unit", "لكل وحدة")], ["all", L("All units offered", "كل الوحدات المعروضة")]] as [PricesFor, string][]).map(([p, lab]) => (
+                                  <button key={p} onClick={() => setPricesFor(p)} className="rounded-md px-3 py-1 text-[11.5px] font-extrabold transition" style={pricesFor === p ? { background: "#fff", color: C.navy, boxShadow: "0 1px 3px rgba(20,40,70,.12)" } : { background: "transparent", color: C.muted }}>{lab}</button>
+                                ))}
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1170,6 +1182,17 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         </span>
                       </td>
                     </tr>
+                    {/* Multi-unit: the equipment details shown represent one unit; each unit is verified individually. */}
+                    {units > 1 && (
+                    <tr>
+                      <td colSpan={cols.length + 1} style={{ padding: "8px 14px", background: C.surface2, borderTop: `1px solid ${C.line}` }}>
+                        <span className="inline-flex flex-wrap items-center gap-1.5 text-[11.5px] font-bold" style={{ color: C.muted }}>
+                          <span className="material-icons-outlined" style={{ fontSize: 15 }}>shield</span>
+                          {L(`Details shown are for 1 unit only — each of the ${units} units is verified individually in the deal room before approval.`, `التفاصيل المعروضة لوحدة واحدة فقط — يتم التحقق من كل وحدة من الـ ${units} على حدة في غرفة الصفقة قبل الاعتماد.`)}
+                        </span>
+                      </td>
+                    </tr>
+                    )}
                     <tr>
                       <RowHead title={L("Year", "سنة الصنع")} sub={(() => { const my = cols[0]?.bid.reqMinYear; return my == null ? undefined : my >= 1990 ? `${L("min year", "أدنى سنة")} ${my}` : `${L("max age", "أقصى عمر")} ${my} ${L("yrs", "سنة")}`; })()} />
                       {cols.map((c, idx) => {

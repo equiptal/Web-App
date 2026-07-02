@@ -269,7 +269,6 @@ export function GroupStrip({ group, ar, L, router, filledByItem = {} }: { group:
   const barColor = (p: number) => (p >= 50 ? "#1daf58" : p > 0 ? "#FBBF6B" : "#F87171");
   // web-app/006 — shared-link tracker for this group (copy link + opened/submitted, keyed by group id).
   const [link, setLink] = useState<{ openedCount: number; submittedCount: number; renterName: string | null; bidDeadline: string | null; logoUrl: string | null; groupRef: string | null } | null>(null);
-  const [copied, setCopied] = useState(false);
   // Share + deadline both happen in the shared sheet (same UI as the post-submit confirmation).
   const [shareOpen, setShareOpen] = useState(false);
   const saveDeadline = (iso: string | null) => {
@@ -284,7 +283,6 @@ export function GroupStrip({ group, ar, L, router, filledByItem = {} }: { group:
     return () => { active = false; };
   }, [group.id]);
   const shareUrl = typeof window !== "undefined" ? bidShareUrl(window.location.origin, group.id, link?.renterName) : "";
-  const copyLink = () => { if (shareUrl) navigator.clipboard?.writeText(shareUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); }).catch(() => {}); };
   const isBroadcast = group.type !== "DIRECT";
   const ffItems = [...group.items].sort((a, b) => (b.item?.qty ?? 1) - (a.item?.qty ?? 1));
   const ffShown = ffExpanded ? ffItems : ffItems.slice(0, 4);
@@ -307,7 +305,6 @@ export function GroupStrip({ group, ar, L, router, filledByItem = {} }: { group:
                 <span style={{ flex: 1, minWidth: 120, fontSize: 13, fontWeight: 800, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{shareUrl}</span>
                 <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                   <button onClick={() => setShareOpen(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "none", background: "#f79009", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer" }}><span className="material-icons-outlined" style={{ fontSize: 16 }}>ios_share</span>{L("Share", "مشاركة")}</button>
-                  <button onClick={copyLink} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 13px", borderRadius: 10, border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer" }}><span className="material-icons-outlined" style={{ fontSize: 16 }}>{copied ? "check" : "content_copy"}</span>{copied ? L("Copied", "تم") : L("Copy", "نسخ")}</button>
                   <button onClick={() => setShareOpen(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 13px", borderRadius: 10, border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer" }}><span className="material-icons-outlined" style={{ fontSize: 16 }}>tune</span>{L("Edit", "تعديل")}</button>
                 </div>
               </div>

@@ -368,7 +368,7 @@ export function VerificationFlow() {
                 : logoPreview ? <img src={logoPreview} alt="" className="h-full w-full object-contain" />
                 : <Icon name="image" size={20} className="text-muted" />}
             </span>
-            <span className="flex-1 text-[12px] text-muted">{L("Appears on the bid form your invited suppliers see.", "يظهر في نموذج العرض الذي يراه المؤجّرون المدعوّون.")}</span>
+            <span className="flex-1 text-[12px] text-muted">{L("Appears on your quotations, your shared request link, and the bid form suppliers open.", "يظهر على عروض الأسعار، ورابط الطلب المشترك، ونموذج العرض الذي يفتحه المؤجّرون.")}</span>
             <label className="flex-none cursor-pointer rounded-lg border border-brand bg-surface px-3 py-1.5 text-[12.5px] font-bold text-brand">
               {logoBusy ? v.uploading : companyLogoKey || logoPreview ? L("Change", "تغيير") : L("Upload", "رفع")}
               <input type="file" accept="image/*" className="hidden" disabled={logoBusy} onChange={(e) => { const f = e.target.files?.[0]; if (f) onPickLogo(f); }} />

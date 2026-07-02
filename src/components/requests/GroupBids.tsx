@@ -193,6 +193,8 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   const [langPick, setLangPick] = useState(false); // quotation language chooser (Arabic | English)
   const [renterName, setRenterName] = useState("");
   const [companyName, setCompanyName] = useState("");
+  // Renter company identity for the quotation Rentee block (app parity) — from /api/me.
+  const [renterId, setRenterId] = useState<{ phone: string | null; email: string | null; crNumber: string | null; vatNumber: string | null; nationalAddress: string | null }>({ phone: null, email: null, crNumber: null, vatNumber: null, nationalAddress: null });
   const { tier } = useSession();
   const verified = tier === "verified";
   const [quoteGate, setQuoteGate] = useState(false); // unverified → confirm before issuing the quotation
@@ -210,10 +212,11 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
     let active = true;
     fetch("/api/me", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { user?: { firstName?: string; lastName?: string; companyName?: string | null } } | null) => {
+      .then((d: { user?: { firstName?: string; lastName?: string; companyName?: string | null; phone?: string | null; email?: string | null; crNumber?: string | null; vatNumber?: string | null; nationalAddress?: string | null } } | null) => {
         if (active && d?.user) {
           setRenterName([d.user.firstName, d.user.lastName].filter(Boolean).join(" "));
           setCompanyName(d.user.companyName ?? "");
+          setRenterId({ phone: d.user.phone ?? null, email: d.user.email ?? null, crNumber: d.user.crNumber ?? null, vatNumber: d.user.vatNumber ?? null, nationalAddress: d.user.nationalAddress ?? null });
         }
       })
       .catch(() => {});
@@ -315,10 +318,11 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
     }
   }
 
-  function downloadQuotation(langIsAr: boolean) {
+  function downloadQuotation(langIsAr: boolean, only?: GroupBid[]) {
     // Include off-platform (shared-link) bids alongside on-platform ones so a selected supplier
-    // submission can be exported as a quotation just like an app bid.
-    const chosen = [...(bids ?? []), ...subCards].filter((b) => selected.has(b.id));
+    // submission can be exported as a quotation just like an app bid. `only` lets a single card (e.g.
+    // the submission viewer's Download) export just that bid through the SAME app-parity template.
+    const chosen = only ?? [...(bids ?? []), ...subCards].filter((b) => selected.has(b.id));
     if (!chosen.length) return;
     const esc = (str: string) => String(str).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
     const itemMap = new Map(group.items.map((it) => [it.id, it]));
@@ -342,8 +346,17 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       const L = (en: string, arr: string) => (isAr ? arr : en);
       const sar = L("SAR", "ر.س");
       const dateStr = new Date().toLocaleDateString(isAr ? "ar-SA" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
-      // Verified renters issue the quotation under their company name; otherwise their personal name.
-      const rentee = { name: (verified && companyName.trim() ? companyName.trim() : renterName) || L("Moedatech renter", "مستأجر معداتك"), org: "Moedatech", city: group.city ?? group.locationLabel };
+      // Rentee identity (app parity) — company name primary when verified, else personal name; plus the
+      // renter's real CR/VAT/national address/phone/email from /api/me (value-or-"Verified" pill).
+      const rentee = {
+        name: (verified && companyName.trim() ? companyName.trim() : renterName) || L("Moedatech renter", "مستأجر معداتك"),
+        city: group.city ?? group.locationLabel,
+        crNumber: renterId.crNumber,
+        vatNumber: renterId.vatNumber,
+        nationalAddress: renterId.nationalAddress,
+        phone: renterId.phone,
+        email: renterId.email,
+      };
       const sup = supBids[0];
       const supInit = (sup.supplierName || "S").replace(/[^A-Za-z0-9]/g, "").slice(0, 3).toUpperCase() || "S";
       const qnum = `Q-${reqCode}-${supInit}${si + 1}`;
@@ -368,12 +381,19 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       const supIdRows =
         idRow(L("National address", "العنوان الوطني"), ld.national ?? sup.supplierNationalAddress, sup.compliance.nationalAddress) +
         idRow(L("CR #", "السجل التجاري"), ld.commercial ?? sup.supplierCrNumber, sup.compliance.activityLicense) +
-        idRow(L("VAT #", "الرقم الضريبي"), ld.vat ?? sup.supplierVatNumber, sup.compliance.taxNumber);
-      const supChipList = [
-        sup.verified ? L("Verified", "موثَّق") : null,
-        (sup.companyCertCodes ?? []).includes("LC") ? L("Local content", "محتوى محلي") : null,
-        (sup.companyCertCodes ?? []).includes("SASO") ? L("SASO certified", "شهادة ساسو") : null,
-      ].filter(Boolean) as string[];
+        idRow(L("VAT #", "الرقم الضريبي"), ld.vat ?? sup.supplierVatNumber, sup.compliance.taxNumber) +
+        idRow(L("Contact", "التواصل"), ld.contact ?? null, false);
+      // Rentee identity rows (app parity) — same value-or-"Verified" rule as the supplier.
+      const renteeIdRows =
+        idRow(L("National address", "العنوان الوطني"), rentee.nationalAddress, verified) +
+        idRow(L("CR #", "السجل التجاري"), rentee.crNumber, verified) +
+        idRow(L("VAT #", "الرقم الضريبي"), rentee.vatNumber, verified) +
+        idRow(L("Phone", "الهاتف"), rentee.phone, false) +
+        idRow(L("Email", "البريد الإلكتروني"), rentee.email, false);
+      const renteeChips = verified ? `<div class="pchips"><span class="pchip">✓ ${esc(L("Verified", "موثَّق"))}</span></div>` : "";
+      // App parity: the quotation surfaces only the "Verified" chip — the app removed certificate chips
+      // (Local content / SASO) from the quotation ("no longer surfaces certificates").
+      const supChipList = [sup.verified ? L("Verified", "موثَّق") : null].filter(Boolean) as string[];
       const supChips = supChipList.length ? `<div class="pchips">${supChipList.map((c) => `<span class="pchip">✓ ${esc(c)}</span>`).join("")}</div>` : "";
 
       const eqLine = (b: GroupBid) => (b.equipment ? [b.equipment.make, b.equipment.model, b.equipment.year].filter(Boolean).join(" · ") : "—");
@@ -448,14 +468,22 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         operator: (inc: string | null, nat: string | null) => { if (inc == null) return null; if (inc.toUpperCase() !== "YES") return L("No operator", "بدون مشغّل"); return L("Includes operator", "يشمل مشغّلاً") + (nat ? ` · ${L("Nationality", "الجنسية")}: ${nat}` : ""); },
       };
       const kvRow = (label: string, val: string | null) => (val ? `<div class="kv"><span>${esc(label)}</span><b>${esc(val)}</b></div>` : "");
+      // App parity: the equipment-terms section prints the required/held safety certifications.
+      const eqCertsText = (b: GroupBid) => {
+        const cs = (b.heldCertCodes?.length ? b.heldCertCodes : b.equipmentCertCodes) ?? [];
+        return cs.length ? cs.map((c) => (isAr ? CERT_LABEL[c]?.ar : CERT_LABEL[c]?.en)).filter(Boolean).join(" · ") : null;
+      };
       let eqTermRows: string;
       if (supBids.length === 1) {
         const et = sup.requestTerms;
-        eqTermRows = kvRow(L("Operator", "المشغّل"), tfmt.operator(et.operatorIncluded, et.operatorNationality)) + kvRow(L("Fuel type", "نوع الوقود"), tfmt.fuel(et.fuelType));
+        eqTermRows =
+          kvRow(L("Operator", "المشغّل"), tfmt.operator(et.operatorIncluded, et.operatorNationality)) +
+          kvRow(L("Equipment safety certifications", "شهادات سلامة المعدة"), eqCertsText(sup)) +
+          kvRow(L("Fuel type", "نوع الوقود"), tfmt.fuel(et.fuelType));
       } else {
         eqTermRows = supBids.map((b) => {
           const et = b.requestTerms;
-          const parts = [tfmt.operator(et.operatorIncluded, et.operatorNationality), tfmt.fuel(et.fuelType)].filter(Boolean).join(" · ");
+          const parts = [tfmt.operator(et.operatorIncluded, et.operatorNationality), eqCertsText(b), tfmt.fuel(et.fuelType)].filter(Boolean).join(" · ");
           return kvRow(labelOf(b), parts || null);
         }).join("");
       }
@@ -473,7 +501,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         <div class="q-body">
           <div class="parties">
             <div class="party"><div class="plabel">${esc(L("Supplier", "المؤجّر"))}</div><div class="pname">${esc(sup.supplierName)}</div>${sup.rating != null ? `<div class="pmeta">★ ${sup.rating.toFixed(1)}</div>` : ""}${supIdRows}${supChips}</div>
-            <div class="party"><div class="plabel">${esc(L("Rentee", "المستأجر"))}</div><div class="pname">${esc(rentee.name)}</div><div class="pmeta">${[verified ? esc(L("Verified renter", "مستأجر موثّق")) : "", esc(rentee.org), rentee.city ? esc(rentee.city) : ""].filter(Boolean).join(" · ")}</div></div>
+            <div class="party"><div class="plabel">${esc(L("Rentee", "المستأجر"))}</div><div class="pname">${esc(rentee.name)}</div>${rentee.city ? `<div class="pmeta">${esc(rentee.city)}</div>` : ""}${renteeIdRows}${renteeChips}</div>
           </div>
           <div class="metastrip">
             <div><span>${esc(L("Request #", "رقم الطلب"))}</span><b>${esc(groupRef ?? reqLabel)}</b></div>
@@ -493,7 +521,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
             <div class="trow"><span>${esc(L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"))}</span><b>${nf(vat)}</b></div>
             <div class="trow grand"><span>${esc(L("Total", "الإجمالي"))}</span><b>${nf(total)} ${esc(sar)}</b></div>
           </div>
-          <div class="words"><div class="wl">${esc(L("Amount in words", "المبلغ كتابةً"))}</div>${esc(isAr ? `${numWordsAr(total)} ريال سعودي` : `${numWords(total)} Saudi Riyals`)} · ${supBids.length} ${esc(isAr ? (supBids.length > 1 ? "بنود" : "بند") : supBids.length > 1 ? "items" : "item")}</div>
+          <div class="words"><div class="wl">${esc(L("Amount in words", "المبلغ كتابةً"))}</div>${esc(isAr ? `${numWordsAr(total)} ريال سعودي` : `${numWords(total)} Saudi Riyals`)}</div>
           <div class="card"><div class="card-h">${esc(L("Project terms", "شروط المشروع"))}</div>
             ${scopeRows}
             <div class="kv"><span>${esc(L("Rental basis", "أساس الإيجار"))}</span><b>${esc(rentalBasis || "—")}</b></div>
@@ -775,21 +803,10 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         const rowSep = { borderTop: "1px solid #EFF2F6" } as const;
         const iconBox = { width: 40, height: 40, borderRadius: 11, background: "#eff4f9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } as const;
         const blueLink = { background: "none", border: "none", color: "#1a7ec8", fontWeight: 800, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" } as const;
-        // Top banner — every card carries one so the rows line up across cards (parity with the off-platform banner).
-        const banner =
-          b.unreadTerms.length > 0
-            ? { icon: "bolt", text: L(`Updated offer · ${b.unreadTerms.length} new`, `عرض مُحدّث · ${b.unreadTerms.length} جديد`), bg: "#fff4e5", c: "#d4780a", bd: "#f7e4c6" }
-            : b.status === "COUNTER_OFFERED"
-              ? { icon: "bolt", text: L("Updated offer", "عرض مُحدّث"), bg: "#fff4e5", c: "#d4780a", bd: "#f7e4c6" }
-              : b.status === "ACCEPTED"
-                ? { icon: "verified", text: L("Accepted — order placed", "مقبول — تم الطلب"), bg: "#e7f7ee", c: "#1daf58", bd: "#cdebd9" }
-                : b.status === "OPEN_FOR_NEGOTIATION"
-                  ? { icon: "forum", text: L("In negotiation", "قيد التفاوض"), bg: "#fff3e0", c: "#d4780a", bd: "#f7e4c6" }
-                  : b.status === "EXPIRED"
-                    ? { icon: "schedule", text: L("Offer expired", "انتهى العرض"), bg: "#eff4f9", c: "#6b8fa8", bd: "#e1e8f0" }
-                    : b.status === "WITHDRAWN"
-                      ? { icon: "block", text: L("Offer withdrawn", "عرض مسحوب"), bg: "#eff4f9", c: "#6b8fa8", bd: "#e1e8f0" }
-                      : { icon: "auto_awesome", text: L("New offer", "عرض جديد"), bg: "#e6f2fb", c: "#1a7ec8", bd: "#cfe6f7" };
+        // Top banner = the bid's SOURCE only (2 values, app parity): on-platform bids are always
+        // "Via Moedatech app" in BLUE; off-platform shared-link bids carry the ORANGE banner on their
+        // own card (SharedLinkBidCard). The negotiation STATUS lives in the right badge + the CTA suffix.
+        const banner = { icon: "verified_user", text: L("Via Moedatech app", "عبر تطبيق معداتك"), bg: "#e6f2fb", c: "#1a7ec8", bd: "#cfe6f7" };
         return (
           <div
             key={b.id}
@@ -822,9 +839,6 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                   <span style={{ width: 22, height: 22, borderRadius: "50%", background: "#1c3550", color: "#fff", fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{(b.supplierName || "S").charAt(0).toUpperCase()}</span>
                   <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550" }}>{b.supplierName}</span>
                   {b.verified && <span className="material-icons-outlined" style={{ fontSize: 16, color: "#1daf58" }}>verified</span>}
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 10, fontWeight: 800, padding: "2px 7px", borderRadius: 100, background: "#e6f2fb", color: "#1a7ec8" }}>
-                    <span className="material-icons-outlined" style={{ fontSize: 12 }}>verified_user</span>{L("via Moedatech app", "عبر تطبيق معداتك")}
-                  </span>
                 </div>
               </div>
               {!selectMode && (
@@ -1030,6 +1044,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           ar={ar}
           L={L}
           onClose={() => setSubmissionBid(null)}
+          onDownloadQuotation={() => downloadQuotation(ar, [submissionBid])}
         />
       )}
     </div>

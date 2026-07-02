@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Fragment, type ReactNode } from "react";
+import { useEffect, useRef, useState, Fragment, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchRequestDetail, cancelRequest, updateRequest, fetchRequestSubmissions, bidShareUrl, setBidDeadline } from "@/lib/api/client";
@@ -16,6 +16,55 @@ function fmtDate(v: string | null | undefined, ar: boolean): string {
   if (!v) return "—";
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+/**
+ * EVERY request-level field the backend stored — request details show all of them, but only the ones
+ * that actually have a value (nulls/empties are dropped). Enums are formatted bilingually; unknown enum
+ * values fall back to a prettified raw string. Shared by RequestDetail + RequestGroupDetail.
+ */
+export function requestDetailRows(r: RequestRecord, ar: boolean, L: (en: string, arr: string) => string): [string, ReactNode][] {
+  const yn = (b: boolean | null | undefined) => (b == null ? null : b ? L("Yes", "نعم") : L("No", "لا"));
+  const pretty = (v: string) => v.replace(/[_-]+/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  const enumL = (v: unknown, map: Record<string, [string, string]>) => {
+    if (v == null || v === "") return null;
+    const s = String(v);
+    const x = map[s.toUpperCase()] ?? map[s.toLowerCase()];
+    return x ? L(x[0], x[1]) : pretty(s);
+  };
+  const qty = (n: unknown, unit: [string, string]) => (n == null ? null : `${Number(n).toLocaleString(ar ? "ar-SA" : "en-US")} ${L(unit[0], unit[1])}`);
+  const rentalMap = { DAILY: ["Daily", "يومي"], WEEKLY: ["Weekly", "أسبوعي"], MONTHLY: ["Monthly", "شهري"], PER_JOB: ["Per job", "للمهمة"], LONG_TERM: ["Long term", "طويل الأمد"] } as Record<string, [string, string]>;
+  const urgencyMap = { ASAP: ["ASAP", "عاجل"], SOON: ["Soon", "قريبًا"], FAR_FUTURE: ["Future", "مستقبلًا"] } as Record<string, [string, string]>;
+  const payMap = { UPFRONT: ["Upfront", "مقدمًا"], DAILY: ["Daily", "يومي"], "NET-30": ["Net 30 days", "صافي ٣٠ يومًا"], "NET-60": ["Net 60 days", "صافي ٦٠ يومًا"], "END-OF-JOB": ["End of job", "نهاية المهمة"] } as Record<string, [string, string]>;
+  const slaMap = { FOUR_HR: ["4 hours", "٤ ساعات"], EIGHT_HR: ["8 hours", "٨ ساعات"], TWENTY_FOUR_HR: ["24 hours", "٢٤ ساعة"], FORTY_EIGHT_HR: ["48 hours", "٤٨ ساعة"], SEVENTY_TWO_HR: ["72 hours", "٧٢ ساعة"] } as Record<string, [string, string]>;
+  const maintMap = { SUPPLIER: ["Supplier", "المؤجّر"], RENTER: ["Renter", "المستأجر"], RENTEE: ["Renter", "المستأجر"] } as Record<string, [string, string]>;
+  const otMap = { "0": ["None", "بدون"], WITHOUT: ["None", "بدون"], "1.5X": ["1.5×", "1.5×"], "2X": ["2×", "2×"] } as Record<string, [string, string]>;
+  const rows: [string, ReactNode][] = [
+    [L("Rental basis", "أساس الإيجار"), enumL(r.rentalType, rentalMap)],
+    [L("Urgency", "الإلحاح"), enumL(r.urgency, urgencyMap)],
+    [L("Duration", "المدة"), qty(r.estimatedDurationDays, ["days", "يوم"])],
+    [L("Working hours", "ساعات العمل"), qty(r.workingHoursPerDay, ["hrs/day", "ساعة/يوم"])],
+    [L("Working days / week", "أيام العمل/أسبوع"), r.workingDaysPerWeek ?? null],
+    [L("Estimated job hours", "ساعات المهمة التقديرية"), qty(r.jobEstimatedHours, ["hrs", "ساعة"])],
+    [L("Overtime rate", "أجر العمل الإضافي"), enumL(r.overtimeRate, otMap)],
+    [L("Terrain", "التضاريس"), enumL(r.terrainType, {})],
+    [L("Fulfillment", "نوع التنفيذ"), enumL(r.fulfillmentType, {})],
+    [L("Payment terms", "شروط الدفع"), enumL(r.paymentTerms, payMap)],
+    [L("Payment method", "طريقة الدفع"), enumL(r.paymentMethod, {})],
+    [L("Breakdown response", "زمن الاستجابة للأعطال"), enumL(r.breakdownResponseSla, slaMap)],
+    [L("Maintenance", "الصيانة"), enumL(r.maintenanceResponsibility, maintMap)],
+    [L("Budget", "الميزانية"), r.budgetCeiling ? `${Number(r.budgetCeiling).toLocaleString(ar ? "ar-SA" : "en-US")} ${L("SAR", "ر.س")}` : null],
+    [L("Min. supplier rating", "أدنى تقييم للمؤجّر"), r.minimumSupplierRating ? `★ ${Number(r.minimumSupplierRating).toFixed(1)}` : null],
+    [L("Delivery lead time", "مهلة التسليم"), enumL(r.deliveryLeadTime, {})],
+    [L("Offer duration", "مدة العرض"), enumL(r.offerDuration, {})],
+    [L("Verified suppliers only", "مؤجّرون موثّقون فقط"), yn(r.verifiedSuppliersOnly)],
+    [L("On-site storage", "تخزين في الموقع"), yn(r.equipmentStorageOnSite)],
+    [L("Subletting allowed", "التأجير من الباطن"), yn(r.subletting)],
+    [L("Local content", "المحتوى المحلي"), yn(r.localContent)],
+    [L("Extendable", "قابل للتمديد"), yn(r.extendable)],
+    [L("Required certificates", "الشهادات المطلوبة"), r.requiredCerts && r.requiredCerts.length ? r.requiredCerts.join(", ") : null],
+  ];
+  return rows.filter(([, v]) => v != null && v !== "" && v !== "—");
 }
 
 export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: string) => void }) {
@@ -96,6 +145,14 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
   useEffect(() => {
     if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("view") === "bids") setView("bids");
   }, []);
+  // Land on the bids cards, not the request header, when switching to the bids view (button or deep-link).
+  // Depends on `r` too so the deep-link case scrolls once the record (and the bids section) has mounted.
+  const bidsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (view !== "bids" || !r) return;
+    const t = setTimeout(() => bidsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+    return () => clearTimeout(t);
+  }, [view, r]);
 
   if (error) return <div className="rproto"><div className="rempty">{L("Couldn’t load this request.", "تعذّر تحميل هذا الطلب.")}</div></div>;
   if (!r) return <div className="rproto"><div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 28 }}>progress_activity</span></div></div>;
@@ -169,12 +226,12 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
       </div>
 
       {view === "bids" ? (
-        <>
+        <div ref={bidsRef} style={{ scrollMarginTop: 74 }}>
           <button className="btn sm" style={{ marginBottom: 14 }} onClick={() => setView("details")}>
             <span className="material-icons-outlined rq-arrow" style={{ transform: ar ? "none" : "scaleX(-1)" }}>chevron_right</span> {L("Back to request", "العودة للطلب")}
           </button>
           <RequestBids requestId={r.id} />
-        </>
+        </div>
       ) : (
         <>
           {/* equipment */}
@@ -195,19 +252,13 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
             </div>
           </div>
 
-          {/* preferences — only fields that have a value; the whole section hides if all are empty */}
+          {/* request details — every stored field that has a value (the whole section hides if none) */}
           {(() => {
-            const prefs = ([
-              [L("Rental basis", "أساس الإيجار"), r.rentalType],
-              [L("Payment terms", "شروط الدفع"), r.paymentTerms],
-              [L("Working hours", "ساعات العمل"), r.workingHoursPerDay ? `${r.workingHoursPerDay} ${L("hrs/day", "ساعة/يوم")}` : null],
-              [L("Maintenance", "الصيانة"), r.maintenanceResponsibility],
-              [L("Budget", "الميزانية"), r.budgetCeiling ? `${Number(r.budgetCeiling).toLocaleString(ar ? "ar-SA" : "en-US")} ${L("SAR", "ر.س")}` : null],
-            ] as [string, ReactNode][]).filter(([, v]) => v != null && v !== "");
+            const prefs = requestDetailRows(r, ar, L);
             if (!prefs.length) return null;
             return (
               <div className="dsec">
-                <div className="dsec-h"><span className="material-icons-outlined">tune</span>{L("Preferences", "التفضيلات")}</div>
+                <div className="dsec-h"><span className="material-icons-outlined">tune</span>{L("Request details", "تفاصيل الطلب")}</div>
                 <div className="dcard">
                   <div className="kv">
                     {prefs.map(([k, v]) => <Fragment key={k}><span className="k">{k}</span><span className="v">{v}</span></Fragment>)}

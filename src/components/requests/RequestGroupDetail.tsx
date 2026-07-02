@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState, Fragment, type ReactNode } from "react";
+import { useEffect, useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchRequestGroup, fetchRequestDetail } from "@/lib/api/client";
 import { parseAddress, publicTaxonomyUrl, type RequestRecord } from "@/lib/contract/requests";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { LocationMap } from "@/components/requests/LocationMap";
-import { Ditem } from "@/components/requests/RequestDetail";
+import { Ditem, requestDetailRows } from "@/components/requests/RequestDetail";
 import "@/components/requests/requests-proto.css";
 
 const STATUS_CLS: Record<string, string> = {
@@ -110,19 +110,13 @@ export function RequestGroupDetail({ groupId, onTitle }: { groupId: string; onTi
         </div>
       </div>
 
-      {/* shared preferences (identical across the group) — only fields that have a value */}
+      {/* shared request details (identical across the group) — every stored field that has a value */}
       {(() => {
-        const prefs = ([
-          [L("Rental basis", "أساس الإيجار"), first.rentalType],
-          [L("Payment terms", "شروط الدفع"), first.paymentTerms],
-          [L("Working hours", "ساعات العمل"), first.workingHoursPerDay ? `${first.workingHoursPerDay} ${L("hrs/day", "ساعة/يوم")}` : null],
-          [L("Maintenance", "الصيانة"), first.maintenanceResponsibility],
-          [L("Budget", "الميزانية"), first.budgetCeiling ? `${Number(first.budgetCeiling).toLocaleString(ar ? "ar-SA" : "en-US")} ${L("SAR", "ر.س")}` : null],
-        ] as [string, ReactNode][]).filter(([, v]) => v != null && v !== "");
+        const prefs = requestDetailRows(first, ar, L);
         if (!prefs.length) return null;
         return (
           <div className="dsec">
-            <div className="dsec-h"><span className="material-icons-outlined">tune</span>{L("Preferences", "التفضيلات")}</div>
+            <div className="dsec-h"><span className="material-icons-outlined">tune</span>{L("Request details", "تفاصيل الطلب")}</div>
             <div className="dcard">
               <div className="kv">
                 {prefs.map(([k, v]) => <Fragment key={k}><span className="k">{k}</span><span className="v">{v}</span></Fragment>)}

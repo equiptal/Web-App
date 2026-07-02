@@ -120,7 +120,7 @@ export function SharedLinkBidCard({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 14px", background: "#fff4e5", borderBottom: "1px solid #f7e4c6" }}>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 11.5, fontWeight: 800, color: "#d4780a", minWidth: 0 }}>
           <span className="material-icons-outlined" style={{ fontSize: 15, flexShrink: 0 }}>link</span>
-          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{L("Off-platform · via shared link", "خارج المنصة · عبر الرابط")}</span>
+          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{L("Off-platform · via your request link", "خارج المنصة · عبر رابط طلبك")}</span>
         </span>
         <span style={{ fontSize: 12, fontWeight: 700, color: "#b07a3a", whiteSpace: "nowrap", flexShrink: 0 }}>{agoShort}</span>
       </div>
@@ -238,8 +238,8 @@ export function SharedLinkBidCard({
             )}
             {([
               [L(`Rental (${nf(bid.price ?? 0)}/${periodOf(bid.priceUnit)} × ${u} unit${u > 1 ? "s" : ""})`, `الإيجار (${nf(bid.price ?? 0)}/${periodOf(bid.priceUnit)} × ${u})`), rental],
-              ...(deliv ? [[L("Delivery to site", "النقل إلى الموقع"), deliv]] as [string, number][] : []),
-              ...(ret ? [[L("Return from site", "الإرجاع من الموقع"), ret]] as [string, number][] : []),
+              ...(deliv ? [[L(`Delivery to site (${nf(bid.mobPrice ?? 0)} × ${u} unit${u > 1 ? "s" : ""})`, `النقل إلى الموقع (${nf(bid.mobPrice ?? 0)} × ${u})`), deliv]] as [string, number][] : []),
+              ...(ret ? [[L(`Return from site (${nf(bid.demobPrice ?? 0)} × ${u} unit${u > 1 ? "s" : ""})`, `الإرجاع من الموقع (${nf(bid.demobPrice ?? 0)} × ${u})`), ret]] as [string, number][] : []),
               [L("Subtotal before VAT", "المجموع قبل الضريبة"), sub],
               [L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"), vat],
             ] as [string, number][]).map(([lab, val], i) => (

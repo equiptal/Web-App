@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
-import { fetchReceivedBids, fetchMyRequests, startDealRoom } from "@/lib/api/client";
+import { fetchReceivedBids, fetchMyRequests, startDealRoom, fetchRequestSubmissions } from "@/lib/api/client";
 import type { InboxBid } from "@/lib/contract/inbox";
 
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
@@ -26,6 +26,8 @@ export function InboxView() {
   // requestId → requestGroupId, from `my-requests` (same source the requests page groups by). Lets the
   // inbox cluster a multi-item RFQ's fan-out siblings without any received-bids backend change.
   const [groupMap, setGroupMap] = useState<Map<string, string>>(new Map());
+  // group key → RFQ short code (RFQ-NNNNN), fetched per group (same source the requests page uses).
+  const [groupRefs, setGroupRefs] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     let active = true;
@@ -33,7 +35,19 @@ export function InboxView() {
       .then(([r, req]) => {
         if (!active) return;
         setBids(r.bids);
-        setGroupMap(new Map(req.requests.filter((x) => x.requestGroupId).map((x) => [x.id, x.requestGroupId as string])));
+        const gm = new Map(req.requests.filter((x) => x.requestGroupId).map((x) => [x.id, x.requestGroupId as string]));
+        setGroupMap(gm);
+        // Fetch each group's RFQ short code (groupRef) via one representative request per group.
+        const repByGroup = new Map<string, string>();
+        for (const b of r.bids) {
+          const gKey = gm.get(b.request.id) ?? b.request.groupId ?? b.request.id ?? b.bidId;
+          if (!repByGroup.has(gKey) && b.request.id) repByGroup.set(gKey, b.request.id);
+        }
+        Promise.all(
+          [...repByGroup.entries()].map(([gKey, rid]) =>
+            fetchRequestSubmissions(rid).then((s) => [gKey, s.groupRef] as const).catch(() => [gKey, null] as const),
+          ),
+        ).then((pairs) => active && setGroupRefs(new Map(pairs.filter((p): p is readonly [string, string] => !!p[1]))));
       })
       .catch(() => active && setBids([]));
     return () => { active = false; };
@@ -76,8 +90,8 @@ export function InboxView() {
     return (
       <div className="mx-auto mt-10 max-w-md rounded-2xl border border-border bg-surface p-8 text-center">
         <Icon name="inbox" size={40} className="text-muted" />
-        <h2 className="mt-3 text-[16px] font-extrabold text-navy">{L("No bids yet", "لا عروض بعد")}</h2>
-        <p className="mt-1 text-[13px] text-muted">{L("Bids suppliers send you will show up here, grouped by request.", "ستظهر هنا العروض التي يرسلها المورّدون، مُجمّعة حسب الطلب.")}</p>
+        <h2 className="mt-3 text-[16px] font-extrabold text-navy">{L("No in-app bids yet", "لا عروض داخل التطبيق بعد")}</h2>
+        <p className="mt-1 text-[13px] text-muted">{L("Bids suppliers send you inside the app show up here, grouped by request. Off-platform bids from your shared link appear on each request itself.", "تظهر هنا العروض التي يرسلها المؤجّرون داخل التطبيق، مُجمّعة حسب الطلب. أمّا عروض الرابط المشترك (خارج المنصة) فتظهر على كل طلب.")}</p>
       </div>
     );
   }
@@ -139,17 +153,19 @@ export function InboxView() {
     <div dir={ar ? "rtl" : "ltr"} className="mx-auto w-full max-w-3xl">
       {[...groups.values()].map((g) => (
         <div key={g.key} className="mb-6">
-          {/* Level 1 — the RFQ group */}
+          {/* Level 1 — the RFQ group: RFQ-NNNNN short code first, then the location */}
           <div className="mb-2 flex items-center gap-2 px-1 text-[13.5px] font-extrabold text-navy">
-            <Icon name="folder_open" size={16} /> <span className="truncate">{g.label}</span>
+            <Icon name="folder_open" size={16} />
+            {groupRefs.get(g.key) && <span className="flex-none rounded-md bg-navy px-2 py-0.5 font-mono text-[11.5px] font-extrabold text-white">{groupRefs.get(g.key)}</span>}
+            <span className="truncate text-muted">{g.label}</span>
             <span className="flex-none text-[11px] font-bold uppercase tracking-wide text-muted">· {g.count} {L("bids", "عروض")}</span>
           </div>
           {[...g.subs.values()].map((sub) => (
             <div key={sub.key} className="mb-3 ms-2 border-s-2 border-border ps-3">
-              {/* Level 2 — equipment type */}
-              <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wide text-muted">
-                <Icon name="construction" size={13} /> <span className="truncate">{sub.label}</span>
-                <span className="flex-none normal-case text-muted/70">· {sub.rows.length}</span>
+              {/* Level 2 — equipment type (prominent) */}
+              <div className="mb-2 inline-flex items-center gap-1.5 rounded-lg bg-brand-soft px-2.5 py-1 text-[12.5px] font-extrabold text-brand">
+                <Icon name="construction" size={15} /> <span className="truncate">{sub.label}</span>
+                <span className="flex-none rounded-full bg-brand/15 px-1.5 text-[11px] font-bold">{sub.rows.length}</span>
               </div>
               <div className="flex flex-col gap-2">{sub.rows.map(row)}</div>
             </div>

@@ -113,7 +113,9 @@ export function mapQuotation(raw: unknown): QuotationView {
   return {
     pdfUrl: s(q.pdfUrl),
     pdfStatus: s(q.pdfStatus),
-    quotationNumber: s(q.quotationNumber) ?? s(q.number),
+    // The backend Quotation model has no human quotation number — fall back to its id (uuid) so the
+    // doc still carries a stable reference. (/web:link-backend deal-room: quotationNumber gap.)
+    quotationNumber: s(q.quotationNumber) ?? s(q.number) ?? s(q.id),
   };
 }
 
@@ -174,7 +176,9 @@ export function mapDealRoom(raw: unknown): DealRoomView {
     rate: n(d.lastProposedRate) ?? n(bid.priceAmount),
     mobPrice: n(d.lastProposedMobPrice) ?? n(bid.mobPrice),
     demobPrice: n(d.lastProposedDemobPrice) ?? n(bid.demobPrice),
-    periods: n(bid.duration) ?? n((d.request as Record<string, unknown>)?.estimatedDurationDays),
+    // The Bid model has no `duration` (confirmed via /web:link-backend) — the request's estimated
+    // duration is the source of truth.
+    periods: n((d.request as Record<string, unknown>)?.estimatedDurationDays),
     priceUnit: s(d.lastProposedPriceUnit) ?? s(bid.priceUnit),
     numberOfUnits:
       n((Array.isArray((d.request as Record<string, unknown>)?.equipmentItems) ? ((d.request as Record<string, unknown>).equipmentItems as Record<string, unknown>[])[0] : undefined)?.numberOfUnits) ?? 1,
