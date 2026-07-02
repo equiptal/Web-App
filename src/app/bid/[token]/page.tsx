@@ -328,17 +328,22 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                 {q > 1 && (
                   <div className="units-note" style={{ flexWrap: "wrap", gap: 10, alignItems: "center" }}>
                     <span className="material-icons-outlined un-lead">layers</span>
-                    <span className="un-tx" style={{ flex: 1, minWidth: 180 }}>{L(`Multi-unit item — the renter needs ${q} units. Offer as many as you can supply; prices below multiply by this.`, `بند متعدد الوحدات — يحتاج المستأجر ${q} وحدات. اعرض ما تستطيع توفيره؛ تُضرب الأسعار أدناه بهذا العدد.`)}</span>
-                    {/* Partial-bid field — a clear white pill with a bold orange-bordered input so it's
-                        obvious this is where the supplier sets how many of the N units they can supply. */}
-                    <label style={{ display: "inline-flex", alignItems: "center", gap: 9, fontSize: 12.5, fontWeight: 800, color: "#1c3550", whiteSpace: "nowrap", background: "#fff", border: "1px solid #e6c690", borderRadius: 10, padding: "6px 8px 6px 12px" }}>
-                      {L("Units you can supply", "الوحدات المتاحة لديك")}
-                      <input type="number" inputMode="numeric" min={1} max={q} step={1} value={a?.offeredUnits ?? String(q)}
-                        onChange={(e) => setOffered(it.requestItemId, e.target.value)}
-                        onBlur={(e) => { const v = Math.min(q, Math.max(1, Math.round(num(e.target.value)) || q)); setOffered(it.requestItemId, String(v)); }}
-                        style={{ width: 60, height: 38, padding: "0 8px", borderRadius: 8, border: "2px solid #f79009", fontSize: 16, fontWeight: 900, color: "#1c3550", textAlign: "center", fontFamily: "inherit", background: "#fff" }} />
+                    <span className="un-tx" style={{ flex: 1, minWidth: 180 }}>{L(`Multi-unit item — the renter needs ${q} units. Set how many you can supply (bid on some or all); prices below multiply by this.`, `بند متعدد الوحدات — يحتاج المستأجر ${q} وحدات. حدّد كم وحدة تستطيع توفيرها (اعرض على بعضها أو كلّها)؛ تُضرب الأسعار أدناه بهذا العدد.`)}</span>
+                    {/* Partial-bid control — an explicit −/+ stepper so it's unmistakable the supplier can
+                        choose to supply fewer than the N units the renter asked for. Drives the Qty below. */}
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 10, whiteSpace: "nowrap", background: "#fff", border: "1px solid #e6c690", borderRadius: 10, padding: "6px 12px" }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550" }}>{L("Units you can supply", "الوحدات المتاحة لديك")}</span>
+                      <span style={{ display: "inline-flex", alignItems: "center", border: "2px solid #f79009", borderRadius: 9, overflow: "hidden" }}>
+                        <button type="button" aria-label={L("Fewer units", "تقليل")} disabled={oq <= 1}
+                          onClick={() => setOffered(it.requestItemId, String(Math.max(1, oq - 1)))}
+                          style={{ width: 36, height: 36, border: "none", background: oq <= 1 ? "#f6efe2" : "#fff5e8", color: oq <= 1 ? "#c9b48c" : "#b45309", fontSize: 22, fontWeight: 900, cursor: oq <= 1 ? "default" : "pointer", lineHeight: 1, fontFamily: "inherit" }}>−</button>
+                        <span style={{ minWidth: 38, textAlign: "center", fontSize: 16, fontWeight: 900, color: "#1c3550" }}>{oq}</span>
+                        <button type="button" aria-label={L("More units", "زيادة")} disabled={oq >= q}
+                          onClick={() => setOffered(it.requestItemId, String(Math.min(q, oq + 1)))}
+                          style={{ width: 36, height: 36, border: "none", background: oq >= q ? "#f6efe2" : "#fff5e8", color: oq >= q ? "#c9b48c" : "#b45309", fontSize: 22, fontWeight: 900, cursor: oq >= q ? "default" : "pointer", lineHeight: 1, fontFamily: "inherit" }}>+</button>
+                      </span>
                       <span style={{ color: "#6b8fa8", fontWeight: 800, fontSize: 14 }}>/ {q}</span>
-                    </label>
+                    </span>
                   </div>
                 )}
 
@@ -384,14 +389,14 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                   <tbody>
                     <tr>
                       <td><div className="it-lbl">{L("Rental", "الإيجار")}</div></td>
-                      <td className="num">{unit}</td><td className="num">{q}</td>
+                      <td className="num">{unit}</td><td className="num">{oq}</td>
                       <td className="num"><input className={`ptbl-in${showErrors && num(a?.rentalRate ?? "") <= 0 ? " invalid" : ""}`} inputMode="numeric" value={a?.rentalRate ?? ""} onChange={(e) => setPrice(it.requestItemId, "rentalRate", e.target.value)} placeholder="0" /></td>
                       <td className="num tot">{num(a?.rentalRate ?? "") ? nf(line(a!.rentalRate)) : "—"}</td>
                     </tr>
                     {delBySup && (
                     <tr>
                       <td><div className="it-lbl">{L("Delivery to site", "النقل إلى الموقع")}</div><div className="it-sub2">{L("price × qty", "السعر × العدد")}</div></td>
-                      <td className="num">{L("Trip", "رحلة")}</td><td className="num">{q}</td>
+                      <td className="num">{L("Trip", "رحلة")}</td><td className="num">{oq}</td>
                       <td className="num"><input className="ptbl-in" inputMode="numeric" value={a?.deliveryPrice ?? ""} onChange={(e) => setPrice(it.requestItemId, "deliveryPrice", e.target.value)} placeholder="0" /></td>
                       <td className="num tot">{num(a?.deliveryPrice ?? "") ? nf(line(a!.deliveryPrice)) : "—"}</td>
                     </tr>
@@ -399,7 +404,7 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                     {retBySup && (
                     <tr>
                       <td><div className="it-lbl">{L("Return from site", "النقل من الموقع")}</div><div className="it-sub2">{L("price × qty", "السعر × العدد")}</div></td>
-                      <td className="num">{L("Trip", "رحلة")}</td><td className="num">{q}</td>
+                      <td className="num">{L("Trip", "رحلة")}</td><td className="num">{oq}</td>
                       <td className="num"><input className="ptbl-in" inputMode="numeric" value={a?.returnPrice ?? ""} onChange={(e) => setPrice(it.requestItemId, "returnPrice", e.target.value)} placeholder="0" /></td>
                       <td className="num tot">{num(a?.returnPrice ?? "") ? nf(line(a!.returnPrice)) : "—"}</td>
                     </tr>
