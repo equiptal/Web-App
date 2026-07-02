@@ -9,17 +9,34 @@ function req(path: string, cookie?: string) {
 const AUTHED = "mt_refresh=sometoken";
 const isNext = (res: Response) => res.headers.get("x-middleware-next") === "1";
 
-describe("gating middleware (AC-07/08/16/17/20)", () => {
-  it("unauthenticated → redirect to /login?next=<path> (AC-16/20)", () => {
+describe("public-by-default gating middleware", () => {
+  it("unauthenticated → public page (home) passes through (browse freely)", () => {
     const res = middleware(req("/"));
+    expect(isNext(res)).toBe(true);
+  });
+
+  it("unauthenticated → public browse pages (/create, /stores, /compare) pass through", () => {
+    for (const p of ["/create", "/stores/42", "/compare"]) {
+      expect(isNext(middleware(req(p)))).toBe(true);
+    }
+  });
+
+  it("unauthenticated → gated page redirects to /login?next=<path>", () => {
+    const res = middleware(req("/profile"));
     const loc = res.headers.get("location") ?? "";
     expect(res.status).toBeGreaterThanOrEqual(300);
     expect(loc).toContain("/login");
-    expect(loc).toContain(`next=${encodeURIComponent("/")}`);
+    expect(loc).toContain(`next=${encodeURIComponent("/profile")}`);
   });
 
-  it("authenticated → gated page passes through (AC-17)", () => {
-    const res = middleware(req("/", AUTHED));
+  it("unauthenticated → nested gated page (/requests/123) redirects to /login", () => {
+    const res = middleware(req("/requests/123"));
+    expect(res.status).toBeGreaterThanOrEqual(300);
+    expect(res.headers.get("location") ?? "").toContain("/login");
+  });
+
+  it("authenticated → gated page passes through", () => {
+    const res = middleware(req("/profile", AUTHED));
     expect(isNext(res)).toBe(true);
   });
 

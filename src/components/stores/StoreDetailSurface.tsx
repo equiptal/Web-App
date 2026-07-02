@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
+import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import { EquipmentDetailModal } from "@/components/stores/EquipmentDetailModal";
+import { SignInPrompt } from "@/components/common/SignInPrompt";
 import type { EquipmentCard, StoreDetail, TaxonomyNode } from "@/lib/contract/stores";
 
 /**
@@ -16,6 +18,8 @@ import type { EquipmentCard, StoreDetail, TaxonomyNode } from "@/lib/contract/st
 export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (name: string) => void }) {
   const t = useT();
   const router = useRouter();
+  const { status } = useSession();
+  const anon = status === "anon"; // guests can't view store detail until T7 (public browse) ships
   const [detail, setDetail] = useState<StoreDetail | null>(null);
   const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -40,6 +44,7 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
   }, []);
 
   useEffect(() => {
+    if (anon) return; // guests see the sign-in prompt; don't fire the authed fetch
     setError(false);
     setDetail(null);
     const ctrl = new AbortController();
@@ -56,6 +61,7 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, reloadKey]);
 
+  if (anon) return <SignInPrompt title={t.browse.signInTitle} />;
   if (error) {
     return (
       <div className="rounded-[14px] border border-border bg-surface p-8 text-center text-[13px] text-muted">

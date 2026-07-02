@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
+import { useSession } from "@/lib/session";
+import { SignInPrompt } from "@/components/common/SignInPrompt";
 import { fetchMyRequests, fetchBids, fetchRequestSubmissions, startDealRoom, recommendBids, askBids, parseBid, captureBidEvents, fetchDealRoomDocuments, fetchBidDocuments } from "@/lib/api/client";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { groupRequests, type RequestGroup } from "@/lib/contract/requests";
@@ -48,6 +50,9 @@ const SUGGEST_ICON: Record<string, string> = {
 
 export function BidComparisonWorkspace() {
   const { locale } = useLocale();
+  const { status } = useSession();
+  // Comparing bids is inherently personal (your own requests) — nothing to browse as a guest.
+  const anon = status === "anon";
   const ar = locale === "ar";
   const L = (e: string, a: string) => (ar ? a : e);
   const sar = L("SAR", "ر.س");
@@ -117,12 +122,13 @@ export function BidComparisonWorkspace() {
   }
 
   useEffect(() => {
+    if (anon) return; // guests see the sign-in prompt; skip the authed fetch
     let active = true;
     fetchMyRequests()
       .then((d) => active && setGroups(groupRequests(d.requests)))
       .catch(() => active && setError(true));
     return () => { active = false; };
-  }, []);
+  }, [anon]);
 
   // Off-platform (shared-link form) bids don't appear in fetchMyRequests' bidCount. Fetch each
   // broadcast group's submissions and count them per request, so a request that received ONLY form
@@ -695,6 +701,13 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
     w.document.close();
   }
 
+  if (anon)
+    return (
+      <SignInPrompt
+        title={L("Sign in to compare bids", "سجّل الدخول لمقارنة العروض")}
+        body={L("Comparison shows bids on your own requests. Sign in to see your requests and their bids.", "تعرض المقارنة العروض على طلباتك. سجّل الدخول لعرض طلباتك وعروضها.")}
+      />
+    );
   if (error) return <Box>{L("Couldn’t load your requests.", "تعذّر تحميل طلباتك.")}</Box>;
   if (!groups) return <Spinner />;
   if (!locations.length) return <Box>{L("No requests to compare yet.", "لا توجد طلبات للمقارنة بعد.")}</Box>;

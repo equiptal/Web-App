@@ -45,6 +45,7 @@ export const en = {
     inbox: "Inbox",
     request: "Request",
     account: "Account",
+    signIn: "Sign in",
     welcome: "Welcome",
     collapseSidebar: "Collapse sidebar",
     expandSidebar: "Expand sidebar",
@@ -89,6 +90,8 @@ export const en = {
   },
   browse: {
     title: "Verified Suppliers",
+    signInTitle: "Sign in to browse suppliers",
+    signInBody: "Browsing suppliers and their equipment needs an account. Sign in — it only takes a moment.",
     search: "Search stores or equipment",
     city: "City",
     category: "Category",
@@ -510,6 +513,8 @@ export const en = {
       lastName: "Last name must be 2–50 characters.", // AC-02/03
       city: "Select your city.", // AC-02
       jobTitle: "Select your job title.", // AC-02
+      email: "Enter a valid email address.",
+      emailRequired: "A valid email address is required.",
       whatsapp: "Enter a valid Saudi mobile number.", // AC-04
       submit: "We couldn't save your details. Please try again.",
       offline: "You appear to be offline. Your details are kept — try again.", // AC-23

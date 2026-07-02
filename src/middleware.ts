@@ -2,25 +2,26 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 /**
- * Gating middleware (web-app/001, AC-07/08/16/17/20). Edge check on the refresh-token cookie (the
- * 30-day "remembered" envelope — name kept in sync with `auth-server.ts` REFRESH_COOKIE): present ⇒
- * treat as a valid session (the access token is refreshed lazily by `/api/auth/session`).
+ * Gating middleware. The web is **public by default** (browse without an account); only the
+ * personal, account-bound areas listed in GATED_PREFIXES require a session. Edge check on the
+ * refresh-token cookie (the 30-day "remembered" envelope — name kept in sync with `auth-server.ts`
+ * REFRESH_COOKIE): present ⇒ treat as a valid session (the access token is refreshed lazily by
+ * `/api/auth/session`).
  *
- * - Unauthenticated → any gated page redirects to `/login?next=<path>` (AC-16/20).
- * - Authenticated → `/login` redirects to `next` (AC-07) or home (AC-08); other pages pass (AC-17).
+ * - Any page NOT under a GATED_PREFIX loads for everyone (guests browse freely). The account gate
+ *   fires in-app at request submit (the combined OTP+register modal), not in middleware.
+ * - Unauthenticated → a gated page redirects to `/login?next=<path>` (AC-16/20).
+ * - Authenticated → `/login` redirects to `next` (AC-07) or home (AC-08).
  *
  * The matcher excludes `/api/*`, Next internals and static files, so the auth API stays reachable
  * while signed out and assets aren't gated.
- *
- * Public pages (no account required) are allow-listed in PUBLIC_PREFIXES and bypass the gate — the
- * shared supplier bid form `/bid/<token>` (web-app/006) is opened by suppliers who have no login.
  */
 const REFRESH_COOKIE = "mt_refresh";
 const ID_COOKIE = "mt_id";
 
-// Pages that must load while signed out. Keep in sync with any new public (account-less) routes.
-// Matched as exact path or `<prefix>/…` so a future `/bidsomething` route can't inherit access.
-const PUBLIC_PREFIXES = ["/bid"];
+// Personal, account-bound areas that still require a session. Everything else is public.
+// Matched as exact path or `<prefix>/…`. Keep in sync as new account-only areas are added.
+const GATED_PREFIXES = ["/profile", "/requests", "/deal-room", "/inbox", "/dashboard"];
 
 function safeNext(next: string | null): string {
   // Only allow same-origin relative paths (block protocol-relative `//host`).
@@ -41,11 +42,6 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(dest);
   }
 
-  // Public (account-less) pages bypass the gate — e.g. the shared supplier bid form `/bid/<token>`.
-  if (PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
-    return NextResponse.next();
-  }
-
   // A refresh token (normal sign-in) OR an idToken (handoff session, no refresh) counts as authed.
   const authed = Boolean(req.cookies.get(REFRESH_COOKIE)?.value || req.cookies.get(ID_COOKIE)?.value);
 
@@ -61,7 +57,9 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  if (!authed) {
+  // Only the personal, account-bound areas gate; everything else is public (browse freely).
+  const isGated = GATED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  if (isGated && !authed) {
     const dest = req.nextUrl.clone();
     dest.pathname = "/login";
     dest.search = `?next=${encodeURIComponent(pathname + search)}`;

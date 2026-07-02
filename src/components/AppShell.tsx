@@ -88,15 +88,20 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
     router.push("/login");
   };
 
-  const navItems = [
-    { key: "home", icon: "home", label: t.shell.home, href: "/" },
-    { key: "requests", icon: "grid_view", label: t.shell.requests, href: "/requests" },
-    { key: "compare", icon: "compare_arrows", label: t.shell.compare, href: "/compare" },
+  // `gated` items are the personal, account-bound areas (mirror middleware's GATED_PREFIXES). The web
+  // is public to browse, so signed-out visitors only see the public nav; the rest appears once authed.
+  const allNav = [
+    { key: "home", icon: "home", label: t.shell.home, href: "/", gated: false },
+    { key: "requests", icon: "grid_view", label: t.shell.requests, href: "/requests", gated: true },
+    { key: "compare", icon: "compare_arrows", label: t.shell.compare, href: "/compare", gated: true },
     // Procurement dashboard is a demo surface — only the CCC mock account sees it.
-    ...(canSeeProcurementDashboard(user) ? [{ key: "dashboard", icon: "dashboard", label: t.shell.dashboard, href: "/dashboard" }] : []),
-    { key: "inbox", icon: "inbox", label: t.shell.inbox, href: "/inbox" },
-    { key: "profile", icon: "person", label: t.shell.profile, href: "/profile" },
+    ...(canSeeProcurementDashboard(user) ? [{ key: "dashboard", icon: "dashboard", label: t.shell.dashboard, href: "/dashboard", gated: true }] : []),
+    { key: "inbox", icon: "inbox", label: t.shell.inbox, href: "/inbox", gated: true },
+    { key: "profile", icon: "person", label: t.shell.profile, href: "/profile", gated: true },
   ];
+  // While the session is still loading, keep the full nav (avoids a flash of the guest nav for a
+  // returning signed-in renter). Once resolved, guests see only the public items.
+  const navItems = status === "anon" ? allNav.filter((it) => !it.gated) : allNav;
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
   const initials = (name.trim() ? name.trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("") : "").toUpperCase();
   const greeting = `${t.shell.welcome}${name ? `, ${name}` : ""}`;
@@ -144,8 +149,9 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
           ))}
         </nav>
 
-        {/* Tier-status footer card (AC-06/08) — hidden when collapsed (no room for the CTA) */}
-        {!collapsed && <TierCard tier={tier} onGo={(href) => router.push(href)} />}
+        {/* Tier-status footer card (AC-06/08) — hidden when collapsed (no room for the CTA) and for
+            signed-out visitors (its guest→profile nudge assumes a session). */}
+        {!collapsed && status === "authed" && <TierCard tier={tier} onGo={(href) => router.push(href)} />}
       </aside>
 
       {/* Main column */}
@@ -181,6 +187,16 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                 </button>
               ))}
             </span>
+
+            {/* Signed-out visitors browse freely; this is their path into the account gate. */}
+            {status === "anon" && (
+              <button
+                onClick={() => router.push(`/login?next=${encodeURIComponent(pathname)}`)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3.5 py-1.5 text-[12.5px] font-bold text-white transition hover:brightness-105"
+              >
+                <Icon name="login" size={16} /> {t.shell.signIn}
+              </button>
+            )}
 
             {status === "authed" && (
               <span className={`hidden rounded-full border px-2.5 py-1 text-[11px] font-bold sm:inline-flex ${badge.cls}`}>{badge.label}</span>
