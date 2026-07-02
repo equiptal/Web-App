@@ -471,11 +471,14 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   const negMobLead = lockedVal((k) => k.includes("leadtime"));
   const negMobPrice = lockedVal((k) => k.includes("mobilizationpricing"));
   const negDemobPrice = lockedVal((k) => k.includes("demobilizationpricing"));
-  // Rate: only reflect a deal-room change once it's CONFIRMED — i.e. the synthetic PRICE term is
-  // locked/agreed (both sides accepted). `raw.currentPrice` is the deal room's lastProposedRate (the
-  // latest PENDING counter), so we ignore it; show the agreed rate if locked, else the supplier's
-  // original submitted offer (`priceAmount`). Same lock-gating as mob/demob above.
+  // Rate (T16): reflect the rate AGREED BY BOTH — never a pending counter. Two backend mechanisms:
+  //  (1) a locked/agreed PRICE term (`negRate`), or (2) the bid reaching ACCEPTED, where the deal's
+  //  final rate is `currentPrice` (= lastProposedRate at acceptance). So: locked rate → else, when the
+  //  bid is ACCEPTED, the accepted `currentPrice` → else the supplier's original offer (`priceAmount`).
+  //  While negotiation is still open (not accepted, not locked) we keep the original — a live counter
+  //  does NOT move the headline.
   const negRate = lockedVal((k) => k === "price");
+  const bidAccepted = (s(raw.status) ?? "").toUpperCase() === "ACCEPTED";
 
   return {
     id: String(raw.id ?? ""),
@@ -487,7 +490,7 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     distanceKm,
     submittedAt: s(raw.createdAt),
     validUntil: s(raw.validUntil),
-    price: n(negRate) ?? n(raw.priceAmount), // confirmed (locked) rate, else the original offer — never the pending counter
+    price: n(negRate) ?? (bidAccepted ? n(raw.currentPrice) : null) ?? n(raw.priceAmount), // agreed (locked) rate → accepted deal's final rate → original offer (T16)
     mobPrice: n(negMobPrice) ?? n(raw.mobPrice),
     demobPrice: n(negDemobPrice) ?? n(raw.demobPrice),
     priceUnit: s(raw.priceUnit),

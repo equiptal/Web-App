@@ -331,7 +331,13 @@ export function BidComparisonWorkspace() {
     ? pickIdRaw
     : cols.length > 1 ? cols[0]?.bid.id ?? null : null;
   const suggestions = rec?.suggestions ?? []; // context-aware what-if chips from Mansour (replace the hardcoded set)
+  // T17 — a request is "decided" when a bid is ACCEPTED in the deal room (Case A) or a survey reported
+  // a bidder as the winner (Case C‑bidder — the backend marks that bid ACCEPTED too). Both surface as
+  // status === "ACCEPTED" here. Case B (awarded in the UI only) is a soft, reversible local mark that
+  // does NOT close the request. Case C off‑platform / no‑winner needs a survey‑outcome read (⚠ backend,
+  // not available yet). Precedence A/C‑bidder (accepted) > B (local).
   const awarded = bids?.find((b) => b.status === "ACCEPTED") ?? null;
+  const decidedByAccept = awarded != null;
   // Award = a per-column toggle that PERSISTS (localStorage): "🔨 Award" → "✓ Awarded". Awarding opens a
   // prompt to finalize by accepting the terms with the supplier in the deal room; un-clicking removes it.
   const [awardedIds, setAwardedIds] = useState<Record<string, boolean>>({});
@@ -737,6 +743,20 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
         <Box title={L("No bids yet", "لا توجد عروض بعد")}>{L("This item has no bids to compare yet — you can re-broadcast the request.", "لا توجد عروض على هذه المعدة بعد — يمكنك إعادة بثّ الطلب.")}</Box>
       ) : (
         <>
+          {/* T17 — decided banner: once a bid is accepted (deal room / survey‑bidder), the request is
+              closed. Losing columns are left as‑is (per decision); only the winner is badged below. */}
+          {decidedByAccept && (
+            <div className="flex flex-wrap items-center gap-2 rounded-2xl border px-4 py-3 text-[13px] font-extrabold" style={{ background: C.successBg, borderColor: "rgba(29,175,88,.35)", color: "#137C42" }}>
+              <span className="material-icons-outlined" style={{ fontSize: 18 }}>check_circle</span>
+              {L(`Accepted — ${awarded!.supplierName} · request closed`, `تم القبول — ${awarded!.supplierName} · الطلب مُغلق`)}
+              {awarded!.dealRoomId && (
+                <button onClick={() => router.push(`/deal-room/${awarded!.dealRoomId}`)} className="ms-auto inline-flex items-center gap-1 underline" style={{ color: "#137C42" }}>
+                  {L("View deal room", "غرفة الصفقة")}<span className="material-icons-outlined" style={{ fontSize: 14, transform: ar ? "scaleX(-1)" : undefined }}>arrow_forward</span>
+                </button>
+              )}
+            </div>
+          )}
+
           {/* ── item card: icon + name + "N bidding · N in comparison" + item dropdown + supplier chips ── */}
           <div className="rounded-2xl border" style={{ borderColor: C.border, background: "#fff" }}>
             <div className="flex items-center gap-3 p-4">
@@ -1139,12 +1159,14 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                               // Conflict from either an in-app negotiable term OR the responsibility state itself
                               // (shared-link declines surface as cr.state === "red" via linkSide — T9).
                               const dealConflict = cr.state === "red" || (fatKey ? (c.bid.negotiableTerms ?? []).some((t) => t.key === fatKey && t.state === "conflict") : false);
-                              // §6 chip: "{term} · {owner}" coloured by tone — supplier=green, you=blue, conflict=red.
+                              // T11 chip: colour = MATCH state (green = matches request incl. "you", red = conflict);
+                              // the owner label (you / supplier) is separate, from the actual responsible side.
                               const tone = dealConflict ? "red" : responsibilityTone(cr);
-                              const bg = tone === "green" ? C.successBg : tone === "red" ? C.dangerBg : tone === "blue" ? C.renteeDim : C.surface3;
-                              const fg = tone === "green" ? C.success : tone === "red" ? C.danger : tone === "blue" ? C.rentee : C.muted;
-                              const bd = tone === "green" ? "rgba(29,175,88,.3)" : tone === "red" ? "rgba(217,54,42,.3)" : tone === "blue" ? "rgba(37,99,235,.3)" : C.border;
-                              const owner = tone === "green" ? L("supplier", "المؤجّر") : tone === "blue" ? L("you", "أنت") : tone === "red" ? L("conflict", "تعارض") : L("—", "—");
+                              const bg = tone === "green" ? C.successBg : tone === "red" ? C.dangerBg : C.surface3;
+                              const fg = tone === "green" ? C.success : tone === "red" ? C.danger : C.muted;
+                              const bd = tone === "green" ? "rgba(29,175,88,.3)" : tone === "red" ? "rgba(217,54,42,.3)" : C.border;
+                              const side = cr.bidSide ?? cr.requestSide;
+                              const owner = tone === "red" ? L("conflict", "تعارض") : side === "supplier" ? L("supplier", "المؤجّر") : side === "me" ? L("you", "أنت") : L("—", "—");
                               const entered = renterCosts[m.key];
                               return (
                                 <span key={m.key} className="inline-flex items-center gap-1 self-start px-[9px] py-1 text-[11px]" style={{ background: bg, color: fg, fontWeight: 800, borderRadius: 7, border: `1px solid ${bd}` }}>
@@ -1184,7 +1206,12 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                     </tr>
                   </>)}
 
-                  {/* 🚜 EQUIPMENT */}
+                  {/* 🚜 EQUIPMENT
+                      T14 — three distinct source layers, do NOT conflate:
+                        • Company docs (CR / VAT / national address) → company VERIFICATION (companyDocChips, in the Cost/identity header).
+                        • Equipment safety cert + Proof of ownership → the EQUIPMENT's documents (equipmentCertCodes / ownershipDocs).
+                        • Operator cert + required equipment cert term → negotiable DEAL-ROOM terms (live).
+                      Colour rule (T11): green = matches the request · blue = held/shown but not required · red = required-unmet. */}
                   <SectionRow id="equip" icon="construction" title={L("Equipment", "المعدّة")} accent={C.action} accentText="#fff" n={cols.length} collapsed={collapsed.has("equip")} onToggle={() => toggleSection("equip")} />
                   {!collapsed.has("equip") && (<>
                     {/* One merged banner (T8): supplier-acknowledged + (when multi-unit) the per-unit caveat,
@@ -1233,10 +1260,18 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                           const codes = c.bid.equipmentCertCodes ?? [];
                           const allHeld = requiredEquipCerts.every((cert) => codes.includes(cert));
                           const noneHeld = requiredEquipCerts.every((cert) => !codes.includes(cert));
+                          // T12: held-but-NOT-required certs (e.g. supplier has SPSP, request wanted TÜV) →
+                          // shown as BLUE "extra" chips alongside the required ones (green ✓ / red ✗).
+                          const extras = codes.filter((code) => !requiredEquipCerts.includes(code));
                           return (
                             <Td key={c.bid.id} ok={allHeld} fail={noneHeld}>
                               <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
                                 {requiredEquipCerts.map((cert) => <span key={cert}>{docChip(c, certLabel(cert), codes.includes(cert), cert, true)}</span>)}
+                                {extras.map((cert) => (
+                                  <span key={cert} className="inline-flex items-center gap-1 text-[11.5px]" title={L("Held — not required", "متوفّرة — غير مطلوبة")} style={{ background: C.renteeDim, color: C.rentee, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: "1px solid rgba(37,99,235,.3)" }}>
+                                    <span className="material-icons-outlined" style={{ fontSize: 11 }}>add</span>{certLabel(cert)}
+                                  </span>
+                                ))}
                               </span>
                             </Td>
                           );
@@ -1253,10 +1288,18 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         <RowHead title={L("Proof of ownership", "إثبات الملكية")} sub={L("supplier-provided document", "مستند مقدَّم من المؤجّر")} />
                         {cols.map((c) => {
                           const held = (c.bid.ownershipDocs ?? []).some((o) => o.key === doc.key);
-                          // Proof of ownership just reports what the equipment carries: ✓ when held, a
-                          // neutral "—" when not (NEVER red — it isn't a requirement). Off-platform bids
-                          // carry no ownership docs, so they show "—".
-                          return <Td key={c.bid.id} ok={held}>{held ? docChip(c, ar ? doc.labelAr : doc.labelEn, held, doc.key, true) : <span style={{ color: C.muted }}>—</span>}</Td>;
+                          const label = ar ? doc.labelAr : doc.labelEn;
+                          // Proof of ownership is INFORMATIONAL, never required (T13): show any doc the
+                          // equipment carries as a BLUE chip (clickable to view), a neutral "—" when none.
+                          // Never green/red, no cell tint. Off-platform bids carry no docs → "—".
+                          if (!held) return <Td key={c.bid.id}><span style={{ color: C.muted }}>—</span></Td>;
+                          return (
+                            <Td key={c.bid.id}>
+                              <button type="button" onClick={() => openDoc(c, doc.key, label)} title={L("View document", "عرض المستند")} className="inline-flex items-center gap-1 text-[11.5px]" style={{ background: C.renteeDim, color: C.rentee, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: "1px solid rgba(37,99,235,.3)" }}>
+                                <span className="material-icons-outlined" style={{ fontSize: 11 }}>description</span>{label}<span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>visibility</span>
+                              </button>
+                            </Td>
+                          );
                         })}
                       </tr>
                     ))}
@@ -1289,15 +1332,24 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                     </th>
                     {cols.map((c) => {
                       const isAwarded = !!awardedIds[c.bid.id];
+                      const isAcceptedWinner = decidedByAccept && awarded!.id === c.bid.id; // Case A / C-bidder winner
+                      const blockedByAccept = decidedByAccept && !isAcceptedWinner; // request decided → can't award another
                       return (
                         <td key={c.bid.id} className="align-top" style={{ padding: "14px 15px", borderTop: `2px solid ${C.border}`, borderInlineStart: `1px solid ${C.line}` }}>
                           <div className="flex flex-col gap-[7px]">
-                            {/* Award = in-place toggle (prototype): "🔨 Award" (green) ⇄ "✓ Awarded" (dark green). Negotiate = white/blue outline → deal room. */}
-                            <button onClick={() => toggleAward(c.bid)} className="inline-flex w-full items-center justify-center gap-1.5 text-[12.5px] text-white" style={{ background: isAwarded ? "#137C42" : C.success, padding: 9, borderRadius: 9, fontWeight: 800 }}>
-                              <span className="material-icons-outlined" style={{ fontSize: 16 }}>{isAwarded ? "check_circle" : "gavel"}</span>{isAwarded ? L("Awarded", "تمت الترسية") : L("Award", "ترسية")}
-                            </button>
-                            <button onClick={() => goDealRoom(c.bid, "negotiate")} disabled={busy} className="inline-flex w-full items-center justify-center gap-1.5 text-[12.5px] disabled:opacity-60" style={{ background: "#fff", color: C.rentee, border: `1px solid rgba(37,99,235,.35)`, padding: 9, borderRadius: 9, fontWeight: 800 }}>
-                              <span className="material-icons-outlined" style={{ fontSize: 15 }}>swap_horiz</span>{L("Negotiate", "تفاوض")}
+                            {isAcceptedWinner ? (
+                              /* Case A / C-bidder: finalized winner — a static "Accepted" badge, not a toggle. */
+                              <span className="inline-flex w-full items-center justify-center gap-1.5 text-[12.5px] text-white" style={{ background: "#137C42", padding: 9, borderRadius: 9, fontWeight: 800 }}>
+                                <span className="material-icons-outlined" style={{ fontSize: 16 }}>check_circle</span>{L("Accepted", "مقبول")}
+                              </span>
+                            ) : (
+                              /* Award = in-place toggle: "Award" (green) ⇄ "Awarded" (Case B, soft/reversible). Disabled once the request is decided elsewhere. */
+                              <button onClick={() => toggleAward(c.bid)} disabled={blockedByAccept} title={isAwarded && !blockedByAccept ? L("Awarded — finalize in the deal room", "تمت الترسية — أتمِم في غرفة الصفقة") : undefined} className="inline-flex w-full items-center justify-center gap-1.5 text-[12.5px] text-white disabled:opacity-45 disabled:cursor-default" style={{ background: isAwarded ? "#137C42" : C.success, padding: 9, borderRadius: 9, fontWeight: 800 }}>
+                                <span className="material-icons-outlined" style={{ fontSize: 16 }}>{isAwarded ? "check_circle" : "gavel"}</span>{isAwarded ? L("Awarded", "تمت الترسية") : L("Award", "ترسية")}
+                              </button>
+                            )}
+                            <button onClick={() => goDealRoom(c.bid, isAcceptedWinner ? "award" : "negotiate")} disabled={busy} className="inline-flex w-full items-center justify-center gap-1.5 text-[12.5px] disabled:opacity-60" style={{ background: "#fff", color: C.rentee, border: `1px solid rgba(37,99,235,.35)`, padding: 9, borderRadius: 9, fontWeight: 800 }}>
+                              <span className="material-icons-outlined" style={{ fontSize: 15 }}>{isAcceptedWinner ? "forum" : "swap_horiz"}</span>{isAcceptedWinner ? L("View deal room", "غرفة الصفقة") : L("Negotiate", "تفاوض")}
                             </button>
                           </div>
                         </td>

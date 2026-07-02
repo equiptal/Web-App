@@ -207,10 +207,10 @@ describe("displayQuote (RATE PERIOD + PRICES FOR toggles)", () => {
   });
 });
 
-describe("responsibilityTone (green=supplier / blue=you / red=conflict)", () => {
+describe("responsibilityTone (T11: green=matches request incl. 'you' / red=conflict / grey=n/a)", () => {
   const cr = (p: Partial<CostResponsibility>): CostResponsibility => ({ key: "fuel", labelEn: "Fuel", labelAr: "وقود", bidSide: null, requestSide: null, state: "grey", ...p });
-  it("supplier-covered → green", () => expect(responsibilityTone(cr({ bidSide: "supplier", state: "green" }))).toBe("green"));
-  it("renter-handled → blue", () => expect(responsibilityTone(cr({ bidSide: "me", requestSide: "me", state: "green" }))).toBe("blue"));
+  it("supplier-covered, matched → green", () => expect(responsibilityTone(cr({ bidSide: "supplier", requestSide: "supplier", state: "green" }))).toBe("green"));
+  it("renter-handled, matched → green (T11: 'on you' that matches the request is green, not blue)", () => expect(responsibilityTone(cr({ bidSide: "me", requestSide: "me", state: "green" }))).toBe("green"));
   it("conflict → red", () => expect(responsibilityTone(cr({ bidSide: "me", requestSide: "supplier", state: "red" }))).toBe("red"));
   it("not provided → grey", () => expect(responsibilityTone(cr({}))).toBe("grey"));
 });

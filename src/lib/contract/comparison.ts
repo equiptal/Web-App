@@ -304,15 +304,16 @@ export type RatePeriod = "PER_DAY" | "PER_WEEK" | "PER_MONTH";
 export type PricesFor = "unit" | "all";
 
 /**
- * Cost-responsibility chip tone for the comparison (§6 Terms): the supplier covering the term reads
- * green; the renter handling it reads **blue** (informational — your responsibility, not "bad"); a
- * disagreement reads red. Grey = not provided. Distinct from the engine's green/red/grey `state`.
+ * Cost-responsibility chip tone for the comparison (T11): GREEN = the term MATCHES what the request
+ * asked (agreed by both), regardless of which side covers it — including a term on YOU. RED = a
+ * disagreement. Grey = not provided/derivable. Blue is reserved for cert/ownership "extras" (T12/T13),
+ * not cost terms (which are always request-assigned → match or conflict). The owner label (you /
+ * supplier) is derived separately from `bidSide`, not from this tone.
  */
 export function responsibilityTone(cr: CostResponsibility): "green" | "blue" | "red" | "grey" {
   if (cr.state === "red") return "red";
-  if (cr.bidSide === "supplier") return "green";
-  if (cr.requestSide === "me" || cr.bidSide === "me") return "blue";
-  return cr.state === "green" ? "green" : "grey";
+  if (cr.state === "green") return "green";
+  return "grey";
 }
 
 export interface DisplayQuote {
