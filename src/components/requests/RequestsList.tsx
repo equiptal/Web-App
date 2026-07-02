@@ -96,7 +96,9 @@ export function RequestsList() {
         // Each submission item carries its parent requestId → count submissions + sum covered units.
         for (const s of subs) for (const it of s.items) if (it.requestId) {
           rmap[it.requestId] = (rmap[it.requestId] ?? 0) + 1;
-          umap[it.requestId] = (umap[it.requestId] ?? 0) + (it.numberOfUnits ?? 1);
+          // Partial bid: count the units the supplier actually OFFERED on this line, not the requested
+          // count — so a shared-link bid on a subset (e.g. 1 of 3) fills 1/3, not 3/3.
+          umap[it.requestId] = (umap[it.requestId] ?? 0) + (it.offeredUnits ?? it.numberOfUnits ?? 1);
         }
       }
       setLinkBids(gmap);

@@ -974,7 +974,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                       <td colSpan={cols.length + 1} style={{ padding: "8px 14px", background: C.warningBg, borderTop: `1px solid ${C.line}` }}>
                         <span className="inline-flex flex-wrap items-center gap-1.5 text-[11.5px] font-bold" style={{ color: C.warning }}>
                           <span className="material-icons-outlined" style={{ fontSize: 15 }}>forum</span>
-                          {L("You can negotiate these prices in the deal room — nothing here is final.", "يمكنك التفاوض على هذه الأسعار في غرفة الصفقة — لا شيء هنا نهائي.")}
+                          {L("You can negotiate these prices in the deal room for bids in app.", "يمكنك التفاوض على هذه الأسعار في غرفة الصفقة لعروض التطبيق.")}
                         </span>
                       </td>
                     </tr>
@@ -1057,7 +1057,9 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         );
                         return (
                           <Td key={c.bid.id} ok={!conflict} fail={conflict}>
-                            {stated ? (<>
+                            {/* When delivery is on the renter, the supplier bears nothing — show "on you"
+                                (+ your estimate), never the supplier's stated 0. Applies to link bids too. */}
+                            {(stated && !onRenter) ? (<>
                               {/* total prominent + a small distance chip; per-unit (mob+demob) breakdown is the sub */}
                               <span className="inline-flex flex-wrap items-center gap-1.5">
                                 <span className="font-mono text-[15px] font-extrabold" style={{ color: C.navy, fontWeight: 900 }}>{sar} {nf(mobDemobUnit(c))}{unitsOf(c) > 1 ? ` → ${sar} ${nf(mobDemobTotal(c))}` : ""}</span>
@@ -1173,7 +1175,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                       <td colSpan={cols.length + 1} style={{ padding: "8px 14px", background: C.warningBg, borderTop: `1px solid ${C.line}` }}>
                         <span className="inline-flex flex-wrap items-center gap-1.5 text-[11.5px] font-bold" style={{ color: C.warning }}>
                           <span className="material-icons-outlined" style={{ fontSize: 15 }}>warning_amber</span>
-                          {L("These are acknowledged by the supplier — verify each one in the deal room.", "هذه مُقَرّة من المؤجّر — تحقّق من كلٍّ منها في غرفة الصفقة.")}
+                          {L("These are acknowledged by the supplier — for in-app bids, verify each one in the deal room.", "هذه مُقَرّة من المؤجّر — لعروض التطبيق، تحقّق من كلٍّ منها في غرفة الصفقة.")}
                           {(() => { const drId = cols.find((c) => c.bid.dealRoomId)?.bid.dealRoomId; return drId ? (
                             <button type="button" onClick={() => router.push(`/deal-room/${drId}`)} className="inline-flex items-center gap-0.5 font-extrabold underline" style={{ color: C.warning }}>
                               {L("verify in deal room", "تحقّق في غرفة الصفقة")}<span className="material-icons-outlined" style={{ fontSize: 13, transform: ar ? "scaleX(-1)" : undefined }}>arrow_forward</span>
@@ -1199,7 +1201,9 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         const yr = c.equipment.find((r) => r.key === "year");
                         // Off-platform: no equipment record — show the confirmed year requirement (e.g. "≥ 2018").
                         if (c.bid.viaSharedLink) {
-                          const v = yr ? (c.bid.reqMinYear != null ? `≥ ${c.bid.reqMinYear}` : yr.state === "conflict" ? L("Not met", "غير مطابق") : L("Confirmed", "مؤكّد")) : null;
+                          // Confirmed → green "≥ 2022" (the requirement the supplier met); declined → red "Not met".
+                          // (Previously showed "≥ 2022" even on a conflict, so a decline read as a red requirement.)
+                          const v = yr ? (yr.state === "conflict" ? L("Not met", "غير مطابق") : c.bid.reqMinYear != null ? `≥ ${c.bid.reqMinYear}` : L("Confirmed", "مؤكّد")) : null;
                           return <Td key={c.bid.id} ok={!!yr && yr.state !== "conflict"} fail={yr?.state === "conflict"}>{v ? <span className="text-[14px]" style={{ fontWeight: 900 }}>{v}</span> : <span style={{ color: C.muted }}>—</span>}</Td>;
                         }
                         return <Td key={c.bid.id} ok={yr?.state !== "conflict"} fail={yr?.state === "conflict"}><span className="text-[14px]" style={{ fontWeight: 900 }}>{c.bid.equipment?.year ?? "—"}</span>{yearWin.has(idx) && <span className="mt-0.5 block text-[11px]" style={{ color: C.success, fontWeight: 800 }}>{L("newest", "الأحدث")}</span>}</Td>;
@@ -1234,10 +1238,16 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         like the cert rows — ✓ when the supplier carries it, ⚠ otherwise. */}
                     {ownershipDocTypes.map((doc) => (
                       <tr key={doc.key}>
-                        <RowHead title={`${ar ? doc.labelAr : doc.labelEn} ${L("certificate", "شهادة")}`} />
+                        {/* General "Proof of ownership" name with the specific doc as the ✓/✗ value. Sub is
+                            neutral ("supplier-provided") — these rows are driven by what the supplier
+                            uploaded, NOT by a renter requirement, so no "required:" label. */}
+                        <RowHead title={L("Proof of ownership", "إثبات الملكية")} sub={L("supplier-provided document", "مستند مقدَّم من المؤجّر")} />
                         {cols.map((c) => {
                           const held = (c.bid.ownershipDocs ?? []).some((o) => o.key === doc.key);
-                          return <Td key={c.bid.id} ok={held} fail={!held}>{docChip(c, ar ? doc.labelAr : doc.labelEn, held, doc.key, true)}</Td>;
+                          // Proof of ownership just reports what the equipment carries: ✓ when held, a
+                          // neutral "—" when not (NEVER red — it isn't a requirement). Off-platform bids
+                          // carry no ownership docs, so they show "—".
+                          return <Td key={c.bid.id} ok={held}>{held ? docChip(c, ar ? doc.labelAr : doc.labelEn, held, doc.key, true) : <span style={{ color: C.muted }}>—</span>}</Td>;
                         })}
                       </tr>
                     ))}

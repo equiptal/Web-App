@@ -183,8 +183,10 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   const [supplierKey, setSupplierKey] = useState<string>("all");
   const [selectedItem, setSelectedItem] = useState<string>(initialItemId ?? "all"); // scope bids to one request item
   const [itemMenuOpen, setItemMenuOpen] = useState(false);
-  const [openPrice, setOpenPrice] = useState<string | null>(null);
-  const [perUnit, setPerUnit] = useState(false); // price breakdown: "All N units" vs "Per unit"
+  // Price breakdown open/collapsed PER CARD (a Set of bid ids), so expanding one bid's price doesn't
+  // close another's — each card toggles independently. `perUnitIds` holds the per-card "Per unit" toggle.
+  const [openPrices, setOpenPrices] = useState<Set<string>>(new Set());
+  const [perUnitIds, setPerUnitIds] = useState<Set<string>>(new Set());
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectMode, setSelectMode] = useState(false); // prototype: pick bids to compare/export
@@ -751,7 +753,8 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         const offered = b.unitsOffered || 1; // units this supplier is offering
         const needed = b.numberOfUnits || offered; // units the request asked for
         const cover = needed ? Math.min(100, Math.round((offered / needed) * 100)) : 0;
-        const priceOpen = openPrice === b.id;
+        const priceOpen = openPrices.has(b.id);
+        const perUnit = perUnitIds.has(b.id); // this card's "Per unit" vs "All N units" toggle
         const isSel = selected.has(b.id);
         // Card price — canonical quote: rate ÷ period-days × duration (weekly ÷7, monthly ÷26),
         // mob/demob × units, VAT 15%. "Per unit" toggle prices one unit; else all offered units.
@@ -900,7 +903,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                 <span style={{ fontSize: 17, fontWeight: 900, color: "#f79009" }}>{nf(perUnitRentalTotal)} {L("SAR", "ر.س")}</span>
                 {isAccepted && <span className="material-icons-outlined" style={{ fontSize: 18, color: "#1daf58" }} title={L("Accepted", "مقبول")}>check_circle</span>}
                 {!selectMode && (
-                  <button onClick={() => { setOpenPrice(priceOpen ? null : b.id); setPerUnit(false); }} style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #d4e0ec", background: "#F7FAFC", color: "#6b8fa8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <button onClick={() => { setOpenPrices((s) => { const n = new Set(s); if (n.has(b.id)) n.delete(b.id); else n.add(b.id); return n; }); setPerUnitIds((s) => { const n = new Set(s); n.delete(b.id); return n; }); }} style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #d4e0ec", background: "#F7FAFC", color: "#6b8fa8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     <span className="material-icons-outlined" style={{ fontSize: 18 }}>{priceOpen ? "expand_less" : "expand_more"}</span>
                   </button>
                 )}
@@ -910,7 +913,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                   {offered > 1 && (
                     <div style={{ display: "inline-flex", background: "#eff4f9", borderRadius: 10, padding: 3, marginBottom: 12 }}>
                       {([[false, L(`All ${offered} units`, `كل ${offered} وحدات`)], [true, L("Per unit", "لكل وحدة")]] as [boolean, string][]).map(([v, lab]) => (
-                        <button key={String(v)} onClick={() => setPerUnit(v)} style={{ padding: "6px 13px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12.5, fontFamily: "inherit", background: perUnit === v ? "#1c3550" : "transparent", color: perUnit === v ? "#fff" : "#6b8fa8" }}>{lab}</button>
+                        <button key={String(v)} onClick={() => setPerUnitIds((s) => { const n = new Set(s); if (v) n.add(b.id); else n.delete(b.id); return n; })} style={{ padding: "6px 13px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12.5, fontFamily: "inherit", background: perUnit === v ? "#1c3550" : "transparent", color: perUnit === v ? "#fff" : "#6b8fa8" }}>{lab}</button>
                       ))}
                     </div>
                   )}

@@ -105,6 +105,19 @@ export function SharedLinkBidCard({
     { label: L("Pending", "معلّق"), n: termTally.pending, c: "#d4780a" },
   ];
   const certChips = (bid.equipmentCertCodes ?? []).map((c) => (ar ? CERT_LABEL[c]?.ar : CERT_LABEL[c]?.en) || c).slice(0, 2);
+  // Equipment-related terms the supplier answered (minimum year, equipment certificate) rendered as
+  // ✓/✗ value chips — so an equipment term the renter asked (e.g. a year the supplier confirmed) is
+  // visible here even when no certificates were requested. Previously only cert chips showed, leaving
+  // the row blank on year-only requests.
+  const eqChips = (bid.terms.equipment ?? []).map((r) => {
+    const label =
+      r.key === "year"
+        ? bid.reqMinYear ? String(bid.reqMinYear) : L("Year", "سنة الصنع")
+        : r.key === "certs"
+          ? (certChips.length ? certChips.join(" · ") : L("Equipment cert", "شهادة المعدة"))
+          : (ar ? r.labelAr : r.labelEn);
+    return { key: r.key, label, state: r.state };
+  });
 
   const rowSep = { borderTop: "1px solid #EFF2F6" } as const;
   const iconBox = { width: 40, height: 40, borderRadius: 11, background: "#eff4f9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } as const;
@@ -122,7 +135,16 @@ export function SharedLinkBidCard({
           <span className="material-icons-outlined" style={{ fontSize: 15, flexShrink: 0 }}>link</span>
           <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{L("Off-platform · via your request link", "خارج المنصة · عبر رابط طلبك")}</span>
         </span>
-        <span style={{ fontSize: 12, fontWeight: 700, color: "#b07a3a", whiteSpace: "nowrap", flexShrink: 0 }}>{agoShort}</span>
+        {/* Valid-until sits UP here next to "N days ago" so it doesn't add a line to the card body. */}
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0, whiteSpace: "nowrap" }}>
+          {validUntil && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 800, color: validTone.c, background: validTone.bg, padding: "2px 8px", borderRadius: 20 }}>
+              <span className="material-icons-outlined" style={{ fontSize: 12 }}>{expired ? "event_busy" : "schedule"}</span>
+              {expired ? L("Expired", "منتهٍ") : L(`Valid until ${fmtDate(validUntil)}`, `صالح حتى ${fmtDate(validUntil)}`)}
+            </span>
+          )}
+          <span style={{ fontSize: 12, fontWeight: 700, color: "#b07a3a" }}>{agoShort}</span>
+        </span>
       </div>
       {(picking || legacy) && (
         <div
@@ -149,12 +171,6 @@ export function SharedLinkBidCard({
             <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550" }}>{bid.supplierName}</span>
             {bid.verified && <span className="material-icons-outlined" style={{ fontSize: 16, color: "#1daf58" }}>verified</span>}
           </div>
-          {validUntil && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 7, fontSize: 11, fontWeight: 800, color: validTone.c, background: validTone.bg, padding: "3px 9px", borderRadius: 20, alignSelf: "flex-start" }}>
-              <span className="material-icons-outlined" style={{ fontSize: 13 }}>{expired ? "event_busy" : "schedule"}</span>
-              {expired ? L("Quote expired", "انتهى العرض") : L(`Valid until ${fmtDate(validUntil)}`, `صالح حتى ${fmtDate(validUntil)}`)}
-            </span>
-          )}
         </div>
       </div>
 
@@ -174,9 +190,20 @@ export function SharedLinkBidCard({
         </div>
         <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Equipment", "المعدة")}</span>
         <div style={{ display: "flex", gap: 4, flexWrap: "nowrap", flex: 1, minWidth: 0, overflowX: "auto" }} className="no-sb">
-          {certChips.map((c, i) => (
-            <span key={i} style={{ fontSize: 11, fontWeight: 800, color: "#1daf58", background: "#e7f7ee", padding: "2px 9px", borderRadius: 20, whiteSpace: "nowrap" }}>✓ {c}</span>
-          ))}
+          {eqChips.length === 0 ? (
+            <span style={{ fontSize: 12, color: "#9AA7B8", fontWeight: 700 }}>{L("No equipment terms requested", "لا شروط خاصة بالمعدة")}</span>
+          ) : (
+            eqChips.map((c, i) => {
+              const matched = c.state === "matched";
+              const conflict = c.state === "conflict";
+              const col = matched ? "#1daf58" : conflict ? "#d9362a" : "#6b8fa8";
+              const bg = matched ? "#e7f7ee" : conflict ? "#fcebea" : "#eef2f6";
+              const mark = matched ? "✓ " : conflict ? "✕ " : "";
+              return (
+                <span key={i} style={{ fontSize: 11, fontWeight: 800, color: col, background: bg, padding: "2px 9px", borderRadius: 20, whiteSpace: "nowrap" }}>{mark}{c.label}</span>
+              );
+            })
+          )}
         </div>
         {/* self-declared disclaimer — these were only acknowledged by the supplier in the form */}
         <button
@@ -191,8 +218,8 @@ export function SharedLinkBidCard({
             <div onClick={() => setEqInfoOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 20 }} />
             <div style={{ position: "absolute", zIndex: 30, top: "100%", insetInlineEnd: 12, marginTop: 4, width: 250, background: "#1c3550", color: "#fff", borderRadius: 12, padding: "11px 13px", boxShadow: "0 12px 30px rgba(16,38,63,.35)", fontSize: 12, fontWeight: 600, lineHeight: 1.5 }}>
               {L(
-                "These certificates were acknowledged by the supplier in your shared-link form only — they haven’t been verified.",
-                "أقرّ المؤجّر بهذه الشهادات في نموذج الرابط فقط — ولم يتم التحقق منها.",
+                "These details were acknowledged by the supplier in your shared-link form only — they haven’t been verified.",
+                "أقرّ المؤجّر بهذه التفاصيل في نموذج الرابط فقط — ولم يتم التحقق منها.",
               )}
             </div>
           </>
