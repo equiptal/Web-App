@@ -127,7 +127,8 @@ export interface SubmitBidFormPayload {
   /** Supplier-set quote expiry (ISO) — optional. */
   validUntil?: string;
   /** `offeredUnits` (partial bid) is optional — omit → backend defaults to the full requested count.
-   *  When sent it must be 1..numberOfUnits (backend 400s otherwise). Ignored by staging until PR #465 lands. */
+   *  When sent it must be 1..numberOfUnits (backend 400s otherwise). Live on staging: submitBidForm
+   *  persists + prices on it and getRequestSubmissions returns it. */
   items: { requestItemId: string; confirmations: LinkBidConfirmations; offeredUnits?: number; rentalRate: number; deliveryPrice?: number; returnPrice?: number }[];
 }
 
@@ -165,7 +166,7 @@ export function mapLinkSubmissions(raw: unknown): LinkBidSubmission[] {
           requestId: s(i.requestId),
           label: s(i.label),
           numberOfUnits: n(i.numberOfUnits) ?? 1,
-          offeredUnits: n(i.offeredUnits) ?? (n(i.numberOfUnits) ?? 1), // partial bid; falls back to the requested count (staging has no offeredUnits yet)
+          offeredUnits: n(i.offeredUnits) ?? (n(i.numberOfUnits) ?? 1), // partial bid (live on staging); falls back to the requested count only for older submissions with no stored value
           priceUnit: s(i.priceUnit),
           rentalRate: n(i.rentalRate),
           deliveryPrice: n(i.deliveryPrice),
@@ -269,8 +270,8 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
     priceUnit: it?.priceUnit ?? null,
     duration: null, // open-ended; the comparison falls back to the request duration
     numberOfUnits: it?.numberOfUnits ?? 1,
-    // Partial bid: the units this line offered (PR #465). Falls back to the requested count until the
-    // backend + public form carry `offeredUnits` on staging — so today this still reads "covers all".
+    // Partial bid: the units this line offered — live end-to-end (form sends it, backend persists +
+    // returns it). Falls back to the requested count only for older submissions with no stored value.
     unitsOffered: it?.offeredUnits ?? it?.numberOfUnits ?? 1,
     reqMinYear: reqYearNum,
     equipment: null, // the form confirms "meets the requested year", not a specific make/model/year
