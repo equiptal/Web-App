@@ -112,6 +112,10 @@ export interface EquipmentItem {
    */
   rawSize: string | null;
   ref: TaxonomyRef;
+  /** The agent's CANONICAL match names (English + Arabic) — DISPLAY ONLY for "MATCHED TO", used as the
+   *  Arabic source (and the fallback when an item didn't resolve to a taxonomy node). IDs/submit always
+   *  use `ref`, never these. null for manually-added items (they resolve from the taxonomy). */
+  agentNames?: { category: string; categoryAr: string | null; subtype: string; subtypeAr: string | null; capacity: string; capacityAr: string | null } | null;
   verdict: Verdict; // from the agent
   /** AC-19: nearest-measurement suggestion when the RFQ measurement isn't in the taxonomy. */
   suggestion?: MeasurementSuggestion;

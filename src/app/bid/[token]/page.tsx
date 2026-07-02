@@ -283,7 +283,7 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                       return (
                         <div key={c.key} className={`treqcell${showErrors && ans === undefined ? " needpick" : ""}`}>
                           <div className="tc-name">{c.label}</div>
-                          <div className="tc-rw"><span className="q">{L("Renter wants", "يطلب المستأجر")}:</span> <i>{c.value}</i></div>
+                          <div className="tc-rw"><span className="q">{L("Renter wants", "يطلب المستأجر")}:</span> <i>{ar ? localizeTermValue(c.value) : c.value}</i></div>
                           <div className="tc-sw"><span className="q">{L("Your answer", "إجابتك")}:</span><YesNo L={L} value={ans} onChange={(v) => setContract((p) => ({ ...p, [c.key]: v }))} /></div>
                         </div>
                       );
@@ -301,28 +301,6 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
               <p className="rnote">{data.notes}</p>
             </div>
           )}
-
-          {/* Pricing VAT mode — some suppliers quote prices that already include 15% VAT. */}
-          <div className="sec">
-            <div className="sec-h"><span className="material-icons-outlined hdic">receipt_long</span><h3>{L("How did you price?", "كيف سعّرت؟")}</h3></div>
-            <div style={{ display: "inline-flex", border: "1px solid var(--border)", borderRadius: "var(--r-md)", overflow: "hidden", background: "var(--surface1)", flexWrap: "wrap" }}>
-              {([[false, L("Before VAT — add 15%", "قبل الضريبة — تُضاف ١٥٪")], [true, L("VAT included (15%)", "شامل الضريبة ١٥٪")]] as [boolean, string][]).map(([v, lab]) => (
-                <button
-                  key={String(v)}
-                  type="button"
-                  onClick={() => setVatIncluded(v)}
-                  style={{ border: "none", cursor: "pointer", font: "inherit", fontWeight: 800, fontSize: 12.5, padding: "10px 16px", background: vatIncluded === v ? "var(--navy)" : "transparent", color: vatIncluded === v ? "#fff" : "var(--navy-mid)" }}
-                >
-                  {lab}
-                </button>
-              ))}
-            </div>
-            <div className="ro-hint">
-              {vatIncluded
-                ? L("The prices you enter below are treated as VAT-inclusive — we show the VAT breakdown, and your grand total stays exactly what you typed.", "تُعامَل الأسعار التي تُدخلها أدناه على أنها شاملة للضريبة — نعرض تفصيل الضريبة، ويبقى إجماليك كما أدخلته تمامًا.")
-                : L("Enter your prices before VAT — we add 15% automatically. Switch this if your prices already include VAT.", "أدخل أسعارك قبل الضريبة — نضيف ١٥٪ تلقائيًا. بدّل الخيار إذا كانت أسعارك تشمل الضريبة.")}
-            </div>
-          </div>
 
           {/* Per item */}
           {data.items.map((it, idx) => {
@@ -378,7 +356,7 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                     <div className="treqgrid">
                       {terms.map((k) => {
                         const ans = a?.confirmations[k];
-                        const val = (k === "operatorCert" || k === "equipmentCert") ? (it.requiredTerms[k] ?? "").toUpperCase() : it.requiredTerms[k];
+                        const val = (k === "operatorCert" || k === "equipmentCert") ? (it.requiredTerms[k] ?? "").toUpperCase() : (ar ? localizeTermValue(it.requiredTerms[k]) : it.requiredTerms[k]);
                         return (
                           <div key={k} className={`treqcell${ans === false ? " declined" : ""}${showErrors && ans === undefined ? " needpick" : ""}`}>
                             <div className="tc-name">{L(TERM_LABEL[k][0], TERM_LABEL[k][1])}</div>
@@ -391,9 +369,16 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                   </>
                 )}
 
-                <div className="subhead"><span className="material-icons-outlined">request_quote</span>{L("Pricing", "التسعير")}</div>
+                <div className="subhead"><span className="material-icons-outlined">request_quote</span>{L("Pricing", "التسعير")}
+                  {/* Inline VAT toggle — clarifies right at the price box whether the entered prices include 15% VAT. */}
+                  <span style={{ marginInlineStart: "auto", display: "inline-flex", border: "1px solid var(--border)", borderRadius: 7, overflow: "hidden", textTransform: "none", letterSpacing: 0 }}>
+                    {([[false, L("Excl. VAT", "قبل الضريبة")], [true, L("Incl. VAT", "شامل الضريبة")]] as [boolean, string][]).map(([v, lab]) => (
+                      <button key={String(v)} type="button" onClick={() => setVatIncluded(v)} style={{ border: "none", cursor: "pointer", font: "inherit", textTransform: "none", letterSpacing: 0, fontWeight: 800, fontSize: 10.5, padding: "3px 9px", background: vatIncluded === v ? "var(--navy)" : "var(--surface1)", color: vatIncluded === v ? "#fff" : "var(--muted)" }}>{lab}</button>
+                    ))}
+                  </span>
+                </div>
                 <table className="ptbl">
-                  <thead><tr><th>{L("Item", "البند")}</th><th className="num">{L("Unit", "الوحدة")}</th><th className="num">{L("Qty", "العدد")}</th><th className="num">{L("Your price", "سعرك")}</th><th className="num">{L("Total", "الإجمالي")}</th></tr></thead>
+                  <thead><tr><th>{L("Item", "البند")}</th><th className="num">{L("Unit", "الوحدة")}</th><th className="num">{L("Qty", "العدد")}</th><th className="num">{vatIncluded ? L("Price (incl. VAT)", "السعر (شامل الضريبة)") : L("Your price", "سعرك")}</th><th className="num">{L("Total", "الإجمالي")}</th></tr></thead>
                   <tbody>
                     <tr>
                       <td><div className="it-lbl">{L("Rental", "الإيجار")}</div></td>
@@ -508,6 +493,32 @@ function Countdown({ iso, L, fmtDate }: { iso: string; L: (e: string, a: string)
 function partyLabel(v: string | null | undefined, L: (e: string, a: string) => string) {
   const u = (v ?? "").toLowerCase();
   return u === "renter" || u === "rentee" ? L("Renter", "المستأجر") : u === "supplier" ? L("Supplier", "المؤجّر") : (v ?? "—");
+}
+
+/**
+ * Arabic display for a required-term VALUE on the Arabic form — the request stores enum tokens
+ * (DIESEL, Renter, NET-30, FOUR_HR, 2X, Yes/No…) that would otherwise show in English. Maps the known
+ * ones to Arabic; leaves anything unknown (years, cert names, free text) untouched. Display-only.
+ */
+const AR_TERM_VALUE: Record<string, string> = {
+  // party (fuel responsibility / delivery / provider)
+  RENTER: "المستأجر", RENTEE: "المستأجر", SUPPLIER: "المؤجّر", ME: "أنا",
+  // fuel type
+  DIESEL: "ديزل", PETROL: "بنزين", GASOLINE: "بنزين", ELECTRIC: "كهربائي", HYBRID: "هجين",
+  // yes/no · included
+  YES: "نعم", NO: "لا", TRUE: "نعم", FALSE: "لا", INCLUDED: "مشمول", EXCLUDED: "غير مشمول",
+  // payment terms
+  "NET-0": "صافي فوري", "NET-15": "صافي ١٥ يومًا", "NET-30": "صافي ٣٠ يومًا", "NET-60": "صافي ٦٠ يومًا", "NET-90": "صافي ٩٠ يومًا",
+  UPFRONT: "مقدمًا", ADVANCE: "دفعة مقدمة", "END-OF-JOB": "نهاية المهمة", DAILY: "يومي", "UPON-DELIVERY": "عند التسليم", MILESTONE: "دفعات مرحلية",
+  // breakdown SLA
+  FOUR_HR: "٤ ساعات", EIGHT_HR: "٨ ساعات", TWENTY_FOUR_HR: "٢٤ ساعة", FORTY_EIGHT_HR: "٤٨ ساعة", SEVENTY_TWO_HR: "٧٢ ساعة",
+  // overtime
+  "2X": "٢×", "1.5X": "١٫٥×", WITHOUT: "بدون", "0": "بدون",
+};
+function localizeTermValue(v: string | null | undefined): string | null {
+  if (v == null || String(v).trim() === "") return v ?? null;
+  const s = String(v).trim();
+  return AR_TERM_VALUE[s.toUpperCase()] ?? s;
 }
 
 function rentalBasisLabel(v: string, L: (e: string, a: string) => string) {

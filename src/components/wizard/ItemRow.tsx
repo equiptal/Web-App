@@ -89,8 +89,15 @@ export function ItemRow({
     ? resolveRef(taxonomy, { ...item.ref, measurementId: item.suggestion.measurementId }).measurement
     : undefined;
   const matchedMeasurement = measurement ?? suggestedMeasurement;
-  const sizeLabel = matchedMeasurement ? taxName(matchedMeasurement, locale) : undefined;
-  const matchLabel = [taxName(category, locale) || undefined, taxName(subcategory, locale) || undefined, sizeLabel].filter(Boolean).join(" · ") || (item.rawLabel ?? "—");
+  // "MATCHED TO" names: the taxonomy (locale-aware, authoritative + ID-consistent) when the ref resolved;
+  // otherwise the agent's CANONICAL name (Arabic when the UI is Arabic) so an off-taxonomy/"new" match
+  // still reads in the right script. Display-only — `ref`/submit always use the English canonical.
+  const an = item.agentNames;
+  const isAr = locale === "ar";
+  const nm = (node: { name: string; nameAr?: string | null } | null | undefined, en?: string, arName?: string | null) =>
+    node ? (taxName(node, locale) || undefined) : (isAr ? (arName || en || undefined) : en || undefined);
+  const sizeLabel = matchedMeasurement ? taxName(matchedMeasurement, locale) : (isAr ? an?.capacityAr || an?.capacity : an?.capacity) || undefined;
+  const matchLabel = [nm(category, an?.category, an?.categoryAr), nm(subcategory, an?.subtype, an?.subtypeAr), sizeLabel].filter(Boolean).join(" · ") || (item.rawLabel ?? "—");
   // What the renter actually wrote — name + stated size — so "from your RFQ" keeps the size visible.
   const rawDisplay = [item.rawLabel, item.rawSize].filter(Boolean).join(" · ") || item.rawLabel;
 

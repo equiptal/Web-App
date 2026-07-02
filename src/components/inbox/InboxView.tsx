@@ -99,13 +99,16 @@ export function InboxView() {
   // Two-level grouping: RFQ group (fan-out `requestGroupId`, falling back to the individual request
   // until the backend projects it) → equipment type (subtype) → bid rows.
   type Sub = { key: string; label: string; rows: InboxBid[] };
-  type Grp = { key: string; label: string; subs: Map<string, Sub>; count: number };
+  type Grp = { key: string; label: string; code: string | null; subs: Map<string, Sub>; count: number };
   const groups = new Map<string, Grp>();
   for (const b of bids) {
     const gKey = groupMap.get(b.request.id) ?? b.request.groupId ?? b.request.id ?? b.bidId;
     const gLabel = b.request.location || b.request.displayId || b.request.shortCode || L("Request", "طلب");
+    // Per-request code fallback (REQ-…) shown until the RFQ group short code (RFQ-…) is available —
+    // same rule as the requests page (`groupRef ?? items[0].displayId`), so a code always shows.
+    const gCode = b.request.displayId ?? b.request.shortCode ?? null;
     let g = groups.get(gKey);
-    if (!g) { g = { key: gKey, label: gLabel, subs: new Map(), count: 0 }; groups.set(gKey, g); }
+    if (!g) { g = { key: gKey, label: gLabel, code: gCode, subs: new Map(), count: 0 }; groups.set(gKey, g); }
     const tKey = b.equipmentType.id || b.request.id || b.bidId;
     const tLabel = b.equipmentType.name || b.request.equipmentSummary || L("Equipment", "معدة");
     let sub = g.subs.get(tKey);
@@ -153,13 +156,16 @@ export function InboxView() {
     <div dir={ar ? "rtl" : "ltr"} className="mx-auto w-full max-w-3xl">
       {[...groups.values()].map((g) => (
         <div key={g.key} className="mb-6">
-          {/* Level 1 — the RFQ group: RFQ-NNNNN short code first, then the location */}
+          {/* Level 1 — the RFQ group: the short code first (RFQ-NNNNN when available, else the REQ- code —
+              same fallback as the requests page), then the location. */}
+          {(() => { const code = groupRefs.get(g.key) ?? g.code; return (
           <div className="mb-2 flex items-center gap-2 px-1 text-[13.5px] font-extrabold text-navy">
             <Icon name="folder_open" size={16} />
-            {groupRefs.get(g.key) && <span className="flex-none rounded-md bg-navy px-2 py-0.5 font-mono text-[11.5px] font-extrabold text-white">{groupRefs.get(g.key)}</span>}
+            {code && <span className="flex-none rounded-md bg-navy px-2 py-0.5 font-mono text-[11.5px] font-extrabold text-white">{code}</span>}
             <span className="truncate text-muted">{g.label}</span>
             <span className="flex-none text-[11px] font-bold uppercase tracking-wide text-muted">· {g.count} {L("bids", "عروض")}</span>
           </div>
+          ); })()}
           {[...g.subs.values()].map((sub) => (
             <div key={sub.key} className="mb-3 ms-2 border-s-2 border-border ps-3">
               {/* Level 2 — equipment type (prominent) */}

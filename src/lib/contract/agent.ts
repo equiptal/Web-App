@@ -20,6 +20,11 @@ export interface RFQLineItem {
   category: string;
   subtype: string;
   capacity: string;
+  // Arabic canonical match names (Mansour) — DISPLAY ONLY for "MATCHED TO"; the English category/
+  // subtype/capacity above stay the source for taxonomy IDs + the submit payload.
+  category_ar?: string | null;
+  subtype_ar?: string | null;
+  capacity_ar?: string | null;
   capacity_input_value?: string | null; // verbatim size phrase the renter stated (e.g. "30 ton")
   quantity: number | null;
   operator_included: boolean | null;

@@ -18,9 +18,9 @@ import { ShareForBidsSheet } from "@/components/requests/ShareForBidsSheet";
 
 // Prototype animation system — scoped so it can't leak into the app's global CSS.
 const CSS = `
-.rlive{min-height:100vh;padding:44px 22px 70px}
+.rlive{min-height:100vh;padding:20px 24px 32px}
 .rlive *{box-sizing:border-box}
-.rlive-in{max-width:720px;margin:0 auto}
+.rlive-in{max-width:1120px;margin:0 auto}
 @keyframes rlv-rise{0%{transform:translateY(10px);opacity:0}100%{transform:translateY(0);opacity:1}}
 @keyframes rlv-fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes rlv-pop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
@@ -94,7 +94,7 @@ export function Confirmation() {
 
         {/* ── success header ── */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", animation: "rlv-rise .5s ease both" }}>
-          <div style={{ position: "relative", width: 58, height: 58, marginBottom: 15 }}>
+          <div style={{ position: "relative", width: 58, height: 58, marginBottom: 8 }}>
             <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "#22A55B", opacity: 0.28, animation: "rlv-ring 1.1s ease-out .1s both" }} />
             <div style={{ position: "relative", width: 58, height: 58, borderRadius: "50%", background: "#E7F7EE", display: "flex", alignItems: "center", justifyContent: "center", animation: "rlv-pop .5s cubic-bezier(.2,1.3,.5,1) both" }}>
               <Svg w={27} stroke="#15914E" sw={3.2}><path d="M20 6L9 17l-5-5" /></Svg>
@@ -111,11 +111,11 @@ export function Confirmation() {
           </div>
         </div>
 
-        {/* ── one card: share row on top, tutorial below ── */}
-        <div style={{ marginTop: 28, background: "#16263F", borderRadius: 22, overflow: "hidden", boxShadow: "0 18px 44px rgba(16,32,58,.22)", animation: "rlv-rise .55s ease .05s both" }}>
+        {/* ── one card: share (left) + how-it-works (right) side by side on wide screens; stacks when narrow ── */}
+        <div style={{ marginTop: 16, background: "#16263F", borderRadius: 22, overflow: "hidden", boxShadow: "0 18px 44px rgba(16,32,58,.22)", animation: "rlv-rise .55s ease .05s both", display: "flex", flexWrap: "wrap", alignItems: "stretch" }}>
 
-          {/* share row */}
-          <div style={{ padding: "26px 28px 24px" }}>
+          {/* share column */}
+          <div style={{ flex: "1 1 380px", minWidth: 300, padding: "22px 24px 22px" }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 13 }}>
               <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(251,191,107,.16)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <Svg w={21} stroke="#FBBF6B" sw={2.2}><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" /></Svg>
@@ -155,7 +155,7 @@ export function Confirmation() {
         </div>
 
         {/* ── primary path ── */}
-        <div style={{ marginTop: 24, display: "flex", alignItems: "center", justifyContent: "center", gap: 12, flexWrap: "wrap", animation: "rlv-rise .65s ease .15s both" }}>
+        <div style={{ marginTop: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 12, flexWrap: "wrap", animation: "rlv-rise .65s ease .15s both" }}>
           <button onClick={onView} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "14px 26px", borderRadius: 12, border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 800, fontSize: 15, background: "#16263F", color: "#fff" }}>
             {L("View request & bids", "عرض الطلب والعروض")}
             <span style={ar ? { transform: "scaleX(-1)", display: "inline-flex" } : { display: "inline-flex" }}><Svg w={17} stroke="currentColor" sw={2.4}><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></Svg></span>
@@ -215,8 +215,8 @@ function HowItWorks({ ar, L }: { ar: boolean; L: (e: string, a: string) => strin
   );
 
   return (
-    <div style={{ borderTop: "1px solid #26374F", padding: "20px 28px 22px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 13, padding: "0 4px", gap: 10 }}>
+    <div style={{ flex: "1 1 560px", minWidth: 340, borderInlineStart: "1px solid #26374F", padding: "18px 22px 20px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, padding: "0 2px", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
           <span style={{ width: 30, height: 30, borderRadius: 9, background: OR, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>▶</span>
           <div>
@@ -236,7 +236,7 @@ function HowItWorks({ ar, L }: { ar: boolean; L: (e: string, a: string) => strin
         <span style={{ width: 9, height: 9, borderRadius: "50%", background: "#61C554" }} />
         <div style={{ flex: 1, marginInlineStart: 6, background: "#0F1B2E", border: "1px solid #2A3B54", borderRadius: 6, padding: "4px 10px", fontSize: 11, fontWeight: 600, color: "#8FA0B8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", direction: "ltr" }}>{sc.url}</div>
       </div>
-      <div style={{ height: 340, background: "#EEF2F7", border: "1px solid #2A3B54", borderTop: "none", borderRadius: "0 0 13px 13px", position: "relative", overflow: "hidden" }}>
+      <div style={{ height: 240, background: "#EEF2F7", border: "1px solid #2A3B54", borderTop: "none", borderRadius: "0 0 13px 13px", position: "relative", overflow: "hidden" }}>
         {step === 0 && <SceneShare key="s0" ar={ar} L={L} />}
         {step === 1 && <SceneForm key="s1" ar={ar} L={L} />}
         {step === 2 && <SceneDone key="s2" ar={ar} L={L} />}

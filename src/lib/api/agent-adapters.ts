@@ -148,6 +148,13 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
   reconcileRequestWide(items, "deliveryOverride", (v) => (project.deliveryToSite = v));
   reconcileRequestWide(items, "returnOverride", (v) => (project.returnFromSite = v));
   reconcileRequestWide(items, "fuelResponsibilityOverride", (v) => (project.fuelResponsibility = v));
+  // AC-28: if EVERY item wants the same manufacture year, apply it request-wide (shown once for all)
+  // and clear the per-item overrides; a mix (or differing years) keeps the per-item values.
+  const years = items.map((i) => i.equipmentYear ?? null);
+  if (years.length && years.every((y) => y != null && y === years[0])) {
+    project.advanced.equipmentYear = years[0];
+    for (const i of items) i.equipmentYear = null;
+  }
   // AC-50: equipment-level safety certs the agent detected (per-item safety_certifications, e.g. the
   // equipment must hold SASO/TÜV) → project-level Safety field. Tolerates single value or array.
   const equipSafety = (out.line_items ?? []).flatMap((li) => safetyList(li.safety_certifications));
@@ -290,6 +297,8 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
     // size; it belongs in "MATCHED TO", not the raw input). null when the renter stated no size.
     rawSize: li.capacity_input_value ?? null,
     ref,
+    // Agent canonical match names (EN + AR) — display-only source for "MATCHED TO"; ref/submit stay English.
+    agentNames: { category: li.category, categoryAr: li.category_ar ?? null, subtype: li.subtype, subtypeAr: li.subtype_ar ?? null, capacity: li.capacity, capacityAr: li.capacity_ar ?? null },
     verdict,
     resolved,
     removed: false,
