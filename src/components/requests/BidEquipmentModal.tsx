@@ -138,10 +138,15 @@ export function BidEquipmentModal({
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 800, color: "#d4780a" }}>{L("Supplier-provided details", "تفاصيل مُدخلة من المؤجّر")}</div>
                   <div style={{ fontSize: 12.5, color: "#B07A3A", fontWeight: 600, lineHeight: 1.5, marginTop: 3 }}>
-                    {L(
-                      "These specs were entered by the supplier and cover one representative unit — the rest of the available quantity may vary. You can confirm condition, certificates and ownership inside the deal room before you approve the bid.",
-                      "أُدخلت هذه المواصفات من المؤجّر وتغطّي وحدة واحدة تمثيلية — وقد تختلف بقية الكمية المتاحة. يمكنك تأكيد الحالة والشهادات والملكية داخل غرفة الصفقة قبل اعتماد العرض.",
-                    )}
+                    {bid.viaSharedLink
+                      ? L(
+                          "The supplier acknowledged these in your shared-link form only — they haven’t been verified. Review the full submission before you rely on them.",
+                          "أقرّ المؤجّر بهذه التفاصيل في نموذج الرابط فقط — ولم يتم التحقق منها. راجع العرض المُقدَّم كاملاً قبل الاعتماد عليها.",
+                        )
+                      : L(
+                          "These specs were entered by the supplier and cover one representative unit — the rest of the available quantity may vary. You can confirm condition, certificates and ownership inside the deal room before you approve the bid.",
+                          "أُدخلت هذه المواصفات من المؤجّر وتغطّي وحدة واحدة تمثيلية — وقد تختلف بقية الكمية المتاحة. يمكنك تأكيد الحالة والشهادات والملكية داخل غرفة الصفقة قبل اعتماد العرض.",
+                        )}
                   </div>
                 </div>
               </div>
@@ -159,7 +164,7 @@ export function BidEquipmentModal({
               {tile(L("MEASUREMENT", "القياس"), measurement || "—")}
               {tile(L("QUANTITY OFFERED", "الكمية المعروضة"), `×${offered}`)}
               {tile(L("FUEL TYPE", "نوع الوقود"), fuel || "—")}
-              {tile(L("YEAR", "السنة"), eq?.year != null ? String(eq.year) : "—")}
+              {tile(L("YEAR", "السنة"), eq?.year != null ? String(eq.year) : bid.viaSharedLink && bid.reqMinYear != null ? `≥ ${bid.reqMinYear}` : "—")}
               {tile(L("RATE", "السعر"), <>{nf(bid.price ?? 0)} {L("SAR", "ر.س")} <span style={{ fontSize: 12, fontWeight: 700, color: "#C98A4B" }}>/ {periodOf(bid.priceUnit, ar)}</span></>, true)}
             </div>
 
@@ -200,8 +205,8 @@ export function BidEquipmentModal({
             disabled={busy}
             style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "14px", borderRadius: 14, border: "none", background: "#1c3550", color: "#fff", fontWeight: 800, fontSize: 15, cursor: busy ? "default" : "pointer", fontFamily: "inherit", opacity: busy ? 0.7 : 1 }}
           >
-            <span className="material-icons-outlined" style={{ fontSize: 18 }}>{busy ? "progress_activity" : "forum"}</span>
-            {L("Request more details", "اطلب مزيد من التفاصيل")}
+            <span className="material-icons-outlined" style={{ fontSize: 18 }}>{busy ? "progress_activity" : bid.viaSharedLink ? "visibility" : "forum"}</span>
+            {bid.viaSharedLink ? L("View bid submission", "عرض العرض المُقدَّم") : L("Request more details", "اطلب مزيد من التفاصيل")}
           </button>
         </div>
       </div>

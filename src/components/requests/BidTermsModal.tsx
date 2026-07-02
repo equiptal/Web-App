@@ -1,20 +1,25 @@
 "use client";
 
+import { useState } from "react";
 import type { TermRow, TermState } from "@/lib/contract/bids";
 
 /**
- * Per-term status modal (prototype "Terms — <supplier>"): three sections — Equipment / Project /
- * Documents — each row carrying one status. matched/agreed are settled; negotiating/conflict are the
- * live deal-room state; grey = not declared/verified yet. The footer opens the deal room.
+ * Per-term status modal (app parity: "Terms — <supplier>"). Every term the bid touches — equipment,
+ * project, documents — is bucketed by STATE into three tabs, mirroring the mobile app: Conflict /
+ * Pending review / Matched. matched+agreed → Matched; conflict → Conflict; grey+negotiating (still
+ * being worked out) → Pending review. The footer opens the deal room.
  */
-type Tone = { label: (ok: string) => string; ar: string; c: string; mark: string };
+type Tone = { word: (ok: string) => string; ar: string; c: string; mark: string };
 const STATE: Record<TermState, Tone> = {
-  matched: { label: (ok) => ok, ar: "مطابق", c: "#1daf58", mark: "✓" },
-  agreed: { label: (ok) => ok, ar: "متفق", c: "#1daf58", mark: "✓" },
-  negotiating: { label: () => "In deal room", ar: "في غرفة الصفقة", c: "#d4780a", mark: "↻" },
-  conflict: { label: () => "Conflict", ar: "تعارض", c: "#d9362a", mark: "!" },
-  grey: { label: () => "Unverified", ar: "غير موثَّق", c: "#9AA7B8", mark: "–" },
+  matched: { word: (ok) => ok, ar: "مطابق", c: "#1daf58", mark: "✓" },
+  agreed: { word: (ok) => ok, ar: "متفق", c: "#1daf58", mark: "✓" },
+  negotiating: { word: () => "In deal room", ar: "في غرفة الصفقة", c: "#d4780a", mark: "↻" },
+  conflict: { word: () => "Conflict", ar: "تعارض", c: "#d9362a", mark: "!" },
+  grey: { word: () => "Pending review", ar: "بانتظار المراجعة", c: "#9AA7B8", mark: "–" },
 };
+
+type Bucket = "conflict" | "pending" | "matched";
+const bucketOf = (s: TermState): Bucket => (s === "conflict" ? "conflict" : s === "matched" || s === "agreed" ? "matched" : "pending");
 
 export function BidTermsModal({
   supplier,
@@ -35,36 +40,20 @@ export function BidTermsModal({
   negotiateLabel?: string;
   onClose: () => void;
 }) {
-  const okCount = (rows: TermRow[]) => rows.filter((r) => r.state === "matched" || r.state === "agreed").length;
-  const chip = (label: string, rows: TermRow[]) => {
-    const ok = okCount(rows), total = rows.length;
-    const tone = total && ok === total ? { bg: "#e7f7ee", c: "#1daf58" } : ok > 0 ? { bg: "#fff3e0", c: "#d4780a" } : { bg: "#eff4f9", c: "#6b8fa8" };
-    return (
-      <span key={label} style={{ fontSize: 13, fontWeight: 800, color: tone.c, background: tone.bg, padding: "5px 12px", borderRadius: 20 }}>
-        {label} {ok}/{total}
-      </span>
-    );
-  };
+  // Flatten every term the bid touches and bucket by state (app's 3-way split).
+  const allRows = [...terms.equipment, ...terms.contract, ...terms.supplier];
+  const byBucket: Record<Bucket, TermRow[]> = { conflict: [], pending: [], matched: [] };
+  for (const r of allRows) byBucket[bucketOf(r.state)].push(r);
 
-  const section = (title: string, okWord: string, rows: TermRow[]) =>
-    rows.length === 0 ? null : (
-      <div key={title} style={{ marginTop: 18 }}>
-        <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".06em", color: "#6b8fa8", marginBottom: 4 }}>{title}</div>
-        {rows.map((r) => {
-          const st = STATE[r.state];
-          const word = ar ? st.ar : st.label(okWord);
-          return (
-            <div key={r.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "13px 0", borderBottom: "1px solid #EFF2F6" }}>
-              <span style={{ fontSize: 15, fontWeight: 600, color: "#1c3550" }}>
-                {ar ? r.labelAr : r.labelEn}
-                {r.state === "conflict" && r.detail && <span style={{ color: "#6b8fa8", fontWeight: 500 }}> · {ar ? r.detail.ar : r.detail.en}</span>}
-              </span>
-              <span style={{ fontSize: 14.5, fontWeight: 800, color: st.c, whiteSpace: "nowrap" }}>{st.mark} {word}</span>
-            </div>
-          );
-        })}
-      </div>
-    );
+  const tabs: { key: Bucket; label: string; c: string; bg: string }[] = [
+    { key: "conflict", label: L("Conflict", "تعارض"), c: "#d9362a", bg: "#fdecea" },
+    { key: "pending", label: L("Pending review", "بانتظار المراجعة"), c: "#d4780a", bg: "#fff3e0" },
+    { key: "matched", label: L("Matched", "مطابق"), c: "#1daf58", bg: "#e7f7ee" },
+  ];
+  // Open on the first tab that has something (Conflict → Pending → Matched), else Matched.
+  const firstNonEmpty = tabs.find((t) => byBucket[t.key].length)?.key ?? "matched";
+  const [active, setActive] = useState<Bucket>(firstNonEmpty);
+  const rows = byBucket[active];
 
   return (
     <div
@@ -83,15 +72,44 @@ export function BidTermsModal({
           </button>
         </div>
 
-        <div style={{ overflowY: "auto", padding: "0 22px 18px" }}>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {chip(L("Equipment", "المعدة"), terms.equipment)}
-            {chip(L("Project", "المشروع"), terms.contract)}
-            {chip(L("Documents", "المستندات"), terms.supplier)}
-          </div>
-          {section(L("EQUIPMENT TERMS", "شروط المعدة"), L("Matched", "مطابق"), terms.equipment)}
-          {section(L("PROJECT TERMS", "شروط المشروع"), L("Agreed", "متفق"), terms.contract)}
-          {section(L("DOCUMENTS", "المستندات"), L("Verified", "موثَّق"), terms.supplier)}
+        {/* 3 state tabs (Conflict / Pending review / Matched) with counts */}
+        <div style={{ display: "flex", gap: 8, padding: "0 22px 4px" }}>
+          {tabs.map((t) => {
+            const on = active === t.key;
+            const n = byBucket[t.key].length;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setActive(t.key)}
+                style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 8px", borderRadius: 11, border: `1.5px solid ${on ? t.c : "#e6ebf2"}`, background: on ? t.bg : "#fff", color: on ? t.c : "#6b8fa8", fontFamily: "inherit", fontWeight: 800, fontSize: 12.5, cursor: "pointer", whiteSpace: "nowrap" }}
+              >
+                {t.label} <span style={{ fontWeight: 900 }}>{n}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ overflowY: "auto", padding: "10px 22px 18px" }}>
+          {rows.length === 0 ? (
+            <div style={{ padding: "26px 0", textAlign: "center", fontSize: 13.5, fontWeight: 600, color: "#9AA7B8" }}>
+              {active === "conflict" ? L("No conflicts.", "لا تعارضات.") : active === "pending" ? L("Nothing pending review.", "لا شيء بانتظار المراجعة.") : L("Nothing matched yet.", "لا مطابقات بعد.")}
+            </div>
+          ) : (
+            rows.map((r, i) => {
+              const st = STATE[r.state];
+              const okWord = active === "matched" ? L("Matched", "مطابق") : st.word("");
+              const word = ar ? st.ar : st.word(active === "matched" ? "Matched" : "");
+              return (
+                <div key={`${r.key}-${i}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "13px 0", borderBottom: "1px solid #EFF2F6" }}>
+                  <span style={{ fontSize: 15, fontWeight: 600, color: "#1c3550" }}>
+                    {ar ? r.labelAr : r.labelEn}
+                    {r.detail && (r.state === "conflict" || r.state === "negotiating") && <span style={{ color: "#6b8fa8", fontWeight: 500 }}> · {ar ? r.detail.ar : r.detail.en}</span>}
+                  </span>
+                  <span style={{ fontSize: 14.5, fontWeight: 800, color: st.c, whiteSpace: "nowrap" }}>{st.mark} {word || okWord}</span>
+                </div>
+              );
+            })
+          )}
         </div>
 
         <div style={{ padding: "14px 22px 20px", borderTop: "1px solid #EFF2F6" }}>

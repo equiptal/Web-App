@@ -150,13 +150,27 @@ function computeCashUpfront(bid: BidCard, rental: Money, mob: Money): Money {
 /** The five cost-responsibility alignments, from the bid's request-terms vs the request assignment. */
 function buildCostResponsibilities(bid: BidCard, requestSides: Partial<Record<CostResponsibility["key"], "supplier" | "me">>): CostResponsibility[] {
   const rt = bid.requestTerms;
+  const isLink = bid.viaSharedLink;
+  // For a shared-link bid, translate the supplier's Yes/No confirmation (a term-row state) into a side
+  // relative to what the request asked: agreed → same side as the request; declined → the OTHER side
+  // (which makes state "red" below, so the conflict surfaces in the cost-terms row — T9).
+  const linkSide = (contractKey: string, requestSide: "supplier" | "me" | null): "supplier" | "me" | null => {
+    if (!requestSide) return null;
+    const st = bid.terms.contract.find((t) => t.key === contractKey)?.state;
+    if (st === "matched" || st === "agreed") return requestSide;
+    if (st === "conflict") return requestSide === "supplier" ? "me" : "supplier";
+    return null;
+  };
   // Where derivable from BidCard; otherwise null (not provided — no fabrication).
   const bidSides: Record<CostResponsibility["key"], "supplier" | "me" | null> = {
-    fuel: null, // fuel responsibility isn't on the bid card today → not provided
-    maintenance: rt.maintenanceResponsibility ? (/(supplier|مؤجّر)/i.test(rt.maintenanceResponsibility) ? "supplier" : "me") : null,
+    fuel: isLink ? linkSide("fuel_responsibility", requestSides.fuel ?? null) : null, // in-app: not on the card today
+    // Link form never asks maintenance → mirror the request's assignment (T5); in-app uses the declared value.
+    maintenance: isLink
+      ? (requestSides.maintenance ?? null)
+      : rt.maintenanceResponsibility ? (/(supplier|مؤجّر)/i.test(rt.maintenanceResponsibility) ? "supplier" : "me") : null,
     overtime: null,
-    operator_food: null,
-    operator_transport_accommodation: null,
+    operator_food: isLink ? linkSide("fat_food", requestSides.operator_food ?? null) : null,
+    operator_transport_accommodation: isLink ? linkSide("fat_transport", requestSides.operator_transport_accommodation ?? null) : null,
   };
   const meta: { key: CostResponsibility["key"]; en: string; ar: string }[] = [
     { key: "fuel", en: "Fuel", ar: "الوقود" },

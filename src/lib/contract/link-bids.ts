@@ -324,6 +324,18 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
       ],
     },
     requestTerms: { operatorIncluded: null, operatorNationality: null, fuelType: null, paymentMethod: null, paymentTerms: null, breakdownResponseSla: null, overtimeRate: null, maintenanceResponsibility: null },
+    // Request-assigned cost sides (from the required terms) so the comparison's cost-terms rows render
+    // even for a link-only comparison, and maintenance mirrors the request (T5/T9).
+    requestResponsibilities: (() => {
+      const side = (v: string | null | undefined): "supplier" | "me" | null =>
+        !v ? null : /(supplier|مؤجّر)/i.test(v) ? "supplier" : /(renter|rentee|me|مستأجر|أنت)/i.test(v) ? "me" : null;
+      const rr: Partial<Record<"fuel" | "maintenance" | "operator_food" | "operator_transport_accommodation", "supplier" | "me">> = {};
+      const f = side(rt.fuel); if (f) rr.fuel = f;
+      const mn = side(rt.maintenance); if (mn) rr.maintenance = mn;
+      const ff = side(rt.fatFood); if (ff) rr.operator_food = ff;
+      const ftr = side(rt.fatTransport); if (ftr) rr.operator_transport_accommodation = ftr;
+      return rr;
+    })(),
     lockedTerms: [],
     unreadTerms: [],
     progress: { agreed: 0, total: 0 },

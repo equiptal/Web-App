@@ -63,6 +63,7 @@ export function BidComparisonWorkspace() {
 
   const [groups, setGroups] = useState<RequestGroup[] | null>(null);
   const [linkByRequest, setLinkByRequest] = useState<Record<string, number>>({}); // off-platform link-bid count per request id — folded into selector gating so link-only requests aren't hidden
+  const [linkByGroup, setLinkByGroup] = useState<Record<string, number>>({}); // DISTINCT off-platform submissions per group (a submission spanning N items counts once) — for the group total
   const [linkLoaded, setLinkLoaded] = useState(false); // off-platform counts fetched (so default selection can wait for link-only groups)
   const [groupRefById, setGroupRefById] = useState<Record<string, string>>({}); // request-group id → RFQ-NNNNN group code (from any submission), shown on the RFQ tabs
   const [error, setError] = useState(false);
@@ -135,23 +136,30 @@ export function BidComparisonWorkspace() {
     ).then((all) => {
       if (!active) return;
       const rmap: Record<string, number> = {};
+      const gmap: Record<string, number> = {};
       const gref: Record<string, string> = {};
       all.forEach((subs, i) => {
         // `all` is aligned with `targets`; the group's RFQ code is the groupRef on any of its submissions.
         const g = gref[targets[i].id] ? null : subs.find((s) => s.groupRef)?.groupRef;
         if (g) gref[targets[i].id] = g;
+        // Per-item link count (a submission on N items counts on each) — for the item selector.
         for (const sub of subs) for (const it of sub.items) if (it.requestId) rmap[it.requestId] = (rmap[it.requestId] ?? 0) + 1;
+        // DISTINCT submissions for the group (a multi-item submission counts once) — for the group total.
+        gmap[targets[i].id] = new Set(subs.map((s) => s.id)).size;
       });
       setLinkByRequest(rmap);
+      setLinkByGroup(gmap);
       setGroupRefById(gref);
       setLinkLoaded(true);
     });
     return () => { active = false; };
   }, [groups]);
 
-  // "Effective" bid count = app bids + off-platform link bids — the basis for selector gating.
+  // Per-item "effective" bid count (app bids + link bids touching that item) — for the item selector.
   const effItemBids = (it: RequestGroup["items"][number]) => it.bidCount + (linkByRequest[it.id] ?? 0);
-  const effGroupBids = (g: RequestGroup) => g.items.reduce((s, it) => s + effItemBids(it), 0);
+  // GROUP total = DISTINCT bids (T10): app bids (each on one item) + distinct link submissions (a
+  // submission spanning several items counts once), so it matches the fulfilment panel / "View all bids".
+  const effGroupBids = (g: RequestGroup) => g.items.reduce((s, it) => s + it.bidCount, 0) + (linkByGroup[g.id] ?? 0);
 
   const locations = useMemo<LocationNode[]>(() => {
     if (!groups) return [];
@@ -704,22 +712,20 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
     <div className={`space-y-4 transition-[margin] duration-200 ${chatOpen ? "md:me-[412px]" : ""}`} style={{ color: C.navy }}>
       {/* ── RFQ tabs (§1: replace location grouping; same pill style as My Requests) ── */}
       <div className="text-[11px] font-extrabold" style={{ color: C.muted, letterSpacing: ".4px" }}>{L("REQUESTS FOR QUOTE", "طلبات التسعير")}</div>
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="flex gap-2.5 overflow-x-auto pb-1.5">
         {locations.map((l) => {
           const on = l.key === loc?.key;
-          const rfqId = l.groups[0]?.items[0]?.displayId ?? "RFQ";
-          const groupRef = groupRefById[l.groups[0]?.id ?? ""] ?? null; // per-group RFQ-NNNNN code (when the group got shared-link submissions)
+          // Show the RFQ GROUP code as the primary (like My Requests: groupRef ?? the request displayId).
+          const code = groupRefById[l.groups[0]?.id ?? ""] ?? l.groups[0]?.items[0]?.displayId ?? "RFQ";
           return (
             <button key={l.key} onClick={() => setActiveLoc(l.key)}
-              className="inline-flex flex-none flex-col items-start gap-0.5 rounded-xl border px-4 py-2.5 text-start transition"
+              className="flex-none rounded-2xl border px-[15px] py-[11px] text-start transition"
               style={{ minWidth: 180, ...(on ? { background: C.navy, borderColor: C.navy } : { background: "#fff", borderColor: C.border }) }}>
-              <span className="flex items-center gap-2">
-                <span className="text-[13.5px] font-extrabold" style={{ color: on ? "#fff" : C.navy }}>{rfqId}</span>
-                {groupRef && <span className="rounded-full px-2 text-[10.5px] font-mono font-bold" style={on ? { background: "rgba(255,255,255,.16)", color: "#fff" } : { background: C.actionDim, color: C.action }} title={L("Shared-link RFQ code", "رمز طلب التسعير عبر الرابط")}>{groupRef}</span>}
-                <span className="rounded-full px-2 text-[10.5px] font-bold" style={on ? { background: "rgba(255,255,255,.2)", color: "#fff" } : { background: C.surface3, color: C.navy }}>{l.itemCount} {L("items", "أصناف")}</span>
-                {l.bidCount > 0 && <span className="rounded-full px-2 text-[10.5px] font-bold" style={on ? { background: "rgba(255,255,255,.16)", color: "#fff" } : { background: C.successBg, color: C.success }}>{l.bidCount} {L("bids", "عروض")}</span>}
+              <span className="flex items-center justify-between gap-2">
+                <span className="text-[14px] font-black" style={{ color: on ? "#fff" : C.navy }}>{code}</span>
+                <span className="rounded-full px-2 py-0.5 text-[11px] font-extrabold" style={on ? { background: "rgba(255,255,255,.16)", color: "#fff" } : { background: C.surface2, color: C.muted }}>{l.itemCount} {L("items", "عناصر")}</span>
               </span>
-              <span className="text-[11.5px] font-semibold" style={{ color: on ? "rgba(255,255,255,.7)" : C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 220 }}>{l.label}</span>
+              <span className="mt-[3px] block text-[12px] font-semibold" style={{ color: on ? "#C7D4E5" : C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 165 }}>{l.label}</span>
             </button>
           );
         })}
@@ -947,10 +953,20 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                                 </b>
                                 <div className="mt-0.5 flex items-center gap-2 whitespace-nowrap text-[10.5px] font-bold">
                                   {c.bid.rating != null && <span className="inline-flex items-center gap-0.5" style={{ color: C.action }}><span className="material-icons-outlined" style={{ fontSize: 12 }}>star</span>{c.bid.rating}</span>}
-                                  <span className="inline-flex items-center gap-1" style={{ color: c.bid.viaSharedLink ? C.action : C.muted }}>
-                                    <span className="material-icons-outlined" style={{ fontSize: 12 }}>{isUpload ? "description" : c.bid.viaSharedLink ? "link" : "smartphone"}</span>
-                                    {isUpload ? L("uploaded file", "ملف مرفوع") : c.bid.viaSharedLink ? L("shared link", "رابط") : L("Moedatech app", "تطبيق معداتك")}
-                                  </span>
+                                  {(() => {
+                                    // Source chip — same colours + wording as the bid-card banners (T4):
+                                    // orange "Off-platform · via your request link" / blue "Via Moedatech app".
+                                    const chip = isUpload
+                                      ? { bg: C.surface2, c: C.muted, icon: "description", text: L("Uploaded file", "ملف مرفوع") }
+                                      : c.bid.viaSharedLink
+                                        ? { bg: "#fff4e5", c: "#d4780a", icon: "link", text: L("Off-platform · via your request link", "خارج المنصة · عبر رابط طلبك") }
+                                        : { bg: "#e6f2fb", c: "#1a7ec8", icon: "verified_user", text: L("Via Moedatech app", "عبر تطبيق معداتك") };
+                                    return (
+                                      <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5" style={{ background: chip.bg, color: chip.c }}>
+                                        <span className="material-icons-outlined" style={{ fontSize: 12 }}>{chip.icon}</span>{chip.text}
+                                      </span>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                             </div>
@@ -1120,7 +1136,9 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                             {requiredResp.map((m) => {
                               const cr = c.costResponsibilities.find((x) => x.key === m.key)!;
                               const fatKey = m.key === "operator_food" ? "fat_food" : m.key === "operator_transport_accommodation" ? "fat_accommodation_transport" : null;
-                              const dealConflict = fatKey ? (c.bid.negotiableTerms ?? []).some((t) => t.key === fatKey && t.state === "conflict") : false;
+                              // Conflict from either an in-app negotiable term OR the responsibility state itself
+                              // (shared-link declines surface as cr.state === "red" via linkSide — T9).
+                              const dealConflict = cr.state === "red" || (fatKey ? (c.bid.negotiableTerms ?? []).some((t) => t.key === fatKey && t.state === "conflict") : false);
                               // §6 chip: "{term} · {owner}" coloured by tone — supplier=green, you=blue, conflict=red.
                               const tone = dealConflict ? "red" : responsibilityTone(cr);
                               const bg = tone === "green" ? C.successBg : tone === "red" ? C.dangerBg : tone === "blue" ? C.renteeDim : C.surface3;
@@ -1169,13 +1187,15 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                   {/* 🚜 EQUIPMENT */}
                   <SectionRow id="equip" icon="construction" title={L("Equipment", "المعدّة")} accent={C.action} accentText="#fff" n={cols.length} collapsed={collapsed.has("equip")} onToggle={() => toggleSection("equip")} />
                   {!collapsed.has("equip") && (<>
-                    {/* Equipment + operator terms are ACKNOWLEDGED from the request today, not yet supplier-declared.
-                        Full-width banner; the per-supplier "verify in deal room" link sits in each cell below. */}
+                    {/* One merged banner (T8): supplier-acknowledged + (when multi-unit) the per-unit caveat,
+                        scoped to in-app bids, with the "verify in deal room" link when a room exists. */}
                     <tr>
                       <td colSpan={cols.length + 1} style={{ padding: "8px 14px", background: C.warningBg, borderTop: `1px solid ${C.line}` }}>
                         <span className="inline-flex flex-wrap items-center gap-1.5 text-[11.5px] font-bold" style={{ color: C.warning }}>
                           <span className="material-icons-outlined" style={{ fontSize: 15 }}>warning_amber</span>
-                          {L("These are acknowledged by the supplier — for in-app bids, verify each one in the deal room.", "هذه مُقَرّة من المؤجّر — لعروض التطبيق، تحقّق من كلٍّ منها في غرفة الصفقة.")}
+                          {units > 1
+                            ? L(`Supplier-acknowledged, not verified; shown for 1 of ${units} units — verify each in the deal room (in-app bids).`, `مُقَرّة من المؤجّر، غير مُتحقَّق منها؛ معروضة لوحدة من ${units} — تحقّق من كلٍّ منها في غرفة الصفقة (لعروض التطبيق).`)
+                            : L("Supplier-acknowledged, not verified — verify in the deal room (in-app bids).", "مُقَرّة من المؤجّر، غير مُتحقَّق منها — تحقّق في غرفة الصفقة (لعروض التطبيق).")}
                           {(() => { const drId = cols.find((c) => c.bid.dealRoomId)?.bid.dealRoomId; return drId ? (
                             <button type="button" onClick={() => router.push(`/deal-room/${drId}`)} className="inline-flex items-center gap-0.5 font-extrabold underline" style={{ color: C.warning }}>
                               {L("verify in deal room", "تحقّق في غرفة الصفقة")}<span className="material-icons-outlined" style={{ fontSize: 13, transform: ar ? "scaleX(-1)" : undefined }}>arrow_forward</span>
@@ -1184,17 +1204,6 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         </span>
                       </td>
                     </tr>
-                    {/* Multi-unit: the equipment details shown represent one unit; each unit is verified individually. */}
-                    {units > 1 && (
-                    <tr>
-                      <td colSpan={cols.length + 1} style={{ padding: "8px 14px", background: C.surface2, borderTop: `1px solid ${C.line}` }}>
-                        <span className="inline-flex flex-wrap items-center gap-1.5 text-[11.5px] font-bold" style={{ color: C.muted }}>
-                          <span className="material-icons-outlined" style={{ fontSize: 15 }}>shield</span>
-                          {L(`Details shown are for 1 unit only — each of the ${units} units is verified individually in the deal room before approval.`, `التفاصيل المعروضة لوحدة واحدة فقط — يتم التحقق من كل وحدة من الـ ${units} على حدة في غرفة الصفقة قبل الاعتماد.`)}
-                        </span>
-                      </td>
-                    </tr>
-                    )}
                     <tr>
                       <RowHead title={L("Year", "سنة الصنع")} sub={(() => { const my = cols[0]?.bid.reqMinYear; return my == null ? undefined : my >= 1990 ? `${L("min year", "أدنى سنة")} ${my}` : `${L("max age", "أقصى عمر")} ${my} ${L("yrs", "سنة")}`; })()} />
                       {cols.map((c, idx) => {
@@ -1485,6 +1494,8 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
             <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: C.border }}>
               <span className="inline-flex items-center gap-2 text-[14px] font-extrabold" style={{ color: C.navy }}><span className="material-icons-outlined" style={{ fontSize: 18, color: C.navyMid }}>description</span>{docView.label}</span>
               <div className="flex items-center gap-1">
+                {/* T3: anything viewable is downloadable — fetch the presigned file as a blob and save it. */}
+                {docView.url && <button onClick={() => downloadDocFile(docView.url!, docView.label)} title={L("Download", "تنزيل")} className="grid h-8 w-8 place-items-center rounded-full" style={{ color: C.muted }}><span className="material-icons-outlined" style={{ fontSize: 18 }}>download</span></button>}
                 {docView.url && <a href={docView.url} target="_blank" rel="noopener noreferrer" title={L("Open in new tab", "فتح في تبويب جديد")} className="grid h-8 w-8 place-items-center rounded-full" style={{ color: C.muted }}><span className="material-icons-outlined" style={{ fontSize: 18 }}>open_in_new</span></a>}
                 <button onClick={() => setDocView(null)} className="grid h-8 w-8 place-items-center rounded-full" style={{ color: C.muted }} aria-label={L("Close", "إغلاق")}><span className="material-icons-outlined" style={{ fontSize: 18 }}>close</span></button>
               </div>
@@ -1517,6 +1528,28 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
 }
 
 /* ---------------------------------- bits ---------------------------------- */
+/** Download the doc being viewed (T3). Fetches the presigned URL as a blob so it saves to disk with a
+ *  sensible filename; falls back to opening in a new tab if the fetch is blocked (CORS/expired URL). */
+async function downloadDocFile(url: string, label: string): Promise<void> {
+  const safe = (label || "document").replace(/[^\w.\-]+/g, "_").slice(0, 60);
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(String(res.status));
+    const blob = await res.blob();
+    const ext = blob.type.includes("pdf") ? "pdf" : (blob.type.split("/")[1] || url.split("?")[0].split(".").pop() || "file");
+    const obj = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = obj;
+    a.download = /\.[a-z0-9]+$/i.test(safe) ? safe : `${safe}.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(obj);
+  } catch {
+    window.open(url, "_blank", "noopener");
+  }
+}
+
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -1550,7 +1583,23 @@ function RowHead({ title, sub }: { title: string; sub?: string }) {
 }
 function Td({ children, ok, fail }: { children: React.ReactNode; ok?: boolean; fail?: boolean }) {
   // prototype: data cell padding 14px 15px, 1px left column separator.
-  return <td className="align-top text-[13px] font-bold" style={{ padding: "14px 15px", borderBottom: `1px solid ${C.line}`, borderInlineStart: `1px solid ${C.line}`, color: C.navy, background: ok ? "rgba(29,175,88,.06)" : fail ? "rgba(217,54,42,.07)" : undefined }}>{children}</td>;
+  // A `fail` cell is a SOLID light-red with red text + inset accent so "Not met" reads clearly even
+  // inside the green "Recommended" column (T6) — the old 7%-opacity tint was invisible there.
+  return (
+    <td
+      className="align-top text-[13px] font-bold"
+      style={{
+        padding: "14px 15px",
+        borderBottom: `1px solid ${C.line}`,
+        borderInlineStart: `1px solid ${C.line}`,
+        color: fail ? C.danger : C.navy,
+        background: fail ? C.dangerBg : ok ? "rgba(29,175,88,.06)" : undefined,
+        boxShadow: fail ? `inset 3px 0 0 ${C.danger}` : undefined,
+      }}
+    >
+      {children}
+    </td>
+  );
 }
 function Sub({ children }: { children: React.ReactNode }) {
   // prototype: secondary line 11px/600, margin-top 3px.

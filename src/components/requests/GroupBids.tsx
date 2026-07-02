@@ -795,9 +795,9 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           return t;
         }, { matched: 0, conflict: 0, pending: 0 });
         const termChips = [
-          { label: L("Matched", "مطابق"), n: termTally.matched, c: "#1daf58" },
           { label: L("Conflict", "تعارض"), n: termTally.conflict, c: "#d9362a" },
-          { label: L("Pending", "معلّق"), n: termTally.pending, c: "#d4780a" },
+          { label: L("Pending review", "بانتظار المراجعة"), n: termTally.pending, c: "#d4780a" },
+          { label: L("Matched", "مطابق"), n: termTally.matched, c: "#1daf58" },
         ];
         const certChips = [
           ...(b.equipmentCertCodes ?? []).map((c) => (ar ? CERT_LABEL[c]?.ar : CERT_LABEL[c]?.en) || c),
@@ -814,7 +814,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           <div
             key={b.id}
             onClick={selectMode ? () => toggleSelect(b.id) : undefined}
-            style={{ flex: cardFlex, minWidth: 320, scrollSnapAlign: "start", alignSelf: "stretch", display: "flex", flexDirection: "column", position: "relative", background: "#fff", border: `1px solid ${isSel ? "#f79009" : "#d4e0ec"}`, borderRadius: 18, overflow: "hidden", boxShadow: "0 1px 2px rgba(20,40,70,.04)", outline: isSel ? "2px solid #f79009" : "none", outlineOffset: 2, cursor: selectMode ? "pointer" : "default" }}
+            style={{ flex: cardFlex, minWidth: 320, scrollSnapAlign: "start", alignSelf: "flex-start", display: "flex", flexDirection: "column", position: "relative", background: "#fff", border: `1px solid ${isSel ? "#f79009" : "#d4e0ec"}`, borderRadius: 18, overflow: "hidden", boxShadow: "0 1px 2px rgba(20,40,70,.04)", outline: isSel ? "2px solid #f79009" : "none", outlineOffset: 2, cursor: selectMode ? "pointer" : "default" }}
           >
             <div style={{ height: 4, background: banner.c }} />
             {banner && (

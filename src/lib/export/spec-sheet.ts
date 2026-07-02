@@ -6,6 +6,7 @@ import {
   type FuelType,
   type Party,
   type OperatorCertificate,
+  type SafetyCertificate,
   type OperatorNeeded,
 } from "@/lib/contract";
 
@@ -17,11 +18,17 @@ export interface SpecRow {
   qty: number;
   year: string;
   operatorNeeded: OperatorNeeded;
+  /** Operator certificate(s) — only when an operator is required (else empty). */
+  operatorCert: OperatorCertificate[];
+  /** Operator F.A.T split — who covers food / accommodation & transport (only when operator required). */
+  fatFood: Party | null;
+  fatTransport: Party | null;
   fuelType: FuelType;
   fuelResp: Party;
   delivery: Party;
   ret: Party;
-  certificate: OperatorCertificate[];
+  /** EQUIPMENT safety certificate(s) (per-item, inheriting the request-wide default). */
+  certificate: SafetyCertificate[];
   notes: string;
 }
 
@@ -39,11 +46,16 @@ export function buildSpecRows(draft: RfqDraft, taxonomy: Taxonomy): SpecRow[] {
       qty: item.quantity, // AC-55 / AC-52 (x2 → 2)
       year,
       operatorNeeded: item.operatorNeeded,
+      // Operator cert / F.A.T only carry meaning when an operator is required.
+      operatorCert: item.operatorNeeded === "yes" ? item.operator.certificate : [],
+      fatFood: item.operatorNeeded === "yes" ? item.operator.fatFood : null,
+      fatTransport: item.operatorNeeded === "yes" ? item.operator.fatAccommodationTransport : null,
       fuelType: item.fuelType,
       fuelResp: item.fuelResponsibilityOverride ?? draft.project.fuelResponsibility ?? "me",
       delivery: item.deliveryOverride ?? draft.project.deliveryToSite ?? "me",
       ret: item.returnOverride ?? draft.project.returnFromSite ?? "me",
-      certificate: item.operator.certificate,
+      // EQUIPMENT safety cert — per-item override, else the request-wide "settings for all" default.
+      certificate: item.safetyCertsOverride ?? draft.project.certificates.safety,
       notes: item.additionalNotes,
     };
   });

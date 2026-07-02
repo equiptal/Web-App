@@ -243,7 +243,10 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
         {/* pb-24 keeps the wizard's Back/Next footer clear of the fixed mobile bottom-nav. The nav is
             only hidden at md+, so keep the bottom padding large until md (sm:py-7 alone would shrink
             it at 640–767px while the nav is still showing, hiding the footer under it). */}
-        <main className={fullBleed ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" : `mx-auto w-full px-4 py-6 pb-24 sm:px-7 sm:pt-7 md:py-7 ${wide ? "max-w-none" : "max-w-6xl"}`}>{children}</main>
+        {/* One consistent page container across the app (T1/T2): My Requests' 1440px width + a slightly
+            larger horizontal gutter so content isn't flush to the sidebar / page edge. `wide` stays
+            uncapped (My Requests caps itself at 1440 via .rproto). */}
+        <main className={fullBleed ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" : `mx-auto w-full px-5 py-6 pb-24 sm:px-8 sm:pt-7 md:py-7 ${wide ? "max-w-none" : "max-w-[1440px]"}`}>{children}</main>
       </div>
 
       {/* Mobile bottom nav — the navy sidebar is desktop-only, so phones navigate from here. */}

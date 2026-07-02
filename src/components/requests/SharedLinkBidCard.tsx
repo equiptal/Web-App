@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { BidCard } from "@/lib/contract/bids";
 import { CERT_LABEL } from "@/lib/contract/bids";
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
+import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { EquipImg } from "@/components/requests/EquipImg";
 
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
@@ -45,7 +46,7 @@ export function SharedLinkBidCard({
   const [priceOpen, setPriceOpen] = useState(false);
   const [perUnit, setPerUnit] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
-  const [eqInfoOpen, setEqInfoOpen] = useState(false); // "acknowledged in the form only" disclaimer
+  const [equipOpen, setEquipOpen] = useState(false); // equipment-detail modal (year/cert + self-declared note)
   const picking = selectMode === true; // grouped select flow: whole-card select, hide actions
   const legacy = selectMode === undefined; // single-request view: always-on checkbox + full card
 
@@ -100,9 +101,9 @@ export function SharedLinkBidCard({
     return t;
   }, { matched: 0, conflict: 0, pending: 0 });
   const termChips = [
-    { label: L("Matched", "مطابق"), n: termTally.matched, c: "#1daf58" },
     { label: L("Conflict", "تعارض"), n: termTally.conflict, c: "#d9362a" },
-    { label: L("Pending", "معلّق"), n: termTally.pending, c: "#d4780a" },
+    { label: L("Pending review", "بانتظار المراجعة"), n: termTally.pending, c: "#d4780a" },
+    { label: L("Matched", "مطابق"), n: termTally.matched, c: "#1daf58" },
   ];
   const certChips = (bid.equipmentCertCodes ?? []).map((c) => (ar ? CERT_LABEL[c]?.ar : CERT_LABEL[c]?.en) || c).slice(0, 2);
   // Equipment-related terms the supplier answered (minimum year, equipment certificate) rendered as
@@ -126,7 +127,7 @@ export function SharedLinkBidCard({
   return (
     <div
       onClick={picking ? onToggleSelect : undefined}
-      style={{ flex: cardFlex ?? "0 0 calc(44% - 8px)", minWidth: 320, scrollSnapAlign: "start", alignSelf: "stretch", display: "flex", flexDirection: "column", position: "relative", background: "#fff", border: `1px solid ${isSel ? "#f79009" : "#d4e0ec"}`, borderRadius: 18, overflow: "hidden", boxShadow: "0 1px 2px rgba(20,40,70,.04)", outline: isSel ? "2px solid #f79009" : "none", outlineOffset: 2, cursor: picking ? "pointer" : "default" }}
+      style={{ flex: cardFlex ?? "0 0 calc(44% - 8px)", minWidth: 320, scrollSnapAlign: "start", alignSelf: "flex-start", display: "flex", flexDirection: "column", position: "relative", background: "#fff", border: `1px solid ${isSel ? "#f79009" : "#d4e0ec"}`, borderRadius: 18, overflow: "hidden", boxShadow: "0 1px 2px rgba(20,40,70,.04)", outline: isSel ? "2px solid #f79009" : "none", outlineOffset: 2, cursor: picking ? "pointer" : "default" }}
     >
       <div style={{ height: 4, background: "#d4780a" }} />
       {/* off-platform banner — replaces a status pill + the old "submitted" footer line */}
@@ -205,25 +206,9 @@ export function SharedLinkBidCard({
             })
           )}
         </div>
-        {/* self-declared disclaimer — these were only acknowledged by the supplier in the form */}
-        <button
-          onClick={() => setEqInfoOpen((o) => !o)}
-          aria-label={L("About these details", "حول هذه التفاصيل")}
-          style={{ flexShrink: 0, width: 24, height: 24, borderRadius: "50%", border: "1.5px solid #d9362a", background: eqInfoOpen ? "#fcebea" : "#fff", color: "#d9362a", fontWeight: 900, fontSize: 14, lineHeight: 1, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit" }}
-        >
-          !
-        </button>
-        {eqInfoOpen && (
-          <>
-            <div onClick={() => setEqInfoOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 20 }} />
-            <div style={{ position: "absolute", zIndex: 30, top: "100%", insetInlineEnd: 12, marginTop: 4, width: 250, background: "#1c3550", color: "#fff", borderRadius: 12, padding: "11px 13px", boxShadow: "0 12px 30px rgba(16,38,63,.35)", fontSize: 12, fontWeight: 600, lineHeight: 1.5 }}>
-              {L(
-                "These details were acknowledged by the supplier in your shared-link form only — they haven’t been verified.",
-                "أقرّ المؤجّر بهذه التفاصيل في نموذج الرابط فقط — ولم يتم التحقق منها.",
-              )}
-            </div>
-          </>
-        )}
+        {/* Details opens the equipment modal (year/cert + the self-declared note now live there, like the
+            in-app card) — replaces the old inline warning icon. */}
+        {!picking && <button onClick={() => setEquipOpen(true)} style={blueLink}>{L("Details", "التفاصيل")} ›</button>}
       </div>
 
       {/* Terms row */}
@@ -305,6 +290,14 @@ export function SharedLinkBidCard({
           negotiateLabel={L("View bid submission", "عرض العرض المُقدَّم")}
           onNegotiate={() => { setTermsOpen(false); onViewSubmission(); }}
           onClose={() => setTermsOpen(false)}
+        />
+      )}
+      {equipOpen && (
+        <BidEquipmentModal
+          bid={bid}
+          busy={false}
+          onRequestDetails={() => { setEquipOpen(false); onViewSubmission(); }}
+          onClose={() => setEquipOpen(false)}
         />
       )}
     </div>
