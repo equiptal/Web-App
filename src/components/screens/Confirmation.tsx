@@ -18,7 +18,7 @@ import { ShareForBidsSheet } from "@/components/requests/ShareForBidsSheet";
 
 // Prototype animation system — scoped so it can't leak into the app's global CSS.
 const CSS = `
-.rlive{min-height:100vh;padding:20px 24px 32px}
+.rlive{min-height:100vh;padding:10px 24px 28px}
 .rlive *{box-sizing:border-box}
 .rlive-in{max-width:1120px;margin:0 auto}
 @keyframes rlv-rise{0%{transform:translateY(10px);opacity:0}100%{transform:translateY(0);opacity:1}}
@@ -94,14 +94,14 @@ export function Confirmation() {
 
         {/* ── success header ── */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", animation: "rlv-rise .5s ease both" }}>
-          <div style={{ position: "relative", width: 58, height: 58, marginBottom: 8 }}>
+          <div style={{ position: "relative", width: 48, height: 48, marginBottom: 6 }}>
             <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "#22A55B", opacity: 0.28, animation: "rlv-ring 1.1s ease-out .1s both" }} />
-            <div style={{ position: "relative", width: 58, height: 58, borderRadius: "50%", background: "#E7F7EE", display: "flex", alignItems: "center", justifyContent: "center", animation: "rlv-pop .5s cubic-bezier(.2,1.3,.5,1) both" }}>
-              <Svg w={27} stroke="#15914E" sw={3.2}><path d="M20 6L9 17l-5-5" /></Svg>
+            <div style={{ position: "relative", width: 48, height: 48, borderRadius: "50%", background: "#E7F7EE", display: "flex", alignItems: "center", justifyContent: "center", animation: "rlv-pop .5s cubic-bezier(.2,1.3,.5,1) both" }}>
+              <Svg w={24} stroke="#15914E" sw={3.2}><path d="M20 6L9 17l-5-5" /></Svg>
             </div>
           </div>
-          <div style={{ fontSize: 25, fontWeight: 800, color: "#16263F", letterSpacing: "-.01em" }}>{L("Your request is live", "طلبك الآن نشط")}</div>
-          <div style={{ fontSize: 14.5, fontWeight: 500, color: "#5A6B82", marginTop: 6, lineHeight: 1.5, maxWidth: 460 }}>
+          <div style={{ fontSize: 23, fontWeight: 800, color: "#16263F", letterSpacing: "-.01em" }}>{L("Your request is live", "طلبك الآن نشط")}</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: "#5A6B82", marginTop: 4, lineHeight: 1.4 }}>
             {refCode && <span style={{ color: "#16263F", fontWeight: 700 }}>{refCode}</span>}
             {refCode && " · "}
             {count > 0 && `${count} ${count === 1 ? L("item", "بند") : L("items", "بنود")} · `}
@@ -111,27 +111,27 @@ export function Confirmation() {
           </div>
         </div>
 
-        {/* ── one card: share (left) + how-it-works (right) side by side on wide screens; stacks when narrow ── */}
-        <div style={{ marginTop: 16, background: "#16263F", borderRadius: 22, overflow: "hidden", boxShadow: "0 18px 44px rgba(16,32,58,.22)", animation: "rlv-rise .55s ease .05s both", display: "flex", flexWrap: "wrap", alignItems: "stretch" }}>
+        {/* ── one card, stacked: a compact horizontal share strip on top, the how-it-works demo below ── */}
+        <div style={{ marginTop: 14, background: "#16263F", borderRadius: 22, overflow: "hidden", boxShadow: "0 18px 44px rgba(16,32,58,.22)", animation: "rlv-rise .55s ease .05s both" }}>
 
-          {/* share column */}
-          <div style={{ flex: "1 1 380px", minWidth: 300, padding: "22px 24px 22px" }}>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 13 }}>
-              <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(251,191,107,.16)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Svg w={21} stroke="#FBBF6B" sw={2.2}><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" /></Svg>
+          {/* share strip — invite line + inline link/copy/share/preview, kept to two tight rows */}
+          <div style={{ padding: "16px 22px 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 11, flexWrap: "wrap" }}>
+              <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(251,191,107,.16)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Svg w={18} stroke="#FBBF6B" sw={2.2}><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" /></Svg>
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 18, fontWeight: 800, color: "#fff", lineHeight: 1.3 }}>{L("Know suppliers already? Invite them", "تعرف مؤجّرين؟ ادعهم")}</div>
-                <div style={{ fontSize: 13.5, fontWeight: 500, color: "#AEBBCE", marginTop: 6, lineHeight: 1.55 }}>{L("Share a private link with any supplier — even off-platform. Their bids land right here alongside the rest.", "شارك رابطاً خاصاً مع أي مؤجّر — حتى خارج المنصة. تصل عروضهم هنا مع البقية.")}</div>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <span style={{ fontSize: 15.5, fontWeight: 800, color: "#fff" }}>{L("Know suppliers already? Invite them", "تعرف مؤجّرين؟ ادعهم")}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 500, color: "#AEBBCE", marginInlineStart: 8 }}>{L("Share a private link — their bids land right here.", "شارك رابطاً خاصاً — تصل عروضهم هنا مباشرة.")}</span>
               </div>
-              <button onClick={() => setShareOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 600, color: "#FBBF6B", flexShrink: 0, paddingTop: 4, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
-                <Svg w={15} stroke="#FBBF6B" sw={2.1}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Svg>
-                <span style={{ color: "#FBBF6B", fontWeight: 700 }}>{deadline ? L("Edit deadline", "تعديل الموعد") : L("Set a deadline", "حدد موعداً نهائياً")}</span>
+              <button onClick={() => setShareOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, color: "#FBBF6B", flexShrink: 0, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+                <Svg w={14} stroke="#FBBF6B" sw={2.1}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Svg>
+                {deadline ? L("Edit deadline", "تعديل الموعد") : L("Set a deadline", "حدد موعداً نهائياً")}
               </button>
             </div>
 
             {/* link + share + preview — one inline row */}
-            <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <div style={{ flex: 1, minWidth: 240, display: "flex", alignItems: "center", gap: 9, background: "#0F1B2E", border: "1px solid #26374F", borderRadius: 12, padding: "7px 7px 7px 14px" }}>
                 <Svg w={15} stroke="#7C8DA6" sw={2} style={{ flexShrink: 0 }}><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" /><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" /></Svg>
                 <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, color: "#C7D2E0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", direction: "ltr", textAlign: ar ? "right" : "left" }}>{linkDisplay}</span>
@@ -215,7 +215,7 @@ function HowItWorks({ ar, L }: { ar: boolean; L: (e: string, a: string) => strin
   );
 
   return (
-    <div style={{ flex: "1 1 560px", minWidth: 340, borderInlineStart: "1px solid #26374F", padding: "18px 22px 20px" }}>
+    <div style={{ borderTop: "1px solid #26374F", padding: "16px 22px 18px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, padding: "0 2px", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
           <span style={{ width: 30, height: 30, borderRadius: 9, background: OR, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>▶</span>

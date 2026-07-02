@@ -329,13 +329,15 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                   <div className="units-note" style={{ flexWrap: "wrap", gap: 10, alignItems: "center" }}>
                     <span className="material-icons-outlined un-lead">layers</span>
                     <span className="un-tx" style={{ flex: 1, minWidth: 180 }}>{L(`Multi-unit item — the renter needs ${q} units. Offer as many as you can supply; prices below multiply by this.`, `بند متعدد الوحدات — يحتاج المستأجر ${q} وحدات. اعرض ما تستطيع توفيره؛ تُضرب الأسعار أدناه بهذا العدد.`)}</span>
-                    <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 800, color: "#1c3550", whiteSpace: "nowrap" }}>
+                    {/* Partial-bid field — a clear white pill with a bold orange-bordered input so it's
+                        obvious this is where the supplier sets how many of the N units they can supply. */}
+                    <label style={{ display: "inline-flex", alignItems: "center", gap: 9, fontSize: 12.5, fontWeight: 800, color: "#1c3550", whiteSpace: "nowrap", background: "#fff", border: "1px solid #e6c690", borderRadius: 10, padding: "6px 8px 6px 12px" }}>
                       {L("Units you can supply", "الوحدات المتاحة لديك")}
                       <input type="number" inputMode="numeric" min={1} max={q} step={1} value={a?.offeredUnits ?? String(q)}
                         onChange={(e) => setOffered(it.requestItemId, e.target.value)}
                         onBlur={(e) => { const v = Math.min(q, Math.max(1, Math.round(num(e.target.value)) || q)); setOffered(it.requestItemId, String(v)); }}
-                        style={{ width: 68, padding: "8px 10px", borderRadius: 8, border: "1px solid #d4e0ec", fontSize: 14, fontWeight: 800, color: "#1c3550", textAlign: "center", fontFamily: "inherit" }} />
-                      <span style={{ color: "#6b8fa8", fontWeight: 700 }}>/ {q}</span>
+                        style={{ width: 60, height: 38, padding: "0 8px", borderRadius: 8, border: "2px solid #f79009", fontSize: 16, fontWeight: 900, color: "#1c3550", textAlign: "center", fontFamily: "inherit", background: "#fff" }} />
+                      <span style={{ color: "#6b8fa8", fontWeight: 800, fontSize: 14 }}>/ {q}</span>
                     </label>
                   </div>
                 )}

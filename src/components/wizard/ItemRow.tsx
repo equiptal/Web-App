@@ -74,6 +74,9 @@ export function ItemRow({
   ];
 
   const { category, subcategory, measurement } = resolveRef(taxonomy, item.ref);
+  // Request-wide equipment year (AC-28) — the per-item year INHERITS this until overridden, matching
+  // the "settings for all items" behaviour of fuel/delivery/return above.
+  const sharedYear = state.draft?.project?.advanced?.equipmentYear ?? null;
   // Part 1: the optional free-text "work type" is surfaced only for crane subtypes — mirror the mobile
   // gate (equipment_step.dart `_isCraneSelected`: the subtype's English name contains "crane").
   const isCrane = (subcategory?.name ?? "").toLowerCase().includes("crane");
@@ -369,7 +372,7 @@ export function ItemRow({
           {/* Equipment year (AC-28) — per-item override of the request-wide year. "Any" inherits it. */}
           <ChipField label={t.step2.perItem.equipmentYear} note={t.step2.perItem.equipmentYearHint}>
             <YearPicker
-              value={item.equipmentYear ?? null}
+              value={item.equipmentYear ?? sharedYear}
               onChange={(v) => actions.patchItem(item.id, { equipmentYear: v })}
               anyLabel={t.options.equipmentYear.any}
               customLabel={t.options.equipmentYear.custom}
