@@ -89,9 +89,10 @@ export const BID_FORM_CSS = `
 .item-hd .inm{font-size:17px;font-weight:800;letter-spacing:-.2px}
 .item-hd .imeta{font-size:13px;color:rgba(255,255,255,.72);font-weight:700}
 /* compact, self-sizing units pill — subtle tinted amber (single) / solid orange (multi); never stretches */
-.item-hd .units-chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;letter-spacing:.01em;color:#FCD9A0;background:rgba(252,217,160,.14);border:1px solid rgba(252,217,160,.32);border-radius:var(--r-full);padding:3px 10px;white-space:nowrap}
+.item-hd .units-chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;letter-spacing:.01em;color:rgba(255,255,255,.72);background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.20);border-radius:var(--r-full);padding:3px 10px;white-space:nowrap}
 .item-hd .units-chip .material-icons-outlined{font-size:13px}
-.item-hd .units-chip.multi{background:var(--action);border-color:transparent;color:#fff}
+/* Multi-unit: still subtle/light-grey (not bright orange) — just a touch more visible than single. */
+.item-hd .units-chip.multi{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.26);color:rgba(255,255,255,.88)}
 .item-hd .ibadge{margin-inline-start:auto;flex:0 0 auto;font-size:10.5px;font-weight:800;color:rgba(255,255,255,.85);background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:var(--r-full);padding:4px 11px;white-space:nowrap}
 .tmtx-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-md)}
 .tmtx{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed}

@@ -149,28 +149,35 @@ function computeCashUpfront(bid: BidCard, rental: Money, mob: Money): Money {
 
 /** The five cost-responsibility alignments, from the bid's request-terms vs the request assignment. */
 function buildCostResponsibilities(bid: BidCard, requestSides: Partial<Record<CostResponsibility["key"], "supplier" | "me">>): CostResponsibility[] {
-  const rt = bid.requestTerms;
-  const isLink = bid.viaSharedLink;
-  // For a shared-link bid, translate the supplier's Yes/No confirmation (a term-row state) into a side
-  // relative to what the request asked: agreed → same side as the request; declined → the OTHER side
-  // (which makes state "red" below, so the conflict surfaces in the cost-terms row — T9).
-  const linkSide = (contractKey: string, requestSide: "supplier" | "me" | null): "supplier" | "me" | null => {
+  // Drive every cost side from the NEGOTIABLE-TERM truth (in-app AND link), so a term the supplier
+  // deviates on reads red and one they accept reads green — instead of grey. We read the term state
+  // across all term sources (contract / equipment / negotiable) and translate it relative to what the
+  // request asked: agreed → same side as the request; conflict → the OTHER side (→ state "red" below);
+  // grey/negotiating/absent → not derivable (null).
+  const termState = (keys: string[]): string | undefined => {
+    const all = [...bid.terms.contract, ...bid.terms.equipment, ...(bid.negotiableTerms ?? [])];
+    return all.find((t) => keys.includes(t.key))?.state;
+  };
+  const sideFromTerm = (keys: string[], requestSide: "supplier" | "me" | null): "supplier" | "me" | null => {
     if (!requestSide) return null;
-    const st = bid.terms.contract.find((t) => t.key === contractKey)?.state;
+    const st = termState(keys);
     if (st === "matched" || st === "agreed") return requestSide;
     if (st === "conflict") return requestSide === "supplier" ? "me" : "supplier";
     return null;
   };
-  // Where derivable from BidCard; otherwise null (not provided — no fabrication).
+  // Maintenance request side: prefer the request-level assignment (opts), else the bid's own requestTerms.
+  const rtMaint = bid.requestTerms.maintenanceResponsibility
+    ? (/(supplier|مؤجّر)/i.test(bid.requestTerms.maintenanceResponsibility) ? "supplier" : "me")
+    : null;
+  const maintReqSide = (requestSides.maintenance ?? rtMaint) as "supplier" | "me" | null;
   const bidSides: Record<CostResponsibility["key"], "supplier" | "me" | null> = {
-    fuel: isLink ? linkSide("fuel_responsibility", requestSides.fuel ?? null) : null, // in-app: not on the card today
-    // Link form never asks maintenance → mirror the request's assignment (T5); in-app uses the declared value.
-    maintenance: isLink
-      ? (requestSides.maintenance ?? null)
-      : rt.maintenanceResponsibility ? (/(supplier|مؤجّر)/i.test(rt.maintenanceResponsibility) ? "supplier" : "me") : null,
+    fuel: sideFromTerm(["fuel_responsibility"], requestSides.fuel ?? null),
+    // Maintenance is an acknowledge term (accepted by bidding) → mirror the request's assignment.
+    maintenance: sideFromTerm(["maintenance_responsibility", "maintenance"], maintReqSide) ?? maintReqSide,
     overtime: null,
-    operator_food: isLink ? linkSide("fat_food", requestSides.operator_food ?? null) : null,
-    operator_transport_accommodation: isLink ? linkSide("fat_transport", requestSides.operator_transport_accommodation ?? null) : null,
+    operator_food: sideFromTerm(["fat_food"], requestSides.operator_food ?? null),
+    // in-app uses `fat_accommodation_transport`, link uses `fat_transport` — accept either spelling.
+    operator_transport_accommodation: sideFromTerm(["fat_accommodation_transport", "fat_transport"], requestSides.operator_transport_accommodation ?? null),
   };
   const meta: { key: CostResponsibility["key"]; en: string; ar: string }[] = [
     { key: "fuel", en: "Fuel", ar: "الوقود" },

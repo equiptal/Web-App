@@ -99,9 +99,9 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
     { key: "inbox", icon: "inbox", label: t.shell.inbox, href: "/inbox", gated: true },
     { key: "profile", icon: "person", label: t.shell.profile, href: "/profile", gated: true },
   ];
-  // While the session is still loading, keep the full nav (avoids a flash of the guest nav for a
-  // returning signed-in renter). Once resolved, guests see only the public items.
-  const navItems = status === "anon" ? allNav.filter((it) => !it.gated) : allNav;
+  // All tabs are visible to everyone (guests included) — each account-bound tab renders a guest
+  // empty-state + CTA rather than being hidden, so the site feels open and there are no dead ends.
+  const navItems = allNav;
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
   const initials = (name.trim() ? name.trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("") : "").toUpperCase();
   const greeting = `${t.shell.welcome}${name ? `, ${name}` : ""}`;
@@ -262,7 +262,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
         {/* One consistent page container across the app (T1/T2): My Requests' 1440px width + a slightly
             larger horizontal gutter so content isn't flush to the sidebar / page edge. `wide` stays
             uncapped (My Requests caps itself at 1440 via .rproto). */}
-        <main className={fullBleed ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" : `mx-auto w-full px-5 py-6 pb-24 sm:px-8 sm:pt-7 md:py-7 ${wide ? "max-w-none" : "max-w-[1440px]"}`}>{children}</main>
+        <main className={fullBleed ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" : `mx-auto w-full px-6 py-6 pb-24 sm:px-10 sm:pt-7 md:py-7 lg:px-12 ${wide ? "max-w-none" : "max-w-[1440px]"}`}>{children}</main>
       </div>
 
       {/* Mobile bottom nav — the navy sidebar is desktop-only, so phones navigate from here. */}

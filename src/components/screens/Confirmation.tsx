@@ -87,7 +87,9 @@ export function Confirmation() {
     if (!shareUrl) return;
     navigator.clipboard?.writeText(shareUrl).then(() => { setCopied(true); flash(L("Link copied to clipboard", "تم نسخ الرابط")); setTimeout(() => setCopied(false), 2000); }).catch(() => {});
   };
-  const onView = () => router.push(reqUuid ? `/requests/${encodeURIComponent(reqUuid)}` : "/requests");
+  // Land on the multi-item GROUP detail (resolves the whole group from this member request id) so the
+  // post-submit view matches the request-details screen — not the single-request page.
+  const onView = () => router.push(reqUuid ? `/requests/group/${encodeURIComponent(reqUuid)}` : "/requests");
 
   return (
     <div className="rlive" dir={ar ? "rtl" : "ltr"}>

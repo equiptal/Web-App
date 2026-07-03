@@ -19,7 +19,13 @@ const STATE: Record<TermState, Tone> = {
 };
 
 type Bucket = "conflict" | "pending" | "matched";
-const bucketOf = (s: TermState): Bucket => (s === "conflict" ? "conflict" : s === "matched" || s === "agreed" ? "matched" : "pending");
+// App parity (T18): only an active deal-room counter is "pending review". `grey` = not-applicable
+// (no requirement) and is EXCLUDED, so it never inflates the pending count.
+const bucketOf = (s: TermState): Bucket | null => (s === "conflict" ? "conflict" : s === "matched" || s === "agreed" ? "matched" : s === "negotiating" ? "pending" : null);
+
+// Vague/lumped rows that a SPECIFIC term supersedes (in-app bids carry both) — drop the vague one when
+// its specific counterpart is present. Link bids have no specific counterpart, so their real row stays.
+const SUPERSEDED_BY: Record<string, string> = { certs: "safety_certifications", operator: "operator_included" };
 
 export function BidTermsModal({
   supplier,
@@ -30,6 +36,8 @@ export function BidTermsModal({
   onNegotiate,
   negotiateLabel,
   onClose,
+  hidePending,
+  negotiable,
 }: {
   supplier: string;
   terms: { equipment: TermRow[]; contract: TermRow[]; supplier: TermRow[] };
@@ -39,15 +47,31 @@ export function BidTermsModal({
   onNegotiate: () => void;
   negotiateLabel?: string;
   onClose: () => void;
+  /** Off-platform (shared-link) bids have no deal room → no "Pending review" state; hide that tab. */
+  hidePending?: boolean;
+  /** The comparison's specific negotiable terms (safety cert, operator cert, FAT, fuel resp, …) — the
+   *  app-accurate rows. When present they replace the vague equipment "certs"/"operator" lumped rows. */
+  negotiable?: TermRow[];
 }) {
-  // Flatten every term the bid touches and bucket by state (app's 3-way split).
-  const allRows = [...terms.equipment, ...terms.contract, ...terms.supplier];
+  // Merge every term source, prefer the SPECIFIC negotiable rows, de-dup by key, drop superseded vague
+  // rows and n/a (grey) rows — so a conflict names the exact term (e.g. "Equipment safety certificate")
+  // and "Pending review" reflects only real un-converged (negotiating) terms (T18, mobile-app parity).
+  const merged = [...(negotiable ?? []), ...terms.equipment, ...terms.contract, ...terms.supplier];
+  const keys = new Set(merged.map((r) => r.key));
+  const seen = new Set<string>();
+  const allRows = merged.filter((r) => {
+    if (seen.has(r.key)) return false;
+    seen.add(r.key);
+    const sup = SUPERSEDED_BY[r.key];
+    return !(sup && keys.has(sup)); // drop the vague row when its specific counterpart exists
+  });
   const byBucket: Record<Bucket, TermRow[]> = { conflict: [], pending: [], matched: [] };
-  for (const r of allRows) byBucket[bucketOf(r.state)].push(r);
+  for (const r of allRows) { const b = bucketOf(r.state); if (b) byBucket[b].push(r); }
 
   const tabs: { key: Bucket; label: string; c: string; bg: string }[] = [
     { key: "conflict", label: L("Conflict", "تعارض"), c: "#d9362a", bg: "#fdecea" },
-    { key: "pending", label: L("Pending review", "بانتظار المراجعة"), c: "#d4780a", bg: "#fff3e0" },
+    // Hidden for off-platform bids — no deal room means terms are answered Yes/No, never "pending review".
+    ...(hidePending ? [] : [{ key: "pending" as Bucket, label: L("Pending review", "بانتظار المراجعة"), c: "#d4780a", bg: "#fff3e0" }]),
     { key: "matched", label: L("Matched", "مطابق"), c: "#1daf58", bg: "#e7f7ee" },
   ];
   // Open on the first tab that has something (Conflict → Pending → Matched), else Matched.

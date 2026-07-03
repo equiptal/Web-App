@@ -37,9 +37,18 @@ export function RequestGroupDetail({ groupId, onTitle }: { groupId: string; onTi
     let active = true;
     (async () => {
       try {
-        const { requests } = await fetchRequestGroup(groupId);
-        // Historical/solo fallback: a request with no requestGroupId yields an empty group filter —
-        // in that case treat the param as a single request id.
+        let { requests } = await fetchRequestGroup(groupId);
+        // The param may be a MEMBER request id (e.g. the post-submit redirect uses a request UUID),
+        // not the group id. If the group filter is empty, fetch that request, read its requestGroupId,
+        // and resolve the whole group from it — so we render every item, not just one.
+        if (!requests.length) {
+          const one = await fetchRequestDetail(groupId);
+          const gid = (one as { requestGroupId?: string | null }).requestGroupId ?? null;
+          if (gid && gid !== groupId) {
+            const grp = await fetchRequestGroup(gid);
+            if (grp.requests.length) requests = grp.requests;
+          }
+        }
         const ids = requests.length ? requests.map((r) => r.id) : [groupId];
         const recs = await Promise.all(ids.map((id) => fetchRequestDetail(id)));
         if (active) setRecords(recs);

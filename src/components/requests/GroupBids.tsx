@@ -799,10 +799,6 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           { label: L("Pending review", "بانتظار المراجعة"), n: termTally.pending, c: "#d4780a" },
           { label: L("Matched", "مطابق"), n: termTally.matched, c: "#1daf58" },
         ];
-        const certChips = [
-          ...(b.equipmentCertCodes ?? []).map((c) => (ar ? CERT_LABEL[c]?.ar : CERT_LABEL[c]?.en) || c),
-          ...(b.ownershipDocs ?? []).map((o) => (ar ? o.labelAr : o.labelEn)),
-        ].slice(0, 3);
         const rowSep = { borderTop: "1px solid #EFF2F6" } as const;
         const iconBox = { width: 40, height: 40, borderRadius: 11, background: "#eff4f9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } as const;
         const blueLink = { background: "none", border: "none", color: "#1a7ec8", fontWeight: 800, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" } as const;
@@ -866,11 +862,8 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                 <EquipImg src={b.itemImage} categoryId={b.categoryId} name={ar ? b.itemLabelAr : b.itemLabel} box="" img="h-5 w-5 object-contain" iconSize={20} />
               </div>
               <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Equipment", "المعدة")}</span>
-              <div style={{ display: "flex", gap: 4, flexWrap: "nowrap", flex: 1, minWidth: 0, overflowX: "auto" }} className="no-sb">
-                {certChips.map((c, i) => (
-                  <span key={i} style={{ fontSize: 11, fontWeight: 800, color: "#1daf58", background: "#e7f7ee", padding: "2px 9px", borderRadius: 20, whiteSpace: "nowrap" }}>✓ {c}</span>
-                ))}
-              </div>
+              {/* No cert chips on the card — all equipment detail lives in the Details modal only. */}
+              <div style={{ flex: 1 }} />
               {!selectMode && (
                 <button onClick={() => setEquipBid(b)} style={blueLink}>{L("Details", "التفاصيل")} ›</button>
               )}
@@ -1020,6 +1013,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         <BidTermsModal
           supplier={termsBid.supplierName}
           terms={termsBid.terms}
+          negotiable={termsBid.negotiableTerms}
           ar={ar}
           L={L}
           busy={busyId === termsBid.id}

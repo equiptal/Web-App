@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import type { BidCard } from "@/lib/contract/bids";
-import { CERT_LABEL } from "@/lib/contract/bids";
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { EquipImg } from "@/components/requests/EquipImg";
@@ -105,20 +104,6 @@ export function SharedLinkBidCard({
     { label: L("Pending review", "بانتظار المراجعة"), n: termTally.pending, c: "#d4780a" },
     { label: L("Matched", "مطابق"), n: termTally.matched, c: "#1daf58" },
   ];
-  const certChips = (bid.equipmentCertCodes ?? []).map((c) => (ar ? CERT_LABEL[c]?.ar : CERT_LABEL[c]?.en) || c).slice(0, 2);
-  // Equipment-related terms the supplier answered (minimum year, equipment certificate) rendered as
-  // ✓/✗ value chips — so an equipment term the renter asked (e.g. a year the supplier confirmed) is
-  // visible here even when no certificates were requested. Previously only cert chips showed, leaving
-  // the row blank on year-only requests.
-  const eqChips = (bid.terms.equipment ?? []).map((r) => {
-    const label =
-      r.key === "year"
-        ? bid.reqMinYear ? String(bid.reqMinYear) : L("Year", "سنة الصنع")
-        : r.key === "certs"
-          ? (certChips.length ? certChips.join(" · ") : L("Equipment cert", "شهادة المعدة"))
-          : (ar ? r.labelAr : r.labelEn);
-    return { key: r.key, label, state: r.state };
-  });
 
   const rowSep = { borderTop: "1px solid #EFF2F6" } as const;
   const iconBox = { width: 40, height: 40, borderRadius: 11, background: "#eff4f9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } as const;
@@ -190,24 +175,8 @@ export function SharedLinkBidCard({
           <EquipImg src={itemImage ?? null} categoryId={categoryId ?? null} name={title} box="" img="h-5 w-5 object-contain" iconSize={20} />
         </div>
         <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Equipment", "المعدة")}</span>
-        <div style={{ display: "flex", gap: 4, flexWrap: "nowrap", flex: 1, minWidth: 0, overflowX: "auto" }} className="no-sb">
-          {eqChips.length === 0 ? (
-            <span style={{ fontSize: 12, color: "#9AA7B8", fontWeight: 700 }}>{L("No equipment terms requested", "لا شروط خاصة بالمعدة")}</span>
-          ) : (
-            eqChips.map((c, i) => {
-              const matched = c.state === "matched";
-              const conflict = c.state === "conflict";
-              const col = matched ? "#1daf58" : conflict ? "#d9362a" : "#6b8fa8";
-              const bg = matched ? "#e7f7ee" : conflict ? "#fcebea" : "#eef2f6";
-              const mark = matched ? "✓ " : conflict ? "✕ " : "";
-              return (
-                <span key={i} style={{ fontSize: 11, fontWeight: 800, color: col, background: bg, padding: "2px 9px", borderRadius: 20, whiteSpace: "nowrap" }}>{mark}{c.label}</span>
-              );
-            })
-          )}
-        </div>
-        {/* Details opens the equipment modal (year/cert + the self-declared note now live there, like the
-            in-app card) — replaces the old inline warning icon. */}
+        {/* No cert/term chips on the card — all equipment detail lives in the Details modal only. */}
+        <div style={{ flex: 1 }} />
         {!picking && <button onClick={() => setEquipOpen(true)} style={blueLink}>{L("Details", "التفاصيل")} ›</button>}
       </div>
 
@@ -284,9 +253,11 @@ export function SharedLinkBidCard({
         <BidTermsModal
           supplier={bid.supplierName}
           terms={bid.terms}
+          negotiable={bid.negotiableTerms}
           ar={ar}
           L={L}
           busy={false}
+          hidePending  /* off-platform: no deal room → no "Pending review" state */
           negotiateLabel={L("View bid submission", "عرض العرض المُقدَّم")}
           onNegotiate={() => { setTermsOpen(false); onViewSubmission(); }}
           onClose={() => setTermsOpen(false)}
@@ -296,6 +267,7 @@ export function SharedLinkBidCard({
         <BidEquipmentModal
           bid={bid}
           busy={false}
+          itemLabel={title}
           onRequestDetails={() => { setEquipOpen(false); onViewSubmission(); }}
           onClose={() => setEquipOpen(false)}
         />

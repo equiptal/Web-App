@@ -189,3 +189,24 @@ There are **three distinct ways a request becomes decided**, each with a differe
 5. **Phase 5 (colour+source):** T11 → T12 → T13 → T14 (shared colour rule first, then per‑row sources).
 6. **Phase 6 (live data):** T15 (real‑time terms) + T16 (price sync — agreed‑by‑both).
 7. **Phase 7 (decided state):** T17 — the three decided cases (A deal‑room accepted · B UI‑only award · C survey), shared "mark‑winner + closed banner" treatment (losers unchanged).
+
+---
+
+# Batch 3 — quick polish + terms accuracy
+
+**Done (shipped alongside):** unit pill → subtle grey (bid form); request‑group tabs ordered by **date (latest first)**; post‑submit redirect → **group** detail (`RequestGroupDetail` resolves the group from a member request id); bid **cards show no equipment chips** (in‑app + link) — all detail in the Details modal; link equipment modal title uses the item name (was "—"); link terms modal **hides the "Pending review" tab** (no deal room); page **gutter increased** a bit more (px‑6 / sm:px‑10 / lg:px‑12).
+
+## T18 — Terms modal accuracy = mobile‑app parity (in‑app bids)
+**Scope:** Contract (`bids.ts` `buildBidTerms`), Web UI (`BidTermsModal`, callers). **Reference:** `apps/mobile/.../terms_modal.dart`.
+The in‑app terms modal shows a vague lumped **"Certificates"** conflict and an inflated **"Pending review"** count, because the modal only receives `terms.{equipment,contract,supplier}` — **not** `negotiableTerms`, where the specific rows live (`safety_certifications` = "Equipment safety certificates", `operator_certification` = "Operator certification"). Placeholder always‑grey rows (measurement, attachments, mob/demob pricing) also inflate "pending".
+- **AC1:** The modal shows the **specific** cert/operator terms (Equipment safety certificate, Operator certificate) — a conflict names exactly which term, matching the app.
+- **AC2:** "Pending review" reflects **real un‑converged requirements** (renter asked, not yet agreed) — the app's `pending` semantics — not always‑grey placeholders; drop placeholder/no‑requirement rows.
+- **AC3:** Do NOT break **link** bids — for link submissions, `"certs"` IS the real equipment cert row (not lumped); only in‑app conflates it. Handle both term models.
+- **AC4:** Match the app's state rule: a contract/declaration row is `matched` only when both sides converged; a set‑but‑un‑negotiated requirement is `pending`, not matched.
+- **Given** an in‑app bid conflicts on the equipment safety cert **when** I open Terms → Conflict **then** it lists "Equipment safety certificate", not a vague "Certificates".
+
+## T19 — ⚠ RFQ group code on new/submission‑less requests
+**Scope:** Web UI (`RequestsList` already prefers `groupRef ?? displayId`); **⚠ Backend** likely.
+A freshly created request's tab shows the per‑request **`REQ-`** code, not the **`RFQ-`** group code, because the group code is only surfaced via `getRequestSubmissions` (which needs an off‑platform submission). The comparison shows `RFQ-` only when the group already has submissions.
+- **AC1:** The requests page tab shows the **`RFQ-` group code** for a request even before any off‑platform submission.
+- **AC2:** Needs the backend to expose the group code (RFQ‑NNNNN) on `my-requests` (per group) or `getRequestSubmissions` **top‑level, regardless of submissions** — the web already renders `groupRef` when present, so it's a data/`⚠ Backend` gap. Raise via `/web:link-backend`.

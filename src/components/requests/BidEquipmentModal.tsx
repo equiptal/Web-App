@@ -28,11 +28,14 @@ export function BidEquipmentModal({
   busy,
   onRequestDetails,
   onClose,
+  itemLabel,
 }: {
   bid: BidCard;
   busy: boolean;
   onRequestDetails: () => void;
   onClose: () => void;
+  /** Fallback title when the bid has no equipment record (off-platform link bids) — the request item name. */
+  itemLabel?: string | null;
 }) {
   const { locale } = useLocale();
   const ar = locale === "ar";
@@ -69,7 +72,7 @@ export function BidEquipmentModal({
     ...eqCerts.map((c) => (ar ? CERT_LABEL[c]?.ar : CERT_LABEL[c]?.en) || c),
     ...ownership.map((o) => (ar ? o.labelAr : o.labelEn)),
   ];
-  const title = (ar ? eq?.categoryAr : eq?.category) || [bid.equipment?.make, bid.equipment?.model].filter(Boolean).join(" ") || "—";
+  const title = (ar ? eq?.categoryAr : eq?.category) || [bid.equipment?.make, bid.equipment?.model].filter(Boolean).join(" ") || itemLabel || "—";
   const subtitle = eq ? [eq.manufacturer, eq.modelName, eq.year != null ? String(eq.year) : null].filter(Boolean).join(" · ") : "";
   const measurement = eq ? (ar ? eq.measurementAr : eq.measurement) : null;
   const fuel = eq?.fuel ?? null;

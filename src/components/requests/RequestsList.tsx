@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchMyRequests, fetchRequestSubmissions, fetchBids, bidShareUrl, setBidDeadline, setShareLinkLogo } from "@/lib/api/client";
-import { groupRequests, pinAirportFirst, cappedFilled, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
+import { groupRequests, cappedFilled, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
 import { GroupBids } from "@/components/requests/GroupBids";
 import { useHeaderBack } from "@/components/AppShell";
 import { ShareForBidsSheet } from "@/components/requests/ShareForBidsSheet";
@@ -110,7 +110,12 @@ export function RequestsList() {
   }, [items]);
 
   // Cluster the fanned-out requests into submission groups (Airport project pinned first).
-  const groups = pinAirportFirst(groupRequests(items ?? []));
+  // Order request-group tabs by date, latest first (newest request appears first).
+  const groups = [...groupRequests(items ?? [])].sort((a, b) => {
+    const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return tb - ta;
+  });
   const linkCountOf = (g: RequestGroup) => linkBids[g.id] ?? 0;
   // Show a group in My Bids if it received an on-platform bid OR an off-platform shared-link bid.
   const bidGroups = groups.filter((g) => g.totalBids > 0 || linkCountOf(g) > 0);
