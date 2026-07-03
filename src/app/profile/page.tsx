@@ -6,6 +6,7 @@ import { AppShell } from "@/components/AppShell";
 import { useT, useLocale } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
+import { SignInPrompt } from "@/components/common/SignInPrompt";
 
 interface MeProfile {
   firstName: string | null;
@@ -26,7 +27,7 @@ export default function ProfilePage() {
   const ar = locale === "ar";
   const L = (e: string, a: string) => (ar ? a : e);
   const router = useRouter();
-  const { user, tier } = useSession();
+  const { user, tier, status } = useSession();
 
   const [profile, setProfile] = useState<MeProfile | null>(null);
   const [companyName, setCompanyName] = useState("");
@@ -76,6 +77,20 @@ export default function ProfilePage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  if (status === "anon") {
+    return (
+      <AppShell title={t.shell.profile}>
+        <div className="mx-auto max-w-xl">
+          <SignInPrompt
+            icon="person"
+            title={L("Sign in to view your profile", "سجّل الدخول لعرض ملفك")}
+            body={L("Your account details and verification live here once you sign in.", "تظهر تفاصيل حسابك وتوثيقك هنا بعد تسجيل الدخول.")}
+          />
+        </div>
+      </AppShell>
+    );
   }
 
   return (

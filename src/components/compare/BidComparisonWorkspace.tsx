@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
-import { SignInPrompt } from "@/components/common/SignInPrompt";
+import { GuestQuickCompare } from "@/components/compare/GuestQuickCompare";
 import { fetchMyRequests, fetchBids, fetchRequestSubmissions, startDealRoom, recommendBids, askBids, parseBid, captureBidEvents, fetchDealRoomDocuments, fetchBidDocuments } from "@/lib/api/client";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { groupRequests, type RequestGroup } from "@/lib/contract/requests";
@@ -703,13 +703,8 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
     w.document.close();
   }
 
-  if (anon)
-    return (
-      <SignInPrompt
-        title={L("Sign in to compare bids", "سجّل الدخول لمقارنة العروض")}
-        body={L("Comparison shows bids on your own requests. Sign in to see your requests and their bids.", "تعرض المقارنة العروض على طلباتك. سجّل الدخول لعرض طلباتك وعروضها.")}
-      />
-    );
+  // Signed-out visitors get the request-free quick-compare (upload quotes → compare → AI rank/ask).
+  if (anon) return <GuestQuickCompare />;
   if (error) return <Box>{L("Couldn’t load your requests.", "تعذّر تحميل طلباتك.")}</Box>;
   if (!groups) return <Spinner />;
   if (!locations.length) return <Box>{L("No requests to compare yet.", "لا توجد طلبات للمقارنة بعد.")}</Box>;

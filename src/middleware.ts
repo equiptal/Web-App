@@ -19,9 +19,11 @@ import type { NextRequest } from "next/server";
 const REFRESH_COOKIE = "mt_refresh";
 const ID_COOKIE = "mt_id";
 
-// Personal, account-bound areas that still require a session. Everything else is public.
-// Matched as exact path or `<prefix>/…`. Keep in sync as new account-only areas are added.
-const GATED_PREFIXES = ["/profile", "/requests", "/deal-room", "/inbox", "/dashboard"];
+// Routes that still hard-require a session at the edge. The nav *tabs* (Requests / Inbox / Profile /
+// Compare) are NOT gated — they load for everyone and render a guest empty-state + CTA in-app, so the
+// site feels open. Only resource-specific routes that make no sense without an account stay gated:
+// a specific deal room (reached via a bid/award) and the demo dashboard.
+const GATED_PREFIXES = ["/deal-room", "/dashboard"];
 
 function safeNext(next: string | null): string {
   // Only allow same-origin relative paths (block protocol-relative `//host`).

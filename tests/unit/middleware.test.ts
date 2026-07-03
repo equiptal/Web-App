@@ -15,28 +15,28 @@ describe("public-by-default gating middleware", () => {
     expect(isNext(res)).toBe(true);
   });
 
-  it("unauthenticated → public browse pages (/create, /stores, /compare) pass through", () => {
-    for (const p of ["/create", "/stores/42", "/compare"]) {
+  it("unauthenticated → public tabs (/create, /stores, /compare, /requests, /inbox, /profile) pass through", () => {
+    for (const p of ["/create", "/stores/42", "/compare", "/requests", "/requests/123", "/inbox", "/profile"]) {
       expect(isNext(middleware(req(p)))).toBe(true);
     }
   });
 
-  it("unauthenticated → gated page redirects to /login?next=<path>", () => {
-    const res = middleware(req("/profile"));
+  it("unauthenticated → gated page (/deal-room/x) redirects to /login?next=<path>", () => {
+    const res = middleware(req("/deal-room/abc"));
     const loc = res.headers.get("location") ?? "";
     expect(res.status).toBeGreaterThanOrEqual(300);
     expect(loc).toContain("/login");
-    expect(loc).toContain(`next=${encodeURIComponent("/profile")}`);
+    expect(loc).toContain(`next=${encodeURIComponent("/deal-room/abc")}`);
   });
 
-  it("unauthenticated → nested gated page (/requests/123) redirects to /login", () => {
-    const res = middleware(req("/requests/123"));
+  it("unauthenticated → demo dashboard redirects to /login", () => {
+    const res = middleware(req("/dashboard"));
     expect(res.status).toBeGreaterThanOrEqual(300);
     expect(res.headers.get("location") ?? "").toContain("/login");
   });
 
   it("authenticated → gated page passes through", () => {
-    const res = middleware(req("/profile", AUTHED));
+    const res = middleware(req("/deal-room/abc", AUTHED));
     expect(isNext(res)).toBe(true);
   });
 

@@ -104,6 +104,38 @@ method. Change needed:
   **Then** the response is identical to before (regression guard).
 - **Note:** cannot ship from the web repo. `/web:link-backend "email OTP delivery"` opens the backend PR.
 
+## T8 — Tabs visible to guests with empty-state + CTA  [DONE]
+**Scope:** Web UI. **Satisfies:** "why can't I view other tabs" — keep tabs, show empty+CTA.
+
+Middleware `GATED_PREFIXES` reduced to `["/deal-room","/dashboard"]` (tabs no longer gated); AppShell
+shows **all** nav to guests; page-level guards render a guest empty-state (`SignInPrompt`, now with a
+configurable CTA/icon) on Requests (→ "Create request"), Inbox + Profile (→ "Sign in"). Middleware
+tests updated. `tsc`/`eslint`/201 tests green.
+
+## T9 — Guest bid-comparison mode (upload → compare → agent, no request/account)  [DONE]
+**Scope:** Web UI. **Satisfies:** "can they upload/compare/use agent without requests or bids".
+
+Feasible web-only: `/api/me/bids/{parse,recommend,ask}` use `relayToMansour` (NO auth). Add a
+"no-request context" mode to `BidComparisonWorkspace`: a guest can upload supplier quotes, compare
+them side-by-side, and use the agent (rank/ask) with no request and no account. Replaces the current
+anon `SignInPrompt` on `/compare`. Account still required only to **start a deal room / award**.
+
+- **Given** a signed-out visitor on `/compare`, **When** they upload ≥2 quotes, **Then** they compare
+  + can rank/ask the agent, no sign-in.
+- **Given** they try to start a deal / award, **Then** the account gate (combined modal) fires.
+
+## T10 — Per-device soft limit on both agents before account  [DONE]
+**Scope:** Web UI. **Satisfies:** "limit per user to use the request agent before creating a request".
+
+A guest has no identity, so enforce a **per-device** counter (localStorage) on both the RFQ create
+agent (`/api/agent/process`) and the compare agent (parse/recommend/ask). After N free runs (default
+3), show an account prompt instead of running. Signed-in users are unlimited. Soft (bypassable by
+clearing storage) — a nudge, not hard enforcement; a hard per-IP cap would need a Mansour change.
+
+- **Given** a guest who has run an agent N times, **When** they trigger it again, **Then** the account
+  gate is shown instead of a run.
+- **Given** a signed-in user, **When** they use an agent, **Then** no limit applies.
+
 ## T7 — ⚠ Backend (Moedatech-App): public read-only supplier/store browse  [IN SCOPE — guarded, bundle with T5]
 **Scope:** Backend-dependency (2nd shared change) + web wiring. **Satisfies:** "web open for everyone to browse/see". **Bundle:** one guarded backend pass with T5.
 

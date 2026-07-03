@@ -3,7 +3,10 @@
 import { useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
+import { useSession } from "@/lib/session";
 import { Button, Card, TextArea, Icon } from "@/components/ui";
+import { AccountModal } from "@/components/onboarding/AccountModal";
+import { bumpAgentUse, guestLimitReached } from "@/lib/access/agent-quota";
 
 /** Accepted file types (AC-05/07): PDF, image, Word, Excel. No size/count/length limit (AC-08). */
 const ACCEPT_ATTR =
@@ -35,8 +38,21 @@ const FILE_CHIPS = ["PDF", "Word", "Excel", "Image"];
 export function Intake() {
   const t = useT();
   const { state, actions } = useRfq();
+  const { status } = useSession();
   const [rejected, setRejected] = useState(false);
+  const [showAccount, setShowAccount] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  // Per-device soft limit (T10): a guest gets a few free agent runs, then we prompt them to create an
+  // account instead of running again. Signed-in users are never limited.
+  const runAgent = () => {
+    if (status === "anon" && guestLimitReached("create")) {
+      setShowAccount(true);
+      return;
+    }
+    if (status === "anon") bumpAgentUse("create");
+    void actions.process();
+  };
 
   const canStart = state.text.trim().length > 0 || state.files.length > 0;
   // A draft exists when the renter came back here from a wizard step ("Your request") — show
@@ -164,13 +180,16 @@ export function Intake() {
           )}
           <div className="flex items-center gap-3">
             {hasDraft && <span className="hidden text-[12px] text-muted sm:inline">{t.intake.editReparseNote}</span>}
-            <Button disabled={!canStart} onClick={() => actions.process()} className="px-6 py-3 text-[14px]">
+            <Button disabled={!canStart} onClick={runAgent} className="px-6 py-3 text-[14px]">
               {hasDraft ? t.intake.reAnalyze : t.intake.startProcessing}{" "}
               <Icon name="arrow_forward" size={18} className="rtl:scale-x-[-1]" />
             </Button>
           </div>
         </div>
       </Card>
+
+      {/* Guest hit the free agent-run limit → create an account, then continue processing. */}
+      <AccountModal open={showAccount} onClose={() => setShowAccount(false)} onCreated={() => { setShowAccount(false); void actions.process(); }} />
     </div>
   );
 }
