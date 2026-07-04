@@ -80,7 +80,7 @@ export function BidComparisonWorkspace() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [preset, setPreset] = useState<Preset>("best");
   const [period, setPeriod] = useState<RatePeriod>("PER_DAY"); // RATE PERIOD toggle (Day/Week/Month) — display + totals
-  const [pricesFor, setPricesFor] = useState<PricesFor>("all"); // PRICES FOR toggle (per-unit / all-units)
+  const [pricesFor, setPricesFor] = useState<PricesFor>("unit"); // PRICES FOR toggle — default PER UNIT
   const [busy, setBusy] = useState(false);
   const [renterCosts, setRenterCosts] = useState<Partial<Record<CostResponsibility["key"], number>>>({});
   // Mansour judgement layer (live when connected; deterministic fallback otherwise).
@@ -464,9 +464,10 @@ export function BidComparisonWorkspace() {
   // §6 per-row winners — single leader only (ties unhighlighted), shown as a "✓ BEST" tag on the cell.
   const hasDuration = durationDays != null && durationDays > 0; // request has a start+end → show the duration-based rental row
   const rentalWin = rowWinners(cols.map((c) => (c.bid.price != null ? dq(c).rentalForPeriod : null)), "min");
-  const durationWin = rowWinners(cols.map((c) => dq(c).durationRental), "min");
-  const mobWin = rowWinners(cols.map((c) => (c.mob.stated ? c.mob.value : null)), "min"); // cheapest delivery
-  const demobWin = rowWinners(cols.map((c) => (c.demob.stated ? c.demob.value : null)), "min"); // cheapest return
+  // Cheapest by the SUPPLIER-borne mob+demob total (only the parts the supplier bears — parts on the
+  // renter are "on you", not priced). One combined winner for the single Mobilization + demob row.
+  const supBorneUnit = (c: BidColumn) => (mobByRentee !== true && c.mob.stated ? c.mob.value : 0) + (demobByRentee !== true && c.demob.stated ? c.demob.value : 0);
+  const mobWin = rowWinners(cols.map((c) => { const u = supBorneUnit(c); return u > 0 ? u : null; }), "min");
   const distanceWin = rowWinners(cols.map((c) => c.bid.distanceKm ?? null), "min");
   const yearWin = rowWinners(cols.map((c) => c.bid.equipment?.year ?? null), "max");
   // §6 rule: one equipment-cert row per REQUIRED cert (not required → not shown).
@@ -1086,70 +1087,62 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                                 {rentalWin.has(idx) && bestTag}
                               </span>
                               {unitsOf(c) > 1 && <Sub>{`(${nf(dq(c).ratePerPeriod)}/${per} × ${unitsOf(c)} ${L("units", "وحدة")})`}</Sub>}
+                              {/* Estimated rental for the whole duration — a smaller, coloured sub of the rental cost. */}
+                              {hasDuration && dq(c).durationRental != null && (
+                                <div className="mt-0.5 text-[11px] font-bold" style={{ color: C.rentee }}>
+                                  {L("Est. rental", "الإيجار التقديري")}: {sar} {nf(dq(c).durationRental!)}
+                                  <span style={{ fontWeight: 600, opacity: 0.85 }}> · {durationDays} {L("days", "يوم")}{unitsOf(c) > 1 ? ` × ${unitsOf(c)}` : ""}</span>
+                                </div>
+                              )}
                             </>)}
                           </Td>
                         );
                       })}
                     </tr>
-                    {/* ONE "Mobilization + demob" row showing BOTH sides — delivery and return can differ
-                        (e.g. delivery on the supplier, return on you), so each is a labeled value/state. */}
+                    {/* ONE "Mobilization + demob" row (original layout): one supplier-borne total headline +
+                        a breakdown below. Per part — on the renter → "on you", on the supplier → its price. */}
                     <tr>
                       <RowHead title={L("Mobilization + demob", "النقل + الإرجاع")} sub={L("delivery + return", "التوصيل + الإرجاع")} />
                       {cols.map((c, idx) => {
                         const rm = renterMob[c.bid.id];
-                        // Render one side's value/state (priced → your estimate → conflict → on you / not stated).
-                        const sideVal = (p: { stated: boolean; value: number }, by: boolean | null, win: Set<number>, showKm: boolean) => {
-                          const onRenter = by === true;
-                          const conflict = by === false && !p.stated;
-                          if (p.stated && !onRenter) return (
-                            <span className="inline-flex flex-wrap items-center gap-1">
-                              <span className="font-mono text-[13.5px] font-extrabold" style={{ color: C.navy }}>{sar} {nf(p.value)}{unitsOf(c) > 1 ? ` → ${sar} ${nf((p.value || 0) * unitsOf(c))}` : ""}</span>
-                              {showKm && c.bid.distanceKm != null && <span className="text-[10px] font-bold" style={{ color: C.navyMid }}>· {Math.round(c.bid.distanceKm)} {L("km", "كم")}</span>}
-                              {win.has(idx) && bestTag}
-                            </span>
-                          );
-                          if (onRenter && rm) return <span className="text-[12.5px] font-bold" style={{ color: C.rentee }}>{sar} {nf(rm)} · {L("your est.", "تقديرك")}</span>;
-                          if (conflict) return <span className="inline-flex items-center gap-0.5 text-[12px] font-bold" style={{ color: C.danger }}><span className="material-icons-outlined" style={{ fontSize: 12 }}>warning_amber</span>{L("not included", "غير مُدرج")}</span>;
-                          return <span className="text-[12px]" style={{ color: C.muted }}>{onRenter ? L("on you", "عليك") : L("not stated", "غير محدد")}</span>;
-                        };
-                        const anyConflict = (mobByRentee === false && !c.mob.stated) || (demobByRentee === false && !c.demob.stated);
+                        // Breakdown token per part: renter → "on you"; supplier + priced → SAR X; supplier + not priced → red "—".
+                        const token = (p: { stated: boolean; value: number }, by: boolean | null) =>
+                          by === true ? <span style={{ color: C.rentee, fontWeight: 700 }}>{L("on you", "عليك")}</span>
+                            : p.stated ? <span style={{ color: C.navy, fontWeight: 800 }}>{sar} {nf(p.value)}</span>
+                            : <span style={{ color: by === false ? C.danger : C.muted, fontWeight: 700 }}>—</span>;
+                        // Headline = the SUPPLIER-borne total (parts not on the renter). Parts on you aren't priced here.
+                        const supUnit = supBorneUnit(c);
+                        const supTotal = supUnit * unitsOf(c);
+                        const conflict = (mobByRentee === false && !c.mob.stated) || (demobByRentee === false && !c.demob.stated);
                         const anyOnRenter = mobByRentee === true || demobByRentee === true;
-                        const line = (label: string, node: React.ReactNode) => (
-                          <div className="flex items-baseline gap-1.5"><span className="text-[10px] font-extrabold uppercase tracking-wide" style={{ color: C.muted, flex: "0 0 52px" }}>{label}</span>{node}</div>
+                        const breakdown = (
+                          <Sub><span className="inline-flex flex-wrap items-center gap-1">{L("Delivery", "التوصيل")}: {token(c.mob, mobByRentee)} · {L("Return", "الإرجاع")}: {token(c.demob, demobByRentee)}{unitsOf(c) > 1 && supUnit > 0 ? ` · × ${unitsOf(c)} ${L("units", "وحدة")}` : ""}</span></Sub>
                         );
                         return (
-                          <Td key={c.bid.id} ok={!anyConflict} fail={anyConflict}>
-                            <div className="flex flex-col gap-1">
-                              {line(L("Delivery", "التوصيل"), sideVal(c.mob, mobByRentee, mobWin, true))}
-                              {line(L("Return", "الإرجاع"), sideVal(c.demob, demobByRentee, demobWin, false))}
-                              {anyOnRenter && (rm
-                                ? <span className="inline-flex items-center gap-1.5 text-[10.5px] font-bold" style={{ color: C.rentee }}><button onClick={() => addMobCost(c.bid.id, L("Delivery + return", "النقل والإرجاع"))} className="underline">{L("edit estimate", "تعديل التقدير")}</button><button onClick={() => removeMobCost(c.bid.id)} title={L("Remove", "إزالة")} className="grid h-4 w-4 place-items-center rounded-full" style={{ background: C.surface3, color: C.muted }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>close</span></button></span>
-                                : <button onClick={() => addMobCost(c.bid.id, L("Delivery + return", "النقل والإرجاع"))} className="inline-flex items-center gap-0.5 self-start rounded-full border px-1.5 py-0.5 text-[9.5px] font-extrabold" style={{ color: C.rentee, borderColor: "rgba(37,99,235,.4)", background: "#fff" }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>add</span>{L("add cost", "أضف تكلفة")}</button>)}
-                            </div>
-                          </Td>
-                        );
-                      })}
-                    </tr>
-                    {/* §6: Estimated rental — shown ONLY when the request has a duration (start + end) */}
-                    {hasDuration && (
-                    <tr>
-                      <RowHead title={L("Estimated rental", "الإيجار التقديري")} sub={L(`${durationDays}-day duration`, `مدة ${durationDays} يوم`)} />
-                      {cols.map((c, idx) => {
-                        const drv = dq(c).durationRental;
-                        return (
-                          <Td key={c.bid.id} ok={drv != null}>
-                            {drv != null ? (<>
+                          <Td key={c.bid.id} ok={!conflict} fail={conflict}>
+                            {supUnit > 0 ? (<>
                               <span className="inline-flex flex-wrap items-center gap-1.5">
-                                <span className="font-mono text-[15px] font-extrabold" style={{ color: C.navy, fontWeight: 900 }}>{sar} {nf(drv)}</span>
-                                {durationWin.has(idx) && bestTag}
+                                <span className="font-mono text-[15px] font-extrabold" style={{ color: C.navy, fontWeight: 900 }}>{sar} {nf(supUnit)}{unitsOf(c) > 1 ? ` → ${sar} ${nf(supTotal)}` : ""}</span>
+                                {c.bid.distanceKm != null && <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={{ background: C.surface2, color: C.navyMid }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>place</span>{Math.round(c.bid.distanceKm)} {L("km", "كم")}</span>}
+                                {mobWin.has(idx) && bestTag}
                               </span>
-                              <Sub>{`${nf(Math.round(drv / ((durationDays || 1) * unitsOf(c))))}/${L("day", "يوم")} × ${durationDays} ${L("days", "يوم")} × ${unitsOf(c)} ${unitsOf(c) > 1 ? L("units", "وحدة") : L("unit", "وحدة")}`}</Sub>
-                            </>) : <span style={{ color: C.muted }}>{L("not stated", "غير محدد")}</span>}
+                              {breakdown}
+                            </>) : rm ? (<>
+                              <span className="inline-flex items-center gap-1.5 text-[13px] font-bold">{sar} {nf(rm)}
+                                <button onClick={() => addMobCost(c.bid.id, L("Delivery + return", "النقل والإرجاع"))} className="text-[10px] font-bold underline" style={{ color: C.rentee }}>{L("edit", "تعديل")}</button>
+                                <button onClick={() => removeMobCost(c.bid.id)} title={L("Remove your estimate", "إزالة تقديرك")} className="grid h-4 w-4 place-items-center rounded-full" style={{ background: C.surface3, color: C.muted }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>close</span></button>
+                              </span>
+                              <Sub>{L("your estimate", "تقديرك")} · {L("Delivery", "التوصيل")}: {token(c.mob, mobByRentee)} · {L("Return", "الإرجاع")}: {token(c.demob, demobByRentee)}</Sub>
+                            </>) : conflict ? (
+                              <><span className="inline-flex items-center gap-1.5 text-[12px] font-bold" style={{ color: C.danger }}>{L("supplier didn't include it", "لم يُدرجه المؤجّر")}</span>{breakdown}</>
+                            ) : (
+                              <><span className="inline-flex items-center gap-1.5 text-[12px]" style={{ color: C.muted }}>{anyOnRenter ? L("on you", "عليك") : L("not stated", "غير محدد")}{anyOnRenter && <button onClick={() => addMobCost(c.bid.id, L("Delivery + return", "النقل والإرجاع"))} className="inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[9.5px] font-extrabold" style={{ color: C.rentee, borderColor: "rgba(37,99,235,.4)", background: "#fff" }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>add</span>{L("add cost", "أضف تكلفة")}</button>}</span>{breakdown}</>
+                            )}
                           </Td>
                         );
                       })}
                     </tr>
-                    )}
+                    {/* Estimated rental now lives as a sub of the Rental cost cell above (not its own row). */}
                     {requiredResp.length > 0 && (
                     <tr>
                       {/* §6: label cell carries ONE "Estimate your costs" popup button (not per-term add) */}
