@@ -78,6 +78,7 @@ describe("parseAddress", () => {
 const li = (p: Partial<RequestListItem>): RequestListItem => ({
   id: "x",
   requestGroupId: null,
+  groupRef: null,
   displayId: "REQ-1",
   type: "BROADCAST",
   status: "OPEN",

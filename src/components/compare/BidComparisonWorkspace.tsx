@@ -731,8 +731,9 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
       <div className="flex gap-2.5 overflow-x-auto pb-1.5">
         {locations.map((l) => {
           const on = l.key === loc?.key;
-          // Show the RFQ GROUP code as the primary (like My Requests: groupRef ?? the request displayId).
-          const code = groupRefById[l.groups[0]?.id ?? ""] ?? l.groups[0]?.items[0]?.displayId ?? "RFQ";
+          // Show the RFQ GROUP code as the primary — prefer my-requests' groupRef (T19), then the
+          // submissions-derived one, then the request displayId.
+          const code = l.groups[0]?.groupRef ?? groupRefById[l.groups[0]?.id ?? ""] ?? l.groups[0]?.items[0]?.displayId ?? "RFQ";
           return (
             <button key={l.key} onClick={() => setActiveLoc(l.key)}
               className="flex-none rounded-2xl border px-[15px] py-[11px] text-start transition"

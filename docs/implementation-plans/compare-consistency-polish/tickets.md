@@ -205,8 +205,9 @@ The in‑app terms modal shows a vague lumped **"Certificates"** conflict and an
 - **AC4:** Match the app's state rule: a contract/declaration row is `matched` only when both sides converged; a set‑but‑un‑negotiated requirement is `pending`, not matched.
 - **Given** an in‑app bid conflicts on the equipment safety cert **when** I open Terms → Conflict **then** it lists "Equipment safety certificate", not a vague "Certificates".
 
-## T19 — ⚠ RFQ group code on new/submission‑less requests
-**Scope:** Web UI (`RequestsList` already prefers `groupRef ?? displayId`); **⚠ Backend** likely.
-A freshly created request's tab shows the per‑request **`REQ-`** code, not the **`RFQ-`** group code, because the group code is only surfaced via `getRequestSubmissions` (which needs an off‑platform submission). The comparison shows `RFQ-` only when the group already has submissions.
-- **AC1:** The requests page tab shows the **`RFQ-` group code** for a request even before any off‑platform submission.
-- **AC2:** Needs the backend to expose the group code (RFQ‑NNNNN) on `my-requests` (per group) or `getRequestSubmissions` **top‑level, regardless of submissions** — the web already renders `groupRef` when present, so it's a data/`⚠ Backend` gap. Raise via `/web:link-backend`.
+## T19 — ⚠ Backend: return the RFQ group code on EVERY request (bid‑less too)
+**Scope:** **⚠ Backend** (agents `getRequestSubmissions` and/or app‑backend `my-requests`). Web needs no change — it already renders `groupRef ?? displayId`.
+**Live‑verified (REQ‑00209 / 00762689):** `GET /agents/requests/{id}/bid-submissions` returns the code **only per submission** — `submissions[0].groupRef = "RFQ-00010"`; the **top‑level `groupRef` is `undefined`**. So a request WITH a submission shows `RFQ-` on both the requests page + comparison (works today); a request with **zero submissions** returns no `groupRef` anywhere → the web correctly falls back to `REQ-`.
+- **AC1:** The endpoint returns the group code (`RFQ-NNNNN`) for a request even with **zero bids/submissions**.
+- **AC2:** Preferred: **hoist it to the response top level** in `getRequestSubmissions` (the code is already derived there per submission — compute it from the group up‑front and return `groupRef` regardless of `submissions.length`). Alternatively add it to `my-requests` per group.
+- **AC3:** No web change — the web already surfaces `groupRef` when present.

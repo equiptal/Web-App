@@ -95,6 +95,8 @@ export interface RequestListItem {
   /** Multi-item submission group — all fanned-out requests from one submit share this (null = solo). */
   requestGroupId: string | null;
   displayId: string;
+  /** RFQ group short code (`RFQ-NNNNN`) from my-requests once the backend returns it (T19); null until then. */
+  groupRef: string | null;
   type: RequestType;
   status: RequestStatus;
   urgency: Urgency | null;
@@ -117,6 +119,8 @@ export interface RequestListItem {
 export interface RequestGroup {
   /** The group id (or the lone request's id when it has no group). */
   id: string;
+  /** RFQ group short code (`RFQ-NNNNN`) from my-requests, if the backend returns it (T19); else null. */
+  groupRef: string | null;
   items: RequestListItem[];
   city: string | null;
   neighbourhood: string | null;
@@ -178,6 +182,8 @@ export function mapRequestListItem(r: RequestRecord): RequestListItem {
     id: r.id,
     requestGroupId: str(r.requestGroupId),
     displayId: str(r.displayId) ?? str(r.shortCode) ?? r.id,
+    // RFQ group code from my-requests (T19). Defensive on the field name the backend adds.
+    groupRef: str(r.groupRef) ?? str(r.requestGroupShortCode) ?? str(r.groupShortCode) ?? str(r.rfqRef) ?? null,
     type: r.type,
     status: r.status,
     urgency: (str(r.urgency) as Urgency) ?? null,
@@ -240,6 +246,7 @@ export function groupRequests(items: RequestListItem[]): RequestGroup[] {
     const statuses = [...new Set(groupItems.map((i) => i.status))];
     return {
       id: first.requestGroupId ?? first.id,
+      groupRef: groupItems.find((i) => i.groupRef)?.groupRef ?? null,
       items: groupItems,
       city,
       neighbourhood,
