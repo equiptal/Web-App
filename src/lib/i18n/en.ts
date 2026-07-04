@@ -411,6 +411,8 @@ export const en = {
     createAccount: "Create account",
     postTitle: "Create your account to post your request",
     postBody: "Complete your details and your request will be posted right away.",
+    gateTitle: "Create your account to continue",
+    gateSub: "Enter your phone number — we'll text a verification code. New or returning, just enter your number.",
   },
   gate: {
     confirmLocation: "Confirm the location to continue.", // AC-12/16

@@ -58,6 +58,8 @@ function AccountFlow({ onCreated }: { onCreated: () => void }) {
     return (
       <div className="p-[22px]">
         <PhoneEntry
+          title={t.guest.gateTitle}
+          subtitle={t.guest.gateSub}
           onCodeSent={(p) => {
             setPhone(p);
             setPhase("code");

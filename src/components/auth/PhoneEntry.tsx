@@ -9,7 +9,7 @@ import { Icon } from "@/components/ui";
  * Phone-entry screen (AC-01/02/15/24), matching the prototype's login `form-inner`. `+966` preset;
  * on submit requests a code and advances to the code screen.
  */
-export function PhoneEntry({ onCodeSent }: { onCodeSent: (phone: string) => void }) {
+export function PhoneEntry({ onCodeSent, title, subtitle }: { onCodeSent: (phone: string) => void; title?: string; subtitle?: string }) {
   const t = useT();
   const a = t.auth;
   const [digits, setDigits] = useState("");
@@ -29,8 +29,8 @@ export function PhoneEntry({ onCodeSent }: { onCodeSent: (phone: string) => void
 
   return (
     <form onSubmit={submit} noValidate>
-      <h2 className="mb-[6px] text-[26px] font-extrabold tracking-[-.5px] text-navy">{a.signInTitle}</h2>
-      <p className="mb-[28px] text-[14px] leading-[1.55] text-muted">{a.signInSub}</p>
+      <h2 className="mb-[6px] text-[26px] font-extrabold tracking-[-.5px] text-navy">{title ?? a.signInTitle}</h2>
+      <p className="mb-[28px] text-[14px] leading-[1.55] text-muted">{subtitle ?? a.signInSub}</p>
 
       <label className="mb-[8px] block text-[12.5px] font-bold text-navy-mid">{a.phoneLabel}</label>
       <div className="flex gap-[10px]" dir="ltr">

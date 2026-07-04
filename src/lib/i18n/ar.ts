@@ -412,6 +412,8 @@ export const ar: Dictionary = {
     createAccount: "إنشاء حساب",
     postTitle: "أنشئ حسابك لإرسال طلبك",
     postBody: "أكمل بياناتك وسيُرسَل طلبك مباشرةً.",
+    gateTitle: "أنشئ حسابك للمتابعة",
+    gateSub: "أدخل رقم جوالك — سنرسل رمز تحقق. سواء كنت جديدًا أو عائدًا، فقط أدخل رقمك.",
   },
   gate: {
     confirmLocation: "أكّد الموقع للمتابعة.",
