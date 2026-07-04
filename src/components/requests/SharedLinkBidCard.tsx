@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { BidCard } from "@/lib/contract/bids";
+import { bucketBidTerms, type BidCard } from "@/lib/contract/bids";
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { EquipImg } from "@/components/requests/EquipImg";
@@ -83,24 +83,10 @@ export function SharedLinkBidCard({
   const soon = daysLeft != null && daysLeft >= 0 && daysLeft <= 3;
   const validTone = expired ? { c: "#d9362a", bg: "#fcebea" } : soon ? { c: "#d4780a", bg: "#fff3e0" } : { c: "#1a7ec8", bg: "#e6f2fb" };
 
-  // Mobile parity (v3_bid_card TermsSectionRow): tally the negotiable terms into Matched / Conflict /
-  // Pending (grey + negotiating fold into Pending) — the same 6 keys the app counts on the bid card.
-  const NEG_KEYS = ["payment_terms", "breakdown_response_sla", "overtime_rate", "fuel_responsibility", "certs", "operator"];
-  const negRows = (() => {
-    const seen = new Set<string>(); const out: typeof bid.terms.equipment = [];
-    for (const r of [...bid.terms.equipment, ...bid.terms.contract, ...(bid.negotiableTerms ?? [])]) {
-      if (NEG_KEYS.includes(r.key) && !seen.has(r.key)) { seen.add(r.key); out.push(r); }
-    }
-    return out;
-  })();
-  const termTally = negRows.reduce((t, r) => {
-    if (r.state === "matched" || r.state === "agreed") t.matched++;
-    else if (r.state === "conflict") t.conflict++;
-    else t.pending++;
-    return t;
-  }, { matched: 0, conflict: 0, pending: 0 });
-  // Off-platform bids have no deal room, so nothing is ever "Pending review" — show only
-  // Conflict / Matched on the card (mirrors the terms modal's hidePending).
+  // App parity: the SAME shared tally the on-platform card + the Terms modal use (bucketBidTerms), so the
+  // off-platform card count always equals the modal. Off-platform has no deal room → no "Pending review"
+  // chip on the card (mirrors the terms modal's hidePending); Conflict / Matched only.
+  const termTally = bucketBidTerms(bid.terms, bid.negotiableTerms).counts;
   const termChips = [
     { label: L("Conflict", "تعارض"), n: termTally.conflict, c: "#d9362a" },
     { label: L("Matched", "مطابق"), n: termTally.matched, c: "#1daf58" },

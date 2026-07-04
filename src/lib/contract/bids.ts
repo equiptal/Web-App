@@ -291,7 +291,8 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
 
   // Single "operator" row for the BID CARD's equipment bucket (mobile app parity): conflict on a
   // nationality deviation or when the RFQ needs an operator the bid omits; matched when included.
-  const operator: TermState = !reqOperator ? "grey" : deviationKeys.has("operator_nationality") || !bidOperator ? "conflict" : "matched";
+  // App parity (terms_modal.dart): the single operator term also conflicts on a missing operator cert.
+  const operator: TermState = !reqOperator ? "grey" : deviationKeys.has("operator_nationality") || deviationKeys.has("operator_certification") || !bidOperator ? "conflict" : "matched";
 
   // operator_certification & safety_certifications — CONFLICT_ELIGIBLE / Negotiable in the app
   // (term-matching.ts: "Moved Acknowledge → Negotiable"). They live in the comparison's negotiable
@@ -636,28 +637,36 @@ export function bidSuppliers(bids: BidCard[]): BidSupplier[] {
  * (grey) rows (grey = no requirement → excluded, never counted).
  */
 export type TermBucket = "conflict" | "pending" | "matched";
-const TERM_SUPERSEDED_BY: Record<string, string> = { certs: "safety_certifications", operator: "operator_included" };
-const bucketOfTermState = (s: TermState): TermBucket | null =>
-  s === "conflict" ? "conflict" : s === "matched" || s === "agreed" ? "matched" : s === "negotiating" ? "pending" : null;
+// App parity (mobile terms_modal.dart `_negotiableTermKeys`): the bid-card chips AND the Terms-modal tabs
+// count EXACTLY these 6 LUMPED negotiable terms — nothing else. Excluded (informational / acknowledge /
+// identity, never counted): equipment identity (measurement/year/fuel/attachments), maintenance, CR/VAT,
+// mob/demob pricing, and the SPLIT operator_*/fat_* rows (operator + FAT fold into the single `operator`
+// term). `safety_certifications` is the one cert term; `operator` is the single lumped operator row.
+const COUNTED_TERM_KEYS = new Set([
+  "payment_terms", "breakdown_response_sla", "overtime_rate", "fuel_responsibility", "safety_certifications", "operator",
+]);
+// App parity (`_TermsStateCounts`): 5 row-states collapse to 3 — `matched`; `conflict`; everything else
+// (pending / negotiating / grey / open-value) → Pending, so the three counts always sum to the row total.
+const bucketOfTermState = (s: TermState): TermBucket =>
+  s === "conflict" ? "conflict" : s === "matched" || s === "agreed" ? "matched" : "pending";
 
 export function bucketBidTerms(
   terms: { equipment: TermRow[]; contract: TermRow[]; supplier: TermRow[] },
   negotiable?: TermRow[],
 ): { rows: TermRow[]; byBucket: Record<TermBucket, TermRow[]>; counts: Record<TermBucket, number> } {
   const merged = [...(negotiable ?? []), ...terms.equipment, ...terms.contract, ...terms.supplier];
-  const keys = new Set(merged.map((r) => r.key));
   const seen = new Set<string>();
   const rows = merged.filter((r) => {
-    if (seen.has(r.key)) return false;
+    if (!COUNTED_TERM_KEYS.has(r.key)) return false; // only the app's 6 negotiable terms
+    // App parity: fuel_responsibility is counted only when the rentee actually declared it (an
+    // undeclared/open — grey — row is dropped, not shown as Pending).
+    if (r.key === "fuel_responsibility" && r.state === "grey") return false;
+    if (seen.has(r.key)) return false; // keep the first (negotiable rows carry the live deal-room state)
     seen.add(r.key);
-    const sup = TERM_SUPERSEDED_BY[r.key];
-    return !(sup && keys.has(sup));
+    return true;
   });
   const byBucket: Record<TermBucket, TermRow[]> = { conflict: [], pending: [], matched: [] };
-  for (const r of rows) {
-    const b = bucketOfTermState(r.state);
-    if (b) byBucket[b].push(r);
-  }
+  for (const r of rows) byBucket[bucketOfTermState(r.state)].push(r);
   return { rows, byBucket, counts: { conflict: byBucket.conflict.length, pending: byBucket.pending.length, matched: byBucket.matched.length } };
 }
 

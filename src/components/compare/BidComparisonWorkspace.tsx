@@ -1217,13 +1217,10 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         const supTotal = supUnit * unitsOf(c);
                         const conflict = (mobByRentee === false && !c.mob.stated) || (demobByRentee === false && !c.demob.stated);
                         const anyOnRenter = mobByRentee === true || demobByRentee === true;
-                        // An on-you part the renter hasn't estimated yet → offer the popup.
-                        const unestimated = (mobByRentee === true && deliveryEst === 0) || (demobByRentee === true && returnEst === 0);
-                        const estimateBtn = anyOnRenter && unestimated && !rm ? (
-                          <button onClick={openEstimate} className="inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[9.5px] font-extrabold" style={{ color: C.rentee, borderColor: "rgba(37,99,235,.4)", background: "#fff" }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>add</span>{L("estimate", "قدّر")}</button>
-                        ) : null;
+                        // The "+ estimate" affordance lives ONLY in the Cost terms row (label cell), not
+                        // inline per mob/demob part — this row just shows the delivery/return breakdown.
                         const breakdown = (
-                          <Sub><span className="inline-flex flex-wrap items-center gap-1">{L("Delivery", "التوصيل")}: {token(c.mob, mobByRentee, deliveryEst)} · {L("Return", "الإرجاع")}: {token(c.demob, demobByRentee, returnEst)}{unitsOf(c) > 1 && supUnit > 0 ? ` · × ${unitsOf(c)} ${L("units", "وحدة")}` : ""} {estimateBtn}</span></Sub>
+                          <Sub><span className="inline-flex flex-wrap items-center gap-1">{L("Delivery", "التوصيل")}: {token(c.mob, mobByRentee, deliveryEst)} · {L("Return", "الإرجاع")}: {token(c.demob, demobByRentee, returnEst)}{unitsOf(c) > 1 && supUnit > 0 ? ` · × ${unitsOf(c)} ${L("units", "وحدة")}` : ""}</span></Sub>
                         );
                         return (
                           <Td key={c.bid.id} ok={!conflict} fail={conflict}>
