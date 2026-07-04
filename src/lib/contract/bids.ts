@@ -474,14 +474,11 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   const negMobLead = lockedVal((k) => k.includes("leadtime"));
   const negMobPrice = lockedVal((k) => k.includes("mobilizationpricing"));
   const negDemobPrice = lockedVal((k) => k.includes("demobilizationpricing"));
-  // Rate (T16): reflect the rate AGREED BY BOTH — never a pending counter. Two backend mechanisms:
-  //  (1) a locked/agreed PRICE term (`negRate`), or (2) the bid reaching ACCEPTED, where the deal's
-  //  final rate is `currentPrice` (= lastProposedRate at acceptance). So: locked rate → else, when the
-  //  bid is ACCEPTED, the accepted `currentPrice` → else the supplier's original offer (`priceAmount`).
-  //  While negotiation is still open (not accepted, not locked) we keep the original — a live counter
-  //  does NOT move the headline.
+  // Rate (T16): show the LIVE deal-room rate, matching the mobile bid card. The backend already
+  //  computes `currentPrice = dealRoom.lastProposedRate ?? priceAmount` (getBidList/received-bids), so
+  //  it reflects the latest negotiated rate and falls back to the original when there's no deal room.
+  //  Prefer it; keep the locked PRICE term + the raw offer as fallbacks.
   const negRate = lockedVal((k) => k === "price");
-  const bidAccepted = (s(raw.status) ?? "").toUpperCase() === "ACCEPTED";
 
   return {
     id: String(raw.id ?? ""),
@@ -494,7 +491,7 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     distanceKm,
     submittedAt: s(raw.createdAt),
     validUntil: s(raw.validUntil),
-    price: n(negRate) ?? (bidAccepted ? n(raw.currentPrice) : null) ?? n(raw.priceAmount), // agreed (locked) rate → accepted deal's final rate → original offer (T16)
+    price: n(raw.currentPrice) ?? n(negRate) ?? n(raw.priceAmount), // live deal-room rate (app parity) → locked rate → original offer (T16)
     mobPrice: n(negMobPrice) ?? n(raw.mobPrice),
     demobPrice: n(negDemobPrice) ?? n(raw.demobPrice),
     priceUnit: s(raw.priceUnit),
