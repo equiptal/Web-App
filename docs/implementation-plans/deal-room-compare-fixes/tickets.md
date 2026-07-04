@@ -53,8 +53,15 @@ fully fixed:** the comparison derives term state from the **bid-list qualificati
 matching), **not** the live **deal-room** term state — so a term that's "matched" in the bid data yet
 "conflict" in the deal room still can't read as a conflict here.
 **B2b (follow-up):** thread the live deal-room term states (or settled values) into the comparison
-pipeline so the compare reflects the *deal-room* truth, not just bid-vs-request matching. Larger change;
-likely needs the deal-room term states available where the comparison is built.
+pipeline so the compare reflects the *deal-room* truth, not just bid-vs-request matching.
+
+**Status — NOT web-fixable (verified 2026-07-04); needs backend, which is out of scope per Yara.** The
+bid-list payload exposes only `lockedTerms` (state `agreed`) + `unreadTerms` (unseen counter) — there is
+**no `disputed`/`pending` per-term state** in any web payload, so a term that was `matched` at bid-time but
+became `disputed` in the deal room is indistinguishable from `matched` web-side. The existing gate already
+avoids force-greening a live negotiation (greys `negotiating`/unresolved, greens only `matched`/`agreed`,
+`conflict`→red), so no term force-greens — but the residual screenshot case can't be fixed without the
+backend surfacing per-term live states in `getBidList` (Yara: no backend changes). **Left as-is.**
 
 ---
 
@@ -150,16 +157,15 @@ deal-room rate/mob/demob and totals).
 **Revised approach:** render the web quotation **client-side from the confirmed Quotation row's agreed
 values** (mirror `extractQuotationData`'s formula + terms split), not from bid-list values.
 
-**⚠ FINDING — B5 is BACKEND-BLOCKED (verified 2026-07-04):** the web's `GET /quotation` returns only
-`{ pdfUrl, pdfStatus }` (`QuotationView`, `deal-room.ts:109-120`); the backend `getQuotation` returns PDF
-metadata, not the structured `extractQuotationData`. With the **server PDF disabled**, `pdfUrl` never
-resolves, so the web deal-room "Download quotation" is effectively broken AND the web has no agreed data to
-render client-side. **Fix requires a backend change:** `getQuotation` (or a new endpoint) must return the
-structured agreed quotation payload — `agreedRate, priceUnit, mobPrice, demobPrice, numberOfUnits(agreedUnits),
-estimatedTotal, parties(names+phones), agreedTerms[], fixedTerms[]`, localized-ready — so the web renders
-the quotation the way the app now does. → carry via `/web:link-backend` + a `Moedatech-App` PR.
-(The GroupBids per-supplier HTML quotation is a separate, pre-confirmation surface; the *confirmed* deal
-quotation is the one that must match the app and is the backend-blocked piece.)
+**Status — DONE (web-only, no backend change).** Correction: `getQuotation` actually returns the **whole
+Quotation row**, which stores the agreed snapshot (`agreedRate, priceUnit, contractType, agreedTerms[],
+rentee/supplierPhone, rentee/supplierEmail`) — the web was just discarding all but `pdfUrl`.
+Implemented: `QuotationView`/`mapQuotation` now carry that snapshot; `DealRoom.tsx` "Download quotation"
+renders a **client-side** bilingual quotation (server PDF is disabled) built from the snapshot + the deal
+room (`mobPrice/demobPrice/numberOfUnits/fixed terms/supplier name`) + `/api/me` (rentee name). Totals
+mirror `extractQuotationData`: `rate × durationFactor` (PER_DAY=days, PER_WEEK=ceil/7, PER_MONTH=ceil/30,
+PER_JOB=1); `(rental + mob + demob) × units`; VAT 15%; no duration ⇒ "As operated". `agreedUnits ≈
+numberOfUnits` (web has no assembled deals). If a real `pdfUrl` ever exists it's still opened.
 
 ---
 

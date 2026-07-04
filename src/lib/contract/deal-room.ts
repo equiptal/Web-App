@@ -106,20 +106,52 @@ function mapDoc(raw: Record<string, unknown>): DealRoomDocument {
  * fresh presigned download link. `pdfStatus` is `PENDING` while the PDF is still being generated
  * (the app polls until it's ready), then ready.
  */
+/** One agreed term snapshotted on the confirmed Quotation row (backend `agreedTerms` JSON). */
+export interface QuotationTerm {
+  key: string;
+  label: string;
+  labelAr: string;
+  value: unknown;
+}
+
 export interface QuotationView {
   pdfUrl: string | null;
   pdfStatus: string | null;
   quotationNumber: string | null;
+  // Agreed snapshot from the Quotation row — the server PDF is DISABLED, so the web renders the
+  // quotation client-side from these (+ the DealRoomView) the way the app does (extractQuotationData).
+  agreedRate: number | null;
+  priceUnit: string | null;
+  contractType: string | null;
+  agreedTerms: QuotationTerm[];
+  renteePhone: string | null;
+  supplierPhone: string | null;
+  renteeEmail: string | null;
+  supplierEmail: string | null;
 }
 
 export function mapQuotation(raw: unknown): QuotationView {
   const q = (raw ?? {}) as Record<string, unknown>;
+  const agreedTermsRaw = Array.isArray(q.agreedTerms) ? (q.agreedTerms as Record<string, unknown>[]) : [];
   return {
     pdfUrl: s(q.pdfUrl),
     pdfStatus: s(q.pdfStatus),
     // The backend Quotation model has no human quotation number — fall back to its id (uuid) so the
     // doc still carries a stable reference. (/web:link-backend deal-room: quotationNumber gap.)
     quotationNumber: s(q.quotationNumber) ?? s(q.number) ?? s(q.id),
+    agreedRate: n(q.agreedRate),
+    priceUnit: s(q.priceUnit),
+    contractType: s(q.contractType),
+    agreedTerms: agreedTermsRaw.map((t) => ({
+      key: s(t.key) ?? "",
+      label: s(t.label) ?? s(t.key) ?? "",
+      labelAr: s(t.labelAr) ?? s(t.label) ?? "",
+      value: t.value,
+    })),
+    renteePhone: s(q.renteePhone),
+    supplierPhone: s(q.supplierPhone),
+    renteeEmail: s(q.renteeEmail),
+    supplierEmail: s(q.supplierEmail),
   };
 }
 

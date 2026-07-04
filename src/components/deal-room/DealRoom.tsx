@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { StreamChat, type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
 import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, ApiError } from "@/lib/api/client";
-import type { DealRoomView, DealRoomDocument, DealRoomDocuments } from "@/lib/contract/deal-room";
+import type { DealRoomView, DealRoomDocument, DealRoomDocuments, QuotationView } from "@/lib/contract/deal-room";
 import { DealRoomTerms, type ResolutionsMap } from "@/components/deal-room/DealRoomTerms";
 import "@/components/deal-room/deal-room-proto.css";
 
@@ -13,6 +13,87 @@ type ChatMsg = { id: string; text?: string; user?: { id?: string }; created_at?:
 
 const STREAM_KEY = process.env.NEXT_PUBLIC_STREAM_API_KEY ?? "";
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
+
+/**
+ * Client-rendered confirmed-deal quotation (the backend server PDF is disabled — the client renders it
+ * now, app parity). Values mirror the app's `extractQuotationData`: rental = agreedRate × durationFactor
+ * (PER_DAY = duration days, PER_WEEK = ceil(days/7), PER_MONTH = ceil(days/30), PER_JOB = 1); estimated
+ * total = (rental + mobilization + demobilization) × units; VAT 15%. Agreed values come from the confirmed
+ * Quotation row (+ the deal room for mob/demob/units/fixed terms/supplier name; renter name from /api/me).
+ */
+function buildQuotationHtml(room: DealRoomView, q: QuotationView, renteeName: string, ar: boolean, L: (en: string, arr: string) => string): string {
+  const esc = (v: unknown) => String(v ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
+  const sar = L("SAR", "ر.س");
+  const rate = q.agreedRate ?? room.rate ?? 0;
+  const unit = (q.priceUnit ?? room.priceUnit ?? "PER_DAY").toUpperCase();
+  const mob = room.mobPrice ?? 0;
+  const demob = room.demobPrice ?? 0;
+  const units = room.numberOfUnits || 1;
+  const days = room.periods;
+  const periodLabel = unit === "PER_WEEK" ? L("week", "أسبوع") : unit === "PER_MONTH" ? L("month", "شهر") : unit === "PER_JOB" ? L("job", "مهمة") : L("day", "يوم");
+  let durationFactor: number | null = null;
+  if (unit === "PER_JOB") durationFactor = 1;
+  else if (days != null) durationFactor = unit === "PER_WEEK" ? Math.ceil(days / 7) : unit === "PER_MONTH" ? Math.ceil(days / 30) : days;
+  const hasTotal = rate > 0 && durationFactor != null;
+  const rentalTotal = hasTotal ? rate * (durationFactor as number) : 0;
+  const subtotal = hasTotal ? (rentalTotal + mob + demob) * units : 0;
+  const vat = Math.round(subtotal * 0.15);
+  const total = subtotal + vat;
+  const dateStr = new Date().toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const ref = (q.quotationNumber ?? "").slice(0, 8).toUpperCase();
+  const money = (v: number) => `${nf(v)} ${sar}`;
+
+  const valFmt = (v: unknown): string => {
+    if (v == null || v === "") return "—";
+    if (Array.isArray(v)) return v.length ? v.map(String).join(", ") : "—";
+    if (typeof v === "boolean") return v ? L("Yes", "نعم") : L("No", "لا");
+    const t = String(v).toLowerCase();
+    if (t === "supplier") return L("Supplier", "المؤجّر");
+    if (t === "rentee" || t === "renter") return L("Rentee", "المستأجر");
+    if (t === "true" || t === "included" || t === "yes") return L("Yes", "نعم");
+    if (t === "false" || t === "excluded" || t === "not_included" || t === "no") return L("No", "لا");
+    return String(v);
+  };
+  const termRow = (label: string, v: unknown) => `<div class="kv"><span>${esc(label)}</span><b>${esc(valFmt(v))}</b></div>`;
+  const agreedRows = q.agreedTerms.filter((t) => t.key !== "PRICE").map((t) => termRow(ar ? t.labelAr : t.label, t.value)).join("");
+  const fixedRows = room.terms.filter((t) => t.state === "fixed").map((t) => termRow(ar ? t.labelAr : t.label, t.value ?? t.platformDefault)).join("");
+  const party = (label: string, name: string, phone: string | null, email: string | null) =>
+    `<div class="party"><div class="plabel">${esc(label)}</div><div class="pname">${esc(name || "—")}</div>${phone ? `<div class="pmeta" dir="ltr">${esc(phone)}</div>` : ""}${email ? `<div class="pmeta" dir="ltr">${esc(email)}</div>` : ""}</div>`;
+  const contractType = q.contractType ?? room.contractType;
+
+  return `<!doctype html><html lang="${ar ? "ar" : "en"}" dir="${ar ? "rtl" : "ltr"}"><head><meta charset="utf-8"><title>${esc(L("Confirmed Quotation", "عرض سعر مؤكّد"))}</title>
+  <style>
+  *{box-sizing:border-box;} body{font-family:system-ui,'Segoe UI',Tahoma,sans-serif;color:#12263a;margin:0;padding:28px;background:#fff;}
+  .q{max-width:800px;margin:0 auto;}
+  .qh{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #f7900a;padding-bottom:14px;margin-bottom:18px;}
+  .qt{font-size:22px;font-weight:800;color:#1c3550;} .qsub{font-size:12px;color:#6b8fa8;font-weight:700;text-align:${ar ? "left" : "right"};}
+  .ref{display:inline-block;background:#eff4f9;border-radius:100px;padding:3px 10px;font-size:11px;font-weight:800;color:#2a4f72;margin-bottom:6px;}
+  .card{border:1px solid #e4edf5;border-radius:12px;padding:14px 16px;margin-bottom:16px;}
+  .card-h{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#6b8fa8;margin-bottom:8px;}
+  .kv{display:flex;justify-content:space-between;gap:16px;font-size:13px;padding:6px 0;border-bottom:1px solid #f2f6fa;} .kv:last-child{border-bottom:0;} .kv span{color:#6b8fa8;font-weight:600;} .kv b{font-weight:800;color:#12263a;}
+  .kv.tot b{color:#f7900a;font-size:15px;}
+  .parties{display:flex;gap:20px;margin-bottom:16px;} .party{flex:1;border:1px solid #e4edf5;border-radius:12px;padding:12px 14px;}
+  .plabel{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#6b8fa8;} .pname{font-size:16px;font-weight:800;margin-top:4px;color:#1c3550;} .pmeta{font-size:12px;color:#6b8fa8;font-weight:600;margin-top:3px;}
+  @media print{body{padding:0;}}
+  </style></head><body><div class="q">
+    <div class="qh"><div>${ref ? `<div class="ref">#${esc(ref)}</div>` : ""}<div class="qt">${esc(L("Confirmed Quotation", "عرض سعر مؤكّد"))}</div></div><div class="qsub">${esc(dateStr)}${contractType ? `<br>${esc(L("Contract", "العقد"))}: ${esc(contractType)}` : ""}</div></div>
+    <div class="parties">
+      ${party(L("Supplier", "المؤجّر"), room.supplier.name, q.supplierPhone, q.supplierEmail)}
+      ${party(L("Rentee", "المستأجر"), renteeName, q.renteePhone, q.renteeEmail)}
+    </div>
+    <div class="card"><div class="card-h">${esc(L("Price breakdown", "تفصيل السعر"))}</div>
+      <div class="kv"><span>${esc(L("Agreed rate", "السعر المتفق عليه"))}</span><b>${esc(money(rate))} / ${esc(periodLabel)}${units > 1 ? ` · ${esc(L("per unit", "لكل وحدة"))}` : ""}</b></div>
+      ${mob ? `<div class="kv"><span>${esc(L("Mobilization", "النقل"))}</span><b>${esc(money(mob))}</b></div>` : ""}
+      ${demob ? `<div class="kv"><span>${esc(L("Return", "الإرجاع"))}</span><b>${esc(money(demob))}</b></div>` : ""}
+      ${units > 1 ? `<div class="kv"><span>${esc(L("Units", "الوحدات"))}</span><b>${units}</b></div>` : ""}
+      ${hasTotal
+        ? `<div class="kv"><span>${esc(L("Subtotal before VAT", "المجموع قبل الضريبة"))}</span><b>${esc(money(subtotal))}</b></div><div class="kv"><span>${esc(L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"))}</span><b>${esc(money(vat))}</b></div><div class="kv tot"><span>${esc(L("Estimated total", "الإجمالي التقديري"))}</span><b>${esc(money(total))}</b></div>`
+        : `<div class="kv tot"><span>${esc(L("Estimated total", "الإجمالي التقديري"))}</span><b>${esc(L("As operated", "حسب التشغيل"))}</b></div>`}
+    </div>
+    ${agreedRows ? `<div class="card"><div class="card-h">${esc(L("Agreed terms", "الشروط المتفق عليها"))}</div>${agreedRows}</div>` : ""}
+    ${fixedRows ? `<div class="card"><div class="card-h">${esc(L("Fixed terms", "الشروط الثابتة"))}</div>${fixedRows}</div>` : ""}
+  </div></body></html>`;
+}
 
 export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) => void }) {
   const { locale } = useLocale();
@@ -48,20 +129,39 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
 
   const loadRoom = () => fetchDealRoom(id).then(setRoom).catch(() => setError(true));
 
-  // Download the official quotation for a closed deal (app parity) — fetch the backend-generated PDF
-  // and open its presigned URL. While the PDF is still being generated (`pdfStatus: PENDING`) the
-  // backend has no URL yet, so we tell the renter to try again shortly (the app polls; here a re-tap).
+  // The confirmed-deal quotation. The server-side PDF is disabled (app parity — the client renders it
+  // now), so we build it CLIENT-SIDE from the confirmed Quotation row's AGREED snapshot (agreedRate,
+  // agreedTerms, contractType, phones/emails) + the deal room (mob/demob, units, fixed terms, supplier
+  // name) + the renter's name (/api/me), matching the app's extractQuotationData. If a real presigned
+  // pdfUrl ever exists it's opened as-is (fallback).
   async function downloadQuotation() {
-    if (quoteBusy) return;
+    if (quoteBusy || !room) return;
     setQuoteBusy(true);
     setQuoteErr(null);
     try {
       const q = await fetchQuotation(id);
       if (q.pdfUrl) {
         window.open(q.pdfUrl, "_blank", "noopener,noreferrer");
-      } else {
-        setQuoteErr(L("Quotation is being prepared — try again in a moment.", "يتم تجهيز عرض السعر — حاول مرة أخرى بعد لحظات."));
+        return;
       }
+      let renteeName = "";
+      try {
+        const meRes = await fetch("/api/me", { cache: "no-store" });
+        if (meRes.ok) {
+          const d = (await meRes.json()) as { user?: { firstName?: string | null; lastName?: string | null; companyName?: string | null } };
+          const u = d.user ?? {};
+          renteeName = (u.companyName?.trim() || [u.firstName, u.lastName].filter(Boolean).join(" ")) ?? "";
+        }
+      } catch {
+        /* name is best-effort */
+      }
+      const w = window.open("", "_blank");
+      if (!w) {
+        setQuoteErr(L("Allow pop-ups to open the quotation.", "اسمح بالنوافذ المنبثقة لفتح عرض السعر."));
+        return;
+      }
+      w.document.write(buildQuotationHtml(room, q, renteeName, ar, L));
+      w.document.close();
     } catch (e) {
       setQuoteErr(errMsg(e, L("Couldn’t load the quotation.", "تعذّر تحميل عرض السعر.")));
     } finally {
