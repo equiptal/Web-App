@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { StreamChat, type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
 import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, ApiError } from "@/lib/api/client";
@@ -13,6 +13,7 @@ type ChatMsg = { id: string; text?: string; user?: { id?: string }; created_at?:
 
 const STREAM_KEY = process.env.NEXT_PUBLIC_STREAM_API_KEY ?? "";
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
+type LFn = (en: string, arr: string) => string;
 
 /**
  * Client-rendered confirmed-deal quotation (the backend server PDF is disabled — the client renders it
@@ -104,8 +105,9 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const [error, setError] = useState(false);
   const [breakdown, setBreakdown] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [showAccept, setShowAccept] = useState(false);
-  const [showCounter, setShowCounter] = useState(false);
+  // App parity: a single guided flow modal (3 steps: Terms → Price → Summary) handles both Counter and
+  // Accept. `flowMode` picks which — null = closed.
+  const [flowMode, setFlowMode] = useState<"counter" | "accept" | null>(null);
   const [counterErr, setCounterErr] = useState<string | null>(null);
   const [showDocs, setShowDocs] = useState(false);
   const [quoteBusy, setQuoteBusy] = useState(false);
@@ -281,10 +283,10 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     }
   }
 
-  function onCounter() {
+  function openFlow(mode: "counter" | "accept") {
     if (!room || busy) return;
     setCounterErr(null);
-    setShowCounter(true);
+    setFlowMode(mode);
   }
 
   // Collect a term resolution locally (no server call — app parity). Submitted on Counter/Accept.
@@ -307,7 +309,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
       await proposeRate(id, { proposedRate: next.rate, priceUnit: room.priceUnit ?? "PER_DAY", mobPrice: next.mobPrice, demobPrice: next.demobPrice });
       setResolutions({});
       await loadRoom();
-      setShowCounter(false);
+      setFlowMode(null);
     } catch (e) {
       setCounterErr(errMsg(e, L("Couldn’t send your counter — please try again.", "تعذّر إرسال عرضك المقابل — حاول مرة أخرى.")));
     } finally {
@@ -315,16 +317,17 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     }
   }
 
-  async function doAccept() {
+  async function doAccept(contractType: string = "formal") {
     if (!room || busy) return;
     setBusy(true);
     try {
       // App parity (accept-all-terms): submit the locally-collected term resolutions together with the
-      // accept. contractType defaults to "formal"; agreedUnits is omitted (no assembled deals on web).
-      await acceptDeal(id, "formal", { termResolutions: resolutionUpdates() });
+      // accept. contractType is chosen on the flow's Summary step (defaults to "formal"); agreedUnits is
+      // omitted (no assembled deals on web).
+      await acceptDeal(id, contractType, { termResolutions: resolutionUpdates() });
       setResolutions({});
       await loadRoom();
-      setShowAccept(false);
+      setFlowMode(null);
     } catch (e) {
       window.alert(errMsg(e, L("Couldn’t accept right now — please try again.", "تعذّر القبول الآن — حاول مرة أخرى.")));
     } finally {
@@ -413,9 +416,9 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
         ) : room.myTurn ? (
           <>
             <div className="pc-cta">
-              <button className="btn outline" disabled={busy} onClick={onCounter}><span className="material-icons-outlined">swap_horiz</span>{L("Counter", "تفاوض")}</button>
+              <button className="btn outline" disabled={busy} onClick={() => openFlow("counter")}><span className="material-icons-outlined">swap_horiz</span>{L("Counter", "تفاوض")}</button>
               {/* Accept is gated exactly like the app: blocked while any term is disputed (acceptAllTerms 409s otherwise). */}
-              <button className="btn green" disabled={busy || !canAccept} onClick={() => setShowAccept(true)}><span className="material-icons-outlined">check</span>{L("Accept", "قبول")}</button>
+              <button className="btn green" disabled={busy || !canAccept} onClick={() => openFlow("accept")}><span className="material-icons-outlined">check</span>{L("Accept", "قبول")}</button>
             </div>
             {!canAccept && (
               <div className="turn-strip" style={{ color: "var(--warn,#b45309)" }}>
@@ -510,12 +513,25 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
         </div>
       )}
 
-      {showAccept && (
-        <AcceptModal ar={ar} L={L} busy={busy} rate={rate} periods={periods} units={units} grand={grand} onClose={() => !busy && setShowAccept(false)} onConfirm={doAccept} />
-      )}
-
-      {showCounter && (
-        <CounterModal ar={ar} L={L} busy={busy} error={counterErr} initialRate={room.rate ?? 0} initialMob={room.mobPrice ?? 0} initialDemob={room.demobPrice ?? 0} onClose={() => !busy && setShowCounter(false)} onSubmit={submitCounter} />
+      {flowMode && (
+        <CounterFlow
+          mode={flowMode}
+          room={room}
+          ar={ar}
+          L={L}
+          busy={busy}
+          error={counterErr}
+          resolutions={resolutions}
+          onResolveLocal={setResolution}
+          onReopenLocal={clearResolution}
+          unresolvedCount={unresolvedDisputed.length}
+          periodLabel={periodLabel}
+          periods={periods}
+          units={units}
+          onClose={() => !busy && setFlowMode(null)}
+          onCounter={submitCounter}
+          onAccept={doAccept}
+        />
       )}
 
       {showDocs && <DocumentsModal id={id} ar={ar} L={L} supplierName={room.supplier.name} onClose={() => setShowDocs(false)} />}
@@ -606,73 +622,221 @@ function fmtDocsTitle(L: (en: string, arr: string) => string, supplierName: stri
   return L(`${name}’s documents`, `مستندات ${name}`);
 }
 
-/** Styled in-app accept confirmation (replaces the browser confirm) — matches the app's deal dialog. */
-function CounterModal({ ar, L, busy, error, initialRate, initialMob, initialDemob, onClose, onSubmit }: { ar: boolean; L: (en: string, arr: string) => string; busy: boolean; error: string | null; initialRate: number; initialMob: number; initialDemob: number; onClose: () => void; onSubmit: (next: { rate: number; mobPrice?: number; demobPrice?: number }) => void }) {
-  const [val, setVal] = useState(initialRate > 0 ? String(initialRate) : "");
-  const [mob, setMob] = useState(initialMob > 0 ? String(initialMob) : "");
-  const [demob, setDemob] = useState(initialDemob > 0 ? String(initialDemob) : "");
-  const rate = Number(val);
-  const valid = val.trim() !== "" && !Number.isNaN(rate) && rate > 0;
-  const numOrUndef = (s: string) => { const n = Number(s); return s.trim() !== "" && !Number.isNaN(n) && n >= 0 ? n : undefined; };
-  const submit = () => onSubmit({ rate, mobPrice: numOrUndef(mob), demobPrice: numOrUndef(demob) });
-  const priceField = (label: string, v: string, set: (s: string) => void, unit: string, autoFocus = false) => (
-    <label className="mt-3 block">
-      <span className="text-[12px] font-bold" style={{ color: "var(--navy-mid,#33506e)" }}>{label}</span>
-      <div className="mt-1 flex items-center gap-2 rounded-[10px] border px-3" style={{ borderColor: "var(--border,#e5e7eb)", background: "var(--surface2,#f5f7fa)" }}>
-        <input type="number" inputMode="numeric" min={0} autoFocus={autoFocus} className="h-[44px] w-full bg-transparent text-[15px] font-bold outline-0" style={{ color: "var(--navy,#0f1e2e)" }} value={v} onChange={(e) => set(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && valid && !busy) submit(); }} placeholder="0" />
-        <span className="flex-none text-[12px] font-bold" style={{ color: "var(--muted,#6b7280)" }}>{unit}</span>
-      </div>
-    </label>
-  );
+/** Centered modal shell for the guided flow — a flex column card that scrolls its body. */
+function FlowShell({ ar, onClose, children }: { ar: boolean; onClose: () => void; children: ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" dir={ar ? "rtl" : "ltr"} onClick={onClose}>
-      <div className="w-full max-w-sm rounded-2xl bg-[var(--surface1,#fff)] p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full" style={{ background: "rgba(247,144,9,.12)" }}>
-          <span className="material-icons-outlined" style={{ color: "var(--action,#f7900a)", fontSize: 26 }}>swap_horiz</span>
-        </div>
-        <h3 className="text-center text-[17px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>{L("Send a counter-offer", "إرسال عرض مقابل")}</h3>
-        <p className="mt-1.5 text-center text-[13px] leading-relaxed" style={{ color: "var(--muted,#6b7280)" }}>
-          {L("Propose your daily rate and delivery/return prices. The supplier can accept or counter back.", "اقترح سعرك اليومي وأسعار التوصيل/الإرجاع. يمكن للمؤجّر قبولها أو الرد بعرض مقابل.")}
-        </p>
-        {priceField(L("Your daily rate (SAR)", "سعرك اليومي (ر.س)"), val, setVal, L("SAR / day", "ر.س / يوم"), true)}
-        {priceField(L("Mobilization / delivery (SAR)", "النقل / التوصيل (ر.س)"), mob, setMob, L("SAR", "ر.س"))}
-        {priceField(L("Return (SAR)", "الإرجاع (ر.س)"), demob, setDemob, L("SAR", "ر.س"))}
-        {error && <p className="mt-2 text-[12.5px] font-semibold" style={{ color: "#dc2626" }}>{error}</p>}
-        <div className="mt-5 flex gap-2.5">
-          <button className="flex-1 rounded-[10px] border px-4 py-2.5 text-[13px] font-bold disabled:opacity-50" style={{ borderColor: "var(--border,#e5e7eb)", color: "var(--navy,#0f1e2e)" }} disabled={busy} onClick={onClose}>{L("Cancel", "إلغاء")}</button>
-          <button className="flex-1 rounded-[10px] px-4 py-2.5 text-[13px] font-bold text-white disabled:opacity-50" style={{ background: "var(--action,#f7900a)" }} disabled={busy || !valid} onClick={submit}>{busy ? L("Sending…", "جارٍ الإرسال…") : L("Send counter", "إرسال العرض")}</button>
-        </div>
+      <div className="flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-[var(--surface1,#fff)] shadow-xl" onClick={(e) => e.stopPropagation()}>
+        {children}
       </div>
     </div>
   );
 }
 
-function AcceptModal({ ar, L, busy, rate, periods, units, grand, onClose, onConfirm }: { ar: boolean; L: (en: string, arr: string) => string; busy: boolean; rate: number; periods: number; units: number; grand: number; onClose: () => void; onConfirm: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" dir={ar ? "rtl" : "ltr"} onClick={onClose}>
-      <div className="w-full max-w-sm rounded-2xl bg-[var(--surface1,#fff)] p-5 text-center shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full" style={{ background: "rgba(22,163,74,.12)" }}>
-          <span className="material-icons-outlined" style={{ color: "#16a34a", fontSize: 26 }}>handshake</span>
-        </div>
-        <h3 className="text-[17px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>{L("Accept all terms?", "قبول جميع الشروط؟")}</h3>
-        <p className="mt-1.5 text-[13px] leading-relaxed" style={{ color: "var(--muted,#6b7280)" }}>
-          {L("This sends your acceptance to the supplier for final confirmation. The agreed terms will be locked in.", "سيتم إرسال قبولك للمؤجر للتأكيد النهائي. سيتم تثبيت الشروط المتفق عليها.")}
-        </p>
-        <div className="mt-3.5 rounded-[12px] px-4 py-3 text-start" style={{ background: "var(--surface2,#f5f7fa)" }}>
-          <div className="flex items-center justify-between text-[13px]">
-            <span style={{ color: "var(--muted,#6b7280)" }}>{L("Rate", "السعر")}</span>
-            <span className="font-bold" style={{ color: "var(--navy,#0f1e2e)" }}>{nf(rate)} × {periods}{units > 1 ? ` × ${units}` : ""}</span>
+/**
+ * Guided counter/accept flow — app parity (counter_offer_flow_sheet + accept flow). One 3-step modal
+ * (Terms → Price → Summary) drives BOTH modes:
+ *  · Step 1 Terms — reuses `DealRoomTerms` so the renter resolves each differing term LOCALLY
+ *    (accept / keep-mine / counter). Next is gated until nothing is left unresolved (the app's
+ *    "resolve all first" rule; the backend's accept-all-terms 409s otherwise).
+ *  · Step 2 Price — line items (daily rate / mobilization / return) with a live estimated total. In
+ *    ACCEPT mode these are read-only (you're accepting the standing offer); in COUNTER mode editable.
+ *  · Step 3 Summary — the composed offer + (accept only) a contract-type selector, plus an
+ *    acknowledgment. The CTA morphs: "Send counter offer" vs "Accept offer".
+ * Accept is preceded by a binding-commitment warning. Nothing is submitted until the final CTA — the
+ * parent's `submitCounter`/`doAccept` do the batched term + rate/accept-all call.
+ */
+function CounterFlow({
+  mode, room, ar, L, busy, error,
+  resolutions, onResolveLocal, onReopenLocal, unresolvedCount,
+  periodLabel, periods, units, onClose, onCounter, onAccept,
+}: {
+  mode: "counter" | "accept";
+  room: DealRoomView;
+  ar: boolean;
+  L: LFn;
+  busy: boolean;
+  error: string | null;
+  resolutions: ResolutionsMap;
+  onResolveLocal: (key: string, action: "accept" | "counter", value?: unknown) => void;
+  onReopenLocal: (key: string) => void;
+  unresolvedCount: number;
+  periodLabel: string;
+  periods: number;
+  units: number;
+  onClose: () => void;
+  onCounter: (next: { rate: number; mobPrice?: number; demobPrice?: number }) => void;
+  onAccept: (contractType: string) => void;
+}) {
+  const editable = mode === "counter";
+  // Accept is gated behind a binding-commitment warning first (app parity). Counter skips it.
+  const [bindingOk, setBindingOk] = useState(mode === "counter");
+  const [page, setPage] = useState(0); // 0 = Terms, 1 = Price, 2 = Summary
+  const [rateStr, setRateStr] = useState(room.rate ? String(room.rate) : "");
+  const [mobStr, setMobStr] = useState(room.mobPrice ? String(room.mobPrice) : "");
+  const [demobStr, setDemobStr] = useState(room.demobPrice ? String(room.demobPrice) : "");
+  const [contractType, setContractType] = useState(room.contractType ?? "formal");
+  const [ack, setAck] = useState(false);
+
+  const num = (s: string) => { const n = Number(s); return s.trim() !== "" && !Number.isNaN(n) && n >= 0 ? n : 0; };
+  const rate = editable ? num(rateStr) : (room.rate ?? 0);
+  const mob = editable ? num(mobStr) : (room.mobPrice ?? 0);
+  const demob = editable ? num(demobStr) : (room.demobPrice ?? 0);
+  const rateValid = rate > 0;
+  const subtotal = rate * periods * units + mob + demob;
+  const vat = Math.round(subtotal * 0.15);
+  const total = subtotal + vat;
+  const sar = L("SAR", "ر.س");
+  const money = (v: number) => `${nf(v)} ${sar}`;
+
+  const CONTRACT_TYPES: { value: string; label: string }[] = [
+    { value: "formal", label: L("Formal contract", "عقد رسمي") },
+    { value: "simple", label: L("Simple agreement", "اتفاق مبسّط") },
+    { value: "platform", label: L("Platform terms", "شروط المنصّة") },
+    { value: "direct", label: L("Direct", "مباشر") },
+    { value: "none", label: L("No contract", "بدون عقد") },
+  ];
+
+  // Binding-commitment warning before the accept flow.
+  if (!bindingOk) {
+    return (
+      <FlowShell ar={ar} onClose={onClose}>
+        <div className="p-5 text-center">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full" style={{ background: "rgba(217,54,42,.1)" }}>
+            <span className="material-icons-outlined" style={{ color: "#d9362a", fontSize: 26 }}>gavel</span>
           </div>
-          <div className="mt-1.5 flex items-center justify-between text-[14px]">
-            <span className="font-bold" style={{ color: "var(--navy,#0f1e2e)" }}>{L("Estimated total", "الإجمالي التقديري")}</span>
-            <span className="font-extrabold" style={{ color: "#16a34a" }}>{nf(grand)} {L("SAR", "ر.س")}</span>
+          <h3 className="text-[17px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>{L("This is a binding commitment", "هذا التزام مُلزِم")}</h3>
+          <p className="mt-1.5 text-[13px] leading-relaxed" style={{ color: "var(--muted,#6b7280)" }}>
+            {L("Accepting confirms the agreed rate and terms with the supplier for final confirmation. Please review the terms and price before you continue.", "القبول يؤكّد السعر والشروط المتفق عليها مع المؤجّر للتأكيد النهائي. يُرجى مراجعة الشروط والسعر قبل المتابعة.")}
+          </p>
+          <label className="mt-4 flex items-center justify-center gap-2 text-[13px] font-bold" style={{ color: "var(--navy,#0f1e2e)" }}>
+            <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />
+            {L("I understand this is binding", "أفهم أن هذا مُلزِم")}
+          </label>
+          <div className="mt-5 flex gap-2.5">
+            <button className="flex-1 rounded-[10px] border px-4 py-2.5 text-[13px] font-bold" style={{ borderColor: "var(--border,#e5e7eb)", color: "var(--navy,#0f1e2e)" }} onClick={onClose}>{L("Cancel", "إلغاء")}</button>
+            <button className="flex-1 rounded-[10px] px-4 py-2.5 text-[13px] font-bold text-white disabled:opacity-50" style={{ background: "#16a34a" }} disabled={!ack} onClick={() => { setAck(false); setBindingOk(true); }}>{L("Continue", "متابعة")}</button>
           </div>
         </div>
-        <div className="mt-5 flex gap-2.5">
-          <button className="flex-1 rounded-[10px] border px-4 py-2.5 text-[13px] font-bold disabled:opacity-50" style={{ borderColor: "var(--border,#e5e7eb)", color: "var(--navy,#0f1e2e)" }} disabled={busy} onClick={onClose}>{L("Cancel", "إلغاء")}</button>
-          <button className="flex-1 rounded-[10px] px-4 py-2.5 text-[13px] font-bold text-white disabled:opacity-50" style={{ background: "#16a34a" }} disabled={busy} onClick={onConfirm}>{busy ? L("Accepting…", "جارٍ القبول…") : L("Accept", "قبول")}</button>
-        </div>
-      </div>
+      </FlowShell>
+    );
+  }
+
+  const canNext = page === 0 ? unresolvedCount === 0 : page === 1 ? (editable ? rateValid : true) : true;
+  const canSubmit = editable ? rateValid && ack : ack;
+  const doSubmit = () =>
+    editable
+      ? onCounter({ rate, mobPrice: mob || undefined, demobPrice: demob || undefined })
+      : onAccept(contractType);
+
+  const priceRow = (label: string, v: string, set: (s: string) => void, ro: boolean) => (
+    <div className="mt-2.5 flex items-center justify-between rounded-[10px] border px-3 py-2" style={{ borderColor: "var(--border,#e5e7eb)", background: ro ? "var(--surface2,#f5f7fa)" : "var(--surface1,#fff)" }}>
+      <span className="text-[12.5px] font-bold" style={{ color: "var(--navy-mid,#33506e)" }}>{label}</span>
+      {ro ? (
+        <span className="text-[14px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>{money(num(v))}</span>
+      ) : (
+        <span className="flex items-center gap-1.5">
+          <input type="number" inputMode="numeric" min={0} value={v} onChange={(e) => set(e.target.value)} className="w-24 rounded-[8px] border px-2 py-1 text-end text-[14px] font-bold outline-0" style={{ borderColor: "var(--border,#e5e7eb)", color: "var(--navy,#0f1e2e)" }} placeholder="0" />
+          <span className="text-[11px] font-bold" style={{ color: "var(--muted,#6b7280)" }}>{sar}</span>
+        </span>
+      )}
     </div>
+  );
+
+  return (
+    <FlowShell ar={ar} onClose={() => !busy && onClose()}>
+      {/* header */}
+      <div className="flex items-center justify-between border-b px-5 py-3.5" style={{ borderColor: "var(--border,#e5e7eb)" }}>
+        <h3 className="text-[15px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>
+          {mode === "counter" ? L("Send a counter-offer", "إرسال عرض مقابل") : L("Accept the offer", "قبول العرض")}
+        </h3>
+        <button onClick={() => !busy && onClose()} className="grid h-8 w-8 place-items-center rounded-full" style={{ color: "var(--muted,#6b7280)" }} aria-label={L("Close", "إغلاق")}>
+          <span className="material-icons-outlined" style={{ fontSize: 18 }}>close</span>
+        </button>
+      </div>
+
+      {/* pagination dots */}
+      <div className="flex items-center justify-center gap-1.5 py-2.5">
+        {[0, 1, 2].map((i) => (
+          <span key={i} style={{ width: 7, height: 7, borderRadius: "50%", background: i === page ? "var(--action,#f7900a)" : "var(--border,#d4e0ec)", transition: "background .15s" }} />
+        ))}
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-2">
+        {page === 0 && (
+          <div>
+            <div className="mb-1.5 text-[13px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>{L("Review terms", "مراجعة الشروط")}</div>
+            {room.terms.length === 0 ? (
+              <p className="py-6 text-center text-[13px]" style={{ color: "var(--muted,#6b7280)" }}>{L("No terms to review.", "لا توجد شروط للمراجعة.")}</p>
+            ) : (
+              <DealRoomTerms terms={room.terms} ar={ar} L={L} busy={busy} resolutions={resolutions} onResolveLocal={onResolveLocal} onReopenLocal={onReopenLocal} />
+            )}
+            {unresolvedCount > 0 && (
+              <p className="mt-2 text-[12px] font-semibold" style={{ color: "var(--warn,#b45309)" }}>
+                {L(`Resolve ${unresolvedCount} differing term${unresolvedCount > 1 ? "s" : ""} to continue`, `قم بحل ${unresolvedCount} شرطًا مختلفًا للمتابعة`)}
+              </p>
+            )}
+          </div>
+        )}
+
+        {page === 1 && (
+          <div>
+            <div className="mb-1.5 text-[13px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>{editable ? L("Propose your price", "اقترح سعرك") : L("Price", "السعر")}</div>
+            {editable && (
+              <p className="mb-1 text-[12px]" style={{ color: "var(--muted,#6b7280)" }}>{L("The supplier can accept or counter back.", "يمكن للمؤجّر القبول أو الرد بعرض مقابل.")}</p>
+            )}
+            {priceRow(`${L("Daily rate", "السعر اليومي")} (${periodLabel})`, rateStr, setRateStr, !editable)}
+            {priceRow(L("Mobilization / delivery", "النقل / التوصيل"), mobStr, setMobStr, !editable)}
+            {priceRow(L("Return", "الإرجاع"), demobStr, setDemobStr, !editable)}
+            <div className="mt-3 flex items-center justify-between rounded-[10px] px-3 py-2.5" style={{ background: "var(--surface2,#f5f7fa)" }}>
+              <span className="text-[13px] font-bold" style={{ color: "var(--navy,#0f1e2e)" }}>{L("Estimated total", "الإجمالي التقديري")}</span>
+              <span className="text-[15px] font-extrabold" style={{ color: "var(--action,#f7900a)" }}>{money(total)}</span>
+            </div>
+            {editable && !rateValid && <p className="mt-2 text-[12px] font-semibold" style={{ color: "#d9362a" }}>{L("Enter a daily rate to continue", "أدخل سعرًا يوميًا للمتابعة")}</p>}
+          </div>
+        )}
+
+        {page === 2 && (
+          <div>
+            <div className="mb-1.5 text-[13px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>{L("Summary", "الملخّص")}</div>
+            <div className="rounded-[10px] border px-3 py-2.5" style={{ borderColor: "var(--border,#e5e7eb)" }}>
+              <div className="flex items-center justify-between text-[13px]"><span style={{ color: "var(--muted,#6b7280)" }}>{L("Rate", "السعر")}</span><b style={{ color: "var(--navy,#0f1e2e)" }}>{money(rate)} / {periodLabel}{units > 1 ? ` · ×${units}` : ""}</b></div>
+              {mob > 0 && <div className="mt-1 flex items-center justify-between text-[13px]"><span style={{ color: "var(--muted,#6b7280)" }}>{L("Mobilization", "النقل")}</span><b style={{ color: "var(--navy,#0f1e2e)" }}>{money(mob)}</b></div>}
+              {demob > 0 && <div className="mt-1 flex items-center justify-between text-[13px]"><span style={{ color: "var(--muted,#6b7280)" }}>{L("Return", "الإرجاع")}</span><b style={{ color: "var(--navy,#0f1e2e)" }}>{money(demob)}</b></div>}
+              <div className="mt-1.5 flex items-center justify-between border-t pt-1.5 text-[14px]" style={{ borderColor: "var(--border,#e5e7eb)" }}><b style={{ color: "var(--navy,#0f1e2e)" }}>{L("Estimated total", "الإجمالي التقديري")}</b><b style={{ color: "var(--action,#f7900a)" }}>{money(total)}</b></div>
+            </div>
+            {mode === "accept" && (
+              <label className="mt-3 block">
+                <span className="text-[12px] font-bold" style={{ color: "var(--navy-mid,#33506e)" }}>{L("Contract type", "نوع العقد")}</span>
+                <select value={contractType} onChange={(e) => setContractType(e.target.value)} className="mt-1 h-[42px] w-full rounded-[10px] border px-3 text-[14px] font-bold outline-0" style={{ borderColor: "var(--border,#e5e7eb)", color: "var(--navy,#0f1e2e)", background: "var(--surface1,#fff)" }}>
+                  {CONTRACT_TYPES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                </select>
+              </label>
+            )}
+            <label className="mt-3 flex items-start gap-2 text-[12.5px] font-semibold" style={{ color: "var(--navy,#0f1e2e)" }}>
+              <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} className="mt-0.5" />
+              {mode === "counter"
+                ? L("I confirm this counter-offer is correct.", "أؤكّد أن هذا العرض المقابل صحيح.")
+                : L("I confirm the agreed rate and terms.", "أؤكّد السعر والشروط المتفق عليها.")}
+            </label>
+            {error && <p className="mt-2 text-[12.5px] font-semibold" style={{ color: "#d9362a" }}>{error}</p>}
+          </div>
+        )}
+      </div>
+
+      {/* footer nav */}
+      <div className="flex items-center gap-2.5 border-t px-5 py-3.5" style={{ borderColor: "var(--border,#e5e7eb)" }}>
+        {page > 0 && (
+          <button className="rounded-[10px] border px-4 py-2.5 text-[13px] font-bold disabled:opacity-50" style={{ borderColor: "var(--border,#e5e7eb)", color: "var(--navy,#0f1e2e)" }} disabled={busy} onClick={() => setPage((p) => p - 1)}>{L("Back", "رجوع")}</button>
+        )}
+        {page < 2 ? (
+          <button className="rounded-[10px] px-5 py-2.5 text-[13px] font-bold text-white disabled:opacity-50" style={{ background: "var(--action,#f7900a)", marginInlineStart: "auto" }} disabled={!canNext} onClick={() => setPage((p) => p + 1)}>{L("Next", "التالي")}</button>
+        ) : (
+          <button className="rounded-[10px] px-5 py-2.5 text-[13px] font-bold text-white disabled:opacity-50" style={{ background: mode === "counter" ? "var(--action,#f7900a)" : "#16a34a", marginInlineStart: "auto" }} disabled={busy || !canSubmit} onClick={doSubmit}>
+            {busy ? L("Sending…", "جارٍ الإرسال…") : mode === "counter" ? L("Send counter offer", "إرسال العرض المقابل") : L("Accept offer", "قبول العرض")}
+          </button>
+        )}
+      </div>
+    </FlowShell>
   );
 }
