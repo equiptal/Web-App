@@ -171,9 +171,10 @@ export function mapDealRoom(raw: unknown): DealRoomView {
   const bid = (d.bid ?? {}) as Record<string, unknown>;
   const status = (s(d.status) as DealRoomStatus) ?? "NEGOTIATING";
   const lastCounterBy = s(d.lastCounterBy);
-  // Rentee's turn when negotiating and the last move wasn't the rentee's (supplier countered, or
-  // the opening bid is on the table). Other statuses are not actionable by the renter.
-  const myTurn = status === "NEGOTIATING" && lastCounterBy !== "rentee";
+  // Rentee's turn (app parity, deal_card_vm.dart): the renter can act whenever the deal is live and the
+  // last move wasn't theirs — that INCLUDES an OPEN room (the opening bid on the table, no counter yet),
+  // not just NEGOTIATING. Terminal (CLOSED/ABANDONED) and AWAITING_SUPPLIER_CONFIRMATION are not actionable.
+  const myTurn = (status === "OPEN" || status === "NEGOTIATING") && lastCounterBy !== "rentee";
 
   // Terms — surface the negotiable ones (drop PRICE; the rate card owns it). Keep the rest so the
   // renter can see matches and resolve any differing (disputed) term before accepting all.

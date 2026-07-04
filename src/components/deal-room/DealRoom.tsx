@@ -124,6 +124,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const [text, setText] = useState("");
   const channelRef = useRef<Channel | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const roomRefetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const errMsg = (e: unknown, fb: string) => (e instanceof ApiError ? (ar ? e.messageAr : e.detail) || fb : fb);
 
@@ -217,7 +218,14 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
         channelRef.current = ch;
         setMessages([...ch.state.messages] as ChatMsg[]);
         setChatReady(true);
-        ch.on("message.new", () => setMessages([...ch.state.messages] as ChatMsg[]));
+        ch.on("message.new", () => {
+          setMessages([...ch.state.messages] as ChatMsg[]);
+          // A supplier action (rate counter / term update / confirm / decline) arrives as a system
+          // message — refetch the room (debounced ~1.5s, app parity) so the status + terms reflect it
+          // immediately rather than waiting for the 15s poll.
+          if (roomRefetchTimer.current) clearTimeout(roomRefetchTimer.current);
+          roomRefetchTimer.current = setTimeout(() => { void loadRoom(); }, 1500);
+        });
       } catch {
         /* chat unavailable — the rest of the room still works */
       }
@@ -225,8 +233,11 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     return () => {
       cancelled = true;
       channelRef.current = null;
+      if (roomRefetchTimer.current) clearTimeout(roomRefetchTimer.current);
       client?.disconnectUser().catch(() => {});
     };
+    // loadRoom just re-reads fetchDealRoom(id) (id stable) — don't re-open the chat connection for it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   useEffect(() => {
@@ -427,7 +438,10 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
       )}
 
       {/* terms — show negotiable terms; the renter resolves any DIFFERING (disputed) one before accept */}
-      {room.terms.length > 0 && (
+      {/* App parity: terms are surfaced only when it's the renter's turn to act (the app shows them in a
+          turn-gated sheet, never inline while awaiting/closed). This also stops a resolved deal from still
+          showing a red "Conflict" card after acceptance/confirmation. */}
+      {room.myTurn && room.terms.length > 0 && (
         <div className="terms-card">
           <button type="button" className="tc-h tc-toggle" aria-expanded={termsOpen} onClick={() => { termsToggled.current = true; setTermsOpen((o) => !o); }}>
             <span className="material-icons-outlined">fact_check</span>
