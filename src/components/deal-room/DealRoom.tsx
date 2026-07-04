@@ -161,12 +161,13 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     setShowCounter(true);
   }
 
-  async function submitCounter(rate: number) {
+  async function submitCounter(next: { rate: number; mobPrice?: number; demobPrice?: number }) {
     if (!room || busy) return;
     setBusy(true);
     setCounterErr(null);
     try {
-      await proposeRate(id, { proposedRate: rate, priceUnit: room.priceUnit ?? "PER_DAY" });
+      // App parity: the counter step proposes the daily rate AND the mobilization/return prices together.
+      await proposeRate(id, { proposedRate: next.rate, priceUnit: room.priceUnit ?? "PER_DAY", mobPrice: next.mobPrice, demobPrice: next.demobPrice });
       await loadRoom();
       setShowCounter(false);
     } catch (e) {
@@ -176,7 +177,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     }
   }
 
-  async function onResolve(key: string, action: "accept" | "counter", value?: unknown) {
+  async function onResolve(key: string, action: "accept" | "counter" | "reopen", value?: unknown) {
     if (!room || busy) return;
     setBusy(true);
     try {
@@ -193,7 +194,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     if (!room || busy) return;
     setBusy(true);
     try {
-      await acceptDeal(id);
+      await acceptDeal(id, room.contractType ?? "platform", room.numberOfUnits || undefined);
       await loadRoom();
       setShowAccept(false);
     } catch (e) {
@@ -379,7 +380,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
       )}
 
       {showCounter && (
-        <CounterModal ar={ar} L={L} busy={busy} error={counterErr} initialRate={room.rate ?? 0} onClose={() => !busy && setShowCounter(false)} onSubmit={submitCounter} />
+        <CounterModal ar={ar} L={L} busy={busy} error={counterErr} initialRate={room.rate ?? 0} initialMob={room.mobPrice ?? 0} initialDemob={room.demobPrice ?? 0} onClose={() => !busy && setShowCounter(false)} onSubmit={submitCounter} />
       )}
 
       {showDocs && <DocumentsModal id={id} ar={ar} L={L} supplierName={room.supplier.name} onClose={() => setShowDocs(false)} />}
@@ -471,10 +472,23 @@ function fmtDocsTitle(L: (en: string, arr: string) => string, supplierName: stri
 }
 
 /** Styled in-app accept confirmation (replaces the browser confirm) — matches the app's deal dialog. */
-function CounterModal({ ar, L, busy, error, initialRate, onClose, onSubmit }: { ar: boolean; L: (en: string, arr: string) => string; busy: boolean; error: string | null; initialRate: number; onClose: () => void; onSubmit: (rate: number) => void }) {
+function CounterModal({ ar, L, busy, error, initialRate, initialMob, initialDemob, onClose, onSubmit }: { ar: boolean; L: (en: string, arr: string) => string; busy: boolean; error: string | null; initialRate: number; initialMob: number; initialDemob: number; onClose: () => void; onSubmit: (next: { rate: number; mobPrice?: number; demobPrice?: number }) => void }) {
   const [val, setVal] = useState(initialRate > 0 ? String(initialRate) : "");
+  const [mob, setMob] = useState(initialMob > 0 ? String(initialMob) : "");
+  const [demob, setDemob] = useState(initialDemob > 0 ? String(initialDemob) : "");
   const rate = Number(val);
   const valid = val.trim() !== "" && !Number.isNaN(rate) && rate > 0;
+  const numOrUndef = (s: string) => { const n = Number(s); return s.trim() !== "" && !Number.isNaN(n) && n >= 0 ? n : undefined; };
+  const submit = () => onSubmit({ rate, mobPrice: numOrUndef(mob), demobPrice: numOrUndef(demob) });
+  const priceField = (label: string, v: string, set: (s: string) => void, unit: string, autoFocus = false) => (
+    <label className="mt-3 block">
+      <span className="text-[12px] font-bold" style={{ color: "var(--navy-mid,#33506e)" }}>{label}</span>
+      <div className="mt-1 flex items-center gap-2 rounded-[10px] border px-3" style={{ borderColor: "var(--border,#e5e7eb)", background: "var(--surface2,#f5f7fa)" }}>
+        <input type="number" inputMode="numeric" min={0} autoFocus={autoFocus} className="h-[44px] w-full bg-transparent text-[15px] font-bold outline-0" style={{ color: "var(--navy,#0f1e2e)" }} value={v} onChange={(e) => set(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && valid && !busy) submit(); }} placeholder="0" />
+        <span className="flex-none text-[12px] font-bold" style={{ color: "var(--muted,#6b7280)" }}>{unit}</span>
+      </div>
+    </label>
+  );
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" dir={ar ? "rtl" : "ltr"} onClick={onClose}>
       <div className="w-full max-w-sm rounded-2xl bg-[var(--surface1,#fff)] p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
@@ -483,19 +497,15 @@ function CounterModal({ ar, L, busy, error, initialRate, onClose, onSubmit }: { 
         </div>
         <h3 className="text-center text-[17px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>{L("Send a counter-offer", "إرسال عرض مقابل")}</h3>
         <p className="mt-1.5 text-center text-[13px] leading-relaxed" style={{ color: "var(--muted,#6b7280)" }}>
-          {L("Propose your daily rate. The supplier can accept it or counter back.", "اقترح سعرك اليومي. يمكن للمؤجّر قبوله أو الرد بعرض مقابل.")}
+          {L("Propose your daily rate and delivery/return prices. The supplier can accept or counter back.", "اقترح سعرك اليومي وأسعار التوصيل/الإرجاع. يمكن للمؤجّر قبولها أو الرد بعرض مقابل.")}
         </p>
-        <label className="mt-4 block">
-          <span className="text-[12px] font-bold" style={{ color: "var(--navy-mid,#33506e)" }}>{L("Your daily rate (SAR)", "سعرك اليومي (ر.س)")}</span>
-          <div className="mt-1 flex items-center gap-2 rounded-[10px] border px-3" style={{ borderColor: "var(--border,#e5e7eb)", background: "var(--surface2,#f5f7fa)" }}>
-            <input type="number" inputMode="numeric" min={1} autoFocus className="h-[44px] w-full bg-transparent text-[15px] font-bold outline-0" style={{ color: "var(--navy,#0f1e2e)" }} value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && valid && !busy) onSubmit(rate); }} placeholder="0" />
-            <span className="flex-none text-[12px] font-bold" style={{ color: "var(--muted,#6b7280)" }}>{L("SAR / day", "ر.س / يوم")}</span>
-          </div>
-        </label>
+        {priceField(L("Your daily rate (SAR)", "سعرك اليومي (ر.س)"), val, setVal, L("SAR / day", "ر.س / يوم"), true)}
+        {priceField(L("Mobilization / delivery (SAR)", "النقل / التوصيل (ر.س)"), mob, setMob, L("SAR", "ر.س"))}
+        {priceField(L("Return (SAR)", "الإرجاع (ر.س)"), demob, setDemob, L("SAR", "ر.س"))}
         {error && <p className="mt-2 text-[12.5px] font-semibold" style={{ color: "#dc2626" }}>{error}</p>}
         <div className="mt-5 flex gap-2.5">
           <button className="flex-1 rounded-[10px] border px-4 py-2.5 text-[13px] font-bold disabled:opacity-50" style={{ borderColor: "var(--border,#e5e7eb)", color: "var(--navy,#0f1e2e)" }} disabled={busy} onClick={onClose}>{L("Cancel", "إلغاء")}</button>
-          <button className="flex-1 rounded-[10px] px-4 py-2.5 text-[13px] font-bold text-white disabled:opacity-50" style={{ background: "var(--action,#f7900a)" }} disabled={busy || !valid} onClick={() => onSubmit(rate)}>{busy ? L("Sending…", "جارٍ الإرسال…") : L("Send counter", "إرسال العرض")}</button>
+          <button className="flex-1 rounded-[10px] px-4 py-2.5 text-[13px] font-bold text-white disabled:opacity-50" style={{ background: "var(--action,#f7900a)" }} disabled={busy || !valid} onClick={submit}>{busy ? L("Sending…", "جارٍ الإرسال…") : L("Send counter", "إرسال العرض")}</button>
         </div>
       </div>
     </div>

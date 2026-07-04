@@ -262,7 +262,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
         {/* One consistent page container across the app (T1/T2): My Requests' 1440px width + a slightly
             larger horizontal gutter so content isn't flush to the sidebar / page edge. `wide` stays
             uncapped (My Requests caps itself at 1440 via .rproto). */}
-        <main className={fullBleed ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" : `mx-auto w-full px-6 py-6 pb-24 sm:px-10 sm:pt-7 md:py-7 lg:px-12 ${wide ? "max-w-none" : "max-w-[1440px]"}`}>{children}</main>
+        <main className={fullBleed ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" : `mx-auto w-full px-6 py-6 pb-24 sm:px-12 sm:pt-7 md:py-7 lg:px-20 xl:px-28 ${wide ? "max-w-none" : "max-w-[1440px]"}`}>{children}</main>
       </div>
 
       {/* Mobile bottom nav — the navy sidebar is desktop-only, so phones navigate from here. */}

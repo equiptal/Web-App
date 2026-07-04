@@ -271,5 +271,28 @@
 .dlproto .tcard-resolved-h { display: flex; align-items: center; gap: 9px; width: 100%; background: none; border: 0; cursor: pointer; padding: 10px 14px; font: inherit; text-align: start; }
 .dlproto .tcard-resolved-h .ok-tick { color: var(--success,#1daf58); font-size: 18px; flex: 0 0 auto; }
 .dlproto .tcard-resolved .tcard-val { margin-inline-start: auto; color: var(--navy-mid,#2a4f72); font-weight: 700; }
-.dlproto .tcard-peek { display: flex; flex-wrap: wrap; gap: 18px; padding: 0 14px 11px 38px; font-size: 12px; color: var(--muted,#6b8fa8); }
+.dlproto .tcard-peek { display: flex; flex-direction: column; gap: 8px; padding: 0 14px 11px 38px; font-size: 12px; color: var(--muted,#6b8fa8); }
 .dlproto .tcard-peek b { color: var(--navy,#1c3550); }
+
+/* ── App-parity term rows: grouping + progress meter + 4 reference value rows ── */
+.dlproto .terms-progress { padding: 6px 4px 2px; }
+.dlproto .terms-progress-h { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 800; color: var(--navy,#1c3550); margin-bottom: 5px; }
+.dlproto .terms-progress-h .tp-open { color: var(--warning,#d4780a); }
+.dlproto .terms-progress-bar { height: 6px; border-radius: 6px; background: var(--surface3,#e4eaf1); overflow: hidden; }
+.dlproto .terms-progress-bar > div { height: 100%; border-radius: 6px; background: var(--success,#1daf58); transition: width .25s; }
+.dlproto .terms-group { display: flex; flex-direction: column; gap: 8px; }
+.dlproto .terms-group-h { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--muted,#6b8fa8); margin: 8px 2px 0; }
+.dlproto .terms-group-h span { background: var(--surface3,#e4eaf1); color: var(--navy-mid,#2a4f72); border-radius: 999px; padding: 0 7px; font-size: 10px; }
+/* reference value rows (Current / You / Supplier / Platform default) */
+.dlproto .tcard-vrs { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.dlproto .tcard-vr { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.dlproto .tcard-vr .k { font-size: 11px; font-weight: 700; color: var(--muted,#6b8fa8); }
+.dlproto .tcard-vr b { font-size: 13px; font-weight: 600; color: var(--navy,#1c3550); text-align: end; }
+.dlproto .tcard-vr b.cur { font-weight: 800; }
+.dlproto .tcard-warn { color: var(--warning,#d4780a); font-size: 17px; flex: 0 0 auto; }
+/* fixed (locked) row + mandatory badge */
+.dlproto .tcard-fixed { padding: 0; background: var(--surface2,#f2f6fa); }
+.dlproto .tcard-fixed .lock-tick { color: var(--navy,#1c3550); font-size: 17px; flex: 0 0 auto; }
+.dlproto .tcard-state.st-mand { background: rgba(217,54,42,.12); color: var(--danger,#d9362a); font-weight: 900; }
+.dlproto .tcard-reopen { align-self: flex-start; background: none; border: 0; padding: 0; font: inherit; font-size: 11.5px; font-weight: 700; color: var(--navy-mid,#2a4f72); text-decoration: underline; cursor: pointer; }
+.dlproto .tcard-reopen:disabled { opacity: .5; cursor: default; }

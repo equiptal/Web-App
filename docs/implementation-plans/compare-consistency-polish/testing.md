@@ -58,3 +58,61 @@ Reference flow from the earlier test case (create → link bid + app bid → com
 ## Exit criteria
 - A + automated green (tsc / vitest / eslint).
 - B + C + D executed on staging with results recorded; any [BE] gap (esp. T16 accepted‑rate, survey outcome) raised as a `⚠ Backend` handoff.
+
+---
+
+# Full manual test checklist — everything shipped this epic (run on staging)
+
+**One setup that exercises most of it:** create a BROADCAST request with **2 items**, one **multi‑unit** (Forklift ×3); operator required, operator cert = **SPSP**, equipment safety cert = **TÜV**; **delivery = supplier, return = me**; maintenance = supplier; **start+end dates** (a duration); FAT accom/transport = me. Place **1 in‑app bid** (declares TÜV, FAT accom on supplier) + **1 off‑platform link bid** (offer a partial count; say No to Accommodation & transport).
+
+## Layout & navigation
+- [ ] Every page (requests, compare, inbox, profile, create, deal‑room) shares the same **1440 width + gutter**; nothing flush to the sidebar/edge; no horizontal scroll.
+- [ ] Post‑submit "View request & bids" → the **group detail** with ALL items (not a single‑item page).
+- [ ] Request tabs ordered by **date, newest first**.
+
+## Create / spec sheet
+- [ ] Safety cert set in "Settings for all" appears on **each item** (per‑item, overridable).
+- [ ] Review step shows an **Operator details** block (only for items needing an operator).
+- [ ] Export/Excel spec sheet has **Safety cert** + **Operator cert / Food / Accom. & transport** columns.
+
+## Bid form (public link)
+- [ ] Multi‑unit item shows a **−/+ stepper**; lowering it updates the Qty column + totals (partial bid).
+- [ ] VAT toggle at the price box works; unit pill is **subtle grey**.
+
+## Bid cards (in‑app + link)
+- [ ] **No cert/term chips** on the Equipment row — only "Equipment … Details ›".
+- [ ] Off‑platform card: **"Valid until"** on the top row; **Details** modal opens with the **item name** title + year/cert + self‑declared note.
+- [ ] Expand price on one card → **others stay collapsed**; price breakdown opens **Per unit** by default.
+- [ ] Status pill reflects **Accepted** (deal‑room accept) or **Awarded** (survey win).
+
+## Bid comparison — layout
+- [ ] Tabs lead with the **RFQ group code** (like the requests screen).
+- [ ] Column **source chips** match the card banners (orange off‑platform / blue in‑app).
+- [ ] **Distinct bid counts** agree across fulfilment / "View all bids" / tab / per‑item (a link submission spanning 2 items counts once).
+- [ ] Doc viewer has a **download** button (view + download any CR/VAT/ownership file).
+- [ ] Terms modal → **3 tabs** (Conflict / Pending review / Matched); conflict names the **specific** cert; off‑platform bids have **no Pending tab**.
+
+## Bid comparison — correctness (the big one)
+- [ ] **Cost terms** coloured by truth: matches request → **green** (incl. "Fuel · you"); deviates → **red**; extras → blue. In‑app terms are no longer grey.
+- [ ] **Operator cert**: required SPSP + supplier declared TÜV → **red** (green only if it satisfies the requirement or the deal room agreed it).
+- [ ] **Equipment cert**: required green/red **+ held‑but‑not‑required** cert shown as a **blue** extra.
+- [ ] **Proof of ownership**: any equipment doc → **blue** clickable chip; none → **`—`**; never red.
+- [ ] **Year**: confirmed → green `≥ 2022`; declined → **red "Not met"**, visible even in the green Recommended column.
+- [ ] **Maintenance** on a shared‑link bid shows the request's party (e.g. `· supplier`), not `—`.
+- [ ] **Mob/demob = one row**: supplier‑borne total headline + breakdown "Delivery: … · Return: …" (renter part = "on you", supplier part = price).
+- [ ] **Estimated rental** = a smaller **blue** sub under Rental cost (not its own row).
+- [ ] Notes read "…in the deal room **for bids in app**"; equipment banner is **one** merged line (multi‑unit variant shows "1 of N units").
+- [ ] **PRICES FOR** defaults to **Per unit**.
+
+## Deal‑room / survey dependent
+- [ ] Negotiate a rate in the deal room → comparison **and** card show the **live rate** (~20s / refocus).
+- [ ] **Accept** a bid → "Accepted — request closed" banner + winner badge + others' Award disabled; survives reload.
+- [ ] Report a **bidder** winner in the Outcome Survey → shows **"Awarded"** (`wonViaSurvey`).
+
+## RFQ code (gated on backend `getMyMarketplaceRequests` returning `groupRef`)
+- [ ] Once deployed: requests tabs / strip / comparison show **`RFQ-…`** for every request incl. bid‑less. Until then, `REQ-…` (no regression).
+
+## Arabic / RTL (quick pass)
+- [ ] Switch to AR on comparison + cards → labels translated, layout mirrored, chips/banners RTL.
+
+**Known backend‑gated:** RFQ code on bid‑less requests (needs `groupRef` in `my-requests`). Everything else is web‑complete + live once deployed.

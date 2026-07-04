@@ -226,13 +226,13 @@ export function fetchStreamToken(id: string): Promise<{ token: string | null; us
 }
 
 /** Counter the offer with a new rate. */
-export function proposeRate(id: string, body: { proposedRate: number; priceUnit: string; message?: string }): Promise<unknown> {
+export function proposeRate(id: string, body: { proposedRate: number; priceUnit: string; mobPrice?: number; demobPrice?: number; message?: string }): Promise<unknown> {
   return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/rate-proposal`, body);
 }
 
 /** Accept the current offer (accept all terms → confirm). */
-export function acceptDeal(id: string, contractType = "platform"): Promise<unknown> {
-  return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/accept`, { contractType });
+export function acceptDeal(id: string, contractType = "platform", agreedUnits?: number): Promise<unknown> {
+  return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/accept`, agreedUnits != null ? { contractType, agreedUnits } : { contractType });
 }
 
 /** Resolve one negotiable term — accept the supplier's value, counter it, or reopen. */

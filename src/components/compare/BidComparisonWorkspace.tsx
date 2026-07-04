@@ -104,6 +104,9 @@ export function BidComparisonWorkspace() {
   const [estimateOpen, setEstimateOpen] = useState(false); // §6: one multi-field "Estimate your own costs" popup
   const [estDraft, setEstDraft] = useState<Record<string, string>>({});
   const [renterMob, setRenterMob] = useState<Record<string, number>>({}); // renter's own delivery (mob/demob) estimate per bid
+  // Request-level delivery/return estimate — mob/demob assignment is the same for every bid, so when
+  // it's "on you" the renter estimates it once (in the "Estimate your costs" popup), not per bid.
+  const [renterMobEst, setRenterMobEst] = useState<{ delivery?: number; return?: number }>({});
   const [docView, setDocView] = useState<{ label: string; url: string | null; value?: string | null; loading: boolean } | null>(null); // in-app document viewer (url = uploaded file; value = captured form text)
   // Presigned documents (company verification + equipment) per bid, fetched on demand from
   // /api/me/bids/:id/documents — drives the "green if the doc exists" chips and the in-app viewer.
@@ -184,10 +187,10 @@ export function BidComparisonWorkspace() {
     // Only surface locations that actually have bids to compare (fall back to all if none do).
     const all = [...map.values()];
     const withBids = all.filter((n) => n.bidCount > 0);
-    const ranked = (withBids.length ? withBids : all).sort((a, b) => b.bidCount - a.bidCount);
-    // Demo ordering: Airport project first.
-    const isAir = (n: LocationNode) => /airport|مطار/i.test(n.label || "");
-    return [...ranked.filter(isAir), ...ranked.filter((n) => !isAir(n))];
+    // Order the RFQ tabs by date, newest first — so the latest request leads (matches the My Requests
+    // / My Bids tab order). createdAt comes from the group; a missing date sorts last.
+    const ts = (n: LocationNode) => (n.groups[0]?.createdAt ? new Date(n.groups[0].createdAt as string).getTime() : 0);
+    return (withBids.length ? withBids : all).sort((a, b) => ts(b) - ts(a));
   }, [groups, ar, linkByRequest]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -247,6 +250,12 @@ export function BidComparisonWorkspace() {
   useEffect(() => {
     try { localStorage.setItem("cmp-renter-costs", JSON.stringify(renterCosts)); } catch {}
   }, [renterCosts]);
+  useEffect(() => {
+    try { const raw = localStorage.getItem("cmp-renter-mob-est"); if (raw) setRenterMobEst(JSON.parse(raw)); } catch {}
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem("cmp-renter-mob-est", JSON.stringify(renterMobEst)); } catch {}
+  }, [renterMobEst]);
 
   // Auto-refresh: while any compared bid has an active deal room, poll its live term state (locked →
   // agreed, counter → negotiating, deviation → conflict) so the matrix + Terms stay in sync without a
@@ -368,12 +377,15 @@ export function BidComparisonWorkspace() {
   const itemSpec = itemSpecParts.join(" · ");
   const mobByRentee = activeItemObj?.mobByRentee ?? null; // who YOUR request assigned DELIVERY (mobilization) to (true = you, false = supplier)
   const demobByRentee = activeItemObj?.demobByRentee ?? null; // …and RETURN (demobilization) — can differ from delivery
+  // The renter's request-level delivery/return estimate that lands on them (only the parts assigned to
+  // "you"). Same for every bid, so it's entered once in the "Estimate your costs" popup.
+  const mobEstOnYou = (mobByRentee === true ? (renterMobEst.delivery ?? 0) : 0) + (demobByRentee === true ? (renterMobEst.return ?? 0) : 0);
   // Displayed total = the supplier's STATED costs + 15% VAT + the renter's own entered costs (responsibilities
   // on them + their delivery estimate). Always shown as a running total of what's known — never "not stated".
   const VAT = 0.15;
   // A cost the renter adds counts toward their total unless the supplier already covers it (AC-12).
   // (Matches the chips: you can only add a cost where bidSide !== "supplier".)
-  const renterAddBid = (c: BidColumn) => c.costResponsibilities.reduce((s, x) => (x.renterCost && x.bidSide !== "supplier" ? s + x.renterCost : s), 0) + (renterMob[c.bid.id] ?? 0);
+  const renterAddBid = (c: BidColumn) => c.costResponsibilities.reduce((s, x) => (x.renterCost && x.bidSide !== "supplier" ? s + x.renterCost : s), 0) + (renterMob[c.bid.id] ?? mobEstOnYou);
   // §6 toggles drive the totals: displayQuote re-expresses rate for the chosen RATE PERIOD and scales
   // every figure by PRICES-FOR. unitsOf is PER COLUMN = the units that supplier offered (1 when "Per unit").
   const dq = (c: BidColumn) => displayQuote(c.bid, period, pricesFor, durationDays);
@@ -484,18 +496,43 @@ export function BidComparisonWorkspace() {
   const requiredResp = RESP_META.filter((m) => cols.some((c) => c.costResponsibilities.find((x) => x.key === m.key)?.requestSide != null));
   // The responsibilities the request put on the RENTER → the fields of the "Estimate your own costs" popup.
   const youTerms = requiredResp.filter((m) => cols.some((c) => c.costResponsibilities.find((x) => x.key === m.key)?.requestSide === "me"));
-  const estTotal = youTerms.reduce((s, m) => s + (renterCosts[m.key] ?? 0), 0);
-  const openEstimate = () => { const d: Record<string, string> = {}; for (const m of youTerms) { const v = renterCosts[m.key]; if (v != null) d[m.key] = String(v); } setEstDraft(d); setEstimateOpen(true); };
+  // Delivery/return are estimable in the popup only when the request put them on the renter.
+  const showDeliveryEst = mobByRentee === true;
+  const showReturnEst = demobByRentee === true;
+  const estTotal = youTerms.reduce((s, m) => s + (renterCosts[m.key] ?? 0), 0) + mobEstOnYou;
+  const openEstimate = () => {
+    const d: Record<string, string> = {};
+    for (const m of youTerms) { const v = renterCosts[m.key]; if (v != null) d[m.key] = String(v); }
+    if (showDeliveryEst && renterMobEst.delivery != null) d.__delivery = String(renterMobEst.delivery);
+    if (showReturnEst && renterMobEst.return != null) d.__return = String(renterMobEst.return);
+    setEstDraft(d); setEstimateOpen(true);
+  };
   const saveEstimate = () => {
     setRenterCosts((p) => {
       const next = { ...p };
       for (const m of youTerms) { const n = parseInt((estDraft[m.key] ?? "").replace(/[^0-9]/g, ""), 10); if (n > 0) next[m.key] = n; else delete next[m.key]; }
       return next;
     });
+    // Delivery/return land on the renter at the request level — save them once, applied to every bid.
+    setRenterMobEst(() => {
+      const dv = showDeliveryEst ? parseInt((estDraft.__delivery ?? "").replace(/[^0-9]/g, ""), 10) : 0;
+      const rv = showReturnEst ? parseInt((estDraft.__return ?? "").replace(/[^0-9]/g, ""), 10) : 0;
+      const next: { delivery?: number; return?: number } = {};
+      if (dv > 0) next.delivery = dv;
+      if (rv > 0) next.return = rv;
+      return next;
+    });
     setEstimateOpen(false);
   };
   // §6 rule: the operator row appears only when the request requires an operator certificate.
   const operatorRequired = cols.some((c) => !!c.bid.operatorCertReq);
+  // "Operator included" is an acknowledge term the request asks when it needs an operator. In-app bids
+  // carry it on negotiableTerms; off-platform link bids put it on terms.contract (the column's .cost).
+  // Surface it in the Equipment section so a supplier's "No" (conflict) reads as red there, not only in
+  // the terms modal.
+  const operIncOf = (c: BidColumn) =>
+    c.cost.find((r) => r.key === "operator_included") ?? (c.bid.negotiableTerms ?? []).find((r) => r.key === "operator_included");
+  const operatorIncludedAsked = cols.some((c) => { const t = operIncOf(c); return !!t && t.state !== "grey"; });
 
   // Ask Mansour to rank + recommend whenever the candidate set / preset / free text / costs change.
   const recKey = useMemo(() => baseCols.map((c) => c.bid.id).join(","), [baseCols]);
@@ -1105,9 +1142,13 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                       <RowHead title={L("Mobilization + demob", "النقل + الإرجاع")} sub={L("delivery + return", "التوصيل + الإرجاع")} />
                       {cols.map((c, idx) => {
                         const rm = renterMob[c.bid.id];
-                        // Breakdown token per part: renter → "on you"; supplier + priced → SAR X; supplier + not priced → red "—".
-                        const token = (p: { stated: boolean; value: number }, by: boolean | null) =>
-                          by === true ? <span style={{ color: C.rentee, fontWeight: 700 }}>{L("on you", "عليك")}</span>
+                        // The renter's own estimate per on-you part (request-level, from the "Estimate your costs" popup).
+                        const deliveryEst = mobByRentee === true ? (renterMobEst.delivery ?? 0) : 0;
+                        const returnEst = demobByRentee === true ? (renterMobEst.return ?? 0) : 0;
+                        // Breakdown token per part: renter → "on you" (+ their estimate when entered); supplier + priced
+                        // → SAR X; supplier + not priced → red "—".
+                        const token = (p: { stated: boolean; value: number }, by: boolean | null, est = 0) =>
+                          by === true ? <span style={{ color: C.rentee, fontWeight: 700 }}>{L("on you", "عليك")}{est > 0 ? ` · ~${sar} ${nf(est)}` : ""}</span>
                             : p.stated ? <span style={{ color: C.navy, fontWeight: 800 }}>{sar} {nf(p.value)}</span>
                             : <span style={{ color: by === false ? C.danger : C.muted, fontWeight: 700 }}>—</span>;
                         // Headline = the SUPPLIER-borne total (parts not on the renter). Parts on you aren't priced here.
@@ -1115,8 +1156,13 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         const supTotal = supUnit * unitsOf(c);
                         const conflict = (mobByRentee === false && !c.mob.stated) || (demobByRentee === false && !c.demob.stated);
                         const anyOnRenter = mobByRentee === true || demobByRentee === true;
+                        // An on-you part the renter hasn't estimated yet → offer the popup.
+                        const unestimated = (mobByRentee === true && deliveryEst === 0) || (demobByRentee === true && returnEst === 0);
+                        const estimateBtn = anyOnRenter && unestimated && !rm ? (
+                          <button onClick={openEstimate} className="inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[9.5px] font-extrabold" style={{ color: C.rentee, borderColor: "rgba(37,99,235,.4)", background: "#fff" }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>add</span>{L("estimate", "قدّر")}</button>
+                        ) : null;
                         const breakdown = (
-                          <Sub><span className="inline-flex flex-wrap items-center gap-1">{L("Delivery", "التوصيل")}: {token(c.mob, mobByRentee)} · {L("Return", "الإرجاع")}: {token(c.demob, demobByRentee)}{unitsOf(c) > 1 && supUnit > 0 ? ` · × ${unitsOf(c)} ${L("units", "وحدة")}` : ""}</span></Sub>
+                          <Sub><span className="inline-flex flex-wrap items-center gap-1">{L("Delivery", "التوصيل")}: {token(c.mob, mobByRentee, deliveryEst)} · {L("Return", "الإرجاع")}: {token(c.demob, demobByRentee, returnEst)}{unitsOf(c) > 1 && supUnit > 0 ? ` · × ${unitsOf(c)} ${L("units", "وحدة")}` : ""} {estimateBtn}</span></Sub>
                         );
                         return (
                           <Td key={c.bid.id} ok={!conflict} fail={conflict}>
@@ -1132,11 +1178,11 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                                 <button onClick={() => addMobCost(c.bid.id, L("Delivery + return", "النقل والإرجاع"))} className="text-[10px] font-bold underline" style={{ color: C.rentee }}>{L("edit", "تعديل")}</button>
                                 <button onClick={() => removeMobCost(c.bid.id)} title={L("Remove your estimate", "إزالة تقديرك")} className="grid h-4 w-4 place-items-center rounded-full" style={{ background: C.surface3, color: C.muted }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>close</span></button>
                               </span>
-                              <Sub>{L("your estimate", "تقديرك")} · {L("Delivery", "التوصيل")}: {token(c.mob, mobByRentee)} · {L("Return", "الإرجاع")}: {token(c.demob, demobByRentee)}</Sub>
+                              <Sub>{L("your estimate", "تقديرك")} · {L("Delivery", "التوصيل")}: {token(c.mob, mobByRentee, deliveryEst)} · {L("Return", "الإرجاع")}: {token(c.demob, demobByRentee, returnEst)}</Sub>
                             </>) : conflict ? (
                               <><span className="inline-flex items-center gap-1.5 text-[12px] font-bold" style={{ color: C.danger }}>{L("supplier didn't include it", "لم يُدرجه المؤجّر")}</span>{breakdown}</>
                             ) : (
-                              <><span className="inline-flex items-center gap-1.5 text-[12px]" style={{ color: C.muted }}>{anyOnRenter ? L("on you", "عليك") : L("not stated", "غير محدد")}{anyOnRenter && <button onClick={() => addMobCost(c.bid.id, L("Delivery + return", "النقل والإرجاع"))} className="inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[9.5px] font-extrabold" style={{ color: C.rentee, borderColor: "rgba(37,99,235,.4)", background: "#fff" }}><span className="material-icons-outlined" style={{ fontSize: 11 }}>add</span>{L("add cost", "أضف تكلفة")}</button>}</span>{breakdown}</>
+                              <><span className="inline-flex items-center gap-1.5 text-[12px]" style={{ color: C.muted }}>{anyOnRenter ? (mobEstOnYou > 0 ? `${sar} ${nf(mobEstOnYou)}` : L("on you", "عليك")) : L("not stated", "غير محدد")}</span>{breakdown}</>
                             )}
                           </Td>
                         );
@@ -1149,7 +1195,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                       <td className="sticky start-0 z-[1] align-top text-[12.5px]" style={{ background: C.surface2, color: C.navy, fontWeight: 900, width: 200, minWidth: 200, padding: "14px 16px" }}>
                         {L("Cost terms", "شروط التكلفة")}
                         <span className="mt-0.5 block text-[10.5px] font-semibold" style={{ color: C.muted }}>{L("who handles what", "من يتحمّل ماذا")}</span>
-                        {youTerms.length > 0 && (
+                        {(youTerms.length > 0 || showDeliveryEst || showReturnEst) && (
                           <button onClick={openEstimate} className="mt-2 inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-extrabold" style={{ borderColor: "rgba(37,99,235,.4)", color: C.rentee, background: C.renteeDim, borderStyle: "dashed" }}>
                             🧮 {estTotal > 0 ? L(`Your est. ~${sar} ${nf(estTotal)}`, `تقديرك ~${sar} ${nf(estTotal)}`) : L("Estimate your costs", "قدّر تكاليفك")}
                           </button>
@@ -1171,7 +1217,12 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                               const fg = tone === "green" ? C.success : tone === "red" ? C.danger : C.muted;
                               const bd = tone === "green" ? "rgba(29,175,88,.3)" : tone === "red" ? "rgba(217,54,42,.3)" : C.border;
                               const side = cr.bidSide ?? cr.requestSide;
-                              const owner = tone === "red" ? L("conflict", "تعارض") : side === "supplier" ? L("supplier", "المؤجّر") : side === "me" ? L("you", "أنت") : L("—", "—");
+                              // On a conflict, name BOTH sides — what the request asked ("your choice") vs the
+                              // supplier's position — instead of a bare "conflict" (user: show what the conflict is).
+                              const sideLabel = (sd: string | null | undefined) => sd === "supplier" ? L("supplier", "المؤجّر") : sd === "me" ? L("you", "أنت") : null;
+                              const owner = tone === "red"
+                                ? `${L("your choice", "اختيارك")}: ${sideLabel(cr.requestSide) ?? "—"} · ${L("supplier", "المؤجّر")}: ${sideLabel(cr.bidSide) ?? L("declined", "رفض")}`
+                                : side === "supplier" ? L("supplier", "المؤجّر") : side === "me" ? L("you", "أنت") : L("—", "—");
                               const entered = renterCosts[m.key];
                               return (
                                 <span key={m.key} className="inline-flex items-center gap-1 self-start px-[9px] py-1 text-[11px]" style={{ background: bg, color: fg, fontWeight: 800, borderRadius: 7, border: `1px solid ${bd}` }}>
@@ -1308,6 +1359,20 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         })}
                       </tr>
                     ))}
+                    {/* Operator included — acknowledge term. Green ✓ "Included" when the supplier includes an
+                        operator, red ✗ "Not included" on a conflict (e.g. link supplier said No to a required
+                        operator). Reflects the same truth the terms modal shows, inside the Equipment section. */}
+                    {operatorIncludedAsked && (
+                    <tr>
+                      <RowHead title={L("Operator", "المشغّل")} sub={L("required", "مطلوب")} />
+                      {cols.map((c) => {
+                        const t = operIncOf(c);
+                        if (!t || t.state === "grey") return <Td key={c.bid.id}><span style={{ color: C.muted }}>—</span></Td>;
+                        const included = t.state === "matched" || t.state === "agreed";
+                        return <Td key={c.bid.id} ok={included} fail={!included}>{certPill(included ? L("Included", "مشمول") : L("Not included", "غير مشمول"), included)}</Td>;
+                      })}
+                    </tr>
+                    )}
                     {/* L3 operator certificate — a DECLARED deal-room term, never a verified pill. Sub shows the
                         rentee's required license level; each cell the supplier's declared position (t3Declarations). */}
                     {operatorRequired && (
@@ -1325,7 +1390,22 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         const declaredOk = !!declared && !/not\s*confirmed|غير|لم/i.test(declared);
                         const satisfiesReq = declaredOk && norm(declared).split(" ").some((tok) => tok.length > 1 && norm(req).includes(tok));
                         const met = term?.state === "agreed" ? true : term?.state === "conflict" ? false : satisfiesReq;
-                        return <Td key={c.bid.id} ok={met} fail={!met}>{certPill(req, met)}</Td>;
+                        // T12 parity with the equipment-cert row: when the supplier DECLARED a real cert that
+                        // doesn't satisfy the requirement (e.g. required SPSP, declared TÜV), show it as a BLUE
+                        // "extra" chip next to the red required one — so the renter sees what they DO hold.
+                        const showExtra = !met && declaredOk && !!declared && !satisfiesReq;
+                        return (
+                          <Td key={c.bid.id} ok={met} fail={!met}>
+                            <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
+                              {certPill(req, met)}
+                              {showExtra && (
+                                <span className="inline-flex items-center gap-1 text-[11.5px]" title={L("Declared — doesn’t meet the requirement", "مُعلن — لا يفي بالمطلوب")} style={{ background: C.renteeDim, color: C.rentee, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: "1px solid rgba(37,99,235,.3)" }}>
+                                  <span className="material-icons-outlined" style={{ fontSize: 11 }}>add</span>{declared}
+                                </span>
+                              )}
+                            </span>
+                          </Td>
+                        );
                       })}
                     </tr>
                     )}
@@ -1530,9 +1610,25 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                   </div>
                 </div>
               ))}
+              {/* Delivery / return that the request put on YOU — estimate them here too (they land on you
+                  regardless of which supplier, so they're entered once). */}
+              {([["__delivery", L("Delivery (on you)", "التوصيل (عليك)"), showDeliveryEst], ["__return", L("Return (on you)", "الإرجاع (عليك)"), showReturnEst]] as const)
+                .filter(([, , show]) => show)
+                .map(([key, label]) => (
+                  <div key={key}>
+                    <label className="mb-1.5 block text-[12.5px] font-extrabold" style={{ color: C.navy }}>{label}</label>
+                    <div className="flex h-[48px] items-center gap-2.5 rounded-lg border px-4" style={{ background: C.surface2, borderColor: C.border }}>
+                      <span className="text-[13px] font-extrabold" style={{ color: C.muted }}>{sar}</span>
+                      <input type="number" inputMode="numeric" min={0} value={estDraft[key] ?? ""} onChange={(e) => setEstDraft((p) => ({ ...p, [key]: e.target.value }))} placeholder="0" className="min-w-0 flex-1 bg-transparent text-[15px] font-bold outline-none" style={{ color: C.navy }} />
+                    </div>
+                  </div>
+                ))}
+              {youTerms.length === 0 && !showDeliveryEst && !showReturnEst && (
+                <p className="m-0 text-[13px] font-semibold" style={{ color: C.muted }}>{L("Nothing on you to estimate — the request put every cost on the supplier.", "لا شيء عليك لتقديره — وضع الطلب كل التكاليف على المؤجّر.")}</p>
+              )}
             </div>
             <div className="flex items-center justify-between gap-3 border-t px-6 py-4" style={{ borderColor: C.line }}>
-              <span className="text-[13px] font-extrabold" style={{ color: C.navy }}>{L("Your total est.", "إجمالي تقديرك")} <span style={{ color: C.rentee }}>{sar} {nf(youTerms.reduce((s, m) => s + (parseInt((estDraft[m.key] ?? "").replace(/[^0-9]/g, ""), 10) || 0), 0))}</span></span>
+              <span className="text-[13px] font-extrabold" style={{ color: C.navy }}>{L("Your total est.", "إجمالي تقديرك")} <span style={{ color: C.rentee }}>{sar} {nf(["__delivery", "__return", ...youTerms.map((m) => m.key)].reduce((s, k) => s + (parseInt((estDraft[k] ?? "").replace(/[^0-9]/g, ""), 10) || 0), 0))}</span></span>
               <div className="flex gap-2.5">
                 <button onClick={() => setEstimateOpen(false)} className="rounded-lg border px-4 py-2 text-[13px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>{L("Cancel", "إلغاء")}</button>
                 <button onClick={saveEstimate} className="rounded-lg px-5 py-2 text-[13px] font-bold text-white" style={{ background: C.rentee }}>{L("Save estimate", "حفظ التقدير")}</button>

@@ -240,11 +240,16 @@ function reducer(state: RfqState, a: Action): RfqState {
         return { ...d, project: { ...d.project, advanced }, items };
       });
     case "SET_CERTIFICATES":
-      // AC-50: the request-wide safety certificates are the "settings for all items" DEFAULT for each
-      // item's EQUIPMENT safety cert — items inherit it at render (item.safetyCertsOverride ?? shared)
-      // and override per item, exactly like fuel/delivery/return. It no longer fans into the OPERATOR
-      // cert (those are independent per item). So this just updates the project-level list.
-      return withDraft(state, (d) => ({ ...d, project: { ...d.project, certificates: { ...d.project.certificates, ...a.patch } } }));
+      // AC-50: the request-wide safety certificates are the "settings for all items" value for each
+      // item's EQUIPMENT safety cert. Choosing it applies to ALL items — so, exactly like
+      // delivery/return/fuel (PATCH_REQUESTWIDE), CLEAR each item's per-item safety override so every
+      // item follows the shared setting (items with an override — e.g. from agent extraction — would
+      // otherwise ignore the request-wide click). It never fans into the OPERATOR cert (per-item).
+      return withDraft(state, (d) => ({
+        ...d,
+        project: { ...d.project, certificates: { ...d.project.certificates, ...a.patch } },
+        items: a.patch.safety !== undefined ? d.items.map((i) => ({ ...i, safetyCertsOverride: null })) : d.items,
+      }));
     case "PATCH_REQUESTWIDE":
       // Choosing a request-wide value applies it to ALL items — clear that field's per-item
       // overrides so every item follows the shared setting (AC-25/26).

@@ -154,14 +154,27 @@ function buildCostResponsibilities(bid: BidCard, requestSides: Partial<Record<Co
   // across all term sources (contract / equipment / negotiable) and translate it relative to what the
   // request asked: agreed → same side as the request; conflict → the OTHER side (→ state "red" below);
   // grey/negotiating/absent → not derivable (null).
-  const termState = (keys: string[]): string | undefined => {
+  const termRowOf = (keys: string[]): TermRow | undefined => {
     const all = [...bid.terms.contract, ...bid.terms.equipment, ...(bid.negotiableTerms ?? [])];
-    return all.find((t) => keys.includes(t.key))?.state;
+    return all.find((t) => keys.includes(t.key));
+  };
+  // A deal-room agreed VALUE tells us who ended up responsible — parse the settled value into a side
+  // (e.g. "supplier"/"included"/"yes" → supplier; "rentee"/"excluded"/"no" → me). Null when unclear.
+  const sideFromValue = (v: string | null | undefined): "supplier" | "me" | null => {
+    if (!v) return null;
+    const t = v.toLowerCase();
+    if (/(supplier|مؤجّر|مورد|included|includes|provided|\byes\b)/.test(t)) return "supplier";
+    if (/(rentee|renter|\bme\b|\byou\b|excluded|not included|\bno\b|self|أنت|مستأجر|عليك)/.test(t)) return "me";
+    return null;
   };
   const sideFromTerm = (keys: string[], requestSide: "supplier" | "me" | null): "supplier" | "me" | null => {
     if (!requestSide) return null;
-    const st = termState(keys);
-    if (st === "matched" || st === "agreed") return requestSide;
+    const t = termRowOf(keys);
+    const st = t?.state;
+    // Agreed in the deal room: honor the SETTLED value (an accept can flip the side); fall back to the
+    // request side only when the value doesn't clearly name a party.
+    if (st === "agreed") return sideFromValue(t?.value) ?? requestSide;
+    if (st === "matched") return requestSide;
     if (st === "conflict") return requestSide === "supplier" ? "me" : "supplier";
     return null;
   };

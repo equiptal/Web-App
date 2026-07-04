@@ -74,7 +74,11 @@ export function BidEquipmentModal({
   ];
   const title = (ar ? eq?.categoryAr : eq?.category) || [bid.equipment?.make, bid.equipment?.model].filter(Boolean).join(" ") || itemLabel || "—";
   const subtitle = eq ? [eq.manufacturer, eq.modelName, eq.year != null ? String(eq.year) : null].filter(Boolean).join(" · ") : "";
-  const measurement = eq ? (ar ? eq.measurementAr : eq.measurement) : null;
+  // Off-platform bids carry no equipment record; the requested capacity/measurement is embedded in the
+  // item label ("subtype · capacity") — surface the capacity portion so MEASUREMENT isn't blank.
+  const measurement = eq
+    ? (ar ? eq.measurementAr : eq.measurement)
+    : (itemLabel && itemLabel.includes(" · ") ? itemLabel.split(" · ").slice(1).join(" · ") : null);
   const fuel = eq?.fuel ?? null;
   const km = bid.distanceKm != null ? Math.round(bid.distanceKm) : null;
   const offered = bid.unitsOffered || 1;

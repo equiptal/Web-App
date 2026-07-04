@@ -4,25 +4,19 @@ import { useState } from "react";
 import type { DealTerm } from "@/lib/contract/deal-room";
 
 type LFn = (en: string, ar: string) => string;
-type ResolveFn = (key: string, action: "accept" | "counter", value?: unknown) => void;
+type ResolveFn = (key: string, action: "accept" | "counter" | "reopen", value?: unknown) => void;
 
 /** App parity (term_card.dart): 5 colour-coded states. */
 export const STATE_META: Record<string, { en: string; ar: string; cls: string }> = {
   fixed: { en: "Fixed", ar: "ثابت", cls: "st-fixed" },
   agreed: { en: "Agreed", ar: "متفق عليه", cls: "st-agreed" },
-  soft_accepted: { en: "Accepted", ar: "مقبول", cls: "st-agreed" },
+  soft_accepted: { en: "Accepted", ar: "مقبول", cls: "st-soft" },
   disputed: { en: "Conflict", ar: "تعارض", cls: "st-disputed" },
   pending: { en: "Pending", ar: "قيد الانتظار", cls: "st-pending" },
 };
 
-/** Resolved (matched/accepted) terms collapse to a green row; conflicted/pending stay open. */
-const isResolved = (state: string) => state === "agreed" || state === "fixed" || state === "soft_accepted";
-/** Sort order on the single screen: conflicts first (open/red), then pending, then resolved (collapsed/green). */
-function order(state: string): number {
-  if (state === "disputed") return 0;
-  if (state === "pending") return 1;
-  return 2;
-}
+/** Agreed / accepted terms collapse to a green row. Fixed terms are locked (own group). */
+const isAgreedish = (state: string) => state === "agreed" || state === "soft_accepted";
 
 export function valText(v: unknown, L: LFn): string {
   if (v == null || v === "") return "—";
@@ -31,8 +25,10 @@ export function valText(v: unknown, L: LFn): string {
   const str = String(v);
   if (str === "supplier") return L("Supplier", "المؤجّر");
   if (str === "rentee") return L("Rentee", "المستأجر");
-  if (str.toLowerCase() === "true") return L("Yes", "نعم");
-  if (str.toLowerCase() === "false") return L("No", "لا");
+  if (str === "either") return L("Either", "أيّهما");
+  if (str === "shared") return L("Shared", "مشترك");
+  if (str.toLowerCase() === "true" || str === "included" || str === "yes") return L("Yes", "نعم");
+  if (str.toLowerCase() === "false" || str === "excluded" || str === "not_included" || str === "no") return L("No", "لا");
   return str;
 }
 
@@ -82,7 +78,7 @@ function CounterEditor({ term, ar, L, onSubmit, onCancel }: { term: DealTerm; ar
         <div className="tc-pills">
           {term.options.map((o) => <button key={o.value} type="button" className={`tc-pill${multi.includes(o.value) ? " on" : ""}`} onClick={() => toggle(o.value)}>{ar ? o.labelAr : o.labelEn}</button>)}
         </div>
-        {acts(multi.length === 0, () => multi)}
+        {acts(false, () => multi)}
       </div>
     );
   }
@@ -115,15 +111,50 @@ function CounterEditor({ term, ar, L, onSubmit, onCancel }: { term: DealTerm; ar
   );
 }
 
-/** One term card. Resolved → collapsed green row. Conflict/pending → open card with inline resolve. */
+/** The reference value rows (app parity, term_card.dart _ValueRow): Current (bold) → You → Supplier →
+ *  Platform default. Only rows with a value are shown. */
+function ValueRows({ term, L }: { term: DealTerm; L: LFn }) {
+  const row = (label: string, v: unknown, bold = false) =>
+    v == null || v === "" ? null : (
+      <div className="tcard-vr"><span className="k">{label}</span><b className={bold ? "cur" : undefined}>{valText(v, L)}</b></div>
+    );
+  return (
+    <div className="tcard-vrs">
+      {row(L("Current value", "القيمة الحالية"), term.value, true)}
+      {row(L("You", "أنت"), term.renteePreference)}
+      {row(L("Supplier declared", "ما أقرّه المؤجّر"), term.supplierDeclared)}
+      {row(L("Platform default", "الافتراضي"), term.platformDefault)}
+    </div>
+  );
+}
+
+/** One term card. Agreed → collapsed green row (with Reopen). Fixed → locked row. Conflict/pending →
+ *  open card with the reference rows + inline resolve (Accept / Keep mine / Counter). */
 function TermCard({ term, ar, L, busy, onResolve }: { term: DealTerm; ar: boolean; L: LFn; busy: boolean; onResolve: ResolveFn }) {
   const st = STATE_META[term.state] ?? STATE_META.pending;
   const disputed = term.state === "disputed";
+  const fixed = term.state === "fixed";
   const [open, setOpen] = useState(false); // resolved rows can be expanded on demand
   const [countering, setCountering] = useState(false);
+  const mandatory = term.isMandatory ? <span className="tcard-state st-mand">{L("Mandatory", "إلزامي")}</span> : null;
 
-  // Resolved (matched / accepted) → collapsed green row, tap to peek.
-  if (isResolved(term.state)) {
+  // Fixed → locked row (lock icon + navy "Fixed" badge, no actions — app parity).
+  if (fixed) {
+    return (
+      <div className="tcard tcard-fixed">
+        <div className="tcard-resolved-h" style={{ cursor: "default" }}>
+          <span className="material-icons-outlined lock-tick">lock</span>
+          <span className="tcard-lab">{ar ? term.labelAr : term.label}{term.itemLabel ? <em> · {term.itemLabel}</em> : null}</span>
+          <span className="tcard-val">{valText(term.value ?? term.platformDefault, L)}</span>
+          <span className={`tcard-state ${st.cls}`}>{ar ? st.ar : st.en}</span>
+          {mandatory}
+        </div>
+      </div>
+    );
+  }
+
+  // Agreed / accepted → collapsed green row, tap to peek; renter can reopen.
+  if (isAgreedish(term.state)) {
     return (
       <div className="tcard tcard-resolved">
         <button type="button" className="tcard-resolved-h" onClick={() => setOpen((o) => !o)}>
@@ -131,28 +162,28 @@ function TermCard({ term, ar, L, busy, onResolve }: { term: DealTerm; ar: boolea
           <span className="tcard-lab">{ar ? term.labelAr : term.label}{term.itemLabel ? <em> · {term.itemLabel}</em> : null}</span>
           <span className="tcard-val">{valText(term.value ?? term.supplierDeclared ?? term.renteePreference, L)}</span>
           <span className={`tcard-state ${st.cls}`}>{ar ? st.ar : st.en}</span>
+          {mandatory}
         </button>
         {open && (
           <div className="tcard-peek">
-            <span>{L("Supplier", "المؤجّر")}: <b>{valText(term.supplierDeclared, L)}</b></span>
-            <span>{L("You", "أنت")}: <b>{valText(term.renteePreference, L)}</b></span>
+            <ValueRows term={term} L={L} />
+            <button type="button" className="tcard-reopen" disabled={busy} onClick={() => onResolve(term.key, "reopen")}>{L("Reopen term", "إعادة فتح الشرط")}</button>
           </div>
         )}
       </div>
     );
   }
 
-  // Conflict / pending → open card with actions.
+  // Conflict / pending → open card with the reference rows + actions.
   return (
     <div className={`tcard ${disputed ? "tcard-critical" : "tcard-pending"}`}>
       <div className="tcard-h">
+        {disputed && <span className="material-icons-outlined tcard-warn">warning_amber</span>}
         <span className="tcard-lab">{ar ? term.labelAr : term.label}{term.itemLabel ? <em> · {term.itemLabel}</em> : null}</span>
         <span className={`tcard-state ${st.cls}`}>{ar ? st.ar : st.en}</span>
+        {mandatory}
       </div>
-      <div className="tcard-vals">
-        <div className="tcard-v"><span className="k">{L("Supplier", "المؤجّر")}</span><b>{valText(term.supplierDeclared, L)}</b></div>
-        <div className="tcard-v mine"><span className="k">{L("You", "أنت")}</span><b>{valText(term.renteePreference, L)}</b></div>
-      </div>
+      <ValueRows term={term} L={L} />
       {countering ? (
         <CounterEditor term={term} ar={ar} L={L} onCancel={() => setCountering(false)} onSubmit={(v) => { setCountering(false); onResolve(term.key, "counter", v); }} />
       ) : (
@@ -167,16 +198,38 @@ function TermCard({ term, ar, L, busy, onResolve }: { term: DealTerm; ar: boolea
 }
 
 /**
- * Deal-room terms — ALL on one screen (app parity, term_card.dart): conflicted terms are open/red with
- * inline resolve (Accept / Keep mine / Counter); matched & accepted terms collapse to a green row.
- * Sorted conflicts → pending → resolved. Resolve is immediate (per term), not staged.
+ * Deal-room terms — app parity (term_card.dart + term_grouping.dart). Grouped by actionability with a
+ * progress meter: NEEDS YOUR INPUT (conflict/pending) → AGREED (collapsed green, reopenable) → FIXED
+ * (locked). Resolve is immediate (per term). One screen, no staging.
  */
 export function DealRoomTerms({ terms, ar, L, busy, onResolve }: { terms: DealTerm[]; ar: boolean; L: LFn; busy: boolean; onResolve: ResolveFn }) {
   if (terms.length === 0) return null;
-  const sorted = [...terms].sort((a, b) => order(a.state) - order(b.state));
+  const needsInput = terms.filter((t) => t.state === "disputed" || t.state === "pending");
+  const agreed = terms.filter((t) => isAgreedish(t.state));
+  const fixed = terms.filter((t) => t.state === "fixed");
+  const resolvedCount = agreed.length + fixed.length;
+  const pct = terms.length ? Math.round((resolvedCount / terms.length) * 100) : 0;
+  const groups: { label: string; terms: DealTerm[] }[] = [
+    { label: L("Needs your input", "تحتاج ردّك"), terms: needsInput },
+    { label: L("Agreed", "متفق عليه"), terms: agreed },
+    { label: L("Fixed", "ثابتة"), terms: fixed },
+  ];
   return (
     <div className="terms-list">
-      {sorted.map((tm) => <TermCard key={tm.key + (tm.itemLabel ?? "")} term={tm} ar={ar} L={L} busy={busy} onResolve={onResolve} />)}
+      {/* Progress meter (app parity: "N of M resolved"). */}
+      <div className="terms-progress">
+        <div className="terms-progress-h">
+          <span>{L(`${resolvedCount} of ${terms.length} resolved`, `${resolvedCount} من ${terms.length} تمّت`)}</span>
+          {needsInput.length > 0 && <span className="tp-open">{L(`${needsInput.length} to review`, `${needsInput.length} للمراجعة`)}</span>}
+        </div>
+        <div className="terms-progress-bar"><div style={{ width: `${pct}%` }} /></div>
+      </div>
+      {groups.filter((g) => g.terms.length > 0).map((g) => (
+        <div key={g.label} className="terms-group">
+          <div className="terms-group-h">{g.label} <span>{g.terms.length}</span></div>
+          {g.terms.map((tm) => <TermCard key={tm.key + (tm.itemLabel ?? "")} term={tm} ar={ar} L={L} busy={busy} onResolve={onResolve} />)}
+        </div>
+      ))}
     </div>
   );
 }

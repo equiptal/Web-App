@@ -99,9 +99,10 @@ export function SharedLinkBidCard({
     else t.pending++;
     return t;
   }, { matched: 0, conflict: 0, pending: 0 });
+  // Off-platform bids have no deal room, so nothing is ever "Pending review" — show only
+  // Conflict / Matched on the card (mirrors the terms modal's hidePending).
   const termChips = [
     { label: L("Conflict", "تعارض"), n: termTally.conflict, c: "#d9362a" },
-    { label: L("Pending review", "بانتظار المراجعة"), n: termTally.pending, c: "#d4780a" },
     { label: L("Matched", "مطابق"), n: termTally.matched, c: "#1daf58" },
   ];
 

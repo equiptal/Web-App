@@ -10,16 +10,21 @@ import { withAuthedBackend, appAuthErrorResponse } from "@/lib/api/app-backend-a
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   let contractType = "platform";
+  let agreedUnits: number | undefined;
   try {
-    const b = (await req.json()) as { contractType?: string };
+    const b = (await req.json()) as { contractType?: string; agreedUnits?: number };
     if (b?.contractType) contractType = b.contractType;
+    // Multi-supplier assembly (app parity): how many units the renter is accepting on this bid.
+    if (typeof b?.agreedUnits === "number" && b.agreedUnits > 0) agreedUnits = b.agreedUnits;
   } catch {
     /* default */
   }
   const base = `/api/deal-rooms/${encodeURIComponent(id)}`;
+  const body: Record<string, unknown> = { contractType };
+  if (agreedUnits != null) body.agreedUnits = agreedUnits;
   return withAuthedBackend(req, async (call) => {
     try {
-      const raw = await call(`${base}/accept-all-terms`, { method: "POST", body: JSON.stringify({ contractType }) });
+      const raw = await call(`${base}/accept-all-terms`, { method: "POST", body: JSON.stringify(body) });
       return NextResponse.json(raw ?? { ok: true });
     } catch (err) {
       // Idempotency: accept-all-terms requires NEGOTIATING. If the rentee already accepted (a prior

@@ -23,6 +23,10 @@ export interface DealTerm {
   value: unknown;
   renteePreference: unknown;
   supplierDeclared: unknown;
+  /** The platform's default/fallback value for this term (app parity — shown as a third reference row). */
+  platformDefault: unknown;
+  /** Mandatory terms must be resolved to close the deal (app shows a red "Mandatory" badge). */
+  isMandatory: boolean;
   itemLabel: string | null;
   /** Inline choices for this term (from the resolved T3 platform default) — drives the pill picker
    *  when countering a non-binary / non-price term. */
@@ -152,6 +156,8 @@ export function mapDealRoom(raw: unknown): DealRoomView {
       value: t.value,
       renteePreference: t.renteePreference,
       supplierDeclared: t.supplierDeclared,
+      platformDefault: t.platformDefault ?? t.platform_default ?? t.defaultValue ?? null,
+      isMandatory: t.isMandatory === true || t.mandatory === true,
       itemLabel: s(t.itemLabel),
       options: (Array.isArray(t.options) ? (t.options as Record<string, unknown>[]) : []).map((o) => ({
         value: s(o.value) ?? "",
