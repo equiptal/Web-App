@@ -55,13 +55,15 @@ matching), **not** the live **deal-room** term state — so a term that's "match
 **B2b (follow-up):** thread the live deal-room term states (or settled values) into the comparison
 pipeline so the compare reflects the *deal-room* truth, not just bid-vs-request matching.
 
-**Status — NOT web-fixable (verified 2026-07-04); needs backend, which is out of scope per Yara.** The
-bid-list payload exposes only `lockedTerms` (state `agreed`) + `unreadTerms` (unseen counter) — there is
-**no `disputed`/`pending` per-term state** in any web payload, so a term that was `matched` at bid-time but
-became `disputed` in the deal room is indistinguishable from `matched` web-side. The existing gate already
-avoids force-greening a live negotiation (greys `negotiating`/unresolved, greens only `matched`/`agreed`,
-`conflict`→red), so no term force-greens — but the residual screenshot case can't be fixed without the
-backend surfacing per-term live states in `getBidList` (Yara: no backend changes). **Left as-is.**
+**Status — DONE (web-only, deal room as source of truth).** Yara: "read it from the deal room." Correct —
+the bid-list payload lacks live states, but `fetchDealRoom(id)` returns the room's `terms[]` with real
+states. Implemented in `BidComparisonWorkspace`: for each compared bid with a `dealRoomId`, fetch its deal
+room (parallel, best-effort, re-run on the 20s poll), and `overlayDealRoomTerms` maps each deal-room term
+onto the bid's term rows **by key** before `buildItemComparison`. State map: `disputed→conflict`,
+`pending→negotiating`, `agreed`/`soft_accepted→agreed`, `fixed→matched`. **FAT alias:** the deal room's
+combined `fat` term ("Operator FAT") overlays onto both split rows `fat_food` + `fat_accommodation_transport`
+(the exact screenshot case). Now a term that's a conflict in the deal room shows red/conflict in compare,
+not green. No backend change.
 
 ---
 

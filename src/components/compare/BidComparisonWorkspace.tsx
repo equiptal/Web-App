@@ -5,14 +5,52 @@ import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { GuestQuickCompare } from "@/components/compare/GuestQuickCompare";
-import { fetchMyRequests, fetchBids, fetchRequestSubmissions, startDealRoom, recommendBids, askBids, parseBid, captureBidEvents, fetchDealRoomDocuments, fetchBidDocuments } from "@/lib/api/client";
+import { fetchMyRequests, fetchBids, fetchRequestSubmissions, startDealRoom, recommendBids, askBids, parseBid, captureBidEvents, fetchDealRoomDocuments, fetchBidDocuments, fetchDealRoom } from "@/lib/api/client";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { groupRequests, type RequestGroup } from "@/lib/contract/requests";
-import type { DealRoomDocuments } from "@/lib/contract/deal-room";
-import { CERT_LABEL, type BidCard, type CertCode } from "@/lib/contract/bids";
+import type { DealRoomDocuments, DealTerm } from "@/lib/contract/deal-room";
+import { CERT_LABEL, type BidCard, type CertCode, type TermRow, type TermState } from "@/lib/contract/bids";
 import { buildItemComparison, sortByPreset, displayQuote, responsibilityTone, rowWinners, type BidColumn, type Preset, type CostResponsibility, type RatePeriod, type PricesFor } from "@/lib/contract/comparison";
 import { bidColumnToComputed, normalizedBidToBidCard, presetToAgent, type RecommendResult } from "@/lib/contract/agent-bids";
 import { EquipImg } from "@/components/requests/EquipImg";
+
+/** Deal-room term state → the comparison's TermRow state. The deal room is the source of truth for a
+ *  negotiated bid (the bids-list payload lacks live disputed/pending states). Keys absent from the room
+ *  keep their bid-vs-request state. */
+const DR_STATE_TO_TERM: Record<string, TermState> = {
+  disputed: "conflict",
+  pending: "negotiating",
+  agreed: "agreed",
+  soft_accepted: "agreed",
+  fixed: "matched",
+};
+/** Return an overlaid copy of the bid whose term rows reflect the live deal-room term states/values
+ *  (matched by key across contract/equipment/supplier + negotiableTerms). Immutable — never mutates
+ *  the source bid. */
+// The comparison splits FAT into fat_food + fat_accommodation_transport, but the deal room may carry a
+// single combined `fat` term ("Operator FAT"). Alias the combined term onto both split rows.
+const FAT_SPLIT_KEYS = new Set(["fat_food", "fat_accommodation_transport"]);
+
+function overlayDealRoomTerms(bid: BidCard, roomTerms: DealTerm[] | undefined): BidCard {
+  if (!roomTerms || roomTerms.length === 0) return bid;
+  const byKey = new Map(roomTerms.map((t) => [t.key, t]));
+  const apply = (row: TermRow): TermRow => {
+    const dt = byKey.get(row.key) ?? (FAT_SPLIT_KEYS.has(row.key) ? byKey.get("fat") : undefined);
+    if (!dt) return row;
+    const st = DR_STATE_TO_TERM[String(dt.state)];
+    const value = dt.value == null ? row.value : Array.isArray(dt.value) ? dt.value.map(String).join(", ") : String(dt.value);
+    return { ...row, state: st ?? row.state, value };
+  };
+  return {
+    ...bid,
+    terms: {
+      equipment: bid.terms.equipment.map(apply),
+      contract: bid.terms.contract.map(apply),
+      supplier: bid.terms.supplier.map(apply),
+    },
+    negotiableTerms: (bid.negotiableTerms ?? []).map(apply),
+  };
+}
 
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
 
@@ -76,6 +114,9 @@ export function BidComparisonWorkspace() {
   const [activeItem, setActiveItem] = useState<string | null>(null);
   const [bids, setBids] = useState<BidCard[] | null>(null);
   const [bidsLoading, setBidsLoading] = useState(false);
+  // Live deal-room terms per dealRoomId — the source of truth for negotiated term states, overlaid onto
+  // the comparison (the bids-list payload only carries agreed/unread, not disputed/pending).
+  const [roomTerms, setRoomTerms] = useState<Record<string, DealTerm[]>>({});
   const [submissions, setSubmissions] = useState<LinkBidSubmission[]>([]); // off-platform shared-link bids for the active item
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [preset, setPreset] = useState<Preset>("best");
@@ -279,6 +320,23 @@ export function BidComparisonWorkspace() {
     };
   }, [activeItem, hasActiveDealRoom]);
 
+  // Fetch each compared bid's deal room so its LIVE term states (disputed/pending/agreed) drive the
+  // comparison — the deal room is the source of truth. Best-effort + parallel; re-runs when `bids`
+  // refreshes (incl. the 20s poll), so the matrix tracks live negotiation. A failed fetch just leaves
+  // that bid on its bid-vs-request state.
+  useEffect(() => {
+    const ids = [...new Set((bids ?? []).map((b) => b.dealRoomId).filter((x): x is string => !!x))];
+    if (!ids.length) return;
+    let active = true;
+    Promise.all(ids.map((id) => fetchDealRoom(id).then((r) => [id, r.terms] as const).catch(() => null))).then((pairs) => {
+      if (!active) return;
+      const next: Record<string, DealTerm[]> = {};
+      for (const p of pairs) if (p) next[p[0]] = p[1];
+      if (Object.keys(next).length) setRoomTerms((prev) => ({ ...prev, ...next }));
+    });
+    return () => { active = false; };
+  }, [bids]);
+
   const reqDurationDays = items.find((i) => i.id === activeItem)?.durationDays ?? null;
   // Staging demo: tag the first real bid as off-platform "via shared link" (rest = via Moedatech app).
   const raw = useMemo<BidCard[] | null>(() => {
@@ -295,8 +353,11 @@ export function BidComparisonWorkspace() {
       if (!it) return [];
       return [{ ...submissionToBidCard(s, it), id: `link-${s.id}-${it.requestItemId}` }];
     });
-    return [...bids, ...linkCards, ...uploaded];
-  }, [bids, uploaded, submissions, activeItem]);
+    // Overlay live deal-room term states onto app bids (source of truth) before comparing; off-platform
+    // link cards + uploads have no deal room, so they pass through untouched.
+    const overlaidBids = bids.map((b) => (b.dealRoomId ? overlayDealRoomTerms(b, roomTerms[b.dealRoomId]) : b));
+    return [...overlaidBids, ...linkCards, ...uploaded];
+  }, [bids, uploaded, submissions, activeItem, roomTerms]);
   const comparison = useMemo(() => (raw ? buildItemComparison(raw, { renterCosts, requestDurationDays: reqDurationDays, requestResponsibilities: raw[0]?.requestResponsibilities ?? {} }) : null), [raw, renterCosts, reqDurationDays]);
   useEffect(() => {
     if (!comparison) return;
