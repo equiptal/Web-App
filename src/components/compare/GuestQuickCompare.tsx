@@ -1,12 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useLocale } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { AccountModal } from "@/components/onboarding/AccountModal";
 import { parseBid, recommendBids, askBids } from "@/lib/api/client";
 import { agentUses, bumpAgentUse, guestLimitReached, GUEST_AGENT_LIMIT } from "@/lib/access/agent-quota";
-import type { NormalizedBid, ComputedBid, RecommendResult, RankedBid } from "@/lib/contract/agent-bids";
+import { toComputedBids } from "@/lib/contract/quick-compare";
+import type { NormalizedBid, RecommendResult, RankedBid } from "@/lib/contract/agent-bids";
 
 /**
  * Guest quick-compare (public-web-auth-gate T9). A signed-out visitor can upload supplier quotes, see
@@ -29,25 +30,6 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-/** Build the agent's ComputedBid[] from parsed quotes: no request requirements → all qualify; all-in =
- *  stated price + mobilization + demobilization; percent-vs-lowest across the set. */
-function toComputed(bids: LocalBid[]): ComputedBid[] {
-  const totals = bids.map((b) => (b.price_amount ?? 0) + (b.mobilization_amount ?? 0) + (b.demobilization_amount ?? 0));
-  const positives = totals.filter((t) => t > 0);
-  const lowest = positives.length ? Math.min(...positives) : 0;
-  return bids.map((b, i) => {
-    const total = totals[i] > 0 ? totals[i] : null;
-    return {
-      ...b,
-      bid_id: b._uid,
-      all_in_total: total,
-      qualified: true,
-      requirement_conflicts: [],
-      percent_vs_lowest: total && lowest ? Math.round(((total - lowest) / lowest) * 100) : null,
-    };
-  });
-}
-
 export function GuestQuickCompare() {
   const { locale } = useLocale();
   const ar = locale === "ar";
@@ -64,6 +46,9 @@ export function GuestQuickCompare() {
   const [chat, setChat] = useState<{ role: "user" | "agent"; text: string }[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [showAccount, setShowAccount] = useState(false);
+
+  // Deterministic money layer (all-in + percent-vs-lowest), keyed by each quote's stable id.
+  const computed = useMemo(() => toComputedBids(bids.map((b) => ({ ...b, bid_id: b._uid }))), [bids]);
 
   // The AI analysis (rank/ask) is the metered agent use. Returns false + opens the account gate when
   // the guest's free allowance is spent.
@@ -104,7 +89,7 @@ export function GuestQuickCompare() {
   async function rank() {
     if (bids.length < 2 || !spendAnalysis()) return;
     setBusy(true);
-    const r = await recommendBids({ request: { hasRequirements: false }, bids: toComputed(bids), previous_ranking: ranking });
+    const r = await recommendBids({ request: { hasRequirements: false }, bids: computed, previous_ranking: ranking });
     setBusy(false);
     if (r.agent && r.result) {
       setRec(r.result);
@@ -120,7 +105,7 @@ export function GuestQuickCompare() {
     setChat((c) => [...c, { role: "user", text: v }]);
     setChatInput("");
     setBusy(true);
-    const r = await askBids({ message: v, request: { hasRequirements: false }, bids: toComputed(bids), current_ranking: ranking });
+    const r = await askBids({ message: v, request: { hasRequirements: false }, bids: computed, current_ranking: ranking });
     setBusy(false);
     if (r.agent && r.result) {
       setChat((c) => [...c, { role: "agent", text: r.result!.reply }]);
@@ -199,7 +184,7 @@ export function GuestQuickCompare() {
                     <td className="whitespace-nowrap p-3 text-navy">{b.price_amount != null ? `${nf(b.price_amount)} ${L("SAR", "ر.س")}${b.price_unit ? ` / ${b.price_unit.replace("PER_", "").toLowerCase()}` : ""}` : "—"}</td>
                     <td className="whitespace-nowrap p-3 text-navy-mid">{(b.mobilization_amount ?? b.demobilization_amount) != null ? `${nf(b.mobilization_amount ?? 0)} / ${nf(b.demobilization_amount ?? 0)}` : "—"}</td>
                     <td className="whitespace-nowrap p-3 font-extrabold text-navy">{total > 0 ? `${nf(total)} ${L("SAR", "ر.س")}` : "—"}</td>
-                    <td className="whitespace-nowrap p-3 text-navy-mid">{rec && total > 0 ? (toComputed(bids).find((c) => c.bid_id === b._uid)?.percent_vs_lowest === 0 ? L("lowest", "الأقل") : `+${toComputed(bids).find((c) => c.bid_id === b._uid)?.percent_vs_lowest}%`) : "—"}</td>
+                    <td className="whitespace-nowrap p-3 text-navy-mid">{rec && total > 0 ? (computed.find((c) => c.bid_id === b._uid)?.percent_vs_lowest === 0 ? L("lowest", "الأقل") : `+${computed.find((c) => c.bid_id === b._uid)?.percent_vs_lowest}%`) : "—"}</td>
                     <td className="whitespace-nowrap p-3 text-navy-mid">{b.valid_until || "—"}</td>
                   </tr>
                 );
