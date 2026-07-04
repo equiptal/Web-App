@@ -10,6 +10,7 @@ import type { Locale } from "@/lib/i18n/config";
 import { SurveyProvider } from "@/components/surveys/SurveyProvider";
 import { fetchDealRoomUnread } from "@/lib/api/client";
 import { canSeeProcurementDashboard } from "@/lib/access/dashboard";
+import { NotificationsBell } from "@/components/NotificationsBell";
 
 /**
  * App shell for the renter web app (web-app/004, AC-01/02/03/09/25). Navy sidebar (brand, a Request
@@ -215,6 +216,8 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                 )}
               </button>
             )}
+
+            {status === "authed" && <NotificationsBell />}
 
             {status === "authed" && (
               <div className="relative">

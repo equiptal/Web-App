@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withAuthedBackend, appAuthErrorResponse } from "@/lib/api/app-backend-authed";
+import { clearAuthCookies } from "@/lib/api/auth-server";
 import { normalizeTier } from "@/lib/contract/auth";
 import { supplierStatusToVerification, type RenterProfile } from "@/lib/contract/onboarding";
 
@@ -82,6 +83,24 @@ export async function GET(req: Request) {
         user,
         verification: { status: supplierStatusToVerification(status.supplierStatus) },
       });
+    } catch (err) {
+      return appAuthErrorResponse(err);
+    }
+  });
+}
+
+/**
+ * DELETE /api/me — delete (soft-delete) the signed-in renter's account (app parity, `DELETE /users/me`).
+ * On success the account is gone, so we clear the auth cookies; the client drops to anon and returns
+ * home. Guarded behind an explicit typed-confirm modal on the client.
+ */
+export async function DELETE(req: Request) {
+  return withAuthedBackend(req, async (call) => {
+    try {
+      await call<void>("/users/me", { method: "DELETE" });
+      const res = NextResponse.json({ ok: true });
+      clearAuthCookies(res);
+      return res;
     } catch (err) {
       return appAuthErrorResponse(err);
     }

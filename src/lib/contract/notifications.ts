@@ -1,0 +1,83 @@
+/**
+ * web notifications (bell) — wire types + deep-link mapper.
+ * Source: shared app backend `GET /notifications/me` (list, already localized by `language`),
+ * `PUT /notifications/{id}/read`, `PUT /notifications/read-all`. There is NO unread-count endpoint —
+ * the badge reads `meta.total` from a `filter=unread&page=1` list call.
+ */
+
+export type NotificationFilter = "all" | "read" | "unread";
+
+/** One notification row (mirrors the app's NotificationItem; `title`/`body` are pre-localized). */
+export interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  roleContext: "rentee" | "supplier" | "both" | string;
+  isRead: boolean;
+  createdAt: string; // ISO
+  data?: Record<string, unknown>;
+}
+
+export interface NotificationList {
+  data: NotificationItem[];
+  meta: { page: number; limit: number; total: number };
+}
+
+const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v : null);
+
+export function mapNotification(raw: unknown): NotificationItem {
+  const n = (raw ?? {}) as Record<string, unknown>;
+  return {
+    id: String(n.id ?? ""),
+    type: str(n.type) ?? "",
+    title: str(n.title) ?? "",
+    body: str(n.body) ?? "",
+    roleContext: str(n.roleContext) ?? "both",
+    isRead: n.isRead === true,
+    createdAt: str(n.createdAt) ?? "",
+    data: (n.data && typeof n.data === "object" ? (n.data as Record<string, unknown>) : undefined),
+  };
+}
+
+export function mapNotificationList(raw: unknown): NotificationList {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const data = Array.isArray(r.data) ? r.data.map(mapNotification) : [];
+  const meta = (r.meta ?? {}) as Record<string, unknown>;
+  const num = (v: unknown, d: number) => (typeof v === "number" && !Number.isNaN(v) ? v : d);
+  return {
+    data,
+    meta: {
+      page: num(meta.page, 1),
+      limit: num(meta.limit, data.length),
+      total: num(meta.total, data.length),
+    },
+  };
+}
+
+/**
+ * Web route a notification should open, derived from its `type` + `data` (app parity, renter-only —
+ * `roleContext` is ignored because the web is the rentee surface). `null` → display-only (no target),
+ * the bell just marks it read on click.
+ */
+export function notificationHref(n: NotificationItem): string | null {
+  const d = n.data ?? {};
+  const requestId = str(d.requestId);
+  const dealRoomId = str(d.dealRoomId);
+  switch (n.type) {
+    case "request.broadcast":
+    case "request.direct":
+      return requestId ? `/requests/${requestId}` : null;
+    case "bid.received":
+    case "bid.accepted":
+      return requestId ? `/requests/${requestId}?view=bids` : null;
+    case "RFQ_CLOSED_FOMO":
+      return "/compare";
+    default:
+      break;
+  }
+  if (n.type.startsWith("deal.")) return dealRoomId ? `/deal-room/${dealRoomId}` : "/inbox";
+  if (n.type.startsWith("verification.")) return "/verify";
+  // equipment.* / job.* / support.reply / admin.* / message.new / referral.* → display-only.
+  return null;
+}

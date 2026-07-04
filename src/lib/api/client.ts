@@ -6,6 +6,7 @@ import type { ComputedBid, RecommendResult, BidAskResult, BidParseResult, AwardN
 import { mapBidFormData, mapLinkSubmissions, type BidFormData, type LinkBidSubmission, type SubmitBidFormPayload } from "@/lib/contract/link-bids";
 import type { PendingResponse, RespondBody, RespondResult } from "@/lib/contract/survey";
 import type { InboxBid } from "@/lib/contract/inbox";
+import type { NotificationList, NotificationFilter } from "@/lib/contract/notifications";
 
 /** Body of POST /api/me/bids/recommend. user_id is attached server-side. */
 export interface RecommendPayload {
@@ -288,6 +289,33 @@ export function fetchReceivedBids(filter?: { status?: string; page?: number; lim
 /** Total unread deal-room messages for the renter (role-scoped) — drives the inbox badge. */
 export function fetchDealRoomUnread(): Promise<{ total: number }> {
   return getJson<{ total: number }>("/api/me/deal-rooms/unread-count");
+}
+
+/* ----------------- notifications (bell) ----------------- */
+
+/** One page of the renter's notifications (already localized by the BFF from the UI locale). */
+export function fetchNotifications(opts?: { page?: number; filter?: NotificationFilter }): Promise<NotificationList> {
+  const qs = new URLSearchParams();
+  qs.set("page", String(opts?.page ?? 1));
+  if (opts?.filter) qs.set("filter", opts.filter);
+  return getJson<NotificationList>(`/api/me/notifications?${qs.toString()}`);
+}
+
+/** Unread notification count for the bell badge — the backend has no count endpoint, so we read
+ *  `meta.total` from an unread-filtered list (page 1). */
+export async function fetchNotificationsUnreadCount(): Promise<number> {
+  const list = await fetchNotifications({ page: 1, filter: "unread" });
+  return list.meta.total;
+}
+
+/** Mark one notification read. */
+export function markNotificationRead(id: string): Promise<unknown> {
+  return postJsonMethod(`/api/me/notifications/${encodeURIComponent(id)}/read`, {}, "PUT");
+}
+
+/** Mark every notification read → the number cleared. */
+export function markAllNotificationsRead(): Promise<{ count: number }> {
+  return postJsonMethod<{ count: number }>("/api/me/notifications/read-all", {}, "PUT");
 }
 
 /* ----------------- web-app/007: Mansour judgement layer (soft) ----------------- */
