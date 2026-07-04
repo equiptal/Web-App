@@ -63,7 +63,8 @@ Reference flow from the earlier test case (create → link bid + app bid → com
 
 # Full manual test checklist — everything shipped this epic (run on staging)
 
-**One setup that exercises most of it:** create a BROADCAST request with **2 items**, one **multi‑unit** (Forklift ×3); operator required, operator cert = **SPSP**, equipment safety cert = **TÜV**; **delivery = supplier, return = me**; maintenance = supplier; **start+end dates** (a duration); FAT accom/transport = me. Place **1 in‑app bid** (declares TÜV, FAT accom on supplier) + **1 off‑platform link bid** (offer a partial count; say No to Accommodation & transport).
+**One setup that exercises most of it:** create a BROADCAST request with **2 items**, one **multi‑unit** (Forklift ×3); operator required, operator cert = **SPSP**, equipment safety cert = **TÜV**; **delivery = supplier, return = me**; maintenance =
+ supplier; **start+end dates** (a duration); FAT accom/transport = me. Place **1 in‑app bid** (declares TÜV, FAT accom on supplier) + **1 off‑platform link bid** (offer a partial count; say No to Accommodation & transport).
 
 ## Layout & navigation
 - [ ] Every page (requests, compare, inbox, profile, create, deal‑room) shares the same **1440 width + gutter**; nothing flush to the sidebar/edge; no horizontal scroll.

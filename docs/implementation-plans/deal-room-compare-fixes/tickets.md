@@ -46,6 +46,16 @@ comparison receives term state.
 **AC:** a term that is Conflict/Pending in the deal room shows as a conflict (not green) in the comparison;
 a settled term shows its agreed side.
 
+**Status — PARTIAL (shipped) + follow-up B2b needed.** The gate is in: `buildCostResponsibilities` no
+longer force-greens (maintenance only greens at the request side when no negotiable term exists; an
+existing-but-unresolved term stays grey; conflict→red, agreed→resolve). **But the screenshot case isn't
+fully fixed:** the comparison derives term state from the **bid-list qualification data** (bid-vs-request
+matching), **not** the live **deal-room** term state — so a term that's "matched" in the bid data yet
+"conflict" in the deal room still can't read as a conflict here.
+**B2b (follow-up):** thread the live deal-room term states (or settled values) into the comparison
+pipeline so the compare reflects the *deal-room* truth, not just bid-vs-request matching. Larger change;
+likely needs the deal-room term states available where the comparison is built.
+
 ---
 
 ## B3 — Deal-room terms: locked / turn-gating + conflict display vs the app

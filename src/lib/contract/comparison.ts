@@ -183,10 +183,14 @@ function buildCostResponsibilities(bid: BidCard, requestSides: Partial<Record<Co
     ? (/(supplier|مؤجّر)/i.test(bid.requestTerms.maintenanceResponsibility) ? "supplier" : "me")
     : null;
   const maintReqSide = (requestSides.maintenance ?? rtMaint) as "supplier" | "me" | null;
+  const maintKeys = ["maintenance_responsibility", "maintenance"];
   const bidSides: Record<CostResponsibility["key"], "supplier" | "me" | null> = {
     fuel: sideFromTerm(["fuel_responsibility"], requestSides.fuel ?? null),
-    // Maintenance is an acknowledge term (accepted by bidding) → mirror the request's assignment.
-    maintenance: sideFromTerm(["maintenance_responsibility", "maintenance"], maintReqSide) ?? maintReqSide,
+    // Maintenance is an acknowledge term (accepted by bidding) → mirror the request's assignment ONLY
+    // when there is no negotiable maintenance term. If a term EXISTS but is unresolved
+    // (negotiating/grey), keep it grey — never force green (B2: a disputed/pending term must not read
+    // as agreed). `conflict` still flips → red, `agreed`/`matched` still resolve, via sideFromTerm.
+    maintenance: sideFromTerm(maintKeys, maintReqSide) ?? (termRowOf(maintKeys) ? null : maintReqSide),
     overtime: null,
     operator_food: sideFromTerm(["fat_food"], requestSides.operator_food ?? null),
     // in-app uses `fat_accommodation_transport`, link uses `fat_transport` — accept either spelling.

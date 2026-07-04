@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { TermRow, TermState } from "@/lib/contract/bids";
+import { bucketBidTerms, type TermRow, type TermState } from "@/lib/contract/bids";
 
 /**
  * Per-term status modal (app parity: "Terms — <supplier>"). Every term the bid touches — equipment,
@@ -19,13 +19,6 @@ const STATE: Record<TermState, Tone> = {
 };
 
 type Bucket = "conflict" | "pending" | "matched";
-// App parity (T18): only an active deal-room counter is "pending review". `grey` = not-applicable
-// (no requirement) and is EXCLUDED, so it never inflates the pending count.
-const bucketOf = (s: TermState): Bucket | null => (s === "conflict" ? "conflict" : s === "matched" || s === "agreed" ? "matched" : s === "negotiating" ? "pending" : null);
-
-// Vague/lumped rows that a SPECIFIC term supersedes (in-app bids carry both) — drop the vague one when
-// its specific counterpart is present. Link bids have no specific counterpart, so their real row stays.
-const SUPERSEDED_BY: Record<string, string> = { certs: "safety_certifications", operator: "operator_included" };
 
 export function BidTermsModal({
   supplier,
@@ -53,20 +46,9 @@ export function BidTermsModal({
    *  app-accurate rows. When present they replace the vague equipment "certs"/"operator" lumped rows. */
   negotiable?: TermRow[];
 }) {
-  // Merge every term source, prefer the SPECIFIC negotiable rows, de-dup by key, drop superseded vague
-  // rows and n/a (grey) rows — so a conflict names the exact term (e.g. "Equipment safety certificate")
-  // and "Pending review" reflects only real un-converged (negotiating) terms (T18, mobile-app parity).
-  const merged = [...(negotiable ?? []), ...terms.equipment, ...terms.contract, ...terms.supplier];
-  const keys = new Set(merged.map((r) => r.key));
-  const seen = new Set<string>();
-  const allRows = merged.filter((r) => {
-    if (seen.has(r.key)) return false;
-    seen.add(r.key);
-    const sup = SUPERSEDED_BY[r.key];
-    return !(sup && keys.has(sup)); // drop the vague row when its specific counterpart exists
-  });
-  const byBucket: Record<Bucket, TermRow[]> = { conflict: [], pending: [], matched: [] };
-  for (const r of allRows) { const b = bucketOf(r.state); if (b) byBucket[b].push(r); }
+  // Shared bucketing (bids.ts bucketBidTerms) — the SAME logic the bid card's tally uses, so the tab
+  // counts here always equal the card's "Conflict N · Matched N" (T18 + B1, mobile-app parity).
+  const { byBucket } = bucketBidTerms(terms, negotiable);
 
   const tabs: { key: Bucket; label: string; c: string; bg: string }[] = [
     { key: "conflict", label: L("Conflict", "تعارض"), c: "#d9362a", bg: "#fdecea" },

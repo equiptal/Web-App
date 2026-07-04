@@ -628,6 +628,39 @@ export function bidSuppliers(bids: BidCard[]): BidSupplier[] {
   return order.map((k) => map.get(k)!);
 }
 
+/**
+ * Bucket a bid's terms into Conflict / Pending review / Matched — the SINGLE source of truth for both
+ * the Terms modal tabs AND the bid card's "Conflict N · Matched N" tally, so the two always agree.
+ * Merges the specific negotiable rows + equipment/contract/supplier, de-dups by key, drops the vague
+ * rows a specific one supersedes (certs→safety_certifications, operator→operator_included) and the n/a
+ * (grey) rows (grey = no requirement → excluded, never counted).
+ */
+export type TermBucket = "conflict" | "pending" | "matched";
+const TERM_SUPERSEDED_BY: Record<string, string> = { certs: "safety_certifications", operator: "operator_included" };
+const bucketOfTermState = (s: TermState): TermBucket | null =>
+  s === "conflict" ? "conflict" : s === "matched" || s === "agreed" ? "matched" : s === "negotiating" ? "pending" : null;
+
+export function bucketBidTerms(
+  terms: { equipment: TermRow[]; contract: TermRow[]; supplier: TermRow[] },
+  negotiable?: TermRow[],
+): { rows: TermRow[]; byBucket: Record<TermBucket, TermRow[]>; counts: Record<TermBucket, number> } {
+  const merged = [...(negotiable ?? []), ...terms.equipment, ...terms.contract, ...terms.supplier];
+  const keys = new Set(merged.map((r) => r.key));
+  const seen = new Set<string>();
+  const rows = merged.filter((r) => {
+    if (seen.has(r.key)) return false;
+    seen.add(r.key);
+    const sup = TERM_SUPERSEDED_BY[r.key];
+    return !(sup && keys.has(sup));
+  });
+  const byBucket: Record<TermBucket, TermRow[]> = { conflict: [], pending: [], matched: [] };
+  for (const r of rows) {
+    const b = bucketOfTermState(r.state);
+    if (b) byBucket[b].push(r);
+  }
+  return { rows, byBucket, counts: { conflict: byBucket.conflict.length, pending: byBucket.pending.length, matched: byBucket.matched.length } };
+}
+
 /** Flatten the `{activeBids, expiredBids}` envelope → active first, then expired. */
 export function mapBidList(raw: unknown): BidCard[] {
   const r = (raw ?? {}) as Record<string, unknown>;

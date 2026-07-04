@@ -9,7 +9,7 @@ import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
 import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
-import { bidSuppliers, CERT_LABEL, type BidCard } from "@/lib/contract/bids";
+import { bidSuppliers, bucketBidTerms, CERT_LABEL, type BidCard } from "@/lib/contract/bids";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { computeBidQuote } from "@/lib/contract/comparison";
 import type { RequestGroup } from "@/lib/contract/requests";
@@ -262,6 +262,20 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
 
   // Scope to the item the renter tapped "View Bids" on (or "all" when entering via "View all bids").
   useEffect(() => { setSelectedItem(initialItemId ?? "all"); }, [initialItemId, group.id]);
+
+  // B4: while comparing, a click anywhere outside the selection UI (toolbar / cards / action bar, all
+  // tagged data-select-ui) exits selection — replaces the old Cancel button.
+  useEffect(() => {
+    if (!selectMode) return;
+    const onDown = (e: MouseEvent) => {
+      const el = e.target as Element | null;
+      if (el && el.closest("[data-select-ui]")) return;
+      setSelectMode(false);
+      setSelected(new Set());
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [selectMode]);
 
   const toggleSelect = (id: string) =>
     setSelected((prev) => {
@@ -713,30 +727,26 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "0 0 14px" }}>
+      <div data-select-ui style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "0 0 14px" }}>
         <span style={{ fontSize: 13, fontWeight: 700, color: "#2a4f72" }}>
           {selectMode
-            ? L("Tap a bid to select · compare or download a quotation", "اضغط على عرض للتحديد · قارن أو نزّل عرض سعر")
+            ? L("Tap bids to compare · click away to cancel", "اضغط على العروض للمقارنة · انقر خارجًا للإلغاء")
             : `${shown.length} ${L("bids from", "عروض من")} ${shownSuppliers} ${L("suppliers", "مؤجّرين")}${selItem ? ` · ${selItem.name}` : ""}`}
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-          {selectMode && (
-            <button onClick={() => { setSelectMode(false); setSelected(new Set()); }} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 800, color: "#6b8fa8" }}>
-              {L("Cancel", "إلغاء")}
-            </button>
-          )}
+          {/* B4: clicking outside exits selection (see the mousedown effect) — no Cancel button. */}
           <button
             onClick={() => setSelectMode((m) => !m)}
-            title={L("Pick bids to compare or quote", "اختر عروضًا للمقارنة أو التسعير")}
+            title={L("Pick bids to compare", "اختر عروضًا للمقارنة")}
             style={{ display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 11, padding: "10px 16px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", background: selectMode ? "#1c3550" : "#fff", color: selectMode ? "#fff" : "#1c3550", border: `1px solid ${selectMode ? "#1c3550" : "#d4e0ec"}` }}
           >
-            <span className="material-icons-outlined" style={{ fontSize: 17 }}>checklist</span>
-            {selectMode ? L("Selecting", "جارٍ التحديد") : L("Select bids", "تحديد العروض")}
+            <span className="material-icons-outlined" style={{ fontSize: 17 }}>compare_arrows</span>
+            {selectMode ? L("Comparing", "جارٍ المقارنة") : L("Compare bids", "مقارنة العروض")}
           </button>
         </div>
       </div>
 
-      <div className="bids-snap">
+      <div className="bids-snap" data-select-ui>
       {shown.map((b) => {
         if (b.viaSharedLink) {
           return (
@@ -797,26 +807,13 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           }
         })();
         const isAccepted = (b.status ?? "").toUpperCase() === "ACCEPTED" || wonSurvey; // decided → accepted/awarded styling
-        // Mobile parity (v3_bid_card TermsSectionRow): tally the negotiable terms into Matched / Conflict /
-        // Pending (grey + negotiating fold into Pending) — the same 6 keys the app counts on the bid card.
-        const NEG_KEYS = ["payment_terms", "breakdown_response_sla", "overtime_rate", "fuel_responsibility", "certs", "operator"];
-        const negRows = (() => {
-          const seen = new Set<string>(); const out: typeof b.terms.equipment = [];
-          for (const r of [...b.terms.equipment, ...b.terms.contract, ...(b.negotiableTerms ?? [])]) {
-            if (NEG_KEYS.includes(r.key) && !seen.has(r.key)) { seen.add(r.key); out.push(r); }
-          }
-          return out;
-        })();
-        const termTally = negRows.reduce((t, r) => {
-          if (r.state === "matched" || r.state === "agreed") t.matched++;
-          else if (r.state === "conflict") t.conflict++;
-          else t.pending++;
-          return t;
-        }, { matched: 0, conflict: 0, pending: 0 });
+        // B1: the card tally uses the SAME bucketing as the Terms modal (bucketBidTerms) so the card's
+        // "Conflict N · Matched N" always equals what the modal lists when opened.
+        const termCounts = bucketBidTerms(b.terms, b.negotiableTerms).counts;
         const termChips = [
-          { label: L("Conflict", "تعارض"), n: termTally.conflict, c: "#d9362a" },
-          { label: L("Pending review", "بانتظار المراجعة"), n: termTally.pending, c: "#d4780a" },
-          { label: L("Matched", "مطابق"), n: termTally.matched, c: "#1daf58" },
+          { label: L("Conflict", "تعارض"), n: termCounts.conflict, c: "#d9362a" },
+          { label: L("Pending review", "بانتظار المراجعة"), n: termCounts.pending, c: "#d4780a" },
+          { label: L("Matched", "مطابق"), n: termCounts.matched, c: "#1daf58" },
         ];
         const rowSep = { borderTop: "1px solid #EFF2F6" } as const;
         const iconBox = { width: 40, height: 40, borderRadius: 11, background: "#eff4f9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } as const;
@@ -829,7 +826,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           <div
             key={b.id}
             onClick={selectMode ? () => toggleSelect(b.id) : undefined}
-            style={{ flex: cardFlex, minWidth: 320, scrollSnapAlign: "start", alignSelf: "flex-start", display: "flex", flexDirection: "column", position: "relative", background: "#fff", border: `1px solid ${isSel ? "#f79009" : "#d4e0ec"}`, borderRadius: 18, overflow: "hidden", boxShadow: "0 1px 2px rgba(20,40,70,.04)", outline: isSel ? "2px solid #f79009" : "none", outlineOffset: 2, cursor: selectMode ? "pointer" : "default" }}
+            style={{ flex: cardFlex, minWidth: 320, scrollSnapAlign: "start", alignSelf: "flex-start", display: "flex", flexDirection: "column", position: "relative", background: isSel ? "#fff8f0" : "#fff", border: `1px solid ${isSel ? "#f79009" : "#d4e0ec"}`, borderRadius: 18, overflow: "hidden", boxShadow: isSel ? "inset 0 0 0 2px #f79009" : "0 1px 2px rgba(20,40,70,.04)", cursor: selectMode ? "pointer" : "default" }}
           >
             <div style={{ height: 4, background: banner.c }} />
             {banner && (
@@ -971,7 +968,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       </div>
 
       {selectMode && selectedCount > 0 && (
-        <div className="qbar">
+        <div className="qbar" data-select-ui>
           <span className="qn">{selectedCount} {L("selected", "محدّد")}</span>
           {selectedCount < shown.length && <span className="qclear" onClick={() => setSelected(new Set(shown.map((b) => b.id)))}>{L("Select all", "تحديد الكل")}</span>}
           <span className="qclear" onClick={() => setSelected(new Set())}>{L("Clear", "مسح")}</span>
