@@ -177,6 +177,18 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     };
   }, [id]);
 
+  // Live refresh (app parity): the supplier's moves happen server-side — a rate counter, term updates,
+  // and especially the CONFIRM that closes the deal (and a decline that reopens it). The app reacts to
+  // FCM signals; here we poll the room while it's active so the renter sees those without reloading.
+  // Stops once the deal is terminal (CLOSED / ABANDONED).
+  useEffect(() => {
+    const st = room?.status;
+    if (!st || st === "CLOSED" || st === "ABANDONED") return;
+    const t = setInterval(() => { void loadRoom(); }, 15000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room?.status, id]);
+
   useEffect(() => {
     if (room && onTitle) onTitle(room.supplier.name);
   }, [room, onTitle]);
