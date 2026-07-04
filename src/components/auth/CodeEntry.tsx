@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type ClipboardEvent, type FormEvent, type KeyboardEvent } from "react";
-import { postAuth, type AuthKind } from "./authClient";
+import { postAuth, type AuthKind, type OtpChannel } from "./authClient";
 import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import type { RenterUser } from "@/lib/contract/auth";
@@ -17,13 +17,18 @@ export function CodeEntry({
   phone,
   onVerified,
   onEditNumber,
+  channel,
 }: {
   phone: string;
   onVerified: (user: RenterUser) => void;
   onEditNumber: () => void;
+  /** The delivery channel the code was sent on (T5) — drives the "sent to" line + Resend. */
+  channel?: OtpChannel;
 }) {
   const t = useT();
   const a = t.auth;
+  // Where the code went: the email for EMAIL delivery, else the phone (delivery-only — verify is by phone).
+  const dest = channel?.method === "EMAIL" && channel.email ? channel.email : phone;
   const inputs = useRef<Array<HTMLInputElement | null>>([]);
   const [boxes, setBoxes] = useState(["", "", "", ""]);
   const [busy, setBusy] = useState(false);
@@ -78,7 +83,7 @@ export function CodeEntry({
   const resend = async () => {
     setErr(null);
     setResent(false);
-    const r = await postAuth("/api/auth/resend", { phone }); // AC-12: no cooldown
+    const r = await postAuth("/api/auth/resend", { phone, otpMethod: channel?.method ?? "SMS", otpEmail: channel?.email }); // AC-12: no cooldown; same channel
     if (r.ok) {
       setResent(true);
       resetBoxes();
@@ -101,7 +106,7 @@ export function CodeEntry({
       <h2 className="mb-[6px] text-[26px] font-extrabold tracking-[-.5px] text-navy">{a.codeTitle}</h2>
       <p className="mb-[28px] text-[14px] leading-[1.55] text-muted">
         {sentPre}
-        <b className="text-navy">{phone}</b>
+        <b className="text-navy" dir="ltr">{dest}</b>
         {sentPost}
       </p>
 

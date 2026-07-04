@@ -469,6 +469,11 @@ export const ar: Dictionary = {
     signInSub: "أدخل رقم هاتفك للمتابعة. سنرسل لك رمز التحقق برسالة نصية.",
     phoneLabel: "رقم الهاتف", // AC-01
     phonePlaceholder: "5X XXX XXXX",
+    deliveryLabel: "أرسل الرمز عبر", // T5: قناة إرسال رمز التحقق
+    viaSms: "رسالة نصية",
+    viaEmail: "بريد إلكتروني",
+    emailLabel: "البريد الإلكتروني",
+    emailInvalid: "أدخل بريدًا إلكترونيًا صحيحًا.",
     sendCode: "إرسال الرمز", // AC-01
     sending: "جارٍ الإرسال…",
     signInFoot: "جديد هنا؟ فقط أدخل رقمك — وسنكمل التسجيل.",

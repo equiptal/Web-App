@@ -7,7 +7,7 @@ import { authErrorResponse, localeFromRequest } from "@/lib/api/auth-server";
  * Proxies backend `POST /auth/resend-otp`. Body: { phone }.
  */
 export async function POST(req: Request) {
-  let body: { phone?: string } = {};
+  let body: { phone?: string; otpMethod?: "SMS" | "WHATSAPP" | "EMAIL"; otpEmail?: string } = {};
   try {
     body = await req.json();
   } catch {
@@ -20,7 +20,8 @@ export async function POST(req: Request) {
     const data = await authPost<{ success?: boolean; expiresAt?: string }>(
       "/auth/resend-otp",
       // The live backend's resend schema requires `role` (the docs omitted it) — same as login.
-      { phone, countryCode: "+966", otpMethod: "SMS", role: "rentee" },
+      // Resend over the SAME channel the code was first sent on (EMAIL carries otpEmail).
+      { phone, countryCode: "+966", otpMethod: body.otpMethod ?? "SMS", otpEmail: body.otpEmail, role: "rentee" },
       localeFromRequest(req),
     );
     return NextResponse.json({ success: true, expiresAt: data.expiresAt });

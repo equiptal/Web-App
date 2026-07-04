@@ -468,6 +468,11 @@ export const en = {
     signInSub: "Enter your phone number to continue. We'll text you a verification code.",
     phoneLabel: "Phone number", // AC-01
     phonePlaceholder: "5X XXX XXXX",
+    deliveryLabel: "Send code via", // T5: OTP delivery channel
+    viaSms: "Text (SMS)",
+    viaEmail: "Email",
+    emailLabel: "Email address",
+    emailInvalid: "Enter a valid email address.",
     sendCode: "Send code", // AC-01
     sending: "Sending…",
     signInFoot: "New here? Just enter your number — we'll set you up.",

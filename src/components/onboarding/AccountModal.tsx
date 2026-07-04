@@ -6,6 +6,7 @@ import { useSession } from "@/lib/session";
 import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
 import { PhoneEntry } from "@/components/auth/PhoneEntry";
 import { CodeEntry } from "@/components/auth/CodeEntry";
+import type { OtpChannel } from "@/components/auth/authClient";
 import type { RenterUser } from "@/lib/contract/auth";
 
 /**
@@ -48,6 +49,7 @@ function AccountFlow({ onCreated }: { onCreated: () => void }) {
   const alreadyComplete = status === "authed" && (user?.tier === "basic" || user?.tier === "verified");
   const [phase, setPhase] = useState<Phase>(hasGuestSession ? "profile" : "phone");
   const [phone, setPhone] = useState<string | null>(user?.phone ?? null);
+  const [channel, setChannel] = useState<OtpChannel>({ method: "SMS" });
 
   // If we somehow open for an already-complete account, don't show the form — just continue.
   useEffect(() => {
@@ -60,8 +62,9 @@ function AccountFlow({ onCreated }: { onCreated: () => void }) {
         <PhoneEntry
           title={t.guest.gateTitle}
           subtitle={t.guest.gateSub}
-          onCodeSent={(p) => {
+          onCodeSent={(p, ch) => {
             setPhone(p);
+            setChannel(ch);
             setPhase("code");
           }}
         />
@@ -74,6 +77,7 @@ function AccountFlow({ onCreated }: { onCreated: () => void }) {
       <div className="p-[22px]">
         <CodeEntry
           phone={phone}
+          channel={channel}
           onVerified={(u: RenterUser) => {
             signIn(u); // start the session from the verified identity (carries the real tier)
             // Returning account that's already complete → skip the profile form and post the request.
