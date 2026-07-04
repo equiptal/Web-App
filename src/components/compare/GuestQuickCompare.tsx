@@ -66,7 +66,7 @@ export function GuestQuickCompare() {
     setBusy(true);
     try {
       const data = await fileToBase64(file);
-      const r = await parseBid({ attachments: [{ type: file.type || "application/octet-stream", filename: file.name, data }] });
+      const r = await parseBid({ attachments: [{ type: file.type || "application/octet-stream", filename: file.name, data }], request_context: { subtype: null } });
       if (!r.agent) {
         setNote(L("The AI assistant isn't reachable right now.", "المساعد الذكي غير متاح حاليًا."));
       } else if (r.result && r.result.ok) {
@@ -77,7 +77,9 @@ export function GuestQuickCompare() {
         setRanking(null);
         setNote(null);
       } else {
-        setNote(L("Couldn't read that file — nothing was added.", "تعذّرت قراءة الملف — لم يُضف شيء."));
+        // Surface Mansour's reason so a parse miss is diagnosable (unsupported file, no price found, …).
+        const reason = r.result && !r.result.ok ? r.result.reason : null;
+        setNote(reason ? L(`Couldn't read that quote — ${reason}`, `تعذّرت قراءة العرض — ${reason}`) : L("Couldn't read that file — nothing was added.", "تعذّرت قراءة الملف — لم يُضف شيء."));
       }
     } catch {
       setNote(L("Couldn't read that file — nothing was added.", "تعذّرت قراءة الملف — لم يُضف شيء."));
