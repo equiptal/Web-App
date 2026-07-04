@@ -113,6 +113,7 @@ const QSTYLE = `
   .plabel{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#6b8fa8;}
   .pname{font-size:17px;font-weight:800;margin-top:5px;}
   .pmeta{font-size:12px;color:#6b8fa8;font-weight:600;margin-top:3px;}
+  .psub{font-size:12px;color:#6b8fa8;font-weight:600;margin-top:2px;}
   .docs{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
   .doc-ok{font-size:10.5px;font-weight:800;color:#1daf58;background:#e7f7ee;border-radius:100px;padding:2px 8px;}
   .ver-ok{color:#1daf58;font-weight:800;}
@@ -351,8 +352,12 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       const dateStr = new Date().toLocaleDateString(isAr ? "ar-SA" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
       // Rentee identity (app parity) — company name primary when verified, else personal name; plus the
       // renter's real CR/VAT/national address/phone/email from /api/me (value-or-"Verified" pill).
+      // App parity (_RenteeBlock _partyHeader): company name is primary when the renter HAS a company
+      // (gated on company presence, not verified), with the person's name demoted to a subtitle.
+      const renteeHasCompany = !!companyName.trim();
       const rentee = {
-        name: (verified && companyName.trim() ? companyName.trim() : renterName) || L("Moedatech renter", "مستأجر معداتك"),
+        name: (renteeHasCompany ? companyName.trim() : renterName) || L("Moedatech renter", "مستأجر معداتك"),
+        person: renteeHasCompany ? (renterName || null) : null,
         city: group.city ?? group.locationLabel,
         crNumber: renterId.crNumber,
         vatNumber: renterId.vatNumber,
@@ -403,6 +408,10 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       // (Local content / SASO) from the quotation ("no longer surfaces certificates").
       const supChipList = [sup.verified ? L("Verified", "موثَّق") : null].filter(Boolean) as string[];
       const supChips = supChipList.length ? `<div class="pchips">${supChipList.map((c) => `<span class="pchip">✓ ${esc(c)}</span>`).join("")}</div>` : "";
+      // App parity (UnverifiedIndividualIdentity): unverified individual suppliers get a subtitle;
+      // companies / verified suppliers do not.
+      const supplierSub = sup.compliance.entityType === "individual" && !sup.verified
+        ? L("Individual supplier · unverified", "مُورِّد فرد · غير موثَّق") : null;
 
       const eqLine = (b: GroupBid) => (b.equipment ? [b.equipment.make, b.equipment.model, b.equipment.year].filter(Boolean).join(" · ") : "—");
       const labelOf = (b: GroupBid) => (ar ? b.itemLabelAr : b.itemLabel) || (itemMap.get(b.requestId)?.displayId ?? b.requestId);
@@ -508,8 +517,8 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         <div class="q-head"><div class="q-title">${esc(L("Equipment rental quotation", "عرض سعر تأجير معدات"))}</div><div class="q-sub"><span class="qn">${esc(qnum)}</span><span>${esc(dateStr)}</span></div></div>
         <div class="q-body">
           <div class="parties">
-            <div class="party"><div class="plabel">${esc(L("Supplier", "المؤجّر"))}</div><div class="pname">${esc(sup.supplierName)}</div>${sup.rating != null ? `<div class="pmeta">★ ${sup.rating.toFixed(1)}</div>` : ""}${supIdRows}${supChips}</div>
-            <div class="party"><div class="plabel">${esc(L("Rentee", "المستأجر"))}</div><div class="pname">${esc(rentee.name)}</div>${rentee.city ? `<div class="pmeta">${esc(rentee.city)}</div>` : ""}${renteeIdRows}${renteeChips}</div>
+            <div class="party"><div class="plabel">${esc(L("Supplier", "المؤجِّر"))}</div><div class="pname">${esc(sup.supplierName)}</div>${supplierSub ? `<div class="psub">${esc(supplierSub)}</div>` : ""}${supIdRows}${supChips}</div>
+            <div class="party"><div class="plabel">${esc(L("Rentee", "المُستأجِر"))}</div><div class="pname">${esc(rentee.name)}</div>${rentee.person ? `<div class="psub">${esc(rentee.person)}</div>` : ""}${renteeIdRows}${renteeChips}</div>
           </div>
           <div class="metastrip">
             <div><span>${esc(L("Request #", "رقم الطلب"))}</span><b>${esc(groupRef ?? reqLabel)}</b></div>
