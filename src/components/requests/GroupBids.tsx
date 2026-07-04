@@ -740,8 +740,11 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
             />
           );
         }
-        const sp = SPILL[b.status] ?? SPILL.PENDING;
-        const sc = ({
+        // A survey-reported winner (wonViaSurvey) that isn't ACCEPTED still reads as a decided "Awarded"
+        // bid — app parity (the mobile card reflects both). ACCEPTED keeps its own "Accepted" pill.
+        const wonSurvey = b.wonViaSurvey === true && b.status !== "ACCEPTED";
+        const sp = wonSurvey ? { cls: "sp-accepted", dot: false, en: "Awarded", ar: "تمت الترسية" } : (SPILL[b.status] ?? SPILL.PENDING);
+        const sc = wonSurvey ? { bg: "#e7f7ee", c: "#1daf58", dot: false } : ({
           PENDING: { bg: "#e6f2fb", c: "#1a7ec8", dot: true },
           OPEN_FOR_NEGOTIATION: { bg: "#fff3e0", c: "#d4780a", dot: true },
           COUNTER_OFFERED: { bg: "#fff3e0", c: "#d4780a", dot: true },
@@ -777,7 +780,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
             default: return L("Daily rental total", "إجمالي الإيجار اليومي");
           }
         })();
-        const isAccepted = (b.status ?? "").toUpperCase() === "ACCEPTED";
+        const isAccepted = (b.status ?? "").toUpperCase() === "ACCEPTED" || wonSurvey; // decided → accepted/awarded styling
         // Mobile parity (v3_bid_card TermsSectionRow): tally the negotiable terms into Matched / Conflict /
         // Pending (grey + negotiating fold into Pending) — the same 6 keys the app counts on the bid card.
         const NEG_KEYS = ["payment_terms", "breakdown_response_sla", "overtime_rate", "fuel_responsibility", "certs", "operator"];

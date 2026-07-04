@@ -337,13 +337,14 @@ export function BidComparisonWorkspace() {
     ? pickIdRaw
     : cols.length > 1 ? cols[0]?.bid.id ?? null : null;
   const suggestions = rec?.suggestions ?? []; // context-aware what-if chips from Mansour (replace the hardcoded set)
-  // T17 — a request is "decided" when a bid is ACCEPTED in the deal room (Case A) or a survey reported
-  // a bidder as the winner (Case C‑bidder — the backend marks that bid ACCEPTED too). Both surface as
-  // status === "ACCEPTED" here. Case B (awarded in the UI only) is a soft, reversible local mark that
-  // does NOT close the request. Case C off‑platform / no‑winner needs a survey‑outcome read (⚠ backend,
-  // not available yet). Precedence A/C‑bidder (accepted) > B (local).
-  const awarded = bids?.find((b) => b.status === "ACCEPTED") ?? null;
+  // T17 — a request is "decided" when a bid is ACCEPTED in the deal room (→ "Accepted") OR the rentee
+  // reported this supplier as the winner in a survey (`wonViaSurvey` → "Awarded"). App parity: the mobile
+  // bid card reflects BOTH signals. Case B (awarded in the UI only) is a soft, reversible local mark that
+  // does NOT close the request. Precedence: backend accepted/awarded > local.
+  const awarded = bids?.find((b) => b.status === "ACCEPTED" || b.wonViaSurvey === true) ?? null;
   const decidedByAccept = awarded != null;
+  // Which word to show for the decided winner: a deal-room accept reads "Accepted", a survey win "Awarded".
+  const decidedWord = awarded?.status === "ACCEPTED" ? L("Accepted", "مقبول") : L("Awarded", "تمت الترسية");
   // Award = a per-column toggle that PERSISTS (localStorage): "🔨 Award" → "✓ Awarded". Awarding opens a
   // prompt to finalize by accepting the terms with the supplier in the deal room; un-clicking removes it.
   const [awardedIds, setAwardedIds] = useState<Record<string, boolean>>({});
@@ -759,7 +760,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
           {decidedByAccept && (
             <div className="flex flex-wrap items-center gap-2 rounded-2xl border px-4 py-3 text-[13px] font-extrabold" style={{ background: C.successBg, borderColor: "rgba(29,175,88,.35)", color: "#137C42" }}>
               <span className="material-icons-outlined" style={{ fontSize: 18 }}>check_circle</span>
-              {L(`Accepted — ${awarded!.supplierName} · request closed`, `تم القبول — ${awarded!.supplierName} · الطلب مُغلق`)}
+              {L(`${decidedWord} — ${awarded!.supplierName} · request closed`, `${decidedWord} — ${awarded!.supplierName} · الطلب مُغلق`)}
               {awarded!.dealRoomId && (
                 <button onClick={() => router.push(`/deal-room/${awarded!.dealRoomId}`)} className="ms-auto inline-flex items-center gap-1 underline" style={{ color: "#137C42" }}>
                   {L("View deal room", "غرفة الصفقة")}<span className="material-icons-outlined" style={{ fontSize: 14, transform: ar ? "scaleX(-1)" : undefined }}>arrow_forward</span>
@@ -1361,7 +1362,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                             {isAcceptedWinner ? (
                               /* Case A / C-bidder: finalized winner — a static "Accepted" badge, not a toggle. */
                               <span className="inline-flex w-full items-center justify-center gap-1.5 text-[12.5px] text-white" style={{ background: "#137C42", padding: 9, borderRadius: 9, fontWeight: 800 }}>
-                                <span className="material-icons-outlined" style={{ fontSize: 16 }}>check_circle</span>{L("Accepted", "مقبول")}
+                                <span className="material-icons-outlined" style={{ fontSize: 16 }}>check_circle</span>{decidedWord}
                               </span>
                             ) : (
                               /* Award = in-place toggle: "Award" (green) ⇄ "Awarded" (Case B, soft/reversible). Disabled once the request is decided elsewhere. */

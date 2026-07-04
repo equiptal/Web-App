@@ -68,6 +68,9 @@ const OWNERSHIP_DOC_LABELS: Record<string, { key: string; labelEn: string; label
 export interface BidCard {
   id: string;
   status: BidStatus;
+  /** Won via a RENTEE_OUTCOME survey (app parity: `wonViaSurvey`) — the rentee reported this supplier
+   *  as the winner. Distinct from a deal-room accept (`status === "ACCEPTED"`); both = a decided winner. */
+  wonViaSurvey?: boolean;
   supplierId: string | null;
   supplierName: string;
   verified: boolean;
@@ -483,6 +486,7 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   return {
     id: String(raw.id ?? ""),
     status: (s(raw.status) as BidStatus) ?? "PENDING",
+    wonViaSurvey: raw.wonViaSurvey === true, // survey-reported winner (app parity) — decided even if status isn't ACCEPTED
     supplierId: sup.id != null ? String(sup.id) : null,
     supplierName: s(raw.supplierDisplayName) ?? s(sup.companyName) ?? ([s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" ") || "Supplier"),
     verified: supVerified,
