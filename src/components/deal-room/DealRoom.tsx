@@ -323,7 +323,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
             <span className="tc-h-meta">{room.terms.length}{unresolvedDisputed.length ? ` · ${unresolvedDisputed.length} ${L("differ", "مختلف")}` : ""}</span>
             <span className="material-icons-outlined tc-chev" style={{ transform: termsOpen ? "rotate(180deg)" : "none" }}>expand_more</span>
           </button>
-          {termsOpen && <DealRoomTerms terms={room.terms} ar={ar} L={L} busy={busy || !room.myTurn} resolutions={resolutions} onResolveLocal={setResolution} onReopenLocal={clearResolution} />}
+          {termsOpen && <DealRoomTerms terms={room.terms} ar={ar} L={L} busy={busy} readOnly={!room.myTurn} resolutions={resolutions} onResolveLocal={setResolution} onReopenLocal={clearResolution} />}
         </div>
       )}
 

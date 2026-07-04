@@ -58,7 +58,12 @@ likely needs the deal-room term states available where the comparison is built.
 
 ---
 
-## B3 — Deal-room terms: locked / turn-gating + conflict display vs the app
+## B3 — Deal-room terms: locked / turn-gating + conflict display vs the app  [DONE]
+**Fixed:** when it's NOT the renter's turn, `DealRoomTerms` now renders needs-input terms **read-only**
+(no greyed Accept/Counter/Keep-mine buttons, no Undo) — the rentee sees the conflict + values but can't
+act, matching the app (`DealRoom.tsx` passes `readOnly={!room.myTurn}`; actions gated on `!readOnly`).
+Was: buttons shown greyed/disabled via `busy || !myTurn`.
+
 **Problem** (Screenshot 192410): the term action buttons (Keep mine / Counter / Accept supplier's) appear
 **locked/disabled**; "in the app all terms shown have conflict on the supplier side and he cannot accept or
 do anything." Need the web's turn-gating + locked/conflict presentation to match the app exactly.
@@ -122,6 +127,39 @@ mob/demob? VAT rounding? terms?).
 **Investigation:** compare the backend `quotation.service.ts` math/values vs GroupBids' math.
 **AC:** the web quotation values match the app's downloaded quotation for the same deal (incl. negotiated
 deal-room rate/mob/demob and totals).
+
+**AUTHORITATIVE APP SPEC (Yara, 2026-07-04) — align to this:**
+- **Server PDF is DISABLED** — `confirmDeal` creates a `Quotation` row but **no PDF**; the **client renders
+  the quotation** now (`quotation.service.generatePdf` only reachable via `retryPdf`). ⇒ the web's
+  deal-room "Download quotation" that polls for `pdfUrl` never resolves → **broken**; the web must render
+  client-side from the Quotation row's agreed data.
+- **Values come from the deal-room AGREED state (`extractQuotationData`), NOT the raw bid/request:**
+  - `agreedRate = quotation.agreedRate ?? dealRoom.lastProposedRate ?? bid.priceAmount`
+  - `mobPrice/demobPrice` = `lastProposed* ?? bid` (**per-unit**)
+  - `numberOfUnits = dealRoom.agreedUnits ?? bid.unitsOffered.length ?? item.numberOfUnits ?? 1` (assembled
+    deals quote only their accepted slice)
+  - `rentalTotal = agreedRate × durationFactor` (PER_DAY/WEEK/MONTH/JOB)
+  - `estimatedTotal = (rentalTotal + mobPrice + demobPrice) × numberOfUnits`; VAT 15%
+  - Terms: `agreedTerms` = state≠fixed, `fixedTerms` = state fixed → **two separate tables**
+  - Parties: company name for verified merchants else first+last; phones snapshotted on the quotation
+  - Fully localized EN/AR per-field
+- Template sections (each page, AR p1 / EN p2): Header (logo, "Confirmed Quotation", ref pill = first 8 of
+  quotationId, date) · Price Breakdown · Project Details · Site & Preferences · Agreed Terms + Fixed Terms
+  · footer. Logo + footer text are the only admin-configurable bits.
+
+**Revised approach:** render the web quotation **client-side from the confirmed Quotation row's agreed
+values** (mirror `extractQuotationData`'s formula + terms split), not from bid-list values.
+
+**⚠ FINDING — B5 is BACKEND-BLOCKED (verified 2026-07-04):** the web's `GET /quotation` returns only
+`{ pdfUrl, pdfStatus }` (`QuotationView`, `deal-room.ts:109-120`); the backend `getQuotation` returns PDF
+metadata, not the structured `extractQuotationData`. With the **server PDF disabled**, `pdfUrl` never
+resolves, so the web deal-room "Download quotation" is effectively broken AND the web has no agreed data to
+render client-side. **Fix requires a backend change:** `getQuotation` (or a new endpoint) must return the
+structured agreed quotation payload — `agreedRate, priceUnit, mobPrice, demobPrice, numberOfUnits(agreedUnits),
+estimatedTotal, parties(names+phones), agreedTerms[], fixedTerms[]`, localized-ready — so the web renders
+the quotation the way the app now does. → carry via `/web:link-backend` + a `Moedatech-App` PR.
+(The GroupBids per-supplier HTML quotation is a separate, pre-confirmation surface; the *confirmed* deal
+quotation is the one that must match the app and is the backend-blocked piece.)
 
 ---
 

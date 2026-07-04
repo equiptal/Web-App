@@ -137,8 +137,8 @@ function ValueRows({ term, L }: { term: DealTerm; L: LFn }) {
  * keep-mine / counter → collected LOCALLY, no server call) or, once the renter has chosen, a collapsed
  * "you'll…" row with Undo. Nothing is sent until Counter/Accept (app parity — batched submit).
  */
-function TermCard({ term, ar, L, busy, resolution, onResolveLocal, onReopenLocal }: {
-  term: DealTerm; ar: boolean; L: LFn; busy: boolean;
+function TermCard({ term, ar, L, busy, readOnly, resolution, onResolveLocal, onReopenLocal }: {
+  term: DealTerm; ar: boolean; L: LFn; busy: boolean; readOnly: boolean;
   resolution?: TermResolution; onResolveLocal: ResolveLocalFn; onReopenLocal: ReopenLocalFn;
 }) {
   const st = STATE_META[term.state] ?? STATE_META.pending;
@@ -198,9 +198,11 @@ function TermCard({ term, ar, L, busy, resolution, onResolveLocal, onReopenLocal
           <span className="tcard-val">{chosen}{chosenVal !== "—" ? `: ${chosenVal}` : ""}</span>
           {mandatory}
         </div>
-        <div className="tcard-peek">
-          <button type="button" className="tcard-reopen" disabled={busy} onClick={() => onReopenLocal(term.key)}>{L("Undo", "تراجع")}</button>
-        </div>
+        {!readOnly && (
+          <div className="tcard-peek">
+            <button type="button" className="tcard-reopen" disabled={busy} onClick={() => onReopenLocal(term.key)}>{L("Undo", "تراجع")}</button>
+          </div>
+        )}
       </div>
     );
   }
@@ -215,7 +217,9 @@ function TermCard({ term, ar, L, busy, resolution, onResolveLocal, onReopenLocal
         {mandatory}
       </div>
       <ValueRows term={term} L={L} />
-      {countering ? (
+      {/* App parity: when it's NOT the renter's turn, terms are read-only (no action buttons) — the
+          rentee can view the conflict but can't act until the supplier responds. */}
+      {readOnly ? null : countering ? (
         <CounterEditor term={term} ar={ar} L={L} onCancel={() => setCountering(false)} onSubmit={(v) => { setCountering(false); onResolveLocal(term.key, "counter", v); }} />
       ) : (
         <div className="tcard-acts">
@@ -234,8 +238,8 @@ function TermCard({ term, ar, L, busy, resolution, onResolveLocal, onReopenLocal
  * or Accept submit. Grouped with a progress meter: NEEDS YOUR INPUT → YOU'LL SEND (locally resolved) →
  * AGREED (server) → FIXED.
  */
-export function DealRoomTerms({ terms, ar, L, busy, resolutions, onResolveLocal, onReopenLocal }: {
-  terms: DealTerm[]; ar: boolean; L: LFn; busy: boolean;
+export function DealRoomTerms({ terms, ar, L, busy, readOnly = false, resolutions, onResolveLocal, onReopenLocal }: {
+  terms: DealTerm[]; ar: boolean; L: LFn; busy: boolean; readOnly?: boolean;
   resolutions: ResolutionsMap; onResolveLocal: ResolveLocalFn; onReopenLocal: ReopenLocalFn;
 }) {
   if (terms.length === 0) return null;
@@ -265,7 +269,7 @@ export function DealRoomTerms({ terms, ar, L, busy, resolutions, onResolveLocal,
         <div key={g.label} className="terms-group">
           <div className="terms-group-h">{g.label} <span>{g.terms.length}</span></div>
           {g.terms.map((tm) => (
-            <TermCard key={tm.key + (tm.itemLabel ?? "")} term={tm} ar={ar} L={L} busy={busy} resolution={resolutions[tm.key]} onResolveLocal={onResolveLocal} onReopenLocal={onReopenLocal} />
+            <TermCard key={tm.key + (tm.itemLabel ?? "")} term={tm} ar={ar} L={L} busy={busy} readOnly={readOnly} resolution={resolutions[tm.key]} onResolveLocal={onResolveLocal} onReopenLocal={onReopenLocal} />
           ))}
         </div>
       ))}
