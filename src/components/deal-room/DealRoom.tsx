@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { StreamChat, type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
-import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, resolveTerm, ApiError } from "@/lib/api/client";
+import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, ApiError } from "@/lib/api/client";
 import type { DealRoomView, DealRoomDocument, DealRoomDocuments } from "@/lib/contract/deal-room";
-import { DealRoomTerms } from "@/components/deal-room/DealRoomTerms";
+import { DealRoomTerms, type ResolutionsMap } from "@/components/deal-room/DealRoomTerms";
 import "@/components/deal-room/deal-room-proto.css";
 
 type StreamAttachment = { type?: string; image_url?: string; thumb_url?: string; asset_url?: string; title?: string; mime_type?: string; file_size?: number; fallback?: string };
@@ -33,6 +33,9 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [termsOpen, setTermsOpen] = useState(true);
   const termsToggled = useRef(false);
+  // App parity: term accept/counter are collected LOCALLY here and submitted once (batched) on
+  // Counter/Accept — nothing is PATCHed per click.
+  const [resolutions, setResolutions] = useState<ResolutionsMap>({});
 
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [myStreamId, setMyStreamId] = useState<string | null>(null);
@@ -161,13 +164,25 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     setShowCounter(true);
   }
 
+  // Collect a term resolution locally (no server call — app parity). Submitted on Counter/Accept.
+  const setResolution = (key: string, action: "accept" | "counter", value?: unknown) =>
+    setResolutions((r) => ({ ...r, [key]: { action, value } }));
+  const clearResolution = (key: string) =>
+    setResolutions((r) => { const n = { ...r }; delete n[key]; return n; });
+  const resolutionUpdates = () =>
+    Object.entries(resolutions).map(([termKey, r]) => ({ termKey, action: r.action, value: r.value }));
+
   async function submitCounter(next: { rate: number; mobPrice?: number; demobPrice?: number }) {
     if (!room || busy) return;
     setBusy(true);
     setCounterErr(null);
     try {
-      // App parity: the counter step proposes the daily rate AND the mobilization/return prices together.
+      // App parity (DealRoomCounterWithRate): batch the locally-resolved term updates, THEN propose the
+      // daily rate + mobilization/return prices — all as one counter move.
+      const updates = resolutionUpdates();
+      if (updates.length) await batchUpdateTerms(id, updates);
       await proposeRate(id, { proposedRate: next.rate, priceUnit: room.priceUnit ?? "PER_DAY", mobPrice: next.mobPrice, demobPrice: next.demobPrice });
+      setResolutions({});
       await loadRoom();
       setShowCounter(false);
     } catch (e) {
@@ -177,24 +192,14 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     }
   }
 
-  async function onResolve(key: string, action: "accept" | "counter" | "reopen", value?: unknown) {
-    if (!room || busy) return;
-    setBusy(true);
-    try {
-      await resolveTerm(id, key, action, value);
-      await loadRoom();
-    } catch (e) {
-      window.alert(errMsg(e, L("Couldn’t update that term — please try again.", "تعذّر تحديث هذا الشرط — حاول مرة أخرى.")));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function doAccept() {
     if (!room || busy) return;
     setBusy(true);
     try {
-      await acceptDeal(id, room.contractType ?? "platform", room.numberOfUnits || undefined);
+      // App parity (accept-all-terms): submit the locally-collected term resolutions together with the
+      // accept. contractType defaults to "formal"; agreedUnits is omitted (no assembled deals on web).
+      await acceptDeal(id, "formal", { termResolutions: resolutionUpdates() });
+      setResolutions({});
       await loadRoom();
       setShowAccept(false);
     } catch (e) {
@@ -228,6 +233,10 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const awaiting = room.status === "AWAITING_SUPPLIER_CONFIRMATION";
   const waiting = awaiting || (!room.myTurn && room.status === "NEGOTIATING");
   const cardCls = closed ? "closed" : waiting ? "neg" : "";
+  // Accept is gated (like the app) until every differing term is resolved — now satisfied by a LOCAL
+  // resolution, not a server round-trip.
+  const unresolvedDisputed = room.terms.filter((t) => t.state === "disputed" && !resolutions[t.key]);
+  const canAccept = unresolvedDisputed.length === 0;
 
   return (
     <div className="dlproto" dir={ar ? "rtl" : "ltr"}>
@@ -283,9 +292,9 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
             <div className="pc-cta">
               <button className="btn outline" disabled={busy} onClick={onCounter}><span className="material-icons-outlined">swap_horiz</span>{L("Counter", "تفاوض")}</button>
               {/* Accept is gated exactly like the app: blocked while any term is disputed (acceptAllTerms 409s otherwise). */}
-              <button className="btn green" disabled={busy || room.hasDisputedTerms} onClick={() => setShowAccept(true)}><span className="material-icons-outlined">check</span>{L("Accept", "قبول")}</button>
+              <button className="btn green" disabled={busy || !canAccept} onClick={() => setShowAccept(true)}><span className="material-icons-outlined">check</span>{L("Accept", "قبول")}</button>
             </div>
-            {room.hasDisputedTerms && (
+            {!canAccept && (
               <div className="turn-strip" style={{ color: "var(--warn,#b45309)" }}>
                 <span className="material-icons-outlined" style={{ color: "var(--warn,#b45309)" }}>error_outline</span>
                 {L("Resolve the differing terms below before you can accept", "قم بحل الشروط المختلفة أدناه قبل القبول")}
@@ -311,10 +320,10 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
           <button type="button" className="tc-h tc-toggle" aria-expanded={termsOpen} onClick={() => { termsToggled.current = true; setTermsOpen((o) => !o); }}>
             <span className="material-icons-outlined">fact_check</span>
             <span>{L("Terms", "الشروط")}</span>
-            <span className="tc-h-meta">{room.terms.length}{room.hasDisputedTerms ? ` · ${room.terms.filter((tm) => tm.state === "disputed").length} ${L("differ", "مختلف")}` : ""}</span>
+            <span className="tc-h-meta">{room.terms.length}{unresolvedDisputed.length ? ` · ${unresolvedDisputed.length} ${L("differ", "مختلف")}` : ""}</span>
             <span className="material-icons-outlined tc-chev" style={{ transform: termsOpen ? "rotate(180deg)" : "none" }}>expand_more</span>
           </button>
-          {termsOpen && <DealRoomTerms terms={room.terms} ar={ar} L={L} busy={busy || !room.myTurn} onResolve={onResolve} />}
+          {termsOpen && <DealRoomTerms terms={room.terms} ar={ar} L={L} busy={busy || !room.myTurn} resolutions={resolutions} onResolveLocal={setResolution} onReopenLocal={clearResolution} />}
         </div>
       )}
 

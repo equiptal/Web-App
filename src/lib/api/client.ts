@@ -230,12 +230,27 @@ export function proposeRate(id: string, body: { proposedRate: number; priceUnit:
   return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/rate-proposal`, body);
 }
 
-/** Accept the current offer (accept all terms → confirm). */
-export function acceptDeal(id: string, contractType = "platform", agreedUnits?: number): Promise<unknown> {
-  return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/accept`, agreedUnits != null ? { contractType, agreedUnits } : { contractType });
+/** A batched term resolution — matches the app's `{ termKey, action, value? }`. */
+export type TermUpdate = { termKey: string; action: string; value?: unknown };
+
+/**
+ * Accept the current offer (accept-all-terms). App parity: `contractType` defaults to `"formal"`, the
+ * locally-collected `termResolutions` are submitted together, and `agreedUnits` is only sent for
+ * assembled multi-supplier deals (the web has none → omit it).
+ */
+export function acceptDeal(id: string, contractType = "formal", opts?: { termResolutions?: TermUpdate[]; agreedUnits?: number }): Promise<unknown> {
+  const body: Record<string, unknown> = { contractType };
+  if (opts?.termResolutions && opts.termResolutions.length) body.termResolutions = opts.termResolutions;
+  if (opts?.agreedUnits != null) body.agreedUnits = opts.agreedUnits;
+  return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/accept`, body);
 }
 
-/** Resolve one negotiable term — accept the supplier's value, counter it, or reopen. */
+/** Submit all locally-collected term resolutions at once (app parity — batched with the rate counter). */
+export function batchUpdateTerms(id: string, updates: TermUpdate[], note?: string): Promise<unknown> {
+  return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/terms/batch`, { updates, note });
+}
+
+/** Resolve one negotiable term (legacy single-term PATCH — retained for callers outside the deal room). */
 export function resolveTerm(id: string, key: string, action: "accept" | "counter" | "reopen", value?: unknown): Promise<unknown> {
   return postJsonMethod(`/api/me/deal-rooms/${encodeURIComponent(id)}/terms/${encodeURIComponent(key)}`, { action, value }, "PATCH");
 }

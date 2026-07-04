@@ -4,7 +4,13 @@ import { useState } from "react";
 import type { DealTerm } from "@/lib/contract/deal-room";
 
 type LFn = (en: string, ar: string) => string;
-type ResolveFn = (key: string, action: "accept" | "counter" | "reopen", value?: unknown) => void;
+
+/** A locally-collected resolution for one term (app parity: nothing is sent until Counter/Accept). */
+export type TermResolution = { action: "accept" | "counter"; value?: unknown };
+export type ResolutionsMap = Record<string, TermResolution>;
+
+type ResolveLocalFn = (key: string, action: "accept" | "counter", value?: unknown) => void;
+type ReopenLocalFn = (key: string) => void;
 
 /** App parity (term_card.dart): 5 colour-coded states. */
 export const STATE_META: Record<string, { en: string; ar: string; cls: string }> = {
@@ -15,8 +21,9 @@ export const STATE_META: Record<string, { en: string; ar: string; cls: string }>
   pending: { en: "Pending", ar: "قيد الانتظار", cls: "st-pending" },
 };
 
-/** Agreed / accepted terms collapse to a green row. Fixed terms are locked (own group). */
+/** Agreed / accepted terms (server-side) collapse to a green row. Fixed terms are locked (own group). */
 const isAgreedish = (state: string) => state === "agreed" || state === "soft_accepted";
+const isNeedsInput = (state: string) => state === "disputed" || state === "pending";
 
 export function valText(v: unknown, L: LFn): string {
   if (v == null || v === "") return "—";
@@ -46,7 +53,6 @@ function isBinary(t: DealTerm): boolean {
 /** Inline counter editor — typed by term (price number / option pills / binary toggle / free value). */
 function CounterEditor({ term, ar, L, onSubmit, onCancel }: { term: DealTerm; ar: boolean; L: LFn; onSubmit: (v: unknown) => void; onCancel: () => void }) {
   const [val, setVal] = useState<string>("");
-  // Multi-select state for cert-list terms — seeded from the renter's current value.
   const [multi, setMulti] = useState<string[]>(() => {
     const cur = term.renteePreference ?? term.value;
     if (Array.isArray(cur)) return cur.map(String);
@@ -56,7 +62,7 @@ function CounterEditor({ term, ar, L, onSubmit, onCancel }: { term: DealTerm; ar
   const acts = (disabled: boolean, v: () => unknown) => (
     <div className="tc-counter-acts">
       <button className="tc-btn ghost" type="button" onClick={onCancel}>{L("Cancel", "إلغاء")}</button>
-      <button className="tc-btn solid" type="button" disabled={disabled} onClick={() => onSubmit(v())}>{L("Send counter", "إرسال العرض المضاد")}</button>
+      <button className="tc-btn solid" type="button" disabled={disabled} onClick={() => onSubmit(v())}>{L("Set counter", "تعيين العرض المضاد")}</button>
     </div>
   );
   if (isPriceKey(term.key)) {
@@ -70,7 +76,6 @@ function CounterEditor({ term, ar, L, onSubmit, onCancel }: { term: DealTerm; ar
       </div>
     );
   }
-  // Cert-list terms (operator_certification / safety_certifications): multi-select set of cert codes.
   if (isCertListKey(term.key) && (term.options?.length ?? 0) > 0) {
     const toggle = (v: string) => setMulti((m) => (m.includes(v) ? m.filter((x) => x !== v) : [...m, v]));
     return (
@@ -111,8 +116,7 @@ function CounterEditor({ term, ar, L, onSubmit, onCancel }: { term: DealTerm; ar
   );
 }
 
-/** The reference value rows (app parity, term_card.dart _ValueRow): Current (bold) → You → Supplier →
- *  Platform default. Only rows with a value are shown. */
+/** The reference value rows (app parity, term_card.dart _ValueRow). Only rows with a value are shown. */
 function ValueRows({ term, L }: { term: DealTerm; L: LFn }) {
   const row = (label: string, v: unknown, bold = false) =>
     v == null || v === "" ? null : (
@@ -128,15 +132,22 @@ function ValueRows({ term, L }: { term: DealTerm; L: LFn }) {
   );
 }
 
-/** One term card. Agreed → collapsed green row (with Reopen). Fixed → locked row. Conflict/pending →
- *  open card with the reference rows + inline resolve (Accept / Keep mine / Counter). */
-function TermCard({ term, ar, L, busy, onResolve }: { term: DealTerm; ar: boolean; L: LFn; busy: boolean; onResolve: ResolveFn }) {
+/**
+ * One term card. Server-agreed/fixed render read-only. A needs-input term is either OPEN (accept /
+ * keep-mine / counter → collected LOCALLY, no server call) or, once the renter has chosen, a collapsed
+ * "you'll…" row with Undo. Nothing is sent until Counter/Accept (app parity — batched submit).
+ */
+function TermCard({ term, ar, L, busy, resolution, onResolveLocal, onReopenLocal }: {
+  term: DealTerm; ar: boolean; L: LFn; busy: boolean;
+  resolution?: TermResolution; onResolveLocal: ResolveLocalFn; onReopenLocal: ReopenLocalFn;
+}) {
   const st = STATE_META[term.state] ?? STATE_META.pending;
   const disputed = term.state === "disputed";
   const fixed = term.state === "fixed";
-  const [open, setOpen] = useState(false); // resolved rows can be expanded on demand
+  const [open, setOpen] = useState(false);
   const [countering, setCountering] = useState(false);
   const mandatory = term.isMandatory ? <span className="tcard-state st-mand">{L("Mandatory", "إلزامي")}</span> : null;
+  const label = <span className="tcard-lab">{ar ? term.labelAr : term.label}{term.itemLabel ? <em> · {term.itemLabel}</em> : null}</span>;
 
   // Fixed → locked row (lock icon + navy "Fixed" badge, no actions — app parity).
   if (fixed) {
@@ -144,7 +155,7 @@ function TermCard({ term, ar, L, busy, onResolve }: { term: DealTerm; ar: boolea
       <div className="tcard tcard-fixed">
         <div className="tcard-resolved-h" style={{ cursor: "default" }}>
           <span className="material-icons-outlined lock-tick">lock</span>
-          <span className="tcard-lab">{ar ? term.labelAr : term.label}{term.itemLabel ? <em> · {term.itemLabel}</em> : null}</span>
+          {label}
           <span className="tcard-val">{valText(term.value ?? term.platformDefault, L)}</span>
           <span className={`tcard-state ${st.cls}`}>{ar ? st.ar : st.en}</span>
           {mandatory}
@@ -153,44 +164,64 @@ function TermCard({ term, ar, L, busy, onResolve }: { term: DealTerm; ar: boolea
     );
   }
 
-  // Agreed / accepted → collapsed green row, tap to peek; renter can reopen.
+  // Server-agreed / accepted → collapsed green row, tap to peek. Read-only (settled server-side; the
+  // app never reopens a term server-side).
   if (isAgreedish(term.state)) {
     return (
       <div className="tcard tcard-resolved">
         <button type="button" className="tcard-resolved-h" onClick={() => setOpen((o) => !o)}>
           <span className="material-icons-outlined ok-tick">check_circle</span>
-          <span className="tcard-lab">{ar ? term.labelAr : term.label}{term.itemLabel ? <em> · {term.itemLabel}</em> : null}</span>
+          {label}
           <span className="tcard-val">{valText(term.value ?? term.supplierDeclared ?? term.renteePreference, L)}</span>
           <span className={`tcard-state ${st.cls}`}>{ar ? st.ar : st.en}</span>
           {mandatory}
         </button>
-        {open && (
-          <div className="tcard-peek">
-            <ValueRows term={term} L={L} />
-            <button type="button" className="tcard-reopen" disabled={busy} onClick={() => onResolve(term.key, "reopen")}>{L("Reopen term", "إعادة فتح الشرط")}</button>
-          </div>
-        )}
+        {open && <div className="tcard-peek"><ValueRows term={term} L={L} /></div>}
       </div>
     );
   }
 
-  // Conflict / pending → open card with the reference rows + actions.
+  // Needs-input term the renter has resolved LOCALLY → collapsed "you'll…" row + Undo (drops the local
+  // resolution; no server call). Submitted only on Counter/Accept.
+  if (resolution) {
+    const chosen = resolution.action === "accept"
+      ? L("You'll accept", "ستقبل")
+      : L("You'll counter", "ستقترح");
+    const chosenVal = resolution.action === "accept"
+      ? valText(term.supplierDeclared ?? term.value, L)
+      : valText(resolution.value, L);
+    return (
+      <div className="tcard tcard-resolved">
+        <div className="tcard-resolved-h" style={{ cursor: "default" }}>
+          <span className="material-icons-outlined ok-tick">check_circle</span>
+          {label}
+          <span className="tcard-val">{chosen}{chosenVal !== "—" ? `: ${chosenVal}` : ""}</span>
+          {mandatory}
+        </div>
+        <div className="tcard-peek">
+          <button type="button" className="tcard-reopen" disabled={busy} onClick={() => onReopenLocal(term.key)}>{L("Undo", "تراجع")}</button>
+        </div>
+      </div>
+    );
+  }
+
+  // Needs-input, unresolved → open card with the reference rows + actions (collected locally).
   return (
     <div className={`tcard ${disputed ? "tcard-critical" : "tcard-pending"}`}>
       <div className="tcard-h">
         {disputed && <span className="material-icons-outlined tcard-warn">warning_amber</span>}
-        <span className="tcard-lab">{ar ? term.labelAr : term.label}{term.itemLabel ? <em> · {term.itemLabel}</em> : null}</span>
+        {label}
         <span className={`tcard-state ${st.cls}`}>{ar ? st.ar : st.en}</span>
         {mandatory}
       </div>
       <ValueRows term={term} L={L} />
       {countering ? (
-        <CounterEditor term={term} ar={ar} L={L} onCancel={() => setCountering(false)} onSubmit={(v) => { setCountering(false); onResolve(term.key, "counter", v); }} />
+        <CounterEditor term={term} ar={ar} L={L} onCancel={() => setCountering(false)} onSubmit={(v) => { setCountering(false); onResolveLocal(term.key, "counter", v); }} />
       ) : (
         <div className="tcard-acts">
-          {disputed && <button className="tc-btn ghost" type="button" disabled={busy} onClick={() => onResolve(term.key, "counter", term.renteePreference)}>{L("Keep mine", "الإبقاء على عرضي")}</button>}
+          {disputed && <button className="tc-btn ghost" type="button" disabled={busy} onClick={() => onResolveLocal(term.key, "counter", term.renteePreference)}>{L("Keep mine", "الإبقاء على عرضي")}</button>}
           <button className="tc-btn outline" type="button" disabled={busy} onClick={() => setCountering(true)}>{L("Counter", "عرض مضاد")}</button>
-          <button className="tc-btn solid" type="button" disabled={busy} onClick={() => onResolve(term.key, "accept")}>{disputed ? L("Accept supplier’s", "قبول عرض المؤجّر") : L("Accept", "قبول")}</button>
+          <button className="tc-btn solid" type="button" disabled={busy} onClick={() => onResolveLocal(term.key, "accept")}>{disputed ? L("Accept supplier’s", "قبول عرض المؤجّر") : L("Accept", "قبول")}</button>
         </div>
       )}
     </div>
@@ -198,36 +229,44 @@ function TermCard({ term, ar, L, busy, onResolve }: { term: DealTerm; ar: boolea
 }
 
 /**
- * Deal-room terms — app parity (term_card.dart + term_grouping.dart). Grouped by actionability with a
- * progress meter: NEEDS YOUR INPUT (conflict/pending) → AGREED (collapsed green, reopenable) → FIXED
- * (locked). Resolve is immediate (per term). One screen, no staging.
+ * Deal-room terms — app parity (term_card.dart + counter_offer_terms_page.dart). The renter resolves
+ * needs-input terms LOCALLY (accept / keep-mine / counter); nothing is sent until the batched Counter
+ * or Accept submit. Grouped with a progress meter: NEEDS YOUR INPUT → YOU'LL SEND (locally resolved) →
+ * AGREED (server) → FIXED.
  */
-export function DealRoomTerms({ terms, ar, L, busy, onResolve }: { terms: DealTerm[]; ar: boolean; L: LFn; busy: boolean; onResolve: ResolveFn }) {
+export function DealRoomTerms({ terms, ar, L, busy, resolutions, onResolveLocal, onReopenLocal }: {
+  terms: DealTerm[]; ar: boolean; L: LFn; busy: boolean;
+  resolutions: ResolutionsMap; onResolveLocal: ResolveLocalFn; onReopenLocal: ReopenLocalFn;
+}) {
   if (terms.length === 0) return null;
-  const needsInput = terms.filter((t) => t.state === "disputed" || t.state === "pending");
+  const needsInput = terms.filter((t) => isNeedsInput(t.state));
+  const unresolved = needsInput.filter((t) => !resolutions[t.key]);
+  const pendingLocal = needsInput.filter((t) => resolutions[t.key]);
   const agreed = terms.filter((t) => isAgreedish(t.state));
   const fixed = terms.filter((t) => t.state === "fixed");
-  const resolvedCount = agreed.length + fixed.length;
+  const resolvedCount = agreed.length + fixed.length + pendingLocal.length;
   const pct = terms.length ? Math.round((resolvedCount / terms.length) * 100) : 0;
   const groups: { label: string; terms: DealTerm[] }[] = [
-    { label: L("Needs your input", "تحتاج ردّك"), terms: needsInput },
+    { label: L("Needs your input", "تحتاج ردّك"), terms: unresolved },
+    { label: L("You'll send", "سترسل"), terms: pendingLocal },
     { label: L("Agreed", "متفق عليه"), terms: agreed },
     { label: L("Fixed", "ثابتة"), terms: fixed },
   ];
   return (
     <div className="terms-list">
-      {/* Progress meter (app parity: "N of M resolved"). */}
       <div className="terms-progress">
         <div className="terms-progress-h">
           <span>{L(`${resolvedCount} of ${terms.length} resolved`, `${resolvedCount} من ${terms.length} تمّت`)}</span>
-          {needsInput.length > 0 && <span className="tp-open">{L(`${needsInput.length} to review`, `${needsInput.length} للمراجعة`)}</span>}
+          {unresolved.length > 0 && <span className="tp-open">{L(`${unresolved.length} to review`, `${unresolved.length} للمراجعة`)}</span>}
         </div>
         <div className="terms-progress-bar"><div style={{ width: `${pct}%` }} /></div>
       </div>
       {groups.filter((g) => g.terms.length > 0).map((g) => (
         <div key={g.label} className="terms-group">
           <div className="terms-group-h">{g.label} <span>{g.terms.length}</span></div>
-          {g.terms.map((tm) => <TermCard key={tm.key + (tm.itemLabel ?? "")} term={tm} ar={ar} L={L} busy={busy} onResolve={onResolve} />)}
+          {g.terms.map((tm) => (
+            <TermCard key={tm.key + (tm.itemLabel ?? "")} term={tm} ar={ar} L={L} busy={busy} resolution={resolutions[tm.key]} onResolveLocal={onResolveLocal} onReopenLocal={onReopenLocal} />
+          ))}
         </div>
       ))}
     </div>
