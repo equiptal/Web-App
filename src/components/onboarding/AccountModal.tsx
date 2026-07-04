@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
@@ -41,10 +41,18 @@ type Phase = "phone" | "code" | "profile";
 function AccountFlow({ onCreated }: { onCreated: () => void }) {
   const t = useT();
   const { status, user, signIn } = useSession();
-  // An existing (guest) session with a phone skips OTP and goes straight to the profile step.
-  const hasSession = status === "authed" && !!user?.phone;
-  const [phase, setPhase] = useState<Phase>(hasSession ? "profile" : "phone");
+  // An existing (guest-tier) session with a phone skips OTP and goes straight to the profile step. A
+  // session that's ALREADY basic/verified has a complete profile — nothing to fill — so it proceeds
+  // straight to posting (handled by the effect below); it should never linger on the profile step.
+  const hasGuestSession = status === "authed" && !!user?.phone && user?.tier === "guest";
+  const alreadyComplete = status === "authed" && (user?.tier === "basic" || user?.tier === "verified");
+  const [phase, setPhase] = useState<Phase>(hasGuestSession ? "profile" : "phone");
   const [phone, setPhone] = useState<string | null>(user?.phone ?? null);
+
+  // If we somehow open for an already-complete account, don't show the form — just continue.
+  useEffect(() => {
+    if (alreadyComplete) onCreated();
+  }, [alreadyComplete, onCreated]);
 
   if (phase === "phone") {
     return (
@@ -65,8 +73,11 @@ function AccountFlow({ onCreated }: { onCreated: () => void }) {
         <CodeEntry
           phone={phone}
           onVerified={(u: RenterUser) => {
-            signIn(u); // start the (guest) session so the profile step can read the verified phone
-            setPhase("profile");
+            signIn(u); // start the session from the verified identity (carries the real tier)
+            // Returning account that's already complete → skip the profile form and post the request.
+            // Only a new/incomplete (guest-tier) number needs to fill in the profile (guest→basic).
+            if (u.tier === "basic" || u.tier === "verified") onCreated();
+            else setPhase("profile");
           }}
           onEditNumber={() => setPhase("phone")}
         />
