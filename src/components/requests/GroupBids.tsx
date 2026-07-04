@@ -382,18 +382,23 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       // Value: off-platform link value first, else the on-platform real number (bid-list supplierProfile),
       // else the app's "Verified" pill when only the presence flag is known.
       const supIdRows =
-        idRow(L("National address", "العنوان الوطني"), ld.national ?? sup.supplierNationalAddress, sup.compliance.nationalAddress) +
-        idRow(L("CR #", "السجل التجاري"), ld.commercial ?? sup.supplierCrNumber, sup.compliance.activityLicense) +
-        idRow(L("VAT #", "الرقم الضريبي"), ld.vat ?? sup.supplierVatNumber, sup.compliance.taxNumber) +
-        idRow(L("Contact", "التواصل"), ld.contact ?? null, false);
-      // Rentee identity rows (app parity) — same value-or-"Verified" rule as the supplier.
+        // Labels + AR match the mobile quotation_document (CR=س.ت, VAT=ض.ق.م, "National Address").
+        // App parity: supplier rows gate the "Verified" pill on PARTY-verified (supplierStatus===2),
+        // not per-doc presence — a verified supplier missing a value still shows the pill.
+        idRow(L("National Address", "العنوان الوطني"), ld.national ?? sup.supplierNationalAddress, sup.verified) +
+        idRow(L("CR #", "س.ت"), ld.commercial ?? sup.supplierCrNumber, sup.verified) +
+        idRow(L("VAT #", "ض.ق.م"), ld.vat ?? sup.supplierVatNumber, sup.verified) +
+        idRow(L("Phone", "الهاتف"), ld.contact ?? null, false); // off-platform contact → Phone (mobile has no "Contact" row)
+      // Rentee identity rows — same labels/rule as the supplier; pill gates on the renter-verified flag.
       const renteeIdRows =
-        idRow(L("National address", "العنوان الوطني"), rentee.nationalAddress, verified) +
-        idRow(L("CR #", "السجل التجاري"), rentee.crNumber, verified) +
-        idRow(L("VAT #", "الرقم الضريبي"), rentee.vatNumber, verified) +
+        idRow(L("National Address", "العنوان الوطني"), rentee.nationalAddress, verified) +
+        idRow(L("CR #", "س.ت"), rentee.crNumber, verified) +
+        idRow(L("VAT #", "ض.ق.م"), rentee.vatNumber, verified) +
         idRow(L("Phone", "الهاتف"), rentee.phone, false) +
-        idRow(L("Email", "البريد الإلكتروني"), rentee.email, false);
-      const renteeChips = verified ? `<div class="pchips"><span class="pchip">✓ ${esc(L("Verified", "موثَّق"))}</span></div>` : "";
+        idRow(L("Email", "البريد"), rentee.email, false);
+      // App parity: the rentee block has NO "Verified" chip row (mobile _RenteeBlock emits none) — the
+      // inline identity-row pills already carry the verified signal.
+      const renteeChips = "";
       // App parity: the quotation surfaces only the "Verified" chip — the app removed certificate chips
       // (Local content / SASO) from the quotation ("no longer surfaces certificates").
       const supChipList = [sup.verified ? L("Verified", "موثَّق") : null].filter(Boolean) as string[];

@@ -19,7 +19,18 @@ interface BackendMe {
   vatNumber?: string | null;
   taxNumber?: string | null;
   nationalAddress?: string | null;
-  supplierProfile?: { companyName?: string | null; crNumber?: string | null; commercialRegistrationNumber?: string | null; vatNumber?: string | null; taxNumber?: string | null; nationalAddress?: string | null } | null;
+  // Saudi National Address parts (the backend returns these, not a composed string).
+  buildingNumber?: string | null;
+  shortAddress?: string | null;
+  district?: string | null;
+  companyCity?: string | null;
+  postalCode?: string | null;
+  supplierProfile?: {
+    companyName?: string | null; crNumber?: string | null; commercialRegistrationNumber?: string | null;
+    vatNumber?: string | null; taxNumber?: string | null; nationalAddress?: string | null;
+    buildingNumber?: string | null; shortAddress?: string | null; district?: string | null;
+    companyCity?: string | null; postalCode?: string | null;
+  } | null;
 }
 interface BackendStatus {
   supplierStatus?: number | null;
@@ -50,7 +61,22 @@ export async function GET(req: Request) {
         // tolerant of the backend's field naming. Null when absent (quotation falls back to the pill).
         crNumber: me.crNumber ?? me.commercialRegistrationNumber ?? me.supplierProfile?.crNumber ?? me.supplierProfile?.commercialRegistrationNumber ?? null,
         vatNumber: me.vatNumber ?? me.taxNumber ?? me.supplierProfile?.vatNumber ?? me.supplierProfile?.taxNumber ?? null,
-        nationalAddress: me.nationalAddress ?? me.supplierProfile?.nationalAddress ?? null,
+        // Backend returns the National Address as structured parts, not a string — compose it
+        // (building no. · short address · district · city · postal code) so the quotation shows the real
+        // address instead of always falling back to the "Verified" pill (mobile composes it the same way).
+        nationalAddress:
+          me.nationalAddress ??
+          me.supplierProfile?.nationalAddress ??
+          ([
+            me.buildingNumber ?? me.supplierProfile?.buildingNumber,
+            me.shortAddress ?? me.supplierProfile?.shortAddress,
+            me.district ?? me.supplierProfile?.district,
+            me.companyCity ?? me.supplierProfile?.companyCity,
+            me.postalCode ?? me.supplierProfile?.postalCode,
+          ]
+            .map((v) => (typeof v === "string" ? v.trim() : ""))
+            .filter(Boolean)
+            .join(", ") || null),
       };
       return NextResponse.json({
         user,
