@@ -393,7 +393,8 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         idRow(L("National Address", "العنوان الوطني"), ld.national ?? sup.supplierNationalAddress, sup.verified) +
         idRow(L("CR #", "س.ت"), ld.commercial ?? sup.supplierCrNumber, sup.verified) +
         idRow(L("VAT #", "ض.ق.م"), ld.vat ?? sup.supplierVatNumber, sup.verified) +
-        idRow(L("Phone", "الهاتف"), ld.contact ?? null, false); // off-platform contact → Phone (mobile has no "Contact" row)
+        idRow(L("Phone", "الهاتف"), ld.contact ?? sup.supplierPhone, false) + // on-platform phone or off-platform contact (mobile has no "Contact" row)
+        (sup.compliance.entityType === "company" ? idRow(L("Email", "البريد"), sup.supplierEmail, false) : ""); // company only, per app
       // Rentee identity rows — same labels/rule as the supplier; pill gates on the renter-verified flag.
       const renteeIdRows =
         idRow(L("National Address", "العنوان الوطني"), rentee.nationalAddress, verified) +

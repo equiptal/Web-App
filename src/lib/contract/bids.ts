@@ -110,6 +110,10 @@ export interface BidCard {
   supplierCrNumber?: string | null;
   supplierVatNumber?: string | null;
   supplierNationalAddress?: string | null;
+  /** Supplier contact for the quotation party block (app parity). Phone ships today (bid-list sends it);
+   *  email is null until the bid-list projection adds it (backend), then the Email row lights up. */
+  supplierPhone?: string | null;
+  supplierEmail?: string | null;
   matchCount: number;
   conflictCount: number;
   dealRoomId: string | null;
@@ -201,6 +205,9 @@ export interface TermRow {
   state: TermState;
   /** Optional one-line explainer shown under the term (e.g. the supplier's answer vs the renter's request). */
   detail?: { en: string; ar: string };
+  /** The negotiated value once the term is AGREED in the deal room (from lockedTerms) — lets the cost
+   *  responsibilities reflect what was actually settled, not the renter's original request side. */
+  value?: string | null;
 }
 
 const n = (v: unknown): number | null => {
@@ -299,6 +306,23 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
   const rOvertime: TermRow = { key: "overtime_rate", labelEn: "Overtime", labelAr: "العمل الإضافي", state: contractState("overtime_rate", s(req.overtimeRate)) };
   const rMaint: TermRow = { key: "maintenance_responsibility", labelEn: "Maintenance", labelAr: "الصيانة", state: maintenance };
 
+  // Conflict detail (Renter: X · Supplier: Y) — app parity with link bids, so an in-app conflict in
+  // the Terms modal names BOTH sides, not just the term. Cert terms carry the exact codes.
+  const t3 = (raw.t3Declarations ?? {}) as Record<string, unknown>;
+  const opDeclared = s(t3.operator_certification) ?? s(t3.operatorCertification);
+  const certName = (c: CertCode) => CERT_LABEL[c]?.en ?? c;
+  const certNameAr = (c: CertCode) => CERT_LABEL[c]?.ar ?? c;
+  const dash = "—";
+  const opCertDetail = reqOpCert
+    ? { en: `Renter: ${reqOpCert} · Supplier: ${opDeclared ?? dash}`, ar: `المستأجر: ${reqOpCert} · المؤجّر: ${opDeclared ?? dash}` }
+    : undefined;
+  const safetyDetail = requiredCerts.length
+    ? {
+        en: `Renter: ${requiredCerts.map(certName).join("/")} · Supplier: ${heldCertCodes.length ? heldCertCodes.map(certName).join("/") : dash}`,
+        ar: `المستأجر: ${requiredCerts.map(certNameAr).join("/")} · المؤجّر: ${heldCertCodes.length ? heldCertCodes.map(certNameAr).join("/") : dash}`,
+      }
+    : undefined;
+
   return {
     // BID-CARD buckets — mirror the mobile app's bid card exactly: Equipment 6 · Project 4. Operator is
     // ONE row (nationality/FAT are informational, not separate counted terms). Keys stay canonical so
@@ -317,8 +341,8 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
     negotiable: [
       { key: "operator_included", labelEn: "Operator included", labelAr: "تشمل مشغّل", state: operatorIncluded },
       { key: "operator_nationality", labelEn: "Operator nationality", labelAr: "جنسية المشغّل", state: contractState("operator_nationality", opNat) },
-      { key: "operator_certification", labelEn: "Operator certification", labelAr: "شهادة المشغّل", state: operatorCertState },
-      { key: "safety_certifications", labelEn: "Equipment safety certificates", labelAr: "شهادات سلامة المعدة", state: safetyCertState },
+      { key: "operator_certification", labelEn: "Operator certification", labelAr: "شهادة المشغّل", state: operatorCertState, detail: opCertDetail },
+      { key: "safety_certifications", labelEn: "Equipment safety certificates", labelAr: "شهادات سلامة المعدة", state: safetyCertState, detail: safetyDetail },
       { key: "fat_food", labelEn: "Operator FAT — Food", labelAr: "الإعاشة (F.A.T) — الطعام", state: contractState("fat_food", fatFood) },
       { key: "fat_accommodation_transport", labelEn: "Operator FAT — Accommodation/Transport", labelAr: "الإعاشة (F.A.T) — الإقامة/النقل", state: contractState("fat_accommodation_transport", fatAccom) },
       { key: "fuel_responsibility", labelEn: "Fuel responsibility", labelAr: "مسؤولية الوقود", state: contractState("fuel_responsibility", fuelResp) },
@@ -446,16 +470,22 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   const unreadTerms = (Array.isArray(raw.unreadTerms) ? (raw.unreadTerms as unknown[]) : []).map(String);
   const pm = (raw.progressMeter ?? {}) as Record<string, unknown>;
   const progress = { agreed: n(pm.agreed) ?? 0, total: n(pm.total) ?? 0 };
-  // Distance: use a server-computed value if present, else derive it from the bid's equipment
-  // coordinates (bids.equipment_lat/lng) vs the request's project location. Null → "—" (no location).
+  // Distance — app parity (bid.service.ts:134-137): a bid's location is its custom pin
+  // (equipmentLat/Lng) if the supplier dropped one, otherwise its selected YARD's coordinates —
+  // never the equipment listing's own lat/lng. Falls back to the listing's yard, then a
+  // server-computed value. Measured to the request's project location; null → "—" (no location).
+  // Keeping this the single source keeps every surface (comparison, cards, modal) consistent.
   const eqObj = (eq ?? {}) as Record<string, unknown>;
-  const bidLat = pickNum(raw, "equipmentLat", "equipment_lat", "bidLat", "lat") ?? pickNum(eqObj, "lat", "latitude");
-  const bidLng = pickNum(raw, "equipmentLng", "equipment_lng", "bidLng", "lng") ?? pickNum(eqObj, "lng", "longitude");
+  const bidYard = (raw.yard ?? {}) as Record<string, unknown>;
+  const eqYard = (eqObj.yard ?? {}) as Record<string, unknown>;
+  const bidLat = pickNum(raw, "equipmentLat", "equipment_lat") ?? pickNum(bidYard, "latitude", "lat") ?? pickNum(eqYard, "latitude", "lat");
+  const bidLng = pickNum(raw, "equipmentLng", "equipment_lng") ?? pickNum(bidYard, "longitude", "lng") ?? pickNum(eqYard, "longitude", "lng");
   const reqLat = pickNum(rq, "projectLat", "project_lat", "lat");
   const reqLng = pickNum(rq, "projectLng", "project_lng", "lng");
   const distanceKm = n(raw.distanceKm) ?? haversineKm(bidLat, bidLng, reqLat, reqLng);
 
   const lockedKeys = new Set(lockedTerms.map((t) => normKey(t.key)));
+  const lockedValByKey = new Map(lockedTerms.map((t) => [normKey(t.key), t.value != null && t.value !== "" ? String(t.value) : null]));
   const unreadKeys = new Set(unreadTerms.map(normKey));
   const lockedVal = (pred: (k: string) => boolean): string | null => {
     const t = lockedTerms.find((x) => pred(normKey(x.key)));
@@ -466,7 +496,9 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   const overlayLocked = (rows: TermRow[]): TermRow[] =>
     rows.map((r) => {
       const k = normKey(r.key);
-      if (lockedKeys.has(k)) return { ...r, state: "agreed" as TermState };
+      // Locked → "agreed", and carry the negotiated value so the cost responsibilities reflect what was
+      // actually settled in the deal room (e.g. accepting the supplier's FAT flips the side to supplier).
+      if (lockedKeys.has(k)) return { ...r, state: "agreed" as TermState, value: lockedValByKey.get(k) ?? r.value ?? null };
       if (unreadKeys.has(k)) return { ...r, state: "negotiating" as TermState };
       return r;
     });
@@ -518,6 +550,8 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     supplierCrNumber,
     supplierVatNumber,
     supplierNationalAddress,
+    supplierPhone: s(sup.phone),
+    supplierEmail: s(sup.email), // not in the bid-list projection yet → null until the backend adds it
     matchCount: n(raw.matchCount) ?? 0,
     conflictCount: n(raw.conflictCount) ?? 0,
     dealRoomId: s(raw.dealRoomId),
