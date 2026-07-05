@@ -20,7 +20,7 @@ import { ShareForBidsSheet } from "@/components/requests/ShareForBidsSheet";
 const CSS = `
 .rlive{min-height:100vh;padding:10px 24px 28px}
 .rlive *{box-sizing:border-box}
-.rlive-in{max-width:1120px;margin:0 auto}
+.rlive-in{max-width:900px;margin:0 auto}
 @keyframes rlv-rise{0%{transform:translateY(10px);opacity:0}100%{transform:translateY(0);opacity:1}}
 @keyframes rlv-fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes rlv-pop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
