@@ -11,3 +11,11 @@
  * sync on the same NEXT_PUBLIC_PUBLIC_WEB_ENABLED variable.
  */
 export const PUBLIC_WEB_ENABLED = process.env.NEXT_PUBLIC_PUBLIC_WEB_ENABLED === "1";
+
+/**
+ * BID_VERIFY_ENABLED — the "quote → transform → renter-verify → commit" flow. ON (NEXT_PUBLIC_BID_VERIFY_ENABLED=1):
+ * a quote upload runs /bids/transform and opens the verify screen; the renter confirms each field before
+ * the bid is committed into the comparison. OFF (default): the legacy path — upload → parse → add straight
+ * to the matrix (with the match-warning popup) — unchanged.
+ */
+export const BID_VERIFY_ENABLED = process.env.NEXT_PUBLIC_BID_VERIFY_ENABLED === "1";

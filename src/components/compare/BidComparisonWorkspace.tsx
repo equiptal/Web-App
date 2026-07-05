@@ -5,13 +5,16 @@ import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { GuestQuickCompare } from "@/components/compare/GuestQuickCompare";
-import { fetchMyRequests, fetchBids, fetchRequestSubmissions, startDealRoom, recommendBids, askBids, parseBid, captureBidEvents, fetchDealRoomDocuments, fetchBidDocuments, fetchDealRoom } from "@/lib/api/client";
+import { fetchMyRequests, fetchBids, fetchRequestSubmissions, startDealRoom, recommendBids, askBids, parseBid, transformBid, captureBidEvents, fetchDealRoomDocuments, fetchBidDocuments, fetchDealRoom } from "@/lib/api/client";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { groupRequests, type RequestGroup } from "@/lib/contract/requests";
 import type { DealRoomDocuments, DealTerm } from "@/lib/contract/deal-room";
 import { CERT_LABEL, type BidCard, type CertCode, type TermRow, type TermState } from "@/lib/contract/bids";
 import { buildItemComparison, sortByPreset, displayQuote, responsibilityTone, rowWinners, type BidColumn, type Preset, type CostResponsibility, type RatePeriod, type PricesFor } from "@/lib/contract/comparison";
-import { bidColumnToComputed, normalizedBidToBidCard, presetToAgent, type RecommendResult } from "@/lib/contract/agent-bids";
+import { bidColumnToComputed, normalizedBidToBidCard, presetToAgent, type RecommendResult, type NormalizedBid } from "@/lib/contract/agent-bids";
+import { BID_VERIFY_ENABLED } from "@/lib/flags";
+import { bidQuoteToFormDraft, type BidFormDraft, type TransformRequestCtx } from "@/lib/contract/bid-form";
+import { BidVerifyModal } from "@/components/compare/BidVerifyModal";
 import { EquipImg } from "@/components/requests/EquipImg";
 
 /** Deal-room term state → the comparison's TermRow state. The deal room is the source of truth for a
@@ -169,6 +172,7 @@ export function BidComparisonWorkspace() {
   const [bidDocs, setBidDocs] = useState<Record<string, DealRoomDocuments>>({});
   // A parsed quote the agent flagged (match.needs_confirmation) — added to the comparison only on confirm.
   const [confirmAdd, setConfirmAdd] = useState<{ card: BidCard; warnings: string[]; blocking: boolean } | null>(null);
+  const [verify, setVerify] = useState<{ draft: BidFormDraft; extracted: NormalizedBid } | null>(null); // BID_VERIFY_ENABLED: renter-verify screen for an uploaded quote
   const prevRankRef = useRef<RecommendResult["ranking"] | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const preselectRef = useRef<Set<string> | null>(null); // bid ids to pre-select from ?bids= (one-shot, from My Bids)
@@ -287,7 +291,7 @@ export function BidComparisonWorkspace() {
     if (!activeItem) { setBids(null); return; }
     let active = true;
     setBidsLoading(true);
-    setUploaded([]); setRec(null); setAgentLive(false); setFreeText(""); setFreeApplied(""); setFxEcho(null); setChat([]); setConfirmAdd(null); setRenterMob({}); prevRankRef.current = null;
+    setUploaded([]); setRec(null); setAgentLive(false); setFreeText(""); setFreeApplied(""); setFxEcho(null); setChat([]); setConfirmAdd(null); setVerify(null); setRenterMob({}); prevRankRef.current = null;
     fetchBids(activeItem)
       .then((d) => active && setBids(d.bids))
       .catch(() => active && setBids([]))
@@ -723,6 +727,33 @@ export function BidComparisonWorkspace() {
     toast(L("Reading the quote…", "جارٍ قراءة العرض…"));
     try {
       const data = await fileToBase64(file);
+      if (BID_VERIFY_ENABLED) {
+        // Send the request context so the agent PRE-ANSWERS the terms; omit for a guest / no active request.
+        const ctx: TransformRequestCtx | undefined = activeItemObj
+          ? {
+              subtype: activeItemObj.item?.name ?? null,
+              terms: (() => {
+                const rt = baseCols[0]?.bid;
+                return rt ? {
+                  fuelType: rt.requestTerms.fuelType ?? undefined,
+                  year: rt.reqMinYear ?? undefined,
+                  nationality: rt.requestTerms.operatorNationality ?? undefined,
+                  operator: rt.requestTerms.operatorIncluded != null ? rt.requestTerms.operatorIncluded.toUpperCase() === "YES" : undefined,
+                } : undefined;
+              })(),
+            }
+          : undefined;
+        const t = await transformBid({ attachments: [{ type: file.type || "application/octet-stream", filename: file.name, data }], request: ctx });
+        if (!t.agent) { toast(L("Quote upload needs your AI assistant — not connected.", "رفع العرض يحتاج مساعدك الذكي — غير متصل.")); return; }
+        if (t.result) {
+          const draft = bidQuoteToFormDraft(t.result.bid, t.result.term_matches, ctx);
+          draft.meta.source_file = file.name;
+          setVerify({ draft, extracted: t.result.bid });
+        } else {
+          toast(L("Couldn't read that file. Nothing was added.", "تعذّرت قراءة الملف. لم يُضف شيء."));
+        }
+        return;
+      }
       const r = await parseBid({ attachments: [{ type: file.type || "application/octet-stream", filename: file.name, data }], request_context: { subtype: activeItemObj?.item?.name ?? null } });
       if (!r.agent) { toast(L("Quote upload needs your AI assistant — not connected.", "رفع العرض يحتاج مساعدك الذكي — غير متصل.")); return; }
       if (r.result && r.result.ok) {
@@ -1623,6 +1654,22 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
       )}
 
       {/* ── confirm-before-adding a flagged uploaded quote (match.needs_confirmation) ── */}
+      {verify && (
+        <BidVerifyModal
+          draft={verify.draft}
+          extracted={verify.extracted}
+          ar={ar}
+          L={L}
+          onClose={() => setVerify(null)}
+          onCommitted={(bid) => {
+            const card = normalizedBidToBidCard(bid, { duration: durationDays, units });
+            setUploaded((p) => [...p.filter((b) => b.id !== card.id), card]);
+            setVerify(null);
+            toast(L(`Added ${card.supplierName}'s quote from the file.`, `أُضيف عرض ${card.supplierName} من الملف.`));
+          }}
+        />
+      )}
+
       {confirmAdd && (
         <div className="fixed inset-0 z-[420] grid place-items-center p-6" style={{ background: "rgba(28,53,80,.42)", backdropFilter: "blur(3px)" }} onClick={() => setConfirmAdd(null)}>
           <div className="w-[460px] max-w-full overflow-hidden rounded-2xl" style={{ background: "#fff" }} onClick={(e) => e.stopPropagation()}>
