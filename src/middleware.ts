@@ -2,28 +2,38 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 /**
- * Gating middleware. The web is **public by default** (browse without an account); only the
- * personal, account-bound areas listed in GATED_PREFIXES require a session. Edge check on the
- * refresh-token cookie (the 30-day "remembered" envelope — name kept in sync with `auth-server.ts`
- * REFRESH_COOKIE): present ⇒ treat as a valid session (the access token is refreshed lazily by
- * `/api/auth/session`).
+ * Gating middleware — behaviour switches on the PUBLIC-WEB feature flag.
  *
- * - Any page NOT under a GATED_PREFIX loads for everyone (guests browse freely). The account gate
- *   fires in-app at request submit (the combined OTP+register modal), not in middleware.
- * - Unauthenticated → a gated page redirects to `/login?next=<path>` (AC-16/20).
- * - Authenticated → `/login` redirects to `next` (AC-07) or home (AC-08).
+ * Flag ON (staging, NEXT_PUBLIC_PUBLIC_WEB_ENABLED=1): the web is **public to browse**; only the
+ * account-bound resources in GATED_PREFIXES require a session. The account gate fires in-app at
+ * request submit (the combined OTP+register modal), not in middleware.
  *
- * The matcher excludes `/api/*`, Next internals and static files, so the auth API stays reachable
- * while signed out and assets aren't gated.
+ * Flag OFF (default → production): the legacy behaviour — the WHOLE app requires a session; only the
+ * account-less routes in PUBLIC_PREFIXES (the shared supplier bid form `/bid/<token>`) are public.
+ * One edge switch is enough to hold the public-web epic back from prod: with the flag off, guests are
+ * redirected to /login before any guest-facing UI (open tabs, guest compare, the OTP submit modal)
+ * can render, so that code is inert.
+ *
+ * Edge check on the refresh-token cookie (the 30-day "remembered" envelope — name kept in sync with
+ * `auth-server.ts` REFRESH_COOKIE): present ⇒ treat as a valid session (the access token is refreshed
+ * lazily by `/api/auth/session`). `/login` redirects an authed user to `next` (AC-07) or home (AC-08).
+ * The matcher excludes `/api/*`, Next internals and static files.
  */
 const REFRESH_COOKIE = "mt_refresh";
 const ID_COOKIE = "mt_id";
 
-// Routes that still hard-require a session at the edge. The nav *tabs* (Requests / Inbox / Profile /
-// Compare) are NOT gated — they load for everyone and render a guest empty-state + CTA in-app, so the
-// site feels open. Only resource-specific routes that make no sense without an account stay gated:
-// a specific deal room (reached via a bid/award) and the demo dashboard.
+// PUBLIC-WEB FEATURE FLAG. Set NEXT_PUBLIC_PUBLIC_WEB_ENABLED=1 in the STAGING environment to keep
+// public browse there. Leave it unset in production until the public-web + one-step-auth-gate epic
+// ships (same env-flag pattern as LOGO_UPLOAD_ENABLED). Read at call time so it's build-inlined in
+// prod and toggleable in tests.
+const publicWebEnabled = () => process.env.NEXT_PUBLIC_PUBLIC_WEB_ENABLED === "1";
+
+// Flag ON: only these account-bound resources gate (a specific deal room reached via a bid/award, and
+// the demo dashboard); everything else browses freely.
 const GATED_PREFIXES = ["/deal-room", "/dashboard"];
+// Flag OFF (legacy/prod): everything gates EXCEPT these account-less routes (the shared supplier bid
+// form `/bid/<token>`, opened by suppliers who have no login).
+const PUBLIC_PREFIXES = ["/bid"];
 
 function safeNext(next: string | null): string {
   // Only allow same-origin relative paths (block protocol-relative `//host`).
@@ -59,9 +69,12 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Only the personal, account-bound areas gate; everything else is public (browse freely).
-  const isGated = GATED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-  if (isGated && !authed) {
+  // Decide whether this path needs a session. Flag ON: only GATED_PREFIXES gate. Flag OFF (legacy):
+  // everything gates except the account-less PUBLIC_PREFIXES.
+  const needsSession = publicWebEnabled()
+    ? GATED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+    : !PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  if (needsSession && !authed) {
     const dest = req.nextUrl.clone();
     dest.pathname = "/login";
     dest.search = `?next=${encodeURIComponent(pathname + search)}`;

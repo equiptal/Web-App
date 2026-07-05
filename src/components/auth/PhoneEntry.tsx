@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { postAuth, type AuthKind, type OtpChannel } from "./authClient";
 import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
+import { PUBLIC_WEB_ENABLED } from "@/lib/flags";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -68,12 +69,17 @@ export function PhoneEntry({
       <h2 className="mb-[6px] text-[26px] font-extrabold tracking-[-.5px] text-navy">{title ?? a.signInTitle}</h2>
       <p className="mb-[24px] text-[14px] leading-[1.55] text-muted">{subtitle ?? a.signInSub}</p>
 
-      {/* Delivery-channel toggle (T5): SMS default, Email reveals the destination field. */}
-      <label className="mb-[8px] block text-[12.5px] font-bold text-navy-mid">{a.deliveryLabel}</label>
-      <div className="mb-[18px] grid grid-cols-2 gap-[6px] rounded-[10px] border border-border bg-surface2 p-[4px]">
-        {segBtn("SMS", "sms", a.viaSms)}
-        {segBtn("EMAIL", "mail", a.viaEmail)}
-      </div>
+      {/* Delivery-channel toggle (T5) — public-web epic only. When the flag is OFF (production) sign-in
+          is SMS-only, exactly as prod is today (method stays "SMS", so the email field never shows). */}
+      {PUBLIC_WEB_ENABLED && (
+        <>
+          <label className="mb-[8px] block text-[12.5px] font-bold text-navy-mid">{a.deliveryLabel}</label>
+          <div className="mb-[18px] grid grid-cols-2 gap-[6px] rounded-[10px] border border-border bg-surface2 p-[4px]">
+            {segBtn("SMS", "sms", a.viaSms)}
+            {segBtn("EMAIL", "mail", a.viaEmail)}
+          </div>
+        </>
+      )}
 
       <label className="mb-[8px] block text-[12.5px] font-bold text-navy-mid">{a.phoneLabel}</label>
       <div className="flex gap-[10px]" dir="ltr">
