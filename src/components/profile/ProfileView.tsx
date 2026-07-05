@@ -38,6 +38,7 @@ export function ProfileView() {
   const [showDelete, setShowDelete] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
   const [langBusy, setLangBusy] = useState(false);
+  const [company, setCompany] = useState<{ logoUrl: string | null; legalName: string | null } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -50,6 +51,13 @@ export function ProfileView() {
       })
       .catch(() => active && setLoadError(true))
       .finally(() => active && setLoading(false));
+    // Company logo + legal name for the company card view (the /me payload lacks the presigned logo URL).
+    fetch("/api/verification", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s: { companyLogoUrl?: string | null; companyLegalName?: string | null; companyName?: string | null } | null) => {
+        if (active && s) setCompany({ logoUrl: s.companyLogoUrl ?? null, legalName: s.companyLegalName ?? s.companyName ?? null });
+      })
+      .catch(() => {});
     return () => {
       active = false;
     };
@@ -164,7 +172,7 @@ export function ProfileView() {
       )}
 
       {/* Company / verification card. */}
-      {!loading && profile && <CompanyCard status={verification} onGo={() => router.push("/verify")} />}
+      {!loading && profile && <CompanyCard status={verification} profile={profile} company={company} onGo={() => router.push("/verify")} />}
 
       {/* Rewards — coming soon (grayed, app parity). */}
       {!loading && (
@@ -278,19 +286,47 @@ function LinkRow({ icon, label, href }: { icon: string; label: string; href: str
   );
 }
 
-function CompanyCard({ status, onGo }: { status: VerificationStatus; onGo: () => void }) {
+function CompanyCard({ status, profile, company, onGo }: { status: VerificationStatus; profile: RenterProfile; company: { logoUrl: string | null; legalName: string | null } | null; onGo: () => void }) {
   const t = useT();
+  const { locale } = useLocale();
+  const ar = locale === "ar";
+  const L = (e: string, a: string) => (ar ? a : e);
   const p = t.profile;
   const base = "mt-4 rounded-[14px] border p-4";
 
   if (status === "verified") {
+    const name = company?.legalName || profile.companyName || L("Your company", "شركتك");
+    // CR / VAT numbers may not be returned once verified (only the docs are on file) → show the value
+    // when present, else the green "Verified" pill (app parity, same as the quotation identity rows).
+    const rows: { label: string; value: string | null }[] = [
+      { label: L("CR #", "السجل التجاري"), value: profile.crNumber ?? null },
+      { label: L("VAT #", "الرقم الضريبي"), value: profile.vatNumber ?? null },
+      { label: L("National Address", "العنوان الوطني"), value: profile.nationalAddress ?? null },
+    ];
     return (
-      <div className={`${base} flex items-center gap-3 border-ok/30 bg-ok-soft`}>
-        <Icon name="verified" size={22} className="flex-none text-ok" />
-        <div>
-          <p className="text-[13.5px] font-bold text-navy">{p.companyVerifiedTitle}</p>
-          <p className="text-[12.5px] text-muted">{p.companyVerifiedBody}</p>
+      <div className={`${base} border-ok/30 bg-ok-soft`}>
+        <div className="flex items-center gap-3">
+          {company?.logoUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={company.logoUrl} alt="" className="h-12 w-12 flex-none rounded-[10px] border border-ok/25 bg-white object-contain p-1" />
+          ) : (
+            <span className="grid h-12 w-12 flex-none place-items-center rounded-[10px] border border-ok/25 bg-white text-ok"><Icon name="verified" size={24} /></span>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[14px] font-extrabold text-navy">{name}</p>
+            <p className="mt-0.5 inline-flex items-center gap-1 text-[12px] font-bold text-ok"><Icon name="verified" size={14} />{p.companyVerifiedTitle}</p>
+          </div>
         </div>
+        <dl className="mt-3 grid grid-cols-1 gap-y-2.5 border-t border-ok/20 pt-3 sm:grid-cols-3 sm:gap-x-4">
+          {rows.map((r) => (
+            <div key={r.label} className="min-w-0">
+              <dt className="text-[11px] font-bold uppercase tracking-wide text-muted">{r.label}</dt>
+              <dd className="mt-0.5 truncate text-[13px] font-semibold text-navy">
+                {r.value || <span className="inline-flex items-center gap-1 text-ok"><Icon name="verified" size={13} />{L("Verified", "موثَّق")}</span>}
+              </dd>
+            </div>
+          ))}
+        </dl>
       </div>
     );
   }
