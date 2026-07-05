@@ -679,9 +679,20 @@ export type TermBucket = "conflict" | "pending" | "matched";
 // identity, never counted): equipment identity (measurement/year/fuel/attachments), maintenance, CR/VAT,
 // mob/demob pricing, and the SPLIT operator_*/fat_* rows (operator + FAT fold into the single `operator`
 // term). `safety_certifications` is the one cert term; `operator` is the single lumped operator row.
-const COUNTED_TERM_KEYS = new Set([
-  "payment_terms", "breakdown_response_sla", "overtime_rate", "fuel_responsibility", "safety_certifications", "operator",
-]);
+// The app's 6 counted negotiable terms, as GROUPS — with the off-platform (link-bid) key aliases
+// mapped to the same group so a shared-link bid counts the same terms as an in-app bid (the two
+// mappers emit different key names for the same term, e.g. link "certs" == in-app "safety_certifications",
+// link "operator_included" == in-app "operator"). Counting one row per GROUP keeps in-app bids at the
+// same total (operator + operator_included fold to one). Without this, off-platform bids showed
+// "Conflict 0 · Matched 0" because none of their keys matched the in-app names.
+const COUNTED_TERM_GROUP: Record<string, string> = {
+  operator: "operator", operator_included: "operator",
+  safety_certifications: "certs", certs: "certs",
+  fuel_responsibility: "fuel",
+  payment_terms: "payment", payment: "payment",
+  overtime_rate: "overtime", overtime: "overtime",
+  breakdown_response_sla: "breakdown", breakdown_sla: "breakdown",
+};
 // App parity (`_TermsStateCounts`): 5 row-states collapse to 3 — `matched`; `conflict`; everything else
 // (pending / negotiating / grey / open-value) → Pending, so the three counts always sum to the row total.
 const bucketOfTermState = (s: TermState): TermBucket =>
@@ -694,12 +705,13 @@ export function bucketBidTerms(
   const merged = [...(negotiable ?? []), ...terms.equipment, ...terms.contract, ...terms.supplier];
   const seen = new Set<string>();
   const rows = merged.filter((r) => {
-    if (!COUNTED_TERM_KEYS.has(r.key)) return false; // only the app's 6 negotiable terms
+    const group = COUNTED_TERM_GROUP[r.key];
+    if (!group) return false; // only the app's 6 negotiable terms (in-app OR link-bid key name)
     // App parity: fuel_responsibility is counted only when the rentee actually declared it (an
     // undeclared/open — grey — row is dropped, not shown as Pending).
-    if (r.key === "fuel_responsibility" && r.state === "grey") return false;
-    if (seen.has(r.key)) return false; // keep the first (negotiable rows carry the live deal-room state)
-    seen.add(r.key);
+    if (group === "fuel" && r.state === "grey") return false;
+    if (seen.has(group)) return false; // one row per GROUP (keep the first — negotiable carries live deal-room state)
+    seen.add(group);
     return true;
   });
   const byBucket: Record<TermBucket, TermRow[]> = { conflict: [], pending: [], matched: [] };

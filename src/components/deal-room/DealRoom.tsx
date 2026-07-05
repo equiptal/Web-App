@@ -115,7 +115,8 @@ function buildQuotationHtml(room: DealRoomView, q: QuotationView, renteeName: st
         { label: L("Phone", "الهاتف"), value: q.supplierPhone },
         { label: L("Email", "البريد"), value: q.supplierEmail },
       ],
-      chips: room.supplier.isVerified ? [L("Verified", "موثَّق")] : [],
+      // Verified shows on the CR/VAT rows ("✓ Verified") — no standalone orphan party chip.
+      chips: [],
     },
     rentee: {
       label: L("Rentee", "المُستأجِر"),

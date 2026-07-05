@@ -391,16 +391,20 @@ export function BidComparisonWorkspace() {
   const baseCols = useMemo(() => allCols.filter((c) => selected.has(c.bid.id)), [allCols, selected]);
   const detCols = useMemo(() => sortByPreset(baseCols, preset), [baseCols, preset]);
   const cols = useMemo(() => {
-    if (agentLive && rec?.ranking?.length) {
+    // The 4 preset criteria (Best / Lowest / Newest / Most trusted) are ALWAYS a deterministic web sort.
+    // The agent order applies ONLY when a free-text query is active (the "Ask AI" box) — a preset never
+    // hands the ranking to the agent. (choosePreset clears freeApplied, so a preset click drops to the
+    // web sort even if the agent is live.)
+    if (freeApplied && agentLive && rec?.ranking?.length) {
       // String() both sides so a number/string id mismatch can't break the match.
       const rank = new Map(rec.ranking.map((r) => [String(r.bid_id), r.rank] as const));
-      // Only trust the agent order when it actually covers the current columns; otherwise fall back to
-      // the deterministic preset sort (which always reflects the chosen rank) so the table never freezes.
+      // Only trust the agent order when it actually covers the current columns; else fall back to the
+      // deterministic sort so the table never freezes.
       const covered = baseCols.length > 0 && baseCols.every((c) => rank.has(String(c.bid.id)));
       if (covered) return [...baseCols].sort((a, b) => rank.get(String(a.bid.id))! - rank.get(String(b.bid.id))!);
     }
     return detCols;
-  }, [baseCols, detCols, agentLive, rec]);
+  }, [baseCols, detCols, agentLive, rec, freeApplied]);
   // Fetch each visible bid's documents once (company + equipment, presigned) so the company-doc
   // chips reflect what's actually uploaded and open the real file — no deal room needed. Best-effort:
   // if the endpoint isn't available the chips fall back to the bid-list compliance flags.

@@ -466,7 +466,9 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         title: L("Equipment rental quotation", "عرض سعر تأجير معدات"),
         quotationNumber: qnum,
         dateStr,
-        supplier: { label: L("Supplier", "المؤجِّر"), name: sup.supplierName, sub: supplierSub, idRows: supIdRows, chips: sup.verified ? [L("Verified", "موثَّق")] : [] },
+        // Verified status now shows on the CR/VAT rows ("✓ Verified"), so no standalone party chip
+        // (it rendered only under the supplier — never the rentee — and read as an orphan badge).
+        supplier: { label: L("Supplier", "المؤجِّر"), name: sup.supplierName, sub: supplierSub, idRows: supIdRows, chips: [] },
         rentee: { label: L("Rentee", "المُستأجِر"), name: rentee.name, sub: rentee.person, idRows: renteeIdRows, chips: [] },
         meta: [
           { label: L("Request #", "رقم الطلب"), value: groupRef ?? reqLabel },

@@ -393,7 +393,13 @@ export function rowWinners(values: (number | null | undefined)[], dir: "min" | "
 export type Preset = "best" | "lowest" | "newest" | "trusted";
 export function sortByPreset(cols: BidColumn[], preset: Preset): BidColumn[] {
   const out = [...cols];
-  const allInOf = (c: BidColumn) => (c.allIn.stated ? c.allIn.value : Number.POSITIVE_INFINITY);
+  // "Lowest cost" / "Best" rank by the all-in TOTAL. When the request has no duration the total isn't
+  // computable ("rental not totaled — set a duration") — so fall back to whatever price IS available
+  // (the bid's per-unit rate × units) so the sort still orders by cost instead of doing nothing. Only
+  // fall back when NO column has a real total; if some do, unstated ones sort last (never falsely cheapest).
+  const anyStated = cols.some((c) => c.allIn.stated);
+  const rateProxy = (c: BidColumn) => { const r = num(c.bid.price); return r == null ? Number.POSITIVE_INFINITY : r * (c.bid.numberOfUnits || 1); };
+  const allInOf = (c: BidColumn) => (c.allIn.stated ? c.allIn.value : anyStated ? Number.POSITIVE_INFINITY : rateProxy(c));
   const yearOf = (c: BidColumn) => c.bid.equipment?.year ?? 0;
   const trustOf = (c: BidColumn) => (c.bid.verified ? 1000 : 0) + (c.bid.rating ?? 0);
   switch (preset) {
