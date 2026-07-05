@@ -179,8 +179,20 @@ export function mapDealRoom(raw: unknown): DealRoomView {
   // Terms — surface the negotiable ones (drop PRICE; the rate card owns it). Keep the rest so the
   // renter can see matches and resolve any differing (disputed) term before accepting all.
   const rawTerms = Array.isArray(d.terms) ? (d.terms as Record<string, unknown>[]) : [];
+  // The backend still emits the RETIRED combined `fat` term ("Operator FAT") alongside the newer split
+  // `fat_food` / `fat_accommodation_transport` rows (kept for in-flight rooms). On older bids the legacy
+  // control carried a stale default (e.g. `fat = supplier`) while the split values were correct, so the
+  // legacy row disputes and shows a PHANTOM "Operator FAT" conflict. When the split rows are present they
+  // are the real per-item FAT — drop the stale combined row so it can't manufacture a conflict.
+  const hasSplitFat = rawTerms.some((t) => { const k = s(t.key); return k === "fat_food" || k === "fat_accommodation_transport"; });
+  // Priced line items (mob/demob pricing) are NOT negotiable term cards — they're settled on the counter
+  // flow's Price page (app parity: terms-journey "Priced"). `mobilization_lead_time` is retired/hidden
+  // from every deal-room surface. Drop all three from the terms list so they never render as term rows.
+  const PRICE_LINE_KEYS = new Set(["mobilization_pricing", "demobilization_pricing", "mobilization_lead_time"]);
   const terms: DealTerm[] = rawTerms
     .filter((t) => s(t.key) !== "PRICE")
+    .filter((t) => !PRICE_LINE_KEYS.has(s(t.key) ?? ""))
+    .filter((t) => !(hasSplitFat && s(t.key) === "fat"))
     .map((t) => ({
       key: s(t.key) ?? "",
       label: s(t.label) ?? s(t.key) ?? "",
@@ -199,6 +211,15 @@ export function mapDealRoom(raw: unknown): DealRoomView {
       })),
     }));
   const hasDisputedTerms = terms.some((t) => t.state === "disputed");
+
+  // Price-basis units (app parity: quotation.service extractQuotationData) — the deal total scales by
+  // the SUPPLIER'S OFFERED count, NOT the requested count. Precedence: agreedUnits → bid.unitsOffered
+  // length → request numberOfUnits → 1.
+  const reqObj = (d.request ?? {}) as Record<string, unknown>;
+  const firstReqItem = (Array.isArray(reqObj.equipmentItems) ? (reqObj.equipmentItems as Record<string, unknown>[])[0] : undefined) ?? {};
+  const requestedUnits = n(firstReqItem.numberOfUnits) ?? 1;
+  const offeredUnits = Array.isArray(bid.unitsOffered) && bid.unitsOffered.length > 0 ? bid.unitsOffered.length : null;
+  const priceUnits = n(d.agreedUnits) ?? offeredUnits ?? requestedUnits;
 
   return {
     id: String(d.id ?? ""),
@@ -219,8 +240,7 @@ export function mapDealRoom(raw: unknown): DealRoomView {
     // duration is the source of truth.
     periods: n((d.request as Record<string, unknown>)?.estimatedDurationDays),
     priceUnit: s(d.lastProposedPriceUnit) ?? s(bid.priceUnit),
-    numberOfUnits:
-      n((Array.isArray((d.request as Record<string, unknown>)?.equipmentItems) ? ((d.request as Record<string, unknown>).equipmentItems as Record<string, unknown>[])[0] : undefined)?.numberOfUnits) ?? 1,
+    numberOfUnits: priceUnits,
     lastCounterBy,
     myTurn,
     terms,

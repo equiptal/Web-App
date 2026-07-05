@@ -28,14 +28,19 @@ const DR_STATE_TO_TERM: Record<string, TermState> = {
  *  (matched by key across contract/equipment/supplier + negotiableTerms). Immutable — never mutates
  *  the source bid. */
 // The comparison splits FAT into fat_food + fat_accommodation_transport, but the deal room may carry a
-// single combined `fat` term ("Operator FAT"). Alias the combined term onto both split rows.
+// single combined `fat` term ("Operator FAT"). Alias the combined term onto both split rows — but ONLY
+// when it's a POSITIVE resolution. Older bids left a stale default on the retired combined control
+// (e.g. `fat = supplier`) that disputes; inheriting that would manufacture a phantom conflict on split
+// rows whose real per-item values actually match. So a combined `fat` that's disputed/pending is ignored.
 const FAT_SPLIT_KEYS = new Set(["fat_food", "fat_accommodation_transport"]);
+const FAT_ALIAS_STATES = new Set(["agreed", "soft_accepted", "fixed"]);
 
 function overlayDealRoomTerms(bid: BidCard, roomTerms: DealTerm[] | undefined): BidCard {
   if (!roomTerms || roomTerms.length === 0) return bid;
   const byKey = new Map(roomTerms.map((t) => [t.key, t]));
   const apply = (row: TermRow): TermRow => {
-    const dt = byKey.get(row.key) ?? (FAT_SPLIT_KEYS.has(row.key) ? byKey.get("fat") : undefined);
+    const aliasFat = FAT_SPLIT_KEYS.has(row.key) ? byKey.get("fat") : undefined;
+    const dt = byKey.get(row.key) ?? (aliasFat && FAT_ALIAS_STATES.has(String(aliasFat.state)) ? aliasFat : undefined);
     if (!dt) return row;
     const st = DR_STATE_TO_TERM[String(dt.state)];
     const value = dt.value == null ? row.value : Array.isArray(dt.value) ? dt.value.map(String).join(", ") : String(dt.value);
@@ -122,6 +127,16 @@ export function BidComparisonWorkspace() {
   const [preset, setPreset] = useState<Preset>("best");
   const [period, setPeriod] = useState<RatePeriod>("PER_DAY"); // RATE PERIOD toggle (Day/Week/Month) — display + totals
   const [pricesFor, setPricesFor] = useState<PricesFor>("unit"); // PRICES FOR toggle — default PER UNIT
+  // Default the RATE PERIOD to how the bids were actually quoted (the request's rental type) so a monthly
+  // bid shows e.g. "SAR 120/month" instead of its per-day conversion "SAR 4/day". Runs once when bids
+  // load; the renter can still toggle. (All bids share the request's rental unit.)
+  const periodInit = useRef(false);
+  useEffect(() => {
+    if (periodInit.current || !bids || bids.length === 0) return;
+    const u = bids.find((b) => b.priceUnit)?.priceUnit?.toUpperCase();
+    if (u === "PER_DAY" || u === "PER_WEEK" || u === "PER_MONTH") setPeriod(u as RatePeriod);
+    periodInit.current = true;
+  }, [bids]);
   const [busy, setBusy] = useState(false);
   const [renterCosts, setRenterCosts] = useState<Partial<Record<CostResponsibility["key"], number>>>({});
   // Mansour judgement layer (live when connected; deterministic fallback otherwise).
@@ -423,6 +438,17 @@ export function BidComparisonWorkspace() {
   useEffect(() => { try { localStorage.setItem("compare-awarded-ids", JSON.stringify(awardedIds)); } catch {} }, [awardedIds]);
   const toggleAward = (bid: BidCard) => {
     const was = !!awardedIds[bid.id];
+    // Single-winner lock (app parity): a request/group has ONE winner. Block awarding a DIFFERENT
+    // supplier while one is already awarded — whether by a backend accept / survey win (`awarded`) OR a
+    // local award (`awardedIds`). Toggling the current winner OFF (to re-decide) is still allowed.
+    if (!was) {
+      const currentId = awarded?.id ?? Object.keys(awardedIds).find((id) => awardedIds[id]);
+      if (currentId && currentId !== bid.id) {
+        const wname = bids?.find((b) => b.id === currentId)?.supplierName ?? "";
+        toast(L(`Already awarded${wname ? ` to ${wname}` : ""} — remove it first`, `تمت الترسية${wname ? ` إلى ${wname}` : ""} — أزِلها أولاً`));
+        return;
+      }
+    }
     setAwardedIds((m) => { const n = { ...m }; if (was) delete n[bid.id]; else n[bid.id] = true; return n; });
     if (was) toast(L(`Removed award — ${bid.supplierName}`, `أُزيلت الترسية — ${bid.supplierName}`));
     else setAwardPrompt(bid); // just awarded → offer to finalize in the deal room
@@ -1481,7 +1507,10 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                     {cols.map((c) => {
                       const isAwarded = !!awardedIds[c.bid.id];
                       const isAcceptedWinner = decidedByAccept && awarded!.id === c.bid.id; // Case A / C-bidder winner
-                      const blockedByAccept = decidedByAccept && !isAcceptedWinner; // request decided → can't award another
+                      // Can't award another once a winner exists — backend accept/survey (`awarded`) OR a
+                      // local award on a different column (single-winner lock).
+                      const otherLocalWinner = Object.keys(awardedIds).some((id) => awardedIds[id] && id !== c.bid.id);
+                      const blockedByAccept = (decidedByAccept && !isAcceptedWinner) || (!isAwarded && otherLocalWinner);
                       return (
                         <td key={c.bid.id} className="align-top" style={{ padding: "14px 15px", borderTop: `2px solid ${C.border}`, borderInlineStart: `1px solid ${C.line}` }}>
                           <div className="flex flex-col gap-[7px]">

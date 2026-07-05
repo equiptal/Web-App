@@ -1,0 +1,276 @@
+/**
+ * ONE quotation template, shared by the bid-card quotation download (GroupBids) and the deal-room
+ * confirmed quotation (DealRoom), so both look identical and match the app's formal quotation
+ * (ported from prototypes/requests-grouped.html + apps/mobile live_quotation_document.dart).
+ *
+ * Pure string builder — no React. Callers map their own data into `QuotationDoc`; number formatting +
+ * amount-in-words + the CR/VAT/"Verified" pill logic + the CSS all live here so the two surfaces can
+ * never drift apart again.
+ */
+
+export type QLang = "en" | "ar";
+
+/** One party identity row (National Address / CR # / VAT # / Phone / Email). A row shows its `value`,
+ *  or the app's green "Verified" pill when `verified` is true and no value is known, or nothing. */
+export interface QuotationIdRow {
+  label: string;
+  value?: string | null;
+  /** When there's no value, gate showing a "Verified" pill on this (party-verified). */
+  verified?: boolean;
+}
+
+export interface QuotationParty {
+  label: string;
+  name: string;
+  sub?: string | null;
+  idRows: QuotationIdRow[];
+  /** Small green chips under the party (e.g. "Verified"). */
+  chips?: string[];
+}
+
+export interface QuotationMetaCell {
+  label: string;
+  value: string;
+}
+
+export interface QuotationListedLine {
+  label: string;
+  detail: string;
+  units: number;
+  verified?: boolean;
+  /** Already-localized cert labels (e.g. "TÜV", "SPSP"). */
+  certs?: string[];
+}
+
+/** One invoice row. `num` numbers the primary (rental) rows; sub-rows (delivery/return) pass null. */
+export interface QuotationLineItem {
+  num?: number | null;
+  label: string;
+  detail?: string | null;
+  unit: string;
+  qty: string;
+  price: string;
+  total: string;
+  /** Small note shown above the total (e.g. "As operated" for open-ended rentals). */
+  totalNote?: string | null;
+}
+
+export interface QuotationCard {
+  title: string;
+  rows: { label: string; value: string }[];
+}
+
+export interface QuotationDoc {
+  lang: QLang;
+  title: string;
+  quotationNumber: string;
+  dateStr: string;
+  supplier: QuotationParty;
+  rentee: QuotationParty;
+  meta: QuotationMetaCell[];
+  listedTitle?: string;
+  listed?: QuotationListedLine[];
+  lineItems: QuotationLineItem[];
+  currency: string;
+  totals: { subtotal: number; vat: number; total: number };
+  cards: QuotationCard[];
+  legal: string[];
+}
+
+/** Formal quotation stylesheet — ported verbatim from prototypes/requests-grouped.html. */
+export const QUOTATION_STYLE = `
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Inter','Segoe UI',Roboto,sans-serif;color:#1c3550;background:#f1f5f9;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .q-doc{max-width:780px;margin:18px auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 6px 24px rgba(28,53,80,.1);page-break-after:always;}
+  .q-doc:last-child{page-break-after:auto;}
+  .q-head{background:linear-gradient(135deg,#1c3550,#12263a);color:#fff;padding:26px 34px;}
+  .q-title{font-size:23px;font-weight:900;letter-spacing:-.3px;}
+  .q-sub{display:flex;justify-content:space-between;margin-top:10px;font-size:12.5px;font-weight:700;color:rgba(255,255,255,.72);}
+  .q-sub .qn{color:#fff;font-family:'IBM Plex Sans',monospace;}
+  .q-body{padding:24px 34px 30px;}
+  .parties{display:flex;gap:30px;padding-bottom:18px;border-bottom:1px solid #e4edf5;}
+  .party{flex:1;}
+  .plabel{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#6b8fa8;}
+  .pname{font-size:17px;font-weight:800;margin-top:5px;}
+  .pmeta{font-size:12px;color:#6b8fa8;font-weight:600;margin-top:3px;}
+  .psub{font-size:12px;color:#6b8fa8;font-weight:600;margin-top:2px;}
+  .docs{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
+  .doc-ok{font-size:10.5px;font-weight:800;color:#1daf58;background:#e7f7ee;border-radius:100px;padding:2px 8px;}
+  .ver-ok{color:#1daf58;font-weight:800;}
+  .metastrip{display:grid;grid-template-columns:repeat(3,1fr);margin:18px 0;border:1px solid #e4edf5;border-radius:10px;overflow:hidden;}
+  .metastrip>div{padding:11px 13px;border-inline-end:1px solid #e4edf5;border-top:1px solid #e4edf5;}
+  .metastrip>div:nth-child(-n+3){border-top:0;}
+  .metastrip>div:nth-child(3n){border-inline-end:0;}
+  /* party identity rows (National address / CR / VAT) + verification chips (app parity) */
+  .pid-row{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;padding:3px 0;}
+  .pid-row span{color:#6b8fa8;font-weight:600;}
+  .pid-row b{font-weight:800;font-family:'IBM Plex Sans',monospace;}
+  .pill-ver{color:#1daf58;font-weight:800;}
+  .pchips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
+  .pchip{font-size:10px;font-weight:800;color:#1daf58;background:#e7f7ee;border-radius:100px;padding:2px 8px;}
+  .metastrip span{display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b8fa8;}
+  .metastrip b{font-size:12.5px;font-weight:800;margin-top:4px;display:block;}
+  .listed{background:#f7fafd;border:1px solid #e4edf5;border-radius:10px;padding:13px 15px;margin-bottom:18px;}
+  .listed .ll{font-size:10.5px;font-weight:700;text-transform:uppercase;color:#6b8fa8;}
+  .listed .lv{font-size:13.5px;font-weight:700;color:#2a4f72;margin-top:5px;}
+  .ptable{width:100%;border-collapse:collapse;margin-bottom:8px;}
+  .ptable th{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#6b8fa8;text-align:start;padding:8px 10px;background:#eff4f9;}
+  .ptable th.num,.ptable td.num{text-align:end;font-family:'IBM Plex Sans',monospace;}
+  .ptable td{padding:11px 10px;border-bottom:1px solid #e4edf5;font-size:13px;vertical-align:top;}
+  .ptable td .sm{font-size:11px;color:#6b8fa8;font-weight:600;margin-top:2px;}
+  .totals{margin:6px 0 18px;}
+  .trow{display:flex;justify-content:space-between;padding:7px 10px;font-size:13.5px;}
+  .trow span{color:#2a4f72;font-weight:600;}
+  .trow b{font-family:'IBM Plex Sans',monospace;font-weight:800;}
+  .trow.grand{border-top:2px solid #d4e0ec;margin-top:4px;padding-top:11px;font-size:16px;}
+  .trow.grand b{color:#f79009;}
+  .words{background:#eaf1fe;border:1px solid #cfe0fb;border-radius:10px;padding:13px 15px;margin-bottom:18px;font-size:13px;color:#1849a9;}
+  .words .wl{font-size:10px;font-weight:800;text-transform:uppercase;margin-bottom:4px;}
+  .card{border:1px solid #e4edf5;border-radius:10px;overflow:hidden;margin-bottom:18px;}
+  .card-h{background:#fbeeea;padding:11px 15px;font-size:13.5px;font-weight:800;}
+  .kv{display:flex;align-items:center;gap:8px;padding:9px 15px;border-top:1px solid #f0f4f8;font-size:13px;}
+  .kv::before{content:"";width:6px;height:6px;border-radius:50%;background:#1daf58;flex:0 0 auto;}
+  .kv span{color:#6b8fa8;font-weight:600;}.kv b{font-weight:800;margin-inline-start:auto;text-align:end;}
+  .tc{margin:0 0 18px;padding-inline-start:20px;font-size:11.5px;color:#2a4f72;line-height:1.7;}
+  .tc li{margin-bottom:5px;}
+  .signed{display:flex;align-items:center;gap:12px;background:#eef7f1;border-radius:10px;padding:13px 15px;font-size:12px;}
+  .sig-check{flex:0 0 auto;width:30px;height:30px;border-radius:50%;background:#dcf4e8;color:#1daf58;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center;}
+  .sig-txt b{display:block;color:#1c3550;}.sig-txt>div{color:#6b8fa8;font-family:'IBM Plex Sans',monospace;margin-top:3px;}
+  .foot{text-align:center;color:#9bb3c8;font-size:11px;margin-top:16px;}
+  @media print{body{background:#fff;}.q-doc{box-shadow:none;margin:0;border-radius:0;}}`;
+
+const esc = (str: unknown) => String(str ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
+const nf = (n: number) => Math.round(n).toLocaleString("en-US");
+
+/** Amount-in-words (English) — ported from the requests-grouped prototype's quotation export. */
+export function numWords(n: number): string {
+  n = Math.round(n);
+  if (n === 0) return "Zero";
+  const o = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
+  const t = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+  const u = (x: number) => { let s = ""; if (x >= 100) { s += o[Math.floor(x / 100)] + " hundred"; x %= 100; if (x) s += " and "; } if (x >= 20) { s += t[Math.floor(x / 10)]; if (x % 10) s += "-" + o[x % 10]; } else if (x > 0) s += o[x]; return s; };
+  let r = "";
+  ([["million", 1e6], ["thousand", 1e3]] as [string, number][]).forEach(([nm, v]) => { if (n >= v) { r += u(Math.floor(n / v)) + " " + nm + " "; n %= v; } });
+  if (n > 0) r += u(n);
+  r = r.trim();
+  return r.charAt(0).toUpperCase() + r.slice(1);
+}
+
+/** Amount-in-words (Arabic tafqīt) — best-effort for currency amounts (0..999,999,999). */
+export function numWordsAr(num: number): string {
+  num = Math.round(num);
+  if (num === 0) return "صفر";
+  const ones = ["", "واحد", "اثنان", "ثلاثة", "أربعة", "خمسة", "ستة", "سبعة", "ثمانية", "تسعة", "عشرة", "أحد عشر", "اثنا عشر", "ثلاثة عشر", "أربعة عشر", "خمسة عشر", "ستة عشر", "سبعة عشر", "ثمانية عشر", "تسعة عشر"];
+  const tens = ["", "", "عشرون", "ثلاثون", "أربعون", "خمسون", "ستون", "سبعون", "ثمانون", "تسعون"];
+  const hundreds = ["", "مائة", "مئتان", "ثلاثمائة", "أربعمائة", "خمسمائة", "ستمائة", "سبعمائة", "ثمانمائة", "تسعمائة"];
+  const below1000 = (x: number): string => {
+    const out: string[] = [];
+    const h = Math.floor(x / 100);
+    const rem = x % 100;
+    if (h) out.push(hundreds[h]);
+    if (rem) {
+      if (rem < 20) out.push(ones[rem]);
+      else {
+        const o = rem % 10;
+        if (o) out.push(ones[o]);
+        out.push(tens[Math.floor(rem / 10)]);
+      }
+    }
+    return out.join(" و");
+  };
+  const parts: string[] = [];
+  const millions = Math.floor(num / 1e6);
+  const thousands = Math.floor((num % 1e6) / 1e3);
+  const rest = num % 1e3;
+  if (millions) parts.push(millions === 1 ? "مليون" : millions === 2 ? "مليونان" : `${below1000(millions)} مليون`);
+  if (thousands) parts.push(thousands === 1 ? "ألف" : thousands === 2 ? "ألفان" : `${below1000(thousands)} ألف`);
+  if (rest) parts.push(below1000(rest));
+  return parts.join(" و");
+}
+
+function idRowHtml(row: QuotationIdRow, L: (en: string, ar: string) => string): string {
+  if (row.value) return `<div class="pid-row"><span>${esc(row.label)}</span><b>${esc(row.value)}</b></div>`;
+  if (row.verified) return `<div class="pid-row"><span>${esc(row.label)}</span><span class="pill-ver">✓ ${esc(L("Verified", "موثَّق"))}</span></div>`;
+  return "";
+}
+
+function partyHtml(p: QuotationParty, L: (en: string, ar: string) => string): string {
+  const idRows = p.idRows.map((r) => idRowHtml(r, L)).join("");
+  const chips = (p.chips ?? []).filter(Boolean);
+  const chipsHtml = chips.length ? `<div class="pchips">${chips.map((c) => `<span class="pchip">✓ ${esc(c)}</span>`).join("")}</div>` : "";
+  return `<div class="party"><div class="plabel">${esc(p.label)}</div><div class="pname">${esc(p.name || "—")}</div>${p.sub ? `<div class="psub">${esc(p.sub)}</div>` : ""}${idRows}${chipsHtml}</div>`;
+}
+
+function cardHtml(card: QuotationCard): string {
+  if (!card.rows.length) return "";
+  const rows = card.rows.map((r) => `<div class="kv"><span>${esc(r.label)}</span><b>${esc(r.value)}</b></div>`).join("");
+  return `<div class="card"><div class="card-h">${esc(card.title)}</div>${rows}</div>`;
+}
+
+/** Render ONE quotation as a `<section class="q-doc">` (one per supplier / deal). */
+export function renderQuotationSection(doc: QuotationDoc): string {
+  const isAr = doc.lang === "ar";
+  const L = (en: string, ar: string) => (isAr ? ar : en);
+  const metaHtml = doc.meta.map((m) => `<div><span>${esc(m.label)}</span><b>${esc(m.value)}</b></div>`).join("");
+  const listedHtml = doc.listed?.length
+    ? `<div class="listed"><div class="ll">${esc(doc.listedTitle ?? L("Listed equipment", "المعدات المدرجة"))} (${doc.listed.length})</div>${doc.listed
+        .map((l) => {
+          const ver = l.verified ? ` &nbsp;·&nbsp; <span class="ver-ok">✔ ${esc(L("verified", "موثّقة"))}</span>` : "";
+          const certs = l.certs?.length ? ` &nbsp;·&nbsp; ${l.certs.map((c) => `<span class="doc-ok">✓ ${esc(c)}</span>`).join(" ")}` : "";
+          return `<div class="lv">${esc(l.label)} &nbsp;·&nbsp; ${esc(l.detail)} &nbsp;·&nbsp; ${l.units} ${esc(l.units > 1 ? L("units", "وحدات") : L("unit", "وحدة"))}${ver}${certs}</div>`;
+        })
+        .join("")}</div>`
+    : "";
+  const rows = doc.lineItems
+    .map(
+      (it) =>
+        `<tr><td class="num">${it.num ?? ""}</td><td><b>${esc(it.label)}</b>${it.detail ? `<div class="sm">${esc(it.detail)}</div>` : ""}</td><td>${esc(it.unit)}</td><td class="num">${esc(it.qty)}</td><td class="num">${esc(it.price)}</td><td class="num">${it.totalNote ? `<div class="sm">${esc(it.totalNote)}</div>` : ""}${esc(it.total)}</td></tr>`,
+    )
+    .join("");
+  const words = isAr ? `${numWordsAr(doc.totals.total)} ريال سعودي` : `${numWords(doc.totals.total)} Saudi Riyals`;
+  const cards = doc.cards.map(cardHtml).join("");
+  const legal = doc.legal.length ? `<ol class="tc">${doc.legal.map((t) => `<li>${esc(t)}</li>`).join("")}</ol>` : "";
+
+  return `<section class="q-doc" dir="${isAr ? "rtl" : "ltr"}" lang="${isAr ? "ar" : "en"}">
+    <div class="q-head"><div class="q-title">${esc(doc.title)}</div><div class="q-sub"><span class="qn">${esc(doc.quotationNumber)}</span><span>${esc(doc.dateStr)}</span></div></div>
+    <div class="q-body">
+      <div class="parties">${partyHtml(doc.supplier, L)}${partyHtml(doc.rentee, L)}</div>
+      ${metaHtml ? `<div class="metastrip">${metaHtml}</div>` : ""}
+      ${listedHtml}
+      <table class="ptable">
+        <thead><tr><th class="num">#</th><th>${esc(L("Item", "البند"))}</th><th>${esc(L("Unit", "الوحدة"))}</th><th class="num">${esc(L("Qty", "العدد"))}</th><th class="num">${esc(L("Price", "السعر"))}</th><th class="num">${esc(L("Total", "الإجمالي"))}</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="totals">
+        <div class="trow"><span>${esc(L("Subtotal before VAT", "الإجمالي قبل الضريبة"))}</span><b>${nf(doc.totals.subtotal)}</b></div>
+        <div class="trow"><span>${esc(L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"))}</span><b>${nf(doc.totals.vat)}</b></div>
+        <div class="trow grand"><span>${esc(L("Total", "الإجمالي"))}</span><b>${nf(doc.totals.total)} ${esc(doc.currency)}</b></div>
+      </div>
+      <div class="words"><div class="wl">${esc(L("Amount in words", "المبلغ كتابةً"))}</div>${esc(words)}</div>
+      ${cards}
+      ${legal}
+      <div class="signed"><span class="sig-check">✓</span><div class="sig-txt"><b>${esc(L("Electronically signed via the Moedatech platform", "موقّع إلكترونيًا عبر منصة معداتك"))}</b><div>${esc(doc.quotationNumber)} · ${esc(doc.dateStr)}</div></div></div>
+      <div class="foot">${esc(L("Auto-generated by Moedatech · support@moedatech.com", "صادر تلقائيًا من منصة معداتك · support@moedatech.com"))}</div>
+    </div>
+  </section>`;
+}
+
+/** The standard Saudi quotation legal clauses (bilingual). */
+export function quotationLegal(L: (en: string, ar: string) => string): string[] {
+  return [
+    L("This quotation is valid for seven (7) days from the issue date and expires automatically thereafter unless confirmed through the Moedatech platform.", "هذا العرض ساري المفعول لمدة سبعة (٧) أيام من تاريخ الإصدار، وتسقط صلاحيته تلقائيًا بعد ذلك ما لم يتم تأكيده عبر منصة معداتك."),
+    L("Prices are inclusive of items explicitly listed in the pricing table above. VAT at 15% applies per Saudi tax law.", "الأسعار شاملة لِما ذُكر صراحةً في جدول التسعير أعلاه، وضريبة القيمة المضافة بنسبة ١٥٪ مفروضة وفقًا للنظام السعودي."),
+    L("The supplier is responsible for the equipment's roadworthiness and technical safety on the delivery date, and for satisfying mandated safety certifications.", "المُورِّد مسؤول عن صلاحية المعدة وسلامتها الفنية في تاريخ التسليم، وعن استيفاء شهادات السلامة والوثائق المطلوبة نظامًا."),
+    L("This quotation is governed by the laws of the Kingdom of Saudi Arabia; competent Saudi courts have exclusive jurisdiction over any dispute.", "يخضع هذا العرض لأنظمة المملكة العربية السعودية، وتختصُّ المحاكم السعودية المختصة بالفصل في أي نزاع."),
+    L("This document is issued electronically via the Moedatech platform and is legally equivalent to a signed document under the Saudi Electronic Transactions Law.", "تَمَّ إصدار هذا المستند إلكترونيًا عبر منصة معداتك، ويُعدّ مكافئًا قانونيًا للمستند الموقَّع وفقًا لنظام التعاملات الإلكترونية السعودي."),
+  ];
+}
+
+/** Wrap one or more rendered sections into a full, self-printing HTML page. */
+export function wrapQuotationPage(sectionsHtml: string, opts: { lang: QLang; title: string; autoPrint?: boolean }): string {
+  const isAr = opts.lang === "ar";
+  const printScript = opts.autoPrint === false ? "" : `<script>window.onload=function(){setTimeout(function(){window.print();},350);}</script>`;
+  return `<!doctype html><html lang="${isAr ? "ar" : "en"}" dir="${isAr ? "rtl" : "ltr"}"><head><meta charset="utf-8"><title>${esc(opts.title)}</title>` +
+    `<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">` +
+    `<style>${QUOTATION_STYLE}</style></head><body>${sectionsHtml}${printScript}</body></html>`;
+}

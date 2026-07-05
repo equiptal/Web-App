@@ -266,6 +266,11 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
   const fuel: TermState = !reqFuel || !bidFuel ? "grey" : unverified ? "grey" : reqFuel === bidFuel ? "matched" : "conflict";
 
   const contractState = (key: string, reqVal: string | null): TermState => (!reqVal ? "grey" : deviationKeys.has(key) ? "conflict" : "matched");
+  // Contract NEGOTIABLES (payment / SLA / overtime): app parity (terms_modal.dart `contractState`) — an
+  // un-negotiated supplier declaration is NOT "matched", it stays PENDING (grey → Pending review) until
+  // it's locked/agreed in the deal room (overlayLocked upgrades a locked term → agreed). Only a
+  // backend-flagged deviation → conflict. This is why overtime shows "Pending review", not "Matched".
+  const negContractState = (key: string): TermState => (deviationKeys.has(key) ? "conflict" : "grey");
 
   // Operator (spec 128). operator_included is an ACKNOWLEDGE term (matched, or conflict only when the
   // RFQ needs an operator the bid omits); operator_nationality is its own CONFLICT_ELIGIBLE term.
@@ -302,9 +307,9 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
   const safetyCertState: TermState = requiredCerts.length === 0 ? "grey" : deviationKeys.has("safety_certifications") ? "conflict" : certs;
 
   // Project rows reused by both the bid-card "Project" bucket and the comparison's negotiable set.
-  const rPayment: TermRow = { key: "payment_terms", labelEn: "Payment terms", labelAr: "شروط الدفع", state: contractState("payment_terms", s(req.paymentTerms)) };
-  const rSla: TermRow = { key: "breakdown_response_sla", labelEn: "Breakdown response", labelAr: "زمن الاستجابة للأعطال", state: contractState("breakdown_response_sla", s(req.breakdownResponseSla)) };
-  const rOvertime: TermRow = { key: "overtime_rate", labelEn: "Overtime", labelAr: "العمل الإضافي", state: contractState("overtime_rate", s(req.overtimeRate)) };
+  const rPayment: TermRow = { key: "payment_terms", labelEn: "Payment terms", labelAr: "شروط الدفع", state: negContractState("payment_terms") };
+  const rSla: TermRow = { key: "breakdown_response_sla", labelEn: "Breakdown response", labelAr: "زمن الاستجابة للأعطال", state: negContractState("breakdown_response_sla") };
+  const rOvertime: TermRow = { key: "overtime_rate", labelEn: "Overtime", labelAr: "العمل الإضافي", state: negContractState("overtime_rate") };
   const rMaint: TermRow = { key: "maintenance_responsibility", labelEn: "Maintenance", labelAr: "الصيانة", state: maintenance };
 
   // Conflict detail (Renter: X · Supplier: Y) — app parity with link bids, so an in-app conflict in
@@ -323,6 +328,19 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
         ar: `المستأجر: ${requiredCerts.map(certNameAr).join("/")} · المؤجّر: ${heldCertCodes.length ? heldCertCodes.map(certNameAr).join("/") : dash}`,
       }
     : undefined;
+  // The lumped `operator` bid-card row shows only "Conflict" with no values today. Give it the same
+  // Renter/Supplier detail as the specific rows (app parity) — pick the reason that drove the conflict:
+  // a missing operator, an operator-certification deviation, or an operator-nationality deviation.
+  const opNatDeclared = s(t3.operator_nationality) ?? s(t3.operatorNationality);
+  const operatorDetail: { en: string; ar: string } | undefined = !reqOperator
+    ? undefined
+    : !bidOperator
+      ? { en: "Renter: operator required · Supplier: not included", ar: "المستأجر: مطلوب مشغّل · المؤجّر: غير مشمول" }
+      : deviationKeys.has("operator_certification") && opCertDetail
+        ? opCertDetail
+        : deviationKeys.has("operator_nationality")
+          ? { en: `Renter: ${opNat ?? dash} · Supplier: ${opNatDeclared ?? dash}`, ar: `المستأجر: ${opNat ?? dash} · المؤجّر: ${opNatDeclared ?? dash}` }
+          : undefined;
 
   return {
     // BID-CARD buckets — mirror the mobile app's bid card exactly: Equipment 6 · Project 4. Operator is
@@ -334,7 +352,7 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
       { key: "year", labelEn: "Year of manufacture", labelAr: "سنة الصنع", state: year },
       { key: "fuel", labelEn: "Fuel type", labelAr: "نوع الوقود", state: fuel },
       { key: "attachments", labelEn: "Attachments", labelAr: "الملحقات", state: "grey" },
-      { key: "operator", labelEn: "Operator", labelAr: "المشغّل", state: operator },
+      { key: "operator", labelEn: "Operator", labelAr: "المشغّل", state: operator, detail: operatorDetail },
     ],
     contract: [rPayment, rSla, rOvertime, rMaint],
     // COMPARISON-only expanded set (the web side-by-side "Negotiable terms" section) — NOT on the bid

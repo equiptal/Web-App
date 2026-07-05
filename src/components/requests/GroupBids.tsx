@@ -16,6 +16,7 @@ import type { RequestGroup } from "@/lib/contract/requests";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { quotationFileTitle } from "@/lib/compare/quotation-token";
+import { renderQuotationSection, wrapQuotationPage, quotationLegal, type QuotationDoc, type QuotationLineItem, type QuotationCard } from "@/lib/quotation/render";
 
 /** A group bid = a request's bid tagged with which item (request) it belongs to. */
 type GroupBid = BidCard & { requestId: string; itemLabel: string; itemLabelAr: string; categoryId: string | null; itemImage: string | null };
@@ -51,113 +52,9 @@ function offerSuffix(uiState: string | null, L: (en: string, ar: string) => stri
   }
 }
 
-/** Amount-in-words (English) — ported from the requests-grouped prototype's quotation export. */
-function numWords(n: number): string {
-  n = Math.round(n);
-  if (n === 0) return "Zero";
-  const o = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
-  const t = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
-  const u = (x: number) => { let s = ""; if (x >= 100) { s += o[Math.floor(x / 100)] + " hundred"; x %= 100; if (x) s += " and "; } if (x >= 20) { s += t[Math.floor(x / 10)]; if (x % 10) s += "-" + o[x % 10]; } else if (x > 0) s += o[x]; return s; };
-  let r = "";
-  ([["million", 1e6], ["thousand", 1e3]] as [string, number][]).forEach(([nm, v]) => { if (n >= v) { r += u(Math.floor(n / v)) + " " + nm + " "; n %= v; } });
-  if (n > 0) r += u(n);
-  r = r.trim();
-  return r.charAt(0).toUpperCase() + r.slice(1);
-}
-
-/** Amount-in-words (Arabic tafqīt) — best-effort for currency amounts (0..999,999,999). */
-function numWordsAr(num: number): string {
-  num = Math.round(num);
-  if (num === 0) return "صفر";
-  const ones = ["", "واحد", "اثنان", "ثلاثة", "أربعة", "خمسة", "ستة", "سبعة", "ثمانية", "تسعة", "عشرة", "أحد عشر", "اثنا عشر", "ثلاثة عشر", "أربعة عشر", "خمسة عشر", "ستة عشر", "سبعة عشر", "ثمانية عشر", "تسعة عشر"];
-  const tens = ["", "", "عشرون", "ثلاثون", "أربعون", "خمسون", "ستون", "سبعون", "ثمانون", "تسعون"];
-  const hundreds = ["", "مائة", "مئتان", "ثلاثمائة", "أربعمائة", "خمسمائة", "ستمائة", "سبعمائة", "ثمانمائة", "تسعمائة"];
-  const below1000 = (x: number): string => {
-    const out: string[] = [];
-    const h = Math.floor(x / 100);
-    const rem = x % 100;
-    if (h) out.push(hundreds[h]);
-    if (rem) {
-      if (rem < 20) out.push(ones[rem]);
-      else {
-        const o = rem % 10;
-        if (o) out.push(ones[o]);
-        out.push(tens[Math.floor(rem / 10)]);
-      }
-    }
-    return out.join(" و");
-  };
-  const parts: string[] = [];
-  const millions = Math.floor(num / 1e6);
-  const thousands = Math.floor((num % 1e6) / 1e3);
-  const rest = num % 1e3;
-  if (millions) parts.push(millions === 1 ? "مليون" : millions === 2 ? "مليونان" : `${below1000(millions)} مليون`);
-  if (thousands) parts.push(thousands === 1 ? "ألف" : thousands === 2 ? "ألفان" : `${below1000(thousands)} ألف`);
-  if (rest) parts.push(below1000(rest));
-  return parts.join(" و");
-}
-
-/** Formal quotation PDF stylesheet — ported verbatim from prototypes/requests-grouped.html. */
-const QSTYLE = `
-  *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:'Inter','Segoe UI',Roboto,sans-serif;color:#1c3550;background:#f1f5f9;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  .q-doc{max-width:780px;margin:18px auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 6px 24px rgba(28,53,80,.1);page-break-after:always;}
-  .q-doc:last-child{page-break-after:auto;}
-  .q-head{background:linear-gradient(135deg,#1c3550,#12263a);color:#fff;padding:26px 34px;}
-  .q-title{font-size:23px;font-weight:900;letter-spacing:-.3px;}
-  .q-sub{display:flex;justify-content:space-between;margin-top:10px;font-size:12.5px;font-weight:700;color:rgba(255,255,255,.72);}
-  .q-sub .qn{color:#fff;font-family:'IBM Plex Sans',monospace;}
-  .q-body{padding:24px 34px 30px;}
-  .parties{display:flex;gap:30px;padding-bottom:18px;border-bottom:1px solid #e4edf5;}
-  .party{flex:1;}
-  .plabel{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#6b8fa8;}
-  .pname{font-size:17px;font-weight:800;margin-top:5px;}
-  .pmeta{font-size:12px;color:#6b8fa8;font-weight:600;margin-top:3px;}
-  .psub{font-size:12px;color:#6b8fa8;font-weight:600;margin-top:2px;}
-  .docs{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
-  .doc-ok{font-size:10.5px;font-weight:800;color:#1daf58;background:#e7f7ee;border-radius:100px;padding:2px 8px;}
-  .ver-ok{color:#1daf58;font-weight:800;}
-  .metastrip{display:grid;grid-template-columns:repeat(3,1fr);margin:18px 0;border:1px solid #e4edf5;border-radius:10px;overflow:hidden;}
-  .metastrip>div{padding:11px 13px;border-inline-end:1px solid #e4edf5;border-top:1px solid #e4edf5;}
-  .metastrip>div:nth-child(-n+3){border-top:0;}
-  .metastrip>div:nth-child(3n){border-inline-end:0;}
-  /* party identity rows (National address / CR / VAT) + verification chips (app parity) */
-  .pid-row{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;padding:3px 0;}
-  .pid-row span{color:#6b8fa8;font-weight:600;}
-  .pid-row b{font-weight:800;font-family:'IBM Plex Sans',monospace;}
-  .pill-ver{color:#1daf58;font-weight:800;}
-  .pchips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
-  .pchip{font-size:10px;font-weight:800;color:#1daf58;background:#e7f7ee;border-radius:100px;padding:2px 8px;}
-  .metastrip span{display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b8fa8;}
-  .metastrip b{font-size:12.5px;font-weight:800;margin-top:4px;display:block;}
-  .listed{background:#f7fafd;border:1px solid #e4edf5;border-radius:10px;padding:13px 15px;margin-bottom:18px;}
-  .listed .ll{font-size:10.5px;font-weight:700;text-transform:uppercase;color:#6b8fa8;}
-  .listed .lv{font-size:13.5px;font-weight:700;color:#2a4f72;margin-top:5px;}
-  .ptable{width:100%;border-collapse:collapse;margin-bottom:8px;}
-  .ptable th{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#6b8fa8;text-align:start;padding:8px 10px;background:#eff4f9;}
-  .ptable th.num,.ptable td.num{text-align:end;font-family:'IBM Plex Sans',monospace;}
-  .ptable td{padding:11px 10px;border-bottom:1px solid #e4edf5;font-size:13px;vertical-align:top;}
-  .ptable td .sm{font-size:11px;color:#6b8fa8;font-weight:600;margin-top:2px;}
-  .totals{margin:6px 0 18px;}
-  .trow{display:flex;justify-content:space-between;padding:7px 10px;font-size:13.5px;}
-  .trow span{color:#2a4f72;font-weight:600;}
-  .trow b{font-family:'IBM Plex Sans',monospace;font-weight:800;}
-  .trow.grand{border-top:2px solid #d4e0ec;margin-top:4px;padding-top:11px;font-size:16px;}
-  .trow.grand b{color:#f79009;}
-  .words{background:#eaf1fe;border:1px solid #cfe0fb;border-radius:10px;padding:13px 15px;margin-bottom:18px;font-size:13px;color:#1849a9;}
-  .words .wl{font-size:10px;font-weight:800;text-transform:uppercase;margin-bottom:4px;}
-  .card{border:1px solid #e4edf5;border-radius:10px;overflow:hidden;margin-bottom:18px;}
-  .card-h{background:#fbeeea;padding:11px 15px;font-size:13.5px;font-weight:800;}
-  .kv{display:flex;align-items:center;gap:8px;padding:9px 15px;border-top:1px solid #f0f4f8;font-size:13px;}
-  .kv::before{content:"";width:6px;height:6px;border-radius:50%;background:#1daf58;flex:0 0 auto;}
-  .kv span{color:#6b8fa8;font-weight:600;}.kv b{font-weight:800;margin-inline-start:auto;text-align:end;}
-  .tc{margin:0 0 18px;padding-inline-start:20px;font-size:11.5px;color:#2a4f72;line-height:1.7;}
-  .tc li{margin-bottom:5px;}
-  .signed{display:flex;align-items:center;gap:12px;background:#eef7f1;border-radius:10px;padding:13px 15px;font-size:12px;}
-  .sig-check{flex:0 0 auto;width:30px;height:30px;border-radius:50%;background:#dcf4e8;color:#1daf58;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center;}
-  .sig-txt b{display:block;color:#1c3550;}.sig-txt>div{color:#6b8fa8;font-family:'IBM Plex Sans',monospace;margin-top:3px;}
-  .foot{text-align:center;color:#9bb3c8;font-size:11px;margin-top:16px;}
-  @media print{body{background:#fff;}.q-doc{box-shadow:none;margin:0;border-radius:0;}}`;
+// The formal quotation template (styles, amount-in-words, section renderer) now lives in the shared
+// `@/lib/quotation/render` module so this bid-card download and the deal-room confirmed quotation use
+// ONE identical template.
 
 /**
  * Grouped My Bids (web-app/multi-item-requests, Phase 2). Fetches bids for every request in the
@@ -340,9 +237,12 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
     // Include off-platform (shared-link) bids alongside on-platform ones so a selected supplier
     // submission can be exported as a quotation just like an app bid. `only` lets a single card (e.g.
     // the submission viewer's Download) export just that bid through the SAME app-parity template.
-    const chosen = only ?? [...(bids ?? []), ...subCards].filter((b) => selected.has(b.id));
+    // Default to ALL bids in the group when nothing is explicitly selected. Clicking "Download
+    // quotations" with no selection used to silently no-op (empty `chosen` → early return), which read
+    // as a dead button. `only` still exports a single card (submission viewer).
+    const all = [...(bids ?? []), ...subCards];
+    const chosen = only ?? (selected.size ? all.filter((b) => selected.has(b.id)) : all);
     if (!chosen.length) return;
-    const esc = (str: string) => String(str).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
     const itemMap = new Map(group.items.map((it) => [it.id, it]));
     // Request codes this quotation covers — stamped in the filename so Compare scopes to them.
     const coveredCodes = [...new Set(chosen.map((b) => itemMap.get(b.requestId)?.displayId).filter(Boolean) as string[])];
@@ -394,37 +294,24 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       // Supplier identity rows (app parity): off-platform submissions carry real CR/VAT/address VALUES;
       // on-platform bids carry only verification FLAGS → render the app's value-or-"Verified" pill.
       const ld = sup.linkDocs ?? {};
-      const idRow = (label: string, value: string | null | undefined, verifiedFlag: boolean) =>
-        value ? `<div class="pid-row"><span>${esc(label)}</span><b>${esc(value)}</b></div>`
-          : verifiedFlag ? `<div class="pid-row"><span>${esc(label)}</span><span class="pill-ver">✓ ${esc(L("Verified", "موثَّق"))}</span></div>`
-            : "";
-      // Value: off-platform link value first, else the on-platform real number (bid-list supplierProfile),
-      // else the app's "Verified" pill when only the presence flag is known.
-      const supIdRows =
-        // Labels + AR match the mobile quotation_document (CR=س.ت, VAT=ض.ق.م, "National Address").
-        // App parity: supplier rows gate the "Verified" pill on PARTY-verified (supplierStatus===2),
-        // not per-doc presence — a verified supplier missing a value still shows the pill.
-        idRow(L("National Address", "العنوان الوطني"), ld.national ?? sup.supplierNationalAddress, sup.verified) +
-        idRow(L("CR #", "س.ت"), ld.commercial ?? sup.supplierCrNumber, sup.verified) +
-        idRow(L("VAT #", "ض.ق.م"), ld.vat ?? sup.supplierVatNumber, sup.verified) +
-        idRow(L("Phone", "الهاتف"), ld.contact ?? sup.supplierPhone, false) + // on-platform phone or off-platform contact (mobile has no "Contact" row)
-        (sup.compliance.entityType === "company" ? idRow(L("Email", "البريد"), sup.supplierEmail, false) : ""); // company only, per app
-      // Rentee identity rows — same labels/rule as the supplier; pill gates on the renter-verified flag.
-      const renteeIdRows =
-        idRow(L("National Address", "العنوان الوطني"), rentee.nationalAddress, verified) +
-        idRow(L("CR #", "س.ت"), rentee.crNumber, verified) +
-        idRow(L("VAT #", "ض.ق.م"), rentee.vatNumber, verified) +
-        idRow(L("Phone", "الهاتف"), rentee.phone, false) +
-        idRow(L("Email", "البريد"), rentee.email, false);
-      // App parity: the rentee block has NO "Verified" chip row (mobile _RenteeBlock emits none) — the
-      // inline identity-row pills already carry the verified signal.
-      const renteeChips = "";
-      // App parity: the quotation surfaces only the "Verified" chip — the app removed certificate chips
-      // (Local content / SASO) from the quotation ("no longer surfaces certificates").
-      const supChipList = [sup.verified ? L("Verified", "موثَّق") : null].filter(Boolean) as string[];
-      const supChips = supChipList.length ? `<div class="pchips">${supChipList.map((c) => `<span class="pchip">✓ ${esc(c)}</span>`).join("")}</div>` : "";
-      // App parity (UnverifiedIndividualIdentity): unverified individual suppliers get a subtitle;
-      // companies / verified suppliers do not.
+      // Party identity rows — value-or-"Verified"-pill (the shared renderer draws them). Labels + AR
+      // match the mobile quotation_document (CR=س.ت, VAT=ض.ق.م, "National Address"). Supplier rows gate
+      // the pill on PARTY-verified (a verified supplier missing a value still shows the pill).
+      const supIdRows = [
+        { label: L("National Address", "العنوان الوطني"), value: ld.national ?? sup.supplierNationalAddress, verified: sup.verified },
+        { label: L("CR #", "س.ت"), value: ld.commercial ?? sup.supplierCrNumber, verified: sup.verified },
+        { label: L("VAT #", "ض.ق.م"), value: ld.vat ?? sup.supplierVatNumber, verified: sup.verified },
+        { label: L("Phone", "الهاتف"), value: ld.contact ?? sup.supplierPhone }, // on-platform phone or off-platform contact
+        ...(sup.compliance.entityType === "company" ? [{ label: L("Email", "البريد"), value: sup.supplierEmail }] : []), // company only, per app
+      ];
+      const renteeIdRows = [
+        { label: L("National Address", "العنوان الوطني"), value: rentee.nationalAddress, verified },
+        { label: L("CR #", "س.ت"), value: rentee.crNumber, verified },
+        { label: L("VAT #", "ض.ق.م"), value: rentee.vatNumber, verified },
+        { label: L("Phone", "الهاتف"), value: rentee.phone },
+        { label: L("Email", "البريد"), value: rentee.email },
+      ];
+      // App parity (UnverifiedIndividualIdentity): unverified individual suppliers get a subtitle.
       const supplierSub = sup.compliance.entityType === "individual" && !sup.verified
         ? L("Individual supplier · unverified", "مُورِّد فرد · غير موثَّق") : null;
 
@@ -435,29 +322,31 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       const daysPerPeriod = (u: string | null) => { switch ((u ?? "PER_DAY").toUpperCase()) { case "PER_WEEK": return 7; case "PER_MONTH": return 26; case "PER_JOB": return 0; default: return 1; } };
       const periodLabel = (u: string | null) => { switch ((u ?? "PER_DAY").toUpperCase()) { case "PER_WEEK": return L("week", "أسبوع"); case "PER_MONTH": return L("month", "شهر"); case "PER_JOB": return L("job", "مهمة"); default: return L("day", "يوم"); } };
 
-      // Pricing rows — 6-column invoice (# · Item · Unit · Qty · Price · Total), app-parity layout.
-      // Totals keep the web's chosen math: rate ÷ period-days × duration × units, mob/demob × units.
+      // Invoice line items — rate ÷ period-days × duration × units; mob/demob × units (open-ended → "as
+      // operated"). The shared renderer draws the 6-column table (# · Item · Unit · Qty · Price · Total).
       let sub = 0;
       let rowNum = 0;
-      const rows = supBids.map((b) => {
+      const lineItems: QuotationLineItem[] = [];
+      for (const b of supBids) {
         const rate = b.price ?? 0;
         const units = b.numberOfUnits || 1;
         const dpp = daysPerPeriod(b.priceUnit);
         const plabel = periodLabel(b.priceUnit);
         const durDays = itemMap.get(b.requestId)?.durationDays ?? null;
         rowNum += 1;
-        let lineSub: number, qtyCell: string, priceCell: string, totalCell: string;
+        let lineSub: number, qtyCell: string, priceCell: string, totalCell: string, totalNote: string | null = null;
         if (durDays == null) {
           lineSub = rate * units; // open-ended: one-period preview; billed "as operated"
           qtyCell = "∞";
-          priceCell = `${nf(rate)} / ${esc(plabel)}`;
-          totalCell = `<div class="sm">${esc(L("As operated", "حسب التشغيل"))}</div>${nf(rate)} / ${esc(plabel)}`;
+          priceCell = `${nf(rate)} / ${plabel}`;
+          totalCell = `${nf(rate)} / ${plabel}`;
+          totalNote = L("As operated", "حسب التشغيل");
         } else if (dpp > 0) {
           const periods = durDays / dpp;
           const pStr = Number.isInteger(periods) ? String(periods) : periods.toFixed(2);
           lineSub = (rate / dpp) * durDays * units;
-          qtyCell = `${pStr} ${esc(plabel)}${units > 1 ? ` × ${units}` : ""}`;
-          priceCell = `${nf(rate)} / ${esc(plabel)}`;
+          qtyCell = `${pStr} ${plabel}${units > 1 ? ` × ${units}` : ""}`;
+          priceCell = `${nf(rate)} / ${plabel}`;
           totalCell = nf(lineSub);
         } else {
           lineSub = rate * units; // PER_JOB
@@ -468,27 +357,20 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         const mobTotal = (b.mobPrice ?? 0) * units;
         const demobTotal = (b.demobPrice ?? 0) * units;
         sub += lineSub + mobTotal + demobTotal;
-        let r = `<tr><td class="num">${rowNum}</td><td><b>${esc(L("Rental", "الإيجار"))} — ${esc(labelOf(b))}</b><div class="sm">${esc(eqLine(b))}</div></td><td>${esc(plabel)}</td><td class="num">${qtyCell}</td><td class="num">${priceCell}</td><td class="num">${totalCell}</td></tr>`;
-        if (b.mobPrice) r += `<tr><td></td><td><b>${esc(L("Delivery to site", "النقل إلى الموقع"))}</b><div class="sm">${esc(labelOf(b))}</div></td><td>${esc(L("Trip", "رحلة"))}</td><td class="num">${units}</td><td class="num">${nf(b.mobPrice)}</td><td class="num">${nf(mobTotal)}</td></tr>`;
-        if (b.demobPrice) r += `<tr><td></td><td><b>${esc(L("Return from site", "الإرجاع من الموقع"))}</b><div class="sm">${esc(labelOf(b))}</div></td><td>${esc(L("Trip", "رحلة"))}</td><td class="num">${units}</td><td class="num">${nf(b.demobPrice)}</td><td class="num">${nf(demobTotal)}</td></tr>`;
-        return r;
-      }).join("");
+        lineItems.push({ num: rowNum, label: `${L("Rental", "الإيجار")} — ${labelOf(b)}`, detail: eqLine(b), unit: plabel, qty: qtyCell, price: priceCell, total: totalCell, totalNote });
+        if (b.mobPrice) lineItems.push({ num: null, label: L("Delivery to site", "النقل إلى الموقع"), detail: labelOf(b), unit: L("Trip", "رحلة"), qty: String(units), price: nf(b.mobPrice), total: nf(mobTotal) });
+        if (b.demobPrice) lineItems.push({ num: null, label: L("Return from site", "الإرجاع من الموقع"), detail: labelOf(b), unit: L("Trip", "رحلة"), qty: String(units), price: nf(b.demobPrice), total: nf(demobTotal) });
+      }
       const vat = Math.round(sub * 0.15);
       const total = sub + vat;
 
-      const listedLines = supBids.map((b) => {
-        const units = b.numberOfUnits || 1;
-        const verified = b.eqVerified ? ` &nbsp;·&nbsp; <span class="ver-ok">✔ ${esc(L("verified", "موثّقة"))}</span>` : "";
-        const certs = b.heldCertCodes.length
-          ? ` &nbsp;·&nbsp; ${b.heldCertCodes.map((c) => `<span class="doc-ok">✓ ${esc(isAr ? CERT_LABEL[c].ar : CERT_LABEL[c].en)}</span>`).join(" ")}`
-          : "";
-        return `<div class="lv">${esc(labelOf(b))} &nbsp;·&nbsp; ${esc(eqLine(b))} &nbsp;·&nbsp; ${units} ${esc(units > 1 ? L("units", "وحدات") : L("unit", "وحدة"))}${verified}${certs}</div>`;
-      }).join("");
-      const scopeRows = supBids.map((b) => {
-        const it = itemMap.get(b.requestId);
-        const units = b.numberOfUnits || 1;
-        return `<div class="kv"><span>${esc(it?.displayId ?? b.requestId)}</span><b>${units} × ${esc(labelOf(b))}</b></div>`;
-      }).join("");
+      const listed = supBids.map((b) => ({
+        label: labelOf(b),
+        detail: eqLine(b),
+        units: b.numberOfUnits || 1,
+        verified: b.eqVerified,
+        certs: b.heldCertCodes.map((c) => (isAr ? CERT_LABEL[c].ar : CERT_LABEL[c].en)),
+      }));
 
       // ---- Equipment-terms + Contract-terms cards (the renter's RFQ terms, formatted bilingually) ----
       const tfmt = {
@@ -499,80 +381,69 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         fuel: (v: string | null) => { if (!v) return null; const m: Record<string, [string, string]> = { DIESEL: ["Diesel", "ديزل"], PETROL: ["Petrol", "بنزين"], ELECTRIC: ["Electric", "كهربائي"] }; const x = m[v.toUpperCase()]; return x ? L(x[0], x[1]) : v; },
         operator: (inc: string | null, nat: string | null) => { if (inc == null) return null; if (inc.toUpperCase() !== "YES") return L("No operator", "بدون مشغّل"); return L("Includes operator", "يشمل مشغّلاً") + (nat ? ` · ${L("Nationality", "الجنسية")}: ${nat}` : ""); },
       };
-      const kvRow = (label: string, val: string | null) => (val ? `<div class="kv"><span>${esc(label)}</span><b>${esc(val)}</b></div>` : "");
       // App parity: the equipment-terms section prints the required/held safety certifications.
       const eqCertsText = (b: GroupBid) => {
         const cs = (b.heldCertCodes?.length ? b.heldCertCodes : b.equipmentCertCodes) ?? [];
         return cs.length ? cs.map((c) => (isAr ? CERT_LABEL[c]?.ar : CERT_LABEL[c]?.en)).filter(Boolean).join(" · ") : null;
       };
-      let eqTermRows: string;
+      const cards: QuotationCard[] = [];
+      const projectRows = supBids.map((b) => ({
+        label: itemMap.get(b.requestId)?.displayId ?? b.requestId,
+        value: `${b.numberOfUnits || 1} × ${labelOf(b)}`,
+      }));
+      projectRows.push({ label: L("Rental basis", "أساس الإيجار"), value: rentalBasis || "—" });
+      projectRows.push({ label: L("Equipment lines", "بنود المعدات"), value: String(supBids.length) });
+      projectRows.push({ label: L("Total units", "إجمالي الوحدات"), value: String(supBids.reduce((s2, b) => s2 + (b.numberOfUnits || 1), 0)) });
+      cards.push({ title: L("Project terms", "شروط المشروع"), rows: projectRows });
+
+      const eqRows: { label: string; value: string }[] = [];
+      const addEq = (label: string, val: string | null) => { if (val) eqRows.push({ label, value: val }); };
       if (supBids.length === 1) {
         const et = sup.requestTerms;
-        eqTermRows =
-          kvRow(L("Operator", "المشغّل"), tfmt.operator(et.operatorIncluded, et.operatorNationality)) +
-          kvRow(L("Equipment safety certifications", "شهادات سلامة المعدة"), eqCertsText(sup)) +
-          kvRow(L("Fuel type", "نوع الوقود"), tfmt.fuel(et.fuelType));
+        addEq(L("Operator", "المشغّل"), tfmt.operator(et.operatorIncluded, et.operatorNationality));
+        addEq(L("Equipment safety certifications", "شهادات سلامة المعدة"), eqCertsText(sup));
+        addEq(L("Fuel type", "نوع الوقود"), tfmt.fuel(et.fuelType));
       } else {
-        eqTermRows = supBids.map((b) => {
+        for (const b of supBids) {
           const et = b.requestTerms;
           const parts = [tfmt.operator(et.operatorIncluded, et.operatorNationality), eqCertsText(b), tfmt.fuel(et.fuelType)].filter(Boolean).join(" · ");
-          return kvRow(labelOf(b), parts || null);
-        }).join("");
+          if (parts) eqRows.push({ label: labelOf(b), value: parts });
+        }
       }
-      const eqTermsCard = eqTermRows ? `<div class="card"><div class="card-h">${esc(L("Equipment terms", "شروط المعدة"))}</div>${eqTermRows}</div>` : "";
-      const ct = sup.requestTerms;
-      const contractRows =
-        kvRow(L("Payment terms", "شروط الدفع"), tfmt.payTerms(ct.paymentTerms)) +
-        kvRow(L("Breakdown response", "زمن الاستجابة للأعطال"), tfmt.sla(ct.breakdownResponseSla)) +
-        kvRow(L("Overtime", "العمل الإضافي"), tfmt.overtime(ct.overtimeRate)) +
-        kvRow(L("Maintenance", "الصيانة"), tfmt.maint(ct.maintenanceResponsibility));
-      const contractTermsCard = contractRows ? `<div class="card"><div class="card-h">${esc(L("Contract terms", "شروط العقد"))}</div>${contractRows}</div>` : "";
+      if (eqRows.length) cards.push({ title: L("Equipment terms", "شروط المعدة"), rows: eqRows });
 
-      return `<section class="q-doc" dir="${isAr ? "rtl" : "ltr"}" lang="${isAr ? "ar" : "en"}">
-        <div class="q-head"><div class="q-title">${esc(L("Equipment rental quotation", "عرض سعر تأجير معدات"))}</div><div class="q-sub"><span class="qn">${esc(qnum)}</span><span>${esc(dateStr)}</span></div></div>
-        <div class="q-body">
-          <div class="parties">
-            <div class="party"><div class="plabel">${esc(L("Supplier", "المؤجِّر"))}</div><div class="pname">${esc(sup.supplierName)}</div>${supplierSub ? `<div class="psub">${esc(supplierSub)}</div>` : ""}${supIdRows}${supChips}</div>
-            <div class="party"><div class="plabel">${esc(L("Rentee", "المُستأجِر"))}</div><div class="pname">${esc(rentee.name)}</div>${rentee.person ? `<div class="psub">${esc(rentee.person)}</div>` : ""}${renteeIdRows}${renteeChips}</div>
-          </div>
-          <div class="metastrip">
-            <div><span>${esc(L("Request #", "رقم الطلب"))}</span><b>${esc(groupRef ?? reqLabel)}</b></div>
-            <div><span>${esc(L("Issue date", "تاريخ الإصدار"))}</span><b>${esc(dateStr)}</b></div>
-            <div><span>${esc(L("Valid until", "صالح حتى"))}</span><b>${esc(valid)}</b></div>
-            <div><span>${esc(L("Rental start", "بدء الإيجار"))}</span><b>${esc(startStr)}</b></div>
-            <div><span>${esc(L("Rental end", "نهاية الإيجار"))}</span><b>${esc(endStr)}</b></div>
-            <div><span>${esc(L("Currency", "العملة"))}</span><b>${esc(L("SAR · Saudi Riyal", "SAR · ريال سعودي"))}</b></div>
-          </div>
-          <div class="listed"><div class="ll">${esc(L("Listed equipment", "المعدات المدرجة"))} (${supBids.length})</div>${listedLines}</div>
-          <table class="ptable">
-            <thead><tr><th class="num">#</th><th>${esc(L("Item", "البند"))}</th><th>${esc(L("Unit", "الوحدة"))}</th><th class="num">${esc(L("Qty", "العدد"))}</th><th class="num">${esc(L("Price", "السعر"))}</th><th class="num">${esc(L("Total", "الإجمالي"))}</th></tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-          <div class="totals">
-            <div class="trow"><span>${esc(L("Subtotal before VAT", "الإجمالي قبل الضريبة"))}</span><b>${nf(sub)}</b></div>
-            <div class="trow"><span>${esc(L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"))}</span><b>${nf(vat)}</b></div>
-            <div class="trow grand"><span>${esc(L("Total", "الإجمالي"))}</span><b>${nf(total)} ${esc(sar)}</b></div>
-          </div>
-          <div class="words"><div class="wl">${esc(L("Amount in words", "المبلغ كتابةً"))}</div>${esc(isAr ? `${numWordsAr(total)} ريال سعودي` : `${numWords(total)} Saudi Riyals`)}</div>
-          <div class="card"><div class="card-h">${esc(L("Project terms", "شروط المشروع"))}</div>
-            ${scopeRows}
-            <div class="kv"><span>${esc(L("Rental basis", "أساس الإيجار"))}</span><b>${esc(rentalBasis || "—")}</b></div>
-            <div class="kv"><span>${esc(L("Equipment lines", "بنود المعدات"))}</span><b>${supBids.length}</b></div>
-            <div class="kv"><span>${esc(L("Total units", "إجمالي الوحدات"))}</span><b>${supBids.reduce((sum, b) => sum + (b.numberOfUnits || 1), 0)}</b></div>
-          </div>
-          ${eqTermsCard}
-          ${contractTermsCard}
-          <ol class="tc">
-            <li>${esc(L("This quotation is valid for seven (7) days from the issue date and expires automatically thereafter unless confirmed through the Moedatech platform.", "هذا العرض ساري المفعول لمدة سبعة (٧) أيام من تاريخ الإصدار، وتسقط صلاحيته تلقائيًا بعد ذلك ما لم يتم تأكيده عبر منصة معداتك."))}</li>
-            <li>${esc(L("Prices are inclusive of items explicitly listed in the pricing table above. VAT at 15% applies per Saudi tax law.", "الأسعار شاملة لِما ذُكر صراحةً في جدول التسعير أعلاه، وضريبة القيمة المضافة بنسبة ١٥٪ مفروضة وفقًا للنظام السعودي."))}</li>
-            <li>${esc(L("The supplier is responsible for the equipment's roadworthiness and technical safety on the delivery date, and for satisfying mandated safety certifications.", "المُورِّد مسؤول عن صلاحية المعدة وسلامتها الفنية في تاريخ التسليم، وعن استيفاء شهادات السلامة والوثائق المطلوبة نظامًا."))}</li>
-            <li>${esc(L("This quotation is governed by the laws of the Kingdom of Saudi Arabia; competent Saudi courts have exclusive jurisdiction over any dispute.", "يخضع هذا العرض لأنظمة المملكة العربية السعودية، وتختصُّ المحاكم السعودية المختصة بالفصل في أي نزاع."))}</li>
-            <li>${esc(L("This document is issued electronically via the Moedatech platform and is legally equivalent to a signed document under the Saudi Electronic Transactions Law.", "تَمَّ إصدار هذا المستند إلكترونيًا عبر منصة معداتك، ويُعدّ مكافئًا قانونيًا للمستند الموقَّع وفقًا لنظام التعاملات الإلكترونية السعودي."))}</li>
-          </ol>
-          <div class="signed"><span class="sig-check">✓</span><div class="sig-txt"><b>${esc(L("Electronically signed via the Moedatech platform", "موقّع إلكترونيًا عبر منصة معداتك"))}</b><div>${esc(qnum)} · ${esc(dateStr)}</div></div></div>
-          <div class="foot">${esc(L("Auto-generated by Moedatech · support@moedatech.com", "صادر تلقائيًا من منصة معداتك · support@moedatech.com"))}</div>
-        </div>
-      </section>`;
+      const ct = sup.requestTerms;
+      const ctRows: { label: string; value: string }[] = [];
+      const addCt = (label: string, val: string | null) => { if (val) ctRows.push({ label, value: val }); };
+      addCt(L("Payment terms", "شروط الدفع"), tfmt.payTerms(ct.paymentTerms));
+      addCt(L("Breakdown response", "زمن الاستجابة للأعطال"), tfmt.sla(ct.breakdownResponseSla));
+      addCt(L("Overtime", "العمل الإضافي"), tfmt.overtime(ct.overtimeRate));
+      addCt(L("Maintenance", "الصيانة"), tfmt.maint(ct.maintenanceResponsibility));
+      if (ctRows.length) cards.push({ title: L("Contract terms", "شروط العقد"), rows: ctRows });
+
+      const doc: QuotationDoc = {
+        lang: isAr ? "ar" : "en",
+        title: L("Equipment rental quotation", "عرض سعر تأجير معدات"),
+        quotationNumber: qnum,
+        dateStr,
+        supplier: { label: L("Supplier", "المؤجِّر"), name: sup.supplierName, sub: supplierSub, idRows: supIdRows, chips: sup.verified ? [L("Verified", "موثَّق")] : [] },
+        rentee: { label: L("Rentee", "المُستأجِر"), name: rentee.name, sub: rentee.person, idRows: renteeIdRows, chips: [] },
+        meta: [
+          { label: L("Request #", "رقم الطلب"), value: groupRef ?? reqLabel },
+          { label: L("Issue date", "تاريخ الإصدار"), value: dateStr },
+          { label: L("Valid until", "صالح حتى"), value: valid },
+          { label: L("Rental start", "بدء الإيجار"), value: startStr },
+          { label: L("Rental end", "نهاية الإيجار"), value: endStr },
+          { label: L("Currency", "العملة"), value: L("SAR · Saudi Riyal", "SAR · ريال سعودي") },
+        ],
+        listed,
+        lineItems,
+        currency: sar,
+        totals: { subtotal: sub, vat, total },
+        cards,
+        legal: quotationLegal(L),
+      };
+      return renderQuotationSection(doc);
     };
 
     // Single language (the renter picks Arabic or English) — one page per supplier, no 2-in-1.
@@ -580,14 +451,24 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       .map((supBids, si) => renderSection(supBids, si, langIsAr))
       .join("");
 
-    const html = `<!doctype html><html lang="${langIsAr ? "ar" : "en"}" dir="${langIsAr ? "rtl" : "ltr"}"><head><meta charset="utf-8"><title>${esc(quotationFileTitle(group.id, coveredCodes))}</title>` +
-      `<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">` +
-      `<style>${QSTYLE}</style></head><body>${sections}` +
-      `<script>window.onload=function(){setTimeout(function(){window.print();},350);}</script></body></html>`;
+    const html = wrapQuotationPage(sections, { lang: langIsAr ? "ar" : "en", title: quotationFileTitle(group.id, coveredCodes) });
+    // Robust open: a popup-blocked `window.open` returns null and used to silently fail (dead click).
+    // Fall back to downloading the self-printing HTML file so the quotation is never a no-op.
     const w = window.open("", "_blank");
-    if (!w) return;
-    w.document.write(html);
-    w.document.close();
+    if (w) {
+      w.document.write(html);
+      w.document.close();
+      return;
+    }
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${quotationFileTitle(group.id, coveredCodes).replace(/[^\w.-]+/g, "_")}.html`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
   }
 
   if (error) return <div className="rempty">{L("Couldn’t load the bids.", "تعذّر تحميل العروض.")}</div>;

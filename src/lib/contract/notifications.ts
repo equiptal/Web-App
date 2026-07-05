@@ -41,12 +41,19 @@ export function mapNotification(raw: unknown): NotificationItem {
 }
 
 export function mapNotificationList(raw: unknown): NotificationList {
+  // IMPORTANT: `withAuthedBackend`'s call() unwraps the backend `{ success, data, meta }` envelope to
+  // `body.data`, so for a paginated list `raw` arrives as the ITEMS ARRAY and the envelope `meta` is
+  // dropped. Accept BOTH shapes — the unwrapped array, or a `{ data, meta }` object — otherwise the list
+  // is always empty (`raw.data` is undefined on an array) and the badge count is always 0.
   const r = (raw ?? {}) as Record<string, unknown>;
-  const data = Array.isArray(r.data) ? r.data.map(mapNotification) : [];
+  const arr: unknown[] = Array.isArray(raw) ? raw : Array.isArray(r.data) ? (r.data as unknown[]) : [];
+  const data = arr.map(mapNotification);
   const meta = (r.meta ?? {}) as Record<string, unknown>;
   const num = (v: unknown, d: number) => (typeof v === "number" && !Number.isNaN(v) ? v : d);
   return {
     data,
+    // `meta` is dropped by the envelope unwrap for lists → fall back to the page's item count (the
+    // unread page length ≤ 20 is a good-enough badge; there is no separate unread-count endpoint).
     meta: {
       page: num(meta.page, 1),
       limit: num(meta.limit, data.length),

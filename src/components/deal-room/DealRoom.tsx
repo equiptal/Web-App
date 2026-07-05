@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { StreamChat, type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
-import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, ApiError } from "@/lib/api/client";
+import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, ApiError } from "@/lib/api/client";
 import type { DealRoomView, DealRoomDocument, DealRoomDocuments, QuotationView } from "@/lib/contract/deal-room";
 import { DealRoomTerms, type ResolutionsMap } from "@/components/deal-room/DealRoomTerms";
+import { renderQuotationSection, wrapQuotationPage, quotationLegal, type QuotationDoc, type QuotationLineItem, type QuotationCard, type QuotationMetaCell } from "@/lib/quotation/render";
 import "@/components/deal-room/deal-room-proto.css";
 
 type StreamAttachment = { type?: string; image_url?: string; thumb_url?: string; asset_url?: string; title?: string; mime_type?: string; file_size?: number; fallback?: string };
@@ -15,6 +16,20 @@ const STREAM_KEY = process.env.NEXT_PUBLIC_STREAM_API_KEY ?? "";
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
 type LFn = (en: string, arr: string) => string;
 
+// Deal-room chat attachments — matched EXACTLY to the mobile app (chat_input_bar.dart): images +
+// documents ≤ 10 MB, video ≤ 25 MB, and ONE attachment per message. The web used to allow any file,
+// any size, multiple at once — these bring it in line.
+const CHAT_IMAGE_EXT = ["jpg", "jpeg", "png", "webp", "heic"];
+const CHAT_DOC_EXT = ["pdf", "doc", "docx", "xls", "xlsx", "csv", "txt", "ppt", "pptx"];
+const CHAT_VIDEO_EXT = ["mp4", "mov", "m4v", "webm", "3gp"];
+const CHAT_ACCEPT = [
+  "image/jpeg", "image/png", "image/webp", "image/heic", ".jpg", ".jpeg", ".png", ".webp", ".heic",
+  ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt", ".ppt", ".pptx",
+  "video/mp4", "video/quicktime", "video/webm", ".mp4", ".mov", ".m4v", ".webm", ".3gp",
+].join(",");
+const CHAT_MAX_MEDIA = 10 * 1024 * 1024; // images + documents
+const CHAT_MAX_VIDEO = 25 * 1024 * 1024; // video
+
 /**
  * Client-rendered confirmed-deal quotation (the backend server PDF is disabled — the client renders it
  * now, app parity). Values mirror the app's `extractQuotationData`: rental = agreedRate × durationFactor
@@ -23,7 +38,7 @@ type LFn = (en: string, arr: string) => string;
  * Quotation row (+ the deal room for mob/demob/units/fixed terms/supplier name; renter name from /api/me).
  */
 function buildQuotationHtml(room: DealRoomView, q: QuotationView, renteeName: string, ar: boolean, L: (en: string, arr: string) => string): string {
-  const esc = (v: unknown) => String(v ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
+  const lang = ar ? "ar" : "en";
   const sar = L("SAR", "ر.س");
   const rate = q.agreedRate ?? room.rate ?? 0;
   const unit = (q.priceUnit ?? room.priceUnit ?? "PER_DAY").toUpperCase();
@@ -36,13 +51,16 @@ function buildQuotationHtml(room: DealRoomView, q: QuotationView, renteeName: st
   if (unit === "PER_JOB") durationFactor = 1;
   else if (days != null) durationFactor = unit === "PER_WEEK" ? Math.ceil(days / 7) : unit === "PER_MONTH" ? Math.ceil(days / 30) : days;
   const hasTotal = rate > 0 && durationFactor != null;
-  const rentalTotal = hasTotal ? rate * (durationFactor as number) : 0;
-  const subtotal = hasTotal ? (rentalTotal + mob + demob) * units : 0;
+  // Same money math as the live card: rental + mob + demob, all × units, + 15% VAT (offered units).
+  const rentalTotal = hasTotal ? rate * (durationFactor as number) * units : 0;
+  const mobTotal = mob * units;
+  const demobTotal = demob * units;
+  const subtotal = hasTotal ? rentalTotal + mobTotal + demobTotal : 0;
   const vat = Math.round(subtotal * 0.15);
   const total = subtotal + vat;
   const dateStr = new Date().toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
-  const ref = (q.quotationNumber ?? "").slice(0, 8).toUpperCase();
-  const money = (v: number) => `${nf(v)} ${sar}`;
+  const qnum = (q.quotationNumber ?? "").slice(0, 8).toUpperCase() || "—";
+  const contractType = q.contractType ?? room.contractType;
 
   const valFmt = (v: unknown): string => {
     if (v == null || v === "") return "—";
@@ -55,45 +73,66 @@ function buildQuotationHtml(room: DealRoomView, q: QuotationView, renteeName: st
     if (t === "false" || t === "excluded" || t === "not_included" || t === "no") return L("No", "لا");
     return String(v);
   };
-  const termRow = (label: string, v: unknown) => `<div class="kv"><span>${esc(label)}</span><b>${esc(valFmt(v))}</b></div>`;
-  const agreedRows = q.agreedTerms.filter((t) => t.key !== "PRICE").map((t) => termRow(ar ? t.labelAr : t.label, t.value)).join("");
-  const fixedRows = room.terms.filter((t) => t.state === "fixed").map((t) => termRow(ar ? t.labelAr : t.label, t.value ?? t.platformDefault)).join("");
-  const party = (label: string, name: string, phone: string | null, email: string | null) =>
-    `<div class="party"><div class="plabel">${esc(label)}</div><div class="pname">${esc(name || "—")}</div>${phone ? `<div class="pmeta" dir="ltr">${esc(phone)}</div>` : ""}${email ? `<div class="pmeta" dir="ltr">${esc(email)}</div>` : ""}</div>`;
-  const contractType = q.contractType ?? room.contractType;
 
-  return `<!doctype html><html lang="${ar ? "ar" : "en"}" dir="${ar ? "rtl" : "ltr"}"><head><meta charset="utf-8"><title>${esc(L("Confirmed Quotation", "عرض سعر مؤكّد"))}</title>
-  <style>
-  *{box-sizing:border-box;} body{font-family:system-ui,'Segoe UI',Tahoma,sans-serif;color:#12263a;margin:0;padding:28px;background:#fff;}
-  .q{max-width:800px;margin:0 auto;}
-  .qh{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #f7900a;padding-bottom:14px;margin-bottom:18px;}
-  .qt{font-size:22px;font-weight:800;color:#1c3550;} .qsub{font-size:12px;color:#6b8fa8;font-weight:700;text-align:${ar ? "left" : "right"};}
-  .ref{display:inline-block;background:#eff4f9;border-radius:100px;padding:3px 10px;font-size:11px;font-weight:800;color:#2a4f72;margin-bottom:6px;}
-  .card{border:1px solid #e4edf5;border-radius:12px;padding:14px 16px;margin-bottom:16px;}
-  .card-h{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#6b8fa8;margin-bottom:8px;}
-  .kv{display:flex;justify-content:space-between;gap:16px;font-size:13px;padding:6px 0;border-bottom:1px solid #f2f6fa;} .kv:last-child{border-bottom:0;} .kv span{color:#6b8fa8;font-weight:600;} .kv b{font-weight:800;color:#12263a;}
-  .kv.tot b{color:#f7900a;font-size:15px;}
-  .parties{display:flex;gap:20px;margin-bottom:16px;} .party{flex:1;border:1px solid #e4edf5;border-radius:12px;padding:12px 14px;}
-  .plabel{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#6b8fa8;} .pname{font-size:16px;font-weight:800;margin-top:4px;color:#1c3550;} .pmeta{font-size:12px;color:#6b8fa8;font-weight:600;margin-top:3px;}
-  @media print{body{padding:0;}}
-  </style></head><body><div class="q">
-    <div class="qh"><div>${ref ? `<div class="ref">#${esc(ref)}</div>` : ""}<div class="qt">${esc(L("Confirmed Quotation", "عرض سعر مؤكّد"))}</div></div><div class="qsub">${esc(dateStr)}${contractType ? `<br>${esc(L("Contract", "العقد"))}: ${esc(contractType)}` : ""}</div></div>
-    <div class="parties">
-      ${party(L("Supplier", "المؤجّر"), room.supplier.name, q.supplierPhone, q.supplierEmail)}
-      ${party(L("Rentee", "المستأجر"), renteeName, q.renteePhone, q.renteeEmail)}
-    </div>
-    <div class="card"><div class="card-h">${esc(L("Price breakdown", "تفصيل السعر"))}</div>
-      <div class="kv"><span>${esc(L("Agreed rate", "السعر المتفق عليه"))}</span><b>${esc(money(rate))} / ${esc(periodLabel)}${units > 1 ? ` · ${esc(L("per unit", "لكل وحدة"))}` : ""}</b></div>
-      ${mob ? `<div class="kv"><span>${esc(L("Mobilization", "النقل"))}</span><b>${esc(money(mob))}</b></div>` : ""}
-      ${demob ? `<div class="kv"><span>${esc(L("Return", "الإرجاع"))}</span><b>${esc(money(demob))}</b></div>` : ""}
-      ${units > 1 ? `<div class="kv"><span>${esc(L("Units", "الوحدات"))}</span><b>${units}</b></div>` : ""}
-      ${hasTotal
-        ? `<div class="kv"><span>${esc(L("Subtotal before VAT", "المجموع قبل الضريبة"))}</span><b>${esc(money(subtotal))}</b></div><div class="kv"><span>${esc(L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"))}</span><b>${esc(money(vat))}</b></div><div class="kv tot"><span>${esc(L("Estimated total", "الإجمالي التقديري"))}</span><b>${esc(money(total))}</b></div>`
-        : `<div class="kv tot"><span>${esc(L("Estimated total", "الإجمالي التقديري"))}</span><b>${esc(L("As operated", "حسب التشغيل"))}</b></div>`}
-    </div>
-    ${agreedRows ? `<div class="card"><div class="card-h">${esc(L("Agreed terms", "الشروط المتفق عليها"))}</div>${agreedRows}</div>` : ""}
-    ${fixedRows ? `<div class="card"><div class="card-h">${esc(L("Fixed terms", "الشروط الثابتة"))}</div>${fixedRows}</div>` : ""}
-  </div></body></html>`;
+  // Invoice line items (rental + delivery + return) — SAME 6-column table as the bid-card quotation.
+  const lineItems: QuotationLineItem[] = [];
+  if (hasTotal) {
+    lineItems.push({ num: 1, label: L("Rental", "الإيجار"), detail: room.supplier.name, unit: periodLabel, qty: `${durationFactor}${units > 1 ? ` × ${units}` : ""}`, price: `${nf(rate)} / ${periodLabel}`, total: nf(rentalTotal) });
+  } else {
+    lineItems.push({ num: 1, label: L("Rental", "الإيجار"), detail: room.supplier.name, unit: periodLabel, qty: "∞", price: `${nf(rate)} / ${periodLabel}`, total: `${nf(rate)} / ${periodLabel}`, totalNote: L("As operated", "حسب التشغيل") });
+  }
+  if (mob) lineItems.push({ num: null, label: L("Delivery to site", "النقل إلى الموقع"), detail: room.supplier.name, unit: L("Trip", "رحلة"), qty: String(units), price: nf(mob), total: nf(mobTotal) });
+  if (demob) lineItems.push({ num: null, label: L("Return from site", "الإرجاع من الموقع"), detail: room.supplier.name, unit: L("Trip", "رحلة"), qty: String(units), price: nf(demob), total: nf(demobTotal) });
+
+  const cards: QuotationCard[] = [];
+  const agreedRows = q.agreedTerms.filter((t) => t.key !== "PRICE").map((t) => ({ label: ar ? t.labelAr : t.label, value: valFmt(t.value) }));
+  if (agreedRows.length) cards.push({ title: L("Agreed terms", "الشروط المتفق عليها"), rows: agreedRows });
+  const fixedRows = room.terms.filter((t) => t.state === "fixed").map((t) => ({ label: ar ? t.labelAr : t.label, value: valFmt(t.value ?? t.platformDefault) }));
+  if (fixedRows.length) cards.push({ title: L("Fixed terms", "الشروط الثابتة"), rows: fixedRows });
+
+  const meta: QuotationMetaCell[] = [
+    { label: L("Reference", "المرجع"), value: qnum },
+    { label: L("Issue date", "تاريخ الإصدار"), value: dateStr },
+    { label: L("Contract", "العقد"), value: contractType ?? "—" },
+    { label: L("Rate period", "فترة السعر"), value: periodLabel },
+    { label: L("Units offered", "الوحدات المعروضة"), value: String(units) },
+    { label: L("Currency", "العملة"), value: L("SAR · Saudi Riyal", "SAR · ريال سعودي") },
+  ];
+
+  const doc: QuotationDoc = {
+    lang,
+    title: L("Equipment rental quotation", "عرض سعر تأجير معدات"),
+    quotationNumber: qnum,
+    dateStr,
+    supplier: {
+      label: L("Supplier", "المؤجِّر"),
+      name: room.supplier.name,
+      idRows: [
+        { label: L("National Address", "العنوان الوطني"), verified: room.supplier.isVerified },
+        { label: L("CR #", "س.ت"), verified: room.supplier.isVerified },
+        { label: L("VAT #", "ض.ق.م"), verified: room.supplier.isVerified },
+        { label: L("Phone", "الهاتف"), value: q.supplierPhone },
+        { label: L("Email", "البريد"), value: q.supplierEmail },
+      ],
+      chips: room.supplier.isVerified ? [L("Verified", "موثَّق")] : [],
+    },
+    rentee: {
+      label: L("Rentee", "المُستأجِر"),
+      name: renteeName,
+      idRows: [
+        { label: L("Phone", "الهاتف"), value: q.renteePhone },
+        { label: L("Email", "البريد"), value: q.renteeEmail },
+      ],
+      chips: [],
+    },
+    meta,
+    lineItems,
+    currency: sar,
+    totals: { subtotal, vat, total },
+    cards,
+    legal: quotationLegal(L),
+  };
+  return wrapQuotationPage(renderQuotationSection(doc), { lang, title: L("Confirmed Quotation", "عرض سعر مؤكّد") });
 }
 
 export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) => void }) {
@@ -113,6 +152,10 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const [quoteBusy, setQuoteBusy] = useState(false);
   const [quoteErr, setQuoteErr] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [fileErr, setFileErr] = useState<string | null>(null);
+  const [releaseOpen, setReleaseOpen] = useState(false); // reopen-accepted-deal confirm modal
+  const [releasing, setReleasing] = useState(false);
+  const [releaseErr, setReleaseErr] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [termsOpen, setTermsOpen] = useState(true);
   const termsToggled = useRef(false);
@@ -131,6 +174,21 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const errMsg = (e: unknown, fb: string) => (e instanceof ApiError ? (ar ? e.messageAr : e.detail) || fb : fb);
 
   const loadRoom = () => fetchDealRoom(id).then(setRoom).catch(() => setError(true));
+  // Reopen an accepted (CLOSED) deal for re-negotiation (app parity: "release"). Backend flips
+  // CLOSED → NEGOTIATING and re-arms the bid; loadRoom then brings the terms/price card + composer back.
+  async function doRelease() {
+    setReleaseErr(null);
+    setReleasing(true);
+    try {
+      await releaseDeal(id);
+      setReleaseOpen(false);
+      await loadRoom();
+    } catch (e) {
+      setReleaseErr(e instanceof ApiError ? e.message : L("Couldn't reopen the deal. Please try again.", "تعذّر إعادة فتح الصفقة. حاول مرة أخرى."));
+    } finally {
+      setReleasing(false);
+    }
+  }
 
   // The confirmed-deal quotation. The server-side PDF is disabled (app parity — the client renders it
   // now), so we build it CLIENT-SIDE from the confirmed Quotation row's AGREED snapshot (agreedRate,
@@ -257,27 +315,37 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     }
   }
 
-  /** Upload + send any media (image/pdf/file/video) via GetStream; backend sets no type restriction. */
+  /** Upload + send ONE attachment via GetStream, gated to the app's allowed types + size caps. */
   async function sendFiles(files: FileList | null) {
     const ch = channelRef.current;
     if (!ch || !files || !files.length) return;
+    setFileErr(null);
+    // App parity: one attachment per message — take the first only.
+    const file = files[0];
+    const ext = (file.name.split(".").pop() ?? "").toLowerCase();
+    const isImg = file.type.startsWith("image/") || CHAT_IMAGE_EXT.includes(ext);
+    const isVideo = file.type.startsWith("video/") || CHAT_VIDEO_EXT.includes(ext);
+    const isDoc = CHAT_DOC_EXT.includes(ext);
+    if (!isImg && !isVideo && !isDoc) {
+      setFileErr(L("That file type isn't supported.", "نوع الملف غير مدعوم."));
+      return;
+    }
+    const cap = isVideo ? CHAT_MAX_VIDEO : CHAT_MAX_MEDIA;
+    if (file.size > cap) {
+      setFileErr(L(`File is too large (max ${Math.round(cap / (1024 * 1024))} MB).`, `الملف كبير جدًا (الحد ${Math.round(cap / (1024 * 1024))} ميغابايت).`));
+      return;
+    }
     setUploading(true);
     try {
-      const attachments: StreamAttachment[] = [];
-      for (const file of Array.from(files)) {
-        const isImg = file.type.startsWith("image/");
-        const res = isImg ? await ch.sendImage(file) : await ch.sendFile(file);
-        attachments.push(
-          isImg
-            ? { type: "image", image_url: res.file, fallback: file.name }
-            : { type: "file", asset_url: res.file, title: file.name, mime_type: file.type, file_size: file.size },
-        );
-      }
+      const res = isImg ? await ch.sendImage(file) : await ch.sendFile(file);
+      const attachment: StreamAttachment = isImg
+        ? { type: "image", image_url: res.file, fallback: file.name }
+        : { type: "file", asset_url: res.file, title: file.name, mime_type: file.type, file_size: file.size };
       const body = text.trim();
-      await ch.sendMessage({ text: body || undefined, attachments });
+      await ch.sendMessage({ text: body || undefined, attachments: [attachment] });
       setText("");
     } catch {
-      /* upload/send failed — leave the composer untouched so the renter can retry */
+      setFileErr(L("Upload failed — please try again.", "فشل الرفع — حاول مجددًا."));
     } finally {
       setUploading(false);
     }
@@ -340,9 +408,11 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
 
   const rate = room.rate ?? 0;
   const periods = room.periods ?? 1;
-  const units = room.numberOfUnits || 1; // rate is PER-UNIT → rental × units (consistent with cards/quotations)
+  const units = room.numberOfUnits || 1; // supplier's OFFERED units — rate, mob AND demob are PER-UNIT (app parity: extractQuotationData → (rental + mob + demob) × units)
   const rentalTotal = rate * periods * units;
-  const subtotal = rentalTotal + (room.mobPrice ?? 0) + (room.demobPrice ?? 0);
+  const mobTotal = (room.mobPrice ?? 0) * units;
+  const demobTotal = (room.demobPrice ?? 0) * units;
+  const subtotal = rentalTotal + mobTotal + demobTotal;
   const vat = Math.round(subtotal * 0.15);
   const grand = subtotal + vat;
   // Billing-period label from the bid's price unit (same mapping the bid cards use).
@@ -400,8 +470,8 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
           {breakdown && (
             <div className="breakdown">
               <div className="brow"><span className="l">{L("Rental", "الإيجار")} ({nf(rate)} × {periods}{units > 1 ? ` × ${units}` : ""})</span><span className="v">{nf(rentalTotal)}</span></div>
-              {room.mobPrice ? <div className="brow"><span className="l">{L("Mobilization", "النقل")}</span><span className="v">{nf(room.mobPrice)}</span></div> : null}
-              {room.demobPrice ? <div className="brow"><span className="l">{L("Return", "الإرجاع")}</span><span className="v">{nf(room.demobPrice)}</span></div> : null}
+              {room.mobPrice ? <div className="brow"><span className="l">{L("Mobilization", "النقل")}{units > 1 ? ` (${nf(room.mobPrice)} × ${units})` : ""}</span><span className="v">{nf(mobTotal)}</span></div> : null}
+              {room.demobPrice ? <div className="brow"><span className="l">{L("Return", "الإرجاع")}{units > 1 ? ` (${nf(room.demobPrice)} × ${units})` : ""}</span><span className="v">{nf(demobTotal)}</span></div> : null}
               <div className="brow"><span className="l">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="v">{nf(subtotal)}</span></div>
               <div className="brow"><span className="l">{L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)")}</span><span className="v">{nf(vat)}</span></div>
               <div className="brow tot"><span className="l">{L("Estimated total", "الإجمالي التقديري")}</span><span className="v">{nf(grand)} {L("SAR", "ر.س")}</span></div>
@@ -498,6 +568,10 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
             <span className="material-icons-outlined">{quoteBusy ? "hourglass_top" : "download"}</span>
             {quoteBusy ? L("Preparing quotation…", "يتم تجهيز عرض السعر…") : L("Download quotation", "تنزيل عرض السعر")}
           </button>
+          <button type="button" className="dl-quote reopen" onClick={() => { setReleaseErr(null); setReleaseOpen(true); }} disabled={releasing}>
+            <span className="material-icons-outlined">lock_open</span>
+            {L("Reopen negotiation", "إعادة فتح التفاوض")}
+          </button>
           {quoteErr && <span className="ro-note quote-err">{quoteErr}</span>}
         </div>
       ) : abandoned ? (
@@ -507,9 +581,10 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
           <button type="button" className="ib" disabled={!chatReady || uploading} onClick={() => fileInputRef.current?.click()} aria-label={L("Attach a file", "إرفاق ملف")}>
             <span className="material-icons-outlined">{uploading ? "hourglass_top" : "attach_file"}</span>
           </button>
-          <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => { void sendFiles(e.target.files); e.target.value = ""; }} />
+          <input ref={fileInputRef} type="file" accept={CHAT_ACCEPT} hidden onChange={(e) => { void sendFiles(e.target.files); e.target.value = ""; }} />
           <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} disabled={!chatReady} placeholder={L("Type a message…", "اكتب رسالة…")} />
           <span className="ib send" onClick={send}><span className="material-icons-outlined">send</span></span>
+          {fileErr && <span className="ro-note quote-err">{fileErr}</span>}
         </div>
       )}
 
@@ -532,6 +607,25 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
           onCounter={submitCounter}
           onAccept={doAccept}
         />
+      )}
+
+      {releaseOpen && (
+        <div className="fixed inset-0 z-[70] grid place-items-center p-4" style={{ background: "rgba(16,38,63,.5)" }} onClick={() => !releasing && setReleaseOpen(false)}>
+          <div className="w-full max-w-[420px] rounded-2xl bg-white p-5 text-center" dir={ar ? "rtl" : "ltr"} onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full" style={{ background: "rgba(247,144,10,.12)" }}>
+              <span className="material-icons-outlined" style={{ color: "#f7900a", fontSize: 26 }}>lock_open</span>
+            </div>
+            <h3 className="text-[17px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>{L("Reopen this deal?", "إعادة فتح هذه الصفقة؟")}</h3>
+            <p className="mt-1.5 text-[13px] leading-relaxed" style={{ color: "var(--muted,#6b7280)" }}>
+              {L("This reopens negotiation with the supplier — the accepted deal returns to negotiating and the terms/price can change again. A new quotation is issued once you re-confirm.", "يعيد هذا فتح التفاوض مع المؤجّر — تعود الصفقة المقبولة إلى التفاوض ويمكن تغيير الشروط والسعر. يصدر عرض سعر جديد بعد إعادة التأكيد.")}
+            </p>
+            {releaseErr && <p className="mt-2 text-[12px] font-semibold" style={{ color: "#d9362a" }}>{releaseErr}</p>}
+            <div className="mt-5 flex gap-2.5">
+              <button className="flex-1 rounded-[10px] border px-4 py-2.5 text-[13px] font-bold" style={{ borderColor: "var(--border,#e5e7eb)", color: "var(--navy,#0f1e2e)" }} disabled={releasing} onClick={() => setReleaseOpen(false)}>{L("Cancel", "إلغاء")}</button>
+              <button className="flex-1 rounded-[10px] px-4 py-2.5 text-[13px] font-bold text-white disabled:opacity-60" style={{ background: "#f7900a" }} disabled={releasing} onClick={() => void doRelease()}>{releasing ? L("Reopening…", "جارٍ إعادة الفتح…") : L("Reopen", "إعادة الفتح")}</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showDocs && <DocumentsModal id={id} ar={ar} L={L} supplierName={room.supplier.name} onClose={() => setShowDocs(false)} />}
@@ -683,7 +777,7 @@ function CounterFlow({
   const mob = editable ? num(mobStr) : (room.mobPrice ?? 0);
   const demob = editable ? num(demobStr) : (room.demobPrice ?? 0);
   const rateValid = rate > 0;
-  const subtotal = rate * periods * units + mob + demob;
+  const subtotal = (rate * periods + mob + demob) * units; // mob/demob are per-unit too (app parity)
   const vat = Math.round(subtotal * 0.15);
   const total = subtotal + vat;
   const sar = L("SAR", "ر.س");

@@ -246,6 +246,12 @@ export function acceptDeal(id: string, contractType = "formal", opts?: { termRes
   return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/accept`, body);
 }
 
+/** Reopen an accepted (CLOSED) deal room for re-negotiation (app parity: "release"). Flips CLOSED →
+ *  NEGOTIATING and re-arms the bid so the renter can re-negotiate + re-confirm (re-issues the quotation). */
+export function releaseDeal(id: string, reason?: string): Promise<unknown> {
+  return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/release`, reason ? { reason } : {});
+}
+
 /** Submit all locally-collected term resolutions at once (app parity — batched with the rate counter). */
 export function batchUpdateTerms(id: string, updates: TermUpdate[], note?: string): Promise<unknown> {
   return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/terms/batch`, { updates, note });

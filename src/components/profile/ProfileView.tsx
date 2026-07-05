@@ -88,7 +88,7 @@ export function ProfileView() {
   const rowCls = "flex w-full items-center gap-3 px-4 py-3.5 text-start transition hover:bg-surface2";
 
   return (
-    <div className="mx-auto max-w-xl pb-10" dir={ar ? "rtl" : "ltr"}>
+    <div className="pb-10" dir={ar ? "rtl" : "ltr"}>
       {/* Navy header */}
       <div className="flex items-center gap-4 rounded-[16px] bg-navy p-5 text-white">
         <span className="grid h-16 w-16 flex-none place-items-center rounded-full bg-white/12 text-white">
