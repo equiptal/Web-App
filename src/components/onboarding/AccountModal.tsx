@@ -19,7 +19,7 @@ import { normalizeTier, type RenterUser } from "@/lib/contract/auth";
  * Email is required here (see `requireEmail`). Verification is NOT required — becoming basic is enough
  * to post.
  */
-export function AccountModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
+export function AccountModal({ open, onClose, onCreated, title, subtitle }: { open: boolean; onClose: () => void; onCreated: () => void; title?: string; subtitle?: string }) {
   const { locale } = useLocale();
   if (!open) return null;
   return (
@@ -30,7 +30,7 @@ export function AccountModal({ open, onClose, onCreated }: { open: boolean; onCl
     >
       <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-surface shadow-xl" onClick={(e) => e.stopPropagation()}>
         {/* Fresh mount each open → the flow always starts at the right step for the current session. */}
-        <AccountFlow onCreated={onCreated} />
+        <AccountFlow onCreated={onCreated} title={title} subtitle={subtitle} />
       </div>
     </div>
   );
@@ -39,7 +39,7 @@ export function AccountModal({ open, onClose, onCreated }: { open: boolean; onCl
 type Phase = "phone" | "code" | "profile";
 
 /** The three-step flow. Mounted only while the modal is open, so its phase resets on each open. */
-function AccountFlow({ onCreated }: { onCreated: () => void }) {
+function AccountFlow({ onCreated, title, subtitle }: { onCreated: () => void; title?: string; subtitle?: string }) {
   const t = useT();
   const { status, user, signIn } = useSession();
   // An existing (guest-tier) session with a phone skips OTP and goes straight to the profile step. A
@@ -60,8 +60,8 @@ function AccountFlow({ onCreated }: { onCreated: () => void }) {
     return (
       <div className="p-[22px]">
         <PhoneEntry
-          title={t.guest.gateTitle}
-          subtitle={t.guest.gateSub}
+          title={title ?? t.guest.gateTitle}
+          subtitle={subtitle ?? t.guest.gateSub}
           onCodeSent={(p, ch) => {
             setPhone(p);
             setChannel(ch);

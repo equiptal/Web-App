@@ -1,14 +1,15 @@
 "use client";
 
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
+import { useAuthGate } from "@/components/auth/AuthGate";
 
 /**
  * Empty state for signed-out visitors on account-bound surfaces (public-web-auth-gate). Shown instead
  * of an error/redirect when the session is anon — a clear nudge rather than a broken-looking page.
- * Defaults to a "Sign in" CTA (→ `/login?next=<here>`), but callers can override the copy, icon, and
- * CTA (e.g. the Requests tab nudges "Create request" → /create).
+ * The default "Sign in" CTA opens the in-app auth modal (there is no /login page); callers can override
+ * the copy, icon, and give a `ctaHref` to navigate instead (e.g. Requests nudges "Create request" → /create).
  */
 export function SignInPrompt({
   title,
@@ -22,13 +23,15 @@ export function SignInPrompt({
   icon?: string;
   /** Override the button label (defaults to "Sign in"). */
   ctaLabel?: string;
-  /** Override the button target (defaults to `/login?next=<current path>`). */
+  /** Navigate to this target instead of opening the auth modal (e.g. "/create"). */
   ctaHref?: string;
 }) {
   const t = useT();
   const router = useRouter();
-  const pathname = usePathname();
-  const go = () => router.push(ctaHref ?? `/login?next=${encodeURIComponent(pathname)}`);
+  const { openAuth } = useAuthGate();
+  // A custom target navigates (e.g. "Create request" → /create); the default sign-in CTA opens the
+  // auth modal in place (no /login page).
+  const go = () => (ctaHref ? router.push(ctaHref) : openAuth());
   return (
     <div className="rounded-[12px] border border-border bg-surface p-8 text-center">
       <span className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-brand-soft text-brand">
