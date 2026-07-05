@@ -10,10 +10,10 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 /**
  * Phone-entry screen (AC-01/02/15/24), matching the prototype's login `form-inner`. `+966` preset.
- * The renter picks the OTP delivery channel — Text (SMS, default) or Email; the phone is ALWAYS the
- * account identity, and choosing Email reveals a destination-email field (T5, delivery-only). On submit
- * it requests a code over the chosen channel and advances to the code screen (carrying the channel so
- * Resend uses it too).
+ * The renter picks the OTP channel — Text (SMS, default) or Email. Phase B: the chosen channel IS the
+ * login identity — SMS keys the account by phone; Email reveals an email field and keys it by that
+ * email. On submit it requests a code over the chosen channel and advances to the code screen, carrying
+ * the channel so BOTH resend AND verify use it.
  */
 export function PhoneEntry({
   onCodeSent,

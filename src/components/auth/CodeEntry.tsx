@@ -22,12 +22,13 @@ export function CodeEntry({
   phone: string;
   onVerified: (user: RenterUser) => void;
   onEditNumber: () => void;
-  /** The delivery channel the code was sent on (T5) — drives the "sent to" line + Resend. */
+  /** The channel the code was sent on — the login identity (Phase B). Drives the "sent to" line and is
+   *  forwarded to BOTH resend AND verify (the OTP is keyed by phone for SMS, by email for EMAIL). */
   channel?: OtpChannel;
 }) {
   const t = useT();
   const a = t.auth;
-  // Where the code went: the email for EMAIL delivery, else the phone (delivery-only — verify is by phone).
+  // Where the code went = the login identity for this channel (Phase B): the email for EMAIL, else the phone.
   const dest = channel?.method === "EMAIL" && channel.email ? channel.email : phone;
   const inputs = useRef<Array<HTMLInputElement | null>>([]);
   const [boxes, setBoxes] = useState(["", "", "", ""]);
@@ -70,7 +71,8 @@ export function CodeEntry({
     setErr(null);
     setResent(false);
     setBusy(true);
-    const r = await postAuth("/api/auth/verify", { phone, code });
+    // Verify on the SAME channel the code was requested on (Phase B — the OTP is keyed by that identity).
+    const r = await postAuth("/api/auth/verify", { phone, code, otpMethod: channel?.method ?? "SMS", otpEmail: channel?.email });
     setBusy(false);
     if (r.ok) {
       onVerified(r.data.user as RenterUser);

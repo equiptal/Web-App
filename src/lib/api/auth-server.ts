@@ -82,6 +82,7 @@ const KIND_STATUS: Record<AuthErrorKind, number> = {
   expired: 410,
   locked: 423,
   send_failed: 502,
+  phone_exists: 409,
   offline: 503,
   not_configured: 500,
   unknown: 502,

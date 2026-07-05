@@ -14,6 +14,7 @@ export type AuthErrorKind =
   | "expired" // E6001 — OTP older than 5 min (AC-11)
   | "locked" // E6002 — 5-attempt lockout (AC-10)
   | "send_failed" // E6003 — SMS could not be sent (AC-15)
+  | "phone_exists" // PHONE_ALREADY_EXISTS (409) — EMAIL login but the phone is on another account
   | "offline" // fetch rejected — no connectivity (AC-24)
   | "not_configured" // APP_API_URL missing
   | "unknown";
@@ -30,6 +31,8 @@ const CODE_TO_KIND: Record<string, AuthErrorKind> = {
   E6001: "expired",
   E6002: "locked",
   E6003: "send_failed",
+  // Phase B: an EMAIL login whose phone already belongs to another account (backend won't hijack it).
+  PHONE_ALREADY_EXISTS: "phone_exists",
 };
 
 /** Carries the mapped kind plus the backend status/code/message so handlers can surface detail. */

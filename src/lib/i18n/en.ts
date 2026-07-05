@@ -504,6 +504,7 @@ export const en = {
       expired: "That code has expired. Request a new one.", // AC-11
       locked: "Too many attempts. Request a new code.", // AC-10
       send_failed: "We couldn't send the code. Please try again.", // AC-15
+      phone_exists: "This phone is already registered. Sign in with Text (SMS) instead.", // Phase B email-login collision
       offline: "You appear to be offline. Check your connection and try again.", // AC-24
       unknown: "Something went wrong. Please try again.",
     },
