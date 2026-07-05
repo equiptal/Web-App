@@ -41,6 +41,14 @@ export interface NormalizedBid {
   valid_until: string | null;
   source_file: string | null;
   notes: string | null;
+  /** Distance from the supplier to the project site, in km (the value the app shows as "Distance to
+   *  site"). The agent ranks proximity + applies `max_distance_km` from this — null when not shared
+   *  (e.g. off-platform link bids). Optional: parsed off-platform quotes don't carry it. */
+  distance_km?: number | null;
+  /** Extra ranking signals the web already has (the agent consumes what's present, ignores the rest). */
+  supplier_verified?: boolean | null;
+  supplier_rating?: number | null;
+  units_offered?: number | null;
 }
 
 /** A bid AFTER the web computed the deterministic layer — what /bids/recommend consumes. */
@@ -203,6 +211,12 @@ export function bidColumnToComputed(col: BidColumn): ComputedBid {
     valid_until: b.validUntil,
     source_file: null,
     notes: b.note,
+    // Proximity + trust signals the app already displays → pass them so the agent can rank "closest"
+    // and apply the max_distance_km hard filter (previously starved → "distance not shared").
+    distance_km: b.distanceKm ?? null,
+    supplier_verified: b.verified ?? null,
+    supplier_rating: b.rating ?? null,
+    units_offered: b.unitsOffered ?? null,
     all_in_total: col.allIn.stated ? col.allIn.value : null,
     qualified: col.conflicts === 0,
     requirement_conflicts: conflictLabels(col),
@@ -225,7 +239,7 @@ export function normalizedBidToBidCard(nb: NormalizedBid, ctx: { duration: numbe
     supplierName: nb.supplier_name ?? "Uploaded quote",
     verified: false,
     rating: null,
-    distanceKm: null,
+    distanceKm: nb.distance_km ?? null,
     submittedAt: null,
     validUntil: nb.valid_until,
     price: nb.price_amount,
