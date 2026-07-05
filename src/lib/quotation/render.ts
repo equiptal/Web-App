@@ -116,7 +116,8 @@ export const QUOTATION_STYLE = `
   .pid-row{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;padding:3px 0;}
   .pid-row span{color:#6b8fa8;font-weight:600;}
   .pid-row b{font-weight:800;font-family:'IBM Plex Sans',monospace;}
-  .pill-ver{color:#1daf58;font-weight:800;}
+  .pill-ver{display:inline-flex;align-items:center;gap:5px;color:#1daf58;background:#e7f7ee;border-radius:100px;padding:2px 9px;font-weight:800;font-size:10.5px;}
+  .pv-seal{display:inline-grid;place-items:center;width:13px;height:13px;border-radius:50%;background:#1daf58;color:#fff;font-size:8.5px;line-height:1;}
   .pchips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
   .pchip{font-size:10px;font-weight:800;color:#1daf58;background:#e7f7ee;border-radius:100px;padding:2px 8px;}
   .metastrip span{display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b8fa8;}
@@ -132,6 +133,13 @@ export const QUOTATION_STYLE = `
   .ptable th.num,.ptable td.num{text-align:end;font-family:'IBM Plex Sans',monospace;}
   .ptable td{padding:11px 10px;border-bottom:1px solid #e4edf5;font-size:13px;vertical-align:top;}
   .ptable td .sm{font-size:11px;color:#6b8fa8;font-weight:600;margin-top:2px;}
+  /* Per-item grouping: each numbered rental row starts a group (thicker top rule); its delivery/return
+     sub-rows are tinted + indented with a ↳ so it's clear which item they belong to. */
+  .ptable tr.grp td{border-top:2px solid #d4e0ec;}
+  .ptable tbody tr.grp:first-child td{border-top:0;}
+  .ptable tr.sub td{background:#f7fafd;}
+  .ptable tr.sub td.item{padding-inline-start:26px;position:relative;}
+  .ptable tr.sub td.item::before{content:"↳";position:absolute;inset-inline-start:10px;color:#9bb3c8;font-weight:800;}
   .totals{margin:6px 0 18px;}
   .trow{display:flex;justify-content:space-between;padding:7px 10px;font-size:13.5px;}
   .trow span{color:#2a4f72;font-weight:600;}
@@ -205,7 +213,7 @@ export function numWordsAr(num: number): string {
 
 function idRowHtml(row: QuotationIdRow, L: (en: string, ar: string) => string): string {
   if (row.value) return `<div class="pid-row"><span>${esc(row.label)}</span><b>${esc(row.value)}</b></div>`;
-  if (row.verified) return `<div class="pid-row"><span>${esc(row.label)}</span><span class="pill-ver">✓ ${esc(L("Verified", "موثَّق"))}</span></div>`;
+  if (row.verified) return `<div class="pid-row"><span>${esc(row.label)}</span><span class="pill-ver"><span class="pv-seal">✓</span> ${esc(L("Verified", "موثَّق"))}</span></div>`;
   return "";
 }
 
@@ -238,7 +246,11 @@ export function renderQuotationSection(doc: QuotationDoc): string {
           // the legacy concatenated line.
           if (l.chips?.length) {
             const chips = l.chips.filter((c) => c.value).map((c) => `<span class="lchip"><i>${esc(c.label)}</i>${esc(c.value)}</span>`).join("");
-            return `<div class="lv">${esc(l.label)}${ver}${certs}</div><div class="lchips">${chips}</div>`;
+            const extras = [
+              l.verified ? `<span class="ver-ok">✔ ${esc(L("verified", "موثّقة"))}</span>` : "",
+              ...(l.certs ?? []).map((c) => `<span class="doc-ok">✓ ${esc(c)}</span>`),
+            ].filter(Boolean).join(" ");
+            return `<div class="lchips">${chips}</div>${extras ? `<div class="lv" style="margin-top:8px">${extras}</div>` : ""}`;
           }
           return `<div class="lv">${esc(l.label)} &nbsp;·&nbsp; ${esc(l.detail)} &nbsp;·&nbsp; ${l.units} ${esc(l.units > 1 ? L("units", "وحدات") : L("unit", "وحدة"))}${ver}${certs}</div>`;
         })
@@ -247,7 +259,7 @@ export function renderQuotationSection(doc: QuotationDoc): string {
   const rows = doc.lineItems
     .map(
       (it) =>
-        `<tr><td class="num">${it.num ?? ""}</td><td><b>${esc(it.label)}</b>${it.detail ? `<div class="sm">${esc(it.detail)}</div>` : ""}</td><td>${esc(it.unit)}</td><td class="num">${esc(it.qty)}</td><td class="num">${esc(it.price)}</td><td class="num">${it.totalNote ? `<div class="sm">${esc(it.totalNote)}</div>` : ""}${esc(it.total)}</td></tr>`,
+        `<tr class="${it.num != null ? "grp" : "sub"}"><td class="num">${it.num ?? ""}</td><td class="item"><b>${esc(it.label)}</b>${it.detail ? `<div class="sm">${esc(it.detail)}</div>` : ""}</td><td>${esc(it.unit)}</td><td class="num">${esc(it.qty)}</td><td class="num">${esc(it.price)}</td><td class="num">${it.totalNote ? `<div class="sm">${esc(it.totalNote)}</div>` : ""}${esc(it.total)}</td></tr>`,
     )
     .join("");
   // Amount in words with halalas (app parity), + an optional suffix ("Estimate for one day · …").

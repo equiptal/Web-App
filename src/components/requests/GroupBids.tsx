@@ -366,7 +366,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         const mobTotal = (b.mobPrice ?? 0) * units;
         const demobTotal = (b.demobPrice ?? 0) * units;
         sub += lineSub + mobTotal + demobTotal;
-        lineItems.push({ num: rowNum, label: `${L("Rental", "الإيجار")} — ${labelOf(b)}`, detail: eqLine(b), unit: plabel, qty: qtyCell, price: priceCell, total: totalCell, totalNote });
+        lineItems.push({ num: rowNum, label: `${L("Rental", "الإيجار")} — ${labelOf(b)}`, detail: eqLine(b) === "—" ? null : eqLine(b), unit: plabel, qty: qtyCell, price: priceCell, total: totalCell, totalNote });
         if (b.mobPrice) lineItems.push({ num: null, label: L("Delivery to site", "النقل إلى الموقع"), detail: labelOf(b), unit: L("Trip", "رحلة"), qty: String(units), price: m2(b.mobPrice), total: m2(mobTotal) });
         if (b.demobPrice) lineItems.push({ num: null, label: L("Return from site", "الإرجاع من الموقع"), detail: labelOf(b), unit: L("Trip", "رحلة"), qty: String(units), price: m2(b.demobPrice), total: m2(demobTotal) });
       }
@@ -390,11 +390,18 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         const cs = (b.heldCertCodes?.length ? b.heldCertCodes : b.equipmentCertCodes) ?? [];
         return cs.length ? cs.map((c) => (isAr ? CERT_LABEL[c]?.ar : CERT_LABEL[c]?.en)).filter(Boolean).join(" · ") : null;
       };
-      // Listed equipment as an app-parity chip card (Brand/Model/Year/Fuel/Units) under the type·size name.
+      // Listed equipment as an app-parity chip card (app's live_quotation_document _buildEquipmentIdentity
+      // order): Type · Size · Brand · Model · Year · Fuel · Units. Type/Size are split out of the item
+      // label; Brand/Model/Year from the offered equipment. (Category name isn't in the web bid payload —
+      // only the id — so that one chip is omitted.)
       const listed = supBids.map((b) => {
         const eq = b.equipment;
+        const segs = labelOf(b).split(" · ").map((x) => x.trim()).filter(Boolean);
+        const size = segs.length > 1 ? segs.slice(1).join(" · ") : null;
         const fuel = tfmt.fuel(b.requestTerms.fuelType);
         const chips: { label: string; value: string }[] = [];
+        chips.push({ label: L("Type", "النوع"), value: segs[0] ?? labelOf(b) });
+        if (size) chips.push({ label: L("Size", "المقاس"), value: size });
         if (eq?.make) chips.push({ label: L("Brand", "العلامة"), value: eq.make });
         if (eq?.model) chips.push({ label: L("Model", "الطراز"), value: eq.model });
         if (eq?.year) chips.push({ label: L("Year", "السنة"), value: String(eq.year) });
