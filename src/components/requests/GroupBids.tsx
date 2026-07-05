@@ -375,20 +375,13 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       const allOpenEnded = !anyCommitted && openRate != null;
 
       const offeredUnits = (b: GroupBid) => b.unitsOffered || b.numberOfUnits || 1;
-      const listed = supBids.map((b) => ({
-        label: labelOf(b),
-        detail: eqLine(b),
-        units: offeredUnits(b),
-        verified: b.eqVerified,
-        certs: b.heldCertCodes.map((c) => (isAr ? CERT_LABEL[c].ar : CERT_LABEL[c].en)),
-      }));
 
       // ---- Equipment-terms + Contract-terms cards (the renter's RFQ terms, formatted bilingually) ----
       const tfmt = {
         sla: (v: string | null) => { if (!v) return null; const m: Record<string, [string, string]> = { FOUR_HR: ["4 hours", "٤ ساعات"], EIGHT_HR: ["8 hours", "٨ ساعات"], TWENTY_FOUR_HR: ["24 hours", "٢٤ ساعة"], FORTY_EIGHT_HR: ["48 hours", "٤٨ ساعة"], SEVENTY_TWO_HR: ["72 hours", "٧٢ ساعة"] }; const x = m[v.toUpperCase()]; return x ? L(x[0], x[1]) : v; },
         overtime: (v: string | null) => { if (v == null) return null; const u = v.toUpperCase(); if (u === "0" || u === "WITHOUT") return L("None", "بدون"); if (u === "1.5X") return "1.5×"; if (u === "2X") return "2×"; return v; },
         maint: (v: string | null) => { if (!v) return null; const u = v.toLowerCase(); if (u === "supplier") return L("Supplier", "المؤجّر"); if (u === "renter" || u === "rentee") return L("Renter", "المستأجر"); return v; },
-        payTerms: (v: string | null) => { if (!v) return null; const m: Record<string, [string, string]> = { upfront: ["Upfront", "مقدمًا"], daily: ["Daily", "يومي"], "net-30": ["Net 30 days", "صافي ٣٠ يومًا"], "net-60": ["Net 60 days", "صافي ٦٠ يومًا"], "end-of-job": ["End of job", "نهاية المهمة"] }; const x = m[v.toLowerCase()]; return x ? L(x[0], x[1]) : v; },
+        payTerms: (v: string | null) => { if (!v) return null; const k = v.toLowerCase().replace(/[_-]/g, ""); const m: Record<string, [string, string]> = { upfront: ["Upfront", "مقدمًا"], daily: ["Daily", "يومي"], net0: ["Net 0", "فوري"], net30: ["Net 30 days", "صافي ٣٠ يومًا"], net60: ["Net 60 days", "صافي ٦٠ يومًا"], net90: ["Net 90 days", "صافي ٩٠ يومًا"], endofjob: ["End of job", "نهاية المهمة"] }; const x = m[k]; return x ? L(x[0], x[1]) : v; },
         fuel: (v: string | null) => { if (!v) return null; const m: Record<string, [string, string]> = { DIESEL: ["Diesel", "ديزل"], PETROL: ["Petrol", "بنزين"], ELECTRIC: ["Electric", "كهربائي"] }; const x = m[v.toUpperCase()]; return x ? L(x[0], x[1]) : v; },
         operator: (inc: string | null, nat: string | null) => { if (inc == null) return null; if (inc.toUpperCase() !== "YES") return L("No operator", "بدون مشغّل"); return L("Includes operator", "يشمل مشغّلاً") + (nat ? ` · ${L("Nationality", "الجنسية")}: ${nat}` : ""); },
       };
@@ -397,6 +390,26 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         const cs = (b.heldCertCodes?.length ? b.heldCertCodes : b.equipmentCertCodes) ?? [];
         return cs.length ? cs.map((c) => (isAr ? CERT_LABEL[c]?.ar : CERT_LABEL[c]?.en)).filter(Boolean).join(" · ") : null;
       };
+      // Listed equipment as an app-parity chip card (Brand/Model/Year/Fuel/Units) under the type·size name.
+      const listed = supBids.map((b) => {
+        const eq = b.equipment;
+        const fuel = tfmt.fuel(b.requestTerms.fuelType);
+        const chips: { label: string; value: string }[] = [];
+        if (eq?.make) chips.push({ label: L("Brand", "العلامة"), value: eq.make });
+        if (eq?.model) chips.push({ label: L("Model", "الطراز"), value: eq.model });
+        if (eq?.year) chips.push({ label: L("Year", "السنة"), value: String(eq.year) });
+        if (fuel) chips.push({ label: L("Fuel", "الوقود"), value: fuel });
+        chips.push({ label: L("Units offered", "الوحدات المعروضة"), value: String(offeredUnits(b)) });
+        return {
+          label: labelOf(b),
+          detail: eqLine(b),
+          units: offeredUnits(b),
+          verified: b.eqVerified,
+          certs: b.heldCertCodes.map((c) => (isAr ? CERT_LABEL[c].ar : CERT_LABEL[c].en)),
+          chips,
+        };
+      });
+
       const cards: QuotationCard[] = [];
       const projectRows = supBids.map((b) => ({
         label: itemMap.get(b.requestId)?.displayId ?? b.requestId,
@@ -407,29 +420,38 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       projectRows.push({ label: L("Total units", "إجمالي الوحدات"), value: String(supBids.reduce((s2, b) => s2 + offeredUnits(b), 0)) });
       cards.push({ title: L("Project terms", "شروط المشروع"), rows: projectRows });
 
+      // App parity: the quotation shows the SUPPLIER's declared terms (not the renter's often-blank
+      // request), with a "· Agreed" tag when the term was locked in the deal room. normKey form:
+      // payment_terms→paymentterms, breakdown_response_sla→breakdownresponsesla, etc.
+      const agBadge = (b: GroupBid, nk: string) => ((b.agreedTermKeys ?? []).includes(nk) ? ` · ${L("Agreed", "متفق عليه")}` : "");
+      const declaredNat = (b: GroupBid) => b.declaredTerms?.operatorNationality ?? b.requestTerms.operatorNationality;
+      const eqCert = (b: GroupBid) => { const t = eqCertsText(b); return t ? t + agBadge(b, "safetycertifications") : null; };
+
       const eqRows: { label: string; value: string }[] = [];
       const addEq = (label: string, val: string | null) => { if (val) eqRows.push({ label, value: val }); };
       if (supBids.length === 1) {
-        const et = sup.requestTerms;
-        addEq(L("Operator", "المشغّل"), tfmt.operator(et.operatorIncluded, et.operatorNationality));
-        addEq(L("Equipment safety certifications", "شهادات سلامة المعدة"), eqCertsText(sup));
-        addEq(L("Fuel type", "نوع الوقود"), tfmt.fuel(et.fuelType));
+        addEq(L("Operator", "المشغّل"), tfmt.operator(sup.requestTerms.operatorIncluded, declaredNat(sup)));
+        addEq(L("Equipment safety certifications", "شهادات سلامة المعدة"), eqCert(sup));
+        addEq(L("Fuel type", "نوع الوقود"), tfmt.fuel(sup.requestTerms.fuelType));
       } else {
         for (const b of supBids) {
-          const et = b.requestTerms;
-          const parts = [tfmt.operator(et.operatorIncluded, et.operatorNationality), eqCertsText(b), tfmt.fuel(et.fuelType)].filter(Boolean).join(" · ");
+          const parts = [tfmt.operator(b.requestTerms.operatorIncluded, declaredNat(b)), eqCert(b), tfmt.fuel(b.requestTerms.fuelType)].filter(Boolean).join(" · ");
           if (parts) eqRows.push({ label: labelOf(b), value: parts });
         }
       }
       if (eqRows.length) cards.push({ title: L("Equipment terms", "شروط المعدة"), rows: eqRows });
 
-      const ct = sup.requestTerms;
+      const dt = sup.declaredTerms;
+      const rt = sup.requestTerms;
       const ctRows: { label: string; value: string }[] = [];
       const addCt = (label: string, val: string | null) => { if (val) ctRows.push({ label, value: val }); };
-      addCt(L("Payment terms", "شروط الدفع"), tfmt.payTerms(ct.paymentTerms));
-      addCt(L("Breakdown response", "زمن الاستجابة للأعطال"), tfmt.sla(ct.breakdownResponseSla));
-      addCt(L("Overtime", "العمل الإضافي"), tfmt.overtime(ct.overtimeRate));
-      addCt(L("Maintenance", "الصيانة"), tfmt.maint(ct.maintenanceResponsibility));
+      const pay = tfmt.payTerms(dt?.paymentTerms ?? rt.paymentTerms);
+      addCt(L("Payment type", "نوع الدفع"), pay ? pay + agBadge(sup, "paymentterms") : null);
+      const sla = tfmt.sla(dt?.breakdownResponseSla ?? rt.breakdownResponseSla);
+      addCt(L("Breakdown response", "زمن الاستجابة للأعطال"), sla ? sla + agBadge(sup, "breakdownresponsesla") : null);
+      const ot = tfmt.overtime(dt?.overtimeRate ?? rt.overtimeRate);
+      addCt(L("Overtime", "العمل الإضافي"), ot ? ot + agBadge(sup, "overtimerate") : null);
+      addCt(L("Maintenance", "الصيانة"), tfmt.maint(rt.maintenanceResponsibility));
       if (ctRows.length) cards.push({ title: L("Contract terms", "شروط العقد"), rows: ctRows });
 
       const doc: QuotationDoc = {

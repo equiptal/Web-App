@@ -40,6 +40,9 @@ export interface QuotationListedLine {
   verified?: boolean;
   /** Already-localized cert labels (e.g. "TÜV", "SPSP"). */
   certs?: string[];
+  /** Labeled spec chips (app parity: Type/Size/Brand/Model/Year/Fuel/Units). When present, rendered as
+   *  chips under the equipment name instead of the concatenated detail line. */
+  chips?: { label: string; value: string }[];
 }
 
 /** One invoice row. `num` numbers the primary (rental) rows; sub-rows (delivery/return) pass null. */
@@ -121,6 +124,9 @@ export const QUOTATION_STYLE = `
   .listed{background:#f7fafd;border:1px solid #e4edf5;border-radius:10px;padding:13px 15px;margin-bottom:18px;}
   .listed .ll{font-size:10.5px;font-weight:700;text-transform:uppercase;color:#6b8fa8;}
   .listed .lv{font-size:13.5px;font-weight:700;color:#2a4f72;margin-top:5px;}
+  .lchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .lchip{font-size:11px;font-weight:700;color:#2a4f72;background:#fff;border:1px solid #dbe6f0;border-radius:8px;padding:3px 9px;}
+  .lchip i{color:#6b8fa8;font-style:normal;font-weight:800;margin-inline-end:5px;text-transform:uppercase;font-size:9.5px;letter-spacing:.03em;}
   .ptable{width:100%;border-collapse:collapse;margin-bottom:8px;}
   .ptable th{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#6b8fa8;text-align:start;padding:8px 10px;background:#eff4f9;}
   .ptable th.num,.ptable td.num{text-align:end;font-family:'IBM Plex Sans',monospace;}
@@ -228,6 +234,12 @@ export function renderQuotationSection(doc: QuotationDoc): string {
         .map((l) => {
           const ver = l.verified ? ` &nbsp;·&nbsp; <span class="ver-ok">✔ ${esc(L("verified", "موثّقة"))}</span>` : "";
           const certs = l.certs?.length ? ` &nbsp;·&nbsp; ${l.certs.map((c) => `<span class="doc-ok">✓ ${esc(c)}</span>`).join(" ")}` : "";
+          // App parity: labeled spec chips (Type/Size/Brand/Model/Year/Fuel/Units) when provided, else
+          // the legacy concatenated line.
+          if (l.chips?.length) {
+            const chips = l.chips.filter((c) => c.value).map((c) => `<span class="lchip"><i>${esc(c.label)}</i>${esc(c.value)}</span>`).join("");
+            return `<div class="lv">${esc(l.label)}${ver}${certs}</div><div class="lchips">${chips}</div>`;
+          }
           return `<div class="lv">${esc(l.label)} &nbsp;·&nbsp; ${esc(l.detail)} &nbsp;·&nbsp; ${l.units} ${esc(l.units > 1 ? L("units", "وحدات") : L("unit", "وحدة"))}${ver}${certs}</div>`;
         })
         .join("")}</div>`

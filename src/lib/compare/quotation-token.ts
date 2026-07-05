@@ -67,6 +67,16 @@ export function groupIdFromFileName(fileName: string): string | null {
   return null;
 }
 
+/** The human short code a NEW quotation filename leads with — the group code `RFQ-NNNNN` (preferred),
+ *  else the single request id `REQ-NNNNN`. Tolerates browser " (1)" suffixes + the __items__ tail. */
+export function primaryCodeFromFileName(fileName: string): string | null {
+  const base = fileName.replace(/\.pdf$/i, "");
+  const rfq = base.match(/RFQ-\d+/i);
+  if (rfq) return rfq[0].toUpperCase();
+  const req = base.match(/REQ-\d+/i);
+  return req ? req[0].toUpperCase() : null;
+}
+
 /** Validate/normalise a manually pasted comparison code. */
 export function normalizeComparisonCode(input: string): string | null {
   const v = input.trim();

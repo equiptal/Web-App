@@ -163,6 +163,18 @@ export interface BidCard {
     overtimeRate: string | null;
     maintenanceResponsibility: string | null;
   };
+  /** The SUPPLIER's DECLARED (T3) term values — the app's quotation shows these, not the renter's
+   *  (often-blank) request terms. Null when the supplier didn't declare that term. Absent on
+   *  off-platform (shared-link) bids, which carry no T3 declarations. */
+  declaredTerms?: {
+    paymentTerms: string | null;
+    breakdownResponseSla: string | null;
+    overtimeRate: string | null;
+    operatorNationality: string | null;
+    fuelResponsibility: string | null;
+  };
+  /** Normalized keys of terms AGREED/locked in the deal room — drives the quotation's "Agreed" badge. */
+  agreedTermKeys?: string[];
   /** 014 lifecycle, server-enriched in getBidList (same source the mobile bid card reads). Drives the
    *  live deal-terms strip + overlays locked terms onto the Terms modal / quotation. */
   lockedTerms: { key: string; value: unknown }[]; // agreed terms + their negotiated value
@@ -609,6 +621,14 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
       overtimeRate: lockedVal((k) => k.includes("overtime")) ?? s(rq.overtimeRate),
       maintenanceResponsibility: lockedVal((k) => k.includes("maintenance")) ?? s(rq.maintenanceResponsibility),
     },
+    declaredTerms: {
+      paymentTerms: s(t3decl.payment_terms),
+      breakdownResponseSla: s(t3decl.breakdown_response_sla),
+      overtimeRate: s(t3decl.overtime_rate),
+      operatorNationality: s(t3decl.operator_nationality) ?? s(t3decl.operatorNationality),
+      fuelResponsibility: s(t3decl.fuel_responsibility),
+    },
+    agreedTermKeys: lockedTerms.map((t) => normKey(t.key)),
     lockedTerms,
     unreadTerms,
     progress,
