@@ -38,7 +38,7 @@ export function ProfileView() {
   const [showDelete, setShowDelete] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
   const [langBusy, setLangBusy] = useState(false);
-  const [company, setCompany] = useState<{ logoUrl: string | null; legalName: string | null } | null>(null);
+  const [company, setCompany] = useState<CompanyInfo | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -51,11 +51,34 @@ export function ProfileView() {
       })
       .catch(() => active && setLoadError(true))
       .finally(() => active && setLoading(false));
-    // Company logo + legal name for the company card view (the /me payload lacks the presigned logo URL).
+    // Company details for the company card (fields are under `submission`; the /me payload lacks the
+    // presigned logo URL). Merge with the doc-URLs fetch below.
     fetch("/api/verification", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((s: { companyLogoUrl?: string | null; companyLegalName?: string | null; companyName?: string | null } | null) => {
-        if (active && s) setCompany({ logoUrl: s.companyLogoUrl ?? null, legalName: s.companyLegalName ?? s.companyName ?? null });
+      .then((d: { submission?: { companyLogoUrl?: string | null; companyName?: string | null; authorityRole?: string | null; nationalId?: string | null; companyCity?: string | null; companyAddress?: string | null } } | null) => {
+        if (!active || !d?.submission) return;
+        const s = d.submission;
+        setCompany((c) => ({
+          logoUrl: s.companyLogoUrl ?? null,
+          legalName: s.companyName ?? null,
+          authorityRole: s.authorityRole ?? null,
+          nationalId: s.nationalId ?? null,
+          companyCity: s.companyCity ?? null,
+          companyAddress: s.companyAddress ?? null,
+          docs: c?.docs ?? null,
+        }));
+      })
+      .catch(() => {});
+    // Presigned document URLs (verified-only; a non-verified caller 403s → we just skip the View links).
+    fetch("/api/verification/docs", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { crDocUrl?: string | null; vatDocUrl?: string | null; nationalAddressDocUrl?: string | null } | null) => {
+        if (!active || !d) return;
+        setCompany((c) => ({
+          logoUrl: c?.logoUrl ?? null, legalName: c?.legalName ?? null, authorityRole: c?.authorityRole ?? null,
+          nationalId: c?.nationalId ?? null, companyCity: c?.companyCity ?? null, companyAddress: c?.companyAddress ?? null,
+          docs: { crDocUrl: d.crDocUrl ?? null, vatDocUrl: d.vatDocUrl ?? null, nationalAddressDocUrl: d.nationalAddressDocUrl ?? null },
+        }));
       })
       .catch(() => {});
     return () => {
@@ -286,7 +309,17 @@ function LinkRow({ icon, label, href }: { icon: string; label: string; href: str
   );
 }
 
-function CompanyCard({ status, profile, company, onGo }: { status: VerificationStatus; profile: RenterProfile; company: { logoUrl: string | null; legalName: string | null } | null; onGo: () => void }) {
+type CompanyInfo = {
+  logoUrl: string | null;
+  legalName: string | null;
+  authorityRole: string | null;
+  nationalId: string | null;
+  companyCity: string | null;
+  companyAddress: string | null;
+  docs: { crDocUrl: string | null; vatDocUrl: string | null; nationalAddressDocUrl: string | null } | null;
+};
+
+function CompanyCard({ status, profile, company, onGo }: { status: VerificationStatus; profile: RenterProfile; company: CompanyInfo | null; onGo: () => void }) {
   const t = useT();
   const { locale } = useLocale();
   const ar = locale === "ar";
@@ -296,13 +329,23 @@ function CompanyCard({ status, profile, company, onGo }: { status: VerificationS
 
   if (status === "verified") {
     const name = company?.legalName || profile.companyName || L("Your company", "شركتك");
-    // CR / VAT numbers may not be returned once verified (only the docs are on file) → show the value
-    // when present, else the green "Verified" pill (app parity, same as the quotation identity rows).
-    const rows: { label: string; value: string | null }[] = [
-      { label: L("CR #", "السجل التجاري"), value: profile.crNumber ?? null },
-      { label: L("VAT #", "الرقم الضريبي"), value: profile.vatNumber ?? null },
-      { label: L("National Address", "العنوان الوطني"), value: profile.nationalAddress ?? null },
+    const roleLabel = (r: string | null | undefined) => { const u = (r ?? "").toLowerCase(); return u === "owner" ? L("Owner", "المالك") : u === "manager" ? L("Manager", "مدير") : u === "employee" ? L("Employee", "موظف") : (r || null); };
+    const docs = company?.docs;
+    // Real text values (app parity: authority role, national ID, city, full national address).
+    const valRows: { label: string; value: string | null }[] = [
+      { label: L("Authority role", "الصفة"), value: roleLabel(company?.authorityRole) },
+      { label: L("National ID", "رقم الهوية"), value: company?.nationalId ?? null },
+      { label: L("City", "المدينة"), value: company?.companyCity ?? null },
+      { label: L("National Address", "العنوان الوطني"), value: company?.companyAddress ?? profile.nationalAddress ?? null },
     ];
+    // CR / VAT / National-Address are DOCUMENTS (no number) — show a "View" link to the presigned file
+    // (app's doc-preview tiles); fall back to the green "Verified" pill when the URL isn't available.
+    const docRows: { label: string; url: string | null }[] = [
+      { label: L("CR document", "وثيقة السجل التجاري"), url: docs?.crDocUrl ?? null },
+      { label: L("VAT document", "وثيقة الرقم الضريبي"), url: docs?.vatDocUrl ?? null },
+      { label: L("National Address certificate", "شهادة العنوان الوطني"), url: docs?.nationalAddressDocUrl ?? null },
+    ];
+    const verifiedPill = <span className="inline-flex items-center gap-1 text-ok"><Icon name="verified" size={13} />{L("Verified", "موثَّق")}</span>;
     return (
       <div className={`${base} border-ok/30 bg-ok-soft`}>
         <div className="flex items-center gap-3">
@@ -317,12 +360,18 @@ function CompanyCard({ status, profile, company, onGo }: { status: VerificationS
             <p className="mt-0.5 inline-flex items-center gap-1 text-[12px] font-bold text-ok"><Icon name="verified" size={14} />{p.companyVerifiedTitle}</p>
           </div>
         </div>
-        <dl className="mt-3 grid grid-cols-1 gap-y-2.5 border-t border-ok/20 pt-3 sm:grid-cols-3 sm:gap-x-4">
-          {rows.map((r) => (
+        <dl className="mt-3 grid grid-cols-1 gap-y-2.5 border-t border-ok/20 pt-3 sm:grid-cols-2 sm:gap-x-5">
+          {valRows.filter((r) => r.value).map((r) => (
             <div key={r.label} className="min-w-0">
               <dt className="text-[11px] font-bold uppercase tracking-wide text-muted">{r.label}</dt>
-              <dd className="mt-0.5 truncate text-[13px] font-semibold text-navy">
-                {r.value || <span className="inline-flex items-center gap-1 text-ok"><Icon name="verified" size={13} />{L("Verified", "موثَّق")}</span>}
+              <dd className="mt-0.5 text-[13px] font-semibold text-navy">{r.value}</dd>
+            </div>
+          ))}
+          {docRows.map((r) => (
+            <div key={r.label} className="min-w-0">
+              <dt className="text-[11px] font-bold uppercase tracking-wide text-muted">{r.label}</dt>
+              <dd className="mt-0.5 text-[13px] font-semibold text-navy">
+                {r.url ? <a href={r.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-brand hover:underline"><Icon name="visibility" size={14} />{L("View", "عرض")}</a> : verifiedPill}
               </dd>
             </div>
           ))}
