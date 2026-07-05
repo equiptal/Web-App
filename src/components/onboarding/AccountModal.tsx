@@ -7,7 +7,7 @@ import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
 import { PhoneEntry } from "@/components/auth/PhoneEntry";
 import { CodeEntry } from "@/components/auth/CodeEntry";
 import type { OtpChannel } from "@/components/auth/authClient";
-import type { RenterUser } from "@/lib/contract/auth";
+import { normalizeTier, type RenterUser } from "@/lib/contract/auth";
 
 /**
  * Combined auth + account-registration popup shown when a guest submits an RFQ. Now that the web is
@@ -78,11 +78,18 @@ function AccountFlow({ onCreated }: { onCreated: () => void }) {
         <CodeEntry
           phone={phone}
           channel={channel}
-          onVerified={(u: RenterUser) => {
-            signIn(u); // start the session from the verified identity (carries the real tier)
-            // Returning account that's already complete → skip the profile form and post the request.
-            // Only a new/incomplete (guest-tier) number needs to fill in the profile (guest→basic).
-            if (u.tier === "basic" || u.tier === "verified") onCreated();
+          onVerified={async (u: RenterUser) => {
+            signIn(u); // start the session from the verified identity
+            // The verify-otp tier can come back thin/guest for a RETURNING account — which would wrongly
+            // push an already-registered renter through the profile step (registering them as a fresh
+            // guest that createRequest then rejects). Confirm the AUTHORITATIVE tier from /api/me
+            // (reads /users/me) before deciding: already basic/verified → skip registration and post.
+            let tier = u.tier;
+            try {
+              const r = await fetch("/api/me", { cache: "no-store" });
+              if (r.ok) { const d = (await r.json()) as { user?: { tier?: unknown } }; tier = normalizeTier(d.user?.tier); }
+            } catch { /* keep the verify tier on a network hiccup */ }
+            if (tier === "basic" || tier === "verified") onCreated();
             else setPhase("profile");
           }}
           onEditNumber={() => setPhase("phone")}

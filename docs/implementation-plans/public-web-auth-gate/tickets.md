@@ -179,3 +179,47 @@ Profile) hide or route through the gate for guests. Ensure no signed-out page de
   action is visible and authed-only nav is hidden or gate-routed.
 - **Given** a guest clicks an authed-only nav item, **When** followed, **Then** they hit `/login`
   (or the combined step where appropriate), never a broken page.
+
+---
+
+## Update — 2026-07-05 (build review + decisions)
+
+**Shipping model — flag-gated, staging-only.** The whole epic is behind
+`NEXT_PUBLIC_PUBLIC_WEB_ENABLED` (`src/lib/flags.ts`; the edge middleware reads the same var; the
+`PhoneEntry` email/SMS toggle is wrapped in it). **Default OFF → production is byte-identical to today**
+(SMS-only, login-gated). **Rollout decision: staging-only for now** — set the env var to `1` on the
+staging Amplify app to exercise it; leave it UNSET in prod until we decide to go live. Unset = off, so
+prod is safe by default.
+
+**Status vs the tickets above:**
+- **Implemented (web):** T1, T2, T3, T4, T6, T8, T9, T10.
+- **T2 hardening:** `AccountModal` now confirms the AUTHORITATIVE tier from `/api/me` after OTP, so a
+  returning **basic/verified** account skips the register step instead of being re-registered as a
+  guest (fixed a real bug where an already-registered user was treated as new).
+- **T4 note:** the email option is built **functional** (sends `otpMethod:"EMAIL"` + `otpEmail`), not
+  the original "disabled / coming-soon" — so it depends on **T5** being live.
+- **T5 (email-OTP backend):** IN PROGRESS (owner building it). Until live, `request-code` with EMAIL
+  returns 400 — email-OTP is only meaningful on staging behind the flag once the backend lands.
+- **T7 (public browse):** DECISION — **wait** for a backend public `/stores` endpoint; the interim
+  "sign-in" empty states stay until then.
+
+### T11 — ⚠ Backend (Moedatech-App): provision a web-registered account so `createRequest` accepts it  [SHIP-BLOCKER]
+**Scope:** Backend-dependency (agents `createRequest`). **Carry via** `/web:link-agents`.
+**Satisfies:** the whole point of the epic — a guest who registered through the gate can actually post.
+
+**Problem.** A guest who completes the one-step gate (OTP → profile → **basic**) then submits →
+`POST /agents/requests` → agents `createRequest` returns **500 / `INTERNAL_ERROR`** ("Failed to create
+request"; relayed as 502 — verified in the dev log). The owner-lookup / tier gate in `createRequest`
+doesn't recognise a freshly web-registered account as a rentee, so the flow dead-ends at the finish
+line. The web side is correct (it authenticates and submits as the new user).
+
+**Fix (decided: backend provisions the account).** On register (guest→basic) — or in `createRequest`'s
+owner resolution — ensure the account exists as a **rentee** in the data the agents backend reads
+(marketplace DB), with the tenant + tier `createRequest` requires. Confirm via CloudWatch: the
+request's `requestGroupId` should log the `createRequest` success path, not the owner-lookup throw.
+
+- **Given** a brand-new account created through the web one-step gate (basic tier), **When** it submits
+  an RFQ, **Then** `createRequest` succeeds (no 500) and the request posts.
+- **Given** an existing, already-provisioned renter, **When** they submit, **Then** behaviour is
+  unchanged (regression guard).
+- **Note:** cannot ship from the web repo — needs a Moedatech-App PR.

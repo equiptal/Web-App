@@ -147,3 +147,25 @@ code is sent to. Email is **not** a separate account and **not** a login identif
 - **Email-OTP is a genuine backend change** — do not imply it's live in the UI (disabled state).
 - **Mobile parity** — mobile is phone-only too; a phone-first combined step stays consistent.
 - **No env changes** needed (reuses `APP_API_URL`, `TENANT_ID`).
+
+## Status & decisions — 2026-07-05 (build review)
+The web is built; the epic now ships **behind a feature flag** and stays **staging-only** until the
+backend deps land. Revised decisions:
+
+- **Feature flag (new since original plan).** Everything is gated by `NEXT_PUBLIC_PUBLIC_WEB_ENABLED`
+  (`src/lib/flags.ts` + middleware + `PhoneEntry`). Default OFF → prod is unchanged (SMS-only,
+  login-gated). Set `=1` on staging to exercise; leave unset in prod.
+- **Rollout: staging-only for now.** Do NOT flip prod on until the two backend deps below are live.
+- **Email OTP (T5): IN PROGRESS** (owner building the backend). The web already sends
+  `otpMethod:"EMAIL"`, so it works end-to-end on staging only once the backend accepts it (until then
+  `request-code` 400s for EMAIL). This supersedes the original "disabled/coming-soon" state for T4.
+- **Public browse (T7): WAIT** for a backend public `/stores` endpoint (safe projection). Guests keep
+  the interim sign-in empty states until it lands.
+- **NEW SHIP-BLOCKER — T11 (guest provisioning).** Not in the original plan: a freshly web-registered
+  `basic` account 500s on `createRequest` (agents backend owner/tier lookup doesn't know the new
+  rentee). **Decided: fix backend-side** (provision the rentee on register / in owner resolution).
+  This is the true gate on going live — see tickets.md T11.
+
+**Go-live checklist (when we decide to flip prod on):** T5 email-OTP live · T11 guest provisioning
+fixed · T7 public browse (or accept interim empty states) · then set `NEXT_PUBLIC_PUBLIC_WEB_ENABLED=1`
+on the prod Amplify app.
