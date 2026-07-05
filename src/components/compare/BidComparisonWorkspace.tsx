@@ -409,7 +409,12 @@ export function BidComparisonWorkspace() {
   // chips reflect what's actually uploaded and open the real file — no deal room needed. Best-effort:
   // if the endpoint isn't available the chips fall back to the bid-list compliance flags.
   useEffect(() => {
-    const missing = cols.map((c) => c.bid.id).filter((id) => id && !(id in bidDocs));
+    // Only in-app bids have a real /bids/{id}/documents endpoint. Off-platform shared-link bids
+    // (id `link-…`) carry their company docs as inline values, and uploaded quotes (`upload:…`) have
+    // no files — so skip both, or the fetch 404s on those synthetic ids.
+    const missing = cols
+      .map((c) => c.bid.id)
+      .filter((id) => id && !id.startsWith("link-") && !id.startsWith("upload:") && !(id in bidDocs));
     if (!missing.length) return;
     let alive = true;
     Promise.all(
