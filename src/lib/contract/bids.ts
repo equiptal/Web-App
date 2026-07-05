@@ -478,13 +478,12 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     if (food) requestResponsibilities.operator_food = food;
     if (trans) requestResponsibilities.operator_transport_accommodation = trans;
   }
-  // The safety-cert requirement (TUV/SPSP/SASO) lives in the item's `safetyCertifications`; request-level
-  // `requiredCerts` carries LC / SASO-registration etc. Union both so the cert rows reflect what the
-  // request actually asks for (new web/agent requests put safety certs only in safetyCertifications).
-  const requiredCerts = certList([
-    ...(Array.isArray(rq.requiredCerts) ? (rq.requiredCerts as unknown[]) : []),
-    ...(Array.isArray(rqItem.safetyCertifications) ? (rqItem.safetyCertifications as unknown[]) : []),
-  ]);
+  // The safety-cert requirement (TÜV/SPSP/SASO) lives ONLY in the item's `safetyCertifications` — the
+  // documented source. The request-level `requiredCerts` field is not used by the backend/app (per the
+  // API docs), so we no longer read it.
+  const requiredCerts = certList(
+    Array.isArray(rqItem.safetyCertifications) ? (rqItem.safetyCertifications as unknown[]) : [],
+  );
   // LEVEL 3 — Operator certification is a DECLARED deal-room term, not a verified held-doc pill. The
   // rentee's requirement is the request item's operatorLicenseLevel; the supplier's position comes
   // from the bid's t3Declarations (operator_certification). Both are plain strings for a term row.

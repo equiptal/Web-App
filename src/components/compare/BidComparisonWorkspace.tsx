@@ -726,7 +726,12 @@ export function BidComparisonWorkspace() {
       const r = await parseBid({ attachments: [{ type: file.type || "application/octet-stream", filename: file.name, data }], request_context: { subtype: activeItemObj?.item?.name ?? null } });
       if (!r.agent) { toast(L("Quote upload needs your AI assistant — not connected.", "رفع العرض يحتاج مساعدك الذكي — غير متصل.")); return; }
       if (r.result && r.result.ok) {
-        const card = normalizedBidToBidCard(r.result.bid, { duration: durationDays, units });
+        // Qualify the uploaded quote against the SAME request requirements the in-app / link bids carry
+        // (year minimum + required equipment certs), sourced from any reference bid already in the table —
+        // so its year/certs read green/red like a real bid instead of neutral. Cost/operator terms stay
+        // grey (an uploaded file doesn't answer them). No reference bid → stays neutral.
+        const reqRef = allCols.map((c) => c.bid).find((b) => b.reqMinYear != null || (b.requiredCerts?.length ?? 0) > 0);
+        const card = normalizedBidToBidCard(r.result.bid, { duration: durationDays, units, reqMinYear: reqRef?.reqMinYear ?? null, requiredCerts: reqRef?.requiredCerts ?? [] });
         const m = r.result.match;
         // Severity model (Mansour): TYPE/SIZE mismatch is BLOCKING (wrong equipment) → popup + do NOT add.
         // Any other mismatch (location advisory) needs confirmation → popup, but STILL comparable (add on
