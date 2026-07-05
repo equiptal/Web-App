@@ -12,6 +12,10 @@ export type AuthKind =
 
 type AuthResult = { ok: true; data: Record<string, unknown> } | { ok: false; kind: AuthKind };
 
+/** OTP delivery channel chosen at the phone step (T5). Phone stays the account identity; when the
+ *  channel is EMAIL the code is delivered to `email`. Carried to the code step so Resend uses it too. */
+export type OtpChannel = { method: "SMS" | "EMAIL"; email?: string };
+
 export async function postAuth(path: string, body: unknown): Promise<AuthResult> {
   let res: Response;
   try {

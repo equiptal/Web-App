@@ -1,18 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
-import { fetchBids, startDealRoom } from "@/lib/api/client";
-import { CredentialPills } from "@/components/requests/CredentialPills";
-import { TermsPanel } from "@/components/requests/TermsPanel";
-import { TermClassBadges } from "@/components/requests/TermClassBadges";
-import { DealRoomBanner, SupplierDocs } from "@/components/requests/BidCardExtras";
-import { bidSuppliers, CERT_LABEL, type BidCard } from "@/lib/contract/bids";
+import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/client";
+import { BidTermsModal } from "@/components/requests/BidTermsModal";
+import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
+import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
+import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
+import { useSession } from "@/lib/session";
+import { bidSuppliers, bucketBidTerms, CERT_LABEL, type BidCard } from "@/lib/contract/bids";
+import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
+import { computeBidQuote } from "@/lib/contract/comparison";
 import type { RequestGroup } from "@/lib/contract/requests";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { EquipImg } from "@/components/requests/EquipImg";
-import { quotationFileTitle } from "@/lib/compare/quotation-token";
+import { quotationDownloadName } from "@/lib/compare/quotation-token";
+import { renderQuotationSection, wrapQuotationPage, quotationLegal, type QuotationDoc, type QuotationLineItem, type QuotationCard } from "@/lib/quotation/render";
 
 /** A group bid = a request's bid tagged with which item (request) it belongs to. */
 type GroupBid = BidCard & { requestId: string; itemLabel: string; itemLabelAr: string; categoryId: string | null; itemImage: string | null };
@@ -38,77 +42,26 @@ function pillLabel(status: string, L: (en: string, ar: string) => string): strin
   }
 }
 
-/** Amount-in-words (English) — ported from the requests-grouped prototype's quotation export. */
-function numWords(n: number): string {
-  n = Math.round(n);
-  if (n === 0) return "Zero";
-  const o = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
-  const t = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
-  const u = (x: number) => { let s = ""; if (x >= 100) { s += o[Math.floor(x / 100)] + " hundred"; x %= 100; if (x) s += " and "; } if (x >= 20) { s += t[Math.floor(x / 10)]; if (x % 10) s += "-" + o[x % 10]; } else if (x > 0) s += o[x]; return s; };
-  let r = "";
-  ([["million", 1e6], ["thousand", 1e3]] as [string, number][]).forEach(([nm, v]) => { if (n >= v) { r += u(Math.floor(n / v)) + " " + nm + " "; n %= v; } });
-  if (n > 0) r += u(n);
-  r = r.trim();
-  return r.charAt(0).toUpperCase() + r.slice(1);
+/** Offer-state suffix for the deal-room CTA (uiState) — new / updated offer / whose move it is. */
+function offerSuffix(uiState: string | null, L: (en: string, ar: string) => string): string | null {
+  switch (uiState) {
+    case "new": return L("New offer", "عرض جديد");
+    case "fresh": return L("Updated offer", "عرض مُحدّث");
+    case "your-turn": return L("Your turn", "دورك");
+    default: return null;
+  }
 }
 
-/** Formal quotation PDF stylesheet — ported verbatim from prototypes/requests-grouped.html. */
-const QSTYLE = `
-  *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:'Inter','Segoe UI',Roboto,sans-serif;color:#1c3550;background:#f1f5f9;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  .q-doc{max-width:780px;margin:18px auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 6px 24px rgba(28,53,80,.1);page-break-after:always;}
-  .q-doc:last-child{page-break-after:auto;}
-  .q-head{background:linear-gradient(135deg,#1c3550,#12263a);color:#fff;padding:26px 34px;}
-  .q-title{font-size:23px;font-weight:900;letter-spacing:-.3px;}
-  .q-sub{display:flex;justify-content:space-between;margin-top:10px;font-size:12.5px;font-weight:700;color:rgba(255,255,255,.72);}
-  .q-sub .qn{color:#fff;font-family:'IBM Plex Sans',monospace;}
-  .q-body{padding:24px 34px 30px;}
-  .parties{display:flex;gap:30px;padding-bottom:18px;border-bottom:1px solid #e4edf5;}
-  .party{flex:1;}
-  .plabel{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#6b8fa8;}
-  .pname{font-size:17px;font-weight:800;margin-top:5px;}
-  .pmeta{font-size:12px;color:#6b8fa8;font-weight:600;margin-top:3px;}
-  .docs{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
-  .doc-ok{font-size:10.5px;font-weight:800;color:#1daf58;background:#e7f7ee;border-radius:100px;padding:2px 8px;}
-  .ver-ok{color:#1daf58;font-weight:800;}
-  .metastrip{display:grid;grid-template-columns:repeat(5,1fr);margin:18px 0;border:1px solid #e4edf5;border-radius:10px;overflow:hidden;}
-  .metastrip>div{padding:11px 13px;border-inline-end:1px solid #e4edf5;}
-  .metastrip>div:last-child{border-inline-end:0;}
-  .metastrip span{display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b8fa8;}
-  .metastrip b{font-size:12.5px;font-weight:800;margin-top:4px;display:block;}
-  .listed{background:#f7fafd;border:1px solid #e4edf5;border-radius:10px;padding:13px 15px;margin-bottom:18px;}
-  .listed .ll{font-size:10.5px;font-weight:700;text-transform:uppercase;color:#6b8fa8;}
-  .listed .lv{font-size:13.5px;font-weight:700;color:#2a4f72;margin-top:5px;}
-  .ptable{width:100%;border-collapse:collapse;margin-bottom:8px;}
-  .ptable th{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#6b8fa8;text-align:start;padding:8px 10px;background:#eff4f9;}
-  .ptable th.num,.ptable td.num{text-align:end;font-family:'IBM Plex Sans',monospace;}
-  .ptable td{padding:11px 10px;border-bottom:1px solid #e4edf5;font-size:13px;vertical-align:top;}
-  .ptable td .sm{font-size:11px;color:#6b8fa8;font-weight:600;margin-top:2px;}
-  .totals{margin:6px 0 18px;}
-  .trow{display:flex;justify-content:space-between;padding:7px 10px;font-size:13.5px;}
-  .trow span{color:#2a4f72;font-weight:600;}
-  .trow b{font-family:'IBM Plex Sans',monospace;font-weight:800;}
-  .trow.grand{border-top:2px solid #d4e0ec;margin-top:4px;padding-top:11px;font-size:16px;}
-  .trow.grand b{color:#f79009;}
-  .words{background:#eaf1fe;border:1px solid #cfe0fb;border-radius:10px;padding:13px 15px;margin-bottom:18px;font-size:13px;color:#1849a9;}
-  .words .wl{font-size:10px;font-weight:800;text-transform:uppercase;margin-bottom:4px;}
-  .card{border:1px solid #e4edf5;border-radius:10px;overflow:hidden;margin-bottom:18px;}
-  .card-h{background:#fbeeea;padding:11px 15px;font-size:13.5px;font-weight:800;}
-  .kv{display:flex;justify-content:space-between;gap:14px;padding:10px 15px;border-top:1px solid #f0f4f8;font-size:13px;}
-  .kv span{color:#6b8fa8;font-weight:600;}.kv b{font-weight:800;text-align:end;}
-  .tc{margin:0 0 18px;padding-inline-start:20px;font-size:11.5px;color:#2a4f72;line-height:1.7;}
-  .tc li{margin-bottom:5px;}
-  .signed{background:#eef7f1;border-radius:10px;padding:13px 15px;font-size:12px;}
-  .signed b{display:block;color:#1c3550;}.signed div{color:#6b8fa8;font-family:'IBM Plex Sans',monospace;margin-top:3px;}
-  .foot{text-align:center;color:#9bb3c8;font-size:11px;margin-top:16px;}
-  @media print{body{background:#fff;}.q-doc{box-shadow:none;margin:0;border-radius:0;}}`;
+// The formal quotation template (styles, amount-in-words, section renderer) now lives in the shared
+// `@/lib/quotation/render` module so this bid-card download and the deal-room confirmed quotation use
+// ONE identical template.
 
 /**
  * Grouped My Bids (web-app/multi-item-requests, Phase 2). Fetches bids for every request in the
  * group, merges them, and shows a supplier Level-2 filter + equipment-focused bid cards across the
  * whole submission, plus select-for-quotation. `getBidList` is per-request, so we fan the fetch out.
  */
-export function GroupBids({ group }: { group: RequestGroup }) {
+export function GroupBids({ group, initialItemId }: { group: RequestGroup; initialItemId?: string | null }) {
   const { locale } = useLocale();
   const ar = locale === "ar";
   const L = (en: string, arr: string) => (ar ? arr : en);
@@ -126,20 +79,46 @@ export function GroupBids({ group }: { group: RequestGroup }) {
   const [bids, setBids] = useState<GroupBid[] | null>(null);
   const [error, setError] = useState(false);
   const [supplierKey, setSupplierKey] = useState<string>("all");
-  const [openPrice, setOpenPrice] = useState<string | null>(null);
+  const [selectedItem, setSelectedItem] = useState<string>(initialItemId ?? "all"); // scope bids to one request item
+  const [itemMenuOpen, setItemMenuOpen] = useState(false);
+  // Price breakdown open/collapsed PER CARD (a Set of bid ids), so expanding one bid's price doesn't
+  // close another's — each card toggles independently. `perUnitIds` holds the per-card "Per unit" toggle.
+  const [openPrices, setOpenPrices] = useState<Set<string>>(new Set());
+  // Default to PER UNIT — track the cards switched to "all units" instead (empty = per-unit default).
+  const [allUnitsIds, setAllUnitsIds] = useState<Set<string>>(new Set());
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectMode, setSelectMode] = useState(false); // prototype: pick bids to compare/export
   const [equipBid, setEquipBid] = useState<GroupBid | null>(null);
-  const [openTermsId, setOpenTermsId] = useState<string | null>(null);
+  const [termsBid, setTermsBid] = useState<GroupBid | null>(null);
   const [langPick, setLangPick] = useState(false); // quotation language chooser (Arabic | English)
   const [renterName, setRenterName] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  // Renter company identity for the quotation Rentee block (app parity) — from /api/me.
+  const [renterId, setRenterId] = useState<{ phone: string | null; email: string | null; crNumber: string | null; vatNumber: string | null; nationalAddress: string | null }>({ phone: null, email: null, crNumber: null, vatNumber: null, nationalAddress: null });
+  const { tier } = useSession();
+  const verified = tier === "verified";
+  const [quoteGate, setQuoteGate] = useState(false); // unverified → confirm before issuing the quotation
+  // web-app/006 demo (staging only) — relabel real bids as off-platform "via shared link".
+  const [submissions, setSubmissions] = useState<LinkBidSubmission[]>([]); // real off-platform submissions (all group items)
+  const [groupRef, setGroupRef] = useState<string | null>(null); // RFQ-NNNNN group short code (agents bid-submissions) — stamped on the quotation
+  const [submissionBid, setSubmissionBid] = useState<GroupBid | null>(null);
+  // Bid filter (source + refine), matching the bids-by-supplier prototype.
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [fSource, setFSource] = useState<"all" | "link" | "platform" | "file">("all");
+  const [fVerified, setFVerified] = useState(false);
+  const [fKm, setFKm] = useState(false);
 
   useEffect(() => {
     let active = true;
     fetch("/api/me", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { user?: { firstName?: string; lastName?: string } } | null) => {
-        if (active && d?.user) setRenterName([d.user.firstName, d.user.lastName].filter(Boolean).join(" "));
+      .then((d: { user?: { firstName?: string; lastName?: string; companyName?: string | null; phone?: string | null; email?: string | null; crNumber?: string | null; vatNumber?: string | null; nationalAddress?: string | null } } | null) => {
+        if (active && d?.user) {
+          setRenterName([d.user.firstName, d.user.lastName].filter(Boolean).join(" "));
+          setCompanyName(d.user.companyName ?? "");
+          setRenterId({ phone: d.user.phone ?? null, email: d.user.email ?? null, crNumber: d.user.crNumber ?? null, vatNumber: d.user.vatNumber ?? null, nationalAddress: d.user.nationalAddress ?? null });
+        }
       })
       .catch(() => {});
     return () => { active = false; };
@@ -169,10 +148,31 @@ export function GroupBids({ group }: { group: RequestGroup }) {
     )
       .then((lists) => active && setBids(lists.flat()))
       .catch(() => active && setError(true));
+    // Off-platform shared-link submissions are stored once per GROUP (a single bid covers all items),
+    // so fetch them once by the group id — not per item (which would duplicate them). Best-effort.
+    setSubmissions([]);
+    fetchRequestSubmissions(group.id).then((r) => { if (active) { setSubmissions(r.submissions); setGroupRef(r.groupRef); } }).catch(() => {});
     return () => {
       active = false;
     };
   }, [group.id, group.items]);
+
+  // Scope to the item the renter tapped "View Bids" on (or "all" when entering via "View all bids").
+  useEffect(() => { setSelectedItem(initialItemId ?? "all"); }, [initialItemId, group.id]);
+
+  // B4: while comparing, a click anywhere outside the selection UI (toolbar / cards / action bar, all
+  // tagged data-select-ui) exits selection — replaces the old Cancel button.
+  useEffect(() => {
+    if (!selectMode) return;
+    const onDown = (e: MouseEvent) => {
+      const el = e.target as Element | null;
+      if (el && el.closest("[data-select-ui]")) return;
+      setSelectMode(false);
+      setSelected(new Set());
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [selectMode]);
 
   const toggleSelect = (id: string) =>
     setSelected((prev) => {
@@ -182,10 +182,33 @@ export function GroupBids({ group }: { group: RequestGroup }) {
       return next;
     });
 
+  // An off-platform submission is stored once per GROUP but covers several items. Show ONE card per
+  // item (parity with on-platform bids) — scoped to that item's terms + price + total, matched to its
+  // request so we can show the real equipment icon/image. Memoized so goCompare can include them too.
+  const subCards: GroupBid[] = useMemo(
+    () =>
+      submissions.flatMap((s) =>
+        s.items.map((it): GroupBid => {
+          const gi = group.items.find((g) => g.id === it.requestId);
+          return {
+            ...submissionToBidCard(s, it),
+            id: `link-${s.id}-${it.requestItemId}`, // unique per item-card (no key/selection collisions)
+            requestId: it.requestId ?? s.requestId,
+            itemLabel: gi?.item?.name ?? it.label ?? L("Equipment", "المعدة"),
+            itemLabelAr: gi?.item?.nameAr ?? it.label ?? "المعدة",
+            categoryId: gi?.item?.categoryId ?? null,
+            itemImage: gi?.item?.imageUrl ?? null,
+          };
+        }),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [submissions, group.items, ar],
+  );
+
   // web-app/007 — open the comparison workspace pre-selected to the chosen bids (and their item).
   function goCompare() {
-    const chosen = (bids ?? []).filter((b) => selected.has(b.id));
-    if (chosen.length < 2) return;
+    const chosen = [...(bids ?? []), ...subCards].filter((b) => selected.has(b.id));
+    if (chosen.length < 1) return;
     const params = new URLSearchParams({ group: group.id });
     const itemId = chosen[0]?.requestId;
     if (itemId) params.set("item", itemId);
@@ -210,11 +233,16 @@ export function GroupBids({ group }: { group: RequestGroup }) {
     }
   }
 
-  function downloadQuotation(langIsAr: boolean) {
-    if (!bids) return;
-    const chosen = bids.filter((b) => selected.has(b.id));
+  function downloadQuotation(langIsAr: boolean, only?: GroupBid[]) {
+    // Include off-platform (shared-link) bids alongside on-platform ones so a selected supplier
+    // submission can be exported as a quotation just like an app bid. `only` lets a single card (e.g.
+    // the submission viewer's Download) export just that bid through the SAME app-parity template.
+    // Default to ALL bids in the group when nothing is explicitly selected. Clicking "Download
+    // quotations" with no selection used to silently no-op (empty `chosen` → early return), which read
+    // as a dead button. `only` still exports a single card (submission viewer).
+    const all = [...(bids ?? []), ...subCards];
+    const chosen = only ?? (selected.size ? all.filter((b) => selected.has(b.id)) : all);
     if (!chosen.length) return;
-    const esc = (str: string) => String(str).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
     const itemMap = new Map(group.items.map((it) => [it.id, it]));
     // Request codes this quotation covers — stamped in the filename so Compare scopes to them.
     const coveredCodes = [...new Set(chosen.map((b) => itemMap.get(b.requestId)?.displayId).filter(Boolean) as string[])];
@@ -229,14 +257,28 @@ export function GroupBids({ group }: { group: RequestGroup }) {
       if (list) list.push(b);
       else bySupplier.set(key, [b]);
     }
-    const reqCode = String(group.items[0]?.displayId ?? group.id).replace(/[^A-Za-z0-9-]/g, "");
+    const reqCode = String(groupRef ?? group.items[0]?.displayId ?? group.id).replace(/[^A-Za-z0-9-]/g, "");
 
     // Render one supplier's quotation in a single language; bilingual output stacks both per supplier.
     const renderSection = (supBids: GroupBid[], si: number, isAr: boolean) => {
       const L = (en: string, arr: string) => (isAr ? arr : en);
       const sar = L("SAR", "ر.س");
       const dateStr = new Date().toLocaleDateString(isAr ? "ar-SA" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
-      const rentee = { name: renterName || L("Moedatech renter", "مستأجر معداتك"), org: "Moedatech", city: group.city ?? group.locationLabel };
+      // Rentee identity (app parity) — company name primary when verified, else personal name; plus the
+      // renter's real CR/VAT/national address/phone/email from /api/me (value-or-"Verified" pill).
+      // App parity (_RenteeBlock _partyHeader): company name is primary when the renter HAS a company
+      // (gated on company presence, not verified), with the person's name demoted to a subtitle.
+      const renteeHasCompany = !!companyName.trim();
+      const rentee = {
+        name: (renteeHasCompany ? companyName.trim() : renterName) || L("Moedatech renter", "مستأجر معداتك"),
+        person: renteeHasCompany ? (renterName || null) : null,
+        city: group.city ?? group.locationLabel,
+        crNumber: renterId.crNumber,
+        vatNumber: renterId.vatNumber,
+        nationalAddress: renterId.nationalAddress,
+        phone: renterId.phone,
+        email: renterId.email,
+      };
       const sup = supBids[0];
       const supInit = (sup.supplierName || "S").replace(/[^A-Za-z0-9]/g, "").slice(0, 3).toUpperCase() || "S";
       const qnum = `Q-${reqCode}-${supInit}${si + 1}`;
@@ -245,149 +287,208 @@ export function GroupBids({ group }: { group: RequestGroup }) {
       const reqIds = [...new Set(supBids.map((b) => itemMap.get(b.requestId)?.displayId ?? b.requestId))];
       const reqLabel = reqIds.length === 1 ? reqIds[0] : `${reqIds[0]} +${reqIds.length - 1}`;
       const rentalBasis = itemMap.get(sup.requestId)?.rentalType ?? "";
+      const reqItem = itemMap.get(sup.requestId);
+      const fmtRefDate = (d: string | null | undefined) => (d ? new Date(d).toLocaleDateString(isAr ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—");
+      const startStr = fmtRefDate(reqItem?.startDate);
+      const endStr = fmtRefDate(reqItem?.endDate);
+      // Supplier identity rows (app parity): off-platform submissions carry real CR/VAT/address VALUES;
+      // on-platform bids carry only verification FLAGS → render the app's value-or-"Verified" pill.
+      const ld = sup.linkDocs ?? {};
+      // Party identity rows — value-or-"Verified"-pill (the shared renderer draws them). Labels + AR
+      // match the mobile quotation_document (CR=س.ت, VAT=ض.ق.م, "National Address"). Supplier rows gate
+      // the pill on PARTY-verified (a verified supplier missing a value still shows the pill).
+      const supIdRows = [
+        { label: L("National Address", "العنوان الوطني"), value: ld.national ?? sup.supplierNationalAddress, verified: sup.verified },
+        { label: L("CR #", "س.ت"), value: ld.commercial ?? sup.supplierCrNumber, verified: sup.verified },
+        { label: L("VAT #", "ض.ق.م"), value: ld.vat ?? sup.supplierVatNumber, verified: sup.verified },
+        { label: L("Phone", "الهاتف"), value: ld.contact ?? sup.supplierPhone }, // on-platform phone or off-platform contact
+        ...(sup.compliance.entityType === "company" ? [{ label: L("Email", "البريد"), value: sup.supplierEmail }] : []), // company only, per app
+      ];
+      const renteeIdRows = [
+        { label: L("National Address", "العنوان الوطني"), value: rentee.nationalAddress, verified },
+        { label: L("CR #", "س.ت"), value: rentee.crNumber, verified },
+        { label: L("VAT #", "ض.ق.م"), value: rentee.vatNumber, verified },
+        { label: L("Phone", "الهاتف"), value: rentee.phone },
+        { label: L("Email", "البريد"), value: rentee.email },
+      ];
+      // App parity (UnverifiedIndividualIdentity): unverified individual suppliers get a subtitle.
+      const supplierSub = sup.compliance.entityType === "individual" && !sup.verified
+        ? L("Individual supplier · unverified", "مُورِّد فرد · غير موثَّق") : null;
 
       const eqLine = (b: GroupBid) => (b.equipment ? [b.equipment.make, b.equipment.model, b.equipment.year].filter(Boolean).join(" · ") : "—");
       const labelOf = (b: GroupBid) => (ar ? b.itemLabelAr : b.itemLabel) || (itemMap.get(b.requestId)?.displayId ?? b.requestId);
       // App rule (014 CR #141): the bid is priced per billing period; the unit count is NOT multiplied
       // into the price (it's shown for information only). Open-ended → ∞ qty + one-period "as operated".
-      const daysPerPeriod = (u: string | null) => { switch ((u ?? "PER_DAY").toUpperCase()) { case "PER_WEEK": return 7; case "PER_MONTH": return 30; case "PER_JOB": return 0; default: return 1; } };
+      const daysPerPeriod = (u: string | null) => { switch ((u ?? "PER_DAY").toUpperCase()) { case "PER_WEEK": return 7; case "PER_MONTH": return 26; case "PER_JOB": return 0; default: return 1; } };
       const periodLabel = (u: string | null) => { switch ((u ?? "PER_DAY").toUpperCase()) { case "PER_WEEK": return L("week", "أسبوع"); case "PER_MONTH": return L("month", "شهر"); case "PER_JOB": return L("job", "مهمة"); default: return L("day", "يوم"); } };
 
-      // Pricing rows across every selected equipment for this supplier.
+      // Invoice line items — rate ÷ period-days × duration × units; mob/demob × units (open-ended → "as
+      // operated"). The shared renderer draws the 6-column table (# · Item · Unit · Qty · Price · Total).
+      const m2 = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); // app parity: money shows halalas
       let sub = 0;
-      const rows = supBids.map((b) => {
+      let rowNum = 0;
+      let openRate: number | null = null; // representative per-unit·period rate for open-ended framing
+      let openPlabel = "";
+      let anyCommitted = false;
+      const lineItems: QuotationLineItem[] = [];
+      for (const b of supBids) {
         const rate = b.price ?? 0;
-        const units = b.numberOfUnits || 1; // bid price is PER-UNIT → × quantity (app parity)
+        // Supplier's OFFERED units (app `_offeredUnitsForBid`: unitsOffered → requested → 1). The rental
+        // line is PER-UNIT (not × units, app parity); units only scale the per-unit mob/demob transport.
+        const units = b.unitsOffered || b.numberOfUnits || 1;
         const dpp = daysPerPeriod(b.priceUnit);
         const plabel = periodLabel(b.priceUnit);
         const durDays = itemMap.get(b.requestId)?.durationDays ?? null;
-        const unitsPart = units > 1 ? `${units} ${esc(L("units", "وحدات"))} × ` : "";
-        const ratePart = `${nf(rate)} ${esc(sar)}/${esc(plabel)}`;
-        // App-style single rental line ("2 units × 30 days @ 200 SAR/day") — no Qty/Price columns, so the
-        // duration is never mislabelled as a quantity. Matches the bid card, deal room, and mobile app.
-        let lineSub: number, desc: string, amountCell: string;
+        rowNum += 1;
+        let lineSub: number, qtyCell: string, priceCell: string, totalCell: string, totalNote: string | null = null;
         if (durDays == null) {
-          lineSub = rate * units; // open-ended: one-period preview feeds the estimate; billed "as operated"
-          desc = `${unitsPart}${ratePart} · ${esc(L("as operated", "حسب التشغيل"))}`;
-          amountCell = `<div class="sm">${esc(L("As operated", "حسب التشغيل"))}</div>${nf(lineSub)} / ${esc(plabel)}`;
+          lineSub = rate; // open-ended: one-period PER-UNIT preview; billed "as operated" (app parity)
+          qtyCell = "∞";
+          priceCell = `${m2(rate)} / ${plabel}`;
+          totalCell = `${m2(rate)} / ${plabel}`;
+          totalNote = L("As operated", "حسب التشغيل");
+          if (openRate == null) { openRate = rate; openPlabel = plabel; }
         } else if (dpp > 0) {
+          anyCommitted = true;
           const periods = durDays / dpp;
           const pStr = Number.isInteger(periods) ? String(periods) : periods.toFixed(2);
-          const perWord = isAr || Number(pStr) === 1 ? plabel : `${plabel}s`;
-          lineSub = (rate / dpp) * durDays * units;
-          desc = `${unitsPart}${pStr} ${esc(perWord)} @ ${ratePart}`;
-          amountCell = nf(lineSub);
+          lineSub = (rate / dpp) * durDays; // per-unit over the committed duration (units shown separately)
+          qtyCell = `${pStr} ${plabel}`;
+          priceCell = `${m2(rate)} / ${plabel}`;
+          totalCell = m2(lineSub);
         } else {
-          lineSub = rate * units; // PER_JOB
-          desc = `${unitsPart}${ratePart}`;
-          amountCell = nf(lineSub);
+          anyCommitted = true;
+          lineSub = rate; // PER_JOB, per-unit
+          qtyCell = "1";
+          priceCell = m2(rate);
+          totalCell = m2(lineSub);
         }
-        sub += lineSub + (b.mobPrice ?? 0) + (b.demobPrice ?? 0);
-        let r = `<tr><td><b>${esc(labelOf(b))}</b><div class="sm">${esc(eqLine(b))} · ${desc}</div></td><td class="num">${amountCell}</td></tr>`;
-        if (b.mobPrice) r += `<tr><td><b>${esc(L("Mobilization to site", "النقل إلى الموقع"))}</b> <span class="sm">(1 ${esc(L("trip", "رحلة"))})</span><div class="sm">${esc(labelOf(b))}</div></td><td class="num">${nf(b.mobPrice)}</td></tr>`;
-        if (b.demobPrice) r += `<tr><td><b>${esc(L("Return from site", "الإرجاع من الموقع"))}</b> <span class="sm">(1 ${esc(L("trip", "رحلة"))})</span><div class="sm">${esc(labelOf(b))}</div></td><td class="num">${nf(b.demobPrice)}</td></tr>`;
-        return r;
-      }).join("");
-      const vat = Math.round(sub * 0.15);
+        const mobTotal = (b.mobPrice ?? 0) * units;
+        const demobTotal = (b.demobPrice ?? 0) * units;
+        sub += lineSub + mobTotal + demobTotal;
+        lineItems.push({ num: rowNum, label: `${L("Rental", "الإيجار")} — ${labelOf(b)}`, detail: eqLine(b) === "—" ? null : eqLine(b), unit: plabel, qty: qtyCell, price: priceCell, total: totalCell, totalNote });
+        if (b.mobPrice) lineItems.push({ num: null, label: L("Delivery to site", "النقل إلى الموقع"), detail: labelOf(b), unit: L("Trip", "رحلة"), qty: String(units), price: m2(b.mobPrice), total: m2(mobTotal) });
+        if (b.demobPrice) lineItems.push({ num: null, label: L("Return from site", "الإرجاع من الموقع"), detail: labelOf(b), unit: L("Trip", "رحلة"), qty: String(units), price: m2(b.demobPrice), total: m2(demobTotal) });
+      }
+      const vat = sub * 0.15; // exact (not rounded) so the amount-in-words can show halalas — app parity
       const total = sub + vat;
+      const allOpenEnded = !anyCommitted && openRate != null;
 
-      const listedLines = supBids.map((b) => {
-        const units = b.numberOfUnits || 1;
-        const verified = b.eqVerified ? ` &nbsp;·&nbsp; <span class="ver-ok">✔ ${esc(L("verified", "موثّقة"))}</span>` : "";
-        const certs = b.heldCertCodes.length
-          ? ` &nbsp;·&nbsp; ${b.heldCertCodes.map((c) => `<span class="doc-ok">✓ ${esc(isAr ? CERT_LABEL[c].ar : CERT_LABEL[c].en)}</span>`).join(" ")}`
-          : "";
-        return `<div class="lv">${esc(labelOf(b))} &nbsp;·&nbsp; ${esc(eqLine(b))} &nbsp;·&nbsp; ${units} ${esc(units > 1 ? L("units", "وحدات") : L("unit", "وحدة"))}${verified}${certs}</div>`;
-      }).join("");
-      const scopeRows = supBids.map((b) => {
-        const it = itemMap.get(b.requestId);
-        const units = b.numberOfUnits || 1;
-        return `<div class="kv"><span>${esc(it?.displayId ?? b.requestId)}</span><b>${units} × ${esc(labelOf(b))}</b></div>`;
-      }).join("");
+      const offeredUnits = (b: GroupBid) => b.unitsOffered || b.numberOfUnits || 1;
 
       // ---- Equipment-terms + Contract-terms cards (the renter's RFQ terms, formatted bilingually) ----
       const tfmt = {
         sla: (v: string | null) => { if (!v) return null; const m: Record<string, [string, string]> = { FOUR_HR: ["4 hours", "٤ ساعات"], EIGHT_HR: ["8 hours", "٨ ساعات"], TWENTY_FOUR_HR: ["24 hours", "٢٤ ساعة"], FORTY_EIGHT_HR: ["48 hours", "٤٨ ساعة"], SEVENTY_TWO_HR: ["72 hours", "٧٢ ساعة"] }; const x = m[v.toUpperCase()]; return x ? L(x[0], x[1]) : v; },
         overtime: (v: string | null) => { if (v == null) return null; const u = v.toUpperCase(); if (u === "0" || u === "WITHOUT") return L("None", "بدون"); if (u === "1.5X") return "1.5×"; if (u === "2X") return "2×"; return v; },
         maint: (v: string | null) => { if (!v) return null; const u = v.toLowerCase(); if (u === "supplier") return L("Supplier", "المؤجّر"); if (u === "renter" || u === "rentee") return L("Renter", "المستأجر"); return v; },
-        payTerms: (v: string | null) => { if (!v) return null; const m: Record<string, [string, string]> = { upfront: ["Upfront", "مقدمًا"], daily: ["Daily", "يومي"], "net-30": ["Net 30 days", "صافي ٣٠ يومًا"], "net-60": ["Net 60 days", "صافي ٦٠ يومًا"], "end-of-job": ["End of job", "نهاية المهمة"] }; const x = m[v.toLowerCase()]; return x ? L(x[0], x[1]) : v; },
+        payTerms: (v: string | null) => { if (!v) return null; const k = v.toLowerCase().replace(/[_-]/g, ""); const m: Record<string, [string, string]> = { upfront: ["Upfront", "مقدمًا"], daily: ["Daily", "يومي"], net0: ["Net 0", "فوري"], net30: ["Net 30 days", "صافي ٣٠ يومًا"], net60: ["Net 60 days", "صافي ٦٠ يومًا"], net90: ["Net 90 days", "صافي ٩٠ يومًا"], endofjob: ["End of job", "نهاية المهمة"] }; const x = m[k]; return x ? L(x[0], x[1]) : v; },
         fuel: (v: string | null) => { if (!v) return null; const m: Record<string, [string, string]> = { DIESEL: ["Diesel", "ديزل"], PETROL: ["Petrol", "بنزين"], ELECTRIC: ["Electric", "كهربائي"] }; const x = m[v.toUpperCase()]; return x ? L(x[0], x[1]) : v; },
         operator: (inc: string | null, nat: string | null) => { if (inc == null) return null; if (inc.toUpperCase() !== "YES") return L("No operator", "بدون مشغّل"); return L("Includes operator", "يشمل مشغّلاً") + (nat ? ` · ${L("Nationality", "الجنسية")}: ${nat}` : ""); },
       };
-      const kvRow = (label: string, val: string | null) => (val ? `<div class="kv"><span>${esc(label)}</span><b>${esc(val)}</b></div>` : "");
-      let eqTermRows: string;
-      if (supBids.length === 1) {
-        const et = sup.requestTerms;
-        eqTermRows = kvRow(L("Operator", "المشغّل"), tfmt.operator(et.operatorIncluded, et.operatorNationality)) + kvRow(L("Fuel type", "نوع الوقود"), tfmt.fuel(et.fuelType));
-      } else {
-        eqTermRows = supBids.map((b) => {
-          const et = b.requestTerms;
-          const parts = [tfmt.operator(et.operatorIncluded, et.operatorNationality), tfmt.fuel(et.fuelType)].filter(Boolean).join(" · ");
-          return kvRow(labelOf(b), parts || null);
-        }).join("");
-      }
-      const eqTermsCard = eqTermRows ? `<div class="card"><div class="card-h">${esc(L("Equipment terms", "شروط المعدة"))}</div>${eqTermRows}</div>` : "";
-      const ct = sup.requestTerms;
-      const contractRows =
-        kvRow(L("Payment method", "طريقة الدفع"), ct.paymentMethod) +
-        kvRow(L("Payment terms", "شروط الدفع"), tfmt.payTerms(ct.paymentTerms)) +
-        kvRow(L("Breakdown response", "زمن الاستجابة للأعطال"), tfmt.sla(ct.breakdownResponseSla)) +
-        kvRow(L("Overtime", "العمل الإضافي"), tfmt.overtime(ct.overtimeRate)) +
-        kvRow(L("Maintenance", "الصيانة"), tfmt.maint(ct.maintenanceResponsibility));
-      const contractTermsCard = contractRows ? `<div class="card"><div class="card-h">${esc(L("Contract terms", "شروط العقد"))}</div>${contractRows}</div>` : "";
+      // App parity: the equipment-terms section prints the required/held safety certifications.
+      const eqCertsText = (b: GroupBid) => {
+        const cs = (b.heldCertCodes?.length ? b.heldCertCodes : b.equipmentCertCodes) ?? [];
+        return cs.length ? cs.map((c) => (isAr ? CERT_LABEL[c]?.ar : CERT_LABEL[c]?.en)).filter(Boolean).join(" · ") : null;
+      };
+      // Listed equipment as an app-parity chip card (app's live_quotation_document _buildEquipmentIdentity
+      // order): Type · Size · Brand · Model · Year · Fuel · Units. Type/Size are split out of the item
+      // label; Brand/Model/Year from the offered equipment. (Category name isn't in the web bid payload —
+      // only the id — so that one chip is omitted.)
+      const listed = supBids.map((b) => {
+        const eq = b.equipment;
+        const segs = labelOf(b).split(" · ").map((x) => x.trim()).filter(Boolean);
+        const size = segs.length > 1 ? segs.slice(1).join(" · ") : null;
+        const fuel = tfmt.fuel(b.requestTerms.fuelType);
+        const chips: { label: string; value: string }[] = [];
+        chips.push({ label: L("Type", "النوع"), value: segs[0] ?? labelOf(b) });
+        if (size) chips.push({ label: L("Size", "المقاس"), value: size });
+        if (eq?.make) chips.push({ label: L("Brand", "العلامة"), value: eq.make });
+        if (eq?.model) chips.push({ label: L("Model", "الطراز"), value: eq.model });
+        if (eq?.year) chips.push({ label: L("Year", "السنة"), value: String(eq.year) });
+        if (fuel) chips.push({ label: L("Fuel", "الوقود"), value: fuel });
+        chips.push({ label: L("Units offered", "الوحدات المعروضة"), value: String(offeredUnits(b)) });
+        return {
+          label: labelOf(b),
+          detail: eqLine(b),
+          units: offeredUnits(b),
+          verified: b.eqVerified,
+          certs: b.heldCertCodes.map((c) => (isAr ? CERT_LABEL[c].ar : CERT_LABEL[c].en)),
+          chips,
+        };
+      });
 
-      return `<section class="q-doc" dir="${isAr ? "rtl" : "ltr"}" lang="${isAr ? "ar" : "en"}">
-        <div class="q-head"><div class="q-title">${esc(L("Equipment rental quotation", "عرض سعر تأجير معدات"))}</div><div class="q-sub"><span class="qn">${esc(qnum)}</span><span>${esc(dateStr)}</span></div></div>
-        <div class="q-body">
-          <div class="parties">
-            <div class="party"><div class="plabel">${esc(L("Supplier", "المؤجّر"))}</div><div class="pname">${esc(sup.supplierName)}</div><div class="pmeta">${[sup.verified ? esc(L("Verified supplier", "مؤجّر موثّق")) : "", sup.rating != null ? "★ " + sup.rating.toFixed(1) : ""].filter(Boolean).join(" · ")}</div>${(() => {
-              const c = sup.compliance;
-              const docs = [c.activityLicense && L("CR", "السجل التجاري"), c.taxNumber && L("VAT", "الرقم الضريبي"), c.nationalAddress && L("National address", "العنوان الوطني")].filter(Boolean) as string[];
-              return docs.length ? `<div class="docs">${docs.map((d) => `<span class="doc-ok">✓ ${esc(d)}</span>`).join("")}</div>` : "";
-            })()}</div>
-            <div class="party"><div class="plabel">${esc(L("Rentee", "المستأجر"))}</div><div class="pname">${esc(rentee.name)}</div><div class="pmeta">${esc(rentee.org)}${rentee.city ? " · " + esc(rentee.city) : ""}</div></div>
-          </div>
-          <div class="metastrip">
-            <div><span>${esc(L("Request #", "رقم الطلب"))}</span><b>${esc(reqLabel)}</b></div>
-            <div><span>${esc(L("Issue date", "تاريخ الإصدار"))}</span><b>${esc(dateStr)}</b></div>
-            <div><span>${esc(L("Valid until", "صالح حتى"))}</span><b>${esc(valid)}</b></div>
-            <div><span>${esc(L("Rental basis", "أساس الإيجار"))}</span><b>${esc(rentalBasis || "—")}</b></div>
-            <div><span>${esc(L("Currency", "العملة"))}</span><b>${esc(sar)}</b></div>
-          </div>
-          <div class="listed"><div class="ll">${esc(L("Listed equipment", "المعدات المدرجة"))} (${supBids.length})</div>${listedLines}</div>
-          <table class="ptable">
-            <thead><tr><th>${esc(L("Item", "البند"))}</th><th class="num">${esc(L("Amount", "المبلغ"))}</th></tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-          <div class="totals">
-            <div class="trow"><span>${esc(L("Subtotal before VAT", "الإجمالي قبل الضريبة"))}</span><b>${nf(sub)}</b></div>
-            <div class="trow"><span>${esc(L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"))}</span><b>${nf(vat)}</b></div>
-            <div class="trow grand"><span>${esc(L("Estimated total", "الإجمالي التقديري"))}</span><b>${nf(total)} ${esc(sar)}</b></div>
-          </div>
-          ${!isAr ? `<div class="words"><div class="wl">Amount in words</div>${esc(numWords(total))} Saudi Riyals · ${supBids.length} ${supBids.length > 1 ? "items" : "item"} · final amount as operated</div>` : ""}
-          <div class="card"><div class="card-h">${esc(L("Project terms", "شروط المشروع"))}</div>
-            ${scopeRows}
-            <div class="kv"><span>${esc(L("Rental basis", "أساس الإيجار"))}</span><b>${esc(rentalBasis || "—")}</b></div>
-            <div class="kv"><span>${esc(L("Equipment lines", "بنود المعدات"))}</span><b>${supBids.length}</b></div>
-            <div class="kv"><span>${esc(L("Total units", "إجمالي الوحدات"))}</span><b>${supBids.reduce((sum, b) => sum + (b.numberOfUnits || 1), 0)}</b></div>
-          </div>
-          ${eqTermsCard}
-          ${contractTermsCard}
-          <ol class="tc">
-            <li>${esc(
-              valid !== "—"
-                ? L(`Valid until ${valid}. After this date the quotation expires automatically unless it is confirmed on the Moedatech platform.`, `صالح حتى ${valid}. ينتهي هذا العرض تلقائيًا بعد هذا التاريخ ما لم يُؤكَّد عبر منصة معداتك.`)
-                : L("This quotation stays valid until it is confirmed on the Moedatech platform.", "يظل هذا العرض ساريًا حتى يتم تأكيده عبر منصة معداتك."),
-            )}</li>
-            <li>${esc(L("Prices cover only the equipment and services listed above; VAT at 15% is added as shown, in line with Saudi tax law.", "تشمل الأسعار المعدات والخدمات المدرجة أعلاه فقط، وتُضاف ضريبة القيمة المضافة ١٥٪ كما هو موضّح وفق النظام الضريبي السعودي."))}</li>
-            <li>${esc(L("The supplier guarantees the equipment is roadworthy and technically safe on the delivery date, and provides the required safety certificates.", "يضمن المؤجّر أن المعدة صالحة وآمنة فنيًا في تاريخ التسليم، ويوفّر شهادات السلامة المطلوبة."))}</li>
-            <li>${esc(L("This quotation is governed by the laws of the Kingdom of Saudi Arabia, and the competent Saudi courts have exclusive jurisdiction over any dispute.", "يخضع هذا العرض لأنظمة المملكة العربية السعودية، وتختص المحاكم السعودية المختصة بالنظر في أي نزاع."))}</li>
-            <li>${esc(L("Issued electronically through the Moedatech platform, this quotation is legally equivalent to a signed document under the Saudi Electronic Transactions Law.", "صدر هذا العرض إلكترونيًا عبر منصة معداتك ويعادل قانونيًا وثيقة موقّعة وفق نظام التعاملات الإلكترونية السعودي."))}</li>
-          </ol>
-          <div class="signed"><b>${esc(L("Electronically signed via the Moedatech platform", "موقّع إلكترونيًا عبر منصة معداتك"))}</b><div>${esc(qnum)} · ${esc(dateStr)}</div></div>
-          <div class="foot">${esc(L("Auto-generated by Moedatech", "مُولّد تلقائيًا بواسطة معداتك"))} · ${esc(L("Comparison code", "رمز المقارنة"))}: ${esc(group.id)}</div>
-        </div>
-      </section>`;
+      const cards: QuotationCard[] = [];
+      const projectRows = supBids.map((b) => ({
+        label: itemMap.get(b.requestId)?.displayId ?? b.requestId,
+        value: `${offeredUnits(b)} × ${labelOf(b)}`,
+      }));
+      projectRows.push({ label: L("Rental basis", "أساس الإيجار"), value: rentalBasis || "—" });
+      projectRows.push({ label: L("Equipment lines", "بنود المعدات"), value: String(supBids.length) });
+      projectRows.push({ label: L("Total units", "إجمالي الوحدات"), value: String(supBids.reduce((s2, b) => s2 + offeredUnits(b), 0)) });
+      cards.push({ title: L("Project terms", "شروط المشروع"), rows: projectRows });
+
+      // App parity: the quotation shows the SUPPLIER's declared terms (not the renter's often-blank
+      // request), with a "· Agreed" tag when the term was locked in the deal room. normKey form:
+      // payment_terms→paymentterms, breakdown_response_sla→breakdownresponsesla, etc.
+      const agBadge = (b: GroupBid, nk: string) => ((b.agreedTermKeys ?? []).includes(nk) ? ` · ${L("Agreed", "متفق عليه")}` : "");
+      const declaredNat = (b: GroupBid) => b.declaredTerms?.operatorNationality ?? b.requestTerms.operatorNationality;
+      const eqCert = (b: GroupBid) => { const t = eqCertsText(b); return t ? t + agBadge(b, "safetycertifications") : null; };
+
+      const eqRows: { label: string; value: string }[] = [];
+      const addEq = (label: string, val: string | null) => { if (val) eqRows.push({ label, value: val }); };
+      if (supBids.length === 1) {
+        addEq(L("Operator", "المشغّل"), tfmt.operator(sup.requestTerms.operatorIncluded, declaredNat(sup)));
+        addEq(L("Equipment safety certifications", "شهادات سلامة المعدة"), eqCert(sup));
+        addEq(L("Fuel type", "نوع الوقود"), tfmt.fuel(sup.requestTerms.fuelType));
+      } else {
+        for (const b of supBids) {
+          const parts = [tfmt.operator(b.requestTerms.operatorIncluded, declaredNat(b)), eqCert(b), tfmt.fuel(b.requestTerms.fuelType)].filter(Boolean).join(" · ");
+          if (parts) eqRows.push({ label: labelOf(b), value: parts });
+        }
+      }
+      if (eqRows.length) cards.push({ title: L("Equipment terms", "شروط المعدة"), rows: eqRows });
+
+      const dt = sup.declaredTerms;
+      const rt = sup.requestTerms;
+      const ctRows: { label: string; value: string }[] = [];
+      const addCt = (label: string, val: string | null) => { if (val) ctRows.push({ label, value: val }); };
+      const pay = tfmt.payTerms(dt?.paymentTerms ?? rt.paymentTerms);
+      addCt(L("Payment type", "نوع الدفع"), pay ? pay + agBadge(sup, "paymentterms") : null);
+      const sla = tfmt.sla(dt?.breakdownResponseSla ?? rt.breakdownResponseSla);
+      addCt(L("Breakdown response", "زمن الاستجابة للأعطال"), sla ? sla + agBadge(sup, "breakdownresponsesla") : null);
+      const ot = tfmt.overtime(dt?.overtimeRate ?? rt.overtimeRate);
+      addCt(L("Overtime", "العمل الإضافي"), ot ? ot + agBadge(sup, "overtimerate") : null);
+      addCt(L("Maintenance", "الصيانة"), tfmt.maint(rt.maintenanceResponsibility));
+      if (ctRows.length) cards.push({ title: L("Contract terms", "شروط العقد"), rows: ctRows });
+
+      const doc: QuotationDoc = {
+        lang: isAr ? "ar" : "en",
+        title: L("Equipment rental quotation", "عرض سعر تأجير معدات"),
+        quotationNumber: qnum,
+        dateStr,
+        supplier: { label: L("Supplier", "المؤجِّر"), name: sup.supplierName, sub: supplierSub, idRows: supIdRows, chips: sup.verified ? [L("Verified", "موثَّق")] : [] },
+        rentee: { label: L("Rentee", "المُستأجِر"), name: rentee.name, sub: rentee.person, idRows: renteeIdRows, chips: [] },
+        meta: [
+          { label: L("Request #", "رقم الطلب"), value: groupRef ?? reqLabel },
+          { label: L("Issue date", "تاريخ الإصدار"), value: dateStr },
+          { label: L("Valid until", "صالح حتى"), value: valid },
+          { label: L("Rental start", "بدء الإيجار"), value: startStr },
+          { label: L("Rental end", "نهاية الإيجار"), value: endStr },
+          { label: L("Currency", "العملة"), value: L("SAR · Saudi Riyal", "SAR · ريال سعودي") },
+        ],
+        listed,
+        lineItems,
+        currency: sar,
+        // Open-ended bids: reframe the grand row as the per-unit·period rate ("Total / unit · day") and
+        // note the estimate, exactly like the app's live quotation. Committed durations show a real total.
+        totals: allOpenEnded
+          ? { subtotal: sub, vat, total, label: `${L("Total", "الإجمالي")} / ${L("unit", "وحدة")} · ${openPlabel}`, valueOverride: `${m2(openRate!)} ${sar}` }
+          : { subtotal: sub, vat, total },
+        cards,
+        legal: quotationLegal(L),
+        amountWordsSuffix: allOpenEnded ? L("Estimate for one day · Final amount as operated", "تقدير ليوم واحد · المبلغ النهائي حسب التشغيل") : undefined,
+      };
+      return renderQuotationSection(doc);
     };
 
     // Single language (the renter picks Arabic or English) — one page per supplier, no 2-in-1.
@@ -395,185 +496,423 @@ export function GroupBids({ group }: { group: RequestGroup }) {
       .map((supBids, si) => renderSection(supBids, si, langIsAr))
       .join("");
 
-    const html = `<!doctype html><html lang="${langIsAr ? "ar" : "en"}" dir="${langIsAr ? "rtl" : "ltr"}"><head><meta charset="utf-8"><title>${esc(quotationFileTitle(group.id, coveredCodes))}</title>` +
-      `<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">` +
-      `<style>${QSTYLE}</style></head><body>${sections}` +
-      `<script>window.onload=function(){setTimeout(function(){window.print();},350);}</script></body></html>`;
+    // Human-readable name: group short code (RFQ-NNNNN) when present, else the single request id
+    // (REQ-NNNNN); covered item codes are stamped for re-upload scoping.
+    const dlPrimary = groupRef ?? coveredCodes[0] ?? group.items[0]?.displayId ?? "quotation";
+    const dlName = quotationDownloadName(dlPrimary, coveredCodes);
+    const html = wrapQuotationPage(sections, { lang: langIsAr ? "ar" : "en", title: dlName });
+    // Robust open: a popup-blocked `window.open` returns null and used to silently fail (dead click).
+    // Fall back to downloading the self-printing HTML file so the quotation is never a no-op.
     const w = window.open("", "_blank");
-    if (!w) return;
-    w.document.write(html);
-    w.document.close();
+    if (w) {
+      w.document.write(html);
+      w.document.close();
+      return;
+    }
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${dlName.replace(/[^\w.-]+/g, "_")}.html`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
   }
 
   if (error) return <div className="rempty">{L("Couldn’t load the bids.", "تعذّر تحميل العروض.")}</div>;
   if (!bids) return <div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 26 }}>progress_activity</span></div>;
-  if (bids.length === 0) return <div className="rempty">{L("No bids yet for this request.", "لا توجد عروض بعد لهذا الطلب.")}</div>;
+  const allBids = [...bids, ...subCards];
+  if (allBids.length === 0) return <div className="rempty">{L("No bids yet for this request.", "لا توجد عروض بعد لهذا الطلب.")}</div>;
 
-  const suppliers = bidSuppliers(bids);
-  const shown = (supplierKey === "all" ? [...bids].sort((a, b) => a.requestId.localeCompare(b.requestId)) : bids.filter((b) => (b.supplierId ?? b.supplierName) === supplierKey));
-  const selectedCount = bids.filter((b) => selected.has(b.id)).length;
+  const suppliers = bidSuppliers(allBids);
+  // Bid source: off-platform shared-link vs on-platform (no uploaded-file source on this surface yet).
+  const sourceOf = (b: GroupBid): "link" | "platform" | "file" => (b.viaSharedLink ? "link" : "platform");
+  const srcCount = (s: "all" | "link" | "platform" | "file") => (s === "all" ? allBids.length : allBids.filter((b) => sourceOf(b) === s).length);
+  const base = supplierKey === "all" ? [...allBids].sort((a, b) => a.requestId.localeCompare(b.requestId)) : allBids.filter((b) => (b.supplierId ?? b.supplierName) === supplierKey);
+  const shown = base.filter(
+    (b) =>
+      (selectedItem === "all" || b.requestId === selectedItem) &&
+      (fSource === "all" || sourceOf(b) === fSource) &&
+      (!fVerified || b.verified) &&
+      (!fKm || (b.distanceKm != null && b.distanceKm <= 50)),
+  );
+  const fActive = (fSource !== "all" ? 1 : 0) + (fVerified ? 1 : 0) + (fKm ? 1 : 0);
+  const selectedCount = allBids.filter((b) => selected.has(b.id)).length;
+  // Item picker: one entry per request line + its bid count (off-platform included via allBids).
+  const itemList = group.items.map((it) => ({
+    id: it.id,
+    name: (ar ? it.item?.nameAr : it.item?.name) || it.displayId,
+    img: it.item?.imageUrl ?? null,
+    categoryId: it.item?.categoryId ?? null,
+    qty: it.item?.qty ?? 1,
+    count: allBids.filter((b) => b.requestId === it.id).length,
+  }));
+  const selItem = itemList.find((i) => i.id === selectedItem) ?? null;
+  const shownSuppliers = new Set(shown.map((b) => b.supplierId ?? b.supplierName)).size;
+  // Card width scales with how many bids there are: 1–2 grow to fill the row (no empty side margin);
+  // 3+ take a fixed width so the third card peeks at the edge, hinting the horizontal scroll.
+  const cardFlex = shown.length <= 2 ? "1 1 0" : "0 0 calc(44% - 8px)";
+  // Toolbar chip styles (prototype bids-by-supplier).
+  const supChip = (on: boolean): CSSProperties => ({ display: "flex", alignItems: "center", gap: 7, whiteSpace: "nowrap", flexShrink: 0, padding: "10px 14px", borderRadius: 22, cursor: "pointer", fontWeight: 800, fontSize: 13, fontFamily: "inherit", background: on ? "#1c3550" : "#fff", color: on ? "#fff" : "#1c3550", border: `1px solid ${on ? "#1c3550" : "#d4e0ec"}` });
+  const chipCount = (on: boolean): CSSProperties => ({ fontSize: 11, fontWeight: 800, background: on ? "rgba(255,255,255,.18)" : "#eff4f9", color: on ? "#fff" : "#6b8fa8", padding: "1px 7px", borderRadius: 20 });
+  const itemMenuRow = (on: boolean): CSSProperties => ({ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "start", padding: "9px 11px", borderRadius: 9, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 13, fontFamily: "inherit", background: on ? "#eff4f9" : "transparent", color: "#1c3550" });
+  const menuCount: CSSProperties = { fontSize: 11, fontWeight: 800, color: "#6b8fa8", background: "#F0F4F9", padding: "1px 8px", borderRadius: 20 };
 
   return (
     <div>
-      {/* Level 2 — supplier filter */}
-      <div className="flevel">
-        <div className="flab"><span className="material-icons-outlined">storefront</span>{L("Supplier", "المؤجّر")}</div>
-        <div className="chips-row">
-          <button className={`req-chip${supplierKey === "all" ? " on" : ""}`} onClick={() => setSupplierKey("all")}>
-            {L("All suppliers", "كل المؤجّرين")} <span className="ct">{bids.length}</span>
+      {/* toolbar — supplier tabs | item picker | filter icon (prototype bids-by-supplier) */}
+      <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 14 }}>
+        {/* supplier tabs */}
+        <div style={{ flex: 1, minWidth: 0, display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+          <button onClick={() => setSupplierKey("all")} style={supChip(supplierKey === "all")}>
+            {L("All suppliers", "كل المؤجّرين")}<span style={chipCount(supplierKey === "all")}>{allBids.length}</span>
           </button>
-          {suppliers.map((s) => (
-            <button key={s.key} className={`req-chip sup-chip${supplierKey === s.key ? " on" : ""}`} onClick={() => setSupplierKey(s.key)}>
-              <span className="av">{s.name.charAt(0).toUpperCase()}</span>{s.name}
-              {s.verified && <span className="material-icons-outlined vtick">verified</span>}
-              <span className="ct">{s.count}</span>
-            </button>
-          ))}
+          {suppliers.map((s) => {
+            const on = supplierKey === s.key;
+            return (
+              <button key={s.key} onClick={() => setSupplierKey(s.key)} style={supChip(on)}>
+                <span style={{ width: 18, height: 18, borderRadius: "50%", background: on ? "rgba(255,255,255,.2)" : "#1c3550", color: "#fff", fontSize: 10, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.name.charAt(0).toUpperCase()}</span>
+                {s.name}
+                {s.verified && <span className="material-icons-outlined" style={{ fontSize: 14, color: on ? "#7CE5A6" : "#1daf58" }}>verified</span>}
+                <span style={chipCount(on)}>{s.count}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ width: 1, height: 34, background: "#D7DEE8", flexShrink: 0 }} />
+        {/* item picker */}
+        <div style={{ position: "relative", flexShrink: 0 }}>
+          <button onClick={() => { setItemMenuOpen((o) => !o); setFilterOpen(false); }} title={L("Filter by item", "تصفية حسب البند")} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 11, border: "1.5px solid #1c3550", background: "#1c3550", color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer" }}>
+            <span style={{ width: 28, height: 28, borderRadius: 8, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0, padding: 1 }}>
+              {selItem
+                ? <EquipImg src={selItem.img} categoryId={selItem.categoryId} name={selItem.name} box="" img="h-[26px] w-[26px] object-contain" iconSize={24} />
+                : <span className="material-icons-outlined" style={{ fontSize: 20, color: "#1c3550" }}>apps</span>}
+            </span>
+            <span style={{ fontSize: 11, fontWeight: 800, background: "rgba(255,255,255,.16)", color: "#FBBF6B", padding: "1px 7px", borderRadius: 20 }}>{selItem ? selItem.count : allBids.length}</span>
+            <span className="material-icons-outlined" style={{ fontSize: 16, color: "#9DAFC6" }}>expand_more</span>
+          </button>
+          {itemMenuOpen && (
+            <>
+              <div onClick={() => setItemMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 20 }} />
+              <div style={{ position: "absolute", zIndex: 30, top: "100%", insetInlineEnd: 0, marginTop: 6, background: "#fff", border: "1px solid #d4e0ec", borderRadius: 13, boxShadow: "0 16px 40px rgba(20,40,70,.20)", padding: 6, minWidth: 280, maxHeight: 360, overflowY: "auto" }}>
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".06em", color: "#6b8fa8", padding: "6px 9px 7px" }}>{L("VIEWING ITEM", "البند المعروض")}</div>
+                <button onClick={() => { setSelectedItem("all"); setItemMenuOpen(false); }} style={itemMenuRow(selectedItem === "all")}>
+                  <span className="material-icons-outlined" style={{ fontSize: 18 }}>apps</span>
+                  <span style={{ flex: 1 }}>{L("All items", "كل البنود")}</span>
+                  <span style={menuCount}>{allBids.length}</span>
+                </button>
+                {itemList.map((m) => (
+                  <button key={m.id} onClick={() => { setSelectedItem(m.id); setItemMenuOpen(false); }} style={itemMenuRow(selectedItem === m.id)}>
+                    <EquipImg src={m.img} categoryId={m.categoryId} name={m.name} box="" img="h-4 w-4 object-contain" iconSize={18} />
+                    <span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</span>
+                    {m.qty > 1 && <span style={{ fontSize: 10, fontWeight: 800, color: "#d4780a", background: "#fff3e0", padding: "1px 6px", borderRadius: 20 }}>×{m.qty}</span>}
+                    <span style={menuCount}>{m.count}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+        {/* filter icon */}
+        <div style={{ position: "relative", flexShrink: 0 }}>
+          <button onClick={() => { setFilterOpen((o) => !o); setItemMenuOpen(false); }} title={L("Filter bids", "تصفية العروض")} style={{ position: "relative", width: 42, height: 42, borderRadius: 11, border: `1.5px solid ${fActive ? "#f79009" : "#d4e0ec"}`, background: fActive ? "#fff4e5" : "#fff", color: fActive ? "#f79009" : "#1c3550", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span className="material-icons-outlined" style={{ fontSize: 20 }}>filter_list</span>
+            {fActive > 0 && <span style={{ position: "absolute", top: -6, insetInlineEnd: -6, fontSize: 10, fontWeight: 900, background: "#f79009", color: "#fff", minWidth: 17, height: 17, borderRadius: 20, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #fff" }}>{fActive}</span>}
+          </button>
+          {filterOpen && (
+            <>
+              <div className="filter-backdrop" onClick={() => setFilterOpen(false)} />
+              <div className="filter-pop" style={{ insetInlineStart: "auto", insetInlineEnd: 0 }}>
+                <div className="fp-h">{L("Bid source", "مصدر العرض")}</div>
+                {([
+                  ["all", L("All sources", "كل المصادر"), null, ""],
+                  ["link", L("Off your request link", "من رابط طلبك"), "link", "var(--action)"],
+                  ["platform", L("On platform", "على المنصة"), "verified", "var(--success)"],
+                ] as const).map(([key, label, icon, color]) => (
+                  <div key={key} className={`fp-opt${fSource === key ? " on" : ""}`} onClick={() => setFSource(key)}>
+                    <span className="radio" />
+                    {icon && <span className="material-icons-outlined fp-ic" style={{ color }}>{icon}</span>}
+                    {label}
+                    <span className="fp-n">{srcCount(key)}</span>
+                  </div>
+                ))}
+                <div className="fp-div" />
+                <div className="fp-h">{L("Refine", "تنقية")}</div>
+                <div className={`fp-opt fp-check${fVerified ? " on" : ""}`} onClick={() => setFVerified((v) => !v)}>
+                  <span className="box"><span className="material-icons-outlined">check</span></span>
+                  <span className="material-icons-outlined fp-ic" style={{ color: "var(--success)" }}>verified_user</span>{L("Verified suppliers only", "المؤجّرون الموثّقون فقط")}
+                </div>
+                <div className={`fp-opt fp-check${fKm ? " on" : ""}`} onClick={() => setFKm((v) => !v)}>
+                  <span className="box"><span className="material-icons-outlined">check</span></span>
+                  <span className="material-icons-outlined fp-ic" style={{ color: "var(--navy-mid)" }}>place</span>{L("Within 50 km of site", "ضمن ٥٠ كم من الموقع")}
+                </div>
+                <div className="fp-foot">
+                  <button className="clr" onClick={() => { setFSource("all"); setFVerified(false); setFKm(false); }}>{L("Clear all", "مسح الكل")}</button>
+                  <button className="done" onClick={() => setFilterOpen(false)}>{L("Done", "تم")}</button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      <div className="contentbar">
-        <span className="count">
-          {supplierKey === "all"
-            ? `${shown.length} ${L("bids from", "عروض من")} ${suppliers.length} ${L("suppliers", "مؤجّرين")}`
-            : `${shown.length} ${L("bids from this supplier", "عروض من هذا المؤجّر")}`}
-          {" — "}{L("select cards to quote", "حدّد البطاقات لعرض السعر")}
+      <div data-select-ui style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "0 0 14px" }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: "#2a4f72" }}>
+          {selectMode
+            ? L("Tap bids to compare · click away to cancel", "اضغط على العروض للمقارنة · انقر خارجًا للإلغاء")
+            : `${shown.length} ${L("bids from", "عروض من")} ${shownSuppliers} ${L("suppliers", "مؤجّرين")}${selItem ? ` · ${selItem.name}` : ""}`}
         </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          {/* B4: clicking outside exits selection (see the mousedown effect) — no Cancel button. */}
+          <button
+            onClick={() => setSelectMode((m) => !m)}
+            title={L("Pick bids to compare", "اختر عروضًا للمقارنة")}
+            style={{ display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 11, padding: "10px 16px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", background: selectMode ? "#1c3550" : "#fff", color: selectMode ? "#fff" : "#1c3550", border: `1px solid ${selectMode ? "#1c3550" : "#d4e0ec"}` }}
+          >
+            <span className="material-icons-outlined" style={{ fontSize: 17 }}>compare_arrows</span>
+            {selectMode ? L("Comparing", "جارٍ المقارنة") : L("Compare bids", "مقارنة العروض")}
+          </button>
+        </div>
       </div>
 
+      <div className="bids-snap" data-select-ui>
       {shown.map((b) => {
-        const sp = SPILL[b.status] ?? SPILL.PENDING;
+        if (b.viaSharedLink) {
+          return (
+            <SharedLinkBidCard
+              key={b.id}
+              bid={b}
+              ar={ar}
+              L={L}
+              isSel={selected.has(b.id)}
+              selectMode={selectMode}
+              cardFlex={cardFlex}
+              onToggleSelect={() => toggleSelect(b.id)}
+              onViewSubmission={() => setSubmissionBid(b)}
+              itemLabel={ar ? b.itemLabelAr : b.itemLabel}
+              itemImage={b.itemImage}
+              categoryId={b.categoryId}
+            />
+          );
+        }
+        // A survey-reported winner (wonViaSurvey) that isn't ACCEPTED still reads as a decided "Awarded"
+        // bid — app parity (the mobile card reflects both). ACCEPTED keeps its own "Accepted" pill.
+        const wonSurvey = b.wonViaSurvey === true && b.status !== "ACCEPTED";
+        const sp = wonSurvey ? { cls: "sp-accepted", dot: false, en: "Awarded", ar: "تمت الترسية" } : (SPILL[b.status] ?? SPILL.PENDING);
+        const sc = wonSurvey ? { bg: "#e7f7ee", c: "#1daf58", dot: false } : ({
+          PENDING: { bg: "#e6f2fb", c: "#1a7ec8", dot: true },
+          OPEN_FOR_NEGOTIATION: { bg: "#fff3e0", c: "#d4780a", dot: true },
+          COUNTER_OFFERED: { bg: "#fff3e0", c: "#d4780a", dot: true },
+          ACCEPTED: { bg: "#e7f7ee", c: "#1daf58", dot: false },
+          EXPIRED: { bg: "#eff4f9", c: "#6b8fa8", dot: false },
+          WITHDRAWN: { bg: "#eff4f9", c: "#6b8fa8", dot: false },
+        } as Record<string, { bg: string; c: string; dot: boolean }>)[b.status] ?? { bg: "#e6f2fb", c: "#1a7ec8", dot: true };
         const disabled = b.status === "EXPIRED" || b.status === "WITHDRAWN" || b.expired;
-        const periods = b.duration ?? 1;
-        const units = b.numberOfUnits || 1; // bid price is per-unit → × units (app parity)
-        const rentalTotal = (b.price ?? 0) * periods * units;
-        const sub = rentalTotal + (b.mobPrice ?? 0) + (b.demobPrice ?? 0);
-        const vat = Math.round(sub * 0.15);
-        const grand = sub + vat;
-        const priceOpen = openPrice === b.id;
+        const offered = b.unitsOffered || 1; // units this supplier is offering
+        const needed = b.numberOfUnits || offered; // units the request asked for
+        const cover = needed ? Math.min(100, Math.round((offered / needed) * 100)) : 0;
+        const priceOpen = openPrices.has(b.id);
+        const perUnit = !allUnitsIds.has(b.id); // default per-unit; a card is "all units" only if toggled
         const isSel = selected.has(b.id);
+        // Card price — canonical quote: rate ÷ period-days × duration (weekly ÷7, monthly ÷26),
+        // mob/demob × units, VAT 15%. "Per unit" toggle prices one unit; else all offered units.
+        const u = priceOpen && perUnit ? 1 : offered;
+        const cq = computeBidQuote(b, { units: u, fallbackDays: group.items.find((it) => it.id === b.requestId)?.durationDays ?? null });
+        const rental = cq.rentalSubtotal;
+        const deliv = cq.mobTotal;
+        const ret = cq.demobTotal;
+        const sub = cq.subtotalPreVat;
+        const vat = Math.round(cq.vat);
+        const grand = Math.round(cq.total);
+        // Mobile parity (v3_bid_card): collapsed headline = the PER-UNIT rental total (rate × periods),
+        // excluding units/mob/demob/VAT — so bids compare on the unit rate. All-in lives in the grand total.
+        const perUnitRentalTotal = Math.round((b.price ?? 0) * cq.periods);
+        const rentalTotalLabel = ((): string => {
+          switch ((b.priceUnit ?? "PER_DAY").toUpperCase()) {
+            case "PER_WEEK": return L("Weekly rental total", "إجمالي الإيجار الأسبوعي");
+            case "PER_MONTH": return L("Monthly rental total", "إجمالي الإيجار الشهري");
+            case "PER_JOB": return L("Job total", "إجمالي المهمة");
+            default: return L("Daily rental total", "إجمالي الإيجار اليومي");
+          }
+        })();
+        const isAccepted = (b.status ?? "").toUpperCase() === "ACCEPTED" || wonSurvey; // decided → accepted/awarded styling
+        // B1: the card tally uses the SAME bucketing as the Terms modal (bucketBidTerms) so the card's
+        // "Conflict N · Matched N" always equals what the modal lists when opened.
+        const termCounts = bucketBidTerms(b.terms, b.negotiableTerms).counts;
+        const termChips = [
+          { label: L("Conflict", "تعارض"), n: termCounts.conflict, c: "#d9362a" },
+          { label: L("Pending review", "بانتظار المراجعة"), n: termCounts.pending, c: "#d4780a" },
+          { label: L("Matched", "مطابق"), n: termCounts.matched, c: "#1daf58" },
+        ];
+        const rowSep = { borderTop: "1px solid #EFF2F6" } as const;
+        const iconBox = { width: 40, height: 40, borderRadius: 11, background: "#eff4f9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } as const;
+        const blueLink = { background: "none", border: "none", color: "#1a7ec8", fontWeight: 800, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" } as const;
+        // Top banner = the bid's SOURCE only (2 values, app parity): on-platform bids are always
+        // "Via Moedatech app" in BLUE; off-platform shared-link bids carry the ORANGE banner on their
+        // own card (SharedLinkBidCard). The negotiation STATUS lives in the right badge + the CTA suffix.
+        const banner = { icon: "verified_user", text: L("Via Moedatech app", "عبر تطبيق معداتك"), bg: "#e6f2fb", c: "#1a7ec8", bd: "#cfe6f7" };
         return (
-          <div className={`bid${isSel ? " sel" : ""}`} key={b.id}>
-            {/* deal-room status banner (app parity) — whose move it is + agreed-terms meter */}
-            <DealRoomBanner bid={b} ar={ar} />
-            {/* equipment-focused header */}
-            <div className="bid-head">
-              <div className="bid-eq"><EquipImg src={b.itemImage} categoryId={b.categoryId} name={ar ? b.itemLabelAr : b.itemLabel} box="" img="h-7 w-7 object-contain" iconSize={24} /></div>
-              <div className="bid-hh">
-                <div className="r1">
-                  <span className="sname">{ar ? b.itemLabelAr : b.itemLabel}</span>
-                  {units > 1 && <span className="qty-badge">× {units}</span>}
-                  <span className={`material-icons-outlined ${b.verified ? "eqv-ok" : "eqv-no"}`}>{b.verified ? "verified" : "gpp_bad"}</span>
-                  <span className={`spill ${sp.cls}`}>{sp.dot && <span className="d" />}{ar ? sp.ar : sp.en}</span>
-                </div>
-                <div className="bid-by">
-                  <span className="material-icons-outlined">storefront</span>{b.supplierName}
-                  {b.verified && <span className="material-icons-outlined vf">verified</span>}
-                  {b.rating != null && <><span className="dotsep">·</span><span className="star"><span className="material-icons-outlined">star</span>{b.rating.toFixed(1)}</span></>}
-                </div>
-                <CredentialPills required={b.requiredCerts} held={b.heldCertCodes} ar={ar} />
-                {/* supplier credentials on file — identity docs (CR / VAT / National address) + held certs */}
-                <SupplierDocs compliance={b.compliance} heldCerts={b.heldCertCodes} requiredCerts={b.requiredCerts} ar={ar} />
+          <div
+            key={b.id}
+            onClick={selectMode ? () => toggleSelect(b.id) : undefined}
+            style={{ flex: cardFlex, minWidth: 320, scrollSnapAlign: "start", alignSelf: "flex-start", display: "flex", flexDirection: "column", position: "relative", background: isSel ? "#fff8f0" : "#fff", border: `1px solid ${isSel ? "#f79009" : "#d4e0ec"}`, borderRadius: 18, overflow: "hidden", boxShadow: isSel ? "inset 0 0 0 2px #f79009" : "0 1px 2px rgba(20,40,70,.04)", cursor: selectMode ? "pointer" : "default" }}
+          >
+            <div style={{ height: 4, background: banner.c }} />
+            {banner && (
+              <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", background: banner.bg, borderBottom: `1px solid ${banner.bd}`, fontSize: 11.5, fontWeight: 800, color: banner.c }}>
+                <span className="material-icons-outlined" style={{ fontSize: 16 }}>{banner.icon}</span>{banner.text}
               </div>
-              <div className={`bid-check${isSel ? " on" : ""}`} onClick={() => toggleSelect(b.id)} title={L("Select for quotation", "حدّد لعرض السعر")}>
-                <span className="material-icons-outlined">check</span>
+            )}
+            {selectMode && (
+              <div style={{ position: "absolute", top: 12, insetInlineEnd: 12, width: 26, height: 26, borderRadius: "50%", background: isSel ? "#f79009" : "#fff", border: `2px solid ${isSel ? "#f79009" : "#d4e0ec"}`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(20,40,70,.18)", zIndex: 5, pointerEvents: "none" }}>
+                {isSel && <span className="material-icons-outlined" style={{ fontSize: 16 }}>check</span>}
               </div>
-            </div>
+            )}
 
-            {/* offered equipment (013 AC-06: collapsed row = distance + label + tap; make/model/year live in the modal) */}
-            <div
-              className={`equip-row row-sep${b.equipment?.id ? " tappable" : ""}`}
-              role={b.equipment?.id ? "button" : undefined}
-              tabIndex={b.equipment?.id ? 0 : undefined}
-              onClick={() => b.equipment?.id && setEquipBid(b)}
-              onKeyDown={(e) => b.equipment?.id && (e.key === "Enter" || e.key === " ") && setEquipBid(b)}
-              title={b.equipment?.id ? L("Tap for details", "اضغط للتفاصيل") : undefined}
-            >
-              <div className="el">
-                <div className="elab">{L("Equipment", "المعدة")}{b.eqVerified && <span className="material-icons-outlined vt">verified</span>}</div>
-                <div className="esub">{b.distanceKm != null ? `${Math.round(b.distanceKm)} ${L("km from the project", "كم من المشروع")}` : L("Distance not shared", "المسافة غير محددة")}</div>
+            {/* header */}
+            <div style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "16px 16px 12px" }}>
+              <div style={{ width: 56, height: 56, borderRadius: 14, background: "#eff4f9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <EquipImg src={b.itemImage} categoryId={b.categoryId} name={ar ? b.itemLabelAr : b.itemLabel} box="" img="h-10 w-10 object-contain" iconSize={36} />
               </div>
-              {b.equipment?.id && (
-                <span className="equip-view">
-                  {L("Tap for details", "اضغط للتفاصيل")}<span className="material-icons-outlined">chevron_right</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 8, minWidth: 0 }}>
+                  <span style={{ flex: "0 1 auto", minWidth: 0, fontSize: 13.5, fontWeight: 900, color: "#1c3550", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.25 }} title={ar ? b.itemLabelAr : b.itemLabel}>{ar ? b.itemLabelAr : b.itemLabel}</span>
+                  <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, color: "#d4780a", background: "#fff3e0", padding: "1px 8px", borderRadius: 20 }}>×{offered}</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 6 }}>
+                  <span style={{ width: 22, height: 22, borderRadius: "50%", background: "#1c3550", color: "#fff", fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{(b.supplierName || "S").charAt(0).toUpperCase()}</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550" }}>{b.supplierName}</span>
+                  {b.verified && <span className="material-icons-outlined" style={{ fontSize: 16, color: "#1daf58" }}>verified</span>}
+                </div>
+              </div>
+              {!selectMode && (
+                <span style={{ whiteSpace: "nowrap", fontSize: 11, fontWeight: 800, padding: "5px 11px", borderRadius: 20, background: sc.bg, color: sc.c, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  {sc.dot && <span style={{ width: 6, height: 6, borderRadius: "50%", background: sc.c }} />}{ar ? sp.ar : sp.en}
                 </span>
               )}
             </div>
 
-            {/* Terms — per-class status badges (Equipment / Project / Supplier); tap → modal with the
-                per-term status inside each class. New-counter badge surfaces unseen deal-room changes. */}
-            <button
-              type="button"
-              className={`terms-row row-sep tappable${openTermsId === b.id ? " open" : ""}`}
-              aria-expanded={openTermsId === b.id}
-              onClick={() => setOpenTermsId(openTermsId === b.id ? null : b.id)}
-            >
-              <span className="tlab">{L("Terms", "الشروط")}</span>
-              <TermClassBadges terms={b.terms} ar={ar} />
-              {b.unreadTerms.length > 0 && <span className="dr-turn">{b.unreadTerms.length} {L("new", "جديد")}</span>}
-              <span className="material-icons-outlined chev">expand_more</span>
-            </button>
-            {openTermsId === b.id && <TermsPanel terms={b.terms} ar={ar} L={L} />}
-
-            {/* supplier note (app parity — BidModel.note) */}
-            {b.note && (
-              <div className="bid-note row-sep">
-                <span className="material-icons-outlined">sticky_note_2</span>
-                <span className="bn-text">{b.note}</span>
+            {/* fulfillment band */}
+            <div style={{ margin: "0 16px 14px", padding: "10px 14px", borderRadius: 12, background: "#fff4e5", display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: "#1c3550", whiteSpace: "nowrap" }}>{L(`Covers ${offered} of ${needed} units`, `يغطّي ${offered} من ${needed} وحدات`)}</span>
+              <div style={{ flex: 1, height: 8, borderRadius: 6, background: "rgba(247,144,9,.18)", overflow: "hidden" }}>
+                <div style={{ height: "100%", borderRadius: 6, background: "#f79009", width: `${cover}%` }} />
               </div>
-            )}
+              <span style={{ fontSize: 12, color: "#6b8fa8", fontWeight: 700, whiteSpace: "nowrap" }}>{[b.rating != null ? `★ ${b.rating.toFixed(1)}` : "", b.distanceKm != null ? `${Math.round(b.distanceKm)} km` : ""].filter(Boolean).join(" · ")}</span>
+            </div>
 
-            {/* price */}
-            <div className={`price-row${priceOpen ? " open" : ""}`}>
-              <div className="price-collapsed" onClick={() => setOpenPrice(priceOpen ? null : b.id)}>
-                <span className="pl">{L("Rate", "السعر")}</span>
-                <span className="pr">{nf(b.price ?? 0)} {L("SAR", "ر.س")} / {periodOf(b.priceUnit)}{units > 1 ? ` · ${L("per unit", "لكل وحدة")}` : ""}<span className="chev">expand_more</span></span>
+            {/* Equipment row */}
+            <div style={{ ...rowSep, display: "flex", alignItems: "center", gap: 12, padding: "13px 16px" }}>
+              <div style={iconBox}>
+                <EquipImg src={b.itemImage} categoryId={b.categoryId} name={ar ? b.itemLabelAr : b.itemLabel} box="" img="h-5 w-5 object-contain" iconSize={20} />
               </div>
-              {priceOpen && (
-                <div className="price-body">
-                  <div className="prow"><span className="pl2">{L("Rental", "الإيجار")} ({nf(b.price ?? 0)} × {periods}{units > 1 ? ` × ${units}` : ""})</span><span className="pv">{nf(rentalTotal)}</span></div>
-                  {b.mobPrice ? <div className="prow"><span className="pl2">{L("Delivery to site", "النقل إلى الموقع")}{b.mobLeadTime && <span className="lead">{L("delivery within", "تسليم خلال")} {b.mobLeadTime}</span>}</span><span className="pv">{nf(b.mobPrice)}</span></div> : null}
-                  {b.demobPrice ? <div className="prow"><span className="pl2">{L("Return from site", "النقل من الموقع")}{b.demobLeadTime && <span className="lead">{L("return within", "إرجاع خلال")} {b.demobLeadTime}</span>}</span><span className="pv">{nf(b.demobPrice)}</span></div> : null}
-                  <div className="prow"><span className="pl2">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="pv">{nf(sub)}</span></div>
-                  <div className="prow"><span className="pl2">{L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)")}</span><span className="pv">{nf(vat)}</span></div>
-                  <div className="grandcard"><span className="gl">{L("Estimated total", "الإجمالي التقديري")}</span><span className="gv">{nf(grand)} {L("SAR", "ر.س")}</span></div>
+              <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Equipment", "المعدة")}</span>
+              {/* No cert chips on the card — all equipment detail lives in the Details modal only. */}
+              <div style={{ flex: 1 }} />
+              {!selectMode && (
+                <button onClick={() => setEquipBid(b)} style={blueLink}>{L("Details", "التفاصيل")} ›</button>
+              )}
+            </div>
+
+            {/* Terms row */}
+            <div style={{ ...rowSep, display: "flex", alignItems: "center", gap: 12, padding: "13px 16px" }}>
+              <div style={iconBox}><span className="material-icons-outlined" style={{ fontSize: 20, color: "#6b8fa8" }}>description</span></div>
+              <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Terms", "الشروط")}</span>
+              <div style={{ display: "flex", gap: 4, flexWrap: "nowrap", flex: 1, minWidth: 0, overflowX: "auto" }} className="no-sb">
+                {termChips.map((t) => (
+                  <span key={t.label} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 800, color: t.n > 0 ? t.c : "#9AA7B8", whiteSpace: "nowrap" }}>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: t.n > 0 ? t.c : "#c3d2e0" }} />{t.label} {t.n}
+                  </span>
+                ))}
+              </div>
+              {!selectMode && <button onClick={() => setTermsBid(b)} style={blueLink}>{L("View", "عرض")} ›</button>}
+            </div>
+
+
+            {/* Price row — headline is the PER-UNIT rental total (mobile parity); rate shown in the caption */}
+            <div style={{ ...rowSep, padding: "13px 16px", ...(isAccepted ? { background: "#e7f7ee" } : {}) }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ ...iconBox, background: "#fff4e5" }}><span className="material-icons-outlined" style={{ fontSize: 20, color: "#f79009" }}>payments</span></div>
+                <div style={{ minWidth: 0 }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{rentalTotalLabel}</span>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#6b8fa8", marginTop: 1 }}>{nf(b.price ?? 0)}/{periodOf(b.priceUnit)} × {Number.isInteger(cq.periods) ? cq.periods : cq.periods.toFixed(2)} · {L("per unit", "للوحدة")}</div>
+                </div>
+                <div style={{ flex: 1 }} />
+                <span style={{ fontSize: 17, fontWeight: 900, color: "#f79009" }}>{nf(perUnitRentalTotal)} {L("SAR", "ر.س")}</span>
+                {isAccepted && <span className="material-icons-outlined" style={{ fontSize: 18, color: "#1daf58" }} title={L("Accepted", "مقبول")}>check_circle</span>}
+                {!selectMode && (
+                  <button onClick={() => { setOpenPrices((s) => { const n = new Set(s); if (n.has(b.id)) n.delete(b.id); else n.add(b.id); return n; }); setAllUnitsIds((s) => { const n = new Set(s); n.delete(b.id); return n; }); }} style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #d4e0ec", background: "#F7FAFC", color: "#6b8fa8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <span className="material-icons-outlined" style={{ fontSize: 18 }}>{priceOpen ? "expand_less" : "expand_more"}</span>
+                  </button>
+                )}
+              </div>
+              {priceOpen && !selectMode && (
+                <div style={{ marginTop: 12 }}>
+                  {offered > 1 && (
+                    <div style={{ display: "inline-flex", background: "#eff4f9", borderRadius: 10, padding: 3, marginBottom: 12 }}>
+                      {([[false, L(`All ${offered} units`, `كل ${offered} وحدات`)], [true, L("Per unit", "لكل وحدة")]] as [boolean, string][]).map(([v, lab]) => (
+                        <button key={String(v)} onClick={() => setAllUnitsIds((s) => { const n = new Set(s); if (v) n.delete(b.id); else n.add(b.id); return n; })} style={{ padding: "6px 13px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12.5, fontFamily: "inherit", background: perUnit === v ? "#1c3550" : "transparent", color: perUnit === v ? "#fff" : "#6b8fa8" }}>{lab}</button>
+                      ))}
+                    </div>
+                  )}
+                  {([
+                    [L(`Rental (${nf(b.price ?? 0)}/${periodOf(b.priceUnit)} × ${Number.isInteger(cq.periods) ? cq.periods : cq.periods.toFixed(2)}${u > 1 ? ` × ${u}` : ""})`, `الإيجار (${nf(b.price ?? 0)}/${periodOf(b.priceUnit)} × ${Number.isInteger(cq.periods) ? cq.periods : cq.periods.toFixed(2)}${u > 1 ? ` × ${u}` : ""})`), rental, null],
+                    ...(deliv ? [[u > 1 ? L(`Delivery to site (${nf(Math.round(deliv / u))} × ${u} units)`, `النقل إلى الموقع (${nf(Math.round(deliv / u))} × ${u} وحدة)`) : L("Delivery to site", "النقل إلى الموقع"), deliv, b.mobLeadTime]] as [string, number, string | null][] : []),
+                    ...(ret ? [[u > 1 ? L(`Return from site (${nf(Math.round(ret / u))} × ${u} units)`, `الإرجاع من الموقع (${nf(Math.round(ret / u))} × ${u} وحدة)`) : L("Return from site", "الإرجاع من الموقع"), ret, b.demobLeadTime]] as [string, number, string | null][] : []),
+                    [L("Subtotal before VAT", "المجموع قبل الضريبة"), sub, null],
+                    [L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"), vat, null],
+                  ] as [string, number, string | null][]).map(([lab, val, note], i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 0", borderBottom: "1px solid #F2F5F8" }}>
+                      <span style={{ fontSize: 13.5, color: "#2a4f72", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>{lab}{note ? <span style={{ fontSize: 11, color: "#6b8fa8", background: "#eff4f9", padding: "1px 7px", borderRadius: 20, whiteSpace: "nowrap" }}>{note}</span> : null}</span>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550", fontVariantNumeric: "tabular-nums" }}>{nf(val)}</span>
+                    </div>
+                  ))}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, padding: "12px 14px", borderRadius: 10, background: "#FAFCFE", border: "1.5px solid #1c3550" }}>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Grand total", "الإجمالي الكلي")}</span>
+                    <span style={{ fontSize: 18, fontWeight: 900, color: "#1c3550" }}>{nf(grand)} <span style={{ color: "#f79009" }}>{L("SAR", "ر.س")}</span></span>
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* lifecycle chips */}
-            <div className="lc-chips">
-              {b.validUntil && <span className="lc-chip"><span className="material-icons-outlined">schedule</span>{L("Valid until", "صالح حتى")} {new Date(b.validUntil).toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short" })}</span>}
-              {b.distanceKm != null && <span className="lc-chip"><span className="material-icons-outlined">place</span>{Math.round(b.distanceKm)} {L("km", "كم")}</span>}
-            </div>
+            {/* supplier note */}
+            {b.note && (
+              <div style={{ ...rowSep, display: "flex", gap: 8, padding: "12px 16px", alignItems: "flex-start" }}>
+                <span style={{ fontSize: 15 }}>💬</span>
+                <span style={{ fontSize: 13, color: "#6b8fa8", fontWeight: 600, lineHeight: 1.5 }}>{b.note}</span>
+              </div>
+            )}
 
-            {/* negotiate footer */}
-            <div className="neg-footer">
-              <button className="neg-pill" disabled={disabled || busyId === b.id} onClick={() => startNegotiation(b)}>
-                {pillLabel(b.status, L)}
-                {!disabled && <span className="material-icons-outlined">arrow_forward</span>}
-              </button>
-            </div>
+            {/* CTA */}
+            {!selectMode && (
+              <div style={{ marginTop: "auto", padding: "12px 16px 16px" }}>
+                <button disabled={disabled || busyId === b.id} onClick={() => startNegotiation(b)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "14px", borderRadius: 14, border: "none", background: disabled ? "#9AA7B8" : "#1c3550", color: "#fff", fontWeight: 800, fontSize: 15, cursor: disabled ? "default" : "pointer", fontFamily: "inherit", opacity: busyId === b.id ? 0.7 : 1 }}>
+                  <span className="material-icons-outlined" style={{ fontSize: 18 }}>{b.status === "ACCEPTED" ? "receipt_long" : "forum"}</span>{pillLabel(b.status, L)}{offerSuffix(b.uiState, L) ? ` · ${offerSuffix(b.uiState, L)}` : ""}
+                </button>
+              </div>
+            )}
           </div>
         );
       })}
+      </div>
 
-      {selectedCount > 0 && (
-        <div className="qbar">
+      {selectMode && selectedCount > 0 && (
+        <div className="qbar" data-select-ui>
           <span className="qn">{selectedCount} {L("selected", "محدّد")}</span>
           {selectedCount < shown.length && <span className="qclear" onClick={() => setSelected(new Set(shown.map((b) => b.id)))}>{L("Select all", "تحديد الكل")}</span>}
           <span className="qclear" onClick={() => setSelected(new Set())}>{L("Clear", "مسح")}</span>
-          {/* web-app/007 — Compare the selected bids side by side (needs ≥2). */}
+          {/* web-app/007 — Compare the selected bids side by side (works with a single bid too). */}
           <button
             className="qdl"
-            disabled={selectedCount < 2}
-            style={{ background: "var(--navy)", opacity: selectedCount < 2 ? 0.5 : 1 }}
-            title={selectedCount < 2 ? L("Select at least 2 to compare", "اختر عرضين على الأقل") : L("Compare side by side", "قارن جنبًا إلى جنب")}
+            disabled={selectedCount < 1}
+            style={{ background: "var(--navy)", opacity: selectedCount < 1 ? 0.5 : 1 }}
+            title={L("Compare side by side", "قارن جنبًا إلى جنب")}
             onClick={goCompare}
           >
             <span className="material-icons-outlined">compare_arrows</span> {L("Compare", "قارن")}
           </button>
-          <button className="qdl" onClick={() => setLangPick(true)}>
+          <button className="qdl" onClick={() => (verified ? setLangPick(true) : setQuoteGate(true))}>
             <span className="material-icons-outlined">download</span> {L("Download quotations", "تنزيل عروض الأسعار")}
           </button>
         </div>
@@ -612,6 +951,43 @@ export function GroupBids({ group }: { group: RequestGroup }) {
           busy={busyId === equipBid.id}
           onRequestDetails={() => startNegotiation(equipBid)}
           onClose={() => setEquipBid(null)}
+        />
+      )}
+
+      {/* Terms modal (prototype "Terms — <supplier>") — per-class term status + Negotiate terms */}
+      {termsBid && (
+        <BidTermsModal
+          supplier={termsBid.supplierName}
+          terms={termsBid.terms}
+          negotiable={termsBid.negotiableTerms}
+          ar={ar}
+          L={L}
+          busy={busyId === termsBid.id}
+          onNegotiate={() => { const b = termsBid; setTermsBid(null); startNegotiation(b); }}
+          onClose={() => setTermsBid(null)}
+        />
+      )}
+
+      {/* Issue-quotation gate for an unverified renter (company name vs personal name). */}
+      {quoteGate && (
+        <QuotationVerifyGate
+          ar={ar}
+          L={L}
+          onClose={() => setQuoteGate(false)}
+          onVerify={() => { setQuoteGate(false); router.push("/verify"); }}
+          onContinue={() => { setQuoteGate(false); setLangPick(true); }}
+        />
+      )}
+
+      {/* web-app/006 — read-only viewer of an off-platform shared-link submission (real answers) */}
+      {submissionBid && (
+        <SharedBidSubmissionModal
+          bid={submissionBid}
+          submission={submissions.find((s) => s.id === submissionBid.submissionKey) ?? null}
+          ar={ar}
+          L={L}
+          onClose={() => setSubmissionBid(null)}
+          onDownloadQuotation={() => downloadQuotation(ar, [submissionBid])}
         />
       )}
     </div>

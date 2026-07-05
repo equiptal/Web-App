@@ -1,6 +1,24 @@
 import { describe, it, expect } from "vitest";
 import { mapBidList, bidSuppliers, type BidCard } from "@/lib/contract/bids";
 
+describe("mapBidList — unitsOffered (supplier's chosen quantity)", () => {
+  const req = { request: { equipmentItems: [{ numberOfUnits: 10 }] } };
+  it("reads units_offered array length as the offered count", () => {
+    const out = mapBidList({ activeBids: [{ id: "b1", unitsOffered: [1, 2, 3], ...req }] });
+    expect(out[0].unitsOffered).toBe(3);
+    expect(out[0].numberOfUnits).toBe(10); // still the request's needed units
+  });
+  it("falls back to the request's units when the bid omits units_offered", () => {
+    const out = mapBidList({ activeBids: [{ id: "b1", ...req }] });
+    expect(out[0].unitsOffered).toBe(10);
+  });
+  it("treats an EMPTY units_offered array as 'bid the request as posted' (not 0)", () => {
+    // Regression: empty array → 0 made the header tile read 0/N while the card said 'covers N of N'.
+    const out = mapBidList({ activeBids: [{ id: "b1", unitsOffered: [], ...req }] });
+    expect(out[0].unitsOffered).toBe(10);
+  });
+});
+
 describe("mapBidList — supplierId", () => {
   it("maps a numeric supplier.id to a string", () => {
     const out = mapBidList({ activeBids: [{ id: "b1", supplier: { id: 42, companyName: "Al Rajhi" } }] });
@@ -45,10 +63,10 @@ describe("bidSuppliers", () => {
   const bc = (p: Partial<BidCard>): BidCard => ({
     id: "b", status: "PENDING", supplierId: null, supplierName: "S", verified: false, rating: null,
     distanceKm: null, submittedAt: null, validUntil: null, price: null, mobPrice: null, demobPrice: null,
-    priceUnit: null, duration: null, numberOfUnits: 1, equipment: null, eqVerified: false,
+    priceUnit: null, duration: null, numberOfUnits: 1, unitsOffered: 1, reqMinYear: null, equipment: null, eqVerified: false,
     compliance: { entityType: "individual", activityLicense: false, taxNumber: false, nationalAddress: false, safety: false, saso: false, localContent: false },
     matchCount: 0, conflictCount: 0, dealRoomId: null, expired: false,
-    note: null, requiredCerts: [], heldCertCodes: [], mobLeadTime: null, demobLeadTime: null,
+    note: null, requiredCerts: [], heldCertCodes: [], ownershipDocs: [], mobLeadTime: null, demobLeadTime: null,
     terms: { equipment: [], contract: [], supplier: [] },
     requestTerms: { operatorIncluded: null, operatorNationality: null, fuelType: null, paymentMethod: null, paymentTerms: null, breakdownResponseSla: null, overtimeRate: null, maintenanceResponsibility: null },
     lockedTerms: [], unreadTerms: [], progress: { agreed: 0, total: 0 }, lastEventAr: null, round: 1,

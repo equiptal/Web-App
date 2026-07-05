@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchRequestGroup, fetchRequestDetail } from "@/lib/api/client";
 import { parseAddress, publicTaxonomyUrl, type RequestRecord } from "@/lib/contract/requests";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { LocationMap } from "@/components/requests/LocationMap";
-import { Ditem } from "@/components/requests/RequestDetail";
+import { Ditem, requestDetailRows } from "@/components/requests/RequestDetail";
 import "@/components/requests/requests-proto.css";
 
 const STATUS_CLS: Record<string, string> = {
@@ -37,9 +37,18 @@ export function RequestGroupDetail({ groupId, onTitle }: { groupId: string; onTi
     let active = true;
     (async () => {
       try {
-        const { requests } = await fetchRequestGroup(groupId);
-        // Historical/solo fallback: a request with no requestGroupId yields an empty group filter —
-        // in that case treat the param as a single request id.
+        let { requests } = await fetchRequestGroup(groupId);
+        // The param may be a MEMBER request id (e.g. the post-submit redirect uses a request UUID),
+        // not the group id. If the group filter is empty, fetch that request, read its requestGroupId,
+        // and resolve the whole group from it — so we render every item, not just one.
+        if (!requests.length) {
+          const one = await fetchRequestDetail(groupId);
+          const gid = (one as { requestGroupId?: string | null }).requestGroupId ?? null;
+          if (gid && gid !== groupId) {
+            const grp = await fetchRequestGroup(gid);
+            if (grp.requests.length) requests = grp.requests;
+          }
+        }
         const ids = requests.length ? requests.map((r) => r.id) : [groupId];
         const recs = await Promise.all(ids.map((id) => fetchRequestDetail(id)));
         if (active) setRecords(recs);
@@ -110,20 +119,21 @@ export function RequestGroupDetail({ groupId, onTitle }: { groupId: string; onTi
         </div>
       </div>
 
-      {/* shared preferences (identical across the group) */}
-      <div className="dsec">
-        <div className="dsec-h"><span className="material-icons-outlined">tune</span>{L("Preferences", "التفضيلات")}</div>
-        <div className="dcard">
-          <div className="kv">
-            <span className="k">{L("Rental basis", "أساس الإيجار")}</span><span className="v">{first.rentalType ?? "—"}</span>
-            <span className="k">{L("Payment terms", "شروط الدفع")}</span><span className="v">{first.paymentTerms ?? "—"}</span>
-            <span className="k">{L("Payment method", "طريقة الدفع")}</span><span className="v">{first.paymentMethod ?? "—"}</span>
-            <span className="k">{L("Working hours", "ساعات العمل")}</span><span className="v">{first.workingHoursPerDay ? `${first.workingHoursPerDay} ${L("hrs/day", "ساعة/يوم")}` : "—"}</span>
-            <span className="k">{L("Maintenance", "الصيانة")}</span><span className="v">{first.maintenanceResponsibility ?? "—"}</span>
-            <span className="k">{L("Budget", "الميزانية")}</span><span className="v">{first.budgetCeiling ? `${Number(first.budgetCeiling).toLocaleString(ar ? "ar-SA" : "en-US")} ${L("SAR", "ر.س")}` : "—"}</span>
+      {/* shared request details (identical across the group) — every stored field that has a value */}
+      {(() => {
+        const prefs = requestDetailRows(first, ar, L);
+        if (!prefs.length) return null;
+        return (
+          <div className="dsec">
+            <div className="dsec-h"><span className="material-icons-outlined">tune</span>{L("Request details", "تفاصيل الطلب")}</div>
+            <div className="dcard">
+              <div className="kv">
+                {prefs.map(([k, v]) => <Fragment key={k}><span className="k">{k}</span><span className="v">{v}</span></Fragment>)}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* every item's FULL details inline — all on one screen (no per-item navigation) */}
       <div className="dsec">

@@ -2,39 +2,40 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useLocale } from "@/lib/i18n";
-import { Icon } from "@/components/ui";
-import type { BidCard, CertCode } from "@/lib/contract/bids";
+import { CERT_LABEL, type BidCard, type CertCode } from "@/lib/contract/bids";
+import { EquipImg } from "@/components/requests/EquipImg";
 import type { EquipmentDetail } from "@/lib/contract/stores";
+import type { DealRoomDocument } from "@/lib/contract/deal-room";
+import { fetchBidDocuments } from "@/lib/api/client";
 
-/** Cert thumbnails shown in the strip (013 AC-07): SASO, Local content, TÜV+SPSP — grouped. */
-type CertSlot = { key: string; en: string; ar: string };
-
-function certSlots(held: CertCode[]): CertSlot[] {
-  const set = new Set(held);
-  const out: CertSlot[] = [];
-  if (set.has("SASO")) out.push({ key: "SASO", en: "SASO certificate", ar: "شهادة SASO" });
-  if (set.has("LC")) out.push({ key: "LC", en: "Local content", ar: "محتوى محلي" });
-  if (set.has("TUV") || set.has("SPSP")) out.push({ key: "TUVSPSP", en: "TÜV + SPSP", ar: "TÜV + SPSP" });
-  return out;
-}
-
-type Hero = { kind: "photo"; i: number } | { kind: "cert"; slot: CertSlot };
+const periodOf = (u: string | null, ar: boolean) => {
+  switch ((u ?? "PER_DAY").toUpperCase()) {
+    case "PER_WEEK": return ar ? "أسبوع" : "week";
+    case "PER_MONTH": return ar ? "شهر" : "month";
+    case "PER_JOB": return ar ? "مهمة" : "job";
+    default: return ar ? "يوم" : "day";
+  }
+};
+const nf = (n: number) => Math.round(n).toLocaleString("en-US");
 
 /**
- * Bid-card equipment modal (013 AC-07/08/09/10). Distinct from the store equipment sheet: it layers
- * the bid's held-cert thumbnails onto the photo strip, shows Distance + Measurement side-by-side with
- * the km value dominant, and the primary CTA opens the deal room for this supplier × request pair.
+ * Bid-card equipment modal (prototype "<equipment> details"): hero + facility-verified chip, a
+ * supplier-provided-details disclaimer with the available quantity, a spec grid (distance,
+ * measurement, units offered, fuel, year, rate), held certs/ownership, and a deal-room CTA.
  */
 export function BidEquipmentModal({
   bid,
   busy,
   onRequestDetails,
   onClose,
+  itemLabel,
 }: {
   bid: BidCard;
   busy: boolean;
   onRequestDetails: () => void;
   onClose: () => void;
+  /** Fallback title when the bid has no equipment record (off-platform link bids) — the request item name. */
+  itemLabel?: string | null;
 }) {
   const { locale } = useLocale();
   const ar = locale === "ar";
@@ -42,8 +43,8 @@ export function BidEquipmentModal({
   const equipmentId = bid.equipment?.id ?? null;
 
   const [eq, setEq] = useState<EquipmentDetail | null>(null);
-  const [error, setError] = useState(false);
-  const [hero, setHero] = useState<Hero>({ kind: "photo", i: 0 });
+  // The supplier's equipment documents (presigned) — shown as openable rows, like the app's docs sheet.
+  const [docs, setDocs] = useState<DealRoomDocument[]>([]);
 
   useEffect(() => {
     if (!equipmentId) return;
@@ -51,131 +52,168 @@ export function BidEquipmentModal({
     fetch(`/api/equipment/${encodeURIComponent(equipmentId)}`, { cache: "no-store", signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
       .then((d: EquipmentDetail) => setEq(d))
-      .catch((e) => {
-        if (e?.name !== "AbortError") setError(true);
-      });
+      .catch(() => {});
     return () => ctrl.abort();
   }, [equipmentId]);
 
-  const photos = eq?.photos ?? [];
-  const slots = useMemo(() => certSlots(bid.heldCertCodes), [bid.heldCertCodes]);
-  const title = eq ? (ar ? eq.category : eq.category) || (ar ? eq.subcategory : eq.subcategory) || "—" : "—";
-  const measurement = eq ? (ar ? eq.measurementAr : eq.measurement) : null;
+  useEffect(() => {
+    // Off-platform (shared-link) bids have no real bid-documents endpoint — skip.
+    if (bid.viaSharedLink || !bid.id) return;
+    let active = true;
+    fetchBidDocuments(bid.id)
+      .then((d) => { if (active) setDocs(d.equipmentDocuments ?? []); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [bid.id, bid.viaSharedLink]);
+
+  const eqCerts: CertCode[] = bid.equipmentCertCodes ?? [];
+  const ownership = bid.ownershipDocs ?? [];
+  const certChips = [
+    ...eqCerts.map((c) => (ar ? CERT_LABEL[c]?.ar : CERT_LABEL[c]?.en) || c),
+    ...ownership.map((o) => (ar ? o.labelAr : o.labelEn)),
+  ];
+  const title = (ar ? eq?.categoryAr : eq?.category) || [bid.equipment?.make, bid.equipment?.model].filter(Boolean).join(" ") || itemLabel || "—";
   const subtitle = eq ? [eq.manufacturer, eq.modelName, eq.year != null ? String(eq.year) : null].filter(Boolean).join(" · ") : "";
+  // Off-platform bids carry no equipment record; the requested capacity/measurement is embedded in the
+  // item label ("subtype · capacity") — surface the capacity portion so MEASUREMENT isn't blank.
+  const measurement = eq
+    ? (ar ? eq.measurementAr : eq.measurement)
+    : (itemLabel && itemLabel.includes(" · ") ? itemLabel.split(" · ").slice(1).join(" · ") : null);
+  const fuel = eq?.fuel ?? null;
   const km = bid.distanceKm != null ? Math.round(bid.distanceKm) : null;
+  const offered = bid.unitsOffered || 1;
+  const photo = useMemo(() => eq?.photos?.[0] ?? bid.equipment?.imageUrl ?? null, [eq, bid.equipment]);
+  const verified = bid.eqVerified || eq?.isVerified;
+
+  const tile = (label: string, value: React.ReactNode, accent = false) => (
+    <div style={{ background: accent ? "#fff4e5" : "#F7FAFC", borderRadius: 12, padding: "11px 13px" }}>
+      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".05em", color: "#6b8fa8" }}>{label}</div>
+      <div style={{ fontSize: 16, fontWeight: 900, color: accent ? "#f79009" : "#1c3550", marginTop: 4 }}>{value}</div>
+    </div>
+  );
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-end overflow-y-auto bg-black/50 p-0 sm:place-items-center sm:p-4" onClick={onClose}>
+    <div
+      dir={ar ? "rtl" : "ltr"}
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(16,38,63,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+    >
       <div
-        className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-[18px] bg-surface sm:rounded-[16px]"
         onClick={(e) => e.stopPropagation()}
-        dir={ar ? "rtl" : "ltr"}
+        style={{ width: "100%", maxWidth: 440, maxHeight: "92vh", display: "flex", flexDirection: "column", background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 60px rgba(16,38,63,.35)" }}
       >
-        {/* Header / close */}
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <span className="text-[14px] font-extrabold text-navy">{bid.supplierName}</span>
-          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface2" aria-label={L("Close", "إغلاق")}>
-            <Icon name="close" size={18} />
+        {/* header strip */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 16px" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 800, color: "#1c3550" }}>
+            {bid.supplierName}
+            {bid.verified && <span className="material-icons-outlined" style={{ fontSize: 16, color: "#1daf58" }}>verified</span>}
+          </span>
+          <button onClick={onClose} aria-label={L("Close", "إغلاق")} style={{ width: 34, height: 34, borderRadius: 10, border: "none", background: "#eff4f9", color: "#6b8fa8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span className="material-icons-outlined" style={{ fontSize: 19 }}>close</span>
           </button>
         </div>
 
-        {error ? (
-          <div className="p-8 text-center text-[13px] text-muted">{L("Couldn’t load the equipment.", "تعذّر تحميل المعدة.")}</div>
-        ) : (
-          <div className="overflow-y-auto">
-            {/* Hero — photo OR cert deal-room placeholder (AC-08) */}
-            <div className="relative grid h-[240px] place-items-center bg-gradient-to-br from-surface2 to-surface3">
-              {hero.kind === "cert" ? (
-                <div className="mx-6 flex max-w-sm flex-col items-center gap-3 rounded-[14px] border border-dashed border-border bg-surface/80 px-6 py-7 text-center">
-                  <Icon name="lock" size={34} className="text-muted" />
-                  <div className="text-[14px] font-extrabold text-navy">{ar ? hero.slot.ar : hero.slot.en}</div>
-                  <div className="text-[12.5px] leading-relaxed text-muted">
-                    {L("You can view the full document in the deal room.", "يمكنك مشاهدة الوثيقة الكاملة في غرفة الصفقة")}
+        <div style={{ overflowY: "auto" }}>
+          {/* hero */}
+          <div style={{ position: "relative", height: 168, background: "linear-gradient(135deg,#F1F5FA,#E4EBF3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <EquipImg src={photo} categoryId={null} name={title} box="" img="h-20 w-20 object-contain" iconSize={64} />
+            {certChips.length > 0 && (
+              <div style={{ position: "absolute", bottom: 10, insetInlineStart: 14, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {certChips.slice(0, 3).map((c, i) => (
+                  <span key={i} style={{ fontSize: 11.5, fontWeight: 800, color: "#1daf58", background: "#e7f7ee", padding: "3px 9px", borderRadius: 20 }}>✓ {c}</span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ padding: "16px 18px 4px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <h2 style={{ fontSize: 20, fontWeight: 900, color: "#1c3550", margin: 0 }}>{title}</h2>
+              {verified && <span className="material-icons-outlined" style={{ fontSize: 17, color: "#1daf58" }}>verified</span>}
+            </div>
+            {subtitle && <p style={{ fontSize: 13, color: "#6b8fa8", fontWeight: 600, margin: "5px 0 0" }}>{subtitle}</p>}
+            {verified && (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 10, fontSize: 12.5, fontWeight: 800, color: "#1a7ec8", background: "#e6f2fb", padding: "5px 11px", borderRadius: 20 }}>
+                <span className="material-icons-outlined" style={{ fontSize: 15 }}>verified_user</span>{L("Facility verified", "منشأة موثّقة")}
+              </span>
+            )}
+
+            {/* supplier-provided details disclaimer */}
+            <div style={{ marginTop: 14, background: "#fff4e5", border: "1px solid #FDE4C4", borderRadius: 13, padding: "13px 14px" }}>
+              <div style={{ display: "flex", gap: 9 }}>
+                <span style={{ width: 22, height: 22, borderRadius: "50%", background: "#f79009", color: "#fff", fontSize: 13, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>i</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: "#d4780a" }}>{L("Supplier-provided details", "تفاصيل مُدخلة من المؤجّر")}</div>
+                  <div style={{ fontSize: 12.5, color: "#B07A3A", fontWeight: 600, lineHeight: 1.5, marginTop: 3 }}>
+                    {bid.viaSharedLink
+                      ? L(
+                          "The supplier acknowledged these in your shared-link form only — they haven’t been verified. Review the full submission before you rely on them.",
+                          "أقرّ المؤجّر بهذه التفاصيل في نموذج الرابط فقط — ولم يتم التحقق منها. راجع العرض المُقدَّم كاملاً قبل الاعتماد عليها.",
+                        )
+                      : L(
+                          "These specs were entered by the supplier and cover one representative unit — the rest of the available quantity may vary. You can confirm condition, certificates and ownership inside the deal room before you approve the bid.",
+                          "أُدخلت هذه المواصفات من المؤجّر وتغطّي وحدة واحدة تمثيلية — وقد تختلف بقية الكمية المتاحة. يمكنك تأكيد الحالة والشهادات والملكية داخل غرفة الصفقة قبل اعتماد العرض.",
+                        )}
                   </div>
                 </div>
-              ) : photos.length > 0 ? (
-                <div className="h-full w-full bg-center bg-no-repeat" style={{ backgroundImage: `url("${photos[hero.i]}")`, backgroundSize: "cover" }} />
-              ) : (
-                <Icon name="construction" size={56} className="text-muted" />
-              )}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 11, paddingTop: 11, borderTop: "1px solid #FBE0BE" }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 700, color: "#d4780a" }}>
+                  <span className="material-icons-outlined" style={{ fontSize: 16 }}>inventory_2</span>{L("Available quantity", "الكمية المتاحة")}
+                </span>
+                <span style={{ fontSize: 13.5, fontWeight: 900, color: "#1c3550" }}>{offered} {L(offered > 1 ? "units" : "unit", offered > 1 ? "وحدات" : "وحدة")}</span>
+              </div>
             </div>
 
-            {/* Thumbnail strip — photos first, then held-cert thumbnails (AC-07) */}
-            {(photos.length > 0 || slots.length > 0) && (
-              <div className="flex gap-2 overflow-x-auto border-b border-border px-4 py-3">
-                {photos.map((p, i) => (
-                  <button
-                    key={`p${i}`}
-                    onClick={() => setHero({ kind: "photo", i })}
-                    className={`h-14 w-14 flex-shrink-0 rounded-[10px] bg-center bg-cover ring-2 ${hero.kind === "photo" && hero.i === i ? "ring-brand" : "ring-transparent"}`}
-                    style={{ backgroundImage: `url("${p}")` }}
-                    aria-label={`${L("Photo", "صورة")} ${i + 1}`}
-                  />
+            {/* spec grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10, marginTop: 14 }}>
+              {tile(L("DISTANCE", "المسافة"), km != null ? <>{km} <span style={{ fontSize: 12, fontWeight: 700, color: "#6b8fa8" }}>{L("km from project", "كم من المشروع")}</span></> : "—")}
+              {tile(L("MEASUREMENT", "القياس"), measurement || "—")}
+              {tile(L("QUANTITY OFFERED", "الكمية المعروضة"), `×${offered}`)}
+              {tile(L("FUEL TYPE", "نوع الوقود"), fuel || "—")}
+              {tile(L("YEAR", "السنة"), eq?.year != null ? String(eq.year) : bid.viaSharedLink && bid.reqMinYear != null ? `≥ ${bid.reqMinYear}` : "—")}
+              {tile(L("RATE", "السعر"), <>{nf(bid.price ?? 0)} {L("SAR", "ر.س")} <span style={{ fontSize: 12, fontWeight: 700, color: "#C98A4B" }}>/ {periodOf(bid.priceUnit, ar)}</span></>, true)}
+            </div>
+
+            {/* Equipment documents (presigned) — openable rows, mirroring the app's documents sheet. */}
+            {docs.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".05em", color: "#6b8fa8", marginBottom: 4 }}>{L("EQUIPMENT DOCUMENTS", "مستندات المعدة")}</div>
+                {docs.map((d, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "1px solid #EFF2F6" }}>
+                    <span className="material-icons-outlined" style={{ fontSize: 19, color: "#1daf58" }}>{d.fileType === "pdf" ? "picture_as_pdf" : "image"}</span>
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: "#1c3550" }}>{(ar ? d.labelAr : d.label) || d.label}</span>
+                    <a href={d.url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12.5, fontWeight: 800, color: "#1a7ec8", textDecoration: "none" }}>
+                      <span className="material-icons-outlined" style={{ fontSize: 16 }}>visibility</span>{L("View", "عرض")}
+                    </a>
+                  </div>
                 ))}
-                {slots.map((slot) => {
-                  const active = hero.kind === "cert" && hero.slot.key === slot.key;
-                  return (
-                    <button
-                      key={slot.key}
-                      onClick={() => setHero({ kind: "cert", slot })}
-                      className={`relative grid h-14 w-14 flex-shrink-0 place-items-center rounded-[10px] border border-border bg-surface2 ring-2 ${active ? "ring-brand" : "ring-transparent"}`}
-                      title={ar ? slot.ar : slot.en}
-                    >
-                      <Icon name="verified_user" size={22} className="text-navy" />
-                      <span className="absolute -end-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-ok text-white">
-                        <Icon name="check" size={11} />
-                      </span>
-                    </button>
-                  );
-                })}
               </div>
             )}
 
-            <div className="flex flex-col gap-4 p-5">
-              {/* Title block */}
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-[18px] font-extrabold text-navy">{title}</h2>
-                  {bid.eqVerified && <Icon name="verified" size={16} className="text-ok" />}
-                </div>
-                {subtitle && <p className="mt-1 text-[13px] text-muted">{subtitle}</p>}
-              </div>
-
-              {/* Distance + Measurement side-by-side (AC-09) — km dominant */}
-              <div className="grid grid-cols-2 gap-2.5">
-                <div className="rounded-[12px] border border-border bg-surface2/40 px-4 py-3">
-                  <div className="text-[10.5px] font-semibold uppercase tracking-wide text-muted">{L("Distance", "المسافة")}</div>
-                  {km != null ? (
-                    <div className="mt-0.5 flex items-baseline gap-1">
-                      <span className="text-[24px] font-extrabold leading-none text-navy">{km}</span>
-                      <span className="text-[12px] font-bold text-muted">{L("km from project", "كم من المشروع")}</span>
-                    </div>
-                  ) : (
-                    <div className="mt-1 text-[15px] font-bold text-muted">—</div>
-                  )}
-                </div>
-                <div className="rounded-[12px] border border-border bg-surface2/40 px-4 py-3">
-                  <div className="text-[10.5px] font-semibold uppercase tracking-wide text-muted">{L("Measurement", "القياس")}</div>
-                  <div className="mt-1 text-[15px] font-bold text-navy">{measurement || "—"}</div>
+            {/* Fallback: cert/ownership summary chips when no document files are on file. */}
+            {docs.length === 0 && certChips.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".05em", color: "#6b8fa8", marginBottom: 8 }}>{L("CERTIFICATES & OWNERSHIP ON FILE", "الشهادات والملكية المتوفّرة")}</div>
+                <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+                  {certChips.map((c, i) => (
+                    <span key={i} style={{ fontSize: 12.5, fontWeight: 800, color: "#1daf58", background: "#e7f7ee", padding: "4px 11px", borderRadius: 20 }}>✓ {c}</span>
+                  ))}
                 </div>
               </div>
-            </div>
+            )}
           </div>
-        )}
+        </div>
 
-        {/* Footer CTA — opens the deal room (AC-10) */}
-        <div className="border-t border-border p-4">
+        {/* footer CTA */}
+        <div style={{ padding: "14px 18px", borderTop: "1px solid #EFF2F6" }}>
           <button
             onClick={onRequestDetails}
             disabled={busy}
-            className="flex w-full items-center justify-center gap-2 rounded-[12px] bg-navy py-3 text-[14px] font-extrabold text-white disabled:opacity-60"
+            style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "14px", borderRadius: 14, border: "none", background: "#1c3550", color: "#fff", fontWeight: 800, fontSize: 15, cursor: busy ? "default" : "pointer", fontFamily: "inherit", opacity: busy ? 0.7 : 1 }}
           >
-            {busy ? (
-              <Icon name="progress_activity" size={18} className="animate-spin" />
-            ) : (
-              <Icon name="forum" size={18} />
-            )}
-            {L("Request more details", "اطلب مزيد من التفاصيل")}
+            <span className="material-icons-outlined" style={{ fontSize: 18 }}>{busy ? "progress_activity" : bid.viaSharedLink ? "visibility" : "forum"}</span>
+            {bid.viaSharedLink ? L("View bid submission", "عرض العرض المُقدَّم") : L("Request more details", "اطلب مزيد من التفاصيل")}
           </button>
         </div>
       </div>

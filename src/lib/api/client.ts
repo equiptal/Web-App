@@ -3,6 +3,10 @@ import type { RequestListItem, RequestRecord } from "@/lib/contract/requests";
 import type { BidCard } from "@/lib/contract/bids";
 import type { DealRoomView, DealRoomDocuments, QuotationView } from "@/lib/contract/deal-room";
 import type { ComputedBid, RecommendResult, BidAskResult, BidParseResult, AwardNudgeResult, PreferencePreset, RankingPreference, RankedBid, BidEventInput } from "@/lib/contract/agent-bids";
+import { mapBidFormData, mapLinkSubmissions, type BidFormData, type LinkBidSubmission, type SubmitBidFormPayload } from "@/lib/contract/link-bids";
+import type { PendingResponse, RespondBody, RespondResult } from "@/lib/contract/survey";
+import type { InboxBid } from "@/lib/contract/inbox";
+import type { NotificationList, NotificationFilter } from "@/lib/contract/notifications";
 
 /** Body of POST /api/me/bids/recommend. user_id is attached server-side. */
 export interface RecommendPayload {
@@ -124,9 +128,9 @@ export async function processRfq(input: ProcessInput): Promise<AgentDraft> {
       throw new ApiError("network");
     }
     if (!res.ok) throw new ApiError("network");
-    const data = (await res.json()) as { status: string; draft?: AgentDraft; code?: ApiErrorKind };
+    const data = (await res.json()) as { status: string; draft?: AgentDraft; code?: ApiErrorKind; detail?: string; messageAr?: string; backendStatus?: number };
     if (data.status === "done" && data.draft) return data.draft;
-    if (data.status === "error") throw new ApiError(data.code ?? "network");
+    if (data.status === "error") throw new ApiError(data.code ?? "network", "agent job error", { detail: data.detail, messageAr: data.messageAr, backendStatus: data.backendStatus });
     await sleep(2000);
   }
   throw new ApiError("network"); // timed out
@@ -206,6 +210,12 @@ export function fetchDealRoomDocuments(id: string): Promise<DealRoomDocuments> {
   return getJson<DealRoomDocuments>(`/api/me/deal-rooms/${encodeURIComponent(id)}/documents`);
 }
 
+/** A bid's documents (company verification + equipment) as presigned entries — no deal room needed.
+ *  Proxies the backend `GET /marketplace/bids/{id}/documents`; same shape as the deal-room docs sheet. */
+export function fetchBidDocuments(id: string): Promise<DealRoomDocuments> {
+  return getJson<DealRoomDocuments>(`/api/me/bids/${encodeURIComponent(id)}/documents`);
+}
+
 /** The official quotation PDF for a closed deal (app parity — backend-generated from the template). */
 export function fetchQuotation(id: string): Promise<QuotationView> {
   return getJson<QuotationView>(`/api/me/deal-rooms/${encodeURIComponent(id)}/quotation`);
@@ -217,24 +227,101 @@ export function fetchStreamToken(id: string): Promise<{ token: string | null; us
 }
 
 /** Counter the offer with a new rate. */
-export function proposeRate(id: string, body: { proposedRate: number; priceUnit: string; message?: string }): Promise<unknown> {
+export function proposeRate(id: string, body: { proposedRate: number; priceUnit: string; mobPrice?: number; demobPrice?: number; message?: string }): Promise<unknown> {
   return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/rate-proposal`, body);
 }
 
-/** Accept the current offer (accept all terms → confirm). */
-export function acceptDeal(id: string, contractType = "platform"): Promise<unknown> {
-  return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/accept`, { contractType });
+/** A batched term resolution — matches the app's `{ termKey, action, value? }`. */
+export type TermUpdate = { termKey: string; action: string; value?: unknown };
+
+/**
+ * Accept the current offer (accept-all-terms). App parity: `contractType` defaults to `"formal"`, the
+ * locally-collected `termResolutions` are submitted together, and `agreedUnits` is only sent for
+ * assembled multi-supplier deals (the web has none → omit it).
+ */
+export function acceptDeal(id: string, contractType = "formal", opts?: { termResolutions?: TermUpdate[]; agreedUnits?: number }): Promise<unknown> {
+  const body: Record<string, unknown> = { contractType };
+  if (opts?.termResolutions && opts.termResolutions.length) body.termResolutions = opts.termResolutions;
+  if (opts?.agreedUnits != null) body.agreedUnits = opts.agreedUnits;
+  return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/accept`, body);
 }
 
-/** Resolve one negotiable term — accept the supplier's value, counter it, or reopen. */
+/** Reopen an accepted (CLOSED) deal room for re-negotiation (app parity: "release"). Flips CLOSED →
+ *  NEGOTIATING and re-arms the bid so the renter can re-negotiate + re-confirm (re-issues the quotation). */
+export function releaseDeal(id: string, reason?: string): Promise<unknown> {
+  return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/release`, reason ? { reason } : {});
+}
+
+/** Submit all locally-collected term resolutions at once (app parity — batched with the rate counter). */
+export function batchUpdateTerms(id: string, updates: TermUpdate[], note?: string): Promise<unknown> {
+  return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/terms/batch`, { updates, note });
+}
+
+/** Resolve one negotiable term (legacy single-term PATCH — retained for callers outside the deal room). */
 export function resolveTerm(id: string, key: string, action: "accept" | "counter" | "reopen", value?: unknown): Promise<unknown> {
   return postJsonMethod(`/api/me/deal-rooms/${encodeURIComponent(id)}/terms/${encodeURIComponent(key)}`, { action, value }, "PATCH");
 }
 
 export function submitRequest(
   payload: RfqRequestPayload & { simulateError?: boolean },
-): Promise<{ requestId: string; requestIds?: string[] }> {
-  return postJson<{ requestId: string; requestIds?: string[] }>("/api/requests", payload);
+): Promise<{ requestId: string; requestIds?: string[]; requestUuids?: string[] }> {
+  return postJson<{ requestId: string; requestIds?: string[]; requestUuids?: string[] }>("/api/requests", payload);
+}
+
+/* ----------------- Outcome Survey (renter) ----------------- */
+
+/** The next pending outcome survey for the renter (one unit at a time; null when none due). */
+export function fetchPendingSurvey(): Promise<PendingResponse> {
+  return getJson<PendingResponse>("/api/me/surveys/pending");
+}
+
+/** Submit the renter's answer to one survey. Idempotent server-side on already-resolved surveys. */
+export function respondSurvey(surveyId: string, body: RespondBody): Promise<RespondResult> {
+  return postJson<RespondResult>(`/api/me/surveys/${encodeURIComponent(surveyId)}/respond`, body);
+}
+
+/* ----------------- Inbox / deal-room-per-bid (renter) ----------------- */
+
+/** Every bid offered to the renter (across all RFQs) + per-bid deal-room status & unread count. */
+export function fetchReceivedBids(filter?: { status?: string; page?: number; limit?: number }): Promise<{ bids: InboxBid[] }> {
+  const qs = new URLSearchParams();
+  if (filter?.status) qs.set("status", filter.status);
+  if (filter?.page) qs.set("page", String(filter.page));
+  if (filter?.limit) qs.set("limit", String(filter.limit));
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return getJson<{ bids: InboxBid[] }>(`/api/me/received-bids${suffix}`);
+}
+
+/** Total unread deal-room messages for the renter (role-scoped) — drives the inbox badge. */
+export function fetchDealRoomUnread(): Promise<{ total: number }> {
+  return getJson<{ total: number }>("/api/me/deal-rooms/unread-count");
+}
+
+/* ----------------- notifications (bell) ----------------- */
+
+/** One page of the renter's notifications (already localized by the BFF from the UI locale). */
+export function fetchNotifications(opts?: { page?: number; filter?: NotificationFilter }): Promise<NotificationList> {
+  const qs = new URLSearchParams();
+  qs.set("page", String(opts?.page ?? 1));
+  if (opts?.filter) qs.set("filter", opts.filter);
+  return getJson<NotificationList>(`/api/me/notifications?${qs.toString()}`);
+}
+
+/** Unread notification count for the bell badge — the backend has no count endpoint, so we read
+ *  `meta.total` from an unread-filtered list (page 1). */
+export async function fetchNotificationsUnreadCount(): Promise<number> {
+  const list = await fetchNotifications({ page: 1, filter: "unread" });
+  return list.meta.total;
+}
+
+/** Mark one notification read. */
+export function markNotificationRead(id: string): Promise<unknown> {
+  return postJsonMethod(`/api/me/notifications/${encodeURIComponent(id)}/read`, {}, "PUT");
+}
+
+/** Mark every notification read → the number cleared. */
+export function markAllNotificationsRead(): Promise<{ count: number }> {
+  return postJsonMethod<{ count: number }>("/api/me/notifications/read-all", {}, "PUT");
 }
 
 /* ----------------- web-app/007: Mansour judgement layer (soft) ----------------- */
@@ -315,4 +402,54 @@ export async function fetchTaxonomy(): Promise<Taxonomy> {
     if (e instanceof ApiError) throw e;
     throw new ApiError("network");
   }
+}
+
+// ── web-app/006 (expanded) — shared-link bids ──────────────────────────────────────────────────
+
+/** Public: bid-form render data for a shared-link token (request items + terms + renter name). */
+export async function fetchBidFormData(token: string): Promise<BidFormData> {
+  return mapBidFormData(await getJson<unknown>(`/api/bid-form/${encodeURIComponent(token)}`));
+}
+
+/** Public: submit an off-platform bid through the shared link. */
+export async function submitBidForm(token: string, payload: SubmitBidFormPayload): Promise<{ id: string }> {
+  return postJson<{ id: string }>(`/api/bid-form/${encodeURIComponent(token)}/submissions`, payload);
+}
+
+/** Authed (renter): a request's off-platform submissions + link tracker (opened/submitted + token). */
+export async function fetchRequestSubmissions(
+  requestId: string,
+): Promise<{ renterName: string | null; openedCount: number; submittedCount: number; bidDeadline: string | null; logoUrl: string | null; groupRef: string | null; submissions: LinkBidSubmission[] }> {
+  const raw = await getJson<{ renterName?: string | null; openedCount?: number; submittedCount?: number; bidDeadline?: string | null; logoUrl?: string | null; groupRef?: string | null }>(
+    `/api/me/requests/${encodeURIComponent(requestId)}/submissions`,
+  );
+  const submissions = mapLinkSubmissions(raw);
+  return {
+    renterName: raw.renterName ?? null,
+    openedCount: raw.openedCount ?? 0,
+    submittedCount: raw.submittedCount ?? 0,
+    bidDeadline: raw.bidDeadline ?? null,
+    logoUrl: raw.logoUrl ?? null,
+    // The RFQ group short code (RFQ-NNNNN). The backend returns it per-submission (and/or top-level) —
+    // surface whichever is present so the RFQ tabs + quotation show it.
+    groupRef: raw.groupRef ?? submissions.find((x) => x.groupRef)?.groupRef ?? null,
+    submissions,
+  };
+}
+
+/** Set / clear the request's optional bid-submission deadline (AC-04/05/06). `deadline` = ISO or null. */
+export async function setBidDeadline(requestId: string, deadline: string | null): Promise<{ deadline: string | null }> {
+  return postJsonMethod<{ deadline: string | null }>(`/api/me/requests/${encodeURIComponent(requestId)}/share-link`, { deadline }, "PUT");
+}
+
+/** Set / clear the renter's company logo on the request's shared bid form. `logoUrl` = data URL or null. */
+export async function setShareLinkLogo(requestId: string, logoUrl: string | null): Promise<unknown> {
+  return postJsonMethod(`/api/me/requests/${encodeURIComponent(requestId)}/share-link`, { logoUrl }, "PUT");
+}
+
+/** Build a request's public share link. The token IS the request's UUID; the renter-name slug is a
+ *  cosmetic prefix. The /bid page extracts the trailing UUID, so a slug with dashes is safe. */
+export function bidShareUrl(origin: string, requestId: string, renterName?: string | null): string {
+  const slug = renterName ? renterName.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) : "";
+  return `${origin}/bid/${slug ? `${slug}-` : ""}${requestId}`;
 }

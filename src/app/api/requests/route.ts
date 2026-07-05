@@ -45,12 +45,16 @@ export async function POST(req: Request) {
     try {
       const payload = draftToCreateRequest(body as RfqRequestPayload, userId);
       const data = await agentsPost<CreateRequestResult>("/agents/requests", payload);
-      // The server fans out one request per equipment item → `requests[]`. Surface every code.
+      // The server fans out one request per equipment item → `requests[]`. Surface every code (for
+      // display) AND the request UUIDs (the bid-link token resolves by UUID, never the shortCode).
       const codes = (data.requests ?? [])
         .map((r) => r.shortCode ?? r.requestId)
         .filter((c): c is string => !!c);
+      const uuids = (data.requests ?? [])
+        .map((r) => r.requestId)
+        .filter((c): c is string => !!c);
       return NextResponse.json(
-        { requestId: codes[0] ?? "RFQ", requestIds: codes.length ? codes : ["RFQ"] },
+        { requestId: codes[0] ?? "RFQ", requestIds: codes.length ? codes : ["RFQ"], requestUuids: uuids },
         { status: 201 },
       );
     } catch (err) {

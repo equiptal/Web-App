@@ -31,7 +31,7 @@ export function TermClassBadges({
   const classes = [
     { label: L("Equipment", "المعدة"), rows: terms.equipment },
     { label: L("Project", "المشروع"), rows: terms.contract },
-    { label: L("Supplier", "المؤجّر"), rows: terms.supplier },
+    { label: L("Documents", "المستندات"), rows: terms.supplier },
   ].filter((c) => c.rows.length > 0);
 
   return (

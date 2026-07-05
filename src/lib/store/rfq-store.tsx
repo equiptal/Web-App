@@ -7,8 +7,6 @@ import {
   Certificates,
   EquipmentItem,
   OperatorDetails,
-  OPERATOR_CERTIFICATES,
-  type OperatorCertificate,
   Preferences,
   ProjectDetails,
   RfqDraft,
@@ -63,6 +61,8 @@ export interface RfqState {
   requestId: string | null;
   /** Every short code from the fan-out (one per equipment item); requestId is the first. */
   requestIds: string[];
+  /** The fan-out request UUIDs (parallel to requestIds) — the bid-link token resolves by UUID. */
+  requestUuids: string[];
   multiLocationDismissed: boolean;
   seq: number;
   /** web-app/002: the project + items exactly as the agent first returned them — used to mark
@@ -86,6 +86,7 @@ const initialState: RfqState = {
   errorDetail: null,
   requestId: null,
   requestIds: [],
+  requestUuids: [],
   multiLocationDismissed: false,
   seq: 100,
   agentOrigin: null,
@@ -100,11 +101,11 @@ type Action =
   | { t: "SET_SIMULATE_ERROR"; value: boolean }
   | { t: "PROCESS_START" }
   | { t: "PROCESS_SUCCESS"; draft: AgentDraft }
-  | { t: "PROCESS_ERROR"; kind: ApiErrorKind }
+  | { t: "PROCESS_ERROR"; kind: ApiErrorKind; detail?: RfqState["errorDetail"] }
   | { t: "ENTER_WIZARD" }
   | { t: "RESUME_WIZARD" }
   | { t: "GO_INTAKE" }
-  | { t: "DISMISS_DRAFT_PROMPT" }
+  | { t: "RESUME_DRAFT" }
   | { t: "GO_STEP"; step: Step }
   | { t: "PATCH_LOCATION"; patch: Partial<ProjectDetails["location"]> }
   | { t: "CONFIRM_LOCATION" }
@@ -125,7 +126,7 @@ type Action =
   | { t: "REMOVE_ITEM"; id: string }
   | { t: "PATCH_PREFERENCES"; patch: DeepPrefPatch }
   | { t: "SUBMIT_START" }
-  | { t: "SUBMIT_SUCCESS"; requestId: string; requestIds: string[] }
+  | { t: "SUBMIT_SUCCESS"; requestId: string; requestIds: string[]; requestUuids: string[] }
   | { t: "SUBMIT_ERROR"; kind: ApiErrorKind; detail?: RfqState["errorDetail"] }
   | { t: "HYDRATE"; saved: Partial<RfqState> }
   | { t: "RESET" };
@@ -163,7 +164,7 @@ function reducer(state: RfqState, a: Action): RfqState {
     case "SET_SIMULATE_ERROR":
       return { ...state, simulateError: a.value };
     case "PROCESS_START":
-      return { ...state, phase: "processing", busy: true, error: null };
+      return { ...state, phase: "processing", busy: true, error: null, errorDetail: null };
     case "PROCESS_SUCCESS":
       return {
         ...state,
@@ -183,7 +184,7 @@ function reducer(state: RfqState, a: Action): RfqState {
         multiLocationDismissed: false,
       };
     case "PROCESS_ERROR":
-      return { ...state, busy: false, error: a.kind };
+      return { ...state, busy: false, error: a.kind, errorDetail: a.detail ?? null };
     case "ENTER_WIZARD":
       return { ...state, phase: "wizard", step: 1 };
     case "RESUME_WIZARD":
@@ -193,8 +194,12 @@ function reducer(state: RfqState, a: Action): RfqState {
       // Return to intake preserving text/files (AC-10: input preserved). Keeps `step` so the renter
       // can jump back to the wizard where they were ("Your request" step → back to review).
       return { ...state, phase: "intake", error: null };
-    case "DISMISS_DRAFT_PROMPT":
-      return { ...state, draftPrompt: false };
+    case "RESUME_DRAFT":
+      // "Continue draft": dismiss the prompt and drop the renter back INTO the review wizard at the
+      // step they left (restored by HYDRATE) — never the raw "Your request" input screen, whose
+      // primary action is "Re-analyze" and would discard their edits. A rehydrated draft has always
+      // already been processed (the prompt only shows when a saved draft exists).
+      return { ...state, draftPrompt: false, phase: "wizard", error: null };
     case "GO_STEP":
       return { ...state, step: a.step };
     case "PATCH_LOCATION":
@@ -224,20 +229,27 @@ function reducer(state: RfqState, a: Action): RfqState {
     case "PATCH_TIMING":
       return withDraft(state, (d) => ({ ...d, project: { ...d.project, timing: { ...d.project.timing, ...a.patch } } }));
     case "PATCH_ADVANCED":
-      return withDraft(state, (d) => ({ ...d, project: { ...d.project, advanced: { ...d.project.advanced, ...a.patch } } }));
-    case "SET_CERTIFICATES":
       return withDraft(state, (d) => {
-        const certificates = { ...d.project.certificates, ...a.patch };
+        const advanced = { ...d.project.advanced, ...a.patch };
         let items = d.items;
-        // AC-50: the project Safety certificates apply to every item's operator — EXCEPT items the
-        // agent already set certs on from the RFQ (those keep theirs). Multi-select, so fan the whole
-        // list (restricted to the operator-selectable certs — the free-text "other" stays project-level).
-        if (a.patch.safety) {
-          const certs = a.patch.safety.filter((c) => (OPERATOR_CERTIFICATES as string[]).includes(c)) as OperatorCertificate[];
-          items = d.items.map((i) => (i.operator.certByAgent ? i : { ...i, operator: { ...i.operator, certificate: certs } }));
+        // The request-wide minimum equipment year applies to EVERY item so it's reflected on each item's
+        // own picker (the renter can still override a single item afterwards via patchItem). AC-28.
+        if (a.patch.equipmentYear !== undefined) {
+          items = d.items.map((i) => ({ ...i, equipmentYear: a.patch.equipmentYear ?? null }));
         }
-        return { ...d, project: { ...d.project, certificates }, items };
+        return { ...d, project: { ...d.project, advanced }, items };
       });
+    case "SET_CERTIFICATES":
+      // AC-50: the request-wide safety certificates are the "settings for all items" value for each
+      // item's EQUIPMENT safety cert. Choosing it applies to ALL items — so, exactly like
+      // delivery/return/fuel (PATCH_REQUESTWIDE), CLEAR each item's per-item safety override so every
+      // item follows the shared setting (items with an override — e.g. from agent extraction — would
+      // otherwise ignore the request-wide click). It never fans into the OPERATOR cert (per-item).
+      return withDraft(state, (d) => ({
+        ...d,
+        project: { ...d.project, certificates: { ...d.project.certificates, ...a.patch } },
+        items: a.patch.safety !== undefined ? d.items.map((i) => ({ ...i, safetyCertsOverride: null })) : d.items,
+      }));
     case "PATCH_REQUESTWIDE":
       // Choosing a request-wide value applies it to ALL items — clear that field's per-item
       // overrides so every item follows the shared setting (AC-25/26).
@@ -317,7 +329,7 @@ function reducer(state: RfqState, a: Action): RfqState {
     case "SUBMIT_START":
       return { ...state, busy: true, error: null, errorDetail: null };
     case "SUBMIT_SUCCESS":
-      return { ...state, busy: false, phase: "confirmation", requestId: a.requestId, requestIds: a.requestIds };
+      return { ...state, busy: false, phase: "confirmation", requestId: a.requestId, requestIds: a.requestIds, requestUuids: a.requestUuids };
     case "SUBMIT_ERROR":
       return { ...state, busy: false, error: a.kind, errorDetail: a.detail ?? null };
     case "RESET":
@@ -354,13 +366,17 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
         const draft = await processRfq({ text: s.text, files: s.files, simulateError: s.simulateError });
         dispatch({ t: "PROCESS_SUCCESS", draft });
       } catch (e) {
-        dispatch({ t: "PROCESS_ERROR", kind: e instanceof ApiError ? e.kind : "unknown" });
+        const detail =
+          e instanceof ApiError
+            ? { detail: e.detail, backendCode: e.backendCode, backendStatus: e.backendStatus, status: e.status }
+            : null;
+        dispatch({ t: "PROCESS_ERROR", kind: e instanceof ApiError ? e.kind : "unknown", detail });
       }
     },
     enterWizard: () => dispatch({ t: "ENTER_WIZARD" }),
     resumeWizard: () => dispatch({ t: "RESUME_WIZARD" }),
     goIntake: () => dispatch({ t: "GO_INTAKE" }),
-    dismissDraftPrompt: () => dispatch({ t: "DISMISS_DRAFT_PROMPT" }),
+    resumeDraft: () => dispatch({ t: "RESUME_DRAFT" }),
     goStep: (step: Step) => dispatch({ t: "GO_STEP", step }),
 
     patchLocation: (patch: Partial<ProjectDetails["location"]>) => dispatch({ t: "PATCH_LOCATION", patch }),
@@ -390,13 +406,13 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
       if (!s.draft) return;
       dispatch({ t: "SUBMIT_START" });
       try {
-        const { requestId, requestIds } = await submitRequest({
+        const { requestId, requestIds, requestUuids } = await submitRequest({
           project: s.draft.project,
           items: postableItems(s.draft.items), // AC-33/34: exclude no-match/removed
           preferences: s.draft.preferences,
           simulateError: s.simulateError,
         });
-        dispatch({ t: "SUBMIT_SUCCESS", requestId, requestIds: requestIds ?? (requestId ? [requestId] : []) });
+        dispatch({ t: "SUBMIT_SUCCESS", requestId, requestIds: requestIds ?? (requestId ? [requestId] : []), requestUuids: requestUuids ?? [] });
       } catch (e) {
         const detail =
           e instanceof ApiError

@@ -95,6 +95,8 @@ export interface RequestListItem {
   /** Multi-item submission group — all fanned-out requests from one submit share this (null = solo). */
   requestGroupId: string | null;
   displayId: string;
+  /** RFQ group short code (`RFQ-NNNNN`) from my-requests once the backend returns it (T19); null until then. */
+  groupRef: string | null;
   type: RequestType;
   status: RequestStatus;
   urgency: Urgency | null;
@@ -117,6 +119,8 @@ export interface RequestListItem {
 export interface RequestGroup {
   /** The group id (or the lone request's id when it has no group). */
   id: string;
+  /** RFQ group short code (`RFQ-NNNNN`) from my-requests, if the backend returns it (T19); else null. */
+  groupRef: string | null;
   items: RequestListItem[];
   city: string | null;
   neighbourhood: string | null;
@@ -178,6 +182,8 @@ export function mapRequestListItem(r: RequestRecord): RequestListItem {
     id: r.id,
     requestGroupId: str(r.requestGroupId),
     displayId: str(r.displayId) ?? str(r.shortCode) ?? r.id,
+    // RFQ group code from my-requests (T19). Defensive on the field name the backend adds.
+    groupRef: str(r.groupRef) ?? str(r.requestGroupShortCode) ?? str(r.groupShortCode) ?? str(r.rfqRef) ?? null,
     type: r.type,
     status: r.status,
     urgency: (str(r.urgency) as Urgency) ?? null,
@@ -236,10 +242,11 @@ export function groupRequests(items: RequestListItem[]): RequestGroup[] {
     const first = groupItems[0];
     const address = first.city; // RequestListItem.city holds the full project address label
     const { city, neighbourhood } = parseAddress(address);
-    const locationLabel = city ? (neighbourhood ? `${city} — ${neighbourhood}` : city) : (address ?? "—");
+    const locationLabel = prettyLocation(city ? (neighbourhood ? `${city} — ${neighbourhood}` : city) : (address ?? "—"));
     const statuses = [...new Set(groupItems.map((i) => i.status))];
     return {
       id: first.requestGroupId ?? first.id,
+      groupRef: groupItems.find((i) => i.groupRef)?.groupRef ?? null,
       items: groupItems,
       city,
       neighbourhood,
@@ -253,6 +260,23 @@ export function groupRequests(items: RequestListItem[]): RequestGroup[] {
       asap: groupItems.some((i) => i.urgency === "ASAP"),
     };
   });
+}
+
+/** Demo label fix: show the airport project by its real name ("Airport" → "King Khalid Airport"). */
+export function prettyLocation(s: string): string {
+  return /king\s*khalid/i.test(s) ? s : s.replace(/\bairport\b/gi, "King Khalid Airport");
+}
+
+/** Fulfillment math: units covered for an equipment line = supplier-offered (on-platform) + off-platform
+ *  covered units, never below 0 or above what the line needs. Drives the "X / total" tracking bar. */
+export function cappedFilled(needed: number, onUnits: number, offUnits: number): number {
+  return Math.max(0, Math.min(needed, (onUnits || 0) + (offUnits || 0)));
+}
+
+/** Demo ordering: pin the Airport project's group(s) to the front, keeping the rest in order. */
+export function pinAirportFirst(groups: RequestGroup[]): RequestGroup[] {
+  const isAir = (g: RequestGroup) => /airport|مطار/i.test(g.locationLabel || g.city || "");
+  return [...groups.filter(isAir), ...groups.filter((g) => !isAir(g))];
 }
 
 /** Detail passes the record through largely intact (the screen renders every field). */

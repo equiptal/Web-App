@@ -100,6 +100,31 @@ export function jobStatus(raw: unknown): "pending" | "done" | "error" {
 }
 
 /**
+ * Pull the human reason out of Mansour's error shape. It can live top-level (`{ error }`/`{ message }`),
+ * inside the `{ ok, data }` envelope (`data.error` — e.g. "Premature close"), or under `data.result.error`.
+ */
+export function reasonFromBody(b: unknown): string | undefined {
+  const top = (b ?? {}) as Record<string, unknown>;
+  const inner = unwrapEnvelope(b);
+  const result = (inner.result ?? {}) as Record<string, unknown>;
+  const pick = (v: unknown): string | undefined => {
+    if (typeof v === "string" && v.trim()) return v;
+    if (v && typeof v === "object" && typeof (v as { message?: unknown }).message === "string") return (v as { message: string }).message;
+    return undefined;
+  };
+  return pick(top.error) ?? pick(top.message) ?? pick(inner.error) ?? pick(inner.message) ?? pick(result.error);
+}
+
+/** Same, but reads an unread Response body (consumes it). */
+export async function mansourReason(res: Response): Promise<string | undefined> {
+  try {
+    return reasonFromBody(await res.json());
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Adapt Mansour's `RFQAgentOutput` → the UI view-model (`AgentDraft`).
  *
  * The renter-facing verdict isn't a field Mansour emits — it's DERIVED here from the match
@@ -123,19 +148,26 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
   reconcileRequestWide(items, "deliveryOverride", (v) => (project.deliveryToSite = v));
   reconcileRequestWide(items, "returnOverride", (v) => (project.returnFromSite = v));
   reconcileRequestWide(items, "fuelResponsibilityOverride", (v) => (project.fuelResponsibility = v));
-  // AC-50: equipment-level safety certs the agent detected (per-item safety_certifications, e.g. the
-  // equipment must hold SASO/TÜV) → project-level Safety field. Tolerates single value or array.
-  const equipSafety = (out.line_items ?? []).flatMap((li) => safetyList(li.safety_certifications));
-  // AC-50: if the items that HAVE an agent-set operator certificate all share the same set (e.g. all
-  // TÜV), also reflect it at project level and let that control them. No-operator items (no cert)
-  // don't block this — they just aren't counted.
-  const certLists = items.map((i) => i.operator.certificate).filter((c) => c.length > 0);
-  const certKey = (c: OperatorCertificate[]) => [...c].sort().join(",");
-  const sharedOperatorCerts =
-    certLists.length > 0 && certLists.every((c) => certKey(c) === certKey(certLists[0])) ? certLists[0] : [];
-  if (sharedOperatorCerts.length) for (const i of items) i.operator.certByAgent = false;
-  const projectSafety = [...new Set([...equipSafety, ...sharedOperatorCerts])];
-  if (projectSafety.length) project.certificates.safety = projectSafety;
+  // AC-28: if EVERY item wants the same manufacture year, apply it request-wide (shown once for all)
+  // and clear the per-item overrides; a mix (or differing years) keeps the per-item values.
+  const years = items.map((i) => i.equipmentYear ?? null);
+  if (years.length && years.every((y) => y != null && y === years[0])) {
+    project.advanced.equipmentYear = years[0];
+    for (const i of items) i.equipmentYear = null;
+  }
+  // AC-50: equipment safety certs (TÜV/SPSP/SASO) are PER-ITEM (set in toItem from each line's
+  // safety_certifications), globalized to the request-wide "Certificates" default when every item
+  // shares the same set — the same lift-to-request-wide rule as delivery/return/fuel/year. Distinct
+  // from the OPERATOR cert (item.operator.certificate → operatorLicenseLevel), which stays per-item.
+  const certKey = (c: OperatorCertificate[] | null | undefined) => (c && c.length ? [...c].sort().join(",") : "");
+  const itemSafety = items.map((i) => i.safetyCertsOverride ?? []);
+  const allSameSafety = items.length > 0 && itemSafety.every((c) => certKey(c) === certKey(itemSafety[0]));
+  if (allSameSafety && itemSafety[0].length) {
+    project.certificates.safety = itemSafety[0]; // uniform → globalize + inherit per item
+    for (const i of items) i.safetyCertsOverride = null;
+  } else if (!allSameSafety) {
+    project.certificates.safety = []; // items differ → no request-wide default; per-item overrides kept
+  }
   // Field-keyed agent notes (dotted path → note) for inline rendering beside each field.
   const fieldNotes: Record<string, string> = {};
   for (const fn of out.field_notes ?? []) {
@@ -265,12 +297,19 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
     // size; it belongs in "MATCHED TO", not the raw input). null when the renter stated no size.
     rawSize: li.capacity_input_value ?? null,
     ref,
+    // Agent canonical match names (EN + AR) — display-only source for "MATCHED TO"; ref/submit stay English.
+    agentNames: { category: li.category, categoryAr: li.category_ar ?? null, subtype: li.subtype, subtypeAr: li.subtype_ar ?? null, capacity: li.capacity, capacityAr: li.capacity_ar ?? null },
     verdict,
     resolved,
     removed: false,
     suggestion: li.capacity_id && li.capacity_match && CAP_NEEDS_CHECK.has(li.capacity_match) ? { measurementId: li.capacity_id } : undefined,
     advisory: li.capacity_advisory ?? null,
     quantity: li.quantity ?? 1,
+    // AC-28: pre-fill the equipment year from Mansour (minimum_equipment_year, or the legacy
+    // max_equipment_age) — a 4-digit year the wizard's YearField renders; null ⇒ "any".
+    equipmentYear: (li.minimum_equipment_year ?? li.max_equipment_age) != null ? String(li.minimum_equipment_year ?? li.max_equipment_age) : null,
+    // AC-50: per-item EQUIPMENT safety certs (reconciled to request-wide below when every item agrees).
+    safetyCertsOverride: safetyList(li.safety_certifications),
     operatorNeeded,
     operator: {
       ...defaultOperatorDetails(),

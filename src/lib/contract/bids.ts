@@ -40,10 +40,37 @@ function certList(v: unknown): CertCode[] {
   }
   return out;
 }
+/**
+ * Equipment `documentKeys[].type` → EQUIPMENT safety cert (Level 2), EXACT match only. The equipment
+ * safety certs are tuv / spsp / saso / saso_technical_inspection. Ownership/PoO types (istimara,
+ * customs, sale_contract, saso_registration) return null here — they're handled as ownership docs.
+ * LC is NOT an equipment doc: Local Content is a COMPANY (Level 1) cert (`localContentDocKey`), so it
+ * is intentionally absent here.
+ */
+function eqDocTypeToCert(type: string): CertCode | null {
+  const t = type.trim().toLowerCase();
+  if (t === "tuv" || t === "tüv") return "TUV";
+  if (t === "spsp") return "SPSP";
+  // saso AND saso_technical_inspection are the SASO safety cert (NOT ownership, NOT company SASO reg).
+  if (t === "saso" || t === "saso_technical_inspection" || t === "saso-technical" || t === "saso_technical") return "SASO";
+  return null;
+}
+/** Equipment proof-of-ownership / registration doc types → labels (Business-documents row).
+ *  NOTE: saso_technical_inspection is a SASO CERT (see eqDocTypeToCert), so it's NOT listed here;
+ *  only true ownership docs are. */
+const OWNERSHIP_DOC_LABELS: Record<string, { key: string; labelEn: string; labelAr: string }> = {
+  istimara: { key: "istimara", labelEn: "Istimara", labelAr: "استمارة" },
+  customs: { key: "customs", labelEn: "Customs", labelAr: "بيان جمركي" },
+  sale_contract: { key: "sale_contract", labelEn: "Sale contract", labelAr: "عقد بيع" },
+  saso_registration: { key: "saso_registration", labelEn: "SASO registration", labelAr: "تسجيل ساسو" },
+};
 
 export interface BidCard {
   id: string;
   status: BidStatus;
+  /** Won via a RENTEE_OUTCOME survey (app parity: `wonViaSurvey`) — the rentee reported this supplier
+   *  as the winner. Distinct from a deal-room accept (`status === "ACCEPTED"`); both = a decided winner. */
+  wonViaSurvey?: boolean;
   supplierId: string | null;
   supplierName: string;
   verified: boolean;
@@ -60,6 +87,11 @@ export interface BidCard {
   /** Units the RFQ asked for (request.equipmentItems[0].numberOfUnits). The bid price is PER-UNIT, so
    *  totals on the card + quotation multiply by this (app parity: v3_bid_card.dart). */
   numberOfUnits: number;
+  /** Units THIS supplier offered to cover (bid.units_offered length). ≤ numberOfUnits. Drives
+   *  fulfillment ("covers X of Y units"); defaults to numberOfUnits when the bid doesn't specify. */
+  unitsOffered: number;
+  /** The request's equipment-year requirement (raw maxEquipmentAge — a min year like 2020, or an age). */
+  reqMinYear: number | null;
   equipment: { id: string | null; make: string | null; model: string | null; year: number | null; imageUrl: string | null } | null;
   /** Whether the offered equipment is verified (for the comparison's compliance block). */
   eqVerified: boolean;
@@ -73,6 +105,15 @@ export interface BidCard {
     saso: boolean;
     localContent: boolean;
   };
+  /** Supplier's real company-doc VALUES (bid-list supplierProfile) — used by the quotation identity
+   *  rows. null when not provided → the quotation shows the app's "Verified" pill instead. */
+  supplierCrNumber?: string | null;
+  supplierVatNumber?: string | null;
+  supplierNationalAddress?: string | null;
+  /** Supplier contact for the quotation party block (app parity). Phone ships today (bid-list sends it);
+   *  email is null until the bid-list projection adds it (backend), then the Email row lights up. */
+  supplierPhone?: string | null;
+  supplierEmail?: string | null;
   matchCount: number;
   conflictCount: number;
   dealRoomId: string | null;
@@ -81,15 +122,35 @@ export interface BidCard {
   note: string | null;
   /** Certs the RFQ asked for (app: request.requiredCerts) — drives the credential pills. */
   requiredCerts: CertCode[];
-  /** Certs this supplier actually holds (app: supplier.heldCerts) — ✓/✗ vs requiredCerts. */
+  /** FLAT held-cert union (backend resolveHeldCerts parity) — used for required-cert matching. Mixes
+   *  Level 1 + Level 2; for level-accurate display use companyCertCodes / equipmentCertCodes. */
   heldCertCodes: CertCode[];
+  /** LEVEL 1 (Company): certs held in the supplier's verification — LC (localContentDocKey) + SASO
+   *  registration (sasoHeavyEquipDocKey) + heldCertDocs. Rendered in the Company documents group. */
+  companyCertCodes?: CertCode[];
+  /** LEVEL 2 (Equipment): safety certs from equipment.documentKeys (TÜV/SPSP/SASO/saso_technical) —
+   *  the equipment-level cert pills. */
+  equipmentCertCodes?: CertCode[];
+  /** LEVEL 2 (Equipment) proof-of-ownership docs the equipment carries (istimara / customs /
+   *  sale_contract / saso_registration) — held documents, never a cert pill. */
+  ownershipDocs: { key: string; labelEn: string; labelAr: string }[];
+  /** LEVEL 3 (Operator): a declared deal-room term, NOT a held-doc pill. Rentee's required operator
+   *  license level (request operatorLicenseLevel) + the supplier's declared position (t3Declarations). */
+  operatorCertReq?: string | null;
+  operatorCertDeclared?: string | null;
   /** Lead times for the price breakdown's mobilization/return rows (013 AC-11 inline tags). */
   mobLeadTime: string | null;
   demobLeadTime: string | null;
-  /** Per-class term status for the card badges + Terms modal (app parity — Equipment / Project /
-   *  Supplier). Equipment + contract(=Project) are the request-vs-offer compare (deal-room-overlaid);
-   *  supplier = the verification docs held (CR / VAT / National address). */
+  /** Per-class term status for the card badges + Terms modal — MIRRORS THE MOBILE APP'S BID CARD:
+   *  Equipment (6), Project/contract (4), Supplier (CR + VAT, 2). Equipment + contract are the
+   *  request-vs-offer compare (deal-room-overlaid). */
   terms: { equipment: TermRow[]; contract: TermRow[]; supplier: TermRow[] };
+  /** Web comparison-only: the full deal-room negotiable + acknowledge terms (overlaid live). Feeds the
+   *  side-by-side "Negotiable terms" section; NOT shown on the bid card so the card matches the app. */
+  negotiableTerms?: TermRow[];
+  /** Who the RENTEE asked to bear each cost (from the request) — drives the comparison's add-cost
+   *  gating (add only when it's on the rentee) and conflict colouring. supplier / me. */
+  requestResponsibilities?: Partial<Record<"fuel" | "maintenance" | "overtime" | "operator_food" | "operator_transport_accommodation", "supplier" | "me">>;
   /** The renter's RFQ term values (raw) — rendered as Equipment-terms + Contract-terms cards in the
    *  generated quotation. Request-level (payment/maintenance) + first-item operator/fuel. */
   requestTerms: {
@@ -102,6 +163,18 @@ export interface BidCard {
     overtimeRate: string | null;
     maintenanceResponsibility: string | null;
   };
+  /** The SUPPLIER's DECLARED (T3) term values — the app's quotation shows these, not the renter's
+   *  (often-blank) request terms. Null when the supplier didn't declare that term. Absent on
+   *  off-platform (shared-link) bids, which carry no T3 declarations. */
+  declaredTerms?: {
+    paymentTerms: string | null;
+    breakdownResponseSla: string | null;
+    overtimeRate: string | null;
+    operatorNationality: string | null;
+    fuelResponsibility: string | null;
+  };
+  /** Normalized keys of terms AGREED/locked in the deal room — drives the quotation's "Agreed" badge. */
+  agreedTermKeys?: string[];
   /** 014 lifecycle, server-enriched in getBidList (same source the mobile bid card reads). Drives the
    *  live deal-terms strip + overlays locked terms onto the Terms modal / quotation. */
   lockedTerms: { key: string; value: unknown }[]; // agreed terms + their negotiated value
@@ -113,6 +186,21 @@ export interface BidCard {
    *  `new` = just submitted, `fresh` = updated, `your-turn` = supplier countered (renter acts),
    *  `waiting` = renter countered (awaiting supplier). null when no room/derivation. */
   uiState: "new" | "fresh" | "your-turn" | "waiting" | null;
+  /* ── web-app/006 (expanded) shared-link bids ──
+   * An off-platform bid a supplier submitted through the renter's shared link (no account). Mapped
+   * from a real `LinkBidSubmission` via `submissionToBidCard` (lib/contract/link-bids). Renders as a
+   * distinct "via shared link" card (no deal room) with a flat quoted total and a read-only
+   * "view submission" viewer instead of the negotiate footer. */
+  viaSharedLink?: boolean;
+  /** Flat quoted total (incl VAT) for a link bid — shown instead of the rate/period breakdown. */
+  quotedTotal?: number | null;
+  /** The submission id the read-only viewer opens (off-platform supplier submission). */
+  submissionKey?: string;
+  /** "submitted N days ago" for the link-bid card (avoids non-deterministic date math). */
+  agoDays?: number;
+  /** Off-platform bids capture company-doc VALUES (not files) — keyed by the comparison's doc hint
+   *  ("commercial"/"vat"/"national"). The comparison shows the value instead of opening a document. */
+  linkDocs?: Record<string, string> | null;
 }
 
 /** A Terms-modal row state: green (matches RFQ) / red (conflicts) / grey (unverified or undeclared). */
@@ -127,6 +215,11 @@ export interface TermRow {
   labelEn: string;
   labelAr: string;
   state: TermState;
+  /** Optional one-line explainer shown under the term (e.g. the supplier's answer vs the renter's request). */
+  detail?: { en: string; ar: string };
+  /** The negotiated value once the term is AGREED in the deal room (from lockedTerms) — lets the cost
+   *  responsibilities reflect what was actually settled, not the renter's original request side. */
+  value?: string | null;
 }
 
 const n = (v: unknown): number | null => {
@@ -134,6 +227,19 @@ const n = (v: unknown): number | null => {
   return typeof x === "number" && !Number.isNaN(x) ? x : null;
 };
 const s = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v : null);
+/** First present number across several candidate keys (camelCase + snake_case payloads). */
+const pickNum = (o: Record<string, unknown>, ...keys: string[]): number | null => {
+  for (const k of keys) { const x = n(o[k]); if (x != null) return x; }
+  return null;
+};
+/** Great-circle distance in km between two lat/lng points; null if either is missing. */
+function haversineKm(aLat: number | null, aLng: number | null, bLat: number | null, bLng: number | null): number | null {
+  if (aLat == null || aLng == null || bLat == null || bLng == null) return null;
+  const R = 6371, toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(bLat - aLat), dLng = toRad(bLng - aLng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
 /** Normalize a term key for fuzzy matching across the request, deal-room, and Terms-modal vocabularies. */
 const normKey = (k: string) => k.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -144,7 +250,7 @@ const normKey = (k: string) => k.toLowerCase().replace(/[^a-z0-9]/g, "");
  *  - red   → declared and conflicts (capacity/year/fuel mismatch, missing cert, or a deviation key)
  *  - green → declared and matches
  */
-function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requiredCerts: CertCode[], heldCertCodes: CertCode[]): { equipment: TermRow[]; contract: TermRow[] } {
+function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requiredCerts: CertCode[], heldCertCodes: CertCode[]): { equipment: TermRow[]; contract: TermRow[]; negotiable: TermRow[] } {
   const req = (raw.request ?? {}) as Record<string, unknown>;
   const reqItems = Array.isArray(req.equipmentItems) ? (req.equipmentItems as Record<string, unknown>[]) : [];
   const reqItem = reqItems[0] ?? {};
@@ -160,40 +266,120 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
   const heldSet = new Set(heldCertCodes);
   const certs: TermState = requiredCerts.length === 0 ? "grey" : requiredCerts.every((c) => heldSet.has(c)) ? "matched" : "conflict";
 
-  const maxAge = n(reqItem.maxEquipmentAge);
+  // The column holds a MINIMUM MANUFACTURE YEAR (e.g. 2018), not an age — match by comparing years
+  // directly (terms-journey doc). Read `minimumEquipmentYear` (the renamed/exposed field); fall back to
+  // the legacy `maxEquipmentAge` key only for old payloads. Conflict = bid older than the minimum year.
+  const minYear = n(reqItem.minimumEquipmentYear) ?? n(reqItem.maxEquipmentAge);
   const bidYear = n(eq.year) ?? 0;
-  const year: TermState = maxAge == null || bidYear === 0 ? "grey" : unverified ? "grey" : new Date().getFullYear() - bidYear > maxAge ? "conflict" : "matched";
+  const year: TermState = minYear == null || bidYear === 0 ? "grey" : unverified ? "grey" : bidYear < minYear ? "conflict" : "matched";
 
   const reqFuel = s(reqItem.fuelTypePreference)?.toUpperCase();
   const bidFuel = s(eq.fuelType)?.toUpperCase();
   const fuel: TermState = !reqFuel || !bidFuel ? "grey" : unverified ? "grey" : reqFuel === bidFuel ? "matched" : "conflict";
 
-  // Operator (spec 128): conflict on a nationality deviation or when the RFQ needs an operator the bid omits; else grey/unverified.
+  const contractState = (key: string, reqVal: string | null): TermState => (!reqVal ? "grey" : deviationKeys.has(key) ? "conflict" : "matched");
+  // Contract NEGOTIABLES (payment / SLA / overtime): app parity (terms_modal.dart `contractState`) — an
+  // un-negotiated supplier declaration is NOT "matched", it stays PENDING (grey → Pending review) until
+  // it's locked/agreed in the deal room (overlayLocked upgrades a locked term → agreed). Only a
+  // backend-flagged deviation → conflict. This is why overtime shows "Pending review", not "Matched".
+  const negContractState = (key: string): TermState => (deviationKeys.has(key) ? "conflict" : "grey");
+
+  // Operator (spec 128). operator_included is an ACKNOWLEDGE term (matched, or conflict only when the
+  // RFQ needs an operator the bid omits); operator_nationality is its own CONFLICT_ELIGIBLE term.
   const reqOperator = s(reqItem.operatorIncluded)?.toUpperCase() === "YES";
   const bidOperator = s(raw.operatorIncluded)?.toUpperCase() === "YES";
-  const operator: TermState = deviationKeys.has("operator_nationality") || (reqOperator && !bidOperator) ? "conflict" : "grey";
+  const operatorIncluded: TermState = !reqOperator ? "grey" : bidOperator ? "matched" : "conflict";
+  const opNat = reqOperator
+    ? (s(reqItem.operatorNationality) === "restricted" ? (s(reqItem.operatorNationalityCustom) ?? "restricted") : s(reqItem.operatorNationality))
+    : null;
 
-  const contractState = (key: string, reqVal: string | null): TermState => (!reqVal ? "grey" : deviationKeys.has(key) ? "conflict" : "matched");
-  const t3 = (raw.t3Declarations ?? {}) as Record<string, unknown>;
+  // FAT split + fuel responsibility — request prefs map to supplier/rentee (term-matching.ts parity).
+  // fat_food / fat_accommodation_transport AND fuel_responsibility are all CONFLICT_ELIGIBLE / Negotiable
+  // (terms-journey doc + CONFLICT_ELIGIBLE_KEYS): the supplier declares them and they can dispute.
+  const toResp = (camel: string, snake: string): string | null => { const v = reqItem[camel] ?? reqItem[snake]; return v === true ? "supplier" : v === false ? "rentee" : null; };
+  const fatFood = toResp("fatFood", "fat_food");
+  const fatAccom = toResp("fatAccommodationTransport", "fat_accommodation_transport");
+  const fuelResp = toResp("dieselIncluded", "diesel_included");
+
+  // maintenance_responsibility is ACKNOWLEDGE → fixed (terms-journey doc; NOT in CONFLICT_ELIGIBLE_KEYS):
+  // the supplier accepts it by bidding, it never disputes. Matched once the rentee set it, else grey.
   const reqMaint = s(req.maintenanceResponsibility)?.toLowerCase();
-  const bidMaint = s(t3.maintenance_responsibility)?.toLowerCase();
-  const maintenance: TermState = !reqMaint ? "grey" : !bidMaint ? "grey" : reqMaint === bidMaint ? "matched" : "conflict";
+  const maintenance: TermState = !reqMaint ? "grey" : "matched";
+
+  // Single "operator" row for the BID CARD's equipment bucket (mobile app parity): conflict on a
+  // nationality deviation or when the RFQ needs an operator the bid omits; matched when included.
+  // App parity (terms_modal.dart): the single operator term also conflicts on a missing operator cert.
+  const operator: TermState = !reqOperator ? "grey" : deviationKeys.has("operator_nationality") || deviationKeys.has("operator_certification") || !bidOperator ? "conflict" : "matched";
+
+  // operator_certification & safety_certifications — CONFLICT_ELIGIBLE / Negotiable in the app
+  // (term-matching.ts: "Moved Acknowledge → Negotiable"). They live in the comparison's negotiable
+  // set ONLY (never the bid card), so deal-room agreements overlay them live via overlayLocked().
+  const reqOpCert = s(reqItem.operatorLicenseLevel) ?? s(req.operatorLicenseLevel);
+  const operatorCertState: TermState = !reqOpCert ? "grey" : deviationKeys.has("operator_certification") ? "conflict" : "matched";
+  const safetyCertState: TermState = requiredCerts.length === 0 ? "grey" : deviationKeys.has("safety_certifications") ? "conflict" : certs;
+
+  // Project rows reused by both the bid-card "Project" bucket and the comparison's negotiable set.
+  const rPayment: TermRow = { key: "payment_terms", labelEn: "Payment terms", labelAr: "شروط الدفع", state: negContractState("payment_terms") };
+  const rSla: TermRow = { key: "breakdown_response_sla", labelEn: "Breakdown response", labelAr: "زمن الاستجابة للأعطال", state: negContractState("breakdown_response_sla") };
+  const rOvertime: TermRow = { key: "overtime_rate", labelEn: "Overtime", labelAr: "العمل الإضافي", state: negContractState("overtime_rate") };
+  const rMaint: TermRow = { key: "maintenance_responsibility", labelEn: "Maintenance", labelAr: "الصيانة", state: maintenance };
+
+  // Conflict detail (Renter: X · Supplier: Y) — app parity with link bids, so an in-app conflict in
+  // the Terms modal names BOTH sides, not just the term. Cert terms carry the exact codes.
+  const t3 = (raw.t3Declarations ?? {}) as Record<string, unknown>;
+  const opDeclared = s(t3.operator_certification) ?? s(t3.operatorCertification);
+  const certName = (c: CertCode) => CERT_LABEL[c]?.en ?? c;
+  const certNameAr = (c: CertCode) => CERT_LABEL[c]?.ar ?? c;
+  const dash = "—";
+  const opCertDetail = reqOpCert
+    ? { en: `Renter: ${reqOpCert} · Supplier: ${opDeclared ?? dash}`, ar: `المستأجر: ${reqOpCert} · المؤجّر: ${opDeclared ?? dash}` }
+    : undefined;
+  const safetyDetail = requiredCerts.length
+    ? {
+        en: `Renter: ${requiredCerts.map(certName).join("/")} · Supplier: ${heldCertCodes.length ? heldCertCodes.map(certName).join("/") : dash}`,
+        ar: `المستأجر: ${requiredCerts.map(certNameAr).join("/")} · المؤجّر: ${heldCertCodes.length ? heldCertCodes.map(certNameAr).join("/") : dash}`,
+      }
+    : undefined;
+  // The lumped `operator` bid-card row shows only "Conflict" with no values today. Give it the same
+  // Renter/Supplier detail as the specific rows (app parity) — pick the reason that drove the conflict:
+  // a missing operator, an operator-certification deviation, or an operator-nationality deviation.
+  const opNatDeclared = s(t3.operator_nationality) ?? s(t3.operatorNationality);
+  const operatorDetail: { en: string; ar: string } | undefined = !reqOperator
+    ? undefined
+    : !bidOperator
+      ? { en: "Renter: operator required · Supplier: not included", ar: "المستأجر: مطلوب مشغّل · المؤجّر: غير مشمول" }
+      : deviationKeys.has("operator_certification") && opCertDetail
+        ? opCertDetail
+        : deviationKeys.has("operator_nationality")
+          ? { en: `Renter: ${opNat ?? dash} · Supplier: ${opNatDeclared ?? dash}`, ar: `المستأجر: ${opNat ?? dash} · المؤجّر: ${opNatDeclared ?? dash}` }
+          : undefined;
 
   return {
+    // BID-CARD buckets — mirror the mobile app's bid card exactly: Equipment 6 · Project 4. Operator is
+    // ONE row (nationality/FAT are informational, not separate counted terms). Keys stay canonical so
+    // the deal-room overlay still matches.
     equipment: [
       { key: "measurement", labelEn: "Measurement", labelAr: "القياس", state: measurement },
       { key: "certs", labelEn: "Certificates", labelAr: "الشهادات", state: certs },
       { key: "year", labelEn: "Year of manufacture", labelAr: "سنة الصنع", state: year },
       { key: "fuel", labelEn: "Fuel type", labelAr: "نوع الوقود", state: fuel },
-      { key: "operator", labelEn: "Operator", labelAr: "المشغّل", state: operator },
       { key: "attachments", labelEn: "Attachments", labelAr: "الملحقات", state: "grey" },
+      { key: "operator", labelEn: "Operator", labelAr: "المشغّل", state: operator, detail: operatorDetail },
     ],
-    contract: [
-      { key: "payment_method", labelEn: "Payment method", labelAr: "طريقة الدفع", state: contractState("payment_method", s(req.paymentMethod)) },
-      { key: "payment_terms", labelEn: "Payment terms", labelAr: "شروط الدفع", state: contractState("payment_terms", s(req.paymentTerms)) },
-      { key: "breakdown_response_sla", labelEn: "Breakdown response", labelAr: "زمن الاستجابة للأعطال", state: contractState("breakdown_response_sla", s(req.breakdownResponseSla)) },
-      { key: "overtime", labelEn: "Overtime", labelAr: "العمل الإضافي", state: contractState("overtime", s(req.overtimeRate)) },
-      { key: "maintenance", labelEn: "Maintenance", labelAr: "الصيانة", state: maintenance },
+    contract: [rPayment, rSla, rOvertime, rMaint],
+    // COMPARISON-only expanded set (the web side-by-side "Negotiable terms" section) — NOT on the bid
+    // card. Carries the full deal-room negotiable + acknowledge terms with live overlay states.
+    negotiable: [
+      { key: "operator_included", labelEn: "Operator included", labelAr: "تشمل مشغّل", state: operatorIncluded },
+      { key: "operator_nationality", labelEn: "Operator nationality", labelAr: "جنسية المشغّل", state: contractState("operator_nationality", opNat) },
+      { key: "operator_certification", labelEn: "Operator certification", labelAr: "شهادة المشغّل", state: operatorCertState, detail: opCertDetail },
+      { key: "safety_certifications", labelEn: "Equipment safety certificates", labelAr: "شهادات سلامة المعدة", state: safetyCertState, detail: safetyDetail },
+      { key: "fat_food", labelEn: "Operator FAT — Food", labelAr: "الإعاشة (F.A.T) — الطعام", state: contractState("fat_food", fatFood) },
+      { key: "fat_accommodation_transport", labelEn: "Operator FAT — Accommodation/Transport", labelAr: "الإعاشة (F.A.T) — الإقامة/النقل", state: contractState("fat_accommodation_transport", fatAccom) },
+      { key: "fuel_responsibility", labelEn: "Fuel responsibility", labelAr: "مسؤولية الوقود", state: contractState("fuel_responsibility", fuelResp) },
+      rPayment, rSla, rOvertime, rMaint,
+      { key: "mobilization_pricing", labelEn: "Mobilization pricing", labelAr: "تسعير النقل", state: "grey" },
+      { key: "demobilization_pricing", labelEn: "Demobilization pricing", labelAr: "تسعير الإرجاع", state: "grey" },
     ],
   };
 }
@@ -201,27 +387,109 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
 function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   const sup = (raw.supplier ?? {}) as Record<string, unknown>;
   const prof = (sup.supplierProfile ?? {}) as Record<string, unknown>;
+  // The company-verification docs (CR/VAT/national address) can hang off several shapes depending on
+  // the projection — scan every plausible profile object so we read them wherever they live.
+  const profSources = [prof, sup, sup.profile, sup.company, sup.companyProfile, raw.supplierProfile, raw.profile]
+    .filter((o): o is Record<string, unknown> => !!o && typeof o === "object");
+  const docKey = (...keys: string[]) => profSources.some((o) => keys.some((k) => !!s(o[k])));
   const eq = (raw.equipment ?? null) as Record<string, unknown> | null;
   const certs = (sup.certs ?? {}) as { TUV?: boolean; SASO?: boolean; SPSP?: boolean };
   const heldCerts = Array.isArray(sup.heldCerts) ? (sup.heldCerts as string[]) : [];
-  // Supplier's held certs (app parity): heldCerts list ∪ certs flags ∪ profile doc keys.
+  const push = (arr: CertCode[], c: CertCode | null) => { if (c && !arr.includes(c)) arr.push(c); };
+
+  // LEVEL 1 — Company certs (supplier verification): LC (`localContentDocKey`) + SASO registration
+  // (`sasoHeavyEquipDocKey`) + the company-wide typed `heldCertDocs` map. These are company-held docs,
+  // NOT equipment docs — they belong in the Company documents group.
+  const companyCertCodes: CertCode[] = [];
+  if (docKey("localContentDocKey", "local_content_doc_key")) push(companyCertCodes, "LC");
+  if (docKey("sasoHeavyEquipDocKey", "saso_heavy_equip_doc_key")) push(companyCertCodes, "SASO");
+  for (const src of profSources) {
+    const map = src.heldCertDocs ?? src.held_cert_docs;
+    if (map && typeof map === "object" && !Array.isArray(map)) {
+      for (const [type, val] of Object.entries(map as Record<string, unknown>)) {
+        if (val) push(companyCertCodes, toCert(type));
+      }
+    }
+  }
+
+  // LEVEL 2 — Equipment docs: equipment_listings.documentKeys = [{ key, type }]. Split into safety
+  // CERTS (tuv/spsp/saso/saso_technical_inspection → cert pills) and proof-of-ownership DOCS
+  // (istimara/customs/sale_contract/saso_registration). Both live at the Equipment level.
+  const eqDocs = (Array.isArray(eq?.documentKeys) ? eq!.documentKeys : Array.isArray(eq?.document_keys) ? eq!.document_keys : []) as unknown[];
+  const equipmentCertCodes: CertCode[] = [];
+  const ownershipDocs: { key: string; labelEn: string; labelAr: string }[] = [];
+  for (const d of eqDocs) {
+    const dk = d as Record<string, unknown>;
+    const rawType = String((typeof d === "string" ? d : (dk.type ?? dk.code ?? "")) ?? "");
+    push(equipmentCertCodes, eqDocTypeToCert(rawType));
+    const own = OWNERSHIP_DOC_LABELS[rawType.trim().toLowerCase()];
+    if (own && !ownershipDocs.some((o) => o.key === own.key)) ownershipDocs.push(own);
+  }
+
+  // The FLAT held-cert union (backend resolveHeldCerts parity) — used for required-cert MATCHING and
+  // the legacy single "Certificates" term state. Level-accurate display uses companyCertCodes /
+  // equipmentCertCodes above; this union deliberately merges both levels plus the projected flags.
   const held = certList(heldCerts);
-  if (certs.TUV && !held.includes("TUV")) held.push("TUV");
-  if (certs.SASO && !held.includes("SASO")) held.push("SASO");
-  if (certs.SPSP && !held.includes("SPSP")) held.push("SPSP");
-  if (s(prof.sasoHeavyEquipDocKey) && !held.includes("SASO")) held.push("SASO");
-  if (s(prof.localContentDocKey) && !held.includes("LC")) held.push("LC");
+  if (certs.TUV) push(held, "TUV");
+  if (certs.SASO) push(held, "SASO");
+  if (certs.SPSP) push(held, "SPSP");
+  for (const c of companyCertCodes) push(held, c);
+  for (const c of equipmentCertCodes) push(held, c);
   const eqVerified = eq ? eq.verificationStatus === "VERIFIED" || eq.isVerified === true || eq.verified === true : false;
-  // Supplier identity, app parity (counterparty_identity_row): show each value only when the supplier
-  // actually has it (a presence/input check on the value itself — not a verified-assumption). CR/VAT
-  // values (crNumber/vatNumber) come straight from the bid payload; the Saudi national-address block
-  // (shortAddress/postalCode/buildingNumber/district) shows only if the backend projects those values.
-  const hasCr = !!s(prof.crNumber);
-  const hasVat = !!s(prof.vatNumber);
-  const hasNationalAddr = !!s(prof.shortAddress) || !!s(prof.postalCode) || !!s(prof.buildingNumber) || !!s(prof.companyAddress);
-  const requiredCerts = certList((raw.request as Record<string, unknown> | undefined)?.requiredCerts);
+  // CANONICAL verified signal across the platform (bid card / profile / limits): supplierStatus === 2
+  // (1=pending, 2=verified/approved, 3=rejected — see onboarding.ts supplierStatusToVerification).
+  // `isVerified` is an INDEPENDENT column that can diverge from the verification tier, so we do NOT
+  // OR it in here — that produced false "Verified" badges. A supplier is verified iff status === 2.
+  const supVerified = n(sup.supplierStatus) === 2;
+  // Company docs are read from the supplier's REAL verification fields projected in the bid list
+  // (crNumber / vatNumber / national-address parts / localContentDocKey / sasoHeavyEquipDocKey). Show a
+  // doc ONLY when its actual field is present — NEVER inferred from "verified" (a verified supplier can
+  // still lack an optional doc), so the table + card match the admin panel exactly.
+  const hasCr = docKey("crDocKey", "cr_doc_key", "crNumber", "commercialRegistrationNumber", "commercial_registration_number", "crFileKey");
+  const hasVat = docKey("vatDocKey", "vat_doc_key", "vatNumber", "taxNumber", "tax_number", "vatFileKey");
+  const hasNationalAddr = docKey("nationalAddressDocKey", "national_address_doc_key", "nationalId", "national_id", "companyAddress", "company_address", "companyCity", "shortAddress", "short_address", "postalCode", "postal_code", "buildingNumber", "building_number", "district");
+  // Real company-doc VALUES for the quotation identity rows (first present across the profile shapes).
+  const profVal = (...keys: string[]): string | null => { for (const o of profSources) for (const k of keys) { const v = s(o[k]); if (v) return v; } return null; };
+  const supplierCrNumber = profVal("crNumber", "commercialRegistrationNumber", "commercial_registration_number");
+  const supplierVatNumber = profVal("vatNumber", "taxNumber", "tax_number");
+  // National address: a single field if present, else composed from its Saudi-address parts (app parity).
+  const supplierNationalAddress =
+    profVal("nationalAddress", "national_address", "companyAddress", "company_address") ||
+    ([profVal("buildingNumber", "building_number"), profVal("shortAddress", "short_address"), profVal("district"), profVal("postalCode", "postal_code"), profVal("companyCity", "company_city")].filter(Boolean).join(" ") || null);
   const rq = (raw.request ?? {}) as Record<string, unknown>;
   const rqItem = (Array.isArray(rq.equipmentItems) ? (rq.equipmentItems as Record<string, unknown>[]) : [])[0] ?? {};
+  // Who the RENTEE asked to bear each cost (request side): diesel-included / FAT split → supplier|me.
+  const respSide = (v: unknown): "supplier" | "me" | undefined => {
+    if (v === true) return "supplier";
+    if (v === false) return "me";
+    const sv = typeof v === "string" ? v.toLowerCase() : "";
+    if (sv === "supplier") return "supplier";
+    if (sv === "rentee" || sv === "me") return "me";
+    return undefined;
+  };
+  const requestResponsibilities: NonNullable<BidCard["requestResponsibilities"]> = {};
+  {
+    const fuel = respSide(rqItem.dieselIncluded ?? rqItem.diesel_included);
+    const food = respSide(rqItem.fatFood ?? rqItem.fat_food);
+    const trans = respSide(rqItem.fatAccommodationTransport ?? rqItem.fat_accommodation_transport);
+    const m = s(rq.maintenanceResponsibility)?.toLowerCase();
+    if (fuel) requestResponsibilities.fuel = fuel;
+    if (m) requestResponsibilities.maintenance = m.includes("supplier") || m.includes("مؤجّر") ? "supplier" : "me";
+    if (food) requestResponsibilities.operator_food = food;
+    if (trans) requestResponsibilities.operator_transport_accommodation = trans;
+  }
+  // The safety-cert requirement (TÜV/SPSP/SASO) lives ONLY in the item's `safetyCertifications` — the
+  // documented source. The request-level `requiredCerts` field is not used by the backend/app (per the
+  // API docs), so we no longer read it.
+  const requiredCerts = certList(
+    Array.isArray(rqItem.safetyCertifications) ? (rqItem.safetyCertifications as unknown[]) : [],
+  );
+  // LEVEL 3 — Operator certification is a DECLARED deal-room term, not a verified held-doc pill. The
+  // rentee's requirement is the request item's operatorLicenseLevel; the supplier's position comes
+  // from the bid's t3Declarations (operator_certification). Both are plain strings for a term row.
+  const t3decl = (raw.t3Declarations ?? {}) as Record<string, unknown>;
+  const operatorCertReq = s(rqItem.operatorLicenseLevel) ?? s(rq.operatorLicenseLevel);
+  const operatorCertDeclared = s(t3decl.operator_certification) ?? s(t3decl.operatorCertification);
 
   // 014 lifecycle — server-enriched in getBidList (the same source the mobile bid card reads): each
   // locked (agreed) term carries its negotiated value, so they overlay the Terms-modal state + the
@@ -232,7 +500,22 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   const unreadTerms = (Array.isArray(raw.unreadTerms) ? (raw.unreadTerms as unknown[]) : []).map(String);
   const pm = (raw.progressMeter ?? {}) as Record<string, unknown>;
   const progress = { agreed: n(pm.agreed) ?? 0, total: n(pm.total) ?? 0 };
+  // Distance — app parity (bid.service.ts:134-137): a bid's location is its custom pin
+  // (equipmentLat/Lng) if the supplier dropped one, otherwise its selected YARD's coordinates —
+  // never the equipment listing's own lat/lng. Falls back to the listing's yard, then a
+  // server-computed value. Measured to the request's project location; null → "—" (no location).
+  // Keeping this the single source keeps every surface (comparison, cards, modal) consistent.
+  const eqObj = (eq ?? {}) as Record<string, unknown>;
+  const bidYard = (raw.yard ?? {}) as Record<string, unknown>;
+  const eqYard = (eqObj.yard ?? {}) as Record<string, unknown>;
+  const bidLat = pickNum(raw, "equipmentLat", "equipment_lat") ?? pickNum(bidYard, "latitude", "lat") ?? pickNum(eqYard, "latitude", "lat");
+  const bidLng = pickNum(raw, "equipmentLng", "equipment_lng") ?? pickNum(bidYard, "longitude", "lng") ?? pickNum(eqYard, "longitude", "lng");
+  const reqLat = pickNum(rq, "projectLat", "project_lat", "lat");
+  const reqLng = pickNum(rq, "projectLng", "project_lng", "lng");
+  const distanceKm = n(raw.distanceKm) ?? haversineKm(bidLat, bidLng, reqLat, reqLng);
+
   const lockedKeys = new Set(lockedTerms.map((t) => normKey(t.key)));
+  const lockedValByKey = new Map(lockedTerms.map((t) => [normKey(t.key), t.value != null && t.value !== "" ? String(t.value) : null]));
   const unreadKeys = new Set(unreadTerms.map(normKey));
   const lockedVal = (pred: (k: string) => boolean): string | null => {
     const t = lockedTerms.find((x) => pred(normKey(x.key)));
@@ -243,7 +526,9 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   const overlayLocked = (rows: TermRow[]): TermRow[] =>
     rows.map((r) => {
       const k = normKey(r.key);
-      if (lockedKeys.has(k)) return { ...r, state: "agreed" as TermState };
+      // Locked → "agreed", and carry the negotiated value so the cost responsibilities reflect what was
+      // actually settled in the deal room (e.g. accepting the supplier's FAT flips the side to supplier).
+      if (lockedKeys.has(k)) return { ...r, state: "agreed" as TermState, value: lockedValByKey.get(k) ?? r.value ?? null };
       if (unreadKeys.has(k)) return { ...r, state: "negotiating" as TermState };
       return r;
     });
@@ -251,23 +536,34 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   const negMobLead = lockedVal((k) => k.includes("leadtime"));
   const negMobPrice = lockedVal((k) => k.includes("mobilizationpricing"));
   const negDemobPrice = lockedVal((k) => k.includes("demobilizationpricing"));
+  // Rate (T16): show the LIVE deal-room rate, matching the mobile bid card. The backend already
+  //  computes `currentPrice = dealRoom.lastProposedRate ?? priceAmount` (getBidList/received-bids), so
+  //  it reflects the latest negotiated rate and falls back to the original when there's no deal room.
+  //  Prefer it; keep the locked PRICE term + the raw offer as fallbacks.
+  const negRate = lockedVal((k) => k === "price");
 
   return {
     id: String(raw.id ?? ""),
     status: (s(raw.status) as BidStatus) ?? "PENDING",
+    wonViaSurvey: raw.wonViaSurvey === true, // survey-reported winner (app parity) — decided even if status isn't ACCEPTED
     supplierId: sup.id != null ? String(sup.id) : null,
     supplierName: s(raw.supplierDisplayName) ?? s(sup.companyName) ?? ([s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" ") || "Supplier"),
-    verified: sup.supplierStatus === 2 || prof.verified === true,
+    verified: supVerified,
     rating: n(sup.rating) ?? n(prof.rating),
-    distanceKm: n(raw.distanceKm),
+    distanceKm,
     submittedAt: s(raw.createdAt),
     validUntil: s(raw.validUntil),
-    price: n(raw.currentPrice) ?? n(raw.priceAmount),
+    price: n(raw.currentPrice) ?? n(negRate) ?? n(raw.priceAmount), // live deal-room rate (app parity) → locked rate → original offer (T16)
     mobPrice: n(negMobPrice) ?? n(raw.mobPrice),
     demobPrice: n(negDemobPrice) ?? n(raw.demobPrice),
     priceUnit: s(raw.priceUnit),
     duration: n(raw.duration),
     numberOfUnits: n(rqItem.numberOfUnits) ?? 1,
+    // Supplier's chosen quantity (bid.units_offered is an array; its length = offered unit count).
+    // An EMPTY array means the supplier didn't pick a subset → they bid the request as posted (covers
+    // its full unit count), NOT 0 — otherwise the header tile reads 0/1 while the card says "covers 1 of 1".
+    unitsOffered: Array.isArray(raw.unitsOffered) && raw.unitsOffered.length > 0 ? raw.unitsOffered.length : (n(raw.unitsOffered) ?? n(rqItem.numberOfUnits) ?? 1),
+    reqMinYear: n(rqItem.maxEquipmentAge),
     equipment: eq
       ? { id: s(eq.id) ?? s(eq.equipmentId), make: s(eq.manufacturer) ?? s(eq.make), model: s(eq.model), year: n(eq.year), imageUrl: s(eq.imageUrl) ?? s(eq.primaryPhotoUrl) }
       : null,
@@ -278,28 +574,42 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
       taxNumber: hasVat,
       nationalAddress: hasNationalAddr,
       safety: certs.TUV === true || certs.SPSP === true || heldCerts.some((c) => /tuv|spsp|safety/i.test(c)),
-      saso: certs.SASO === true || !!s(prof.sasoHeavyEquipDocKey) || heldCerts.some((c) => /saso/i.test(c)),
-      localContent: !!s(prof.localContentDocKey) || heldCerts.some((c) => /local.?content/i.test(c)),
+      saso: certs.SASO === true || docKey("sasoHeavyEquipDocKey", "saso_heavy_equip_doc_key") || held.includes("SASO") || heldCerts.some((c) => /saso/i.test(c)),
+      localContent: docKey("localContentDocKey", "local_content_doc_key") || held.includes("LC") || heldCerts.some((c) => /local.?content/i.test(c)),
     },
+    supplierCrNumber,
+    supplierVatNumber,
+    supplierNationalAddress,
+    supplierPhone: s(sup.phone),
+    supplierEmail: s(sup.email), // not in the bid-list projection yet → null until the backend adds it
     matchCount: n(raw.matchCount) ?? 0,
     conflictCount: n(raw.conflictCount) ?? 0,
     dealRoomId: s(raw.dealRoomId),
     expired: expired || raw.isExpired === true || raw.status === "EXPIRED",
     note: s(raw.note),
     requiredCerts,
+    requestResponsibilities,
     heldCertCodes: held,
+    companyCertCodes,
+    equipmentCertCodes,
+    ownershipDocs,
+    operatorCertReq,
+    operatorCertDeclared,
     mobLeadTime: negMobLead ?? s(raw.mobLeadTime),
     demobLeadTime: s(raw.demobLeadTime),
     terms: {
       equipment: overlayLocked(baseTerms.equipment),
       contract: overlayLocked(baseTerms.contract),
-      // Supplier verification docs the supplier holds (CR / VAT / National address) — informational.
+      // Supplier identity bucket — CR + VAT only, matching the mobile app's bid card (2 informational
+      // rows). National address / LC / SASO are surfaced in the web comparison's Company-documents row,
+      // not on the bid card.
       supplier: [
         { key: "cr", labelEn: "Commercial registration", labelAr: "السجل التجاري", state: (hasCr ? "matched" : "grey") as TermState },
         { key: "vat", labelEn: "VAT registration", labelAr: "الرقم الضريبي", state: (hasVat ? "matched" : "grey") as TermState },
-        { key: "national_address", labelEn: "National address", labelAr: "العنوان الوطني", state: (hasNationalAddr ? "matched" : "grey") as TermState },
       ],
     },
+    // Comparison-only expanded negotiable/acknowledge terms (live deal-room overlay) — not on the bid card.
+    negotiableTerms: overlayLocked(baseTerms.negotiable),
     requestTerms: {
       operatorIncluded: s(rqItem.operatorIncluded),
       operatorNationality: lockedVal((k) => k.includes("nationality")) ?? s(rqItem.operatorNationality),
@@ -310,6 +620,14 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
       overtimeRate: lockedVal((k) => k.includes("overtime")) ?? s(rq.overtimeRate),
       maintenanceResponsibility: lockedVal((k) => k.includes("maintenance")) ?? s(rq.maintenanceResponsibility),
     },
+    declaredTerms: {
+      paymentTerms: s(t3decl.payment_terms),
+      breakdownResponseSla: s(t3decl.breakdown_response_sla),
+      overtimeRate: s(t3decl.overtime_rate),
+      operatorNationality: s(t3decl.operator_nationality) ?? s(t3decl.operatorNationality),
+      fuelResponsibility: s(t3decl.fuel_responsibility),
+    },
+    agreedTermKeys: lockedTerms.map((t) => normKey(t.key)),
     lockedTerms,
     unreadTerms,
     progress,
@@ -346,6 +664,47 @@ export function bidSuppliers(bids: BidCard[]): BidSupplier[] {
     }
   }
   return order.map((k) => map.get(k)!);
+}
+
+/**
+ * Bucket a bid's terms into Conflict / Pending review / Matched — the SINGLE source of truth for both
+ * the Terms modal tabs AND the bid card's "Conflict N · Matched N" tally, so the two always agree.
+ * Merges the specific negotiable rows + equipment/contract/supplier, de-dups by key, drops the vague
+ * rows a specific one supersedes (certs→safety_certifications, operator→operator_included) and the n/a
+ * (grey) rows (grey = no requirement → excluded, never counted).
+ */
+export type TermBucket = "conflict" | "pending" | "matched";
+// App parity (mobile terms_modal.dart `_negotiableTermKeys`): the bid-card chips AND the Terms-modal tabs
+// count EXACTLY these 6 LUMPED negotiable terms — nothing else. Excluded (informational / acknowledge /
+// identity, never counted): equipment identity (measurement/year/fuel/attachments), maintenance, CR/VAT,
+// mob/demob pricing, and the SPLIT operator_*/fat_* rows (operator + FAT fold into the single `operator`
+// term). `safety_certifications` is the one cert term; `operator` is the single lumped operator row.
+const COUNTED_TERM_KEYS = new Set([
+  "payment_terms", "breakdown_response_sla", "overtime_rate", "fuel_responsibility", "safety_certifications", "operator",
+]);
+// App parity (`_TermsStateCounts`): 5 row-states collapse to 3 — `matched`; `conflict`; everything else
+// (pending / negotiating / grey / open-value) → Pending, so the three counts always sum to the row total.
+const bucketOfTermState = (s: TermState): TermBucket =>
+  s === "conflict" ? "conflict" : s === "matched" || s === "agreed" ? "matched" : "pending";
+
+export function bucketBidTerms(
+  terms: { equipment: TermRow[]; contract: TermRow[]; supplier: TermRow[] },
+  negotiable?: TermRow[],
+): { rows: TermRow[]; byBucket: Record<TermBucket, TermRow[]>; counts: Record<TermBucket, number> } {
+  const merged = [...(negotiable ?? []), ...terms.equipment, ...terms.contract, ...terms.supplier];
+  const seen = new Set<string>();
+  const rows = merged.filter((r) => {
+    if (!COUNTED_TERM_KEYS.has(r.key)) return false; // only the app's 6 negotiable terms
+    // App parity: fuel_responsibility is counted only when the rentee actually declared it (an
+    // undeclared/open — grey — row is dropped, not shown as Pending).
+    if (r.key === "fuel_responsibility" && r.state === "grey") return false;
+    if (seen.has(r.key)) return false; // keep the first (negotiable rows carry the live deal-room state)
+    seen.add(r.key);
+    return true;
+  });
+  const byBucket: Record<TermBucket, TermRow[]> = { conflict: [], pending: [], matched: [] };
+  for (const r of rows) byBucket[bucketOfTermState(r.state)].push(r);
+  return { rows, byBucket, counts: { conflict: byBucket.conflict.length, pending: byBucket.pending.length, matched: byBucket.matched.length } };
 }
 
 /** Flatten the `{activeBids, expiredBids}` envelope → active first, then expired. */

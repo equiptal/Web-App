@@ -1,0 +1,535 @@
+"use client";
+
+import { use, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { fetchBidFormData, submitBidForm } from "@/lib/api/client";
+import type { BidFormData, BidFormItem } from "@/lib/contract/link-bids";
+import { buildSubmissionNotes, priceToStore } from "@/lib/contract/vat-inclusive";
+import { BID_FORM_CSS } from "@/components/bid/bidFormStyles";
+
+/**
+ * web-app/006 — PUBLIC supplier bid form (spec "Layout B": supplier-bid-v2.html). An off-platform
+ * supplier opens the renter's shared link `/bid/{slug}-{groupId}`, sees the request's project terms +
+ * per-item terms (wide table) + pricing, enters company details, and submits. Stored independently.
+ * Bilingual (?lang=ar) + RTL. Closed (AC-11/12) / countdown (AC-10) / already-submitted (AC-33) states.
+ */
+
+const TERM_KEYS = ["operator", "nationality", "fatFood", "fatTransport", "fuel", "fuelType", "year", "operatorCert", "equipmentCert"] as const;
+type TermKey = (typeof TERM_KEYS)[number];
+const TERM_LABEL: Record<TermKey, [string, string]> = {
+  operator: ["Operator", "المشغّل"],
+  nationality: ["Operator nationality", "جنسية المشغّل"],
+  fatFood: ["Food (F.A.T)", "الطعام"],
+  fatTransport: ["Accommodation & transport", "السكن والمواصلات"],
+  fuel: ["Fuel responsibility", "مسؤولية الوقود"],
+  fuelType: ["Fuel type", "نوع الوقود"],
+  year: ["Equipment year", "سنة الصنع"],
+  operatorCert: ["Operator certificate", "شهادة المشغّل"],
+  equipmentCert: ["Equipment certificate", "شهادة المعدة"],
+};
+const UNIT_LABEL: Record<string, [string, string]> = {
+  PER_DAY: ["day", "يوم"], PER_WEEK: ["week", "أسبوع"], PER_MONTH: ["month", "شهر"], PER_JOB: ["job", "مهمة"],
+};
+const num = (v: string) => (v.trim() && Number.isFinite(Number(v)) ? Number(v) : 0);
+
+// The supplier "Quote valid until" field. Enabled now that the link_bid_submissions.valid_until
+// migration (20260629000000) is on staging and the submit handler persists it end-to-end.
+const QUOTE_EXPIRY_ENABLED = true;
+
+type Answer = {
+  confirmations: Partial<Record<TermKey, boolean>>;
+  rentalRate: string;
+  deliveryPrice: string;
+  returnPrice: string;
+  /** Partial bid: units this supplier offers on this line (1..numberOfUnits). Defaults to the full count. */
+  offeredUnits: string;
+};
+
+export default function BidFormPage({ params }: { params: Promise<{ token: string }> }) {
+  const { token: rawToken } = use(params);
+  // The URL is /bid/{slug}-{groupId}; the token is the trailing UUID (group id).
+  const token = rawToken.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0] ?? rawToken;
+
+  const sp = useSearchParams();
+  const [lang, setLang] = useState<"en" | "ar">(sp.get("lang") === "ar" ? "ar" : "en");
+  const ar = lang === "ar";
+  const L = (e: string, a: string) => (ar ? a : e);
+  const nf = (n: number) => new Intl.NumberFormat(ar ? "ar-EG" : "en-US").format(Math.round(n));
+
+  const [data, setData] = useState<BidFormData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [answers, setAnswers] = useState<Record<string, Answer>>({});
+  const [contract, setContract] = useState<Record<string, boolean>>({});
+  const [company, setCompany] = useState({ companyName: "", crNumber: "", vatNumber: "", nationalAddress: "", contactInfo: "", notes: "", validUntil: "" });
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [showErrors, setShowErrors] = useState(false);
+  const [yesItem, setYesItem] = useState<Record<string, boolean>>({}); // per-item "Yes to all this item's terms"
+  const [yesContract, setYesContract] = useState(false); // "Yes to all" for the for-all-items contract terms
+  // Some suppliers quote prices that ALREADY include 15% VAT. When on, the prices entered below are
+  // treated as VAT-inclusive (gross) — we strip the VAT back out on submit so the stored bid stays
+  // VAT-exclusive like every on-platform bid, and the renter side reproduces the same total.
+  const [vatIncluded, setVatIncluded] = useState(false);
+  // Suppliers may submit more than one bid per request (e.g. alternative options) — no single-submission lock.
+
+  useEffect(() => {
+    let alive = true;
+    fetchBidFormData(token)
+      .then((d) => {
+        if (!alive) return;
+        setData(d);
+        const init: Record<string, Answer> = {};
+        for (const it of d.items) {
+          // No default — the supplier must explicitly answer Yes/No on each term (starts unselected/grey).
+          init[it.requestItemId] = { confirmations: {}, rentalRate: "", deliveryPrice: "", returnPrice: "", offeredUnits: String(it.numberOfUnits || 1) };
+        }
+        setAnswers(init);
+        setContract({});
+      })
+      .catch(() => alive && setNotFound(true))
+      .finally(() => alive && setLoading(false));
+    return () => { alive = false; };
+  }, [token]);
+
+  const itemTerms = (it: BidFormItem) => TERM_KEYS.filter((k) => it.requiredTerms[k] != null);
+  const setConf = (id: string, k: TermKey, v: boolean) => setAnswers((p) => ({ ...p, [id]: { ...p[id], confirmations: { ...p[id].confirmations, [k]: v } } }));
+  const setPrice = (id: string, field: "rentalRate" | "deliveryPrice" | "returnPrice", v: string) => setAnswers((p) => ({ ...p, [id]: { ...p[id], [field]: v } }));
+  const setOffered = (id: string, v: string) => setAnswers((p) => ({ ...p, [id]: { ...p[id], offeredUnits: v } }));
+  // Units this line offers — parsed + clamped to 1..numberOfUnits; defaults to the full requested count.
+  const offeredQty = (it: BidFormItem, a?: Answer) => { const max = it.numberOfUnits || 1; const nq = Math.round(num(a?.offeredUnits ?? "")); return nq >= 1 && nq <= max ? nq : max; };
+
+  // Per-item "Yes to all" — toggles all of THIS item's terms Yes; off clears them so they can answer
+  // individually. Lives below each item header (next to its Terms subhead).
+  const toggleItemYes = (it: BidFormItem) => {
+    const on = !yesItem[it.requestItemId];
+    setYesItem((p) => ({ ...p, [it.requestItemId]: on }));
+    setAnswers((p) => {
+      const conf = { ...(p[it.requestItemId]?.confirmations ?? {}) };
+      for (const k of itemTerms(it)) conf[k] = on ? true : undefined;
+      return { ...p, [it.requestItemId]: { ...p[it.requestItemId], confirmations: conf } };
+    });
+  };
+  // "Yes to all" for the for-all-items contract terms (same pattern).
+  const toggleContractYes = () => {
+    if (!data) return;
+    const on = !yesContract;
+    setYesContract(on);
+    const next: Record<string, boolean> = {};
+    if (on) for (const c of data.contractTerms) next[c.key] = true;
+    setContract(next);
+  };
+
+  // Reset for "Submit another bid" — clear terms/prices for a fresh quotation (keep company details,
+  // since it's the same supplier sending another option).
+  const resetForm = () => {
+    if (!data) return;
+    const init: Record<string, Answer> = {};
+    for (const it of data.items) init[it.requestItemId] = { confirmations: {}, rentalRate: "", deliveryPrice: "", returnPrice: "", offeredUnits: String(it.numberOfUnits || 1) };
+    setAnswers(init);
+    setContract({});
+    setYesItem({});
+    setYesContract(false);
+    setShowErrors(false);
+    setSubmitting(false);
+    setSubmitted(false);
+    window.scrollTo(0, 0);
+  };
+
+  // Returns the NET (before-VAT) item subtotal. When the supplier priced VAT-inclusive, strip the 15%
+  // back out so the ×1.15 downstream reproduces exactly the gross they typed.
+  const itemSubtotal = (it: BidFormItem, a?: Answer) => {
+    if (!a) return 0;
+    const q = offeredQty(it, a); // price the units actually offered (partial bid)
+    const gross = (num(a.rentalRate) + num(a.deliveryPrice) + num(a.returnPrice)) * q;
+    return vatIncluded ? gross / 1.15 : gross;
+  };
+  const grand = useMemo(
+    () => (data?.items ?? []).reduce((s, it) => s + itemSubtotal(it, answers[it.requestItemId]) * 1.15, 0),
+    [data, answers, vatIncluded],
+  );
+
+  const companyValid = company.companyName.trim() && company.crNumber.trim() && company.vatNumber.trim() && company.nationalAddress.trim() && company.contactInfo.trim();
+  const itemsValid = (data?.items ?? []).every((it) => num(answers[it.requestItemId]?.rentalRate ?? "") > 0);
+  // Every shown term (per-item + project) must be answered Yes/No — no silent grey/unanswered terms.
+  const termsAnswered =
+    (data?.items ?? []).every((it) => itemTerms(it).every((k) => typeof answers[it.requestItemId]?.confirmations[k] === "boolean")) &&
+    (data?.contractTerms ?? []).every((c) => typeof contract[c.key] === "boolean");
+  const valid = !!companyValid && itemsValid && termsAnswered;
+
+  async function onSubmit() {
+    setShowErrors(true);
+    if (!valid || !data) return;
+    setSubmitting(true);
+    try {
+      await submitBidForm(token, {
+        companyName: company.companyName.trim(),
+        crNumber: company.crNumber.trim(),
+        vatNumber: company.vatNumber.trim(),
+        nationalAddress: company.nationalAddress.trim(),
+        contactInfo: company.contactInfo.trim(),
+        // No backend flag for VAT-inclusive pricing — carry it as a tagged line in the notes (which
+        // round-trip to the renter's submission view). The viewer surfaces it as a dedicated note.
+        notes: buildSubmissionNotes(company.notes, vatIncluded),
+        validUntil: company.validUntil ? new Date(company.validUntil).toISOString() : undefined,
+        items: data.items.map((it) => {
+          const a = answers[it.requestItemId];
+          // Store VAT-exclusive prices. If the supplier priced VAT-inclusive, strip the 15% back out so
+          // the renter side — which always adds VAT — lands on the same total.
+          // Merge the project/contract confirmations (apply to all items) into each item's answers.
+          return { requestItemId: it.requestItemId, confirmations: { ...a.confirmations, ...contract }, offeredUnits: it.numberOfUnits > 1 ? offeredQty(it, a) : undefined, rentalRate: priceToStore(num(a.rentalRate), vatIncluded), deliveryPrice: priceToStore(num(a.deliveryPrice), vatIncluded), returnPrice: priceToStore(num(a.returnPrice), vatIncluded) };
+        }),
+      });
+      setSubmitted(true);
+      window.scrollTo(0, 0);
+    } catch {
+      setSubmitting(false);
+      fetchBidFormData(token).then((d) => setData(d)).catch(() => {});
+      alert(L("Could not submit — the request may have closed, or please try again.", "تعذّر الإرسال — قد يكون الطلب أُغلق، أو حاول مرة أخرى."));
+    }
+  }
+
+  const dir = ar ? "rtl" : "ltr";
+  const sar = L("SAR", "ر.س");
+  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+  return (
+    <div dir={dir} className={`bidpage${ar ? " rtl" : ""}`}>
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=Inter:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
+      <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" />
+      <style>{BID_FORM_CSS}</style>
+
+      {/* Public header bar — renter identity + language toggle */}
+      <header className="pubbar">
+        <div className="pubbar-in">
+          {data?.renter.logoUrl
+            ? <div className="rlogo rlogo-img">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={data.renter.logoUrl} alt="" /></div>
+            : <div className="rlogo">{(data?.renter.name || "?").trim().slice(0, 2).toUpperCase()}</div>}
+          <div className="rmeta">
+            <div className="rlabel">{L("Request from", "طلب من")}</div>
+            <div className="rname">{data?.renter.name || data?.renter.contactName || L("Renter", "مستأجر")}</div>
+            {data && (data.renter.verified || data.renter.city || data.renter.contactName) && (
+              <div className="rsub">
+                {data.renter.verified && <span className="material-icons-outlined">verified</span>}
+                <span>{[data.renter.verified ? L("Verified renter", "مستأجر موثّق") : null, data.renter.city, data.renter.contactName ? `${L("Contact", "المسؤول")}: ${data.renter.contactName}` : null].filter(Boolean).join(" · ")}</span>
+              </div>
+            )}
+          </div>
+          <div className="spacer" />
+          <div className="langtog">
+            <button className={lang === "en" ? "on" : ""} onClick={() => setLang("en")}>EN</button>
+            <button className={lang === "ar" ? "on" : ""} onClick={() => setLang("ar")}>ع</button>
+          </div>
+        </div>
+      </header>
+
+      {loading && <div className="wrap"><p className="state-msg">{L("Loading…", "جارٍ التحميل…")}</p></div>}
+
+      {!loading && (notFound || !data) && (
+        <div className="wrap"><div className="state"><div className="sic err"><span className="material-icons-outlined">link_off</span></div><h2>{L("Link not found", "الرابط غير موجود")}</h2><p>{L("This bid link is invalid or has expired.", "هذا الرابط غير صالح أو منتهٍ.")}</p></div></div>
+      )}
+
+      {/* Closed (AC-11/12) */}
+      {!loading && data?.status === "closed" && (
+        <div className="wrap"><div className="state"><div className="sic neutral"><span className="material-icons-outlined">lock_clock</span></div>
+          <h2>{L("Not accepting bids", "لا يستقبل العروض")}</h2>
+          <p>{data.closedReason === "deadline" ? L("The deadline for this request has passed.", "انتهى الموعد النهائي لهذا الطلب.") : L("This request is closed and no longer accepting bids.", "هذا الطلب مُغلق ولم يعد يستقبل العروض.")}</p>
+        </div></div>
+      )}
+
+      {/* Success (AC-29) — suppliers may submit another bid (e.g. an alternative option). */}
+      {submitted && (
+        <div className="wrap"><div className="state"><div className="sic"><span className="material-icons-outlined">check_circle</span></div>
+          <h2>{L("Bid submitted", "تم إرسال العرض")}</h2>
+          <p>{L("Your bid is now with the renter on the Moedatech platform — they can view it and compare it side by side with the other bids.", "عرضك الآن لدى المستأجر على منصة معداتك — يمكنه عرضه ومقارنته جنباً إلى جنب مع بقية العروض.")}</p>
+          <span className="recap"><span className="material-icons-outlined">payments</span>{sar} {nf(grand)}</span>
+          <div className="state-actions"><button className="btn" onClick={resetForm}><span className="material-icons-outlined">add</span>{L("Submit another bid", "إرسال عرض آخر")}</button></div>
+        </div></div>
+      )}
+
+      {/* The form */}
+      {!loading && data?.status === "open" && !submitted && (
+        <div className="wrap">
+          <div className="intro">
+            <h1>{L("Submit your bid", "قدّم عرضك")}</h1>
+            <p>{L("For each item, confirm its terms in the table, then price it below.", "لكل بند، أكّد شروطه في الجدول ثم سعّره بالأسفل.")}</p>
+          </div>
+
+          {data.deadline && <Countdown iso={data.deadline} L={L} fmtDate={fmtDate} />}
+
+          {/* Project terms */}
+          {data.projectTerms && (
+            <div className="sec">
+              <div className="sec-h"><span className="material-icons-outlined hdic">tune</span><h3>{L("Project terms", "شروط المشروع")}</h3><span className="ro-tag">{L("From request", "من الطلب")}</span></div>
+              <div className="ro-grid">
+                {data.projectTerms.location && <Cell k={L("Location", "الموقع")}>{data.projectTerms.lat != null && data.projectTerms.lng != null ? <a className="maplink" href={`https://www.google.com/maps?q=${data.projectTerms.lat},${data.projectTerms.lng}`} target="_blank" rel="noopener noreferrer">{data.projectTerms.location}<span className="material-icons-outlined">place</span></a> : data.projectTerms.location}</Cell>}
+                {data.projectTerms.rentalBasis && <Cell k={L("Rental basis", "أساس الإيجار")}>{rentalBasisLabel(data.projectTerms.rentalBasis, L)}</Cell>}
+                {data.projectTerms.startDate && <Cell k={L("Rental start", "بدء الإيجار")}>{fmtDate(data.projectTerms.startDate)}</Cell>}
+                <Cell k={L("Rental end", "نهاية الإيجار")}>{data.projectTerms.endDate ? fmtDate(data.projectTerms.endDate) : L("Open-ended", "بدون نهاية محددة")}</Cell>
+                {data.projectTerms.hoursPerDay != null && <Cell k={L("Hours per day", "ساعات/يوم")}>{data.projectTerms.hoursPerDay}</Cell>}
+                {data.projectTerms.workingDaysPerWeek != null && <Cell k={L("Working days / week", "أيام العمل/أسبوع")}>{data.projectTerms.workingDaysPerWeek}</Cell>}
+              </div>
+              <div className="ro-hint">{L("Only details the renter set are shown.", "تُعرض فقط التفاصيل التي حدّدها المستأجر.")}</div>
+
+              {data.contractTerms.length > 0 && (
+                <>
+                  <div className="subhead"><span className="material-icons-outlined">gavel</span>{L("Contract terms — for all items", "شروط العقد — لكل البنود")}
+                    <button type="button" className={`yall${yesContract ? " on" : ""}`} onClick={toggleContractYes}><span className="yall-sw"></span>{L("Yes to all", "نعم للكل")}</button>
+                  </div>
+                  <div className="treqgrid">
+                    {data.contractTerms.map((c) => {
+                      const ans = contract[c.key];
+                      return (
+                        <div key={c.key} className={`treqcell${showErrors && ans === undefined ? " needpick" : ""}`}>
+                          <div className="tc-name">{c.label}</div>
+                          <div className="tc-rw"><span className="q">{L("Renter wants", "يطلب المستأجر")}:</span> <i>{ar ? localizeTermValue(c.value) : c.value}</i></div>
+                          <div className="tc-sw"><span className="q">{L("Your answer", "إجابتك")}:</span><YesNo L={L} value={ans} onChange={(v) => setContract((p) => ({ ...p, [c.key]: v }))} /></div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Renter's notes (read-only) — shown only if the renter wrote any. */}
+          {data.notes && (
+            <div className="sec">
+              <div className="sec-h"><span className="material-icons-outlined hdic">sticky_note_2</span><h3>{L("Renter's notes", "ملاحظات المستأجر")}</h3><span className="ro-tag">{L("From request", "من الطلب")}</span></div>
+              <p className="rnote">{data.notes}</p>
+            </div>
+          )}
+
+          {/* Per item */}
+          {data.items.map((it, idx) => {
+            const a = answers[it.requestItemId];
+            const terms = itemTerms(it);
+            const label = (ar ? it.labelAr : it.label) || it.label || L("Equipment", "المعدة");
+            const size = (ar ? it.sizeAr : it.size) || it.size || null;
+            const q = it.numberOfUnits || 1;
+            const oq = offeredQty(it, a); // units this line offers (≤ q)
+            const unit = it.priceUnit ? (ar ? UNIT_LABEL[it.priceUnit]?.[1] : UNIT_LABEL[it.priceUnit]?.[0]) ?? it.priceUnit : L("unit", "وحدة");
+            const sub = itemSubtotal(it, a);
+            const line = (v: string) => (num(v) ? num(v) * oq : 0);
+            // Supplier prices delivery/return ONLY when they handle it; if the renter does, no price row.
+            const delBySup = (it.deliveryBy || "").toLowerCase() === "supplier";
+            const retBySup = (it.returnBy || "").toLowerCase() === "supplier";
+            return (
+              <div className="sec" key={it.requestItemId}>
+                <div className="item-hd">
+                  <span className="material-icons-outlined">construction</span>
+                  <div className="inm-wrap"><span className="inm">{label}</span>{size && <span className="imeta">· {size}</span>}
+                    <span className={`units-chip${q > 1 ? " multi" : ""}`}><span className="material-icons-outlined">{q > 1 ? "layers" : "package_2"}</span>×{q} {q === 1 ? L("unit", "وحدة") : L("units", "وحدات")}</span></div>
+                  <span className="ibadge">{L(`Item ${idx + 1} of ${data.items.length}`, `البند ${idx + 1} من ${data.items.length}`)}</span>
+                </div>
+
+                {q > 1 && (
+                  <div className="units-note" style={{ flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+                    <span className="material-icons-outlined un-lead">layers</span>
+                    <span className="un-tx" style={{ flex: 1, minWidth: 180 }}>{L(`Multi-unit item — the renter needs ${q} units. Set how many you can supply (bid on some or all); prices below multiply by this.`, `بند متعدد الوحدات — يحتاج المستأجر ${q} وحدات. حدّد كم وحدة تستطيع توفيرها (اعرض على بعضها أو كلّها)؛ تُضرب الأسعار أدناه بهذا العدد.`)}</span>
+                    {/* Partial-bid control — an explicit −/+ stepper so it's unmistakable the supplier can
+                        choose to supply fewer than the N units the renter asked for. Drives the Qty below. */}
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 10, whiteSpace: "nowrap", background: "#fff", border: "1px solid #e6c690", borderRadius: 10, padding: "6px 12px" }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550" }}>{L("Units you can supply", "الوحدات المتاحة لديك")}</span>
+                      <span style={{ display: "inline-flex", alignItems: "center", border: "2px solid #f79009", borderRadius: 9, overflow: "hidden" }}>
+                        <button type="button" aria-label={L("Fewer units", "تقليل")} disabled={oq <= 1}
+                          onClick={() => setOffered(it.requestItemId, String(Math.max(1, oq - 1)))}
+                          style={{ width: 36, height: 36, border: "none", background: oq <= 1 ? "#f6efe2" : "#fff5e8", color: oq <= 1 ? "#c9b48c" : "#b45309", fontSize: 22, fontWeight: 900, cursor: oq <= 1 ? "default" : "pointer", lineHeight: 1, fontFamily: "inherit" }}>−</button>
+                        <span style={{ minWidth: 38, textAlign: "center", fontSize: 16, fontWeight: 900, color: "#1c3550" }}>{oq}</span>
+                        <button type="button" aria-label={L("More units", "زيادة")} disabled={oq >= q}
+                          onClick={() => setOffered(it.requestItemId, String(Math.min(q, oq + 1)))}
+                          style={{ width: 36, height: 36, border: "none", background: oq >= q ? "#f6efe2" : "#fff5e8", color: oq >= q ? "#c9b48c" : "#b45309", fontSize: 22, fontWeight: 900, cursor: oq >= q ? "default" : "pointer", lineHeight: 1, fontFamily: "inherit" }}>+</button>
+                      </span>
+                      <span style={{ color: "#6b8fa8", fontWeight: 800, fontSize: 14 }}>/ {q}</span>
+                    </span>
+                  </div>
+                )}
+
+                {(it.deliveryBy || it.returnBy || it.notes) && (
+                  <div className="iteminfo">
+                    {it.deliveryBy && <span className="ii"><b>{L("Delivery", "النقل إلى الموقع")}:</b> {partyLabel(it.deliveryBy, L)}</span>}
+                    {it.returnBy && <span className="ii"><b>{L("Return", "النقل من الموقع")}:</b> {partyLabel(it.returnBy, L)}</span>}
+                    {it.notes && <span className="ii note"><span className="material-icons-outlined">sticky_note_2</span>{it.notes}</span>}
+                  </div>
+                )}
+
+                {terms.length > 0 && (
+                  <>
+                    <div className="subhead"><span className="material-icons-outlined">fact_check</span>{L("Terms — can you meet each?", "الشروط — هل يمكنك الالتزام بكلٍّ منها؟")}
+                      <button type="button" className={`yall${yesItem[it.requestItemId] ? " on" : ""}`} onClick={() => toggleItemYes(it)}><span className="yall-sw"></span>{L("Yes to all", "نعم للكل")}</button>
+                    </div>
+                    <div className="treqgrid">
+                      {terms.map((k) => {
+                        const ans = a?.confirmations[k];
+                        const val = (k === "operatorCert" || k === "equipmentCert") ? (it.requiredTerms[k] ?? "").toUpperCase() : (ar ? localizeTermValue(it.requiredTerms[k]) : it.requiredTerms[k]);
+                        return (
+                          <div key={k} className={`treqcell${ans === false ? " declined" : ""}${showErrors && ans === undefined ? " needpick" : ""}`}>
+                            <div className="tc-name">{L(TERM_LABEL[k][0], TERM_LABEL[k][1])}</div>
+                            <div className="tc-rw"><span className="q">{L("Renter wants", "يطلب المستأجر")}:</span> <i>{val}</i></div>
+                            <div className="tc-sw"><span className="q">{L("Your answer", "إجابتك")}:</span><YesNo L={L} value={ans} onChange={(v) => setConf(it.requestItemId, k, v)} /></div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+
+                <div className="subhead"><span className="material-icons-outlined">request_quote</span>{L("Pricing", "التسعير")}
+                  {/* Inline VAT toggle — clarifies right at the price box whether the entered prices include 15% VAT. */}
+                  <span style={{ marginInlineStart: "auto", display: "inline-flex", border: "1px solid var(--border)", borderRadius: 7, overflow: "hidden", textTransform: "none", letterSpacing: 0 }}>
+                    {([[false, L("Excl. VAT", "قبل الضريبة")], [true, L("Incl. VAT", "شامل الضريبة")]] as [boolean, string][]).map(([v, lab]) => (
+                      <button key={String(v)} type="button" onClick={() => setVatIncluded(v)} style={{ border: "none", cursor: "pointer", font: "inherit", textTransform: "none", letterSpacing: 0, fontWeight: 800, fontSize: 10.5, padding: "3px 9px", background: vatIncluded === v ? "var(--navy)" : "var(--surface1)", color: vatIncluded === v ? "#fff" : "var(--muted)" }}>{lab}</button>
+                    ))}
+                  </span>
+                </div>
+                <table className="ptbl">
+                  <thead><tr><th>{L("Item", "البند")}</th><th className="num">{L("Unit", "الوحدة")}</th><th className="num">{L("Qty", "العدد")}</th><th className="num">{vatIncluded ? L("Price (incl. VAT)", "السعر (شامل الضريبة)") : L("Your price", "سعرك")}</th><th className="num">{L("Total", "الإجمالي")}</th></tr></thead>
+                  <tbody>
+                    <tr>
+                      <td><div className="it-lbl">{L("Rental", "الإيجار")}</div></td>
+                      <td className="num">{unit}</td><td className="num">{oq}</td>
+                      <td className="num"><input className={`ptbl-in${showErrors && num(a?.rentalRate ?? "") <= 0 ? " invalid" : ""}`} inputMode="numeric" value={a?.rentalRate ?? ""} onChange={(e) => setPrice(it.requestItemId, "rentalRate", e.target.value)} placeholder="0" /></td>
+                      <td className="num tot">{num(a?.rentalRate ?? "") ? nf(line(a!.rentalRate)) : "—"}</td>
+                    </tr>
+                    {delBySup && (
+                    <tr>
+                      <td><div className="it-lbl">{L("Delivery to site", "النقل إلى الموقع")}</div><div className="it-sub2">{L("price × qty", "السعر × العدد")}</div></td>
+                      <td className="num">{L("Trip", "رحلة")}</td><td className="num">{oq}</td>
+                      <td className="num"><input className="ptbl-in" inputMode="numeric" value={a?.deliveryPrice ?? ""} onChange={(e) => setPrice(it.requestItemId, "deliveryPrice", e.target.value)} placeholder="0" /></td>
+                      <td className="num tot">{num(a?.deliveryPrice ?? "") ? nf(line(a!.deliveryPrice)) : "—"}</td>
+                    </tr>
+                    )}
+                    {retBySup && (
+                    <tr>
+                      <td><div className="it-lbl">{L("Return from site", "النقل من الموقع")}</div><div className="it-sub2">{L("price × qty", "السعر × العدد")}</div></td>
+                      <td className="num">{L("Trip", "رحلة")}</td><td className="num">{oq}</td>
+                      <td className="num"><input className="ptbl-in" inputMode="numeric" value={a?.returnPrice ?? ""} onChange={(e) => setPrice(it.requestItemId, "returnPrice", e.target.value)} placeholder="0" /></td>
+                      <td className="num tot">{num(a?.returnPrice ?? "") ? nf(line(a!.returnPrice)) : "—"}</td>
+                    </tr>
+                    )}
+                  </tbody>
+                </table>
+                <div className="itot">
+                  <span className="r">{vatIncluded ? L("Net (before VAT)", "الصافي (قبل الضريبة)") : L("Subtotal", "المجموع")}<b>{sub ? nf(sub) : "—"} {sar}</b></span>
+                  <span className="r">{L("VAT 15%", "ضريبة ١٥٪")}<b>{sub ? nf(sub * 0.15) : "—"} {sar}</b></span>
+                  <span className="r t">{vatIncluded ? L("Item total (incl. VAT)", "إجمالي البند (شامل الضريبة)") : L("Item total", "إجمالي البند")}<b>{sub ? nf(sub * 1.15) : "—"} {sar}</b></span>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Grand total */}
+          <div className="grand"><span className="gk">{L("Grand total — all items (incl. VAT)", "الإجمالي الكلي — كل البنود (شامل الضريبة)")}</span><span className="gv">{grand > 0 ? nf(grand) : "—"} {sar}</span></div>
+
+          {/* Your details */}
+          <div className="sec">
+            <div className="sec-h"><span className="material-icons-outlined hdic">badge</span><h3>{L("Your details", "بياناتك")}</h3></div>
+            <Field label={L("Company name", "اسم الشركة")} req invalid={showErrors && !company.companyName.trim()} L={L}><input value={company.companyName} onChange={(e) => setCompany({ ...company, companyName: e.target.value })} placeholder={L("e.g. Gulf Heavy Equipment Co.", "مثال: شركة الخليج للمعدات")} /></Field>
+            <div className="frow">
+              <Field label={L("CR number", "رقم السجل التجاري")} req invalid={showErrors && !company.crNumber.trim()} L={L}><input inputMode="numeric" value={company.crNumber} onChange={(e) => setCompany({ ...company, crNumber: e.target.value })} /></Field>
+              <Field label={L("VAT number", "الرقم الضريبي")} req invalid={showErrors && !company.vatNumber.trim()} L={L}><input inputMode="numeric" value={company.vatNumber} onChange={(e) => setCompany({ ...company, vatNumber: e.target.value })} /></Field>
+            </div>
+            <Field label={L("National address", "العنوان الوطني")} req invalid={showErrors && !company.nationalAddress.trim()} L={L}><input value={company.nationalAddress} onChange={(e) => setCompany({ ...company, nationalAddress: e.target.value })} /></Field>
+            <Field label={L("Contact info", "بيانات التواصل")} req invalid={showErrors && !company.contactInfo.trim()} L={L}><input value={company.contactInfo} onChange={(e) => setCompany({ ...company, contactInfo: e.target.value })} placeholder={L("Phone or email so the renter can reach you", "هاتف أو بريد ليتواصل معك المستأجر")} /></Field>
+            {QUOTE_EXPIRY_ENABLED && <Field label={L("Quote valid until (optional)", "صلاحية العرض حتى (اختياري)")} L={L}><input type="date" value={company.validUntil} onChange={(e) => setCompany({ ...company, validUntil: e.target.value })} /></Field>}
+            <div className="notes-field"><label>{L("Notes (optional) — for the whole quotation", "ملاحظات (اختياري) — لكامل عرض السعر")}</label><textarea value={company.notes} onChange={(e) => setCompany({ ...company, notes: e.target.value })} /></div>
+          </div>
+
+          {showErrors && !valid && <div className="submit-err"><span className="material-icons-outlined">error_outline</span>{L("Please complete the highlighted items: answer every term, enter a rate for each item, and fill all company details.", "الرجاء إكمال العناصر المظللة: أجب عن كل شرط، وأدخل سعراً لكل بند، واملأ جميع بيانات الشركة.")}</div>}
+          <div className="submit-bar"><button className="btn primary lg" disabled={submitting} onClick={onSubmit}><span className="material-icons-outlined">send</span>{submitting ? L("Submitting…", "جارٍ الإرسال…") : L("Submit bid", "إرسال العرض")}</button>
+            <div className="submit-note">{L("Once submitted, your bid is final and can't be edited from this link.", "بعد الإرسال، يصبح عرضك نهائياً ولا يمكن تعديله من هذا الرابط.")}</div>
+          </div>
+          <div className="footer-note">{L("Private bid link — your details are shared only with the renter.", "رابط عرض خاص — تُشارك بياناتك مع المستأجر فقط.")}</div>
+        </div>
+      )}
+
+      <footer className="pb-powered">{L("Powered by", "مُشغّل بواسطة")} <b>Moedatech</b></footer>
+    </div>
+  );
+}
+
+function Cell({ k, children }: { k: string; children: React.ReactNode }) {
+  return <div className="ro-cell"><div className="k">{k}</div><div className="v">{children}</div></div>;
+}
+
+function YesNo({ value, onChange, L }: { value: boolean | undefined; onChange: (v: boolean) => void; L: (e: string, a: string) => string }) {
+  return (
+    <span className="miniseg">
+      <button type="button" className={`ok${value === true ? " on" : ""}`} onClick={() => onChange(true)}><span className="material-icons-outlined">check</span>{L("Yes", "نعم")}</button>
+      <button type="button" className={`no${value === false ? " on" : ""}`} onClick={() => onChange(false)}>{L("No", "لا")}</button>
+    </span>
+  );
+}
+
+function Field({ label, req, invalid, children, L }: { label: string; req?: boolean; invalid?: boolean; children: React.ReactNode; L: (e: string, a: string) => string }) {
+  return (
+    <div className={`field${invalid ? " invalid" : ""}`}>
+      <label>{label}{req && <span className="reqx"> *</span>}</label>
+      {children}
+      <div className="err">{L("Required", "مطلوب")}</div>
+    </div>
+  );
+}
+
+function Countdown({ iso, L, fmtDate }: { iso: string; L: (e: string, a: string) => string; fmtDate: (s: string) => string }) {
+  const [now, setNow] = useState(0);
+  useEffect(() => { setNow(Date.now()); const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  if (!now) return null;
+  const ms = new Date(iso).getTime() - now;
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+  const p = (n: number) => String(n).padStart(2, "0");
+  const time = new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return (
+    <div className="countdown">
+      <div className="cd-label"><span className="material-icons-outlined">schedule</span>{ms <= 0 ? L("Bidding has closed", "أُغلق استقبال العروض") : L("Bidding closes in", "ينتهي استقبال العروض خلال")}</div>
+      {ms > 0 && (
+        <div className="cd-boxes">
+          <div className="cd-box"><b>{p(d)}</b><span>{L("Days", "يوم")}</span></div><span className="cd-sep">:</span>
+          <div className="cd-box"><b>{p(h)}</b><span>{L("Hours", "ساعة")}</span></div><span className="cd-sep">:</span>
+          <div className="cd-box"><b>{p(m)}</b><span>{L("Mins", "دقيقة")}</span></div>
+        </div>
+      )}
+      <div className="cd-deadline">{L("Deadline", "الموعد النهائي")} · <b>{fmtDate(iso)} · {time}</b></div>
+    </div>
+  );
+}
+
+function partyLabel(v: string | null | undefined, L: (e: string, a: string) => string) {
+  const u = (v ?? "").toLowerCase();
+  return u === "renter" || u === "rentee" ? L("Renter", "المستأجر") : u === "supplier" ? L("Supplier", "المؤجّر") : (v ?? "—");
+}
+
+/**
+ * Arabic display for a required-term VALUE on the Arabic form — the request stores enum tokens
+ * (DIESEL, Renter, NET-30, FOUR_HR, 2X, Yes/No…) that would otherwise show in English. Maps the known
+ * ones to Arabic; leaves anything unknown (years, cert names, free text) untouched. Display-only.
+ */
+const AR_TERM_VALUE: Record<string, string> = {
+  // party (fuel responsibility / delivery / provider)
+  RENTER: "المستأجر", RENTEE: "المستأجر", SUPPLIER: "المؤجّر", ME: "أنا",
+  // fuel type
+  DIESEL: "ديزل", PETROL: "بنزين", GASOLINE: "بنزين", ELECTRIC: "كهربائي", HYBRID: "هجين",
+  // yes/no · included
+  YES: "نعم", NO: "لا", TRUE: "نعم", FALSE: "لا", INCLUDED: "مشمول", EXCLUDED: "غير مشمول",
+  // payment terms
+  "NET-0": "صافي فوري", "NET-15": "صافي ١٥ يومًا", "NET-30": "صافي ٣٠ يومًا", "NET-60": "صافي ٦٠ يومًا", "NET-90": "صافي ٩٠ يومًا",
+  UPFRONT: "مقدمًا", ADVANCE: "دفعة مقدمة", "END-OF-JOB": "نهاية المهمة", DAILY: "يومي", "UPON-DELIVERY": "عند التسليم", MILESTONE: "دفعات مرحلية",
+  // breakdown SLA
+  FOUR_HR: "٤ ساعات", EIGHT_HR: "٨ ساعات", TWENTY_FOUR_HR: "٢٤ ساعة", FORTY_EIGHT_HR: "٤٨ ساعة", SEVENTY_TWO_HR: "٧٢ ساعة",
+  // overtime
+  "2X": "٢×", "1.5X": "١٫٥×", WITHOUT: "بدون", "0": "بدون",
+};
+function localizeTermValue(v: string | null | undefined): string | null {
+  if (v == null || String(v).trim() === "") return v ?? null;
+  const s = String(v).trim();
+  return AR_TERM_VALUE[s.toUpperCase()] ?? s;
+}
+
+function rentalBasisLabel(v: string, L: (e: string, a: string) => string) {
+  const m: Record<string, [string, string]> = { DAILY: ["Daily", "يومي"], WEEKLY: ["Weekly", "أسبوعي"], MONTHLY: ["Monthly", "شهري"], PER_JOB: ["Per job", "للمهمة"], LONG_TERM: ["Long term", "طويل الأمد"] };
+  const e = m[String(v).toUpperCase()];
+  return e ? L(e[0], e[1]) : v;
+}

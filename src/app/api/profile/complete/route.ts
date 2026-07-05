@@ -28,6 +28,7 @@ export async function POST(req: Request) {
       };
       if (str(body.email)) payload.email = str(body.email);
       if (str(body.whatsapp)) payload.whatsapp = str(body.whatsapp);
+      if (str(body.companyName)) payload.companyName = str(body.companyName); // profile display company name
 
       await call<Record<string, unknown>>("/users/me/profile", {
         method: "PUT", // completeProfile is PUT /users/me/profile (POST 404s)

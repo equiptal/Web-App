@@ -25,6 +25,22 @@ export function quotationFileTitle(groupId: string, reqCodes: string[] = []): st
   return codes.length ? `${base}${ITEMS_MARKER}${codes.join("__")}` : base;
 }
 
+/**
+ * Human-readable download filename / print `<title>` for a quotation: the request GROUP short code
+ * (`RFQ-NNNNN`) when the quotation covers a group, else the single request id (`REQ-NNNNN`). Covered
+ * item codes are still stamped via ITEMS_MARKER so a re-upload can scope the comparison.
+ *
+ * NOTE: unlike `quotationFileTitle`, this does NOT embed the group UUID — so `groupIdFromFileName`
+ * cannot recover a group id from it. The Compare re-upload path should recognise the short code
+ * (`RFQ-`/`REQ-`) or the renter pastes it; auto-recognition by UUID only applies to legacy files.
+ */
+export function quotationDownloadName(primaryCode: string | null | undefined, reqCodes: string[] = []): string {
+  const clean = (s: string) => String(s ?? "").replace(/[^A-Za-z0-9-]/g, "");
+  const base = clean(primaryCode ?? "") || "quotation";
+  const codes = [...new Set(reqCodes)].map(clean).filter(Boolean).filter((c) => c !== base);
+  return codes.length ? `${base}${ITEMS_MARKER}${codes.join("__")}` : base;
+}
+
 /** The request codes a quotation filename was stamped with (empty when none / renamed away). */
 export function itemCodesFromFileName(fileName: string): string[] {
   const base = fileName.replace(/\.pdf$/i, "");
@@ -49,6 +65,16 @@ export function groupIdFromFileName(fileName: string): string | null {
     if (rest) return rest;
   }
   return null;
+}
+
+/** The human short code a NEW quotation filename leads with — the group code `RFQ-NNNNN` (preferred),
+ *  else the single request id `REQ-NNNNN`. Tolerates browser " (1)" suffixes + the __items__ tail. */
+export function primaryCodeFromFileName(fileName: string): string | null {
+  const base = fileName.replace(/\.pdf$/i, "");
+  const rfq = base.match(/RFQ-\d+/i);
+  if (rfq) return rfq[0].toUpperCase();
+  const req = base.match(/REQ-\d+/i);
+  return req ? req[0].toUpperCase() : null;
 }
 
 /** Validate/normalise a manually pasted comparison code. */

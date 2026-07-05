@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useLocale, useT } from "@/lib/i18n";
+import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import { StoreCard } from "@/components/stores/StoreCard";
+import { SignInPrompt } from "@/components/common/SignInPrompt";
 import type { StoreCard as StoreCardData, TaxonomyNode } from "@/lib/contract/stores";
 
 interface CityOpt {
@@ -25,7 +27,11 @@ const selectCls =
 export function BrowseSurface({ title, previewCount }: { title?: string; previewCount?: number }) {
   const t = useT();
   const { locale } = useLocale();
+  const { status } = useSession();
   const ar = locale === "ar";
+  // Guests can't browse suppliers until the public browse endpoint (T7) ships — show a sign-in nudge
+  // instead of firing the authed fetch (which would 401 into an error panel).
+  const anon = status === "anon";
 
   const [cities, setCities] = useState<CityOpt[]>([]);
   const [taxonomy, setTaxonomy] = useState<TaxonomyNode[]>([]);
@@ -81,6 +87,7 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
   }, [search]);
 
   useEffect(() => {
+    if (anon) return; // no authed fetch for guests — the render shows the sign-in prompt
     setError(false);
     setStores(null);
     const qs = new URLSearchParams();
@@ -99,7 +106,7 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
         if (e?.name !== "AbortError") setError(true);
       });
     return () => ctrl.abort();
-  }, [debounced, city, categoryId, subcategoryId, measurementId, verifiedOnly, reloadKey]);
+  }, [debounced, city, categoryId, subcategoryId, measurementId, verifiedOnly, reloadKey, anon]);
 
   const onCategory = (v: string) => {
     setCategoryId(v);
@@ -193,7 +200,9 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
       </div>
 
       {/* Results (AC-16/17/23) */}
-      {error ? (
+      {anon ? (
+        <SignInPrompt />
+      ) : error ? (
         <div className="rounded-[12px] border border-border bg-surface p-8 text-center text-[13px] text-muted">
           <Icon name="error_outline" size={22} className="mx-auto mb-2 text-muted" />
           <p>{t.browse.error}</p>

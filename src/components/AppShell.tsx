@@ -1,11 +1,16 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
 import { useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import type { Locale } from "@/lib/i18n/config";
+import { SurveyProvider } from "@/components/surveys/SurveyProvider";
+import { fetchDealRoomUnread } from "@/lib/api/client";
+import { canSeeProcurementDashboard } from "@/lib/access/dashboard";
+import { NotificationsBell } from "@/components/NotificationsBell";
 
 /**
  * App shell for the renter web app (web-app/004, AC-01/02/03/09/25). Navy sidebar (brand, a Request
@@ -13,14 +18,50 @@ import type { Locale } from "@/lib/i18n/config";
  * — AC-06/08) plus a top bar with a "Welcome, {name}" greeting, the EN/AR toggle, and an avatar
  * account menu with Sign out (AC-03/09). No Requests/Jobs/notifications surfaces (AC-25).
  */
-export function AppShell({ children, title }: { children: ReactNode; title?: string }) {
+type AppShellProps = { children: ReactNode; title?: string; fullBleed?: boolean; wide?: boolean };
+
+/** A page can show a Back arrow in the top bar (beside the title) by registering a handler. */
+const BackContext = createContext<(fn: (() => void) | null) => void>(() => {});
+export function useHeaderBack(handler: (() => void) | null) {
+  const register = useContext(BackContext);
+  useEffect(() => {
+    register(handler);
+    return () => register(null);
+  }, [handler, register]);
+}
+
+/** Public shell: hosts the Outcome Survey gate so the chrome (topbar icon) and pages can both read it. */
+export function AppShell(props: AppShellProps) {
+  return (
+    <SurveyProvider>
+      <AppShellInner {...props} />
+    </SurveyProvider>
+  );
+}
+
+function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
   const { locale, setLocale } = useLocale();
   const t = useT();
-  const { tier, status, signOut } = useSession();
+  const { tier, status, signOut, user } = useSession();
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [name, setName] = useState("");
+  // A child page may register a Back handler to show an arrow in the top bar beside the title.
+  const [back, setBack] = useState<(() => void) | null>(null);
+  const registerBack = useCallback((fn: (() => void) | null) => setBack(() => fn), []);
+  // Collapsible sidebar — persisted so the choice sticks across navigations. Default expanded on first
+  // render (server + first client paint match), then honor the stored preference after mount.
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    try { setCollapsed(localStorage.getItem("sb-collapsed") === "1"); } catch {}
+  }, []);
+  const toggleCollapsed = () =>
+    setCollapsed((c) => {
+      const next = !c;
+      try { localStorage.setItem("sb-collapsed", next ? "1" : "0"); } catch {}
+      return next;
+    });
 
   // The signed-in renter's display name (for the greeting + avatar initials) comes from /api/me.
   useEffect(() => {
@@ -33,18 +74,35 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
       .catch(() => setName(""));
   }, [status]);
 
+  // Unread deal-room messages (inbox badge) — role-scoped total from the app-backend.
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    if (status !== "authed") return;
+    let active = true;
+    fetchDealRoomUnread().then((r) => active && setUnread(r.total)).catch(() => {});
+    return () => { active = false; };
+  }, [status]);
+
   const handleSignOut = async () => {
     setMenuOpen(false);
     await signOut(); // AC-09
     router.push("/login");
   };
 
-  const navItems = [
-    { key: "home", icon: "home", label: t.shell.home, href: "/" },
-    { key: "requests", icon: "grid_view", label: t.shell.requests, href: "/requests" },
-    { key: "compare", icon: "compare_arrows", label: t.shell.compare, href: "/compare" },
-    { key: "profile", icon: "person", label: t.shell.profile, href: "/profile" },
+  // `gated` items are the personal, account-bound areas (mirror middleware's GATED_PREFIXES). The web
+  // is public to browse, so signed-out visitors only see the public nav; the rest appears once authed.
+  const allNav = [
+    { key: "home", icon: "home", label: t.shell.home, href: "/", gated: false },
+    { key: "requests", icon: "grid_view", label: t.shell.requests, href: "/requests", gated: true },
+    { key: "compare", icon: "compare_arrows", label: t.shell.compare, href: "/compare", gated: true },
+    // Procurement dashboard is a demo surface — only the CCC mock account sees it.
+    ...(canSeeProcurementDashboard(user) ? [{ key: "dashboard", icon: "dashboard", label: t.shell.dashboard, href: "/dashboard", gated: true }] : []),
+    { key: "inbox", icon: "inbox", label: t.shell.inbox, href: "/inbox", gated: true },
+    { key: "profile", icon: "person", label: t.shell.profile, href: "/profile", gated: true },
   ];
+  // All tabs are visible to everyone (guests included) — each account-bound tab renders a guest
+  // empty-state + CTA rather than being hidden, so the site feels open and there are no dead ends.
+  const navItems = allNav;
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
   const initials = (name.trim() ? name.trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("") : "").toUpperCase();
   const greeting = `${t.shell.welcome}${name ? `, ${name}` : ""}`;
@@ -57,36 +115,59 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
   const badge = tierBadge[tier] ?? tierBadge.guest;
 
   return (
+    <BackContext.Provider value={registerBack}>
     <div className="flex min-h-screen">
       {/* Sidebar (navy) — AC-02. Sticky full-height so the tier card stays in view (no page-scroll). */}
-      <aside className="hidden w-[232px] flex-none flex-col self-start bg-gradient-to-b from-[#1e3a5f] to-[#0f1e2e] px-3.5 py-5 text-white md:flex md:sticky md:top-0 md:h-screen md:overflow-y-auto">
-        <div className="flex items-center justify-center px-2 pb-[18px] pt-1">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/moedatech-logo.png" alt="Moedatech" className="h-8 w-auto [filter:brightness(0)_invert(1)]" />
+      <aside className={`hidden flex-none flex-col self-start bg-gradient-to-b from-[#1e3a5f] to-[#0f1e2e] py-5 text-white transition-[width] duration-200 md:flex md:sticky md:top-0 md:h-screen md:overflow-y-auto ${collapsed ? "w-[68px] px-2" : "w-[232px] px-3.5"}`}>
+        <div className={`flex items-center pb-2 pt-1 ${collapsed ? "justify-center px-0" : "justify-between px-2"}`}>
+          {!collapsed && (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src="/moedatech-logo.png" alt="Moedatech" className="h-8 w-auto [filter:brightness(0)_invert(1)]" />
+          )}
+          <button
+            onClick={toggleCollapsed}
+            className="grid h-8 w-8 flex-none place-items-center rounded-[9px] text-white/70 transition hover:bg-white/[.08] hover:text-white"
+            aria-label={collapsed ? t.shell.expandSidebar : t.shell.collapseSidebar}
+            aria-expanded={!collapsed}
+            title={collapsed ? t.shell.expandSidebar : t.shell.collapseSidebar}
+          >
+            <Icon name={collapsed ? "chevron_right" : "chevron_left"} size={20} />
+          </button>
         </div>
 
-        <nav className="flex flex-col gap-0.5">
+        <nav className="mt-2 flex flex-col gap-0.5">
           {navItems.map((it) => (
-            <button
+            <Link
               key={it.key}
-              onClick={() => router.push(it.href)}
-              className={`flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-[13.5px] font-bold transition ${
+              href={it.href}
+              title={collapsed ? it.label : undefined}
+              className={`flex items-center rounded-[10px] py-2.5 text-[13.5px] font-bold transition ${collapsed ? "justify-center px-0" : "gap-3 px-3"} ${
                 isActive(it.href) ? "bg-white/10 text-white shadow-[inset_3px_0_0_#f79009]" : "text-white/70 hover:bg-white/[.06] hover:text-white"
               }`}
             >
-              <Icon name={it.icon} size={21} /> {it.label}
-            </button>
+              <Icon name={it.icon} size={21} /> {!collapsed && it.label}
+            </Link>
           ))}
         </nav>
 
-        {/* Tier-status footer card (AC-06/08) */}
-        <TierCard tier={tier} onGo={(href) => router.push(href)} />
+        {/* Tier-status footer card (AC-06/08) — hidden when collapsed (no room for the CTA) and for
+            signed-out visitors (its guest→profile nudge assumes a session). */}
+        {!collapsed && status === "authed" && <TierCard tier={tier} onGo={(href) => router.push(href)} />}
       </aside>
 
       {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top bar — AC-03 */}
-        <header className="sticky top-0 z-30 flex h-[62px] items-center gap-4 border-b border-border bg-surface px-4 sm:px-7">
+        <header className="sticky top-0 z-30 flex h-[62px] items-center gap-3 border-b border-border bg-surface px-4 sm:px-7">
+          {back && (
+            <button
+              onClick={back}
+              aria-label={locale === "ar" ? "رجوع" : "Back"}
+              className="grid h-9 w-9 flex-none place-items-center rounded-full border border-border text-navy transition hover:bg-surface2"
+            >
+              <Icon name={locale === "ar" ? "arrow_forward" : "arrow_back"} size={20} />
+            </button>
+          )}
           <b className="truncate text-[19px] font-extrabold tracking-[-.4px] text-navy">
             {title ?? (
               <>
@@ -108,9 +189,35 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
               ))}
             </span>
 
+            {/* Signed-out visitors browse freely; this is their path into the account gate. */}
+            {status === "anon" && (
+              <button
+                onClick={() => router.push(`/login?next=${encodeURIComponent(pathname)}`)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3.5 py-1.5 text-[12.5px] font-bold text-white transition hover:brightness-105"
+              >
+                <Icon name="login" size={16} /> {t.shell.signIn}
+              </button>
+            )}
+
             {status === "authed" && (
               <span className={`hidden rounded-full border px-2.5 py-1 text-[11px] font-bold sm:inline-flex ${badge.cls}`}>{badge.label}</span>
             )}
+
+            {status === "authed" && (
+              <button
+                onClick={() => router.push("/inbox")}
+                className="relative grid h-9 w-9 place-items-center rounded-full text-navy-mid transition hover:bg-surface2"
+                aria-label={t.shell.inbox}
+                title={t.shell.inbox}
+              >
+                <Icon name="inbox" size={20} />
+                {unread > 0 && (
+                  <span className="absolute -end-0.5 -top-0.5 grid h-[17px] min-w-[17px] place-items-center rounded-full bg-brand px-1 text-[10px] font-extrabold text-white ring-2 ring-surface">{unread > 99 ? "99+" : unread}</span>
+                )}
+              </button>
+            )}
+
+            {status === "authed" && <NotificationsBell />}
 
             {status === "authed" && (
               <div className="relative">
@@ -155,24 +262,28 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
         {/* pb-24 keeps the wizard's Back/Next footer clear of the fixed mobile bottom-nav. The nav is
             only hidden at md+, so keep the bottom padding large until md (sm:py-7 alone would shrink
             it at 640–767px while the nav is still showing, hiding the footer under it). */}
-        <main className="mx-auto w-full max-w-6xl px-4 py-6 pb-24 sm:px-7 sm:pt-7 md:py-7">{children}</main>
+        {/* One consistent page container across the app (T1/T2): My Requests' 1440px width + a slightly
+            larger horizontal gutter so content isn't flush to the sidebar / page edge. `wide` stays
+            uncapped (My Requests caps itself at 1440 via .rproto). */}
+        <main className={fullBleed ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" : `mx-auto w-full px-6 py-6 pb-24 sm:px-12 sm:pt-7 md:py-7 lg:px-20 xl:px-28 ${wide ? "max-w-none" : "max-w-[1440px]"}`}>{children}</main>
       </div>
 
       {/* Mobile bottom nav — the navy sidebar is desktop-only, so phones navigate from here. */}
       <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-surface md:hidden">
         {navItems.map((it) => (
-          <button
+          <Link
             key={it.key}
-            onClick={() => router.push(it.href)}
+            href={it.href}
             className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-bold transition ${
               isActive(it.href) ? "text-brand" : "text-muted"
             }`}
           >
             <Icon name={it.icon} size={22} /> {it.label}
-          </button>
+          </Link>
         ))}
       </nav>
     </div>
+    </BackContext.Provider>
   );
 }
 

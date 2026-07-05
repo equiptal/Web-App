@@ -1,6 +1,14 @@
 /* Exact port of rentee-requests.html styles (list + detail + bids), scoped under .rproto so the
    semantic class names can't leak into the rest of the app. Colors/sizes are verbatim from the
    prototype. Real data is rendered into this exact markup by the requests components. */
+
+/* Hide the scrollbar on horizontally-scrollable chip rows (chips never wrap; they scroll if long). */
+.no-sb { scrollbar-width: none; -ms-overflow-style: none; }
+.no-sb::-webkit-scrollbar { display: none; }
+
+/* My-Requests item cards: two per row on desktop, ONE per row on mobile so they're not cramped. */
+.rq-item-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 768px) { .rq-item-grid { grid-template-columns: 1fr; } }
 .rproto {
   --navy: #1c3550;
   --navy-deep: #12263a;
@@ -30,7 +38,7 @@
   --r-lg: 14px;
   --r-full: 100px;
 
-  max-width: 1060px;
+  max-width: 1440px;
   margin: 0 auto;
   color: var(--navy);
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -141,7 +149,24 @@
 .rproto .flab { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); margin: 0 2px 8px; }
 .rproto .flab .material-icons-outlined { font-size: 14px; }
 .rproto .chips-row { display: flex; gap: 9px; overflow-x: auto; padding-bottom: 4px; }
-.rproto .gctx { display: flex; align-items: center; gap: 13px; background: linear-gradient(135deg, var(--navy), var(--navy-deep, #12263a)); color: #fff; border-radius: var(--r-lg); padding: 13px 15px; margin-bottom: 14px; }
+.rproto .gctx { display: flex; flex-direction: column; gap: 13px; background: linear-gradient(135deg, var(--navy), var(--navy-deep, #12263a)); color: #fff; border-radius: var(--r-lg); padding: 13px 15px; margin-bottom: 14px; }
+.rproto .gctx .gx-row { display: flex; align-items: center; gap: 13px; }
+.rproto .gctx .gx-track { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.14); }
+.rproto .gctx .gx-track .gx-tk-ic { font-size: 16px; color: #ffc97a; }
+.rproto .gctx .gx-track .rt-lbl { font-size: 11.5px; font-weight: 800; color: #fff; }
+.rproto .gctx .gx-track .rt-stat { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; color: rgba(255, 255, 255, 0.7); }
+.rproto .gctx .gx-track .rt-stat .material-icons-outlined { font-size: 15px; color: rgba(255, 255, 255, 0.7); }
+.rproto .gctx .gx-track .rt-stat b { font-family: "IBM Plex Sans", monospace; font-size: 16px; font-weight: 800; color: #fff; }
+.rproto .gctx .gx-track .rt-stat.sub b { color: #ffc97a; }
+.rproto .gctx .gx-track .rt-copy { margin-inline-start: auto; display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 11.5px; font-weight: 700; color: #fff; background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: var(--r-sm); padding: 6px 12px; cursor: pointer; }
+.rproto .gctx .gx-track .rt-copy .material-icons-outlined { font-size: 14px; }
+.rproto .gctx .gx-track .rt-share { margin-inline-start: auto; display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 11.5px; font-weight: 800; color: var(--navy-deep, #12263a); background: #ffc97a; border: 0; border-radius: var(--r-sm); padding: 6px 12px; cursor: pointer; }
+.rproto .gctx .gx-track .rt-share .material-icons-outlined { font-size: 14px; }
+.rproto .gctx .gx-track .rt-share + .rt-copy { margin-inline-start: 0; }
+/* Inline action group at the end of the strip — Share · Copy · Set deadline (consistent 8px gaps). */
+.rproto .gctx .gx-track .gx-acts { margin-inline-start: auto; display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rproto .gctx .gx-track .gx-acts .rt-share, .rproto .gctx .gx-track .gx-acts .rt-copy { margin-inline-start: 0; }
+.rproto .gctx .gx-track .gx-acts input[type="datetime-local"] { border: 0; border-radius: var(--r-sm); padding: 5px 8px; font: inherit; font-size: 12.5px; }
 .rproto .gctx .gx-ic { position: relative; width: 40px; height: 40px; border-radius: 10px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; background: #fff; }
 .rproto .gctx .gx-ic .gx-more-badge { position: absolute; bottom: -5px; inset-inline-end: -5px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: var(--r-full); background: var(--action); color: #fff; font-size: 9.5px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid var(--navy-deep, #12263a); }
 .rproto .gctx .gx-main { flex: 1; min-width: 0; }
@@ -159,7 +184,25 @@
 .rproto .gctx .gx-link .material-icons-outlined { font-size: 14px; }
 .rproto[dir="rtl"] .gctx .gx-link .material-icons-outlined { transform: scaleX(-1); }
 .rproto .st-mixed { background: rgba(28,53,80,0.07); color: var(--navy-mid); } .rproto .st-mixed .dot { background: var(--navy-mid); }
+/* fulfillment tracking grid (one tile per equipment line, color-coded by coverage) */
+.rproto .ffwrap { margin-bottom: 16px; }
+.rproto .ffgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(224px, 1fr)); gap: 10px; }
+.rproto .fftile { background: var(--surface1); border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 13px; }
+.rproto .fftile .ff-tt { display: flex; align-items: center; gap: 10px; }
+.rproto .fftile .ff-th { width: 38px; height: 38px; border-radius: 9px; flex: 0 0 auto; background: var(--surface2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--navy-mid); overflow: hidden; }
+.rproto .fftile .ff-meta { min-width: 0; }
+.rproto .fftile .ff-nm { font-size: 13px; font-weight: 800; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rproto .fftile .ff-fr { font-size: 11.5px; color: var(--muted); font-weight: 600; margin-top: 1px; }
+.rproto .fftile .ff-fr b { font-family: "IBM Plex Sans", monospace; color: var(--navy); font-weight: 800; }
+.rproto .fftile .ff-bar { height: 8px; border-radius: var(--r-full); background: var(--surface3); overflow: hidden; margin-top: 11px; }
+.rproto .fftile .ff-fill { height: 100%; border-radius: var(--r-full); transition: width .3s; }
+.rproto .fftile.low .ff-fill { background: var(--danger); }
+.rproto .fftile.part .ff-fill { background: var(--action); }
+.rproto .fftile.full .ff-fill { background: var(--success); }
+.rproto .fftile.full { border-color: rgba(29, 175, 88, 0.4); }
 .rproto .contentbar { display: flex; align-items: center; gap: 10px; margin: 2px 0 12px; }
+.rproto .rq-expand { display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--navy-mid); background: none; border: 0; cursor: pointer; padding: 0; }
+.rproto .rq-expand .material-icons-outlined { font-size: 18px; }
 .rproto .contentbar .count { font-size: 13px; font-weight: 700; color: var(--muted); }
 /* mobile: let the group strip's badges wrap to their own row instead of squeezing the title */
 @media (max-width: 640px) {
@@ -168,6 +211,10 @@
   .rproto .gctx .gx-badges { width: 100%; justify-content: flex-start; margin-top: 6px; }
 }
 
+/* Screen 2 — horizontal snap bid cards (~2.5 visible, scroll for more) */
+.rproto .bids-snap { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 10px; align-items: flex-start; -webkit-overflow-scrolling: touch; }
+.rproto .bids-snap > * { flex: 0 0 clamp(300px, 82vw, 356px); scroll-snap-align: start; margin-bottom: 0; }
+@media (min-width: 900px) { .rproto .bids-snap > * { flex-basis: 41%; } }
 .rproto .bids-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .rproto .bids-bar .count { font-size: 13px; font-weight: 700; color: var(--muted); }
 
@@ -292,6 +339,7 @@
 .rproto .tp-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); }
 .rproto .tp-row:last-child { border-bottom: 0; }
 .rproto .tp-lab { font-size: 13px; font-weight: 600; color: var(--navy); }
+.rproto .tp-lab .tp-detail { font-size: 11px; font-weight: 500; color: var(--danger); margin-inline-start: 5px; }
 .rproto .tp-state { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 800; white-space: nowrap; }
 .rproto .tp-state .material-icons-outlined { font-size: 15px; }
 .rproto .tp-state.ok { color: var(--success); }
@@ -347,6 +395,15 @@
 .rproto .lc-chips { display: flex; gap: 7px; padding: 8px 14px 4px; flex-wrap: wrap; }
 .rproto .lc-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--navy-mid); background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-full); padding: 4px 10px; }
 .rproto .lc-chip .material-icons-outlined { font-size: 13px; color: var(--muted); }
+/* Bid source chip: blue = on-platform (via Moedatech app), orange = off-platform (shared link). */
+.rproto .src-chip { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: var(--r-full); white-space: nowrap; }
+.rproto .src-chip .material-icons-outlined { font-size: 12px; }
+.rproto .src-chip.src-app { background: var(--info-bg); color: var(--info); }
+.rproto .src-chip.src-link { background: var(--action-dim); color: var(--warning); }
+/* Price-negotiable hint (app parity): tappable blue row above the price → opens the deal room. */
+.rproto .neg-hint { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; border-top: 1px solid var(--line); background: var(--info-bg); color: var(--info); font: inherit; font-weight: 700; font-size: 12px; text-align: start; padding: 9px 14px; cursor: pointer; }
+.rproto .neg-hint:disabled { cursor: default; opacity: .6; }
+.rproto .neg-hint .material-icons-outlined { font-size: 16px; flex: 0 0 auto; }
 .rproto .neg-footer { border-top: 1px solid var(--border); padding: 10px 14px 12px; }
 .rproto .neg-footer.turn { background: var(--action-dim); }
 .rproto .nf-r1 { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
@@ -365,3 +422,90 @@
 .rproto .rstate { display: grid; place-items: center; padding: 60px 0; color: var(--muted); }
 .rproto .rempty { border: 1px dashed var(--border); background: rgba(239, 244, 249, 0.4); border-radius: var(--r-lg); padding: 40px; text-align: center; font-size: 13.5px; color: var(--muted); }
 .rproto .material-icons-outlined { font-family: "Material Icons Outlined"; line-height: 1; }
+
+/* ── web-app/006 shared-link (off-platform) bid card + read-only submission viewer (STAGING DEMO) ── */
+.rproto .bid-link { border-color: rgba(247, 144, 9, 0.4); }
+.rproto .bid-link.sel { border-color: var(--rentee); box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25); }
+.rproto .slb-strip { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 800; padding: 8px 15px; background: var(--action-dim); color: #8a5a06; border-bottom: 1px solid rgba(247, 144, 9, 0.28); }
+.rproto .slb-strip .material-icons-outlined { font-size: 15px; color: var(--action); }
+.rproto .slb-body { padding: 14px 15px; }
+.rproto .slb-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 800; border-radius: 100px; padding: 2px 9px; background: var(--action-dim); color: #8a5a06; border: 1px solid rgba(247, 144, 9, 0.35); margin-inline-start: 6px; }
+.rproto .slb-pill .material-icons-outlined { font-size: 11px; color: var(--action); }
+.rproto .slb-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 9px; }
+.rproto .slb-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 800; border-radius: 8px; padding: 3px 8px; background: var(--surface2); color: var(--navy-mid); border: 1px solid var(--border); }
+.rproto .slb-badge.ok { background: var(--success-bg); color: var(--success); border-color: rgba(29, 175, 88, 0.25); }
+.rproto .slb-badge .material-icons-outlined { font-size: 12px; }
+.rproto .slb-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 12px; margin-top: 12px; border-top: 1px solid var(--surface3); }
+/* Tappable "Terms match" row → expands the inline TermsPanel (parity with on-platform bid cards). */
+.rproto button.slb-row { width: 100%; background: none; border: 0; border-top: 1px solid var(--surface3); font: inherit; text-align: inherit; cursor: pointer; }
+.rproto .slb-row.tappable:hover { background: var(--surface1); }
+.rproto .slb-row .chev { flex: 0 0 auto; font-size: 20px; color: var(--muted); transition: transform 0.2s; }
+.rproto .slb-row.open .chev { transform: rotate(180deg); }
+.rproto .slb-left { min-width: 0; }
+.rproto .slb-lbl { font-size: 12px; font-weight: 800; color: var(--navy-mid); }
+.rproto .slb-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.rproto .slb-total { font-family: "IBM Plex Sans", monospace; font-size: 16px; font-weight: 800; color: var(--action); white-space: nowrap; }
+.rproto .slb-foot-meta { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.rproto .slb-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: var(--navy-mid); background: var(--surface2); border: 1px solid var(--border); border-radius: 100px; padding: 5px 11px; }
+.rproto .slb-chip .material-icons-outlined { font-size: 13px; color: var(--muted); }
+.rproto .slb-link { display: inline-flex; align-items: center; gap: 3px; font: inherit; font-size: 12px; font-weight: 700; color: var(--rentee); background: none; border: 0; cursor: pointer; }
+.rproto .slb-link .material-icons-outlined { font-size: 15px; }
+.rproto .slb-view-btn { width: 100%; margin-top: 12px; border: 0; border-radius: var(--r-md); background: var(--rentee); color: #fff; font: inherit; font-weight: 800; font-size: 13.5px; padding: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer; transition: filter 0.12s; }
+.rproto .slb-view-btn:hover { filter: brightness(1.06); }
+.rproto .slb-view-btn .material-icons-outlined { font-size: 18px; }
+.rproto .slb-offnote { font-size: 11px; color: var(--muted); font-weight: 600; text-align: center; margin: 7px 0 0; line-height: 1.4; }
+
+/* read-only submission viewer (modal) */
+.rproto .slb-overlay { position: fixed; inset: 0; z-index: 400; background: rgba(28, 53, 80, 0.45); display: flex; align-items: flex-start; justify-content: center; padding: 24px; overflow: auto; }
+.rproto .slb-modal { width: 880px; max-width: 100%; height: 92vh; display: flex; flex-direction: column; background: var(--surface1); border-radius: 18px; box-shadow: 0 30px 70px rgba(28, 53, 80, 0.35); margin: auto; overflow: hidden; }
+.rproto .slb-head { display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px; background: linear-gradient(150deg, var(--navy), var(--navy-deep)); color: #fff; }
+.rproto .slb-head-ic { width: 40px; height: 40px; border-radius: var(--r-md); background: linear-gradient(135deg, var(--action), #ffa733); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.rproto .slb-head-ic .material-icons-outlined { font-size: 22px; color: #fff; }
+.rproto .slb-head-tx { flex: 1; min-width: 0; }
+.rproto .slb-head-tx h3 { margin: 0; font-size: 16px; font-weight: 800; }
+.rproto .slb-head-tx p { margin: 2px 0 0; font-size: 12px; color: rgba(255, 255, 255, 0.7); }
+.rproto .slb-head-x { margin-inline-start: auto; width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.1); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; }
+.rproto .slb-banner { display: flex; align-items: center; gap: 8px; background: var(--action-dim); color: #8a5a06; font-size: 12px; font-weight: 700; padding: 10px 18px; border-bottom: 1px solid rgba(247, 144, 9, 0.2); }
+.rproto .slb-banner .material-icons-outlined { font-size: 16px; color: var(--action); }
+.rproto .slb-frame { flex: 1; width: 100%; border: 0; background: #fff; }
+.rproto .slb-foot { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-top: 1px solid var(--surface3); }
+.rproto .slb-foot-sp { flex: 1; }
+.rproto .slb-add { display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: var(--r-md); background: var(--rentee); color: #fff; font: inherit; font-weight: 800; font-size: 13px; padding: 11px 18px; cursor: pointer; }
+.rproto .slb-add .material-icons-outlined { font-size: 18px; }
+
+/* shared-link tracker strip on the request detail */
+.rproto .rd-track { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; padding: 13px 16px; border-radius: var(--r-lg); background: linear-gradient(150deg, var(--navy), var(--navy-deep)); color: #fff; }
+.rproto .rd-track > .material-icons-outlined { font-size: 17px; color: #ffc97a; }
+.rproto .rd-track .rt-lbl { font-size: 12px; font-weight: 800; color: #fff; }
+.rproto .rd-track .rt-stat { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: rgba(255, 255, 255, 0.72); }
+.rproto .rd-track .rt-stat .material-icons-outlined { font-size: 15px; color: rgba(255, 255, 255, 0.72); }
+.rproto .rd-track .rt-stat b { font-family: "IBM Plex Sans", monospace; font-size: 16px; font-weight: 800; color: #fff; }
+.rproto .rd-track .rt-stat.sub b { color: #ffc97a; }
+.rproto .rd-track .rt-copy { margin-inline-start: auto; display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 700; color: #fff; background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: var(--r-sm); padding: 7px 13px; cursor: pointer; }
+.rproto .rd-track .rt-copy .material-icons-outlined { font-size: 14px; }
+
+/* Filter bids dropdown (source + refine) */
+.rproto .filterbar { position: relative; margin-bottom: 14px; }
+.rproto .filterbtn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 15px; border: 1px solid var(--border); background: var(--surface1); border-radius: var(--r-md); font: inherit; font-size: 13px; font-weight: 700; color: var(--navy); cursor: pointer; }
+.rproto .filterbtn > .material-icons-outlined { font-size: 18px; color: var(--navy-mid); }
+.rproto .filterbtn .chev { transition: transform 0.15s; margin-inline-start: 2px; }
+.rproto .filterbtn.open .chev { transform: rotate(180deg); }
+.rproto .fb-count { font-size: 11px; font-weight: 800; background: var(--action); color: #fff; border-radius: 100px; padding: 1px 7px; }
+.rproto .filter-backdrop { position: fixed; inset: 0; z-index: 79; }
+.rproto .filter-pop { position: absolute; top: calc(100% + 6px); inset-inline-start: 0; z-index: 80; width: 300px; max-width: calc(100vw - 28px); background: var(--surface1); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: 0 18px 44px rgba(28, 53, 80, 0.22); padding: 8px; }
+.rproto .fp-h { font-size: 11px; font-weight: 800; color: var(--muted); letter-spacing: 0.3px; padding: 8px 10px 6px; }
+.rproto .fp-opt { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: var(--r-md); cursor: pointer; font-size: 13px; font-weight: 700; color: var(--navy); }
+.rproto .fp-opt:hover { background: var(--surface2); }
+.rproto .fp-opt .radio { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--border); flex: 0 0 auto; display: grid; place-items: center; }
+.rproto .fp-opt.on .radio { border-color: var(--rentee); }
+.rproto .fp-opt.on .radio::after { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--rentee); }
+.rproto .fp-opt .fp-ic { font-size: 16px; }
+.rproto .fp-opt .fp-n { margin-inline-start: auto; font-size: 11px; font-weight: 700; background: var(--surface3); color: var(--navy-mid); border-radius: 100px; padding: 1px 8px; }
+.rproto .fp-div { height: 1px; background: var(--surface3); margin: 7px 6px; }
+.rproto .fp-check .box { width: 18px; height: 18px; border-radius: 5px; border: 2px solid var(--border); flex: 0 0 auto; display: grid; place-items: center; color: #fff; }
+.rproto .fp-check.on .box { background: var(--rentee); border-color: var(--rentee); }
+.rproto .fp-check .box .material-icons-outlined { font-size: 14px; opacity: 0; }
+.rproto .fp-check.on .box .material-icons-outlined { opacity: 1; }
+.rproto .fp-foot { display: flex; align-items: center; gap: 8px; padding: 8px 6px 2px; border-top: 1px solid var(--surface3); margin-top: 6px; }
+.rproto .fp-foot .clr { font: inherit; font-size: 12px; font-weight: 700; color: var(--muted); background: none; border: 0; cursor: pointer; padding: 8px 10px; }
+.rproto .fp-foot .done { margin-inline-start: auto; font: inherit; font-size: 12.5px; font-weight: 800; color: #fff; background: var(--action); border: 0; border-radius: var(--r-sm); padding: 9px 18px; cursor: pointer; }

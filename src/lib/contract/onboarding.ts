@@ -20,10 +20,17 @@ export interface RenterProfile {
   tier: RenterTier;
   firstName: string | null;
   lastName: string | null;
+  /** Company name on the renter's profile (display name; verification holds the legal name). */
+  companyName: string | null;
   city: string | null;
   jobTitle: string | null;
   email: string | null;
   whatsapp: string | null;
+  /** Company identity from the renter's profile — shown on the generated quotation's Rentee party
+   *  block (app parity). Null when the backend hasn't supplied them. */
+  crNumber?: string | null;
+  vatNumber?: string | null;
+  nationalAddress?: string | null;
 }
 
 /** A master-data option (city / job title). */

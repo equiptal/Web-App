@@ -3,13 +3,19 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
-import { fetchBids, startDealRoom } from "@/lib/api/client";
+import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/client";
 import type { BidCard } from "@/lib/contract/bids";
+import { computeBidQuote } from "@/lib/contract/comparison";
+import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { CredentialPills } from "@/components/requests/CredentialPills";
 import { TermsPanel } from "@/components/requests/TermsPanel";
 import { TermClassBadges } from "@/components/requests/TermClassBadges";
-import { DealRoomBanner, SupplierDocs } from "@/components/requests/BidCardExtras";
+import { DealRoomBanner, SupplierDocs, EquipmentDocs } from "@/components/requests/BidCardExtras";
+import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
+import { useSession } from "@/lib/session";
+import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
+import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
 
 /** Lifecycle pill (matches the prototype SPILL). */
 const SPILL: Record<string, { cls: string; dot: boolean; en: string; ar: string }> = {
@@ -40,6 +46,16 @@ function pillLabel(status: string, L: (en: string, ar: string) => string): strin
   }
 }
 
+/** Offer-state suffix for the deal-room CTA (uiState) — new / updated offer / whose move it is. */
+function offerSuffix(uiState: string | null, L: (en: string, ar: string) => string): string | null {
+  switch (uiState) {
+    case "new": return L("New offer", "عرض جديد");
+    case "fresh": return L("Updated offer", "عرض مُحدّث");
+    case "your-turn": return L("Your turn", "دورك");
+    default: return null; // waiting / null → no suffix
+  }
+}
+
 
 export function RequestBids({ requestId }: { requestId: string }) {
   const { locale } = useLocale();
@@ -62,6 +78,12 @@ export function RequestBids({ requestId }: { requestId: string }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [equipBid, setEquipBid] = useState<BidCard | null>(null);
   const [openTermsId, setOpenTermsId] = useState<string | null>(null);
+  const { tier } = useSession();
+  const [quoteGate, setQuoteGate] = useState(false); // unverified → confirm before issuing the quotation
+  // web-app/006 (expanded) — real off-platform submissions via the request's shared link.
+  const [submissions, setSubmissions] = useState<LinkBidSubmission[]>([]);
+  const [src, setSrc] = useState<"all" | "app" | "link">("all"); // source filter
+  const [submissionBid, setSubmissionBid] = useState<BidCard | null>(null);
 
   const toggleSelect = (id: string) =>
     setSelected((prev) => {
@@ -74,7 +96,8 @@ export function RequestBids({ requestId }: { requestId: string }) {
   // Quotation PDF (matches the app's bid_pdf_builder: supplier + equipment + pricing breakdown).
   // Rendered via the browser's print-to-PDF so Arabic/RTL render correctly without font embedding.
   function downloadQuotation() {
-    const chosen = (bids ?? []).filter((b) => selected.has(b.id));
+    // Include off-platform (shared-link) submissions, not just on-platform bids.
+    const chosen = merged.filter((b) => selected.has(b.id));
     if (!chosen.length) return;
     const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
     const sar = L("SAR", "ر.س");
@@ -141,6 +164,11 @@ export function RequestBids({ requestId }: { requestId: string }) {
     fetchBids(requestId)
       .then((d) => active && setBids(d.bids))
       .catch(() => active && setError(true));
+    // Off-platform shared-link submissions (independent of the app bids; best-effort).
+    setSubmissions([]);
+    fetchRequestSubmissions(requestId)
+      .then((r) => active && setSubmissions(r.submissions))
+      .catch(() => {});
     return () => {
       active = false;
     };
@@ -167,7 +195,21 @@ export function RequestBids({ requestId }: { requestId: string }) {
 
   if (error) return <div className="rempty">{L("Couldn’t load the bids.", "تعذّر تحميل العروض.")}</div>;
   if (!bids) return <div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 26 }}>progress_activity</span></div>;
-  if (bids.length === 0) return <div className="rempty">{L("No bids yet — suppliers' offers will appear here.", "لا توجد عروض بعد — ستظهر عروض المؤجّرين هنا.")}</div>;
+  // Merge on-platform app bids with off-platform shared-link submissions (mapped to a BidCard shape).
+  // A submission covers the whole group; on a single request, show only THIS request's item (one card).
+  const linkLabels = new Map<string, string | null>(); // card id → item label (for the card title)
+  const linkCards = submissions.flatMap((s) => {
+    const it = s.items.find((i) => i.requestId === requestId) ?? (s.items.length === 1 ? s.items[0] : null);
+    if (!it) return [];
+    const id = `link-${s.id}-${it.requestItemId}`;
+    linkLabels.set(id, it.label ?? null);
+    return [{ ...submissionToBidCard(s, it), id }];
+  });
+  const merged = [...bids, ...linkCards];
+  const linkCount = linkCards.length;
+  const appCount = bids.length;
+  const allBids = merged.filter((b) => (src === "all" ? true : src === "link" ? b.viaSharedLink : !b.viaSharedLink));
+  if (merged.length === 0) return <div className="rempty">{L("No bids yet — suppliers' offers will appear here.", "لا توجد عروض بعد — ستظهر عروض المؤجّرين هنا.")}</div>;
 
   return (
     <div>
@@ -177,18 +219,50 @@ export function RequestBids({ requestId }: { requestId: string }) {
         <span className="material-icons-outlined go">chevron_right</span>
       </button>
       <div className="bids-bar">
-        <span className="count">{bids.length} {L("bids", "عروض")}</span>
+        <span className="count">{allBids.length} {L("bids", "عروض")}</span>
+        {linkCount > 0 && (
+          <div className="bids-srcfilter" style={{ display: "flex", gap: 6, marginInlineStart: "auto" }}>
+            {([
+              ["all", L("All", "الكل"), appCount + linkCount],
+              ["app", L("In-app", "داخل التطبيق"), appCount],
+              ["link", L("Via shared link", "عبر الرابط"), linkCount],
+            ] as const).map(([k, lbl, n]) => (
+              <button key={k} type="button" onClick={() => setSrc(k)}
+                className="srcchip"
+                style={{ border: "1px solid", borderRadius: 999, padding: "3px 10px", fontSize: 11.5, fontWeight: 700,
+                  ...(src === k ? { background: "#0f172a", color: "#fff", borderColor: "#0f172a" } : { background: "#fff", color: "#475569", borderColor: "#e2e8f0" }) }}>
+                {lbl} <span style={{ opacity: 0.7 }}>{n}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
-      {bids.map((b) => {
+      {allBids.map((b) => {
+        if (b.viaSharedLink) {
+          return (
+            <SharedLinkBidCard
+              key={b.id}
+              bid={b}
+              ar={ar}
+              L={L}
+              isSel={selected.has(b.id)}
+              onToggleSelect={() => toggleSelect(b.id)}
+              onViewSubmission={() => setSubmissionBid(b)}
+              itemLabel={linkLabels.get(b.id) ?? null}
+            />
+          );
+        }
         const sp = SPILL[b.status] ?? SPILL.PENDING;
         const accepted = b.status === "ACCEPTED";
         const disabled = b.status === "EXPIRED" || b.status === "WITHDRAWN" || b.expired;
-        const periods = b.duration ?? 1;
-        const units = b.numberOfUnits || 1; // bid price is per-unit → × units (app parity)
-        const rentalTotal = (b.price ?? 0) * periods * units;
-        const sub = rentalTotal + (b.mobPrice ?? 0) + (b.demobPrice ?? 0);
-        const vat = Math.round(sub * 0.15);
-        const grand = sub + vat;
+        // Canonical quote: rate ÷ period-days × duration (weekly ÷7, monthly ÷26), mob/demob × units, VAT 15%.
+        const q = computeBidQuote(b);
+        const units = q.units;
+        const periods = q.periods;
+        const rentalTotal = q.rentalSubtotal;
+        const sub = q.subtotalPreVat;
+        const vat = Math.round(q.vat);
+        const grand = Math.round(q.total);
         const evt =
           b.status === "COUNTER_OFFERED" ? L("Countered", "قدّم عرضاً مقابلاً")
           : b.status === "ACCEPTED" ? L("Accepted", "مقبول")
@@ -210,6 +284,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
                 <div className="r1">
                   <span className="sname">{b.supplierName}</span>
                   <span className={`spill ${sp.cls}`}>{sp.dot && <span className="d" />}{ar ? sp.ar : sp.en}</span>
+                  <span className="src-chip src-app"><span className="material-icons-outlined">verified_user</span>{L("via Moedatech app", "عبر تطبيق معداتك")}</span>
                 </div>
                 <div className="bid-evt">{evt}</div>
                 <div className="credrow">
@@ -221,8 +296,8 @@ export function RequestBids({ requestId }: { requestId: string }) {
                   {b.rating != null && <span className="credpill cp-ok"><span className="material-icons-outlined">star</span>{b.rating.toFixed(1)}</span>}
                   <CredentialPills required={b.requiredCerts} held={b.heldCertCodes} ar={ar} />
                 </div>
-                {/* supplier credentials on file — identity docs (CR / VAT / National address) + held certs */}
-                <SupplierDocs compliance={b.compliance} heldCerts={b.heldCertCodes} requiredCerts={b.requiredCerts} ar={ar} />
+                {/* Company documents on file (Level 1) — CR / VAT / National address + LC / SASO registration */}
+                <SupplierDocs compliance={b.compliance} companyCerts={b.companyCertCodes ?? []} ar={ar} />
               </div>
               <div className={`bid-check${isSel ? " on" : ""}`} onClick={() => toggleSelect(b.id)} title={L("Select for quotation", "حدّد لعرض السعر")}>
                 <span className="material-icons-outlined">check</span>
@@ -257,6 +332,8 @@ export function RequestBids({ requestId }: { requestId: string }) {
               <div className="el">
                 <div className="elab">{L("Equipment", "المعدة")}{b.eqVerified && <span className="material-icons-outlined vt">verified</span>}{units > 1 && <span className="qty-badge">× {units}</span>}</div>
                 <div className="esub">{b.distanceKm != null ? `${Math.round(b.distanceKm)} ${L("km from the project", "كم من المشروع")}` : L("Distance not shared", "المسافة غير محددة")}</div>
+                {/* Equipment certs + proof-of-ownership docs on file (Level 2) */}
+                <EquipmentDocs equipmentCerts={b.equipmentCertCodes ?? []} ownershipDocs={b.ownershipDocs} ar={ar} />
               </div>
               {b.equipment?.id && (
                 <span className="equip-view">
@@ -274,6 +351,12 @@ export function RequestBids({ requestId }: { requestId: string }) {
               </div>
             )}
 
+            {/* price-negotiable hint (app parity — unconditional on on-platform cards; opens the deal room) */}
+            <button type="button" className="neg-hint" disabled={busyId === b.id} onClick={() => startNegotiation(b)}>
+              <span className="material-icons-outlined">forum</span>
+              {L("This price is negotiable — open the deal room to chat", "هذا السعر قابل للتفاوض — افتح غرفة الصفقة للتحدث")}
+            </button>
+
             {/* price expandable */}
             <div className={`price-row${priceOpen ? " open" : ""}`}>
               <div className="price-collapsed" onClick={() => setOpenPrice(priceOpen ? null : b.id)}>
@@ -282,7 +365,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
               </div>
               {priceOpen && (
                 <div className="price-body">
-                  <div className="prow"><span className="pl2">{L("Rental", "الإيجار")} ({nf(b.price ?? 0)} × {periods}{units > 1 ? ` × ${units}` : ""})</span><span className="pv">{nf(rentalTotal)}</span></div>
+                  <div className="prow"><span className="pl2">{L("Rental", "الإيجار")} ({nf(b.price ?? 0)} × {Number.isInteger(periods) ? periods : periods.toFixed(2)}{units > 1 ? ` × ${units}` : ""})</span><span className="pv">{nf(rentalTotal)}</span></div>
                   {b.mobPrice ? <div className="prow"><span className="pl2">{L("Delivery to site", "النقل إلى الموقع")}{b.mobLeadTime && <span className="lead">{L("delivery within", "تسليم خلال")} {b.mobLeadTime}</span>}</span><span className="pv">{nf(b.mobPrice)}</span></div> : null}
                   {b.demobPrice ? <div className="prow"><span className="pl2">{L("Return from site", "النقل من الموقع")}{b.demobLeadTime && <span className="lead">{L("return within", "إرجاع خلال")} {b.demobLeadTime}</span>}</span><span className="pv">{nf(b.demobPrice)}</span></div> : null}
                   <div className="prow"><span className="pl2">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="pv">{nf(sub)}</span></div>
@@ -303,7 +386,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
                 EXPIRED/WITHDRAWN are disabled. The CTA always routes into the deal room. */}
             <div className="neg-footer">
               <button className="neg-pill" disabled={disabled || busyId === b.id} onClick={() => startNegotiation(b)}>
-                {pillLabel(b.status, L)}
+                {pillLabel(b.status, L)}{offerSuffix(b.uiState, L) ? ` · ${offerSuffix(b.uiState, L)}` : ""}
                 {!disabled && <span className="material-icons-outlined">arrow_forward</span>}
               </button>
               <p className="nf-hint">
@@ -321,7 +404,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
         <div className="qbar">
           <span className="qn">{selected.size} {L("selected", "محدّد")}</span>
           <span className="qclear" onClick={() => setSelected(new Set())}>{L("Clear", "مسح")}</span>
-          <button className="qdl" onClick={downloadQuotation}>
+          <button className="qdl" onClick={() => (tier === "verified" ? downloadQuotation() : setQuoteGate(true))}>
             <span className="material-icons-outlined">download</span> {L("Download quotation", "تنزيل عرض السعر")}
           </button>
         </div>
@@ -333,6 +416,28 @@ export function RequestBids({ requestId }: { requestId: string }) {
           busy={busyId === equipBid.id}
           onRequestDetails={() => startNegotiation(equipBid)}
           onClose={() => setEquipBid(null)}
+        />
+      )}
+
+      {/* web-app/006 — read-only viewer of an off-platform shared-link submission (real answers) */}
+      {submissionBid && (
+        <SharedBidSubmissionModal
+          bid={submissionBid}
+          submission={submissions.find((s) => s.id === submissionBid.submissionKey) ?? null}
+          ar={ar}
+          L={L}
+          onClose={() => setSubmissionBid(null)}
+        />
+      )}
+
+      {/* Issue-quotation gate for an unverified renter (company name vs personal name). */}
+      {quoteGate && (
+        <QuotationVerifyGate
+          ar={ar}
+          L={L}
+          onClose={() => setQuoteGate(false)}
+          onVerify={() => { setQuoteGate(false); router.push("/verify"); }}
+          onContinue={() => { setQuoteGate(false); downloadQuotation(); }}
         />
       )}
     </div>

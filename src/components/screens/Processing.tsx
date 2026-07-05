@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react";
 import { useT, fmt } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
-import { Button, Card, Badge, Icon } from "@/components/ui";
+import { Button, Badge, Icon } from "@/components/ui";
 
 export function Processing() {
   const t = useT();
   const { state, actions } = useRfq();
-  const { busy, error, draft } = state;
+  const { busy, error, draft, errorDetail } = state;
 
   const stages = [t.processing.stage1, t.processing.stage2, t.processing.stage3, t.processing.stage4];
 
@@ -29,21 +29,45 @@ export function Processing() {
     return () => clearTimeout(id);
   }, [done, actions]);
 
-  /* ----------------------------- Error (AC-09 / AC-10) ----------------------------- */
+  /* ----------------------------- Error (AC-09 / AC-10) — clear modal ----------------------------- */
   if (error) {
     const isEmpty = error === "empty";
+    // Distinguish the agent's real failure (forwarded from Mansour) from a plain connection drop, so the
+    // reason is clear: 429 = busy/rate-limited, 402/403 = unavailable (usage/credits/auth).
+    const bs = errorDetail?.backendStatus;
+    const agentBusy = bs === 429;
+    const agentDown = bs === 402 || bs === 403;
+    const title = isEmpty ? t.errors.emptyTitle : agentBusy ? t.errors.busyTitle : agentDown ? t.errors.unavailableTitle : t.errors.networkTitle;
+    const body = isEmpty ? t.errors.emptyBody : agentBusy ? t.errors.busyBody : agentDown ? t.errors.unavailableBody : t.errors.networkBody;
+    const icon = isEmpty ? "search_off" : agentBusy ? "hourglass_empty" : agentDown ? "cloud_off" : "wifi_off";
     return (
-      <div className="mx-auto max-w-xl py-8">
-        <Card tone={isEmpty ? "warn" : "danger"}>
-          <h2 className="text-base font-semibold">{isEmpty ? t.errors.emptyTitle : t.errors.networkTitle}</h2>
-          <p className="mt-1 text-sm text-muted">{isEmpty ? t.errors.emptyBody : t.errors.networkBody}</p>
-          <div className="mt-4 flex gap-2">
-            <Button onClick={() => actions.process()}>{t.common.retry}</Button>
-            <Button variant="secondary" onClick={() => actions.goIntake()}>
-              {t.errors.switchManual}
-            </Button>
+      <div
+        className="fixed inset-0 z-[70] flex items-center justify-center bg-navy/45 p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="proc-err-title"
+        onClick={(e) => { if (e.target === e.currentTarget) actions.goIntake(); }}
+      >
+        <div className="relative w-full max-w-sm rounded-2xl bg-surface p-7 text-center shadow-[0_24px_60px_rgba(16,32,58,.35)]">
+          <button
+            onClick={() => actions.goIntake()}
+            aria-label={t.common.close}
+            className="absolute end-3 top-3 grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface3 hover:text-navy"
+          >
+            <Icon name="close" size={18} />
+          </button>
+          <div className={`mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full ${isEmpty || agentBusy ? "bg-warn-soft text-warn" : "bg-danger-soft text-danger"}`}>
+            <Icon name={icon} size={34} />
           </div>
-        </Card>
+          <h2 id="proc-err-title" className="text-[19px] font-extrabold tracking-tight text-navy">{title}</h2>
+          <p className="mx-auto mt-2 max-w-[300px] text-[14px] leading-relaxed text-muted">{body}</p>
+          {errorDetail?.detail && (
+            <p className="mx-auto mt-3 max-w-[320px] break-words rounded-lg bg-surface3 px-3 py-2 text-start font-mono text-[11.5px] leading-snug text-muted">{errorDetail.detail}</p>
+          )}
+          <Button className="mt-6 w-full py-3 text-[15px]" onClick={() => actions.process()}>
+            <Icon name="refresh" size={19} /> {t.common.retry}
+          </Button>
+        </div>
       </div>
     );
   }

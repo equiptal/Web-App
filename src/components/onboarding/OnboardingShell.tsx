@@ -44,7 +44,7 @@ export function OnboardingShell({ step, children }: { step: 1 | 2; children: Rea
         </span>
       </div>
 
-      <div className="mx-auto max-w-lg px-5 py-8">
+      <div className={`mx-auto px-5 py-8 ${step === 2 ? "max-w-3xl" : "max-w-lg"}`}>
         {/* Stepline only on the verify step — on account creation the "Verify company (later)"
             preview read as overwhelming, so the account form stands on its own. */}
         {step === 2 && (

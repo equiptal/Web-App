@@ -78,6 +78,8 @@ export interface OperatorDetails {
    *  Sent as operatorNationalityCustom (≤100). */
   nationalityCustom?: string | null;
   certificate: OperatorCertificate[]; // multi-select; defaulted from project Safety certs (AC-24/50)
+  /** Free-text operator certificate when "other" is selected — appended to operatorLicenseLevel (app parity). */
+  certificateOther?: string | null;
   /** AC-50: true when the agent set the cert per-item from the RFQ — the project-level Safety cert
    *  then leaves it untouched (only fills items the agent didn't mention). */
   certByAgent?: boolean;
@@ -110,6 +112,10 @@ export interface EquipmentItem {
    */
   rawSize: string | null;
   ref: TaxonomyRef;
+  /** The agent's CANONICAL match names (English + Arabic) — DISPLAY ONLY for "MATCHED TO", used as the
+   *  Arabic source (and the fallback when an item didn't resolve to a taxonomy node). IDs/submit always
+   *  use `ref`, never these. null for manually-added items (they resolve from the taxonomy). */
+  agentNames?: { category: string; categoryAr: string | null; subtype: string; subtypeAr: string | null; capacity: string; capacityAr: string | null } | null;
   verdict: Verdict; // from the agent
   /** AC-19: nearest-measurement suggestion when the RFQ measurement isn't in the taxonomy. */
   suggestion?: MeasurementSuggestion;
@@ -140,6 +146,18 @@ export interface EquipmentItem {
   deliveryOverride: Party | null;
   returnOverride: Party | null;
   fuelResponsibilityOverride: Party | null;
+  /** AC-50: per-item EQUIPMENT safety certs (TÜV/SPSP/SASO). null ⇒ inherit the request-wide
+   *  `project.certificates.safety` (the "settings for all items" default), overridable per item —
+   *  same globalize-with-override model as delivery/return/fuel. Distinct from the OPERATOR cert. */
+  safetyCertsOverride?: SafetyCertificate[] | null;
+  /** AC-28: per-item equipment year override. null ⇒ inherit the request-wide year
+   *  (`project.advanced.equipmentYear`). Value is "any" | a 4-digit year | "custom:<text>". */
+  equipmentYear?: string | null;
+  /** Per-item equipment attachments/accessories. `attachmentIds` are admin-defined SubtypeAttachment
+   *  ids for this subtype; `customAttachments` are renter free-text additions. Stored on the request
+   *  item as `attachment_ids` / `custom_attachments` (Json arrays). */
+  attachmentIds?: string[];
+  customAttachments?: string[];
 
   /** AC-57: confidence on agent-prefilled per-item fields (UI badges). */
   fieldConfidence?: {
@@ -237,7 +255,7 @@ export function defaultPreferences(): Preferences {
 }
 
 export function defaultOperatorDetails(): OperatorDetails {
-  return { nightShift: false, nationality: null, nationalityCustom: null, certificate: [], fatFood: "me", fatAccommodationTransport: "me" };
+  return { nightShift: false, nationality: null, nationalityCustom: null, certificate: [], certificateOther: null, fatFood: "me", fatAccommodationTransport: "me" };
 }
 
 /** Build a blank item (used when the renter adds a missed item — AC-22). */
@@ -260,6 +278,9 @@ export function newManualItem(id: string): EquipmentItem {
     deliveryOverride: null,
     returnOverride: null,
     fuelResponsibilityOverride: null,
+    equipmentYear: null, // inherit request-wide year unless overridden
+    attachmentIds: [],
+    customAttachments: [],
   };
 }
 

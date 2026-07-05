@@ -1,5 +1,25 @@
 import { describe, it, expect } from "vitest";
-import { parseAddress, groupRequests, mapRequestListItem, publicTaxonomyUrl, type RequestListItem, type RequestRecord } from "@/lib/contract/requests";
+import { parseAddress, groupRequests, mapRequestListItem, publicTaxonomyUrl, cappedFilled, type RequestListItem, type RequestRecord } from "@/lib/contract/requests";
+
+/* ------------------------------- cappedFilled (fulfillment math) ------------------------------- */
+
+describe("cappedFilled", () => {
+  it("sums on- + off-platform offered units (10 needed: 2 + 3 → 5)", () => {
+    expect(cappedFilled(10, 2 + 3, 0)).toBe(5);
+  });
+  it("a 1-unit line with one bid is 1/1", () => {
+    expect(cappedFilled(1, 1, 0)).toBe(1);
+  });
+  it("caps at the units needed (never over-fills)", () => {
+    expect(cappedFilled(3, 5, 4)).toBe(3);
+  });
+  it("adds off-platform covered units", () => {
+    expect(cappedFilled(10, 2, 3)).toBe(5);
+  });
+  it("is 0 when there are no bids", () => {
+    expect(cappedFilled(10, 0, 0)).toBe(0);
+  });
+});
 
 /* ------------------------------- publicTaxonomyUrl ------------------------------- */
 
@@ -58,6 +78,7 @@ describe("parseAddress", () => {
 const li = (p: Partial<RequestListItem>): RequestListItem => ({
   id: "x",
   requestGroupId: null,
+  groupRef: null,
   displayId: "REQ-1",
   type: "BROADCAST",
   status: "OPEN",

@@ -10,7 +10,17 @@
  * `bidColumnToComputed` is the mapper from our engine's BidColumn to the agent's ComputedBid.
  */
 import type { BidColumn } from "@/lib/contract/comparison";
-import type { BidCard, CertCode } from "@/lib/contract/bids";
+import type { BidCard, CertCode, TermRow } from "@/lib/contract/bids";
+
+/** Map a free-text cert token from a parsed quote to a canonical code (mirrors link-bids toCertCode). */
+function toCertCode(raw: string): CertCode | null {
+  const u = (raw ?? "").toUpperCase();
+  if (u.includes("TUV") || u.includes("TÜV")) return "TUV";
+  if (u.includes("SPSP")) return "SPSP";
+  if (u.includes("SASO")) return "SASO";
+  if (u === "LC" || u.includes("LOCAL")) return "LC";
+  return null;
+}
 
 export type BidPriceUnit = "PER_DAY" | "PER_WEEK" | "PER_MONTH" | "PER_JOB";
 export type BidSource = "app" | "uploaded_quote" | "shared_link";
@@ -118,7 +128,10 @@ export interface QuoteMatchCheck {
   type_size: TypeSizeMatch; // exact | needs_check (vs the request item)
   location: "match" | "mismatch" | "unknown"; // vs the request project location
   dates: "match" | "mismatch" | "unknown"; // vs the request rental window
-  needs_confirmation: boolean; // any mismatch / needs_check → popup
+  needs_confirmation: boolean; // any mismatch / needs_check → popup (still comparable)
+  /** TYPE/SIZE mismatch = wrong equipment → popup + DO NOT add the bid (can't compare a forklift to an
+   *  excavator). Location mismatch is advisory (popup, still added); dates are informational (never gate). */
+  blocking?: boolean;
   warnings: string[]; // human-readable, for the popup body
 }
 
@@ -213,8 +226,22 @@ export function bidColumnToComputed(col: BidColumn): ComputedBid {
  * its all-in is comparable. It carries no request-qualification (terms left empty → grey, not excluded);
  * `source: "uploaded_quote"` is preserved via the id prefix + note so the UI can tag it.
  */
-export function normalizedBidToBidCard(nb: NormalizedBid, ctx: { duration: number | null; units: number }): BidCard {
+export function normalizedBidToBidCard(
+  nb: NormalizedBid,
+  ctx: { duration: number | null; units: number; reqMinYear?: number | null; requiredCerts?: CertCode[] },
+): BidCard {
   const maint = nb.cost_responsibilities.maintenance;
+  // Qualify the uploaded quote against the SAME request requirements the in-app bids use (passed in from
+  // a reference bid): its declared certs vs the required set, and its year vs the request's minimum. An
+  // uploaded file doesn't answer cost/operator terms, so those stay grey (unknown) — this only fills the
+  // rows we can honestly derive from the parsed data.
+  const certCodes = (nb.certificates ?? []).map(toCertCode).filter((c): c is CertCode => !!c);
+  const reqMinYear = ctx.reqMinYear ?? null;
+  const requiredCerts = ctx.requiredCerts ?? [];
+  const yearTerm: TermRow[] =
+    reqMinYear != null && nb.equipment_year != null
+      ? [{ key: "year", labelEn: "Year of manufacture", labelAr: "سنة الصنع", state: nb.equipment_year < reqMinYear ? "conflict" : "matched" }]
+      : [];
   return {
     id: nb.bid_id ?? `upload:${nb.source_file ?? nb.supplier_name ?? "quote"}`,
     status: "PENDING",
@@ -231,6 +258,9 @@ export function normalizedBidToBidCard(nb: NormalizedBid, ctx: { duration: numbe
     priceUnit: nb.price_unit,
     duration: ctx.duration,
     numberOfUnits: ctx.units || 1,
+    unitsOffered: ctx.units || 1, // uploaded quotes cover the full quantity
+
+    reqMinYear,
     equipment: { id: null, make: null, model: nb.equipment_subtype, year: nb.equipment_year, imageUrl: null },
     eqVerified: false,
     compliance: { entityType: "individual", activityLicense: false, taxNumber: false, nationalAddress: false, safety: false, saso: false, localContent: false },
@@ -239,11 +269,13 @@ export function normalizedBidToBidCard(nb: NormalizedBid, ctx: { duration: numbe
     dealRoomId: null,
     expired: false,
     note: nb.notes ?? (nb.source_file ? `From uploaded file: ${nb.source_file}` : "From uploaded file"),
-    requiredCerts: [],
-    heldCertCodes: nb.certificates as unknown as CertCode[],
+    requiredCerts,
+    heldCertCodes: certCodes,
+    equipmentCertCodes: certCodes,
+    ownershipDocs: [],
     mobLeadTime: null,
     demobLeadTime: null,
-    terms: { equipment: [], contract: [], supplier: [] },
+    terms: { equipment: yearTerm, contract: [], supplier: [] },
     requestTerms: {
       operatorIncluded: null,
       operatorNationality: null,

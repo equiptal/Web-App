@@ -16,6 +16,7 @@ import {
   type OtherCertificate,
 } from "@/lib/contract";
 import { ItemRow } from "@/components/wizard/ItemRow";
+import { YearPicker } from "@/components/wizard/YearPicker";
 
 function toggle<T>(arr: T[], v: T): T[] {
   return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
@@ -28,7 +29,8 @@ type Group = "all" | "needs-ok" | "matched" | "not-available";
 
 function groupOf(i: EquipmentItem): Exclude<Group, "all"> {
   if (i.verdict === "no-match") return "not-available";
-  if (i.resolved) return "matched";
+  // A complete ref auto-counts as Matched (Need-OK is skipped once the match is fully classified).
+  if (i.resolved || isCompleteRef(i.ref)) return "matched";
   return "needs-ok";
 }
 
@@ -134,6 +136,19 @@ export function Step2Equipment() {
           </Field>
           <Field label={t.step1.requestWide.fuelResponsibility} agent={agentMatches(project.fuelResponsibility, ap?.fuelResponsibility)}>
             <RadioGroup<Party> name="fuelResp" value={project.fuelResponsibility} onChange={(v) => actions.patchRequestWide({ fuelResponsibility: v })} options={partyOpts} />
+          </Field>
+        </div>
+
+        {/* Equipment year (AC-28) — request-wide default, overridable per item on each card. */}
+        <div className="mt-4 sm:max-w-[260px]">
+          <Field label={t.step1.advanced.equipmentYear} optional agent={agentMatches(project.advanced.equipmentYear, ap?.advanced.equipmentYear)}>
+            <YearPicker
+              value={project.advanced.equipmentYear}
+              onChange={(v) => actions.patchAdvanced({ equipmentYear: v })}
+              anyLabel={t.options.equipmentYear.any}
+              customLabel={t.options.equipmentYear.custom}
+              customPlaceholder={t.options.equipmentYear.customPlaceholder}
+            />
           </Field>
         </div>
 

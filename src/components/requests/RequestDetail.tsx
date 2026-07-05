@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, Fragment, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
-import { fetchRequestDetail, cancelRequest, updateRequest } from "@/lib/api/client";
+import { fetchRequestDetail, cancelRequest, updateRequest, fetchRequestSubmissions, setBidDeadline } from "@/lib/api/client";
 import { publicTaxonomyUrl, type RequestItem, type RequestRecord } from "@/lib/contract/requests";
 import { RequestBids } from "@/components/requests/RequestBids";
 import { EquipImg } from "@/components/requests/EquipImg";
@@ -18,6 +18,55 @@ function fmtDate(v: string | null | undefined, ar: boolean): string {
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
+/**
+ * EVERY request-level field the backend stored — request details show all of them, but only the ones
+ * that actually have a value (nulls/empties are dropped). Enums are formatted bilingually; unknown enum
+ * values fall back to a prettified raw string. Shared by RequestDetail + RequestGroupDetail.
+ */
+export function requestDetailRows(r: RequestRecord, ar: boolean, L: (en: string, arr: string) => string): [string, ReactNode][] {
+  const yn = (b: boolean | null | undefined) => (b == null ? null : b ? L("Yes", "نعم") : L("No", "لا"));
+  const pretty = (v: string) => v.replace(/[_-]+/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  const enumL = (v: unknown, map: Record<string, [string, string]>) => {
+    if (v == null || v === "") return null;
+    const s = String(v);
+    const x = map[s.toUpperCase()] ?? map[s.toLowerCase()];
+    return x ? L(x[0], x[1]) : pretty(s);
+  };
+  const qty = (n: unknown, unit: [string, string]) => (n == null ? null : `${Number(n).toLocaleString(ar ? "ar-SA" : "en-US")} ${L(unit[0], unit[1])}`);
+  const rentalMap = { DAILY: ["Daily", "يومي"], WEEKLY: ["Weekly", "أسبوعي"], MONTHLY: ["Monthly", "شهري"], PER_JOB: ["Per job", "للمهمة"], LONG_TERM: ["Long term", "طويل الأمد"] } as Record<string, [string, string]>;
+  const urgencyMap = { ASAP: ["ASAP", "عاجل"], SOON: ["Soon", "قريبًا"], FAR_FUTURE: ["Future", "مستقبلًا"] } as Record<string, [string, string]>;
+  const payMap = { UPFRONT: ["Upfront", "مقدمًا"], DAILY: ["Daily", "يومي"], "NET-30": ["Net 30 days", "صافي ٣٠ يومًا"], "NET-60": ["Net 60 days", "صافي ٦٠ يومًا"], "END-OF-JOB": ["End of job", "نهاية المهمة"] } as Record<string, [string, string]>;
+  const slaMap = { FOUR_HR: ["4 hours", "٤ ساعات"], EIGHT_HR: ["8 hours", "٨ ساعات"], TWENTY_FOUR_HR: ["24 hours", "٢٤ ساعة"], FORTY_EIGHT_HR: ["48 hours", "٤٨ ساعة"], SEVENTY_TWO_HR: ["72 hours", "٧٢ ساعة"] } as Record<string, [string, string]>;
+  const maintMap = { SUPPLIER: ["Supplier", "المؤجّر"], RENTER: ["Renter", "المستأجر"], RENTEE: ["Renter", "المستأجر"] } as Record<string, [string, string]>;
+  const otMap = { "0": ["None", "بدون"], WITHOUT: ["None", "بدون"], "1.5X": ["1.5×", "1.5×"], "2X": ["2×", "2×"] } as Record<string, [string, string]>;
+  const rows: [string, ReactNode][] = [
+    [L("Rental basis", "أساس الإيجار"), enumL(r.rentalType, rentalMap)],
+    [L("Urgency", "الإلحاح"), enumL(r.urgency, urgencyMap)],
+    [L("Duration", "المدة"), qty(r.estimatedDurationDays, ["days", "يوم"])],
+    [L("Working hours", "ساعات العمل"), qty(r.workingHoursPerDay, ["hrs/day", "ساعة/يوم"])],
+    [L("Working days / week", "أيام العمل/أسبوع"), r.workingDaysPerWeek ?? null],
+    [L("Estimated job hours", "ساعات المهمة التقديرية"), qty(r.jobEstimatedHours, ["hrs", "ساعة"])],
+    [L("Overtime rate", "أجر العمل الإضافي"), enumL(r.overtimeRate, otMap)],
+    [L("Terrain", "التضاريس"), enumL(r.terrainType, {})],
+    [L("Fulfillment", "نوع التنفيذ"), enumL(r.fulfillmentType, {})],
+    [L("Payment terms", "شروط الدفع"), enumL(r.paymentTerms, payMap)],
+    [L("Payment method", "طريقة الدفع"), enumL(r.paymentMethod, {})],
+    [L("Breakdown response", "زمن الاستجابة للأعطال"), enumL(r.breakdownResponseSla, slaMap)],
+    [L("Maintenance", "الصيانة"), enumL(r.maintenanceResponsibility, maintMap)],
+    [L("Budget", "الميزانية"), r.budgetCeiling ? `${Number(r.budgetCeiling).toLocaleString(ar ? "ar-SA" : "en-US")} ${L("SAR", "ر.س")}` : null],
+    [L("Min. supplier rating", "أدنى تقييم للمؤجّر"), r.minimumSupplierRating ? `★ ${Number(r.minimumSupplierRating).toFixed(1)}` : null],
+    [L("Delivery lead time", "مهلة التسليم"), enumL(r.deliveryLeadTime, {})],
+    [L("Offer duration", "مدة العرض"), enumL(r.offerDuration, {})],
+    [L("Verified suppliers only", "مؤجّرون موثّقون فقط"), yn(r.verifiedSuppliersOnly)],
+    [L("On-site storage", "تخزين في الموقع"), yn(r.equipmentStorageOnSite)],
+    [L("Subletting allowed", "التأجير من الباطن"), yn(r.subletting)],
+    [L("Local content", "المحتوى المحلي"), yn(r.localContent)],
+    [L("Extendable", "قابل للتمديد"), yn(r.extendable)],
+    [L("Required certificates", "الشهادات المطلوبة"), r.requiredCerts && r.requiredCerts.length ? r.requiredCerts.join(", ") : null],
+  ];
+  return rows.filter(([, v]) => v != null && v !== "" && v !== "—");
+}
+
 export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: string) => void }) {
   const { locale } = useLocale();
   const ar = locale === "ar";
@@ -29,7 +78,29 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
   const [busy, setBusy] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
-
+  // The request id IS the share-link token; we fetch the renter name + bid deadline for the deadline row.
+  const [link, setLink] = useState<{ renterName: string | null; openedCount: number; submittedCount: number; bidDeadline: string | null } | null>(null);
+  useEffect(() => {
+    let active = true;
+    fetchRequestSubmissions(id).then((r) => active && setLink(r)).catch(() => {});
+    return () => { active = false; };
+  }, [id]);
+  // AC-06 — set / adjust / clear the bid-submission deadline from the request header.
+  const [dlEdit, setDlEdit] = useState(false);
+  const [dlInput, setDlInput] = useState("");
+  const toLocalInput = (iso: string | null) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const openDl = () => { setDlInput(toLocalInput(link?.bidDeadline ?? null)); setDlEdit(true); };
+  const saveDl = async (clear?: boolean) => {
+    const iso = clear || !dlInput ? null : new Date(dlInput).toISOString();
+    try { await setBidDeadline(id, iso); setLink((p) => (p ? { ...p, bidDeadline: iso } : p)); } catch { /* ignore */ }
+    setDlEdit(false);
+  };
   const reload = () => fetchRequestDetail(id).then(setR).catch(() => setError(true));
   useEffect(() => {
     let active = true;
@@ -63,6 +134,14 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
   useEffect(() => {
     if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("view") === "bids") setView("bids");
   }, []);
+  // Land on the bids cards, not the request header, when switching to the bids view (button or deep-link).
+  // Depends on `r` too so the deep-link case scrolls once the record (and the bids section) has mounted.
+  const bidsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (view !== "bids" || !r) return;
+    const t = setTimeout(() => bidsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+    return () => clearTimeout(t);
+  }, [view, r]);
 
   if (error) return <div className="rproto"><div className="rempty">{L("Couldn’t load this request.", "تعذّر تحميل هذا الطلب.")}</div></div>;
   if (!r) return <div className="rproto"><div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 28 }}>progress_activity</span></div></div>;
@@ -70,7 +149,6 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
   const item = r.equipmentItems?.[0];
   const period = r.startDate ? (r.endDate ? `${fmtDate(r.startDate, ar)} – ${fmtDate(r.endDate, ar)}` : fmtDate(r.startDate, ar)) : "—";
   const urgency = r.urgency === "ASAP" ? L("ASAP", "فوري") : r.urgency === "SOON" ? L("Soon", "قريباً") : L("Scheduled", "مجدول");
-
   return (
     <div className="rproto" dir={ar ? "rtl" : "ltr"}>
       {/* status */}
@@ -81,21 +159,55 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
         {(r.bidCount ?? 0) > 0 && <span className="stbadge st-active" style={{ marginInlineStart: "auto" }}><span className="material-icons-outlined" style={{ fontSize: 13 }}>gavel</span>{r.bidCount} {L("bids", "عروض")}</span>}
       </div>
 
-      {/* infostrip */}
+      {/* AC-06 — bid-submission deadline (set / adjust / clear) */}
+      {r.type === "BROADCAST" && (
+        <div className="rd-track" style={{ marginTop: 8 }}>
+          <span className="material-icons-outlined">schedule</span>
+          <span className="rt-lbl">{L("Bid deadline", "الموعد النهائي")}</span>
+          {!dlEdit ? (
+            <>
+              <span className="rt-stat sub">
+                {link?.bidDeadline
+                  ? new Date(link.bidDeadline).toLocaleString(ar ? "ar-SA" : "en-GB", { dateStyle: "medium", timeStyle: "short" })
+                  : L("No deadline", "بدون موعد")}
+              </span>
+              <button className="rt-copy" onClick={openDl}>
+                <span className="material-icons-outlined">edit</span>{link?.bidDeadline ? L("Adjust", "تعديل") : L("Set deadline", "تحديد موعد")}
+              </button>
+            </>
+          ) : (
+            <span style={{ display: "inline-flex", gap: 6, alignItems: "center", marginInlineStart: "auto", flexWrap: "wrap" }}>
+              <input type="datetime-local" value={dlInput} onChange={(e) => setDlInput(e.target.value)}
+                style={{ border: "1px solid var(--border)", borderRadius: 8, padding: "4px 8px", fontSize: 12.5 }} />
+              <button className="rt-copy" onClick={() => saveDl(false)}><span className="material-icons-outlined">check</span>{L("Save", "حفظ")}</button>
+              {link?.bidDeadline && <button className="rt-copy" onClick={() => saveDl(true)}>{L("Clear", "مسح")}</button>}
+              <button className="rt-copy" onClick={() => setDlEdit(false)}>{L("Cancel", "إلغاء")}</button>
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* infostrip — only fields that actually have a value */}
       <div className="infostrip">
-        <div className="ic"><div className="lab">{L("Location", "الموقع")}</div><div className="val">{r.projectAddressLabel ?? "—"}</div></div>
-        <div className="ic"><div className="lab">{L("Period", "الفترة")}</div><div className="val">{period}</div></div>
-        <div className="ic"><div className="lab">{L("Duration", "المدة")}</div><div className="val mono">{r.estimatedDurationDays ? `${r.estimatedDurationDays} ${L("days", "يوم")}` : "—"}</div></div>
-        <div className="ic"><div className="lab">{L("Urgency", "الإلحاح")}</div><div className="val">{urgency}</div></div>
+        {([
+          [L("Location", "الموقع"), r.projectAddressLabel, false],
+          [L("Period", "الفترة"), r.startDate ? period : null, false],
+          [L("Duration", "المدة"), r.estimatedDurationDays ? `${r.estimatedDurationDays} ${L("days", "يوم")}` : null, true],
+          [L("Urgency", "الإلحاح"), urgency, false],
+        ] as [string, ReactNode, boolean][])
+          .filter(([, v]) => v != null && v !== "" && v !== "—")
+          .map(([lab, v, mono]) => (
+            <div className="ic" key={lab}><div className="lab">{lab}</div><div className={mono ? "val mono" : "val"}>{v}</div></div>
+          ))}
       </div>
 
       {view === "bids" ? (
-        <>
+        <div ref={bidsRef} style={{ scrollMarginTop: 74 }}>
           <button className="btn sm" style={{ marginBottom: 14 }} onClick={() => setView("details")}>
             <span className="material-icons-outlined rq-arrow" style={{ transform: ar ? "none" : "scaleX(-1)" }}>chevron_right</span> {L("Back to request", "العودة للطلب")}
           </button>
           <RequestBids requestId={r.id} />
-        </>
+        </div>
       ) : (
         <>
           {/* equipment */}
@@ -116,20 +228,21 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
             </div>
           </div>
 
-          {/* preferences */}
-          <div className="dsec">
-            <div className="dsec-h"><span className="material-icons-outlined">tune</span>{L("Preferences", "التفضيلات")}</div>
-            <div className="dcard">
-              <div className="kv">
-                <span className="k">{L("Rental basis", "أساس الإيجار")}</span><span className="v">{r.rentalType ?? "—"}</span>
-                <span className="k">{L("Payment terms", "شروط الدفع")}</span><span className="v">{r.paymentTerms ?? "—"}</span>
-                <span className="k">{L("Payment method", "طريقة الدفع")}</span><span className="v">{r.paymentMethod ?? "—"}</span>
-                <span className="k">{L("Working hours", "ساعات العمل")}</span><span className="v">{r.workingHoursPerDay ? `${r.workingHoursPerDay} ${L("hrs/day", "ساعة/يوم")}` : "—"}</span>
-                <span className="k">{L("Maintenance", "الصيانة")}</span><span className="v">{r.maintenanceResponsibility ?? "—"}</span>
-                <span className="k">{L("Budget", "الميزانية")}</span><span className="v">{r.budgetCeiling ? `${Number(r.budgetCeiling).toLocaleString(ar ? "ar-SA" : "en-US")} ${L("SAR", "ر.س")}` : "—"}</span>
+          {/* request details — every stored field that has a value (the whole section hides if none) */}
+          {(() => {
+            const prefs = requestDetailRows(r, ar, L);
+            if (!prefs.length) return null;
+            return (
+              <div className="dsec">
+                <div className="dsec-h"><span className="material-icons-outlined">tune</span>{L("Request details", "تفاصيل الطلب")}</div>
+                <div className="dcard">
+                  <div className="kv">
+                    {prefs.map(([k, v]) => <Fragment key={k}><span className="k">{k}</span><span className="v">{v}</span></Fragment>)}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            );
+          })()}
 
           {/* notes */}
           {r.additionalNotes && (

@@ -4,11 +4,11 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { GroupStrip } from "@/components/requests/RequestsList";
-import { fetchRequestGroup, fetchBids, fetchRequestDetail } from "@/lib/api/client";
+import { fetchRequestGroup, fetchBids, fetchRequestDetail, fetchMyRequests } from "@/lib/api/client";
 import { groupRequests, mapRequestListItem, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
 import type { BidCard } from "@/lib/contract/bids";
 import { EquipImg, equipmentIcon } from "@/components/requests/EquipImg";
-import { groupIdFromFileName, itemCodesFromFileName } from "@/lib/compare/quotation-token";
+import { groupIdFromFileName, itemCodesFromFileName, primaryCodeFromFileName } from "@/lib/compare/quotation-token";
 import "@/components/requests/requests-proto.css";
 import "@/components/compare/compare-proto.css";
 
@@ -79,13 +79,24 @@ export function CompareBids() {
     (async () => {
       for (const e of pending) {
         try {
-          const { requests } = await fetchRequestGroup(e.code);
-          let items: RequestListItem[] = requests;
-          // Historical/solo requests have a null requestGroupId, so the stamped code is the request
-          // id (not a group id) and the groupId filter returns nothing — fall back to that one request.
-          if (!items.length) {
-            const rec = await fetchRequestDetail(e.code).catch(() => null);
-            if (rec) items = [mapRequestListItem(rec)];
+          let items: RequestListItem[] = [];
+          if (/^(RFQ|REQ)-\d+$/i.test(e.code)) {
+            // New quotation filenames carry a HUMAN short code (RFQ-NNNNN group / REQ-NNNNN single) with
+            // no UUID — resolve it against the renter's own requests (groupRef / displayId).
+            const code = e.code.toUpperCase();
+            const all = await fetchMyRequests().then((r) => r.requests).catch(() => [] as RequestListItem[]);
+            items = /^RFQ-/i.test(e.code)
+              ? all.filter((it) => (it.groupRef ?? "").toUpperCase() === code)
+              : all.filter((it) => it.displayId.toUpperCase() === code);
+          } else {
+            const { requests } = await fetchRequestGroup(e.code);
+            items = requests;
+            // Historical/solo requests have a null requestGroupId, so the stamped code is the request
+            // id (not a group id) and the groupId filter returns nothing — fall back to that one request.
+            if (!items.length) {
+              const rec = await fetchRequestDetail(e.code).catch(() => null);
+              if (rec) items = [mapRequestListItem(rec)];
+            }
           }
           if (!items.length) { if (active) setLoaded((p) => ({ ...p, [e.code]: "error" })); continue; }
           // Scope to ONLY the equipment the uploaded quotation covered (stamped in its filename).
@@ -119,7 +130,8 @@ export function CompareBids() {
     if (!files?.length) return;
     let added = false;
     for (const f of Array.from(files)) {
-      const gid = groupIdFromFileName(f.name);
+      // Legacy files embed the group UUID; new files are named with the human RFQ-/REQ- short code.
+      const gid = groupIdFromFileName(f.name) ?? primaryCodeFromFileName(f.name);
       if (gid) { addCode(gid, f.name); added = true; }
     }
     if (!added) setError(L("That file isn’t a Moedatech quotation — use the file you downloaded, or paste its comparison code.", "هذا الملف ليس عرض سعر من معداتك — استخدم الملف الذي نزّلته أو الصق رمز المقارنة."));

@@ -9,17 +9,26 @@ import { withAuthedBackend, appAuthErrorResponse } from "@/lib/api/app-backend-a
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  let contractType = "platform";
+  let contractType = "formal"; // app-parity default (was "platform")
+  let agreedUnits: number | undefined;
+  let termResolutions: { termKey: string; action: string; value?: unknown }[] | undefined;
   try {
-    const b = (await req.json()) as { contractType?: string };
+    const b = (await req.json()) as { contractType?: string; agreedUnits?: number; termResolutions?: typeof termResolutions };
     if (b?.contractType) contractType = b.contractType;
+    // Multi-supplier assembly (app parity): only assembled deals send agreedUnits — the web has none.
+    if (typeof b?.agreedUnits === "number" && b.agreedUnits > 0) agreedUnits = b.agreedUnits;
+    // Locally-collected term resolutions submitted with the accept (app parity: accept-all-terms batches them).
+    if (Array.isArray(b?.termResolutions) && b.termResolutions.length) termResolutions = b.termResolutions;
   } catch {
     /* default */
   }
   const base = `/api/deal-rooms/${encodeURIComponent(id)}`;
+  const body: Record<string, unknown> = { contractType };
+  if (agreedUnits != null) body.agreedUnits = agreedUnits;
+  if (termResolutions) body.termResolutions = termResolutions;
   return withAuthedBackend(req, async (call) => {
     try {
-      const raw = await call(`${base}/accept-all-terms`, { method: "POST", body: JSON.stringify({ contractType }) });
+      const raw = await call(`${base}/accept-all-terms`, { method: "POST", body: JSON.stringify(body) });
       return NextResponse.json(raw ?? { ok: true });
     } catch (err) {
       // Idempotency: accept-all-terms requires NEGOTIATING. If the rentee already accepted (a prior

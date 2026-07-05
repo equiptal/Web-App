@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/session";
 import { PhoneEntry } from "@/components/auth/PhoneEntry";
 import { CodeEntry } from "@/components/auth/CodeEntry";
+import type { OtpChannel } from "@/components/auth/authClient";
 import type { RenterUser } from "@/lib/contract/auth";
 
 /**
@@ -15,8 +16,9 @@ export function LoginFlow({ next }: { next: string }) {
   const router = useRouter();
   const { signIn } = useSession();
   const [phone, setPhone] = useState<string | null>(null);
+  const [channel, setChannel] = useState<OtpChannel>({ method: "SMS" });
 
-  const onCodeSent = (p: string) => setPhone(p); // AC-02: advance to code entry
+  const onCodeSent = (p: string, ch: OtpChannel) => { setPhone(p); setChannel(ch); }; // AC-02: advance to code entry
   const onEditNumber = () => setPhone(null); // AC-13: back to phone entry
 
   const onVerified = (user: RenterUser) => {
@@ -35,7 +37,7 @@ export function LoginFlow({ next }: { next: string }) {
       {phone === null ? (
         <PhoneEntry onCodeSent={onCodeSent} />
       ) : (
-        <CodeEntry phone={phone} onVerified={onVerified} onEditNumber={onEditNumber} />
+        <CodeEntry phone={phone} channel={channel} onVerified={onVerified} onEditNumber={onEditNumber} />
       )}
     </div>
   );

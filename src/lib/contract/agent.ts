@@ -20,6 +20,11 @@ export interface RFQLineItem {
   category: string;
   subtype: string;
   capacity: string;
+  // Arabic canonical match names (Mansour) — DISPLAY ONLY for "MATCHED TO"; the English category/
+  // subtype/capacity above stay the source for taxonomy IDs + the submit payload.
+  category_ar?: string | null;
+  subtype_ar?: string | null;
+  capacity_ar?: string | null;
   capacity_input_value?: string | null; // verbatim size phrase the renter stated (e.g. "30 ton")
   quantity: number | null;
   operator_included: boolean | null;
@@ -27,6 +32,9 @@ export interface RFQLineItem {
   mobilization_by_rentee: boolean | null;
   demobilization_by_rentee: boolean | null;
   max_equipment_age?: number | null;
+  /** Minimum manufacture year the RFQ asked for (Mansour mirrors max_equipment_age → this to match the
+   *  app's renamed column). A 4-digit year, e.g. 2020. Null when the RFQ stated no year. */
+  minimum_equipment_year?: number | null;
   night_shift_required?: boolean | null;
   number_of_operators?: number | null;
   operator_nationality?: string | null;

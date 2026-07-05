@@ -1,0 +1,424 @@
+<title>Combined auth + register — prototype</title>
+<style>
+  :root{
+    --navy:#1c3550; --navy-deep:#12263a; --navy-mid:#2a4f72;
+    --brand:#f79009; --brand-fg:#fff; --brand-soft:#fef0dc;
+    --muted:#6b8fa8; --surface:#fff; --surface2:#eff4f9; --surface3:#e4edf5;
+    --border:#d4e0ec; --ok:#12a150; --ok-soft:#e7f6ee; --danger:#d92d20; --info:#2563eb;
+    --r-md:10px; --r-lg:16px; --r-full:999px;
+    --shadow:0 24px 60px -18px rgba(18,38,58,.45);
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--font);color:var(--navy);background:var(--surface2);
+    -webkit-font-smoothing:antialiased;line-height:1.5}
+  [dir=rtl]{font-family:var(--font)}
+
+  /* ---- faux app background (the public, signed-out marketplace behind the gate) ---- */
+  .stage{position:relative;min-height:100vh;overflow:hidden}
+  .bg{position:absolute;inset:0;padding:20px 24px;filter:saturate(.9);pointer-events:none;user-select:none}
+  .bg .topbar{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surface);
+    border:1px solid var(--border);border-radius:var(--r-md);box-shadow:0 1px 0 rgba(18,38,58,.03)}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--brand);flex:0 0 auto}
+  .brand{font-weight:800;letter-spacing:-.3px;color:var(--navy)}
+  .pill{margin-inline-start:auto;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;
+    color:var(--muted);background:var(--surface2);border:1px solid var(--border);padding:6px 12px;border-radius:var(--r-full)}
+  .signin{font-size:12.5px;font-weight:800;color:var(--navy);background:var(--surface);border:1px solid var(--border);
+    padding:8px 14px;border-radius:var(--r-full)}
+  .bg .grid{margin-top:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);height:150px;padding:14px;opacity:.85}
+  .card .ph{height:78px;border-radius:8px;background:linear-gradient(120deg,var(--surface3),var(--surface2))}
+  .card .l1{height:11px;width:70%;border-radius:6px;background:var(--surface3);margin-top:12px}
+  .card .l2{height:9px;width:45%;border-radius:6px;background:var(--surface2);margin-top:8px}
+  .scrim{position:absolute;inset:0;background:rgba(18,38,58,.5);backdrop-filter:blur(3px)}
+
+  /* ---- launcher (proves the gate fires at Submit, not before) ---- */
+  .launch{position:relative;z-index:2;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px}
+  .launch-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+    max-width:440px;padding:26px;box-shadow:var(--shadow);text-align:center}
+  .launch-card .k{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .launch-card h1{font-size:21px;margin:.5rem 0 .35rem;letter-spacing:-.4px}
+  .launch-card p{font-size:13.5px;color:var(--muted);margin:0 0 18px}
+
+  /* ---- shared controls ---- */
+  .btn{border:1px solid var(--brand);background:var(--brand);color:var(--brand-fg);font:inherit;font-weight:800;
+    font-size:14.5px;border-radius:var(--r-md);padding:13px 22px;cursor:pointer;display:inline-flex;align-items:center;
+    justify-content:center;gap:8px;transition:filter .12s, opacity .12s;width:100%}
+  .btn:hover{filter:brightness(1.05)} .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn.ghost{background:var(--surface);color:var(--navy);border-color:var(--border)}
+  .btn:focus-visible, input:focus-visible, select:focus-visible, .seg button:focus-visible{outline:2px solid var(--info);outline-offset:2px}
+  label.f{display:block;font-size:12.5px;font-weight:800;color:var(--navy-mid);margin:0 0 6px}
+  .opt{font-size:11px;font-weight:600;color:var(--muted)}
+  .req{color:var(--danger);font-weight:900}
+  .inp{height:46px;width:100%;border:1px solid var(--border);background:var(--surface);border-radius:var(--r-md);
+    padding:0 14px;font:inherit;font-size:14px;color:var(--navy);outline:0}
+  .inp:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(247,144,9,.14)}
+  .inp[readonly]{background:var(--surface2);color:var(--muted)}
+  .err{color:var(--danger);font-size:12px;font-weight:600;margin:5px 0 0}
+
+  /* ---- modal ---- */
+  .overlay{position:fixed;inset:0;z-index:20;display:none;align-items:flex-start;justify-content:center;
+    padding:20px;background:rgba(18,38,58,.5);overflow-y:auto}
+  .overlay.show{display:flex}
+  @media(min-width:640px){.overlay{align-items:center}}
+  .modal{width:100%;max-width:480px;background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--r-lg);box-shadow:var(--shadow);overflow:hidden;animation:rise .22s ease}
+  @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @media(prefers-reduced-motion:reduce){.modal{animation:none}}
+
+  .mhead{display:flex;align-items:flex-start;gap:12px;padding:20px 22px;border-bottom:1px solid var(--border)}
+  .mhead .ic{width:40px;height:40px;flex:0 0 auto;border-radius:var(--r-md);background:var(--brand-soft);
+    color:var(--brand);display:grid;place-items:center;font-size:20px}
+  .mhead h2{font-size:18.5px;margin:0;letter-spacing:-.3px}
+  .mhead p{font-size:13px;color:var(--muted);margin:3px 0 0}
+  .mclose{margin-inline-start:auto;border:0;background:transparent;color:var(--muted);cursor:pointer;
+    font-size:20px;line-height:1;padding:4px}
+
+  /* progress rail — 3 real steps, so numbering encodes true sequence */
+  .rail{display:flex;align-items:center;gap:0;padding:14px 22px 2px}
+  .rail .st{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:800;color:var(--muted)}
+  .rail .st .n{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px;
+    background:var(--surface2);color:var(--muted);border:1.5px solid var(--border)}
+  .rail .st.on .n{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .rail .st.done .n{background:var(--ok);color:#fff;border-color:var(--ok)}
+  .rail .st.on{color:var(--navy)}
+  .rail .bar{flex:1;height:2px;background:var(--border);margin:0 8px;border-radius:2px}
+  .rail .bar.fill{background:var(--ok)}
+
+  .body{padding:20px 22px}
+  .foot{padding:16px 22px 22px}
+  .step{display:none} .step.on{display:block}
+
+  /* phone + country */
+  .phrow{display:flex;gap:10px;direction:ltr}
+  .cc{height:46px;display:flex;align-items:center;gap:6px;padding:0 14px;border:1px solid var(--border);
+    border-radius:var(--r-md);background:var(--surface);font-weight:800;font-size:14px;white-space:nowrap}
+  /* OTP-method segmented control */
+  .seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--surface2);border:1px solid var(--border);
+    border-radius:var(--r-md);padding:4px;margin-bottom:16px}
+  .seg button{border:0;background:transparent;font:inherit;font-weight:800;font-size:13px;color:var(--navy-mid);
+    padding:9px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+  .seg button.on{background:var(--surface);color:var(--navy);box-shadow:0 1px 2px rgba(18,38,58,.12)}
+  .seg button:disabled{color:var(--muted);cursor:not-allowed}
+  .soon{font-size:9.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;background:var(--surface3);
+    color:var(--muted);padding:2px 6px;border-radius:var(--r-full)}
+
+  /* OTP boxes */
+  .otp{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;direction:ltr}
+  .otp input{height:60px;text-align:center;font-size:24px;font-weight:800;border:1.5px solid var(--border);
+    border-radius:var(--r-md);background:var(--surface);color:var(--navy);outline:0;font-variant-numeric:tabular-nums}
+  .otp input:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(247,144,9,.14)}
+  .otp input.filled{border-color:var(--brand);background:var(--brand-soft)}
+  .link{background:0;border:0;color:var(--info);font:inherit;font-weight:800;font-size:13px;cursor:pointer;padding:0}
+  .back{background:0;border:0;color:var(--muted);font:inherit;font-weight:800;font-size:13px;cursor:pointer;
+    display:inline-flex;align-items:center;gap:4px;margin-bottom:14px;padding:0}
+  .center{text-align:center;margin-top:18px;font-size:13px;color:var(--muted)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .fields{display:flex;flex-direction:column;gap:14px}
+  .verified{color:var(--ok);font-weight:800;font-size:11px}
+
+  /* language toggle chip */
+  .lang{position:fixed;top:16px;inset-inline-end:16px;z-index:30;display:flex;gap:4px;background:var(--surface);
+    border:1px solid var(--border);border-radius:var(--r-full);padding:4px;box-shadow:0 2px 8px rgba(18,38,58,.1)}
+  .lang button{border:0;background:transparent;font:inherit;font-weight:800;font-size:12px;color:var(--muted);
+    padding:6px 12px;border-radius:var(--r-full);cursor:pointer}
+  .lang button.on{background:var(--navy);color:#fff}
+  .note{margin-top:14px;font-size:12px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);
+    border-radius:var(--r-md);padding:10px 12px;display:flex;gap:8px}
+</style>
+
+<div class="lang" role="group" aria-label="Language">
+  <button id="en" class="on" onclick="setLang('en')">EN</button>
+  <button id="ar" onclick="setLang('ar')">ع</button>
+</div>
+
+<div class="stage" id="stage" dir="ltr">
+  <!-- Public, signed-out marketplace behind the gate (blurred while the modal is open) -->
+  <div class="bg" id="bg" aria-hidden="true">
+    <div class="topbar">
+      <span class="dot"></span><span class="brand">Moedatech</span>
+      <span class="pill">● <span data-t="guestPill">Browsing as guest</span></span>
+      <span class="signin" data-t="signin">Sign in</span>
+    </div>
+    <div class="grid">
+      <div class="card"><div class="ph"></div><div class="l1"></div><div class="l2"></div></div>
+      <div class="card"><div class="ph"></div><div class="l1"></div><div class="l2"></div></div>
+      <div class="card"><div class="ph"></div><div class="l1"></div><div class="l2"></div></div>
+      <div class="card"><div class="ph"></div><div class="l1"></div><div class="l2"></div></div>
+      <div class="card"><div class="ph"></div><div class="l1"></div><div class="l2"></div></div>
+      <div class="card"><div class="ph"></div><div class="l1"></div><div class="l2"></div></div>
+    </div>
+    <div class="scrim" id="scrim" style="display:none"></div>
+  </div>
+
+  <!-- Launcher: everything above is public; the gate only fires here, at request submit -->
+  <div class="launch">
+    <div class="launch-card">
+      <div class="k" data-t="ctx">Step 4 · Review &amp; submit</div>
+      <h1 data-t="ctxTitle">Your request is ready</h1>
+      <p data-t="ctxBody">Browsing is open to everyone. You only need an account the moment you send a request — and it takes one step.</p>
+      <button class="btn" onclick="open_()"><span data-t="send">Send request</span> →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= COMBINED GATE MODAL ================= -->
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="mtitle">
+  <div class="modal" dir="ltr" id="modal">
+    <div class="mhead">
+      <span class="ic" id="hic">👤</span>
+      <div>
+        <h2 id="mtitle" data-t="h_phone">Create your account to send</h2>
+        <p id="msub" data-t="s_phone">Verify your number, then add a few details — your request posts right away.</p>
+      </div>
+      <button class="mclose" aria-label="Close" onclick="close_()">✕</button>
+    </div>
+
+    <div class="rail" aria-hidden="true">
+      <div class="st on" id="r1"><span class="n">1</span><span data-t="rl_verify">Verify</span></div>
+      <div class="bar" id="b1"></div>
+      <div class="st" id="r2"><span class="n">2</span><span data-t="rl_code">Code</span></div>
+      <div class="bar" id="b2"></div>
+      <div class="st" id="r3"><span class="n">3</span><span data-t="rl_details">Details</span></div>
+    </div>
+
+    <!-- STEP 1 · phone + OTP method -->
+    <form class="step on" id="s1" onsubmit="toCode(event)">
+      <div class="body">
+        <div class="seg" role="group" aria-label="OTP method">
+          <button type="button" class="on" id="mSms" onclick="setMethod('sms')">📱 <span data-t="viaSms">Text (SMS)</span></button>
+          <button type="button" id="mEmail" onclick="setMethod('email')">✉️ <span data-t="viaEmail">Email</span></button>
+        </div>
+        <!-- Phone is always the account identity -->
+        <div id="grpPhone">
+          <label class="f" data-t="phoneLabel">Mobile number</label>
+          <div class="phrow">
+            <span class="cc">🇸🇦 +966</span>
+            <input class="inp" id="phone" type="tel" inputmode="numeric" maxlength="9" placeholder="5X XXX XXXX" autocomplete="tel-national">
+          </div>
+          <p class="err" id="phoneErr" style="display:none" data-t="errPhone">Enter a valid Saudi mobile number.</p>
+        </div>
+        <!-- Email = where the code is sent (only when Email chosen). Not a separate account. -->
+        <div id="grpEmail" style="display:none;margin-top:14px">
+          <label class="f" data-t="emailLabel">Send the code to</label>
+          <input class="inp" id="emailId" type="email" dir="ltr" placeholder="you@company.com">
+          <p class="err" id="emailIdErr" style="display:none" data-t="errEmailId">Enter a valid email address.</p>
+        </div>
+        <div class="note">🔒 <span data-t="phoneNote">Your mobile is your account. The 4-digit code goes to whichever channel you pick.</span></div>
+      </div>
+      <div class="foot"><button class="btn" type="submit"><span data-t="sendCode">Send code</span> →</button></div>
+    </form>
+
+    <!-- STEP 2 · OTP -->
+    <form class="step" id="s2" onsubmit="toDetails(event)">
+      <div class="body">
+        <button class="back" type="button" onclick="toPhone()">← <span data-t="edit">Edit number</span></button>
+        <p style="font-size:13.5px;color:var(--muted);margin:0 0 16px">
+          <span data-t="sentTo">Code sent to</span> <b class="destdisp" style="color:var(--navy)">+966 5X XXX XXXX</b>
+        </p>
+        <div class="otp" id="otp">
+          <input inputmode="numeric" maxlength="1" aria-label="Digit 1">
+          <input inputmode="numeric" maxlength="1" aria-label="Digit 2">
+          <input inputmode="numeric" maxlength="1" aria-label="Digit 3">
+          <input inputmode="numeric" maxlength="1" aria-label="Digit 4">
+        </div>
+        <p class="center" style="margin-top:16px"><button class="link" type="button" data-t="resend">Resend code</button></p>
+      </div>
+      <div class="foot"><button class="btn" type="submit">✓ <span data-t="verify">Verify</span></button></div>
+    </form>
+
+    <!-- STEP 3 · profile (email REQUIRED) -->
+    <form class="step" id="s3" onsubmit="finish(event)">
+      <div class="body">
+        <div class="fields">
+          <div class="two">
+            <div><label class="f" data-t="first">First name <span class="req">*</span></label><input class="inp" id="fn"></div>
+            <div><label class="f" data-t="last">Last name <span class="req">*</span></label><input class="inp" id="ln"></div>
+          </div>
+          <div>
+            <label class="f" data-t="phoneV">Mobile <span class="verified">✓ <span data-t="verifiedTxt">verified</span></span></label>
+            <input class="inp phonedisp" readonly dir="ltr" value="+966 5X XXX XXXX">
+          </div>
+          <div>
+            <label class="f">
+              <span data-t="email">Email</span> <span class="req">*</span>
+            </label>
+            <input class="inp" id="email" type="email" dir="ltr" placeholder="you@company.com">
+            <p class="err" id="emailErr" style="display:none" data-t="errEmail">A valid email is required.</p>
+          </div>
+          <div class="two">
+            <div>
+              <label class="f" data-t="city">City <span class="req">*</span></label>
+              <select class="inp" id="city">
+                <option value="" data-t="selCity">Select city</option>
+                <option>Riyadh</option><option>Jeddah</option><option>Dammam</option><option>Khobar</option><option>Makkah</option>
+              </select>
+            </div>
+            <div>
+              <label class="f" data-t="job">Job title <span class="req">*</span></label>
+              <select class="inp" id="job">
+                <option value="" data-t="selJob">Select role</option>
+                <option>Company Owner</option><option>Project Manager</option><option>Procurement</option><option>Site Engineer</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="f"><span data-t="company">Company name</span> <span class="opt">— <span data-t="optional">optional</span></span></label>
+            <input class="inp" id="co" placeholder="—">
+          </div>
+        </div>
+      </div>
+      <div class="foot"><button class="btn" type="submit"><span data-t="createPost">Create account &amp; post</span> →</button></div>
+    </form>
+
+    <!-- DONE -->
+    <div class="step" id="s4">
+      <div class="body" style="text-align:center;padding:34px 22px 30px">
+        <div style="width:56px;height:56px;border-radius:50%;background:var(--ok-soft);color:var(--ok);display:grid;
+          place-items:center;font-size:28px;margin:0 auto 14px">✓</div>
+        <h2 style="font-size:19px;margin:0 0 6px" data-t="doneTitle">Account created — request sent</h2>
+        <p style="font-size:13.5px;color:var(--muted);margin:0" data-t="doneBody">You're signed in for 30 days. Suppliers can now bid on your request.</p>
+      </div>
+      <div class="foot"><button class="btn ghost" onclick="reset_()" data-t="again">Run it again</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const T = {
+    en:{ guestPill:"Browsing as guest", signin:"Sign in", ctx:"Step 4 · Review & submit",
+      ctxTitle:"Your request is ready",
+      ctxBody:"Browsing is open to everyone. You only need an account the moment you send a request — and it takes one step.",
+      send:"Send request", h_phone:"Create your account to send",
+      s_phone:"Verify your number, then add a few details — your request posts right away.",
+      h_code:"Enter the code", s_code:"We sent a 4-digit code to your phone.",
+      h_details:"A few details", s_details:"This is all we need — your request posts as soon as you save.",
+      rl_verify:"Verify", rl_code:"Code", rl_details:"Details",
+      viaSms:"Text (SMS)", viaEmail:"Email", soon:"Soon", phoneLabel:"Mobile number",
+      emailLabel:"Send the code to", errEmailId:"Enter a valid email address.",
+      errPhone:"Enter a valid Saudi mobile number.",
+      phoneNote:"One account, used across web and the mobile app. We'll send a 4-digit code to the channel you pick.",
+      sendCode:"Send code", edit:"Edit number", sentTo:"Code sent to", resend:"Resend code", verify:"Verify",
+      first:"First name", last:"Last name", phoneV:"Mobile", verifiedTxt:"verified", email:"Email",
+      errEmail:"A valid email is required.", city:"City", selCity:"Select city", job:"Job title",
+      selJob:"Select role", company:"Company name", optional:"optional", createPost:"Create account & post",
+      doneTitle:"Account created — request sent",
+      doneBody:"You're signed in for 30 days. Suppliers can now bid on your request.", again:"Run it again" },
+    ar:{ guestPill:"تتصفح كزائر", signin:"تسجيل الدخول", ctx:"الخطوة ٤ · المراجعة والإرسال",
+      ctxTitle:"طلبك جاهز",
+      ctxBody:"التصفّح متاح للجميع. تحتاج حسابًا فقط عند إرسال الطلب — وبخطوة واحدة.",
+      send:"إرسال الطلب", h_phone:"أنشئ حسابك للإرسال",
+      s_phone:"وثّق رقمك ثم أضف بعض التفاصيل — يُنشر طلبك فورًا.",
+      h_code:"أدخل الرمز", s_code:"أرسلنا رمزًا من ٤ أرقام إلى هاتفك.",
+      h_details:"بعض التفاصيل", s_details:"هذا كل ما نحتاجه — يُنشر طلبك بمجرد الحفظ.",
+      rl_verify:"توثيق", rl_code:"الرمز", rl_details:"التفاصيل",
+      viaSms:"رسالة نصية", viaEmail:"بريد", soon:"قريبًا", phoneLabel:"رقم الجوال",
+      emailLabel:"إرسال الرمز إلى", errEmailId:"أدخل بريدًا إلكترونيًا صحيحًا.",
+      errPhone:"أدخل رقم جوال سعودي صحيح.",
+      phoneNote:"حساب واحد يُستخدم على الويب والتطبيق. سنرسل رمزًا من ٤ أرقام إلى القناة التي تختارها.",
+      sendCode:"إرسال الرمز", edit:"تعديل الرقم", sentTo:"أُرسل الرمز إلى", resend:"إعادة الإرسال", verify:"تحقّق",
+      first:"الاسم الأول", last:"اسم العائلة", phoneV:"الجوال", verifiedTxt:"موثّق", email:"البريد الإلكتروني",
+      errEmail:"البريد الإلكتروني مطلوب وصحيح.", city:"المدينة", selCity:"اختر المدينة", job:"المسمى الوظيفي",
+      selJob:"اختر الدور", company:"اسم الشركة", optional:"اختياري", createPost:"إنشاء الحساب والنشر",
+      doneTitle:"تم إنشاء الحساب — أُرسل الطلب",
+      doneBody:"أنت مسجّل الدخول لمدة ٣٠ يومًا. يمكن للموردين تقديم عروضهم الآن.", again:"جرّب مرة أخرى" },
+  };
+  let lang="en";
+  function setLang(l){
+    lang=l;
+    document.getElementById("en").classList.toggle("on",l==="en");
+    document.getElementById("ar").classList.toggle("on",l==="ar");
+    const rtl=l==="ar";
+    ["stage","modal"].forEach(id=>document.getElementById(id).dir=rtl?"rtl":"ltr");
+    document.querySelectorAll("[data-t]").forEach(el=>{const k=el.getAttribute("data-t"); if(T[l][k]!=null) el.textContent=T[l][k];});
+    syncHead();
+  }
+
+  const overlay=document.getElementById("overlay");
+  const steps={1:"s1",2:"s2",3:"s3",4:"s4"};
+  const heads={1:["h_phone","s_phone","👤"],2:["h_code","s_code","💬"],3:["h_details","s_details","📝"],4:["","",""]};
+  let cur=1;
+  function show(n){
+    cur=n;
+    Object.values(steps).forEach(id=>document.getElementById(id).classList.remove("on"));
+    document.getElementById(steps[n]).classList.add("on");
+    // rail
+    setSt("r1","b1",n>1?"done":(n===1?"on":""));
+    setSt("r2",null,n===2?"on":(n>2?"done":""));
+    setSt("r3",null,n>=3?"on":"");
+    document.getElementById("b1").classList.toggle("fill",n>1);
+    document.getElementById("b2").classList.toggle("fill",n>2);
+    document.querySelector(".rail").style.display = n===4?"none":"flex";
+    syncHead();
+  }
+  function setSt(rid,_,cls){const e=document.getElementById(rid);e.className="st"+(cls?" "+cls:"");}
+  function syncHead(){
+    const [h,s,ic]=heads[cur];
+    if(h){document.getElementById("mtitle").textContent=T[lang][h];document.getElementById("msub").textContent=T[lang][s];
+      document.getElementById("hic").textContent=ic;document.getElementById("mtitle").parentElement.style.display="";
+      document.getElementById("hic").style.display="";}
+    else{document.getElementById("mtitle").parentElement.style.display="none";document.getElementById("hic").style.display="none";}
+  }
+
+  function open_(){overlay.classList.add("show");document.getElementById("scrim").style.display="block";show(1);
+    setTimeout(()=>document.getElementById("phone").focus(),60);}
+  function close_(){overlay.classList.remove("show");document.getElementById("scrim").style.display="none";}
+  function reset_(){document.getElementById("phone").value="";document.getElementById("email").value="";
+    document.querySelectorAll("#otp input").forEach(i=>{i.value="";i.classList.remove("filled")});
+    ["fn","ln","co"].forEach(id=>document.getElementById(id).value="");
+    document.getElementById("city").value="";document.getElementById("job").value="";close_();}
+
+  let method="sms";
+  function setMethod(m){
+    method=m;
+    document.getElementById("mSms").classList.toggle("on",m==="sms");
+    document.getElementById("mEmail").classList.toggle("on",m==="email");
+    // Phone is always shown (it's the account); Email just reveals the code destination.
+    document.getElementById("grpEmail").style.display=m==="email"?"":"none";
+    if(m==="email") setTimeout(()=>document.getElementById("emailId").focus(),40);
+  }
+  function toCode(e){
+    e.preventDefault();
+    // Phone is always required — it's the account identity.
+    const v=document.getElementById("phone").value.replace(/\D/g,"");
+    const okP=/^5\d{8}$/.test(v);
+    document.getElementById("phoneErr").style.display=okP?"none":"block";
+    if(!okP)return;
+    const phoneFmt="+966 "+v.slice(0,2)+" "+v.slice(2,5)+" "+v.slice(5);
+    let dest=phoneFmt; // where the code is delivered
+    if(method==="email"){
+      const em=document.getElementById("emailId").value.trim();
+      const okE=/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em);
+      document.getElementById("emailIdErr").style.display=okE?"none":"block";
+      if(!okE)return;
+      dest=em;                                   // code goes to the email
+      document.getElementById("email").value=em; // pre-fill the required profile email
+    }
+    // step 2 shows the delivery destination; step 3's Mobile field always shows the phone (the account)
+    document.querySelectorAll(".destdisp").forEach(el=>el.textContent=dest);
+    document.querySelectorAll(".phonedisp").forEach(el=>el.value=phoneFmt);
+    show(2);setTimeout(()=>document.querySelector("#otp input").focus(),60);
+  }
+  function toPhone(){show(1);}
+  function toDetails(e){e.preventDefault();show(3);setTimeout(()=>document.getElementById("fn").focus(),60);}
+  function finish(e){
+    e.preventDefault();
+    const email=document.getElementById("email").value.trim();
+    const ok=/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
+    document.getElementById("emailErr").style.display=ok?"none":"block";
+    const fn=document.getElementById("fn").value.trim(), ln=document.getElementById("ln").value.trim();
+    const city=document.getElementById("city").value, job=document.getElementById("job").value;
+    if(!ok||!fn||!ln||!city||!job) return; // email + core fields required
+    show(4);
+  }
+
+  // OTP box behaviour
+  const boxes=[...document.querySelectorAll("#otp input")];
+  boxes.forEach((b,i)=>{
+    b.addEventListener("input",()=>{b.value=b.value.replace(/\D/g,"").slice(-1);b.classList.toggle("filled",!!b.value);
+      if(b.value&&i<3)boxes[i+1].focus();});
+    b.addEventListener("keydown",e=>{if(e.key==="Backspace"&&!b.value&&i>0)boxes[i-1].focus();});
+  });
+  overlay.addEventListener("click",e=>{if(e.target===overlay)close_();});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape")close_();});
+</script>

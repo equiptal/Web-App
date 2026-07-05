@@ -52,7 +52,7 @@ describe("agentOutputToDraft — request-wide reconciliation (AC-25/26)", () => 
     expect(d.items.every((i) => i.deliveryOverride === null)).toBe(true); // overrides cleared
   });
 
-  it("reflects a common agent operator certificate at the project Safety level (AC-50)", () => {
+  it("keeps the operator certificate per-item (from the agent) and does NOT leak it to project safety", () => {
     const d = agentOutputToDraft(
       extractAgentOutput(
         jobPollItems([
@@ -61,20 +61,36 @@ describe("agentOutputToDraft — request-wide reconciliation (AC-25/26)", () => 
         ]),
       ),
     );
-    expect(d.project.certificates.safety).toEqual(["tuv"]); // checked at project level
+    // Operator cert stays per-item (the agent sets it from each line); no request-wide globalize.
     expect(d.items.every((i) => JSON.stringify(i.operator.certificate) === JSON.stringify(["tuv"]))).toBe(true);
+    expect(d.project.certificates.safety).toEqual([]); // operator cert is separate from EQUIPMENT safety
   });
 
-  it("lifts the common cert even when a no-operator item has none (AC-50)", () => {
+  it("globalizes a uniform EQUIPMENT safety cert to the request-wide default + clears per-item (AC-50)", () => {
     const d = agentOutputToDraft(
       extractAgentOutput(
         jobPollItems([
-          { ...confidentLine, operator_license_level: "TUV" },
-          { ...confidentLine, operator_included: false }, // e.g. a generator — no cert
+          { ...confidentLine, safety_certifications: "TUV" },
+          { ...confidentLine, safety_certifications: "TUV" },
         ]),
       ),
     );
-    expect(d.project.certificates.safety).toEqual(["tuv"]); // no-operator item doesn't block the lift
+    expect(d.project.certificates.safety).toEqual(["tuv"]); // uniform → globalized
+    expect(d.items.every((i) => i.safetyCertsOverride === null)).toBe(true); // per-item cleared → inherits
+  });
+
+  it("keeps EQUIPMENT safety certs per-item when items differ (AC-50)", () => {
+    const d = agentOutputToDraft(
+      extractAgentOutput(
+        jobPollItems([
+          { ...confidentLine, safety_certifications: "TUV" },
+          { ...confidentLine, safety_certifications: "SPSP" },
+        ]),
+      ),
+    );
+    expect(d.project.certificates.safety).toEqual([]); // differ → no request-wide default
+    expect(JSON.stringify(d.items[0].safetyCertsOverride)).toBe(JSON.stringify(["tuv"]));
+    expect(JSON.stringify(d.items[1].safetyCertsOverride)).toBe(JSON.stringify(["spsp"]));
   });
 
   it("leaves the request-wide setting unselected (null) when items disagree", () => {

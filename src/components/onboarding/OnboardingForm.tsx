@@ -43,6 +43,7 @@ export function OnboardingForm({
   onDone,
   headline,
   subhead,
+  requireEmail = false,
 }: {
   next: string;
   /** When provided, called after the account is created instead of navigating (e.g. modal flow). */
@@ -50,6 +51,9 @@ export function OnboardingForm({
   /** Optional header overrides (e.g. "Create your account to post your request"). */
   headline?: string;
   subhead?: string;
+  /** When true, email is a required field (combined create gate). Default false keeps the standalone
+   *  onboarding route's email optional. */
+  requireEmail?: boolean;
 }) {
   const t = useT();
   const o = t.onboarding;
@@ -61,6 +65,7 @@ export function OnboardingForm({
   const [lastName, setLastName] = useState("");
   const [city, setCity] = useState("");
   const [jobTitle, setJobTitle] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [cities, setCities] = useState<Opt[]>(FALLBACK_CITIES);
@@ -98,6 +103,11 @@ export function OnboardingForm({
     if (lastName.trim().length < 2 || lastName.trim().length > 50) next_fe.lastName = o.errors.lastName;
     if (!city.trim()) next_fe.city = o.errors.city;
     if (!jobTitle.trim()) next_fe.jobTitle = o.errors.jobTitle;
+    // Email is optional by default, but required in the combined create gate. When present (either
+    // mode), it must be a valid address.
+    const emailVal = email.trim();
+    if (requireEmail && !emailVal) next_fe.email = o.errors.emailRequired;
+    else if (emailVal && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailVal)) next_fe.email = o.errors.email;
     if (whatsapp.trim() && !/^(\+?966|0)?5\d{8}$/.test(whatsapp.replace(/\s/g, ""))) next_fe.whatsapp = o.errors.whatsapp;
     if (Object.keys(next_fe).length) {
       setFe(next_fe);
@@ -115,6 +125,7 @@ export function OnboardingForm({
           lastName: lastName.trim(),
           city: city.trim(),
           jobTitle: jobTitle.trim(),
+          companyName: companyName.trim() || undefined,
           email: email.trim() || undefined,
           whatsapp: whatsapp.trim() || undefined,
         }),
@@ -201,16 +212,31 @@ export function OnboardingForm({
 
         <div>
           <label className={labelCls}>
-            {o.email} <span className="text-[11px] font-medium text-muted">— {o.optional}</span>
+            {o.companyName} <span className="text-[11px] font-medium text-muted">— {o.optional}</span>
           </label>
-          <input className={inputCls} type="email" value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" />
+          <input className={inputCls} value={companyName} onChange={(e) => setCompanyName(e.target.value)} maxLength={200} placeholder={o.companyNamePlaceholder} />
         </div>
-        <div>
-          <label className={labelCls}>
-            {o.whatsapp} <span className="text-[11px] font-medium text-muted">— {o.optional}</span>
-          </label>
-          <input className={inputCls} inputMode="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+9665XXXXXXXX" dir="ltr" />
-          {fe.whatsapp && <p className="mt-1 text-[12px] text-danger">{fe.whatsapp}</p>}
+
+        <div className="grid grid-cols-1 gap-[12px] sm:grid-cols-2">
+          <div>
+            <label className={labelCls}>
+              {o.email}{" "}
+              {requireEmail ? (
+                <span className="text-danger">*</span>
+              ) : (
+                <span className="text-[11px] font-medium text-muted">— {o.optional}</span>
+              )}
+            </label>
+            <input className={inputCls} type="email" value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" />
+            {fe.email && <p className="mt-1 text-[12px] text-danger">{fe.email}</p>}
+          </div>
+          <div>
+            <label className={labelCls}>
+              {o.whatsapp} <span className="text-[11px] font-medium text-muted">— {o.optional}</span>
+            </label>
+            <input className={inputCls} inputMode="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+9665XXXXXXXX" dir="ltr" />
+            {fe.whatsapp && <p className="mt-1 text-[12px] text-danger">{fe.whatsapp}</p>}
+          </div>
         </div>
 
         {err && <p className="text-[13px] font-semibold text-danger">{err}</p>}

@@ -4,12 +4,13 @@ import type { TermRow } from "@/lib/contract/bids";
  * Unified per-term state: the static request-vs-offer compare (matched/conflict/grey) overlaid with
  * the live deal-room state — `agreed` (locked, green padlock) and `negotiating` (an unseen counter).
  */
+// Wording mirrors the mobile app's bid-card terms (app_en/ar.arb).
 const STATE: Record<TermRow["state"], { cls: string; en: string; ar: string; icon: string }> = {
-  agreed: { cls: "locked", en: "Agreed", ar: "تم الاتفاق", icon: "lock" },
-  negotiating: { cls: "open", en: "Negotiating", ar: "قيد التفاوض", icon: "sync_alt" },
-  matched: { cls: "matched", en: "Matches", ar: "مطابق", icon: "check_circle" },
-  conflict: { cls: "conflict", en: "Conflicts", ar: "تعارض", icon: "cancel" },
-  grey: { cls: "grey", en: "Not verified", ar: "غير موثَّق", icon: "remove_circle_outline" },
+  agreed: { cls: "locked", en: "Agreed", ar: "متفق", icon: "lock" },
+  negotiating: { cls: "open", en: "Determined in deal room", ar: "تُحدَّد في غرفة الصفقة", icon: "forum" },
+  matched: { cls: "matched", en: "Matched", ar: "مطابق", icon: "check_circle" },
+  conflict: { cls: "conflict", en: "Conflict", ar: "تعارض", icon: "cancel" },
+  grey: { cls: "grey", en: "Unverified", ar: "غير موثَّق", icon: "remove_circle_outline" },
 };
 
 /**

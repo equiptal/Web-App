@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useT, useLocale, fmt } from "@/lib/i18n";
+import type { SubtypeAttachmentOption } from "@/lib/contract/app";
 import { useRfq, agentMatches } from "@/lib/store/rfq-store";
 import { SUPPORT_WHATSAPP_NUMBER } from "@/lib/config/support";
 import { AgentMark, Button, Field, Icon, Pchips, SelChips, Select, Stepper, TextArea, TextInput, Toggle, Modal } from "@/components/ui";
+import { YearPicker } from "@/components/wizard/YearPicker";
 import {
   EquipmentItem,
   Taxonomy,
@@ -72,10 +74,19 @@ export function ItemRow({
   ];
 
   const { category, subcategory, measurement } = resolveRef(taxonomy, item.ref);
+  // Request-wide equipment year (AC-28) — the per-item year INHERITS this until overridden, matching
+  // the "settings for all items" behaviour of fuel/delivery/return above.
+  const sharedYear = state.draft?.project?.advanced?.equipmentYear ?? null;
+  // Request-wide EQUIPMENT safety certs (AC-50) — per-item value inherits this until overridden (same
+  // globalize-with-override model). Distinct from the operator cert below.
+  const sharedSafety = state.draft?.project?.certificates?.safety ?? [];
+  const itemSafety = item.safetyCertsOverride ?? sharedSafety;
   // Part 1: the optional free-text "work type" is surfaced only for crane subtypes — mirror the mobile
   // gate (equipment_step.dart `_isCraneSelected`: the subtype's English name contains "crane").
   const isCrane = (subcategory?.name ?? "").toLowerCase().includes("crane");
-  const status = item.verdict === "no-match" ? "not-available" : item.resolved ? "matched" : "needs-ok";
+  // "Need OK" auto-resolves to Matched once the taxonomy ref is complete — the renter no longer has to
+  // click Approve. Only a no-match (not-available) or an item still missing a ref level shows otherwise.
+  const status = item.verdict === "no-match" ? "not-available" : item.resolved || isCompleteRef(item.ref) ? "matched" : "needs-ok";
   const glyph = (item.ref.categoryId && CATEGORY_ICON[item.ref.categoryId]) || "construction";
   // "MATCHED TO" must show ONLY values that exist in our taxonomy: the resolved measurement, or the
   // agent's suggested canonical size (also a real taxonomy node) while the size is still pending.
@@ -85,8 +96,15 @@ export function ItemRow({
     ? resolveRef(taxonomy, { ...item.ref, measurementId: item.suggestion.measurementId }).measurement
     : undefined;
   const matchedMeasurement = measurement ?? suggestedMeasurement;
-  const sizeLabel = matchedMeasurement ? taxName(matchedMeasurement, locale) : undefined;
-  const matchLabel = [taxName(category, locale) || undefined, taxName(subcategory, locale) || undefined, sizeLabel].filter(Boolean).join(" · ") || (item.rawLabel ?? "—");
+  // "MATCHED TO" names: the taxonomy (locale-aware, authoritative + ID-consistent) when the ref resolved;
+  // otherwise the agent's CANONICAL name (Arabic when the UI is Arabic) so an off-taxonomy/"new" match
+  // still reads in the right script. Display-only — `ref`/submit always use the English canonical.
+  const an = item.agentNames;
+  const isAr = locale === "ar";
+  const nm = (node: { name: string; nameAr?: string | null } | null | undefined, en?: string, arName?: string | null) =>
+    node ? (taxName(node, locale) || undefined) : (isAr ? (arName || en || undefined) : en || undefined);
+  const sizeLabel = matchedMeasurement ? taxName(matchedMeasurement, locale) : (isAr ? an?.capacityAr || an?.capacity : an?.capacity) || undefined;
+  const matchLabel = [nm(category, an?.category, an?.categoryAr), nm(subcategory, an?.subtype, an?.subtypeAr), sizeLabel].filter(Boolean).join(" · ") || (item.rawLabel ?? "—");
   // What the renter actually wrote — name + stated size — so "from your RFQ" keeps the size visible.
   const rawDisplay = [item.rawLabel, item.rawSize].filter(Boolean).join(" · ") || item.rawLabel;
 
@@ -312,6 +330,17 @@ export function ItemRow({
                     options={opt(OPERATOR_CERTIFICATES, t.options.safetyCert)}
                   />
                 </ChipField>
+                {/* Free-text operator certificate when "Other" is selected (app parity) */}
+                {item.operator.certificate.includes("other") && (
+                  <ChipField label={t.step2.perItem.certificateOther}>
+                    <TextInput
+                      maxLength={100}
+                      value={item.operator.certificateOther ?? ""}
+                      placeholder={t.step2.perItem.certificateOtherPlaceholder}
+                      onChange={(e) => actions.patchItemOperator(item.id, { certificateOther: e.target.value })}
+                    />
+                  </ChipField>
+                )}
                 {/* Part 2: F.A.T split into two who-covers controls — Food, and Accommodation & transport. */}
                 <ChipField label={t.step2.perItem.fatFood} agent={agentMatches(item.operator.fatFood, ai?.operator.fatFood)} note={fn("operator_accommodation_by_rentee")}>
                   <Pchips<Party> value={item.operator.fatFood} onChange={(v) => actions.patchItemOperator(item.id, { fatFood: v })} onClear={() => actions.patchItemOperator(item.id, { fatFood: null })} options={opt(PARTIES, t.options.party)} />
@@ -343,6 +372,30 @@ export function ItemRow({
               <Pchips<Party> value={item.returnOverride ?? sharedReturn} onChange={(v) => actions.patchItem(item.id, { returnOverride: v })} options={opt(PARTIES, t.options.party)} />
             </ChipField>
           </div>
+
+          {/* Equipment year (AC-28) — per-item override of the request-wide year. "Any" inherits it. */}
+          <ChipField label={t.step2.perItem.equipmentYear} note={t.step2.perItem.equipmentYearHint}>
+            <YearPicker
+              value={item.equipmentYear ?? sharedYear}
+              onChange={(v) => actions.patchItem(item.id, { equipmentYear: v })}
+              anyLabel={t.options.equipmentYear.any}
+              customLabel={t.options.equipmentYear.custom}
+              customPlaceholder={t.options.equipmentYear.customPlaceholder}
+            />
+          </ChipField>
+
+          {/* Equipment safety certificate (AC-50) — per-item; inherits the request-wide "settings for all"
+              default until overridden (same model as fuel/delivery/return). NOT the operator cert above. */}
+          <ChipField label={t.step1.certificates.safety} agent={agentMatches(item.safetyCertsOverride, ai?.safetyCertsOverride)}>
+            <SelChips<OperatorCertificate>
+              values={itemSafety}
+              onToggle={(v) => actions.patchItem(item.id, { safetyCertsOverride: toggle(itemSafety, v) })}
+              options={opt(OPERATOR_CERTIFICATES, t.options.safetyCert)}
+            />
+          </ChipField>
+
+          {/* Attachments / accessories — admin-defined per subtype + free-text customs. */}
+          <ItemAttachments item={item} />
 
           {/* Additional notes (AC-53) */}
           <ChipField label={t.step2.perItem.additionalNotes} agent={agentMatches(item.additionalNotes, ai?.additionalNotes)}>
@@ -437,5 +490,71 @@ function ChipField({ label, agent, note, children }: { label: string; agent?: bo
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * Per-item equipment attachments. Pulls the admin-defined attachment list for the item's subtype
+ * (GET /api/equipment/attachments/:subtypeId) and shows it as multi-select chips — the renter can ONLY
+ * pick from this predefined set (SubtypeAttachment rows), never free-text. `preSelected` rows default
+ * on. Selections persist on the draft item as `attachmentIds` → backend `attachment_ids`. The section
+ * is hidden when the subtype has no configured attachments.
+ */
+function ItemAttachments({ item }: { item: EquipmentItem }) {
+  const t = useT();
+  const { locale } = useLocale();
+  const { actions } = useRfq();
+  // Attachments are keyed by the app's "subtype" = the SUBCATEGORY id in the 3-level taxonomy, or the
+  // CATEGORY id in the canonical 2-level taxonomy (no subcategory). Mirror the mobile app's `type.key`
+  // fallback so preselected attachments resolve in BOTH taxonomy shapes.
+  const subtypeId = item.ref.subcategoryId || item.ref.categoryId;
+  const [avail, setAvail] = useState<SubtypeAttachmentOption[]>([]);
+  const initedFor = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!subtypeId) {
+      setAvail([]);
+      return;
+    }
+    let active = true;
+    fetch(`/api/equipment/attachments/${encodeURIComponent(subtypeId)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: SubtypeAttachmentOption[]) => {
+        if (!active) return;
+        const arr = Array.isArray(list) ? list : [];
+        setAvail(arr);
+        // Apply admin "pre-selected" defaults once per subtype, only when nothing is chosen yet.
+        if (initedFor.current !== subtypeId) {
+          initedFor.current = subtypeId;
+          if ((item.attachmentIds ?? []).length === 0) {
+            const pre = arr.filter((a) => a.preSelected).map((a) => a.id);
+            if (pre.length) actions.patchItem(item.id, { attachmentIds: pre });
+          }
+        }
+      })
+      .catch(() => {
+        if (active) setAvail([]);
+      });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subtypeId]);
+
+  const selected = item.attachmentIds ?? [];
+  const nameOf = (a: SubtypeAttachmentOption) => (locale === "ar" ? a.nameAr || a.name : a.name);
+
+  // Choose-from-set only: nothing to show when this subtype has no admin-defined attachments.
+  if (avail.length === 0) return null;
+
+  return (
+    <ChipField label={t.step2.perItem.attachments}>
+      <p className="-mt-1 mb-2 text-[12px] text-muted">{t.step2.perItem.attachmentsHint}</p>
+      <SelChips<string>
+        values={selected}
+        onToggle={(v) => actions.patchItem(item.id, { attachmentIds: toggle(selected, v) })}
+        options={avail.map((a) => ({ value: a.id, label: nameOf(a) }))}
+      />
+    </ChipField>
   );
 }
