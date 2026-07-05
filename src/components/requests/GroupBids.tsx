@@ -15,7 +15,7 @@ import { computeBidQuote } from "@/lib/contract/comparison";
 import type { RequestGroup } from "@/lib/contract/requests";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { EquipImg } from "@/components/requests/EquipImg";
-import { quotationFileTitle } from "@/lib/compare/quotation-token";
+import { quotationDownloadName } from "@/lib/compare/quotation-token";
 import { renderQuotationSection, wrapQuotationPage, quotationLegal, type QuotationDoc, type QuotationLineItem, type QuotationCard } from "@/lib/quotation/render";
 
 /** A group bid = a request's bid tagged with which item (request) it belongs to. */
@@ -324,50 +324,61 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
 
       // Invoice line items — rate ÷ period-days × duration × units; mob/demob × units (open-ended → "as
       // operated"). The shared renderer draws the 6-column table (# · Item · Unit · Qty · Price · Total).
+      const m2 = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); // app parity: money shows halalas
       let sub = 0;
       let rowNum = 0;
+      let openRate: number | null = null; // representative per-unit·period rate for open-ended framing
+      let openPlabel = "";
+      let anyCommitted = false;
       const lineItems: QuotationLineItem[] = [];
       for (const b of supBids) {
         const rate = b.price ?? 0;
-        const units = b.numberOfUnits || 1;
+        // Supplier's OFFERED units (app `_offeredUnitsForBid`: unitsOffered → requested → 1). The rental
+        // line is PER-UNIT (not × units, app parity); units only scale the per-unit mob/demob transport.
+        const units = b.unitsOffered || b.numberOfUnits || 1;
         const dpp = daysPerPeriod(b.priceUnit);
         const plabel = periodLabel(b.priceUnit);
         const durDays = itemMap.get(b.requestId)?.durationDays ?? null;
         rowNum += 1;
         let lineSub: number, qtyCell: string, priceCell: string, totalCell: string, totalNote: string | null = null;
         if (durDays == null) {
-          lineSub = rate * units; // open-ended: one-period preview; billed "as operated"
+          lineSub = rate; // open-ended: one-period PER-UNIT preview; billed "as operated" (app parity)
           qtyCell = "∞";
-          priceCell = `${nf(rate)} / ${plabel}`;
-          totalCell = `${nf(rate)} / ${plabel}`;
+          priceCell = `${m2(rate)} / ${plabel}`;
+          totalCell = `${m2(rate)} / ${plabel}`;
           totalNote = L("As operated", "حسب التشغيل");
+          if (openRate == null) { openRate = rate; openPlabel = plabel; }
         } else if (dpp > 0) {
+          anyCommitted = true;
           const periods = durDays / dpp;
           const pStr = Number.isInteger(periods) ? String(periods) : periods.toFixed(2);
-          lineSub = (rate / dpp) * durDays * units;
-          qtyCell = `${pStr} ${plabel}${units > 1 ? ` × ${units}` : ""}`;
-          priceCell = `${nf(rate)} / ${plabel}`;
-          totalCell = nf(lineSub);
+          lineSub = (rate / dpp) * durDays; // per-unit over the committed duration (units shown separately)
+          qtyCell = `${pStr} ${plabel}`;
+          priceCell = `${m2(rate)} / ${plabel}`;
+          totalCell = m2(lineSub);
         } else {
-          lineSub = rate * units; // PER_JOB
-          qtyCell = units > 1 ? String(units) : "1";
-          priceCell = nf(rate);
-          totalCell = nf(lineSub);
+          anyCommitted = true;
+          lineSub = rate; // PER_JOB, per-unit
+          qtyCell = "1";
+          priceCell = m2(rate);
+          totalCell = m2(lineSub);
         }
         const mobTotal = (b.mobPrice ?? 0) * units;
         const demobTotal = (b.demobPrice ?? 0) * units;
         sub += lineSub + mobTotal + demobTotal;
         lineItems.push({ num: rowNum, label: `${L("Rental", "الإيجار")} — ${labelOf(b)}`, detail: eqLine(b), unit: plabel, qty: qtyCell, price: priceCell, total: totalCell, totalNote });
-        if (b.mobPrice) lineItems.push({ num: null, label: L("Delivery to site", "النقل إلى الموقع"), detail: labelOf(b), unit: L("Trip", "رحلة"), qty: String(units), price: nf(b.mobPrice), total: nf(mobTotal) });
-        if (b.demobPrice) lineItems.push({ num: null, label: L("Return from site", "الإرجاع من الموقع"), detail: labelOf(b), unit: L("Trip", "رحلة"), qty: String(units), price: nf(b.demobPrice), total: nf(demobTotal) });
+        if (b.mobPrice) lineItems.push({ num: null, label: L("Delivery to site", "النقل إلى الموقع"), detail: labelOf(b), unit: L("Trip", "رحلة"), qty: String(units), price: m2(b.mobPrice), total: m2(mobTotal) });
+        if (b.demobPrice) lineItems.push({ num: null, label: L("Return from site", "الإرجاع من الموقع"), detail: labelOf(b), unit: L("Trip", "رحلة"), qty: String(units), price: m2(b.demobPrice), total: m2(demobTotal) });
       }
-      const vat = Math.round(sub * 0.15);
+      const vat = sub * 0.15; // exact (not rounded) so the amount-in-words can show halalas — app parity
       const total = sub + vat;
+      const allOpenEnded = !anyCommitted && openRate != null;
 
+      const offeredUnits = (b: GroupBid) => b.unitsOffered || b.numberOfUnits || 1;
       const listed = supBids.map((b) => ({
         label: labelOf(b),
         detail: eqLine(b),
-        units: b.numberOfUnits || 1,
+        units: offeredUnits(b),
         verified: b.eqVerified,
         certs: b.heldCertCodes.map((c) => (isAr ? CERT_LABEL[c].ar : CERT_LABEL[c].en)),
       }));
@@ -389,11 +400,11 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       const cards: QuotationCard[] = [];
       const projectRows = supBids.map((b) => ({
         label: itemMap.get(b.requestId)?.displayId ?? b.requestId,
-        value: `${b.numberOfUnits || 1} × ${labelOf(b)}`,
+        value: `${offeredUnits(b)} × ${labelOf(b)}`,
       }));
       projectRows.push({ label: L("Rental basis", "أساس الإيجار"), value: rentalBasis || "—" });
       projectRows.push({ label: L("Equipment lines", "بنود المعدات"), value: String(supBids.length) });
-      projectRows.push({ label: L("Total units", "إجمالي الوحدات"), value: String(supBids.reduce((s2, b) => s2 + (b.numberOfUnits || 1), 0)) });
+      projectRows.push({ label: L("Total units", "إجمالي الوحدات"), value: String(supBids.reduce((s2, b) => s2 + offeredUnits(b), 0)) });
       cards.push({ title: L("Project terms", "شروط المشروع"), rows: projectRows });
 
       const eqRows: { label: string; value: string }[] = [];
@@ -439,9 +450,14 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         listed,
         lineItems,
         currency: sar,
-        totals: { subtotal: sub, vat, total },
+        // Open-ended bids: reframe the grand row as the per-unit·period rate ("Total / unit · day") and
+        // note the estimate, exactly like the app's live quotation. Committed durations show a real total.
+        totals: allOpenEnded
+          ? { subtotal: sub, vat, total, label: `${L("Total", "الإجمالي")} / ${L("unit", "وحدة")} · ${openPlabel}`, valueOverride: `${m2(openRate!)} ${sar}` }
+          : { subtotal: sub, vat, total },
         cards,
         legal: quotationLegal(L),
+        amountWordsSuffix: allOpenEnded ? L("Estimate for one day · Final amount as operated", "تقدير ليوم واحد · المبلغ النهائي حسب التشغيل") : undefined,
       };
       return renderQuotationSection(doc);
     };
@@ -451,7 +467,11 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       .map((supBids, si) => renderSection(supBids, si, langIsAr))
       .join("");
 
-    const html = wrapQuotationPage(sections, { lang: langIsAr ? "ar" : "en", title: quotationFileTitle(group.id, coveredCodes) });
+    // Human-readable name: group short code (RFQ-NNNNN) when present, else the single request id
+    // (REQ-NNNNN); covered item codes are stamped for re-upload scoping.
+    const dlPrimary = groupRef ?? coveredCodes[0] ?? group.items[0]?.displayId ?? "quotation";
+    const dlName = quotationDownloadName(dlPrimary, coveredCodes);
+    const html = wrapQuotationPage(sections, { lang: langIsAr ? "ar" : "en", title: dlName });
     // Robust open: a popup-blocked `window.open` returns null and used to silently fail (dead click).
     // Fall back to downloading the self-printing HTML file so the quotation is never a no-op.
     const w = window.open("", "_blank");
@@ -464,7 +484,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${quotationFileTitle(group.id, coveredCodes).replace(/[^\w.-]+/g, "_")}.html`;
+    a.download = `${dlName.replace(/[^\w.-]+/g, "_")}.html`;
     document.body.appendChild(a);
     a.click();
     a.remove();

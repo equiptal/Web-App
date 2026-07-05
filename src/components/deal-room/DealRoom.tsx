@@ -6,6 +6,7 @@ import { useLocale } from "@/lib/i18n";
 import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, ApiError } from "@/lib/api/client";
 import type { DealRoomView, DealRoomDocument, DealRoomDocuments, QuotationView } from "@/lib/contract/deal-room";
 import { DealRoomTerms, type ResolutionsMap } from "@/components/deal-room/DealRoomTerms";
+import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
 import { renderQuotationSection, wrapQuotationPage, quotationLegal, type QuotationDoc, type QuotationLineItem, type QuotationCard, type QuotationMetaCell } from "@/lib/quotation/render";
 import "@/components/deal-room/deal-room-proto.css";
 
@@ -153,6 +154,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const [quoteErr, setQuoteErr] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [fileErr, setFileErr] = useState<string | null>(null);
+  const [voiceRecording, setVoiceRecording] = useState(false); // mic active → composer hands its row to the recorder
   const [releaseOpen, setReleaseOpen] = useState(false); // reopen-accepted-deal confirm modal
   const [releasing, setReleasing] = useState(false);
   const [releaseErr, setReleaseErr] = useState<string | null>(null);
@@ -346,6 +348,22 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
       setText("");
     } catch {
       setFileErr(L("Upload failed — please try again.", "فشل الرفع — حاول مجددًا."));
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  /** Send a recorded voice note as an audio attachment (app parity: mic → voice bubble). */
+  async function sendVoiceNote(file: File) {
+    const ch = channelRef.current;
+    if (!ch) return;
+    setFileErr(null);
+    setUploading(true);
+    try {
+      const res = await ch.sendFile(file);
+      await ch.sendMessage({ attachments: [{ type: "audio", asset_url: res.file, title: file.name, mime_type: file.type, file_size: file.size }] });
+    } catch {
+      setFileErr(L("Couldn't send the voice note.", "تعذّر إرسال الملاحظة الصوتية."));
     } finally {
       setUploading(false);
     }
@@ -546,6 +564,8 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={a.thumb_url || a.image_url} alt={a.fallback || ""} />
                     </a>
+                  ) : a.type === "audio" || (a.mime_type || "").startsWith("audio/") ? (
+                    <audio key={i} controls preload="none" src={a.asset_url} className="msg-att-audio" style={{ display: "block", maxWidth: "100%", marginTop: 6 }} />
                   ) : (
                     <a key={i} href={a.asset_url} target="_blank" rel="noopener noreferrer" className="msg-att-file">
                       <span className="material-icons-outlined">{(a.mime_type || "").includes("pdf") ? "picture_as_pdf" : "insert_drive_file"}</span>
@@ -578,12 +598,29 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
         <div className="composer ro"><span className="ro-note">{L("Deal room has been cancelled", "تم إلغاء غرفة الصفقة")}</span></div>
       ) : (
         <div className="composer">
-          <button type="button" className="ib" disabled={!chatReady || uploading} onClick={() => fileInputRef.current?.click()} aria-label={L("Attach a file", "إرفاق ملف")}>
-            <span className="material-icons-outlined">{uploading ? "hourglass_top" : "attach_file"}</span>
-          </button>
-          <input ref={fileInputRef} type="file" accept={CHAT_ACCEPT} hidden onChange={(e) => { void sendFiles(e.target.files); e.target.value = ""; }} />
-          <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} disabled={!chatReady} placeholder={L("Type a message…", "اكتب رسالة…")} />
-          <span className="ib send" onClick={send}><span className="material-icons-outlined">send</span></span>
+          {!voiceRecording && (
+            <>
+              <button type="button" className="ib" disabled={!chatReady || uploading} onClick={() => fileInputRef.current?.click()} aria-label={L("Attach a file", "إرفاق ملف")}>
+                <span className="material-icons-outlined">{uploading ? "hourglass_top" : "attach_file"}</span>
+              </button>
+              <input ref={fileInputRef} type="file" accept={CHAT_ACCEPT} hidden onChange={(e) => { void sendFiles(e.target.files); e.target.value = ""; }} />
+            </>
+          )}
+          <VoiceRecorder
+            disabled={!chatReady || uploading}
+            ar={ar}
+            L={L}
+            maxBytes={CHAT_MAX_MEDIA}
+            onRecordingChange={setVoiceRecording}
+            onRecorded={(f) => void sendVoiceNote(f)}
+            onError={setFileErr}
+          />
+          {!voiceRecording && (
+            <>
+              <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} disabled={!chatReady} placeholder={L("Type a message…", "اكتب رسالة…")} />
+              <span className="ib send" onClick={send}><span className="material-icons-outlined">send</span></span>
+            </>
+          )}
           {fileErr && <span className="ro-note quote-err">{fileErr}</span>}
         </div>
       )}

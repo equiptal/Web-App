@@ -72,9 +72,13 @@ export interface QuotationDoc {
   listed?: QuotationListedLine[];
   lineItems: QuotationLineItem[];
   currency: string;
-  totals: { subtotal: number; vat: number; total: number };
+  /** `label`/`valueOverride` reframe the grand row for open-ended/as-operated bids (app parity:
+   *  "Total / unit · day" showing the per-unit·period rate instead of the summed total). */
+  totals: { subtotal: number; vat: number; total: number; label?: string; valueOverride?: string };
   cards: QuotationCard[];
   legal: string[];
+  /** Appended after the amount-in-words (app parity: "Estimate for one day · Final amount as operated"). */
+  amountWordsSuffix?: string;
 }
 
 /** Formal quotation stylesheet — ported verbatim from prototypes/requests-grouped.html. */
@@ -91,6 +95,10 @@ export const QUOTATION_STYLE = `
   .parties{display:flex;gap:30px;padding-bottom:18px;border-bottom:1px solid #e4edf5;}
   .party{flex:1;}
   .plabel{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#6b8fa8;}
+  .phead{display:flex;align-items:center;gap:10px;margin-top:6px;}
+  .pava{flex:0 0 auto;width:38px;height:38px;border-radius:50%;background:#eef3f8;color:#2a4f72;font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center;}
+  .phead-t{min-width:0;}
+  .phead .pname{margin-top:0;}
   .pname{font-size:17px;font-weight:800;margin-top:5px;}
   .pmeta{font-size:12px;color:#6b8fa8;font-weight:600;margin-top:3px;}
   .psub{font-size:12px;color:#6b8fa8;font-weight:600;margin-top:2px;}
@@ -140,7 +148,8 @@ export const QUOTATION_STYLE = `
   @media print{body{background:#fff;}.q-doc{box-shadow:none;margin:0;border-radius:0;}}`;
 
 const esc = (str: unknown) => String(str ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
-const nf = (n: number) => Math.round(n).toLocaleString("en-US");
+/** 2-decimal money (app parity: quotation totals show halalas, e.g. 250.00 / 37.50). */
+const money2 = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** Amount-in-words (English) — ported from the requests-grouped prototype's quotation export. */
 export function numWords(n: number): string {
@@ -198,7 +207,9 @@ function partyHtml(p: QuotationParty, L: (en: string, ar: string) => string): st
   const idRows = p.idRows.map((r) => idRowHtml(r, L)).join("");
   const chips = (p.chips ?? []).filter(Boolean);
   const chipsHtml = chips.length ? `<div class="pchips">${chips.map((c) => `<span class="pchip">✓ ${esc(c)}</span>`).join("")}</div>` : "";
-  return `<div class="party"><div class="plabel">${esc(p.label)}</div><div class="pname">${esc(p.name || "—")}</div>${p.sub ? `<div class="psub">${esc(p.sub)}</div>` : ""}${idRows}${chipsHtml}</div>`;
+  // Avatar circle with the party initial (app parity).
+  const initial = (p.name || "?").trim().charAt(0).toUpperCase() || "?";
+  return `<div class="party"><div class="plabel">${esc(p.label)}</div><div class="phead"><span class="pava">${esc(initial)}</span><div class="phead-t"><div class="pname">${esc(p.name || "—")}</div>${p.sub ? `<div class="psub">${esc(p.sub)}</div>` : ""}</div></div>${idRows}${chipsHtml}</div>`;
 }
 
 function cardHtml(card: QuotationCard): string {
@@ -227,7 +238,15 @@ export function renderQuotationSection(doc: QuotationDoc): string {
         `<tr><td class="num">${it.num ?? ""}</td><td><b>${esc(it.label)}</b>${it.detail ? `<div class="sm">${esc(it.detail)}</div>` : ""}</td><td>${esc(it.unit)}</td><td class="num">${esc(it.qty)}</td><td class="num">${esc(it.price)}</td><td class="num">${it.totalNote ? `<div class="sm">${esc(it.totalNote)}</div>` : ""}${esc(it.total)}</td></tr>`,
     )
     .join("");
-  const words = isAr ? `${numWordsAr(doc.totals.total)} ريال سعودي` : `${numWords(doc.totals.total)} Saudi Riyals`;
+  // Amount in words with halalas (app parity), + an optional suffix ("Estimate for one day · …").
+  const riyals = Math.floor(doc.totals.total + 1e-6);
+  const halalas = Math.round((doc.totals.total - riyals) * 100);
+  const wordsBase = isAr
+    ? `${numWordsAr(riyals)} ريال سعودي${halalas ? ` و${numWordsAr(halalas)} هللة` : ""}`
+    : `${numWords(riyals)} Saudi Riyals${halalas ? ` and ${numWords(halalas)} halalas` : ""}`;
+  const words = doc.amountWordsSuffix ? `${wordsBase} · ${doc.amountWordsSuffix}` : wordsBase;
+  const grandLabel = doc.totals.label ?? L("Total", "الإجمالي");
+  const grandValue = doc.totals.valueOverride ? esc(doc.totals.valueOverride) : `${money2(doc.totals.total)} ${esc(doc.currency)}`;
   const cards = doc.cards.map(cardHtml).join("");
   const legal = doc.legal.length ? `<ol class="tc">${doc.legal.map((t) => `<li>${esc(t)}</li>`).join("")}</ol>` : "";
 
@@ -242,9 +261,9 @@ export function renderQuotationSection(doc: QuotationDoc): string {
         <tbody>${rows}</tbody>
       </table>
       <div class="totals">
-        <div class="trow"><span>${esc(L("Subtotal before VAT", "الإجمالي قبل الضريبة"))}</span><b>${nf(doc.totals.subtotal)}</b></div>
-        <div class="trow"><span>${esc(L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"))}</span><b>${nf(doc.totals.vat)}</b></div>
-        <div class="trow grand"><span>${esc(L("Total", "الإجمالي"))}</span><b>${nf(doc.totals.total)} ${esc(doc.currency)}</b></div>
+        <div class="trow"><span>${esc(L("Subtotal before VAT", "الإجمالي قبل الضريبة"))}</span><b>${money2(doc.totals.subtotal)}</b></div>
+        <div class="trow"><span>${esc(L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"))}</span><b>${money2(doc.totals.vat)}</b></div>
+        <div class="trow grand"><span>${esc(grandLabel)}</span><b>${grandValue}</b></div>
       </div>
       <div class="words"><div class="wl">${esc(L("Amount in words", "المبلغ كتابةً"))}</div>${esc(words)}</div>
       ${cards}

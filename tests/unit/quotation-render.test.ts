@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { renderQuotationSection, wrapQuotationPage, quotationLegal, type QuotationDoc } from "@/lib/quotation/render";
+import { quotationDownloadName } from "@/lib/compare/quotation-token";
 
 const L = (en: string) => en;
 
@@ -70,8 +71,31 @@ describe("shared quotation renderer", () => {
     const page = wrapQuotationPage(renderQuotationSection(dealDoc()), { lang: "en", title: "Confirmed Quotation" });
     expect(page).toContain("<!doctype html>");
     expect(page).toContain('class="q-doc"');
-    expect(page).toContain("460 SAR");
+    expect(page).toContain("460.00 SAR");
     expect(page).toContain("window.print()");
+  });
+
+  it("renders party avatar initials (app parity)", () => {
+    const html = renderQuotationSection(bidDoc());
+    expect(html).toContain('class="pava"');
+    expect(html).toContain(">A<"); // Acme → "A"
+  });
+
+  it("shows halalas + an open-ended suffix and reframes the grand total", () => {
+    const doc = bidDoc();
+    doc.totals = { subtotal: 250, vat: 37.5, total: 287.5, label: "Total / unit · day", valueOverride: "50.00 SAR" };
+    doc.amountWordsSuffix = "Estimate for one day · Final amount as operated";
+    const html = renderQuotationSection(doc);
+    expect(html).toContain("and Fifty halalas");
+    expect(html).toContain("Estimate for one day");
+    expect(html).toContain("Total / unit · day");
+    expect(html).toContain("50.00 SAR"); // grand-row override, not the summed total
+  });
+
+  it("builds a human download name: RFQ group code, else REQ single, stamping covered codes", () => {
+    expect(quotationDownloadName("RFQ-00228", ["REQ-00228"])).toBe("RFQ-00228__items__REQ-00228");
+    expect(quotationDownloadName("REQ-00228", ["REQ-00228"])).toBe("REQ-00228");
+    expect(quotationDownloadName(null)).toBe("quotation");
   });
 
   it("shows the Verified pill when a party id-row has no value but is verified", () => {
