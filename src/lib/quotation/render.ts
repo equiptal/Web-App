@@ -213,7 +213,7 @@ export function numWordsAr(num: number): string {
 
 function idRowHtml(row: QuotationIdRow, L: (en: string, ar: string) => string): string {
   if (row.value) return `<div class="pid-row"><span>${esc(row.label)}</span><b>${esc(row.value)}</b></div>`;
-  if (row.verified) return `<div class="pid-row"><span>${esc(row.label)}</span><span class="pill-ver"><span class="pv-seal">✓</span> ${esc(L("Verified", "موثَّق"))}</span></div>`;
+  if (row.verified) return `<div class="pid-row"><span>${esc(row.label)}</span><span class="pill-ver">✓ ${esc(L("Verified", "موثَّق"))}</span></div>`;
   return "";
 }
 
