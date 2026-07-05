@@ -7,15 +7,13 @@ export type AuthKind =
   | "expired"
   | "locked"
   | "send_failed"
-  | "phone_exists"
   | "offline"
   | "unknown";
 
 type AuthResult = { ok: true; data: Record<string, unknown> } | { ok: false; kind: AuthKind };
 
-/** OTP channel chosen at the phone step. Phase B — the channel used to sign in IS the login identity:
- *  SMS/WhatsApp key the account+OTP by phone; EMAIL keys them by `email`. The chosen channel must be
- *  carried through to BOTH resend AND verify (the OTP is keyed by whichever identifier was used). */
+/** OTP delivery channel chosen at the phone step (T5). Phone stays the account identity; when the
+ *  channel is EMAIL the code is delivered to `email`. Carried to the code step so Resend uses it too. */
 export type OtpChannel = { method: "SMS" | "EMAIL"; email?: string };
 
 export async function postAuth(path: string, body: unknown): Promise<AuthResult> {

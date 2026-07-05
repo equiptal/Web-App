@@ -18,7 +18,7 @@ interface VerifyResponse {
  * { phone, code }.
  */
 export async function POST(req: Request) {
-  let body: { phone?: string; code?: string; otpMethod?: "SMS" | "WHATSAPP" | "EMAIL"; otpEmail?: string } = {};
+  let body: { phone?: string; code?: string } = {};
   try {
     body = await req.json();
   } catch {
@@ -29,13 +29,7 @@ export async function POST(req: Request) {
   if (!phone || !code) return NextResponse.json({ code: "invalid_code" }, { status: 400 });
 
   try {
-    // Phase B: verify with the SAME channel used at request-code — the OTP + account are keyed by the
-    // login identity (phone for SMS/WhatsApp, the email for EMAIL). Omitting it fails an email login.
-    const data = await authPost<VerifyResponse>(
-      "/auth/verify-otp",
-      { phone, code, otpMethod: body.otpMethod ?? "SMS", otpEmail: body.otpEmail },
-      localeFromRequest(req),
-    );
+    const data = await authPost<VerifyResponse>("/auth/verify-otp", { phone, code }, localeFromRequest(req));
     const user: RenterUser = {
       id: data.user.id,
       phone: data.user.phone,
