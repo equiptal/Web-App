@@ -118,7 +118,10 @@ export interface QuoteMatchCheck {
   type_size: TypeSizeMatch; // exact | needs_check (vs the request item)
   location: "match" | "mismatch" | "unknown"; // vs the request project location
   dates: "match" | "mismatch" | "unknown"; // vs the request rental window
-  needs_confirmation: boolean; // any mismatch / needs_check → popup
+  needs_confirmation: boolean; // any mismatch / needs_check → popup (still comparable)
+  /** TYPE/SIZE mismatch = wrong equipment → popup + DO NOT add the bid (can't compare a forklift to an
+   *  excavator). Location mismatch is advisory (popup, still added); dates are informational (never gate). */
+  blocking?: boolean;
   warnings: string[]; // human-readable, for the popup body
 }
 

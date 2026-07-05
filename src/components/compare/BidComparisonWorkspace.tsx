@@ -168,7 +168,7 @@ export function BidComparisonWorkspace() {
   // /api/me/bids/:id/documents — drives the "green if the doc exists" chips and the in-app viewer.
   const [bidDocs, setBidDocs] = useState<Record<string, DealRoomDocuments>>({});
   // A parsed quote the agent flagged (match.needs_confirmation) — added to the comparison only on confirm.
-  const [confirmAdd, setConfirmAdd] = useState<{ card: BidCard; warnings: string[] } | null>(null);
+  const [confirmAdd, setConfirmAdd] = useState<{ card: BidCard; warnings: string[]; blocking: boolean } | null>(null);
   const prevRankRef = useRef<RecommendResult["ranking"] | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const preselectRef = useRef<Set<string> | null>(null); // bid ids to pre-select from ?bids= (one-shot, from My Bids)
@@ -727,9 +727,14 @@ export function BidComparisonWorkspace() {
       if (!r.agent) { toast(L("Quote upload needs your AI assistant — not connected.", "رفع العرض يحتاج مساعدك الذكي — غير متصل.")); return; }
       if (r.result && r.result.ok) {
         const card = normalizedBidToBidCard(r.result.bid, { duration: durationDays, units });
-        // The agent flags a mismatch (wrong type/size, different location/dates) → confirm before adding (AC-26/36).
-        if (r.result.match?.needs_confirmation) {
-          setConfirmAdd({ card, warnings: r.result.match.warnings ?? [] });
+        const m = r.result.match;
+        // Severity model (Mansour): TYPE/SIZE mismatch is BLOCKING (wrong equipment) → popup + do NOT add.
+        // Any other mismatch (location advisory) needs confirmation → popup, but STILL comparable (add on
+        // confirm). No flag → add silently.
+        if (m?.blocking) {
+          setConfirmAdd({ card, warnings: m.warnings ?? [], blocking: true });
+        } else if (m?.needs_confirmation) {
+          setConfirmAdd({ card, warnings: m.warnings ?? [], blocking: false });
         } else {
           setUploaded((p) => [...p.filter((b) => b.id !== card.id), card]);
           toast(L(`Added ${card.supplierName}'s quote from the file.`, `أُضيف عرض ${card.supplierName} من الملف.`));
@@ -740,7 +745,7 @@ export function BidComparisonWorkspace() {
     } catch { toast(L("Couldn't read that file. Nothing was added.", "تعذّرت قراءة الملف.")); }
   }
   function confirmAddBid() {
-    if (!confirmAdd) return;
+    if (!confirmAdd || confirmAdd.blocking) return; // a blocking (wrong-equipment) quote is never added
     const card = confirmAdd.card;
     setUploaded((p) => [...p.filter((b) => b.id !== card.id), card]);
     toast(L(`Added ${card.supplierName}'s quote — flagged for review.`, `أُضيف عرض ${card.supplierName} — مع تنبيه للمراجعة.`));
@@ -752,7 +757,11 @@ export function BidComparisonWorkspace() {
     captureBidEvents([{
       event_type: kind === "award" ? "award" : "choice",
       request_id: activeItem, bid_id: bid.id, supplier_id: bid.supplierId,
-      payload: kind === "award" ? { chosen_bid: bid.id, beaten_bids: baseCols.map((c) => c.bid.id).filter((id) => id !== bid.id) } : { kind: "negotiate" },
+      // Award learning needs the FULL bids shown (year/price/certs), not just IDs — Mansour derives the
+      // renter's preference axis from the winner vs the field it beat (B3).
+      payload: kind === "award"
+        ? { chosen_bid: bid.id, beaten_bids: baseCols.map((c) => c.bid.id).filter((id) => id !== bid.id), bids: baseCols.map(bidColumnToComputed) }
+        : { kind: "negotiate" },
     }]);
     toast(kind === "award" ? L(`Opening ${bid.supplierName} deal room…`, `يتم فتح غرفة صفقة ${bid.supplierName}…`) : L("Opening the deal room…", "يتم فتح غرفة الصفقة…"));
     if (bid.dealRoomId) { router.push(`/deal-room/${bid.dealRoomId}`); return; }
@@ -1618,8 +1627,8 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
         <div className="fixed inset-0 z-[420] grid place-items-center p-6" style={{ background: "rgba(28,53,80,.42)", backdropFilter: "blur(3px)" }} onClick={() => setConfirmAdd(null)}>
           <div className="w-[460px] max-w-full overflow-hidden rounded-2xl" style={{ background: "#fff" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start gap-3 border-b px-6 py-5" style={{ borderColor: C.line }}>
-              <div className="grid h-11 w-11 flex-none place-items-center rounded-lg" style={{ background: C.warningBg, color: C.warning }}><span className="material-icons-outlined" style={{ fontSize: 24 }}>warning_amber</span></div>
-              <div className="flex-1"><h3 className="m-0 text-[17px] font-extrabold">{L("This quote may not match", "قد لا يطابق هذا العرض")}</h3><p className="m-0 text-[12.5px]" style={{ color: C.muted }}>{L(`${confirmAdd.card.supplierName} — check these before adding it to the comparison.`, `${confirmAdd.card.supplierName} — راجع هذه قبل إضافته للمقارنة.`)}</p></div>
+              <div className="grid h-11 w-11 flex-none place-items-center rounded-lg" style={{ background: confirmAdd.blocking ? C.dangerBg : C.warningBg, color: confirmAdd.blocking ? C.danger : C.warning }}><span className="material-icons-outlined" style={{ fontSize: 24 }}>{confirmAdd.blocking ? "block" : "warning_amber"}</span></div>
+              <div className="flex-1"><h3 className="m-0 text-[17px] font-extrabold">{confirmAdd.blocking ? L("Wrong equipment — can't compare", "معدة غير مطابقة — يتعذّر المقارنة") : L("This quote may not match", "قد لا يطابق هذا العرض")}</h3><p className="m-0 text-[12.5px]" style={{ color: C.muted }}>{confirmAdd.blocking ? L(`${confirmAdd.card.supplierName} — this quote is for different equipment, so it can't be added to this comparison.`, `${confirmAdd.card.supplierName} — هذا العرض لمعدة مختلفة، فلا يمكن إضافته لهذه المقارنة.`) : L(`${confirmAdd.card.supplierName} — check these before adding it to the comparison.`, `${confirmAdd.card.supplierName} — راجع هذه قبل إضافته للمقارنة.`)}</p></div>
               <button onClick={() => setConfirmAdd(null)} className="grid h-8 w-8 flex-none place-items-center rounded-full border" style={{ borderColor: C.border, color: C.muted }}><span className="material-icons-outlined" style={{ fontSize: 18 }}>close</span></button>
             </div>
             <div className="px-6 py-5">
@@ -1632,11 +1641,17 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                   <li className="text-[12.5px]" style={{ color: C.muted }}>{L("The assistant couldn't fully confirm this quote matches your item, location and dates.", "تعذّر على المساعد تأكيد مطابقة العرض للصنف والموقع والتواريخ.")}</li>
                 )}
               </ul>
-              <p className="mt-3 text-[11.5px]" style={{ color: C.muted }}>{L("Adding it keeps it flagged — it's still shown for review, never auto-excluded.", "ستبقى الإضافة مع تنبيه — يظهر للمراجعة ولا يُستبعد تلقائياً.")}</p>
+              <p className="mt-3 text-[11.5px]" style={{ color: C.muted }}>{confirmAdd.blocking ? L("Upload the quote for the right equipment to compare it here.", "ارفع عرضاً للمعدة الصحيحة لمقارنته هنا.") : L("Adding it keeps it flagged — it's still shown for review, never auto-excluded.", "ستبقى الإضافة مع تنبيه — يظهر للمراجعة ولا يُستبعد تلقائياً.")}</p>
             </div>
             <div className="flex justify-end gap-2.5 border-t px-6 py-4" style={{ borderColor: C.line }}>
-              <button onClick={() => setConfirmAdd(null)} className="rounded-lg border px-4 py-2 text-[13px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>{L("Don't add", "لا تُضِف")}</button>
-              <button onClick={confirmAddBid} className="rounded-lg px-4 py-2 text-[13px] font-bold text-white" style={{ background: C.action }}>{L("Add anyway", "أضِفه على أي حال")}</button>
+              {confirmAdd.blocking ? (
+                <button onClick={() => setConfirmAdd(null)} className="rounded-lg px-4 py-2 text-[13px] font-bold text-white" style={{ background: C.navy }}>{L("Close", "إغلاق")}</button>
+              ) : (
+                <>
+                  <button onClick={() => setConfirmAdd(null)} className="rounded-lg border px-4 py-2 text-[13px] font-bold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>{L("Don't add", "لا تُضِف")}</button>
+                  <button onClick={confirmAddBid} className="rounded-lg px-4 py-2 text-[13px] font-bold text-white" style={{ background: C.action }}>{L("Add anyway", "أضِفه على أي حال")}</button>
+                </>
+              )}
             </div>
           </div>
         </div>
