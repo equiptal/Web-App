@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Guest store browse — preview</title>
+<style>
+  :root{
+    --navy:#1c3550; --navy-mid:#2a4f72; --gold:#b8860b;
+    --background:#f5f8fc; --surface:#fff; --surface2:#eff4f9; --surface3:#e4edf5;
+    --muted:#6b8fa8; --border:#d4e0ec;
+    --brand:#f79009; --brand-soft:#fff4e5;
+    --ok:#1daf58; --ok-soft:#e7f7ee; --info:#1a7ec8; --info-soft:#e6f2fb;
+    --danger:#d9362a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--background);color:var(--navy);
+    font-family:"Nunito","Segoe UI",Roboto,-apple-system,sans-serif;line-height:1.4;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 20px 64px}
+  a{color:inherit;text-decoration:none}
+
+  /* top app bar */
+  .appbar{position:sticky;top:0;z-index:5;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--border)}
+  .appbar-in{max-width:1120px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:900;font-size:18px;letter-spacing:-.4px;color:var(--navy)}
+  .logo .mk{display:grid;place-items:center;width:34px;height:34px;border-radius:9px;background:var(--navy);color:#fff;font-size:16px}
+  .nav{display:flex;align-items:center;gap:22px;font-size:13.5px;font-weight:700;color:var(--navy-mid)}
+  .nav .muted{color:var(--muted)}
+  .signin{display:inline-flex;align-items:center;gap:7px;background:var(--brand);color:#fff;font-weight:800;
+    font-size:13.5px;border:0;border-radius:10px;padding:9px 16px;cursor:pointer}
+  .signin:hover{filter:brightness(1.05)}
+
+  .viewtag{display:inline-flex;align-items:center;gap:8px;margin:22px 0 14px;font-size:12px;font-weight:800;
+    letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
+  .viewtag .dot{width:7px;height:7px;border-radius:50%;background:var(--brand)}
+  h2.sec{font-size:22px;font-weight:900;letter-spacing:-.5px;margin-bottom:4px}
+  p.sub{font-size:13.5px;color:var(--muted);margin-bottom:16px}
+
+  /* filter bar */
+  .filters{display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--border);
+    border-radius:16px;padding:16px}
+  .searchbox{position:relative}
+  .searchbox svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted)}
+  .searchbox input{width:100%;height:42px;border:1px solid var(--border);background:var(--surface2);border-radius:10px;
+    padding:0 12px 0 38px;font-size:13.5px;color:var(--navy);outline:0;font-family:inherit}
+  .searchbox input::placeholder{color:var(--muted)}
+  .filrow{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+  select.fil{height:42px;flex:1;min-width:150px;border:1px solid var(--border);background:var(--surface2);border-radius:10px;
+    padding:0 12px;font-size:13px;font-weight:700;color:var(--navy-mid);font-family:inherit;cursor:pointer}
+  .verified-toggle{display:inline-flex;align-items:center;gap:9px;font-size:13px;font-weight:800;color:var(--navy-mid);cursor:pointer;margin-left:2px}
+  .sw{position:relative;width:40px;height:23px;border-radius:99px;border:1px solid var(--ok);background:var(--ok);flex:none}
+  .sw i{position:absolute;top:2px;left:19px;width:17px;height:17px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+  .sw.off{border-color:var(--border);background:var(--surface3)}
+  .sw.off i{left:2px}
+  .ghost-note{font-size:12px;color:var(--muted);font-style:italic;padding:2px 2px 0}
+
+  /* store cards */
+  .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));margin-top:18px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;transition:.15s}
+  .card:hover{border-color:#b9cee0;box-shadow:0 6px 20px rgba(28,53,80,.07)}
+  .card .top{display:flex;align-items:center;gap:12px}
+  .card .lg{width:52px;height:52px;border-radius:12px;background:var(--surface2);display:grid;place-items:center;
+    font-weight:900;color:var(--navy-mid);font-size:18px;flex:none;overflow:hidden}
+  .card .nm{font-weight:800;font-size:15px;letter-spacing:-.2px}
+  .badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;padding:3px 8px;border-radius:99px;margin-top:5px}
+  .badge.ver{background:var(--ok-soft);color:var(--ok)}
+  .badge.new{background:var(--surface3);color:var(--navy-mid)}
+  .card .meta{display:flex;align-items:center;gap:14px;margin-top:14px;padding-top:13px;border-top:1px solid var(--border);
+    font-size:12.5px;color:var(--muted);font-weight:700}
+  .card .meta b{color:var(--navy);font-weight:800}
+  .card .meta .it{display:inline-flex;align-items:center;gap:5px}
+
+  /* store detail */
+  .banner{position:relative;overflow:hidden;border-radius:16px;background:linear-gradient(135deg,#1c3550,#0a1b30);
+    color:#fff;padding:22px 24px 24px;margin-bottom:16px}
+  .banner .row1{display:flex;justify-content:space-between;margin-bottom:20px}
+  .icon-btn{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.12);display:grid;place-items:center;border:0;color:#fff;cursor:pointer}
+  .banner .store{display:flex;align-items:center;gap:16px}
+  .banner .lg{width:64px;height:64px;border-radius:14px;background:rgba(255,255,255,.14);display:grid;place-items:center;font-weight:900;font-size:22px;flex:none}
+  .banner h1{font-size:23px;font-weight:900;letter-spacing:-.4px;display:flex;align-items:center;gap:10px}
+  .banner .vpill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;background:rgba(29,175,88,.22);
+    color:#8ff0b8;padding:4px 10px;border-radius:99px}
+  .banner .desc{font-size:13px;color:#c7d6e6;margin-top:6px;max-width:560px}
+  .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:22px}
+  .tile{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:15px 16px}
+  .tile .k{font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+  .tile .v{font-size:19px;font-weight:900;color:var(--navy);margin-top:4px}
+  .eqhead{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .eqhead h3{font-size:18px;font-weight:900;letter-spacing:-.3px}
+  .eqhead .cnt{background:var(--brand-soft);color:var(--brand);font-weight:900;font-size:12px;padding:2px 10px;border-radius:99px}
+  .eqgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+  .eq{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;transition:.15s}
+  .eq:hover{border-color:#b9cee0;box-shadow:0 6px 20px rgba(28,53,80,.07)}
+  .eq .ph{height:120px;background:var(--surface2);display:grid;place-items:center;color:#a9c2d6}
+  .eq .ph.placeholder{background:repeating-linear-gradient(135deg,#eff4f9,#eff4f9 10px,#e8f0f7 10px,#e8f0f7 20px)}
+  .eq .bd{padding:13px 14px}
+  .eq .nm{font-weight:800;font-size:14.5px;display:flex;align-items:center;gap:6px}
+  .eq .sub{font-size:12px;color:var(--muted);font-weight:700;margin-top:2px}
+  .eq .pr{margin-top:10px;font-size:15px;font-weight:900;color:var(--navy)}
+  .eq .pr small{font-size:11.5px;color:var(--muted);font-weight:700}
+  .eq .por{margin-top:10px;font-size:12.5px;font-weight:800;color:var(--info)}
+  .tick{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;background:var(--ok);color:#fff}
+
+  /* comparison strip */
+  .compare{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px}
+  @media(max-width:720px){.compare{grid-template-columns:1fr}.tiles{grid-template-columns:1fr}}
+  .compare .lab{font-size:12px;font-weight:800;color:var(--navy-mid);margin-bottom:8px;display:flex;align-items:center;gap:7px}
+  .compare .lab .chip{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px}
+  .chip.guest{background:var(--info-soft);color:var(--info)}
+  .chip.member{background:var(--ok-soft);color:var(--ok)}
+  .divider{height:1px;background:var(--border);margin:40px 0 4px}
+  .callout{background:var(--info-soft);border:1px solid #cfe6f7;border-radius:12px;padding:12px 14px;font-size:12.5px;
+    color:#12507e;margin-top:16px;display:flex;gap:9px;align-items:flex-start}
+</style>
+</head>
+<body>
+
+<div class="appbar">
+  <div class="appbar-in">
+    <div class="logo"><span class="mk">M</span> Moedatech</div>
+    <div class="nav">
+      <span>Home</span><span>Browse</span>
+      <span class="muted" title="Hidden for guests">Requests</span>
+      <span class="muted" title="Hidden for guests">Inbox</span>
+      <button class="signin">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
+        Sign in
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- ============ GUEST BROWSE ============ -->
+  <div class="viewtag"><span class="dot"></span> Signed-out visitor · /stores</div>
+  <h2 class="sec">Suggested suppliers</h2>
+  <p class="sub">Browse verified equipment suppliers across Saudi Arabia — no account needed.</p>
+
+  <!-- Guest filter bar: Search + Verified only (City + Category hidden) -->
+  <div class="filters">
+    <div class="searchbox">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input placeholder="Search suppliers or equipment…" />
+    </div>
+    <div class="filrow">
+      <label class="verified-toggle"><span class="sw"><i></i></span> Verified only</label>
+    </div>
+    <div class="ghost-note">City &amp; category filters appear once you sign in.</div>
+  </div>
+
+  <div class="grid">
+    <div class="card"><div class="top"><div class="lg">AR</div><div><div class="nm">Al Rajhi Equipment</div><span class="badge ver"><span class="tick" style="width:13px;height:13px">✓</span> Verified</span></div></div>
+      <div class="meta"><span class="it"><b>48</b> listings</span><span class="it">📍 Riyadh</span></div></div>
+
+    <div class="card"><div class="top"><div class="lg">GC</div><div><div class="nm">Gulf Cranes Co</div><span class="badge ver"><span class="tick" style="width:13px;height:13px">✓</span> Verified</span></div></div>
+      <div class="meta"><span class="it"><b>31</b> listings</span><span class="it">📍 Dammam</span></div></div>
+
+    <div class="card"><div class="top"><div class="lg">NH</div><div><div class="nm">Najd Heavy Machinery</div><span class="badge new">New</span></div></div>
+      <div class="meta"><span class="it"><b>12</b> listings</span><span class="it">📍 Riyadh</span></div></div>
+
+    <div class="card"><div class="top"><div class="lg">JB</div><div><div class="nm">Jeddah Bulk Movers</div><span class="badge ver"><span class="tick" style="width:13px;height:13px">✓</span> Verified</span></div></div>
+      <div class="meta"><span class="it"><b>26</b> listings</span><span class="it">📍 Jeddah</span></div></div>
+
+    <div class="card"><div class="top"><div class="lg">SP</div><div><div class="nm">Saudi Power Rentals</div><span class="badge ver"><span class="tick" style="width:13px;height:13px">✓</span> Verified</span></div></div>
+      <div class="meta"><span class="it"><b>19</b> listings</span><span class="it">📍 Jubail</span></div></div>
+
+    <div class="card"><div class="top"><div class="lg">DL</div><div><div class="nm">Desert Line Logistics</div><span class="badge new">New</span></div></div>
+      <div class="meta"><span class="it"><b>8</b> listings</span><span class="it">📍 Buraydah</span></div></div>
+  </div>
+
+  <!-- filter-bar comparison -->
+  <div class="compare">
+    <div>
+      <div class="lab"><span class="chip guest">Guest</span> Filter bar — signed out</div>
+      <div class="filters">
+        <div class="searchbox"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input placeholder="Search…" /></div>
+        <div class="filrow"><label class="verified-toggle"><span class="sw"><i></i></span> Verified only</label></div>
+      </div>
+    </div>
+    <div>
+      <div class="lab"><span class="chip member">Signed in</span> Filter bar — City + Category return</div>
+      <div class="filters">
+        <div class="searchbox"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input placeholder="Search…" /></div>
+        <div class="filrow">
+          <select class="fil"><option>Any city</option></select>
+          <select class="fil"><option>Any category</option></select>
+          <select class="fil"><option>Pick a category first</option></select>
+          <label class="verified-toggle"><span class="sw off"><i></i></span> Verified</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ============ GUEST STORE DETAIL ============ -->
+  <div class="viewtag"><span class="dot"></span> Signed-out visitor · /stores/al-rajhi</div>
+
+  <div class="banner">
+    <div class="row1">
+      <button class="icon-btn">←</button>
+    </div>
+    <div class="store">
+      <div class="lg">AR</div>
+      <div>
+        <h1>Al Rajhi Equipment <span class="vpill">✓ Verified</span></h1>
+        <div class="desc">Heavy equipment rental across the Central Region. Excavators, cranes, loaders and power generation — operators available.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tiles">
+    <div class="tile"><div class="k">Listings</div><div class="v">48</div></div>
+    <div class="tile"><div class="k">Base city</div><div class="v">Riyadh</div></div>
+    <div class="tile"><div class="k">Documents</div><div class="v" style="color:var(--ok)">Verified</div></div>
+  </div>
+
+  <div class="eqhead"><h3>Equipment</h3><span class="cnt">48</span></div>
+  <div class="eqgrid">
+    <div class="eq"><div class="ph">🏗️</div><div class="bd"><div class="nm">Crawler Excavator <span class="tick">✓</span></div><div class="sub">Caterpillar 320D · 2020</div><div class="pr">SAR 1,200 <small>/ day</small></div></div></div>
+    <div class="eq"><div class="ph">🏗️</div><div class="bd"><div class="nm">Mobile Crane <span class="tick">✓</span></div><div class="sub">SANY STC1000 · 2023</div><div class="pr">SAR 4,500 <small>/ day</small></div></div></div>
+    <div class="eq"><div class="ph placeholder"></div><div class="bd"><div class="nm">Wheel Loader</div><div class="sub">Volvo L120 · 2019</div><div class="por">Price on request</div></div></div>
+    <div class="eq"><div class="ph">⚡</div><div class="bd"><div class="nm">Diesel Generator <span class="tick">✓</span></div><div class="sub">Cummins C500 · 2021</div><div class="pr">SAR 900 <small>/ day</small></div></div></div>
+  </div>
+
+  <div class="callout">
+    <span>ℹ️</span>
+    <span><b>What guests see:</b> real store cards + a store's equipment (photos, make/model/year, price or “price on request”, verified ticks) — sourced from the public <code>/public/stores*</code> endpoints. Contact info, CR/VAT documents, and the equipment-detail sheet stay behind sign-in. Equipment with no photo shows a plain placeholder (the taxonomy-icon fallback is signed-in only).</span>
+  </div>
+
+</div>
+</body>
+</html>

@@ -6,7 +6,6 @@ import { useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import { EquipmentDetailModal } from "@/components/stores/EquipmentDetailModal";
-import { SignInPrompt } from "@/components/common/SignInPrompt";
 import type { EquipmentCard, StoreDetail, TaxonomyNode } from "@/lib/contract/stores";
 
 /**
@@ -19,7 +18,7 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
   const t = useT();
   const router = useRouter();
   const { status } = useSession();
-  const anon = status === "anon"; // guests can't view store detail until T7 (public browse) ships
+  const anon = status === "anon";
   const [detail, setDetail] = useState<StoreDetail | null>(null);
   const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -27,8 +26,11 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
   const [selectedEq, setSelectedEq] = useState<string | null>(null);
   const [showDocs, setShowDocs] = useState(false);
 
-  // Taxonomy icons (shared bucket) → map node id → iconUrl, for equipment with no photo.
+  // Taxonomy icons (shared bucket) → map node id → iconUrl, for equipment with no photo. Authed-only
+  // reference data — skip for guests (they see the public store detail; equipment falls back to its
+  // own photo/placeholder, no taxonomy icon).
   useEffect(() => {
+    if (anon) return;
     fetch("/api/stores/taxonomy", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
       .then((d: { taxonomy: TaxonomyNode[] }) => {
@@ -41,10 +43,9 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
         setIcons(map);
       })
       .catch(() => setIcons({}));
-  }, []);
+  }, [anon]);
 
   useEffect(() => {
-    if (anon) return; // guests see the sign-in prompt; don't fire the authed fetch
     setError(false);
     setDetail(null);
     const ctrl = new AbortController();
@@ -61,7 +62,6 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, reloadKey]);
 
-  if (anon) return <SignInPrompt title={t.browse.signInTitle} />;
   if (error) {
     return (
       <div className="rounded-[14px] border border-border bg-surface p-8 text-center text-[13px] text-muted">

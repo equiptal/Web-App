@@ -160,8 +160,26 @@ return **401**, so guests see error/retry panels instead of real browse content.
 - **Additive / mobile-safe:** existing authed `/stores*` responses byte-unchanged; mobile regression-guarded.
 - View-count side effect on `/stores/{id}` should still behave (or be no-op) for anon.
 
-**Web wiring (after the endpoint exists):** point `/api/stores*` (and taxonomy) at the public endpoint
-when there's no session; flip the T6-interim empty states to render real data for guests.
+**Web wiring — DONE (2026-07-06, `web-public/auth-and-stores` alignment run).** Backend public
+store endpoints are BUILT on that branch (`GET /public/stores`, `/public/stores/{id}`,
+`/public/stores/{id}/equipment`, PII-safe `publicEquipmentProjection`). Web now routes guests to them:
+- `src/lib/api/app-backend-authed.ts` — added `appPublicCall()` (unauth GET, envelope-unwrap + error
+  map, no 401/refresh) and `hasAppSession()` (id/refresh cookie check).
+- `src/app/api/stores/route.ts` + `[id]/route.ts` — **no session ⇒ public endpoint**, session ⇒ authed
+  (unchanged). Detail merges `/public/stores/{id}` + `/equipment` when the detail doesn't inline equipment.
+- `src/lib/contract/stores.ts` — mapper tolerates the public shape: `name`←`companyName`, store `city`
+  derives from `equipment[0].yard.city` when store/yards omit it. (Equipment fields already matched 1:1.)
+- `src/app/api/stores/taxonomy/route.ts` + `master-data/cities/route.ts` — left authed-only (no public
+  reference endpoint; see W-2 below). The browse City + Category filters are **hidden for guests**;
+  `BrowseSurface` skips both fetches when signed out (no 401s). Search + Verified stay for guests.
+- `BrowseSurface` + `StoreDetailSurface` — dropped the anon→`SignInPrompt` gate; guests fetch + render.
+- Tests: `tests/unit/stores.test.ts` +2 (companyName fallback, yard-derived city).
+
+**W-2 (decision 2026-07-06): NO backend change for filters.** Instead of public `/public/taxonomy` +
+`/public/master-data/cities`, the guest browse simply **hides the City + Category/taxonomy filters**
+(they need authed reference data; deferred as non-priority). Guests browse the public store directory
++ a store's equipment with Search + Verified only; the hidden filters return once signed in. Clean,
+web-only, no backend work.
 
 - **Given** a signed-out visitor on `/` or `/stores/{id}`, **When** the public endpoint is live,
   **Then** suggested suppliers + store detail render real read-only data (no sign-in wall, no error panel).

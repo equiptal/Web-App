@@ -48,6 +48,10 @@ function AccountFlow({ onCreated, title, subtitle }: { onCreated: () => void; ti
   const hasGuestSession = status === "authed" && !!user?.phone && user?.tier === "guest";
   const alreadyComplete = status === "authed" && (user?.tier === "basic" || user?.tier === "verified");
   const [phase, setPhase] = useState<Phase>(hasGuestSession ? "profile" : "phone");
+  // Did we start at the profile step (mobile-handoff guest who skipped phone→OTP)? Captured once at
+  // mount. The normal flow collects + persists email at the phone step, so the register step omits it;
+  // the skip-to-profile path never collected an email, so it must ask for it (required) there.
+  const [skippedToProfile] = useState(hasGuestSession);
   const [phone, setPhone] = useState<string | null>(user?.phone ?? null);
   const [channel, setChannel] = useState<OtpChannel>({ method: "SMS" });
 
@@ -101,7 +105,10 @@ function AccountFlow({ onCreated, title, subtitle }: { onCreated: () => void; ti
   return (
     <OnboardingForm
       next="/create"
-      requireEmail
+      // Normal flow: email was collected + persisted at the phone step → don't ask again. Handoff guest
+      // (skipped that step): ask for it here, required.
+      showEmail={skippedToProfile}
+      requireEmail={skippedToProfile}
       onDone={onCreated}
       headline={t.guest.postTitle}
       subhead={t.guest.postBody}

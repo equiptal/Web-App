@@ -132,7 +132,8 @@ export function extractStoreList(raw: unknown): Raw[] {
 export function mapStoreCard(raw: Raw): StoreCard {
   return {
     id: String(raw.id ?? ""),
-    name: str(raw.name) ?? "",
+    // Authed `/stores` sends `name`; the public projection sends the supplier's `companyName`.
+    name: str(raw.name) ?? str(raw.companyName) ?? "",
     logoUrl: mediaUrl(raw.logoUrl ?? raw.logoKey),
     isVerified: bool(raw.isVerified),
     activeEquipmentCount: num(raw.activeEquipmentCount) ?? 0,
@@ -210,16 +211,18 @@ export function mapStoreDetail(raw: Raw): StoreDetail {
   const yards = Array.isArray(raw.yards) ? (raw.yards as Raw[]) : [];
   const equipmentRaw = Array.isArray(raw.equipment) ? (raw.equipment as Raw[]) : [];
   const meta = (raw.equipmentMeta && typeof raw.equipmentMeta === "object" ? (raw.equipmentMeta as Raw) : {}) as Raw;
-  const city = str(store.city) ?? (yards.length ? str(yards[0].city) : null);
+  // Public projection carries city on each equipment's nested `yard` rather than on the store/yards.
+  const eqYard = equipmentRaw.length && equipmentRaw[0].yard && typeof equipmentRaw[0].yard === "object" ? (equipmentRaw[0].yard as Raw) : null;
+  const city = str(store.city) ?? (yards.length ? str(yards[0].city) : null) ?? (eqYard ? str(eqYard.city) : null);
   return {
     id: String(store.id ?? ""),
-    name: str(store.name) ?? "",
+    name: str(store.name) ?? str(store.companyName) ?? "",
     description: str(store.description),
     logoUrl: mediaUrl(store.logoUrl ?? store.logoKey),
     bannerUrl: mediaUrl(store.bannerUrl ?? store.bannerKey),
     viewCount: num(store.viewCount) ?? 0,
     isVerified: bool(store.isVerified),
-    supplierName: str(store.supplierName),
+    supplierName: str(store.supplierName) ?? str(store.companyName),
     city,
     activeEquipmentCount: num(meta.total) ?? equipmentRaw.length,
     equipment: equipmentRaw.map(mapEquipment),

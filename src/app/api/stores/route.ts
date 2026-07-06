@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
-import { withAuthedBackend, appAuthErrorResponse } from "@/lib/api/app-backend-authed";
+import { withAuthedBackend, appAuthErrorResponse, appPublicCall, hasAppSession } from "@/lib/api/app-backend-authed";
+import { localeFromRequest } from "@/lib/api/auth-server";
 import { extractStoreList, mapStoreCard } from "@/lib/contract/stores";
 
 /**
  * GET /api/stores — browse verified suppliers (web-app/004, AC-05/10/11/12/13/14/15/16/24).
- * Proxies the shared backend `GET /stores` (read-only). The backend enforces the visibility rule
- * (visible + active supplier + ≥1 active equipment) and featured/pinned ordering server-side, so
- * the web only forwards the renter's filters and maps the cards. Accepts:
- * `page,limit,search,category,city,measurement,verified`.
+ * Signed-in renters hit the authed `GET /stores`; signed-out visitors hit the PUBLIC directory
+ * `GET /public/stores` (public-web-auth-and-stores / T7) — same visibility + featured ordering,
+ * enforced server-side, on a PII-safe projection. The web only forwards the filters and maps the
+ * cards. Accepts `page,limit,search,category,city,measurement,verified`.
  */
 const PASS = ["page", "limit", "search", "category", "city", "measurement", "verified"] as const;
 
@@ -19,6 +20,17 @@ export async function GET(req: Request) {
     if (v != null && v !== "") qs.set(k, v);
   }
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
+
+  // Guests read the public directory; no session ⇒ no authed 401.
+  if (!(await hasAppSession())) {
+    try {
+      const raw = await appPublicCall(`/public/stores${suffix}`, localeFromRequest(req));
+      return NextResponse.json({ stores: extractStoreList(raw).map(mapStoreCard) });
+    } catch (err) {
+      return appAuthErrorResponse(err);
+    }
+  }
+
   return withAuthedBackend(req, async (call) => {
     try {
       const raw = await call(`/stores${suffix}`);
