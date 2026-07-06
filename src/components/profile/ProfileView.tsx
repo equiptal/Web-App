@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useT, useLocale, type Locale } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
+import { useAuthGate } from "@/components/auth/AuthGate";
+import { PUBLIC_WEB_ENABLED } from "@/lib/flags";
 import { Icon } from "@/components/ui";
 import type { RenterProfile, VerificationStatus } from "@/lib/contract/onboarding";
 import { updateLanguage } from "@/lib/api/profile-client";
@@ -28,6 +30,7 @@ export function ProfileView() {
   const ar = locale === "ar";
   const router = useRouter();
   const { user, tier, signOut } = useSession();
+  const { openAuth } = useAuthGate();
 
   const [profile, setProfile] = useState<RenterProfile | null>(null);
   const [verification, setVerification] = useState<VerificationStatus>("none");
@@ -108,8 +111,10 @@ export function ProfileView() {
 
   const onReLogin = () => {
     // Phone (identity) changed — cookies were cleared by the BFF; drop client state + re-authenticate.
+    // Public web: re-auth via the modal form in place (no /login page). Legacy/prod: the /login gate.
     void signOut();
-    router.replace("/login");
+    if (PUBLIC_WEB_ENABLED) openAuth();
+    else router.replace("/login");
   };
 
   const fullName = [profile?.firstName, profile?.lastName].filter(Boolean).join(" ").trim();

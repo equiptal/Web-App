@@ -22,11 +22,11 @@ import type { NextRequest } from "next/server";
 const REFRESH_COOKIE = "mt_refresh";
 const ID_COOKIE = "mt_id";
 
-// PUBLIC-WEB FEATURE FLAG. Set NEXT_PUBLIC_PUBLIC_WEB_ENABLED=1 in the STAGING environment to keep
-// public browse there. Leave it unset in production until the public-web + one-step-auth-gate epic
-// ships (same env-flag pattern as LOGO_UPLOAD_ENABLED). Read at call time so it's build-inlined in
-// prod and toggleable in tests.
-const publicWebEnabled = () => process.env.NEXT_PUBLIC_PUBLIC_WEB_ENABLED === "1";
+// PUBLIC-WEB FEATURE FLAG — now DEFAULT ON (public browse, no /login gate). Set
+// NEXT_PUBLIC_PUBLIC_WEB_ENABLED=0 to fall back to the legacy session gate (e.g. a kill-switch to
+// hold it back on prod). Keep in sync with `flags.ts` (default ON, `=0` disables). Read at call time
+// so it's toggleable in tests.
+const publicWebEnabled = () => process.env.NEXT_PUBLIC_PUBLIC_WEB_ENABLED !== "0";
 
 // Flag ON: NO route gate at all — the whole web is public. Auth is a modal fired in-app (there is no
 // `/login` redirect); pages that need a session (e.g. a deal room) open the auth modal in place.

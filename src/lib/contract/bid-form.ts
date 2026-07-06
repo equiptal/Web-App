@@ -57,6 +57,9 @@ export interface BidFormDraft {
   project_terms: Record<string, string> | null;
   renter_notes: string | null;
   items: DraftItem[];
+  /** Non-canonical clauses/fees/conditions the agent pulled from the quote that don't map to a field —
+   *  surfaced (editable) so nothing is dropped, and folded into the bid's note for the compare "Notes" row. */
+  extras: { label: string; value: string; status: DraftStatus }[];
 }
 
 /** The request context the web sends to `/bids/transform` so the agent can pre-answer the terms. */
@@ -145,6 +148,10 @@ export function bidQuoteToFormDraft(bid: NormalizedBid, termMatches: TermMatch[]
       )
     : null;
 
+  const extras = (bid.extra_terms ?? [])
+    .filter((e) => e?.label != null && String(e.label).trim())
+    .map((e) => ({ label: String(e.label), value: e.value != null ? String(e.value) : "", status: "extracted" as DraftStatus }));
+
   return {
     meta: { has_request, source_file: bid.source_file ?? null, lang_hint: undefined },
     company,
@@ -152,6 +159,7 @@ export function bidQuoteToFormDraft(bid: NormalizedBid, termMatches: TermMatch[]
     project_terms,
     renter_notes: null,
     items: [item],
+    extras,
   };
 }
 
@@ -173,6 +181,8 @@ export function bidFormDraftToNormalized(draft: BidFormDraft, extracted: Normali
     mobilization_amount: it ? num(it.pricing.delivery_price) : extracted.mobilization_amount,
     demobilization_amount: it ? num(it.pricing.return_price) : extracted.demobilization_amount,
     units_offered: it ? num(it.units_offered) ?? extracted.units_offered : extracted.units_offered,
+    // Carry the (renter-edited) extras back so the committed bid keeps every non-canonical clause.
+    extra_terms: draft.extras.filter((e) => e.label && String(e.label).trim()).map((e) => ({ label: e.label, value: e.value })),
   };
 }
 

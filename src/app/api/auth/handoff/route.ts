@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { fetchMeWithToken } from "@/lib/api/app-backend-authed";
 import { setHandoffSession, localeFromRequest } from "@/lib/api/auth-server";
 import { normalizeTier, type RenterUser } from "@/lib/contract/auth";
+import { PUBLIC_WEB_ENABLED } from "@/lib/flags";
 
 /**
  * GET /api/auth/handoff?token=<idToken> — mobile→web sign-in handoff (mobile/017 AC-08).
@@ -19,9 +20,11 @@ import { normalizeTier, type RenterUser } from "@/lib/contract/auth";
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const token = (url.searchParams.get("token") ?? "").trim();
-  const loginUrl = new URL("/login", url.origin);
+  // Public web has no /login page — a failed/absent handoff just lands on the public home (the auth
+  // modal handles sign-in on the next gated action). Legacy/prod falls back to the /login gate.
+  const fallbackUrl = new URL(PUBLIC_WEB_ENABLED ? "/" : "/login", url.origin);
 
-  if (!token) return NextResponse.redirect(loginUrl);
+  if (!token) return NextResponse.redirect(fallbackUrl);
 
   try {
     const me = await fetchMeWithToken(token, localeFromRequest(req));
@@ -30,7 +33,7 @@ export async function GET(req: Request) {
     setHandoffSession(res, token, user);
     return res;
   } catch {
-    // Invalid/expired carried token → fall back to normal sign-in.
-    return NextResponse.redirect(loginUrl);
+    // Invalid/expired carried token → fall back to the public home (or /login in legacy mode).
+    return NextResponse.redirect(fallbackUrl);
   }
 }

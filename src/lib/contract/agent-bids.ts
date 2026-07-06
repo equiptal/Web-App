@@ -65,6 +65,11 @@ export interface NormalizedBid {
   supplier_vat?: string | null;
   supplier_national_address?: string | null;
   supplier_contact?: string | null;
+  /** Any OTHER field/clause/fee/condition the quote contains that isn't one of the standard fields or
+   *  the 9 canonical terms — the agent emits these (label + value) so NOTHING from the quote is dropped.
+   *  Surfaced in the verify screen's "Additional info from the quote" section and carried into the
+   *  committed bid. Empty/absent until the agent's /bids/transform populates it (see the handoff). */
+  extra_terms?: { label: string; value: string }[];
 }
 
 /** The 9 verifiable Yes/No terms on the bid form (mirrors the shared bid form + BidFormDraft). */
@@ -299,7 +304,12 @@ export function normalizedBidToBidCard(
     conflictCount: 0,
     dealRoomId: null,
     expired: false,
-    note: nb.notes ?? (nb.source_file ? `From uploaded file: ${nb.source_file}` : "From uploaded file"),
+    // Fold the free-text notes + any non-canonical extra_terms (agent-extracted clauses that don't map
+    // to a table field) into one note, so the comparison's "Notes" row surfaces everything the quote had.
+    note:
+      [nb.notes, ...(nb.extra_terms ?? []).filter((e) => e?.label).map((e) => `${e.label}: ${e.value}`)]
+        .filter((s) => s != null && String(s).trim())
+        .join(" · ") || (nb.source_file ? `From uploaded file: ${nb.source_file}` : "From uploaded file"),
     requiredCerts,
     heldCertCodes: certCodes,
     equipmentCertCodes: certCodes,

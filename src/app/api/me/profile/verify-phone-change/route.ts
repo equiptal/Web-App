@@ -7,7 +7,8 @@ import { clearAuthCookies } from "@/lib/api/auth-server";
  * `POST /profile/verify-phone-change`, verifyPhoneChangeSchema / requireTier basic). Body:
  * { newPhone, otp }. The backend returns `requireReLogin: true` — the phone (identity) changed, so the
  * current session tokens no longer match. We CLEAR the auth cookies on the response; the client then
- * redirects to /login to re-authenticate with the new number.
+ * re-authenticates with the new number — via the in-app auth modal on public web (no /login page), or
+ * the /login route in legacy mode.
  */
 export async function POST(req: Request) {
   let body: Record<string, unknown> = {};

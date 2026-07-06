@@ -9,6 +9,7 @@ import { Icon } from "@/components/ui";
 import type { Locale } from "@/lib/i18n/config";
 import { SurveyProvider } from "@/components/surveys/SurveyProvider";
 import { AuthGateProvider, useAuthGate } from "@/components/auth/AuthGate";
+import { PUBLIC_WEB_ENABLED } from "@/lib/flags";
 import { fetchDealRoomUnread } from "@/lib/api/client";
 import { canSeeProcurementDashboard } from "@/lib/access/dashboard";
 import { NotificationsBell } from "@/components/NotificationsBell";
@@ -91,7 +92,9 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
   const handleSignOut = async () => {
     setMenuOpen(false);
     await signOut(); // AC-09
-    router.push("/login");
+    // Public web: no /login page — a signed-out user lands on the public home and browses as a guest
+    // (auth is the modal form on the next gated action). Legacy/prod: back to the /login gate.
+    router.push(PUBLIC_WEB_ENABLED ? "/" : "/login");
   };
 
   // `gated` items are the personal, account-bound areas (mirror middleware's GATED_PREFIXES). The web

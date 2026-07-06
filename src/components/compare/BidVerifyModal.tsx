@@ -64,6 +64,8 @@ export function BidVerifyModal({
     setDraft((d) => { const items = [...d.items]; const terms = [...items[0].terms]; terms[idx] = { ...terms[idx], answer, status: "extracted" }; items[0] = { ...items[0], terms }; return { ...d, items }; });
   const setContract = (idx: number, answer: "yes" | "no") =>
     setDraft((d) => { const ct = [...d.contract_terms]; ct[idx] = { ...ct[idx], answer, status: "extracted" }; return { ...d, contract_terms: ct }; });
+  const setExtra = (idx: number, value: string) =>
+    setDraft((d) => { const extras = [...d.extras]; extras[idx] = { ...extras[idx], value, status: "extracted" }; return { ...d, extras }; });
 
   const allTermsYes = !!item && item.terms.length > 0 && item.terms.every((t) => t.answer === "yes");
   const toggleAllYes = () =>
@@ -253,6 +255,20 @@ export function BidVerifyModal({
                 <div className="field"><label>{L("Quote valid until", "صلاحية العرض حتى")}<Hint status={draft.company.valid_until.status} ar={ar} /></label><input type="date" value={draft.company.valid_until.value ?? ""} onChange={(e) => setCompany("valid_until", e.target.value)} /></div>
                 <div className="notes-field"><label>{L("Notes", "ملاحظات")}</label><textarea value={draft.company.notes.value ?? ""} onChange={(e) => setCompany("notes", e.target.value)} /></div>
               </div>
+
+              {/* §6 Additional notes & terms — non-canonical clauses the agent pulled from the quote. */}
+              {draft.extras.length > 0 && (
+                <div className="sec">
+                  <div className="sec-h"><span className="material-icons-outlined hdic">notes</span><h3>{L("Additional notes & terms", "ملاحظات وشروط إضافية")}</h3><span className="ro-tag">{L("From quote", "من العرض")}</span></div>
+                  {draft.extras.map((e, i) => (
+                    <div className="field" key={i}>
+                      <label>{e.label}<Hint status={e.status} ar={ar} /></label>
+                      <input value={e.value} onChange={(ev) => setExtra(i, ev.target.value)} />
+                    </div>
+                  ))}
+                  <div className="ro-hint">{L("Anything from the quote that doesn't fit a field above — edit or clear it. These show in the comparison's Notes row.", "أي شيء من العرض لا يناسب حقلًا أعلاه — عدّله أو امسحه. تظهر في صف الملاحظات بالمقارنة.")}</div>
+                </div>
+              )}
             </div>
           </div>
         </div>

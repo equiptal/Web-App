@@ -10,9 +10,9 @@ const AUTHED = "mt_refresh=sometoken";
 const isNext = (res: Response) => res.headers.get("x-middleware-next") === "1";
 const FLAG = "NEXT_PUBLIC_PUBLIC_WEB_ENABLED";
 
-/* ── Flag ON: fully public, NO route gate — auth is an in-app modal, no /login redirect (staging) ── */
+/* ── Default (flag unset) OR =1: fully public, NO route gate — auth is an in-app modal, no /login ── */
 describe("public-web ON — no route gate at all", () => {
-  beforeEach(() => { process.env[FLAG] = "1"; });
+  beforeEach(() => { delete process.env[FLAG]; }); // default is now ON
   afterEach(() => { delete process.env[FLAG]; });
 
   it("unauthenticated → EVERY page passes through (incl. former gated /deal-room, /dashboard)", () => {
@@ -33,9 +33,10 @@ describe("public-web ON — no route gate at all", () => {
   });
 });
 
-/* ── Flag OFF (default → production): whole app requires a session; only /bid is public ── */
+/* ── Flag =0 (legacy kill-switch, e.g. prod): whole app requires a session; only /bid is public ── */
 describe("public-web OFF — legacy auth-required gating", () => {
-  beforeEach(() => { delete process.env[FLAG]; });
+  beforeEach(() => { process.env[FLAG] = "0"; });
+  afterEach(() => { delete process.env[FLAG]; });
 
   it("unauthenticated → home + every app page redirects to /login", () => {
     for (const p of ["/", "/create", "/stores/42", "/compare", "/requests", "/inbox", "/profile", "/deal-room/abc", "/dashboard"]) {
