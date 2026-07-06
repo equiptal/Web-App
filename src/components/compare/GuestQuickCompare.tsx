@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { useLocale } from "@/lib/i18n";
+import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { AccountModal } from "@/components/onboarding/AccountModal";
 import { parseBid, recommendBids, askBids } from "@/lib/api/client";
@@ -32,6 +32,7 @@ function fileToBase64(file: File): Promise<string> {
 
 export function GuestQuickCompare() {
   const { locale } = useLocale();
+  const t = useT();
   const ar = locale === "ar";
   const L = (en: string, arr: string) => (ar ? arr : en);
   const nf = (n: number) => Math.round(n).toLocaleString(ar ? "ar-EG" : "en-US");
@@ -134,7 +135,7 @@ export function GuestQuickCompare() {
             <p className="mt-0.5 text-[13px] text-muted">{L("Upload the quotes you received — the AI extracts and lines them up so you can compare, no account needed.", "ارفع العروض التي استلمتها — يستخرجها الذكاء الاصطناعي ويصفّها لتقارنها، دون حساب.")}</p>
           </div>
         </div>
-        <div className="mt-4 flex flex-wrap items-center gap-3">
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
           <button
             onClick={() => fileRef.current?.click()}
             disabled={busy}
@@ -227,7 +228,7 @@ export function GuestQuickCompare() {
         </div>
       )}
 
-      <AccountModal open={showAccount} onClose={() => setShowAccount(false)} onCreated={() => setShowAccount(false)} />
+      <AccountModal open={showAccount} onClose={() => setShowAccount(false)} onCreated={() => setShowAccount(false)} title={t.guest.trialTitle} subtitle={t.guest.trialSub} />
     </div>
   );
 }

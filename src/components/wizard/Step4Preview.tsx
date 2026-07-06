@@ -257,6 +257,8 @@ export function Step4Preview() {
           setShowAccount(false);
           void actions.submit(); // account created (now basic) → post the request
         }}
+        title={t.guest.postGateTitle}
+        postSubhead={t.guest.postBodyRequest}
       />
 
       {/* Basic-account request cap (backend E8009) — verify popup instead of an inline error. */}

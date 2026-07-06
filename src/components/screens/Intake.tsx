@@ -189,7 +189,7 @@ export function Intake() {
       </Card>
 
       {/* Guest hit the free agent-run limit → create an account, then continue processing. */}
-      <AccountModal open={showAccount} onClose={() => setShowAccount(false)} onCreated={() => { setShowAccount(false); void actions.process(); }} />
+      <AccountModal open={showAccount} onClose={() => setShowAccount(false)} onCreated={() => { setShowAccount(false); void actions.process(); }} title={t.guest.trialTitle} subtitle={t.guest.trialSub} />
     </div>
   );
 }

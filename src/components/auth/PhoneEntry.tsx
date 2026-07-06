@@ -186,9 +186,6 @@ export function PhoneEntry({
         {!busy && <Icon name="arrow_forward" size={18} className="rtl:scale-x-[-1]" />}
       </button>
 
-      {PUBLIC_WEB_ENABLED && (
-        <p className="mt-[14px] rounded-[10px] bg-info-soft px-[12px] py-[10px] text-[12px] leading-[1.5] text-info">{a.emailNote}</p>
-      )}
       <div className="mt-[22px] text-center text-[13px] leading-[1.55] text-muted">{a.signInFoot}</div>
     </form>
   );

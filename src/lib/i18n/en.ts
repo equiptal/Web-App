@@ -423,10 +423,17 @@ export const en = {
     blockTitle: "Create an account to continue", // AC-02
     blockBody: "RFQ creation is available to registered renters. Create an account to start a request.",
     createAccount: "Create account",
-    postTitle: "Create your account to post your request",
-    postBody: "Complete your details and your request will be posted right away.",
-    gateTitle: "Create your account to continue",
+    postTitle: "Complete your details",
+    postBody: "Just a few details to finish setting up your account.",
+    // Request-submit gate only — makes it clear the request posts right after (shown when submitting a request).
+    postBodyRequest: "Complete your details and your request will be posted right away.",
+    postGateTitle: "Sign in to post your request",
+    // General title for the sign-in/register modal — it serves BOTH new and returning accounts.
+    gateTitle: "Sign in to continue",
     gateSub: "Enter your phone number — we'll text a verification code. New or returning, just enter your number.",
+    // Guest AI-agent trial exhausted (per-device 3 free runs).
+    trialTitle: "You've reached your free trial",
+    trialSub: "Sign up to keep using the assistant — enter your phone number to continue.",
   },
   gate: {
     confirmLocation: "Confirm the location to continue.", // AC-12/16
@@ -487,7 +494,6 @@ export const en = {
     viaEmail: "Email",
     emailLabel: "Email address",
     emailInvalid: "Enter a valid email address.",
-    emailNote: "Your phone is your account — you sign in with it. Email is only where the code can be sent.",
     countryLabel: "Country",
     smsSaudiOnly: "SMS is available for Saudi (+966) numbers only — your code will be emailed instead.",
     sendCode: "Send code", // AC-01

@@ -19,7 +19,7 @@ import { normalizeTier, type RenterUser } from "@/lib/contract/auth";
  * Email is required here (see `requireEmail`). Verification is NOT required — becoming basic is enough
  * to post.
  */
-export function AccountModal({ open, onClose, onCreated, title, subtitle }: { open: boolean; onClose: () => void; onCreated: () => void; title?: string; subtitle?: string }) {
+export function AccountModal({ open, onClose, onCreated, title, subtitle, postHeadline, postSubhead }: { open: boolean; onClose: () => void; onCreated: () => void; title?: string; subtitle?: string; postHeadline?: string; postSubhead?: string }) {
   const { locale } = useLocale();
   if (!open) return null;
   return (
@@ -30,7 +30,7 @@ export function AccountModal({ open, onClose, onCreated, title, subtitle }: { op
     >
       <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-surface shadow-xl" onClick={(e) => e.stopPropagation()}>
         {/* Fresh mount each open → the flow always starts at the right step for the current session. */}
-        <AccountFlow onCreated={onCreated} title={title} subtitle={subtitle} />
+        <AccountFlow onCreated={onCreated} title={title} subtitle={subtitle} postHeadline={postHeadline} postSubhead={postSubhead} />
       </div>
     </div>
   );
@@ -39,7 +39,7 @@ export function AccountModal({ open, onClose, onCreated, title, subtitle }: { op
 type Phase = "phone" | "code" | "profile";
 
 /** The three-step flow. Mounted only while the modal is open, so its phase resets on each open. */
-function AccountFlow({ onCreated, title, subtitle }: { onCreated: () => void; title?: string; subtitle?: string }) {
+function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead }: { onCreated: () => void; title?: string; subtitle?: string; postHeadline?: string; postSubhead?: string }) {
   const t = useT();
   const { status, user, signIn } = useSession();
   // An existing (guest-tier) session with a phone skips OTP and goes straight to the profile step. A
@@ -110,8 +110,8 @@ function AccountFlow({ onCreated, title, subtitle }: { onCreated: () => void; ti
       showEmail={skippedToProfile}
       requireEmail={skippedToProfile}
       onDone={onCreated}
-      headline={t.guest.postTitle}
-      subhead={t.guest.postBody}
+      headline={postHeadline ?? t.guest.postTitle}
+      subhead={postSubhead ?? t.guest.postBody}
     />
   );
 }
