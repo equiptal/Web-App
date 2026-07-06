@@ -1,30 +1,38 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { commitBid } from "@/lib/api/client";
 import type { NormalizedBid } from "@/lib/contract/agent-bids";
 import {
   type BidFormDraft, type DraftStatus, type TermAnswer,
   BID_TERM_LABEL, bidFormDraftToNormalized, draftVatMode,
 } from "@/lib/contract/bid-form";
+import { BID_FORM_CSS } from "@/components/bid/bidFormStyles";
 
 /**
- * Renter-verify screen for an uploaded quote (Option A). Renders the `BidFormDraft` built by
- * `bidQuoteToFormDraft`, colours every field by `status` (extracted=green · assumed=amber ·
- * needs_verification=red), lets the renter edit each one, and — once the form's own validation passes —
- * commits it via `/bids/commit`, handing the returned comparison bid back to the caller.
+ * Renter-verify screen for an uploaded quote (Option A). Renders the quote transformed into OUR bid-form
+ * template — the SAME layout/classes as the public shareable form (`/bid/[token]` + BID_FORM_CSS) — but
+ * pre-filled with the extracted values and fully editable. Verification is OPTIONAL: the renter can add
+ * it with fields still blank/unverified. Submit → `/bids/commit` (VAT-stripped) → onCommitted(bid).
  */
 type LFn = (en: string, ar: string) => string;
 
-const STATUS_META: Record<DraftStatus, { c: string; bg: string; en: string; ar: string }> = {
-  extracted: { c: "#1daf58", bg: "#e7f7ee", en: "From quote", ar: "من العرض" },
-  assumed: { c: "#d4780a", bg: "#fff3e0", en: "Assumed — confirm", ar: "افتراضي — أكّد" },
-  needs_verification: { c: "#d9362a", bg: "#fdecea", en: "Verify", ar: "تحقّق" },
+const UNIT_LABEL: Record<string, [string, string]> = {
+  PER_DAY: ["day", "يوم"], PER_WEEK: ["week", "أسبوع"], PER_MONTH: ["month", "شهر"], PER_JOB: ["job", "مهمة"],
 };
-
-function StatusChip({ status, ar }: { status: DraftStatus; ar: boolean }) {
-  const m = STATUS_META[status];
-  return <span style={{ fontSize: 10.5, fontWeight: 800, color: m.c, background: m.bg, borderRadius: 100, padding: "2px 8px", whiteSpace: "nowrap" }}>{ar ? m.ar : m.en}</span>;
+const PT_LABEL: Record<string, [string, string]> = {
+  subtype: ["Type", "النوع"], capacity: ["Size", "المقاس"], location: ["Location", "الموقع"],
+  start_date: ["Rental start", "بدء الإيجار"], end_date: ["Rental end", "نهاية الإيجار"],
+};
+const HINT: Record<DraftStatus, { c: string; en: string; ar: string }> = {
+  extracted: { c: "#1daf58", en: "from quote", ar: "من العرض" },
+  assumed: { c: "#d4780a", en: "assumed", ar: "افتراضي" },
+  needs_verification: { c: "#2563EB", en: "to verify", ar: "للتحقّق" },
+};
+/** Tiny per-field provenance hint — subtle, so it doesn't break the shared-form look. */
+function Hint({ status, ar }: { status: DraftStatus; ar: boolean }) {
+  const h = HINT[status];
+  return <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: ".02em", color: h.c, marginInlineStart: 6, textTransform: "uppercase" }}>· {ar ? h.ar : h.en}</span>;
 }
 
 export function BidVerifyModal({
@@ -43,7 +51,7 @@ export function BidVerifyModal({
 
   const item = draft.items[0];
 
-  // Immutable setters — every edit clears the field's needs-verification status (renter confirmed it).
+  // Immutable setters — every edit marks the field extracted (renter confirmed/entered it).
   const setCompany = (key: keyof BidFormDraft["company"], value: string) =>
     setDraft((d) => ({ ...d, company: { ...d.company, [key]: { ...d.company[key], value: value || null, status: "extracted" } } }));
   const setPrice = (key: "rental_price" | "delivery_price" | "return_price", value: string) =>
@@ -54,183 +62,213 @@ export function BidVerifyModal({
     setDraft((d) => { const items = [...d.items]; items[0] = { ...items[0], pricing: { ...items[0].pricing, vat_mode: { value: mode, status: "extracted" } } }; return { ...d, items }; });
   const setTerm = (idx: number, answer: "yes" | "no") =>
     setDraft((d) => { const items = [...d.items]; const terms = [...items[0].terms]; terms[idx] = { ...terms[idx], answer, status: "extracted" }; items[0] = { ...items[0], terms }; return { ...d, items }; });
+  const setContract = (idx: number, answer: "yes" | "no") =>
+    setDraft((d) => { const ct = [...d.contract_terms]; ct[idx] = { ...ct[idx], answer, status: "extracted" }; return { ...d, contract_terms: ct }; });
+
+  const allTermsYes = !!item && item.terms.length > 0 && item.terms.every((t) => t.answer === "yes");
+  const toggleAllYes = () =>
+    setDraft((d) => { const items = [...d.items]; const on = !allTermsYes; items[0] = { ...items[0], terms: items[0].terms.map((t) => ({ ...t, answer: on ? "yes" : null, status: on ? "extracted" : t.status })) }; return { ...d, items }; });
 
   async function submit() {
-    // Verification is OPTIONAL — the renter can add the quote to the comparison with fields still
-    // missing/unverified (they stay marked by their chips). No hard gate; compare with what's known.
+    // Verification is OPTIONAL — no hard gate; add with whatever's known.
     setErr(null);
     setSubmitting(true);
     try {
       const corrected = bidFormDraftToNormalized(draft, extracted);
       const r = await commitBid({ source_file: draft.meta.source_file, extracted, corrected, vat_mode: draftVatMode(draft) });
-      if (r.agent && r.result?.bid) {
-        onCommitted(r.result.bid);
-      } else {
-        setErr(L("Couldn't add the quote — your AI assistant isn't connected. Try again.", "تعذّر إضافة العرض — مساعدك الذكي غير متصل. حاول مجددًا."));
-      }
+      if (r.agent && r.result?.bid) onCommitted(r.result.bid);
+      else setErr(L("Couldn't add the quote — your AI assistant isn't connected. Try again.", "تعذّر إضافة العرض — مساعدك الذكي غير متصل. حاول مجددًا."));
     } catch {
-      setErr(L("Couldn't add the quote — please try again.", "تعذّرت الإضافة — حاول مجددًا."));
+      setErr(L("Couldn't add the quote — please try again.", "تعذّرت الإضافة — حاول مرة أخرى."));
     } finally {
       setSubmitting(false);
     }
   }
 
-  const C = { navy: "#1c3550", muted: "#6b8fa8", border: "#e4edf5", surface: "#f7fafd" };
-  const label = item ? (item.size ? `${item.label} · ${item.size}` : item.label) : "";
-  const inCls = (bad: boolean) => ({ width: "100%", padding: "9px 11px", borderRadius: 9, border: `1.5px solid ${bad ? "#d9362a" : C.border}`, fontSize: 13.5, fontFamily: "inherit", outline: "none", background: "#fff", color: C.navy });
+  const dir = ar ? "rtl" : "ltr";
+  const sar = L("SAR", "ر.س");
+  const nf = (n: number) => new Intl.NumberFormat(ar ? "ar-EG" : "en-US").format(Math.round(n));
+  const units = item ? (item.units_offered.value || 1) : 1;
+  const vatMode = draftVatMode(draft);
+  const rental = item ? (item.pricing.rental_price.value ?? 0) : 0;
+  const delivery = item ? (item.pricing.delivery_price.value ?? 0) : 0;
+  const ret = item ? (item.pricing.return_price.value ?? 0) : 0;
+  const grossItem = (rental + delivery + ret) * units;
+  const net = vatMode === "incl" ? grossItem / 1.15 : grossItem;
+  const itemTotal = net * 1.15;
+  const line = (v: number) => (v ? v * units : 0);
+  const unit = extracted.price_unit ? (ar ? UNIT_LABEL[extracted.price_unit]?.[1] : UNIT_LABEL[extracted.price_unit]?.[0]) ?? extracted.price_unit : L("unit", "وحدة");
+
+  const termCell = (t: TermAnswer, onPick: (a: "yes" | "no") => void) => {
+    const lbl = BID_TERM_LABEL[t.key] ? (ar ? BID_TERM_LABEL[t.key][1] : BID_TERM_LABEL[t.key][0]) : t.label;
+    const cls = t.answer === "no" ? " declined" : t.answer == null ? " needpick" : "";
+    return (
+      <div key={t.key} className={`treqcell${cls}`}>
+        <div className="tc-name">{lbl}<Hint status={t.status} ar={ar} /></div>
+        {t.renter_wants && <div className="tc-rw"><span className="q">{L("Renter wants", "يطلب المستأجر")}:</span> <i>{t.renter_wants}</i></div>}
+        <div className="tc-sw"><span className="q">{L("Your answer", "إجابتك")}:</span>
+          <span className="miniseg">
+            <button type="button" className={`ok${t.answer === "yes" ? " on" : ""}`} onClick={() => onPick("yes")}><span className="material-icons-outlined">check</span>{L("Yes", "نعم")}</button>
+            <button type="button" className={`no${t.answer === "no" ? " on" : ""}`} onClick={() => onPick("no")}>{L("No", "لا")}</button>
+          </span>
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div dir={ar ? "rtl" : "ltr"} onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(16,38,63,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 640, maxHeight: "92vh", display: "flex", flexDirection: "column", background: "#fff", borderRadius: 18, overflow: "hidden", boxShadow: "0 24px 60px rgba(16,38,63,.35)" }}>
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "18px 20px 14px", borderBottom: `1px solid ${C.border}` }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(16,38,63,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "min(960px, 96vw)", maxHeight: "94vh", display: "flex", flexDirection: "column", background: "#fff", borderRadius: 16, overflow: "hidden", boxShadow: "0 24px 60px rgba(16,38,63,.35)" }}>
+        {/* Header (renter-side chrome, not the public renter-identity bar) */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 20px", borderBottom: "1px solid #E4EDF5", flex: "0 0 auto" }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 900, color: C.navy }}>{L("Verify the uploaded quote", "تحقّق من العرض المرفوع")}</h3>
-            <p style={{ margin: "3px 0 0", fontSize: 12.5, color: C.muted }}>{L("Confirm or fix each field — red needs your input — then add it to the comparison.", "أكّد أو صحّح كل حقل — الأحمر يحتاج إدخالك — ثم أضِفه للمقارنة.")}</p>
+            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 900, color: "#1C3550" }}>{L("Verify the uploaded quote", "تحقّق من العرض المرفوع")}</h3>
+            <p style={{ margin: "3px 0 0", fontSize: 12.5, color: "#6B8FA8" }}>{L("We transformed the quote into your bid form — confirm, edit, or leave blank, then add it.", "حوّلنا العرض إلى نموذج عرضك — أكّد أو عدّل أو اترك فارغًا ثم أضِفه.")}</p>
           </div>
-          <button onClick={onClose} aria-label={L("Close", "إغلاق")} style={{ width: 34, height: 34, borderRadius: 9, border: "none", background: C.surface, color: C.muted, cursor: "pointer", fontSize: 18 }}>✕</button>
+          <button onClick={onClose} aria-label={L("Close", "إغلاق")} style={{ width: 34, height: 34, borderRadius: 9, border: "none", background: "#EFF4F9", color: "#6B8FA8", cursor: "pointer", fontSize: 18 }}>✕</button>
         </div>
 
-        <div style={{ overflowY: "auto", padding: "16px 20px 8px" }}>
-          {/* §1 project terms (read-only) */}
-          {draft.project_terms && Object.keys(draft.project_terms).length > 0 && (
-            <section style={{ marginBottom: 18 }}>
-              <SecH>{L("Project terms — from your request", "شروط المشروع — من طلبك")}</SecH>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                {Object.entries(draft.project_terms).map(([k, v]) => (
-                  <div key={k} style={{ background: C.surface, borderRadius: 8, padding: "7px 10px" }}>
-                    <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", color: C.muted }}>{k}</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: C.navy }}>{v}</div>
+        {/* Body — the bid form, styled with BID_FORM_CSS */}
+        <div style={{ flex: 1, overflowY: "auto", background: "#EFF4F9" }}>
+          <div className={`bidpage${ar ? " rtl" : ""}`} dir={dir} style={{ minHeight: 0, background: "transparent" }}>
+            <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" />
+            <style>{BID_FORM_CSS}</style>
+            <div className="wrap" style={{ maxWidth: "none", padding: "18px 20px 24px" }}>
+
+              {/* §1 Project terms — from the request (read-only) */}
+              {draft.project_terms && Object.keys(draft.project_terms).length > 0 && (
+                <div className="sec">
+                  <div className="sec-h"><span className="material-icons-outlined hdic">tune</span><h3>{L("Project terms", "شروط المشروع")}</h3><span className="ro-tag">{L("From request", "من الطلب")}</span></div>
+                  <div className="ro-grid">
+                    {Object.entries(draft.project_terms).map(([k, v]) => (
+                      <div key={k} className="ro-cell"><div className="k">{PT_LABEL[k] ? (ar ? PT_LABEL[k][1] : PT_LABEL[k][0]) : k}</div><div className="v">{v}</div></div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* §4 item — terms + pricing */}
-          {item && (
-            <section style={{ marginBottom: 18 }}>
-              <SecH>{L("Equipment & pricing", "المعدة والتسعير")}</SecH>
-              <div style={{ fontSize: 14, fontWeight: 800, color: C.navy, marginBottom: 10 }}>{label}</div>
-
-              {/* Terms */}
-              {item.terms.length > 0 && (
-                <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
-                  {item.terms.map((t, i) => (
-                    <TermRow key={t.key} t={t} ar={ar} L={L} bad={false} onPick={(a) => setTerm(i, a)} />
-                  ))}
+                  <div className="ro-hint">{L("Only details from your request are shown here.", "تُعرض هنا فقط تفاصيل طلبك.")}</div>
                 </div>
               )}
 
-              {/* Units + VAT mode */}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 12 }}>
-                <Field label={L("Units offered", "الوحدات المعروضة")} status={item.units_offered.status} ar={ar}>
-                  <input type="number" min={1} inputMode="numeric" value={item.units_offered.value ?? ""} onChange={(e) => setUnits(e.target.value)} style={{ ...inCls(false), width: 110 }} />
-                </Field>
-                <div>
-                  <div style={{ fontSize: 11.5, fontWeight: 800, color: C.navy, marginBottom: 5 }}>{L("Prices are", "الأسعار")} <StatusChip status={item.pricing.vat_mode.status} ar={ar} /></div>
-                  <div style={{ display: "inline-flex", border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden" }}>
-                    {([["excl", L("Excl. VAT", "قبل الضريبة")], ["incl", L("Incl. VAT", "شامل الضريبة")]] as ["excl" | "incl", string][]).map(([v, lab]) => (
-                      <button key={v} type="button" onClick={() => setVat(v)} style={{ border: "none", cursor: "pointer", font: "inherit", fontWeight: 800, fontSize: 11.5, padding: "7px 12px", background: draftVatMode(draft) === v ? C.navy : "#fff", color: draftVatMode(draft) === v ? "#fff" : C.muted }}>{lab}</button>
-                    ))}
+              {/* §2 Contract terms (for all items) — usually empty for a transformed quote */}
+              {draft.contract_terms.length > 0 && (
+                <div className="sec">
+                  <div className="sec-h"><span className="material-icons-outlined hdic">gavel</span><h3>{L("Contract terms", "شروط العقد")}</h3></div>
+                  <div className="treqgrid">{draft.contract_terms.map((t, i) => termCell(t, (a) => setContract(i, a)))}</div>
+                </div>
+              )}
+
+              {/* §3 Renter's notes (read-only) */}
+              {draft.renter_notes && (
+                <div className="sec">
+                  <div className="sec-h"><span className="material-icons-outlined hdic">sticky_note_2</span><h3>{L("Renter's notes", "ملاحظات المستأجر")}</h3></div>
+                  <p className="rnote">{draft.renter_notes}</p>
+                </div>
+              )}
+
+              {/* §4 The item — terms + pricing */}
+              {item && (
+                <div className="sec">
+                  <div className="item-hd">
+                    <span className="material-icons-outlined">construction</span>
+                    <div className="inm-wrap"><span className="inm">{item.label || L("Equipment", "المعدة")}</span>{item.size && <span className="imeta">· {item.size}</span>}
+                      <span className={`units-chip${units > 1 ? " multi" : ""}`}><span className="material-icons-outlined">{units > 1 ? "layers" : "package_2"}</span>×{units} {units === 1 ? L("unit", "وحدة") : L("units", "وحدات")}</span></div>
+                  </div>
+
+                  {(item.delivery_by || item.return_by || item.item_notes) && (
+                    <div className="iteminfo">
+                      {item.delivery_by && <span className="ii"><b>{L("Delivery", "النقل إلى الموقع")}:</b> {item.delivery_by}</span>}
+                      {item.return_by && <span className="ii"><b>{L("Return", "النقل من الموقع")}:</b> {item.return_by}</span>}
+                      {item.item_notes && <span className="ii note"><span className="material-icons-outlined">sticky_note_2</span>{item.item_notes}</span>}
+                    </div>
+                  )}
+
+                  {/* Terms */}
+                  {item.terms.length > 0 && (
+                    <>
+                      <div className="subhead"><span className="material-icons-outlined">fact_check</span>{L("Terms — does the quote meet each?", "الشروط — هل يلبّي العرض كلًّا منها؟")}
+                        <button type="button" className={`yall${allTermsYes ? " on" : ""}`} onClick={toggleAllYes}><span className="yall-sw"></span>{L("Yes to all", "نعم للكل")}</button>
+                      </div>
+                      <div className="treqgrid">{item.terms.map((t, i) => termCell(t, (a) => setTerm(i, a)))}</div>
+                    </>
+                  )}
+
+                  {/* Units */}
+                  <div className="subhead"><span className="material-icons-outlined">tag</span>{L("Units offered", "الوحدات المعروضة")}<Hint status={item.units_offered.status} ar={ar} /></div>
+                  <input className="ptbl-in" style={{ width: 120, textAlign: "start" }} type="number" min={1} inputMode="numeric" value={item.units_offered.value ?? ""} onChange={(e) => setUnits(e.target.value)} />
+
+                  {/* Pricing */}
+                  <div className="subhead"><span className="material-icons-outlined">request_quote</span>{L("Pricing", "التسعير")}
+                    <span style={{ marginInlineStart: "auto", display: "inline-flex", border: "1px solid var(--border)", borderRadius: 7, overflow: "hidden", textTransform: "none", letterSpacing: 0 }}>
+                      {([["excl", L("Excl. VAT", "قبل الضريبة")], ["incl", L("Incl. VAT", "شامل الضريبة")]] as ["excl" | "incl", string][]).map(([v, lab]) => (
+                        <button key={v} type="button" onClick={() => setVat(v)} style={{ border: "none", cursor: "pointer", font: "inherit", textTransform: "none", letterSpacing: 0, fontWeight: 800, fontSize: 10.5, padding: "3px 9px", background: vatMode === v ? "var(--navy)" : "var(--surface1)", color: vatMode === v ? "#fff" : "var(--muted)" }}>{lab}</button>
+                      ))}
+                    </span>
+                  </div>
+                  <table className="ptbl">
+                    <thead><tr><th>{L("Item", "البند")}</th><th className="num">{L("Unit", "الوحدة")}</th><th className="num">{L("Qty", "العدد")}</th><th className="num">{vatMode === "incl" ? L("Price (incl. VAT)", "السعر (شامل)") : L("Price", "السعر")}</th><th className="num">{L("Total", "الإجمالي")}</th></tr></thead>
+                    <tbody>
+                      <tr>
+                        <td><div className="it-lbl">{L("Rental", "الإيجار")}</div></td>
+                        <td className="num">{unit}</td><td className="num">{units}</td>
+                        <td className="num"><input className="ptbl-in" inputMode="numeric" value={item.pricing.rental_price.value ?? ""} onChange={(e) => setPrice("rental_price", e.target.value)} placeholder="0" /></td>
+                        <td className="num tot">{rental ? nf(line(rental)) : "—"}</td>
+                      </tr>
+                      <tr>
+                        <td><div className="it-lbl">{L("Delivery to site", "النقل إلى الموقع")}</div><div className="it-sub2">{L("if the supplier delivers", "إن كان النقل على المؤجّر")}</div></td>
+                        <td className="num">{L("Trip", "رحلة")}</td><td className="num">{units}</td>
+                        <td className="num"><input className="ptbl-in" inputMode="numeric" value={item.pricing.delivery_price.value ?? ""} onChange={(e) => setPrice("delivery_price", e.target.value)} placeholder="0" /></td>
+                        <td className="num tot">{delivery ? nf(line(delivery)) : "—"}</td>
+                      </tr>
+                      <tr>
+                        <td><div className="it-lbl">{L("Return from site", "النقل من الموقع")}</div><div className="it-sub2">{L("if the supplier returns it", "إن كان الإرجاع على المؤجّر")}</div></td>
+                        <td className="num">{L("Trip", "رحلة")}</td><td className="num">{units}</td>
+                        <td className="num"><input className="ptbl-in" inputMode="numeric" value={item.pricing.return_price.value ?? ""} onChange={(e) => setPrice("return_price", e.target.value)} placeholder="0" /></td>
+                        <td className="num tot">{ret ? nf(line(ret)) : "—"}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div className="itot">
+                    <span className="r">{vatMode === "incl" ? L("Net (before VAT)", "الصافي (قبل الضريبة)") : L("Subtotal", "المجموع")}<b>{net ? nf(net) : "—"} {sar}</b></span>
+                    <span className="r">{L("VAT 15%", "ضريبة ١٥٪")}<b>{net ? nf(net * 0.15) : "—"} {sar}</b></span>
+                    <span className="r t">{L("Item total", "إجمالي البند")}<b>{net ? nf(itemTotal) : "—"} {sar}</b></span>
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Pricing */}
-              <div style={{ display: "grid", gap: 10 }}>
-                <Field label={L("Rental price", "سعر الإيجار")} status={item.pricing.rental_price.status} ar={ar} req>
-                  <input inputMode="numeric" value={item.pricing.rental_price.value ?? ""} onChange={(e) => setPrice("rental_price", e.target.value)} placeholder="0" style={inCls(false)} />
-                </Field>
-                <Field label={L("Delivery price", "سعر النقل")} status={item.pricing.delivery_price.status} ar={ar}>
-                  <input inputMode="numeric" value={item.pricing.delivery_price.value ?? ""} onChange={(e) => setPrice("delivery_price", e.target.value)} placeholder="0" style={inCls(false)} />
-                </Field>
-                <Field label={L("Return price", "سعر الإرجاع")} status={item.pricing.return_price.status} ar={ar}>
-                  <input inputMode="numeric" value={item.pricing.return_price.value ?? ""} onChange={(e) => setPrice("return_price", e.target.value)} placeholder="0" style={inCls(false)} />
-                </Field>
-              </div>
-            </section>
-          )}
+              {/* Grand total */}
+              <div className="grand"><span className="gk">{L("Grand total (incl. VAT)", "الإجمالي الكلي (شامل الضريبة)")}</span><span className="gv">{net ? nf(itemTotal) : "—"} {sar}</span></div>
 
-          {/* §5 company */}
-          <section style={{ marginBottom: 8 }}>
-            <SecH>{L("Supplier details", "بيانات المؤجّر")}</SecH>
-            <div style={{ display: "grid", gap: 10 }}>
-              <Field label={L("Company name", "اسم الشركة")} status={draft.company.company_name.status} ar={ar} req>
-                <input value={draft.company.company_name.value ?? ""} onChange={(e) => setCompany("company_name", e.target.value)} style={inCls(false)} />
-              </Field>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <Field label={L("CR number", "رقم السجل التجاري")} status={draft.company.cr_number.status} ar={ar} req>
-                  <input inputMode="numeric" value={draft.company.cr_number.value ?? ""} onChange={(e) => setCompany("cr_number", e.target.value)} style={inCls(false)} />
-                </Field>
-                <Field label={L("VAT number", "الرقم الضريبي")} status={draft.company.vat_number.status} ar={ar} req>
-                  <input inputMode="numeric" value={draft.company.vat_number.value ?? ""} onChange={(e) => setCompany("vat_number", e.target.value)} style={inCls(false)} />
-                </Field>
-              </div>
-              <Field label={L("National address", "العنوان الوطني")} status={draft.company.national_address.status} ar={ar} req>
-                <input value={draft.company.national_address.value ?? ""} onChange={(e) => setCompany("national_address", e.target.value)} style={inCls(false)} />
-              </Field>
-              <Field label={L("Contact info", "بيانات التواصل")} status={draft.company.contact.status} ar={ar} req>
-                <input value={draft.company.contact.value ?? ""} onChange={(e) => setCompany("contact", e.target.value)} style={inCls(false)} />
-              </Field>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <Field label={L("Quote valid until", "صلاحية العرض حتى")} status={draft.company.valid_until.status} ar={ar}>
-                  <input type="date" value={draft.company.valid_until.value ?? ""} onChange={(e) => setCompany("valid_until", e.target.value)} style={inCls(false)} />
-                </Field>
-                <Field label={L("Notes", "ملاحظات")} status={draft.company.notes.status} ar={ar}>
-                  <input value={draft.company.notes.value ?? ""} onChange={(e) => setCompany("notes", e.target.value)} style={inCls(false)} />
-                </Field>
+              {/* §5 Supplier details */}
+              <div className="sec">
+                <div className="sec-h"><span className="material-icons-outlined hdic">badge</span><h3>{L("Supplier details", "بيانات المؤجّر")}</h3></div>
+                <div className="field">
+                  <label>{L("Company name", "اسم الشركة")}<span className="reqx"> *</span><Hint status={draft.company.company_name.status} ar={ar} /></label>
+                  <input value={draft.company.company_name.value ?? ""} onChange={(e) => setCompany("company_name", e.target.value)} placeholder={L("e.g. Gulf Heavy Equipment Co.", "مثال: شركة الخليج للمعدات")} />
+                </div>
+                <div className="frow">
+                  <div className="field"><label>{L("CR number", "رقم السجل التجاري")}<span className="reqx"> *</span><Hint status={draft.company.cr_number.status} ar={ar} /></label><input inputMode="numeric" value={draft.company.cr_number.value ?? ""} onChange={(e) => setCompany("cr_number", e.target.value)} /></div>
+                  <div className="field"><label>{L("VAT number", "الرقم الضريبي")}<span className="reqx"> *</span><Hint status={draft.company.vat_number.status} ar={ar} /></label><input inputMode="numeric" value={draft.company.vat_number.value ?? ""} onChange={(e) => setCompany("vat_number", e.target.value)} /></div>
+                </div>
+                <div className="field"><label>{L("National address", "العنوان الوطني")}<span className="reqx"> *</span><Hint status={draft.company.national_address.status} ar={ar} /></label><input value={draft.company.national_address.value ?? ""} onChange={(e) => setCompany("national_address", e.target.value)} /></div>
+                <div className="field"><label>{L("Contact info", "بيانات التواصل")}<span className="reqx"> *</span><Hint status={draft.company.contact.status} ar={ar} /></label><input value={draft.company.contact.value ?? ""} onChange={(e) => setCompany("contact", e.target.value)} placeholder={L("Phone or email", "هاتف أو بريد")} /></div>
+                <div className="field"><label>{L("Quote valid until", "صلاحية العرض حتى")}<Hint status={draft.company.valid_until.status} ar={ar} /></label><input type="date" value={draft.company.valid_until.value ?? ""} onChange={(e) => setCompany("valid_until", e.target.value)} /></div>
+                <div className="notes-field"><label>{L("Notes", "ملاحظات")}</label><textarea value={draft.company.notes.value ?? ""} onChange={(e) => setCompany("notes", e.target.value)} /></div>
               </div>
             </div>
-          </section>
+          </div>
         </div>
 
         {/* Footer */}
-        <div style={{ padding: "12px 20px 16px", borderTop: `1px solid ${C.border}` }}>
-          <p style={{ margin: "0 0 8px", fontSize: 11.5, color: C.muted }}>{L("Fields marked in colour aren't verified yet — you can add it now and fill them in later.", "الحقول الملوّنة غير مؤكَّدة بعد — يمكنك إضافته الآن وإكمالها لاحقًا.")}</p>
-          {err && <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 700, color: "#d9362a" }}>{err}</p>}
+        <div style={{ padding: "12px 20px 16px", borderTop: "1px solid #E4EDF5", flex: "0 0 auto" }}>
+          <p style={{ margin: "0 0 8px", fontSize: 11.5, color: "#6B8FA8" }}>{L("Anything unknown is left for you to fill — or leave it blank and add it now.", "كل ما هو غير معروف متروك لك لتعبئته — أو اتركه فارغًا وأضِفه الآن.")}</p>
+          {err && <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 700, color: "#D9362A" }}>{err}</p>}
           <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={onClose} style={{ flex: "0 0 auto", padding: "11px 18px", borderRadius: 11, border: `1px solid ${C.border}`, background: "#fff", color: C.navy, fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{L("Cancel", "إلغاء")}</button>
-            <button onClick={submit} disabled={submitting} style={{ flex: 1, padding: "11px", borderRadius: 11, border: "none", background: "#1c3550", color: "#fff", fontWeight: 800, fontSize: 14, cursor: submitting ? "default" : "pointer", opacity: submitting ? 0.7 : 1, fontFamily: "inherit" }}>
-              {submitting ? L("Adding…", "جارٍ الإضافة…") : L("Add to comparison", "أضِف للمقارنة")}
+            <button onClick={onClose} style={{ flex: "0 0 auto", padding: "12px 18px", borderRadius: 10, border: "1px solid #D4E0EC", background: "#fff", color: "#1C3550", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{L("Cancel", "إلغاء")}</button>
+            <button onClick={submit} disabled={submitting} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px", borderRadius: 10, border: "none", background: "#F79009", color: "#fff", fontWeight: 800, fontSize: 15, cursor: submitting ? "default" : "pointer", opacity: submitting ? 0.7 : 1, fontFamily: "inherit" }}>
+              <span className="material-icons-outlined" style={{ fontSize: 18 }}>{submitting ? "hourglass_top" : "add"}</span>{submitting ? L("Adding…", "جارٍ الإضافة…") : L("Add to comparison", "أضِف للمقارنة")}
             </button>
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function SecH({ children }: { children: ReactNode }) {
-  return <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".05em", color: "#6b8fa8", marginBottom: 9 }}>{children}</div>;
-}
-
-function Field({ label, status, ar, req, children }: { label: string; status: DraftStatus; ar: boolean; req?: boolean; children: ReactNode }) {
-  return (
-    <label style={{ display: "block" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
-        <span style={{ fontSize: 11.5, fontWeight: 800, color: "#1c3550" }}>{label}{req && <span style={{ color: "#d9362a" }}> *</span>}</span>
-        <StatusChip status={status} ar={ar} />
-      </div>
-      {children}
-    </label>
-  );
-}
-
-function TermRow({ t, ar, L, bad, onPick }: { t: TermAnswer; ar: boolean; L: LFn; bad: boolean; onPick: (a: "yes" | "no") => void }) {
-  const lbl = BID_TERM_LABEL[t.key] ? (ar ? BID_TERM_LABEL[t.key][1] : BID_TERM_LABEL[t.key][0]) : t.label;
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 9, border: `1.5px solid ${bad ? "#d9362a" : "#e4edf5"}`, background: "#fff" }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550" }}>{lbl}</div>
-        {t.renter_wants && <div style={{ fontSize: 11.5, color: "#6b8fa8" }}>{L("Renter wants", "يطلب المستأجر")}: <b>{t.renter_wants}</b></div>}
-      </div>
-      <StatusChip status={t.status} ar={ar} />
-      <span style={{ display: "inline-flex", border: "1px solid #e4edf5", borderRadius: 8, overflow: "hidden" }}>
-        {([["yes", L("Yes", "نعم")], ["no", L("No", "لا")]] as ["yes" | "no", string][]).map(([v, lab]) => (
-          <button key={v} type="button" onClick={() => onPick(v)} style={{ border: "none", cursor: "pointer", font: "inherit", fontWeight: 800, fontSize: 12, padding: "6px 12px", background: t.answer === v ? (v === "yes" ? "#1daf58" : "#d9362a") : "#fff", color: t.answer === v ? "#fff" : "#6b8fa8" }}>{lab}</button>
-        ))}
-      </span>
     </div>
   );
 }
