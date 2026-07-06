@@ -431,9 +431,9 @@ export const en = {
     // General title for the sign-in/register modal — it serves BOTH new and returning accounts.
     gateTitle: "Sign in to continue",
     gateSub: "Enter your phone number — we'll text a verification code. New or returning, just enter your number.",
-    // Guest AI-agent trial exhausted (per-device 3 free runs).
-    trialTitle: "You've reached your free trial",
-    trialSub: "Sign up to keep using the assistant — enter your phone number to continue.",
+    // Guest AI-agent limit reached (per-device run cap). Neutral wording — no free/paid framing.
+    trialTitle: "You've reached your limit",
+    trialSub: "Sign in to continue.",
   },
   gate: {
     confirmLocation: "Confirm the location to continue.", // AC-12/16

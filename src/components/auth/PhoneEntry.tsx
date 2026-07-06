@@ -105,8 +105,8 @@ export function PhoneEntry({
 
   return (
     <form onSubmit={submit} noValidate>
-      <h2 className="mb-[6px] text-[26px] font-extrabold tracking-[-.5px] text-navy">{title ?? a.signInTitle}</h2>
-      <p className="mb-[24px] text-[14px] leading-[1.55] text-muted">{subtitle ?? a.signInSub}</p>
+      <h2 className="mb-[6px] text-center text-[26px] font-extrabold tracking-[-.5px] text-navy">{title ?? a.signInTitle}</h2>
+      <p className="mb-[24px] text-center text-[14px] leading-[1.55] text-muted">{subtitle ?? a.signInSub}</p>
 
       <label className="mb-[8px] block text-[12.5px] font-bold text-navy-mid">
         {a.phoneLabel} {PUBLIC_WEB_ENABLED && <span className="text-danger">*</span>}

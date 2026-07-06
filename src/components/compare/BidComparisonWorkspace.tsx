@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useLocale } from "@/lib/i18n";
+import { useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
-import { GuestQuickCompare } from "@/components/compare/GuestQuickCompare";
+import { AccountModal } from "@/components/onboarding/AccountModal";
+import { agentUses, bumpAgentUse, guestLimitReached, GUEST_AGENT_LIMIT } from "@/lib/access/agent-quota";
 import { fetchMyRequests, fetchBids, fetchRequestSubmissions, startDealRoom, recommendBids, askBids, parseBid, transformBid, captureBidEvents, fetchDealRoomDocuments, fetchBidDocuments, fetchDealRoom } from "@/lib/api/client";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { groupRequests, type RequestGroup } from "@/lib/contract/requests";
@@ -96,8 +97,11 @@ const SUGGEST_ICON: Record<string, string> = {
 
 export function BidComparisonWorkspace() {
   const { locale } = useLocale();
+  const t = useT();
   const { status } = useSession();
-  // Comparing bids is inherently personal (your own requests) — nothing to browse as a guest.
+  // A signed-out visitor gets the SAME comparison workspace, minus any request/group context: they
+  // upload quotes (transformed through the same verify→template flow), compare them in the same matrix,
+  // and use the same AI rank/ask — capped at a per-device free trial, then prompted to create an account.
   const anon = status === "anon";
   const ar = locale === "ar";
   const L = (e: string, a: string) => (ar ? a : e);
@@ -176,7 +180,20 @@ export function BidComparisonWorkspace() {
   const prevRankRef = useRef<RecommendResult["ranking"] | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const preselectRef = useRef<Set<string> | null>(null); // bid ids to pre-select from ?bids= (one-shot, from My Bids)
+  const [showAccount, setShowAccount] = useState(false); // guest: the create-account gate (opens when the free trial is spent, or on a sign-in-only action)
   const router = useRouter();
+
+  // Guest metering (T10): the interactive AI assistant (custom re-rank + ask) is the metered "analysis".
+  // Guest free trial = 3 quote UPLOADS (metered in onUpload). This guard opens the account gate once the
+  // allowance is spent, for any guest action (another upload, a custom re-rank, an assistant question).
+  // It does NOT itself consume a credit — only a successfully-read upload does — so the counter tracks
+  // files uploaded, not clicks. Signed-in users are never limited.
+  const guardGuest = (): boolean => {
+    if (!anon) return true;
+    if (guestLimitReached("compare")) { setShowAccount(true); return false; }
+    return true;
+  };
+  const guestUploadsLeft = anon ? Math.max(0, GUEST_AGENT_LIMIT - agentUses("compare")) : 0;
 
   function toast(msg: string) {
     setToastMsg(msg);
@@ -185,7 +202,9 @@ export function BidComparisonWorkspace() {
   }
 
   useEffect(() => {
-    if (anon) return; // guests see the sign-in prompt; skip the authed fetch
+    // Guests have no requests/groups to load — seed an empty bid set so the matrix builds purely from
+    // their uploaded quotes (`raw` = [...[], ...uploaded]); skip the authed fetch entirely.
+    if (anon) { setBids([]); return; }
     let active = true;
     fetchMyRequests()
       .then((d) => active && setGroups(groupRequests(d.requests)))
@@ -288,6 +307,7 @@ export function BidComparisonWorkspace() {
   }, [loc?.key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    if (anon) return; // guest: bids stay the uploaded-only set (seeded above); never reset to null / refetched
     if (!activeItem) { setBids(null); return; }
     let active = true;
     setBidsLoading(true);
@@ -300,7 +320,7 @@ export function BidComparisonWorkspace() {
     setSubmissions([]);
     fetchRequestSubmissions(activeItem).then((r) => active && setSubmissions(r.submissions)).catch(() => {});
     return () => { active = false; };
-  }, [activeItem]);
+  }, [activeItem, anon]);
 
   // The renter's private cost estimates persist locally ("saved for next time", Q2) — these are the
   // renter's own rough planning numbers for responsibilities that land on them; never sent anywhere.
@@ -450,6 +470,7 @@ export function BidComparisonWorkspace() {
   useEffect(() => { try { const raw = localStorage.getItem("compare-awarded-ids"); if (raw) setAwardedIds(JSON.parse(raw)); } catch {} }, []);
   useEffect(() => { try { localStorage.setItem("compare-awarded-ids", JSON.stringify(awardedIds)); } catch {} }, [awardedIds]);
   const toggleAward = (bid: BidCard) => {
+    if (anon) { setShowAccount(true); return; } // awarding a supplier needs an account
     const was = !!awardedIds[bid.id];
     // Single-winner lock (app parity): a request/group has ONE winner. Block awarding a DIFFERENT
     // supplier while one is already awarded — whether by a backend accept / survey win (`awarded`) OR a
@@ -697,6 +718,7 @@ export function BidComparisonWorkspace() {
   function applyFreeText() {
     const v = freeText.trim();
     if (!v) { setFxEcho(null); return; }
+    if (!guardGuest()) return; // guest: blocked once the 3-upload trial is spent
     const low = v.toLowerCase();
     const hits = fxFactors.filter((f) => f.k.some((w) => low.includes(w)));
     const labels = hits.map((f) => (ar ? f.ar : f.en));
@@ -733,6 +755,8 @@ export function BidComparisonWorkspace() {
 
   async function onUpload(file: File) {
     setUploadOpen(false);
+    // Guest free trial: 3 quote uploads, then the account gate. Signed-in renters are never limited.
+    if (anon && guestLimitReached("compare")) { setShowAccount(true); return; }
     toast(L("Reading the quote…", "جارٍ قراءة العرض…"));
     try {
       const data = await fileToBase64(file);
@@ -755,6 +779,7 @@ export function BidComparisonWorkspace() {
         const t = await transformBid({ attachments: [{ type: file.type || "application/octet-stream", filename: file.name, data }], request: ctx });
         if (!t.agent) { toast(L("Quote upload needs your AI assistant — not connected.", "رفع العرض يحتاج مساعدك الذكي — غير متصل.")); return; }
         if (t.result) {
+          if (anon) bumpAgentUse("compare"); // a successfully-read guest upload consumes one trial credit
           // Wrong-equipment (match.blocking) → hard "can't compare" popup, never added (same as the
           // non-verify path). Only non-blocking quotes go to the verify screen. `needs_confirmation`
           // is advisory — the verify screen IS the confirm step, so it flows straight in there.
@@ -773,6 +798,7 @@ export function BidComparisonWorkspace() {
       const r = await parseBid({ attachments: [{ type: file.type || "application/octet-stream", filename: file.name, data }], request_context: { subtype: activeItemObj?.item?.name ?? null } });
       if (!r.agent) { toast(L("Quote upload needs your AI assistant — not connected.", "رفع العرض يحتاج مساعدك الذكي — غير متصل.")); return; }
       if (r.result && r.result.ok) {
+        if (anon) bumpAgentUse("compare"); // a successfully-read guest upload consumes one trial credit
         // Qualify the uploaded quote against the SAME request requirements the in-app / link bids carry
         // (year minimum + required equipment certs), sourced from any reference bid already in the table —
         // so its year/certs read green/red like a real bid instead of neutral. Cost/operator terms stay
@@ -805,6 +831,7 @@ export function BidComparisonWorkspace() {
   }
 
   async function goDealRoom(bid: BidCard, kind: "award" | "negotiate") {
+    if (anon) { setShowAccount(true); return; } // starting a deal / negotiating needs an account
     if (busy) return;
     captureBidEvents([{
       event_type: kind === "award" ? "award" : "choice",
@@ -828,11 +855,12 @@ export function BidComparisonWorkspace() {
   async function sendChat(text: string) {
     const v = text.trim();
     if (!v) return;
+    if (!guardGuest()) return; // guest: blocked once the 3-upload trial is spent
     setChat((c) => [...c, { role: "user", text: v }]);
     setChatInput("");
     const r = await askBids({
       message: v,
-      request: { hasRequirements: true },
+      request: { hasRequirements: !anon },
       bids: baseCols.map(bidColumnToComputed),
       current_ranking: prevRankRef.current,
     });
@@ -890,11 +918,11 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
     w.document.close();
   }
 
-  // Signed-out visitors get the request-free quick-compare (upload quotes → compare → AI rank/ask).
-  if (anon) return <GuestQuickCompare />;
+  // Signed-out visitors fall through to the SAME workspace below — request-free (no groups/locations),
+  // driven purely by their uploaded quotes. The authed-only guards are skipped for them.
   if (error) return <Box>{L("Couldn’t load your requests.", "تعذّر تحميل طلباتك.")}</Box>;
-  if (!groups) return <Spinner />;
-  if (!locations.length) return <Box>{L("No requests to compare yet.", "لا توجد طلبات للمقارنة بعد.")}</Box>;
+  if (!anon && !groups) return <Spinner />;
+  if (!anon && !locations.length) return <Box>{L("No requests to compare yet.", "لا توجد طلبات للمقارنة بعد.")}</Box>;
 
   /* ── small renderers ── */
   const presetDefs: [Preset, string, string, string][] = [
@@ -913,8 +941,28 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
 
   return (
     <div className={`space-y-4 transition-[margin] duration-200 ${chatOpen ? "md:me-[412px]" : ""}`} style={{ color: C.navy }}>
+      {/* ── Guest header: no requests/groups — just the upload CTA + free-trial counter ── */}
+      {anon && (
+        <div className="rounded-2xl border p-5" style={{ borderColor: C.border, background: "#fff" }}>
+          <div className="flex items-start gap-3">
+            <span className="grid h-11 w-11 flex-none place-items-center rounded-xl" style={{ background: C.actionDim, color: C.action }}><span className="material-icons-outlined" style={{ fontSize: 24 }}>compare_arrows</span></span>
+            <div className="min-w-0">
+              <h2 className="text-[18px] font-extrabold" style={{ color: C.navy }}>{L("Compare supplier quotes", "قارن عروض المؤجّرين")}</h2>
+              <p className="mt-0.5 text-[13px]" style={{ color: C.muted }}>{L("Upload the quotes you received — your AI assistant reads each one, normalizes it to the same template, and lines them up so you can compare like-for-like. No account needed.", "ارفع العروض التي استلمتها — يقرأ مساعدك الذكي كل عرض ويوحّده على نفس القالب ويصفّها لتقارن مثلاً بمثل. دون حساب.")}</p>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+            <button onClick={() => setUploadOpen(true)} className="inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-[13.5px] font-bold text-white transition hover:brightness-105" style={{ background: C.action }}>
+              <span className="material-icons-outlined" style={{ fontSize: 18 }}>upload_file</span>{L("Upload a quote", "رفع عرض")}
+            </button>
+            <span className="text-[12px] font-semibold" style={{ color: C.muted }}>{L(`Free uploads left: ${guestUploadsLeft} · sign in to continue`, `رفعات مجانية متبقية: ${guestUploadsLeft} · سجّل الدخول للمتابعة`)}</span>
+          </div>
+        </div>
+      )}
+
       {/* ── RFQ tabs (§1: replace location grouping; same pill style as My Requests) ── */}
-      <div className="text-[11px] font-extrabold" style={{ color: C.muted, letterSpacing: ".4px" }}>{L("REQUESTS FOR QUOTE", "طلبات التسعير")}</div>
+      {!anon && <div className="text-[11px] font-extrabold" style={{ color: C.muted, letterSpacing: ".4px" }}>{L("REQUESTS FOR QUOTE", "طلبات التسعير")}</div>}
+      {!anon && (
       <div className="flex gap-2.5 overflow-x-auto pb-1.5">
         {locations.map((l) => {
           const on = l.key === loc?.key;
@@ -934,11 +982,16 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
           );
         })}
       </div>
+      )}
 
       {bidsLoading ? (
         <Spinner />
       ) : !comparison || allCols.length === 0 ? (
-        <Box title={L("No bids yet", "لا توجد عروض بعد")}>{L("This item has no bids to compare yet — you can re-broadcast the request.", "لا توجد عروض على هذه المعدة بعد — يمكنك إعادة بثّ الطلب.")}</Box>
+        anon ? (
+          <Box title={L("No quotes yet", "لا توجد عروض بعد")}>{L("Upload at least two supplier quotes to compare them side-by-side.", "ارفع عرضين على الأقل من المؤجّرين لمقارنتهما جنبًا إلى جنب.")}</Box>
+        ) : (
+          <Box title={L("No bids yet", "لا توجد عروض بعد")}>{L("This item has no bids to compare yet — you can re-broadcast the request.", "لا توجد عروض على هذه المعدة بعد — يمكنك إعادة بثّ الطلب.")}</Box>
+        )
       ) : (
         <>
           {/* T17 — decided banner: once a bid is accepted (deal room / survey‑bidder), the request is
@@ -957,6 +1010,18 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
 
           {/* ── item card: icon + name + "N bidding · N in comparison" + item dropdown + supplier chips ── */}
           <div className="rounded-2xl border" style={{ borderColor: C.border, background: "#fff" }}>
+            {anon ? (
+              // Guest: no request/item context — a plain header with the quote count (no item switcher).
+              <div className="flex items-center gap-3 p-4">
+                <div className="grid h-14 w-14 flex-none place-items-center rounded-xl" style={{ background: C.navy }}>
+                  <span className="material-icons-outlined" style={{ fontSize: 30, color: "#fff" }}>compare_arrows</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[17px] font-extrabold leading-tight" style={{ color: C.navy }}>{L("Your uploaded quotes", "عروضك المرفوعة")}</div>
+                  <div className="mt-0.5 text-[12.5px] font-semibold" style={{ color: C.muted }}>{allCols.length} {L("uploaded", "مرفوع")} · {selected.size} {L("in comparison", "في المقارنة")}</div>
+                </div>
+              </div>
+            ) : (
             <div className="flex items-center gap-3 p-4">
               <div className="grid h-14 w-14 flex-none place-items-center rounded-xl" style={{ background: C.navy }}>
                 <EquipImg src={activeItemObj?.item?.imageUrl ?? null} categoryId={activeItemObj?.item?.categoryId ?? null} name={(ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? ""} box="" img="h-8 w-8 object-contain" iconSize={30} />
@@ -990,6 +1055,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                 )}
               </div>
             </div>
+            )}
             <div className="border-t px-4 py-3" style={{ borderColor: C.line }}>
               <div className="mb-2 text-[12px] font-semibold" style={{ color: C.muted }}>{L("Tap a supplier to add or remove it from the comparison columns", "انقر على مؤجّر لإضافته أو إزالته من أعمدة المقارنة")}</div>
               <div className="flex flex-wrap gap-2">
@@ -1203,7 +1269,9 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                   {/* 💰 COST */}
                   <SectionRow id="cost" icon="payments" title={L("Cost", "التكلفة")} accent={C.action} accentText="#fff" n={cols.length} collapsed={collapsed.has("cost")} onToggle={() => toggleSection("cost")} />
                   {!collapsed.has("cost") && (<>
-                    {/* These prices aren't final — the renter negotiates them in the deal room. */}
+                    {/* These prices aren't final — the renter negotiates them in the deal room (in-app bids
+                        only; a guest has no deal room, so the note is hidden for them). */}
+                    {!anon && (
                     <tr>
                       <td colSpan={cols.length + 1} style={{ padding: "8px 14px", background: C.warningBg, borderTop: `1px solid ${C.line}` }}>
                         <span className="inline-flex flex-wrap items-center gap-1.5 text-[11.5px] font-bold" style={{ color: C.warning }}>
@@ -1212,6 +1280,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         </span>
                       </td>
                     </tr>
+                    )}
                     {/* §6 controls strip — RATE PERIOD (Day/Week/Month) + PRICES FOR (per-unit/all) */}
                     <tr>
                       <td colSpan={cols.length + 1} style={{ padding: "9px 16px", background: C.surface2, borderBottom: `1px solid ${C.line}` }}>
@@ -1416,7 +1485,9 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                   <SectionRow id="equip" icon="construction" title={L("Equipment", "المعدّة")} accent={C.action} accentText="#fff" n={cols.length} collapsed={collapsed.has("equip")} onToggle={() => toggleSection("equip")} />
                   {!collapsed.has("equip") && (<>
                     {/* One merged banner (T8): supplier-acknowledged + (when multi-unit) the per-unit caveat,
-                        scoped to in-app bids, with the "verify in deal room" link when a room exists. */}
+                        scoped to in-app bids, with the "verify in deal room" link when a room exists. Hidden
+                        for a guest — they have no in-app bids or deal room. */}
+                    {!anon && (
                     <tr>
                       <td colSpan={cols.length + 1} style={{ padding: "8px 14px", background: C.warningBg, borderTop: `1px solid ${C.line}` }}>
                         <span className="inline-flex flex-wrap items-center gap-1.5 text-[11.5px] font-bold" style={{ color: C.warning }}>
@@ -1432,6 +1503,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         </span>
                       </td>
                     </tr>
+                    )}
                     <tr>
                       <RowHead title={L("Year", "سنة الصنع")} sub={(() => { const my = cols[0]?.bid.reqMinYear; return my == null ? undefined : my >= 1990 ? `${L("min year", "أدنى سنة")} ${my}` : `${L("max age", "أقصى عمر")} ${my} ${L("yrs", "سنة")}`; })()} />
                       {cols.map((c, idx) => {
@@ -1830,6 +1902,9 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
           <span className="material-icons-outlined" style={{ fontSize: 18, color: "#7BE0A5" }}>check_circle</span>{toastMsg}
         </div>
       )}
+
+      {/* Guest gate — opens when the free trial is spent or on a sign-in-only action (award / deal room). */}
+      {anon && <AccountModal open={showAccount} onClose={() => setShowAccount(false)} onCreated={() => setShowAccount(false)} title={t.guest.trialTitle} subtitle={t.guest.trialSub} />}
 
       {/* In-app document viewer — renders the actual file (presigned S3) in a modal, no redirect. */}
       {docView && (
