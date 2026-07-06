@@ -746,6 +746,13 @@ export function BidComparisonWorkspace() {
         const t = await transformBid({ attachments: [{ type: file.type || "application/octet-stream", filename: file.name, data }], request: ctx });
         if (!t.agent) { toast(L("Quote upload needs your AI assistant — not connected.", "رفع العرض يحتاج مساعدك الذكي — غير متصل.")); return; }
         if (t.result) {
+          // Wrong-equipment (match.blocking) → hard "can't compare" popup, never added (same as the
+          // non-verify path). Only non-blocking quotes go to the verify screen. `needs_confirmation`
+          // is advisory — the verify screen IS the confirm step, so it flows straight in there.
+          if (t.result.match?.blocking) {
+            setConfirmAdd({ card: normalizedBidToBidCard(t.result.bid, { duration: durationDays, units }), warnings: t.result.match.warnings ?? [], blocking: true });
+            return;
+          }
           const draft = bidQuoteToFormDraft(t.result.bid, t.result.term_matches, ctx);
           draft.meta.source_file = file.name;
           setVerify({ draft, extracted: t.result.bid });
