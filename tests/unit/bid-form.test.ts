@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { bidQuoteToFormDraft, bidFormDraftToNormalized, isBidFormDraftValid } from "@/lib/contract/bid-form";
+import { normalizedBidToBidCard } from "@/lib/contract/agent-bids";
 import type { NormalizedBid, TermMatch } from "@/lib/contract/agent-bids";
 
 const bid = (o: Partial<NormalizedBid> = {}): NormalizedBid => ({
@@ -71,5 +72,31 @@ describe("isBidFormDraftValid + bidFormDraftToNormalized", () => {
     const tm: TermMatch[] = [{ key: "operator", renter_wants: "true", satisfies: "unknown" }];
     const d = bidQuoteToFormDraft(bid(), tm, null);
     expect(isBidFormDraftValid(d)).toBe(false);
+  });
+});
+
+describe("extra_terms → extras + Notes-row note", () => {
+  const extra = [{ label: "Warranty", value: "90 days" }, { label: "Delivery window", value: "3 days" }];
+
+  it("bidQuoteToFormDraft surfaces extra_terms as editable extras (empty when none)", () => {
+    const d = bidQuoteToFormDraft(bid({ extra_terms: extra }), [], null);
+    expect(d.extras).toHaveLength(2);
+    expect(d.extras[0]).toMatchObject({ label: "Warranty", value: "90 days", status: "extracted" });
+    expect(bidQuoteToFormDraft(bid(), [], null).extras).toEqual([]);
+  });
+
+  it("bidFormDraftToNormalized carries the (edited) extras back onto the bid", () => {
+    const d = bidQuoteToFormDraft(bid({ extra_terms: extra }), [], null);
+    d.extras[0].value = "180 days";
+    const corrected = bidFormDraftToNormalized(d, bid({ extra_terms: extra }));
+    expect(corrected.extra_terms).toEqual([{ label: "Warranty", value: "180 days" }, { label: "Delivery window", value: "3 days" }]);
+  });
+
+  it("normalizedBidToBidCard folds notes + extra_terms into the note (for the compare Notes row)", () => {
+    const card = normalizedBidToBidCard(bid({ notes: "Cash only", extra_terms: extra }), { duration: 5, units: 1 });
+    expect(card.note).toBe("Cash only · Warranty: 90 days · Delivery window: 3 days");
+    // no notes + no extras → falls back to the source-file label
+    const card2 = normalizedBidToBidCard(bid({ notes: null, extra_terms: [] }), { duration: 5, units: 1 });
+    expect(card2.note).toBe("From uploaded file: quote.pdf");
   });
 });

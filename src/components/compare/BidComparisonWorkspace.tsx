@@ -1558,6 +1558,22 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
 
                   {/* Verified supplier + company documents now live in each column's identity header (T1). */}
 
+                  {/* Notes — the last data row. Free text per bid: the app / shared-link supplier note, or an
+                      uploaded quote's notes + agent-extracted extra terms (folded into `note`). Source-agnostic;
+                      shown only when at least one column has a note. */}
+                  {cols.some((c) => !!c.bid.note && c.bid.note.trim() !== "") && (
+                    <tr>
+                      <RowHead title={L("Notes", "ملاحظات")} sub={L("from the quote / bid", "من العرض / العرض المقدَّم")} />
+                      {cols.map((c) => (
+                        <Td key={c.bid.id}>
+                          {c.bid.note && c.bid.note.trim() !== ""
+                            ? <span className="block text-[12px] font-semibold leading-snug" style={{ color: C.navy, whiteSpace: "pre-wrap", maxHeight: 150, overflowY: "auto" }}>{c.bid.note}</span>
+                            : <span style={{ color: C.muted }}>—</span>}
+                        </Td>
+                      ))}
+                    </tr>
+                  )}
+
                   {/* DECIDE — its own band, clearly separated from the equipment section. Award/Negotiate use
                       the SAME colours for every supplier (Award = green solid, Negotiate = navy outline). */}
                   <tr>
