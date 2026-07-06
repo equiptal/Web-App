@@ -10,36 +10,25 @@ const AUTHED = "mt_refresh=sometoken";
 const isNext = (res: Response) => res.headers.get("x-middleware-next") === "1";
 const FLAG = "NEXT_PUBLIC_PUBLIC_WEB_ENABLED";
 
-/* ── Flag ON: public browse, only account-bound resources gate (staging) ── */
-describe("public-web ON — public-by-default gating", () => {
+/* ── Flag ON: fully public, NO route gate — auth is an in-app modal, no /login redirect (staging) ── */
+describe("public-web ON — no route gate at all", () => {
   beforeEach(() => { process.env[FLAG] = "1"; });
   afterEach(() => { delete process.env[FLAG]; });
 
-  it("unauthenticated → public page (home) passes through (browse freely)", () => {
-    expect(isNext(middleware(req("/")))).toBe(true);
-  });
-
-  it("unauthenticated → public tabs (/create, /stores, /compare, /requests, /inbox, /profile) pass through", () => {
-    for (const p of ["/create", "/stores/42", "/compare", "/requests", "/requests/123", "/inbox", "/profile"]) {
-      expect(isNext(middleware(req(p)))).toBe(true);
+  it("unauthenticated → EVERY page passes through (incl. former gated /deal-room, /dashboard)", () => {
+    for (const p of ["/", "/create", "/stores/42", "/compare", "/requests", "/inbox", "/profile", "/deal-room/abc", "/dashboard"]) {
+      expect(isNext(middleware(req(p))), p).toBe(true);
     }
   });
 
-  it("unauthenticated → gated page (/deal-room/x) redirects to /login?next=<path>", () => {
-    const res = middleware(req("/deal-room/abc"));
-    const loc = res.headers.get("location") ?? "";
-    expect(res.status).toBeGreaterThanOrEqual(300);
-    expect(loc).toContain("/login");
-    expect(loc).toContain(`next=${encodeURIComponent("/deal-room/abc")}`);
+  it("never redirects to /login (no route gate)", () => {
+    for (const p of ["/deal-room/abc", "/dashboard", "/profile"]) {
+      const res = middleware(req(p));
+      expect(res.headers.get("location"), p).toBeNull();
+    }
   });
 
-  it("unauthenticated → demo dashboard redirects to /login", () => {
-    const res = middleware(req("/dashboard"));
-    expect(res.status).toBeGreaterThanOrEqual(300);
-    expect(res.headers.get("location") ?? "").toContain("/login");
-  });
-
-  it("authenticated → gated page passes through", () => {
+  it("authenticated → pages pass through", () => {
     expect(isNext(middleware(req("/deal-room/abc", AUTHED)))).toBe(true);
   });
 });

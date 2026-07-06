@@ -2,7 +2,8 @@ import type { AgentDraft, RfqRequestPayload, Taxonomy } from "@/lib/contract";
 import type { RequestListItem, RequestRecord } from "@/lib/contract/requests";
 import type { BidCard } from "@/lib/contract/bids";
 import type { DealRoomView, DealRoomDocuments, QuotationView } from "@/lib/contract/deal-room";
-import type { ComputedBid, RecommendResult, BidAskResult, BidParseResult, AwardNudgeResult, PreferencePreset, RankingPreference, RankedBid, BidEventInput } from "@/lib/contract/agent-bids";
+import type { ComputedBid, RecommendResult, BidAskResult, BidParseResult, AwardNudgeResult, PreferencePreset, RankingPreference, RankedBid, BidEventInput, NormalizedBid, TermMatch, QuoteMatchCheck } from "@/lib/contract/agent-bids";
+import type { TransformRequestCtx } from "@/lib/contract/bid-form";
 import { mapBidFormData, mapLinkSubmissions, type BidFormData, type LinkBidSubmission, type SubmitBidFormPayload } from "@/lib/contract/link-bids";
 import type { PendingResponse, RespondBody, RespondResult } from "@/lib/contract/survey";
 import type { InboxBid } from "@/lib/contract/inbox";
@@ -356,6 +357,36 @@ export async function parseBid(payload: { message?: string; attachments?: { type
     const res = await fetch("/api/me/bids/parse", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), cache: "no-store" });
     if (!res.ok) return { agent: false };
     return (await res.json()) as { agent: boolean; result?: BidParseResult };
+  } catch {
+    return { agent: false };
+  }
+}
+
+/** Result of /bids/transform — a raw extracted bid + per-term signals for the renter-verify screen. */
+export interface BidTransformResult {
+  bid: NormalizedBid;
+  term_matches: TermMatch[];
+  match: QuoteMatchCheck;
+  has_request: boolean;
+}
+
+/** Quote → raw bid + term signals (renter then verifies). `request` optional — omit for a bare quote. */
+export async function transformBid(payload: { attachments: { type: string; filename?: string; data: string }[]; message?: string; request?: TransformRequestCtx | null }): Promise<{ agent: boolean; result?: BidTransformResult }> {
+  try {
+    const res = await fetch("/api/me/bids/transform", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), cache: "no-store" });
+    if (!res.ok) return { agent: false };
+    return (await res.json()) as { agent: boolean; result?: BidTransformResult };
+  } catch {
+    return { agent: false };
+  }
+}
+
+/** Commit the renter-verified draft → a comparison-ready bid (agent strips VAT + feeds the learn loop). */
+export async function commitBid(payload: { source_file: string | null; extracted: NormalizedBid; corrected: NormalizedBid; vat_mode: "incl" | "excl" }): Promise<{ agent: boolean; result?: { bid: NormalizedBid; changed: boolean } }> {
+  try {
+    const res = await fetch("/api/me/bids/commit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), cache: "no-store" });
+    if (!res.ok) return { agent: false };
+    return (await res.json()) as { agent: boolean; result?: { bid: NormalizedBid; changed: boolean } };
   } catch {
     return { agent: false };
   }

@@ -487,6 +487,9 @@ export const en = {
     viaEmail: "Email",
     emailLabel: "Email address",
     emailInvalid: "Enter a valid email address.",
+    emailNote: "Your phone is your account — you sign in with it. Email is only where the code can be sent.",
+    countryLabel: "Country",
+    smsSaudiOnly: "SMS is available for Saudi (+966) numbers only — your code will be emailed instead.",
     sendCode: "Send code", // AC-01
     sending: "Sending…",
     signInFoot: "New here? Just enter your number — we'll set you up.",

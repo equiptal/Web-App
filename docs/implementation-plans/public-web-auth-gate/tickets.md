@@ -160,8 +160,26 @@ return **401**, so guests see error/retry panels instead of real browse content.
 - **Additive / mobile-safe:** existing authed `/stores*` responses byte-unchanged; mobile regression-guarded.
 - View-count side effect on `/stores/{id}` should still behave (or be no-op) for anon.
 
-**Web wiring (after the endpoint exists):** point `/api/stores*` (and taxonomy) at the public endpoint
-when there's no session; flip the T6-interim empty states to render real data for guests.
+**Web wiring — DONE (2026-07-06, `web-public/auth-and-stores` alignment run).** Backend public
+store endpoints are BUILT on that branch (`GET /public/stores`, `/public/stores/{id}`,
+`/public/stores/{id}/equipment`, PII-safe `publicEquipmentProjection`). Web now routes guests to them:
+- `src/lib/api/app-backend-authed.ts` — added `appPublicCall()` (unauth GET, envelope-unwrap + error
+  map, no 401/refresh) and `hasAppSession()` (id/refresh cookie check).
+- `src/app/api/stores/route.ts` + `[id]/route.ts` — **no session ⇒ public endpoint**, session ⇒ authed
+  (unchanged). Detail merges `/public/stores/{id}` + `/equipment` when the detail doesn't inline equipment.
+- `src/lib/contract/stores.ts` — mapper tolerates the public shape: `name`←`companyName`, store `city`
+  derives from `equipment[0].yard.city` when store/yards omit it. (Equipment fields already matched 1:1.)
+- `src/app/api/stores/taxonomy/route.ts` + `master-data/cities/route.ts` — left authed-only (no public
+  reference endpoint; see W-2 below). The browse City + Category filters are **hidden for guests**;
+  `BrowseSurface` skips both fetches when signed out (no 401s). Search + Verified stay for guests.
+- `BrowseSurface` + `StoreDetailSurface` — dropped the anon→`SignInPrompt` gate; guests fetch + render.
+- Tests: `tests/unit/stores.test.ts` +2 (companyName fallback, yard-derived city).
+
+**W-2 (decision 2026-07-06): NO backend change for filters.** Instead of public `/public/taxonomy` +
+`/public/master-data/cities`, the guest browse simply **hides the City + Category/taxonomy filters**
+(they need authed reference data; deferred as non-priority). Guests browse the public store directory
++ a store's equipment with Search + Verified only; the hidden filters return once signed in. Clean,
+web-only, no backend work.
 
 - **Given** a signed-out visitor on `/` or `/stores/{id}`, **When** the public endpoint is live,
   **Then** suggested suppliers + store detail render real read-only data (no sign-in wall, no error panel).
@@ -179,3 +197,47 @@ Profile) hide or route through the gate for guests. Ensure no signed-out page de
   action is visible and authed-only nav is hidden or gate-routed.
 - **Given** a guest clicks an authed-only nav item, **When** followed, **Then** they hit `/login`
   (or the combined step where appropriate), never a broken page.
+
+---
+
+## Update — 2026-07-05 (build review + decisions)
+
+**Shipping model — flag-gated, staging-only.** The whole epic is behind
+`NEXT_PUBLIC_PUBLIC_WEB_ENABLED` (`src/lib/flags.ts`; the edge middleware reads the same var; the
+`PhoneEntry` email/SMS toggle is wrapped in it). **Default OFF → production is byte-identical to today**
+(SMS-only, login-gated). **Rollout decision: staging-only for now** — set the env var to `1` on the
+staging Amplify app to exercise it; leave it UNSET in prod until we decide to go live. Unset = off, so
+prod is safe by default.
+
+**Status vs the tickets above:**
+- **Implemented (web):** T1, T2, T3, T4, T6, T8, T9, T10.
+- **T2 hardening:** `AccountModal` now confirms the AUTHORITATIVE tier from `/api/me` after OTP, so a
+  returning **basic/verified** account skips the register step instead of being re-registered as a
+  guest (fixed a real bug where an already-registered user was treated as new).
+- **T4 note:** the email option is built **functional** (sends `otpMethod:"EMAIL"` + `otpEmail`), not
+  the original "disabled / coming-soon" — so it depends on **T5** being live.
+- **T5 (email-OTP backend):** IN PROGRESS (owner building it). Until live, `request-code` with EMAIL
+  returns 400 — email-OTP is only meaningful on staging behind the flag once the backend lands.
+- **T7 (public browse):** DECISION — **wait** for a backend public `/stores` endpoint; the interim
+  "sign-in" empty states stay until then.
+
+### T11 — ⚠ Backend (Moedatech-App): provision a web-registered account so `createRequest` accepts it  [SHIP-BLOCKER]
+**Scope:** Backend-dependency (agents `createRequest`). **Carry via** `/web:link-agents`.
+**Satisfies:** the whole point of the epic — a guest who registered through the gate can actually post.
+
+**Problem.** A guest who completes the one-step gate (OTP → profile → **basic**) then submits →
+`POST /agents/requests` → agents `createRequest` returns **500 / `INTERNAL_ERROR`** ("Failed to create
+request"; relayed as 502 — verified in the dev log). The owner-lookup / tier gate in `createRequest`
+doesn't recognise a freshly web-registered account as a rentee, so the flow dead-ends at the finish
+line. The web side is correct (it authenticates and submits as the new user).
+
+**Fix (decided: backend provisions the account).** On register (guest→basic) — or in `createRequest`'s
+owner resolution — ensure the account exists as a **rentee** in the data the agents backend reads
+(marketplace DB), with the tenant + tier `createRequest` requires. Confirm via CloudWatch: the
+request's `requestGroupId` should log the `createRequest` success path, not the owner-lookup throw.
+
+- **Given** a brand-new account created through the web one-step gate (basic tier), **When** it submits
+  an RFQ, **Then** `createRequest` succeeds (no 500) and the request posts.
+- **Given** an existing, already-provisioned renter, **When** they submit, **Then** behaviour is
+  unchanged (regression guard).
+- **Note:** cannot ship from the web repo — needs a Moedatech-App PR.

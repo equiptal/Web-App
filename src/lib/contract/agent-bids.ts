@@ -59,6 +59,23 @@ export interface NormalizedBid {
   supplier_verified?: boolean | null;
   supplier_rating?: number | null;
   units_offered?: number | null;
+  /** Supplier compliance/identity pulled from the quote letterhead/footer (T1) — null when not found.
+   *  Legal IDs are ALWAYS renter-verified before commit even when extracted. */
+  supplier_cr?: string | null;
+  supplier_vat?: string | null;
+  supplier_national_address?: string | null;
+  supplier_contact?: string | null;
+}
+
+/** The 9 verifiable Yes/No terms on the bid form (mirrors the shared bid form + BidFormDraft). */
+export type BidTermKey = "operator" | "nationality" | "fatFood" | "fatTransport" | "fuel" | "fuelType" | "year" | "operatorCert" | "equipmentCert";
+
+/** Per-term signal Mansour emits from /bids/transform: whether the quote satisfies the renter's want.
+ *  `unknown` = the quote is silent (or the term has no structured bid field) → the renter must verify. */
+export interface TermMatch {
+  key: BidTermKey;
+  renter_wants: string | null;
+  satisfies: "yes" | "no" | "unknown";
 }
 
 /** A bid AFTER the web computed the deterministic layer — what /bids/recommend consumes. */

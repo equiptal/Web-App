@@ -136,6 +136,54 @@ async function tryRefresh(
   }
 }
 
+/**
+ * One UNAUTHENTICATED call to a PUBLIC app-backend endpoint (no Bearer). Backs the public store
+ * directory (`/public/stores*`) that signed-out visitors browse (public-web-auth-and-stores / T7).
+ * Same tenant header + envelope-unwrap + AppAuthError mapping as an authed call, minus the token
+ * and the 401→refresh dance (a public endpoint never 401s on a missing token).
+ */
+export async function appPublicCall<T>(path: string, locale: string, init: RequestInit = {}): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${serverEnv.appApiUrl}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Tenant-Id": serverEnv.tenantId,
+        "Accept-Language": locale,
+        ...init.headers,
+      },
+      cache: "no-store",
+    });
+  } catch {
+    throw new AppAuthError("offline");
+  }
+  let body: Envelope<T> | undefined;
+  try {
+    body = (await res.json()) as Envelope<T>;
+  } catch {
+    /* non-JSON */
+  }
+  if (!res.ok || body?.success === false) {
+    const code = body?.error?.code;
+    const kind: AppAuthErrorKind = (code && CODE_TO_KIND[code]) || "unknown";
+    throw new AppAuthError(kind, {
+      status: res.status,
+      code,
+      detail: body?.error?.message ?? `app ${path} → HTTP ${res.status}`,
+      messageAr: body?.error?.messageAr,
+    });
+  }
+  return body && "data" in body ? (body.data as T) : (body as unknown as T);
+}
+
+/** True when the request carries a usable session (id or refresh cookie). Route handlers use this to
+ *  pick the authed vs the public app-backend path (e.g. store browse) without firing a 401. */
+export async function hasAppSession(): Promise<boolean> {
+  const jar = await cookies();
+  return Boolean(jar.get(ID_COOKIE)?.value || jar.get(REFRESH_COOKIE)?.value);
+}
+
 /** A call function bound to the current (possibly refreshed) access token. */
 export type AuthedCall = <T>(path: string, init?: RequestInit) => Promise<T>;
 

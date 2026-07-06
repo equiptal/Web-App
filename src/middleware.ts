@@ -28,9 +28,8 @@ const ID_COOKIE = "mt_id";
 // prod and toggleable in tests.
 const publicWebEnabled = () => process.env.NEXT_PUBLIC_PUBLIC_WEB_ENABLED === "1";
 
-// Flag ON: only these account-bound resources gate (a specific deal room reached via a bid/award, and
-// the demo dashboard); everything else browses freely.
-const GATED_PREFIXES = ["/deal-room", "/dashboard"];
+// Flag ON: NO route gate at all — the whole web is public. Auth is a modal fired in-app (there is no
+// `/login` redirect); pages that need a session (e.g. a deal room) open the auth modal in place.
 // Flag OFF (legacy/prod): everything gates EXCEPT these account-less routes (the shared supplier bid
 // form `/bid/<token>`, opened by suppliers who have no login).
 const PUBLIC_PREFIXES = ["/bid"];
@@ -69,10 +68,10 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Decide whether this path needs a session. Flag ON: only GATED_PREFIXES gate. Flag OFF (legacy):
-  // everything gates except the account-less PUBLIC_PREFIXES.
+  // Decide whether this path needs a session. Flag ON: nothing gates (public web — auth is an in-app
+  // modal). Flag OFF (legacy): everything gates except the account-less PUBLIC_PREFIXES.
   const needsSession = publicWebEnabled()
-    ? GATED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+    ? false
     : !PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   if (needsSession && !authed) {
     const dest = req.nextUrl.clone();

@@ -8,6 +8,7 @@ import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import type { Locale } from "@/lib/i18n/config";
 import { SurveyProvider } from "@/components/surveys/SurveyProvider";
+import { AuthGateProvider, useAuthGate } from "@/components/auth/AuthGate";
 import { fetchDealRoomUnread } from "@/lib/api/client";
 import { canSeeProcurementDashboard } from "@/lib/access/dashboard";
 import { NotificationsBell } from "@/components/NotificationsBell";
@@ -30,11 +31,14 @@ export function useHeaderBack(handler: (() => void) | null) {
   }, [handler, register]);
 }
 
-/** Public shell: hosts the Outcome Survey gate so the chrome (topbar icon) and pages can both read it. */
+/** Public shell: hosts the Outcome Survey gate + the app-wide auth-gate modal (public-web has no
+ *  `/login` page — sign-in/register is a modal fired by actions), so the chrome and pages can use both. */
 export function AppShell(props: AppShellProps) {
   return (
     <SurveyProvider>
-      <AppShellInner {...props} />
+      <AuthGateProvider>
+        <AppShellInner {...props} />
+      </AuthGateProvider>
     </SurveyProvider>
   );
 }
@@ -43,6 +47,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
   const { locale, setLocale } = useLocale();
   const t = useT();
   const { tier, status, signOut, user } = useSession();
+  const { openAuth } = useAuthGate();
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -189,10 +194,10 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
               ))}
             </span>
 
-            {/* Signed-out visitors browse freely; this is their path into the account gate. */}
+            {/* Signed-out visitors browse freely; this opens the auth modal (no /login page). */}
             {status === "anon" && (
               <button
-                onClick={() => router.push(`/login?next=${encodeURIComponent(pathname)}`)}
+                onClick={() => openAuth()}
                 className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3.5 py-1.5 text-[12.5px] font-bold text-white transition hover:brightness-105"
               >
                 <Icon name="login" size={16} /> {t.shell.signIn}
