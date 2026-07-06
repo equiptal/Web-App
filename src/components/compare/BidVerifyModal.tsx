@@ -5,7 +5,7 @@ import { commitBid } from "@/lib/api/client";
 import type { NormalizedBid } from "@/lib/contract/agent-bids";
 import {
   type BidFormDraft, type DraftStatus, type TermAnswer,
-  BID_TERM_LABEL, bidFormDraftToNormalized, isBidFormDraftValid, draftVatMode,
+  BID_TERM_LABEL, bidFormDraftToNormalized, draftVatMode,
 } from "@/lib/contract/bid-form";
 
 /**
@@ -40,10 +40,8 @@ export function BidVerifyModal({
   const [draft, setDraft] = useState<BidFormDraft>(initial);
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [showErrors, setShowErrors] = useState(false);
 
   const item = draft.items[0];
-  const valid = isBidFormDraftValid(draft);
 
   // Immutable setters — every edit clears the field's needs-verification status (renter confirmed it).
   const setCompany = (key: keyof BidFormDraft["company"], value: string) =>
@@ -58,9 +56,9 @@ export function BidVerifyModal({
     setDraft((d) => { const items = [...d.items]; const terms = [...items[0].terms]; terms[idx] = { ...terms[idx], answer, status: "extracted" }; items[0] = { ...items[0], terms }; return { ...d, items }; });
 
   async function submit() {
-    setShowErrors(true);
+    // Verification is OPTIONAL — the renter can add the quote to the comparison with fields still
+    // missing/unverified (they stay marked by their chips). No hard gate; compare with what's known.
     setErr(null);
-    if (!valid) return;
     setSubmitting(true);
     try {
       const corrected = bidFormDraftToNormalized(draft, extracted);
@@ -80,7 +78,6 @@ export function BidVerifyModal({
   const C = { navy: "#1c3550", muted: "#6b8fa8", border: "#e4edf5", surface: "#f7fafd" };
   const label = item ? (item.size ? `${item.label} · ${item.size}` : item.label) : "";
   const inCls = (bad: boolean) => ({ width: "100%", padding: "9px 11px", borderRadius: 9, border: `1.5px solid ${bad ? "#d9362a" : C.border}`, fontSize: 13.5, fontFamily: "inherit", outline: "none", background: "#fff", color: C.navy });
-  const missing = (v: unknown) => showErrors && (v == null || String(v).trim() === "");
 
   return (
     <div dir={ar ? "rtl" : "ltr"} onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(16,38,63,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
@@ -120,7 +117,7 @@ export function BidVerifyModal({
               {item.terms.length > 0 && (
                 <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
                   {item.terms.map((t, i) => (
-                    <TermRow key={t.key} t={t} ar={ar} L={L} bad={showErrors && t.answer == null} onPick={(a) => setTerm(i, a)} />
+                    <TermRow key={t.key} t={t} ar={ar} L={L} bad={false} onPick={(a) => setTerm(i, a)} />
                   ))}
                 </div>
               )}
@@ -143,7 +140,7 @@ export function BidVerifyModal({
               {/* Pricing */}
               <div style={{ display: "grid", gap: 10 }}>
                 <Field label={L("Rental price", "سعر الإيجار")} status={item.pricing.rental_price.status} ar={ar} req>
-                  <input inputMode="numeric" value={item.pricing.rental_price.value ?? ""} onChange={(e) => setPrice("rental_price", e.target.value)} placeholder="0" style={inCls(showErrors && !(item.pricing.rental_price.value! > 0))} />
+                  <input inputMode="numeric" value={item.pricing.rental_price.value ?? ""} onChange={(e) => setPrice("rental_price", e.target.value)} placeholder="0" style={inCls(false)} />
                 </Field>
                 <Field label={L("Delivery price", "سعر النقل")} status={item.pricing.delivery_price.status} ar={ar}>
                   <input inputMode="numeric" value={item.pricing.delivery_price.value ?? ""} onChange={(e) => setPrice("delivery_price", e.target.value)} placeholder="0" style={inCls(false)} />
@@ -160,21 +157,21 @@ export function BidVerifyModal({
             <SecH>{L("Supplier details", "بيانات المؤجّر")}</SecH>
             <div style={{ display: "grid", gap: 10 }}>
               <Field label={L("Company name", "اسم الشركة")} status={draft.company.company_name.status} ar={ar} req>
-                <input value={draft.company.company_name.value ?? ""} onChange={(e) => setCompany("company_name", e.target.value)} style={inCls(missing(draft.company.company_name.value))} />
+                <input value={draft.company.company_name.value ?? ""} onChange={(e) => setCompany("company_name", e.target.value)} style={inCls(false)} />
               </Field>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <Field label={L("CR number", "رقم السجل التجاري")} status={draft.company.cr_number.status} ar={ar} req>
-                  <input inputMode="numeric" value={draft.company.cr_number.value ?? ""} onChange={(e) => setCompany("cr_number", e.target.value)} style={inCls(missing(draft.company.cr_number.value))} />
+                  <input inputMode="numeric" value={draft.company.cr_number.value ?? ""} onChange={(e) => setCompany("cr_number", e.target.value)} style={inCls(false)} />
                 </Field>
                 <Field label={L("VAT number", "الرقم الضريبي")} status={draft.company.vat_number.status} ar={ar} req>
-                  <input inputMode="numeric" value={draft.company.vat_number.value ?? ""} onChange={(e) => setCompany("vat_number", e.target.value)} style={inCls(missing(draft.company.vat_number.value))} />
+                  <input inputMode="numeric" value={draft.company.vat_number.value ?? ""} onChange={(e) => setCompany("vat_number", e.target.value)} style={inCls(false)} />
                 </Field>
               </div>
               <Field label={L("National address", "العنوان الوطني")} status={draft.company.national_address.status} ar={ar} req>
-                <input value={draft.company.national_address.value ?? ""} onChange={(e) => setCompany("national_address", e.target.value)} style={inCls(missing(draft.company.national_address.value))} />
+                <input value={draft.company.national_address.value ?? ""} onChange={(e) => setCompany("national_address", e.target.value)} style={inCls(false)} />
               </Field>
               <Field label={L("Contact info", "بيانات التواصل")} status={draft.company.contact.status} ar={ar} req>
-                <input value={draft.company.contact.value ?? ""} onChange={(e) => setCompany("contact", e.target.value)} style={inCls(missing(draft.company.contact.value))} />
+                <input value={draft.company.contact.value ?? ""} onChange={(e) => setCompany("contact", e.target.value)} style={inCls(false)} />
               </Field>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <Field label={L("Quote valid until", "صلاحية العرض حتى")} status={draft.company.valid_until.status} ar={ar}>
@@ -190,7 +187,7 @@ export function BidVerifyModal({
 
         {/* Footer */}
         <div style={{ padding: "12px 20px 16px", borderTop: `1px solid ${C.border}` }}>
-          {showErrors && !valid && <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 700, color: "#d9362a" }}>{L("Answer every term, enter a rental price, and fill all supplier details.", "أجب عن كل شرط، وأدخل سعر الإيجار، واملأ جميع بيانات المؤجّر.")}</p>}
+          <p style={{ margin: "0 0 8px", fontSize: 11.5, color: C.muted }}>{L("Fields marked in colour aren't verified yet — you can add it now and fill them in later.", "الحقول الملوّنة غير مؤكَّدة بعد — يمكنك إضافته الآن وإكمالها لاحقًا.")}</p>
           {err && <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 700, color: "#d9362a" }}>{err}</p>}
           <div style={{ display: "flex", gap: 10 }}>
             <button onClick={onClose} style={{ flex: "0 0 auto", padding: "11px 18px", borderRadius: 11, border: `1px solid ${C.border}`, background: "#fff", color: C.navy, fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{L("Cancel", "إلغاء")}</button>
