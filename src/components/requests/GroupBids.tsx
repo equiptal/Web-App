@@ -92,6 +92,11 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   const [equipBid, setEquipBid] = useState<GroupBid | null>(null);
   const [termsBid, setTermsBid] = useState<GroupBid | null>(null);
   const [langPick, setLangPick] = useState(false); // quotation language chooser (Arabic | English)
+  // Bids captured the instant "Download quotations" is clicked. The language/verify modals aren't part
+  // of the selection UI, so opening one trips the click-outside handler and CLEARS `selected` before the
+  // download fires — which then fell back to exporting EVERY supplier. Snapshotting here keeps the PDF
+  // scoped to exactly what was selected, regardless of that clearing.
+  const [dlOnly, setDlOnly] = useState<GroupBid[] | null>(null);
   const [renterName, setRenterName] = useState("");
   const [companyName, setCompanyName] = useState("");
   // Renter company identity for the quotation Rentee block (app parity) — from /api/me.
@@ -662,18 +667,18 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       <div data-select-ui style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "0 0 14px" }}>
         <span style={{ fontSize: 13, fontWeight: 700, color: "#2a4f72" }}>
           {selectMode
-            ? L("Tap bids to compare · click away to cancel", "اضغط على العروض للمقارنة · انقر خارجًا للإلغاء")
+            ? L("Tap bids to compare or export · click away to cancel", "اضغط على العروض للمقارنة أو التصدير · انقر خارجًا للإلغاء")
             : `${shown.length} ${L("bids from", "عروض من")} ${shownSuppliers} ${L("suppliers", "مؤجّرين")}${selItem ? ` · ${selItem.name}` : ""}`}
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
           {/* B4: clicking outside exits selection (see the mousedown effect) — no Cancel button. */}
           <button
             onClick={() => setSelectMode((m) => !m)}
-            title={L("Pick bids to compare", "اختر عروضًا للمقارنة")}
+            title={L("Pick bids to compare or export", "اختر عروضًا للمقارنة أو التصدير")}
             style={{ display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 11, padding: "10px 16px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", background: selectMode ? "#1c3550" : "#fff", color: selectMode ? "#fff" : "#1c3550", border: `1px solid ${selectMode ? "#1c3550" : "#d4e0ec"}` }}
           >
             <span className="material-icons-outlined" style={{ fontSize: 17 }}>compare_arrows</span>
-            {selectMode ? L("Comparing", "جارٍ المقارنة") : L("Compare bids", "مقارنة العروض")}
+            {selectMode ? L("Selecting", "جارٍ التحديد") : L("Compare / Export", "مقارنة / تصدير")}
           </button>
         </div>
       </div>
@@ -914,7 +919,16 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           >
             <span className="material-icons-outlined">compare_arrows</span> {L("Compare", "قارن")}
           </button>
-          <button className="qdl" onClick={() => (verified ? setLangPick(true) : setQuoteGate(true))}>
+          <button
+            className="qdl"
+            onClick={() => {
+              // Snapshot the selected bids NOW (before a modal can clear the selection) so the quotation
+              // covers only these suppliers — not the whole group.
+              setDlOnly([...(bids ?? []), ...subCards].filter((b) => selected.has(b.id)));
+              if (verified) setLangPick(true);
+              else setQuoteGate(true);
+            }}
+          >
             <span className="material-icons-outlined">download</span> {L("Download quotations", "تنزيل عروض الأسعار")}
           </button>
         </div>
@@ -935,10 +949,10 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                 {L("Choose the language for the generated PDF.", "اختر لغة ملف عرض السعر.")}
               </p>
               <div style={{ display: "flex", gap: 10 }}>
-                <button className="btn primary" style={{ flex: 1 }} onClick={() => { setLangPick(false); downloadQuotation(false); }}>
+                <button className="btn primary" style={{ flex: 1 }} onClick={() => { setLangPick(false); downloadQuotation(false, dlOnly ?? undefined); }}>
                   English
                 </button>
-                <button className="btn primary" style={{ flex: 1 }} onClick={() => { setLangPick(false); downloadQuotation(true); }}>
+                <button className="btn primary" style={{ flex: 1 }} onClick={() => { setLangPick(false); downloadQuotation(true, dlOnly ?? undefined); }}>
                   العربية
                 </button>
               </div>
