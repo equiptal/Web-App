@@ -7,6 +7,9 @@ export type AuthKind =
   | "expired"
   | "locked"
   | "send_failed"
+  | "email_ambiguous"
+  | "email_taken"
+  | "phone_taken"
   | "offline"
   | "unknown";
 

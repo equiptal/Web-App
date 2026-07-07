@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type ClipboardEvent, type FormEvent, type KeyboardEvent } from "react";
-import { postAuth, type AuthKind, type OtpChannel } from "./authClient";
+import { postAuth, type AuthKind } from "./authClient";
 import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import type { RenterUser } from "@/lib/contract/auth";
@@ -9,28 +9,32 @@ import type { RenterUser } from "@/lib/contract/auth";
 const OTP_FONT: React.CSSProperties = { fontFamily: "var(--font-plex), monospace" };
 
 /**
- * Code-entry screen (AC-02/09/10/11/12/13/15/24), matching the prototype's OTP `form-inner`. 4-box
- * input with filled state, verify, resend (no cooldown — AC-12; the prototype's 30s timer is
- * illustrative only), and back (AC-13).
+ * Code-entry screen (AC-02/09/10/11/12/13/15/24) — identity-agnostic. The caller passes the identity to
+ * verify/resend against (`{ phone }` or `{ otpEmail }`) and a `dest` label for the "sent to" line.
+ * Verify branches on the response: an email-first NEW user comes back with `needsSignup` (no session) →
+ * `onNeedsSignup`; otherwise a session is set → `onVerified(user, storedEmail)` (storedEmail feeds W-1).
+ * 4-box input with filled state, resend (no cooldown — AC-12), and back (AC-13).
  */
 export function CodeEntry({
-  phone,
+  dest,
+  verifyPayload,
+  resendPayload,
   onVerified,
+  onNeedsSignup,
   onEditNumber,
-  channel,
+  verifyLabel,
 }: {
-  phone: string;
-  /** `storedEmail` is the email already on the account (may differ from what was typed this login) —
-   *  the caller uses it for the keep/switch prompt (W-1). Null when the account has none yet. */
+  dest: string;
+  verifyPayload: Record<string, unknown>;
+  resendPayload: Record<string, unknown>;
   onVerified: (user: RenterUser, storedEmail: string | null) => void;
+  onNeedsSignup?: (onboardingToken: string, email: string | null) => void;
   onEditNumber: () => void;
-  /** The delivery channel the code was sent on (T5) — drives the "sent to" line + Resend. */
-  channel?: OtpChannel;
+  /** Override the verify button label (e.g. "Verify & create account" for the Modal-2 phone-add). */
+  verifyLabel?: string;
 }) {
   const t = useT();
   const a = t.auth;
-  // Where the code went: the email for EMAIL delivery, else the phone (delivery-only — verify is by phone).
-  const dest = channel?.method === "EMAIL" && channel.email ? channel.email : phone;
   const inputs = useRef<Array<HTMLInputElement | null>>([]);
   const [boxes, setBoxes] = useState(["", "", "", ""]);
   const [busy, setBusy] = useState(false);
@@ -72,9 +76,13 @@ export function CodeEntry({
     setErr(null);
     setResent(false);
     setBusy(true);
-    const r = await postAuth("/api/auth/verify", { phone, code });
+    const r = await postAuth("/api/auth/verify", { ...verifyPayload, code });
     setBusy(false);
     if (r.ok) {
+      if (r.data.needsSignup) {
+        onNeedsSignup?.(String(r.data.onboardingToken ?? ""), typeof r.data.email === "string" ? r.data.email : null);
+        return;
+      }
       const storedEmail = typeof r.data.storedEmail === "string" ? r.data.storedEmail : null;
       onVerified(r.data.user as RenterUser, storedEmail);
       return;
@@ -86,7 +94,7 @@ export function CodeEntry({
   const resend = async () => {
     setErr(null);
     setResent(false);
-    const r = await postAuth("/api/auth/resend", { phone, otpMethod: channel?.method ?? "SMS", otpEmail: channel?.email }); // AC-12: no cooldown; same channel
+    const r = await postAuth("/api/auth/resend", resendPayload); // AC-12: no cooldown; same identity
     if (r.ok) {
       setResent(true);
       resetBoxes();
@@ -145,7 +153,7 @@ export function CodeEntry({
         className="mt-[24px] flex w-full items-center justify-center gap-[7px] rounded-[10px] border border-brand bg-brand px-[24px] py-[13px] text-[14.5px] font-bold text-white transition hover:brightness-[1.04] disabled:opacity-50"
       >
         {!busy && <Icon name="check" size={18} />}
-        <span>{busy ? a.verifying : a.verify}</span>
+        <span>{busy ? a.verifying : verifyLabel ?? a.verify}</span>
       </button>
 
       <div className="mt-[22px] text-center text-[13px] text-muted">

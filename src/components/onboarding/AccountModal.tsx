@@ -5,8 +5,9 @@ import { useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
 import { PhoneEntry } from "@/components/auth/PhoneEntry";
+import { EmailEntry } from "@/components/auth/EmailEntry";
 import { CodeEntry } from "@/components/auth/CodeEntry";
-import type { OtpChannel } from "@/components/auth/authClient";
+import { AddPhoneVerify } from "@/components/auth/AddPhoneVerify";
 import { normalizeTier, type RenterUser } from "@/lib/contract/auth";
 import { updateProfile, type ProfileUpdatePayload } from "@/lib/api/profile-client";
 import { Icon } from "@/components/ui";
@@ -18,16 +19,16 @@ function maskEmail(e: string): string {
 }
 
 /**
- * Combined auth + account-registration popup shown when a guest submits an RFQ. Now that the web is
- * public (no login gate to browse), a submitter may be fully signed out — so this runs the whole gate
- * in ONE step: phone → OTP → profile, ending as a `basic` user, then the caller posts the request.
- *
- * - Signed out → phone → OTP (creates the guest session) → profile (guest→basic).
- * - Existing guest session (e.g. mobile handoff) → skips straight to the profile step (no re-OTP).
- * Email is required here (see `requireEmail`). Verification is NOT required — becoming basic is enough
- * to post.
+ * Combined auth + account-registration popup (public-web-auth-gate). Two sequential modals:
+ *   Modal 1 — get a code with PHONE **or** EMAIL (segmented toggle).
+ *   Modal 2 — create your account (the missing identity + profile).
+ * Every account ends with both phone + email; phone stays the identity. Branches after verify:
+ *   - existing account → session → done (W-1 keep/switch may fire).
+ *   - new via PHONE   → session, no profile → Modal 2 Case 2 (email required, no verify).
+ *   - new via EMAIL   → needsSignup + onboardingToken (no session) → Modal 2 Case 1 (add phone, inline verify).
+ * A phone-first guest who abandons Modal 2 resumes at the profile step (hasGuestSession).
  */
-export function AccountModal({ open, onClose, onCreated, title, subtitle, postHeadline, postSubhead }: { open: boolean; onClose: () => void; onCreated: () => void; title?: string; subtitle?: string; postHeadline?: string; postSubhead?: string }) {
+export function AccountModal({ open, onClose, onCreated, title, subtitle, postHeadline, postSubhead, resumeToken, onNeedsSignup }: { open: boolean; onClose: () => void; onCreated: () => void; title?: string; subtitle?: string; postHeadline?: string; postSubhead?: string; resumeToken?: string; onNeedsSignup?: (token: string, email: string | null) => void }) {
   const { locale } = useLocale();
   if (!open) return null;
   return (
@@ -38,102 +39,135 @@ export function AccountModal({ open, onClose, onCreated, title, subtitle, postHe
     >
       <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-surface shadow-xl" onClick={(e) => e.stopPropagation()}>
         {/* Fresh mount each open → the flow always starts at the right step for the current session. */}
-        <AccountFlow onCreated={onCreated} title={title} subtitle={subtitle} postHeadline={postHeadline} postSubhead={postSubhead} />
+        <AccountFlow onCreated={onCreated} title={title} subtitle={subtitle} postHeadline={postHeadline} postSubhead={postSubhead} resumeToken={resumeToken} onNeedsSignup={onNeedsSignup} />
       </div>
     </div>
   );
 }
 
-type Phase = "phone" | "code" | "emailChoice" | "profile";
+type Phase = "entry" | "code" | "addPhone" | "profile" | "emailChoice";
 
-/** The three-step flow. Mounted only while the modal is open, so its phase resets on each open. */
-function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead }: { onCreated: () => void; title?: string; subtitle?: string; postHeadline?: string; postSubhead?: string }) {
+function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, resumeToken, onNeedsSignup }: { onCreated: () => void; title?: string; subtitle?: string; postHeadline?: string; postSubhead?: string; resumeToken?: string; onNeedsSignup?: (token: string, email: string | null) => void }) {
   const t = useT();
   const { status, user, signIn } = useSession();
-  // An existing (guest-tier) session with a phone skips OTP and goes straight to the profile step. A
-  // session that's ALREADY basic/verified has a complete profile — nothing to fill — so it proceeds
-  // straight to posting (handled by the effect below); it should never linger on the profile step.
+  // A guest-tier session with a phone is a phone-first user who verified but never finished the profile
+  // → resume at Modal 2 (Case 2, email required). Already basic/verified → nothing to fill → continue.
   const hasGuestSession = status === "authed" && !!user?.phone && user?.tier === "guest";
   const alreadyComplete = status === "authed" && (user?.tier === "basic" || user?.tier === "verified");
-  const [phase, setPhase] = useState<Phase>(hasGuestSession ? "profile" : "phone");
-  // Did we start at the profile step (mobile-handoff guest who skipped phone→OTP)? Captured once at
-  // mount. The normal flow collects + persists email at the phone step, so the register step omits it;
-  // the skip-to-profile path never collected an email, so it must ask for it (required) there.
-  const [skippedToProfile] = useState(hasGuestSession);
-  const [phone, setPhone] = useState<string | null>(user?.phone ?? null);
-  const [channel, setChannel] = useState<OtpChannel>({ method: "SMS" });
-  // W-1 keep/switch prompt state: the email typed this login (Y), the stored account email (X), the
-  // full profile (needed to resend on switch — the backend has no partial email update), busy/error.
-  const [typedEmail, setTypedEmail] = useState("");
+  // `resumeToken` = an email-first onboarding the user abandoned before adding a phone → resume at the
+  // add-phone step (Modal 2, Case 1). Otherwise: guest resume → profile; fresh → Modal 1 entry.
+  const [phase, setPhase] = useState<Phase>(resumeToken ? "addPhone" : hasGuestSession ? "profile" : "entry");
+  const [entryMode, setEntryMode] = useState<"phone" | "email">("phone");
+  const [codePhone, setCodePhone] = useState<string | null>(user?.phone ?? null);
+  const [codeEmail, setCodeEmail] = useState<string | null>(null);
+  const [onboardingToken, setOnboardingToken] = useState(resumeToken ?? "");
+  // Modal 2 profile: phone-first (Case 2) + the guest resume collect email (required); email-first
+  // (Case 1) doesn't (email came from the onboarding token).
+  const [profileEmail, setProfileEmail] = useState(true);
+  // W-1 keep/switch state: stored account email (X), the full profile (to resend on switch), busy/error.
   const [storedEmail, setStoredEmail] = useState("");
   const [savedProfile, setSavedProfile] = useState<Record<string, unknown> | null>(null);
   const [switching, setSwitching] = useState(false);
   const [switchErr, setSwitchErr] = useState(false);
+  const typedEmail = codeEmail ?? ""; // W-1 compares this (email typed at entry, if any) to storedEmail
 
   // If we somehow open for an already-complete account, don't show the form — just continue.
   useEffect(() => {
     if (alreadyComplete) onCreated();
   }, [alreadyComplete, onCreated]);
 
-  if (phase === "phone") {
+  // Post-verify routing (existing session set): confirm the AUTHORITATIVE tier from /api/me (verify's
+  // tier can be thin for a returning account), then continue / keep-switch / register.
+  const afterVerified = async (u: RenterUser, xEmail: string | null) => {
+    signIn(u);
+    let tier = u.tier;
+    let me: Record<string, unknown> | null = null;
+    try {
+      const r = await fetch("/api/me", { cache: "no-store" });
+      if (r.ok) { const d = (await r.json()) as { user?: Record<string, unknown> }; me = d.user ?? null; tier = normalizeTier(me?.tier); }
+    } catch { /* keep the verify tier on a network hiccup */ }
+    const complete = tier === "basic" || tier === "verified";
+    // W-1: a COMPLETE account whose stored email (X) differs from the one typed this login (Y) → keep or
+    // switch. Rare in the two-modal model (email isn't typed alongside phone), but preserved for aliases.
+    const x = (xEmail ?? "").trim();
+    const y = typedEmail.trim();
+    if (complete && me && x && y && x.toLowerCase() !== y.toLowerCase()) {
+      setStoredEmail(x);
+      setSavedProfile(me);
+      setPhase("emailChoice");
+      return;
+    }
+    if (complete) onCreated();
+    else { setProfileEmail(true); setPhase("profile"); } // new PHONE user → Modal 2 Case 2 (email required)
+  };
+
+  // ── Modal 1 — get a code with phone OR email ──
+  if (phase === "entry") {
+    const seg = (mode: "phone" | "email", label: string) => (
+      <button
+        type="button"
+        onClick={() => setEntryMode(mode)}
+        aria-pressed={entryMode === mode}
+        className={`flex-1 rounded-[8px] py-2 text-[13px] font-bold transition ${entryMode === mode ? "bg-surface text-navy shadow-[0_1px_2px_rgba(28,53,80,.12)]" : "text-navy-mid"}`}
+      >
+        {label}
+      </button>
+    );
     return (
       <div className="p-[22px]">
-        <PhoneEntry
-          title={title ?? t.guest.gateTitle}
-          subtitle={subtitle ?? t.guest.gateSub}
-          onCodeSent={(p, ch, typed) => {
-            setPhone(p);
-            setChannel(ch);
-            setTypedEmail(typed);
-            setPhase("code");
-          }}
-        />
+        <div className="mb-[18px] grid grid-cols-2 gap-[6px] rounded-[10px] border border-border bg-surface2 p-[4px]">
+          {seg("phone", t.auth.withPhone)}
+          {seg("email", t.auth.withEmail)}
+        </div>
+        {entryMode === "phone" ? (
+          <PhoneEntry
+            title={title ?? t.auth.entryTitle}
+            subtitle={subtitle ?? t.auth.entrySub}
+            onUseEmail={() => setEntryMode("email")}
+            onCodeSent={(p) => { setCodePhone(p); setCodeEmail(null); setPhase("code"); }}
+          />
+        ) : (
+          <EmailEntry
+            title={title ?? t.auth.entryTitle}
+            subtitle={subtitle ?? t.auth.entrySub}
+            onUsePhone={() => setEntryMode("phone")}
+            onCodeSent={(em) => { setCodeEmail(em); setCodePhone(null); setPhase("code"); }}
+          />
+        )}
       </div>
     );
   }
 
-  if (phase === "code" && phone) {
+  // ── Modal 1 — code entry (verify by whichever identity was used) ──
+  if (phase === "code" && (codePhone || codeEmail)) {
+    const verifyPayload = codePhone ? { phone: codePhone } : { otpEmail: codeEmail };
+    const resendPayload = codePhone ? { phone: codePhone, otpMethod: "SMS" } : { otpEmail: codeEmail, otpMethod: "EMAIL" };
     return (
       <div className="p-[22px]">
         <CodeEntry
-          phone={phone}
-          channel={channel}
-          onVerified={async (u: RenterUser, xEmail: string | null) => {
-            signIn(u); // start the session from the verified identity
-            // The verify-otp tier can come back thin/guest for a RETURNING account — which would wrongly
-            // push an already-registered renter through the profile step (registering them as a fresh
-            // guest that createRequest then rejects). Confirm the AUTHORITATIVE tier from /api/me
-            // (reads /users/me) before deciding: already basic/verified → skip registration and post.
-            let tier = u.tier;
-            let me: Record<string, unknown> | null = null;
-            try {
-              const r = await fetch("/api/me", { cache: "no-store" });
-              if (r.ok) { const d = (await r.json()) as { user?: Record<string, unknown> }; me = d.user ?? null; tier = normalizeTier(me?.tier); }
-            } catch { /* keep the verify tier on a network hiccup */ }
-            const complete = tier === "basic" || tier === "verified";
-            // W-1: a COMPLETE account already has an email (X) that differs from the one typed this login
-            // (Y). The backend did NOT overwrite it — so ask the user to keep X or switch to Y. Gated on
-            // `complete` because "switch" resends the FULL profile (the backend has no partial email
-            // update), which only a complete account has. Incomplete accounts keep X and go to register.
-            const x = (xEmail ?? "").trim();
-            const y = typedEmail.trim();
-            if (complete && me && x && y && x.toLowerCase() !== y.toLowerCase()) {
-              setStoredEmail(x);
-              setSavedProfile(me);
-              setPhase("emailChoice");
-              return;
-            }
-            if (complete) onCreated();
-            else setPhase("profile");
-          }}
-          onEditNumber={() => setPhase("phone")}
+          dest={codePhone ?? codeEmail ?? ""}
+          verifyPayload={verifyPayload}
+          resendPayload={resendPayload}
+          onVerified={afterVerified}
+          onNeedsSignup={(token, email) => { setOnboardingToken(token); onNeedsSignup?.(token, email); setPhase("addPhone"); }}
+          onEditNumber={() => setPhase("entry")}
         />
       </div>
     );
   }
 
+  // ── Modal 2, Case 1 — email-first new user adds a phone (inline verify → creates the account) ──
+  if (phase === "addPhone") {
+    return (
+      <AddPhoneVerify
+        onboardingToken={onboardingToken}
+        onVerified={(u) => { signIn(u); setProfileEmail(false); setPhase("profile"); }}
+      />
+    );
+  }
+
+  // ── W-1 keep-vs-switch (complete account, stored email ≠ typed) ──
   if (phase === "emailChoice") {
-    // Prompt is gated on a complete account, so proceeding always posts (no register step needed).
     const useNew = async () => {
       const s = (v: unknown) => (typeof v === "string" ? v : "");
       // Resend the FULL profile (loaded from /api/me) with the new email — the backend has no partial
@@ -173,13 +207,12 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead }: 
     );
   }
 
+  // ── Modal 2 profile — Case 1 (email from token: no email field) / Case 2 (email required) ──
   return (
     <OnboardingForm
       next="/create"
-      // Normal flow: email was collected + persisted at the phone step → don't ask again. Handoff guest
-      // (skipped that step): ask for it here, required.
-      showEmail={skippedToProfile}
-      requireEmail={skippedToProfile}
+      showEmail={profileEmail}
+      requireEmail={profileEmail}
       onDone={onCreated}
       headline={postHeadline ?? t.guest.postTitle}
       subhead={postSubhead ?? t.guest.postBody}

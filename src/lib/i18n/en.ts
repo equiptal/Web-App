@@ -495,13 +495,25 @@ export const en = {
     emailLabel: "Email address",
     emailInvalid: "Enter a valid email address.",
     countryLabel: "Country",
-    smsSaudiOnly: "SMS is available for Saudi (+966) numbers only — your code will be emailed instead.",
+    smsSaudiOnly: "SMS isn't available outside Saudi Arabia — use Email to get your code.",
     emailChoiceTitle: "Keep your saved email?",
     emailChoiceBody: "This number already uses {stored}. Keep it, or switch to the one you just entered ({new})?",
     emailKeep: "Keep current",
     emailUseNew: "Use new",
     emailSwitching: "Switching…",
     emailSwitchError: "Couldn't switch your email — keeping the current one.",
+    withPhone: "Phone",
+    withEmail: "Email",
+    entryTitle: "Sign in or create your account",
+    entrySub: "Enter your phone or email — we'll send a verification code. New or returning, this is the only step.",
+    addPhoneTitle: "Add your phone number",
+    addPhoneSub: "Your phone is your account identity — we'll text a code to verify it.",
+    verifyCreate: "Verify & create account",
+    emailRequiredTitle: "Add your email",
+    emailRequiredSub: "We'll use it for receipts and to help you sign in.",
+    finishTitle: "Finish your signup",
+    finishBody: "You're almost there — add your details to finish creating your account.",
+    finishCta: "Finish signup",
     sendCode: "Send code", // AC-01
     sending: "Sending…",
     signInFoot: "New here? Just enter your number — we'll set you up.",
@@ -519,6 +531,9 @@ export const en = {
       expired: "That code has expired. Request a new one.", // AC-11
       locked: "Too many attempts. Request a new code.", // AC-10
       send_failed: "We couldn't send the code. Please try again.", // AC-15
+      email_ambiguous: "This email is linked to more than one account — please sign in with your phone number.",
+      email_taken: "This email is already in use.",
+      phone_taken: "This number already has an account — sign in instead.",
       offline: "You appear to be offline. Check your connection and try again.", // AC-24
       unknown: "Something went wrong. Please try again.",
     },
