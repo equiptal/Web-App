@@ -132,7 +132,9 @@ export function bidQuoteToFormDraft(bid: NormalizedBid, termMatches: TermMatch[]
     item_notes: null,
     terms: termMatches.map(termFromMatch),
     pricing: {
-      vat_mode: { value: "excl", status: "assumed" }, // unstated → excl, renter confirms
+      // Agent now emits vat_mode ("excl"|"incl") when the quote states it — pre-fill from it (green,
+      // "extracted"). Unstated (null) → assume excl (amber, renter confirms). No more VAT extra row.
+      vat_mode: { value: bid.vat_mode ?? "excl", status: bid.vat_mode ? "extracted" : "assumed" },
       rental_price: { value: bid.price_amount, status: hasPrice ? "extracted" : "needs_verification", required: true },
       delivery_price: { value: bid.mobilization_amount, status: bid.mobilization_amount != null ? "extracted" : "needs_verification" },
       return_price: { value: bid.demobilization_amount, status: bid.demobilization_amount != null ? "extracted" : "needs_verification" },

@@ -39,6 +39,10 @@ export interface NormalizedBid {
   mobilization_amount: number | null;
   demobilization_amount: number | null;
   currency: string | null;
+  /** Whether the quoted prices EXCLUDE or INCLUDE 15% VAT, when the quote states it (the agent parses
+   *  "Prices exclude 15% VAT" / "شامل ض.ق.م" etc. into this). null when unstated → the verify screen
+   *  assumes `excl` and marks it for renter confirmation. */
+  vat_mode?: "excl" | "incl" | null;
   cost_responsibilities: Partial<Record<CostResponsibilityItem, CostParty>>;
   equipment_subtype: string | null;
   equipment_capacity: string | null;
