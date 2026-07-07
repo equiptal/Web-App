@@ -29,4 +29,4 @@ export const BID_VERIFY_ENABLED = process.env.NEXT_PUBLIC_BID_VERIFY_ENABLED !==
  * (VALIDATION_ERROR 400), so this stays `false`. **Flip to `true` here** once the backend accepts an
  * email-only login (email lookup → send code / EMAIL_AMBIGUOUS / needsSignup) — no other change needed.
  */
-export const EMAIL_FIRST_AUTH_ENABLED: boolean = false;
+export const EMAIL_FIRST_AUTH_ENABLED: boolean = true;
