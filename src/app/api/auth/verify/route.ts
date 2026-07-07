@@ -9,19 +9,24 @@ interface VerifyResponse {
   refreshToken?: string;
   idToken?: string;
   expiresIn?: number;
-  // Email-first NEW user: the backend verifies the email but creates NO account yet — it returns a
-  // short-lived onboardingToken the web carries into the phone-add step (Modal 2). No session here.
+  // Email-first NEW user (Modal 1 email verify): backend verifies the email, creates NO account, and
+  // returns a short-lived onboardingToken the web carries into Modal 2. No session here.
   needsSignup?: boolean;
+  // Email-first phone verify (Modal 2b): backend verifies the phone against the onboardingToken and
+  // returns a NEW token carrying `phone ✓`. Still creates NOTHING — the account is made at complete-signup.
+  phoneVerified?: boolean;
   onboardingToken?: string;
   email?: string | null;
 }
 
 /**
- * POST /api/auth/verify — verify the OTP and (usually) start a session (AC-03/04/05/06/09/10/11/15).
- * Proxies backend `POST /auth/verify-otp`. Accepts three identities: `{ phone }` (normal), `{ otpEmail }`
- * (email-first), or `{ onboardingToken, role }` (email-first phone-add). On a normal success it sets
- * httpOnly token cookies and returns the safe `user` (+ `storedEmail` for W-1). For an email-first NEW
- * user the backend returns `needsSignup` (no account/session) → the web collects a phone next.
+ * POST /api/auth/verify — verify an OTP. Proxies backend `POST /auth/verify-otp`. Three identities:
+ * `{ phone }` / `{ otpEmail }` (Modal 1), or `{ onboardingToken, phone }` (Modal 2b — verify the phone
+ * for an email-first signup). **Verify ≠ create:**
+ *  - normal phone/email of an existing (or new-phone) account → session set, returns `user` (+ storedEmail, W-1).
+ *  - new email → `needsSignup` + onboardingToken (no session).
+ *  - Modal 2b phone verify → `{ phoneVerified, onboardingToken }` (no session, no account) — the web
+ *    threads that phone✓ token into `/api/auth/complete-signup`.
  */
 export async function POST(req: Request) {
   let body: { phone?: string; code?: string; otpEmail?: string; onboardingToken?: string; role?: string } = {};
@@ -45,11 +50,15 @@ export async function POST(req: Request) {
       {
         ...(phone ? { phone } : {}),
         ...(otpEmail ? { otpEmail } : {}),
-        ...(onboardingToken ? { onboardingToken, role: body.role } : {}),
+        ...(onboardingToken ? { onboardingToken } : {}),
         code,
       },
       localeFromRequest(req),
     );
+    // Modal 2b — phone verified against the onboarding token: hand back the phone✓ token, NO session.
+    if (data.phoneVerified) {
+      return NextResponse.json({ phoneVerified: true, onboardingToken: data.onboardingToken });
+    }
     // Email-first NEW user → no account/session yet; hand the onboarding token back so the web can
     // collect a phone and finish signup (Modal 2). Do NOT set cookies.
     if (data.needsSignup) {

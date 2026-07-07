@@ -10,6 +10,7 @@ export type AuthKind =
   | "email_ambiguous"
   | "email_taken"
   | "phone_taken"
+  | "phone_not_verified"
   | "offline"
   | "unknown";
 

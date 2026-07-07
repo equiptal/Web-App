@@ -509,6 +509,8 @@ export const en = {
     addPhoneTitle: "Add your phone number",
     addPhoneSub: "Your phone is your account identity — we'll text a code to verify it.",
     verifyCreate: "Verify & create account",
+    verifyPhone: "Verify",
+    phoneVerified: "Phone verified",
     emailRequiredTitle: "Add your email",
     emailRequiredSub: "We'll use it for receipts and to help you sign in.",
     emailSignInUnavailable: "We couldn't sign you in with this email — please use your phone number.",
@@ -534,7 +536,8 @@ export const en = {
       send_failed: "We couldn't send the code. Please try again.", // AC-15
       email_ambiguous: "This email is linked to more than one account — please sign in with your phone number.",
       email_taken: "This email is already in use.",
-      phone_taken: "This number already has an account — sign in instead.",
+      phone_taken: "You already have an account with this number — sign in instead.",
+      phone_not_verified: "Please verify your phone number first.",
       offline: "You appear to be offline. Check your connection and try again.", // AC-24
       unknown: "Something went wrong. Please try again.",
     },

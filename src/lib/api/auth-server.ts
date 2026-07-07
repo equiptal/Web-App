@@ -85,6 +85,7 @@ const KIND_STATUS: Record<AuthErrorKind, number> = {
   email_ambiguous: 409,
   email_taken: 409,
   phone_taken: 409,
+  phone_not_verified: 400,
   offline: 503,
   not_configured: 500,
   unknown: 502,

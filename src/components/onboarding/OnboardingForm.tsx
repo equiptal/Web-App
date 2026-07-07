@@ -86,24 +86,41 @@ export function OnboardingForm({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [fe, setFe] = useState<Record<string, string>>({});
-  // Inline phone verification (Case 1 only): the phone becomes an in-form field with Send-code + OTP.
+  // Inline phone verification (Case 1 only): the phone becomes an in-form field with Send-code + OTP +
+  // a Verify step. Verify ≠ create — the account is made only at "Create account" (complete-signup).
   const [dial, setDial] = useState(SAUDI_DIAL);
   const [phoneDigits, setPhoneDigits] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const [phoneBusy, setPhoneBusy] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState(false);
   const [phoneErr, setPhoneErr] = useState<AuthKind | null>(null);
+  // The onboarding token evolves: email✓ (from Modal 1) → phone✓ (after the inline Verify). The phone✓
+  // token is what complete-signup consumes.
+  const [activeToken, setActiveToken] = useState(phoneVerify?.onboardingToken ?? "");
   const phoneE164 = `${dial}${phoneDigits.replace(/\D/g, "")}`;
   const [sentPre, sentPost] = t.auth.codeSentTo.split("{phone}");
+  const resetPhone = () => { setOtpSent(false); setPhoneVerified(false); setOtpCode(""); setPhoneErr(null); };
 
   const sendPhoneCode = async () => {
     if (!phoneVerify || !phoneDigits.trim()) return;
     setPhoneErr(null);
     setPhoneBusy(true);
-    const r = await postAuth("/api/auth/request-code", { onboardingToken: phoneVerify.onboardingToken, phone: phoneE164, countryCode: dial, otpMethod: "SMS" });
+    const r = await postAuth("/api/auth/request-code", { onboardingToken: activeToken, phone: phoneE164, countryCode: dial, otpMethod: "SMS" });
     setPhoneBusy(false);
-    if (r.ok) setOtpSent(true);
+    if (r.ok) { setOtpSent(true); setPhoneVerified(false); setOtpCode(""); }
     else setPhoneErr(r.kind);
+  };
+
+  // Modal 2b: verify the phone against the token → receive the phone✓ token. Creates NOTHING.
+  const verifyPhone = async () => {
+    if (!phoneVerify || otpCode.replace(/\D/g, "").length < 4) return;
+    setPhoneErr(null);
+    setPhoneBusy(true);
+    const r = await postAuth("/api/auth/verify", { onboardingToken: activeToken, phone: phoneE164, code: otpCode.replace(/\D/g, "") });
+    setPhoneBusy(false);
+    if (r.ok && r.data.phoneVerified) { setActiveToken(String(r.data.onboardingToken ?? activeToken)); setPhoneVerified(true); }
+    else if (!r.ok) setPhoneErr(r.kind);
   };
 
   useEffect(() => {
@@ -144,25 +161,39 @@ export function OnboardingForm({
       else if (emailVal && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailVal)) next_fe.email = o.errors.email;
     }
     if (whatsapp.trim() && !/^(\+?966|0)?5\d{8}$/.test(whatsapp.replace(/\s/g, ""))) next_fe.whatsapp = o.errors.whatsapp;
-    // Case 1: the phone (with its inline OTP) is required here — it's what creates the account.
-    if (phoneVerify && (!phoneDigits.trim() || !otpSent || otpCode.replace(/\D/g, "").length < 4)) next_fe.phone = o.errors.phone;
+    // Case 1: the phone must be VERIFIED (inline) before the account can be created.
+    if (phoneVerify && !phoneVerified) next_fe.phone = o.errors.phone;
     if (Object.keys(next_fe).length) {
       setFe(next_fe);
       return;
     }
     setFe({});
     setBusy(true);
-    // Case 1: verify the phone with the onboarding token FIRST — this creates the account + session,
-    // so the profile save below runs authed. A failure (wrong code, phone taken) stops here.
+    // Case 1 (email-first): CREATE the account atomically — phone✓ token + full profile in one call.
+    // Nothing was written until now, so an abandoned form leaves no account. No /profile/complete.
     if (phoneVerify) {
-      setPhoneErr(null);
-      const vr = await postAuth("/api/auth/verify", { onboardingToken: phoneVerify.onboardingToken, phone: phoneE164, code: otpCode.replace(/\D/g, ""), role: "rentee" });
-      if (!vr.ok) {
-        setBusy(false);
-        setPhoneErr(vr.kind);
+      const cr = await postAuth("/api/auth/complete-signup", {
+        onboardingToken: activeToken,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        city: city.trim(),
+        jobTitle: jobTitle.trim(),
+        companyName: companyName.trim() || undefined,
+        whatsapp: whatsapp.trim() || undefined,
+      });
+      setBusy(false);
+      if (!cr.ok) {
+        // phone_not_verified → nudge back to Verify; other collisions surface at the top.
+        if (cr.kind === "phone_not_verified") { setPhoneVerified(false); setPhoneErr("phone_not_verified"); }
+        else setErr(t.auth.errors[cr.kind]);
         return;
       }
-      signIn(vr.data.user as RenterUser); // establish the client session for the profile save
+      signIn(cr.data.user as RenterUser);
+      await refresh();
+      if (onDone) { onDone(); return; }
+      const dest = next.startsWith("/") && !next.startsWith("//") ? next : "/";
+      router.replace(dest);
+      return;
     }
     let res: Response;
     try {
@@ -230,33 +261,38 @@ export function OnboardingForm({
         </div>
 
         {phoneVerify ? (
-          // Case 1 (email-first): phone is a field here, verified INLINE. Submitting the form verifies
-          // this code (creating the account) then saves the profile — no separate add-phone modal.
+          // Case 1 (email-first): phone is a field here, verified INLINE (Send code → Verify). Verify
+          // creates nothing; the account is created on "Create account" (complete-signup), atomically.
           <div>
-            <label className={labelCls}>{o.phone} <span className="text-danger">*</span></label>
+            <label className={labelCls}>
+              {o.phone} <span className="text-danger">*</span>
+              {phoneVerified && <span className="ms-2 text-[11px] font-bold text-ok">✓ {t.auth.phoneVerified}</span>}
+            </label>
             <div className="flex gap-[10px]" dir="ltr">
               <select
                 aria-label={t.auth.countryLabel}
                 value={dial}
-                onChange={(e) => { setDial(e.target.value); setOtpSent(false); }}
-                className="h-[46px] rounded-[10px] border border-border bg-surface px-[10px] text-[13.5px] font-bold text-navy outline-0 focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)]"
+                onChange={(e) => { setDial(e.target.value); resetPhone(); }}
+                disabled={phoneVerified}
+                className="h-[46px] rounded-[10px] border border-border bg-surface px-[10px] text-[13.5px] font-bold text-navy outline-0 focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)] disabled:opacity-60"
               >
                 {COUNTRY_CODES.map((c) => (
                   <option key={c.dial} value={c.dial}>{c.flag} {c.dial}</option>
                 ))}
               </select>
               <input
-                className={`${inputCls} flex-1`}
+                className={`${inputCls} flex-1 ${phoneVerified ? "bg-surface2 text-muted" : ""}`}
                 type="tel"
                 inputMode="numeric"
                 maxLength={11}
                 value={phoneDigits}
-                onChange={(e) => { setPhoneDigits(e.target.value); setOtpSent(false); }}
+                onChange={(e) => { setPhoneDigits(e.target.value); resetPhone(); }}
+                readOnly={phoneVerified}
                 placeholder={t.auth.phonePlaceholder}
                 dir="ltr"
               />
             </div>
-            {!otpSent ? (
+            {phoneVerified ? null : !otpSent ? (
               <button
                 type="button"
                 onClick={sendPhoneCode}
@@ -268,16 +304,26 @@ export function OnboardingForm({
             ) : (
               <div className="mt-[10px]">
                 <p className="mb-2 text-[12px] text-muted">{sentPre}<b className="text-navy" dir="ltr">{phoneE164}</b>{sentPost}</p>
-                <input
-                  className={inputCls}
-                  inputMode="numeric"
-                  maxLength={4}
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                  placeholder="1234"
-                  dir="ltr"
-                  style={{ letterSpacing: "0.35em", fontFamily: "var(--font-plex), monospace" }}
-                />
+                <div className="flex gap-[10px]">
+                  <input
+                    className={`${inputCls} flex-1`}
+                    inputMode="numeric"
+                    maxLength={4}
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    placeholder="1234"
+                    dir="ltr"
+                    style={{ letterSpacing: "0.35em", fontFamily: "var(--font-plex), monospace" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={verifyPhone}
+                    disabled={phoneBusy || otpCode.replace(/\D/g, "").length < 4}
+                    className="flex-none rounded-[10px] border border-brand bg-brand px-4 text-[13px] font-bold text-white transition hover:brightness-[1.04] disabled:opacity-50"
+                  >
+                    {phoneBusy ? t.auth.verifying : t.auth.verifyPhone}
+                  </button>
+                </div>
                 <button type="button" onClick={sendPhoneCode} className="mt-2 text-[12.5px] font-bold text-info">{t.auth.resend}</button>
               </div>
             )}
@@ -353,7 +399,7 @@ export function OnboardingForm({
       <div className="border-t border-border p-[22px]">
         <button
           type="submit"
-          disabled={busy}
+          disabled={busy || (!!phoneVerify && !phoneVerified)}
           className="flex w-full items-center justify-center gap-[7px] rounded-[10px] border border-brand bg-brand px-[24px] py-[13px] text-[14.5px] font-bold text-brand-fg transition hover:brightness-[1.04] disabled:opacity-50"
         >
           {busy ? o.submitting : o.submit}
