@@ -18,7 +18,7 @@ const siteUrl = "https://web.moedatech.net";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Moedatech — Equipment RFQs",
+    default: "Moedatech - WebApp معداتك - تطبيق الويب",
     template: "%s — Moedatech",
   },
   description:
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "Moedatech",
-    title: "Moedatech — Equipment RFQs",
+    title: "Moedatech - WebApp معداتك - تطبيق الويب",
     description:
       "Create an equipment RFQ from a pasted or uploaded document, collect bids, and close the deal — all in one place.",
     url: siteUrl,
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary",
-    title: "Moedatech — Equipment RFQs",
+    title: "Moedatech - WebApp معداتك - تطبيق الويب",
     description: "Create an equipment RFQ, collect bids, and close the deal — all in one place.",
     images: ["/moedatech-app-icon.png"],
   },
