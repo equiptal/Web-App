@@ -20,7 +20,9 @@ export function CodeEntry({
   channel,
 }: {
   phone: string;
-  onVerified: (user: RenterUser) => void;
+  /** `storedEmail` is the email already on the account (may differ from what was typed this login) —
+   *  the caller uses it for the keep/switch prompt (W-1). Null when the account has none yet. */
+  onVerified: (user: RenterUser, storedEmail: string | null) => void;
   onEditNumber: () => void;
   /** The delivery channel the code was sent on (T5) — drives the "sent to" line + Resend. */
   channel?: OtpChannel;
@@ -73,7 +75,8 @@ export function CodeEntry({
     const r = await postAuth("/api/auth/verify", { phone, code });
     setBusy(false);
     if (r.ok) {
-      onVerified(r.data.user as RenterUser);
+      const storedEmail = typeof r.data.storedEmail === "string" ? r.data.storedEmail : null;
+      onVerified(r.data.user as RenterUser, storedEmail);
       return;
     }
     setErr(r.kind);

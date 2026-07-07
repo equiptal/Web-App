@@ -284,11 +284,13 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
   // backend-flagged deviation → conflict. This is why overtime shows "Pending review", not "Matched".
   const negContractState = (key: string): TermState => (deviationKeys.has(key) ? "conflict" : "grey");
 
-  // Operator (spec 128). operator_included is an ACKNOWLEDGE term (matched, or conflict only when the
-  // RFQ needs an operator the bid omits); operator_nationality is its own CONFLICT_ELIGIBLE term.
+  // Operator (spec 128). operator_included is CONFLICT_ELIGIBLE / Negotiable — the app moved it
+  // Acknowledge → Negotiable (deal-room.service CONFLICT_ELIGIBLE_KEYS): it conflicts when the RFQ needs
+  // an operator the bid omits OR on a backend-flagged deviation, and is countered in the deal room.
+  // operator_nationality is its own CONFLICT_ELIGIBLE term.
   const reqOperator = s(reqItem.operatorIncluded)?.toUpperCase() === "YES";
   const bidOperator = s(raw.operatorIncluded)?.toUpperCase() === "YES";
-  const operatorIncluded: TermState = !reqOperator ? "grey" : bidOperator ? "matched" : "conflict";
+  const operatorIncluded: TermState = !reqOperator ? "grey" : (!bidOperator || deviationKeys.has("operator_included")) ? "conflict" : "matched";
   const opNat = reqOperator
     ? (s(reqItem.operatorNationality) === "restricted" ? (s(reqItem.operatorNationalityCustom) ?? "restricted") : s(reqItem.operatorNationality))
     : null;
@@ -378,6 +380,8 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
       { key: "fat_accommodation_transport", labelEn: "Operator FAT — Accommodation/Transport", labelAr: "الإعاشة (F.A.T) — الإقامة/النقل", state: contractState("fat_accommodation_transport", fatAccom) },
       { key: "fuel_responsibility", labelEn: "Fuel responsibility", labelAr: "مسؤولية الوقود", state: contractState("fuel_responsibility", fuelResp) },
       rPayment, rSla, rOvertime, rMaint,
+      // mobilization_lead_time — CONFLICT_ELIGIBLE / Negotiable (app moved it Priced → Negotiable).
+      { key: "mobilization_lead_time", labelEn: "Mobilization lead time", labelAr: "مهلة التعبئة", state: negContractState("mobilization_lead_time") },
       { key: "mobilization_pricing", labelEn: "Mobilization pricing", labelAr: "تسعير النقل", state: "grey" },
       { key: "demobilization_pricing", labelEn: "Demobilization pricing", labelAr: "تسعير الإرجاع", state: "grey" },
     ],

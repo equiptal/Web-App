@@ -185,10 +185,11 @@ export function mapDealRoom(raw: unknown): DealRoomView {
   // legacy row disputes and shows a PHANTOM "Operator FAT" conflict. When the split rows are present they
   // are the real per-item FAT — drop the stale combined row so it can't manufacture a conflict.
   const hasSplitFat = rawTerms.some((t) => { const k = s(t.key); return k === "fat_food" || k === "fat_accommodation_transport"; });
-  // Priced line items (mob/demob pricing) are NOT negotiable term cards — they're settled on the counter
-  // flow's Price page (app parity: terms-journey "Priced"). `mobilization_lead_time` is retired/hidden
-  // from every deal-room surface. Drop all three from the terms list so they never render as term rows.
-  const PRICE_LINE_KEYS = new Set(["mobilization_pricing", "demobilization_pricing", "mobilization_lead_time"]);
+  // Priced line items (mob/demob PRICING) are NOT negotiable term cards — they're settled on the counter
+  // flow's Price page (rate card mobPrice/demobPrice), so drop them from the term rows.
+  // `mobilization_lead_time` is CONFLICT_ELIGIBLE in the app (deal-room.service CONFLICT_ELIGIBLE_KEYS —
+  // moved Priced → Negotiable), so it MUST render as a negotiable term and is NOT dropped here.
+  const PRICE_LINE_KEYS = new Set(["mobilization_pricing", "demobilization_pricing"]);
   const terms: DealTerm[] = rawTerms
     .filter((t) => s(t.key) !== "PRICE")
     .filter((t) => !PRICE_LINE_KEYS.has(s(t.key) ?? ""))

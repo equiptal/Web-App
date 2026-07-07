@@ -494,6 +494,12 @@ export const ar: Dictionary = {
     emailInvalid: "أدخل بريدًا إلكترونيًا صحيحًا.",
     countryLabel: "الدولة",
     smsSaudiOnly: "الرسائل النصية متاحة للأرقام السعودية (+966) فقط — سيُرسَل الرمز إلى بريدك الإلكتروني بدلاً من ذلك.",
+    emailChoiceTitle: "الإبقاء على بريدك المحفوظ؟",
+    emailChoiceBody: "هذا الرقم يستخدم بالفعل {stored}. أبقِه، أو بدّله بالذي أدخلته للتو ({new})؟",
+    emailKeep: "الإبقاء على الحالي",
+    emailUseNew: "استخدام الجديد",
+    emailSwitching: "جارٍ التبديل…",
+    emailSwitchError: "تعذّر تبديل بريدك — سنبقي الحالي.",
     sendCode: "إرسال الرمز", // AC-01
     sending: "جارٍ الإرسال…",
     signInFoot: "جديد هنا؟ فقط أدخل رقمك — وسنكمل التسجيل.",

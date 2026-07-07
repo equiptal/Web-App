@@ -496,6 +496,12 @@ export const en = {
     emailInvalid: "Enter a valid email address.",
     countryLabel: "Country",
     smsSaudiOnly: "SMS is available for Saudi (+966) numbers only — your code will be emailed instead.",
+    emailChoiceTitle: "Keep your saved email?",
+    emailChoiceBody: "This number already uses {stored}. Keep it, or switch to the one you just entered ({new})?",
+    emailKeep: "Keep current",
+    emailUseNew: "Use new",
+    emailSwitching: "Switching…",
+    emailSwitchError: "Couldn't switch your email — keeping the current one.",
     sendCode: "Send code", // AC-01
     sending: "Sending…",
     signInFoot: "New here? Just enter your number — we'll set you up.",

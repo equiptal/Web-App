@@ -40,7 +40,9 @@ export function PhoneEntry({
   title,
   subtitle,
 }: {
-  onCodeSent: (phone: string, channel: OtpChannel) => void;
+  /** `typedEmail` is the email entered on this screen — carried forward so the code step can compare
+   *  it to the account's stored email and offer a keep/switch prompt (W-1). Empty in legacy/SMS-only. */
+  onCodeSent: (phone: string, channel: OtpChannel, typedEmail: string) => void;
   title?: string;
   subtitle?: string;
 }) {
@@ -85,7 +87,7 @@ export function PhoneEntry({
       otpEmail: PUBLIC_WEB_ENABLED ? trimmedEmail : channel.email,
     });
     setBusy(false);
-    if (r.ok) onCodeSent(phone, channel);
+    if (r.ok) onCodeSent(phone, channel, trimmedEmail);
     else setErr(r.kind);
   };
 
