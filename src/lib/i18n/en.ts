@@ -568,6 +568,7 @@ export const en = {
       email: "Enter a valid email address.",
       emailRequired: "A valid email address is required.",
       whatsapp: "Enter a valid Saudi mobile number.", // AC-04
+      phone: "Enter your phone number and verification code.",
       submit: "We couldn't save your details. Please try again.",
       offline: "You appear to be offline. Your details are kept — try again.", // AC-23
     },

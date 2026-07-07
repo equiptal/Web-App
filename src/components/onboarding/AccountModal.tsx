@@ -7,7 +7,6 @@ import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
 import { PhoneEntry } from "@/components/auth/PhoneEntry";
 import { EmailEntry } from "@/components/auth/EmailEntry";
 import { CodeEntry } from "@/components/auth/CodeEntry";
-import { AddPhoneVerify } from "@/components/auth/AddPhoneVerify";
 import { normalizeTier, type RenterUser } from "@/lib/contract/auth";
 import { updateProfile, type ProfileUpdatePayload } from "@/lib/api/profile-client";
 import { EMAIL_FIRST_AUTH_ENABLED } from "@/lib/flags";
@@ -25,9 +24,11 @@ function maskEmail(e: string): string {
  *   Modal 2 — create your account (the missing identity + profile).
  * Every account ends with both phone + email; phone stays the identity. Branches after verify:
  *   - existing account → session → done (W-1 keep/switch may fire).
- *   - new via PHONE   → session, no profile → Modal 2 Case 2 (email required, no verify).
- *   - new via EMAIL   → needsSignup + onboardingToken (no session) → Modal 2 Case 1 (add phone, inline verify).
- * A phone-first guest who abandons Modal 2 resumes at the profile step (hasGuestSession).
+ *   - new via PHONE   → session, no profile → Modal 2 Case 2 (email required in the form, no verify).
+ *   - new via EMAIL   → needsSignup + onboardingToken (no session) → Modal 2 Case 1 (the profile form
+ *     carries the phone with an INLINE OTP; submitting it verifies the phone → creates the account).
+ * New user = 2 modals total; existing user = 1. A phone-first guest who abandons Modal 2 resumes at the
+ * profile step (hasGuestSession); an email-first abandon resumes at the same form (via resumeToken).
  */
 export function AccountModal({ open, onClose, onCreated, title, subtitle, postHeadline, postSubhead, resumeToken, onNeedsSignup }: { open: boolean; onClose: () => void; onCreated: () => void; title?: string; subtitle?: string; postHeadline?: string; postSubhead?: string; resumeToken?: string; onNeedsSignup?: (token: string, email: string | null) => void }) {
   const { locale } = useLocale();
@@ -46,7 +47,7 @@ export function AccountModal({ open, onClose, onCreated, title, subtitle, postHe
   );
 }
 
-type Phase = "entry" | "code" | "addPhone" | "profile" | "emailChoice";
+type Phase = "entry" | "code" | "profile" | "emailChoice";
 
 function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, resumeToken, onNeedsSignup }: { onCreated: () => void; title?: string; subtitle?: string; postHeadline?: string; postSubhead?: string; resumeToken?: string; onNeedsSignup?: (token: string, email: string | null) => void }) {
   const t = useT();
@@ -55,16 +56,16 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
   // → resume at Modal 2 (Case 2, email required). Already basic/verified → nothing to fill → continue.
   const hasGuestSession = status === "authed" && !!user?.phone && user?.tier === "guest";
   const alreadyComplete = status === "authed" && (user?.tier === "basic" || user?.tier === "verified");
-  // `resumeToken` = an email-first onboarding the user abandoned before adding a phone → resume at the
-  // add-phone step (Modal 2, Case 1). Otherwise: guest resume → profile; fresh → Modal 1 entry.
-  const [phase, setPhase] = useState<Phase>(resumeToken ? "addPhone" : hasGuestSession ? "profile" : "entry");
+  // `resumeToken` = an email-first onboarding the user abandoned before finishing → resume at the same
+  // profile form (Modal 2, Case 1). Otherwise: guest resume → profile; fresh → Modal 1 entry.
+  const [phase, setPhase] = useState<Phase>(resumeToken || hasGuestSession ? "profile" : "entry");
   const [entryMode, setEntryMode] = useState<"phone" | "email">("phone");
   const [codePhone, setCodePhone] = useState<string | null>(user?.phone ?? null);
   const [codeEmail, setCodeEmail] = useState<string | null>(null);
+  // Email-first onboarding token (Case 1). When set, Modal 2 is the account form WITH the inline
+  // phone-verify (and no email field — email came from the token). Empty = phone-first (Case 2: email
+  // required in the form, phone already verified).
   const [onboardingToken, setOnboardingToken] = useState(resumeToken ?? "");
-  // Modal 2 profile: phone-first (Case 2) + the guest resume collect email (required); email-first
-  // (Case 1) doesn't (email came from the onboarding token).
-  const [profileEmail, setProfileEmail] = useState(true);
   // W-1 keep/switch state: stored account email (X), the full profile (to resend on switch), busy/error.
   const [storedEmail, setStoredEmail] = useState("");
   const [savedProfile, setSavedProfile] = useState<Record<string, unknown> | null>(null);
@@ -99,7 +100,7 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
       return;
     }
     if (complete) onCreated();
-    else { setProfileEmail(true); setPhase("profile"); } // new PHONE user → Modal 2 Case 2 (email required)
+    else setPhase("profile"); // new PHONE user → Modal 2 Case 2 (email required; onboardingToken empty)
   };
 
   // ── Modal 1 — get a code with phone OR email ──
@@ -162,20 +163,10 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
           verifyPayload={verifyPayload}
           resendPayload={resendPayload}
           onVerified={afterVerified}
-          onNeedsSignup={(token, email) => { setOnboardingToken(token); onNeedsSignup?.(token, email); setPhase("addPhone"); }}
+          onNeedsSignup={(token, email) => { setOnboardingToken(token); onNeedsSignup?.(token, email); setPhase("profile"); }}
           onEditNumber={() => setPhase("entry")}
         />
       </div>
-    );
-  }
-
-  // ── Modal 2, Case 1 — email-first new user adds a phone (inline verify → creates the account) ──
-  if (phase === "addPhone") {
-    return (
-      <AddPhoneVerify
-        onboardingToken={onboardingToken}
-        onVerified={(u) => { signIn(u); setProfileEmail(false); setPhase("profile"); }}
-      />
     );
   }
 
@@ -220,12 +211,17 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
     );
   }
 
-  // ── Modal 2 profile — Case 1 (email from token: no email field) / Case 2 (email required) ──
+  // ── Modal 2 profile — the single create-account form ──
+  // Case 1 (email-first): onboardingToken set → inline phone-verify in the form, no email field
+  // (it came from the token). Case 2 (phone-first / guest resume): no token → phone already verified,
+  // email required in the form.
+  const emailFirst = !!onboardingToken;
   return (
     <OnboardingForm
       next="/create"
-      showEmail={profileEmail}
-      requireEmail={profileEmail}
+      showEmail={!emailFirst}
+      requireEmail={!emailFirst}
+      phoneVerify={emailFirst ? { onboardingToken } : undefined}
       onDone={onCreated}
       headline={postHeadline ?? t.guest.postTitle}
       subhead={postSubhead ?? t.guest.postBody}

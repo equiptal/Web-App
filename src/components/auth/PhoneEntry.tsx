@@ -10,7 +10,7 @@ export const SAUDI_DIAL = "+966";
 
 // Dial codes offered on public web (KSA default + GCC + common expat origins). SMS is Saudi-only, so a
 // non-Saudi number can't get an SMS code — the phone tab nudges those users to the Email tab. Exported
-// so the Modal-2 phone-add step (AddPhoneVerify) reuses the same list.
+// so the Modal-2 inline phone-verify (OnboardingForm, Case 1) reuses the same list.
 export const COUNTRY_CODES: { dial: string; flag: string; label: string }[] = [
   { dial: "+966", flag: "🇸🇦", label: "Saudi Arabia" },
   { dial: "+971", flag: "🇦🇪", label: "United Arab Emirates" },

@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { useT, useLocale } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
+import { postAuth, type AuthKind } from "@/components/auth/authClient";
+import { COUNTRY_CODES, SAUDI_DIAL } from "@/components/auth/PhoneEntry";
+import type { RenterUser } from "@/lib/contract/auth";
 
 interface Opt {
   value: string;
@@ -45,6 +48,7 @@ export function OnboardingForm({
   subhead,
   requireEmail = false,
   showEmail = true,
+  phoneVerify,
 }: {
   next: string;
   /** When provided, called after the account is created instead of navigating (e.g. modal flow). */
@@ -59,12 +63,16 @@ export function OnboardingForm({
    *  backend persists) email at the phone/OTP step, so the register step must not ask for it again.
    *  Default true keeps email on the standalone onboarding route + the mobile-handoff path. */
   showEmail?: boolean;
+  /** Email-first (Modal 2, Case 1): no account/session yet. Render the phone field with an INLINE
+   *  Send-code + OTP right in this form; on submit we verify the phone with the onboardingToken (which
+   *  creates the account + session) and then save the profile. Absent = phone already verified (Case 2). */
+  phoneVerify?: { onboardingToken: string };
 }) {
   const t = useT();
   const o = t.onboarding;
   const { locale } = useLocale();
   const router = useRouter();
-  const { user, refresh } = useSession();
+  const { user, refresh, signIn } = useSession();
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -78,6 +86,25 @@ export function OnboardingForm({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [fe, setFe] = useState<Record<string, string>>({});
+  // Inline phone verification (Case 1 only): the phone becomes an in-form field with Send-code + OTP.
+  const [dial, setDial] = useState(SAUDI_DIAL);
+  const [phoneDigits, setPhoneDigits] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [phoneBusy, setPhoneBusy] = useState(false);
+  const [phoneErr, setPhoneErr] = useState<AuthKind | null>(null);
+  const phoneE164 = `${dial}${phoneDigits.replace(/\D/g, "")}`;
+  const [sentPre, sentPost] = t.auth.codeSentTo.split("{phone}");
+
+  const sendPhoneCode = async () => {
+    if (!phoneVerify || !phoneDigits.trim()) return;
+    setPhoneErr(null);
+    setPhoneBusy(true);
+    const r = await postAuth("/api/auth/request-code", { onboardingToken: phoneVerify.onboardingToken, phone: phoneE164, countryCode: dial, otpMethod: "SMS" });
+    setPhoneBusy(false);
+    if (r.ok) setOtpSent(true);
+    else setPhoneErr(r.kind);
+  };
 
   useEffect(() => {
     const ar = locale === "ar";
@@ -117,12 +144,26 @@ export function OnboardingForm({
       else if (emailVal && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailVal)) next_fe.email = o.errors.email;
     }
     if (whatsapp.trim() && !/^(\+?966|0)?5\d{8}$/.test(whatsapp.replace(/\s/g, ""))) next_fe.whatsapp = o.errors.whatsapp;
+    // Case 1: the phone (with its inline OTP) is required here — it's what creates the account.
+    if (phoneVerify && (!phoneDigits.trim() || !otpSent || otpCode.replace(/\D/g, "").length < 4)) next_fe.phone = o.errors.phone;
     if (Object.keys(next_fe).length) {
       setFe(next_fe);
       return;
     }
     setFe({});
     setBusy(true);
+    // Case 1: verify the phone with the onboarding token FIRST — this creates the account + session,
+    // so the profile save below runs authed. A failure (wrong code, phone taken) stops here.
+    if (phoneVerify) {
+      setPhoneErr(null);
+      const vr = await postAuth("/api/auth/verify", { onboardingToken: phoneVerify.onboardingToken, phone: phoneE164, code: otpCode.replace(/\D/g, ""), role: "rentee" });
+      if (!vr.ok) {
+        setBusy(false);
+        setPhoneErr(vr.kind);
+        return;
+      }
+      signIn(vr.data.user as RenterUser); // establish the client session for the profile save
+    }
     let res: Response;
     try {
       res = await fetch("/api/profile/complete", {
@@ -188,12 +229,69 @@ export function OnboardingForm({
           </div>
         </div>
 
-        <div>
-          <label className={labelCls}>
-            {o.phone} <span className="ms-1 text-[11px] font-bold text-ok">✓ {o.verified}</span>
-          </label>
-          <input className={`${inputCls} bg-surface2 text-muted`} value={user?.phone ?? ""} readOnly dir="ltr" />
-        </div>
+        {phoneVerify ? (
+          // Case 1 (email-first): phone is a field here, verified INLINE. Submitting the form verifies
+          // this code (creating the account) then saves the profile — no separate add-phone modal.
+          <div>
+            <label className={labelCls}>{o.phone} <span className="text-danger">*</span></label>
+            <div className="flex gap-[10px]" dir="ltr">
+              <select
+                aria-label={t.auth.countryLabel}
+                value={dial}
+                onChange={(e) => { setDial(e.target.value); setOtpSent(false); }}
+                className="h-[46px] rounded-[10px] border border-border bg-surface px-[10px] text-[13.5px] font-bold text-navy outline-0 focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)]"
+              >
+                {COUNTRY_CODES.map((c) => (
+                  <option key={c.dial} value={c.dial}>{c.flag} {c.dial}</option>
+                ))}
+              </select>
+              <input
+                className={`${inputCls} flex-1`}
+                type="tel"
+                inputMode="numeric"
+                maxLength={11}
+                value={phoneDigits}
+                onChange={(e) => { setPhoneDigits(e.target.value); setOtpSent(false); }}
+                placeholder={t.auth.phonePlaceholder}
+                dir="ltr"
+              />
+            </div>
+            {!otpSent ? (
+              <button
+                type="button"
+                onClick={sendPhoneCode}
+                disabled={phoneBusy || !phoneDigits.trim()}
+                className="mt-[10px] inline-flex items-center gap-1.5 rounded-[10px] border border-brand px-4 py-2 text-[13px] font-bold text-brand transition hover:bg-brand-soft disabled:opacity-50"
+              >
+                <Icon name="sms" size={16} /> {phoneBusy ? t.auth.sending : t.auth.sendCode}
+              </button>
+            ) : (
+              <div className="mt-[10px]">
+                <p className="mb-2 text-[12px] text-muted">{sentPre}<b className="text-navy" dir="ltr">{phoneE164}</b>{sentPost}</p>
+                <input
+                  className={inputCls}
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  placeholder="1234"
+                  dir="ltr"
+                  style={{ letterSpacing: "0.35em", fontFamily: "var(--font-plex), monospace" }}
+                />
+                <button type="button" onClick={sendPhoneCode} className="mt-2 text-[12.5px] font-bold text-info">{t.auth.resend}</button>
+              </div>
+            )}
+            {fe.phone && <p className="mt-1 text-[12px] text-danger">{fe.phone}</p>}
+            {phoneErr && <p className="mt-1 text-[12px] text-danger">{t.auth.errors[phoneErr]}</p>}
+          </div>
+        ) : (
+          <div>
+            <label className={labelCls}>
+              {o.phone} <span className="ms-1 text-[11px] font-bold text-ok">✓ {o.verified}</span>
+            </label>
+            <input className={`${inputCls} bg-surface2 text-muted`} value={user?.phone ?? ""} readOnly dir="ltr" />
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-[12px] sm:grid-cols-2">
           <div>
