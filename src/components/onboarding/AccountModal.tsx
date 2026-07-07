@@ -10,6 +10,7 @@ import { CodeEntry } from "@/components/auth/CodeEntry";
 import { AddPhoneVerify } from "@/components/auth/AddPhoneVerify";
 import { normalizeTier, type RenterUser } from "@/lib/contract/auth";
 import { updateProfile, type ProfileUpdatePayload } from "@/lib/api/profile-client";
+import { EMAIL_FIRST_AUTH_ENABLED } from "@/lib/flags";
 import { Icon } from "@/components/ui";
 
 /** Mask a stored email for display: `mahmoud@gmail.com` → `m•••@gmail.com`. */
@@ -103,6 +104,18 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
 
   // ── Modal 1 — get a code with phone OR email ──
   if (phase === "entry") {
+    // Email-first not enabled (backend still requires a phone) → phone-only entry, no toggle.
+    if (!EMAIL_FIRST_AUTH_ENABLED) {
+      return (
+        <div className="p-[22px]">
+          <PhoneEntry
+            title={title ?? t.auth.entryTitle}
+            subtitle={subtitle ?? t.auth.entrySub}
+            onCodeSent={(p) => { setCodePhone(p); setCodeEmail(null); setPhase("code"); }}
+          />
+        </div>
+      );
+    }
     const seg = (mode: "phone" | "email", label: string) => (
       <button
         type="button"

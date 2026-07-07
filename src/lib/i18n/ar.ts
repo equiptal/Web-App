@@ -509,6 +509,7 @@ export const ar: Dictionary = {
     verifyCreate: "تأكيد وإنشاء الحساب",
     emailRequiredTitle: "أضف بريدك الإلكتروني",
     emailRequiredSub: "سنستخدمه للإيصالات ولمساعدتك على تسجيل الدخول.",
+    emailSignInUnavailable: "تعذّر تسجيل دخولك بهذا البريد الإلكتروني — يُرجى استخدام رقم جوالك.",
     finishTitle: "أكمل تسجيلك",
     finishBody: "أوشكت على الانتهاء — أضف بياناتك لإكمال إنشاء حسابك.",
     finishCta: "إكمال التسجيل",

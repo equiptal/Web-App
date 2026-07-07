@@ -67,8 +67,10 @@ export function EmailEntry({
 
       {err && (
         <div className="mt-[10px]">
-          <p className="text-[13px] font-semibold text-danger">{a.errors[err]}</p>
-          {err === "email_ambiguous" && onUsePhone && (
+          {/* `invalid_phone` here is the backend's generic VALIDATION_ERROR — nonsensical on the email
+              tab, so show an email-appropriate message. Both it and ambiguous offer the phone fallback. */}
+          <p className="text-[13px] font-semibold text-danger">{err === "invalid_phone" ? a.emailSignInUnavailable : a.errors[err]}</p>
+          {(err === "email_ambiguous" || err === "invalid_phone") && onUsePhone && (
             <button type="button" onClick={onUsePhone} className="mt-[6px] inline-flex items-center gap-1.5 text-[13px] font-bold text-info">
               <Icon name="smartphone" size={16} /> {a.withPhone}
             </button>

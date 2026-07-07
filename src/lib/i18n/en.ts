@@ -511,6 +511,7 @@ export const en = {
     verifyCreate: "Verify & create account",
     emailRequiredTitle: "Add your email",
     emailRequiredSub: "We'll use it for receipts and to help you sign in.",
+    emailSignInUnavailable: "We couldn't sign you in with this email — please use your phone number.",
     finishTitle: "Finish your signup",
     finishBody: "You're almost there — add your details to finish creating your account.",
     finishCta: "Finish signup",

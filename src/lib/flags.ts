@@ -21,3 +21,12 @@ export const PUBLIC_WEB_ENABLED = process.env.NEXT_PUBLIC_PUBLIC_WEB_ENABLED !==
  * /bids/transform isn't available in an environment.
  */
 export const BID_VERIFY_ENABLED = process.env.NEXT_PUBLIC_BID_VERIFY_ENABLED !== "0";
+
+/**
+ * EMAIL_FIRST_AUTH_ENABLED — Modal 1's Email tab + the email-first onboarding (verify email → add
+ * phone). OFF by default: the deployed `/auth/login` still requires a phone, so a phone-less email
+ * login returns VALIDATION_ERROR (400). When off, Modal 1 is phone-only (email is collected in Modal 2)
+ * — the fully-working path. Set NEXT_PUBLIC_EMAIL_FIRST_AUTH=1 once the backend accepts an email-only
+ * login (look up the account by email → send code / EMAIL_AMBIGUOUS / needsSignup).
+ */
+export const EMAIL_FIRST_AUTH_ENABLED = process.env.NEXT_PUBLIC_EMAIL_FIRST_AUTH === "1";
