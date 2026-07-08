@@ -535,7 +535,7 @@ export const en = {
       expired: "That code has expired. Request a new one.", // AC-11
       locked: "Too many attempts. Request a new code.", // AC-10
       send_failed: "We couldn't send the code. Please try again.", // AC-15
-      email_ambiguous: "This email is linked to more than one account — please sign in with your phone number.",
+      email_ambiguous: "This email is linked to more than one account — use a different email, or sign in with your phone.",
       email_taken: "This email is already in use.",
       phone_taken: "You already have an account with this number.",
       phone_not_verified: "Please verify your phone number first.",
