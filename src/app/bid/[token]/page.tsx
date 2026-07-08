@@ -6,6 +6,8 @@ import { fetchBidFormData, submitBidForm, type BidUploadedFile } from "@/lib/api
 import type { BidFormData, BidFormItem, BidPhotoKind, BidDocKind, CompanyDocKind } from "@/lib/contract/link-bids";
 import { buildSubmissionNotes, priceToStore } from "@/lib/contract/vat-inclusive";
 import { FileUploader, type UploaderKind } from "@/components/bid/FileUploader";
+import { QualityRing } from "@/components/bid/QualityRing";
+import { computeBidQuality } from "@/lib/contract/bid-quality";
 import { BID_FORM_CSS } from "@/components/bid/bidFormStyles";
 
 /**
@@ -171,6 +173,24 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
     (data?.contractTerms ?? []).every((c) => typeof contract[c.key] === "boolean");
   const valid = !!companyValid && itemsValid && termsAnswered;
 
+  // Live bid-quality score (terms match + docs + completeness) — updates as the supplier fills the form.
+  const quality = useMemo(() => {
+    const items = (data?.items ?? []).map((it) => {
+      const a = answers[it.requestItemId];
+      const at = att[it.requestItemId] ?? EMPTY_ATT;
+      return {
+        requiredTerms: it.requiredTerms as Record<string, string | null>,
+        confirmations: { ...(a?.confirmations ?? {}), ...contract } as Record<string, boolean | undefined>,
+        priced: num(a?.rentalRate ?? "") > 0,
+        photoCount: at.photos.length,
+        ownershipCount: at.ownership.length,
+        equipCertCount: at.equipCert.length,
+        operatorCertCount: at.operatorCert.length,
+      };
+    });
+    return computeBidQuality({ items, companyDocCount: companyDocs.length, companyComplete: !!companyValid });
+  }, [data, answers, contract, att, companyDocs, companyValid]);
+
   async function onSubmit() {
     setShowErrors(true);
     if (!valid || !data) return;
@@ -304,6 +324,15 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
           <div className="intro">
             <h1>{L("Submit your bid", "قدّم عرضك")}</h1>
             <p>{L("For each item, confirm its terms in the table, then price it below.", "لكل بند، أكّد شروطه في الجدول ثم سعّره بالأسفل.")}</p>
+          </div>
+
+          {/* Live bid-quality ring — rises as the supplier confirms terms + attaches photos/documents. */}
+          <div className="qbanner">
+            <QualityRing quality={quality} L={L} />
+            <div className="qb-tx">
+              <b>{L("Bid quality", "جودة العرض")}</b>
+              <span>{L("Confirm the renter's terms and attach equipment photos + documents to raise your match score — higher-quality bids stand out to the renter.", "أكّد شروط المستأجر وأرفق صور المعدة والمستندات لرفع درجة المطابقة — العروض عالية الجودة تبرز لدى المستأجر.")}</span>
+            </div>
           </div>
 
           {data.deadline && <Countdown iso={data.deadline} L={L} fmtDate={fmtDate} />}

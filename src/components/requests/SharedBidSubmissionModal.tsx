@@ -5,6 +5,8 @@ import type { BidCard } from "@/lib/contract/bids";
 import type { BidFormData, BidFormItem, LinkBidSubmission, LinkBidItem } from "@/lib/contract/link-bids";
 import { fetchBidFormData } from "@/lib/api/client";
 import { hasVatInclusiveNote, stripVatInclusiveNote } from "@/lib/contract/vat-inclusive";
+import { qualityFromSubmission } from "@/lib/contract/bid-quality";
+import { QualityRing } from "@/components/bid/QualityRing";
 import { BID_FORM_CSS } from "@/components/bid/bidFormStyles";
 
 /**
@@ -149,6 +151,7 @@ export function SharedBidSubmissionModal({
             <h3>{submission?.companyName ?? bid.supplierName}</h3>
             <p>{L("Off-platform · submitted via your shared link · read-only", "خارج المنصة · مُقدَّم عبر رابطك المشترك · للقراءة فقط")}</p>
           </div>
+          {submission && <div className="qring-sm"><QualityRing quality={qualityFromSubmission(submission)} L={L} size={64} /></div>}
           <button className="slb-head-x" onClick={onClose} aria-label={L("Close", "إغلاق")}>
             <span className="material-icons-outlined">close</span>
           </button>

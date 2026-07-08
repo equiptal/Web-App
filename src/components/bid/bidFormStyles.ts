@@ -214,4 +214,13 @@ export const BID_FORM_CSS = `
 .up-add:disabled{opacity:.6;cursor:default}
 .up-add .material-icons-outlined{font-size:18px}
 .up-err{margin-top:6px;font-size:12px;font-weight:700;color:#b42318}
+
+/* ── Bid-quality ring ───────────────────────────────────────────────────── */
+.qring{display:inline-flex;flex-direction:column;align-items:center;gap:4px;flex:none}
+.qring-lb{font-size:11px;font-weight:800;letter-spacing:.2px}
+.qbanner{display:flex;align-items:center;gap:14px;background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px;margin-bottom:14px}
+.qb-tx{display:flex;flex-direction:column;gap:3px;min-width:0}
+.qb-tx b{font-size:14px;color:var(--navy);font-weight:800}
+.qb-tx span{font-size:12.5px;color:var(--muted);line-height:1.5}
+.qring-sm{margin-inline-start:auto}
 `;

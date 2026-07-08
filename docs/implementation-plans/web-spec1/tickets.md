@@ -27,6 +27,11 @@ Given an allowed kind list, then the user picks files, classifies each via dropd
 Per item: Equipment photos + Proof of ownership (always); Equipment cert + Operator cert (only when `requiredTerms.equipmentCert` / `.operator`/`.operatorCert`). Before submit: Company verification section. Thread all keys into the submit payload.
 **Done-when:** typecheck; sections render/gate correctly; submit includes keys.
 
+## T7 — bid-quality ring (match/docs/completeness)
+**AC:** AC-07 · **Files:** `src/lib/contract/bid-quality.ts` (new), `src/components/bid/QualityRing.tsx` (new), `page.tsx`, `SharedBidSubmissionModal.tsx`, `bidFormStyles.ts`
+Given a bid, then a 0–100 quality ring shows how well it matches the renter's request + how complete its docs are (Balanced: terms 40% · docs 40% · completeness 20%). Shown LIVE on the supplier form (updates as they fill) and on the renter's read-only viewer. Client-side, no backend.
+**Done-when:** tsc + lint clean; ring updates live; band colors (low/mid/high).
+
 ## T6 — labels + i18n + validation polish
 **AC:** AC-06 · **Files:** `page.tsx` / `bidFormStyles.ts`
 Bilingual kind labels (EN/AR), client size/type errors, empty/optional handling.
