@@ -1,0 +1,33 @@
+# Tickets — web-spec1 (bid-form attachments)
+
+Branch: `web/web-spec1` → one PR into `staging`.
+
+## T1 — upload-urls BFF route
+**AC:** AC-01 · **Files:** `src/app/api/bid-form/[token]/upload-urls/route.ts` (new)
+Given the client needs a presigned URL, when it POSTs a file manifest, then the route proxies agents `POST /public/bid-form/{token}/upload-urls` and returns `{uploads:[{filename,key,url,contentType}]}`. Mirror the sibling `submissions/route.ts`.
+**Done-when:** typecheck passes; route returns 200 with uploads; upstream 4xx surfaced.
+
+## T2 — link-bids contract
+**AC:** AC-02, AC-03 · **Files:** `src/lib/contract/link-bids.ts`
+Given the submit payload + read mappers, when attachments exist, then `SubmitBidFormPayload.items[]` accepts `photos[]{key,type,filename?}` + `documents[]{key,type,filename?}`, the payload accepts top-level `companyDocuments[]{key,type,filename?}`, and `LinkBidItem` + `LinkBidSubmission` expose them (parsed by `mapLinkSubmissions`). Add the attachment-kind unions.
+**Done-when:** typecheck passes; types match the backend contract.
+
+## T3 — uploadBidFiles client helper
+**AC:** AC-01, AC-06 · **Files:** `src/lib/api/client.ts`
+Given files to upload, when called, then presign (BFF) → PUT each to S3 with the matching `Content-Type` → return `{key,filename,type}[]`. Pre-validate type + size.
+**Done-when:** typecheck; a failed PUT rejects with a usable error.
+
+## T4 — FileUploader component
+**AC:** AC-03, AC-06 · **Files:** `src/components/bid/FileUploader.tsx` (new), `bidFormStyles.ts`
+Given an allowed kind list, then the user picks files, classifies each via dropdown, sees progress + remove; emits the uploaded `{key,type,filename}[]`. Reusable for photos / ownership / certs / company docs.
+**Done-when:** typecheck; add/remove/classify works; disabled while uploading.
+
+## T5 — wire sections into the bid form page
+**AC:** AC-03, AC-04, AC-05 · **Files:** `src/app/bid/[token]/page.tsx`
+Per item: Equipment photos + Proof of ownership (always); Equipment cert + Operator cert (only when `requiredTerms.equipmentCert` / `.operator`/`.operatorCert`). Before submit: Company verification section. Thread all keys into the submit payload.
+**Done-when:** typecheck; sections render/gate correctly; submit includes keys.
+
+## T6 — labels + i18n + validation polish
+**AC:** AC-06 · **Files:** `page.tsx` / `bidFormStyles.ts`
+Bilingual kind labels (EN/AR), client size/type errors, empty/optional handling.
+**Done-when:** build passes; AR + RTL intact.

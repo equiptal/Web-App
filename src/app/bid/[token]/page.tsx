@@ -2,9 +2,10 @@
 
 import { use, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { fetchBidFormData, submitBidForm } from "@/lib/api/client";
-import type { BidFormData, BidFormItem } from "@/lib/contract/link-bids";
+import { fetchBidFormData, submitBidForm, type BidUploadedFile } from "@/lib/api/client";
+import type { BidFormData, BidFormItem, BidPhotoKind, BidDocKind, CompanyDocKind } from "@/lib/contract/link-bids";
 import { buildSubmissionNotes, priceToStore } from "@/lib/contract/vat-inclusive";
+import { FileUploader, type UploaderKind } from "@/components/bid/FileUploader";
 import { BID_FORM_CSS } from "@/components/bid/bidFormStyles";
 
 /**
@@ -45,6 +46,11 @@ type Answer = {
   offeredUnits: string;
 };
 
+// Per-item uploaded attachments (equipment photos + the three per-item document groups). Equipment/
+// operator cert groups are only collected when the request item requires them (gated in the UI).
+type ItemAtt = { photos: BidUploadedFile[]; ownership: BidUploadedFile[]; equipCert: BidUploadedFile[]; operatorCert: BidUploadedFile[] };
+const EMPTY_ATT: ItemAtt = { photos: [], ownership: [], equipCert: [], operatorCert: [] };
+
 export default function BidFormPage({ params }: { params: Promise<{ token: string }> }) {
   const { token: rawToken } = use(params);
   // The URL is /bid/{slug}-{groupId}; the token is the trailing UUID (group id).
@@ -71,6 +77,12 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
   // treated as VAT-inclusive (gross) — we strip the VAT back out on submit so the stored bid stays
   // VAT-exclusive like every on-platform bid, and the renter side reproduces the same total.
   const [vatIncluded, setVatIncluded] = useState(false);
+  // Uploaded attachments: per-item (photos + doc groups) + submission-level company-verification docs.
+  const [att, setAtt] = useState<Record<string, ItemAtt>>({});
+  const [companyDocs, setCompanyDocs] = useState<BidUploadedFile[]>([]);
+  const setItemAtt = (id: string, part: keyof ItemAtt, next: BidUploadedFile[]) =>
+    setAtt((p) => ({ ...p, [id]: { ...(p[id] ?? EMPTY_ATT), [part]: next } }));
+  const itemAtt = (id: string) => att[id] ?? EMPTY_ATT;
   // Suppliers may submit more than one bid per request (e.g. alternative options) — no single-submission lock.
 
   useEffect(() => {
@@ -128,6 +140,8 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
     for (const it of data.items) init[it.requestItemId] = { confirmations: {}, rentalRate: "", deliveryPrice: "", returnPrice: "", offeredUnits: String(it.numberOfUnits || 1) };
     setAnswers(init);
     setContract({});
+    setAtt({});
+    setCompanyDocs([]);
     setYesItem({});
     setYesContract(false);
     setShowErrors(false);
@@ -177,8 +191,12 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
           // Store VAT-exclusive prices. If the supplier priced VAT-inclusive, strip the 15% back out so
           // the renter side — which always adds VAT — lands on the same total.
           // Merge the project/contract confirmations (apply to all items) into each item's answers.
-          return { requestItemId: it.requestItemId, confirmations: { ...a.confirmations, ...contract }, offeredUnits: it.numberOfUnits > 1 ? offeredQty(it, a) : undefined, rentalRate: priceToStore(num(a.rentalRate), vatIncluded), deliveryPrice: priceToStore(num(a.deliveryPrice), vatIncluded), returnPrice: priceToStore(num(a.returnPrice), vatIncluded) };
+          const at = itemAtt(it.requestItemId);
+          const photos = at.photos.map((p) => ({ key: p.key, type: p.type as BidPhotoKind, filename: p.filename ?? undefined }));
+          const documents = [...at.ownership, ...at.equipCert, ...at.operatorCert].map((d) => ({ key: d.key, type: d.type as BidDocKind, filename: d.filename ?? undefined }));
+          return { requestItemId: it.requestItemId, confirmations: { ...a.confirmations, ...contract }, offeredUnits: it.numberOfUnits > 1 ? offeredQty(it, a) : undefined, rentalRate: priceToStore(num(a.rentalRate), vatIncluded), deliveryPrice: priceToStore(num(a.deliveryPrice), vatIncluded), returnPrice: priceToStore(num(a.returnPrice), vatIncluded), ...(photos.length ? { photos } : {}), ...(documents.length ? { documents } : {}) };
         }),
+        companyDocuments: companyDocs.length ? companyDocs.map((d) => ({ key: d.key, type: d.type as CompanyDocKind, filename: d.filename ?? undefined })) : undefined,
       });
       setSubmitted(true);
       window.scrollTo(0, 0);
@@ -188,6 +206,38 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
       alert(L("Could not submit — the request may have closed, or please try again.", "تعذّر الإرسال — قد يكون الطلب أُغلق، أو حاول مرة أخرى."));
     }
   }
+
+  // Classified attachment kinds (bilingual). Codes match the backend `BID_PHOTO_KINDS` / `BID_DOC_TYPES`
+  // / `COMPANY_DOC_TYPES`.
+  const photoKinds: UploaderKind[] = [
+    { value: "front_photo", label: L("Front photo", "صورة أمامية") },
+    { value: "serial_photo", label: L("Serial / plate", "الرقم التسلسلي") },
+    { value: "hours_photo", label: L("Operating hours", "ساعات التشغيل") },
+  ];
+  const ownershipKinds: UploaderKind[] = [
+    { value: "istimara", label: L("Istimara", "الاستمارة") },
+    { value: "customs_card", label: L("Customs card", "البطاقة الجمركية") },
+    { value: "sales_contract", label: L("Sales contract", "عقد البيع") },
+    { value: "saso_registration", label: L("SASO registration", "تسجيل ساسو") },
+  ];
+  const equipCertKinds: UploaderKind[] = [
+    { value: "tuv", label: L("TÜV (Equipment)", "فحص TÜV") },
+    { value: "spsp", label: L("Aramco 3rd-party", "شهادة أرامكو") },
+    { value: "saso_inspection", label: L("SASO inspection", "فحص ساسو") },
+    { value: "insurance", label: L("Insurance", "التأمين") },
+  ];
+  const operatorCertKinds: UploaderKind[] = [
+    { value: "operator_tuv", label: L("Operator TÜV", "فحص TÜV للمشغّل") },
+    { value: "operating_license", label: L("Operating license", "رخصة التشغيل") },
+    { value: "operator_spsp", label: L("Operator SPSP", "SPSP للمشغّل") },
+    { value: "operator_id", label: L("Operator ID", "هوية المشغّل") },
+    { value: "operator_insurance", label: L("Operator insurance", "تأمين المشغّل") },
+  ];
+  const companyKinds: UploaderKind[] = [
+    { value: "commercial_registration", label: L("Commercial registration", "السجل التجاري") },
+    { value: "vat", label: L("VAT certificate", "شهادة الضريبة") },
+    { value: "national_address", label: L("National address", "العنوان الوطني") },
+  ];
 
   const dir = ar ? "rtl" : "ltr";
   const sar = L("SAR", "ر.س");
@@ -416,6 +466,36 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                   <span className="r">{L("VAT 15%", "ضريبة ١٥٪")}<b>{sub ? nf(sub * 0.15) : "—"} {sar}</b></span>
                   <span className="r t">{vatIncluded ? L("Item total (incl. VAT)", "إجمالي البند (شامل الضريبة)") : L("Item total", "إجمالي البند")}<b>{sub ? nf(sub * 1.15) : "—"} {sar}</b></span>
                 </div>
+
+                {/* Attachments — equipment photos + proof of ownership are always offered; equipment /
+                    operator certificates only when this request item requires them. */}
+                <div className="subhead"><span className="material-icons-outlined">photo_camera</span>{L("Equipment photos", "صور المعدة")}</div>
+                <FileUploader token={token} folder="photos" thumbs kinds={photoKinds}
+                  value={itemAtt(it.requestItemId).photos}
+                  onChange={(n) => setItemAtt(it.requestItemId, "photos", n)} L={L} disabled={submitting} />
+
+                <div className="subhead"><span className="material-icons-outlined">verified_user</span>{L("Proof of ownership", "إثبات الملكية")}</div>
+                <FileUploader token={token} folder="documents" kinds={ownershipKinds}
+                  value={itemAtt(it.requestItemId).ownership}
+                  onChange={(n) => setItemAtt(it.requestItemId, "ownership", n)} L={L} disabled={submitting} />
+
+                {it.requiredTerms.equipmentCert != null && (
+                  <>
+                    <div className="subhead"><span className="material-icons-outlined">workspace_premium</span>{L("Equipment certificate", "شهادة المعدة")}</div>
+                    <FileUploader token={token} folder="documents" kinds={equipCertKinds}
+                      value={itemAtt(it.requestItemId).equipCert}
+                      onChange={(n) => setItemAtt(it.requestItemId, "equipCert", n)} L={L} disabled={submitting} />
+                  </>
+                )}
+
+                {(it.requiredTerms.operator != null || it.requiredTerms.operatorCert != null) && (
+                  <>
+                    <div className="subhead"><span className="material-icons-outlined">badge</span>{L("Operator certificate", "شهادة المشغّل")}</div>
+                    <FileUploader token={token} folder="documents" kinds={operatorCertKinds}
+                      value={itemAtt(it.requestItemId).operatorCert}
+                      onChange={(n) => setItemAtt(it.requestItemId, "operatorCert", n)} L={L} disabled={submitting} />
+                  </>
+                )}
               </div>
             );
           })}
@@ -435,6 +515,11 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
             <Field label={L("Contact info", "بيانات التواصل")} req invalid={showErrors && !company.contactInfo.trim()} L={L}><input value={company.contactInfo} onChange={(e) => setCompany({ ...company, contactInfo: e.target.value })} placeholder={L("Phone or email so the renter can reach you", "هاتف أو بريد ليتواصل معك المستأجر")} /></Field>
             {QUOTE_EXPIRY_ENABLED && <Field label={L("Quote valid until (optional)", "صلاحية العرض حتى (اختياري)")} L={L}><input type="date" value={company.validUntil} onChange={(e) => setCompany({ ...company, validUntil: e.target.value })} /></Field>}
             <div className="notes-field"><label>{L("Notes (optional) — for the whole quotation", "ملاحظات (اختياري) — لكامل عرض السعر")}</label><textarea value={company.notes} onChange={(e) => setCompany({ ...company, notes: e.target.value })} /></div>
+
+            {/* Company verification (submission-level) — CR / VAT / national-address docs. */}
+            <div className="subhead"><span className="material-icons-outlined">domain_verification</span>{L("Company verification (optional)", "توثيق الشركة (اختياري)")}</div>
+            <FileUploader token={token} folder="documents" kinds={companyKinds}
+              value={companyDocs} onChange={setCompanyDocs} L={L} disabled={submitting} />
           </div>
 
           {showErrors && !valid && <div className="submit-err"><span className="material-icons-outlined">error_outline</span>{L("Please complete the highlighted items: answer every term, enter a rate for each item, and fill all company details.", "الرجاء إكمال العناصر المظللة: أجب عن كل شرط، وأدخل سعراً لكل بند، واملأ جميع بيانات الشركة.")}</div>}

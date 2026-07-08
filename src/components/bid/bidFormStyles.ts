@@ -196,4 +196,22 @@ export const BID_FORM_CSS = `
 @media (max-width:680px){.ro-grid{grid-template-columns:1fr 1fr}}
 @media (max-width:600px){.wrap{padding:16px 14px 80px}.pubbar-in{padding:10px 14px;gap:10px}.rmeta .rname{font-size:16px}.rlogo{width:40px;height:40px}.intro h1{font-size:19px}.sec{padding:14px}.item-hd{margin:-14px -14px 12px;padding:12px 14px}.item-hd .ibadge{display:none}
 .tmtx-wrap{border:0;overflow:visible}.tmtx,.tmtx tbody{display:block;width:100%}.tmtx thead{display:none}.tmtx tr{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:10px;overflow:hidden}.tmtx td{display:block;border-bottom:1px solid var(--line);border-inline-start:1px solid var(--line);padding:11px 13px}.tmtx td:nth-child(odd){border-inline-start:0}.celllbl{display:block;font-size:10.5px;font-weight:800;text-transform:uppercase;color:var(--navy-mid);margin-bottom:5px}.cd-box{width:60px}.cd-box b{font-size:23px}.ptbl-in{width:90px}.frow{grid-template-columns:1fr}}
+
+/* ── Attachment uploader (FileUploader) ─────────────────────────────────── */
+.uploader{margin:6px 0 12px}
+.up-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.up-item{display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:var(--r-md);padding:8px 10px;background:var(--surface1)}
+.up-thumb{width:44px;height:44px;border-radius:8px;object-fit:cover;border:1px solid var(--border);flex:none}
+.up-fic{font-size:26px;color:var(--navy-mid);flex:none}
+.up-meta{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
+.up-fn{font-size:12.5px;color:var(--navy);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.up-sel{font:inherit;font-size:12px;font-weight:700;color:var(--navy);border:1px solid var(--border);border-radius:7px;padding:5px 8px;background:#fff;max-width:220px}
+.up-rm{flex:none;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--muted);cursor:pointer}
+.up-rm:hover{color:#b42318;border-color:#f0c4bd;background:#fef3f2}
+.up-rm .material-icons-outlined{font-size:18px}
+.up-add{display:inline-flex;align-items:center;gap:7px;font:inherit;font-size:13px;font-weight:800;color:var(--navy);border:1.5px dashed #c8d6e2;border-radius:9px;padding:9px 14px;background:#fff;cursor:pointer}
+.up-add:hover:not(:disabled){background:var(--surface1);border-color:#9fb6c9}
+.up-add:disabled{opacity:.6;cursor:default}
+.up-add .material-icons-outlined{font-size:18px}
+.up-err{margin-top:6px;font-size:12px;font-weight:700;color:#b42318}
 `;
