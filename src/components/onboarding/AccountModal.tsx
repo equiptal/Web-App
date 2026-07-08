@@ -222,6 +222,7 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
       showEmail={!emailFirst}
       requireEmail={!emailFirst}
       phoneVerify={emailFirst ? { onboardingToken } : undefined}
+      onSignIn={() => { setOnboardingToken(""); setCodeEmail(null); setCodePhone(null); setEntryMode("phone"); setPhase("entry"); }}
       onDone={onCreated}
       headline={postHeadline ?? t.guest.postTitle}
       subhead={postSubhead ?? t.guest.postBody}

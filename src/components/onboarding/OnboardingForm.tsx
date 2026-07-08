@@ -49,6 +49,7 @@ export function OnboardingForm({
   requireEmail = false,
   showEmail = true,
   phoneVerify,
+  onSignIn,
 }: {
   next: string;
   /** When provided, called after the account is created instead of navigating (e.g. modal flow). */
@@ -67,6 +68,9 @@ export function OnboardingForm({
    *  Send-code + OTP right in this form; on submit we verify the phone with the onboardingToken (which
    *  creates the account + session) and then save the profile. Absent = phone already verified (Case 2). */
   phoneVerify?: { onboardingToken: string };
+  /** Case 1: if the typed phone already has an account, we show "sign in instead" — clicking it calls
+   *  this to drop back to Modal 1 (phone sign-in). */
+  onSignIn?: () => void;
 }) {
   const t = useT();
   const o = t.onboarding;
@@ -183,8 +187,10 @@ export function OnboardingForm({
       });
       setBusy(false);
       if (!cr.ok) {
-        // phone_not_verified → nudge back to Verify; other collisions surface at the top.
+        // Phone-specific errors show by the phone field (with the sign-in link for phone_taken);
+        // phone_not_verified also drops the ✓ so they re-verify. Others surface at the top.
         if (cr.kind === "phone_not_verified") { setPhoneVerified(false); setPhoneErr("phone_not_verified"); }
+        else if (cr.kind === "phone_taken") setPhoneErr("phone_taken");
         else setErr(t.auth.errors[cr.kind]);
         return;
       }
@@ -328,7 +334,14 @@ export function OnboardingForm({
               </div>
             )}
             {fe.phone && <p className="mt-1 text-[12px] text-danger">{fe.phone}</p>}
-            {phoneErr && <p className="mt-1 text-[12px] text-danger">{t.auth.errors[phoneErr]}</p>}
+            {phoneErr && (
+              <p className="mt-1 text-[12px] text-danger">
+                {t.auth.errors[phoneErr]}
+                {phoneErr === "phone_taken" && onSignIn && (
+                  <> <button type="button" onClick={onSignIn} className="font-bold text-info underline">{t.auth.signInInstead}</button></>
+                )}
+              </p>
+            )}
           </div>
         ) : (
           <div>
