@@ -7,7 +7,7 @@ import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation
 import type { DealRoomView, DealRoomDocument, DealRoomDocuments, QuotationView } from "@/lib/contract/deal-room";
 import { DealRoomTerms, type ResolutionsMap } from "@/components/deal-room/DealRoomTerms";
 import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
-import { renderQuotationSection, wrapQuotationPage, quotationLegal, type QuotationDoc, type QuotationLineItem, type QuotationCard, type QuotationMetaCell } from "@/lib/quotation/render";
+import { renderQuotationSection, wrapQuotationPage, type QuotationDoc, type QuotationLineItem, type QuotationCard } from "@/lib/quotation/render";
 import "@/components/deal-room/deal-room-proto.css";
 
 type StreamAttachment = { type?: string; image_url?: string; thumb_url?: string; asset_url?: string; title?: string; mime_type?: string; file_size?: number; fallback?: string };
@@ -82,23 +82,58 @@ function buildQuotationHtml(room: DealRoomView, q: QuotationView, renteeName: st
   } else {
     lineItems.push({ num: 1, label: L("Rental", "الإيجار"), detail: room.supplier.name, unit: periodLabel, qty: "∞", price: `${nf(rate)} / ${periodLabel}`, total: `${nf(rate)} / ${periodLabel}`, totalNote: L("As operated", "حسب التشغيل") });
   }
-  if (mob) lineItems.push({ num: null, label: L("Delivery to site", "النقل إلى الموقع"), detail: room.supplier.name, unit: L("Trip", "رحلة"), qty: String(units), price: nf(mob), total: nf(mobTotal) });
-  if (demob) lineItems.push({ num: null, label: L("Return from site", "الإرجاع من الموقع"), detail: room.supplier.name, unit: L("Trip", "رحلة"), qty: String(units), price: nf(demob), total: nf(demobTotal) });
+  // Mobilization/demobilization are ALWAYS shown — even when the rentee arranges them (supplier
+  // charges nothing), that must be stated on the quotation.
+  const logiRow = (label: string, price: number, priceTotal: number, byRentee: boolean): QuotationLineItem =>
+    price > 0
+      ? { num: null, label, detail: room.supplier.name, unit: L("Trip", "رحلة"), qty: String(units), price: nf(price), total: nf(priceTotal) }
+      : { num: null, label, detail: byRentee ? L("Arranged by the rentee", "يُرتّبه المستأجر") : L("Included", "مشمول"), unit: "—", qty: "—", price: "—", total: byRentee ? L("By rentee", "على المستأجر") : L("Included", "مشمول") };
+  lineItems.push(logiRow(L("Delivery to site", "النقل إلى الموقع"), mob, mobTotal, room.mobByRentee === true));
+  lineItems.push(logiRow(L("Return from site", "الإرجاع من الموقع"), demob, demobTotal, room.demobByRentee === true));
 
   const cards: QuotationCard[] = [];
-  const agreedRows = q.agreedTerms.filter((t) => t.key !== "PRICE").map((t) => ({ label: ar ? t.labelAr : t.label, value: valFmt(t.value) }));
-  if (agreedRows.length) cards.push({ title: L("Agreed terms", "الشروط المتفق عليها"), rows: agreedRows });
-  const fixedRows = room.terms.filter((t) => t.state === "fixed").map((t) => ({ label: ar ? t.labelAr : t.label, value: valFmt(t.value ?? t.platformDefault) }));
-  if (fixedRows.length) cards.push({ title: L("Fixed terms", "الشروط الثابتة"), rows: fixedRows });
+  // Structured rental/equipment details (from the request item) — rows with no value are skipped
+  // (field names best-effort). Operator/safety + cost responsibilities are NOT separate cards: they
+  // flow through the Agreed/Fixed terms + the price extras below, matching the app.
+  const dd = room.details;
+  const yn = (b: boolean | null) => (b == null ? null : b ? L("Yes", "نعم") : L("No", "لا"));
+  const fmtDate = (v: string | null) => { if (!v) return null; const dt = new Date(v); return isNaN(dt.getTime()) ? v : dt.toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" }); };
+  const addRow = (rowsArr: { label: string; value: string }[], label: string, v: unknown) => {
+    if (v == null || v === "" || (Array.isArray(v) && !v.length)) return;
+    rowsArr.push({ label, value: Array.isArray(v) ? v.join(", ") : String(v) });
+  };
+  const detailRows: { label: string; value: string }[] = [];
+  addRow(detailRows, L("Equipment", "المعدة"), dd.equipmentLabel);
+  addRow(detailRows, L("Location", "الموقع"), dd.location);
+  addRow(detailRows, L("Rental type", "نوع الإيجار"), dd.rentalType);
+  addRow(detailRows, L("Contract type", "نوع العقد"), contractType);
+  addRow(detailRows, L("Start date", "تاريخ البدء"), fmtDate(dd.startDate));
+  addRow(detailRows, L("End date", "تاريخ الانتهاء"), fmtDate(dd.endDate));
+  addRow(detailRows, L("Duration", "المدة"), days != null ? `${days} ${L("days", "يوم")}` : null);
+  addRow(detailRows, L("Working hours/day", "ساعات العمل/يوم"), dd.workingHoursPerDay);
+  addRow(detailRows, L("Working days/week", "أيام العمل/أسبوع"), dd.workingDaysPerWeek);
+  addRow(detailRows, L("Fulfillment", "التنفيذ"), dd.fulfillment);
+  addRow(detailRows, L("Urgency", "الأولوية"), dd.urgency);
+  addRow(detailRows, L("Subletting", "التأجير من الباطن"), yn(dd.subletting));
+  addRow(detailRows, L("Local content", "المحتوى المحلي"), yn(dd.localContent));
+  addRow(detailRows, L("Rental extendable", "قابل للتمديد"), yn(dd.extendable));
+  addRow(detailRows, L("Additional notes", "ملاحظات إضافية"), dd.additionalNotes);
+  if (detailRows.length) cards.push({ title: L("Rental & equipment details", "تفاصيل الإيجار والمعدة"), rows: detailRows });
 
-  const meta: QuotationMetaCell[] = [
-    { label: L("Reference", "المرجع"), value: qnum },
-    { label: L("Issue date", "تاريخ الإصدار"), value: dateStr },
-    { label: L("Contract", "العقد"), value: contractType ?? "—" },
-    { label: L("Rate period", "فترة السعر"), value: periodLabel },
-    { label: L("Units offered", "الوحدات المعروضة"), value: String(units) },
-    { label: L("Currency", "العملة"), value: L("SAR · Saudi Riyal", "SAR · ريال سعودي") },
-  ];
+  // Price extras (app parity): overtime rate + cost-responsibility items ("fuel → supplier"), shown in
+  // the price section. These cost keys are excluded from the term cards below to avoid duplication.
+  const COST_KEYS = new Set(["fuel", "maintenance", "overtime", "overtime_rate", "operator_food", "fat_food", "operator_transport_accommodation", "fat_accommodation_transport", "operator_transport"]);
+  const isCost = (k: string) => COST_KEYS.has(k);
+  const priceExtras: { label: string; value: string }[] = [];
+  if (dd.overtimeRate) priceExtras.push({ label: L("Overtime rate", "سعر العمل الإضافي"), value: /^\d+(\.\d+)?$/.test(dd.overtimeRate) ? `${dd.overtimeRate}x` : dd.overtimeRate });
+  const seenCost = new Set<string>();
+  for (const term of q.agreedTerms) if (isCost(term.key) && !seenCost.has(term.key)) { seenCost.add(term.key); priceExtras.push({ label: ar ? term.labelAr : term.label, value: valFmt(term.value) }); }
+  for (const term of room.terms) if (isCost(term.key) && !seenCost.has(term.key)) { seenCost.add(term.key); priceExtras.push({ label: ar ? term.labelAr : term.label, value: valFmt(term.value ?? term.platformDefault) }); }
+
+  const agreedRows = q.agreedTerms.filter((t) => t.key !== "PRICE" && !isCost(t.key)).map((t) => ({ label: ar ? t.labelAr : t.label, value: valFmt(t.value) }));
+  if (agreedRows.length) cards.push({ title: L("Agreed terms", "الشروط المتفق عليها"), rows: agreedRows });
+  const fixedRows = room.terms.filter((t) => t.state === "fixed" && !isCost(t.key)).map((t) => ({ label: ar ? t.labelAr : t.label, value: valFmt(t.value ?? t.platformDefault) }));
+  if (fixedRows.length) cards.push({ title: L("Fixed terms", "الشروط الثابتة"), rows: fixedRows });
 
   const doc: QuotationDoc = {
     lang,
@@ -127,12 +162,16 @@ function buildQuotationHtml(room: DealRoomView, q: QuotationView, renteeName: st
       ],
       chips: [],
     },
-    meta,
+    logoUrl: typeof window !== "undefined" ? `${window.location.origin}/moedatech-logomark.svg` : undefined,
+    meta: [], // no meta strip (app parity) — reference/contract/period live in the details card
+    priceExtras,
     lineItems,
     currency: sar,
     totals: { subtotal, vat, total },
     cards,
-    legal: quotationLegal(L),
+    showSigned: false,
+    // Short disclaimer instead of the full legal clause list + signed block (app parity).
+    legal: [L("This quotation is generated electronically via Moedatech, valid for 7 days from the issue date. Prices exclude anything not listed above; VAT at 15% applies per Saudi tax law.", "صدر هذا العرض إلكترونيًا عبر منصة معداتك، وهو ساري المفعول لمدة ٧ أيام من تاريخ الإصدار. الأسعار لا تشمل ما لم يُذكر أعلاه، وتُطبَّق ضريبة القيمة المضافة بنسبة ١٥٪ وفقًا للنظام السعودي.")],
   };
   return wrapQuotationPage(renderQuotationSection(doc), { lang, title: L("Confirmed Quotation", "عرض سعر مؤكّد") });
 }

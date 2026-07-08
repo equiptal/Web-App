@@ -66,11 +66,18 @@ export interface QuotationCard {
 export interface QuotationDoc {
   lang: QLang;
   title: string;
+  /** Optional header logo (absolute URL / data URI — the doc renders in a blank print window). */
+  logoUrl?: string;
   quotationNumber: string;
   dateStr: string;
   supplier: QuotationParty;
   rentee: QuotationParty;
   meta: QuotationMetaCell[];
+  /** Extra price rows shown between the line-item table and the totals (app parity: overtime rate,
+   *  cost-responsibility items — "fuel → supplier", etc.). */
+  priceExtras?: { label: string; value: string }[];
+  /** Show the "electronically signed" trust block (default true). */
+  showSigned?: boolean;
   listedTitle?: string;
   listed?: QuotationListedLine[];
   lineItems: QuotationLineItem[];
@@ -91,7 +98,13 @@ export const QUOTATION_STYLE = `
   .q-doc{max-width:780px;margin:18px auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 6px 24px rgba(28,53,80,.1);page-break-after:always;}
   .q-doc:last-child{page-break-after:auto;}
   .q-head{background:linear-gradient(135deg,#1c3550,#12263a);color:#fff;padding:26px 34px;}
+  .q-head-row{display:flex;align-items:center;gap:14px;}
+  .q-logo{flex:0 0 auto;width:44px;height:44px;border-radius:10px;background:#fff;padding:6px;object-fit:contain;}
   .q-title{font-size:23px;font-weight:900;letter-spacing:-.3px;}
+  .price-extras{border:1px solid #e4edf5;border-radius:10px;margin:2px 0 12px;overflow:hidden;}
+  .price-extras .pe-h{background:#eff4f9;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#6b8fa8;padding:8px 13px;}
+  .price-extras .pe-row{display:flex;justify-content:space-between;gap:10px;padding:8px 13px;border-top:1px solid #f0f4f8;font-size:12.5px;}
+  .price-extras .pe-row span{color:#6b8fa8;font-weight:600;}.price-extras .pe-row b{font-weight:800;}
   .q-sub{display:flex;justify-content:space-between;margin-top:10px;font-size:12.5px;font-weight:700;color:rgba(255,255,255,.72);}
   .q-sub .qn{color:#fff;font-family:'IBM Plex Sans',monospace;}
   .q-body{padding:24px 34px 30px;}
@@ -273,9 +286,16 @@ export function renderQuotationSection(doc: QuotationDoc): string {
   const grandValue = doc.totals.valueOverride ? esc(doc.totals.valueOverride) : `${money2(doc.totals.total)} ${esc(doc.currency)}`;
   const cards = doc.cards.map(cardHtml).join("");
   const legal = doc.legal.length ? `<ol class="tc">${doc.legal.map((t) => `<li>${esc(t)}</li>`).join("")}</ol>` : "";
+  const priceExtras = doc.priceExtras?.length
+    ? `<div class="price-extras"><div class="pe-h">${esc(L("Rate & cost responsibilities", "السعر ومسؤوليات التكلفة"))}</div>${doc.priceExtras
+        .map((r) => `<div class="pe-row"><span>${esc(r.label)}</span><b>${esc(r.value)}</b></div>`)
+        .join("")}</div>`
+    : "";
+  const logo = doc.logoUrl ? `<img class="q-logo" src="${esc(doc.logoUrl)}" alt="" />` : "";
+  const signed = doc.showSigned === false ? "" : `<div class="signed"><span class="sig-check">✓</span><div class="sig-txt"><b>${esc(L("Electronically signed via the Moedatech platform", "موقّع إلكترونيًا عبر منصة معداتك"))}</b><div>${esc(doc.quotationNumber)} · ${esc(doc.dateStr)}</div></div></div>`;
 
   return `<section class="q-doc" dir="${isAr ? "rtl" : "ltr"}" lang="${isAr ? "ar" : "en"}">
-    <div class="q-head"><div class="q-title">${esc(doc.title)}</div><div class="q-sub"><span class="qn">${esc(doc.quotationNumber)}</span><span>${esc(doc.dateStr)}</span></div></div>
+    <div class="q-head"><div class="q-head-row">${logo}<div style="flex:1"><div class="q-title">${esc(doc.title)}</div><div class="q-sub"><span class="qn">${esc(doc.quotationNumber)}</span><span>${esc(doc.dateStr)}</span></div></div></div></div>
     <div class="q-body">
       <div class="parties">${partyHtml(doc.supplier, L)}${partyHtml(doc.rentee, L)}</div>
       ${metaHtml ? `<div class="metastrip">${metaHtml}</div>` : ""}
@@ -284,6 +304,7 @@ export function renderQuotationSection(doc: QuotationDoc): string {
         <thead><tr><th class="num">#</th><th>${esc(L("Item", "البند"))}</th><th>${esc(L("Unit", "الوحدة"))}</th><th class="num">${esc(L("Qty", "العدد"))}</th><th class="num">${esc(L("Price", "السعر"))}</th><th class="num">${esc(L("Total", "الإجمالي"))}</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
+      ${priceExtras}
       <div class="totals">
         <div class="trow"><span>${esc(L("Subtotal before VAT", "الإجمالي قبل الضريبة"))}</span><b>${money2(doc.totals.subtotal)}</b></div>
         <div class="trow"><span>${esc(L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"))}</span><b>${money2(doc.totals.vat)}</b></div>
@@ -292,7 +313,7 @@ export function renderQuotationSection(doc: QuotationDoc): string {
       <div class="words"><div class="wl">${esc(L("Amount in words", "المبلغ كتابةً"))}</div>${esc(words)}</div>
       ${cards}
       ${legal}
-      <div class="signed"><span class="sig-check">✓</span><div class="sig-txt"><b>${esc(L("Electronically signed via the Moedatech platform", "موقّع إلكترونيًا عبر منصة معداتك"))}</b><div>${esc(doc.quotationNumber)} · ${esc(doc.dateStr)}</div></div></div>
+      ${signed}
       <div class="foot">${esc(L("Auto-generated by Moedatech · support@moedatech.com", "صادر تلقائيًا من منصة معداتك · support@moedatech.com"))}</div>
     </div>
   </section>`;

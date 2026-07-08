@@ -45,6 +45,10 @@ export interface DealRoomView {
   rate: number | null;
   mobPrice: number | null;
   demobPrice: number | null;
+  /** Mobilization/demobilization RESPONSIBILITY (from the request item). When true the rentee arranges
+   *  it (supplier charges nothing) — the quotation must still state it. */
+  mobByRentee: boolean | null;
+  demobByRentee: boolean | null;
   periods: number | null;
   priceUnit: string | null;
   /** Units the RFQ asked for — the rate is PER-UNIT, so the rental total multiplies by this
@@ -61,6 +65,34 @@ export interface DealRoomView {
   /** True when the supplier opened the room first (chatted before the renter entered) — drives the
    *  "Supplier started this conversation" banner. Pairs with status==="OPEN" before the renter enters. */
   supplierFirstEntry: boolean;
+  /** Structured rental/equipment/operator details from the request item — surfaced on the quotation
+   *  (the negotiated Agreed/Fixed terms are separate). All optional; the quotation skips empty rows. */
+  details: DealItemDetails;
+}
+
+/** Request-item details for the quotation (mapped tolerantly from the raw deal-room payload's
+ *  `request` + `equipmentItems[0]`; field names best-effort, empties dropped by the renderer). */
+export interface DealItemDetails {
+  equipmentLabel: string | null;
+  location: string | null;
+  rentalType: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  workingHoursPerDay: number | null;
+  workingDaysPerWeek: number | null;
+  fulfillment: string | null;
+  urgency: string | null;
+  subletting: boolean | null;
+  localContent: boolean | null;
+  overtimeRate: string | null;
+  additionalNotes: string | null;
+  extendable: boolean | null;
+  operatorIncluded: boolean | null;
+  operatorNationality: string | null;
+  numberOfOperators: number | null;
+  nightShift: boolean | null;
+  equipmentCerts: string[];
+  operatorCerts: string[];
 }
 
 const n = (v: unknown): number | null => {
@@ -222,6 +254,40 @@ export function mapDealRoom(raw: unknown): DealRoomView {
   const offeredUnits = Array.isArray(bid.unitsOffered) && bid.unitsOffered.length > 0 ? bid.unitsOffered.length : null;
   const priceUnits = n(d.agreedUnits) ?? offeredUnits ?? requestedUnits;
 
+  // Structured item details for the quotation — read from the item first, then the request. Field
+  // names are best-effort (tolerant fallbacks); the quotation renderer skips whatever comes back empty.
+  const pick = (...keys: string[]): unknown => {
+    for (const k of keys) {
+      if (firstReqItem[k] != null && firstReqItem[k] !== "") return firstReqItem[k];
+      if (reqObj[k] != null && reqObj[k] !== "") return reqObj[k];
+    }
+    return null;
+  };
+  const bl = (v: unknown): boolean | null => (typeof v === "boolean" ? v : v === "true" ? true : v === "false" ? false : null);
+  const arr = (v: unknown): string[] => (Array.isArray(v) ? v.map((x) => String(x)).filter(Boolean) : []);
+  const details: DealItemDetails = {
+    equipmentLabel: s(pick("label", "equipmentName", "name", "subcategoryName", "categoryName")),
+    location: s(pick("location", "city", "projectLocation", "siteLocation", "deliveryLocation")),
+    rentalType: s(pick("rentalType", "rentalBasis")),
+    startDate: s(pick("startDate", "deliveryDate", "estimatedStartDate", "requiredDate")),
+    endDate: s(pick("endDate", "returnDate")),
+    workingHoursPerDay: n(pick("workingHoursPerDay", "workingHours")),
+    workingDaysPerWeek: n(pick("workingDaysPerWeek", "workingDays")),
+    fulfillment: s(pick("fulfillmentType", "fulfillment")),
+    urgency: s(pick("urgency", "urgencyLevel")),
+    subletting: bl(pick("subletting", "sublettingAllowed")),
+    localContent: bl(pick("localContent", "localContentRequired", "requiresLocalContent")),
+    overtimeRate: s(pick("overtimeRate")),
+    additionalNotes: s(pick("additionalNotes", "notes", "additionalRequirements")),
+    extendable: bl(pick("extendable", "rentalExtendable")),
+    operatorIncluded: bl(pick("operatorIncluded", "operator", "withOperator")),
+    operatorNationality: s(pick("operatorNationality")),
+    numberOfOperators: n(pick("numberOfOperators", "operatorsCount", "operatorCount")),
+    nightShift: bl(pick("nightShiftRequired", "nightShift")),
+    equipmentCerts: arr(pick("safetyCertifications", "equipmentSafetyCertifications", "equipmentCerts")),
+    operatorCerts: arr(pick("operatorSafetyCertifications", "operatorCerts", "operatorCertifications")),
+  };
+
   return {
     id: String(d.id ?? ""),
     status,
@@ -237,6 +303,8 @@ export function mapDealRoom(raw: unknown): DealRoomView {
     rate: n(d.lastProposedRate) ?? n(bid.priceAmount),
     mobPrice: n(d.lastProposedMobPrice) ?? n(bid.mobPrice),
     demobPrice: n(d.lastProposedDemobPrice) ?? n(bid.demobPrice),
+    mobByRentee: bl(pick("mobilizationByRentee", "mobByRentee")),
+    demobByRentee: bl(pick("demobilizationByRentee", "demobByRentee")),
     // The Bid model has no `duration` (confirmed via /web:link-backend) — the request's estimated
     // duration is the source of truth.
     periods: n((d.request as Record<string, unknown>)?.estimatedDurationDays),
@@ -247,5 +315,6 @@ export function mapDealRoom(raw: unknown): DealRoomView {
     terms,
     hasDisputedTerms,
     supplierFirstEntry: d.supplierFirstEntry === true,
+    details,
   };
 }
