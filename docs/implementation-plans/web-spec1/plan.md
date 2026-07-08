@@ -33,9 +33,29 @@ Let an off-platform supplier attach files on the public shared-link bid form (`/
 ## Data model / persistence
 None (web). Backend column `company_documents` already migrated in Moedatech-App.
 
+## Downstream dependency — bid comparison (T8)
+The renter compares off-platform submissions in `BidComparisonWorkspace.tsx`, which turns each
+submission into a `BidCard` via `submissionToBidCard` (`link-bids.ts`). Today that mapper derives doc
+coverage from **text flags + Yes/No confirmations only** (`compliance.activityLicense = has(crNumber)`,
+cert chips from `confirmations`, `ownershipDocs: []`) and **ignores** the new `photos` / `documents` /
+`companyDocuments`. Two concrete gaps this feature creates:
+1. **Doc-coverage chips are blind to real uploads.** The comparison's company-doc chips + equipment-cert
+   chips + in-app viewer fetch from `/api/me/bids/:id/documents` — which the code notes **off-platform
+   bids do not have** (`BidComparisonWorkspace.tsx` ~L436, L548-564). So a supplier who actually uploaded
+   a TÜV / CR / ownership file shows the same as one who only ticked "Yes", and the renter can't open the file.
+2. **Quality ring absent in comparison** — it's the natural place for the renter to weigh bids, but the
+   ring only renders on the form + the single-submission modal so far.
+
+Fix (T8): `submissionToBidCard` maps the submission's signed attachment URLs into the card (company docs
+→ CR/VAT/National-Address chips green from a real file; equipment/operator cert docs → held certs +
+openable files; ownership + photos carried); the comparison's chip/viewer path reads those URLs for
+`link-*` ids instead of the missing endpoint; and each column shows the `QualityRing`
+(`qualityFromSubmission`). May add optional carrier fields on `BidCard` (`bids.ts`).
+
 ## Risks & dependencies
 - **Backend deploy**: the `company_documents` migration + backend-agents route must be deployed before this works end-to-end (Moedatech-App).
 - Presigned PUT `Content-Type` must equal the declared type or S3 rejects.
+- **Bid comparison** consumes submissions via `submissionToBidCard` — must be updated (T8) or the new docs/quality won't surface where the renter actually decides.
 
 ## Open questions
 - ✅ Doc taxonomy — confirmed from the image.

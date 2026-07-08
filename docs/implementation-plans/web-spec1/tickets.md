@@ -32,6 +32,12 @@ Per item: Equipment photos + Proof of ownership (always); Equipment cert + Opera
 Given a bid, then a 0–100 quality ring shows how well it matches the renter's request + how complete its docs are (Balanced: terms 40% · docs 40% · completeness 20%). Shown LIVE on the supplier form (updates as they fill) and on the renter's read-only viewer. Client-side, no backend.
 **Done-when:** tsc + lint clean; ring updates live; band colors (low/mid/high).
 
+## T8 — surface attachments + quality in the bid comparison (dependency)
+**AC:** AC-03, AC-07 · **Files:** `src/lib/contract/link-bids.ts` (`submissionToBidCard`), `src/components/compare/BidComparisonWorkspace.tsx`, `src/lib/contract/bids.ts` (optional carrier fields)
+Given the renter compares off-platform bids, then each column reflects the supplier's ACTUAL uploads (not just text/confirmations): company-doc chips (CR/VAT/National Address) green from a real file + openable; equipment/operator cert chips from uploaded cert files; ownership + photos available; and a `QualityRing` per column. For `link-*` bids the chip/viewer reads the submission's signed attachment URLs (the `/api/me/bids/:id/documents` endpoint doesn't exist for them).
+**Done-when:** tsc + lint clean; a submission with uploads shows green/openable doc chips + its quality ring in the comparison; text-only submissions still render (graceful fallback).
+**Note:** depends on the backend returning signed `photos`/`documents`/`companyDocuments` on `getRequestSubmissions` (done) — so this ships with the same backend deploy.
+
 ## T6 — labels + i18n + validation polish
 **AC:** AC-06 · **Files:** `page.tsx` / `bidFormStyles.ts`
 Bilingual kind labels (EN/AR), client size/type errors, empty/optional handling.
