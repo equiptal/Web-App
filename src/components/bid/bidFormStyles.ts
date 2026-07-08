@@ -206,6 +206,11 @@ export const BID_FORM_CSS = `
 .up-meta{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
 .up-fn{font-size:12.5px;color:var(--navy);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .up-sel{font:inherit;font-size:12px;font-weight:700;color:var(--navy);border:1px solid var(--border);border-radius:7px;padding:5px 8px;background:#fff;max-width:220px}
+.up-kind{align-self:flex-start;font-size:11px;font-weight:800;color:var(--navy-mid);background:var(--surface1);border:1px solid var(--border);border-radius:20px;padding:2px 9px}
+.uprow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.uptog{display:inline-flex;border:1px solid var(--border);border-radius:7px;overflow:hidden}
+.uptog button{border:none;background:#fff;font:inherit;font-size:11.5px;font-weight:800;color:var(--muted);padding:5px 11px;cursor:pointer}
+.uptog button.on{background:var(--navy);color:#fff}
 .up-rm{flex:none;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--muted);cursor:pointer}
 .up-rm:hover{color:#b42318;border-color:#f0c4bd;background:#fef3f2}
 .up-rm .material-icons-outlined{font-size:18px}

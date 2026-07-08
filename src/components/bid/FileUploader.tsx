@@ -72,9 +72,13 @@ export function FileUploader({
               )}
               <div className="up-meta">
                 <span className="up-fn" title={v.filename}>{v.filename}</span>
-                <select className="up-sel" value={v.type} disabled={disabled} onChange={(e) => setType(v.key, e.target.value)}>
-                  {kinds.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
-                </select>
+                {kinds.length > 1 ? (
+                  <select className="up-sel" value={v.type} disabled={disabled} onChange={(e) => setType(v.key, e.target.value)}>
+                    {kinds.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+                  </select>
+                ) : (
+                  <span className="up-kind">{kinds[0]?.label}</span>
+                )}
               </div>
               <button type="button" className="up-rm" aria-label={L("Remove", "إزالة")} disabled={disabled} onClick={() => remove(v.key)}>
                 <span className="material-icons-outlined">close</span>

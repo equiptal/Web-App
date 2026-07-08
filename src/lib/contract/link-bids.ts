@@ -27,13 +27,14 @@ export interface LinkBidConfirmations {
 
 /** Equipment photo kinds — each photo the supplier adds is classified as one of these. */
 export type BidPhotoKind = "front_photo" | "serial_photo" | "hours_photo";
-/** Per-item document kinds: proof-of-ownership + equipment cert + operator cert. */
+/** Per-item document kinds: proof-of-ownership (free-classify) + equipment/operator cert (request-driven,
+ *  TÜV/SPSP/SASO — operator prefixed to stay distinct). */
 export type BidDocKind =
   | "istimara" | "customs_card" | "sales_contract" | "saso_registration"
-  | "tuv" | "spsp" | "saso_inspection" | "insurance"
-  | "operator_tuv" | "operating_license" | "operator_spsp" | "operator_id" | "operator_insurance";
-/** Submission-level company-verification document kinds. */
-export type CompanyDocKind = "commercial_registration" | "vat" | "national_address";
+  | "tuv" | "spsp" | "saso" | "other"
+  | "operator_tuv" | "operator_spsp" | "operator_saso" | "operator_other";
+/** Submission-level company-verification document kinds (aligned to the app's company doc set). */
+export type CompanyDocKind = "cr" | "vat_cert" | "national_address" | "local_content" | "saso_heavy_equip" | "other";
 
 /** An uploaded attachment — `key` is the plain S3 key on submit, a presigned URL on read. */
 export interface BidAttachment { key: string; type: string; filename?: string | null }

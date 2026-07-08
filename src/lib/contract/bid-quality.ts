@@ -16,8 +16,8 @@ import type { LinkBidSubmission } from "@/lib/contract/link-bids";
 const ITEM_TERM_KEYS = ["operator", "nationality", "fatFood", "fatTransport", "fuel", "fuelType", "year", "operatorCert", "equipmentCert"] as const;
 
 const OWNERSHIP_TYPES = new Set(["istimara", "customs_card", "sales_contract", "saso_registration"]);
-const EQUIP_CERT_TYPES = new Set(["tuv", "spsp", "saso_inspection", "insurance"]);
-const OPERATOR_CERT_TYPES = new Set(["operator_tuv", "operating_license", "operator_spsp", "operator_id", "operator_insurance"]);
+const EQUIP_CERT_TYPES = new Set(["tuv", "spsp", "saso", "other"]);
+const OPERATOR_CERT_TYPES = new Set(["operator_tuv", "operator_spsp", "operator_saso", "operator_other"]);
 
 export interface QualityItemInput {
   requiredTerms: Record<string, string | null> | null | undefined;
