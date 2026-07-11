@@ -34,6 +34,14 @@ const TERM_LABEL: Record<TermKey, [string, string]> = {
 const UNIT_LABEL: Record<string, [string, string]> = {
   PER_DAY: ["day", "يوم"], PER_WEEK: ["week", "أسبوع"], PER_MONTH: ["month", "شهر"], PER_JOB: ["job", "مهمة"],
 };
+// Attachment type code → readable label (EN/AR) for the read-only viewer chips/thumbnails.
+const ATT_LABEL: Record<string, [string, string]> = {
+  front_photo: ["Front photo", "صورة أمامية"], serial_photo: ["Serial / plate", "الرقم التسلسلي"], hours_photo: ["Operating hours", "ساعات التشغيل"],
+  istimara: ["Istimara", "الاستمارة"], customs_card: ["Customs card", "البطاقة الجمركية"], sales_contract: ["Sales contract", "عقد البيع"], saso_registration: ["SASO registration", "تسجيل ساسو"],
+  tuv: ["TÜV", "فحص TÜV"], spsp: ["SPSP", "SPSP"], saso: ["SASO", "ساسو"], other: ["Other", "أخرى"],
+  operator_tuv: ["Operator TÜV", "فحص TÜV للمشغّل"], operator_spsp: ["Operator SPSP", "SPSP للمشغّل"], operator_saso: ["Operator SASO", "ساسو للمشغّل"], operator_other: ["Operator (other)", "المشغّل (أخرى)"],
+  cr: ["Commercial registration", "السجل التجاري"], vat_cert: ["VAT certificate", "شهادة الضريبة"], national_address: ["National address", "العنوان الوطني"], local_content: ["Local content", "المحتوى المحلي"], saso_heavy_equip: ["SASO heavy equipment", "ساسو للمعدات الثقيلة"],
+};
 
 export function SharedBidSubmissionModal({
   bid,
@@ -53,6 +61,21 @@ export function SharedBidSubmissionModal({
 }) {
   const nf = (n: number) => new Intl.NumberFormat(ar ? "ar-EG" : "en-US").format(Math.round(n));
   const sar = L("SAR", "ر.س");
+  const attLabel = (t: string) => { const e = ATT_LABEL[t]; return e ? (ar ? e[1] : e[0]) : t.replace(/_/g, " "); };
+  // Read-only chip row for uploaded documents (open in a new tab to view / download).
+  const DocChips = ({ docs }: { docs?: { key: string; type: string; filename?: string | null }[] }) => (
+    !docs?.length ? null : (
+      <div className="ro-chips">
+        {docs.map((d, i) => (
+          <a key={i} className="ro-chip" href={d.key} target="_blank" rel="noopener noreferrer">
+            <span className="material-icons-outlined ic">description</span>
+            {attLabel(d.type)}{d.filename ? ` · ${d.filename}` : ""}
+            <span className="material-icons-outlined dl">download</span>
+          </a>
+        ))}
+      </div>
+    )
+  );
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -308,6 +331,22 @@ export function SharedBidSubmissionModal({
                         <span className="r">{L("VAT 15%", "ضريبة ١٥٪")}<b>{sub ? nf(sub * 0.15) : "—"} {sar}</b></span>
                         <span className="r t">{L("Item total", "إجمالي البند")}<b>{sub ? nf(sub * 1.15) : "—"} {sar}</b></span>
                       </div>
+                      {(a?.photos?.length || a?.documents?.length) ? (
+                        <div className="ro-att">
+                          <div className="ro-att-h">{L("Attachments", "المرفقات")}</div>
+                          {a?.photos?.length ? (
+                            <div className="ro-thumbs">
+                              {a.photos.map((p, i) => (
+                                <a key={i} className="ro-thumb" href={p.key} target="_blank" rel="noopener noreferrer" title={`${attLabel(p.type)}${p.filename ? " · " + p.filename : ""}`}>
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={p.key} alt={attLabel(p.type)} />
+                                </a>
+                              ))}
+                            </div>
+                          ) : null}
+                          <DocChips docs={a?.documents} />
+                        </div>
+                      ) : null}
                     </div>
                   );
                 })}
@@ -335,6 +374,14 @@ export function SharedBidSubmissionModal({
                   <RoField label={L("Contact info", "بيانات التواصل")} value={submission.contactInfo} />
                   {supplierNotes && <RoField label={L("Notes — for the whole quotation", "ملاحظات — لكامل عرض السعر")} value={supplierNotes} multiline />}
                 </div>
+
+                {/* ── Company documents (view / download) ── */}
+                {submission.companyDocuments?.length ? (
+                  <div className="sec">
+                    <div className="sec-h"><span className="material-icons-outlined hdic">verified_user</span><h3>{L("Company documents", "مستندات الشركة")}</h3></div>
+                    <DocChips docs={submission.companyDocuments} />
+                  </div>
+                ) : null}
 
                 <div style={{ textAlign: "center", fontSize: 11, fontWeight: 600, color: "#9AA7B8", padding: "4px 0 2px" }}>{L("Powered by", "مُشغّل بواسطة")} <b style={{ color: "var(--navy)", fontWeight: 800 }}>Moedatech</b></div>
               </div>

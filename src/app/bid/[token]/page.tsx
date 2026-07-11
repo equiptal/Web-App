@@ -536,22 +536,24 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                       <td className="num"><input className={`ptbl-in${showErrors && num(a?.rentalRate ?? "") <= 0 ? " invalid" : ""}`} inputMode="numeric" value={a?.rentalRate ?? ""} onChange={(e) => setPrice(it.requestItemId, "rentalRate", e.target.value)} placeholder="0" /></td>
                       <td className="num tot">{num(a?.rentalRate ?? "") ? nf(line(a!.rentalRate)) : "—"}</td>
                     </tr>
-                    {delBySup && (
+                    {/* Delivery/Return are always shown. When the RENTER handles them, they're read-only
+                        (no price input) — the supplier just sees the renter is responsible. */}
                     <tr>
-                      <td><div className="it-lbl">{L("Delivery to site", "النقل إلى الموقع")}</div><div className="it-sub2">{L("price × qty", "السعر × العدد")}</div></td>
+                      <td><div className="it-lbl">{L("Delivery to site", "النقل إلى الموقع")}</div><div className="it-sub2">{delBySup ? L("price × qty", "السعر × العدد") : L("handled by the renter", "على المستأجر")}</div></td>
                       <td className="num">{L("Trip", "رحلة")}</td><td className="num">{oq}</td>
-                      <td className="num"><input className="ptbl-in" inputMode="numeric" value={a?.deliveryPrice ?? ""} onChange={(e) => setPrice(it.requestItemId, "deliveryPrice", e.target.value)} placeholder="0" /></td>
-                      <td className="num tot">{num(a?.deliveryPrice ?? "") ? nf(line(a!.deliveryPrice)) : "—"}</td>
+                      {delBySup
+                        ? <td className="num"><input className="ptbl-in" inputMode="numeric" value={a?.deliveryPrice ?? ""} onChange={(e) => setPrice(it.requestItemId, "deliveryPrice", e.target.value)} placeholder="0" /></td>
+                        : <td className="num"><span className="byrenter">{L("Renter", "المستأجر")}</span></td>}
+                      <td className="num tot">{delBySup ? (num(a?.deliveryPrice ?? "") ? nf(line(a!.deliveryPrice)) : "—") : "—"}</td>
                     </tr>
-                    )}
-                    {retBySup && (
                     <tr>
-                      <td><div className="it-lbl">{L("Return from site", "النقل من الموقع")}</div><div className="it-sub2">{L("price × qty", "السعر × العدد")}</div></td>
+                      <td><div className="it-lbl">{L("Return from site", "النقل من الموقع")}</div><div className="it-sub2">{retBySup ? L("price × qty", "السعر × العدد") : L("handled by the renter", "على المستأجر")}</div></td>
                       <td className="num">{L("Trip", "رحلة")}</td><td className="num">{oq}</td>
-                      <td className="num"><input className="ptbl-in" inputMode="numeric" value={a?.returnPrice ?? ""} onChange={(e) => setPrice(it.requestItemId, "returnPrice", e.target.value)} placeholder="0" /></td>
-                      <td className="num tot">{num(a?.returnPrice ?? "") ? nf(line(a!.returnPrice)) : "—"}</td>
+                      {retBySup
+                        ? <td className="num"><input className="ptbl-in" inputMode="numeric" value={a?.returnPrice ?? ""} onChange={(e) => setPrice(it.requestItemId, "returnPrice", e.target.value)} placeholder="0" /></td>
+                        : <td className="num"><span className="byrenter">{L("Renter", "المستأجر")}</span></td>}
+                      <td className="num tot">{retBySup ? (num(a?.returnPrice ?? "") ? nf(line(a!.returnPrice)) : "—") : "—"}</td>
                     </tr>
-                    )}
                   </tbody>
                 </table>
                 <div className="itot">
