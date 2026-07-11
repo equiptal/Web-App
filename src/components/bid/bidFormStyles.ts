@@ -262,9 +262,16 @@ export const BID_FORM_CSS = `
 /* Attachment section card (colour header + pill) */
 .att-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:13px}
 /* two side-by-side cards (equipment photos + proof of ownership); stacks on mobile */
-.att-row{display:grid;grid-template-columns:1fr 1fr;gap:13px;align-items:start}
+.att-row{display:grid;grid-template-columns:1fr 1fr;gap:13px;align-items:start;margin-top:20px}
 .att-row .att-card{margin-bottom:13px}
 @media(max-width:640px){.att-row{grid-template-columns:1fr;gap:0}}
+/* delivery/return handled by the renter — read-only chip in the price cell */
+.byrenter{display:inline-block;font-size:11.5px;font-weight:800;color:var(--muted);background:var(--surface1);border:1px solid var(--border);border-radius:20px;padding:2px 10px;white-space:nowrap}
+/* uploaded-file "done" tick — distinguishes a stored file from the empty upload slot */
+.u-fdone{color:#12b76a;font-size:19px;flex:none;margin-inline-start:2px}
+/* compact "add another" shown in a slot once it already holds a file (vs the full dropzone) */
+.u-slot-more{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:12.5px;font-weight:800;color:var(--ac);background:none;border:none;cursor:pointer;padding:8px 2px 2px}
+.u-slot-more .material-icons-outlined{font-size:18px}
 .att-hd{display:flex;align-items:center;gap:11px;padding:13px 15px}
 .att-tile{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none;font-size:19px}
 .att-tt{font-weight:800;font-size:14.5px;color:var(--navy)}
@@ -273,6 +280,18 @@ export const BID_FORM_CSS = `
 .att-pill.req{background:#fef3f2;color:#b42318;border:1px solid #fcc9c2}
 .att-pill.opt{background:#f2f4f7;color:#667085;border:1px solid #e4e7ec}
 .att-body{padding:0 15px 15px}
+
+/* Read-only attachment view (renter's submission viewer) — thumbnails + view/download chips */
+.ro-att{margin-top:12px}
+.ro-att-h{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin-bottom:8px}
+.ro-thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.ro-thumb{width:58px;height:58px;border-radius:8px;border:1px solid var(--border);overflow:hidden;display:block}
+.ro-thumb img{width:100%;height:100%;object-fit:cover}
+.ro-chips{display:flex;flex-wrap:wrap;gap:8px}
+.ro-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--navy);background:var(--surface1);border:1px solid var(--border);border-radius:9px;padding:7px 11px;text-decoration:none}
+.ro-chip:hover{background:#fff;border-color:#c8d6e2}
+.ro-chip .ic{font-size:15px;color:var(--muted)}
+.ro-chip .dl{font-size:16px;color:var(--action);margin-inline-start:2px}
 
 /* ── Bid-quality ring ───────────────────────────────────────────────────── */
 .qring{display:inline-flex;flex-direction:column;align-items:center;gap:4px;flex:none}

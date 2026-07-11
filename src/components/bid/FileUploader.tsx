@@ -107,7 +107,7 @@ export function FileUploader({
             {busy ? L("Uploading…", "جارٍ الرفع…") : L("Upload", "رفع")}
           </button>
         </div>
-      ) : (
+      ) : value.length === 0 ? (
         <button type="button" className="u-slot" disabled={disabled || busy} onClick={() => trigger(kinds[0]?.value ?? "")}>
           <span className="u-slot-ic material-icons-outlined">description</span>
           <span className="u-slot-tx">
@@ -116,7 +116,7 @@ export function FileUploader({
           </span>
           <span className="u-slot-plus material-icons-outlined">add</span>
         </button>
-      )}
+      ) : null}
 
       {value.length > 0 && (
         <div className="u-files">
@@ -134,11 +134,18 @@ export function FileUploader({
                 <span className="u-fkind">{kindLabel(v.type)}</span>
                 <span className="u-ffn" title={v.filename ?? undefined}>{v.filename}</span>
               </div>
+              <span className="u-fdone material-icons-outlined" title={L("Uploaded", "تم الرفع")}>check_circle</span>
               <button type="button" className="u-frm" aria-label={L("Remove", "إزالة")} disabled={disabled} onClick={() => remove(v.key)}>
                 <span className="material-icons-outlined">close</span>
               </button>
             </div>
           ))}
+          {!isPicker && (
+            <button type="button" className="u-slot-more" disabled={disabled || busy} onClick={() => trigger(kinds[0]?.value ?? "")}>
+              <span className="material-icons-outlined">add</span>
+              {busy ? L("Uploading…", "جارٍ الرفع…") : `${L("Add another", "إضافة أخرى")} ${kinds[0]?.label ?? ""}`}
+            </button>
+          )}
         </div>
       )}
       <input ref={inputRef} type="file" accept="image/*,application/pdf" multiple hidden onChange={onFiles} />
