@@ -78,6 +78,23 @@ export function SharedBidSubmissionModal({
       </div>
     )
   );
+  // A company field the supplier gave as text OR a document — render whichever they submitted, in place.
+  const coDoc = (type: string) => submission?.companyDocuments?.find((d) => d.type === type);
+  const CoField = ({ label, text, docType }: { label: string; text?: string | null; docType: string }) => {
+    if (text && text.trim()) return <RoField label={label} value={text} />;
+    const doc = coDoc(docType);
+    if (!doc) return <RoField label={label} value={null} />;
+    return (
+      <div className="field" style={{ marginBottom: 12 }}>
+        <label>{label}</label>
+        <a className="ro-chip" href={doc.key} target="_blank" rel="noopener noreferrer" style={{ marginTop: 2 }}>
+          <span className="material-icons-outlined ic">description</span>
+          {doc.filename || attLabel(doc.type)}
+          <span className="material-icons-outlined dl">download</span>
+        </a>
+      </div>
+    );
+  };
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -381,21 +398,24 @@ export function SharedBidSubmissionModal({
                   <div className="sec-h"><span className="material-icons-outlined hdic">badge</span><h3>{L("Supplier's details", "بيانات المؤجّر")}</h3></div>
                   <RoField label={L("Company name", "اسم الشركة")} value={submission.companyName} />
                   <div className="frow">
-                    <RoField label={L("CR number", "رقم السجل التجاري")} value={submission.crNumber} />
-                    <RoField label={L("VAT number", "الرقم الضريبي")} value={submission.vatNumber} />
+                    <CoField label={L("CR number", "رقم السجل التجاري")} text={submission.crNumber} docType="cr" />
+                    <CoField label={L("VAT number", "الرقم الضريبي")} text={submission.vatNumber} docType="vat_cert" />
                   </div>
-                  <RoField label={L("National address", "العنوان الوطني")} value={submission.nationalAddress} />
+                  <CoField label={L("National address", "العنوان الوطني")} text={submission.nationalAddress} docType="national_address" />
                   <RoField label={L("Contact info", "بيانات التواصل")} value={submission.contactInfo} />
                   {supplierNotes && <RoField label={L("Notes — for the whole quotation", "ملاحظات — لكامل عرض السعر")} value={supplierNotes} multiline />}
                 </div>
 
-                {/* ── Company documents (view / download) ── */}
-                {submission.companyDocuments?.length ? (
-                  <div className="sec">
-                    <div className="sec-h"><span className="material-icons-outlined hdic">verified_user</span><h3>{L("Company documents", "مستندات الشركة")}</h3></div>
-                    <DocChips docs={submission.companyDocuments} />
-                  </div>
-                ) : null}
+                {/* ── Other company documents (CR/VAT/Address now render in their fields above) ── */}
+                {(() => {
+                  const extras = (submission.companyDocuments ?? []).filter((d) => !["cr", "vat_cert", "national_address"].includes(d.type));
+                  return extras.length ? (
+                    <div className="sec">
+                      <div className="sec-h"><span className="material-icons-outlined hdic">folder_open</span><h3>{L("Other company documents", "مستندات أخرى للشركة")}</h3></div>
+                      <DocChips docs={extras} />
+                    </div>
+                  ) : null;
+                })()}
 
                 <div style={{ textAlign: "center", fontSize: 11, fontWeight: 600, color: "#9AA7B8", padding: "4px 0 2px" }}>{L("Powered by", "مُشغّل بواسطة")} <b style={{ color: "var(--navy)", fontWeight: 800 }}>Moedatech</b></div>
               </div>
