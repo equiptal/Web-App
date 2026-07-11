@@ -260,7 +260,11 @@ export const BID_FORM_CSS = `
 .u-err{margin-top:8px;font-size:12px;font-weight:700;color:#b42318}
 
 /* Attachment section card (colour header + pill) */
-.att-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:13px;overflow:hidden}
+.att-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:13px}
+/* two side-by-side cards (equipment photos + proof of ownership); stacks on mobile */
+.att-row{display:grid;grid-template-columns:1fr 1fr;gap:13px;align-items:start}
+.att-row .att-card{margin-bottom:13px}
+@media(max-width:640px){.att-row{grid-template-columns:1fr;gap:0}}
 .att-hd{display:flex;align-items:center;gap:11px;padding:13px 15px}
 .att-tile{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none;font-size:19px}
 .att-tt{font-weight:800;font-size:14.5px;color:var(--navy)}

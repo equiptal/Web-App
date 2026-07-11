@@ -560,21 +560,23 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                   <span className="r t">{vatIncluded ? L("Item total (incl. VAT)", "إجمالي البند (شامل الضريبة)") : L("Item total", "إجمالي البند")}<b>{sub ? nf(sub * 1.15) : "—"} {sar}</b></span>
                 </div>
 
-                {/* Attachments — photos + ownership are always offered (choose-type dropdown); equipment /
+                {/* Attachments — photos + ownership share one row (choose-type dropdown); equipment /
                     operator certificates are request-driven labeled slots, shown only when required. */}
-                <AttachSection icon="photo_camera" accent={ATT_ACCENT.photo}
-                  title={L("Equipment photos", "صور المعدة")} desc={L("Pick what the photo shows, then upload", "اختر ما تُظهره الصورة ثم ارفع")} pill={L("Optional", "اختياري")}>
-                  <FileUploader token={token} folder="photos" thumbs kinds={photoKinds} accent={ATT_ACCENT.photo}
-                    value={itemAtt(it.requestItemId).photos}
-                    onChange={(n) => setItemAtt(it.requestItemId, "photos", n)} L={L} disabled={submitting} />
-                </AttachSection>
+                <div className="att-row">
+                  <AttachSection icon="photo_camera" accent={ATT_ACCENT.photo}
+                    title={L("Equipment photos", "صور المعدة")} desc={L("Pick what the photo shows, then upload", "اختر ما تُظهره الصورة ثم ارفع")} pill={L("Optional", "اختياري")}>
+                    <FileUploader token={token} folder="photos" thumbs kinds={photoKinds} accent={ATT_ACCENT.photo}
+                      value={itemAtt(it.requestItemId).photos}
+                      onChange={(n) => setItemAtt(it.requestItemId, "photos", n)} L={L} disabled={submitting} />
+                  </AttachSection>
 
-                <AttachSection icon="verified_user" accent={ATT_ACCENT.own}
-                  title={L("Proof of ownership", "إثبات الملكية")} desc={L("Choose which document you have, then upload", "اختر المستند الذي لديك ثم ارفع")} pill={L("Optional", "اختياري")}>
-                  <FileUploader token={token} folder="documents" kinds={ownershipKinds} accent={ATT_ACCENT.own}
-                    value={itemAtt(it.requestItemId).ownership}
-                    onChange={(n) => setItemAtt(it.requestItemId, "ownership", n)} L={L} disabled={submitting} />
-                </AttachSection>
+                  <AttachSection icon="verified_user" accent={ATT_ACCENT.own}
+                    title={L("Proof of ownership", "إثبات الملكية")} desc={L("Choose which document you have, then upload", "اختر المستند الذي لديك ثم ارفع")} pill={L("Optional", "اختياري")}>
+                    <FileUploader token={token} folder="documents" kinds={ownershipKinds} accent={ATT_ACCENT.own}
+                      value={itemAtt(it.requestItemId).ownership}
+                      onChange={(n) => setItemAtt(it.requestItemId, "ownership", n)} L={L} disabled={submitting} />
+                  </AttachSection>
+                </div>
 
                 {(() => {
                   const slots = parseCertSlots(it.requiredTerms.equipmentCert, "");
