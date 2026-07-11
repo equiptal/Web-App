@@ -25,6 +25,20 @@ export interface LinkBidConfirmations {
   maintenance?: boolean;
 }
 
+/** Equipment photo kinds — each photo the supplier adds is classified as one of these. */
+export type BidPhotoKind = "front_photo" | "serial_photo" | "hours_photo";
+/** Per-item document kinds: proof-of-ownership (free-classify) + equipment/operator cert (request-driven,
+ *  TÜV/SPSP/SASO — operator prefixed to stay distinct). */
+export type BidDocKind =
+  | "istimara" | "customs_card" | "sales_contract" | "saso_registration"
+  | "tuv" | "spsp" | "saso" | "other"
+  | "operator_tuv" | "operator_spsp" | "operator_saso" | "operator_other";
+/** Submission-level company-verification document kinds (aligned to the app's company doc set). */
+export type CompanyDocKind = "cr" | "vat_cert" | "national_address" | "local_content" | "saso_heavy_equip" | "other";
+
+/** An uploaded attachment — `key` is the plain S3 key on submit, a presigned URL on read. */
+export interface BidAttachment { key: string; type: string; filename?: string | null }
+
 export interface LinkBidItem {
   requestItemId: string;
   /** The request (fan-out) this item belongs to — used to pick the right item in the per-item comparison. */
@@ -44,6 +58,10 @@ export interface LinkBidItem {
   /** The renter's required VALUE per term (operator, nationality, fatFood, fuel, fuelType, year, certs,
    *  payment, overtime, breakdownSla) — drives the "Renter: X · Supplier: Y" conflict detail. */
   requiredTerms?: Record<string, string | null> | null;
+  /** Equipment photos (classified: front/serial/hours) — presigned URLs on read. */
+  photos?: BidAttachment[];
+  /** Per-item documents (ownership / equipment cert / operator cert) — presigned URLs on read. */
+  documents?: BidAttachment[];
 }
 
 export interface LinkBidSubmission {
@@ -67,6 +85,8 @@ export interface LinkBidSubmission {
    *  deadline. Drives the quotation's "Valid until" when present. */
   validUntil?: string | null;
   items: LinkBidItem[];
+  /** Submission-level company-verification docs (CR / VAT / national address) — presigned URLs. */
+  companyDocuments?: BidAttachment[];
   grandTotal?: number | null;
 }
 
@@ -126,16 +146,37 @@ export interface SubmitBidFormPayload {
   notes?: string;
   /** Supplier-set quote expiry (ISO) — optional. */
   validUntil?: string;
+  /** Submission-level company-verification docs (CR / VAT / national address). `key` = the S3 key
+   *  returned by /upload-urls (NOT a URL). Optional. */
+  companyDocuments?: { key: string; type: CompanyDocKind; filename?: string }[];
   /** `offeredUnits` (partial bid) is optional — omit → backend defaults to the full requested count.
    *  When sent it must be 1..numberOfUnits (backend 400s otherwise). Live on staging: submitBidForm
-   *  persists + prices on it and getRequestSubmissions returns it. */
-  items: { requestItemId: string; confirmations: LinkBidConfirmations; offeredUnits?: number; rentalRate: number; deliveryPrice?: number; returnPrice?: number }[];
+   *  persists + prices on it and getRequestSubmissions returns it.
+   *  `photos`/`documents` carry the S3 keys from /upload-urls (classified by `type`). Optional. */
+  items: {
+    requestItemId: string;
+    confirmations: LinkBidConfirmations;
+    offeredUnits?: number;
+    rentalRate: number;
+    deliveryPrice?: number;
+    returnPrice?: number;
+    photos?: { key: string; type: BidPhotoKind; filename?: string }[];
+    documents?: { key: string; type: BidDocKind; filename?: string }[];
+  }[];
 }
 
 const s = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v : typeof v === "number" ? String(v) : null);
 const n = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && v.trim() && Number.isFinite(Number(v)) ? Number(v) : null);
 const b = (v: unknown): boolean | undefined => (v === true || v === "yes" || v === 1 ? true : v === false || v === "no" || v === 0 ? false : undefined);
 const has = (v?: string | null) => !!(v && v.trim());
+/** Parse an attachments array ({key,type,filename}); key is a presigned URL on read. Undefined if empty. */
+const attList = (v: unknown): BidAttachment[] | undefined => {
+  if (!Array.isArray(v)) return undefined;
+  const out = (v as Record<string, unknown>[])
+    .map((e) => ({ key: s(e?.key) ?? "", type: s(e?.type) ?? "", filename: s(e?.filename) }))
+    .filter((a) => a.key);
+  return out.length ? out : undefined;
+};
 
 /** Parse the agents `GET /agents/requests/{id}/bid-submissions` payload into typed submissions. */
 export function mapLinkSubmissions(raw: unknown): LinkBidSubmission[] {
@@ -158,6 +199,7 @@ export function mapLinkSubmissions(raw: unknown): LinkBidSubmission[] {
       contactInfo: s(o.contactInfo),
       notes: s(o.notes),
       validUntil: s(o.validUntil),
+      companyDocuments: attList(o.companyDocuments),
       grandTotal: n(o.grandTotal),
       items: items.map((i) => {
         const c = (i.confirmations ?? {}) as Record<string, unknown>;
@@ -173,6 +215,8 @@ export function mapLinkSubmissions(raw: unknown): LinkBidSubmission[] {
           returnPrice: n(i.returnPrice),
           total: n(i.total),
           requiredTerms: i.requiredTerms && typeof i.requiredTerms === "object" ? (i.requiredTerms as Record<string, string | null>) : null,
+          photos: attList(i.photos),
+          documents: attList(i.documents),
           confirmations: { operator: b(c.operator), nationality: b(c.nationality), fatFood: b(c.fatFood), fatTransport: b(c.fatTransport), fuel: b(c.fuel), fuelType: b(c.fuelType), year: b(c.year), operatorCert: b(c.operatorCert), equipmentCert: b(c.equipmentCert), payment: b(c.payment), overtime: b(c.overtime), breakdownSla: b(c.breakdownSla), maintenance: b(c.maintenance) },
         };
       }),

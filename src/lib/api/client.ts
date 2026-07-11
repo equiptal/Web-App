@@ -447,6 +447,45 @@ export async function submitBidForm(token: string, payload: SubmitBidFormPayload
   return postJson<{ id: string }>(`/api/bid-form/${encodeURIComponent(token)}/submissions`, payload);
 }
 
+/** Content types + size the bid-form upload accepts (mirrors the agents backend). */
+export const BID_UPLOAD_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"] as const;
+export const BID_UPLOAD_MAX_BYTES = 10 * 1024 * 1024; // 10MB
+
+export interface BidUploadInput { file: File; folder: "photos" | "documents"; type: string }
+export interface BidUploadedFile { key: string; type: string; filename: string }
+
+/** Throws a user-facing reason if a file isn't an allowed type / is too big (AC-06). */
+export function validateBidFile(file: File): string | null {
+  if (!(BID_UPLOAD_TYPES as readonly string[]).includes(file.type)) return "unsupported_type";
+  if (file.size > BID_UPLOAD_MAX_BYTES) return "too_large";
+  return null;
+}
+
+/**
+ * Presign (via the BFF) then PUT each file straight to S3, returning the classified {key,type,filename}
+ * to include in the submit payload. Pre-validates type + size. Throws on a failed presign/PUT so the
+ * caller can surface it. `key` is the plain S3 key (NOT the presigned URL) — that's what submit expects.
+ */
+export async function uploadBidFiles(token: string, inputs: BidUploadInput[]): Promise<BidUploadedFile[]> {
+  if (!inputs.length) return [];
+  for (const i of inputs) {
+    const bad = validateBidFile(i.file);
+    if (bad) throw new Error(bad);
+  }
+  const presign = await postJson<{ uploads: { filename: string; key: string; url: string; contentType: string }[] }>(
+    `/api/bid-form/${encodeURIComponent(token)}/upload-urls`,
+    { files: inputs.map((i) => ({ filename: i.file.name, contentType: i.file.type, folder: i.folder })) },
+  );
+  const uploads = presign.uploads ?? [];
+  await Promise.all(
+    uploads.map(async (u, k) => {
+      const res = await fetch(u.url, { method: "PUT", headers: { "Content-Type": inputs[k].file.type }, body: inputs[k].file });
+      if (!res.ok) throw new Error("upload_failed");
+    }),
+  );
+  return uploads.map((u, k) => ({ key: u.key, type: inputs[k].type, filename: u.filename }));
+}
+
 /** Authed (renter): a request's off-platform submissions + link tracker (opened/submitted + token). */
 export async function fetchRequestSubmissions(
   requestId: string,

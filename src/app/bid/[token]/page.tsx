@@ -2,9 +2,12 @@
 
 import { use, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { fetchBidFormData, submitBidForm } from "@/lib/api/client";
-import type { BidFormData, BidFormItem } from "@/lib/contract/link-bids";
+import { fetchBidFormData, submitBidForm, type BidUploadedFile } from "@/lib/api/client";
+import type { BidFormData, BidFormItem, BidPhotoKind, BidDocKind, CompanyDocKind } from "@/lib/contract/link-bids";
 import { buildSubmissionNotes, priceToStore } from "@/lib/contract/vat-inclusive";
+import { FileUploader, type UploaderKind } from "@/components/bid/FileUploader";
+import { QualityRing } from "@/components/bid/QualityRing";
+import { computeBidQuality } from "@/lib/contract/bid-quality";
 import { BID_FORM_CSS } from "@/components/bid/bidFormStyles";
 
 /**
@@ -45,6 +48,40 @@ type Answer = {
   offeredUnits: string;
 };
 
+// Per-item uploaded attachments (equipment photos + the three per-item document groups). Equipment/
+// operator cert groups are only collected when the request item requires them (gated in the UI).
+// Per-item attachments: equipment photos + proof-of-ownership (free-classify), and certificate docs
+// keyed by the request-driven slot code (tuv/spsp/saso/other + operator_* variants).
+type ItemAtt = { photos: BidUploadedFile[]; ownership: BidUploadedFile[]; certs: Record<string, BidUploadedFile[]> };
+const EMPTY_ATT: ItemAtt = { photos: [], ownership: [], certs: {} };
+
+/** Normalize a request cert token → canonical tuv/spsp/saso, or null for free-text "other". */
+function normReqCert(raw: string): "tuv" | "spsp" | "saso" | null {
+  const s = raw.trim().toLowerCase();
+  if (s.startsWith("tuv")) return "tuv";
+  if (s.startsWith("spsp")) return "spsp";
+  if (s.startsWith("saso")) return "saso";
+  return null;
+}
+/** Parse a required-cert string ("tuv, spsp" / "TUV, SASO" / "Other") into distinct labeled slots.
+ *  prefix = "" for equipment certs, "operator_" for operator certs (keeps the stored type distinct). */
+function parseCertSlots(raw: string | null | undefined, prefix: "" | "operator_"): { code: string; base: string; raw: string }[] {
+  if (!raw) return [];
+  const seen = new Set<string>();
+  const out: { code: string; base: string; raw: string }[] = [];
+  for (const tok of String(raw).split(",").map((t) => t.trim()).filter(Boolean)) {
+    const base = normReqCert(tok);
+    const code = `${prefix}${base ?? "other"}`;
+    if (seen.has(code)) continue;
+    seen.add(code);
+    out.push({ code, base: base ?? "other", raw: tok });
+  }
+  return out;
+}
+const CERT_BASE_LABEL: Record<string, [string, string]> = {
+  tuv: ["TÜV", "فحص TÜV"], spsp: ["SPSP", "SPSP"], saso: ["SASO", "ساسو"], other: ["Other", "أخرى"],
+};
+
 export default function BidFormPage({ params }: { params: Promise<{ token: string }> }) {
   const { token: rawToken } = use(params);
   // The URL is /bid/{slug}-{groupId}; the token is the trailing UUID (group id).
@@ -71,6 +108,20 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
   // treated as VAT-inclusive (gross) — we strip the VAT back out on submit so the stored bid stays
   // VAT-exclusive like every on-platform bid, and the renter side reproduces the same total.
   const [vatIncluded, setVatIncluded] = useState(false);
+  // Uploaded attachments: per-item (photos + doc groups) + submission-level company-verification docs.
+  const [att, setAtt] = useState<Record<string, ItemAtt>>({});
+  const setItemAtt = (id: string, part: "photos" | "ownership", next: BidUploadedFile[]) =>
+    setAtt((p) => ({ ...p, [id]: { ...(p[id] ?? EMPTY_ATT), [part]: next } }));
+  const setItemCert = (id: string, code: string, next: BidUploadedFile[]) =>
+    setAtt((p) => { const cur = p[id] ?? EMPTY_ATT; return { ...p, [id]: { ...cur, certs: { ...cur.certs, [code]: next } } }; });
+  const itemAtt = (id: string) => att[id] ?? EMPTY_ATT;
+  // Company verification (submission-level): CR / VAT / National Address are each text OR a doc; plus
+  // optional extra company docs (Local Content / SASO heavy equipment / Other).
+  const [coCr, setCoCr] = useState<BidUploadedFile[]>([]);
+  const [coVat, setCoVat] = useState<BidUploadedFile[]>([]);
+  const [coAddr, setCoAddr] = useState<BidUploadedFile[]>([]);
+  const [coExtra, setCoExtra] = useState<BidUploadedFile[]>([]);
+  const [coMode, setCoMode] = useState<{ cr: "text" | "doc"; vat: "text" | "doc"; addr: "text" | "doc" }>({ cr: "text", vat: "text", addr: "text" });
   // Suppliers may submit more than one bid per request (e.g. alternative options) — no single-submission lock.
 
   useEffect(() => {
@@ -128,6 +179,9 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
     for (const it of data.items) init[it.requestItemId] = { confirmations: {}, rentalRate: "", deliveryPrice: "", returnPrice: "", offeredUnits: String(it.numberOfUnits || 1) };
     setAnswers(init);
     setContract({});
+    setAtt({});
+    setCoCr([]); setCoVat([]); setCoAddr([]); setCoExtra([]);
+    setCoMode({ cr: "text", vat: "text", addr: "text" });
     setYesItem({});
     setYesContract(false);
     setShowErrors(false);
@@ -149,13 +203,34 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
     [data, answers, vatIncluded],
   );
 
-  const companyValid = company.companyName.trim() && company.crNumber.trim() && company.vatNumber.trim() && company.nationalAddress.trim() && company.contactInfo.trim();
+  // Company name + contact are the required identity; CR / VAT / National Address are optional and can
+  // be provided as text OR a document, so they don't gate submission.
+  const companyValid = !!(company.companyName.trim() && company.contactInfo.trim());
   const itemsValid = (data?.items ?? []).every((it) => num(answers[it.requestItemId]?.rentalRate ?? "") > 0);
   // Every shown term (per-item + project) must be answered Yes/No — no silent grey/unanswered terms.
   const termsAnswered =
     (data?.items ?? []).every((it) => itemTerms(it).every((k) => typeof answers[it.requestItemId]?.confirmations[k] === "boolean")) &&
     (data?.contractTerms ?? []).every((c) => typeof contract[c.key] === "boolean");
   const valid = !!companyValid && itemsValid && termsAnswered;
+
+  // Live bid-quality score (terms match + docs + completeness) — updates as the supplier fills the form.
+  const quality = useMemo(() => {
+    const items = (data?.items ?? []).map((it) => {
+      const a = answers[it.requestItemId];
+      const at = att[it.requestItemId] ?? EMPTY_ATT;
+      return {
+        requiredTerms: it.requiredTerms as Record<string, string | null>,
+        confirmations: { ...(a?.confirmations ?? {}), ...contract } as Record<string, boolean | undefined>,
+        priced: num(a?.rentalRate ?? "") > 0,
+        photoCount: at.photos.length,
+        ownershipCount: at.ownership.length,
+        equipCertCount: Object.entries(at.certs).filter(([k]) => !k.startsWith("operator_")).reduce((s, [, v]) => s + v.length, 0),
+        operatorCertCount: Object.entries(at.certs).filter(([k]) => k.startsWith("operator_")).reduce((s, [, v]) => s + v.length, 0),
+      };
+    });
+    const companyDocCount = coCr.length + coVat.length + coAddr.length + coExtra.length;
+    return computeBidQuality({ items, companyDocCount, companyComplete: companyValid });
+  }, [data, answers, contract, att, coCr, coVat, coAddr, coExtra, companyValid]);
 
   async function onSubmit() {
     setShowErrors(true);
@@ -177,8 +252,16 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
           // Store VAT-exclusive prices. If the supplier priced VAT-inclusive, strip the 15% back out so
           // the renter side — which always adds VAT — lands on the same total.
           // Merge the project/contract confirmations (apply to all items) into each item's answers.
-          return { requestItemId: it.requestItemId, confirmations: { ...a.confirmations, ...contract }, offeredUnits: it.numberOfUnits > 1 ? offeredQty(it, a) : undefined, rentalRate: priceToStore(num(a.rentalRate), vatIncluded), deliveryPrice: priceToStore(num(a.deliveryPrice), vatIncluded), returnPrice: priceToStore(num(a.returnPrice), vatIncluded) };
+          const at = itemAtt(it.requestItemId);
+          const photos = at.photos.map((p) => ({ key: p.key, type: p.type as BidPhotoKind, filename: p.filename ?? undefined }));
+          const certDocs = Object.values(at.certs).flat();
+          const documents = [...at.ownership, ...certDocs].map((d) => ({ key: d.key, type: d.type as BidDocKind, filename: d.filename ?? undefined }));
+          return { requestItemId: it.requestItemId, confirmations: { ...a.confirmations, ...contract }, offeredUnits: it.numberOfUnits > 1 ? offeredQty(it, a) : undefined, rentalRate: priceToStore(num(a.rentalRate), vatIncluded), deliveryPrice: priceToStore(num(a.deliveryPrice), vatIncluded), returnPrice: priceToStore(num(a.returnPrice), vatIncluded), ...(photos.length ? { photos } : {}), ...(documents.length ? { documents } : {}) };
         }),
+        companyDocuments: (() => {
+          const all = [...coCr, ...coVat, ...coAddr, ...coExtra];
+          return all.length ? all.map((d) => ({ key: d.key, type: d.type as CompanyDocKind, filename: d.filename ?? undefined })) : undefined;
+        })(),
       });
       setSubmitted(true);
       window.scrollTo(0, 0);
@@ -188,6 +271,26 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
       alert(L("Could not submit — the request may have closed, or please try again.", "تعذّر الإرسال — قد يكون الطلب أُغلق، أو حاول مرة أخرى."));
     }
   }
+
+  // Classified attachment kinds (bilingual). Codes match the backend `BID_PHOTO_KINDS` / `BID_DOC_TYPES`
+  // / `COMPANY_DOC_TYPES`.
+  const photoKinds: UploaderKind[] = [
+    { value: "front_photo", label: L("Front photo", "صورة أمامية") },
+    { value: "serial_photo", label: L("Serial / plate", "الرقم التسلسلي") },
+    { value: "hours_photo", label: L("Operating hours", "ساعات التشغيل") },
+  ];
+  const ownershipKinds: UploaderKind[] = [
+    { value: "istimara", label: L("Istimara", "الاستمارة") },
+    { value: "customs_card", label: L("Customs card", "البطاقة الجمركية") },
+    { value: "sales_contract", label: L("Sales contract", "عقد البيع") },
+    { value: "saso_registration", label: L("SASO registration", "تسجيل ساسو") },
+  ];
+  // Equipment + operator certificate slots are request-driven (parseCertSlots), so no fixed kind list.
+  const companyExtraKinds: UploaderKind[] = [
+    { value: "local_content", label: L("Local content", "المحتوى المحلي") },
+    { value: "saso_heavy_equip", label: L("SASO heavy equipment", "ساسو للمعدات الثقيلة") },
+    { value: "other", label: L("Other", "أخرى") },
+  ];
 
   const dir = ar ? "rtl" : "ltr";
   const sar = L("SAR", "ر.س");
@@ -254,6 +357,15 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
           <div className="intro">
             <h1>{L("Submit your bid", "قدّم عرضك")}</h1>
             <p>{L("For each item, confirm its terms in the table, then price it below.", "لكل بند، أكّد شروطه في الجدول ثم سعّره بالأسفل.")}</p>
+          </div>
+
+          {/* Live bid-quality ring — rises as the supplier confirms terms + attaches photos/documents. */}
+          <div className="qbanner">
+            <QualityRing quality={quality} L={L} />
+            <div className="qb-tx">
+              <b>{L("Bid quality", "جودة العرض")}</b>
+              <span>{L("Confirm the renter's terms and attach equipment photos + documents to raise your match score — higher-quality bids stand out to the renter.", "أكّد شروط المستأجر وأرفق صور المعدة والمستندات لرفع درجة المطابقة — العروض عالية الجودة تبرز لدى المستأجر.")}</span>
+            </div>
           </div>
 
           {data.deadline && <Countdown iso={data.deadline} L={L} fmtDate={fmtDate} />}
@@ -416,6 +528,50 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                   <span className="r">{L("VAT 15%", "ضريبة ١٥٪")}<b>{sub ? nf(sub * 0.15) : "—"} {sar}</b></span>
                   <span className="r t">{vatIncluded ? L("Item total (incl. VAT)", "إجمالي البند (شامل الضريبة)") : L("Item total", "إجمالي البند")}<b>{sub ? nf(sub * 1.15) : "—"} {sar}</b></span>
                 </div>
+
+                {/* Attachments — equipment photos + proof of ownership are always offered; equipment /
+                    operator certificates only when this request item requires them. */}
+                <div className="subhead"><span className="material-icons-outlined">photo_camera</span>{L("Equipment photos", "صور المعدة")}</div>
+                <FileUploader token={token} folder="photos" thumbs kinds={photoKinds}
+                  value={itemAtt(it.requestItemId).photos}
+                  onChange={(n) => setItemAtt(it.requestItemId, "photos", n)} L={L} disabled={submitting} />
+
+                <div className="subhead"><span className="material-icons-outlined">verified_user</span>{L("Proof of ownership", "إثبات الملكية")}</div>
+                <FileUploader token={token} folder="documents" kinds={ownershipKinds}
+                  value={itemAtt(it.requestItemId).ownership}
+                  onChange={(n) => setItemAtt(it.requestItemId, "ownership", n)} L={L} disabled={submitting} />
+
+                {(() => {
+                  // Equipment cert: one labeled upload slot per cert the request requires (TÜV/SPSP/SASO/Other).
+                  const slots = parseCertSlots(it.requiredTerms.equipmentCert, "");
+                  return slots.length ? (
+                    <>
+                      <div className="subhead"><span className="material-icons-outlined">workspace_premium</span>{L("Equipment certificate", "شهادة المعدة")}<span className="req">{L("required by this request", "مطلوبة لهذا الطلب")}</span></div>
+                      {slots.map((sl) => (
+                        <FileUploader key={sl.code} token={token} folder="documents"
+                          kinds={[{ value: sl.code, label: sl.base === "other" ? sl.raw : L(CERT_BASE_LABEL[sl.base][0], CERT_BASE_LABEL[sl.base][1]) }]}
+                          value={itemAtt(it.requestItemId).certs[sl.code] ?? []}
+                          onChange={(n) => setItemCert(it.requestItemId, sl.code, n)} L={L} disabled={submitting} />
+                      ))}
+                    </>
+                  ) : null;
+                })()}
+
+                {(() => {
+                  // Operator cert: labeled slots from the request's operator-cert requirement.
+                  const slots = parseCertSlots(it.requiredTerms.operatorCert, "operator_");
+                  return slots.length ? (
+                    <>
+                      <div className="subhead"><span className="material-icons-outlined">badge</span>{L("Operator certificate", "شهادة المشغّل")}<span className="req">{L("required by this request", "مطلوبة لهذا الطلب")}</span></div>
+                      {slots.map((sl) => (
+                        <FileUploader key={sl.code} token={token} folder="documents"
+                          kinds={[{ value: sl.code, label: sl.base === "other" ? sl.raw : L(CERT_BASE_LABEL[sl.base][0], CERT_BASE_LABEL[sl.base][1]) }]}
+                          value={itemAtt(it.requestItemId).certs[sl.code] ?? []}
+                          onChange={(n) => setItemCert(it.requestItemId, sl.code, n)} L={L} disabled={submitting} />
+                      ))}
+                    </>
+                  ) : null;
+                })()}
               </div>
             );
           })}
@@ -427,14 +583,29 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
           <div className="sec">
             <div className="sec-h"><span className="material-icons-outlined hdic">badge</span><h3>{L("Your details", "بياناتك")}</h3></div>
             <Field label={L("Company name", "اسم الشركة")} req invalid={showErrors && !company.companyName.trim()} L={L}><input value={company.companyName} onChange={(e) => setCompany({ ...company, companyName: e.target.value })} placeholder={L("e.g. Gulf Heavy Equipment Co.", "مثال: شركة الخليج للمعدات")} /></Field>
+            {/* CR / VAT / National Address — each provided as TEXT or a DOCUMENT (optional), aligning with
+                the app's company-verification doc set. */}
+            <CompanyDocField label={L("Commercial registration", "السجل التجاري")} kindValue="cr"
+              mode={coMode.cr} onMode={(m) => setCoMode((s) => ({ ...s, cr: m }))}
+              text={company.crNumber} onText={(v) => setCompany({ ...company, crNumber: v })} textPlaceholder={L("CR number", "رقم السجل التجاري")}
+              docs={coCr} onDocs={setCoCr} token={token} L={L} disabled={submitting} />
             <div className="frow">
-              <Field label={L("CR number", "رقم السجل التجاري")} req invalid={showErrors && !company.crNumber.trim()} L={L}><input inputMode="numeric" value={company.crNumber} onChange={(e) => setCompany({ ...company, crNumber: e.target.value })} /></Field>
-              <Field label={L("VAT number", "الرقم الضريبي")} req invalid={showErrors && !company.vatNumber.trim()} L={L}><input inputMode="numeric" value={company.vatNumber} onChange={(e) => setCompany({ ...company, vatNumber: e.target.value })} /></Field>
+              <CompanyDocField label={L("VAT", "ضريبة القيمة المضافة")} kindValue="vat_cert"
+                mode={coMode.vat} onMode={(m) => setCoMode((s) => ({ ...s, vat: m }))}
+                text={company.vatNumber} onText={(v) => setCompany({ ...company, vatNumber: v })} textPlaceholder={L("VAT number", "الرقم الضريبي")}
+                docs={coVat} onDocs={setCoVat} token={token} L={L} disabled={submitting} />
+              <CompanyDocField label={L("National address", "العنوان الوطني")} kindValue="national_address"
+                mode={coMode.addr} onMode={(m) => setCoMode((s) => ({ ...s, addr: m }))}
+                text={company.nationalAddress} onText={(v) => setCompany({ ...company, nationalAddress: v })} textPlaceholder={L("National address", "العنوان الوطني")}
+                docs={coAddr} onDocs={setCoAddr} token={token} L={L} disabled={submitting} />
             </div>
-            <Field label={L("National address", "العنوان الوطني")} req invalid={showErrors && !company.nationalAddress.trim()} L={L}><input value={company.nationalAddress} onChange={(e) => setCompany({ ...company, nationalAddress: e.target.value })} /></Field>
             <Field label={L("Contact info", "بيانات التواصل")} req invalid={showErrors && !company.contactInfo.trim()} L={L}><input value={company.contactInfo} onChange={(e) => setCompany({ ...company, contactInfo: e.target.value })} placeholder={L("Phone or email so the renter can reach you", "هاتف أو بريد ليتواصل معك المستأجر")} /></Field>
             {QUOTE_EXPIRY_ENABLED && <Field label={L("Quote valid until (optional)", "صلاحية العرض حتى (اختياري)")} L={L}><input type="date" value={company.validUntil} onChange={(e) => setCompany({ ...company, validUntil: e.target.value })} /></Field>}
             <div className="notes-field"><label>{L("Notes (optional) — for the whole quotation", "ملاحظات (اختياري) — لكامل عرض السعر")}</label><textarea value={company.notes} onChange={(e) => setCompany({ ...company, notes: e.target.value })} /></div>
+
+            {/* Optional extra company docs — Local Content / SASO heavy equipment / Other. */}
+            <div className="subhead"><span className="material-icons-outlined">folder_open</span>{L("Other company documents (optional)", "مستندات أخرى للشركة (اختياري)")}</div>
+            <FileUploader token={token} folder="documents" kinds={companyExtraKinds} value={coExtra} onChange={setCoExtra} L={L} disabled={submitting} />
           </div>
 
           {showErrors && !valid && <div className="submit-err"><span className="material-icons-outlined">error_outline</span>{L("Please complete the highlighted items: answer every term, enter a rate for each item, and fill all company details.", "الرجاء إكمال العناصر المظللة: أجب عن كل شرط، وأدخل سعراً لكل بند، واملأ جميع بيانات الشركة.")}</div>}
@@ -469,6 +640,39 @@ function Field({ label, req, invalid, children, L }: { label: string; req?: bool
       <label>{label}{req && <span className="reqx"> *</span>}</label>
       {children}
       <div className="err">{L("Required", "مطلوب")}</div>
+    </div>
+  );
+}
+
+/** A company-verification field the supplier can satisfy as TEXT or a DOCUMENT (their choice). */
+function CompanyDocField({
+  label, kindValue, mode, onMode, text, onText, textPlaceholder, docs, onDocs, token, L, disabled,
+}: {
+  label: string;
+  kindValue: string;
+  mode: "text" | "doc";
+  onMode: (m: "text" | "doc") => void;
+  text: string;
+  onText: (v: string) => void;
+  textPlaceholder?: string;
+  docs: BidUploadedFile[];
+  onDocs: (n: BidUploadedFile[]) => void;
+  token: string;
+  L: (e: string, a: string) => string;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="field">
+      <div className="uprow" style={{ justifyContent: "space-between", marginBottom: 5 }}>
+        <label style={{ margin: 0 }}>{label}</label>
+        <span className="uptog">
+          <button type="button" className={mode === "text" ? "on" : ""} onClick={() => onMode("text")}>{L("Type", "نص")}</button>
+          <button type="button" className={mode === "doc" ? "on" : ""} onClick={() => onMode("doc")}>{L("Upload", "مستند")}</button>
+        </span>
+      </div>
+      {mode === "text"
+        ? <input value={text} onChange={(e) => onText(e.target.value)} placeholder={textPlaceholder} />
+        : <FileUploader token={token} folder="documents" kinds={[{ value: kindValue, label }]} value={docs} onChange={onDocs} L={L} disabled={disabled} />}
     </div>
   );
 }
