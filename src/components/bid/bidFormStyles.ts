@@ -239,6 +239,8 @@ export const BID_FORM_CSS = `
 .u-up{display:inline-flex;align-items:center;gap:7px;font:inherit;font-size:13px;font-weight:800;color:#fff;background:var(--ac);border:none;border-radius:10px;padding:0 16px;cursor:pointer;white-space:nowrap}
 .u-up:disabled{opacity:.6;cursor:default}
 .u-up .material-icons-outlined{font-size:18px}
+.u-pick-hint{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);margin-top:8px}
+.u-pick-hint .material-icons-outlined{font-size:14px}
 .u-slot{width:100%;display:flex;align-items:center;gap:11px;border:1.5px dashed var(--ac-bd);background:var(--ac-bg);border-radius:11px;padding:13px 14px;cursor:pointer;font:inherit;text-align:start}
 .u-slot:hover:not(:disabled){filter:brightness(.985)}
 .u-slot:disabled{opacity:.6;cursor:default}
@@ -281,12 +283,14 @@ export const BID_FORM_CSS = `
 .att-pill.opt{background:#f2f4f7;color:#667085;border:1px solid #e4e7ec}
 .att-body{padding:0 15px 15px}
 
-/* Read-only attachment view (renter's submission viewer) — thumbnails + view/download chips */
-.ro-att{margin-top:12px}
-.ro-att-h{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin-bottom:8px}
-.ro-thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
-.ro-thumb{width:58px;height:58px;border-radius:8px;border:1px solid var(--border);overflow:hidden;display:block}
-.ro-thumb img{width:100%;height:100%;object-fit:cover}
+/* Read-only attachment view (renter's submission viewer) — grouped by section, labeled */
+.ro-att{margin-top:12px;display:flex;flex-direction:column;gap:12px}
+.ro-grp{display:flex;flex-direction:column;gap:8px}
+.ro-att-h{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+.ro-thumbs{display:flex;flex-wrap:wrap;gap:10px}
+.ro-fig{display:inline-flex;flex-direction:column;gap:4px;width:66px;text-decoration:none}
+.ro-fig img{width:66px;height:66px;object-fit:cover;border-radius:8px;border:1px solid var(--border)}
+.ro-fig-lb{font-size:10.5px;font-weight:700;color:var(--navy-mid);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ro-chips{display:flex;flex-wrap:wrap;gap:8px}
 .ro-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--navy);background:var(--surface1);border:1px solid var(--border);border-radius:9px;padding:7px 11px;text-decoration:none}
 .ro-chip:hover{background:#fff;border-color:#c8d6e2}

@@ -42,6 +42,8 @@ const ATT_LABEL: Record<string, [string, string]> = {
   operator_tuv: ["Operator TÜV", "فحص TÜV للمشغّل"], operator_spsp: ["Operator SPSP", "SPSP للمشغّل"], operator_saso: ["Operator SASO", "ساسو للمشغّل"], operator_other: ["Operator (other)", "المشغّل (أخرى)"],
   cr: ["Commercial registration", "السجل التجاري"], vat_cert: ["VAT certificate", "شهادة الضريبة"], national_address: ["National address", "العنوان الوطني"], local_content: ["Local content", "المحتوى المحلي"], saso_heavy_equip: ["SASO heavy equipment", "ساسو للمعدات الثقيلة"],
 };
+// Classify an item's documents back into the same groups the form uploads them under.
+const OWNERSHIP_TYPES = new Set(["istimara", "customs_card", "sales_contract", "saso_registration"]);
 
 export function SharedBidSubmissionModal({
   bid,
@@ -331,22 +333,34 @@ export function SharedBidSubmissionModal({
                         <span className="r">{L("VAT 15%", "ضريبة ١٥٪")}<b>{sub ? nf(sub * 0.15) : "—"} {sar}</b></span>
                         <span className="r t">{L("Item total", "إجمالي البند")}<b>{sub ? nf(sub * 1.15) : "—"} {sar}</b></span>
                       </div>
-                      {(a?.photos?.length || a?.documents?.length) ? (
-                        <div className="ro-att">
-                          <div className="ro-att-h">{L("Attachments", "المرفقات")}</div>
-                          {a?.photos?.length ? (
-                            <div className="ro-thumbs">
-                              {a.photos.map((p, i) => (
-                                <a key={i} className="ro-thumb" href={p.key} target="_blank" rel="noopener noreferrer" title={`${attLabel(p.type)}${p.filename ? " · " + p.filename : ""}`}>
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img src={p.key} alt={attLabel(p.type)} />
-                                </a>
-                              ))}
-                            </div>
-                          ) : null}
-                          <DocChips docs={a?.documents} />
-                        </div>
-                      ) : null}
+                      {(() => {
+                        const docs = a?.documents ?? [];
+                        const ownership = docs.filter((d) => OWNERSHIP_TYPES.has(d.type));
+                        const operatorCert = docs.filter((d) => d.type.startsWith("operator_"));
+                        const equipCert = docs.filter((d) => !OWNERSHIP_TYPES.has(d.type) && !d.type.startsWith("operator_"));
+                        if (!(a?.photos?.length || docs.length)) return null;
+                        return (
+                          <div className="ro-att">
+                            {a?.photos?.length ? (
+                              <div className="ro-grp">
+                                <div className="ro-att-h">{L("Equipment photos", "صور المعدة")}</div>
+                                <div className="ro-thumbs">
+                                  {a.photos.map((p, i) => (
+                                    <a key={i} className="ro-fig" href={p.key} target="_blank" rel="noopener noreferrer" title={p.filename ?? undefined}>
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img src={p.key} alt={attLabel(p.type)} />
+                                      <span className="ro-fig-lb">{attLabel(p.type)}</span>
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+                            {ownership.length ? <div className="ro-grp"><div className="ro-att-h">{L("Proof of ownership", "إثبات الملكية")}</div><DocChips docs={ownership} /></div> : null}
+                            {equipCert.length ? <div className="ro-grp"><div className="ro-att-h">{L("Equipment certificate", "شهادة المعدة")}</div><DocChips docs={equipCert} /></div> : null}
+                            {operatorCert.length ? <div className="ro-grp"><div className="ro-att-h">{L("Operator certificate", "شهادة المشغّل")}</div><DocChips docs={operatorCert} /></div> : null}
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })}
