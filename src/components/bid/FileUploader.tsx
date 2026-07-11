@@ -77,6 +77,7 @@ export function FileUploader({
   return (
     <div className="uploader" style={style}>
       {isPicker ? (
+        <>
         <div className="u-pick">
           <div className="u-sel">
             <button type="button" className="u-sel-btn" disabled={disabled} onClick={() => setOpen((o) => !o)} aria-expanded={open}>
@@ -104,9 +105,14 @@ export function FileUploader({
           </div>
           <button type="button" className="u-up" disabled={disabled || busy} onClick={() => trigger(sel)}>
             <span className="material-icons-outlined">{busy ? "hourglass_top" : "upload"}</span>
-            {busy ? L("Uploading…", "جارٍ الرفع…") : L("Upload", "رفع")}
+            {busy ? L("Uploading…", "جارٍ الرفع…") : L("Add", "إضافة")}
           </button>
         </div>
+        <div className="u-pick-hint">
+          <span className="material-icons-outlined">add_circle_outline</span>
+          {L("Pick a type and Add — you can add as many as you need", "اختر نوعًا واضغط إضافة — يمكنك إضافة العدد الذي تريد")}
+        </div>
+        </>
       ) : value.length === 0 ? (
         <button type="button" className="u-slot" disabled={disabled || busy} onClick={() => trigger(kinds[0]?.value ?? "")}>
           <span className="u-slot-ic material-icons-outlined">description</span>
