@@ -82,6 +82,37 @@ const CERT_BASE_LABEL: Record<string, [string, string]> = {
   tuv: ["TÜV", "فحص TÜV"], spsp: ["SPSP", "SPSP"], saso: ["SASO", "ساسو"], other: ["Other", "أخرى"],
 };
 
+// Per-section colour identity for the attachment cards (matches the uploader accent CSS vars).
+const ATT_ACCENT = {
+  photo: { c: "#e8830c", bg: "#fff7ed", bd: "#f6d5a8" },
+  own: { c: "#2563eb", bg: "#eef4ff", bd: "#c7d8fb" },
+  eqc: { c: "#0e9384", bg: "#ecfdf8", bd: "#9fe0d2" },
+  opc: { c: "#7c3aed", bg: "#f5f2ff", bd: "#dccdfb" },
+  co: { c: "#475569", bg: "#f1f5f9", bd: "#cbd5e1" },
+} as const;
+
+/** A coloured attachment card — icon tile + title + description + Required/Optional pill, then the uploader. */
+function AttachSection({ icon, accent, title, desc, pill, tone = "opt", children }: {
+  icon: string;
+  accent: { c: string; bg: string; bd: string };
+  title: React.ReactNode;
+  desc?: React.ReactNode;
+  pill: string;
+  tone?: "req" | "opt";
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="att-card">
+      <div className="att-hd">
+        <span className="att-tile material-icons-outlined" style={{ background: accent.bg, color: accent.c }}>{icon}</span>
+        <div><div className="att-tt">{title}</div>{desc && <div className="att-dd">{desc}</div>}</div>
+        <span className={`att-pill ${tone}`}>{pill}</span>
+      </div>
+      <div className="att-body">{children}</div>
+    </div>
+  );
+}
+
 export default function BidFormPage({ params }: { params: Promise<{ token: string }> }) {
   const { token: rawToken } = use(params);
   // The URL is /bid/{slug}-{groupId}; the token is the trailing UUID (group id).
@@ -529,47 +560,53 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                   <span className="r t">{vatIncluded ? L("Item total (incl. VAT)", "إجمالي البند (شامل الضريبة)") : L("Item total", "إجمالي البند")}<b>{sub ? nf(sub * 1.15) : "—"} {sar}</b></span>
                 </div>
 
-                {/* Attachments — equipment photos + proof of ownership are always offered; equipment /
-                    operator certificates only when this request item requires them. */}
-                <div className="subhead"><span className="material-icons-outlined">photo_camera</span>{L("Equipment photos", "صور المعدة")}</div>
-                <FileUploader token={token} folder="photos" thumbs kinds={photoKinds}
-                  value={itemAtt(it.requestItemId).photos}
-                  onChange={(n) => setItemAtt(it.requestItemId, "photos", n)} L={L} disabled={submitting} />
+                {/* Attachments — photos + ownership are always offered (choose-type dropdown); equipment /
+                    operator certificates are request-driven labeled slots, shown only when required. */}
+                <AttachSection icon="photo_camera" accent={ATT_ACCENT.photo}
+                  title={L("Equipment photos", "صور المعدة")} desc={L("Pick what the photo shows, then upload", "اختر ما تُظهره الصورة ثم ارفع")} pill={L("Optional", "اختياري")}>
+                  <FileUploader token={token} folder="photos" thumbs kinds={photoKinds} accent={ATT_ACCENT.photo}
+                    value={itemAtt(it.requestItemId).photos}
+                    onChange={(n) => setItemAtt(it.requestItemId, "photos", n)} L={L} disabled={submitting} />
+                </AttachSection>
 
-                <div className="subhead"><span className="material-icons-outlined">verified_user</span>{L("Proof of ownership", "إثبات الملكية")}</div>
-                <FileUploader token={token} folder="documents" kinds={ownershipKinds}
-                  value={itemAtt(it.requestItemId).ownership}
-                  onChange={(n) => setItemAtt(it.requestItemId, "ownership", n)} L={L} disabled={submitting} />
+                <AttachSection icon="verified_user" accent={ATT_ACCENT.own}
+                  title={L("Proof of ownership", "إثبات الملكية")} desc={L("Choose which document you have, then upload", "اختر المستند الذي لديك ثم ارفع")} pill={L("Optional", "اختياري")}>
+                  <FileUploader token={token} folder="documents" kinds={ownershipKinds} accent={ATT_ACCENT.own}
+                    value={itemAtt(it.requestItemId).ownership}
+                    onChange={(n) => setItemAtt(it.requestItemId, "ownership", n)} L={L} disabled={submitting} />
+                </AttachSection>
 
                 {(() => {
-                  // Equipment cert: one labeled upload slot per cert the request requires (TÜV/SPSP/SASO/Other).
                   const slots = parseCertSlots(it.requiredTerms.equipmentCert, "");
                   return slots.length ? (
-                    <>
-                      <div className="subhead"><span className="material-icons-outlined">workspace_premium</span>{L("Equipment certificate", "شهادة المعدة")}<span className="req">{L("required by this request", "مطلوبة لهذا الطلب")}</span></div>
-                      {slots.map((sl) => (
-                        <FileUploader key={sl.code} token={token} folder="documents"
-                          kinds={[{ value: sl.code, label: sl.base === "other" ? sl.raw : L(CERT_BASE_LABEL[sl.base][0], CERT_BASE_LABEL[sl.base][1]) }]}
-                          value={itemAtt(it.requestItemId).certs[sl.code] ?? []}
-                          onChange={(n) => setItemCert(it.requestItemId, sl.code, n)} L={L} disabled={submitting} />
-                      ))}
-                    </>
+                    <AttachSection icon="workspace_premium" accent={ATT_ACCENT.eqc}
+                      title={L("Equipment certificate", "شهادة المعدة")} desc={L("Required by this request", "مطلوبة لهذا الطلب")} pill={L("Required", "مطلوب")} tone="req">
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {slots.map((sl) => (
+                          <FileUploader key={sl.code} token={token} folder="documents" accent={ATT_ACCENT.eqc}
+                            kinds={[{ value: sl.code, label: sl.base === "other" ? sl.raw : L(CERT_BASE_LABEL[sl.base][0], CERT_BASE_LABEL[sl.base][1]) }]}
+                            value={itemAtt(it.requestItemId).certs[sl.code] ?? []}
+                            onChange={(n) => setItemCert(it.requestItemId, sl.code, n)} L={L} disabled={submitting} />
+                        ))}
+                      </div>
+                    </AttachSection>
                   ) : null;
                 })()}
 
                 {(() => {
-                  // Operator cert: labeled slots from the request's operator-cert requirement.
                   const slots = parseCertSlots(it.requiredTerms.operatorCert, "operator_");
                   return slots.length ? (
-                    <>
-                      <div className="subhead"><span className="material-icons-outlined">badge</span>{L("Operator certificate", "شهادة المشغّل")}<span className="req">{L("required by this request", "مطلوبة لهذا الطلب")}</span></div>
-                      {slots.map((sl) => (
-                        <FileUploader key={sl.code} token={token} folder="documents"
-                          kinds={[{ value: sl.code, label: sl.base === "other" ? sl.raw : L(CERT_BASE_LABEL[sl.base][0], CERT_BASE_LABEL[sl.base][1]) }]}
-                          value={itemAtt(it.requestItemId).certs[sl.code] ?? []}
-                          onChange={(n) => setItemCert(it.requestItemId, sl.code, n)} L={L} disabled={submitting} />
-                      ))}
-                    </>
+                    <AttachSection icon="badge" accent={ATT_ACCENT.opc}
+                      title={L("Operator certificate", "شهادة المشغّل")} desc={L("Required by this request", "مطلوبة لهذا الطلب")} pill={L("Required", "مطلوب")} tone="req">
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {slots.map((sl) => (
+                          <FileUploader key={sl.code} token={token} folder="documents" accent={ATT_ACCENT.opc}
+                            kinds={[{ value: sl.code, label: sl.base === "other" ? sl.raw : L(CERT_BASE_LABEL[sl.base][0], CERT_BASE_LABEL[sl.base][1]) }]}
+                            value={itemAtt(it.requestItemId).certs[sl.code] ?? []}
+                            onChange={(n) => setItemCert(it.requestItemId, sl.code, n)} L={L} disabled={submitting} />
+                        ))}
+                      </div>
+                    </AttachSection>
                   ) : null;
                 })()}
               </div>

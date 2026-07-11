@@ -220,6 +220,56 @@ export const BID_FORM_CSS = `
 .up-add .material-icons-outlined{font-size:18px}
 .up-err{margin-top:6px;font-size:12px;font-weight:700;color:#b42318}
 
+/* ── FileUploader v2 — picker (choose type) + labeled slot, accent-driven ─── */
+/* Instances set --ac / --ac-bg / --ac-bd inline for their section colour. */
+.uploader{--ac:#34506b;--ac-bg:#f2f6fa;--ac-bd:#cdd8e3}
+.u-pick{display:flex;gap:9px;align-items:stretch}
+.u-sel{position:relative;flex:1;min-width:0}
+.u-sel-btn{width:100%;display:flex;align-items:center;gap:8px;border:1px solid var(--ac-bd);background:#fff;border-radius:10px;padding:10px 12px;font:inherit;font-size:13px;font-weight:700;color:var(--navy);cursor:pointer;text-align:start}
+.u-sel-btn>span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.u-sel-car{color:var(--muted);font-size:20px}
+.u-sel-back{position:fixed;inset:0;z-index:20}
+.u-sel-menu{position:absolute;top:calc(100% + 6px);inset-inline:0;background:#fff;border:1px solid var(--border);border-radius:11px;box-shadow:0 10px 28px #1c355022;padding:5px;z-index:21;max-height:240px;overflow:auto}
+.u-sel-mi{width:100%;display:flex;align-items:center;gap:9px;padding:9px 10px;border:none;background:none;border-radius:8px;font:inherit;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;text-align:start}
+.u-sel-mi:hover{background:var(--ac-bg)}
+.u-sel-mi.on{background:var(--ac-bg);color:var(--ac);font-weight:800}
+.u-sel-dot{width:22px;height:22px;border-radius:6px;background:var(--ac-bg);color:var(--ac);display:flex;align-items:center;justify-content:center;flex:none;font-size:14px}
+.u-sel-mi>span:nth-child(2){flex:1}
+.u-sel-tick{margin-inline-start:auto;color:var(--ac);font-size:16px}
+.u-up{display:inline-flex;align-items:center;gap:7px;font:inherit;font-size:13px;font-weight:800;color:#fff;background:var(--ac);border:none;border-radius:10px;padding:0 16px;cursor:pointer;white-space:nowrap}
+.u-up:disabled{opacity:.6;cursor:default}
+.u-up .material-icons-outlined{font-size:18px}
+.u-slot{width:100%;display:flex;align-items:center;gap:11px;border:1.5px dashed var(--ac-bd);background:var(--ac-bg);border-radius:11px;padding:13px 14px;cursor:pointer;font:inherit;text-align:start}
+.u-slot:hover:not(:disabled){filter:brightness(.985)}
+.u-slot:disabled{opacity:.6;cursor:default}
+.u-slot-ic{width:34px;height:34px;border-radius:9px;background:var(--ac);color:#fff;display:flex;align-items:center;justify-content:center;flex:none;font-size:18px}
+.u-slot-tx{display:flex;flex-direction:column;min-width:0}
+.u-slot-nm{font-weight:800;font-size:13.5px;color:var(--navy)}
+.u-slot-hint{font-size:11.5px;color:var(--muted)}
+.u-slot-plus{margin-inline-start:auto;color:var(--ac);font-size:22px}
+.u-files{display:flex;flex-direction:column;gap:8px;margin-top:11px}
+.u-frow{display:flex;align-items:center;gap:10px;border:1px solid var(--ac-bd);background:var(--ac-bg);border-radius:10px;padding:8px 10px}
+.u-fic{width:32px;height:32px;border-radius:8px;background:var(--ac);color:#fff;display:flex;align-items:center;justify-content:center;flex:none;font-size:16px;overflow:hidden}
+.u-fic.thumb{background:none}
+.u-fic.thumb img{width:100%;height:100%;object-fit:cover}
+.u-fmeta{min-width:0;flex:1;display:flex;flex-direction:column}
+.u-fkind{font-size:12.5px;font-weight:800;color:var(--navy)}
+.u-ffn{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.u-frm{color:var(--muted);background:none;border:none;cursor:pointer;display:flex;flex:none}
+.u-frm .material-icons-outlined{font-size:18px}
+.u-err{margin-top:8px;font-size:12px;font-weight:700;color:#b42318}
+
+/* Attachment section card (colour header + pill) */
+.att-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:13px;overflow:hidden}
+.att-hd{display:flex;align-items:center;gap:11px;padding:13px 15px}
+.att-tile{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none;font-size:19px}
+.att-tt{font-weight:800;font-size:14.5px;color:var(--navy)}
+.att-dd{font-size:12px;color:var(--muted);margin-top:1px}
+.att-pill{margin-inline-start:auto;font-size:10.5px;font-weight:800;letter-spacing:.3px;border-radius:20px;padding:3px 9px;white-space:nowrap}
+.att-pill.req{background:#fef3f2;color:#b42318;border:1px solid #fcc9c2}
+.att-pill.opt{background:#f2f4f7;color:#667085;border:1px solid #e4e7ec}
+.att-body{padding:0 15px 15px}
+
 /* ── Bid-quality ring ───────────────────────────────────────────────────── */
 .qring{display:inline-flex;flex-direction:column;align-items:center;gap:4px;flex:none}
 .qring-lb{font-size:11px;font-weight:800;letter-spacing:.2px}
