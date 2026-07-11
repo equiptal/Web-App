@@ -140,13 +140,34 @@ export async function processRfq(input: ProcessInput): Promise<AgentDraft> {
 /** Submit the assembled broadcast (AC-42/43). The server fans out one request per item, so
  *  `requestIds` carries every short code (`requestId` = the first, for back-compat). */
 /** The renter's own requests (web-app/request-details-bids). One row per item (backend fan-out). */
-export function fetchMyRequests(filter?: { status?: string; type?: string; groupId?: string }): Promise<{ requests: RequestListItem[] }> {
+export function fetchMyRequests(filter?: { status?: string; type?: string; groupId?: string; page?: number; limit?: number }): Promise<{ requests: RequestListItem[] }> {
   const qs = new URLSearchParams();
   if (filter?.status) qs.set("status", filter.status);
   if (filter?.type) qs.set("type", filter.type);
   if (filter?.groupId) qs.set("groupId", filter.groupId);
+  if (filter?.page) qs.set("page", String(filter.page));
+  if (filter?.limit) qs.set("limit", String(filter.limit));
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
   return getJson<{ requests: RequestListItem[] }>(`/api/me/requests${suffix}`);
+}
+
+/**
+ * Every request the renter has, across all pages. The list endpoint defaults to 20 newest and the
+ * response drops the pagination `total`, so a renter with many requests would hide bids on their older
+ * ones (they fall past page 1). The comparison needs the FULL set so no bid-bearing request is missed:
+ * page through at the backend max (100/page) until a short page signals the end. `filter` forwards
+ * status/type/groupId (never page/limit — those are managed here).
+ */
+export async function fetchAllMyRequests(filter?: { status?: string; type?: string; groupId?: string }): Promise<{ requests: RequestListItem[] }> {
+  const PAGE = 100; // backend caps `limit` at 100 (getPagination Math.min(100, …))
+  const all: RequestListItem[] = [];
+  for (let page = 1; ; page++) {
+    const { requests } = await fetchMyRequests({ ...filter, page, limit: PAGE });
+    all.push(...requests);
+    if (requests.length < PAGE) break; // last (short) page reached
+    if (page >= 50) break; // hard stop (≤5000 requests) — guards against an unexpected full-page loop
+  }
+  return { requests: all };
 }
 
 /** All requests in one submission group (multi-item view) — filtered by `requestGroupId`. */

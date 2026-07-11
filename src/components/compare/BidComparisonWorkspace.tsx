@@ -6,7 +6,7 @@ import { useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { AccountModal } from "@/components/onboarding/AccountModal";
 import { agentUses, bumpAgentUse, guestLimitReached, GUEST_AGENT_LIMIT } from "@/lib/access/agent-quota";
-import { fetchMyRequests, fetchBids, fetchRequestSubmissions, startDealRoom, recommendBids, askBids, parseBid, transformBid, captureBidEvents, fetchDealRoomDocuments, fetchBidDocuments, fetchDealRoom } from "@/lib/api/client";
+import { fetchAllMyRequests, fetchBids, fetchRequestSubmissions, startDealRoom, recommendBids, askBids, parseBid, transformBid, captureBidEvents, fetchDealRoomDocuments, fetchBidDocuments, fetchDealRoom } from "@/lib/api/client";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { groupRequests, type RequestGroup } from "@/lib/contract/requests";
 import type { DealRoomDocuments, DealTerm } from "@/lib/contract/deal-room";
@@ -206,7 +206,9 @@ export function BidComparisonWorkspace() {
     // their uploaded quotes (`raw` = [...[], ...uploaded]); skip the authed fetch entirely.
     if (anon) { setBids([]); return; }
     let active = true;
-    fetchMyRequests()
+    // Load ALL requests (paged), not just the 20 newest — otherwise bids on the renter's older
+    // requests silently drop out of the comparison once the account accumulates newer ones.
+    fetchAllMyRequests()
       .then((d) => active && setGroups(groupRequests(d.requests)))
       .catch(() => active && setError(true));
     return () => { active = false; };
