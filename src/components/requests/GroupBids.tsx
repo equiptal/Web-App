@@ -9,7 +9,7 @@ import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
 import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
-import { bidSuppliers, bucketBidTerms, CERT_LABEL, type BidCard } from "@/lib/contract/bids";
+import { bidSuppliers, bucketBidTerms, CERT_LABEL, type BidCard, type TermRow } from "@/lib/contract/bids";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { computeBidQuote } from "@/lib/contract/comparison";
 import type { RequestGroup } from "@/lib/contract/requests";
@@ -372,8 +372,15 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         const demobTotal = (b.demobPrice ?? 0) * units;
         sub += lineSub + mobTotal + demobTotal;
         lineItems.push({ num: rowNum, label: `${L("Rental", "الإيجار")} — ${labelOf(b)}`, detail: eqLine(b) === "—" ? null : eqLine(b), unit: plabel, qty: qtyCell, price: priceCell, total: totalCell, totalNote });
-        if (b.mobPrice) lineItems.push({ num: null, label: L("Delivery to site", "النقل إلى الموقع"), detail: labelOf(b), unit: L("Trip", "رحلة"), qty: String(units), price: m2(b.mobPrice), total: m2(mobTotal) });
-        if (b.demobPrice) lineItems.push({ num: null, label: L("Return from site", "الإرجاع من الموقع"), detail: labelOf(b), unit: L("Trip", "رحلة"), qty: String(units), price: m2(b.demobPrice), total: m2(demobTotal) });
+        // Always show the mobilization/demobilization legs (deal-room + app parity): a real price when the
+        // supplier charges, else "By rentee" (the rentee arranges it) or "Included" — never silently dropped.
+        const ri = itemMap.get(b.requestId);
+        const logiRow = (label: string, price: number, total: number, byRentee: boolean): QuotationLineItem =>
+          price > 0
+            ? { num: null, label, detail: labelOf(b), unit: L("Trip", "رحلة"), qty: String(units), price: m2(price), total: m2(total) }
+            : { num: null, label, detail: byRentee ? L("Arranged by the rentee", "يُرتّبه المستأجر") : L("Included", "مشمول"), unit: "—", qty: "—", price: "—", total: byRentee ? L("By rentee", "على المستأجر") : L("Included", "مشمول") };
+        lineItems.push(logiRow(L("Delivery to site", "النقل إلى الموقع"), b.mobPrice ?? 0, mobTotal, ri?.mobByRentee === true));
+        lineItems.push(logiRow(L("Return from site", "الإرجاع من الموقع"), b.demobPrice ?? 0, demobTotal, ri?.demobByRentee === true));
       }
       const vat = sub * 0.15; // exact (not rounded) so the amount-in-words can show halalas — app parity
       const total = sub + vat;
@@ -439,32 +446,62 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       const declaredNat = (b: GroupBid) => b.declaredTerms?.operatorNationality ?? b.requestTerms.operatorNationality;
       const eqCert = (b: GroupBid) => { const t = eqCertsText(b); return t ? t + agBadge(b, "safetycertifications") : null; };
 
-      const eqRows: { label: string; value: string }[] = [];
-      const addEq = (label: string, val: string | null) => { if (val) eqRows.push({ label, value: val }); };
-      if (supBids.length === 1) {
-        addEq(L("Operator", "المشغّل"), tfmt.operator(sup.requestTerms.operatorIncluded, declaredNat(sup)));
-        addEq(L("Equipment safety certifications", "شهادات سلامة المعدة"), eqCert(sup));
-        addEq(L("Fuel type", "نوع الوقود"), tfmt.fuel(sup.requestTerms.fuelType));
+      if (sup.viaSharedLink) {
+        // Off-platform (shared-link form) bids carry the FULL set of submitted terms in
+        // terms.equipment / terms.contract (each a Yes/No confirmation of the renter's requirement) —
+        // their requestTerms/declaredTerms are blank. Render every term the renter asked so the
+        // quotation captures the whole bid form, not just the four the platform path renders.
+        const linkVal = (r: TermRow): string | null => {
+          if (r.state === "grey") return null; // renter didn't ask this term → omit
+          if (r.state === "conflict") return L("Not provided", "غير متوفّر"); // supplier said No
+          // Confirmed: show the requested value the supplier committed to (parsed from the row's
+          // "Renter: X · Supplier: Yes" detail), falling back to a plain "Confirmed".
+          const d = (isAr ? r.detail?.ar : r.detail?.en) ?? "";
+          const req = (isAr ? d.split(" · المؤجّر")[0].replace(/^المستأجر:\s*/, "") : d.split(" · Supplier")[0].replace(/^Renter:\s*/, "")).trim();
+          return req && req !== "—" ? req : L("Confirmed", "مؤكّد");
+        };
+        const collect = (pick: (b: GroupBid) => TermRow[] | undefined) => {
+          const seen = new Set<string>();
+          const rows: { label: string; value: string }[] = [];
+          for (const b of supBids) for (const r of pick(b) ?? []) {
+            if (seen.has(r.key)) continue;
+            const v = linkVal(r);
+            if (v) { seen.add(r.key); rows.push({ label: isAr ? r.labelAr : r.labelEn, value: v }); }
+          }
+          return rows;
+        };
+        const eqRowsL = collect((b) => b.terms?.equipment);
+        const ctRowsL = collect((b) => b.terms?.contract);
+        if (eqRowsL.length) cards.push({ title: L("Equipment terms", "شروط المعدة"), rows: eqRowsL });
+        if (ctRowsL.length) cards.push({ title: L("Contract terms", "شروط العقد"), rows: ctRowsL });
       } else {
-        for (const b of supBids) {
-          const parts = [tfmt.operator(b.requestTerms.operatorIncluded, declaredNat(b)), eqCert(b), tfmt.fuel(b.requestTerms.fuelType)].filter(Boolean).join(" · ");
-          if (parts) eqRows.push({ label: labelOf(b), value: parts });
+        const eqRows: { label: string; value: string }[] = [];
+        const addEq = (label: string, val: string | null) => { if (val) eqRows.push({ label, value: val }); };
+        if (supBids.length === 1) {
+          addEq(L("Operator", "المشغّل"), tfmt.operator(sup.requestTerms.operatorIncluded, declaredNat(sup)));
+          addEq(L("Equipment safety certifications", "شهادات سلامة المعدة"), eqCert(sup));
+          addEq(L("Fuel type", "نوع الوقود"), tfmt.fuel(sup.requestTerms.fuelType));
+        } else {
+          for (const b of supBids) {
+            const parts = [tfmt.operator(b.requestTerms.operatorIncluded, declaredNat(b)), eqCert(b), tfmt.fuel(b.requestTerms.fuelType)].filter(Boolean).join(" · ");
+            if (parts) eqRows.push({ label: labelOf(b), value: parts });
+          }
         }
-      }
-      if (eqRows.length) cards.push({ title: L("Equipment terms", "شروط المعدة"), rows: eqRows });
+        if (eqRows.length) cards.push({ title: L("Equipment terms", "شروط المعدة"), rows: eqRows });
 
-      const dt = sup.declaredTerms;
-      const rt = sup.requestTerms;
-      const ctRows: { label: string; value: string }[] = [];
-      const addCt = (label: string, val: string | null) => { if (val) ctRows.push({ label, value: val }); };
-      const pay = tfmt.payTerms(dt?.paymentTerms ?? rt.paymentTerms);
-      addCt(L("Payment type", "نوع الدفع"), pay ? pay + agBadge(sup, "paymentterms") : null);
-      const sla = tfmt.sla(dt?.breakdownResponseSla ?? rt.breakdownResponseSla);
-      addCt(L("Breakdown response", "زمن الاستجابة للأعطال"), sla ? sla + agBadge(sup, "breakdownresponsesla") : null);
-      const ot = tfmt.overtime(dt?.overtimeRate ?? rt.overtimeRate);
-      addCt(L("Overtime", "العمل الإضافي"), ot ? ot + agBadge(sup, "overtimerate") : null);
-      addCt(L("Maintenance", "الصيانة"), tfmt.maint(rt.maintenanceResponsibility));
-      if (ctRows.length) cards.push({ title: L("Contract terms", "شروط العقد"), rows: ctRows });
+        const dt = sup.declaredTerms;
+        const rt = sup.requestTerms;
+        const ctRows: { label: string; value: string }[] = [];
+        const addCt = (label: string, val: string | null) => { if (val) ctRows.push({ label, value: val }); };
+        const pay = tfmt.payTerms(dt?.paymentTerms ?? rt.paymentTerms);
+        addCt(L("Payment type", "نوع الدفع"), pay ? pay + agBadge(sup, "paymentterms") : null);
+        const sla = tfmt.sla(dt?.breakdownResponseSla ?? rt.breakdownResponseSla);
+        addCt(L("Breakdown response", "زمن الاستجابة للأعطال"), sla ? sla + agBadge(sup, "breakdownresponsesla") : null);
+        const ot = tfmt.overtime(dt?.overtimeRate ?? rt.overtimeRate);
+        addCt(L("Overtime", "العمل الإضافي"), ot ? ot + agBadge(sup, "overtimerate") : null);
+        addCt(L("Maintenance", "الصيانة"), tfmt.maint(rt.maintenanceResponsibility));
+        if (ctRows.length) cards.push({ title: L("Contract terms", "شروط العقد"), rows: ctRows });
+      }
 
       const doc: QuotationDoc = {
         lang: isAr ? "ar" : "en",
