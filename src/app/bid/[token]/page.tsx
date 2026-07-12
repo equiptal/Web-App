@@ -306,7 +306,11 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
           {data.items.map((it, idx) => {
             const a = answers[it.requestItemId];
             const terms = itemTerms(it);
-            const label = (ar ? it.labelAr : it.label) || it.label || L("Equipment", "المعدة");
+            // The backend sends the label as "Category / Subcategory" (the category can itself contain a
+            // slash, e.g. "Compactor / Roller"), so show ONLY the subcategory — the segment appended last —
+            // to keep the header uncluttered. Falls back to the whole label when there's no subcategory.
+            const rawLabel = (ar ? it.labelAr : it.label) || it.label || "";
+            const label = rawLabel.split(" / ").pop()?.trim() || L("Equipment", "المعدة");
             const size = (ar ? it.sizeAr : it.size) || it.size || null;
             const q = it.numberOfUnits || 1;
             const oq = offeredQty(it, a); // units this line offers (≤ q)
