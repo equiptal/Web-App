@@ -475,10 +475,19 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
 
   const rate = room.rate ?? 0;
   const periods = room.periods ?? 1;
-  const units = room.numberOfUnits || 1; // supplier's OFFERED units — rate, mob AND demob are PER-UNIT (app parity: extractQuotationData → (rental + mob + demob) × units)
-  const rentalTotal = rate * periods * units;
-  const mobTotal = (room.mobPrice ?? 0) * units;
-  const demobTotal = (room.demobPrice ?? 0) * units;
+  // deal-room/negotiation — per-type units + ÷26 PRORATED math (matches the backend quotation + app):
+  // monthly rate ÷26 / weekly ÷7 / daily × duration(days) × rental units; PER_JOB = rate × units (no
+  // duration). Mob/demob = price × their own unit count (0 when excluded).
+  const FREQ_DAYS: Record<string, number> = { PER_DAY: 1, PER_WEEK: 7, PER_MONTH: 26 };
+  const basisU = (room.priceUnit ?? "PER_DAY").toUpperCase();
+  const rentalUnits = room.agreedUnits ?? room.numberOfUnits ?? 1;
+  const mobUnitsN = Math.min(room.mobUnits ?? rentalUnits, rentalUnits);
+  const demobUnitsN = Math.min(room.demobUnits ?? rentalUnits, rentalUnits);
+  const units = rentalUnits; // the rental count drives the card display
+  const perDayRate = rate / (FREQ_DAYS[basisU] ?? 1);
+  const rentalTotal = basisU === "PER_JOB" ? rate * rentalUnits : perDayRate * periods * rentalUnits;
+  const mobTotal = room.mobExcluded ? 0 : (room.mobPrice ?? 0) * mobUnitsN;
+  const demobTotal = room.demobExcluded ? 0 : (room.demobPrice ?? 0) * demobUnitsN;
   const subtotal = rentalTotal + mobTotal + demobTotal;
   const vat = Math.round(subtotal * 0.15);
   const grand = subtotal + vat;
@@ -540,9 +549,13 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
           </div>
           {breakdown && (
             <div className="breakdown">
-              <div className="brow"><span className="l">{L("Rental", "الإيجار")} ({nf(rate)} × {periods}{units > 1 ? ` × ${units}` : ""})</span><span className="v">{nf(rentalTotal)}</span></div>
-              {room.mobPrice ? <div className="brow"><span className="l">{L("Mobilization", "النقل")}{units > 1 ? ` (${nf(room.mobPrice)} × ${units})` : ""}</span><span className="v">{nf(mobTotal)}</span></div> : null}
-              {room.demobPrice ? <div className="brow"><span className="l">{L("Return", "الإرجاع")}{units > 1 ? ` (${nf(room.demobPrice)} × ${units})` : ""}</span><span className="v">{nf(demobTotal)}</span></div> : null}
+              <div className="brow"><span className="l">{L("Rental", "الإيجار")} ({nf(rate)}/{periodLabel}{basisU !== "PER_JOB" ? ` × ${periods}` : ""}{units > 1 ? ` × ${units}` : ""})</span><span className="v">{nf(rentalTotal)}</span></div>
+              {room.mobExcluded
+                ? <div className="brow"><span className="l">{L("Mobilization", "التعبئة")}</span><span className="v">{L("Not included", "غير مشمول")}</span></div>
+                : room.mobPrice ? <div className="brow"><span className="l">{L("Mobilization", "التعبئة")}{mobUnitsN > 1 ? ` (${nf(room.mobPrice)} × ${mobUnitsN})` : ""}</span><span className="v">{nf(mobTotal)}</span></div> : null}
+              {room.demobExcluded
+                ? <div className="brow"><span className="l">{L("Return", "الإرجاع")}</span><span className="v">{L("Not included", "غير مشمول")}</span></div>
+                : room.demobPrice ? <div className="brow"><span className="l">{L("Return", "الإرجاع")}{demobUnitsN > 1 ? ` (${nf(room.demobPrice)} × ${demobUnitsN})` : ""}</span><span className="v">{nf(demobTotal)}</span></div> : null}
               <div className="brow"><span className="l">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="v">{nf(subtotal)}</span></div>
               <div className="brow"><span className="l">{L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)")}</span><span className="v">{nf(vat)}</span></div>
               <div className="brow tot"><span className="l">{L("Estimated total", "الإجمالي التقديري")}</span><span className="v">{nf(grand)} {L("SAR", "ر.س")}</span></div>
