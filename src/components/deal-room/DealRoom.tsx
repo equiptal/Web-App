@@ -423,16 +423,25 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const resolutionUpdates = () =>
     Object.entries(resolutions).map(([termKey, r]) => ({ termKey, action: r.action, value: r.value }));
 
-  async function submitCounter(next: { rate: number; mobPrice?: number; demobPrice?: number }) {
+  async function submitCounter(next: {
+    rate: number; mobPrice?: number; demobPrice?: number;
+    // deal-room/negotiation — per-type unit counts + leg exclusion travel with the counter.
+    rentalUnits?: number; mobUnits?: number; demobUnits?: number; mobExcluded?: boolean; demobExcluded?: boolean;
+  }) {
     if (!room || busy) return;
     setBusy(true);
     setCounterErr(null);
     try {
       // App parity (DealRoomCounterWithRate): batch the locally-resolved term updates, THEN propose the
-      // daily rate + mobilization/return prices — all as one counter move.
+      // rate + mob/demob prices + per-type unit counts + leg exclusion — all as one counter move.
       const updates = resolutionUpdates();
       if (updates.length) await batchUpdateTerms(id, updates);
-      await proposeRate(id, { proposedRate: next.rate, priceUnit: room.priceUnit ?? "PER_DAY", mobPrice: next.mobPrice, demobPrice: next.demobPrice });
+      await proposeRate(id, {
+        proposedRate: next.rate, priceUnit: room.priceUnit ?? "PER_DAY",
+        mobPrice: next.mobPrice, demobPrice: next.demobPrice,
+        rentalUnits: next.rentalUnits, mobUnits: next.mobUnits, demobUnits: next.demobUnits,
+        mobExcluded: next.mobExcluded, demobExcluded: next.demobExcluded,
+      });
       setResolutions({});
       await loadRoom();
       setFlowMode(null);
@@ -836,7 +845,10 @@ function CounterFlow({
   periods: number;
   units: number;
   onClose: () => void;
-  onCounter: (next: { rate: number; mobPrice?: number; demobPrice?: number }) => void;
+  onCounter: (next: {
+    rate: number; mobPrice?: number; demobPrice?: number;
+    rentalUnits?: number; mobUnits?: number; demobUnits?: number; mobExcluded?: boolean; demobExcluded?: boolean;
+  }) => void;
   onAccept: (contractType: string) => void;
 }) {
   const editable = mode === "counter";
@@ -849,14 +861,53 @@ function CounterFlow({
   const [contractType, setContractType] = useState(room.contractType ?? "formal");
   const [ack, setAck] = useState(false);
 
+  // deal-room/negotiation — per-type unit counts (cap = requested; mob/demob ≤ rental) + leg exclusion.
+  const cap = Math.max(1, room.requestedUnits || units || 1);
+  const dflt = Math.min(cap, room.agreedUnits ?? units ?? 1);
+  const [rentalUnits, setRentalUnits] = useState<number>(dflt);
+  const [mobUnitsN, setMobUnitsN] = useState<number>(room.mobUnits ?? dflt);
+  const [demobUnitsN, setDemobUnitsN] = useState<number>(room.demobUnits ?? dflt);
+  const [mobExcluded, setMobExcluded] = useState<boolean>(room.mobExcluded);
+  const [demobExcluded, setDemobExcluded] = useState<boolean>(room.demobExcluded);
+
   const num = (s: string) => { const n = Number(s); return s.trim() !== "" && !Number.isNaN(n) && n >= 0 ? n : 0; };
   const rate = editable ? num(rateStr) : (room.rate ?? 0);
   const mob = editable ? num(mobStr) : (room.mobPrice ?? 0);
   const demob = editable ? num(demobStr) : (room.demobPrice ?? 0);
   const rateValid = rate > 0;
-  const subtotal = (rate * periods + mob + demob) * units; // mob/demob are per-unit too (app parity)
+
+  // Per-type PRORATED math — monthly ÷26 / weekly ÷7 / daily, × duration(days) × units — matches the
+  // backend quotation calc + the app. Excluded legs contribute 0.
+  const FREQ_DAYS: Record<string, number> = { PER_DAY: 1, PER_WEEK: 7, PER_MONTH: 26 };
+  const basis = (room.priceUnit ?? "PER_DAY").toUpperCase();
+  const perDay = rate / (FREQ_DAYS[basis] ?? 1);
+  const rNU = editable ? rentalUnits : (room.agreedUnits ?? units);
+  const mNU = Math.min(editable ? mobUnitsN : (room.mobUnits ?? rNU), rNU);
+  const dNU = Math.min(editable ? demobUnitsN : (room.demobUnits ?? rNU), rNU);
+  const mEx = editable ? mobExcluded : room.mobExcluded;
+  const dEx = editable ? demobExcluded : room.demobExcluded;
+  const rentalLine = perDay * periods * rNU;
+  const mobLine = mEx ? 0 : mob * mNU;
+  const demobLine = dEx ? 0 : demob * dNU;
+  const subtotal = rentalLine + mobLine + demobLine;
   const vat = Math.round(subtotal * 0.15);
   const total = subtotal + vat;
+
+  // العدد stepper — symmetric, capped. Rental caps at requested; mob/demob cap at the current rental.
+  const Stepper = ({ value, min, max, onChange, disabled }: { value: number; min: number; max: number; onChange: (v: number) => void; disabled?: boolean }) => {
+    const btn = (d: number, lbl: string, off: boolean) => (
+      <button type="button" disabled={disabled || off} onClick={() => onChange(Math.max(min, Math.min(max, value + d)))}
+        className="grid h-[26px] w-[26px] place-items-center rounded-[8px] border text-[16px] font-extrabold disabled:opacity-40"
+        style={{ borderColor: "var(--border,#e5e7eb)", color: "var(--navy,#0f1e2e)", background: "var(--surface1,#fff)" }}>{lbl}</button>
+    );
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        {btn(-1, "−", value <= min)}
+        <span className="min-w-[20px] text-center text-[14px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>{value}</span>
+        {btn(1, "+", value >= max)}
+      </span>
+    );
+  };
   const sar = L("SAR", "ر.س");
   const money = (v: number) => `${nf(v)} ${sar}`;
 
@@ -897,22 +948,38 @@ function CounterFlow({
   const canSubmit = editable ? rateValid && ack : ack;
   const doSubmit = () =>
     editable
-      ? onCounter({ rate, mobPrice: mob || undefined, demobPrice: demob || undefined })
+      ? onCounter({ rate, mobPrice: mob || undefined, demobPrice: demob || undefined, rentalUnits, mobUnits: Math.min(mobUnitsN, rentalUnits), demobUnits: Math.min(demobUnitsN, rentalUnits), mobExcluded, demobExcluded })
       : onAccept(contractType);
 
-  const priceRow = (label: string, v: string, set: (s: string) => void, ro: boolean) => (
-    <div className="mt-2.5 flex items-center justify-between rounded-[10px] border px-3 py-2" style={{ borderColor: "var(--border,#e5e7eb)", background: ro ? "var(--surface2,#f5f7fa)" : "var(--surface1,#fff)" }}>
-      <span className="text-[12.5px] font-bold" style={{ color: "var(--navy-mid,#33506e)" }}>{label}</span>
-      {ro ? (
-        <span className="text-[14px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>{money(num(v))}</span>
-      ) : (
-        <span className="flex items-center gap-1.5">
-          <input type="number" inputMode="numeric" min={0} value={v} onChange={(e) => set(e.target.value)} className="w-24 rounded-[8px] border px-2 py-1 text-end text-[14px] font-bold outline-0" style={{ borderColor: "var(--border,#e5e7eb)", color: "var(--navy,#0f1e2e)" }} placeholder="0" />
-          <span className="text-[11px] font-bold" style={{ color: "var(--muted,#6b7280)" }}>{sar}</span>
-        </span>
-      )}
-    </div>
-  );
+  // A mob/demob leg row: العدد stepper (≤ rental) + editable price + ✕ cancel / + restore, or "غير مشمول".
+  const legRow = (label: string, priceStr: string, setPrice: (s: string) => void, u: number, setU: (v: number) => void, ex: boolean, setEx: (b: boolean) => void) => {
+    const line = ex ? 0 : num(priceStr) * Math.min(u, rentalUnits);
+    return (
+      <div className="mt-2.5 rounded-[10px] border px-3 py-2.5" style={{ borderColor: "var(--border,#e5e7eb)", background: ex ? "var(--surface2,#f5f7fa)" : "var(--surface1,#fff)" }}>
+        <div className="flex items-center justify-between">
+          <span className="text-[12.5px] font-bold" style={{ color: "var(--navy-mid,#33506e)" }}>{label}</span>
+          {editable && (ex
+            ? <button type="button" onClick={() => setEx(false)} className="text-[11px] font-bold" style={{ color: "#16a34a" }}>+ {L("Restore", "استعادة")}</button>
+            : <button type="button" onClick={() => setEx(true)} className="text-[11px] font-bold" style={{ color: "#d9362a" }}>✕ {L("Cancel", "إلغاء")}</button>)}
+        </div>
+        {ex ? (
+          <div className="mt-1.5 text-[12px] font-semibold" style={{ color: "var(--muted,#6b7280)" }}>{L("Not included — by the rentee", "غير مشمول — على المستأجر")}</div>
+        ) : (
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <div>
+              <div className="text-[10.5px] font-semibold" style={{ color: "var(--muted,#6b7280)" }}>{L("Units", "العدد")}</div>
+              {editable ? <Stepper value={Math.min(u, rentalUnits)} min={0} max={rentalUnits} onChange={setU} /> : <b className="text-[14px]" style={{ color: "var(--navy,#0f1e2e)" }}>{Math.min(u, rentalUnits)}</b>}
+            </div>
+            {editable
+              ? <span className="inline-flex items-center gap-1"><input type="number" inputMode="numeric" min={0} value={priceStr} onChange={(e) => setPrice(e.target.value)} className="w-20 rounded-[8px] border px-2 py-1 text-end text-[13px] font-bold outline-0" style={{ borderColor: "var(--border,#e5e7eb)", color: "var(--navy,#0f1e2e)" }} placeholder="0" /><span className="text-[11px]" style={{ color: "var(--muted,#6b7280)" }}>{sar}</span></span>
+              : <b className="text-[13px]" style={{ color: "var(--navy,#0f1e2e)" }}>{money(num(priceStr))}</b>}
+            <b className="text-[13px]" style={{ color: "var(--navy,#0f1e2e)" }}>{money(line)}</b>
+          </div>
+        )}
+      </div>
+    );
+  };
+
 
   return (
     <FlowShell ar={ar} onClose={() => !busy && onClose()}>
@@ -956,14 +1023,36 @@ function CounterFlow({
             {editable && (
               <p className="mb-1 text-[12px]" style={{ color: "var(--muted,#6b7280)" }}>{L("The supplier can accept or counter back.", "يمكن للمؤجّر القبول أو الرد بعرض مقابل.")}</p>
             )}
-            {priceRow(`${L("Daily rate", "السعر اليومي")} (${periodLabel})`, rateStr, setRateStr, !editable)}
-            {priceRow(L("Mobilization / delivery", "النقل / التوصيل"), mobStr, setMobStr, !editable)}
-            {priceRow(L("Return", "الإرجاع"), demobStr, setDemobStr, !editable)}
-            <div className="mt-3 flex items-center justify-between rounded-[10px] px-3 py-2.5" style={{ background: "var(--surface2,#f5f7fa)" }}>
-              <span className="text-[13px] font-bold" style={{ color: "var(--navy,#0f1e2e)" }}>{L("Estimated total", "الإجمالي التقديري")}</span>
-              <span className="text-[15px] font-extrabold" style={{ color: "var(--action,#f7900a)" }}>{money(total)}</span>
+            {/* Base rental — العدد stepper (cap = requested) + rate + line total (÷26 prorated) */}
+            <div className="mt-2.5 rounded-[10px] border px-3 py-2.5" style={{ borderColor: "var(--border,#e5e7eb)" }}>
+              <div className="flex items-center justify-between">
+                <span className="text-[12.5px] font-bold" style={{ color: "var(--navy-mid,#33506e)" }}>{L("Base rental", "الإيجار الأساسي")}</span>
+                <span className="text-[11px]" style={{ color: "var(--muted,#6b7280)" }}>{periodLabel}{periods ? ` · ${periods} ${L("days", "يوم")}` : ""}</span>
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <div>
+                  <div className="text-[10.5px] font-semibold" style={{ color: "var(--muted,#6b7280)" }}>{L("Units", "العدد")}</div>
+                  {editable
+                    ? <Stepper value={rentalUnits} min={1} max={cap} onChange={(v) => { setRentalUnits(v); setMobUnitsN((u) => Math.min(u, v)); setDemobUnitsN((u) => Math.min(u, v)); }} />
+                    : <b className="text-[14px]" style={{ color: "var(--navy,#0f1e2e)" }}>{rNU}</b>}
+                </div>
+                {editable
+                  ? <span className="inline-flex items-center gap-1"><input type="number" inputMode="numeric" min={0} value={rateStr} onChange={(e) => setRateStr(e.target.value)} className="w-24 rounded-[8px] border px-2 py-1 text-end text-[14px] font-bold outline-0" style={{ borderColor: "var(--border,#e5e7eb)", color: "var(--navy,#0f1e2e)" }} placeholder="0" /><span className="text-[11px]" style={{ color: "var(--muted,#6b7280)" }}>{sar}</span></span>
+                  : <b className="text-[14px]" style={{ color: "var(--navy,#0f1e2e)" }}>{money(rate)}</b>}
+                <b className="text-[13px]" style={{ color: "var(--navy,#0f1e2e)" }}>{money(rentalLine)}</b>
+              </div>
+              {editable && <div className="mt-1 text-[10.5px]" style={{ color: "var(--muted,#6b7280)" }}>{L("Requested", "المطلوب")}: {cap}</div>}
             </div>
-            {editable && !rateValid && <p className="mt-2 text-[12px] font-semibold" style={{ color: "#d9362a" }}>{L("Enter a daily rate to continue", "أدخل سعرًا يوميًا للمتابعة")}</p>}
+
+            {legRow(L("Mobilization / delivery", "التعبئة (موب)"), mobStr, setMobStr, mobUnitsN, setMobUnitsN, mobExcluded, setMobExcluded)}
+            {legRow(L("Return", "الإرجاع (ديموب)"), demobStr, setDemobStr, demobUnitsN, setDemobUnitsN, demobExcluded, setDemobExcluded)}
+
+            <div className="mt-3 rounded-[10px] px-3 py-2.5" style={{ background: "var(--surface2,#f5f7fa)" }}>
+              <div className="flex items-center justify-between text-[12.5px]"><span style={{ color: "var(--muted,#6b7280)" }}>{L("Subtotal", "المجموع قبل الضريبة")}</span><b style={{ color: "var(--navy,#0f1e2e)" }}>{money(subtotal)}</b></div>
+              <div className="mt-1 flex items-center justify-between text-[12.5px]"><span style={{ color: "var(--muted,#6b7280)" }}>{L("VAT 15%", "ضريبة القيمة المضافة ١٥٪")}</span><b style={{ color: "var(--navy,#0f1e2e)" }}>{money(vat)}</b></div>
+              <div className="mt-1 flex items-center justify-between border-t pt-1 text-[13px]" style={{ borderColor: "var(--border,#e5e7eb)" }}><b style={{ color: "var(--navy,#0f1e2e)" }}>{L("Estimated total", "الإجمالي التقديري")}</b><b style={{ color: "var(--action,#f7900a)" }}>{money(total)}</b></div>
+            </div>
+            {editable && !rateValid && <p className="mt-2 text-[12px] font-semibold" style={{ color: "#d9362a" }}>{L("Enter a rate to continue", "أدخل سعرًا للمتابعة")}</p>}
           </div>
         )}
 
@@ -971,9 +1060,9 @@ function CounterFlow({
           <div>
             <div className="mb-1.5 text-[13px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>{L("Summary", "الملخّص")}</div>
             <div className="rounded-[10px] border px-3 py-2.5" style={{ borderColor: "var(--border,#e5e7eb)" }}>
-              <div className="flex items-center justify-between text-[13px]"><span style={{ color: "var(--muted,#6b7280)" }}>{L("Rate", "السعر")}</span><b style={{ color: "var(--navy,#0f1e2e)" }}>{money(rate)} / {periodLabel}{units > 1 ? ` · ×${units}` : ""}</b></div>
-              {mob > 0 && <div className="mt-1 flex items-center justify-between text-[13px]"><span style={{ color: "var(--muted,#6b7280)" }}>{L("Mobilization", "النقل")}</span><b style={{ color: "var(--navy,#0f1e2e)" }}>{money(mob)}</b></div>}
-              {demob > 0 && <div className="mt-1 flex items-center justify-between text-[13px]"><span style={{ color: "var(--muted,#6b7280)" }}>{L("Return", "الإرجاع")}</span><b style={{ color: "var(--navy,#0f1e2e)" }}>{money(demob)}</b></div>}
+              <div className="flex items-center justify-between text-[13px]"><span style={{ color: "var(--muted,#6b7280)" }}>{L("Rate", "السعر")}</span><b style={{ color: "var(--navy,#0f1e2e)" }}>{money(rate)} / {periodLabel}{rNU > 1 ? ` · ×${rNU}` : ""}</b></div>
+              <div className="mt-1 flex items-center justify-between text-[13px]"><span style={{ color: "var(--muted,#6b7280)" }}>{L("Mobilization", "التعبئة")}</span><b style={{ color: mEx ? "var(--muted,#6b7280)" : "var(--navy,#0f1e2e)" }}>{mEx ? L("Not included", "غير مشمول") : `${money(mob)}${mNU > 1 ? ` · ×${mNU}` : ""}`}</b></div>
+              <div className="mt-1 flex items-center justify-between text-[13px]"><span style={{ color: "var(--muted,#6b7280)" }}>{L("Return", "الإرجاع")}</span><b style={{ color: dEx ? "var(--muted,#6b7280)" : "var(--navy,#0f1e2e)" }}>{dEx ? L("Not included", "غير مشمول") : `${money(demob)}${dNU > 1 ? ` · ×${dNU}` : ""}`}</b></div>
               <div className="mt-1.5 flex items-center justify-between border-t pt-1.5 text-[14px]" style={{ borderColor: "var(--border,#e5e7eb)" }}><b style={{ color: "var(--navy,#0f1e2e)" }}>{L("Estimated total", "الإجمالي التقديري")}</b><b style={{ color: "var(--action,#f7900a)" }}>{money(total)}</b></div>
             </div>
             {mode === "accept" && (
