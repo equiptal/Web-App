@@ -249,7 +249,14 @@ export function fetchStreamToken(id: string): Promise<{ token: string | null; us
 }
 
 /** Counter the offer with a new rate. */
-export function proposeRate(id: string, body: { proposedRate: number; priceUnit: string; mobPrice?: number; demobPrice?: number; message?: string }): Promise<unknown> {
+export function proposeRate(
+  id: string,
+  body: {
+    proposedRate: number; priceUnit: string; mobPrice?: number; demobPrice?: number; message?: string;
+    // deal-room/negotiation — per-type unit counts (pending, ride the rate_proposal chat) + leg exclusion.
+    rentalUnits?: number; mobUnits?: number; demobUnits?: number; mobExcluded?: boolean; demobExcluded?: boolean;
+  },
+): Promise<unknown> {
   return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/rate-proposal`, body);
 }
 
@@ -261,10 +268,22 @@ export type TermUpdate = { termKey: string; action: string; value?: unknown };
  * locally-collected `termResolutions` are submitted together, and `agreedUnits` is only sent for
  * assembled multi-supplier deals (the web has none → omit it).
  */
-export function acceptDeal(id: string, contractType = "formal", opts?: { termResolutions?: TermUpdate[]; agreedUnits?: number }): Promise<unknown> {
+export function acceptDeal(
+  id: string,
+  contractType = "formal",
+  opts?: {
+    termResolutions?: TermUpdate[]; agreedUnits?: number;
+    // deal-room/negotiation — matched mob/demob unit counts + leg exclusion, written on accept.
+    mobUnits?: number; demobUnits?: number; mobExcluded?: boolean; demobExcluded?: boolean;
+  },
+): Promise<unknown> {
   const body: Record<string, unknown> = { contractType };
   if (opts?.termResolutions && opts.termResolutions.length) body.termResolutions = opts.termResolutions;
   if (opts?.agreedUnits != null) body.agreedUnits = opts.agreedUnits;
+  if (opts?.mobUnits != null) body.mobUnits = opts.mobUnits;
+  if (opts?.demobUnits != null) body.demobUnits = opts.demobUnits;
+  if (opts?.mobExcluded != null) body.mobExcluded = opts.mobExcluded;
+  if (opts?.demobExcluded != null) body.demobExcluded = opts.demobExcluded;
   return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/accept`, body);
 }
 

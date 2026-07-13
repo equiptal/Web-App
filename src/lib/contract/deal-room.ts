@@ -10,6 +10,8 @@ export interface DealParty {
   id: number | null;
   name: string;
   isVerified: boolean;
+  /** Contact number. Server-gated: supplier.phone is always present; rentee.phone only once CLOSED. */
+  phone: string | null;
 }
 
 export type TermState = "fixed" | "soft_accepted" | "disputed" | "pending" | "agreed" | string;
@@ -54,6 +56,19 @@ export interface DealRoomView {
   /** Units the RFQ asked for — the rate is PER-UNIT, so the rental total multiplies by this
    *  (consistent with the bid cards + quotations + the backend deal quotation). */
   numberOfUnits: number;
+  // ── deal-room/negotiation — per-type units + leg exclusion (shared backend) ──
+  /** Matched RENTAL count (drives coverage); `null` = single-supplier/single-unit "full request". */
+  agreedUnits: number | null;
+  /** Matched mob/demob unit counts (each ≤ rental); `null` = not yet negotiated. */
+  mobUnits: number | null;
+  demobUnits: number | null;
+  /** Persisted leg exclusion (both-sided) — render the excluded state from these, NOT local UI state. */
+  mobExcluded: boolean;
+  demobExcluded: boolean;
+  /** The requested rental count — the stepper cap for all three unit types (both roles). */
+  requestedUnits: number;
+  /** Request short code (REQ-NNNNN) for the room header label. */
+  shortCode: string | null;
   /** Who made the last counter ("rentee" | "supplier" | null). The renter is the rentee. */
   lastCounterBy: string | null;
   /** Convenience: is it the renter's turn to act (accept/counter)? */
@@ -299,6 +314,7 @@ export function mapDealRoom(raw: unknown): DealRoomView {
       id: n(sup.id),
       name: s(sup.companyName) ?? s(sup.storeName) ?? ([s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" ") || "Supplier"),
       isVerified: sup.isVerified === true,
+      phone: s(sup.phone),
     },
     rate: n(d.lastProposedRate) ?? n(bid.priceAmount),
     mobPrice: n(d.lastProposedMobPrice) ?? n(bid.mobPrice),
@@ -310,6 +326,14 @@ export function mapDealRoom(raw: unknown): DealRoomView {
     periods: n((d.request as Record<string, unknown>)?.estimatedDurationDays),
     priceUnit: s(d.lastProposedPriceUnit) ?? s(bid.priceUnit),
     numberOfUnits: priceUnits,
+    // deal-room/negotiation — per-type units + exclusion + header code (from the widened payload).
+    agreedUnits: n(d.agreedUnits),
+    mobUnits: n(d.mobUnits),
+    demobUnits: n(d.demobUnits),
+    mobExcluded: d.mobExcluded === true,
+    demobExcluded: d.demobExcluded === true,
+    requestedUnits,
+    shortCode: s(reqObj.shortCode),
     lastCounterBy,
     myTurn,
     terms,
