@@ -508,11 +508,15 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
         <div className="av">{room.supplier.name.charAt(0).toUpperCase()}<span className="online" /></div>
         <div className="nm">
           <div className="row1">{room.supplier.name}{room.supplier.isVerified && <span className="material-icons-outlined">check_circle</span>}</div>
-          <span className="role">{L("Supplier", "مؤجّر")}</span>
+          <span className="role">{L("Supplier", "مؤجّر")}{room.shortCode ? ` · ${room.shortCode}` : ""}</span>
         </div>
         <div className="cacts">
           <span className="cbtn" role="button" tabIndex={0} title={L("Documents", "المستندات")} onClick={() => setShowDocs(true)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setShowDocs(true)}><span className="material-icons-outlined">description</span></span>
-          <span className={`cbtn call${closed ? "" : " locked"}`} title={closed ? L("Call", "اتصال") : L("Unlocks after the deal is confirmed", "يُفتح بعد تأكيد الصفقة")}><span className="material-icons-outlined">call</span></span>
+          {/* deal-room/negotiation (B5): the renter is the rentee → the supplier's number is delivered from
+              the start (server-gated), so calling is unlocked immediately (no wait for CLOSED). */}
+          {room.supplier.phone
+            ? <a className="cbtn call" href={`tel:${room.supplier.phone}`} title={L("Call", "اتصال")}><span className="material-icons-outlined">call</span></a>
+            : <span className="cbtn call locked" title={L("Number unavailable", "الرقم غير متاح")}><span className="material-icons-outlined">call</span></span>}
         </div>
       </div>
 
