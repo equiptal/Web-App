@@ -137,6 +137,25 @@ export async function processRfq(input: ProcessInput): Promise<AgentDraft> {
   throw new ApiError("network"); // timed out
 }
 
+/**
+ * A5 — teach Mansour from the renter's draft-vs-final edits (the web_review learning signal). Pure
+ * fire-and-forget: never awaited on the submit path, swallows every error, and uses `keepalive` so the
+ * POST survives the navigation to the confirmation screen. `patch` is the full corrected RFQ shape from
+ * `draftToRfqCorrection`; `corrector_id`/`source` are set server-side.
+ */
+export async function postRfqCorrection(rfqId: string, patch: unknown, reason?: string): Promise<void> {
+  try {
+    await fetch(`/api/agent/rfq/${encodeURIComponent(rfqId)}/correct`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ patch, reason }),
+      keepalive: true,
+    });
+  } catch {
+    /* learning is best-effort — a miss must never affect request creation */
+  }
+}
+
 /** Submit the assembled broadcast (AC-42/43). The server fans out one request per item, so
  *  `requestIds` carries every short code (`requestId` = the first, for back-compat). */
 /** The renter's own requests (web-app/request-details-bids). One row per item (backend fan-out). */
@@ -249,7 +268,14 @@ export function fetchStreamToken(id: string): Promise<{ token: string | null; us
 }
 
 /** Counter the offer with a new rate. */
-export function proposeRate(id: string, body: { proposedRate: number; priceUnit: string; mobPrice?: number; demobPrice?: number; message?: string }): Promise<unknown> {
+export function proposeRate(
+  id: string,
+  body: {
+    proposedRate: number; priceUnit: string; mobPrice?: number; demobPrice?: number; message?: string;
+    // deal-room/negotiation — per-type unit counts (pending, ride the rate_proposal chat) + leg exclusion.
+    rentalUnits?: number; mobUnits?: number; demobUnits?: number; mobExcluded?: boolean; demobExcluded?: boolean;
+  },
+): Promise<unknown> {
   return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/rate-proposal`, body);
 }
 
@@ -261,10 +287,22 @@ export type TermUpdate = { termKey: string; action: string; value?: unknown };
  * locally-collected `termResolutions` are submitted together, and `agreedUnits` is only sent for
  * assembled multi-supplier deals (the web has none → omit it).
  */
-export function acceptDeal(id: string, contractType = "formal", opts?: { termResolutions?: TermUpdate[]; agreedUnits?: number }): Promise<unknown> {
+export function acceptDeal(
+  id: string,
+  contractType = "formal",
+  opts?: {
+    termResolutions?: TermUpdate[]; agreedUnits?: number;
+    // deal-room/negotiation — matched mob/demob unit counts + leg exclusion, written on accept.
+    mobUnits?: number; demobUnits?: number; mobExcluded?: boolean; demobExcluded?: boolean;
+  },
+): Promise<unknown> {
   const body: Record<string, unknown> = { contractType };
   if (opts?.termResolutions && opts.termResolutions.length) body.termResolutions = opts.termResolutions;
   if (opts?.agreedUnits != null) body.agreedUnits = opts.agreedUnits;
+  if (opts?.mobUnits != null) body.mobUnits = opts.mobUnits;
+  if (opts?.demobUnits != null) body.demobUnits = opts.demobUnits;
+  if (opts?.mobExcluded != null) body.mobExcluded = opts.mobExcluded;
+  if (opts?.demobExcluded != null) body.demobExcluded = opts.demobExcluded;
   return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/accept`, body);
 }
 
@@ -272,6 +310,12 @@ export function acceptDeal(id: string, contractType = "formal", opts?: { termRes
  *  NEGOTIATING and re-arms the bid so the renter can re-negotiate + re-confirm (re-issues the quotation). */
 export function releaseDeal(id: string, reason?: string): Promise<unknown> {
   return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/release`, reason ? { reason } : {});
+}
+
+/** Withdraw a pending acceptance (app parity: "withdraw acceptance"). Flips
+ *  AWAITING_SUPPLIER_CONFIRMATION → NEGOTIATING, clears reserved units, re-arms the bid. */
+export function withdrawAcceptance(id: string): Promise<unknown> {
+  return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/withdraw`, {});
 }
 
 /** Submit all locally-collected term resolutions at once (app parity — batched with the rate counter). */

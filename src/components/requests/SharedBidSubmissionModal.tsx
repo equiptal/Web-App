@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { BidCard } from "@/lib/contract/bids";
 import type { BidFormData, BidFormItem, LinkBidSubmission, LinkBidItem } from "@/lib/contract/link-bids";
+import { CERT_TERM_KEYS, certCodesFromValue, certConfKey, prettyCert } from "@/lib/contract/link-bids";
 import { fetchBidFormData } from "@/lib/api/client";
 import { hasVatInclusiveNote, stripVatInclusiveNote } from "@/lib/contract/vat-inclusive";
 import { qualityFromSubmission } from "@/lib/contract/bid-quality";
@@ -37,17 +38,18 @@ const UNIT_LABEL: Record<string, [string, string]> = {
 // Attachment type code → readable label (EN/AR) for the read-only viewer chips/thumbnails.
 const ATT_LABEL: Record<string, [string, string]> = {
   front_photo: ["Front photo", "صورة أمامية"], serial_photo: ["Serial / plate", "الرقم التسلسلي"], hours_photo: ["Operating hours", "ساعات التشغيل"],
-  istimara: ["Istimara", "الاستمارة"], customs_card: ["Customs card", "البطاقة الجمركية"], sales_contract: ["Sales contract", "عقد البيع"], saso_registration: ["SASO registration", "تسجيل ساسو"],
+  istimara: ["Istimara", "الاستمارة"], customs_card: ["Customs card", "البطاقة الجمركية"], sales_contract: ["Sales contract", "عقد البيع"], saso_registration: ["SASO registration", "تسجيل ساسو"], combined: ["Several documents (one file)", "عدة مستندات (ملف واحد)"],
   tuv: ["TÜV", "فحص TÜV"], spsp: ["SPSP", "SPSP"], saso: ["SASO", "ساسو"], other: ["Other", "أخرى"],
   operator_tuv: ["Operator TÜV", "فحص TÜV للمشغّل"], operator_spsp: ["Operator SPSP", "SPSP للمشغّل"], operator_saso: ["Operator SASO", "ساسو للمشغّل"], operator_other: ["Operator (other)", "المشغّل (أخرى)"],
   cr: ["Commercial registration", "السجل التجاري"], vat_cert: ["VAT certificate", "شهادة الضريبة"], national_address: ["National address", "العنوان الوطني"], local_content: ["Local content", "المحتوى المحلي"], saso_heavy_equip: ["SASO heavy equipment", "ساسو للمعدات الثقيلة"],
 };
 // Classify an item's documents back into the same groups the form uploads them under.
-const OWNERSHIP_TYPES = new Set(["istimara", "customs_card", "sales_contract", "saso_registration"]);
+const OWNERSHIP_TYPES = new Set(["istimara", "customs_card", "sales_contract", "saso_registration", "combined"]);
 
 export function SharedBidSubmissionModal({
   bid,
   submission,
+  focusItemId,
   ar,
   L,
   onClose,
@@ -55,6 +57,9 @@ export function SharedBidSubmissionModal({
 }: {
   bid: BidCard;
   submission: LinkBidSubmission | null;
+  /** When set, the viewer shows ONLY this request item (opened from a single item's bid card) instead
+   *  of every item in the group submission. */
+  focusItemId?: string;
   ar: boolean;
   L: (en: string, arr: string) => string;
   onClose: () => void;
@@ -157,6 +162,11 @@ export function SharedBidSubmissionModal({
       .map((k) => ({ key: k, label: L(labels[k][0], labels[k][1]), value: rt[k] as string }));
   }, [form, submission, L]);
 
+  // When opened from a single item's card, show only that item (fall back to all if it doesn't match).
+  const focusedItems = focusItemId ? items.filter((it) => it.requestItemId === focusItemId) : items;
+  const shownItems = focusedItems.length ? focusedItems : items;
+  const singleItem = !!focusItemId && shownItems.length === 1 && items.length > 1;
+
   const itemSubtotal = (a?: LinkBidItem) => {
     if (!a) return 0;
     const q = a.numberOfUnits || 1;
@@ -164,7 +174,11 @@ export function SharedBidSubmissionModal({
   };
   const subtotal = (submission?.items ?? []).reduce((s, a) => s + itemSubtotal(a), 0);
   const vat = subtotal * 0.15;
-  const grandIncl = submission?.grandTotal ?? subtotal + vat;
+  // Focused on one item → total for THAT item only; otherwise the whole-submission grand total.
+  const shownIds = new Set(shownItems.map((it) => it.requestItemId));
+  const shownSubtotal = (submission?.items ?? []).filter((a) => shownIds.has(a.requestItemId)).reduce((s, a) => s + itemSubtotal(a), 0);
+  const grandIncl = singleItem ? shownSubtotal * 1.15 : (submission?.grandTotal ?? subtotal + vat);
+  const quality = submission ? qualityFromSubmission(submission) : null;
   // Supplier's quote expiry ("Valid until") + the renter's bid deadline ("Bids close").
   const validUntil = submission?.validUntil ?? null;
   const vDaysLeft = validUntil ? Math.ceil((new Date(validUntil).getTime() - Date.now()) / 86400000) : null;
@@ -193,7 +207,6 @@ export function SharedBidSubmissionModal({
             <h3>{submission?.companyName ?? bid.supplierName}</h3>
             <p>{L("Off-platform · submitted via your shared link · read-only", "خارج المنصة · مُقدَّم عبر رابطك المشترك · للقراءة فقط")}</p>
           </div>
-          {submission && <div className="qring-sm"><QualityRing quality={qualityFromSubmission(submission)} L={L} size={64} /></div>}
           <button className="slb-head-x" onClick={onClose} aria-label={L("Close", "إغلاق")}>
             <span className="material-icons-outlined">close</span>
           </button>
@@ -210,6 +223,36 @@ export function SharedBidSubmissionModal({
           ) : (
             <div className={`bidpage${ar ? " rtl" : ""}`} dir={dir}>
               <div style={{ padding: "18px 18px 40px", maxWidth: 900, margin: "0 auto" }}>
+
+                {/* ── Bid quality — prominent, with the same breakdown the supplier saw while bidding ── */}
+                {quality && (
+                  <div className="qbanner">
+                    <QualityRing quality={quality} L={L} />
+                    <div className="qb-tx">
+                      <b>{L("Bid quality", "جودة العرض")}</b>
+                      <span>{L("How well this bid matches your request and how complete its documents and company details are.", "مدى مطابقة هذا العرض لطلبك ومدى اكتمال مستنداته وبيانات الشركة.")}</span>
+                      <div className="qb-parts">
+                        {([
+                          { icon: "rule", lb: L("Terms match", "مطابقة الشروط"), w: 40, v: quality.parts.terms },
+                          { icon: "photo_library", lb: L("Equipment docs", "مستندات المعدة"), w: 30, v: quality.parts.equipment },
+                          { icon: "business", lb: L("Company details", "بيانات الشركة"), w: 30, v: quality.parts.company },
+                        ] as const).map((p) => {
+                          const done = p.v >= 0.999;
+                          return (
+                            <div className={`qpart${done ? " done" : ""}`} key={p.lb}>
+                              <div className="qpart-h">
+                                <span className="qpart-lb"><span className="material-icons-outlined">{done ? "check_circle" : p.icon}</span>{p.lb}</span>
+                                <span className="qpart-pc">{Math.round(p.v * 100)}%</span>
+                              </div>
+                              <div className="qpart-track"><i style={{ width: `${Math.round(p.v * 100)}%` }} /></div>
+                              <span className="qpart-w">{L("weight", "الوزن")} {p.w}%</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* ── Meta strip (Quotation / RFQ / Issued / Valid until / Bids close) ── */}
                 {(submission.quotationRef || submission.rfqRef || submission.groupRef || submission.createdAt || validUntil || bidsClose) && (
@@ -270,8 +313,12 @@ export function SharedBidSubmissionModal({
                   </div>
                 )}
 
-                {/* ── Per item — terms table + pricing table (read-only) ── */}
-                {items.map((it, idx) => {
+                {/* ── Per item — terms table + pricing table (read-only). Focused to one item when opened
+                       from that item's bid card; else every item in the group submission. ── */}
+                {shownItems.map((it) => {
+                  // Real position in the full submission (not the filtered index) so a focused item still
+                  // reads e.g. "Item 2 of 3" rather than "Item 1 of 3".
+                  const idx = Math.max(0, items.findIndex((x) => x.requestItemId === it.requestItemId));
                   const a = ansFor(it.requestItemId);
                   const terms = TERM_KEYS.filter((k) => it.requiredTerms[k] != null);
                   const label = (ar ? it.labelAr : it.label) || it.label || L("Equipment", "المعدة");
@@ -302,23 +349,27 @@ export function SharedBidSubmissionModal({
                         <>
                           <div className="subhead"><span className="material-icons-outlined">fact_check</span>{L("Terms — supplier's answers", "الشروط — إجابات المؤجّر")}</div>
                           <div className="treqgrid">
-                            {terms.map((k) => {
-                              const ok = conf[k];
-                              const val = (k === "operatorCert" || k === "equipmentCert") ? (it.requiredTerms[k] ?? "").toUpperCase() : it.requiredTerms[k];
-                              return (
-                                <div key={k} className={`treqcell${ok === false ? " declined" : ""}`}>
+                            {terms.flatMap((k) => {
+                              const cc = conf as Record<string, boolean | undefined>;
+                              const codes = CERT_TERM_KEYS.has(k) ? certCodesFromValue(it.requiredTerms[k]) : [];
+                              // A cert term with 2+ certs shows one card per cert (the supplier may hold TÜV but not SPSP).
+                              const rows = codes.length > 1
+                                ? codes.map((code) => ({ rk: certConfKey(k, code), ok: cc[certConfKey(k, code)] ?? conf[k], val: prettyCert(code) }))
+                                : [{ rk: k, ok: conf[k], val: (k === "operatorCert" || k === "equipmentCert") ? prettyCert(it.requiredTerms[k] ?? "") : it.requiredTerms[k] }];
+                              return rows.map((row) => (
+                                <div key={row.rk} className={`treqcell${row.ok === true ? " ok" : ""}${row.ok === false ? " declined" : ""}`}>
                                   <div className="tc-name">{L(TERM_LABEL[k][0], TERM_LABEL[k][1])}</div>
-                                  <div className="tc-rw"><span className="q">{L("Renter wants", "يطلب المستأجر")}:</span> <i>{val}</i></div>
-                                  <div className="tc-sw"><span className="q">{L("Supplier's answer", "إجابة المؤجّر")}:</span><RoAns ok={ok} L={L} /></div>
+                                  <div className="tc-rw"><span className="q">{L("Renter wants", "يطلب المستأجر")}:</span> <i>{row.val}</i></div>
+                                  <div className="tc-sw"><span className="q">{L("Supplier's answer", "إجابة المؤجّر")}:</span><RoAns ok={row.ok} L={L} /></div>
                                 </div>
-                              );
+                              ));
                             })}
                           </div>
                         </>
                       )}
 
                       <div className="subhead"><span className="material-icons-outlined">request_quote</span>{L("Pricing", "التسعير")}</div>
-                      <table className="ptbl">
+                      <div className="ptbl-wrap"><table className="ptbl">
                         <thead><tr><th>{L("Item", "البند")}</th><th className="num">{L("Unit", "الوحدة")}</th><th className="num">{L("Qty", "العدد")}</th><th className="num">{L("Price", "السعر")}</th><th className="num">{L("Total", "الإجمالي")}</th></tr></thead>
                         <tbody>
                           <tr>
@@ -344,7 +395,7 @@ export function SharedBidSubmissionModal({
                             </tr>
                           ) : null}
                         </tbody>
-                      </table>
+                      </table></div>
                       <div className="itot">
                         <span className="r">{L("Subtotal", "المجموع")}<b>{sub ? nf(sub) : "—"} {sar}</b></span>
                         <span className="r">{L("VAT 15%", "ضريبة ١٥٪")}<b>{sub ? nf(sub * 0.15) : "—"} {sar}</b></span>
@@ -390,8 +441,8 @@ export function SharedBidSubmissionModal({
                   </div>
                 )}
 
-                {/* ── Grand total ── */}
-                <div className="grand"><span className="gk">{L("Grand total — all items (incl. VAT)", "الإجمالي الكلي — كل البنود (شامل الضريبة)")}</span><span className="gv">{nf(grandIncl)} {sar}</span></div>
+                {/* ── Total (this item when focused, else the whole submission) ── */}
+                <div className="grand"><span className="gk">{singleItem ? L("Item total (incl. VAT)", "إجمالي البند (شامل الضريبة)") : L("Grand total — all items (incl. VAT)", "الإجمالي الكلي — كل البنود (شامل الضريبة)")}</span><span className="gv">{nf(grandIncl)} {sar}</span></div>
 
                 {/* ── Supplier's details (read-only) ── */}
                 <div className="sec">

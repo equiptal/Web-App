@@ -99,7 +99,9 @@ function computeRental(bid: BidCard, fallbackDays?: number | null): Money {
  * Rental: PER_JOB → flat rate; else `rate / daysPerPeriod × durationDays` (weekly ÷7, monthly ÷26).
  * `periods` is the period multiplier shown in the breakdown (weeks/months/days; 1 for a job).
  * Mobilization/demobilization are **per-unit** (× units, app/backend parity). VAT 15%.
- * `durationDays` = the bid's own duration, else `fallbackDays`, else 1.
+ * `durationDays` = the bid's own duration, else `fallbackDays`, else **one full period** — when the
+ * duration is unknown we do NOT prorate (periods=1, rate shown as-is), so a monthly rate with no
+ * duration reads "24,000/month × 1", not a misleading "× 0.04" (≈1 day ÷ 26).
  */
 export interface BidQuote {
   units: number;
@@ -118,7 +120,9 @@ export function computeBidQuote(bid: BidCard, opts?: { fallbackDays?: number | n
   const units = opts?.units ?? (bid.numberOfUnits || 1);
   const dpp = daysPerPeriod(bid.priceUnit);
   const fb = num(opts?.fallbackDays);
-  const days = num(bid.duration) ?? (fb != null && fb > 0 ? fb : 1);
+  // No stated duration and no request fallback → assume ONE FULL PERIOD (days = daysPerPeriod), so the
+  // rate isn't prorated down to a single day (periods = 1). PER_JOB (dpp 0) is flat anyway.
+  const days = num(bid.duration) ?? (fb != null && fb > 0 ? fb : dpp || 1);
   const periods = dpp === 0 ? 1 : days / dpp;
   const perUnitRental = dpp === 0 ? rate : (rate / dpp) * days;
   const rentalSubtotal = perUnitRental * units;
@@ -371,7 +375,10 @@ export function displayQuote(bid: BidCard, period: RatePeriod, pricesFor: Prices
   const fb = num(fallbackDays);
   const durDays = num(bid.duration) ?? (fb != null && fb > 0 ? fb : null);
   const durationRental = durDays != null && dppBid !== 0 ? perDay * durDays * units : null;
-  const base = durationRental ?? rentalForPeriod;
+  // With a duration → the daily rate × duration (durationRental). With NO duration → keep the bid's own
+  // quoted rate × units (NOT the toggle-converted rentalForPeriod), so switching Day/Week/Month re-expresses
+  // only the displayed rate, never the total. Mirrors computeBidQuote's no-proration-when-unknown rule.
+  const base = durationRental ?? rate * units;
   const subtotal = base + mobDemob;
   const vat = subtotal * 0.15;
   return { units, ratePerPeriod, rentalForPeriod, mobDemob, durationRental, subtotal, vat, total: subtotal + vat };

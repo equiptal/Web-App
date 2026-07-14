@@ -83,8 +83,12 @@ export const BID_FORM_CSS = `
 .iteminfo .ii b{color:var(--muted);font-weight:700}
 .iteminfo .ii.note{display:inline-flex;align-items:center;gap:5px;color:var(--muted);font-style:italic}
 .iteminfo .ii.note .material-icons-outlined{font-size:14px}
-.item-hd{display:flex;align-items:center;gap:12px;margin:-16px -18px 14px;padding:14px 18px;background:linear-gradient(135deg,var(--navy),var(--navy-deep));color:#fff;border-radius:var(--r-lg) var(--r-lg) 0 0}
-.item-hd > .material-icons-outlined{font-size:24px;color:#FCD9A0;flex:0 0 auto}
+.item-hd{display:flex;align-items:center;justify-content:flex-start;gap:12px;margin:-16px -18px 14px;padding:14px 18px;background:linear-gradient(135deg,var(--navy),var(--navy-deep));color:#fff;border-radius:var(--r-lg) var(--r-lg) 0 0}
+/* Equipment icon in a rounded tile (mirrors the web's equipment thumbnail); Material Symbols so glyphs
+   the classic set lacks — e.g. forklift — still render. */
+.bidpage .msym{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;line-height:1;letter-spacing:normal;text-transform:none;white-space:nowrap;direction:ltr}
+.item-hd .item-ic{flex:0 0 auto;width:42px;height:42px;display:grid;place-items:center;border-radius:11px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18)}
+.item-hd .item-ic .msym{font-size:25px;color:#FCD9A0}
 .item-hd .inm-wrap{flex:1;min-width:0;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
 .item-hd .inm{font-size:17px;font-weight:800;letter-spacing:-.2px}
 .item-hd .imeta{font-size:13px;color:rgba(255,255,255,.72);font-weight:700}
@@ -94,6 +98,18 @@ export const BID_FORM_CSS = `
 /* Multi-unit: still subtle/light-grey (not bright orange) — just a touch more visible than single. */
 .item-hd .units-chip.multi{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.26);color:rgba(255,255,255,.88)}
 .item-hd .ibadge{margin-inline-start:auto;flex:0 0 auto;font-size:10.5px;font-weight:800;color:rgba(255,255,255,.85);background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:var(--r-full);padding:4px 11px;white-space:nowrap}
+/* Opt-out toggle — supplier bids on only the items they can supply (multi-item requests). */
+.supply-tog{display:flex;align-items:center;gap:11px;width:100%;background:var(--success-bg);border:1px solid rgba(29,175,88,.35);border-radius:var(--r-md);padding:11px 14px;margin-bottom:14px;cursor:pointer;font:inherit;text-align:start}
+.supply-tog.off{background:var(--surface2);border-color:var(--border)}
+.supply-tog .supply-sw{position:relative;width:44px;height:25px;border-radius:100px;background:var(--success);flex:0 0 auto;transition:background .15s}
+.supply-tog.off .supply-sw{background:var(--border)}
+.supply-tog .supply-sw::after{content:"";position:absolute;top:3px;inset-inline-start:22px;width:19px;height:19px;border-radius:50%;background:#fff;transition:inset-inline-start .15s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.supply-tog.off .supply-sw::after{inset-inline-start:3px}
+.supply-tog .supply-tx{flex:1;font-size:13.5px;font-weight:800;color:var(--navy)}
+.supply-tog .supply-skip{font-size:11.5px;font-weight:700;color:var(--muted);white-space:nowrap}
+.skip-note{display:flex;align-items:flex-start;gap:10px;background:var(--surface2);border:1px dashed var(--border);border-radius:var(--r-md);padding:14px 16px;color:var(--navy-mid);font-size:13px;font-weight:600;line-height:1.5}
+.skip-note .material-icons-outlined{font-size:19px;color:var(--muted);flex:0 0 auto;margin-top:1px}
+.item-skipped .item-hd{filter:grayscale(.55);opacity:.7}
 .tmtx-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-md)}
 .tmtx{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed}
 .tmtx th{background:var(--surface2);color:var(--navy-mid);font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:10px;border-bottom:1px solid var(--border);text-align:start}
@@ -105,15 +121,25 @@ export const BID_FORM_CSS = `
 .tmtx .sval{margin-top:9px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .tmtx .sval .sval-q{font-size:11px;font-weight:700;color:var(--navy-mid);text-transform:none}
 /* Responsive term grid — cells wrap into as many rows as needed (no cramped wide table). */
-.treqgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:8px}
-.treqcell{border:1px solid var(--line);border-radius:var(--r-md);padding:11px 13px;background:var(--surface1);min-width:0}
-.treqcell.declined{background:var(--danger-bg);border-color:rgba(217,54,42,.28)}
-.treqcell.needpick{background:#EAF1FE;box-shadow:inset 0 0 0 2px rgba(37,99,235,.4)}
-.treqcell .tc-name{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--navy-mid);margin-bottom:8px;line-height:1.3;overflow-wrap:anywhere}
-.treqcell .tc-rw{font-size:12px;margin-bottom:8px;overflow-wrap:anywhere}
-.treqcell .tc-rw .q{color:var(--muted);font-weight:600}
-.treqcell .tc-rw i{font-style:normal;color:var(--rentee);font-weight:700}
-.treqcell .tc-sw .q{display:block;font-size:11px;font-weight:700;color:var(--navy-mid);margin-bottom:5px}
+.treqgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;align-items:start}
+.treqcell{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;padding:11px 13px 12px;background:var(--surface1);min-width:0;transition:border-color .15s,background .15s,box-shadow .15s}
+.treqcell.ok{border-color:rgba(29,175,88,.32);background:#F5FBF7}
+.treqcell.declined{background:var(--danger-bg);border-color:rgba(217,54,42,.32)}
+.treqcell.needpick{background:#EAF1FE;border-color:transparent;box-shadow:inset 0 0 0 2px rgba(37,99,235,.4)}
+.treqcell .tc-name{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;color:var(--navy);margin-bottom:9px;line-height:1.2;overflow-wrap:anywhere}
+.treqcell .tc-name .material-icons-outlined{font-size:15px;flex:0 0 auto;width:24px;height:24px;display:grid;place-items:center;color:var(--navy-mid);background:var(--surface2);border-radius:7px}
+/* Plain-language explainer under each term name (suppliers found the bare labels unclear). */
+.treqcell .tc-hint{font-size:11px;color:var(--muted);font-weight:600;line-height:1.4;margin:-3px 0 9px;overflow-wrap:anywhere}
+.treqcell.ok .tc-name .material-icons-outlined{color:var(--success);background:var(--success-bg)}
+.treqcell.declined .tc-name .material-icons-outlined{color:var(--danger);background:#fff}
+.treqcell .tc-rw{font-size:12px;margin-bottom:10px;display:flex;flex-direction:column;gap:4px;overflow-wrap:anywhere}
+.treqcell .tc-rw .q{color:var(--muted);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.04em}
+.treqcell .tc-rw i{font-style:normal;color:var(--rentee);font-weight:800;font-size:12.5px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.16);border-radius:7px;padding:3px 9px;width:fit-content;max-width:100%}
+/* Answer sits at the card foot, centered. */
+.treqcell .tc-sw{margin-top:auto;text-align:center}
+.treqcell .tc-sw .q{display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--navy-mid);margin-bottom:6px}
+.treqcell .tc-sw .miniseg{width:fit-content;margin-inline:auto}
+.treqcell .tc-sw .miniseg button{justify-content:center;padding:7px 16px;font-size:12px}
 .tmtx td.declined{background:var(--danger-bg)}
 .tmtx td.needpick{background:#EAF1FE;box-shadow:inset 0 0 0 2px rgba(37,99,235,.4)}
 .celllbl{display:none}
@@ -131,6 +157,9 @@ export const BID_FORM_CSS = `
 .treq-req{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.4}
 .treq .miniseg{flex:0 0 auto}
 @media(max-width:560px){.treq{flex-wrap:wrap}.treq .miniseg{margin-inline-start:auto}}
+/* Pricing table can't shrink below its 5 columns; wrap it so a narrow phone scrolls it instead of
+   widening the whole page. */
+.ptbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .ptbl{width:100%;border-collapse:collapse;font-size:12.5px}
 .ptbl th{background:var(--surface2);color:var(--navy-mid);font-size:10px;font-weight:800;text-transform:uppercase;padding:8px 10px;border-bottom:1px solid var(--border);text-align:start}
 .ptbl th.num,.ptbl td.num{text-align:end}
@@ -157,7 +186,10 @@ export const BID_FORM_CSS = `
 .notes-ro{font-size:13.5px;color:var(--navy);line-height:1.6;white-space:pre-wrap;margin:0}
 .field{margin-bottom:14px}
 .field label{display:block;font-size:12.5px;font-weight:700;color:var(--navy-mid);margin-bottom:7px}
-.field label .reqx{color:var(--danger)}
+.field label .reqx{color:var(--danger);font-weight:800}
+/* "Optional" chip — every field is explicitly marked: red * when required, this pill otherwise. */
+.optx{display:inline-block;margin-inline-start:6px;font-size:9.5px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:1px 7px;vertical-align:middle}
+.reqx{color:var(--danger);font-weight:800}
 .field input{width:100%;height:46px;border:1px solid var(--border);border-radius:var(--r-md);padding:0 13px;font:inherit;font-size:14px;color:var(--navy);outline:0}
 .field input:focus{border-color:var(--action);box-shadow:0 0 0 3px rgba(247,144,9,.12)}
 .field input:disabled,.field input[readonly]{background:var(--surface2);color:var(--navy);-webkit-text-fill-color:var(--navy);opacity:1}
@@ -195,7 +227,14 @@ export const BID_FORM_CSS = `
 .bidpage.inview .miniseg button{cursor:default}
 @media (max-width:680px){.ro-grid{grid-template-columns:1fr 1fr}}
 @media (max-width:600px){.wrap{padding:16px 14px 80px}.pubbar-in{padding:10px 14px;gap:10px}.rmeta .rname{font-size:16px}.rlogo{width:40px;height:40px}.intro h1{font-size:19px}.sec{padding:14px}.item-hd{margin:-14px -14px 12px;padding:12px 14px}.item-hd .ibadge{display:none}
-.tmtx-wrap{border:0;overflow:visible}.tmtx,.tmtx tbody{display:block;width:100%}.tmtx thead{display:none}.tmtx tr{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:10px;overflow:hidden}.tmtx td{display:block;border-bottom:1px solid var(--line);border-inline-start:1px solid var(--line);padding:11px 13px}.tmtx td:nth-child(odd){border-inline-start:0}.celllbl{display:block;font-size:10.5px;font-weight:800;text-transform:uppercase;color:var(--navy-mid);margin-bottom:5px}.cd-box{width:60px}.cd-box b{font-size:23px}.ptbl-in{width:90px}.frow{grid-template-columns:1fr}}
+.tmtx-wrap{border:0;overflow:visible}.tmtx,.tmtx tbody{display:block;width:100%}.tmtx thead{display:none}.tmtx tr{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:10px;overflow:hidden}.tmtx td{display:block;border-bottom:1px solid var(--line);border-inline-start:1px solid var(--line);padding:11px 13px}.tmtx td:nth-child(odd){border-inline-start:0}.celllbl{display:block;font-size:10.5px;font-weight:800;text-transform:uppercase;color:var(--navy-mid);margin-bottom:5px}.cd-box{width:60px}.cd-box b{font-size:23px}
+/* tighter pricing table + 16px inputs (stops iOS focus-zoom); frow + attach cards stack */
+.ptbl td,.ptbl th{padding:9px 7px}.ptbl-in{width:84px}.frow{grid-template-columns:1fr}
+.field input,.notes-field textarea{font-size:16px}
+.qbanner{padding:14px}.item-hd .inm{font-size:16px}
+.grand{padding:15px 16px}.grand .gv{font-size:21px}}
+/* Very narrow phones — one term card per row for comfortable tap targets. */
+@media(max-width:440px){.treqgrid{grid-template-columns:1fr}}
 
 /* ── Attachment uploader (FileUploader) ─────────────────────────────────── */
 .uploader{margin:6px 0 12px}
@@ -282,6 +321,15 @@ export const BID_FORM_CSS = `
 .att-pill.req{background:#fef3f2;color:#b42318;border:1px solid #fcc9c2}
 .att-pill.opt{background:#f2f4f7;color:#667085;border:1px solid #e4e7ec}
 .att-body{padding:0 15px 15px}
+/* combine-into-one-file guidance under a document uploader */
+.att-hint{display:flex;align-items:flex-start;gap:6px;margin:0 15px 13px;padding:8px 10px;background:var(--action-dim);border:1px solid rgba(247,144,9,.28);border-radius:9px;font-size:11.5px;font-weight:600;line-height:1.45;color:var(--navy-mid)}
+.att-hint .material-icons-outlined{font-size:15px;color:var(--action);flex:0 0 auto;margin-top:1px}
+/* Encouragement banner above the attachments — ties uploading to bid quality + winning the deal. */
+.att-upsell{display:flex;align-items:flex-start;gap:13px;margin:20px 0 12px;padding:15px 17px;border-radius:var(--r-lg);background:var(--success-bg);border:1px solid rgba(29,175,88,.45);border-inline-start:4px solid var(--success)}
+.att-upsell .au-ic{flex:0 0 auto;font-size:26px;color:#fff;width:42px;height:42px;display:grid;place-items:center;background:var(--success);border-radius:11px;box-shadow:0 2px 6px rgba(29,175,88,.35)}
+.att-upsell .au-tx{display:flex;flex-direction:column;gap:3px;min-width:0}
+.att-upsell .au-tx b{font-size:14.5px;font-weight:800;color:#136b39}
+.att-upsell .au-tx span{font-size:12.5px;color:var(--navy);font-weight:600;line-height:1.55}
 
 /* Read-only attachment view (renter's submission viewer) — grouped by section, labeled */
 .ro-att{margin-top:12px;display:flex;flex-direction:column;gap:12px}
@@ -300,9 +348,22 @@ export const BID_FORM_CSS = `
 /* ── Bid-quality ring ───────────────────────────────────────────────────── */
 .qring{display:inline-flex;flex-direction:column;align-items:center;gap:4px;flex:none}
 .qring-lb{font-size:11px;font-weight:800;letter-spacing:.2px}
-.qbanner{display:flex;align-items:center;gap:14px;background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px;margin-bottom:14px}
-.qb-tx{display:flex;flex-direction:column;gap:3px;min-width:0}
+.qbanner{display:flex;align-items:flex-start;gap:16px;background:var(--surface1);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 18px;margin-bottom:14px}
+.qb-tx{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
 .qb-tx b{font-size:14px;color:var(--navy);font-weight:800}
 .qb-tx span{font-size:12.5px;color:var(--muted);line-height:1.5}
+/* Quality breakdown — one mini-meter per scoring dimension so the supplier sees what to improve. */
+.qb-parts{display:flex;gap:10px 18px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.qpart{flex:1 1 130px;min-width:120px;display:flex;flex-direction:column;gap:5px}
+.qpart-h{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.qpart-lb{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:var(--navy);white-space:nowrap}
+.qpart-lb .material-icons-outlined{font-size:15px;color:var(--muted)}
+.qpart-pc{font-size:11.5px;font-weight:800;color:var(--muted);font-variant-numeric:tabular-nums}
+.qpart-track{height:5px;border-radius:100px;background:var(--line);overflow:hidden}
+.qpart-track i{display:block;height:100%;border-radius:100px;background:var(--action);transition:width .4s ease,background .3s ease}
+.qpart-w{font-size:10px;font-weight:600;color:var(--muted);opacity:.75;letter-spacing:.02em}
+.qpart.done .qpart-lb,.qpart.done .qpart-pc{color:var(--success)}
+.qpart.done .qpart-lb .material-icons-outlined{color:var(--success)}
+.qpart.done .qpart-track i{background:var(--success)}
 .qring-sm{margin-inline-start:auto}
 `;

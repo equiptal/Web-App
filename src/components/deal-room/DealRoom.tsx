@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, Fragment, type ReactNode } from "react";
 import { StreamChat, type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
-import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, ApiError } from "@/lib/api/client";
-import type { DealRoomView, DealRoomDocument, DealRoomDocuments, QuotationView } from "@/lib/contract/deal-room";
-import { DealRoomTerms, type ResolutionsMap } from "@/components/deal-room/DealRoomTerms";
+import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, ApiError } from "@/lib/api/client";
+import type { DealRoomView, DealTerm, DealRoomDocument, DealRoomDocuments, QuotationView } from "@/lib/contract/deal-room";
+import { valText, type ResolutionsMap } from "@/components/deal-room/DealRoomTerms";
 import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
 import { renderQuotationSection, wrapQuotationPage, type QuotationDoc, type QuotationLineItem, type QuotationCard } from "@/lib/quotation/render";
 import "@/components/deal-room/deal-room-proto.css";
@@ -184,6 +184,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const [room, setRoom] = useState<DealRoomView | null>(null);
   const [error, setError] = useState(false);
   const [breakdown, setBreakdown] = useState(false);
+  const [priceAll, setPriceAll] = useState(false); // price-bar للكل/للوحدة toggle (per-unit default)
   const [busy, setBusy] = useState(false);
   // App parity: a single guided flow modal (3 steps: Terms → Price → Summary) handles both Counter and
   // Accept. `flowMode` picks which — null = closed.
@@ -198,9 +199,8 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const [releaseOpen, setReleaseOpen] = useState(false); // reopen-accepted-deal confirm modal
   const [releasing, setReleasing] = useState(false);
   const [releaseErr, setReleaseErr] = useState<string | null>(null);
+  const [withdrawing, setWithdrawing] = useState(false); // withdraw a pending acceptance (AWAITING)
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [termsOpen, setTermsOpen] = useState(true);
-  const termsToggled = useRef(false);
   // App parity: term accept/counter are collected LOCALLY here and submitted once (batched) on
   // Counter/Accept — nothing is PATCHed per click.
   const [resolutions, setResolutions] = useState<ResolutionsMap>({});
@@ -229,6 +229,22 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
       setReleaseErr(e instanceof ApiError ? e.message : L("Couldn't reopen the deal. Please try again.", "تعذّر إعادة فتح الصفقة. حاول مرة أخرى."));
     } finally {
       setReleasing(false);
+    }
+  }
+
+  // deal-room/negotiation — withdraw a pending acceptance (AWAITING → NEGOTIATING). App parity:
+  // "withdraw acceptance"; backend clears the reserved units + re-arms the bid, loadRoom restores the
+  // negotiate controls. Distinct from release (which reopens a CLOSED deal).
+  async function doWithdraw() {
+    if (withdrawing) return;
+    setWithdrawing(true);
+    try {
+      await withdrawAcceptance(id);
+      await loadRoom();
+    } catch (e) {
+      window.alert(errMsg(e, L("Couldn't withdraw right now — please try again.", "تعذّر سحب القبول الآن — حاول مرة أخرى.")));
+    } finally {
+      setWithdrawing(false);
     }
   }
 
@@ -296,10 +312,6 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     if (room && onTitle) onTitle(room.supplier.name);
   }, [room, onTitle]);
 
-  // Collapse the Terms card by default when nothing needs resolving; open it when a term differs.
-  useEffect(() => {
-    if (room && !termsToggled.current) setTermsOpen(room.hasDisputedTerms);
-  }, [room]);
 
   // Live chat (GetStream).
   useEffect(() => {
@@ -423,16 +435,25 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const resolutionUpdates = () =>
     Object.entries(resolutions).map(([termKey, r]) => ({ termKey, action: r.action, value: r.value }));
 
-  async function submitCounter(next: { rate: number; mobPrice?: number; demobPrice?: number }) {
+  async function submitCounter(next: {
+    rate: number; mobPrice?: number; demobPrice?: number;
+    // deal-room/negotiation — per-type unit counts + leg exclusion travel with the counter.
+    rentalUnits?: number; mobUnits?: number; demobUnits?: number; mobExcluded?: boolean; demobExcluded?: boolean;
+  }) {
     if (!room || busy) return;
     setBusy(true);
     setCounterErr(null);
     try {
       // App parity (DealRoomCounterWithRate): batch the locally-resolved term updates, THEN propose the
-      // daily rate + mobilization/return prices — all as one counter move.
+      // rate + mob/demob prices + per-type unit counts + leg exclusion — all as one counter move.
       const updates = resolutionUpdates();
       if (updates.length) await batchUpdateTerms(id, updates);
-      await proposeRate(id, { proposedRate: next.rate, priceUnit: room.priceUnit ?? "PER_DAY", mobPrice: next.mobPrice, demobPrice: next.demobPrice });
+      await proposeRate(id, {
+        proposedRate: next.rate, priceUnit: room.priceUnit ?? "PER_DAY",
+        mobPrice: next.mobPrice, demobPrice: next.demobPrice,
+        rentalUnits: next.rentalUnits, mobUnits: next.mobUnits, demobUnits: next.demobUnits,
+        mobExcluded: next.mobExcluded, demobExcluded: next.demobExcluded,
+      });
       setResolutions({});
       await loadRoom();
       setFlowMode(null);
@@ -465,11 +486,23 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   if (!room) return <div className="dlproto"><div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 28 }}>progress_activity</span></div></div>;
 
   const rate = room.rate ?? 0;
-  const periods = room.periods ?? 1;
-  const units = room.numberOfUnits || 1; // supplier's OFFERED units — rate, mob AND demob are PER-UNIT (app parity: extractQuotationData → (rental + mob + demob) × units)
-  const rentalTotal = rate * periods * units;
-  const mobTotal = (room.mobPrice ?? 0) * units;
-  const demobTotal = (room.demobPrice ?? 0) * units;
+  // deal-room/negotiation — ÷period PRORATED math (matches the backend quotation + app): monthly ÷26 /
+  // weekly ÷7 / daily, × duration(days) × rental units; PER_JOB = rate × units. Mob/demob = price × their
+  // own unit count (0 when excluded). NO duration → assume ONE FULL PERIOD so the base rate is kept as-is
+  // (monthly stays monthly), NOT prorated down to a single day.
+  const FREQ_DAYS: Record<string, number> = { PER_DAY: 1, PER_WEEK: 7, PER_MONTH: 26 };
+  const basisU = (room.priceUnit ?? "PER_DAY").toUpperCase();
+  const dppRoom = FREQ_DAYS[basisU] || 1;
+  const hasDuration = room.periods != null && room.periods > 0;
+  const periods = hasDuration ? (room.periods as number) : dppRoom; // duration in DAYS; default = one full period
+  const rentalUnits = room.agreedUnits ?? room.numberOfUnits ?? 1;
+  const mobUnitsN = Math.min(room.mobUnits ?? rentalUnits, rentalUnits);
+  const demobUnitsN = Math.min(room.demobUnits ?? rentalUnits, rentalUnits);
+  const units = rentalUnits; // the rental count drives the card display
+  const perDayRate = rate / dppRoom;
+  const rentalTotal = basisU === "PER_JOB" ? rate * rentalUnits : perDayRate * periods * rentalUnits;
+  const mobTotal = room.mobExcluded ? 0 : (room.mobPrice ?? 0) * mobUnitsN;
+  const demobTotal = room.demobExcluded ? 0 : (room.demobPrice ?? 0) * demobUnitsN;
   const subtotal = rentalTotal + mobTotal + demobTotal;
   const vat = Math.round(subtotal * 0.15);
   const grand = subtotal + vat;
@@ -482,11 +515,20 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
       default: return L("day", "يوم");
     }
   })();
+  // Rental factor label: no duration / one full period → base rate as-is ("1,600/week"); a whole number
+  // of periods → "× N"; a partial (day-count) duration → effective per-day rate × days ("229/day × 3 days").
+  const periodCount = periods / dppRoom;
+  const rentalLabel =
+    basisU === "PER_JOB"
+      ? nf(rate)
+      : !hasDuration || periodCount === 1
+        ? `${nf(rate)}/${periodLabel}`
+        : Number.isInteger(periodCount)
+          ? `${nf(rate)}/${periodLabel} × ${periodCount}`
+          : `${nf(Math.round(perDayRate))}/${L("day", "يوم")} × ${room.periods} ${L("days", "يوم")}`;
   const closed = room.status === "CLOSED";
   const abandoned = room.status === "ABANDONED";
   const awaiting = room.status === "AWAITING_SUPPLIER_CONFIRMATION";
-  const waiting = awaiting || (!room.myTurn && room.status === "NEGOTIATING");
-  const cardCls = closed ? "closed" : waiting ? "neg" : "";
   // Accept is gated (like the app) until every differing term is resolved — now satisfied by a LOCAL
   // resolution, not a server round-trip.
   const unresolvedDisputed = room.terms.filter((t) => t.state === "disputed" && !resolutions[t.key]);
@@ -494,95 +536,130 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
 
   return (
     <div className="dlproto" dir={ar ? "rtl" : "ltr"}>
-      {/* contact bar */}
-      <div className="contact">
-        <div className="av">{room.supplier.name.charAt(0).toUpperCase()}<span className="online" /></div>
-        <div className="nm">
-          <div className="row1">{room.supplier.name}{room.supplier.isVerified && <span className="material-icons-outlined">check_circle</span>}</div>
-          <span className="role">{L("Supplier", "مؤجّر")}</span>
+      {/* top bar (§5.2) — supplier chip · equipment/request block · phase pill · icon actions */}
+      <div className="topbar">
+        {/* supplier chip → profile & documents. NOTE: the deal-room payload only carries name + isVerified
+            (no rating/deals/commitment), so that prototype stat line is omitted rather than fabricated. */}
+        <button type="button" className="tb-sup" onClick={() => setShowDocs(true)}>
+          <span className="av">{room.supplier.name.charAt(0).toUpperCase()}</span>
+          <span className="nm">
+            <span className="n">{room.supplier.name}{room.supplier.isVerified && <span className="material-icons-outlined">verified</span>}</span>
+            <span className="sub">{L("Supplier", "المورد")}</span>
+          </span>
+        </button>
+        <span className="tb-div" />
+        {/* equipment / request block */}
+        <div className="tb-eq">
+          <span className="ic"><span className="material-icons-outlined">construction</span></span>
+          <span className="meta">
+            <span className="t">
+              {room.shortCode && <span className="tb-code">{room.shortCode}</span>}
+              {room.details.equipmentLabel ?? L("Equipment", "المعدّة")}
+              {room.numberOfUnits > 1 ? ` · ${room.numberOfUnits} ${L("units", "وحدة")}` : ""}
+              {room.details.operatorIncluded ? ` · ${L("with operator", "مع عامل")}` : ""}
+            </span>
+            <span className="sub">{[room.details.location, periods ? `${periods} ${L("days", "يوم")}` : room.details.rentalType].filter(Boolean).join(" · ")}</span>
+          </span>
         </div>
-        <div className="cacts">
-          <span className="cbtn" role="button" tabIndex={0} title={L("Documents", "المستندات")} onClick={() => setShowDocs(true)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setShowDocs(true)}><span className="material-icons-outlined">description</span></span>
-          <span className={`cbtn call${closed ? "" : " locked"}`} title={closed ? L("Call", "اتصال") : L("Unlocks after the deal is confirmed", "يُفتح بعد تأكيد الصفقة")}><span className="material-icons-outlined">call</span></span>
+        {/* phase pill (status label placement — §5.2) */}
+        <span className="tb-phase">
+          <span className="dot" />
+          {closed ? L("Closed", "مغلق") : abandoned ? L("Cancelled", "ملغاة") : awaiting ? L("Awaiting confirmation", "بانتظار التأكيد") : L("Negotiating", "قيد التفاوض")}
+        </span>
+        <span className="tb-spacer" />
+        {/* icon actions — documents + call */}
+        <div className="tb-icons">
+          <span className="tb-ic" role="button" tabIndex={0} title={L("Documents", "المستندات")} onClick={() => setShowDocs(true)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setShowDocs(true)}><span className="material-icons-outlined">description</span></span>
+          {/* deal-room/negotiation (B5): the rentee gets the supplier's number from the start (server-gated). */}
+          {room.supplier.phone
+            ? <a className="tb-ic call" href={`tel:${room.supplier.phone}`} title={L("Call", "اتصال")}><span className="material-icons-outlined">call</span></a>
+            : <span className="tb-ic call locked" title={L("Number unavailable", "الرقم غير متاح")}><span className="material-icons-outlined">call</span></span>}
         </div>
       </div>
 
-      {/* price card */}
-      <div className={`price-card ${cardCls}`}>
-        <div className="pc-top">
-          {closed ? (
-            <span className="turn-chip done"><span className="material-icons-outlined">verified</span>{L("Accepted", "تم القبول")}</span>
-          ) : room.myTurn ? (
-            <span className="turn-chip mine"><span className="material-icons-outlined">bolt</span>{L("Your move", "دورك")}</span>
-          ) : waiting ? (
-            <span className="turn-chip"><span className="material-icons-outlined">hourglass_top</span>{L("Waiting for supplier response", "في انتظار رد المؤجر")}</span>
-          ) : null}
-          <span className="terms-btn"><span className="material-icons-outlined">check_circle</span>{room.contractType ?? L("Terms", "الشروط")}</span>
-        </div>
-        <div className="pc-body">
-          <div className="pc-rate">{L("SAR", "ر.س")} {nf(rate)} <small>/ {periodLabel}{units > 1 ? ` · ${L("per unit", "لكل وحدة")}` : ""}</small></div>
-          <div className="pc-total">{L("Estimated total", "الإجمالي التقديري")}: <b>{nf(grand)} {L("SAR", "ر.س")}</b></div>
-          <div className={`bd-toggle${breakdown ? " open" : ""}`} onClick={() => setBreakdown((b) => !b)}>
-            {breakdown ? L("Hide breakdown", "إخفاء التفصيل") : L("Show breakdown", "عرض التفصيل")}<span className="material-icons-outlined">expand_more</span>
-          </div>
-          {breakdown && (
-            <div className="breakdown">
-              <div className="brow"><span className="l">{L("Rental", "الإيجار")} ({nf(rate)} × {periods}{units > 1 ? ` × ${units}` : ""})</span><span className="v">{nf(rentalTotal)}</span></div>
-              {room.mobPrice ? <div className="brow"><span className="l">{L("Mobilization", "النقل")}{units > 1 ? ` (${nf(room.mobPrice)} × ${units})` : ""}</span><span className="v">{nf(mobTotal)}</span></div> : null}
-              {room.demobPrice ? <div className="brow"><span className="l">{L("Return", "الإرجاع")}{units > 1 ? ` (${nf(room.demobPrice)} × ${units})` : ""}</span><span className="v">{nf(demobTotal)}</span></div> : null}
-              <div className="brow"><span className="l">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="v">{nf(subtotal)}</span></div>
-              <div className="brow"><span className="l">{L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)")}</span><span className="v">{nf(vat)}</span></div>
-              <div className="brow tot"><span className="l">{L("Estimated total", "الإجمالي التقديري")}</span><span className="v">{nf(grand)} {L("SAR", "ر.س")}</span></div>
-            </div>
-          )}
-        </div>
-        {/* status-driven footer */}
+      {/* price bar — prototype navy banner: centered hero price + end-side status/CTA cluster + breakdown popover */}
+      <div className="price-bar">
+        {/* status pill — pinned to the top corner (end: right in LTR, left in RTL) */}
         {closed ? (
-          <div className="confirmed"><span className="material-icons-outlined">check_circle</span><span className="ct">{L("Deal Confirmed", "تم تأكيد الصفقة")}</span></div>
+          <span className="pb-status done"><span className="dot" />{L("Approved", "معتمد")}</span>
         ) : abandoned ? (
-          <div className="turn-strip" style={{ color: "var(--danger)" }}><span className="material-icons-outlined" style={{ color: "var(--danger)" }}>cancel</span>{L("This deal room has been cancelled", "تم إلغاء غرفة الصفقة هذه")}</div>
-        ) : room.myTurn ? (
-          <>
-            <div className="pc-cta">
-              <button className="btn outline" disabled={busy} onClick={() => openFlow("counter")}><span className="material-icons-outlined">swap_horiz</span>{L("Counter", "تفاوض")}</button>
-              {/* Accept is gated exactly like the app: blocked while any term is disputed (acceptAllTerms 409s otherwise). */}
-              <button className="btn green" disabled={busy || !canAccept} onClick={() => openFlow("accept")}><span className="material-icons-outlined">check</span>{L("Accept", "قبول")}</button>
-            </div>
-            {!canAccept && (
-              <div className="turn-strip" style={{ color: "var(--warn,#b45309)" }}>
-                <span className="material-icons-outlined" style={{ color: "var(--warn,#b45309)" }}>error_outline</span>
-                {L("Resolve the differing terms below before you can accept", "قم بحل الشروط المختلفة أدناه قبل القبول")}
+          <span className="pb-status" style={{ background: "var(--danger-bg)", borderColor: "rgba(217,54,42,.4)", color: "var(--danger)" }}><span className="dot" />{L("Cancelled", "ملغاة")}</span>
+        ) : awaiting ? (
+          <span className="pb-status wait"><span className="dot" />{L("Awaiting confirmation", "بانتظار التأكيد")}</span>
+        ) : (
+          <span className="pb-status"><span className="dot" />{L("Negotiating", "قيد التفاوض")}</span>
+        )}
+
+        {/* centered price + CTAs below */}
+        <div className="pb-center">
+          <div className={`pb-src${closed ? " done" : awaiting ? " wait" : ""}`}>
+            <span className="dot" />
+            {closed ? L("Agreed", "متفق عليه") : room.myTurn ? L("Supplier's counter", "عرض المورد المقابل") : L("Supplier's offer", "عرض المورد الافتتاحي")}
+            {units > 1 ? ` · ${priceAll ? L("all units", "للكل") : L("per unit", "للوحدة")}` : ""}
+          </div>
+          <div className="pb-hero">
+            <span className="n">{nf(priceAll ? rate * units : rate)}</span>
+            <span className="u">{L("SAR", "ر.س")}/{periodLabel}</span>
+          </div>
+          <div className="pb-tools">
+            {units > 1 && (
+              <div className="pb-seg">
+                <button className={priceAll ? "on" : ""} onClick={() => setPriceAll(true)}>{L("All", "للكل")} ({units})</button>
+                <button className={!priceAll ? "on" : ""} onClick={() => setPriceAll(false)}>{L("Per unit", "للوحدة")}</button>
               </div>
             )}
+            <button className={`pb-details${breakdown ? " open" : ""}`} onClick={() => setBreakdown((b) => !b)}>
+              {L("Details", "التفاصيل")}<span className="material-icons-outlined">expand_more</span>
+            </button>
+          </div>
+          {/* CTAs — centered below the price */}
+          {closed ? (
+            <div className="pb-btns">
+              <button className="pb-btn accept" disabled={quoteBusy} onClick={downloadQuotation}><span className="material-icons-outlined">download</span>{L("Download quote", "تنزيل العرض")}</button>
+              <button className="pb-btn ghost" onClick={() => setReleaseOpen(true)}><span className="material-icons-outlined">refresh</span>{L("Reopen", "إعادة فتح")}</button>
+            </div>
+          ) : abandoned ? null : room.myTurn ? (
+            <div className="pb-btns">
+              <button className="pb-btn neg" disabled={busy} onClick={() => openFlow("counter")}><span className="material-icons-outlined">swap_horiz</span>{L("Negotiate", "تفاوض")}</button>
+              {/* Accept is gated exactly like the app: blocked while any term is disputed (acceptAllTerms 409s otherwise). */}
+              <button className="pb-btn accept" disabled={busy || !canAccept} onClick={() => openFlow("accept")}><span className="material-icons-outlined">check</span>{L("Accept", "قبول")}</button>
+            </div>
+          ) : awaiting ? (
+            <div className="pb-btns">
+              {/* deal-room/negotiation — withdraw the pending acceptance (AWAITING → NEGOTIATING). */}
+              <button className="pb-btn ghost" disabled={withdrawing} onClick={doWithdraw}><span className="material-icons-outlined">undo</span>{withdrawing ? L("Withdrawing…", "جارٍ السحب…") : L("Withdraw", "سحب القبول")}</button>
+            </div>
+          ) : null}
+        </div>
+
+        {breakdown && (
+          <>
+            <div className="pb-bd-backdrop" onClick={() => setBreakdown(false)} />
+          <div className="pb-breakdown">
+            <div className="pb-brow"><span className="l">{L("Rental", "الإيجار")} ({rentalLabel}{units > 1 ? ` × ${units}` : ""})</span><span className="v">{nf(rentalTotal)}</span></div>
+            {room.mobExcluded
+              ? <div className="pb-brow"><span className="l">{L("Mobilization", "التعبئة — موب")}</span><span className="v ex">{L("Not included", "غير مشمول")}</span></div>
+              : room.mobPrice ? <div className="pb-brow"><span className="l">{L("Mobilization", "التعبئة — موب")}{mobUnitsN > 1 ? ` (${nf(room.mobPrice)} × ${mobUnitsN})` : ""}</span><span className="v">{nf(mobTotal)}</span></div> : null}
+            {room.demobExcluded
+              ? <div className="pb-brow"><span className="l">{L("Return", "الإرجاع — ديموب")}</span><span className="v ex">{L("Not included", "غير مشمول")}</span></div>
+              : room.demobPrice ? <div className="pb-brow"><span className="l">{L("Return", "الإرجاع — ديموب")}{demobUnitsN > 1 ? ` (${nf(room.demobPrice)} × ${demobUnitsN})` : ""}</span><span className="v">{nf(demobTotal)}</span></div> : null}
+            <div className="pb-brow"><span className="l">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="v">{nf(subtotal)}</span></div>
+            <div className="pb-brow"><span className="l">{L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)")}</span><span className="v">{nf(vat)}</span></div>
+            <div className="pb-brow tot"><span className="l">{L("Estimated total", "الإجمالي التقديري")}</span><span className="v">{nf(grand)} {L("SAR", "ر.س")}</span></div>
+          </div>
           </>
-        ) : (
-          <div className="turn-strip"><span className="material-icons-outlined">hourglass_top</span>{awaiting ? L("Sent — awaiting supplier confirmation", "أُرسل — بانتظار تأكيد المؤجر") : L("Waiting for the supplier", "في انتظار المؤجر")}</div>
         )}
       </div>
 
-      {/* the supplier opened this room first (chatted before the renter entered) — app-parity prompt */}
-      {room.supplierFirstEntry && room.status !== "CLOSED" && room.status !== "ABANDONED" && (
-        <div className="started-banner">
-          <span className="material-icons-outlined">forum</span>
-          {L("The supplier started this conversation — reply to negotiate.", "بدأ المؤجّر هذه المحادثة — ردّ للتفاوض.")}
-        </div>
+      {/* below-bar strips */}
+      {!closed && !abandoned && room.myTurn && !canAccept && (
+        <div className="pb-strip"><span className="material-icons-outlined">error_outline</span>{L("Resolve the differing terms below before you can accept", "قم بحل الشروط المختلفة أدناه قبل القبول")}</div>
+      )}
+      {abandoned && (
+        <div className="pb-strip danger"><span className="material-icons-outlined">cancel</span>{L("This deal room has been cancelled", "تم إلغاء غرفة الصفقة هذه")}</div>
       )}
 
-      {/* terms — show negotiable terms; the renter resolves any DIFFERING (disputed) one before accept */}
-      {/* App parity: terms are surfaced only when it's the renter's turn to act (the app shows them in a
-          turn-gated sheet, never inline while awaiting/closed). This also stops a resolved deal from still
-          showing a red "Conflict" card after acceptance/confirmation. */}
-      {room.myTurn && room.terms.length > 0 && (
-        <div className="terms-card">
-          <button type="button" className="tc-h tc-toggle" aria-expanded={termsOpen} onClick={() => { termsToggled.current = true; setTermsOpen((o) => !o); }}>
-            <span className="material-icons-outlined">fact_check</span>
-            <span>{L("Terms", "الشروط")}</span>
-            <span className="tc-h-meta">{room.terms.length}{unresolvedDisputed.length ? ` · ${unresolvedDisputed.length} ${L("differ", "مختلف")}` : ""}</span>
-            <span className="material-icons-outlined tc-chev" style={{ transform: termsOpen ? "rotate(180deg)" : "none" }}>expand_more</span>
-          </button>
-          {termsOpen && <DealRoomTerms terms={room.terms} ar={ar} L={L} busy={busy} readOnly={!room.myTurn} resolutions={resolutions} onResolveLocal={setResolution} onReopenLocal={clearResolution} />}
-        </div>
-      )}
+      {/* terms are negotiated inside the negotiation sheet (§6 step ②) — no standalone terms card here. */}
 
       {/* thread */}
       <div className="thread">
@@ -594,6 +671,16 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
           <div className="sysev">{L("No messages yet — say hello 👋", "لا رسائل بعد — ابدأ المحادثة 👋")}</div>
         ) : (
           messages.map((m) => {
+            // deal-room/negotiation — system narration (posted by the backend's `system_bot`) renders as a
+            // centered chip (prototype's role-tinted narration), NOT a left/right bubble.
+            if (m.user?.id === "system_bot") {
+              return (
+                <div className="sysev" key={m.id}>
+                  <span className="material-icons-outlined">bolt</span>
+                  <span>{m.text}</span>
+                </div>
+              );
+            }
             const mine = m.user?.id === myStreamId;
             return (
               <div className={`msg ${mine ? "mine" : "them"}`} key={m.id}>
@@ -679,7 +766,9 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
           unresolvedCount={unresolvedDisputed.length}
           periodLabel={periodLabel}
           periods={periods}
+          hasDuration={hasDuration}
           units={units}
+          messages={messages}
           onClose={() => !busy && setFlowMode(null)}
           onCounter={submitCounter}
           onAccept={doAccept}
@@ -687,19 +776,22 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
       )}
 
       {releaseOpen && (
-        <div className="fixed inset-0 z-[70] grid place-items-center p-4" style={{ background: "rgba(16,38,63,.5)" }} onClick={() => !releasing && setReleaseOpen(false)}>
-          <div className="w-full max-w-[420px] rounded-2xl bg-white p-5 text-center" dir={ar ? "rtl" : "ltr"} onClick={(e) => e.stopPropagation()}>
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full" style={{ background: "rgba(247,144,10,.12)" }}>
-              <span className="material-icons-outlined" style={{ color: "#f7900a", fontSize: 26 }}>lock_open</span>
+        <div className="dl-modal" dir={ar ? "rtl" : "ltr"} onClick={() => !releasing && setReleaseOpen(false)}>
+          <div className="dl-modal-card" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+            <div className="dl-modal-head">
+              <span className="dl-modal-ic warn"><span className="material-icons-outlined">lock_open</span></span>
+              <div className="dl-modal-tt"><div className="dl-modal-title">{L("Reopen this deal?", "إعادة فتح هذه الصفقة؟")}</div></div>
+              <button className="dl-modal-x" disabled={releasing} onClick={() => setReleaseOpen(false)} aria-label={L("Close", "إغلاق")}><span className="material-icons-outlined">close</span></button>
             </div>
-            <h3 className="text-[17px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>{L("Reopen this deal?", "إعادة فتح هذه الصفقة؟")}</h3>
-            <p className="mt-1.5 text-[13px] leading-relaxed" style={{ color: "var(--muted,#6b7280)" }}>
-              {L("This reopens negotiation with the supplier — the accepted deal returns to negotiating and the terms/price can change again. A new quotation is issued once you re-confirm.", "يعيد هذا فتح التفاوض مع المؤجّر — تعود الصفقة المقبولة إلى التفاوض ويمكن تغيير الشروط والسعر. يصدر عرض سعر جديد بعد إعادة التأكيد.")}
-            </p>
-            {releaseErr && <p className="mt-2 text-[12px] font-semibold" style={{ color: "#d9362a" }}>{releaseErr}</p>}
-            <div className="mt-5 flex gap-2.5">
-              <button className="flex-1 rounded-[10px] border px-4 py-2.5 text-[13px] font-bold" style={{ borderColor: "var(--border,#e5e7eb)", color: "var(--navy,#0f1e2e)" }} disabled={releasing} onClick={() => setReleaseOpen(false)}>{L("Cancel", "إلغاء")}</button>
-              <button className="flex-1 rounded-[10px] px-4 py-2.5 text-[13px] font-bold text-white disabled:opacity-60" style={{ background: "#f7900a" }} disabled={releasing} onClick={() => void doRelease()}>{releasing ? L("Reopening…", "جارٍ إعادة الفتح…") : L("Reopen", "إعادة الفتح")}</button>
+            <div className="dl-modal-body">
+              <p className="dl-modal-msg">
+                {L("This reopens negotiation with the supplier — the accepted deal returns to negotiating and the terms/price can change again. A new quotation is issued once you re-confirm.", "يعيد هذا فتح التفاوض مع المؤجّر — تعود الصفقة المقبولة إلى التفاوض ويمكن تغيير الشروط والسعر. يصدر عرض سعر جديد بعد إعادة التأكيد.")}
+              </p>
+              {releaseErr && <p className="dl-err">{releaseErr}</p>}
+            </div>
+            <div className="dl-modal-foot">
+              <button className="dl-mbtn" disabled={releasing} onClick={() => setReleaseOpen(false)}>{L("Cancel", "إلغاء")}</button>
+              <button className="dl-mbtn warn" disabled={releasing} onClick={() => void doRelease()}>{releasing ? L("Reopening…", "جارٍ إعادة الفتح…") : L("Reopen", "إعادة الفتح")}</button>
             </div>
           </div>
         </div>
@@ -732,54 +824,43 @@ function DocumentsModal({ id, ar, L, supplierName, onClose }: { id: string; ar: 
   const total = (docs?.companyDocuments.length ?? 0) + (docs?.equipmentDocuments.length ?? 0);
 
   const Row = ({ d }: { d: DealRoomDocument }) => (
-    <a
-      href={d.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-center gap-3 rounded-[10px] border border-[var(--border,#e5e7eb)] px-3 py-2.5 hover:bg-[var(--surface2,#f5f7fa)]"
-    >
-      <span className="material-icons-outlined" style={{ color: d.fileType === "image" ? "#2563eb" : "#dc2626", fontSize: 22 }}>
+    <a href={d.url} target="_blank" rel="noopener noreferrer" className="dl-docrow">
+      <span className="material-icons-outlined ft" style={{ color: d.fileType === "image" ? "var(--rentee)" : "var(--danger)" }}>
         {d.fileType === "image" ? "image" : "picture_as_pdf"}
       </span>
-      <span className="min-w-0 flex-1 truncate text-[13px] font-bold" style={{ color: "var(--navy,#0f1e2e)" }}>
-        {ar && d.labelAr ? d.labelAr : d.label}
-      </span>
-      <span className="material-icons-outlined" style={{ color: "var(--info,#2563eb)", fontSize: 20 }}>open_in_new</span>
+      <span className="nm">{ar && d.labelAr ? d.labelAr : d.label}</span>
+      <span className="material-icons-outlined go">open_in_new</span>
     </a>
   );
 
   const Section = ({ title, items }: { title: string; items: DealRoomDocument[] }) =>
     items.length === 0 ? null : (
-      <div>
-        <div className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-[var(--muted,#6b7280)]">{title}</div>
-        <div className="space-y-2">{items.map((d) => <Row key={d.type} d={d} />)}</div>
+      <div className="dl-docsec">
+        <div className="dl-docsec-h">{title}</div>
+        {items.map((d) => <Row key={d.type} d={d} />)}
       </div>
     );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" dir={ar ? "rtl" : "ltr"} onClick={onClose}>
-      <div className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-[var(--surface1,#fff)] shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-[var(--border,#e5e7eb)] px-5 py-3.5">
-          <h3 className="text-[15px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>
-            {fmtDocsTitle(L, supplierName)}
-          </h3>
-          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full text-[var(--muted,#6b7280)] hover:bg-[var(--surface2,#f5f7fa)]" aria-label={L("Close", "إغلاق")}>
-            <span className="material-icons-outlined" style={{ fontSize: 18 }}>close</span>
-          </button>
+    <div className="dl-modal" dir={ar ? "rtl" : "ltr"} onClick={onClose}>
+      <div className="dl-modal-card" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+        <div className="dl-modal-head">
+          <span className="dl-modal-ic"><span className="material-icons-outlined">folder</span></span>
+          <div className="dl-modal-tt"><div className="dl-modal-title">{fmtDocsTitle(L, supplierName)}</div></div>
+          <button className="dl-modal-x" onClick={onClose} aria-label={L("Close", "إغلاق")}><span className="material-icons-outlined">close</span></button>
         </div>
-
-        <div className="overflow-y-auto px-5 py-4">
+        <div className="dl-modal-body">
           {error ? (
-            <p className="py-6 text-center text-[13px] text-[var(--muted,#6b7280)]">{L("Couldn’t load documents.", "تعذّر تحميل المستندات.")}</p>
+            <p className="dl-modal-note">{L("Couldn’t load documents.", "تعذّر تحميل المستندات.")}</p>
           ) : !docs ? (
-            <div className="grid place-items-center py-8"><span className="material-icons-outlined" style={{ fontSize: 24 }}>progress_activity</span></div>
+            <div style={{ display: "grid", placeItems: "center", padding: "24px 0" }}><span className="material-icons-outlined" style={{ fontSize: 24, color: "var(--muted)" }}>progress_activity</span></div>
           ) : total === 0 ? (
-            <p className="py-6 text-center text-[13px] text-[var(--muted,#6b7280)]">{L("No documents shared yet.", "لا توجد مستندات بعد.")}</p>
+            <p className="dl-modal-note">{L("No documents shared yet.", "لا توجد مستندات بعد.")}</p>
           ) : (
-            <div className="space-y-4">
+            <>
               <Section title={L("Company", "مستندات الشركة")} items={docs.companyDocuments} />
               <Section title={L("Equipment", "مستندات المعدة")} items={docs.equipmentDocuments} />
-            </div>
+            </>
           )}
         </div>
       </div>
@@ -791,17 +872,6 @@ function DocumentsModal({ id, ar, L, supplierName, onClose }: { id: string; ar: 
 function fmtDocsTitle(L: (en: string, arr: string) => string, supplierName: string): string {
   const name = supplierName || L("the supplier", "المؤجّر");
   return L(`${name}’s documents`, `مستندات ${name}`);
-}
-
-/** Centered modal shell for the guided flow — a flex column card that scrolls its body. */
-function FlowShell({ ar, onClose, children }: { ar: boolean; onClose: () => void; children: ReactNode }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" dir={ar ? "rtl" : "ltr"} onClick={onClose}>
-      <div className="flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-[var(--surface1,#fff)] shadow-xl" onClick={(e) => e.stopPropagation()}>
-        {children}
-      </div>
-    </div>
-  );
 }
 
 /**
@@ -820,7 +890,7 @@ function FlowShell({ ar, onClose, children }: { ar: boolean; onClose: () => void
 function CounterFlow({
   mode, room, ar, L, busy, error,
   resolutions, onResolveLocal, onReopenLocal, unresolvedCount,
-  periodLabel, periods, units, onClose, onCounter, onAccept,
+  periodLabel, periods, hasDuration, units, messages, onClose, onCounter, onAccept,
 }: {
   mode: "counter" | "accept";
   room: DealRoomView;
@@ -834,9 +904,14 @@ function CounterFlow({
   unresolvedCount: number;
   periodLabel: string;
   periods: number;
+  hasDuration: boolean;
   units: number;
+  messages: ChatMsg[];
   onClose: () => void;
-  onCounter: (next: { rate: number; mobPrice?: number; demobPrice?: number }) => void;
+  onCounter: (next: {
+    rate: number; mobPrice?: number; demobPrice?: number;
+    rentalUnits?: number; mobUnits?: number; demobUnits?: number; mobExcluded?: boolean; demobExcluded?: boolean;
+  }) => void;
   onAccept: (contractType: string) => void;
 }) {
   const editable = mode === "counter";
@@ -849,14 +924,58 @@ function CounterFlow({
   const [contractType, setContractType] = useState(room.contractType ?? "formal");
   const [ack, setAck] = useState(false);
 
+  // deal-room/negotiation — per-type unit counts (cap = requested; mob/demob ≤ rental) + leg exclusion.
+  const cap = Math.max(1, room.requestedUnits || units || 1);
+  const dflt = Math.min(cap, room.agreedUnits ?? units ?? 1);
+  const [rentalUnits, setRentalUnits] = useState<number>(dflt);
+  const [mobUnitsN, setMobUnitsN] = useState<number>(room.mobUnits ?? dflt);
+  const [demobUnitsN, setDemobUnitsN] = useState<number>(room.demobUnits ?? dflt);
+  const [mobExcluded, setMobExcluded] = useState<boolean>(room.mobExcluded);
+  const [demobExcluded, setDemobExcluded] = useState<boolean>(room.demobExcluded);
+  // Quotation-paper UI-only state (spec §6): collapsible دليل البنود categories + the السجل log modal.
+  const [guideOpen, setGuideOpen] = useState<Record<string, boolean>>({});
+  const [logOpen, setLogOpen] = useState(false);
+  const [logTab, setLogTab] = useState<"all" | "price" | "terms">("all");
+  const [paperZoom, setPaperZoom] = useState(0.85); // desk paper zoom (§6 oldWrap): 50%–180%
+
   const num = (s: string) => { const n = Number(s); return s.trim() !== "" && !Number.isNaN(n) && n >= 0 ? n : 0; };
   const rate = editable ? num(rateStr) : (room.rate ?? 0);
   const mob = editable ? num(mobStr) : (room.mobPrice ?? 0);
   const demob = editable ? num(demobStr) : (room.demobPrice ?? 0);
   const rateValid = rate > 0;
-  const subtotal = (rate * periods + mob + demob) * units; // mob/demob are per-unit too (app parity)
+
+  // Per-type PRORATED math — monthly ÷26 / weekly ÷7 / daily, × duration(days) × units — matches the
+  // backend quotation calc + the app. Excluded legs contribute 0.
+  const FREQ_DAYS: Record<string, number> = { PER_DAY: 1, PER_WEEK: 7, PER_MONTH: 26 };
+  const basis = (room.priceUnit ?? "PER_DAY").toUpperCase();
+  const perDay = rate / (FREQ_DAYS[basis] ?? 1);
+  const rNU = editable ? rentalUnits : (room.agreedUnits ?? units);
+  const mNU = Math.min(editable ? mobUnitsN : (room.mobUnits ?? rNU), rNU);
+  const dNU = Math.min(editable ? demobUnitsN : (room.demobUnits ?? rNU), rNU);
+  const mEx = editable ? mobExcluded : room.mobExcluded;
+  const dEx = editable ? demobExcluded : room.demobExcluded;
+  const rentalLine = perDay * periods * rNU;
+  const mobLine = mEx ? 0 : mob * mNU;
+  const demobLine = dEx ? 0 : demob * dNU;
+  const subtotal = rentalLine + mobLine + demobLine;
   const vat = Math.round(subtotal * 0.15);
   const total = subtotal + vat;
+
+  // العدد stepper — symmetric, capped. Rental caps at requested; mob/demob cap at the current rental.
+  const Stepper = ({ value, min, max, onChange, disabled }: { value: number; min: number; max: number; onChange: (v: number) => void; disabled?: boolean }) => {
+    const btn = (d: number, lbl: string, off: boolean) => (
+      <button type="button" disabled={disabled || off} onClick={() => onChange(Math.max(min, Math.min(max, value + d)))}
+        className="grid h-[26px] w-[26px] place-items-center rounded-[8px] border text-[16px] font-extrabold disabled:opacity-40"
+        style={{ borderColor: "var(--border,#e5e7eb)", color: "var(--navy,#0f1e2e)", background: "var(--surface1,#fff)" }}>{lbl}</button>
+    );
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        {btn(-1, "−", value <= min)}
+        <span className="min-w-[20px] text-center text-[14px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>{value}</span>
+        {btn(1, "+", value >= max)}
+      </span>
+    );
+  };
   const sar = L("SAR", "ر.س");
   const money = (v: number) => `${nf(v)} ${sar}`;
 
@@ -871,143 +990,420 @@ function CounterFlow({
   // Binding-commitment warning before the accept flow.
   if (!bindingOk) {
     return (
-      <FlowShell ar={ar} onClose={onClose}>
-        <div className="p-5 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full" style={{ background: "rgba(217,54,42,.1)" }}>
-            <span className="material-icons-outlined" style={{ color: "#d9362a", fontSize: 26 }}>gavel</span>
+      <div className="dl-modal" dir={ar ? "rtl" : "ltr"} onClick={onClose}>
+        <div className="dl-modal-card" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+          <div className="dl-modal-head">
+            <span className="dl-modal-ic danger"><span className="material-icons-outlined">gavel</span></span>
+            <div className="dl-modal-tt"><div className="dl-modal-title">{L("This is a binding commitment", "هذا التزام مُلزِم")}</div></div>
+            <button className="dl-modal-x" onClick={onClose} aria-label={L("Close", "إغلاق")}><span className="material-icons-outlined">close</span></button>
           </div>
-          <h3 className="text-[17px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>{L("This is a binding commitment", "هذا التزام مُلزِم")}</h3>
-          <p className="mt-1.5 text-[13px] leading-relaxed" style={{ color: "var(--muted,#6b7280)" }}>
-            {L("Accepting confirms the agreed rate and terms with the supplier for final confirmation. Please review the terms and price before you continue.", "القبول يؤكّد السعر والشروط المتفق عليها مع المؤجّر للتأكيد النهائي. يُرجى مراجعة الشروط والسعر قبل المتابعة.")}
-          </p>
-          <label className="mt-4 flex items-center justify-center gap-2 text-[13px] font-bold" style={{ color: "var(--navy,#0f1e2e)" }}>
-            <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />
-            {L("I understand this is binding", "أفهم أن هذا مُلزِم")}
-          </label>
-          <div className="mt-5 flex gap-2.5">
-            <button className="flex-1 rounded-[10px] border px-4 py-2.5 text-[13px] font-bold" style={{ borderColor: "var(--border,#e5e7eb)", color: "var(--navy,#0f1e2e)" }} onClick={onClose}>{L("Cancel", "إلغاء")}</button>
-            <button className="flex-1 rounded-[10px] px-4 py-2.5 text-[13px] font-bold text-white disabled:opacity-50" style={{ background: "#16a34a" }} disabled={!ack} onClick={() => { setAck(false); setBindingOk(true); }}>{L("Continue", "متابعة")}</button>
+          <div className="dl-modal-body center">
+            <p className="dl-modal-msg">
+              {L("Accepting confirms the agreed rate and terms with the supplier for final confirmation. Please review the terms and price before you continue.", "القبول يؤكّد السعر والشروط المتفق عليها مع المؤجّر للتأكيد النهائي. يُرجى مراجعة الشروط والسعر قبل المتابعة.")}
+            </p>
+            <label className="dl-modal-ack">
+              <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />
+              {L("I understand this is binding", "أفهم أن هذا مُلزِم")}
+            </label>
+          </div>
+          <div className="dl-modal-foot">
+            <button className="dl-mbtn" onClick={onClose}>{L("Cancel", "إلغاء")}</button>
+            <button className="dl-mbtn green" disabled={!ack} onClick={() => { setAck(false); setBindingOk(true); }}>{L("Continue", "متابعة")}</button>
           </div>
         </div>
-      </FlowShell>
+      </div>
     );
   }
 
-  const canNext = page === 0 ? unresolvedCount === 0 : page === 1 ? (editable ? rateValid : true) : true;
+  // Pages reordered to spec §6: 0 = السعر (price), 1 = الشروط (terms), 2 = المراجعة (review).
+  const canNext = page === 0 ? (editable ? rateValid : true) : page === 1 ? unresolvedCount === 0 : true;
   const canSubmit = editable ? rateValid && ack : ack;
+  const allMatched = unresolvedCount === 0;
   const doSubmit = () =>
     editable
-      ? onCounter({ rate, mobPrice: mob || undefined, demobPrice: demob || undefined })
+      ? onCounter({ rate, mobPrice: mob || undefined, demobPrice: demob || undefined, rentalUnits, mobUnits: Math.min(mobUnitsN, rentalUnits), demobUnits: Math.min(demobUnitsN, rentalUnits), mobExcluded, demobExcluded })
       : onAccept(contractType);
 
-  const priceRow = (label: string, v: string, set: (s: string) => void, ro: boolean) => (
-    <div className="mt-2.5 flex items-center justify-between rounded-[10px] border px-3 py-2" style={{ borderColor: "var(--border,#e5e7eb)", background: ro ? "var(--surface2,#f5f7fa)" : "var(--surface1,#fff)" }}>
-      <span className="text-[12.5px] font-bold" style={{ color: "var(--navy-mid,#33506e)" }}>{label}</span>
-      {ro ? (
-        <span className="text-[14px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>{money(num(v))}</span>
-      ) : (
-        <span className="flex items-center gap-1.5">
-          <input type="number" inputMode="numeric" min={0} value={v} onChange={(e) => set(e.target.value)} className="w-24 rounded-[8px] border px-2 py-1 text-end text-[14px] font-bold outline-0" style={{ borderColor: "var(--border,#e5e7eb)", color: "var(--navy,#0f1e2e)" }} placeholder="0" />
-          <span className="text-[11px] font-bold" style={{ color: "var(--muted,#6b7280)" }}>{sar}</span>
-        </span>
-      )}
+  // ── quotation-paper helpers (classic terms table + payment card + دليل البنود) ──
+  const PAY_KEYS = new Set(["payment_terms", "payment_method"]);
+  const payTerms = room.terms.filter((t) => PAY_KEYS.has(t.key));
+  const operatingTerms = room.terms.filter((t) => !PAY_KEYS.has(t.key));
+  const supStr = (t: DealTerm) => (t.supplierDeclared != null ? String(t.supplierDeclared) : null);
+  type Dec = { badge: "match" | "conflict" | "none" | "locked"; chosen: unknown; server: boolean };
+  const decide = (t: DealTerm): Dec => {
+    if (t.state === "fixed") return { badge: "locked", chosen: t.value ?? t.platformDefault, server: true };
+    if (t.state === "agreed" || t.state === "soft_accepted") return { badge: "match", chosen: t.value ?? t.supplierDeclared ?? t.renteePreference, server: true };
+    const r = resolutions[t.key];
+    if (!r) return { badge: "none", chosen: null, server: false };
+    if (r.action === "accept") return { badge: "match", chosen: t.supplierDeclared, server: false };
+    const cv = r.value != null ? String(r.value) : null;
+    return { badge: cv != null && cv === supStr(t) ? "match" : "conflict", chosen: r.value, server: false };
+  };
+  const choicesFor = (t: DealTerm): { value: string; label: string }[] => {
+    const seen = new Set<string>();
+    const out: { value: string; label: string }[] = [];
+    const push = (v: unknown, label?: string) => {
+      if (v == null || v === "") return;
+      const val = String(v);
+      if (seen.has(val)) return;
+      seen.add(val);
+      out.push({ value: val, label: label ?? valText(v, L) });
+    };
+    push(t.supplierDeclared);
+    for (const o of t.options) push(o.value, ar ? o.labelAr : o.labelEn);
+    push(t.renteePreference);
+    return out;
+  };
+  const pickTerm = (t: DealTerm, val: string) => {
+    if (val === "__none") { onReopenLocal(t.key); return; }
+    if (supStr(t) != null && val === supStr(t)) onResolveLocal(t.key, "accept");
+    else onResolveLocal(t.key, "counter", val);
+  };
+  const chosenSel = (t: DealTerm): string => { const c = decide(t).chosen; return c != null ? String(c) : "__none"; };
+  const catOf = (k: string): string => {
+    if (/^operator|^fat|nationality|night_shift/.test(k)) return L("Operator", "المشغّل");
+    if (/fuel|maintenance|breakdown|equipment|saso|attachment/.test(k)) return L("Equipment", "المعدّة");
+    if (/overtime|working|crosshire|local_content|shift/.test(k)) return L("Work", "العمل");
+    return L("Other", "أخرى");
+  };
+  const badgeLabel = (b: Dec["badge"]) => (b === "match" ? L("Match", "مطابق") : b === "conflict" ? L("Differs", "يختلف") : b === "locked" ? L("Fixed", "مثبّت") : L("Not set", "لم تحدّد"));
+  const isSettled = (b: Dec["badge"]) => b === "match" || b === "locked";
+  const groupByCat = (list: DealTerm[]): [string, DealTerm[]][] => {
+    const m = new Map<string, DealTerm[]>();
+    for (const t of list) { const c = catOf(t.key); const g = m.get(c) ?? []; g.push(t); m.set(c, g); }
+    return [...m];
+  };
+
+  // Supplier's standing offer total (compare card) — same ÷26 math on the room's on-table numbers.
+  const supTotal = (() => {
+    const rl = ((room.rate ?? 0) / (FREQ_DAYS[basis] ?? 1)) * periods * rNU;
+    const ml = room.mobExcluded ? 0 : (room.mobPrice ?? 0) * mNU;
+    const dl = room.demobExcluded ? 0 : (room.demobPrice ?? 0) * dNU;
+    const sub = rl + ml + dl;
+    return sub + Math.round(sub * 0.15);
+  })();
+  const showCompare = editable && room.lastCounterBy === "supplier";
+  const priceDiff = Math.abs(total - supTotal);
+
+  const STEPS = [L("Price", "السعر"), L("Terms", "الشروط"), L("Review", "المراجعة")];
+  const sheetTitle = `${room.details.equipmentLabel ?? L("Equipment", "المعدّة")}${rNU > 1 ? ` — ${rNU} ${L("units", "وحدات")}` : ""}`;
+  const roomCode = room.shortCode ?? "";
+  const today = new Date().toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const changedFrom = (cur: number, ref: number | null) => ref != null && Math.round(cur) !== Math.round(ref);
+
+  // Quotation head (reused on the price + review papers). CR/VAT + a formal quotation number aren't in
+  // the deal-room payload, so we show the company + location + the room short code (no fabricated ids).
+  const qhead = (_subtitle: string) => (
+    <div className="qp-qhead">
+      <div className="qp-qco">
+        <div className="qp-qlogo">{room.supplier.name.charAt(0).toUpperCase()}</div>
+        <div className="qp-qcoinfo">
+          <b>{room.supplier.name}</b>
+          {room.details.location && <span className="ln">{room.details.location}</span>}
+        </div>
+      </div>
+      <div className="qp-qno" dir="ltr">
+        <div className="lbl">{L("QUOTATION №", "عرض سعر رقم")}</div>
+        <div className="num">{roomCode || "—"}</div>
+        <div className="sub">{L("Issued", "التاريخ")} {today}</div>
+      </div>
     </div>
   );
 
+  // Editable price → the prototype's green "عدّل" box (green tint + inner edit icon).
+  const priceBox = (val: string, onChange: (s: string) => void) => (
+    <span className="qp-pricebox"><span className="material-icons-outlined ic">edit</span><input type="number" inputMode="numeric" min={0} value={val} onChange={(e) => onChange(e.target.value)} className="qp-price-in" placeholder="0" /></span>
+  );
+
+  // A price-table leg row (mob/demob): red ✕ exclude + trip stepper + green price box + المورد ref.
+  const legTr = (label: string, sub: string, priceStr: string, setPrice: (s: string) => void, u: number, setU: (v: number) => void, ex: boolean, setEx: (b: boolean) => void, refPrice: number | null) => {
+    const line = ex ? 0 : num(priceStr) * Math.min(u, rentalUnits);
+    return (
+      <tr className={ex ? "ex" : undefined}>
+        <td>
+          <div className="qp-itemcell">
+            {editable && !ex && <button type="button" className="qp-legx" title={L("Exclude", "استبعاد")} onClick={() => setEx(true)}>✕</button>}
+            <div>
+              <div className="lbl">{label}</div>
+              <div className="sub">{sub}</div>
+              {editable && ex && <button type="button" className="qp-legbtn restore" onClick={() => setEx(false)}>+ {L("Restore", "استعادة")}</button>}
+            </div>
+          </div>
+        </td>
+        <td className="mut">{L("Trip", "رحلة")}</td>
+        <td>{ex ? "—" : <div className="qp-qty">{editable && <span className="hint">{L("Your choice", "خيارك")}</span>}{editable ? <Stepper value={Math.min(u, rentalUnits)} min={0} max={rentalUnits} onChange={setU} /> : <b>{Math.min(u, rentalUnits)}</b>}</div>}</td>
+        <td>
+          {ex ? <span className="qp-excluded">{L("Excluded", "مستبعد")}</span>
+            : editable ? <>{priceBox(priceStr, setPrice)}{refPrice != null && <div className={`qp-ref${changedFrom(num(priceStr), refPrice) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {nf(refPrice)}</div>}</>
+            : <b className="tot">{money(num(priceStr))}</b>}
+        </td>
+        <td><b className="tot">{ex ? L("Not incl.", "غير مشمول") : money(line)}</b></td>
+      </tr>
+    );
+  };
+
   return (
-    <FlowShell ar={ar} onClose={() => !busy && onClose()}>
-      {/* header */}
-      <div className="flex items-center justify-between border-b px-5 py-3.5" style={{ borderColor: "var(--border,#e5e7eb)" }}>
-        <h3 className="text-[15px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>
-          {mode === "counter" ? L("Send a counter-offer", "إرسال عرض مقابل") : L("Accept the offer", "قبول العرض")}
-        </h3>
-        <button onClick={() => !busy && onClose()} className="grid h-8 w-8 place-items-center rounded-full" style={{ color: "var(--muted,#6b7280)" }} aria-label={L("Close", "إغلاق")}>
-          <span className="material-icons-outlined" style={{ fontSize: 18 }}>close</span>
-        </button>
-      </div>
-
-      {/* pagination dots */}
-      <div className="flex items-center justify-center gap-1.5 py-2.5">
-        {[0, 1, 2].map((i) => (
-          <span key={i} style={{ width: 7, height: 7, borderRadius: "50%", background: i === page ? "var(--action,#f7900a)" : "var(--border,#d4e0ec)", transition: "background .15s" }} />
-        ))}
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-2">
-        {page === 0 && (
-          <div>
-            <div className="mb-1.5 text-[13px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>{L("Review terms", "مراجعة الشروط")}</div>
-            {room.terms.length === 0 ? (
-              <p className="py-6 text-center text-[13px]" style={{ color: "var(--muted,#6b7280)" }}>{L("No terms to review.", "لا توجد شروط للمراجعة.")}</p>
-            ) : (
-              <DealRoomTerms terms={room.terms} ar={ar} L={L} busy={busy} resolutions={resolutions} onResolveLocal={onResolveLocal} onReopenLocal={onReopenLocal} />
-            )}
-            {unresolvedCount > 0 && (
-              <p className="mt-2 text-[12px] font-semibold" style={{ color: "var(--warn,#b45309)" }}>
-                {L(`Resolve ${unresolvedCount} differing term${unresolvedCount > 1 ? "s" : ""} to continue`, `قم بحل ${unresolvedCount} شرطًا مختلفًا للمتابعة`)}
-              </p>
-            )}
-          </div>
-        )}
-
-        {page === 1 && (
-          <div>
-            <div className="mb-1.5 text-[13px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>{editable ? L("Propose your price", "اقترح سعرك") : L("Price", "السعر")}</div>
-            {editable && (
-              <p className="mb-1 text-[12px]" style={{ color: "var(--muted,#6b7280)" }}>{L("The supplier can accept or counter back.", "يمكن للمؤجّر القبول أو الرد بعرض مقابل.")}</p>
-            )}
-            {priceRow(`${L("Daily rate", "السعر اليومي")} (${periodLabel})`, rateStr, setRateStr, !editable)}
-            {priceRow(L("Mobilization / delivery", "النقل / التوصيل"), mobStr, setMobStr, !editable)}
-            {priceRow(L("Return", "الإرجاع"), demobStr, setDemobStr, !editable)}
-            <div className="mt-3 flex items-center justify-between rounded-[10px] px-3 py-2.5" style={{ background: "var(--surface2,#f5f7fa)" }}>
-              <span className="text-[13px] font-bold" style={{ color: "var(--navy,#0f1e2e)" }}>{L("Estimated total", "الإجمالي التقديري")}</span>
-              <span className="text-[15px] font-extrabold" style={{ color: "var(--action,#f7900a)" }}>{money(total)}</span>
+    <div className="qp-scrim" dir={ar ? "rtl" : "ltr"} onClick={() => !busy && onClose()}>
+      <div className="qp-sheet qp-full" onClick={(e) => e.stopPropagation()}>
+        {/* two-row header */}
+        <div className="qp-head">
+          <div className="qp-head-r1">
+            <div className="qp-htitle">
+              <div className="t">{sheetTitle}</div>
+              <div className="s">{L("Negotiation room", "غرفة التفاوض")}{roomCode ? ` · ${roomCode}` : ""}</div>
             </div>
-            {editable && !rateValid && <p className="mt-2 text-[12px] font-semibold" style={{ color: "#d9362a" }}>{L("Enter a daily rate to continue", "أدخل سعرًا يوميًا للمتابعة")}</p>}
+            <div className="qp-htotal"><div className="k">{L("Your offer", "إجمالي عرضك")}</div><div className="v">{nf(total)} {sar}</div></div>
+            <button className="qp-x" onClick={() => !busy && onClose()} aria-label={L("Close", "إغلاق")}><span className="material-icons-outlined">close</span></button>
           </div>
-        )}
+          <div className="qp-steps">
+            {STEPS.map((s, i) => (
+              <Fragment key={i}>
+                {i > 0 && <span className={`bar${i <= page ? " done" : ""}`} />}
+                <span className={`qp-step${i === page ? " on" : i < page ? " done" : ""}`}>
+                  <span className="badge">{i < page ? "✓" : i + 1}</span>
+                  <span className="lbl">{s}</span>
+                </span>
+              </Fragment>
+            ))}
+          </div>
+        </div>
 
-        {page === 2 && (
-          <div>
-            <div className="mb-1.5 text-[13px] font-extrabold" style={{ color: "var(--navy,#0f1e2e)" }}>{L("Summary", "الملخّص")}</div>
-            <div className="rounded-[10px] border px-3 py-2.5" style={{ borderColor: "var(--border,#e5e7eb)" }}>
-              <div className="flex items-center justify-between text-[13px]"><span style={{ color: "var(--muted,#6b7280)" }}>{L("Rate", "السعر")}</span><b style={{ color: "var(--navy,#0f1e2e)" }}>{money(rate)} / {periodLabel}{units > 1 ? ` · ×${units}` : ""}</b></div>
-              {mob > 0 && <div className="mt-1 flex items-center justify-between text-[13px]"><span style={{ color: "var(--muted,#6b7280)" }}>{L("Mobilization", "النقل")}</span><b style={{ color: "var(--navy,#0f1e2e)" }}>{money(mob)}</b></div>}
-              {demob > 0 && <div className="mt-1 flex items-center justify-between text-[13px]"><span style={{ color: "var(--muted,#6b7280)" }}>{L("Return", "الإرجاع")}</span><b style={{ color: "var(--navy,#0f1e2e)" }}>{money(demob)}</b></div>}
-              <div className="mt-1.5 flex items-center justify-between border-t pt-1.5 text-[14px]" style={{ borderColor: "var(--border,#e5e7eb)" }}><b style={{ color: "var(--navy,#0f1e2e)" }}>{L("Estimated total", "الإجمالي التقديري")}</b><b style={{ color: "var(--action,#f7900a)" }}>{money(total)}</b></div>
+        {/* body — full-screen grey desk holding the zoomable white paper (§6 oldWrap) */}
+        <div className="qp-desk">
+          <div className="qp-deskpad">
+          {/* ① السعر — quotation paper */}
+          {page === 0 && (
+            <div className="qp-paper" style={{ zoom: String(paperZoom) }}>
+              {showCompare && (
+                <div className="qp-compare">
+                  <div className="duo">
+                    <div className="side sup"><div className="k">{L("Supplier's offer", "عرض المورد")}</div><div className="v">{nf(supTotal)}</div></div>
+                    <div className="side me"><div className="k">{L("Your offer", "عرضك")}</div><div className="v">{nf(total)}</div></div>
+                  </div>
+                  <div className="conv"><span className="track" /><span className={`chip${priceDiff === 0 ? " ok" : ""}`}>{priceDiff === 0 ? L("Match ✓", "تطابق ✓") : `${L("Gap", "الفرق")} ${nf(priceDiff)}`}</span><span className="track" /></div>
+                </div>
+              )}
+              {qhead(sheetTitle)}
+              <div className="qp-sech">{L("Price quotation", "عرض السعر")}</div>
+              <table className="qp-table">
+                <thead><tr><th>{L("Item", "البند")}</th><th>{L("Duration", "المدة")}</th><th>{L("Qty", "العدد")}</th><th>{L("Price", "السعر")}</th><th>{L("Total", "الإجمالي")}</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td><div className="lbl">{L("Base rental", "الإيجار الأساسي")}</div><div className="sub">{room.details.equipmentLabel ?? periodLabel}</div></td>
+                    <td className="mut">{hasDuration ? `${periods} ${L("days", "يوم")}` : "—"}</td>
+                    <td><div className="qp-qty">{editable && <span className="hint">{L("Your choice", "خيارك")}</span>}{editable ? <Stepper value={rentalUnits} min={1} max={cap} onChange={(v) => { setRentalUnits(v); setMobUnitsN((u) => Math.min(u, v)); setDemobUnitsN((u) => Math.min(u, v)); }} /> : <b>{rNU}</b>}<span className="qp-qmatch">✓ {L("Qty", "العدد")} {rNU}</span></div></td>
+                    <td>{editable ? <>{priceBox(rateStr, setRateStr)}{room.rate != null && <div className={`qp-ref${changedFrom(rate, room.rate) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {nf(room.rate)}</div>}</> : <b className="tot">{money(rate)}</b>}</td>
+                    <td><b className="tot">{money(rentalLine)}</b></td>
+                  </tr>
+                  {legTr(L("Mobilization — mob", "التعبئة — موب"), L("delivery", "توصيل"), mobStr, setMobStr, mobUnitsN, setMobUnitsN, mobExcluded, setMobExcluded, room.mobPrice)}
+                  {legTr(L("Return — demob", "الإرجاع — ديموب"), L("pickup", "استلام"), demobStr, setDemobStr, demobUnitsN, setDemobUnitsN, demobExcluded, setDemobExcluded, room.demobPrice)}
+                </tbody>
+              </table>
+              <div className="qp-totals">
+                <div className="qp-trow"><span className="l">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="v">{money(subtotal)}</span></div>
+                <div className="qp-trow"><span className="l">{L("VAT 15%", "ضريبة القيمة المضافة ١٥٪")}</span><span className="v">{money(vat)}</span></div>
+                <div className="qp-trow net"><span className="l">{L("Net incl. VAT", "الصافي شامل الضريبة")}</span><span className="v">{money(total)}</span></div>
+              </div>
+              <div className="qp-words"><span className="k">{L("Amount in words", "المبلغ بالحروف")}</span>{nf(total)} {L("Saudi Riyals only", "ريال سعودي فقط لا غير")}</div>
+              {payTerms.length > 0 && (
+                <div className="qp-pay">
+                  <div className="qp-sech">{L("Payment terms", "شروط الدفع")}</div>
+                  {payTerms.map((t) => { const d = decide(t); const opts = choicesFor(t); return (
+                    <div key={t.key} className="qp-pay-row">
+                      <span className="k">{ar ? t.labelAr : t.label}</span>
+                      {editable && !d.server ? (
+                        <select className="qp-sel" value={chosenSel(t)} onChange={(e) => pickTerm(t, e.target.value)}>
+                          <option value="__none">{L("— choose —", "— اختر —")}</option>
+                          {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                      ) : <b style={{ flex: 1 }}>{valText(d.chosen ?? t.supplierDeclared, L)}</b>}
+                      <span className={`qp-badge ${isSettled(d.badge) ? "match" : d.badge === "conflict" ? "diff" : "none"}`}>{badgeLabel(d.badge)}</span>
+                    </div>
+                  ); })}
+                </div>
+              )}
+              {editable && !rateValid && <p style={{ marginTop: 10, fontSize: 12, fontWeight: 700, color: "var(--danger,#d9362a)" }}>{L("Enter a rate to continue", "أدخل سعرًا للمتابعة")}</p>}
             </div>
-            {mode === "accept" && (
-              <label className="mt-3 block">
-                <span className="text-[12px] font-bold" style={{ color: "var(--navy-mid,#33506e)" }}>{L("Contract type", "نوع العقد")}</span>
-                <select value={contractType} onChange={(e) => setContractType(e.target.value)} className="mt-1 h-[42px] w-full rounded-[10px] border px-3 text-[14px] font-bold outline-0" style={{ borderColor: "var(--border,#e5e7eb)", color: "var(--navy,#0f1e2e)", background: "var(--surface1,#fff)" }}>
-                  {CONTRACT_TYPES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-                </select>
+          )}
+
+          {/* ② الشروط — classic quotation table */}
+          {page === 1 && (
+            <div className="qp-paper" style={{ zoom: String(paperZoom) }}>
+              {qhead(L("Operating terms · Annex", "شروط التشغيل · ملحق"))}
+              <div className="qp-sech">{L("Operating terms", "شروط التشغيل")}</div>
+              {operatingTerms.length === 0 ? (
+                <p style={{ padding: "20px 0", textAlign: "center", color: "var(--muted,#6b8fa8)", fontSize: 13 }}>{L("No operating terms.", "لا توجد شروط تشغيل.")}</p>
+              ) : (
+                <table className="qp-tt">
+                  <thead><tr><th>{L("Term", "البند")}</th><th>{L("Supplier's offer", "عرض المورد")}</th><th>{L("Your decision", "قرارك")}</th><th>{L("Status", "الحالة")}</th></tr></thead>
+                  <tbody>
+                    {groupByCat(operatingTerms.filter((t) => !isSettled(decide(t).badge))).map(([cat, list]) => (
+                      <Fragment key={cat}>
+                        <tr className="cat"><td colSpan={4}>{cat}</td></tr>
+                        {list.map((t) => { const d = decide(t); const opts = choicesFor(t); return (
+                          <tr key={t.key}>
+                            <td className="lbl">{ar ? t.labelAr : t.label}</td>
+                            <td className="sup">{valText(t.supplierDeclared, L)}</td>
+                            <td>{editable ? (
+                              <select className="qp-sel" value={chosenSel(t)} onChange={(e) => pickTerm(t, e.target.value)}>
+                                <option value="__none">{L("— choose —", "— اختر —")}</option>
+                                {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                              </select>
+                            ) : <span className="sup">{valText(d.chosen, L)}</span>}</td>
+                            <td><span className={`qp-ttbadge ${d.badge}`}>{badgeLabel(d.badge)}</span></td>
+                          </tr>
+                        ); })}
+                      </Fragment>
+                    ))}
+                    {operatingTerms.some((t) => isSettled(decide(t).badge)) && (
+                      <>
+                        <tr className="cat settled"><td colSpan={4}>{L("Settled & fixed terms", "البنود المحسومة والمقرّرة")}</td></tr>
+                        {operatingTerms.filter((t) => isSettled(decide(t).badge)).map((t) => { const d = decide(t); return (
+                          <tr key={t.key} className={d.badge === "locked" ? "locked" : undefined}>
+                            <td className="lbl">{d.badge === "locked" ? "🔒 " : ""}{ar ? t.labelAr : t.label}</td>
+                            <td className="sup" colSpan={2}>{valText(d.chosen ?? t.value, L)}{editable && !d.server && <button type="button" className="qp-ttreopen" title={L("Reopen", "إعادة فتح")} onClick={() => onReopenLocal(t.key)}>↻</button>}</td>
+                            <td><span className={`qp-ttbadge ${d.badge}`}>{badgeLabel(d.badge)}</span></td>
+                          </tr>
+                        ); })}
+                      </>
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+
+          {/* ③ المراجعة — quotation summary */}
+          {page === 2 && (
+            <div className="qp-paper" style={{ zoom: String(paperZoom) }}>
+              {qhead(sheetTitle)}
+              {room.details.location && (
+                <div className="qp-addr">
+                  <div className="qp-addrbox"><span className="k">{L("Address", "العنوان")}</span><span className="v">{room.details.location}</span></div>
+                  <div className="qp-addrbox"><span className="k">{L("City", "المدينة")}</span><span className="v">{room.details.location.split(/[·,،]/).map((s) => s.trim()).filter(Boolean).pop()}</span></div>
+                </div>
+              )}
+              <div className="qp-rgrid">
+                <div className="qp-rcol">
+                  <div className="qp-rcard">
+                    <div className="qp-rcard-h"><span className="material-icons-outlined">receipt_long</span>{L("Price summary", "ملخص عرض السعر")}</div>
+                    <div className="qp-totals" style={{ borderTop: 0, paddingTop: 0 }}>
+                      <div className="qp-trow"><span className="l">{L("Quantity", "الكمية")}</span><span className="v">{rNU} {L("units", "وحدة")}{hasDuration ? ` · ${periods} ${L("days", "يوم")}` : ""}</span></div>
+                      <div className="qp-trow"><span className="l">{L("Base rental", "الإيجار الأساسي")}</span><span className="v">{money(rentalLine)}</span></div>
+                      <div className="qp-trow"><span className="l">{L("Mobilization", "التعبئة (موب)")}</span><span className="v">{mEx ? L("Excluded", "غير مشمولة") : money(mobLine)}</span></div>
+                      <div className="qp-trow"><span className="l">{L("Return", "الإرجاع (ديموب)")}</span><span className="v">{dEx ? L("Excluded", "غير مشمول") : money(demobLine)}</span></div>
+                      <div className="qp-trow"><span className="l">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="v">{money(subtotal)}</span></div>
+                      <div className="qp-trow"><span className="l">{L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)")}</span><span className="v">{money(vat)}</span></div>
+                      <div className="qp-trow net"><span className="l">{L("Net incl. VAT", "الصافي · شامل الضريبة")}</span><span className="v">{money(total)}</span></div>
+                    </div>
+                    {showCompare && <span className={`qp-sumbadge${priceDiff === 0 ? " match" : " diff"}`}>{priceDiff === 0 ? L("Matches supplier's offer", "مطابق لعرض المورد") : `${L("Differs from supplier", "يختلف عن عرض المورد")} (${nf(priceDiff)})`}</span>}
+                  </div>
+                  {payTerms.length > 0 && (
+                    <div className="qp-rcard">
+                      <div className="qp-rcard-h"><span className="material-icons-outlined">credit_card</span>{L("Payment terms", "شروط الدفع")}</div>
+                      <div className="qp-totals" style={{ borderTop: 0, paddingTop: 0 }}>
+                        {payTerms.map((t) => { const d = decide(t); return <div key={t.key} className="qp-trow"><span className="l">{ar ? t.labelAr : t.label}</span><span className="v" style={{ fontFamily: "inherit", color: d.badge === "conflict" ? "var(--danger,#d9362a)" : "var(--navy,#1c3550)" }}>{valText(d.chosen ?? t.supplierDeclared, L)}</span></div>; })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {operatingTerms.length > 0 && (() => {
+                  const matched = operatingTerms.filter((t) => isSettled(decide(t).badge)).length;
+                  const diff = operatingTerms.filter((t) => decide(t).badge === "conflict").length;
+                  const pct = (n: number) => `${Math.round((n / operatingTerms.length) * 100)}%`;
+                  return (
+                    <div className="qp-guide-navy">
+                      <div className="qp-gn-h"><span className="material-icons-outlined">list_alt</span>{L("Terms index", "دليل البنود")}<span className="rdy">{matched}/{operatingTerms.length} {L("ready", "جاهز")}</span></div>
+                      <div className="qp-gn-bar"><div className="ok" style={{ width: pct(matched) }} /><div className="df" style={{ width: pct(diff) }} /></div>
+                      <div className="qp-gn-legend"><span className="d ok" />{matched} {L("ready", "جاهز")}<span className="d df" />{diff} {L("differ", "يختلف")}</div>
+                      {diff > 0 && <div className="qp-gn-review"><span className="material-icons-outlined" style={{ fontSize: 15 }}>autorenew</span>{L("Review differing terms", "راجع البنود المختلفة")} ({diff})</div>}
+                      {groupByCat(operatingTerms).map(([cat, list]) => { const open = guideOpen[cat] ?? true; const cm = list.filter((t) => isSettled(decide(t).badge)).length; return (
+                        <div key={cat} className="qp-gncat">
+                          <button type="button" className="qp-gncat-h" onClick={() => setGuideOpen((g) => ({ ...g, [cat]: !open }))}>{cat}<span className="cnt">{cm}/{list.length}</span><span className={`material-icons-outlined chev${open ? " open" : ""}`}>expand_more</span></button>
+                          {open && list.map((t) => { const d = decide(t); return <div key={t.key} className={`qp-gnrow ${d.badge}`}><span className="k">{ar ? t.labelAr : t.label}</span><span className={`qp-gnbadge ${d.badge}`}>{badgeLabel(d.badge)}</span></div>; })}
+                        </div>
+                      ); })}
+                    </div>
+                  );
+                })()}
+              </div>
+              {mode === "accept" && (
+                <label style={{ display: "block", marginTop: 16 }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: "var(--navy-mid,#2a4f72)" }}>{L("Contract type", "نوع العقد")}</span>
+                  <select value={contractType} onChange={(e) => setContractType(e.target.value)} className="qp-sel" style={{ marginTop: 5, width: "100%", height: 42 }}>
+                    {CONTRACT_TYPES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  </select>
+                </label>
+              )}
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 14, fontSize: 12.5, fontWeight: 600, color: "var(--navy,#1c3550)" }}>
+                <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} style={{ marginTop: 2 }} />
+                {mode === "counter" ? L("I confirm this counter-offer is correct.", "أؤكّد أن هذا العرض المقابل صحيح.") : L("I confirm the agreed rate and terms.", "أؤكّد السعر والشروط المتفق عليها.")}
               </label>
+              {error && <p style={{ marginTop: 8, fontSize: 12.5, fontWeight: 700, color: "var(--danger,#d9362a)" }}>{error}</p>}
+            </div>
+          )}
+          </div>
+          {/* zoom rail — fixed in the desk's side margin (right in RTL, left in LTR) */}
+          <div className="qp-zoom">
+            <button type="button" title={L("Zoom in", "تكبير")} onClick={() => setPaperZoom((z) => Math.min(1.8, Math.round((z + 0.15) * 100) / 100))}>+</button>
+            <button type="button" className="pct" title={L("Fit (85%)", "ملاءمة ٨٥٪")} onClick={() => setPaperZoom(0.85)}>{Math.round(paperZoom * 100)}%</button>
+            <button type="button" title={L("Zoom out", "تصغير")} onClick={() => setPaperZoom((z) => Math.max(0.5, Math.round((z - 0.15) * 100) / 100))}>−</button>
+          </div>
+        </div>
+
+        {/* footer */}
+        <div className="qp-foot">
+          <button type="button" className="qp-log" onClick={() => setLogOpen(true)}><span className="material-icons-outlined" style={{ fontSize: 16 }}>history</span>{L("Log", "السجل")}</button>
+          <div className="spacer" />
+          <div className="qp-foot-main">
+            {!editable && allMatched && page < 2 && <button className="qp-fbtn accept" onClick={() => setPage(2)}>✓ {L("Accept offer", "قبول العرض")}</button>}
+            {page < 2 ? (
+              <button className="qp-fbtn primary" disabled={!canNext} onClick={() => setPage((p) => (p + 1) as 0 | 1 | 2)}>{page === 0 ? L("Next: Terms", "التالي: الشروط") : L("Review & send", "مراجعة وإرسال")}<span className="qp-cch">‹</span></button>
+            ) : (
+              <button className={`qp-fbtn ${editable ? "primary" : "accept"}`} disabled={busy || !canSubmit} onClick={doSubmit}>{busy ? L("Sending…", "جارٍ الإرسال…") : editable ? L("Send reply", "إرسال الرد") : L("Accept offer", "قبول العرض")}<span className="qp-cch">‹</span></button>
             )}
-            <label className="mt-3 flex items-start gap-2 text-[12.5px] font-semibold" style={{ color: "var(--navy,#0f1e2e)" }}>
-              <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} className="mt-0.5" />
-              {mode === "counter"
-                ? L("I confirm this counter-offer is correct.", "أؤكّد أن هذا العرض المقابل صحيح.")
-                : L("I confirm the agreed rate and terms.", "أؤكّد السعر والشروط المتفق عليها.")}
-            </label>
-            {error && <p className="mt-2 text-[12.5px] font-semibold" style={{ color: "#d9362a" }}>{error}</p>}
+            <button className="qp-fbtn back" disabled={busy} onClick={() => (page > 0 ? setPage((p) => (p - 1) as 0 | 1 | 2) : onClose())}>{page > 0 ? L("Back", "رجوع") : L("Close", "إغلاق")}<span className="qp-cch">›</span></button>
+          </div>
+          <div className="spacer" />
+        </div>
+
+        {logOpen && (
+          <div className="qp-scrim" style={{ zIndex: 70 }} onClick={() => setLogOpen(false)}>
+            <div className="qp-sheet" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+              <div className="qp-head-r1"><div className="qp-htitle"><div className="t">{L("Negotiation log", "سجل التفاوض")}</div></div><button className="qp-x" onClick={() => setLogOpen(false)}><span className="material-icons-outlined">close</span></button></div>
+              <div className="qp-log-tabs">
+                {([["all", L("All", "الكل")], ["price", L("Price", "السعر")], ["terms", L("Terms", "الشروط")]] as const).map(([k, lbl]) => (
+                  <button key={k} type="button" className={`qp-log-tab${logTab === k ? " on" : ""}`} onClick={() => setLogTab(k)}>{lbl}</button>
+                ))}
+              </div>
+              <div className="qp-body" style={{ background: "#fff", padding: "4px 0 8px" }}>
+                {(() => {
+                  // Real activity log — the deal room's system_bot narration (each counter / rate proposal /
+                  // term action / lifecycle event), newest-first. Full structured per-round price history is
+                  // still latest-only backend-side (spec §11), but every round is narrated here as it happens.
+                  const sys = messages.filter((m) => m.user?.id === "system_bot" && (m.text ?? "").trim());
+                  const sorted = [...sys].sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime());
+                  const PRICE_RE = /سعر|ر\.?\s?س|price|rate|تعبئة|إرجاع|موب|ديموب|SAR/i;
+                  const TERMS_RE = /شرط|بند|term|إعاشة|وقود|صيانة|دفع|مشغّل|مشغل|قبول/i;
+                  const shown = sorted.filter((m) => (logTab === "all" ? true : logTab === "price" ? PRICE_RE.test(m.text ?? "") : TERMS_RE.test(m.text ?? "")));
+                  if (shown.length === 0) return <p style={{ fontSize: 13, color: "var(--muted,#6b8fa8)", textAlign: "center", padding: "24px 0" }}>{L("No activity yet.", "لا يوجد نشاط بعد.")}</p>;
+                  return (
+                    <ul className="qp-log-list">
+                      {shown.map((m) => (
+                        <li key={m.id} className="qp-log-row">
+                          <span className="material-icons-outlined qp-log-ic">bolt</span>
+                          <span className="qp-log-txt">{m.text}</span>
+                          {m.created_at && <span className="qp-log-time">{new Date(m.created_at).toLocaleString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  );
+                })()}
+              </div>
+            </div>
           </div>
         )}
       </div>
-
-      {/* footer nav */}
-      <div className="flex items-center gap-2.5 border-t px-5 py-3.5" style={{ borderColor: "var(--border,#e5e7eb)" }}>
-        {page > 0 && (
-          <button className="rounded-[10px] border px-4 py-2.5 text-[13px] font-bold disabled:opacity-50" style={{ borderColor: "var(--border,#e5e7eb)", color: "var(--navy,#0f1e2e)" }} disabled={busy} onClick={() => setPage((p) => p - 1)}>{L("Back", "رجوع")}</button>
-        )}
-        {page < 2 ? (
-          <button className="rounded-[10px] px-5 py-2.5 text-[13px] font-bold text-white disabled:opacity-50" style={{ background: "var(--action,#f7900a)", marginInlineStart: "auto" }} disabled={!canNext} onClick={() => setPage((p) => p + 1)}>{L("Next", "التالي")}</button>
-        ) : (
-          <button className="rounded-[10px] px-5 py-2.5 text-[13px] font-bold text-white disabled:opacity-50" style={{ background: mode === "counter" ? "var(--action,#f7900a)" : "#16a34a", marginInlineStart: "auto" }} disabled={busy || !canSubmit} onClick={doSubmit}>
-            {busy ? L("Sending…", "جارٍ الإرسال…") : mode === "counter" ? L("Send counter offer", "إرسال العرض المقابل") : L("Accept offer", "قبول العرض")}
-          </button>
-        )}
-      </div>
-    </FlowShell>
+    </div>
   );
 }

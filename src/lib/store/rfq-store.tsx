@@ -19,7 +19,8 @@ import {
   newManualItem,
   postableItems,
 } from "@/lib/contract";
-import { ApiError, ApiErrorKind, fetchTaxonomy, processRfq, submitRequest } from "@/lib/api/client";
+import { ApiError, ApiErrorKind, fetchTaxonomy, postRfqCorrection, processRfq, submitRequest } from "@/lib/api/client";
+import { draftToRfqCorrection } from "@/lib/api/agent-adapters";
 import { useSession } from "@/lib/session";
 
 export type Phase = "intake" | "processing" | "wizard" | "confirmation";
@@ -171,6 +172,7 @@ function reducer(state: RfqState, a: Action): RfqState {
         busy: false,
         error: null,
         draft: {
+          rfqId: a.draft.rfqId ?? null, // A5: anchor for the web_review correction fired at submit
           project: a.draft.project,
           items: a.draft.items,
           preferences: a.draft.preferences ?? defaultPreferences(), // agent-inferred Step-3 prefs when present
@@ -405,14 +407,29 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
       const s = getState();
       if (!s.draft) return;
       dispatch({ t: "SUBMIT_START" });
+      // A5: did the renter edit the agent's original draft? Compared here (before submit) against the
+      // agentOrigin snapshot; the correction is fired AFTER a successful create — fire-and-forget, so it
+      // never blocks or fails the request. Only for real-agent drafts (rfqId present).
+      const finalItems = postableItems(s.draft.items); // AC-33/34: exclude no-match/removed
+      const origin = s.agentOrigin;
+      const editedFromDraft =
+        !!origin &&
+        JSON.stringify([s.draft.project, finalItems]) !== JSON.stringify([origin.project, postableItems(origin.items)]);
       try {
         const { requestId, requestIds, requestUuids } = await submitRequest({
           project: s.draft.project,
-          items: postableItems(s.draft.items), // AC-33/34: exclude no-match/removed
+          items: finalItems,
           preferences: s.draft.preferences,
           simulateError: s.simulateError,
         });
         dispatch({ t: "SUBMIT_SUCCESS", requestId, requestIds: requestIds ?? (requestId ? [requestId] : []), requestUuids: requestUuids ?? [] });
+        if (s.draft.rfqId && editedFromDraft) {
+          const patch = draftToRfqCorrection(
+            { project: s.draft.project, items: finalItems, preferences: s.draft.preferences },
+            s.taxonomy,
+          );
+          void postRfqCorrection(s.draft.rfqId, patch);
+        }
       } catch (e) {
         const detail =
           e instanceof ApiError

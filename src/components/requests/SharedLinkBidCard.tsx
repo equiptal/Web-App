@@ -5,6 +5,8 @@ import { bucketBidTerms, type BidCard } from "@/lib/contract/bids";
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { EquipImg } from "@/components/requests/EquipImg";
+import { BAND_COLOR } from "@/components/bid/QualityRing";
+import type { BidQuality } from "@/lib/contract/bid-quality";
 
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
 
@@ -26,11 +28,14 @@ export function SharedLinkBidCard({
   itemLabel,
   itemImage,
   categoryId,
+  quality,
 }: {
   bid: BidCard;
   ar: boolean;
   L: (en: string, arr: string) => string;
   isSel: boolean;
+  /** Bid-quality score (terms match + docs + company completeness) — shown as a compact ring row. */
+  quality?: BidQuality | null;
   /** Grouped My-Bids select flow: true = picking (whole-card select), false = resting. Omit for the
    *  legacy single-request view, which keeps an always-visible checkbox + the full card. */
   selectMode?: boolean;
@@ -141,8 +146,16 @@ export function SharedLinkBidCard({
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 6 }}>
             <span style={{ width: 22, height: 22, borderRadius: "50%", background: "#1c3550", color: "#fff", fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{(bid.supplierName || "S").charAt(0).toUpperCase()}</span>
-            <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550" }}>{bid.supplierName}</span>
-            {bid.verified && <span className="material-icons-outlined" style={{ fontSize: 16, color: "#1daf58" }}>verified</span>}
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bid.supplierName}</span>
+            {bid.verified && <span className="material-icons-outlined" style={{ fontSize: 16, color: "#1daf58", flexShrink: 0 }}>verified</span>}
+            {/* Bid-quality score sits right beside the name (same spot as the app's verified tick) — a
+                solid band-coloured badge so it reads at a glance, without adding card height. */}
+            {quality && (
+              <span title={L(`Bid quality ${quality.score}% — terms match, documents & company details`, `جودة العرض ${quality.score}٪ — مطابقة الشروط والمستندات وبيانات الشركة`)}
+                style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 900, color: "#fff", background: BAND_COLOR[quality.band], padding: "3px 9px", borderRadius: 20, fontVariantNumeric: "tabular-nums", boxShadow: `0 1px 3px ${BAND_COLOR[quality.band]}59` }}>
+                <span className="material-icons-outlined" style={{ fontSize: 14 }}>workspace_premium</span>{quality.score}%
+              </span>
+            )}
           </div>
         </div>
       </div>
