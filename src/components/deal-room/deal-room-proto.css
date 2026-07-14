@@ -85,8 +85,8 @@
 .dlproto .confirmed { margin: 0 16px 16px; background: var(--success-bg); border: 1px solid rgba(29, 175, 88, 0.3); border-radius: var(--r-md); padding: 14px; display: flex; align-items: center; gap: 10px; }
 .dlproto .confirmed .material-icons-outlined { font-size: 22px; color: var(--success); } .dlproto .confirmed .ct { flex: 1; font-size: 14px; font-weight: 800; color: var(--success); }
 
-/* thread */
-.dlproto .thread { flex: 1; display: flex; flex-direction: column; padding-bottom: 12px; }
+/* thread — the chat panel (prototype: the #E9EEF3 chat area under the price bar) */
+.dlproto .thread { flex: 1; display: flex; flex-direction: column; gap: 3px; padding: 14px 16px 16px; background: #E9EEF3; }
 .dlproto .sysev { align-self: center; display: inline-flex; align-items: center; gap: 7px; background: rgba(107, 143, 168, 0.16); border: 1px solid rgba(107, 143, 168, 0.28); color: var(--navy-mid); border-radius: var(--r-full); padding: 6px 13px; font-size: 12px; font-weight: 700; margin: 8px 0; max-width: 90%; text-align: center; }
 .dlproto .sysev .material-icons-outlined { font-size: 15px; }
 .dlproto .sysev.ok { background: var(--success-bg); border-color: rgba(29, 175, 88, 0.3); color: var(--success); }

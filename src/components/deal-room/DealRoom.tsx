@@ -647,6 +647,16 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
           <div className="sysev">{L("No messages yet — say hello 👋", "لا رسائل بعد — ابدأ المحادثة 👋")}</div>
         ) : (
           messages.map((m) => {
+            // deal-room/negotiation — system narration (posted by the backend's `system_bot`) renders as a
+            // centered chip (prototype's role-tinted narration), NOT a left/right bubble.
+            if (m.user?.id === "system_bot") {
+              return (
+                <div className="sysev" key={m.id}>
+                  <span className="material-icons-outlined">bolt</span>
+                  <span>{m.text}</span>
+                </div>
+              );
+            }
             const mine = m.user?.id === myStreamId;
             return (
               <div className={`msg ${mine ? "mine" : "them"}`} key={m.id}>
