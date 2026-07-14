@@ -87,6 +87,9 @@ export interface OperatorDetails {
    *  Per-item; both become negotiable deal-room terms. (Superseded the old single `fat` choice.) */
   fatFood: Party | null;
   fatAccommodationTransport: Party | null;
+  /** AC-24: whether F.A.T applies at all (operator included) — the agent's explicit `fat_required`
+   *  signal. null when unset; the submit falls back to deriving it from the two sides above. */
+  fatRequired?: boolean | null;
 }
 
 /** AC-19/20: nearest-measurement + optional unit conversion the agent suggests. */
@@ -185,6 +188,9 @@ export interface Preferences {
 
 /** What the agent (mock /api/agent/process) returns — the renter-observable draft. */
 export interface AgentDraft {
+  /** Mansour's stored RFQ id (when parsed by the real agent) — anchors the web_review correction fired
+   *  at submit if the renter edited the draft. null for the mock/manual flow. */
+  rfqId?: string | null;
   project: ProjectDetails;
   items: EquipmentItem[];
   /** Step-3 preferences the agent inferred (payment/maintenance/budget/filters). Renter edits in Step 3. */
@@ -207,6 +213,9 @@ export interface ProcessingSummary {
 
 /** The full editable RFQ: agent-drafted project+items plus renter preferences. */
 export interface RfqDraft {
+  /** Mansour's stored RFQ id — see {@link AgentDraft.rfqId}. Persisted with the draft so a correction
+   *  can be fired at submit even after a reload. */
+  rfqId?: string | null;
   project: ProjectDetails;
   items: EquipmentItem[];
   preferences: Preferences;

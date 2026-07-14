@@ -137,6 +137,25 @@ export async function processRfq(input: ProcessInput): Promise<AgentDraft> {
   throw new ApiError("network"); // timed out
 }
 
+/**
+ * A5 — teach Mansour from the renter's draft-vs-final edits (the web_review learning signal). Pure
+ * fire-and-forget: never awaited on the submit path, swallows every error, and uses `keepalive` so the
+ * POST survives the navigation to the confirmation screen. `patch` is the full corrected RFQ shape from
+ * `draftToRfqCorrection`; `corrector_id`/`source` are set server-side.
+ */
+export async function postRfqCorrection(rfqId: string, patch: unknown, reason?: string): Promise<void> {
+  try {
+    await fetch(`/api/agent/rfq/${encodeURIComponent(rfqId)}/correct`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ patch, reason }),
+      keepalive: true,
+    });
+  } catch {
+    /* learning is best-effort — a miss must never affect request creation */
+  }
+}
+
 /** Submit the assembled broadcast (AC-42/43). The server fans out one request per item, so
  *  `requestIds` carries every short code (`requestId` = the first, for back-compat). */
 /** The renter's own requests (web-app/request-details-bids). One row per item (backend fan-out). */

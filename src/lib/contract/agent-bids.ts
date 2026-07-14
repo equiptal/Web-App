@@ -227,7 +227,10 @@ export function bidColumnToComputed(col: BidColumn): ComputedBid {
   }
   return {
     bid_id: b.id,
-    source: "app",
+    // Preserve an uploaded quote's origin on the echo so Mansour can tell it apart from an in-app bid
+    // when it re-ranks the bids[] we send back. A freshly parsed off-platform quote carries the
+    // `upload:` id prefix (see normalizedBidToBidCard) until it's committed into a real bid.
+    source: b.id.startsWith("upload:") ? "uploaded_quote" : "app",
     supplier_name: b.supplierName,
     supplier_user_id: b.supplierId,
     price_amount: b.price,

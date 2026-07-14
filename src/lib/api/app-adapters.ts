@@ -224,15 +224,19 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
         maxEquipmentAge: toManufactureYear(i.equipmentYear ?? project.advanced.equipmentYear), // AC-28 per-item year, falls back to request-wide (undefined ⇒ key dropped)
         dieselIncluded: toDieselIncluded(i.fuelType, fuelParty), // AC-26
         // Part 2: F.A.T split — each encodes the SIDE (supplier⇒true / me⇒false), omitted without an
-        // operator. `fatRequired` is the legacy single flag, kept for back-compat (supplier covers any
-        // part) until the agent backend reads the split booleans.
+        // operator. The agents create endpoint accepts fatFood/fatAccommodationTransport per item
+        // (verified staging: createRequest.ts maps all three into Prisma).
         fatFood: operatorIncluded && i.operator.fatFood ? i.operator.fatFood === "supplier" : undefined,
         fatAccommodationTransport:
           operatorIncluded && i.operator.fatAccommodationTransport ? i.operator.fatAccommodationTransport === "supplier" : undefined,
-        fatRequired:
-          operatorIncluded && (i.operator.fatFood || i.operator.fatAccommodationTransport)
-            ? i.operator.fatFood === "supplier" || i.operator.fatAccommodationTransport === "supplier"
-            : undefined,
+        // `fatRequired` = whether FAT applies at all. Prefer the agent's explicit signal (i.operator.fatRequired,
+        // from Mansour's fat_required); fall back to deriving it from the two sides for back-compat.
+        fatRequired: operatorIncluded
+          ? i.operator.fatRequired ??
+            (i.operator.fatFood || i.operator.fatAccommodationTransport
+              ? i.operator.fatFood === "supplier" || i.operator.fatAccommodationTransport === "supplier"
+              : undefined)
+          : undefined,
         // §4.2 per-item operator sub-fields (only meaningful when an operator is included):
         nightShiftRequired: operatorIncluded ? i.operator.nightShift : undefined, // AC-24
         operatorNationality: operatorIncluded ? i.operator.nationality ?? undefined : undefined, // AC-24

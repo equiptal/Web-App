@@ -44,7 +44,12 @@ export interface RFQLineItem {
   additional_notes?: string | null; // AC-53 per-item free-text qualifiers ("silent", "breaker")
   diesel_included?: boolean | null; // AC-26 supplier provides fuel
   fat_required?: boolean | null; // AC-24 FAT applies (operator included)
-  operator_accommodation_by_rentee?: boolean | null; // AC-24 who covers FAT: true = rentee/me, false = supplier
+  // AC-24 FAT SPLIT — Mansour emits Food and Accommodation/Transport as SEPARATE signals, each ownable
+  // by a different side (true = rentee/me covers it, false = supplier). Prefer these; fall back to the
+  // legacy single `operator_accommodation_by_rentee` (which mirrors fat_accommodation_transport_by_rentee).
+  fat_food_by_rentee?: boolean | null;
+  fat_accommodation_transport_by_rentee?: boolean | null;
+  operator_accommodation_by_rentee?: boolean | null; // AC-24 legacy mirror: true = rentee/me, false = supplier
   safety_certifications?: string[] | string | null; // AC-50 — agent emits a single value; tolerate both
   capacity_advisory?: string | null;
   fuel_type_match?: FuelTypeMatch;
@@ -104,6 +109,9 @@ export interface SenderContact {
 
 /** Full agent output for `POST /rfq` (unwrapped from the `{ success, data }` envelope). */
 export interface RFQAgentOutput {
+  /** Mansour's stored RFQ id — the anchor for a later `POST /rfq/:id/correct` (the web_review learning
+   *  loop). Carried through the adapter → draft so the wizard can correct against it at submit time. */
+  rfq_id?: string | null;
   sender_contact?: SenderContact;
   rfq_header: RFQHeader;
   line_items: RFQLineItem[];
