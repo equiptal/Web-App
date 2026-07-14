@@ -2,7 +2,8 @@
 
 import type { BidQuality } from "@/lib/contract/bid-quality";
 
-const BAND_COLOR: Record<string, string> = { high: "#12b76a", mid: "#f79009", low: "#f04438" };
+/** Band → colour, shared with the renter-side bid cards so the ring and the card score agree. */
+export const BAND_COLOR: Record<string, string> = { high: "#12b76a", mid: "#f79009", low: "#f04438" };
 
 /**
  * Circular bid-quality indicator (0–100). Shows how well a bid matches the renter's request + how
@@ -17,7 +18,7 @@ export function QualityRing({ quality, L, size = 72 }: { quality: BidQuality; L:
   const color = BAND_COLOR[band];
   const label = band === "high" ? L("High match", "مطابقة عالية") : band === "mid" ? L("Partial match", "مطابقة جزئية") : L("Low match", "مطابقة منخفضة");
   const pct = (n: number) => `${Math.round(n * 100)}%`;
-  const title = `${L("Bid quality", "جودة العرض")}: ${score}% · ${L("Terms", "الشروط")} ${pct(parts.terms)} · ${L("Docs", "المستندات")} ${pct(parts.documents)} · ${L("Details", "البيانات")} ${pct(parts.completeness)}`;
+  const title = `${L("Bid quality", "جودة العرض")}: ${score}% · ${L("Terms", "الشروط")} ${pct(parts.terms)} · ${L("Equipment docs", "مستندات المعدة")} ${pct(parts.equipment)} · ${L("Company", "الشركة")} ${pct(parts.company)}`;
 
   return (
     <div className="qring" title={title}>

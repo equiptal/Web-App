@@ -3,12 +3,14 @@
 import { use, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { fetchBidFormData, submitBidForm, type BidUploadedFile } from "@/lib/api/client";
-import type { BidFormData, BidFormItem, BidPhotoKind, BidDocKind, CompanyDocKind } from "@/lib/contract/link-bids";
+import type { BidFormData, BidFormItem, BidPhotoKind, BidDocKind, CompanyDocKind, LinkBidConfirmations } from "@/lib/contract/link-bids";
+import { CERT_TERM_KEYS, certCodesFromValue, certConfKey, prettyCert } from "@/lib/contract/link-bids";
 import { buildSubmissionNotes, priceToStore } from "@/lib/contract/vat-inclusive";
 import { FileUploader, type UploaderKind } from "@/components/bid/FileUploader";
 import { QualityRing } from "@/components/bid/QualityRing";
 import { computeBidQuality } from "@/lib/contract/bid-quality";
 import { BID_FORM_CSS } from "@/components/bid/bidFormStyles";
+import { equipmentIcon } from "@/components/requests/EquipImg";
 
 /**
  * web-app/006 — PUBLIC supplier bid form (spec "Layout B": supplier-bid-v2.html). An off-platform
@@ -20,15 +22,60 @@ import { BID_FORM_CSS } from "@/components/bid/bidFormStyles";
 const TERM_KEYS = ["operator", "nationality", "fatFood", "fatTransport", "fuel", "fuelType", "year", "operatorCert", "equipmentCert"] as const;
 type TermKey = (typeof TERM_KEYS)[number];
 const TERM_LABEL: Record<TermKey, [string, string]> = {
-  operator: ["Operator", "المشغّل"],
+  operator: ["Operator included", "شمول المشغّل"],
   nationality: ["Operator nationality", "جنسية المشغّل"],
-  fatFood: ["Food (F.A.T)", "الطعام"],
-  fatTransport: ["Accommodation & transport", "السكن والمواصلات"],
-  fuel: ["Fuel responsibility", "مسؤولية الوقود"],
+  fatFood: ["Operator meals (F.A.T)", "إعاشة المشغّل — الطعام"],
+  fatTransport: ["Operator housing & transport", "إعاشة المشغّل — السكن والتنقّل"],
+  fuel: ["Who provides fuel", "مسؤولية الوقود"],
   fuelType: ["Fuel type", "نوع الوقود"],
-  year: ["Equipment year", "سنة الصنع"],
+  year: ["Model year", "سنة الصنع"],
   operatorCert: ["Operator certificate", "شهادة المشغّل"],
   equipmentCert: ["Equipment certificate", "شهادة المعدة"],
+};
+// A Material glyph per term, so each term card reads at a glance.
+const TERM_ICON: Record<TermKey, string> = {
+  operator: "engineering", nationality: "public", fatFood: "restaurant", fatTransport: "night_shelter",
+  fuel: "local_gas_station", fuelType: "local_gas_station", year: "event", operatorCert: "workspace_premium", equipmentCert: "verified",
+};
+// Plain-language explainer per term — suppliers told us the bare labels were unclear.
+const TERM_HINT: Record<TermKey, [string, string]> = {
+  operator: ["A trained operator comes with the machine", "يأتي مشغّل مدرّب مع المعدة"],
+  nationality: ["The operator nationality the renter prefers", "جنسية المشغّل التي يفضّلها المستأجر"],
+  fatFood: ["Who covers the operator's meals on site", "من يتحمّل طعام المشغّل في الموقع"],
+  fatTransport: ["Who covers the operator's housing & transport", "من يتحمّل سكن المشغّل وتنقّله"],
+  fuel: ["Who supplies the fuel during the rental", "من يوفّر الوقود خلال فترة الإيجار"],
+  fuelType: ["The fuel the machine runs on", "نوع الوقود الذي تعمل به المعدة"],
+  year: ["The machine's manufacture year", "سنة تصنيع المعدة"],
+  operatorCert: ["A valid safety certificate for the operator", "شهادة سلامة سارية للمشغّل"],
+  equipmentCert: ["A valid safety certificate for the equipment", "شهادة سلامة سارية للمعدة"],
+};
+// Certificate terms can list several required certs (e.g. "TUV, SPSP, SASO_TECHNICAL_INSPECTION"). Each
+// is confirmed on its OWN card, so a supplier can say they hold TÜV but not SPSP. In state we keep a
+// per-code key `${term}::${code}` PLUS the aggregate `${term}` boolean (true only when every code is Yes)
+// that the wire contract + quality scoring read.
+const certCodesFor = (rt: Record<string, unknown> | null | undefined, k: TermKey): string[] =>
+  CERT_TERM_KEYS.has(k) ? certCodesFromValue(rt?.[k] as string | null | undefined) : [];
+// Drop unanswered (undefined) entries before submit. Per-code keys AND the aggregate both ride the wire —
+// the backend stores confirmations as pass-through JSON, so the renter's viewers see the per-code answers.
+const toWireConf = (conf: Record<string, boolean | undefined>): LinkBidConfirmations => {
+  const out: Record<string, boolean> = {};
+  for (const [key, v] of Object.entries(conf)) if (typeof v === "boolean") out[key] = v;
+  return out as LinkBidConfirmations;
+};
+// Roll per-code answers up into the aggregate: all Yes → true, any No → false, any unanswered → undefined.
+const rollCert = (conf: Record<string, boolean | undefined>, k: TermKey, codes: string[]) => {
+  const vals = codes.map((c) => conf[certConfKey(k, c)]);
+  conf[k] = vals.every((x) => x === true) ? true : vals.some((x) => x === false) ? false : undefined;
+};
+// Default the supplier to "Yes" on every term the renter requires — they meet the ask unless they say otherwise.
+const allYesConf = (rt: Record<string, unknown> | null | undefined): Record<string, boolean> => {
+  const c: Record<string, boolean> = {};
+  for (const k of TERM_KEYS) {
+    if (rt?.[k] == null) continue;
+    for (const code of certCodesFor(rt, k)) c[certConfKey(k, code)] = true; // no-op for non-cert terms
+    c[k] = true;
+  }
+  return c;
 };
 const UNIT_LABEL: Record<string, [string, string]> = {
   PER_DAY: ["day", "يوم"], PER_WEEK: ["week", "أسبوع"], PER_MONTH: ["month", "شهر"], PER_JOB: ["job", "مهمة"],
@@ -40,7 +87,8 @@ const num = (v: string) => (v.trim() && Number.isFinite(Number(v)) ? Number(v) :
 const QUOTE_EXPIRY_ENABLED = true;
 
 type Answer = {
-  confirmations: Partial<Record<TermKey, boolean>>;
+  // Keyed by TermKey, plus per-cert-code composite keys `${certTerm}::${code}` (see CERT_KEYS).
+  confirmations: Record<string, boolean | undefined>;
   rentalRate: string;
   deliveryPrice: string;
   returnPrice: string;
@@ -92,13 +140,15 @@ const ATT_ACCENT = {
 } as const;
 
 /** A coloured attachment card — icon tile + title + description + Required/Optional pill, then the uploader. */
-function AttachSection({ icon, accent, title, desc, pill, tone = "opt", children }: {
+function AttachSection({ icon, accent, title, desc, pill, tone = "opt", hint, children }: {
   icon: string;
   accent: { c: string; bg: string; bd: string };
   title: React.ReactNode;
   desc?: React.ReactNode;
   pill: string;
   tone?: "req" | "opt";
+  /** Small helper line under the uploader (e.g. "you can combine several docs into one file"). */
+  hint?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -109,6 +159,7 @@ function AttachSection({ icon, accent, title, desc, pill, tone = "opt", children
         <span className={`att-pill ${tone}`}>{pill}</span>
       </div>
       <div className="att-body">{children}</div>
+      {hint && <div className="att-hint"><span className="material-icons-outlined">merge_type</span>{hint}</div>}
     </div>
   );
 }
@@ -133,8 +184,10 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
-  const [yesItem, setYesItem] = useState<Record<string, boolean>>({}); // per-item "Yes to all this item's terms"
-  const [yesContract, setYesContract] = useState(false); // "Yes to all" for the for-all-items contract terms
+  // Items the supplier can't supply (multi-item requests) — excluded from terms/pricing/quality/submit
+  // so they can bid on just what they have (e.g. the forklift but not the crane).
+  const [skipped, setSkipped] = useState<Set<string>>(new Set());
+  const toggleSupply = (id: string) => setSkipped((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   // Some suppliers quote prices that ALREADY include 15% VAT. When on, the prices entered below are
   // treated as VAT-inclusive (gross) — we strip the VAT back out on submit so the stored bid stays
   // VAT-exclusive like every on-platform bid, and the renter side reproduces the same total.
@@ -163,11 +216,12 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
         setData(d);
         const init: Record<string, Answer> = {};
         for (const it of d.items) {
-          // No default — the supplier must explicitly answer Yes/No on each term (starts unselected/grey).
-          init[it.requestItemId] = { confirmations: {}, rentalRate: "", deliveryPrice: "", returnPrice: "", offeredUnits: String(it.numberOfUnits || 1) };
+          // Default every required term to "Yes" — the supplier can flip any to "No"; the "Yes to all"
+          // toggle reflects the live answers, so it starts on.
+          init[it.requestItemId] = { confirmations: allYesConf(it.requiredTerms), rentalRate: "", deliveryPrice: "", returnPrice: "", offeredUnits: String(it.numberOfUnits || 1) };
         }
         setAnswers(init);
-        setContract({});
+        setContract(Object.fromEntries(d.contractTerms.map((c) => [c.key, true])));
       })
       .catch(() => alive && setNotFound(true))
       .finally(() => alive && setLoading(false));
@@ -175,30 +229,36 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
   }, [token]);
 
   const itemTerms = (it: BidFormItem) => TERM_KEYS.filter((k) => it.requiredTerms[k] != null);
+  // Every confirmation toggle for an item — one per term, but multi-code cert terms expand to one per code.
+  const itemConfKeys = (it: BidFormItem): string[] =>
+    itemTerms(it).flatMap((k) => { const codes = certCodesFor(it.requiredTerms, k); return codes.length > 1 ? codes.map((code) => certConfKey(k, code)) : [k]; });
   const setConf = (id: string, k: TermKey, v: boolean) => setAnswers((p) => ({ ...p, [id]: { ...p[id], confirmations: { ...p[id].confirmations, [k]: v } } }));
+  // Set one cert code's answer, then re-roll the aggregate the wire contract reads.
+  const setCertConf = (id: string, k: TermKey, codes: string[], code: string, v: boolean) => setAnswers((p) => {
+    const conf = { ...p[id].confirmations, [certConfKey(k, code)]: v };
+    rollCert(conf, k, codes);
+    return { ...p, [id]: { ...p[id], confirmations: conf } };
+  });
   const setPrice = (id: string, field: "rentalRate" | "deliveryPrice" | "returnPrice", v: string) => setAnswers((p) => ({ ...p, [id]: { ...p[id], [field]: v } }));
   const setOffered = (id: string, v: string) => setAnswers((p) => ({ ...p, [id]: { ...p[id], offeredUnits: v } }));
   // Units this line offers — parsed + clamped to 1..numberOfUnits; defaults to the full requested count.
   const offeredQty = (it: BidFormItem, a?: Answer) => { const max = it.numberOfUnits || 1; const nq = Math.round(num(a?.offeredUnits ?? "")); return nq >= 1 && nq <= max ? nq : max; };
 
-  // Per-item "Yes to all" — toggles all of THIS item's terms Yes; off clears them so they can answer
-  // individually. Lives below each item header (next to its Terms subhead).
-  const toggleItemYes = (it: BidFormItem) => {
-    const on = !yesItem[it.requestItemId];
-    setYesItem((p) => ({ ...p, [it.requestItemId]: on }));
+  // Per-item "Yes to all" — the toggle's on/off state is DERIVED from the live answers (see render), so
+  // it never drifts; this just flips every term of THIS item on or off. Lives next to the Terms subhead.
+  const toggleItemYes = (it: BidFormItem, allYes: boolean) => {
     setAnswers((p) => {
       const conf = { ...(p[it.requestItemId]?.confirmations ?? {}) };
-      for (const k of itemTerms(it)) conf[k] = on ? true : undefined;
+      for (const ck of itemConfKeys(it)) conf[ck] = allYes ? undefined : true;
+      for (const k of itemTerms(it)) { const codes = certCodesFor(it.requiredTerms, k); if (codes.length > 1) rollCert(conf, k, codes); }
       return { ...p, [it.requestItemId]: { ...p[it.requestItemId], confirmations: conf } };
     });
   };
-  // "Yes to all" for the for-all-items contract terms (same pattern).
-  const toggleContractYes = () => {
+  // "Yes to all" for the for-all-items contract terms (same derived pattern).
+  const toggleContractYes = (allYes: boolean) => {
     if (!data) return;
-    const on = !yesContract;
-    setYesContract(on);
     const next: Record<string, boolean> = {};
-    if (on) for (const c of data.contractTerms) next[c.key] = true;
+    if (!allYes) for (const c of data.contractTerms) next[c.key] = true;
     setContract(next);
   };
 
@@ -207,14 +267,13 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
   const resetForm = () => {
     if (!data) return;
     const init: Record<string, Answer> = {};
-    for (const it of data.items) init[it.requestItemId] = { confirmations: {}, rentalRate: "", deliveryPrice: "", returnPrice: "", offeredUnits: String(it.numberOfUnits || 1) };
+    for (const it of data.items) init[it.requestItemId] = { confirmations: allYesConf(it.requiredTerms), rentalRate: "", deliveryPrice: "", returnPrice: "", offeredUnits: String(it.numberOfUnits || 1) };
     setAnswers(init);
-    setContract({});
+    setContract(Object.fromEntries(data.contractTerms.map((c) => [c.key, true])));
     setAtt({});
     setCoCr([]); setCoVat([]); setCoAddr([]); setCoExtra([]);
     setCoMode({ cr: "text", vat: "text", addr: "text" });
-    setYesItem({});
-    setYesContract(false);
+    setSkipped(new Set());
     setShowErrors(false);
     setSubmitting(false);
     setSubmitted(false);
@@ -230,23 +289,29 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
     return vatIncluded ? gross / 1.15 : gross;
   };
   const grand = useMemo(
-    () => (data?.items ?? []).reduce((s, it) => s + itemSubtotal(it, answers[it.requestItemId]) * 1.15, 0),
-    [data, answers, vatIncluded],
+    () => (data?.items ?? []).filter((it) => !skipped.has(it.requestItemId)).reduce((s, it) => s + itemSubtotal(it, answers[it.requestItemId]) * 1.15, 0),
+    [data, answers, vatIncluded, skipped],
   );
 
   // Company name + contact are the required identity; CR / VAT / National Address are optional and can
   // be provided as text OR a document, so they don't gate submission.
   const companyValid = !!(company.companyName.trim() && company.contactInfo.trim());
-  const itemsValid = (data?.items ?? []).every((it) => num(answers[it.requestItemId]?.rentalRate ?? "") > 0);
+  // Only items the supplier says they can supply gate submission (skipped ones are dropped from the bid).
+  const suppliedItems = (data?.items ?? []).filter((it) => !skipped.has(it.requestItemId));
+  const itemsValid = suppliedItems.every((it) => num(answers[it.requestItemId]?.rentalRate ?? "") > 0);
   // Every shown term (per-item + project) must be answered Yes/No — no silent grey/unanswered terms.
   const termsAnswered =
-    (data?.items ?? []).every((it) => itemTerms(it).every((k) => typeof answers[it.requestItemId]?.confirmations[k] === "boolean")) &&
+    suppliedItems.every((it) => itemConfKeys(it).every((ck) => typeof answers[it.requestItemId]?.confirmations[ck] === "boolean")) &&
     (data?.contractTerms ?? []).every((c) => typeof contract[c.key] === "boolean");
-  const valid = !!companyValid && itemsValid && termsAnswered;
+  // Can't submit an empty bid — at least one item must be supplied.
+  const hasSupplied = suppliedItems.length > 0;
+  const valid = !!companyValid && itemsValid && termsAnswered && hasSupplied;
+  // "Yes to all" state for the contract terms — derived from the live answers so the toggle never drifts.
+  const allContractYes = !!data && data.contractTerms.length > 0 && data.contractTerms.every((c) => contract[c.key] === true);
 
   // Live bid-quality score (terms match + docs + completeness) — updates as the supplier fills the form.
   const quality = useMemo(() => {
-    const items = (data?.items ?? []).map((it) => {
+    const items = (data?.items ?? []).filter((it) => !skipped.has(it.requestItemId)).map((it) => {
       const a = answers[it.requestItemId];
       const at = att[it.requestItemId] ?? EMPTY_ATT;
       return {
@@ -259,9 +324,15 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
         operatorCertCount: Object.entries(at.certs).filter(([k]) => k.startsWith("operator_")).reduce((s, [, v]) => s + v.length, 0),
       };
     });
-    const companyDocCount = coCr.length + coVat.length + coAddr.length + coExtra.length;
-    return computeBidQuality({ items, companyDocCount, companyComplete: companyValid });
-  }, [data, answers, contract, att, coCr, coVat, coAddr, coExtra, companyValid]);
+    // Optional company slots — each satisfied by text input OR an attached document.
+    const companyInput = {
+      cr: !!company.crNumber.trim() || coCr.length > 0,
+      vat: !!company.vatNumber.trim() || coVat.length > 0,
+      address: !!company.nationalAddress.trim() || coAddr.length > 0,
+      otherDocs: coExtra.length > 0,
+    };
+    return computeBidQuality({ items, company: companyInput });
+  }, [data, answers, contract, att, coCr, coVat, coAddr, coExtra, company.crNumber, company.vatNumber, company.nationalAddress, skipped]);
 
   async function onSubmit() {
     setShowErrors(true);
@@ -278,7 +349,7 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
         // round-trip to the renter's submission view). The viewer surfaces it as a dedicated note.
         notes: buildSubmissionNotes(company.notes, vatIncluded),
         validUntil: company.validUntil ? new Date(company.validUntil).toISOString() : undefined,
-        items: data.items.map((it) => {
+        items: data.items.filter((it) => !skipped.has(it.requestItemId)).map((it) => {
           const a = answers[it.requestItemId];
           // Store VAT-exclusive prices. If the supplier priced VAT-inclusive, strip the 15% back out so
           // the renter side — which always adds VAT — lands on the same total.
@@ -287,7 +358,7 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
           const photos = at.photos.map((p) => ({ key: p.key, type: p.type as BidPhotoKind, filename: p.filename ?? undefined }));
           const certDocs = Object.values(at.certs).flat();
           const documents = [...at.ownership, ...certDocs].map((d) => ({ key: d.key, type: d.type as BidDocKind, filename: d.filename ?? undefined }));
-          return { requestItemId: it.requestItemId, confirmations: { ...a.confirmations, ...contract }, offeredUnits: it.numberOfUnits > 1 ? offeredQty(it, a) : undefined, rentalRate: priceToStore(num(a.rentalRate), vatIncluded), deliveryPrice: priceToStore(num(a.deliveryPrice), vatIncluded), returnPrice: priceToStore(num(a.returnPrice), vatIncluded), ...(photos.length ? { photos } : {}), ...(documents.length ? { documents } : {}) };
+          return { requestItemId: it.requestItemId, confirmations: toWireConf({ ...a.confirmations, ...contract }), offeredUnits: it.numberOfUnits > 1 ? offeredQty(it, a) : undefined, rentalRate: priceToStore(num(a.rentalRate), vatIncluded), deliveryPrice: priceToStore(num(a.deliveryPrice), vatIncluded), returnPrice: priceToStore(num(a.returnPrice), vatIncluded), ...(photos.length ? { photos } : {}), ...(documents.length ? { documents } : {}) };
         }),
         companyDocuments: (() => {
           const all = [...coCr, ...coVat, ...coAddr, ...coExtra];
@@ -315,6 +386,8 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
     { value: "customs_card", label: L("Customs card", "البطاقة الجمركية") },
     { value: "sales_contract", label: L("Sales contract", "عقد البيع") },
     { value: "saso_registration", label: L("SASO registration", "تسجيل ساسو") },
+    // For suppliers whose proofs are combined in a single PDF/scan — upload once, pick this.
+    { value: "combined", label: L("Several documents in one file", "عدة مستندات في ملف واحد") },
   ];
   // Equipment + operator certificate slots are request-driven (parseCertSlots), so no fixed kind list.
   const companyExtraKinds: UploaderKind[] = [
@@ -332,6 +405,8 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=Inter:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
       <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" />
+      {/* Material Symbols covers equipment glyphs the classic set lacks (e.g. forklift) — used for the item icon. */}
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0" />
       <style>{BID_FORM_CSS}</style>
 
       {/* Public header bar — renter identity + language toggle */}
@@ -396,6 +471,26 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
             <div className="qb-tx">
               <b>{L("Bid quality", "جودة العرض")}</b>
               <span>{L("Confirm the renter's terms and attach equipment photos + documents to raise your match score — higher-quality bids stand out to the renter.", "أكّد شروط المستأجر وأرفق صور المعدة والمستندات لرفع درجة المطابقة — العروض عالية الجودة تبرز لدى المستأجر.")}</span>
+              {/* Breakdown — shows the supplier exactly which dimension to improve; each bar turns green when complete. */}
+              <div className="qb-parts">
+                {([
+                  { icon: "rule", lb: L("Terms match", "مطابقة الشروط"), w: 40, v: quality.parts.terms },
+                  { icon: "photo_library", lb: L("Equipment docs", "مستندات المعدة"), w: 30, v: quality.parts.equipment },
+                  { icon: "business", lb: L("Company details", "بيانات الشركة"), w: 30, v: quality.parts.company },
+                ] as const).map((p) => {
+                  const done = p.v >= 0.999;
+                  return (
+                    <div className={`qpart${done ? " done" : ""}`} key={p.lb}>
+                      <div className="qpart-h">
+                        <span className="qpart-lb"><span className="material-icons-outlined">{done ? "check_circle" : p.icon}</span>{p.lb}</span>
+                        <span className="qpart-pc">{Math.round(p.v * 100)}%</span>
+                      </div>
+                      <div className="qpart-track"><i style={{ width: `${Math.round(p.v * 100)}%` }} /></div>
+                      <span className="qpart-w">{L("weight", "الوزن")} {p.w}%</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -418,14 +513,14 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
               {data.contractTerms.length > 0 && (
                 <>
                   <div className="subhead"><span className="material-icons-outlined">gavel</span>{L("Contract terms — for all items", "شروط العقد — لكل البنود")}
-                    <button type="button" className={`yall${yesContract ? " on" : ""}`} onClick={toggleContractYes}><span className="yall-sw"></span>{L("Yes to all", "نعم للكل")}</button>
+                    <button type="button" className={`yall${allContractYes ? " on" : ""}`} onClick={() => toggleContractYes(allContractYes)}><span className="yall-sw"></span>{L("Yes to all", "نعم للكل")}</button>
                   </div>
                   <div className="treqgrid">
                     {data.contractTerms.map((c) => {
                       const ans = contract[c.key];
                       return (
-                        <div key={c.key} className={`treqcell${showErrors && ans === undefined ? " needpick" : ""}`}>
-                          <div className="tc-name">{c.label}</div>
+                        <div key={c.key} className={`treqcell${ans === true ? " ok" : ""}${ans === false ? " declined" : ""}${showErrors && ans === undefined ? " needpick" : ""}`}>
+                          <div className="tc-name"><span className="material-icons-outlined">gavel</span>{c.label}</div>
                           <div className="tc-rw"><span className="q">{L("Renter wants", "يطلب المستأجر")}:</span> <i>{ar ? localizeTermValue(c.value) : c.value}</i></div>
                           <div className="tc-sw"><span className="q">{L("Your answer", "إجابتك")}:</span><YesNo L={L} value={ans} onChange={(v) => setContract((p) => ({ ...p, [c.key]: v }))} /></div>
                         </div>
@@ -449,6 +544,8 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
           {data.items.map((it, idx) => {
             const a = answers[it.requestItemId];
             const terms = itemTerms(it);
+            const confKeys = itemConfKeys(it);
+            const allItemYes = confKeys.length > 0 && confKeys.every((ck) => a?.confirmations[ck] === true);
             // The backend sends the label as "Category / Subcategory" (the category can itself contain a
             // slash, e.g. "Compactor / Roller"), so show ONLY the subcategory — the segment appended last —
             // to keep the header uncluttered. Falls back to the whole label when there's no subcategory.
@@ -463,15 +560,33 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
             // Supplier prices delivery/return ONLY when they handle it; if the renter does, no price row.
             const delBySup = (it.deliveryBy || "").toLowerCase() === "supplier";
             const retBySup = (it.returnBy || "").toLowerCase() === "supplier";
+            const multiItem = data.items.length > 1; // opt-out only makes sense when there's more than one item
+            const skip = skipped.has(it.requestItemId);
             return (
-              <div className="sec" key={it.requestItemId}>
+              <div className={`sec${skip ? " item-skipped" : ""}`} key={it.requestItemId}>
                 <div className="item-hd">
-                  <span className="material-icons-outlined">construction</span>
+                  <span className="item-ic"><span className="msym">{equipmentIcon(rawLabel)}</span></span>
                   <div className="inm-wrap"><span className="inm">{label}</span>{size && <span className="imeta">· {size}</span>}
                     <span className={`units-chip${q > 1 ? " multi" : ""}`}><span className="material-icons-outlined">{q > 1 ? "layers" : "package_2"}</span>×{q} {q === 1 ? L("unit", "وحدة") : L("units", "وحدات")}</span></div>
                   <span className="ibadge">{L(`Item ${idx + 1} of ${data.items.length}`, `البند ${idx + 1} من ${data.items.length}`)}</span>
                 </div>
 
+                {/* Opt-out: in a multi-item request the supplier bids on only what they can supply. */}
+                {multiItem && (
+                  <button type="button" className={`supply-tog${skip ? " off" : ""}`} onClick={() => toggleSupply(it.requestItemId)}>
+                    <span className="supply-sw"></span>
+                    <span className="supply-tx">{skip ? L("You can't supply this item — tap to include it", "لا يمكنك توفير هذا البند — اضغط لإضافته") : L("I can supply this item", "أستطيع توفير هذا البند")}</span>
+                    {!skip && <span className="supply-skip">{L("Can't supply? Skip it", "لا تستطيع؟ استبعده")}</span>}
+                  </button>
+                )}
+
+                {skip ? (
+                  <div className="skip-note">
+                    <span className="material-icons-outlined">block</span>
+                    <span>{L("Not included in your bid. You won't price this item or confirm its terms — bid on the items you can supply.", "غير مُدرَج في عرضك. لن تُسعّر هذا البند أو تؤكّد شروطه — قدّم عرضك على البنود التي تستطيع توفيرها.")}</span>
+                  </div>
+                ) : (
+                <>
                 {q > 1 && (
                   <div className="units-note" style={{ flexWrap: "wrap", gap: 10, alignItems: "center" }}>
                     <span className="material-icons-outlined un-lead">layers</span>
@@ -505,19 +620,27 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                 {terms.length > 0 && (
                   <>
                     <div className="subhead"><span className="material-icons-outlined">fact_check</span>{L("Terms — can you meet each?", "الشروط — هل يمكنك الالتزام بكلٍّ منها؟")}
-                      <button type="button" className={`yall${yesItem[it.requestItemId] ? " on" : ""}`} onClick={() => toggleItemYes(it)}><span className="yall-sw"></span>{L("Yes to all", "نعم للكل")}</button>
+                      <button type="button" className={`yall${allItemYes ? " on" : ""}`} onClick={() => toggleItemYes(it, allItemYes)}><span className="yall-sw"></span>{L("Yes to all", "نعم للكل")}</button>
                     </div>
                     <div className="treqgrid">
-                      {terms.map((k) => {
-                        const ans = a?.confirmations[k];
-                        const val = (k === "operatorCert" || k === "equipmentCert") ? (it.requiredTerms[k] ?? "").toUpperCase() : (ar ? localizeTermValue(it.requiredTerms[k]) : it.requiredTerms[k]);
-                        return (
-                          <div key={k} className={`treqcell${ans === false ? " declined" : ""}${showErrors && ans === undefined ? " needpick" : ""}`}>
-                            <div className="tc-name">{L(TERM_LABEL[k][0], TERM_LABEL[k][1])}</div>
-                            <div className="tc-rw"><span className="q">{L("Renter wants", "يطلب المستأجر")}:</span> <i>{val}</i></div>
-                            <div className="tc-sw"><span className="q">{L("Your answer", "إجابتك")}:</span><YesNo L={L} value={ans} onChange={(v) => setConf(it.requestItemId, k, v)} /></div>
-                          </div>
-                        );
+                      {terms.flatMap((k) => {
+                        const codes = certCodesFor(it.requiredTerms, k);
+                        // A cert term listing 2+ certs gets one card per cert (confirm TÜV but not SPSP);
+                        // everything else stays a single card.
+                        const rows = codes.length > 1
+                          ? codes.map((code) => ({ ck: certConfKey(k, code), code, val: prettyCert(code) }))
+                          : [{ ck: k, code: null as string | null, val: (k === "operatorCert" || k === "equipmentCert") ? prettyCert(it.requiredTerms[k] ?? "") : (ar ? localizeTermValue(it.requiredTerms[k]) : it.requiredTerms[k]) }];
+                        return rows.map((row) => {
+                          const ans = a?.confirmations[row.ck];
+                          return (
+                            <div key={row.ck} className={`treqcell${ans === true ? " ok" : ""}${ans === false ? " declined" : ""}${showErrors && ans === undefined ? " needpick" : ""}`}>
+                              <div className="tc-name"><span className="material-icons-outlined">{TERM_ICON[k]}</span>{L(TERM_LABEL[k][0], TERM_LABEL[k][1])}</div>
+                              <div className="tc-hint">{L(TERM_HINT[k][0], TERM_HINT[k][1])}</div>
+                              <div className="tc-rw"><span className="q">{L("Renter wants", "يطلب المستأجر")}:</span> <i>{row.val}</i></div>
+                              <div className="tc-sw"><span className="q">{L("Can you meet it?", "هل يمكنك الالتزام؟")}:</span><YesNo L={L} value={ans} onChange={(v) => row.code != null ? setCertConf(it.requestItemId, k, codes, row.code, v) : setConf(it.requestItemId, k, v)} /></div>
+                            </div>
+                          );
+                        });
                       })}
                     </div>
                   </>
@@ -531,11 +654,11 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                     ))}
                   </span>
                 </div>
-                <table className="ptbl">
+                <div className="ptbl-wrap"><table className="ptbl">
                   <thead><tr><th>{L("Item", "البند")}</th><th className="num">{L("Unit", "الوحدة")}</th><th className="num">{L("Qty", "العدد")}</th><th className="num">{vatIncluded ? L("Price (incl. VAT)", "السعر (شامل الضريبة)") : L("Your price", "سعرك")}</th><th className="num">{L("Total", "الإجمالي")}</th></tr></thead>
                   <tbody>
                     <tr>
-                      <td><div className="it-lbl">{L("Rental", "الإيجار")}</div></td>
+                      <td><div className="it-lbl">{L("Rental", "الإيجار")}<span className="reqx"> *</span></div></td>
                       <td className="num">{unit}</td><td className="num">{oq}</td>
                       <td className="num"><input className={`ptbl-in${showErrors && num(a?.rentalRate ?? "") <= 0 ? " invalid" : ""}`} inputMode="numeric" value={a?.rentalRate ?? ""} onChange={(e) => setPrice(it.requestItemId, "rentalRate", e.target.value)} placeholder="0" /></td>
                       <td className="num tot">{num(a?.rentalRate ?? "") ? nf(line(a!.rentalRate)) : "—"}</td>
@@ -559,11 +682,20 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                       <td className="num tot">{retBySup ? (num(a?.returnPrice ?? "") ? nf(line(a!.returnPrice)) : "—") : "—"}</td>
                     </tr>
                   </tbody>
-                </table>
+                </table></div>
                 <div className="itot">
                   <span className="r">{vatIncluded ? L("Net (before VAT)", "الصافي (قبل الضريبة)") : L("Subtotal", "المجموع")}<b>{sub ? nf(sub) : "—"} {sar}</b></span>
                   <span className="r">{L("VAT 15%", "ضريبة ١٥٪")}<b>{sub ? nf(sub * 0.15) : "—"} {sar}</b></span>
                   <span className="r t">{vatIncluded ? L("Item total (incl. VAT)", "إجمالي البند (شامل الضريبة)") : L("Item total", "إجمالي البند")}<b>{sub ? nf(sub * 1.15) : "—"} {sar}</b></span>
+                </div>
+
+                {/* Encourage attachments — they raise the bid-quality score and the renter's confidence. */}
+                <div className="att-upsell">
+                  <span className="material-icons-outlined au-ic">workspace_premium</span>
+                  <div className="au-tx">
+                    <b>{L("Photos & documents raise your bid quality", "الصور والمستندات ترفع جودة عرضك")}</b>
+                    <span>{L("Bids with equipment photos and supporting documents score higher and stand out — the renter is far more likely to pick a complete, verified bid and close the deal with you.", "العروض المرفقة بصور المعدة والمستندات الداعمة تحصل على درجة أعلى وتبرز أكثر — والمستأجر أميل بكثير لاختيار عرض مكتمل وموثّق وإتمام الصفقة معك.")}</span>
+                  </div>
                 </div>
 
                 {/* Attachments — photos + ownership share one row (choose-type dropdown); equipment /
@@ -588,7 +720,7 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                   const slots = parseCertSlots(it.requiredTerms.equipmentCert, "");
                   return slots.length ? (
                     <AttachSection icon="workspace_premium" accent={ATT_ACCENT.eqc}
-                      title={L("Equipment certificate", "شهادة المعدة")} desc={L("Required by this request", "مطلوبة لهذا الطلب")} pill={L("Required", "مطلوب")} tone="req">
+                      title={L("Equipment certificate", "شهادة المعدة")} desc={L("Attach if you have it — strengthens your bid", "أرفقها إن توفّرت — تقوّي عرضك")} pill={L("Optional", "اختياري")}>
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {slots.map((sl) => (
                           <FileUploader key={sl.code} token={token} folder="documents" accent={ATT_ACCENT.eqc}
@@ -605,7 +737,7 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                   const slots = parseCertSlots(it.requiredTerms.operatorCert, "operator_");
                   return slots.length ? (
                     <AttachSection icon="badge" accent={ATT_ACCENT.opc}
-                      title={L("Operator certificate", "شهادة المشغّل")} desc={L("Required by this request", "مطلوبة لهذا الطلب")} pill={L("Required", "مطلوب")} tone="req">
+                      title={L("Operator certificate", "شهادة المشغّل")} desc={L("Attach if you have it — strengthens your bid", "أرفقها إن توفّرت — تقوّي عرضك")} pill={L("Optional", "اختياري")}>
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {slots.map((sl) => (
                           <FileUploader key={sl.code} token={token} folder="documents" accent={ATT_ACCENT.opc}
@@ -617,6 +749,8 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                     </AttachSection>
                   ) : null;
                 })()}
+                </>
+                )}
               </div>
             );
           })}
@@ -645,15 +779,15 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                 docs={coAddr} onDocs={setCoAddr} token={token} L={L} disabled={submitting} />
             </div>
             <Field label={L("Contact info", "بيانات التواصل")} req invalid={showErrors && !company.contactInfo.trim()} L={L}><input value={company.contactInfo} onChange={(e) => setCompany({ ...company, contactInfo: e.target.value })} placeholder={L("Phone or email so the renter can reach you", "هاتف أو بريد ليتواصل معك المستأجر")} /></Field>
-            {QUOTE_EXPIRY_ENABLED && <Field label={L("Quote valid until (optional)", "صلاحية العرض حتى (اختياري)")} L={L}><input type="date" value={company.validUntil} onChange={(e) => setCompany({ ...company, validUntil: e.target.value })} /></Field>}
-            <div className="notes-field"><label>{L("Notes (optional) — for the whole quotation", "ملاحظات (اختياري) — لكامل عرض السعر")}</label><textarea value={company.notes} onChange={(e) => setCompany({ ...company, notes: e.target.value })} /></div>
+            {QUOTE_EXPIRY_ENABLED && <Field label={L("Quote valid until", "صلاحية العرض حتى")} L={L}><input type="date" value={company.validUntil} onChange={(e) => setCompany({ ...company, validUntil: e.target.value })} /></Field>}
+            <div className="notes-field"><label>{L("Notes — for the whole quotation", "ملاحظات — لكامل عرض السعر")}<span className="optx">{L("Optional", "اختياري")}</span></label><textarea value={company.notes} onChange={(e) => setCompany({ ...company, notes: e.target.value })} /></div>
 
             {/* Optional extra company docs — Local Content / SASO heavy equipment / Other. */}
-            <div className="subhead"><span className="material-icons-outlined">folder_open</span>{L("Other company documents (optional)", "مستندات أخرى للشركة (اختياري)")}</div>
+            <div className="subhead"><span className="material-icons-outlined">folder_open</span>{L("Other company documents", "مستندات أخرى للشركة")}<span className="optx">{L("Optional", "اختياري")}</span></div>
             <FileUploader token={token} folder="documents" kinds={companyExtraKinds} value={coExtra} onChange={setCoExtra} L={L} disabled={submitting} />
           </div>
 
-          {showErrors && !valid && <div className="submit-err"><span className="material-icons-outlined">error_outline</span>{L("Please complete the highlighted items: answer every term, enter a rate for each item, and fill all company details.", "الرجاء إكمال العناصر المظللة: أجب عن كل شرط، وأدخل سعراً لكل بند، واملأ جميع بيانات الشركة.")}</div>}
+          {showErrors && !valid && <div className="submit-err"><span className="material-icons-outlined">error_outline</span>{!hasSupplied ? L("Mark at least one item as one you can supply — a bid can't be empty.", "حدّد بنداً واحداً على الأقل تستطيع توفيره — لا يمكن أن يكون العرض فارغاً.") : L("Please complete the highlighted items: answer every term, enter a rate for each item, and fill all company details.", "الرجاء إكمال العناصر المظللة: أجب عن كل شرط، وأدخل سعراً لكل بند، واملأ جميع بيانات الشركة.")}</div>}
           <div className="submit-bar"><button className="btn primary lg" disabled={submitting} onClick={onSubmit}><span className="material-icons-outlined">send</span>{submitting ? L("Submitting…", "جارٍ الإرسال…") : L("Submit bid", "إرسال العرض")}</button>
             <div className="submit-note">{L("Once submitted, your bid is final and can't be edited from this link.", "بعد الإرسال، يصبح عرضك نهائياً ولا يمكن تعديله من هذا الرابط.")}</div>
           </div>
@@ -674,7 +808,7 @@ function YesNo({ value, onChange, L }: { value: boolean | undefined; onChange: (
   return (
     <span className="miniseg">
       <button type="button" className={`ok${value === true ? " on" : ""}`} onClick={() => onChange(true)}><span className="material-icons-outlined">check</span>{L("Yes", "نعم")}</button>
-      <button type="button" className={`no${value === false ? " on" : ""}`} onClick={() => onChange(false)}>{L("No", "لا")}</button>
+      <button type="button" className={`no${value === false ? " on" : ""}`} onClick={() => onChange(false)}><span className="material-icons-outlined">close</span>{L("No", "لا")}</button>
     </span>
   );
 }
@@ -682,7 +816,7 @@ function YesNo({ value, onChange, L }: { value: boolean | undefined; onChange: (
 function Field({ label, req, invalid, children, L }: { label: string; req?: boolean; invalid?: boolean; children: React.ReactNode; L: (e: string, a: string) => string }) {
   return (
     <div className={`field${invalid ? " invalid" : ""}`}>
-      <label>{label}{req && <span className="reqx"> *</span>}</label>
+      <label>{label}{req ? <span className="reqx"> *</span> : <span className="optx">{L("Optional", "اختياري")}</span>}</label>
       {children}
       <div className="err">{L("Required", "مطلوب")}</div>
     </div>
@@ -709,7 +843,7 @@ function CompanyDocField({
   return (
     <div className="field">
       <div className="uprow" style={{ justifyContent: "space-between", marginBottom: 5 }}>
-        <label style={{ margin: 0 }}>{label}</label>
+        <label style={{ margin: 0 }}>{label}<span className="optx">{L("Optional", "اختياري")}</span></label>
         <span className="uptog">
           <button type="button" className={mode === "text" ? "on" : ""} onClick={() => onMode("text")}>{L("Type", "نص")}</button>
           <button type="button" className={mode === "doc" ? "on" : ""} onClick={() => onMode("doc")}>{L("Upload", "مستند")}</button>

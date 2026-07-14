@@ -23,14 +23,29 @@ export interface LinkBidConfirmations {
   overtime?: boolean;
   breakdownSla?: boolean;
   maintenance?: boolean;
+  // Per-cert-code answers are also carried, keyed `${certTerm}::${code}` (e.g. "equipmentCert::TUV") —
+  // set when a cert term lists 2+ certs so the supplier can confirm one but not another. The plain
+  // `equipmentCert` / `operatorCert` above stay the aggregate (true only when every code is Yes). The
+  // backend stores confirmations as pass-through JSON (validator: z.record(z.boolean())), so these
+  // round-trip. They live under composite string keys; readers/writers access them via a
+  // `Record<string, boolean | undefined>` cast (kept off this interface to avoid a template-literal
+  // index signature, which Next's SWC transform mishandles).
 }
+
+/** Cert terms can list several required certs; each is confirmed on its own key. Kept here so the
+ *  supplier form (write) and the renter's viewers (read) agree on the exact composite-key format. */
+export const CERT_TERM_KEYS = new Set(["operatorCert", "equipmentCert"]);
+export const certCodesFromValue = (v: string | null | undefined): string[] =>
+  String(v ?? "").split(/[,/]/).map((s) => s.trim()).filter(Boolean);
+export const certConfKey = (term: string, code: string) => `${term}::${code}`;
+export const prettyCert = (code: string) => code.trim().replace(/_/g, " ").toUpperCase();
 
 /** Equipment photo kinds — each photo the supplier adds is classified as one of these. */
 export type BidPhotoKind = "front_photo" | "serial_photo" | "hours_photo";
 /** Per-item document kinds: proof-of-ownership (free-classify) + equipment/operator cert (request-driven,
  *  TÜV/SPSP/SASO — operator prefixed to stay distinct). */
 export type BidDocKind =
-  | "istimara" | "customs_card" | "sales_contract" | "saso_registration"
+  | "istimara" | "customs_card" | "sales_contract" | "saso_registration" | "combined"
   | "tuv" | "spsp" | "saso" | "other"
   | "operator_tuv" | "operator_spsp" | "operator_saso" | "operator_other";
 /** Submission-level company-verification document kinds (aligned to the app's company doc set). */
@@ -217,7 +232,12 @@ export function mapLinkSubmissions(raw: unknown): LinkBidSubmission[] {
           requiredTerms: i.requiredTerms && typeof i.requiredTerms === "object" ? (i.requiredTerms as Record<string, string | null>) : null,
           photos: attList(i.photos),
           documents: attList(i.documents),
-          confirmations: { operator: b(c.operator), nationality: b(c.nationality), fatFood: b(c.fatFood), fatTransport: b(c.fatTransport), fuel: b(c.fuel), fuelType: b(c.fuelType), year: b(c.year), operatorCert: b(c.operatorCert), equipmentCert: b(c.equipmentCert), payment: b(c.payment), overtime: b(c.overtime), breakdownSla: b(c.breakdownSla), maintenance: b(c.maintenance) },
+          confirmations: (() => {
+            const out: LinkBidConfirmations = { operator: b(c.operator), nationality: b(c.nationality), fatFood: b(c.fatFood), fatTransport: b(c.fatTransport), fuel: b(c.fuel), fuelType: b(c.fuelType), year: b(c.year), operatorCert: b(c.operatorCert), equipmentCert: b(c.equipmentCert), payment: b(c.payment), overtime: b(c.overtime), breakdownSla: b(c.breakdownSla), maintenance: b(c.maintenance) };
+            // Preserve per-cert-code keys (e.g. "equipmentCert::TUV") the form sent — the renter's viewers read them.
+            for (const [k, v] of Object.entries(c)) if (k.includes("::")) (out as Record<string, boolean | undefined>)[k] = b(v);
+            return out;
+          })(),
         };
       }),
     };
@@ -291,8 +311,14 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
   // or docs — only the supplier's Yes/No confirmations — so populate Year / Equipment certs / Operator
   // cert from those (showing the requested VALUE the supplier confirmed, e.g. TÜV), not blanks.
   const toCertCode = (raw: string): CertCode | null => { const u = raw.toUpperCase(); return u.includes("TUV") || u.includes("TÜV") ? "TUV" : u.includes("SPSP") ? "SPSP" : u.includes("SASO") ? "SASO" : u.includes("LC") || u.includes("LOCAL") ? "LC" : null; };
-  const reqEqCertCodes = (rt.equipmentCert ? String(rt.equipmentCert).split(/[,/]/) : []).map((x) => toCertCode(x.trim())).filter((x): x is CertCode => !!x);
-  const eqCertConfirmed = c.equipmentCert === true ? reqEqCertCodes : [];
+  const cc = c as Record<string, boolean | undefined>;
+  const reqEqRaw = certCodesFromValue(rt.equipmentCert);
+  const reqEqCertCodes = reqEqRaw.map((x) => toCertCode(x)).filter((x): x is CertCode => !!x);
+  // Held per cert code when the form sent per-code answers (confirm TÜV but not SPSP); else fall back
+  // to the aggregate boolean (older submissions / single-cert requests).
+  const eqCertConfirmed = reqEqRaw
+    .filter((raw) => { const v = cc[certConfKey("equipmentCert", raw)]; return v !== undefined ? v === true : c.equipmentCert === true; })
+    .map((x) => toCertCode(x)).filter((x): x is CertCode => !!x);
   // Extract the required manufacture year from `rt.year` — tolerant of strings like "2018", "≥ 2018",
   // or "2018 or newer" (a bare Number() fails on those, which is why the comparison used to show
   // "Confirmed" instead of the year). Grab the first 4-digit year.
@@ -390,6 +416,7 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
     // Per-item card → that item's total (incl VAT); whole-submission card → the grand total.
     quotedTotal: item ? (it?.total ?? null) : (sub.grandTotal ?? null),
     submissionKey: sub.id,
+    requestItemId: it?.requestItemId,
     // Captured company-doc VALUES (off-platform has no files) — keyed by the comparison's doc hints.
     linkDocs: {
       ...(has(sub.crNumber) ? { commercial: sub.crNumber as string } : {}),
