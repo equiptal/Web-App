@@ -196,6 +196,8 @@ export interface BidCard {
   quotedTotal?: number | null;
   /** The submission id the read-only viewer opens (off-platform supplier submission). */
   submissionKey?: string;
+  /** The request item this link-bid card represents — lets the viewer focus a single item. */
+  requestItemId?: string;
   /** "submitted N days ago" for the link-bid card (avoids non-deterministic date math). */
   agoDays?: number;
   /** Off-platform bids capture company-doc VALUES (not files) — keyed by the comparison's doc hint

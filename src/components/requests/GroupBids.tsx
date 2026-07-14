@@ -11,6 +11,7 @@ import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
 import { bidSuppliers, bucketBidTerms, CERT_LABEL, type BidCard, type TermRow } from "@/lib/contract/bids";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
+import { qualityFromSubmission, type BidQuality, type QualityBand } from "@/lib/contract/bid-quality";
 import { computeBidQuote } from "@/lib/contract/comparison";
 import type { RequestGroup } from "@/lib/contract/requests";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
@@ -19,7 +20,7 @@ import { quotationDownloadName } from "@/lib/compare/quotation-token";
 import { renderQuotationSection, wrapQuotationPage, quotationLegal, type QuotationDoc, type QuotationLineItem, type QuotationCard } from "@/lib/quotation/render";
 
 /** A group bid = a request's bid tagged with which item (request) it belongs to. */
-type GroupBid = BidCard & { requestId: string; itemLabel: string; itemLabelAr: string; categoryId: string | null; itemImage: string | null };
+type GroupBid = BidCard & { requestId: string; itemLabel: string; itemLabelAr: string; categoryId: string | null; itemImage: string | null; quality?: BidQuality | null };
 
 const SPILL: Record<string, { cls: string; dot: boolean; en: string; ar: string }> = {
   PENDING: { cls: "sp-pending", dot: true, en: "New", ar: "جديد" },
@@ -113,6 +114,8 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   const [fSource, setFSource] = useState<"all" | "link" | "platform" | "file">("all");
   const [fVerified, setFVerified] = useState(false);
   const [fKm, setFKm] = useState(false);
+  // Quality sub-filter — only meaningful for shared-link bids (they carry a computed quality score).
+  const [fQuality, setFQuality] = useState<"all" | QualityBand>("all");
 
   useEffect(() => {
     let active = true;
@@ -192,8 +195,9 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   // request so we can show the real equipment icon/image. Memoized so goCompare can include them too.
   const subCards: GroupBid[] = useMemo(
     () =>
-      submissions.flatMap((s) =>
-        s.items.map((it): GroupBid => {
+      submissions.flatMap((s) => {
+        const quality = qualityFromSubmission(s); // submission-level score, shown on each of its item cards
+        return s.items.map((it): GroupBid => {
           const gi = group.items.find((g) => g.id === it.requestId);
           return {
             ...submissionToBidCard(s, it),
@@ -203,9 +207,10 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
             itemLabelAr: gi?.item?.nameAr ?? it.label ?? "المعدة",
             categoryId: gi?.item?.categoryId ?? null,
             itemImage: gi?.item?.imageUrl ?? null,
+            quality,
           };
-        }),
-      ),
+        });
+      }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [submissions, group.items, ar],
   );
@@ -573,15 +578,20 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   // Bid source: off-platform shared-link vs on-platform (no uploaded-file source on this surface yet).
   const sourceOf = (b: GroupBid): "link" | "platform" | "file" => (b.viaSharedLink ? "link" : "platform");
   const srcCount = (s: "all" | "link" | "platform" | "file") => (s === "all" ? allBids.length : allBids.filter((b) => sourceOf(b) === s).length);
+  // Count of link bids in a quality band (drives the sub-filter option counts).
+  const qCount = (band: "all" | QualityBand) => allBids.filter((b) => sourceOf(b) === "link" && (band === "all" || b.quality?.band === band)).length;
+  // The quality sub-filter only applies to link bids and only when the source filter is "link".
+  const qualityActive = fSource === "link" && fQuality !== "all";
   const base = supplierKey === "all" ? [...allBids].sort((a, b) => a.requestId.localeCompare(b.requestId)) : allBids.filter((b) => (b.supplierId ?? b.supplierName) === supplierKey);
   const shown = base.filter(
     (b) =>
       (selectedItem === "all" || b.requestId === selectedItem) &&
       (fSource === "all" || sourceOf(b) === fSource) &&
+      (!qualityActive || b.quality?.band === fQuality) &&
       (!fVerified || b.verified) &&
       (!fKm || (b.distanceKm != null && b.distanceKm <= 50)),
   );
-  const fActive = (fSource !== "all" ? 1 : 0) + (fVerified ? 1 : 0) + (fKm ? 1 : 0);
+  const fActive = (fSource !== "all" ? 1 : 0) + (qualityActive ? 1 : 0) + (fVerified ? 1 : 0) + (fKm ? 1 : 0);
   const selectedCount = allBids.filter((b) => selected.has(b.id)).length;
   // Item picker: one entry per request line + its bid count (off-platform included via allBids).
   const itemList = group.items.map((it) => ({
@@ -681,6 +691,26 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                     <span className="fp-n">{srcCount(key)}</span>
                   </div>
                 ))}
+                {/* Quality sub-filter — only for shared-link bids (they carry a computed quality score). */}
+                {fSource === "link" && (
+                  <>
+                    <div className="fp-div" />
+                    <div className="fp-h">{L("Bid quality", "جودة العرض")}</div>
+                    {([
+                      ["all", L("Any quality", "أي جودة"), null, ""],
+                      ["high", L("High match · 80–100%", "مطابقة عالية · ٨٠–١٠٠٪"), "#12b76a", "workspace_premium"],
+                      ["mid", L("Partial match · 50–79%", "مطابقة جزئية · ٥٠–٧٩٪"), "#f79009", "adjust"],
+                      ["low", L("Low match · 0–49%", "مطابقة منخفضة · ٠–٤٩٪"), "#f04438", "warning"],
+                    ] as const).map(([key, label, color, icon]) => (
+                      <div key={key} className={`fp-opt${fQuality === key ? " on" : ""}`} onClick={() => setFQuality(key)}>
+                        <span className="radio" />
+                        {icon && <span className="material-icons-outlined fp-ic" style={{ color: color || undefined }}>{icon}</span>}
+                        {label}
+                        <span className="fp-n">{qCount(key)}</span>
+                      </div>
+                    ))}
+                  </>
+                )}
                 <div className="fp-div" />
                 <div className="fp-h">{L("Refine", "تنقية")}</div>
                 <div className={`fp-opt fp-check${fVerified ? " on" : ""}`} onClick={() => setFVerified((v) => !v)}>
@@ -692,7 +722,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                   <span className="material-icons-outlined fp-ic" style={{ color: "var(--navy-mid)" }}>place</span>{L("Within 50 km of site", "ضمن ٥٠ كم من الموقع")}
                 </div>
                 <div className="fp-foot">
-                  <button className="clr" onClick={() => { setFSource("all"); setFVerified(false); setFKm(false); }}>{L("Clear all", "مسح الكل")}</button>
+                  <button className="clr" onClick={() => { setFSource("all"); setFQuality("all"); setFVerified(false); setFKm(false); }}>{L("Clear all", "مسح الكل")}</button>
                   <button className="done" onClick={() => setFilterOpen(false)}>{L("Done", "تم")}</button>
                 </div>
               </div>
@@ -737,6 +767,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
               itemLabel={ar ? b.itemLabelAr : b.itemLabel}
               itemImage={b.itemImage}
               categoryId={b.categoryId}
+              quality={b.quality}
             />
           );
         }
@@ -772,6 +803,17 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         // Mobile parity (v3_bid_card): collapsed headline = the PER-UNIT rental total (rate × periods),
         // excluding units/mob/demob/VAT — so bids compare on the unit rate. All-in lives in the grand total.
         const perUnitRentalTotal = Math.round((b.price ?? 0) * cq.periods);
+        // Rental label: one full period → "24,000/month"; a whole multiple → "× N"; a sub-period day
+        // count (e.g. 10 days on a monthly rate) → the effective per-day rate × days, so the factor is a
+        // clean integer, never a confusing "× 0.38" / "× 0.04".
+        const rentalLabel = ((): string => {
+          const price = nf(b.price ?? 0);
+          const per = periodOf(b.priceUnit);
+          if (cq.periods === 1) return `${price}/${per}`;
+          if (Number.isInteger(cq.periods)) return `${price}/${per} × ${cq.periods}`;
+          const perDay = nf(Math.round(cq.perUnitRental / (cq.days || 1)));
+          return `${perDay}/${L("day", "يوم")} × ${cq.days} ${L("days", "يوم")}`;
+        })();
         const rentalTotalLabel = ((): string => {
           switch ((b.priceUnit ?? "PER_DAY").toUpperCase()) {
             case "PER_WEEK": return L("Weekly rental total", "إجمالي الإيجار الأسبوعي");
@@ -880,7 +922,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                 <div style={{ ...iconBox, background: "#fff4e5" }}><span className="material-icons-outlined" style={{ fontSize: 20, color: "#f79009" }}>payments</span></div>
                 <div style={{ minWidth: 0 }}>
                   <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{rentalTotalLabel}</span>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#6b8fa8", marginTop: 1 }}>{nf(b.price ?? 0)}/{periodOf(b.priceUnit)} × {Number.isInteger(cq.periods) ? cq.periods : cq.periods.toFixed(2)} · {L("per unit", "للوحدة")}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#6b8fa8", marginTop: 1 }}>{rentalLabel} · {L("per unit", "للوحدة")}</div>
                 </div>
                 <div style={{ flex: 1 }} />
                 <span style={{ fontSize: 17, fontWeight: 900, color: "#f79009" }}>{nf(perUnitRentalTotal)} {L("SAR", "ر.س")}</span>
@@ -901,7 +943,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                     </div>
                   )}
                   {([
-                    [L(`Rental (${nf(b.price ?? 0)}/${periodOf(b.priceUnit)} × ${Number.isInteger(cq.periods) ? cq.periods : cq.periods.toFixed(2)}${u > 1 ? ` × ${u}` : ""})`, `الإيجار (${nf(b.price ?? 0)}/${periodOf(b.priceUnit)} × ${Number.isInteger(cq.periods) ? cq.periods : cq.periods.toFixed(2)}${u > 1 ? ` × ${u}` : ""})`), rental, null],
+                    [`${L("Rental", "الإيجار")} (${rentalLabel}${u > 1 ? ` × ${u}` : ""})`, rental, null],
                     ...(deliv ? [[u > 1 ? L(`Delivery to site (${nf(Math.round(deliv / u))} × ${u} units)`, `النقل إلى الموقع (${nf(Math.round(deliv / u))} × ${u} وحدة)`) : L("Delivery to site", "النقل إلى الموقع"), deliv, b.mobLeadTime]] as [string, number, string | null][] : []),
                     ...(ret ? [[u > 1 ? L(`Return from site (${nf(Math.round(ret / u))} × ${u} units)`, `الإرجاع من الموقع (${nf(Math.round(ret / u))} × ${u} وحدة)`) : L("Return from site", "الإرجاع من الموقع"), ret, b.demobLeadTime]] as [string, number, string | null][] : []),
                     [L("Subtotal before VAT", "المجموع قبل الضريبة"), sub, null],
@@ -1037,6 +1079,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         <SharedBidSubmissionModal
           bid={submissionBid}
           submission={submissions.find((s) => s.id === submissionBid.submissionKey) ?? null}
+          focusItemId={submissionBid.requestItemId}
           ar={ar}
           L={L}
           onClose={() => setSubmissionBid(null)}

@@ -3,11 +3,13 @@
  * renter's request and how complete its supporting docs are. Computed CLIENT-SIDE (no backend) so it
  * renders identically on the supplier's live form and the renter's read-only viewer.
  *
- * Balanced weighting (product decision): Terms-match 40% · Documents 40% · Completeness 20%.
+ * Weighting (product decision): Terms-match 40% · Equipment docs 30% · Company details 30%.
  *   - Terms-match: of the renter's required per-item terms, the fraction the supplier confirmed "yes".
- *   - Documents: coverage of the expected doc buckets — equipment photos + proof of ownership +
- *     company verification (always), plus equipment / operator certificates when the request needs them.
- *   - Completeness: every item priced + all company details filled.
+ *   - Equipment docs: coverage of the expected equipment doc buckets — equipment photos + proof of
+ *     ownership (always), plus equipment / operator certificates when the request needs them.
+ *   - Company details: fraction of the OPTIONAL company slots provided — CR, VAT, national address,
+ *     and other company documents — each satisfiable as text OR a document. (Company name + contact
+ *     are required to submit and pricing gates submission, so neither is part of the quality score.)
  */
 
 import type { LinkBidSubmission } from "@/lib/contract/link-bids";
@@ -15,9 +17,10 @@ import type { LinkBidSubmission } from "@/lib/contract/link-bids";
 /** The per-item terms the form asks the supplier to confirm (matches the form's TERM_KEYS). */
 const ITEM_TERM_KEYS = ["operator", "nationality", "fatFood", "fatTransport", "fuel", "fuelType", "year", "operatorCert", "equipmentCert"] as const;
 
-const OWNERSHIP_TYPES = new Set(["istimara", "customs_card", "sales_contract", "saso_registration"]);
+const OWNERSHIP_TYPES = new Set(["istimara", "customs_card", "sales_contract", "saso_registration", "combined"]);
 const EQUIP_CERT_TYPES = new Set(["tuv", "spsp", "saso", "other"]);
 const OPERATOR_CERT_TYPES = new Set(["operator_tuv", "operator_spsp", "operator_saso", "operator_other"]);
+const COMPANY_EXTRA_DOC_TYPES = new Set(["local_content", "saso_heavy_equip", "other"]);
 
 export interface QualityItemInput {
   requiredTerms: Record<string, string | null> | null | undefined;
@@ -28,17 +31,23 @@ export interface QualityItemInput {
   equipCertCount: number;
   operatorCertCount: number;
 }
+/** The optional company slots — each satisfied by text input OR an attached document. */
+export interface QualityCompanyInput {
+  cr: boolean;            // commercial registration (number or doc)
+  vat: boolean;           // VAT (number or doc)
+  address: boolean;       // national address (text or doc)
+  otherDocs: boolean;     // ≥1 "other company document" attached
+}
 export interface QualityInput {
   items: QualityItemInput[];
-  companyDocCount: number;
-  companyComplete: boolean;
+  company: QualityCompanyInput;
 }
 
 export type QualityBand = "low" | "mid" | "high";
 export interface BidQuality {
   score: number; // 0–100
   band: QualityBand;
-  parts: { terms: number; documents: number; completeness: number }; // each 0–1
+  parts: { terms: number; equipment: number; company: number }; // each 0–1
 }
 
 const clamp01 = (n: number) => (Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0);
@@ -59,25 +68,25 @@ export function computeBidQuality(input: QualityInput): BidQuality {
   }
   const terms = required ? matched / required : 1;
 
-  // ── Documents: fraction of the expected buckets that have ≥1 file.
+  // ── Equipment docs: fraction of the expected equipment buckets that have ≥1 file.
   const anyNeedsEquipCert = items.some((it) => (it.requiredTerms ?? {}).equipmentCert != null);
   const anyNeedsOperator = items.some((it) => { const rt = it.requiredTerms ?? {}; return rt.operator != null || rt.operatorCert != null; });
   const sum = (f: (it: QualityItemInput) => number) => items.reduce((s, it) => s + f(it), 0);
-  const buckets: boolean[] = [
+  const equipBuckets: boolean[] = [
     sum((it) => it.photoCount) > 0,      // equipment photos (always expected)
     sum((it) => it.ownershipCount) > 0,  // proof of ownership (always expected)
-    input.companyDocCount > 0,           // company verification (always expected)
   ];
-  if (anyNeedsEquipCert) buckets.push(sum((it) => it.equipCertCount) > 0);
-  if (anyNeedsOperator) buckets.push(sum((it) => it.operatorCertCount) > 0);
-  const documents = buckets.length ? buckets.filter(Boolean).length / buckets.length : 1;
+  if (anyNeedsEquipCert) equipBuckets.push(sum((it) => it.equipCertCount) > 0);
+  if (anyNeedsOperator) equipBuckets.push(sum((it) => it.operatorCertCount) > 0);
+  const equipment = equipBuckets.length ? equipBuckets.filter(Boolean).length / equipBuckets.length : 1;
 
-  // ── Completeness: priced items + company details.
-  const pricedFraction = items.length ? items.filter((it) => it.priced).length / items.length : 1;
-  const completeness = 0.6 * pricedFraction + 0.4 * (input.companyComplete ? 1 : 0);
+  // ── Company details: fraction of the optional company slots provided (text OR document).
+  const c = input.company ?? { cr: false, vat: false, address: false, otherDocs: false };
+  const companySlots = [c.cr, c.vat, c.address, c.otherDocs];
+  const company = companySlots.filter(Boolean).length / companySlots.length;
 
-  const score = Math.round(100 * (0.4 * clamp01(terms) + 0.4 * clamp01(documents) + 0.2 * clamp01(completeness)));
-  return { score, band: bandOf(score), parts: { terms: clamp01(terms), documents: clamp01(documents), completeness: clamp01(completeness) } };
+  const score = Math.round(100 * (0.4 * clamp01(terms) + 0.3 * clamp01(equipment) + 0.3 * clamp01(company)));
+  return { score, band: bandOf(score), parts: { terms: clamp01(terms), equipment: clamp01(equipment), company: clamp01(company) } };
 }
 
 /** Adapter: build the quality input from a renter-side submission (classifying documents by type). */
@@ -94,6 +103,12 @@ export function qualityFromSubmission(sub: LinkBidSubmission): BidQuality {
       operatorCertCount: docs.filter((d) => OPERATOR_CERT_TYPES.has(d.type)).length,
     };
   });
-  const companyComplete = !!(sub.companyName && sub.crNumber && sub.vatNumber && sub.nationalAddress && sub.contactInfo);
-  return computeBidQuality({ items, companyDocCount: (sub.companyDocuments ?? []).length, companyComplete });
+  const coDocs = sub.companyDocuments ?? [];
+  const company: QualityCompanyInput = {
+    cr: !!sub.crNumber || coDocs.some((d) => d.type === "cr"),
+    vat: !!sub.vatNumber || coDocs.some((d) => d.type === "vat_cert"),
+    address: !!sub.nationalAddress || coDocs.some((d) => d.type === "national_address"),
+    otherDocs: coDocs.some((d) => COMPANY_EXTRA_DOC_TYPES.has(d.type)),
+  };
+  return computeBidQuality({ items, company });
 }

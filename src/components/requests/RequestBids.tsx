@@ -7,6 +7,7 @@ import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/cli
 import type { BidCard } from "@/lib/contract/bids";
 import { computeBidQuote } from "@/lib/contract/comparison";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
+import { qualityFromSubmission, type BidQuality } from "@/lib/contract/bid-quality";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { CredentialPills } from "@/components/requests/CredentialPills";
 import { TermsPanel } from "@/components/requests/TermsPanel";
@@ -198,11 +199,13 @@ export function RequestBids({ requestId }: { requestId: string }) {
   // Merge on-platform app bids with off-platform shared-link submissions (mapped to a BidCard shape).
   // A submission covers the whole group; on a single request, show only THIS request's item (one card).
   const linkLabels = new Map<string, string | null>(); // card id → item label (for the card title)
+  const linkQuality = new Map<string, BidQuality>(); // card id → bid-quality score (shown on the card)
   const linkCards = submissions.flatMap((s) => {
     const it = s.items.find((i) => i.requestId === requestId) ?? (s.items.length === 1 ? s.items[0] : null);
     if (!it) return [];
     const id = `link-${s.id}-${it.requestItemId}`;
     linkLabels.set(id, it.label ?? null);
+    linkQuality.set(id, qualityFromSubmission(s));
     return [{ ...submissionToBidCard(s, it), id }];
   });
   const merged = [...bids, ...linkCards];
@@ -249,6 +252,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
               onToggleSelect={() => toggleSelect(b.id)}
               onViewSubmission={() => setSubmissionBid(b)}
               itemLabel={linkLabels.get(b.id) ?? null}
+              quality={linkQuality.get(b.id) ?? null}
             />
           );
         }
@@ -424,6 +428,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
         <SharedBidSubmissionModal
           bid={submissionBid}
           submission={submissions.find((s) => s.id === submissionBid.submissionKey) ?? null}
+          focusItemId={submissionBid.requestItemId}
           ar={ar}
           L={L}
           onClose={() => setSubmissionBid(null)}
