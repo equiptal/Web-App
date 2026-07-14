@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { StreamChat, type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
-import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, ApiError } from "@/lib/api/client";
+import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, ApiError } from "@/lib/api/client";
 import type { DealRoomView, DealRoomDocument, DealRoomDocuments, QuotationView } from "@/lib/contract/deal-room";
 import { DealRoomTerms, type ResolutionsMap } from "@/components/deal-room/DealRoomTerms";
 import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
@@ -198,6 +198,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const [releaseOpen, setReleaseOpen] = useState(false); // reopen-accepted-deal confirm modal
   const [releasing, setReleasing] = useState(false);
   const [releaseErr, setReleaseErr] = useState<string | null>(null);
+  const [withdrawing, setWithdrawing] = useState(false); // withdraw a pending acceptance (AWAITING)
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [termsOpen, setTermsOpen] = useState(true);
   const termsToggled = useRef(false);
@@ -229,6 +230,22 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
       setReleaseErr(e instanceof ApiError ? e.message : L("Couldn't reopen the deal. Please try again.", "تعذّر إعادة فتح الصفقة. حاول مرة أخرى."));
     } finally {
       setReleasing(false);
+    }
+  }
+
+  // deal-room/negotiation — withdraw a pending acceptance (AWAITING → NEGOTIATING). App parity:
+  // "withdraw acceptance"; backend clears the reserved units + re-arms the bid, loadRoom restores the
+  // negotiate controls. Distinct from release (which reopens a CLOSED deal).
+  async function doWithdraw() {
+    if (withdrawing) return;
+    setWithdrawing(true);
+    try {
+      await withdrawAcceptance(id);
+      await loadRoom();
+    } catch (e) {
+      window.alert(errMsg(e, L("Couldn't withdraw right now — please try again.", "تعذّر سحب القبول الآن — حاول مرة أخرى.")));
+    } finally {
+      setWithdrawing(false);
     }
   }
 
@@ -581,8 +598,18 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
               </div>
             )}
           </>
+        ) : awaiting ? (
+          <>
+            <div className="turn-strip"><span className="material-icons-outlined">hourglass_top</span>{L("Sent — awaiting supplier confirmation", "أُرسل — بانتظار تأكيد المؤجر")}</div>
+            {/* deal-room/negotiation — withdraw the pending acceptance (AWAITING → NEGOTIATING). */}
+            <div className="pc-cta">
+              <button className="btn outline" disabled={withdrawing} onClick={doWithdraw}>
+                <span className="material-icons-outlined">undo</span>{withdrawing ? L("Withdrawing…", "جارٍ السحب…") : L("Withdraw acceptance", "سحب القبول")}
+              </button>
+            </div>
+          </>
         ) : (
-          <div className="turn-strip"><span className="material-icons-outlined">hourglass_top</span>{awaiting ? L("Sent — awaiting supplier confirmation", "أُرسل — بانتظار تأكيد المؤجر") : L("Waiting for the supplier", "في انتظار المؤجر")}</div>
+          <div className="turn-strip"><span className="material-icons-outlined">hourglass_top</span>{L("Waiting for the supplier", "في انتظار المؤجر")}</div>
         )}
       </div>
 

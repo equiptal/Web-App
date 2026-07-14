@@ -293,6 +293,12 @@ export function releaseDeal(id: string, reason?: string): Promise<unknown> {
   return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/release`, reason ? { reason } : {});
 }
 
+/** Withdraw a pending acceptance (app parity: "withdraw acceptance"). Flips
+ *  AWAITING_SUPPLIER_CONFIRMATION → NEGOTIATING, clears reserved units, re-arms the bid. */
+export function withdrawAcceptance(id: string): Promise<unknown> {
+  return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/withdraw`, {});
+}
+
 /** Submit all locally-collected term resolutions at once (app parity — batched with the rate counter). */
 export function batchUpdateTerms(id: string, updates: TermUpdate[], note?: string): Promise<unknown> {
   return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/terms/batch`, { updates, note });
