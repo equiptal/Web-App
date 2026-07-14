@@ -735,6 +735,9 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         // Mobile parity (v3_bid_card): collapsed headline = the PER-UNIT rental total (rate × periods),
         // excluding units/mob/demob/VAT — so bids compare on the unit rate. All-in lives in the grand total.
         const perUnitRentalTotal = Math.round((b.price ?? 0) * cq.periods);
+        // Period multiplier shown in the breakdown — omitted when it's a single full period (× 1), so a
+        // no-duration monthly bid reads "24,000/month", not a misleading "× 0.04" / "× 1".
+        const periodsTxt = cq.periods === 1 ? "" : ` × ${Number.isInteger(cq.periods) ? cq.periods : cq.periods.toFixed(2)}`;
         const rentalTotalLabel = ((): string => {
           switch ((b.priceUnit ?? "PER_DAY").toUpperCase()) {
             case "PER_WEEK": return L("Weekly rental total", "إجمالي الإيجار الأسبوعي");
@@ -843,7 +846,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                 <div style={{ ...iconBox, background: "#fff4e5" }}><span className="material-icons-outlined" style={{ fontSize: 20, color: "#f79009" }}>payments</span></div>
                 <div style={{ minWidth: 0 }}>
                   <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{rentalTotalLabel}</span>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#6b8fa8", marginTop: 1 }}>{nf(b.price ?? 0)}/{periodOf(b.priceUnit)} × {Number.isInteger(cq.periods) ? cq.periods : cq.periods.toFixed(2)} · {L("per unit", "للوحدة")}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#6b8fa8", marginTop: 1 }}>{nf(b.price ?? 0)}/{periodOf(b.priceUnit)}{periodsTxt} · {L("per unit", "للوحدة")}</div>
                 </div>
                 <div style={{ flex: 1 }} />
                 <span style={{ fontSize: 17, fontWeight: 900, color: "#f79009" }}>{nf(perUnitRentalTotal)} {L("SAR", "ر.س")}</span>
@@ -864,7 +867,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                     </div>
                   )}
                   {([
-                    [L(`Rental (${nf(b.price ?? 0)}/${periodOf(b.priceUnit)} × ${Number.isInteger(cq.periods) ? cq.periods : cq.periods.toFixed(2)}${u > 1 ? ` × ${u}` : ""})`, `الإيجار (${nf(b.price ?? 0)}/${periodOf(b.priceUnit)} × ${Number.isInteger(cq.periods) ? cq.periods : cq.periods.toFixed(2)}${u > 1 ? ` × ${u}` : ""})`), rental, null],
+                    [L(`Rental (${nf(b.price ?? 0)}/${periodOf(b.priceUnit)}${periodsTxt}${u > 1 ? ` × ${u}` : ""})`, `الإيجار (${nf(b.price ?? 0)}/${periodOf(b.priceUnit)}${periodsTxt}${u > 1 ? ` × ${u}` : ""})`), rental, null],
                     ...(deliv ? [[u > 1 ? L(`Delivery to site (${nf(Math.round(deliv / u))} × ${u} units)`, `النقل إلى الموقع (${nf(Math.round(deliv / u))} × ${u} وحدة)`) : L("Delivery to site", "النقل إلى الموقع"), deliv, b.mobLeadTime]] as [string, number, string | null][] : []),
                     ...(ret ? [[u > 1 ? L(`Return from site (${nf(Math.round(ret / u))} × ${u} units)`, `الإرجاع من الموقع (${nf(Math.round(ret / u))} × ${u} وحدة)`) : L("Return from site", "الإرجاع من الموقع"), ret, b.demobLeadTime]] as [string, number, string | null][] : []),
                     [L("Subtotal before VAT", "المجموع قبل الضريبة"), sub, null],
