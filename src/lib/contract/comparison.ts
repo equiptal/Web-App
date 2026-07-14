@@ -375,7 +375,10 @@ export function displayQuote(bid: BidCard, period: RatePeriod, pricesFor: Prices
   const fb = num(fallbackDays);
   const durDays = num(bid.duration) ?? (fb != null && fb > 0 ? fb : null);
   const durationRental = durDays != null && dppBid !== 0 ? perDay * durDays * units : null;
-  const base = durationRental ?? rentalForPeriod;
+  // With a duration → the daily rate × duration (durationRental). With NO duration → keep the bid's own
+  // quoted rate × units (NOT the toggle-converted rentalForPeriod), so switching Day/Week/Month re-expresses
+  // only the displayed rate, never the total. Mirrors computeBidQuote's no-proration-when-unknown rule.
+  const base = durationRental ?? rate * units;
   const subtotal = base + mobDemob;
   const vat = subtotal * 0.15;
   return { units, ratePerPeriod, rentalForPeriod, mobDemob, durationRental, subtotal, vat, total: subtotal + vat };
