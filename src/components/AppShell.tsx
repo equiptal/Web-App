@@ -176,7 +176,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
               <Icon name={locale === "ar" ? "arrow_forward" : "arrow_back"} size={20} />
             </button>
           )}
-          <b className="truncate text-[19px] font-extrabold tracking-[-.4px] text-navy">
+          <b className="min-w-0 flex-1 truncate text-[19px] font-extrabold tracking-[-.4px] text-navy">
             {title ?? (
               <>
                 {greeting} <span className="wave-emoji">👋</span>
@@ -184,7 +184,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
             )}
           </b>
 
-          <div className="ms-auto flex items-center gap-3 text-[13px] font-semibold text-navy-mid">
+          <div className="ms-auto flex flex-none items-center gap-2 text-[13px] font-semibold text-navy-mid sm:gap-3">
             <span className="inline-flex overflow-hidden rounded-md border border-border">
               {(["en", "ar"] as Locale[]).map((l) => (
                 <button
@@ -286,7 +286,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
               isActive(it.href) ? "text-brand" : "text-muted"
             }`}
           >
-            <Icon name={it.icon} size={22} /> {it.label}
+            <Icon name={it.icon} size={22} /> <span className="max-w-full truncate">{it.label}</span>
           </Link>
         ))}
       </nav>

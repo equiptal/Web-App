@@ -297,7 +297,7 @@ export function GroupStrip({ group, ar, L, router, filledByItem = {} }: { group:
     <div style={{ background: "linear-gradient(135deg,#1c3550 0%,#12263a 100%)", borderRadius: 20, padding: "14px 20px", color: "#fff", margin: "12px 0 16px", boxShadow: "0 12px 32px rgba(19,35,60,.18)" }}>
       <div style={{ display: "flex", gap: 24, alignItems: "stretch", flexWrap: "wrap" }}>
         {/* LEFT — request info + share link + stats */}
-        <div style={{ flex: "1 1 280px", minWidth: 240, display: "flex", flexDirection: "column" }}>
+        <div style={{ flex: "1 1 280px", minWidth: 210, display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
             <span style={{ flex: "0 1 auto", minWidth: 0, fontSize: 18, fontWeight: 900, lineHeight: 1.25, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={group.locationLabel}>{group.locationLabel}</span>
             <span style={{ flexShrink: 0, whiteSpace: "nowrap", fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 20, background: "rgba(29,175,88,.16)", color: "#7CE5A6" }}>● {ar ? ov.ar : ov.en}</span>
@@ -325,7 +325,7 @@ export function GroupStrip({ group, ar, L, router, filledByItem = {} }: { group:
         </div>
 
         {/* RIGHT — fulfillment tracking */}
-        <div style={{ flex: "1 1 360px", minWidth: 300, maxWidth: 460, background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.10)", borderRadius: 16, padding: "11px 13px" }}>
+        <div style={{ flex: "1 1 360px", minWidth: 210, maxWidth: 460, background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.10)", borderRadius: 16, padding: "11px 13px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 9 }}>
             <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".07em", color: "#8FA2BC" }}>{L("FULFILLMENT TRACKING", "متابعة التوريد")}</span>
             <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
