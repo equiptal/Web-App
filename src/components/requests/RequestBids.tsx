@@ -143,7 +143,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
         td{padding:7px 0;border-bottom:1px solid #E4EDF5} td.v{text-align:${ar ? "left" : "right"};font-weight:700}
         tr.tot td{border-top:2px solid #D4E0EC;border-bottom:0;font-weight:800;padding-top:10px} tr.tot td.v{color:#F79009}
       </style></head><body>
-      <div class="brand"><span class="logo">MOEDA<i>TECH</i></span><span class="meta">${esc(L("Quotation", "عرض السعر"))}<br>${esc(new Date().toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "long", year: "numeric" }))}</span></div>
+      <div class="brand"><span class="logo">MOEDA<i>TECH</i></span><span class="meta">${esc(L("Quotation", "عرض السعر"))}<br>${esc(new Date().toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "long", year: "numeric" }))}</span></div>
       <h1>${L("Quotation", "عرض السعر")}</h1>
       <p class="sub">${esc(L("Bids on request", "عروض على الطلب"))} ${esc(requestId)} · ${chosen.length} ${L("bids", "عروض")}</p>
       ${sections}
@@ -271,7 +271,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
           b.status === "COUNTER_OFFERED" ? L("Countered", "قدّم عرضاً مقابلاً")
           : b.status === "ACCEPTED" ? L("Accepted", "مقبول")
           : disabled ? L("Validity ended", "انتهت الصلاحية")
-          : b.submittedAt ? `${L("Submitted", "قُدّم")} · ${new Date(b.submittedAt).toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short" })}` : L("Submitted", "قُدّم");
+          : b.submittedAt ? `${L("Submitted", "قُدّم")} · ${new Date(b.submittedAt).toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short" })}` : L("Submitted", "قُدّم");
         const priceOpen = openPrice === b.id;
         const isSel = selected.has(b.id);
         return (
@@ -381,7 +381,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
 
             {/* lifecycle chips */}
             <div className="lc-chips">
-              {b.validUntil && <span className="lc-chip"><span className="material-icons-outlined">schedule</span>{L("Valid until", "صالح حتى")} {new Date(b.validUntil).toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short" })}</span>}
+              {b.validUntil && <span className="lc-chip"><span className="material-icons-outlined">schedule</span>{L("Valid until", "صالح حتى")} {new Date(b.validUntil).toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short" })}</span>}
               {b.distanceKm != null && <span className="lc-chip"><span className="material-icons-outlined">place</span>{Math.round(b.distanceKm)} {L("km", "كم")}</span>}
             </div>
 

@@ -59,7 +59,7 @@ function buildQuotationHtml(room: DealRoomView, q: QuotationView, renteeName: st
   const subtotal = hasTotal ? rentalTotal + mobTotal + demobTotal : 0;
   const vat = Math.round(subtotal * 0.15);
   const total = subtotal + vat;
-  const dateStr = new Date().toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const dateStr = new Date().toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
   const qnum = (q.quotationNumber ?? "").slice(0, 8).toUpperCase() || "—";
   const contractType = q.contractType ?? room.contractType;
 
@@ -97,7 +97,7 @@ function buildQuotationHtml(room: DealRoomView, q: QuotationView, renteeName: st
   // flow through the Agreed/Fixed terms + the price extras below, matching the app.
   const dd = room.details;
   const yn = (b: boolean | null) => (b == null ? null : b ? L("Yes", "نعم") : L("No", "لا"));
-  const fmtDate = (v: string | null) => { if (!v) return null; const dt = new Date(v); return isNaN(dt.getTime()) ? v : dt.toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" }); };
+  const fmtDate = (v: string | null) => { if (!v) return null; const dt = new Date(v); return isNaN(dt.getTime()) ? v : dt.toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" }); };
   const addRow = (rowsArr: { label: string; value: string }[], label: string, v: unknown) => {
     if (v == null || v === "" || (Array.isArray(v) && !v.length)) return;
     rowsArr.push({ label, value: Array.isArray(v) ? v.join(", ") : String(v) });
@@ -700,7 +700,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
                     </a>
                   ),
                 )}
-                <div className="meta">{m.created_at ? new Date(m.created_at as string).toLocaleTimeString(ar ? "ar-SA" : "en-GB", { hour: "2-digit", minute: "2-digit" }) : ""}</div>
+                <div className="meta">{m.created_at ? new Date(m.created_at as string).toLocaleTimeString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { hour: "2-digit", minute: "2-digit" }) : ""}</div>
               </div>
             );
           })
@@ -1088,7 +1088,7 @@ function CounterFlow({
   const STEPS = [L("Price", "السعر"), L("Terms", "الشروط"), L("Review", "المراجعة")];
   const sheetTitle = `${room.details.equipmentLabel ?? L("Equipment", "المعدّة")}${rNU > 1 ? ` — ${rNU} ${L("units", "وحدات")}` : ""}`;
   const roomCode = room.shortCode ?? "";
-  const today = new Date().toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const today = new Date().toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
   const changedFrom = (cur: number, ref: number | null) => ref != null && Math.round(cur) !== Math.round(ref);
 
   // Quotation head (reused on the price + review papers). CR/VAT + a formal quotation number aren't in
@@ -1393,7 +1393,7 @@ function CounterFlow({
                         <li key={m.id} className="qp-log-row">
                           <span className="material-icons-outlined qp-log-ic">bolt</span>
                           <span className="qp-log-txt">{m.text}</span>
-                          {m.created_at && <span className="qp-log-time">{new Date(m.created_at).toLocaleString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</span>}
+                          {m.created_at && <span className="qp-log-time">{new Date(m.created_at).toLocaleString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</span>}
                         </li>
                       ))}
                     </ul>

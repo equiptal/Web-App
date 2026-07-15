@@ -124,7 +124,7 @@ export function SharedBidSubmissionModal({
     return () => { alive = false; };
   }, [submission?.requestId]);
 
-  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
 
   // Match a form item to the supplier's submitted answers (group submissions cover several items;
   // fall back to the sole submitted item when the per-item link is missing — mirrors My Bids).

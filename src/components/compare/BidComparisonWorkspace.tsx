@@ -892,7 +892,7 @@ export function BidComparisonWorkspace() {
     if (!w) { toast(L("Allow pop-ups to export the PDF.", "اسمح بالنوافذ المنبثقة للتصدير.")); return; }
     const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch] as string));
     const itemName = (ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? L("Item", "صنف");
-    const when = new Date().toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+    const when = new Date().toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
     const yes = L("Yes", "نعم"), no = L("No", "لا"), sup = L("Supplier", "المؤجّر"), you = L("You", "أنت");
     const m = (x: { value: number; stated: boolean }) => (x.stated ? `${sar} ${nf(x.value)}` : "—");
     const certsOf = (c: BidColumn, pick: CertCode[], held: CertCode[] = c.bid.heldCertCodes) => { const h = held.filter((x) => pick.includes(x)).map(certLabel); return h.length ? esc(h.join(", ")) : "—"; };

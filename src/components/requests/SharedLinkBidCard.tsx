@@ -81,7 +81,7 @@ export function SharedLinkBidCard({
   const title = itemLabel || eqLine || L("Equipment", "المعدة");
   const agoShort = bid.agoDays === 1 ? L("1 day ago", "قبل يوم") : `${bid.agoDays ?? 2} ${L("days ago", "أيام مضت")}`;
   // Supplier's quote expiry ("Valid until") — surfaced as a chip so the renter sees how long the price holds.
-  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
   const validUntil = bid.validUntil ?? null;
   const daysLeft = validUntil ? Math.ceil((new Date(validUntil).getTime() - Date.now()) / 86400000) : null;
   const expired = daysLeft != null && daysLeft < 0;
