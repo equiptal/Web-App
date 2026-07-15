@@ -89,12 +89,13 @@ export const BID_FORM_CSS = `
 .bidpage .msym{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;line-height:1;letter-spacing:normal;text-transform:none;white-space:nowrap;direction:ltr}
 .item-hd .item-ic{flex:0 0 auto;width:42px;height:42px;display:grid;place-items:center;border-radius:11px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18)}
 .item-hd .item-ic .msym{font-size:25px;color:#FCD9A0}
+.item-hd .item-ic .item-ic-img{width:32px;height:32px;object-fit:contain;border-radius:8px}
 .item-hd .inm-wrap{flex:1;min-width:0;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
 .item-hd .inm{font-size:17px;font-weight:800;letter-spacing:-.2px}
 .item-hd .imeta{font-size:13px;color:rgba(255,255,255,.72);font-weight:700}
 /* compact, self-sizing units pill — subtle tinted amber (single) / solid orange (multi); never stretches */
 .item-hd .units-chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;letter-spacing:.01em;color:rgba(255,255,255,.72);background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.20);border-radius:var(--r-full);padding:3px 10px;white-space:nowrap}
-.item-hd .units-chip .material-icons-outlined{font-size:13px}
+.item-hd .units-chip .msym{font-size:14px}
 /* Multi-unit: still subtle/light-grey (not bright orange) — just a touch more visible than single. */
 .item-hd .units-chip.multi{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.26);color:rgba(255,255,255,.88)}
 .item-hd .ibadge{margin-inline-start:auto;flex:0 0 auto;font-size:10.5px;font-weight:800;color:rgba(255,255,255,.85);background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:var(--r-full);padding:4px 11px;white-space:nowrap}
@@ -145,7 +146,15 @@ export const BID_FORM_CSS = `
 .treqcell .tc-sw .q{color:var(--navy-mid)}
 .treqcell .tc-rw i{display:inline-flex;align-items:center;justify-content:center;min-height:34px;font-style:normal;color:var(--rentee);font-weight:800;font-size:13px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.16);border-radius:8px;padding:2px 12px;max-width:100%;overflow-wrap:break-word}
 .treqcell .tc-sw .miniseg button{justify-content:center;padding:0 14px;height:34px;font-size:12px}
-@media(max-width:560px){.treqcell .tc-rw{max-width:none}}
+/* Mobile: stack the card — name on top, then "Renter's choice" and "Your choice" as full-width
+   label→value rows — so the long term names never collide with the choice pills. */
+@media(max-width:560px){
+  .treqcell{flex-direction:column;align-items:stretch;gap:0}
+  .treqcell .tc-main{width:100%}
+  .treqcell .tc-rw,.treqcell .tc-sw{max-width:none;flex-direction:row;align-items:center;justify-content:space-between;gap:12px;text-align:start;margin-top:9px;padding-top:9px;border-top:1px solid var(--line)}
+  .treqcell .tc-rw i{min-height:0;padding:5px 12px}
+  .treqcell .tc-rw .q,.treqcell .tc-sw .q{white-space:nowrap}
+}
 .tmtx td.declined{background:var(--danger-bg)}
 .tmtx td.needpick{background:#EAF1FE;box-shadow:inset 0 0 0 2px rgba(37,99,235,.4)}
 .celllbl{display:none}
@@ -217,6 +226,7 @@ export const BID_FORM_CSS = `
 .pb-foot{max-width:1060px;margin:0 auto;padding:8px 24px 34px}
 .dlapp{display:flex;align-items:center;gap:18px;background:linear-gradient(120deg,#eef4fb,#fff 62%);border:1px solid var(--border);border-radius:16px;padding:20px 22px;margin-bottom:10px}
 .dlapp-foot{text-align:center;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:18px}
+.pb-powered .pb-powered-logo{height:16px;width:auto;vertical-align:-3px;margin-inline-start:6px}
 .dlapp-ic{flex:0 0 auto;width:58px;height:58px;border-radius:15px;background:linear-gradient(135deg,var(--rentee),#1E40AF);display:grid;place-items:center;box-shadow:0 6px 16px rgba(37,99,235,.28)}
 .dlapp-ic img{width:36px;height:36px;object-fit:contain}
 .dlapp-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}

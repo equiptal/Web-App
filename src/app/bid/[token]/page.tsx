@@ -565,9 +565,12 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
             return (
               <div className={`sec${skip ? " item-skipped" : ""}`} key={it.requestItemId}>
                 <div className="item-hd">
-                  <span className="item-ic"><span className="msym">{equipmentIcon(rawLabel)}</span></span>
+                  <span className="item-ic">{it.imageUrl
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={it.imageUrl} alt="" className="item-ic-img" />
+                    : <span className="msym">{equipmentIcon(rawLabel)}</span>}</span>
                   <div className="inm-wrap"><span className="inm">{label}</span>{size && <span className="imeta">· {size}</span>}
-                    <span className={`units-chip${q > 1 ? " multi" : ""}`}><span className="material-icons-outlined">{q > 1 ? "layers" : "package_2"}</span>×{q} {q === 1 ? L("unit", "وحدة") : L("units", "وحدات")}</span></div>
+                    <span className={`units-chip${q > 1 ? " multi" : ""}`}><span className="msym">{q > 1 ? "layers" : "package_2"}</span>×{q} {q === 1 ? L("unit", "وحدة") : L("units", "وحدات")}</span></div>
                   <span className="ibadge">{L(`Item ${idx + 1} of ${data.items.length}`, `البند ${idx + 1} من ${data.items.length}`)}</span>
                 </div>
 
@@ -821,7 +824,8 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
           </div>
         </div>
         <div className="dlapp-foot">{L("Free to download · Available on the App Store and Google Play", "مجاني للتنزيل · متوفّر على App Store و Google Play")}</div>
-        <div className="pb-powered">{L("Powered by", "مُشغّل بواسطة")} <b>Moedatech</b></div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <div className="pb-powered">{L("Powered by", "مُشغّل بواسطة")} <img className="pb-powered-logo" src="/moedatech-logo.png" alt="Moedatech" /></div>
       </footer>
     </div>
   );
