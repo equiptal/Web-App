@@ -22,7 +22,7 @@ export const BID_FORM_CSS = `
 .langtog{display:inline-flex;border:1px solid var(--border);border-radius:7px;overflow:hidden}
 .langtog button{border:0;background:var(--surface1);color:var(--muted);padding:6px 12px;font:inherit;font-weight:700;font-size:12px;cursor:pointer}
 .langtog button.on{background:var(--navy);color:#fff}
-.wrap{max-width:1060px;margin:0 auto;padding:22px 24px 90px}
+.wrap{max-width:1060px;margin:0 auto;padding:22px 24px 24px}
 .intro{margin:4px 0 18px}
 .intro h1{margin:0 0 5px;font-size:22px;font-weight:800;letter-spacing:-.4px}
 .intro p{margin:0;font-size:13.5px;color:var(--muted)}
@@ -221,12 +221,13 @@ export const BID_FORM_CSS = `
 .submit-err .material-icons-outlined{font-size:17px}
 .submit-bar .btn{width:100%}
 .submit-note{text-align:center;font-size:11.5px;color:var(--muted);margin-top:10px}
-.footer-note{text-align:center;color:var(--muted);font-size:12px;margin-top:30px}
+.footer-note{text-align:center;color:var(--muted);font-size:12px;margin-top:16px}
 /* Footer — download-the-app CTA + a bigger "Powered by Moedatech". */
 .pb-foot{max-width:1060px;margin:0 auto;padding:8px 24px 34px}
 .dlapp{display:flex;align-items:center;gap:18px;background:linear-gradient(120deg,#eef4fb,#fff 62%);border:1px solid var(--border);border-radius:16px;padding:20px 22px;margin-bottom:10px}
 .dlapp-foot{text-align:center;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:18px}
-.pb-powered .pb-powered-logo{height:16px;width:auto;vertical-align:-3px;margin-inline-start:6px}
+.pb-brand{display:flex;justify-content:center;padding:2px 0 16px}
+.pb-brand img{height:28px;width:auto}
 .dlapp-ic{flex:0 0 auto;width:58px;height:58px;border-radius:15px;background:linear-gradient(135deg,var(--rentee),#1E40AF);display:grid;place-items:center;box-shadow:0 6px 16px rgba(37,99,235,.28)}
 .dlapp-ic img{width:36px;height:36px;object-fit:contain}
 .dlapp-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
@@ -260,7 +261,7 @@ export const BID_FORM_CSS = `
 .bidpage.inview .wrap{max-width:none;margin:0;padding:0}
 .bidpage.inview .miniseg button{cursor:default}
 @media (max-width:680px){.ro-grid{grid-template-columns:1fr 1fr}}
-@media (max-width:600px){.wrap{padding:16px 14px 80px}.pubbar-in{padding:10px 14px;gap:10px}.rmeta .rname{font-size:16px}.rlogo{width:40px;height:40px}.intro h1{font-size:19px}.sec{padding:14px}.item-hd{margin:-14px -14px 12px;padding:12px 14px}.item-hd .ibadge{display:none}
+@media (max-width:600px){.wrap{padding:16px 14px 22px}.pubbar-in{padding:10px 14px;gap:10px}.rmeta .rname{font-size:16px}.rlogo{width:40px;height:40px}.intro h1{font-size:19px}.sec{padding:14px}.item-hd{margin:-14px -14px 12px;padding:12px 14px}.item-hd .ibadge{display:none}
 .tmtx-wrap{border:0;overflow:visible}.tmtx,.tmtx tbody{display:block;width:100%}.tmtx thead{display:none}.tmtx tr{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:10px;overflow:hidden}.tmtx td{display:block;border-bottom:1px solid var(--line);border-inline-start:1px solid var(--line);padding:11px 13px}.tmtx td:nth-child(odd){border-inline-start:0}.celllbl{display:block;font-size:10.5px;font-weight:800;text-transform:uppercase;color:var(--navy-mid);margin-bottom:5px}.cd-box{width:60px}.cd-box b{font-size:23px}
 /* tighter pricing table + 16px inputs (stops iOS focus-zoom); frow + attach cards stack */
 .ptbl td,.ptbl th{padding:9px 7px}.ptbl-in{width:84px}.frow{grid-template-columns:1fr}
