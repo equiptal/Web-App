@@ -26,7 +26,7 @@ function fmtDate(iso: string | null, ar: boolean): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
 export function RequestsList() {
@@ -297,7 +297,7 @@ export function GroupStrip({ group, ar, L, router, filledByItem = {} }: { group:
     <div style={{ background: "linear-gradient(135deg,#1c3550 0%,#12263a 100%)", borderRadius: 20, padding: "14px 20px", color: "#fff", margin: "12px 0 16px", boxShadow: "0 12px 32px rgba(19,35,60,.18)" }}>
       <div style={{ display: "flex", gap: 24, alignItems: "stretch", flexWrap: "wrap" }}>
         {/* LEFT — request info + share link + stats */}
-        <div style={{ flex: "1 1 280px", minWidth: 240, display: "flex", flexDirection: "column" }}>
+        <div style={{ flex: "1 1 280px", minWidth: 210, display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
             <span style={{ flex: "0 1 auto", minWidth: 0, fontSize: 18, fontWeight: 900, lineHeight: 1.25, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={group.locationLabel}>{group.locationLabel}</span>
             <span style={{ flexShrink: 0, whiteSpace: "nowrap", fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 20, background: "rgba(29,175,88,.16)", color: "#7CE5A6" }}>● {ar ? ov.ar : ov.en}</span>
@@ -318,14 +318,14 @@ export function GroupStrip({ group, ar, L, router, filledByItem = {} }: { group:
               <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", fontSize: 12, fontWeight: 700, color: "#9DAFC6", marginTop: 9 }}>
                 <span><span className="material-icons-outlined" style={{ fontSize: 14, verticalAlign: "-2px" }}>visibility</span> <b style={{ color: "#C7D4E5" }}>{link?.openedCount ?? 0}</b> {L("opened", "فتحة")}</span>
                 <span><span className="material-icons-outlined" style={{ fontSize: 14, verticalAlign: "-2px" }}>inbox</span> <b style={{ color: "#FBBF6B" }}>{link?.submittedCount ?? 0}</b> {L("submitted", "عرض")}</span>
-                <span><span className="material-icons-outlined" style={{ fontSize: 14, verticalAlign: "-2px" }}>schedule</span> {L("Closes", "يُغلق")} <b style={{ color: "#fff" }}>{link?.bidDeadline ? new Date(link.bidDeadline).toLocaleString(ar ? "ar-SA" : "en-GB", { dateStyle: "medium", timeStyle: "short" }) : L("—", "—")}</b></span>
+                <span><span className="material-icons-outlined" style={{ fontSize: 14, verticalAlign: "-2px" }}>schedule</span> {L("Closes", "يُغلق")} <b style={{ color: "#fff" }}>{link?.bidDeadline ? new Date(link.bidDeadline).toLocaleString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { dateStyle: "medium", timeStyle: "short" }) : L("—", "—")}</b></span>
               </div>
             </div>
           )}
         </div>
 
         {/* RIGHT — fulfillment tracking */}
-        <div style={{ flex: "1 1 360px", minWidth: 300, maxWidth: 460, background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.10)", borderRadius: 16, padding: "11px 13px" }}>
+        <div style={{ flex: "1 1 360px", minWidth: 210, maxWidth: 460, background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.10)", borderRadius: 16, padding: "11px 13px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 9 }}>
             <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".07em", color: "#8FA2BC" }}>{L("FULFILLMENT TRACKING", "متابعة التوريد")}</span>
             <div style={{ display: "flex", alignItems: "center", gap: 9 }}>

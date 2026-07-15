@@ -19,8 +19,8 @@ export const BID_FORM_CSS = `
 .rmeta .rsub{font-size:11.5px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:5px;margin-top:2px}
 .rmeta .rsub .material-icons-outlined{font-size:13px;color:var(--success)}
 .pubbar .spacer{flex:1}
-.langtog{display:inline-flex;border:1px solid var(--border);border-radius:7px;overflow:hidden}
-.langtog button{border:0;background:var(--surface1);color:var(--muted);padding:6px 12px;font:inherit;font-weight:700;font-size:12px;cursor:pointer}
+.langtog{display:inline-flex;border:1.5px solid var(--navy);border-radius:9px;overflow:hidden;box-shadow:0 1px 4px rgba(28,53,80,.14)}
+.langtog button{border:0;background:var(--surface1);color:var(--navy);padding:8px 16px;font:inherit;font-weight:800;font-size:13.5px;cursor:pointer;transition:background .12s}
 .langtog button.on{background:var(--navy);color:#fff}
 .wrap{max-width:1060px;margin:0 auto;padding:22px 24px 24px}
 .intro{margin:4px 0 18px}

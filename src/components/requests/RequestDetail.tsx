@@ -15,7 +15,7 @@ const STATUS_CLS: Record<string, string> = { OPEN: "st-open", ACTIVE: "st-active
 function fmtDate(v: string | null | undefined, ar: boolean): string {
   if (!v) return "—";
   const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
 /**
@@ -32,7 +32,7 @@ export function requestDetailRows(r: RequestRecord, ar: boolean, L: (en: string,
     const x = map[s.toUpperCase()] ?? map[s.toLowerCase()];
     return x ? L(x[0], x[1]) : pretty(s);
   };
-  const qty = (n: unknown, unit: [string, string]) => (n == null ? null : `${Number(n).toLocaleString(ar ? "ar-SA" : "en-US")} ${L(unit[0], unit[1])}`);
+  const qty = (n: unknown, unit: [string, string]) => (n == null ? null : `${Number(n).toLocaleString(ar ? "ar-SA-u-ca-gregory" : "en-US")} ${L(unit[0], unit[1])}`);
   const rentalMap = { DAILY: ["Daily", "يومي"], WEEKLY: ["Weekly", "أسبوعي"], MONTHLY: ["Monthly", "شهري"], PER_JOB: ["Per job", "للمهمة"], LONG_TERM: ["Long term", "طويل الأمد"] } as Record<string, [string, string]>;
   const urgencyMap = { ASAP: ["ASAP", "عاجل"], SOON: ["Soon", "قريبًا"], FAR_FUTURE: ["Future", "مستقبلًا"] } as Record<string, [string, string]>;
   const payMap = { UPFRONT: ["Upfront", "مقدمًا"], DAILY: ["Daily", "يومي"], "NET-30": ["Net 30 days", "صافي ٣٠ يومًا"], "NET-60": ["Net 60 days", "صافي ٦٠ يومًا"], "END-OF-JOB": ["End of job", "نهاية المهمة"] } as Record<string, [string, string]>;
@@ -53,7 +53,7 @@ export function requestDetailRows(r: RequestRecord, ar: boolean, L: (en: string,
     [L("Payment method", "طريقة الدفع"), enumL(r.paymentMethod, {})],
     [L("Breakdown response", "زمن الاستجابة للأعطال"), enumL(r.breakdownResponseSla, slaMap)],
     [L("Maintenance", "الصيانة"), enumL(r.maintenanceResponsibility, maintMap)],
-    [L("Budget", "الميزانية"), r.budgetCeiling ? `${Number(r.budgetCeiling).toLocaleString(ar ? "ar-SA" : "en-US")} ${L("SAR", "ر.س")}` : null],
+    [L("Budget", "الميزانية"), r.budgetCeiling ? `${Number(r.budgetCeiling).toLocaleString(ar ? "ar-SA-u-ca-gregory" : "en-US")} ${L("SAR", "ر.س")}` : null],
     [L("Min. supplier rating", "أدنى تقييم للمؤجّر"), r.minimumSupplierRating ? `★ ${Number(r.minimumSupplierRating).toFixed(1)}` : null],
     [L("Delivery lead time", "مهلة التسليم"), enumL(r.deliveryLeadTime, {})],
     [L("Offer duration", "مدة العرض"), enumL(r.offerDuration, {})],
@@ -168,7 +168,7 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
             <>
               <span className="rt-stat sub">
                 {link?.bidDeadline
-                  ? new Date(link.bidDeadline).toLocaleString(ar ? "ar-SA" : "en-GB", { dateStyle: "medium", timeStyle: "short" })
+                  ? new Date(link.bidDeadline).toLocaleString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { dateStyle: "medium", timeStyle: "short" })
                   : L("No deadline", "بدون موعد")}
               </span>
               <button className="rt-copy" onClick={openDl}>

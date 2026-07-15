@@ -81,7 +81,7 @@ export function SharedLinkBidCard({
   const title = itemLabel || eqLine || L("Equipment", "المعدة");
   const agoShort = bid.agoDays === 1 ? L("1 day ago", "قبل يوم") : `${bid.agoDays ?? 2} ${L("days ago", "أيام مضت")}`;
   // Supplier's quote expiry ("Valid until") — surfaced as a chip so the renter sees how long the price holds.
-  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
   const validUntil = bid.validUntil ?? null;
   const daysLeft = validUntil ? Math.ceil((new Date(validUntil).getTime() - Date.now()) / 86400000) : null;
   const expired = daysLeft != null && daysLeft < 0;
@@ -104,7 +104,7 @@ export function SharedLinkBidCard({
   return (
     <div
       onClick={picking ? onToggleSelect : undefined}
-      style={{ flex: cardFlex ?? "0 0 calc(44% - 8px)", minWidth: 320, scrollSnapAlign: "start", alignSelf: "flex-start", display: "flex", flexDirection: "column", position: "relative", background: "#fff", border: `1px solid ${isSel ? "#f79009" : "#d4e0ec"}`, borderRadius: 18, overflow: "hidden", boxShadow: "0 1px 2px rgba(20,40,70,.04)", outline: isSel ? "2px solid #f79009" : "none", outlineOffset: 2, cursor: picking ? "pointer" : "default" }}
+      style={{ flex: cardFlex ?? "0 0 calc(44% - 8px)", minWidth: 0, scrollSnapAlign: "start", alignSelf: "flex-start", display: "flex", flexDirection: "column", position: "relative", background: "#fff", border: `1px solid ${isSel ? "#f79009" : "#d4e0ec"}`, borderRadius: 18, overflow: "hidden", boxShadow: "0 1px 2px rgba(20,40,70,.04)", outline: isSel ? "2px solid #f79009" : "none", outlineOffset: 2, cursor: picking ? "pointer" : "default" }}
     >
       <div style={{ height: 4, background: "#d4780a" }} />
       {/* off-platform banner — replaces a status pill + the old "submitted" footer line */}

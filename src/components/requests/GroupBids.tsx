@@ -286,7 +286,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
     const renderSection = (supBids: GroupBid[], si: number, isAr: boolean) => {
       const L = (en: string, arr: string) => (isAr ? arr : en);
       const sar = L("SAR", "ر.س");
-      const dateStr = new Date().toLocaleDateString(isAr ? "ar-SA" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
+      const dateStr = new Date().toLocaleDateString(isAr ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
       // Rentee identity (app parity) — company name primary when verified, else personal name; plus the
       // renter's real CR/VAT/national address/phone/email from /api/me (value-or-"Verified" pill).
       // App parity (_RenteeBlock _partyHeader): company name is primary when the renter HAS a company
@@ -306,12 +306,12 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       const supInit = (sup.supplierName || "S").replace(/[^A-Za-z0-9]/g, "").slice(0, 3).toUpperCase() || "S";
       const qnum = `Q-${reqCode}-${supInit}${si + 1}`;
       const validRaw = supBids.map((b) => b.validUntil).filter(Boolean).sort()[0] ?? null;
-      const valid = validRaw ? new Date(validRaw).toLocaleDateString(isAr ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
+      const valid = validRaw ? new Date(validRaw).toLocaleDateString(isAr ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
       const reqIds = [...new Set(supBids.map((b) => itemMap.get(b.requestId)?.displayId ?? b.requestId))];
       const reqLabel = reqIds.length === 1 ? reqIds[0] : `${reqIds[0]} +${reqIds.length - 1}`;
       const rentalBasis = itemMap.get(sup.requestId)?.rentalType ?? "";
       const reqItem = itemMap.get(sup.requestId);
-      const fmtRefDate = (d: string | null | undefined) => (d ? new Date(d).toLocaleDateString(isAr ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—");
+      const fmtRefDate = (d: string | null | undefined) => (d ? new Date(d).toLocaleDateString(isAr ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—");
       const startStr = fmtRefDate(reqItem?.startDate);
       const endStr = fmtRefDate(reqItem?.endDate);
       // Supplier identity rows (app parity): off-platform submissions carry real CR/VAT/address VALUES;
@@ -752,7 +752,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         </div>
       </div>
 
-      <div data-select-ui style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "0 0 14px" }}>
+      <div data-select-ui style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "0 0 14px", flexWrap: "wrap" }}>
         <span style={{ fontSize: 13, fontWeight: 700, color: "#2a4f72" }}>
           {selectMode
             ? L("Tap bids to compare or export · click away to cancel", "اضغط على العروض للمقارنة أو التصدير · انقر خارجًا للإلغاء")
@@ -863,7 +863,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           <div
             key={b.id}
             onClick={selectMode ? () => toggleSelect(b.id) : undefined}
-            style={{ flex: cardFlex, minWidth: 320, scrollSnapAlign: "start", alignSelf: "flex-start", display: "flex", flexDirection: "column", position: "relative", background: isSel ? "#fff8f0" : "#fff", border: `1px solid ${isSel ? "#f79009" : "#d4e0ec"}`, borderRadius: 18, overflow: "hidden", boxShadow: isSel ? "inset 0 0 0 2px #f79009" : "0 1px 2px rgba(20,40,70,.04)", cursor: selectMode ? "pointer" : "default" }}
+            style={{ flex: cardFlex, minWidth: 0, scrollSnapAlign: "start", alignSelf: "flex-start", display: "flex", flexDirection: "column", position: "relative", background: isSel ? "#fff8f0" : "#fff", border: `1px solid ${isSel ? "#f79009" : "#d4e0ec"}`, borderRadius: 18, overflow: "hidden", boxShadow: isSel ? "inset 0 0 0 2px #f79009" : "0 1px 2px rgba(20,40,70,.04)", cursor: selectMode ? "pointer" : "default" }}
           >
             <div style={{ height: 4, background: banner.c }} />
             {banner && (

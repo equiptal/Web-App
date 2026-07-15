@@ -25,8 +25,8 @@ type TermKey = (typeof TERM_KEYS)[number];
 const TERM_LABEL: Record<TermKey, [string, string]> = {
   operator: ["Operator included", "تشمل مشغّل"],
   nationality: ["Operator nationality", "جنسية المشغّل"],
-  fatFood: ["Operator FAT — Food", "الإعاشة (F.A.T) — الطعام"],
-  fatTransport: ["Operator FAT — Accommodation/Transport", "الإعاشة (F.A.T) — الإقامة/النقل"],
+  fatFood: ["Operator Food", "طعام المشغّل"],
+  fatTransport: ["Operator Accommodation & Transport", "سكن وتنقّل المشغّل"],
   fuel: ["Fuel responsibility", "مسؤولية الوقود"],
   fuelType: ["Fuel type", "نوع الوقود"],
   year: ["Equipment year", "سنة الصنع"],
@@ -399,7 +399,8 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
 
   const dir = ar ? "rtl" : "ltr";
   const sar = L("SAR", "ر.س");
-  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+  // Arabic dates use the Gregorian (ميلادي) calendar, not Hijri — force it via the -ca-gregory locale ext.
+  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
 
   return (
     <div dir={dir} className={`bidpage${ar ? " rtl" : ""}`}>
@@ -809,8 +810,6 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
         <div className="pb-brand"><img src="/moedatech-logo.png" alt="Moedatech" /></div>
         {/* Download CTA — nudge off-platform suppliers to install the app; opens the store for their OS. */}
         <div className="dlapp">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <span className="dlapp-ic"><img src="/moedatech-logomark.svg" alt="Moedatech" width={36} height={36} /></span>
           <div className="dlapp-tx">
             <b>{L("Get more rental requests", "استقبل المزيد من طلبات الإيجار")}</b>
             <span>{L("Download the Moedatech app to receive requests directly and bid faster.", "حمّل تطبيق معداتك لاستقبال الطلبات مباشرةً وتقديم عروضك بسرعة.")}</span>
@@ -830,7 +829,6 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
             )}
           </div>
         </div>
-        <div className="dlapp-foot">{L("Free to download · Available on the App Store and Google Play", "مجاني للتنزيل · متوفّر على App Store و Google Play")}</div>
         <div className="pb-powered">{L("Powered by", "مُشغّل بواسطة")} <b>Moedatech</b></div>
       </footer>
     </div>
