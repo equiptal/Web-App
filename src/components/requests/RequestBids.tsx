@@ -17,6 +17,7 @@ import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
 import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
+import { SharedBidNegotiateRoom } from "@/components/requests/SharedBidNegotiateRoom";
 
 /** Lifecycle pill (matches the prototype SPILL). */
 const SPILL: Record<string, { cls: string; dot: boolean; en: string; ar: string }> = {
@@ -85,6 +86,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
   const [submissions, setSubmissions] = useState<LinkBidSubmission[]>([]);
   const [src, setSrc] = useState<"all" | "app" | "link">("all"); // source filter
   const [submissionBid, setSubmissionBid] = useState<BidCard | null>(null);
+  const [negotiateBid, setNegotiateBid] = useState<BidCard | null>(null); // web-app/006 — deal-room-style negotiate view
 
   const toggleSelect = (id: string) =>
     setSelected((prev) => {
@@ -254,6 +256,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
               isSel={selected.has(b.id)}
               onToggleSelect={() => toggleSelect(b.id)}
               onViewSubmission={() => setSubmissionBid(b)}
+              onNegotiate={() => setNegotiateBid(b)}
               itemLabel={linkLabels.get(b.id) ?? null}
               quality={linkQuality.get(b.id) ?? null}
             />
@@ -440,6 +443,19 @@ export function RequestBids({ requestId }: { requestId: string }) {
           ar={ar}
           L={L}
           onClose={() => setSubmissionBid(null)}
+        />
+      )}
+
+      {/* web-app/006 — deal-room-style negotiate relay for an off-platform shared-link bid */}
+      {negotiateBid && (
+        <SharedBidNegotiateRoom
+          bid={negotiateBid}
+          submission={submissions.find((s) => s.id === negotiateBid.submissionKey) ?? null}
+          itemLabel={linkLabels.get(negotiateBid.id) ?? null}
+          ar={ar}
+          L={L}
+          onClose={() => setNegotiateBid(null)}
+          onViewSubmission={() => { const b = negotiateBid; setNegotiateBid(null); setSubmissionBid(b); }}
         />
       )}
 

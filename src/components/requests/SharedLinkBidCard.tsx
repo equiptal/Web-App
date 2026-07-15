@@ -25,6 +25,7 @@ export function SharedLinkBidCard({
   cardFlex,
   onToggleSelect,
   onViewSubmission,
+  onNegotiate,
   itemLabel,
   itemImage,
   categoryId,
@@ -43,6 +44,9 @@ export function SharedLinkBidCard({
   cardFlex?: string;
   onToggleSelect: () => void;
   onViewSubmission: () => void;
+  /** web-app/006 — opens the deal-room-style negotiate view (message relay to the off-platform supplier).
+   *  Omit to render only the "View bid submission" CTA (e.g. contexts without the negotiate flow). */
+  onNegotiate?: () => void;
   itemLabel?: string | null;
   itemImage?: string | null;
   categoryId?: string | null;
@@ -237,14 +241,23 @@ export function SharedLinkBidCard({
         )}
       </div>
 
-      {/* CTA — read-only submission viewer (no deal room for an off-platform supplier) */}
+      {/* CTA — view the read-only submission + (web-app/006) open the deal-room-style negotiate relay. */}
       {!picking && (
         <div style={{ marginTop: "auto", padding: "12px 16px 16px" }}>
-          <button onClick={onViewSubmission} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "14px", borderRadius: 14, border: "none", background: "#1c3550", color: "#fff", fontWeight: 800, fontSize: 15, cursor: "pointer", fontFamily: "inherit" }}>
-            <span className="material-icons-outlined" style={{ fontSize: 18 }}>visibility</span>{L("View bid submission", "عرض العرض المُقدَّم")}
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={onViewSubmission} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px 10px", borderRadius: 14, border: "1.5px solid #1c3550", background: "#fff", color: "#1c3550", fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
+              <span className="material-icons-outlined" style={{ fontSize: 18 }}>visibility</span>{L("View bid", "عرض العرض")}
+            </button>
+            {onNegotiate && (
+              <button onClick={onNegotiate} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px 10px", borderRadius: 14, border: "none", background: "#f79009", color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 2px 6px rgba(247,144,9,.32)" }}>
+                <span className="material-icons-outlined" style={{ fontSize: 18 }}>forum</span>{L("Negotiate", "تفاوض")}
+              </button>
+            )}
+          </div>
           <p style={{ fontSize: 11.5, color: "#9AA7B8", fontWeight: 600, textAlign: "center", margin: "9px 0 0" }}>
-            {L("Off-platform supplier — no deal room. View their submitted bid.", "مؤجّر خارج المنصة — لا توجد غرفة صفقة. اعرض عرضه المُقدَّم.")}
+            {onNegotiate
+              ? L("Message this supplier now — continue the deal with them in the app.", "راسل هذا المؤجّر الآن — وأكمل الصفقة معه في التطبيق.")
+              : L("Off-platform supplier — view their submitted bid.", "مؤجّر خارج المنصة — اعرض عرضه المُقدَّم.")}
           </p>
         </div>
       )}
