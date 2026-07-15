@@ -7,6 +7,7 @@ import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/cli
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
 import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
+import { SharedBidNegotiateRoom } from "@/components/requests/SharedBidNegotiateRoom";
 import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
 import { bidSuppliers, bucketBidTerms, CERT_LABEL, type BidCard, type TermRow } from "@/lib/contract/bids";
@@ -120,6 +121,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   const [submissions, setSubmissions] = useState<LinkBidSubmission[]>([]); // real off-platform submissions (all group items)
   const [groupRef, setGroupRef] = useState<string | null>(null); // RFQ-NNNNN group short code (agents bid-submissions) — stamped on the quotation
   const [submissionBid, setSubmissionBid] = useState<GroupBid | null>(null);
+  const [negotiateBid, setNegotiateBid] = useState<GroupBid | null>(null); // web-app/006 — deal-room-style negotiate view
   // Bid filter (source + refine), matching the bids-by-supplier prototype.
   const [filterOpen, setFilterOpen] = useState(false);
   const [fSource, setFSource] = useState<"all" | "link" | "platform" | "file">("all");
@@ -785,6 +787,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
               cardFlex={cardFlex}
               onToggleSelect={() => toggleSelect(b.id)}
               onViewSubmission={() => setSubmissionBid(b)}
+              onNegotiate={() => setNegotiateBid(b)}
               itemLabel={ar ? b.itemLabelAr : b.itemLabel}
               itemImage={b.itemImage}
               categoryId={b.categoryId}
@@ -1105,6 +1108,19 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           L={L}
           onClose={() => setSubmissionBid(null)}
           onDownloadQuotation={() => downloadQuotation(ar, [submissionBid])}
+        />
+      )}
+
+      {/* web-app/006 — deal-room-style negotiate relay for an off-platform shared-link bid */}
+      {negotiateBid && (
+        <SharedBidNegotiateRoom
+          bid={negotiateBid}
+          submission={submissions.find((s) => s.id === negotiateBid.submissionKey) ?? null}
+          itemLabel={ar ? negotiateBid.itemLabelAr : negotiateBid.itemLabel}
+          ar={ar}
+          L={L}
+          onClose={() => setNegotiateBid(null)}
+          onViewSubmission={() => { const b = negotiateBid; setNegotiateBid(null); setSubmissionBid(b); }}
         />
       )}
     </div>
