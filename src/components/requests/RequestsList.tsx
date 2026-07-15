@@ -26,7 +26,7 @@ function fmtDate(iso: string | null, ar: boolean): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
 export function RequestsList() {
@@ -318,7 +318,7 @@ export function GroupStrip({ group, ar, L, router, filledByItem = {} }: { group:
               <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", fontSize: 12, fontWeight: 700, color: "#9DAFC6", marginTop: 9 }}>
                 <span><span className="material-icons-outlined" style={{ fontSize: 14, verticalAlign: "-2px" }}>visibility</span> <b style={{ color: "#C7D4E5" }}>{link?.openedCount ?? 0}</b> {L("opened", "فتحة")}</span>
                 <span><span className="material-icons-outlined" style={{ fontSize: 14, verticalAlign: "-2px" }}>inbox</span> <b style={{ color: "#FBBF6B" }}>{link?.submittedCount ?? 0}</b> {L("submitted", "عرض")}</span>
-                <span><span className="material-icons-outlined" style={{ fontSize: 14, verticalAlign: "-2px" }}>schedule</span> {L("Closes", "يُغلق")} <b style={{ color: "#fff" }}>{link?.bidDeadline ? new Date(link.bidDeadline).toLocaleString(ar ? "ar-SA" : "en-GB", { dateStyle: "medium", timeStyle: "short" }) : L("—", "—")}</b></span>
+                <span><span className="material-icons-outlined" style={{ fontSize: 14, verticalAlign: "-2px" }}>schedule</span> {L("Closes", "يُغلق")} <b style={{ color: "#fff" }}>{link?.bidDeadline ? new Date(link.bidDeadline).toLocaleString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { dateStyle: "medium", timeStyle: "short" }) : L("—", "—")}</b></span>
               </div>
             </div>
           )}
