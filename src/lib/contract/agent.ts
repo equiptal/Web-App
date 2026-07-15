@@ -42,6 +42,7 @@ export interface RFQLineItem {
   operator_license_levels?: AgentOperatorLicenseLevel[] | null; // ALL operator certs the RFQ named
   // Emitted by Mansour but previously dropped by the adapter — now consumed:
   additional_notes?: string | null; // AC-53 per-item free-text qualifiers ("silent", "breaker")
+  work_type?: string | null; // A7: free-text work type (crane subtypes) — Mansour now emits it
   diesel_included?: boolean | null; // AC-26 supplier provides fuel
   fat_required?: boolean | null; // AC-24 FAT applies (operator included)
   // AC-24 FAT SPLIT — Mansour emits Food and Accommodation/Transport as SEPARATE signals, each ownable

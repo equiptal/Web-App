@@ -45,6 +45,9 @@ const ATT_LABEL: Record<string, [string, string]> = {
 };
 // Classify an item's documents back into the same groups the form uploads them under.
 const OWNERSHIP_TYPES = new Set(["istimara", "customs_card", "sales_contract", "saso_registration", "combined"]);
+// Party-responsibility values read clearer as "On renter" / "On supplier" (matches the supplier form).
+const PARTY_CHOICE: Record<string, [string, string]> = { RENTER: ["On renter", "على المستأجر"], RENTEE: ["On renter", "على المستأجر"], SUPPLIER: ["On supplier", "على المؤجّر"], ME: ["On supplier", "على المؤجّر"] };
+const renterChoice = (v: string | null | undefined, ar: boolean): string => { const p = PARTY_CHOICE[String(v ?? "").trim().toUpperCase()]; return p ? (ar ? p[1] : p[0]) : String(v ?? ""); };
 
 export function SharedBidSubmissionModal({
   bid,
@@ -355,12 +358,12 @@ export function SharedBidSubmissionModal({
                               // A cert term with 2+ certs shows one card per cert (the supplier may hold TÜV but not SPSP).
                               const rows = codes.length > 1
                                 ? codes.map((code) => ({ rk: certConfKey(k, code), ok: cc[certConfKey(k, code)] ?? conf[k], val: prettyCert(code) }))
-                                : [{ rk: k, ok: conf[k], val: (k === "operatorCert" || k === "equipmentCert") ? prettyCert(it.requiredTerms[k] ?? "") : it.requiredTerms[k] }];
+                                : [{ rk: k, ok: conf[k], val: (k === "operatorCert" || k === "equipmentCert") ? prettyCert(it.requiredTerms[k] ?? "") : renterChoice(it.requiredTerms[k], ar) }];
                               return rows.map((row) => (
                                 <div key={row.rk} className={`treqcell${row.ok === true ? " ok" : ""}${row.ok === false ? " declined" : ""}`}>
-                                  <div className="tc-name">{L(TERM_LABEL[k][0], TERM_LABEL[k][1])}</div>
-                                  <div className="tc-rw"><span className="q">{L("Renter wants", "يطلب المستأجر")}:</span> <i>{row.val}</i></div>
-                                  <div className="tc-sw"><span className="q">{L("Supplier's answer", "إجابة المؤجّر")}:</span><RoAns ok={row.ok} L={L} /></div>
+                                  <div className="tc-main"><div className="tc-name">{L(TERM_LABEL[k][0], TERM_LABEL[k][1])}</div></div>
+                                  <div className="tc-rw"><span className="q">{L("Renter's choice", "اختيار المستأجر")}</span> <i>{row.val}</i></div>
+                                  <div className="tc-sw"><span className="q">{L("Supplier's choice", "اختيار المؤجّر")}</span><RoAns ok={row.ok} L={L} /></div>
                                 </div>
                               ));
                             })}

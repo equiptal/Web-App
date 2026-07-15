@@ -121,25 +121,31 @@ export const BID_FORM_CSS = `
 .tmtx .sval{margin-top:9px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .tmtx .sval .sval-q{font-size:11px;font-weight:700;color:var(--navy-mid);text-transform:none}
 /* Responsive term grid — cells wrap into as many rows as needed (no cramped wide table). */
-.treqgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;align-items:start}
-.treqcell{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;padding:11px 13px 12px;background:var(--surface1);min-width:0;transition:border-color .15s,background .15s,box-shadow .15s}
+/* Horizontal term rows, table-like (Term · Renter's ask · Your answer). One per row on
+   tablet/mobile; two per row on wider screens (each card needs room for its three zones). */
+.treqgrid{display:grid;grid-template-columns:1fr;gap:10px;align-items:stretch}
+@media(min-width:760px){.treqgrid{grid-template-columns:1fr 1fr}}
+.treqcell{display:flex;align-items:center;gap:14px;border:1px solid var(--line);border-radius:12px;padding:11px 14px;background:var(--surface1);min-width:0;transition:border-color .15s,background .15s,box-shadow .15s}
 .treqcell.ok{border-color:rgba(29,175,88,.32);background:#F5FBF7}
 .treqcell.declined{background:var(--danger-bg);border-color:rgba(217,54,42,.32)}
 .treqcell.needpick{background:#EAF1FE;border-color:transparent;box-shadow:inset 0 0 0 2px rgba(37,99,235,.4)}
-.treqcell .tc-name{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;color:var(--navy);margin-bottom:9px;line-height:1.2;overflow-wrap:anywhere}
+/* zone 1 — term name + explainer (takes remaining width). break-word (not anywhere) so long names
+   like "Operator FAT — Accommodation/Transport" wrap between words, never mid-word ("Transpo·rt"). */
+.treqcell .tc-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.treqcell .tc-name{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:800;text-transform:none;letter-spacing:-.1px;color:var(--navy);line-height:1.3;overflow-wrap:break-word;word-break:normal}
 .treqcell .tc-name .material-icons-outlined{font-size:15px;flex:0 0 auto;width:24px;height:24px;display:grid;place-items:center;color:var(--navy-mid);background:var(--surface2);border-radius:7px}
-/* Plain-language explainer under each term name (suppliers found the bare labels unclear). */
-.treqcell .tc-hint{font-size:11px;color:var(--muted);font-weight:600;line-height:1.4;margin:-3px 0 9px;overflow-wrap:anywhere}
+.treqcell .tc-hint{font-size:11px;color:var(--muted);font-weight:600;line-height:1.35;overflow-wrap:break-word}
 .treqcell.ok .tc-name .material-icons-outlined{color:var(--success);background:var(--success-bg)}
 .treqcell.declined .tc-name .material-icons-outlined{color:var(--danger);background:#fff}
-.treqcell .tc-rw{font-size:12px;margin-bottom:10px;display:flex;flex-direction:column;gap:4px;overflow-wrap:anywhere}
-.treqcell .tc-rw .q{color:var(--muted);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.04em}
-.treqcell .tc-rw i{font-style:normal;color:var(--rentee);font-weight:800;font-size:12.5px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.16);border-radius:7px;padding:3px 9px;width:fit-content;max-width:100%}
-/* Answer sits at the card foot, centered. */
-.treqcell .tc-sw{margin-top:auto;text-align:center}
-.treqcell .tc-sw .q{display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--navy-mid);margin-bottom:6px}
-.treqcell .tc-sw .miniseg{width:fit-content;margin-inline:auto}
-.treqcell .tc-sw .miniseg button{justify-content:center;padding:7px 16px;font-size:12px}
+/* zones 2 & 3 — Renter's choice + Your answer: identical stacked mini-columns (label over box), both
+   centered and equal height so the two labels sit on one line and the two boxes on the next. */
+.treqcell .tc-rw,.treqcell .tc-sw{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;text-align:center}
+.treqcell .tc-rw{max-width:38%}
+.treqcell .tc-rw .q,.treqcell .tc-sw .q{color:var(--muted);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
+.treqcell .tc-sw .q{color:var(--navy-mid)}
+.treqcell .tc-rw i{display:inline-flex;align-items:center;justify-content:center;min-height:34px;font-style:normal;color:var(--rentee);font-weight:800;font-size:13px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.16);border-radius:8px;padding:2px 12px;max-width:100%;overflow-wrap:break-word}
+.treqcell .tc-sw .miniseg button{justify-content:center;padding:0 14px;height:34px;font-size:12px}
+@media(max-width:560px){.treqcell .tc-rw{max-width:none}}
 .tmtx td.declined{background:var(--danger-bg)}
 .tmtx td.needpick{background:#EAF1FE;box-shadow:inset 0 0 0 2px rgba(37,99,235,.4)}
 .celllbl{display:none}
@@ -207,8 +213,26 @@ export const BID_FORM_CSS = `
 .submit-bar .btn{width:100%}
 .submit-note{text-align:center;font-size:11.5px;color:var(--muted);margin-top:10px}
 .footer-note{text-align:center;color:var(--muted);font-size:12px;margin-top:30px}
-.pb-powered{text-align:center;color:var(--muted);font-size:11.5px;font-weight:600;padding:22px 0 28px;letter-spacing:.02em}
-.pb-powered b{color:var(--navy-mid);font-weight:800}
+/* Footer — download-the-app CTA + a bigger "Powered by Moedatech". */
+.pb-foot{max-width:1060px;margin:0 auto;padding:8px 24px 34px}
+.dlapp{display:flex;align-items:center;gap:18px;background:linear-gradient(120deg,#eef4fb,#fff 62%);border:1px solid var(--border);border-radius:16px;padding:20px 22px;margin-bottom:10px}
+.dlapp-foot{text-align:center;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:18px}
+.dlapp-ic{flex:0 0 auto;width:58px;height:58px;border-radius:15px;background:linear-gradient(135deg,var(--rentee),#1E40AF);display:grid;place-items:center;box-shadow:0 6px 16px rgba(37,99,235,.28)}
+.dlapp-ic img{width:36px;height:36px;object-fit:contain}
+.dlapp-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.dlapp-tx b{font-size:16.5px;font-weight:800;color:var(--navy);letter-spacing:-.2px}
+.dlapp-tx span{font-size:13px;color:var(--muted);line-height:1.5}
+.dlapp-btns{display:flex;flex-direction:row;flex-wrap:wrap;justify-content:flex-end;gap:10px;flex:0 0 auto}
+/* Official-style store badges (black pill · logo · two-line label). */
+.store-badge{display:inline-flex;align-items:center;gap:10px;background:#000;border:1px solid #000;border-radius:11px;padding:8px 15px;text-decoration:none;min-width:158px;transition:transform .12s}
+.store-badge:hover{transform:translateY(-1px)}
+.store-badge svg{width:22px;height:22px;flex:0 0 auto}
+.store-badge .sb-tx{display:flex;flex-direction:column;line-height:1.15;text-align:start;color:#fff}
+.store-badge .sb-tx small{font-size:9px;font-weight:500;letter-spacing:.02em}
+.store-badge .sb-tx b{font-size:15px;font-weight:700;letter-spacing:-.2px}
+.pb-powered{text-align:center;color:var(--muted);font-size:14.5px;font-weight:700;letter-spacing:.02em}
+.pb-powered b{color:var(--navy);font-weight:900;font-size:16px}
+@media(max-width:600px){.dlapp{flex-wrap:wrap;gap:14px;padding:16px}.dlapp-btns{flex-direction:row;width:100%}.store-badge{flex:1;justify-content:center;min-width:0}}
 .state{max-width:560px;margin:60px auto;text-align:center;background:var(--surface1);border:1px solid var(--border);border-radius:20px;padding:44px 34px}
 .state .sic{width:78px;height:78px;border-radius:50%;margin:0 auto 20px;display:flex;align-items:center;justify-content:center;background:var(--success-bg);color:var(--success)}
 .state .sic.neutral{background:var(--surface2);color:var(--muted)}
@@ -233,8 +257,6 @@ export const BID_FORM_CSS = `
 .field input,.notes-field textarea{font-size:16px}
 .qbanner{padding:14px}.item-hd .inm{font-size:16px}
 .grand{padding:15px 16px}.grand .gv{font-size:21px}}
-/* Very narrow phones — one term card per row for comfortable tap targets. */
-@media(max-width:440px){.treqgrid{grid-template-columns:1fr}}
 
 /* ── Attachment uploader (FileUploader) ─────────────────────────────────── */
 .uploader{margin:6px 0 12px}

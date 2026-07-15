@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, Fragment, type ReactNode } from "react";
+import { useEffect, useRef, useState, Fragment } from "react";
 import { StreamChat, type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
 import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, ApiError } from "@/lib/api/client";
@@ -1093,7 +1093,7 @@ function CounterFlow({
 
   // Quotation head (reused on the price + review papers). CR/VAT + a formal quotation number aren't in
   // the deal-room payload, so we show the company + location + the room short code (no fabricated ids).
-  const qhead = (_subtitle: string) => (
+  const qhead = () => (
     <div className="qp-qhead">
       <div className="qp-qco">
         <div className="qp-qlogo">{room.supplier.name.charAt(0).toUpperCase()}</div>
@@ -1183,7 +1183,7 @@ function CounterFlow({
                   <div className="conv"><span className="track" /><span className={`chip${priceDiff === 0 ? " ok" : ""}`}>{priceDiff === 0 ? L("Match ✓", "تطابق ✓") : `${L("Gap", "الفرق")} ${nf(priceDiff)}`}</span><span className="track" /></div>
                 </div>
               )}
-              {qhead(sheetTitle)}
+              {qhead()}
               <div className="qp-sech">{L("Price quotation", "عرض السعر")}</div>
               <table className="qp-table">
                 <thead><tr><th>{L("Item", "البند")}</th><th>{L("Duration", "المدة")}</th><th>{L("Qty", "العدد")}</th><th>{L("Price", "السعر")}</th><th>{L("Total", "الإجمالي")}</th></tr></thead>
@@ -1229,7 +1229,7 @@ function CounterFlow({
           {/* ② الشروط — classic quotation table */}
           {page === 1 && (
             <div className="qp-paper" style={{ zoom: String(paperZoom) }}>
-              {qhead(L("Operating terms · Annex", "شروط التشغيل · ملحق"))}
+              {qhead()}
               <div className="qp-sech">{L("Operating terms", "شروط التشغيل")}</div>
               {operatingTerms.length === 0 ? (
                 <p style={{ padding: "20px 0", textAlign: "center", color: "var(--muted,#6b8fa8)", fontSize: 13 }}>{L("No operating terms.", "لا توجد شروط تشغيل.")}</p>
@@ -1276,7 +1276,7 @@ function CounterFlow({
           {/* ③ المراجعة — quotation summary */}
           {page === 2 && (
             <div className="qp-paper" style={{ zoom: String(paperZoom) }}>
-              {qhead(sheetTitle)}
+              {qhead()}
               {room.details.location && (
                 <div className="qp-addr">
                   <div className="qp-addrbox"><span className="k">{L("Address", "العنوان")}</span><span className="v">{room.details.location}</span></div>

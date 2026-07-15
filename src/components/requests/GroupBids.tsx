@@ -11,7 +11,7 @@ import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
 import { bidSuppliers, bucketBidTerms, CERT_LABEL, type BidCard, type TermRow } from "@/lib/contract/bids";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
-import { qualityFromSubmission, type BidQuality, type QualityBand } from "@/lib/contract/bid-quality";
+import { qualityFromSubmission, type BidQuality } from "@/lib/contract/bid-quality";
 import { computeBidQuote } from "@/lib/contract/comparison";
 import type { RequestGroup } from "@/lib/contract/requests";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
@@ -21,6 +21,17 @@ import { renderQuotationSection, wrapQuotationPage, quotationLegal, type Quotati
 
 /** A group bid = a request's bid tagged with which item (request) it belongs to. */
 type GroupBid = BidCard & { requestId: string; itemLabel: string; itemLabelAr: string; categoryId: string | null; itemImage: string | null; quality?: BidQuality | null };
+
+/** The three quality dimensions the shared-link quality score is built from — each a filter option. */
+type QualityPart = "terms" | "equipment" | "company";
+const PART_META: { key: QualityPart; icon: string; en: string; ar: string }[] = [
+  { key: "terms", icon: "rule", en: "Matched the terms", ar: "طابق الشروط" },
+  { key: "equipment", icon: "photo_library", en: "Uploaded equipment docs", ar: "أرفق مستندات المعدة" },
+  { key: "company", icon: "business", en: "Filled company details", ar: "أكمل بيانات الشركة" },
+];
+// A bid "meets" a dimension: matched every required term / uploaded ≥1 equipment doc / filled ≥1 company detail.
+const partMeets = (q: BidQuality | null | undefined, p: QualityPart): boolean =>
+  !q ? false : p === "terms" ? q.parts.terms >= 0.999 : p === "equipment" ? q.parts.equipment > 0 : q.parts.company > 0;
 
 const SPILL: Record<string, { cls: string; dot: boolean; en: string; ar: string }> = {
   PENDING: { cls: "sp-pending", dot: true, en: "New", ar: "جديد" },
@@ -114,8 +125,10 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   const [fSource, setFSource] = useState<"all" | "link" | "platform" | "file">("all");
   const [fVerified, setFVerified] = useState(false);
   const [fKm, setFKm] = useState(false);
-  // Quality sub-filter — only meaningful for shared-link bids (they carry a computed quality score).
-  const [fQuality, setFQuality] = useState<"all" | QualityBand>("all");
+  // Quality sub-filter (shared-link bids only) — filter by the three quality dimensions the score is
+  // built from: matched terms · uploaded equipment docs · filled company details. Multi-select (AND).
+  const [fqParts, setFqParts] = useState<Set<QualityPart>>(new Set());
+  const toggleQPart = (p: QualityPart) => setFqParts((prev) => { const n = new Set(prev); if (n.has(p)) n.delete(p); else n.add(p); return n; });
 
   useEffect(() => {
     let active = true;
@@ -578,20 +591,34 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   // Bid source: off-platform shared-link vs on-platform (no uploaded-file source on this surface yet).
   const sourceOf = (b: GroupBid): "link" | "platform" | "file" => (b.viaSharedLink ? "link" : "platform");
   const srcCount = (s: "all" | "link" | "platform" | "file") => (s === "all" ? allBids.length : allBids.filter((b) => sourceOf(b) === s).length);
-  // Count of link bids in a quality band (drives the sub-filter option counts).
-  const qCount = (band: "all" | QualityBand) => allBids.filter((b) => sourceOf(b) === "link" && (band === "all" || b.quality?.band === band)).length;
+  // Count of link bids that meet a given quality dimension (drives the sub-filter option counts).
+  const qPartCount = (p: QualityPart) => allBids.filter((b) => sourceOf(b) === "link" && partMeets(b.quality, p)).length;
   // The quality sub-filter only applies to link bids and only when the source filter is "link".
-  const qualityActive = fSource === "link" && fQuality !== "all";
-  const base = supplierKey === "all" ? [...allBids].sort((a, b) => a.requestId.localeCompare(b.requestId)) : allBids.filter((b) => (b.supplierId ?? b.supplierName) === supplierKey);
+  const qualityActive = fSource === "link" && fqParts.size > 0;
+  // Renter bid-list order: in-app (platform) bids FIRST, then off-platform (shared-link) — and within the
+  // off-platform group, HIGHEST-QUALITY first (in-app bids have no shared-link quality score, so they keep
+  // a stable requestId order). requestId is the tiebreak everywhere so the list stays deterministic.
+  const orderForView = (list: GroupBid[]): GroupBid[] =>
+    [...list].sort((a, b) => {
+      const ra = sourceOf(a) === "platform" ? 0 : 1;
+      const rb = sourceOf(b) === "platform" ? 0 : 1;
+      if (ra !== rb) return ra - rb;
+      if (ra === 1) {
+        const q = (b.quality?.score ?? -1) - (a.quality?.score ?? -1); // off-platform: highest quality first
+        if (q !== 0) return q;
+      }
+      return a.requestId.localeCompare(b.requestId);
+    });
+  const base = supplierKey === "all" ? orderForView(allBids) : orderForView(allBids.filter((b) => (b.supplierId ?? b.supplierName) === supplierKey));
   const shown = base.filter(
     (b) =>
       (selectedItem === "all" || b.requestId === selectedItem) &&
       (fSource === "all" || sourceOf(b) === fSource) &&
-      (!qualityActive || b.quality?.band === fQuality) &&
+      (!qualityActive || [...fqParts].every((p) => partMeets(b.quality, p))) &&
       (!fVerified || b.verified) &&
       (!fKm || (b.distanceKm != null && b.distanceKm <= 50)),
   );
-  const fActive = (fSource !== "all" ? 1 : 0) + (qualityActive ? 1 : 0) + (fVerified ? 1 : 0) + (fKm ? 1 : 0);
+  const fActive = (fSource !== "all" ? 1 : 0) + (qualityActive ? fqParts.size : 0) + (fVerified ? 1 : 0) + (fKm ? 1 : 0);
   const selectedCount = allBids.filter((b) => selected.has(b.id)).length;
   // Item picker: one entry per request line + its bid count (off-platform included via allBids).
   const itemList = group.items.map((it) => ({
@@ -691,22 +718,16 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                     <span className="fp-n">{srcCount(key)}</span>
                   </div>
                 ))}
-                {/* Quality sub-filter — only for shared-link bids (they carry a computed quality score). */}
+                {/* Quality sub-filter — shared-link bids only; filter by the three quality dimensions. */}
                 {fSource === "link" && (
                   <>
                     <div className="fp-div" />
-                    <div className="fp-h">{L("Bid quality", "جودة العرض")}</div>
-                    {([
-                      ["all", L("Any quality", "أي جودة"), null, ""],
-                      ["high", L("High match · 80–100%", "مطابقة عالية · ٨٠–١٠٠٪"), "#12b76a", "workspace_premium"],
-                      ["mid", L("Partial match · 50–79%", "مطابقة جزئية · ٥٠–٧٩٪"), "#f79009", "adjust"],
-                      ["low", L("Low match · 0–49%", "مطابقة منخفضة · ٠–٤٩٪"), "#f04438", "warning"],
-                    ] as const).map(([key, label, color, icon]) => (
-                      <div key={key} className={`fp-opt${fQuality === key ? " on" : ""}`} onClick={() => setFQuality(key)}>
-                        <span className="radio" />
-                        {icon && <span className="material-icons-outlined fp-ic" style={{ color: color || undefined }}>{icon}</span>}
-                        {label}
-                        <span className="fp-n">{qCount(key)}</span>
+                    <div className="fp-h">{L("Bid quality — show bids that…", "جودة العرض — أظهر العروض التي…")}</div>
+                    {PART_META.map((p) => (
+                      <div key={p.key} className={`fp-opt fp-check${fqParts.has(p.key) ? " on" : ""}`} onClick={() => toggleQPart(p.key)}>
+                        <span className="box"><span className="material-icons-outlined">check</span></span>
+                        <span className="material-icons-outlined fp-ic" style={{ color: "var(--action)" }}>{p.icon}</span>{L(p.en, p.ar)}
+                        <span className="fp-n">{qPartCount(p.key)}</span>
                       </div>
                     ))}
                   </>
@@ -722,7 +743,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                   <span className="material-icons-outlined fp-ic" style={{ color: "var(--navy-mid)" }}>place</span>{L("Within 50 km of site", "ضمن ٥٠ كم من الموقع")}
                 </div>
                 <div className="fp-foot">
-                  <button className="clr" onClick={() => { setFSource("all"); setFQuality("all"); setFVerified(false); setFKm(false); }}>{L("Clear all", "مسح الكل")}</button>
+                  <button className="clr" onClick={() => { setFSource("all"); setFqParts(new Set()); setFVerified(false); setFKm(false); }}>{L("Clear all", "مسح الكل")}</button>
                   <button className="done" onClick={() => setFilterOpen(false)}>{L("Done", "تم")}</button>
                 </div>
               </div>
