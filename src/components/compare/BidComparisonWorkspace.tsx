@@ -417,6 +417,11 @@ export function BidComparisonWorkspace() {
   const baseCols = useMemo(() => allCols.filter((c) => selected.has(c.bid.id)), [allCols, selected]);
   const detCols = useMemo(() => sortByPreset(baseCols, preset), [baseCols, preset]);
   const cols = useMemo(() => {
+    // Renter-view order (parity with the bid list): in-app (platform) columns FIRST, off-platform
+    // (shared-link / uploaded) after — a STABLE partition, so each group keeps the active ranking (preset
+    // or agent). Under the default "Best" preset that leaves off-platform highest-quality-first.
+    const isOffPlatform = (c: BidColumn) => !!c.bid.viaSharedLink || String(c.bid.id).startsWith("link-") || String(c.bid.id).startsWith("upload:");
+    const inAppFirst = (list: BidColumn[]) => [...list.filter((c) => !isOffPlatform(c)), ...list.filter(isOffPlatform)];
     // The 4 preset criteria (Best / Lowest / Newest / Most trusted) are ALWAYS a deterministic web sort.
     // The agent order applies ONLY when a free-text query is active (the "Ask AI" box) — a preset never
     // hands the ranking to the agent. (choosePreset clears freeApplied, so a preset click drops to the
@@ -427,9 +432,9 @@ export function BidComparisonWorkspace() {
       // Only trust the agent order when it actually covers the current columns; else fall back to the
       // deterministic sort so the table never freezes.
       const covered = baseCols.length > 0 && baseCols.every((c) => rank.has(String(c.bid.id)));
-      if (covered) return [...baseCols].sort((a, b) => rank.get(String(a.bid.id))! - rank.get(String(b.bid.id))!);
+      if (covered) return inAppFirst([...baseCols].sort((a, b) => rank.get(String(a.bid.id))! - rank.get(String(b.bid.id))!));
     }
-    return detCols;
+    return inAppFirst(detCols);
   }, [baseCols, detCols, agentLive, rec, freeApplied]);
   // Fetch each visible bid's documents once (company + equipment, presigned) so the company-doc
   // chips reflect what's actually uploaded and open the real file — no deal room needed. Best-effort:
@@ -923,6 +928,28 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
   // Signed-out visitors fall through to the SAME workspace below — request-free (no groups/locations),
   // driven purely by their uploaded quotes. The authed-only guards are skipped for them.
   if (error) return <Box>{L("Couldn’t load your requests.", "تعذّر تحميل طلباتك.")}</Box>;
+  // Comparison is an account-only feature (product decision): signed-out visitors get a hard "sign in to
+  // compare" gate — no guest uploads/free tries. Creating an account flips the session to authed, which
+  // re-renders straight into the real workspace below.
+  if (anon)
+    return (
+      <>
+        <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-6 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl" style={{ background: C.actionDim, color: C.action }}>
+            <span className="material-icons-outlined" style={{ fontSize: 32 }}>balance</span>
+          </div>
+          <h2 className="mt-5 text-[20px] font-extrabold" style={{ color: C.navy }}>{L("Sign in to compare bids", "سجّل الدخول لمقارنة العروض")}</h2>
+          <p className="mt-2 text-[13.5px] font-medium leading-relaxed" style={{ color: C.muted }}>
+            {L("Create an account to line up suppliers’ offers side by side and pick the best one.", "أنشئ حساباً لعرض عروض المورّدين جنباً إلى جنب واختيار الأفضل.")}
+          </p>
+          <div className="mt-6 flex items-center gap-3">
+            <button type="button" onClick={() => setShowAccount(true)} className="rounded-lg px-5 py-2.5 text-[13.5px] font-extrabold text-white" style={{ background: C.rentee }}>{L("Create account", "إنشاء حساب")}</button>
+            <a href="/login" className="rounded-lg border px-5 py-2.5 text-[13.5px] font-extrabold" style={{ borderColor: C.border, color: C.navy }}>{L("Log in", "تسجيل الدخول")}</a>
+          </div>
+        </div>
+        <AccountModal open={showAccount} onClose={() => setShowAccount(false)} onCreated={() => setShowAccount(false)} title={t.guest.trialTitle} subtitle={t.guest.trialSub} />
+      </>
+    );
   if (!anon && !groups) return <Spinner />;
   if (!anon && !locations.length) return <Box>{L("No requests to compare yet.", "لا توجد طلبات للمقارنة بعد.")}</Box>;
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { useSession } from "@/lib/session";
@@ -42,6 +42,12 @@ export function Intake() {
   const [rejected, setRejected] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  // Server-side guest cap backstop: if localStorage was cleared, the client gate below lets the run
+  // through but the BFF blocks it → the store sets guestLimit → open the SAME account modal (no error).
+  useEffect(() => {
+    if (state.guestLimit) setShowAccount(true);
+  }, [state.guestLimit]);
 
   // Per-device soft limit (T10): a guest gets a few free agent runs, then we prompt them to create an
   // account instead of running again. Signed-in users are never limited.

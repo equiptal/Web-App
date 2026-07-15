@@ -21,14 +21,15 @@ import { equipmentIcon } from "@/components/requests/EquipImg";
 
 const TERM_KEYS = ["operator", "nationality", "fatFood", "fatTransport", "fuel", "fuelType", "year", "operatorCert", "equipmentCert"] as const;
 type TermKey = (typeof TERM_KEYS)[number];
+// Term names mirror the web app's canonical labels (bids.ts negotiable terms) so renter + supplier see the same wording.
 const TERM_LABEL: Record<TermKey, [string, string]> = {
-  operator: ["Operator included", "شمول المشغّل"],
+  operator: ["Operator included", "تشمل مشغّل"],
   nationality: ["Operator nationality", "جنسية المشغّل"],
-  fatFood: ["Operator meals (F.A.T)", "إعاشة المشغّل — الطعام"],
-  fatTransport: ["Operator housing & transport", "إعاشة المشغّل — السكن والتنقّل"],
-  fuel: ["Who provides fuel", "مسؤولية الوقود"],
+  fatFood: ["Operator FAT — Food", "الإعاشة (F.A.T) — الطعام"],
+  fatTransport: ["Operator FAT — Accommodation/Transport", "الإعاشة (F.A.T) — الإقامة/النقل"],
+  fuel: ["Fuel responsibility", "مسؤولية الوقود"],
   fuelType: ["Fuel type", "نوع الوقود"],
-  year: ["Model year", "سنة الصنع"],
+  year: ["Equipment year", "سنة الصنع"],
   operatorCert: ["Operator certificate", "شهادة المشغّل"],
   equipmentCert: ["Equipment certificate", "شهادة المعدة"],
 };
@@ -37,18 +38,10 @@ const TERM_ICON: Record<TermKey, string> = {
   operator: "engineering", nationality: "public", fatFood: "restaurant", fatTransport: "night_shelter",
   fuel: "local_gas_station", fuelType: "local_gas_station", year: "event", operatorCert: "workspace_premium", equipmentCert: "verified",
 };
-// Plain-language explainer per term — suppliers told us the bare labels were unclear.
-const TERM_HINT: Record<TermKey, [string, string]> = {
-  operator: ["A trained operator comes with the machine", "يأتي مشغّل مدرّب مع المعدة"],
-  nationality: ["The operator nationality the renter prefers", "جنسية المشغّل التي يفضّلها المستأجر"],
-  fatFood: ["Who covers the operator's meals on site", "من يتحمّل طعام المشغّل في الموقع"],
-  fatTransport: ["Who covers the operator's housing & transport", "من يتحمّل سكن المشغّل وتنقّله"],
-  fuel: ["Who supplies the fuel during the rental", "من يوفّر الوقود خلال فترة الإيجار"],
-  fuelType: ["The fuel the machine runs on", "نوع الوقود الذي تعمل به المعدة"],
-  year: ["The machine's manufacture year", "سنة تصنيع المعدة"],
-  operatorCert: ["A valid safety certificate for the operator", "شهادة سلامة سارية للمشغّل"],
-  equipmentCert: ["A valid safety certificate for the equipment", "شهادة سلامة سارية للمعدة"],
-};
+// App-download links for the footer CTA (off-platform suppliers → install the app to keep getting requests).
+// TODO(product): replace with the REAL store URLs before shipping.
+const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=REPLACE_WITH_MOEDATECH_ANDROID_ID";
+const APP_STORE_URL = "https://apps.apple.com/app/idREPLACE_WITH_MOEDATECH_IOS_ID";
 // Certificate terms can list several required certs (e.g. "TUV, SPSP, SASO_TECHNICAL_INSPECTION"). Each
 // is confirmed on its OWN card, so a supplier can say they hold TÜV but not SPSP. In state we keep a
 // per-code key `${term}::${code}` PLUS the aggregate `${term}` boolean (true only when every code is Yes)
@@ -184,6 +177,13 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
+  // Mobile OS (for the footer "download the app" CTA → the right store). Detected client-side after mount.
+  const [device, setDevice] = useState<"android" | "ios" | "other">("other");
+  useEffect(() => {
+    const ua = navigator.userAgent || "";
+    const iOS = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); // iPadOS reports MacIntel
+    setDevice(/android/i.test(ua) ? "android" : iOS ? "ios" : "other");
+  }, []);
   // Items the supplier can't supply (multi-item requests) — excluded from terms/pricing/quality/submit
   // so they can bid on just what they have (e.g. the forklift but not the crane).
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
@@ -520,9 +520,9 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                       const ans = contract[c.key];
                       return (
                         <div key={c.key} className={`treqcell${ans === true ? " ok" : ""}${ans === false ? " declined" : ""}${showErrors && ans === undefined ? " needpick" : ""}`}>
-                          <div className="tc-name"><span className="material-icons-outlined">gavel</span>{c.label}</div>
-                          <div className="tc-rw"><span className="q">{L("Renter wants", "يطلب المستأجر")}:</span> <i>{ar ? localizeTermValue(c.value) : c.value}</i></div>
-                          <div className="tc-sw"><span className="q">{L("Your answer", "إجابتك")}:</span><YesNo L={L} value={ans} onChange={(v) => setContract((p) => ({ ...p, [c.key]: v }))} /></div>
+                          <div className="tc-main"><div className="tc-name"><span className="material-icons-outlined">gavel</span>{c.label}</div></div>
+                          <div className="tc-rw"><span className="q">{L("Renter's choice", "اختيار المستأجر")}</span> <i>{choiceLabel(c.value, ar)}</i></div>
+                          <div className="tc-sw"><span className="q">{L("Your choice", "اختيارك")}</span><YesNo L={L} value={ans} onChange={(v) => setContract((p) => ({ ...p, [c.key]: v }))} /></div>
                         </div>
                       );
                     })}
@@ -629,15 +629,16 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                         // everything else stays a single card.
                         const rows = codes.length > 1
                           ? codes.map((code) => ({ ck: certConfKey(k, code), code, val: prettyCert(code) }))
-                          : [{ ck: k, code: null as string | null, val: (k === "operatorCert" || k === "equipmentCert") ? prettyCert(it.requiredTerms[k] ?? "") : (ar ? localizeTermValue(it.requiredTerms[k]) : it.requiredTerms[k]) }];
+                          : [{ ck: k, code: null as string | null, val: (k === "operatorCert" || k === "equipmentCert") ? prettyCert(it.requiredTerms[k] ?? "") : choiceLabel(it.requiredTerms[k], ar) }];
                         return rows.map((row) => {
                           const ans = a?.confirmations[row.ck];
                           return (
                             <div key={row.ck} className={`treqcell${ans === true ? " ok" : ""}${ans === false ? " declined" : ""}${showErrors && ans === undefined ? " needpick" : ""}`}>
-                              <div className="tc-name"><span className="material-icons-outlined">{TERM_ICON[k]}</span>{L(TERM_LABEL[k][0], TERM_LABEL[k][1])}</div>
-                              <div className="tc-hint">{L(TERM_HINT[k][0], TERM_HINT[k][1])}</div>
-                              <div className="tc-rw"><span className="q">{L("Renter wants", "يطلب المستأجر")}:</span> <i>{row.val}</i></div>
-                              <div className="tc-sw"><span className="q">{L("Can you meet it?", "هل يمكنك الالتزام؟")}:</span><YesNo L={L} value={ans} onChange={(v) => row.code != null ? setCertConf(it.requestItemId, k, codes, row.code, v) : setConf(it.requestItemId, k, v)} /></div>
+                              <div className="tc-main">
+                                <div className="tc-name"><span className="material-icons-outlined">{TERM_ICON[k]}</span>{L(TERM_LABEL[k][0], TERM_LABEL[k][1])}</div>
+                              </div>
+                              <div className="tc-rw"><span className="q">{L("Renter's choice", "اختيار المستأجر")}</span> <i>{row.val}</i></div>
+                              <div className="tc-sw"><span className="q">{L("Your choice", "اختيارك")}</span><YesNo L={L} value={ans} onChange={(v) => row.code != null ? setCertConf(it.requestItemId, k, codes, row.code, v) : setConf(it.requestItemId, k, v)} /></div>
                             </div>
                           );
                         });
@@ -795,7 +796,33 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
         </div>
       )}
 
-      <footer className="pb-powered">{L("Powered by", "مُشغّل بواسطة")} <b>Moedatech</b></footer>
+      <footer className="pb-foot">
+        {/* Download CTA — nudge off-platform suppliers to install the app; opens the store for their OS. */}
+        <div className="dlapp">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <span className="dlapp-ic"><img src="/moedatech-logomark.svg" alt="Moedatech" width={36} height={36} /></span>
+          <div className="dlapp-tx">
+            <b>{L("Get more rental requests", "استقبل المزيد من طلبات الإيجار")}</b>
+            <span>{L("Download the Moedatech app to receive requests directly and bid faster.", "حمّل تطبيق معداتك لاستقبال الطلبات مباشرةً وتقديم عروضك بسرعة.")}</span>
+          </div>
+          <div className="dlapp-btns">
+            {device !== "android" && (
+              <a className="store-badge" href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" aria-label="Download on the App Store">
+                <svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" /></svg>
+                <span className="sb-tx"><small>{L("Download on the", "حمّله من")}</small><b>App Store</b></span>
+              </a>
+            )}
+            {device !== "ios" && (
+              <a className="store-badge" href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer" aria-label="Get it on Google Play">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="gpgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#00e0ff" /><stop offset=".45" stopColor="#00e676" /><stop offset=".75" stopColor="#ffcd00" /><stop offset="1" stopColor="#ff3b3b" /></linearGradient></defs><path fill="url(#gpgrad)" d="M4 2.4v19.2l15-9.6z" /></svg>
+                <span className="sb-tx"><small>{L("GET IT ON", "احصل عليه من")}</small><b>Google Play</b></span>
+              </a>
+            )}
+          </div>
+        </div>
+        <div className="dlapp-foot">{L("Free to download · Available on the App Store and Google Play", "مجاني للتنزيل · متوفّر على App Store و Google Play")}</div>
+        <div className="pb-powered">{L("Powered by", "مُشغّل بواسطة")} <b>Moedatech</b></div>
+      </footer>
     </div>
   );
 }
@@ -909,6 +936,19 @@ function localizeTermValue(v: string | null | undefined): string | null {
   if (v == null || String(v).trim() === "") return v ?? null;
   const s = String(v).trim();
   return AR_TERM_VALUE[s.toUpperCase()] ?? s;
+}
+
+// The renter's choice for a term. Party-responsibility values (fuel / FAT) read clearer as
+// "On renter" / "On supplier"; everything else shows the localized value as-is.
+const PARTY_VALUES: Record<string, [string, string]> = {
+  RENTER: ["On renter", "على المستأجر"], RENTEE: ["On renter", "على المستأجر"],
+  SUPPLIER: ["On supplier", "على المؤجّر"], ME: ["On supplier", "على المؤجّر"],
+};
+function choiceLabel(v: string | null | undefined, ar: boolean): string | null {
+  if (v == null || String(v).trim() === "") return v ?? null;
+  const party = PARTY_VALUES[String(v).trim().toUpperCase()];
+  if (party) return ar ? party[1] : party[0];
+  return ar ? localizeTermValue(v) : String(v);
 }
 
 function rentalBasisLabel(v: string, L: (e: string, a: string) => string) {

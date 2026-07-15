@@ -72,6 +72,8 @@ export interface RfqState {
   /** True right after a saved draft was rehydrated on entering /create → show the continue/start-over
    *  prompt so the renter chooses to resume or reset (instead of silently dropping into the draft). */
   draftPrompt: boolean;
+  /** Server guest-parse cap was hit — Intake opens the account modal in response (signed-out only). */
+  guestLimit: boolean;
 }
 
 const initialState: RfqState = {
@@ -92,6 +94,7 @@ const initialState: RfqState = {
   seq: 100,
   agentOrigin: null,
   draftPrompt: false,
+  guestLimit: false,
 };
 
 type Action =
@@ -103,6 +106,7 @@ type Action =
   | { t: "PROCESS_START" }
   | { t: "PROCESS_SUCCESS"; draft: AgentDraft }
   | { t: "PROCESS_ERROR"; kind: ApiErrorKind; detail?: RfqState["errorDetail"] }
+  | { t: "GUEST_LIMIT" }
   | { t: "ENTER_WIZARD" }
   | { t: "RESUME_WIZARD" }
   | { t: "GO_INTAKE" }
@@ -165,7 +169,11 @@ function reducer(state: RfqState, a: Action): RfqState {
     case "SET_SIMULATE_ERROR":
       return { ...state, simulateError: a.value };
     case "PROCESS_START":
-      return { ...state, phase: "processing", busy: true, error: null, errorDetail: null };
+      return { ...state, phase: "processing", busy: true, error: null, errorDetail: null, guestLimit: false };
+    case "GUEST_LIMIT":
+      // Signed-out visitor hit the server parse cap → back to intake with the flag set; Intake opens the
+      // account modal (same UX as the client-side localStorage nudge), never an error screen.
+      return { ...state, busy: false, phase: "intake", error: null, errorDetail: null, guestLimit: true };
     case "PROCESS_SUCCESS":
       return {
         ...state,
@@ -368,6 +376,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
         const draft = await processRfq({ text: s.text, files: s.files, simulateError: s.simulateError });
         dispatch({ t: "PROCESS_SUCCESS", draft });
       } catch (e) {
+        if (e instanceof ApiError && e.kind === "guest_limit") { dispatch({ t: "GUEST_LIMIT" }); return; }
         const detail =
           e instanceof ApiError
             ? { detail: e.detail, backendCode: e.backendCode, backendStatus: e.backendStatus, status: e.status }

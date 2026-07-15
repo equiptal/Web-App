@@ -18,7 +18,7 @@ export interface RecommendPayload {
 }
 
 /** Error kinds the UI distinguishes: empty/unreadable input (AC-09) vs connectivity (AC-10). */
-export type ApiErrorKind = "empty" | "network" | "unknown";
+export type ApiErrorKind = "empty" | "network" | "unknown" | "guest_limit";
 
 export class ApiError extends Error {
   kind: ApiErrorKind;
@@ -119,7 +119,12 @@ export async function processRfq(input: ProcessInput): Promise<AgentDraft> {
   // Tell the agent the UI locale so it writes free-text (notes/advisories/questions) in Arabic
   // even when the RFQ text is English. <html lang> is kept in sync with the locale by the i18n provider.
   const locale = typeof document !== "undefined" ? document.documentElement.lang : "en";
-  const { jobId } = await postJson<{ jobId: string }>("/api/agent/process", { ...input, locale }); // throws ApiError on empty/network
+  const started = await postJson<{ jobId?: string; guestLimit?: boolean }>("/api/agent/process", { ...input, locale }); // throws ApiError on empty/network
+  // Server guest-parse backstop (signed-out visitor over the free limit) — surface it as a distinct kind
+  // the UI maps to the sign-in/account prompt, NOT a scary error.
+  if (started.guestLimit) throw new ApiError("guest_limit");
+  const jobId = started.jobId;
+  if (!jobId) throw new ApiError("network");
   const deadline = Date.now() + PROCESS_TIMEOUT_MS;
   while (Date.now() < deadline) {
     let res: Response;

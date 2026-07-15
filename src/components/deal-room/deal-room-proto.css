@@ -577,3 +577,12 @@
 .dlproto .qp-gnbadge.conflict { background: rgba(217, 54, 42, 0.24); color: #ff9b90; }
 .dlproto .qp-gnbadge.locked { background: rgba(255, 255, 255, 0.14); color: rgba(255, 255, 255, 0.75); }
 .dlproto .qp-gnbadge.none { background: rgba(143, 208, 255, 0.2); color: #8fd0ff; }
+
+/* page-flip between the 3 sheets (§6.1) — each step mounts a fresh .qp-paper, so this replays on every
+   السعر ⇄ الشروط ⇄ المراجعة transition. Respects reduced-motion. */
+@keyframes qpFlip {
+  0% { opacity: 0; transform: perspective(1600px) rotateY(9deg) translateY(6px); box-shadow: 0 18px 44px rgba(9, 20, 34, 0.28); }
+  100% { opacity: 1; transform: perspective(1600px) rotateY(0deg) translateY(0); }
+}
+.dlproto .qp-paper { animation: qpFlip 0.36s cubic-bezier(0.22, 1, 0.36, 1) both; transform-origin: 50% 0%; }
+@media (prefers-reduced-motion: reduce) { .dlproto .qp-paper { animation: none; } }

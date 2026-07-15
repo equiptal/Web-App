@@ -355,6 +355,7 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
     },
     fuelType: (li.fuel_type_preference && FUEL_IN[li.fuel_type_preference]) || "diesel",
     additionalNotes: li.additional_notes ?? "", // AC-53: agent-extracted per-item notes (was dropped)
+    workType: li.work_type ?? undefined, // A7: prefill work type (crane-only; ItemRow gates via isCrane)
     deliveryOverride: li.mobilization_by_rentee == null ? null : li.mobilization_by_rentee ? "me" : "supplier",
     returnOverride: li.demobilization_by_rentee == null ? null : li.demobilization_by_rentee ? "me" : "supplier",
     // AC-26: supplier provides fuel ⇒ fuel responsibility = supplier (else me); null when Mansour didn't say.
@@ -489,6 +490,7 @@ export function draftToRfqCorrection(
       diesel_included: dieselIncluded,
       safety_certifications: safety.length ? safety : null,
       additional_notes: it.additionalNotes || null,
+      work_type: it.workType?.trim() ? it.workType.trim() : null, // A7: teach Mansour on a renter's edit
       category_id: it.ref.categoryId,
       subtype_id: it.ref.subcategoryId,
       capacity_id: it.ref.measurementId,
