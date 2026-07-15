@@ -209,9 +209,12 @@ export function RequestBids({ requestId }: { requestId: string }) {
     return [{ ...submissionToBidCard(s, it), id }];
   });
   const merged = [...bids, ...linkCards];
-  const linkCount = linkCards.length;
-  const appCount = bids.length;
-  const allBids = merged.filter((b) => (src === "all" ? true : src === "link" ? b.viaSharedLink : !b.viaSharedLink));
+  // Off-platform = raw shared-link submissions OR app bids CONVERTED from one (web-app/006). Both are
+  // labelled + counted as off-platform, even though a converted bid is a first-class app bid with a deal room.
+  const isOff = (b: { viaSharedLink?: boolean; converted?: boolean }) => !!(b.viaSharedLink || b.converted);
+  const linkCount = merged.filter(isOff).length;
+  const appCount = merged.filter((b) => !isOff(b)).length;
+  const allBids = merged.filter((b) => (src === "all" ? true : src === "link" ? isOff(b) : !isOff(b)));
   if (merged.length === 0) return <div className="rempty">{L("No bids yet — suppliers' offers will appear here.", "لا توجد عروض بعد — ستظهر عروض المؤجّرين هنا.")}</div>;
 
   return (
@@ -288,7 +291,12 @@ export function RequestBids({ requestId }: { requestId: string }) {
                 <div className="r1">
                   <span className="sname">{b.supplierName}</span>
                   <span className={`spill ${sp.cls}`}>{sp.dot && <span className="d" />}{ar ? sp.ar : sp.en}</span>
-                  <span className="src-chip src-app"><span className="material-icons-outlined">verified_user</span>{L("via Moedatech app", "عبر تطبيق معداتك")}</span>
+                  {b.converted ? (
+                    // web-app/006: a converted bid is a real app bid, but keep its OFF-PLATFORM origin label.
+                    <span className="src-chip" style={{ background: "var(--brand-soft, #fff4e5)", color: "var(--brand, #f79009)" }}><span className="material-icons-outlined">link</span>{L("via shared link", "عبر الرابط")}</span>
+                  ) : (
+                    <span className="src-chip src-app"><span className="material-icons-outlined">verified_user</span>{L("via Moedatech app", "عبر تطبيق معداتك")}</span>
+                  )}
                 </div>
                 <div className="bid-evt">{evt}</div>
                 <div className="credrow">

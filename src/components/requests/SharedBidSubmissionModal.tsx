@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { BidCard } from "@/lib/contract/bids";
 import type { BidFormData, BidFormItem, LinkBidSubmission, LinkBidItem } from "@/lib/contract/link-bids";
 import { CERT_TERM_KEYS, certCodesFromValue, certConfKey, prettyCert } from "@/lib/contract/link-bids";
-import { fetchBidFormData } from "@/lib/api/client";
+import { fetchBidFormData, postSubmissionMessage } from "@/lib/api/client";
 import { hasVatInclusiveNote, stripVatInclusiveNote } from "@/lib/contract/vat-inclusive";
 import { qualityFromSubmission } from "@/lib/contract/bid-quality";
 import { QualityRing } from "@/components/bid/QualityRing";
@@ -471,6 +471,12 @@ export function SharedBidSubmissionModal({
                   ) : null;
                 })()}
 
+                {/* ── Negotiate — pre-conversion relay. The supplier bid off-platform via the shared link and
+                       isn't on the app yet, so the renter can't chat live. Messages sent here are stored on the
+                       submission and injected into the in-app deal room (as the renter, room opened NEGOTIATING)
+                       the moment ops onboard the supplier and convert the bid. ── */}
+                <NegotiateThread submission={submission} ar={ar} L={L} />
+
                 <div style={{ textAlign: "center", fontSize: 11, fontWeight: 600, color: "#9AA7B8", padding: "4px 0 2px" }}>{L("Powered by", "مُشغّل بواسطة")} <b style={{ color: "var(--navy)", fontWeight: 800 }}>Moedatech</b></div>
               </div>
             </div>
@@ -481,8 +487,20 @@ export function SharedBidSubmissionModal({
           <button className="btn sm" onClick={onClose}>{L("Close", "إغلاق")}</button>
           {submission && (
             onDownloadQuotation
-              ? <button className="btn sm primary qprint-hide" onClick={onDownloadQuotation}>{L("Download quotation", "تنزيل عرض السعر")}</button>
+              ? <button className="btn sm qprint-hide" onClick={onDownloadQuotation}>{L("Download quotation", "تنزيل عرض السعر")}</button>
               : <button className="btn sm qprint-hide" onClick={() => window.print()}>{L("Download / Print", "تنزيل / طباعة")}</button>
+          )}
+          {submission && (
+            <button
+              className="btn sm primary qprint-hide"
+              onClick={() => {
+                document.getElementById("slbneg")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                setTimeout(() => document.getElementById("slbneg-input")?.focus(), 350);
+              }}
+            >
+              <span className="material-icons-outlined" style={{ fontSize: 17, marginInlineEnd: 5, verticalAlign: -3 }}>forum</span>
+              {L("Negotiate", "تفاوض")}
+            </button>
           )}
         </div>
       </div>
@@ -522,4 +540,177 @@ function rentalBasisLabel(v: string, L: (e: string, a: string) => string) {
   const m: Record<string, [string, string]> = { DAILY: ["Daily", "يومي"], WEEKLY: ["Weekly", "أسبوعي"], MONTHLY: ["Monthly", "شهري"], PER_JOB: ["Per job", "للمهمة"], LONG_TERM: ["Long term", "طويل الأمد"] };
   const e = m[String(v).toUpperCase()];
   return e ? L(e[0], e[1]) : v;
+}
+
+const NEG_CSS = `
+.slbneg{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface2);margin:4px 0 14px;scroll-margin-top:12px}
+.slbneg-h{display:flex;gap:11px;align-items:flex-start;padding:14px 16px;background:linear-gradient(180deg,var(--action-dim),transparent);border-bottom:1px solid var(--border)}
+.slbneg-h .hic{font-size:20px;color:var(--action);background:#fff;width:34px;height:34px;display:grid;place-items:center;border-radius:9px;flex-shrink:0;border:1px solid rgba(247,144,9,.28)}
+.slbneg-h b{display:block;font-size:14px;font-weight:800;color:var(--navy)}
+.slbneg-h p{margin:3px 0 0;font-size:12px;line-height:1.55;color:var(--navy-mid)}
+.slbneg-thread{display:flex;flex-direction:column;gap:9px;padding:16px;max-height:300px;overflow-y:auto;background:#fff}
+.slbneg-sys{align-self:center;max-width:92%;text-align:center;font-size:11.5px;font-weight:600;line-height:1.5;color:var(--navy-mid);background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 12px}
+.slbneg-sys .material-icons-outlined{font-size:14px;vertical-align:-2px;margin-inline-end:4px;color:var(--action)}
+.slbneg-row{display:flex}
+.slbneg-row.mine{justify-content:flex-end}
+.slbneg-b{max-width:80%;display:flex;flex-direction:column;gap:3px}
+.slbneg-msg{padding:9px 13px;font-size:13px;line-height:1.5;border-radius:14px;word-break:break-word;white-space:pre-wrap;background:var(--surface2);color:var(--navy);border:1px solid var(--border)}
+.slbneg-row.mine .slbneg-msg{background:var(--navy);color:#fff;border:none;border-end-end-radius:4px}
+.slbneg-t{font-size:10.5px;font-weight:600;color:var(--muted);align-self:flex-end;display:inline-flex;align-items:center;gap:3px;padding-inline-end:2px}
+.slbneg-t .material-icons-outlined{font-size:12px}
+.slbneg-t.pending{color:var(--action)}
+.slbneg-t.failed{color:var(--danger)}
+.slbneg-empty{text-align:center;padding:18px 8px 10px}
+.slbneg-empty .material-icons-outlined{font-size:28px;color:var(--action);opacity:.85}
+.slbneg-empty p{margin:7px auto 0;max-width:280px;font-size:12.5px;font-weight:600;line-height:1.5;color:var(--navy-mid)}
+.slbneg-composer{display:flex;gap:8px;align-items:flex-end;padding:11px 12px;border-top:1px solid var(--border);background:var(--surface2)}
+.slbneg-composer textarea{flex:1;resize:none;border:1px solid var(--border);border-radius:11px;padding:10px 12px;font-size:13px;line-height:1.5;font-family:inherit;color:var(--navy);background:#fff;min-height:42px;max-height:120px;outline:none}
+.slbneg-composer textarea:focus{border-color:var(--action);box-shadow:0 0 0 3px var(--action-dim)}
+.slbneg-composer textarea:disabled{opacity:.6}
+.slbneg-send{flex-shrink:0;width:42px;height:42px;border:none;border-radius:11px;background:var(--action);color:#fff;display:grid;place-items:center;cursor:pointer;transition:opacity .15s,transform .1s}
+.slbneg-send:disabled{opacity:.4;cursor:not-allowed}
+.slbneg-send:not(:disabled):active{transform:scale(.94)}
+.slbneg-send .material-icons-outlined{font-size:20px}
+[dir=rtl] .slbneg-send .material-icons-outlined{transform:scaleX(-1)}
+.slbneg-err{display:flex;align-items:center;gap:6px;padding:8px 14px;font-size:12px;font-weight:700;color:var(--danger);background:rgba(220,38,38,.06);border-top:1px solid rgba(220,38,38,.18)}
+.slbneg-err .material-icons-outlined{font-size:15px}
+`;
+
+type NegMsg = { text: string; at: string; pending?: boolean; failed?: boolean };
+
+/**
+ * web-app/006 — the renter's pre-conversion negotiate relay on an off-platform shared-link submission.
+ * The supplier isn't on the app yet, so there's no live chat: messages the renter sends are stored on
+ * the submission (`rentee_messages`) and, when ops onboard the supplier and convert the bid, replayed
+ * into the in-app deal room as the renter's messages with the room opened in NEGOTIATING. First message
+ * also cues ops (email) to bring the supplier onboard. Shows the renter's own thread — no supplier
+ * replies exist until they join and reply in-app.
+ */
+function NegotiateThread({ submission, ar, L }: { submission: LinkBidSubmission; ar: boolean; L: (e: string, a: string) => string }) {
+  const [messages, setMessages] = useState<NegMsg[]>(() => (submission.renteeMessages ?? []).slice());
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const threadRef = useRef<HTMLDivElement | null>(null);
+  const taRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Reset when reopened on a different submission.
+  useEffect(() => { setMessages((submission.renteeMessages ?? []).slice()); setText(""); setError(null); }, [submission.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep the thread pinned to the newest message.
+  useEffect(() => { const el = threadRef.current; if (el) el.scrollTop = el.scrollHeight; }, [messages.length]);
+
+  const fmtTime = (iso: string) => {
+    try { return new Date(iso).toLocaleString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); }
+    catch { return ""; }
+  };
+
+  const grow = (el: HTMLTextAreaElement) => { el.style.height = "auto"; el.style.height = `${Math.min(el.scrollHeight, 120)}px`; };
+
+  const send = async () => {
+    const body = text.trim();
+    if (!body || sending) return;
+    setSending(true); setError(null);
+    const optimistic: NegMsg = { text: body, at: new Date().toISOString(), pending: true };
+    setMessages((m) => [...m, optimistic]);
+    setText("");
+    if (taRef.current) taRef.current.style.height = "auto";
+    try {
+      await postSubmissionMessage(submission.requestId, submission.id, body);
+      setMessages((m) => m.map((x) => (x === optimistic ? { text: body, at: optimistic.at } : x)));
+    } catch (e) {
+      setMessages((m) => m.map((x) => (x === optimistic ? { ...x, pending: false, failed: true } : x)));
+      setError(e instanceof Error && e.message ? e.message : L("Couldn't send your message. Please try again.", "تعذّر إرسال رسالتك. حاول مرة أخرى."));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="slbneg" id="slbneg">
+      <style>{NEG_CSS}</style>
+      <div className="slbneg-h">
+        <span className="material-icons-outlined hic">forum</span>
+        <div>
+          <b>{L("Negotiate this bid", "تفاوض على هذا العرض")}</b>
+          <p>{L(
+            "This bid arrived through your shared link, so the supplier isn't on Moedatech yet. Start the conversation here — we'll invite them to the app and carry your messages over, so you can settle terms and close the deal in-app.",
+            "وصل هذا العرض عبر رابطك المشترك، لذا فإن المؤجّر ليس على معداتك بعد. ابدأ المحادثة هنا — سندعوه إلى التطبيق وننقل رسائلك إليه، لتتمكن من الاتفاق على الشروط وإتمام الصفقة داخل التطبيق.",
+          )}</p>
+        </div>
+      </div>
+
+      <div className="slbneg-thread" ref={threadRef}>
+        <div className="slbneg-sys">
+          <span className="material-icons-outlined">bolt</span>
+          {L(
+            "Messages you send are saved to this bid and delivered to the supplier's deal room the moment they join the app.",
+            "تُحفظ الرسائل التي ترسلها في هذا العرض وتُسلَّم إلى غرفة الصفقة الخاصة بالمؤجّر بمجرد انضمامه إلى التطبيق.",
+          )}
+        </div>
+
+        {messages.length === 0 ? (
+          <div className="slbneg-empty">
+            <span className="material-icons-outlined">chat_bubble_outline</span>
+            <p>{L("No messages yet — send the first one to open negotiations on this bid.", "لا توجد رسائل بعد — أرسل أول رسالة لبدء التفاوض على هذا العرض.")}</p>
+          </div>
+        ) : (
+          messages.map((m, i) => (
+            <div className="slbneg-row mine" key={`${m.at}-${i}`}>
+              <div className="slbneg-b">
+                <div className="slbneg-msg">{m.text}</div>
+                <span className={`slbneg-t${m.pending ? " pending" : ""}${m.failed ? " failed" : ""}`}>
+                  {m.pending ? (
+                    <>
+                      <span className="material-icons-outlined">schedule</span>
+                      {L("Sending…", "جارٍ الإرسال…")}
+                    </>
+                  ) : m.failed ? (
+                    <>
+                      <span className="material-icons-outlined">error_outline</span>
+                      {L("Not sent", "لم تُرسل")}
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-icons-outlined">done</span>
+                      {fmtTime(m.at)}
+                    </>
+                  )}
+                </span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {error && (
+        <div className="slbneg-err">
+          <span className="material-icons-outlined">error_outline</span>
+          {error}
+        </div>
+      )}
+
+      <div className="slbneg-composer">
+        <textarea
+          id="slbneg-input"
+          ref={taRef}
+          value={text}
+          disabled={sending}
+          placeholder={L("Write a message to the supplier…", "اكتب رسالة إلى المؤجّر…")}
+          rows={1}
+          onChange={(e) => { setText(e.target.value); grow(e.target); }}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
+        />
+        <button
+          className="slbneg-send"
+          onClick={() => void send()}
+          disabled={!text.trim() || sending}
+          aria-label={L("Send", "إرسال")}
+          title={L("Send", "إرسال")}
+        >
+          <span className="material-icons-outlined">send</span>
+        </button>
+      </div>
+    </div>
+  );
 }
