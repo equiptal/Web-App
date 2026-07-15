@@ -800,6 +800,8 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
       )}
 
       <footer className="pb-foot">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <div className="pb-brand"><img src="/moedatech-logo.png" alt="Moedatech" /></div>
         {/* Download CTA — nudge off-platform suppliers to install the app; opens the store for their OS. */}
         <div className="dlapp">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -824,8 +826,7 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
           </div>
         </div>
         <div className="dlapp-foot">{L("Free to download · Available on the App Store and Google Play", "مجاني للتنزيل · متوفّر على App Store و Google Play")}</div>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <div className="pb-powered">{L("Powered by", "مُشغّل بواسطة")} <img className="pb-powered-logo" src="/moedatech-logo.png" alt="Moedatech" /></div>
+        <div className="pb-powered">{L("Powered by", "مُشغّل بواسطة")} <b>Moedatech</b></div>
       </footer>
     </div>
   );
