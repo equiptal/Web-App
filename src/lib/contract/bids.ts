@@ -192,6 +192,10 @@ export interface BidCard {
    * distinct "via shared link" card (no deal room) with a flat quoted total and a read-only
    * "view submission" viewer instead of the negotiate footer. */
   viaSharedLink?: boolean;
+  /** web-app/006 (convert): a real app bid that was MATERIALIZED from an off-platform shared-link
+   *  submission (backend `Bid.converted`). It's a first-class app bid (has a deal room), but the
+   *  renter UI keeps labelling + counting it as **off-platform** — its origin. */
+  converted?: boolean;
   /** Flat quoted total (incl VAT) for a link bid — shown instead of the rate/period breakdown. */
   quotedTotal?: number | null;
   /** The submission id the read-only viewer opens (off-platform supplier submission). */
@@ -552,6 +556,8 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     id: String(raw.id ?? ""),
     status: (s(raw.status) as BidStatus) ?? "PENDING",
     wonViaSurvey: raw.wonViaSurvey === true, // survey-reported winner (app parity) — decided even if status isn't ACCEPTED
+    converted: raw.converted === true, // web-app/006: materialized from an off-platform submission → labelled/counted off-platform
+
     supplierId: sup.id != null ? String(sup.id) : null,
     supplierName: s(raw.supplierDisplayName) ?? s(sup.companyName) ?? ([s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" ") || "Supplier"),
     verified: supVerified,

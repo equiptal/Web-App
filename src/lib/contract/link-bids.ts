@@ -95,6 +95,11 @@ export interface LinkBidSubmission {
   vatNumber?: string | null;
   nationalAddress?: string | null;
   contactInfo?: string | null;
+  /** Supplier's city — captured on the form; feeds the account the admin creates on convert. */
+  city?: string | null;
+  /** Rentee's pre-conversion "Negotiate" messages (append-only `{ text, at }`) — rendered as a chat
+   *  thread in the submission viewer. Absent/empty until the renter messages the supplier. */
+  renteeMessages?: { text: string; at: string }[];
   notes?: string | null;
   /** Supplier-set quote expiry (ISO) — how long THEIR price holds. Separate from the renter's bid
    *  deadline. Drives the quotation's "Valid until" when present. */
@@ -160,7 +165,11 @@ export interface SubmitBidFormPayload {
   crNumber: string;
   vatNumber: string;
   nationalAddress: string;
+  /** Supplier phone — the account key. Stored normalized (E.164) in the existing `contact_info`
+   *  column on the backend; the form collects it via a structured phone input. */
   contactInfo: string;
+  /** Supplier's city — optional. */
+  city?: string;
   notes?: string;
   /** Supplier-set quote expiry (ISO) — optional. */
   validUntil?: string;
@@ -215,6 +224,10 @@ export function mapLinkSubmissions(raw: unknown): LinkBidSubmission[] {
       vatNumber: s(o.vatNumber),
       nationalAddress: s(o.nationalAddress),
       contactInfo: s(o.contactInfo),
+      city: s(o.city),
+      renteeMessages: (Array.isArray(o.renteeMessages) ? (o.renteeMessages as Record<string, unknown>[]) : [])
+        .map((m) => ({ text: s(m?.text) ?? "", at: s(m?.at) ?? "" }))
+        .filter((m) => m.text),
       notes: s(o.notes),
       validUntil: s(o.validUntil),
       companyDocuments: attList(o.companyDocuments),
