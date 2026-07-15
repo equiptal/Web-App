@@ -114,6 +114,9 @@ export interface BidFormItem {
   size?: string | null;
   sizeAr?: string | null;
   numberOfUnits: number;
+  /** Taxonomy image — same source the in-app bid/request cards render via EquipImg. Optional: the public
+   *  bid-form endpoint doesn't send it yet (backend gap), so the item falls back to the name-derived glyph. */
+  imageUrl?: string | null;
   /** Rental basis (PER_DAY/PER_WEEK/PER_MONTH/PER_JOB) shown read-only + carried into the submission. */
   priceUnit: string | null;
   /** Read-only context: who handles delivery / return + the renter's per-item note. */
@@ -274,6 +277,7 @@ export function mapBidFormData(raw: unknown): BidFormData {
         size: s(i.size),
         sizeAr: s(i.sizeAr),
         numberOfUnits: n(i.numberOfUnits) ?? 1,
+        imageUrl: s(i.imageUrl),
         priceUnit: s(i.priceUnit),
         deliveryBy: s(i.deliveryBy),
         returnBy: s(i.returnBy),
