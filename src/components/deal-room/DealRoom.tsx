@@ -1185,7 +1185,7 @@ function CounterFlow({
               )}
               {qhead()}
               <div className="qp-sech">{L("Price quotation", "عرض السعر")}</div>
-              <table className="qp-table">
+              <div className="qp-scrollx"><table className="qp-table">
                 <thead><tr><th>{L("Item", "البند")}</th><th>{L("Duration", "المدة")}</th><th>{L("Qty", "العدد")}</th><th>{L("Price", "السعر")}</th><th>{L("Total", "الإجمالي")}</th></tr></thead>
                 <tbody>
                   <tr>
@@ -1198,7 +1198,7 @@ function CounterFlow({
                   {legTr(L("Mobilization — mob", "التعبئة — موب"), L("delivery", "توصيل"), mobStr, setMobStr, mobUnitsN, setMobUnitsN, mobExcluded, setMobExcluded, room.mobPrice)}
                   {legTr(L("Return — demob", "الإرجاع — ديموب"), L("pickup", "استلام"), demobStr, setDemobStr, demobUnitsN, setDemobUnitsN, demobExcluded, setDemobExcluded, room.demobPrice)}
                 </tbody>
-              </table>
+              </table></div>
               <div className="qp-totals">
                 <div className="qp-trow"><span className="l">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="v">{money(subtotal)}</span></div>
                 <div className="qp-trow"><span className="l">{L("VAT 15%", "ضريبة القيمة المضافة ١٥٪")}</span><span className="v">{money(vat)}</span></div>
@@ -1234,7 +1234,7 @@ function CounterFlow({
               {operatingTerms.length === 0 ? (
                 <p style={{ padding: "20px 0", textAlign: "center", color: "var(--muted,#6b8fa8)", fontSize: 13 }}>{L("No operating terms.", "لا توجد شروط تشغيل.")}</p>
               ) : (
-                <table className="qp-tt">
+                <div className="qp-scrollx"><table className="qp-tt">
                   <thead><tr><th>{L("Term", "البند")}</th><th>{L("Supplier's offer", "عرض المورد")}</th><th>{L("Your decision", "قرارك")}</th><th>{L("Status", "الحالة")}</th></tr></thead>
                   <tbody>
                     {groupByCat(operatingTerms.filter((t) => !isSettled(decide(t).badge))).map(([cat, list]) => (
@@ -1268,7 +1268,7 @@ function CounterFlow({
                       </>
                     )}
                   </tbody>
-                </table>
+                </table></div>
               )}
             </div>
           )}

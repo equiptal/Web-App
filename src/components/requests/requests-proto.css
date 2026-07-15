@@ -215,6 +215,9 @@
 .rproto .bids-snap { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 10px; align-items: flex-start; -webkit-overflow-scrolling: touch; }
 .rproto .bids-snap > * { flex: 0 0 clamp(300px, 82vw, 356px); scroll-snap-align: start; margin-bottom: 0; }
 @media (min-width: 900px) { .rproto .bids-snap > * { flex-basis: 41%; } }
+/* Mobile: one card ~full width (peek the next) — overrides the desktop inline cardFlex (44% / grow) so
+   phone cards never render half-width and cram their contents. */
+@media (max-width: 600px) { .rproto .bids-snap > * { flex: 0 0 clamp(290px, 84vw, 356px) !important; } }
 .rproto .bids-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .rproto .bids-bar .count { font-size: 13px; font-weight: 700; color: var(--muted); }
 

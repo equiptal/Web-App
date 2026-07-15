@@ -586,3 +586,45 @@
 }
 .dlproto .qp-paper { animation: qpFlip 0.36s cubic-bezier(0.22, 1, 0.36, 1) both; transform-origin: 50% 0%; }
 @media (prefers-reduced-motion: reduce) { .dlproto .qp-paper { animation: none; } }
+
+/* Wide tables (price + classic terms) scroll inside their own container — never widen the page. */
+.qp-scrollx { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ── Mobile (≤600px) — phones. Scoped to this query so the desktop (≥600px) layout is unchanged. ── */
+@media (max-width: 600px) {
+  /* top bar — tighter; already a horizontal-scroll strip (overflow-x:auto) */
+  .dlproto .topbar { gap: 9px; padding: 9px 12px; }
+  .dlproto .tb-spacer { display: none; }
+  /* price bar — smaller hero so the top-corner status pill can't overlap the number; CTAs stretch/wrap */
+  .dlproto .price-bar { padding: 32px 14px 16px; min-height: 0; }
+  .dlproto .pb-status { top: 10px; inset-inline-end: 10px; font-size: 10px; padding: 3px 9px; }
+  .dlproto .pb-hero .n { font-size: 34px; letter-spacing: -1px; }
+  .dlproto .pb-hero .u { font-size: 14px; }
+  .dlproto .pb-btns { flex-wrap: wrap; }
+  .dlproto .pb-btn { flex: 1 1 auto; justify-content: center; }
+  /* chat — wider bubbles, tighter thread */
+  .dlproto .msg { max-width: 86%; }
+  .dlproto .thread { padding: 12px 12px 14px; }
+  /* ── negotiation sheet ── */
+  .qp-steps { padding: 10px 12px; }
+  .qp-step .lbl { font-size: 12.5px; }
+  .qp-step .badge { width: 26px; height: 26px; font-size: 12px; }
+  .qp-steps .bar { min-width: 8px; margin: 0 5px; }
+  .qp-head-r1 { padding: 7px 12px 6px; gap: 10px; }
+  .qp-deskpad { padding: 12px 10px 34px; }
+  /* paper fills the screen — force the inline zoom off (‼ beats inline) so it isn't shrunk on mobile */
+  .qp-paper { zoom: 1 !important; width: 100%; padding: 16px 14px 26px; }
+  .qp-zoom { display: none; }
+  .qp-qhead { gap: 10px; padding-bottom: 12px; margin-bottom: 12px; }
+  /* tables keep usable column widths and scroll horizontally inside .qp-scrollx */
+  .qp-scrollx .qp-table, .qp-scrollx .qp-tt { min-width: 500px; }
+  .qp-table th, .qp-table td, .qp-tt th, .qp-tt td { padding: 8px 7px; font-size: 11.5px; }
+  .qp-price-in { width: 52px; font-size: 13px; }
+  /* review — single column; address boxes stack */
+  .dlproto .qp-rgrid, .dlproto .qp-addr { grid-template-columns: 1fr; }
+  /* footer — buttons wrap and fill the row */
+  .qp-foot { flex-wrap: wrap; gap: 8px; padding: 9px 12px; }
+  .qp-foot .spacer { display: none; }
+  .qp-foot-main { flex: 1 1 auto; }
+  .qp-fbtn { flex: 1 1 auto; justify-content: center; }
+}
