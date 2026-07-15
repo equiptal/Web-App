@@ -39,9 +39,9 @@ const TERM_ICON: Record<TermKey, string> = {
   fuel: "local_gas_station", fuelType: "local_gas_station", year: "event", operatorCert: "workspace_premium", equipmentCert: "verified",
 };
 // App-download links for the footer CTA (off-platform suppliers → install the app to keep getting requests).
-// TODO(product): replace with the REAL store URLs before shipping.
-const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=REPLACE_WITH_MOEDATECH_ANDROID_ID";
-const APP_STORE_URL = "https://apps.apple.com/app/idREPLACE_WITH_MOEDATECH_IOS_ID";
+// Source: linktr.ee/moedatech (the official app links).
+const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.moedatech.user";
+const APP_STORE_URL = "https://apps.apple.com/sa/app/moedatech/id6749363341";
 // Certificate terms can list several required certs (e.g. "TUV, SPSP, SASO_TECHNICAL_INSPECTION"). Each
 // is confirmed on its OWN card, so a supplier can say they hold TÜV but not SPSP. In state we keep a
 // per-code key `${term}::${code}` PLUS the aggregate `${term}` boolean (true only when every code is Yes)
