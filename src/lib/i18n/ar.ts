@@ -454,7 +454,7 @@ export const ar: Dictionary = {
     rentalBasis: { daily: "يومي", weekly: "أسبوعي", monthly: "شهري" },
     overtime: { without: "بدون", "1.5x": "1.5×", "2x": "2×" },
     equipmentYear: { any: "أي", custom: "مخصص…", customPlaceholder: "اكتب سنة، مثال: 2008" },
-    safetyCert: { tuv: "TÜV", spsp: "SPSP", "saso-technical": "فحص ساسو الفني", other: "أخرى" },
+    safetyCert: { tuv: "TÜV", aramco: "معتمد من أرامكو", spsp: "SPSP", "saso-technical": "فحص ساسو الفني", other: "أخرى" },
     otherCert: { "local-content": "المحتوى المحلي", "saso-registration": "تسجيل ساسو" },
     party: { me: "أنا", supplier: "المورّد" },
     fuelType: { diesel: "ديزل", petrol: "بنزين", electric: "كهربائي", hybrid: "هجين" },

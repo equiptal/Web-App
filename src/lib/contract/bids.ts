@@ -16,10 +16,12 @@ export type BidStatus =
   | string;
 
 /** Safety/credential cert codes (app parity: CertType — LC/SASO/TÜV/SPSP). */
-export type CertCode = "TUV" | "SPSP" | "SASO" | "LC";
-// Labels per 013 acceptance (AC-01/02): LC → "محتوى محلي", SASO → "شهادة SASO".
+// ARAMCO added per the 2026-07 cert rule (TÜV + Aramco are the offered equipment certs; SPSP/SASO stay
+// for legacy data). Labels per 013 acceptance (AC-01/02): LC → "محتوى محلي", SASO → "شهادة SASO".
+export type CertCode = "TUV" | "ARAMCO" | "SPSP" | "SASO" | "LC";
 export const CERT_LABEL: Record<CertCode, { en: string; ar: string }> = {
   TUV: { en: "TÜV", ar: "TÜV" },
+  ARAMCO: { en: "Aramco Certified", ar: "معتمد من أرامكو" },
   SPSP: { en: "SPSP", ar: "SPSP" },
   SASO: { en: "SASO certificate", ar: "شهادة SASO" },
   LC: { en: "Local content", ar: "محتوى محلي" },
@@ -27,6 +29,7 @@ export const CERT_LABEL: Record<CertCode, { en: string; ar: string }> = {
 function toCert(raw: string): CertCode | null {
   const u = raw.trim().toUpperCase();
   if (u === "LC" || /LOCAL.?CONTENT/.test(u)) return "LC";
+  if (/ARAMCO/.test(u)) return "ARAMCO";
   if (/SASO/.test(u)) return "SASO";
   if (/TUV|TÜV/.test(u)) return "TUV";
   if (/SPSP/.test(u)) return "SPSP";
@@ -50,6 +53,7 @@ function certList(v: unknown): CertCode[] {
 function eqDocTypeToCert(type: string): CertCode | null {
   const t = type.trim().toLowerCase();
   if (t === "tuv" || t === "tüv") return "TUV";
+  if (t === "aramco" || t === "aramco_certified" || t === "aramco_certificate") return "ARAMCO";
   if (t === "spsp") return "SPSP";
   // saso AND saso_technical_inspection are the SASO safety cert (NOT ownership, NOT company SASO reg).
   if (t === "saso" || t === "saso_technical_inspection" || t === "saso-technical" || t === "saso_technical") return "SASO";
@@ -64,6 +68,54 @@ const OWNERSHIP_DOC_LABELS: Record<string, { key: string; labelEn: string; label
   sale_contract: { key: "sale_contract", labelEn: "Sale contract", labelAr: "عقد بيع" },
   saso_registration: { key: "saso_registration", labelEn: "SASO registration", labelAr: "تسجيل ساسو" },
 };
+
+/** A document on an offered unit (bid-readiness). URL is a short-lived presigned link (server-signed). */
+export interface OfferedUnitDoc { type: string; key: string; url: string | null; verifyStatus: string | null; expiryDate: string | null; }
+/** A photo on an offered unit — `slot` ∈ {front, serial, hours, …}. `url` is presigned. */
+export interface OfferedUnitPhoto { slot: string; key: string; url: string | null; }
+/** One equipment unit a supplier offered on a NATIVE app bid (bid-readiness — `offeredUnitsDetail`).
+ *  Ownership docs are stripped server-side for the renter. Absent on off-platform shared-link bids. */
+export interface OfferedUnitDetail {
+  equipmentId: string;
+  manufacturer: string | null;
+  modelName: string | null;
+  year: number | null;
+  fuelType: string | null;
+  licensePlateNumber: string | null;
+  subcategoryName: string | null;
+  subcategoryNameAr: string | null;
+  measurementName: string | null;
+  measurementNameAr: string | null;
+  documentKeys: OfferedUnitDoc[];
+  photoKeys: OfferedUnitPhoto[];
+}
+
+/** Parse the raw `offeredUnitsDetail` array (getBidList / getBidDetail) → typed units. undefined when
+ *  absent/empty (off-platform bids), so the readiness surface only renders for native app bids. */
+function mapOfferedUnits(raw: unknown): OfferedUnitDetail[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  const str = (v: unknown): string | null => (v == null || v === "" ? null : String(v));
+  const num = (v: unknown): number | null => (typeof v === "number" ? v : v != null && v !== "" && !isNaN(Number(v)) ? Number(v) : null);
+  return raw.map((u) => {
+    const o = (u ?? {}) as Record<string, unknown>;
+    const docs = (Array.isArray(o.documentKeys) ? o.documentKeys : Array.isArray(o.document_keys) ? o.document_keys : []) as unknown[];
+    const photos = (Array.isArray(o.photoKeys) ? o.photoKeys : Array.isArray(o.photo_keys) ? o.photo_keys : []) as unknown[];
+    return {
+      equipmentId: String(o.equipmentId ?? o.equipment_id ?? o.id ?? ""),
+      manufacturer: str(o.manufacturer ?? o.make),
+      modelName: str(o.modelName ?? o.model_name ?? o.model),
+      year: num(o.year),
+      fuelType: str(o.fuelType ?? o.fuel_type),
+      licensePlateNumber: str(o.licensePlateNumber ?? o.license_plate_number ?? o.plate),
+      subcategoryName: str(o.subcategoryName ?? o.subcategory_name),
+      subcategoryNameAr: str(o.subcategoryNameAr ?? o.subcategory_name_ar),
+      measurementName: str(o.measurementName ?? o.measurement_name),
+      measurementNameAr: str(o.measurementNameAr ?? o.measurement_name_ar),
+      documentKeys: docs.map((d) => { const x = (d ?? {}) as Record<string, unknown>; return { type: String(x.type ?? x.code ?? ""), key: String(x.key ?? ""), url: str(x.url), verifyStatus: str(x.verifyStatus ?? x.verify_status), expiryDate: str(x.expiryDate ?? x.expiry_date) }; }),
+      photoKeys: photos.map((p) => { const x = (p ?? {}) as Record<string, unknown>; return { slot: String(x.slot ?? x.type ?? ""), key: String(x.key ?? ""), url: str(x.url) }; }),
+    };
+  });
+}
 
 export interface BidCard {
   id: string;
@@ -134,6 +186,12 @@ export interface BidCard {
   /** LEVEL 2 (Equipment) proof-of-ownership docs the equipment carries (istimara / customs /
    *  sale_contract / saso_registration) — held documents, never a cert pill. */
   ownershipDocs: { key: string; labelEn: string; labelAr: string }[];
+  /** bid-readiness: the equipment units this supplier offered, with presigned doc/photo links. Only on
+   *  NATIVE app bids (getBidList / getBidDetail `offeredUnitsDetail`); undefined for off-platform bids. */
+  offeredUnitsDetail?: OfferedUnitDetail[];
+  /** Raw requested equipment-cert codes from the request item (lowercase, e.g. ["aramco","tuv"]) — kept
+   *  alongside `requiredCerts` (CertCode[]) so readiness can count certs the CertCode enum can't name. */
+  reqEquipmentCerts?: string[];
   /** LEVEL 3 (Operator): a declared deal-room term, NOT a held-doc pill. Rentee's required operator
    *  license level (request operatorLicenseLevel) + the supplier's declared position (t3Declarations). */
   operatorCertReq?: string | null;
@@ -605,6 +663,8 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     companyCertCodes,
     equipmentCertCodes,
     ownershipDocs,
+    offeredUnitsDetail: mapOfferedUnits(raw.offeredUnitsDetail ?? raw.offered_units_detail),
+    reqEquipmentCerts: (Array.isArray(rqItem.safetyCertifications) ? (rqItem.safetyCertifications as unknown[]) : []).map((x) => String(x).trim().toLowerCase()).filter(Boolean),
     operatorCertReq,
     operatorCertDeclared,
     mobLeadTime: negMobLead ?? s(raw.mobLeadTime),

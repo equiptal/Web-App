@@ -456,7 +456,7 @@ export const en = {
     rentalBasis: { daily: "Daily", weekly: "Weekly", monthly: "Monthly" },
     overtime: { without: "Without", "1.5x": "1.5×", "2x": "2×" },
     equipmentYear: { any: "Any", custom: "Custom…", customPlaceholder: "Type a year, e.g. 2008" },
-    safetyCert: { tuv: "TÜV", spsp: "SPSP", "saso-technical": "SASO technical inspection", other: "Other" },
+    safetyCert: { tuv: "TÜV", aramco: "Aramco Certified", spsp: "SPSP", "saso-technical": "SASO technical inspection", other: "Other" },
     otherCert: { "local-content": "Local content", "saso-registration": "SASO registration" },
     party: { me: "Me", supplier: "Supplier" },
     fuelType: { diesel: "Diesel", petrol: "Petrol", electric: "Electric", hybrid: "Hybrid" },

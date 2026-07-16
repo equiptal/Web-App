@@ -38,7 +38,16 @@ export const CERT_TERM_KEYS = new Set(["operatorCert", "equipmentCert"]);
 export const certCodesFromValue = (v: string | null | undefined): string[] =>
   String(v ?? "").split(/[,/]/).map((s) => s.trim()).filter(Boolean);
 export const certConfKey = (term: string, code: string) => `${term}::${code}`;
-export const prettyCert = (code: string) => code.trim().replace(/_/g, " ").toUpperCase();
+// Known cert codes → clean display labels (2026-07 rule: TÜV + Aramco are the offered equipment certs;
+// legacy SPSP/SASO still render for old data). Unknown codes fall back to prettified uppercase.
+const CERT_LABEL: Record<string, string> = {
+  tuv: "TÜV", aramco: "Aramco Certified", aramco_certified: "Aramco Certified", aramco_certificate: "Aramco Certified",
+  spsp: "SPSP", saso: "SASO", saso_technical_inspection: "SASO technical inspection", saso_registration: "SASO registration",
+};
+export const prettyCert = (code: string) => {
+  const norm = code.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  return CERT_LABEL[norm] ?? code.trim().replace(/_/g, " ").toUpperCase();
+};
 
 /** Equipment photo kinds — each photo the supplier adds is classified as one of these. */
 export type BidPhotoKind = "front_photo" | "serial_photo" | "hours_photo";

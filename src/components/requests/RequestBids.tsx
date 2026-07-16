@@ -19,6 +19,8 @@ import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
 import { SharedBidNegotiateRoom } from "@/components/requests/SharedBidNegotiateRoom";
 import { NEGOTIATE_ENABLED } from "@/lib/config/flags";
+import { computeBidReadiness } from "@/lib/contract/bid-readiness";
+import { BidReadinessBadge, BidEligibilityModal } from "@/components/requests/BidReadiness";
 
 /** Lifecycle pill (matches the prototype SPILL). */
 const SPILL: Record<string, { cls: string; dot: boolean; en: string; ar: string }> = {
@@ -88,6 +90,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
   const [src, setSrc] = useState<"all" | "app" | "link">("all"); // source filter
   const [submissionBid, setSubmissionBid] = useState<BidCard | null>(null);
   const [negotiateBid, setNegotiateBid] = useState<BidCard | null>(null); // web-app/006 — deal-room-style negotiate view
+  const [eligBid, setEligBid] = useState<BidCard | null>(null); // bid-readiness — eligibility view for a native bid's offered units
 
   const toggleSelect = (id: string) =>
     setSelected((prev) => {
@@ -311,6 +314,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
                   )}
                   {b.rating != null && <span className="credpill cp-ok"><span className="material-icons-outlined">star</span>{b.rating.toFixed(1)}</span>}
                   <CredentialPills required={b.requiredCerts} held={b.heldCertCodes} ar={ar} />
+                  {(() => { const rd = computeBidReadiness(b); return rd ? <BidReadinessBadge r={rd} L={L} onClick={() => setEligBid(b)} /> : null; })()}
                 </div>
                 {/* Company documents on file (Level 1) — CR / VAT / National address + LC / SASO registration */}
                 <SupplierDocs compliance={b.compliance} companyCerts={b.companyCertCodes ?? []} ar={ar} />
@@ -460,6 +464,9 @@ export function RequestBids({ requestId }: { requestId: string }) {
           onViewSubmission={() => { const b = negotiateBid; setNegotiateBid(null); setSubmissionBid(b); }}
         />
       )}
+
+      {/* bid-readiness — read-only eligibility view for a native bid's offered units */}
+      {eligBid && (() => { const rd = computeBidReadiness(eligBid); return rd ? <BidEligibilityModal r={rd} supplierName={eligBid.supplierName} ar={ar} L={L} onClose={() => setEligBid(null)} /> : null; })()}
 
       {/* Issue-quotation gate for an unverified renter (company name vs personal name). */}
       {quoteGate && (

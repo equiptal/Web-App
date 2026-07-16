@@ -12,9 +12,11 @@ export const OVERTIME_RATES: OvertimeRate[] = ["without", "1.5x", "2x"];
 /** Min manufacture year — matches the mobile request form: 2015+ / 2018+ / 2020+ / 2022+ + Any. */
 export const EQUIPMENT_YEARS = ["2015+", "2018+", "2020+", "2022+", "any"] as const;
 
-export type SafetyCertificate = "tuv" | "spsp" | "saso-technical" | "other"; // AC-50 (+ web-app/002 free-text "other")
-export const SAFETY_CERTIFICATES: SafetyCertificate[] = ["tuv", "spsp", "saso-technical", "other"];
-/** Operator per-item certificate options — the safety certs PLUS a free-text "other" (app parity). */
+// 2026-07 cert rule: equipment certs offered are TÜV + Aramco (SPSP/SASO dropped from selection but
+// legacy values still RENDER for old data, so they stay in the union). Aramco is equipment-only.
+export type SafetyCertificate = "tuv" | "aramco" | "spsp" | "saso-technical" | "other"; // AC-50 (+ web-app/002 free-text "other")
+export const SAFETY_CERTIFICATES: SafetyCertificate[] = ["tuv", "aramco", "other"];
+/** Operator per-item certificate options — Aramco is NOT an operator cert (equipment-only, app parity). */
 export const OPERATOR_CERTIFICATES: SafetyCertificate[] = ["tuv", "spsp", "saso-technical", "other"];
 
 export type OtherCertificate = "local-content" | "saso-registration"; // AC-50
