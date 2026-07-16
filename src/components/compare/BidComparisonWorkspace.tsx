@@ -12,6 +12,8 @@ import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link
 import { groupRequests, type RequestGroup } from "@/lib/contract/requests";
 import type { DealRoomDocuments, DealTerm } from "@/lib/contract/deal-room";
 import { CERT_LABEL, type BidCard, type CertCode, type TermRow, type TermState } from "@/lib/contract/bids";
+import { computeBidReadiness } from "@/lib/contract/bid-readiness";
+import { BidReadinessBadge, BidEligibilityModal } from "@/components/requests/BidReadiness";
 import { buildItemComparison, sortByPreset, displayQuote, responsibilityTone, rowWinners, type BidColumn, type Preset, type CostResponsibility, type RatePeriod, type PricesFor } from "@/lib/contract/comparison";
 import { bidColumnToComputed, normalizedBidToBidCard, presetToAgent, type RecommendResult, type NormalizedBid } from "@/lib/contract/agent-bids";
 import { BID_VERIFY_ENABLED } from "@/lib/flags";
@@ -136,6 +138,7 @@ export function BidComparisonWorkspace() {
   const [preset, setPreset] = useState<Preset>("best");
   const [period, setPeriod] = useState<RatePeriod>("PER_DAY"); // RATE PERIOD toggle (Day/Week/Month) — display + totals
   const [pricesFor, setPricesFor] = useState<PricesFor>("unit"); // PRICES FOR toggle — default PER UNIT
+  const [eligBid, setEligBid] = useState<BidCard | null>(null); // bid-readiness — eligibility view for a native bid
   // Default the RATE PERIOD to how the bids were actually quoted (the request's rental type) so a monthly
   // bid shows e.g. "SAR 120/month" instead of its per-day conversion "SAR 4/day". Runs once when bids
   // load; the renter can still toggle. (All bids share the request's rental unit.)
@@ -1286,6 +1289,8 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                             <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                               {companyDocChips(c.bid).map((d) => <span key={d.lbl}>{docChip(c, d.lbl, d.has, d.hint)}</span>)}
                             </div>
+                            {/* bid-readiness — equipment eligibility badge (native bids only) */}
+                            {(() => { const rd = computeBidReadiness(c.bid); return rd ? <div className="mt-1.5"><BidReadinessBadge r={rd} L={L} onClick={() => setEligBid(c.bid)} /></div> : null; })()}
                             {recog && <span className="mt-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-bold" style={{ background: C.renteeDim, color: "#1E4FB8", borderColor: "rgba(37,99,235,.28)" }}><span className="material-icons-outlined" style={{ fontSize: 13, color: C.rentee }}>history</span>{recog}</span>}
                           </div>
                         </th>
@@ -1970,6 +1975,8 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
           </div>
         </div>
       )}
+      {/* bid-readiness — read-only eligibility view for a native bid's offered units */}
+      {eligBid && (() => { const rd = computeBidReadiness(eligBid); return rd ? <BidEligibilityModal r={rd} supplierName={eligBid.supplierName} ar={ar} L={L} onClose={() => setEligBid(null)} /> : null; })()}
     </div>
   );
 }

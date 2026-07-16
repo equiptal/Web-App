@@ -1,0 +1,159 @@
+/**
+ * Bid readiness — RENTEE-SUBSET, read-only (ported from the app's bid_readiness.dart).
+ *
+ * Per offered unit, answers "does this unit hold what the request asks for?" — mandatory photos +
+ * the requested equipment / operator certs. Proof-of-ownership is EXCLUDED (the backend strips it from
+ * the renter's `offeredUnitsDetail`, so scoring it would hold every supplier permanently short). Scoring
+ * is presence-based (a held key counts; verify status only decorates). Purely client-side — no backend
+ * readiness number exists. Applies only to NATIVE app bids (those carrying `offeredUnitsDetail`).
+ */
+
+import type { BidCard, OfferedUnitDetail } from "./bids";
+
+export type ReadinessBand = "green" | "yellow" | "red";
+
+export interface ReadinessCert {
+  code: string;
+  labelEn: string;
+  labelAr: string;
+  present: boolean;
+  /** Presigned URL of the held doc backing this cert (tap to open); null when missing. */
+  url: string | null;
+}
+
+export interface UnitReadiness {
+  equipmentId: string;
+  titleEn: string;
+  titleAr: string;
+  year: number | null;
+  reqMinYear: number | null;
+  yearConflict: boolean;
+  photosPresent: boolean;
+  photos: { slot: string; url: string | null }[];
+  equipmentCerts: ReadinessCert[];
+  operatorCerts: ReadinessCert[];
+  done: number;
+  total: number;
+  percent: number;
+  band: ReadinessBand;
+}
+
+export interface BidReadiness {
+  units: UnitReadiness[];
+  readyCount: number; // units fully ready (band === green)
+  committed: number; // units offered
+  requested: number; // request numberOfUnits
+  percent: number; // aggregate = round(Σdone / Σtotal · 100)
+  band: ReadinessBand;
+}
+
+const EQ_CERT_LABELS: Record<string, { en: string; ar: string }> = {
+  tuv: { en: "TÜV", ar: "TÜV" },
+  aramco: { en: "Aramco Certified", ar: "معتمد من أرامكو" },
+  spsp: { en: "SPSP", ar: "SPSP" },
+  saso: { en: "SASO", ar: "شهادة SASO" },
+  saso_technical_inspection: { en: "SASO technical", ar: "فحص ساسو الفني" },
+};
+
+/** Normalize a cert code or doc-type token to a canonical equipment-cert key (tuv/aramco/spsp/saso). */
+function normCert(x: string): string {
+  const t = x.trim().toLowerCase().replace(/[\s-]+/g, "_").replace(/^operator_/, "");
+  if (t.startsWith("aramco")) return "aramco";
+  if (t.startsWith("saso")) return "saso"; // saso, saso_technical_inspection → saso family
+  if (t === "tüv") return "tuv";
+  return t;
+}
+
+const bandOf = (percent: number): ReadinessBand => (percent >= 100 ? "green" : percent >= 50 ? "yellow" : "red");
+const certLabel = (code: string): { labelEn: string; labelAr: string } => {
+  const l = EQ_CERT_LABELS[code] ?? { en: code.toUpperCase(), ar: code.toUpperCase() };
+  return { labelEn: l.en, labelAr: l.ar };
+};
+
+function computeUnit(
+  unit: OfferedUnitDetail,
+  reqEquipCerts: string[],
+  reqOperatorCerts: string[],
+  reqMinYear: number | null,
+): UnitReadiness {
+  // Split the unit's held docs into operator-level vs equipment-level, keyed by canonical cert.
+  const eqDocByCert = new Map<string, string | null>(); // cert → presigned url
+  const opDocByCert = new Map<string, string | null>();
+  for (const d of unit.documentKeys) {
+    const isOp = d.type.trim().toLowerCase().startsWith("operator");
+    const cert = normCert(d.type);
+    (isOp ? opDocByCert : eqDocByCert).set(cert, d.url ?? null);
+  }
+
+  const equipmentCerts: ReadinessCert[] = reqEquipCerts.map((c) => {
+    const code = normCert(c);
+    const present = eqDocByCert.has(code);
+    return { code, ...certLabel(code), present, url: present ? eqDocByCert.get(code) ?? null : null };
+  });
+  const operatorCerts: ReadinessCert[] = reqOperatorCerts.map((c) => {
+    const code = normCert(c);
+    const present = opDocByCert.has(code) || eqDocByCert.has(code); // fall back if not operator-prefixed
+    return { code, ...certLabel(code), present, url: present ? opDocByCert.get(code) ?? eqDocByCert.get(code) ?? null : null };
+  });
+
+  const front = unit.photoKeys.some((p) => /front/i.test(p.slot));
+  const serial = unit.photoKeys.some((p) => /serial|plate/i.test(p.slot));
+  const photosPresent = front && serial;
+
+  const total = 1 + equipmentCerts.length + operatorCerts.length; // 1 = mandatory photos (poo excluded)
+  const done = (photosPresent ? 1 : 0) + equipmentCerts.filter((c) => c.present).length + operatorCerts.filter((c) => c.present).length;
+  const percent = total > 0 ? Math.round((done / total) * 100) : 100;
+
+  // reqMinYear is the raw request value: a real min year (e.g. 2020) or an age. Only flag a conflict
+  // when it clearly reads as a YEAR, to avoid false reds on age-based requests.
+  const looksLikeYear = reqMinYear != null && reqMinYear >= 1990;
+  const yearConflict = !!(looksLikeYear && unit.year != null && unit.year < (reqMinYear as number));
+
+  const title = [unit.manufacturer, unit.modelName].filter(Boolean).join(" ").trim();
+  const titleEn = title || unit.subcategoryName || "Equipment";
+  const titleAr = title || unit.subcategoryNameAr || unit.subcategoryName || "المعدة";
+
+  return {
+    equipmentId: unit.equipmentId,
+    titleEn,
+    titleAr,
+    year: unit.year,
+    reqMinYear: looksLikeYear ? reqMinYear : null,
+    yearConflict,
+    photosPresent,
+    photos: unit.photoKeys.map((p) => ({ slot: p.slot, url: p.url })),
+    equipmentCerts,
+    operatorCerts,
+    done,
+    total,
+    percent,
+    band: bandOf(percent),
+  };
+}
+
+/** Compute readiness for a bid. Returns null for off-platform / non-unit bids (no `offeredUnitsDetail`). */
+export function computeBidReadiness(bid: BidCard): BidReadiness | null {
+  const detail = bid.offeredUnitsDetail;
+  if (!detail || detail.length === 0) return null;
+
+  const reqEquipCerts = (bid.reqEquipmentCerts ?? []).map(normCert);
+  const reqOperatorCerts = String(bid.operatorCertReq ?? "")
+    .split(/[,/]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const units = detail.map((u) => computeUnit(u, reqEquipCerts, reqOperatorCerts, bid.reqMinYear));
+  const sumDone = units.reduce((a, u) => a + u.done, 0);
+  const sumTotal = units.reduce((a, u) => a + u.total, 0);
+  const percent = sumTotal > 0 ? Math.round((sumDone / sumTotal) * 100) : 100;
+  const readyCount = units.filter((u) => u.band === "green" && !u.yearConflict).length;
+
+  return {
+    units,
+    readyCount,
+    committed: units.length,
+    requested: bid.numberOfUnits,
+    percent,
+    band: bandOf(percent),
+  };
+}
