@@ -3,22 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
-import { fetchMyRequests, fetchRequestSubmissions, fetchBids, bidShareUrl, setBidDeadline, setShareLinkLogo } from "@/lib/api/client";
-import { groupRequests, cappedFilled, shortRef, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
+import { fetchMyRequests, fetchRequestSubmissions, fetchBids, bidShareUrl, setBidDeadline, setShareLinkLogo, cancelRequest } from "@/lib/api/client";
+import { groupRequests, cappedFilled, shortRef, statusMeta, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
+import { ConfirmCancelModal } from "@/components/requests/RequestDetail";
 import { GroupBids } from "@/components/requests/GroupBids";
 import { useHeaderBack } from "@/components/AppShell";
 import { ShareForBidsSheet } from "@/components/requests/ShareForBidsSheet";
 import { EquipImg } from "@/components/requests/EquipImg";
 import "@/components/requests/requests-proto.css";
 
-const STATUS: Record<string, { cls: string; en: string; ar: string }> = {
-  OPEN: { cls: "st-open", en: "Open", ar: "مفتوح" },
-  ACTIVE: { cls: "st-active", en: "Active", ar: "نشط" },
-  ACCEPTED: { cls: "st-accepted", en: "Accepted", ar: "مقبول" },
-  EXPIRED: { cls: "st-expired", en: "Expired", ar: "منتهٍ" },
-  CLOSED: { cls: "st-closed", en: "Closed", ar: "مغلق" },
-  MIXED: { cls: "st-mixed", en: "Mixed", ar: "متعدد" },
-};
 type L = (en: string, arr: string) => string;
 type Router = ReturnType<typeof useRouter>;
 
@@ -57,6 +50,21 @@ export function RequestsList() {
   // per request item (on-platform offered units + off-platform), computed for the active RFQ.
   const [offUnitsByRequest, setOffUnitsByRequest] = useState<Record<string, number>>({});
   const [filledByItem, setFilledByItem] = useState<Record<string, number>>({});
+  // Cancel a whole RFQ (group) from the chip: confirm, then DELETE every member request + refresh.
+  const [cancelGroup, setCancelGroup] = useState<RequestGroup | null>(null);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const doCancelGroup = async () => {
+    if (!cancelGroup || cancelBusy) return;
+    setCancelBusy(true);
+    try {
+      await Promise.all(cancelGroup.items.map((it) => cancelRequest(it.id)));
+      const d = await fetchMyRequests();
+      setItems(d.requests);
+      if (activeGroupId === cancelGroup.id) setActiveGroupId(null);
+      setCancelGroup(null);
+    } catch { /* keep the modal open on failure */ }
+    setCancelBusy(false);
+  };
 
   useEffect(() => {
     if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "bids") setSeg("bids");
@@ -160,7 +168,7 @@ export function RequestsList() {
           <div className="rempty">{L("No requests yet.", "لا توجد طلبات بعد.")}</div>
         ) : (
           <div>
-            <GroupChips groups={groups} activeId={activeGroup?.id ?? null} onPick={setActiveGroupId} L={L} groupRefs={groupRefs} />
+            <GroupChips groups={groups} activeId={activeGroup?.id ?? null} onPick={setActiveGroupId} L={L} groupRefs={groupRefs} onCancel={setCancelGroup} />
             {activeGroup && (
               <>
                 <GroupStrip group={activeGroup} ar={ar} L={L} router={router} filledByItem={filledByItem} />
@@ -224,13 +232,15 @@ export function RequestsList() {
         )
       )}
 
+      {cancelGroup && <ConfirmCancelModal ar={ar} L={L} busy={cancelBusy} idLabel={cancelGroup.groupRef ?? shortRef(cancelGroup.id)} onClose={() => { setCancelGroup(null); setCancelBusy(false); }} onConfirm={doCancelGroup} />}
+
       {/* My Bids — grouped by submission, then filtered by supplier (Phase 2) */}
       {seg === "bids" && items && (
         bidGroups.length === 0 ? (
           <div className="rempty">{L("No bids yet.", "لا توجد عروض بعد.")}</div>
         ) : (
           <div>
-            <GroupChips groups={bidGroups} activeId={activeBidGroup?.id ?? null} onPick={(id) => { setActiveGroupId(id); setBidsItemId(null); }} L={L} groupRefs={groupRefs} />
+            <GroupChips groups={bidGroups} activeId={activeBidGroup?.id ?? null} onPick={(id) => { setActiveGroupId(id); setBidsItemId(null); }} L={L} groupRefs={groupRefs} onCancel={setCancelGroup} />
             {activeBidGroup && (
               <>
                 <GroupStrip group={activeBidGroup} ar={ar} L={L} router={router} filledByItem={filledByItem} />
@@ -246,7 +256,7 @@ export function RequestsList() {
 }
 
 /** Level-1 location chips (one per submission group) — shared by both segments. */
-function GroupChips({ groups, activeId, onPick, L, groupRefs }: { groups: RequestGroup[]; activeId: string | null; onPick: (id: string) => void; L: L; groupRefs: Record<string, string> }) {
+function GroupChips({ groups, activeId, onPick, L, groupRefs, onCancel }: { groups: RequestGroup[]; activeId: string | null; onPick: (id: string) => void; L: L; groupRefs: Record<string, string>; onCancel: (gr: RequestGroup) => void }) {
   return (
     <div style={{ marginBottom: 4 }}>
       <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".09em", color: "#6b8fa8", marginBottom: 9 }}>{L("REQUESTS FOR QUOTE", "طلبات التسعير")}</div>
@@ -257,11 +267,16 @@ function GroupChips({ groups, activeId, onPick, L, groupRefs }: { groups: Reques
             <button key={gr.id} onClick={() => onPick(gr.id)} style={{ flexShrink: 0, textAlign: "start", minWidth: 180, padding: "11px 15px", borderRadius: 14, cursor: "pointer", background: on ? "#1c3550" : "#fff", border: `1px solid ${on ? "#1c3550" : "#d4e0ec"}` }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                 <span style={{ fontSize: 14, fontWeight: 900, color: on ? "#fff" : "#1c3550" }}>{gr.groupRef ?? groupRefs[gr.id] ?? shortRef(gr.id)}</span>
-                {(() => {
-                  const s = STATUS[gr.overallStatus] ?? { cls: "st-mixed", en: gr.overallStatus, ar: gr.overallStatus };
-                  const dot = gr.overallStatus === "OPEN" || gr.overallStatus === "ACTIVE" || gr.overallStatus === "ACCEPTED" ? "#1daf58" : gr.overallStatus === "EXPIRED" ? "#d9362a" : "#9AA7B8";
-                  return <span style={{ display: "inline-flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap", fontSize: 11, fontWeight: 800, padding: "2px 9px", borderRadius: 20, background: on ? "rgba(255,255,255,.16)" : "#eff4f9", color: on ? "#fff" : "#2a4f72" }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: dot }} />{L(s.en, s.ar)}</span>;
-                })()}
+                <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                  {(() => {
+                    const s = statusMeta(gr.overallStatus);
+                    const dot = ["OPEN", "ACTIVE", "ACCEPTED"].includes(gr.overallStatus) ? "#1daf58" : gr.overallStatus === "PARTIALLY_ACCEPTED" ? "#f79009" : ["EXPIRED", "FORCE_EXPIRED"].includes(gr.overallStatus) ? "#d9362a" : "#9AA7B8";
+                    return <span style={{ display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", fontSize: 11, fontWeight: 800, padding: "2px 9px", borderRadius: 20, background: on ? "rgba(255,255,255,.16)" : "#eff4f9", color: on ? "#fff" : "#2a4f72" }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: dot }} />{L(s.en, s.ar)}</span>;
+                  })()}
+                  {(gr.overallStatus === "OPEN" || gr.overallStatus === "ACTIVE") && (
+                    <span role="button" tabIndex={0} title={L("Cancel request", "إلغاء الطلب")} aria-label={L("Cancel request", "إلغاء الطلب")} onClick={(e) => { e.stopPropagation(); onCancel(gr); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); onCancel(gr); } }} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, borderRadius: "50%", cursor: "pointer", color: on ? "rgba(255,255,255,.8)" : "#9AA7B8", background: on ? "rgba(255,255,255,.12)" : "#eef2f7" }}><span className="material-icons-outlined" style={{ fontSize: 15 }}>close</span></span>
+                  )}
+                </span>
               </div>
               <div style={{ fontSize: 12, fontWeight: 600, color: on ? "#C7D4E5" : "#6b8fa8", marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 165 }}>{gr.locationLabel}</div>
             </button>
@@ -275,7 +290,7 @@ function GroupChips({ groups, activeId, onPick, L, groupRefs }: { groups: Reques
 /** Group context strip — prototype-exact navy header: left = request info + share link + stats,
  *  right = a fulfillment-tracking panel (one tile per equipment line, color-coded by coverage). */
 export function GroupStrip({ group, ar, L, router, filledByItem = {} }: { group: RequestGroup; ar: boolean; L: L; router: Router; filledByItem?: Record<string, number> }) {
-  const ov = STATUS[group.overallStatus] ?? { cls: "st-mixed", en: group.overallStatus, ar: group.overallStatus };
+  const ov = statusMeta(group.overallStatus);
   const [ffExpanded, setFfExpanded] = useState(false);
   const barColor = (p: number) => (p >= 50 ? "#1daf58" : p > 0 ? "#FBBF6B" : "#F87171");
   // web-app/006 — shared-link tracker for this group (copy link + opened/submitted, keyed by group id).
@@ -316,10 +331,9 @@ export function GroupStrip({ group, ar, L, router, filledByItem = {} }: { group:
                 <span style={{ flex: 1, minWidth: 120, fontSize: 13, fontWeight: 800, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{shareUrl}</span>
                 <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                   <button onClick={() => setShareOpen(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "none", background: "#f79009", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer" }}><span className="material-icons-outlined" style={{ fontSize: 16 }}>ios_share</span>{L("Share", "مشاركة")}</button>
-                  <button onClick={() => setShareOpen(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 13px", borderRadius: 10, border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer" }}><span className="material-icons-outlined" style={{ fontSize: 16 }}>tune</span>{L("Edit", "تعديل")}</button>
                 </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", fontSize: 12, fontWeight: 700, color: "#9DAFC6", marginTop: 9 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", fontSize: 12.5, fontWeight: 800, color: "#E3ECF6", marginTop: 9 }}>
                 <span><span className="material-icons-outlined" style={{ fontSize: 14, verticalAlign: "-2px" }}>visibility</span> <b style={{ color: "#C7D4E5" }}>{link?.openedCount ?? 0}</b> {L("opened", "فتحة")}</span>
                 <span><span className="material-icons-outlined" style={{ fontSize: 14, verticalAlign: "-2px" }}>inbox</span> <b style={{ color: "#FBBF6B" }}>{link?.submittedCount ?? 0}</b> {L("submitted", "عرض")}</span>
                 <span><span className="material-icons-outlined" style={{ fontSize: 14, verticalAlign: "-2px" }}>schedule</span> {L("Closes", "يُغلق")} <b style={{ color: "#fff" }}>{link?.bidDeadline ? new Date(link.bidDeadline).toLocaleString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { dateStyle: "medium", timeStyle: "short" }) : L("—", "—")}</b></span>

@@ -10,8 +10,32 @@
  * here carries exactly one equipment line. The UI never shows a multi-item request.
  */
 
-export type RequestStatus = "OPEN" | "ACTIVE" | "ACCEPTED" | "EXPIRED" | "CLOSED" | string;
+export type RequestStatus = "OPEN" | "ACTIVE" | "PARTIALLY_ACCEPTED" | "ACCEPTED" | "EXPIRED" | "FORCE_EXPIRED" | "HUB_CLOSED" | "CLOSED" | string;
 export type RequestType = "BROADCAST" | "DIRECT" | string;
+
+/**
+ * Single source of truth for request-status display — badge class + bilingual label — mirroring the app
+ * marketplace (rentee_requests_page.dart). Admin/system variants collapse to the renter view:
+ * FORCE_EXPIRED → Expired, HUB_CLOSED → Closed, ABANDONED/CANCELLED → Cancelled. Used by the requests
+ * list, request detail, and group detail so every surface reads the same.
+ */
+export const REQUEST_STATUS: Record<string, { cls: string; en: string; ar: string }> = {
+  OPEN: { cls: "st-open", en: "Open", ar: "مفتوح" },
+  ACTIVE: { cls: "st-active", en: "Active", ar: "نشط" },
+  PARTIALLY_ACCEPTED: { cls: "st-active", en: "Partially accepted", ar: "مقبول جزئياً" },
+  ACCEPTED: { cls: "st-accepted", en: "Accepted", ar: "مقبول" },
+  EXPIRED: { cls: "st-expired", en: "Expired", ar: "منتهٍ" },
+  FORCE_EXPIRED: { cls: "st-expired", en: "Expired", ar: "منتهٍ" },
+  HUB_CLOSED: { cls: "st-closed", en: "Closed", ar: "مغلق" },
+  CLOSED: { cls: "st-closed", en: "Closed", ar: "مغلق" },
+  ABANDONED: { cls: "st-closed", en: "Cancelled", ar: "ملغى" },
+  CANCELLED: { cls: "st-closed", en: "Cancelled", ar: "ملغى" },
+  MIXED: { cls: "st-mixed", en: "Mixed", ar: "متعدد" },
+};
+/** Status badge class + bilingual label, with a safe fallback for any unknown status. */
+export function statusMeta(s: string): { cls: string; en: string; ar: string } {
+  return REQUEST_STATUS[s] ?? { cls: "st-mixed", en: s, ar: s };
+}
 export type Urgency = "ASAP" | "SOON" | "FAR_FUTURE" | string;
 
 /** One enriched equipment line as the backend returns it (taxonomy names folded in). */
