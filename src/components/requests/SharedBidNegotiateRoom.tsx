@@ -66,6 +66,20 @@ export function SharedBidNegotiateRoom({
   }, [onClose]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages.length]);
 
+  // Keep the app's sidebar visible: the panel is fixed, so offset its inline-start by the live width of
+  // the AppShell <aside> (232px expanded / 68px collapsed / 0 on mobile where it's hidden). Re-measure on
+  // resize + sidebar collapse so it stays aligned.
+  const [sbStart, setSbStart] = useState(0);
+  useEffect(() => {
+    const aside = document.querySelector("aside");
+    const measure = () => setSbStart(aside && getComputedStyle(aside).display !== "none" ? Math.round(aside.getBoundingClientRect().width) : 0);
+    measure();
+    const ro = typeof ResizeObserver !== "undefined" && aside ? new ResizeObserver(measure) : null;
+    ro?.observe(aside as Element);
+    window.addEventListener("resize", measure);
+    return () => { window.removeEventListener("resize", measure); ro?.disconnect(); };
+  }, []);
+
   const rate = bid.price ?? 0;
   const offered = bid.unitsOffered || 1;
   const periodLabel = (() => {
@@ -104,7 +118,7 @@ export function SharedBidNegotiateRoom({
   }
 
   return (
-    <div className="sbnr-page" dir={ar ? "rtl" : "ltr"}>
+    <div className="sbnr-page" dir={ar ? "rtl" : "ltr"} style={{ insetInlineStart: sbStart }}>
       <style>{SBNR_CSS}</style>
       <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" />
       <div className="sbnr-topnav">
@@ -144,7 +158,6 @@ export function SharedBidNegotiateRoom({
 
           {/* price bar — their quoted offer, READ-ONLY (no accept/counter: the supplier isn't on the app) */}
           <div className="price-bar">
-            <span className="pb-status wait"><span className="dot" />{L("Not on the app yet", "ليس على التطبيق بعد")}</span>
             <div className="pb-center">
               <div className="pb-src"><span className="dot" />{L("Supplier's quote", "عرض المؤجّر")}{offered > 1 ? ` · ${L("per unit", "للوحدة")}` : ""}</div>
               <div className="pb-hero"><span className="n">{nf(rate)}</span><span className="u">{L("SAR", "ر.س")}/{periodLabel}</span></div>
