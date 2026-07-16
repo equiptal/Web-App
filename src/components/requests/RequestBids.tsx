@@ -443,6 +443,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
           ar={ar}
           L={L}
           onClose={() => setSubmissionBid(null)}
+          onNegotiate={() => { const b = submissionBid; setSubmissionBid(null); setNegotiateBid(b); }}
         />
       )}
 

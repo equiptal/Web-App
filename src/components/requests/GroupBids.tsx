@@ -1108,6 +1108,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           L={L}
           onClose={() => setSubmissionBid(null)}
           onDownloadQuotation={() => downloadQuotation(ar, [submissionBid])}
+          onNegotiate={() => { const b = submissionBid; setSubmissionBid(null); setNegotiateBid(b); }}
         />
       )}
 
