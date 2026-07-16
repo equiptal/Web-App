@@ -226,8 +226,8 @@ export const BID_FORM_CSS = `
 .pb-foot{max-width:1060px;margin:0 auto;padding:8px 24px 34px}
 .dlapp{display:flex;align-items:center;gap:18px;background:linear-gradient(120deg,#eef4fb,#fff 62%);border:1px solid var(--border);border-radius:16px;padding:20px 22px;margin-bottom:10px}
 .dlapp-foot{text-align:center;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:18px}
-.pb-brand{display:flex;justify-content:center;padding:2px 0 16px}
-.pb-brand img{height:28px;width:auto}
+.dlapp-brand{flex:0 0 auto;display:flex;align-items:center}
+.dlapp-brand img{height:30px;width:auto}
 .dlapp-ic{flex:0 0 auto;width:58px;height:58px;border-radius:15px;background:linear-gradient(135deg,var(--rentee),#1E40AF);display:grid;place-items:center;box-shadow:0 6px 16px rgba(37,99,235,.28)}
 .dlapp-ic img{width:36px;height:36px;object-fit:contain}
 .dlapp-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}

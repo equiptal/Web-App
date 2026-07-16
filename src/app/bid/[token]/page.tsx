@@ -801,10 +801,10 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
       )}
 
       <footer className="pb-foot">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <div className="pb-brand"><img src="/moedatech-logo.png" alt="Moedatech" /></div>
-        {/* Download CTA — nudge off-platform suppliers to install the app; opens the store for their OS. */}
+        {/* Download CTA — Moedatech wordmark sits inside the card on the start (left) side. */}
         <div className="dlapp">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <span className="dlapp-brand"><img src="/moedatech-logo.png" alt="Moedatech" /></span>
           <div className="dlapp-tx">
             <b>{L("Get more rental requests", "استقبل المزيد من طلبات الإيجار")}</b>
             <span>{L("Download the Moedatech app to receive requests directly and bid faster.", "حمّل تطبيق معداتك لاستقبال الطلبات مباشرةً وتقديم عروضك بسرعة.")}</span>
