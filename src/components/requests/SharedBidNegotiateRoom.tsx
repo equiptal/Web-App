@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { BidCard } from "@/lib/contract/bids";
 import type { LinkBidSubmission } from "@/lib/contract/link-bids";
-import { postSubmissionMessage } from "@/lib/api/client";
+import { postSubmissionMessage, fetchRequestSubmissions } from "@/lib/api/client";
 import "@/components/deal-room/deal-room-proto.css";
 
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
@@ -53,6 +53,25 @@ export function SharedBidNegotiateRoom({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  // The `submission` prop is a page-load snapshot the parent never refreshes, so it can be stale (missing
+  // messages sent since). Once the user sends here, `dirty` guards against the on-open fetch clobbering
+  // their optimistic/confirmed messages.
+  const dirty = useRef(false);
+
+  // Load the CURRENT persisted messages from the server when the room opens (fixes "messages don't
+  // persist" — the prop snapshot lags behind what's actually saved). Skipped once the user has sent.
+  useEffect(() => {
+    if (!submission?.requestId || !submission?.id) return;
+    let alive = true;
+    fetchRequestSubmissions(submission.requestId)
+      .then((res) => {
+        if (!alive || dirty.current) return;
+        const fresh = res.submissions.find((s) => s.id === submission.id);
+        if (fresh) setMessages((fresh.renteeMessages ?? []).slice());
+      })
+      .catch(() => { /* keep the snapshot we already have */ });
+    return () => { alive = false; };
+  }, [submission?.id, submission?.requestId]);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -101,6 +120,7 @@ export function SharedBidNegotiateRoom({
   async function send() {
     const body = text.trim();
     if (!submission || !body || sending) return;
+    dirty.current = true; // don't let the on-open fetch overwrite what we're sending
     setSending(true);
     setError(null);
     const optimistic: NegMsg = { text: body, at: new Date().toISOString(), pending: true };
