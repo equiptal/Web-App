@@ -61,7 +61,7 @@ export function Step4Preview() {
   const pr = draft.preferences;
   const count = postableItems(draft.items).length;
   const notSent = draft.items.filter((i) => !i.removed && i.verdict === "no-match").length;
-  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
   const certs = [...p.certificates.safety.map((c) => t.options.safetyCert[c]), ...p.certificates.other.map((c) => t.options.otherCert[c])].join(", ");
   const mResp = (t.options.maintenanceResp as Record<string, string>)[pr.maintenance.responsibility] ?? pr.maintenance.responsibility;
   const suppliers =
@@ -257,6 +257,8 @@ export function Step4Preview() {
           setShowAccount(false);
           void actions.submit(); // account created (now basic) → post the request
         }}
+        title={t.guest.postGateTitle}
+        postSubhead={t.guest.postBodyRequest}
       />
 
       {/* Basic-account request cap (backend E8009) — verify popup instead of an inline error. */}

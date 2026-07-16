@@ -192,10 +192,16 @@ export interface BidCard {
    * distinct "via shared link" card (no deal room) with a flat quoted total and a read-only
    * "view submission" viewer instead of the negotiate footer. */
   viaSharedLink?: boolean;
+  /** web-app/006 (convert): a real app bid that was MATERIALIZED from an off-platform shared-link
+   *  submission (backend `Bid.converted`). It's a first-class app bid (has a deal room), but the
+   *  renter UI keeps labelling + counting it as **off-platform** — its origin. */
+  converted?: boolean;
   /** Flat quoted total (incl VAT) for a link bid — shown instead of the rate/period breakdown. */
   quotedTotal?: number | null;
   /** The submission id the read-only viewer opens (off-platform supplier submission). */
   submissionKey?: string;
+  /** The request item this link-bid card represents — lets the viewer focus a single item. */
+  requestItemId?: string;
   /** "submitted N days ago" for the link-bid card (avoids non-deterministic date math). */
   agoDays?: number;
   /** Off-platform bids capture company-doc VALUES (not files) — keyed by the comparison's doc hint
@@ -284,11 +290,13 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
   // backend-flagged deviation → conflict. This is why overtime shows "Pending review", not "Matched".
   const negContractState = (key: string): TermState => (deviationKeys.has(key) ? "conflict" : "grey");
 
-  // Operator (spec 128). operator_included is an ACKNOWLEDGE term (matched, or conflict only when the
-  // RFQ needs an operator the bid omits); operator_nationality is its own CONFLICT_ELIGIBLE term.
+  // Operator (spec 128). operator_included is CONFLICT_ELIGIBLE / Negotiable — the app moved it
+  // Acknowledge → Negotiable (deal-room.service CONFLICT_ELIGIBLE_KEYS): it conflicts when the RFQ needs
+  // an operator the bid omits OR on a backend-flagged deviation, and is countered in the deal room.
+  // operator_nationality is its own CONFLICT_ELIGIBLE term.
   const reqOperator = s(reqItem.operatorIncluded)?.toUpperCase() === "YES";
   const bidOperator = s(raw.operatorIncluded)?.toUpperCase() === "YES";
-  const operatorIncluded: TermState = !reqOperator ? "grey" : bidOperator ? "matched" : "conflict";
+  const operatorIncluded: TermState = !reqOperator ? "grey" : (!bidOperator || deviationKeys.has("operator_included")) ? "conflict" : "matched";
   const opNat = reqOperator
     ? (s(reqItem.operatorNationality) === "restricted" ? (s(reqItem.operatorNationalityCustom) ?? "restricted") : s(reqItem.operatorNationality))
     : null;
@@ -378,6 +386,8 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
       { key: "fat_accommodation_transport", labelEn: "Operator FAT — Accommodation/Transport", labelAr: "الإعاشة (F.A.T) — الإقامة/النقل", state: contractState("fat_accommodation_transport", fatAccom) },
       { key: "fuel_responsibility", labelEn: "Fuel responsibility", labelAr: "مسؤولية الوقود", state: contractState("fuel_responsibility", fuelResp) },
       rPayment, rSla, rOvertime, rMaint,
+      // mobilization_lead_time — CONFLICT_ELIGIBLE / Negotiable (app moved it Priced → Negotiable).
+      { key: "mobilization_lead_time", labelEn: "Mobilization lead time", labelAr: "مهلة التعبئة", state: negContractState("mobilization_lead_time") },
       { key: "mobilization_pricing", labelEn: "Mobilization pricing", labelAr: "تسعير النقل", state: "grey" },
       { key: "demobilization_pricing", labelEn: "Demobilization pricing", labelAr: "تسعير الإرجاع", state: "grey" },
     ],
@@ -546,6 +556,8 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     id: String(raw.id ?? ""),
     status: (s(raw.status) as BidStatus) ?? "PENDING",
     wonViaSurvey: raw.wonViaSurvey === true, // survey-reported winner (app parity) — decided even if status isn't ACCEPTED
+    converted: raw.converted === true, // web-app/006: materialized from an off-platform submission → labelled/counted off-platform
+
     supplierId: sup.id != null ? String(sup.id) : null,
     supplierName: s(raw.supplierDisplayName) ?? s(sup.companyName) ?? ([s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" ") || "Supplier"),
     verified: supVerified,
@@ -701,10 +713,17 @@ const bucketOfTermState = (s: TermState): TermBucket =>
 export function bucketBidTerms(
   terms: { equipment: TermRow[]; contract: TermRow[]; supplier: TermRow[] },
   negotiable?: TermRow[],
+  opts?: { all?: boolean },
 ): { rows: TermRow[]; byBucket: Record<TermBucket, TermRow[]>; counts: Record<TermBucket, number> } {
-  const merged = [...(negotiable ?? []), ...terms.equipment, ...terms.contract, ...terms.supplier];
+  // `all` (off-platform shared-link bids): count EVERY required term the supplier answered — Yes = matched,
+  // No = conflict — so the card's tally matches the full submission view, not just the app's 6 negotiable
+  // terms. Excludes the CR/VAT `supplier` rows (those are company details, not term conflicts).
+  const merged = opts?.all
+    ? [...(negotiable ?? []), ...terms.equipment, ...terms.contract]
+    : [...(negotiable ?? []), ...terms.equipment, ...terms.contract, ...terms.supplier];
   const seen = new Set<string>();
   const rows = merged.filter((r) => {
+    if (opts?.all) return r.state !== "grey"; // every answered term (no COUNTED_TERM_GROUP gate, no group dedup)
     const group = COUNTED_TERM_GROUP[r.key];
     if (!group) return false; // only the app's 6 negotiable terms (in-app OR link-bid key name)
     // App parity: fuel_responsibility is counted only when the rentee actually declared it (an

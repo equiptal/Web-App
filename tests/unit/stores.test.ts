@@ -116,6 +116,27 @@ describe("stores mappers (web-app/004)", () => {
     expect(d.equipment[0].isVerified).toBe(true);
   });
 
+  it("public projection: store card name falls back to companyName", () => {
+    // Authed /stores sends `name`; the PII-safe public projection sends the supplier `companyName`.
+    const card = mapStoreCard({ id: "s3", companyName: "Gulf Cranes Co", isVerified: true, city: "Dammam" });
+    expect(card.name).toBe("Gulf Cranes Co");
+    expect(card.isVerified).toBe(true);
+    expect(card.city).toBe("Dammam");
+  });
+
+  it("public projection: store detail city derives from equipment[0].yard when store/yards omit it", () => {
+    const d = mapStoreDetail({
+      id: "s10",
+      companyName: "Public Store",
+      equipment: [
+        { id: "e1", price: 100, priceUnit: "PER_DAY", verificationStatus: "VERIFIED", yard: { id: "y1", name: "North", city: "Mecca" } },
+      ],
+    });
+    expect(d.name).toBe("Public Store"); // companyName fallback
+    expect(d.city).toBe("Mecca"); // from the nested equipment yard
+    expect(d.equipment).toHaveLength(1);
+  });
+
   it("maps equipment detail: photo URLs from {key} objects, doc types (drops OTHER), price", () => {
     const d = mapEquipmentDetail({
       id: "eqd",

@@ -8,6 +8,8 @@ import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import type { Locale } from "@/lib/i18n/config";
 import { SurveyProvider } from "@/components/surveys/SurveyProvider";
+import { AuthGateProvider, useAuthGate } from "@/components/auth/AuthGate";
+import { PUBLIC_WEB_ENABLED } from "@/lib/flags";
 import { fetchDealRoomUnread } from "@/lib/api/client";
 import { canSeeProcurementDashboard } from "@/lib/access/dashboard";
 import { NotificationsBell } from "@/components/NotificationsBell";
@@ -30,11 +32,14 @@ export function useHeaderBack(handler: (() => void) | null) {
   }, [handler, register]);
 }
 
-/** Public shell: hosts the Outcome Survey gate so the chrome (topbar icon) and pages can both read it. */
+/** Public shell: hosts the Outcome Survey gate + the app-wide auth-gate modal (public-web has no
+ *  `/login` page — sign-in/register is a modal fired by actions), so the chrome and pages can use both. */
 export function AppShell(props: AppShellProps) {
   return (
     <SurveyProvider>
-      <AppShellInner {...props} />
+      <AuthGateProvider>
+        <AppShellInner {...props} />
+      </AuthGateProvider>
     </SurveyProvider>
   );
 }
@@ -43,6 +48,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
   const { locale, setLocale } = useLocale();
   const t = useT();
   const { tier, status, signOut, user } = useSession();
+  const { openAuth } = useAuthGate();
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -86,7 +92,9 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
   const handleSignOut = async () => {
     setMenuOpen(false);
     await signOut(); // AC-09
-    router.push("/login");
+    // Public web: no /login page — a signed-out user lands on the public home and browses as a guest
+    // (auth is the modal form on the next gated action). Legacy/prod: back to the /login gate.
+    router.push(PUBLIC_WEB_ENABLED ? "/" : "/login");
   };
 
   // `gated` items are the personal, account-bound areas (mirror middleware's GATED_PREFIXES). The web
@@ -168,7 +176,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
               <Icon name={locale === "ar" ? "arrow_forward" : "arrow_back"} size={20} />
             </button>
           )}
-          <b className="truncate text-[19px] font-extrabold tracking-[-.4px] text-navy">
+          <b className="min-w-0 flex-1 truncate text-[19px] font-extrabold tracking-[-.4px] text-navy">
             {title ?? (
               <>
                 {greeting} <span className="wave-emoji">👋</span>
@@ -176,7 +184,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
             )}
           </b>
 
-          <div className="ms-auto flex items-center gap-3 text-[13px] font-semibold text-navy-mid">
+          <div className="ms-auto flex flex-none items-center gap-2 text-[13px] font-semibold text-navy-mid sm:gap-3">
             <span className="inline-flex overflow-hidden rounded-md border border-border">
               {(["en", "ar"] as Locale[]).map((l) => (
                 <button
@@ -189,10 +197,10 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
               ))}
             </span>
 
-            {/* Signed-out visitors browse freely; this is their path into the account gate. */}
+            {/* Signed-out visitors browse freely; this opens the auth modal (no /login page). */}
             {status === "anon" && (
               <button
-                onClick={() => router.push(`/login?next=${encodeURIComponent(pathname)}`)}
+                onClick={() => openAuth()}
                 className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3.5 py-1.5 text-[12.5px] font-bold text-white transition hover:brightness-105"
               >
                 <Icon name="login" size={16} /> {t.shell.signIn}
@@ -278,7 +286,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
               isActive(it.href) ? "text-brand" : "text-muted"
             }`}
           >
-            <Icon name={it.icon} size={22} /> {it.label}
+            <Icon name={it.icon} size={22} /> <span className="max-w-full truncate">{it.label}</span>
           </Link>
         ))}
       </nav>

@@ -23,7 +23,36 @@ export interface LinkBidConfirmations {
   overtime?: boolean;
   breakdownSla?: boolean;
   maintenance?: boolean;
+  // Per-cert-code answers are also carried, keyed `${certTerm}::${code}` (e.g. "equipmentCert::TUV") —
+  // set when a cert term lists 2+ certs so the supplier can confirm one but not another. The plain
+  // `equipmentCert` / `operatorCert` above stay the aggregate (true only when every code is Yes). The
+  // backend stores confirmations as pass-through JSON (validator: z.record(z.boolean())), so these
+  // round-trip. They live under composite string keys; readers/writers access them via a
+  // `Record<string, boolean | undefined>` cast (kept off this interface to avoid a template-literal
+  // index signature, which Next's SWC transform mishandles).
 }
+
+/** Cert terms can list several required certs; each is confirmed on its own key. Kept here so the
+ *  supplier form (write) and the renter's viewers (read) agree on the exact composite-key format. */
+export const CERT_TERM_KEYS = new Set(["operatorCert", "equipmentCert"]);
+export const certCodesFromValue = (v: string | null | undefined): string[] =>
+  String(v ?? "").split(/[,/]/).map((s) => s.trim()).filter(Boolean);
+export const certConfKey = (term: string, code: string) => `${term}::${code}`;
+export const prettyCert = (code: string) => code.trim().replace(/_/g, " ").toUpperCase();
+
+/** Equipment photo kinds — each photo the supplier adds is classified as one of these. */
+export type BidPhotoKind = "front_photo" | "serial_photo" | "hours_photo";
+/** Per-item document kinds: proof-of-ownership (free-classify) + equipment/operator cert (request-driven,
+ *  TÜV/SPSP/SASO — operator prefixed to stay distinct). */
+export type BidDocKind =
+  | "istimara" | "customs_card" | "sales_contract" | "saso_registration" | "combined"
+  | "tuv" | "spsp" | "saso" | "other"
+  | "operator_tuv" | "operator_spsp" | "operator_saso" | "operator_other";
+/** Submission-level company-verification document kinds (aligned to the app's company doc set). */
+export type CompanyDocKind = "cr" | "vat_cert" | "national_address" | "local_content" | "saso_heavy_equip" | "other";
+
+/** An uploaded attachment — `key` is the plain S3 key on submit, a presigned URL on read. */
+export interface BidAttachment { key: string; type: string; filename?: string | null }
 
 export interface LinkBidItem {
   requestItemId: string;
@@ -44,6 +73,10 @@ export interface LinkBidItem {
   /** The renter's required VALUE per term (operator, nationality, fatFood, fuel, fuelType, year, certs,
    *  payment, overtime, breakdownSla) — drives the "Renter: X · Supplier: Y" conflict detail. */
   requiredTerms?: Record<string, string | null> | null;
+  /** Equipment photos (classified: front/serial/hours) — presigned URLs on read. */
+  photos?: BidAttachment[];
+  /** Per-item documents (ownership / equipment cert / operator cert) — presigned URLs on read. */
+  documents?: BidAttachment[];
 }
 
 export interface LinkBidSubmission {
@@ -62,11 +95,18 @@ export interface LinkBidSubmission {
   vatNumber?: string | null;
   nationalAddress?: string | null;
   contactInfo?: string | null;
+  /** Supplier's city — captured on the form; feeds the account the admin creates on convert. */
+  city?: string | null;
+  /** Rentee's pre-conversion "Negotiate" messages (append-only `{ text, at }`) — rendered as a chat
+   *  thread in the submission viewer. Absent/empty until the renter messages the supplier. */
+  renteeMessages?: { text: string; at: string }[];
   notes?: string | null;
   /** Supplier-set quote expiry (ISO) — how long THEIR price holds. Separate from the renter's bid
    *  deadline. Drives the quotation's "Valid until" when present. */
   validUntil?: string | null;
   items: LinkBidItem[];
+  /** Submission-level company-verification docs (CR / VAT / national address) — presigned URLs. */
+  companyDocuments?: BidAttachment[];
   grandTotal?: number | null;
 }
 
@@ -79,6 +119,13 @@ export interface BidFormItem {
   size?: string | null;
   sizeAr?: string | null;
   numberOfUnits: number;
+  /** Units still open for a shared-link supplier to offer = numberOfUnits − units already held by other
+   *  suppliers' accepted (AWAITING) + confirmed (CLOSED) deals, clamped ≥ 0. Backend (PR #484) sends it
+   *  per item; OPTIONAL — when absent (pre-deploy backend) the form falls back to numberOfUnits. */
+  remainingUnits?: number;
+  /** Taxonomy image — same source the in-app bid/request cards render via EquipImg. Optional: the public
+   *  bid-form endpoint doesn't send it yet (backend gap), so the item falls back to the name-derived glyph. */
+  imageUrl?: string | null;
   /** Rental basis (PER_DAY/PER_WEEK/PER_MONTH/PER_JOB) shown read-only + carried into the submission. */
   priceUnit: string | null;
   /** Read-only context: who handles delivery / return + the renter's per-item note. */
@@ -122,20 +169,45 @@ export interface SubmitBidFormPayload {
   crNumber: string;
   vatNumber: string;
   nationalAddress: string;
+  /** Supplier phone — the account key. Stored normalized (E.164) in the existing `contact_info`
+   *  column on the backend; the form collects it via a structured phone input. */
   contactInfo: string;
+  /** Supplier's city — optional. */
+  city?: string;
   notes?: string;
   /** Supplier-set quote expiry (ISO) — optional. */
   validUntil?: string;
+  /** Submission-level company-verification docs (CR / VAT / national address). `key` = the S3 key
+   *  returned by /upload-urls (NOT a URL). Optional. */
+  companyDocuments?: { key: string; type: CompanyDocKind; filename?: string }[];
   /** `offeredUnits` (partial bid) is optional — omit → backend defaults to the full requested count.
    *  When sent it must be 1..numberOfUnits (backend 400s otherwise). Live on staging: submitBidForm
-   *  persists + prices on it and getRequestSubmissions returns it. */
-  items: { requestItemId: string; confirmations: LinkBidConfirmations; offeredUnits?: number; rentalRate: number; deliveryPrice?: number; returnPrice?: number }[];
+   *  persists + prices on it and getRequestSubmissions returns it.
+   *  `photos`/`documents` carry the S3 keys from /upload-urls (classified by `type`). Optional. */
+  items: {
+    requestItemId: string;
+    confirmations: LinkBidConfirmations;
+    offeredUnits?: number;
+    rentalRate: number;
+    deliveryPrice?: number;
+    returnPrice?: number;
+    photos?: { key: string; type: BidPhotoKind; filename?: string }[];
+    documents?: { key: string; type: BidDocKind; filename?: string }[];
+  }[];
 }
 
 const s = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v : typeof v === "number" ? String(v) : null);
 const n = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && v.trim() && Number.isFinite(Number(v)) ? Number(v) : null);
 const b = (v: unknown): boolean | undefined => (v === true || v === "yes" || v === 1 ? true : v === false || v === "no" || v === 0 ? false : undefined);
 const has = (v?: string | null) => !!(v && v.trim());
+/** Parse an attachments array ({key,type,filename}); key is a presigned URL on read. Undefined if empty. */
+const attList = (v: unknown): BidAttachment[] | undefined => {
+  if (!Array.isArray(v)) return undefined;
+  const out = (v as Record<string, unknown>[])
+    .map((e) => ({ key: s(e?.key) ?? "", type: s(e?.type) ?? "", filename: s(e?.filename) }))
+    .filter((a) => a.key);
+  return out.length ? out : undefined;
+};
 
 /** Parse the agents `GET /agents/requests/{id}/bid-submissions` payload into typed submissions. */
 export function mapLinkSubmissions(raw: unknown): LinkBidSubmission[] {
@@ -156,8 +228,13 @@ export function mapLinkSubmissions(raw: unknown): LinkBidSubmission[] {
       vatNumber: s(o.vatNumber),
       nationalAddress: s(o.nationalAddress),
       contactInfo: s(o.contactInfo),
+      city: s(o.city),
+      renteeMessages: (Array.isArray(o.renteeMessages) ? (o.renteeMessages as Record<string, unknown>[]) : [])
+        .map((m) => ({ text: s(m?.text) ?? "", at: s(m?.at) ?? "" }))
+        .filter((m) => m.text),
       notes: s(o.notes),
       validUntil: s(o.validUntil),
+      companyDocuments: attList(o.companyDocuments),
       grandTotal: n(o.grandTotal),
       items: items.map((i) => {
         const c = (i.confirmations ?? {}) as Record<string, unknown>;
@@ -173,7 +250,14 @@ export function mapLinkSubmissions(raw: unknown): LinkBidSubmission[] {
           returnPrice: n(i.returnPrice),
           total: n(i.total),
           requiredTerms: i.requiredTerms && typeof i.requiredTerms === "object" ? (i.requiredTerms as Record<string, string | null>) : null,
-          confirmations: { operator: b(c.operator), nationality: b(c.nationality), fatFood: b(c.fatFood), fatTransport: b(c.fatTransport), fuel: b(c.fuel), fuelType: b(c.fuelType), year: b(c.year), operatorCert: b(c.operatorCert), equipmentCert: b(c.equipmentCert), payment: b(c.payment), overtime: b(c.overtime), breakdownSla: b(c.breakdownSla), maintenance: b(c.maintenance) },
+          photos: attList(i.photos),
+          documents: attList(i.documents),
+          confirmations: (() => {
+            const out: LinkBidConfirmations = { operator: b(c.operator), nationality: b(c.nationality), fatFood: b(c.fatFood), fatTransport: b(c.fatTransport), fuel: b(c.fuel), fuelType: b(c.fuelType), year: b(c.year), operatorCert: b(c.operatorCert), equipmentCert: b(c.equipmentCert), payment: b(c.payment), overtime: b(c.overtime), breakdownSla: b(c.breakdownSla), maintenance: b(c.maintenance) };
+            // Preserve per-cert-code keys (e.g. "equipmentCert::TUV") the form sent — the renter's viewers read them.
+            for (const [k, v] of Object.entries(c)) if (k.includes("::")) (out as Record<string, boolean | undefined>)[k] = b(v);
+            return out;
+          })(),
         };
       }),
     };
@@ -210,6 +294,8 @@ export function mapBidFormData(raw: unknown): BidFormData {
         size: s(i.size),
         sizeAr: s(i.sizeAr),
         numberOfUnits: n(i.numberOfUnits) ?? 1,
+        remainingUnits: n(i.remainingUnits) ?? undefined, // absent → page falls back to numberOfUnits
+        imageUrl: s(i.imageUrl),
         priceUnit: s(i.priceUnit),
         deliveryBy: s(i.deliveryBy),
         returnBy: s(i.returnBy),
@@ -247,8 +333,14 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
   // or docs — only the supplier's Yes/No confirmations — so populate Year / Equipment certs / Operator
   // cert from those (showing the requested VALUE the supplier confirmed, e.g. TÜV), not blanks.
   const toCertCode = (raw: string): CertCode | null => { const u = raw.toUpperCase(); return u.includes("TUV") || u.includes("TÜV") ? "TUV" : u.includes("SPSP") ? "SPSP" : u.includes("SASO") ? "SASO" : u.includes("LC") || u.includes("LOCAL") ? "LC" : null; };
-  const reqEqCertCodes = (rt.equipmentCert ? String(rt.equipmentCert).split(/[,/]/) : []).map((x) => toCertCode(x.trim())).filter((x): x is CertCode => !!x);
-  const eqCertConfirmed = c.equipmentCert === true ? reqEqCertCodes : [];
+  const cc = c as Record<string, boolean | undefined>;
+  const reqEqRaw = certCodesFromValue(rt.equipmentCert);
+  const reqEqCertCodes = reqEqRaw.map((x) => toCertCode(x)).filter((x): x is CertCode => !!x);
+  // Held per cert code when the form sent per-code answers (confirm TÜV but not SPSP); else fall back
+  // to the aggregate boolean (older submissions / single-cert requests).
+  const eqCertConfirmed = reqEqRaw
+    .filter((raw) => { const v = cc[certConfKey("equipmentCert", raw)]; return v !== undefined ? v === true : c.equipmentCert === true; })
+    .map((x) => toCertCode(x)).filter((x): x is CertCode => !!x);
   // Extract the required manufacture year from `rt.year` — tolerant of strings like "2018", "≥ 2018",
   // or "2018 or newer" (a bare Number() fails on those, which is why the comparison used to show
   // "Confirmed" instead of the year). Grab the first 4-digit year.
@@ -346,6 +438,7 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
     // Per-item card → that item's total (incl VAT); whole-submission card → the grand total.
     quotedTotal: item ? (it?.total ?? null) : (sub.grandTotal ?? null),
     submissionKey: sub.id,
+    requestItemId: it?.requestItemId,
     // Captured company-doc VALUES (off-platform has no files) — keyed by the comparison's doc hints.
     linkDocs: {
       ...(has(sub.crNumber) ? { commercial: sub.crNumber as string } : {}),

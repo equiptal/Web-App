@@ -5,7 +5,6 @@ import { useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import { StoreCard } from "@/components/stores/StoreCard";
-import { SignInPrompt } from "@/components/common/SignInPrompt";
 import type { StoreCard as StoreCardData, TaxonomyNode } from "@/lib/contract/stores";
 
 interface CityOpt {
@@ -29,8 +28,10 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
   const { locale } = useLocale();
   const { status } = useSession();
   const ar = locale === "ar";
-  // Guests can't browse suppliers until the public browse endpoint (T7) ships — show a sign-in nudge
-  // instead of firing the authed fetch (which would 401 into an error panel).
+  // Guests browse the PUBLIC store directory (real data), but the City + Category filters source
+  // authed-only reference data (`/api/master-data/cities`, `/api/stores/taxonomy`). Rather than a
+  // public reference endpoint, we simply hide those two filters for guests (deferred, non-priority) —
+  // they still get Search + Verified. The filters return once signed in.
   const anon = status === "anon";
 
   const [cities, setCities] = useState<CityOpt[]>([]);
@@ -49,8 +50,14 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
   const [reloadKey, setReloadKey] = useState(0);
   const [expanded, setExpanded] = useState(false);
 
-  // Master data for the filters (cities + taxonomy tree).
+  // Master data for the filters (cities + taxonomy tree) — authed-only; skip for guests (their
+  // City/Category filters are hidden, so don't fire the calls that would 401).
   useEffect(() => {
+    if (anon) {
+      setCities([]);
+      setTaxonomy([]);
+      return;
+    }
     fetch("/api/master-data/cities", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
       .then((raw: unknown) => {
@@ -76,7 +83,7 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
       .then((d: { taxonomy: TaxonomyNode[] }) => setTaxonomy(d.taxonomy ?? []))
       .catch(() => setTaxonomy([]));
-  }, [ar]);
+  }, [ar, anon]);
 
   const subcategories = useMemo(() => taxonomy.find((c) => c.id === categoryId)?.children ?? [], [taxonomy, categoryId]);
   const measurements = useMemo(() => subcategories.find((s) => s.id === subcategoryId)?.children ?? [], [subcategories, subcategoryId]);
@@ -87,7 +94,6 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
   }, [search]);
 
   useEffect(() => {
-    if (anon) return; // no authed fetch for guests — the render shows the sign-in prompt
     setError(false);
     setStores(null);
     const qs = new URLSearchParams();
@@ -106,7 +112,7 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
         if (e?.name !== "AbortError") setError(true);
       });
     return () => ctrl.abort();
-  }, [debounced, city, categoryId, subcategoryId, measurementId, verifiedOnly, reloadKey, anon]);
+  }, [debounced, city, categoryId, subcategoryId, measurementId, verifiedOnly, reloadKey]);
 
   const onCategory = (v: string) => {
     setCategoryId(v);
@@ -149,42 +155,47 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <select className={selectCls} value={city} onChange={(e) => setCity(e.target.value)}>
-            <option value="">{t.browse.anyCity}</option>
-            {cities.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </select>
-          <select className={selectCls} value={categoryId} onChange={(e) => onCategory(e.target.value)}>
-            <option value="">{t.browse.anyCategory}</option>
-            {taxonomy.map((c) => (
-              <option key={c.id} value={c.id}>{tabel(c, ar)}</option>
-            ))}
-          </select>
-          <select className={selectCls} value={subcategoryId} onChange={(e) => onSubcategory(e.target.value)}>
-            {categoryId ? (
-              <>
-                <option value="">{t.browse.anySubcategory}</option>
-                {subcategories.map((s) => (
-                  <option key={s.id} value={s.id}>{tabel(s, ar)}</option>
+          {/* City + Category cascade need authed reference data → shown to signed-in users only. */}
+          {!anon && (
+            <>
+              <select className={selectCls} value={city} onChange={(e) => setCity(e.target.value)}>
+                <option value="">{t.browse.anyCity}</option>
+                {cities.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
                 ))}
-              </>
-            ) : (
-              <option value="">{t.browse.pickCategoryFirst}</option>
-            )}
-          </select>
-          <select className={selectCls} value={measurementId} onChange={(e) => setMeasurementId(e.target.value)}>
-            {subcategoryId ? (
-              <>
-                <option value="">{t.browse.anyMeasurement}</option>
-                {measurements.map((m) => (
-                  <option key={m.id} value={m.id}>{tabel(m, ar)}</option>
+              </select>
+              <select className={selectCls} value={categoryId} onChange={(e) => onCategory(e.target.value)}>
+                <option value="">{t.browse.anyCategory}</option>
+                {taxonomy.map((c) => (
+                  <option key={c.id} value={c.id}>{tabel(c, ar)}</option>
                 ))}
-              </>
-            ) : (
-              <option value="">{t.browse.pickSubcategoryFirst}</option>
-            )}
-          </select>
+              </select>
+              <select className={selectCls} value={subcategoryId} onChange={(e) => onSubcategory(e.target.value)}>
+                {categoryId ? (
+                  <>
+                    <option value="">{t.browse.anySubcategory}</option>
+                    {subcategories.map((s) => (
+                      <option key={s.id} value={s.id}>{tabel(s, ar)}</option>
+                    ))}
+                  </>
+                ) : (
+                  <option value="">{t.browse.pickCategoryFirst}</option>
+                )}
+              </select>
+              <select className={selectCls} value={measurementId} onChange={(e) => setMeasurementId(e.target.value)}>
+                {subcategoryId ? (
+                  <>
+                    <option value="">{t.browse.anyMeasurement}</option>
+                    {measurements.map((m) => (
+                      <option key={m.id} value={m.id}>{tabel(m, ar)}</option>
+                    ))}
+                  </>
+                ) : (
+                  <option value="">{t.browse.pickSubcategoryFirst}</option>
+                )}
+              </select>
+            </>
+          )}
           <button
             type="button"
             onClick={() => setVerifiedOnly((v) => !v)}
@@ -200,9 +211,7 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
       </div>
 
       {/* Results (AC-16/17/23) */}
-      {anon ? (
-        <SignInPrompt />
-      ) : error ? (
+      {error ? (
         <div className="rounded-[12px] border border-border bg-surface p-8 text-center text-[13px] text-muted">
           <Icon name="error_outline" size={22} className="mx-auto mb-2 text-muted" />
           <p>{t.browse.error}</p>

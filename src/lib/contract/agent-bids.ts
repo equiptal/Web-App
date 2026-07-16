@@ -39,6 +39,10 @@ export interface NormalizedBid {
   mobilization_amount: number | null;
   demobilization_amount: number | null;
   currency: string | null;
+  /** Whether the quoted prices EXCLUDE or INCLUDE 15% VAT, when the quote states it (the agent parses
+   *  "Prices exclude 15% VAT" / "شامل ض.ق.م" etc. into this). null when unstated → the verify screen
+   *  assumes `excl` and marks it for renter confirmation. */
+  vat_mode?: "excl" | "incl" | null;
   cost_responsibilities: Partial<Record<CostResponsibilityItem, CostParty>>;
   equipment_subtype: string | null;
   equipment_capacity: string | null;
@@ -51,6 +55,36 @@ export interface NormalizedBid {
   valid_until: string | null;
   source_file: string | null;
   notes: string | null;
+  /** Distance from the supplier to the project site, in km (the value the app shows as "Distance to
+   *  site"). The agent ranks proximity + applies `max_distance_km` from this — null when not shared
+   *  (e.g. off-platform link bids). Optional: parsed off-platform quotes don't carry it. */
+  distance_km?: number | null;
+  /** Extra ranking signals the web already has (the agent consumes what's present, ignores the rest). */
+  supplier_verified?: boolean | null;
+  supplier_rating?: number | null;
+  units_offered?: number | null;
+  /** Supplier compliance/identity pulled from the quote letterhead/footer (T1) — null when not found.
+   *  Legal IDs are ALWAYS renter-verified before commit even when extracted. */
+  supplier_cr?: string | null;
+  supplier_vat?: string | null;
+  supplier_national_address?: string | null;
+  supplier_contact?: string | null;
+  /** Any OTHER field/clause/fee/condition the quote contains that isn't one of the standard fields or
+   *  the 9 canonical terms — the agent emits these (label + value) so NOTHING from the quote is dropped.
+   *  Surfaced in the verify screen's "Additional info from the quote" section and carried into the
+   *  committed bid. Empty/absent until the agent's /bids/transform populates it (see the handoff). */
+  extra_terms?: { label: string; value: string }[];
+}
+
+/** The 9 verifiable Yes/No terms on the bid form (mirrors the shared bid form + BidFormDraft). */
+export type BidTermKey = "operator" | "nationality" | "fatFood" | "fatTransport" | "fuel" | "fuelType" | "year" | "operatorCert" | "equipmentCert";
+
+/** Per-term signal Mansour emits from /bids/transform: whether the quote satisfies the renter's want.
+ *  `unknown` = the quote is silent (or the term has no structured bid field) → the renter must verify. */
+export interface TermMatch {
+  key: BidTermKey;
+  renter_wants: string | null;
+  satisfies: "yes" | "no" | "unknown";
 }
 
 /** A bid AFTER the web computed the deterministic layer — what /bids/recommend consumes. */
@@ -193,7 +227,10 @@ export function bidColumnToComputed(col: BidColumn): ComputedBid {
   }
   return {
     bid_id: b.id,
-    source: "app",
+    // Preserve an uploaded quote's origin on the echo so Mansour can tell it apart from an in-app bid
+    // when it re-ranks the bids[] we send back. A freshly parsed off-platform quote carries the
+    // `upload:` id prefix (see normalizedBidToBidCard) until it's committed into a real bid.
+    source: b.id.startsWith("upload:") ? "uploaded_quote" : "app",
     supplier_name: b.supplierName,
     supplier_user_id: b.supplierId,
     price_amount: b.price,
@@ -213,6 +250,12 @@ export function bidColumnToComputed(col: BidColumn): ComputedBid {
     valid_until: b.validUntil,
     source_file: null,
     notes: b.note,
+    // Proximity + trust signals the app already displays → pass them so the agent can rank "closest"
+    // and apply the max_distance_km hard filter (previously starved → "distance not shared").
+    distance_km: b.distanceKm ?? null,
+    supplier_verified: b.verified ?? null,
+    supplier_rating: b.rating ?? null,
+    units_offered: b.unitsOffered ?? null,
     all_in_total: col.allIn.stated ? col.allIn.value : null,
     qualified: col.conflicts === 0,
     requirement_conflicts: conflictLabels(col),
@@ -249,7 +292,7 @@ export function normalizedBidToBidCard(
     supplierName: nb.supplier_name ?? "Uploaded quote",
     verified: false,
     rating: null,
-    distanceKm: null,
+    distanceKm: nb.distance_km ?? null,
     submittedAt: null,
     validUntil: nb.valid_until,
     price: nb.price_amount,
@@ -268,7 +311,12 @@ export function normalizedBidToBidCard(
     conflictCount: 0,
     dealRoomId: null,
     expired: false,
-    note: nb.notes ?? (nb.source_file ? `From uploaded file: ${nb.source_file}` : "From uploaded file"),
+    // Fold the free-text notes + any non-canonical extra_terms (agent-extracted clauses that don't map
+    // to a table field) into one note, so the comparison's "Notes" row surfaces everything the quote had.
+    note:
+      [nb.notes, ...(nb.extra_terms ?? []).filter((e) => e?.label).map((e) => `${e.label}: ${e.value}`)]
+        .filter((s) => s != null && String(s).trim())
+        .join(" · ") || (nb.source_file ? `From uploaded file: ${nb.source_file}` : "From uploaded file"),
     requiredCerts,
     heldCertCodes: certCodes,
     equipmentCertCodes: certCodes,

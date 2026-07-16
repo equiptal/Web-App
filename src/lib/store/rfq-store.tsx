@@ -19,7 +19,8 @@ import {
   newManualItem,
   postableItems,
 } from "@/lib/contract";
-import { ApiError, ApiErrorKind, fetchTaxonomy, processRfq, submitRequest } from "@/lib/api/client";
+import { ApiError, ApiErrorKind, fetchTaxonomy, postRfqCorrection, processRfq, submitRequest } from "@/lib/api/client";
+import { draftToRfqCorrection } from "@/lib/api/agent-adapters";
 import { useSession } from "@/lib/session";
 
 export type Phase = "intake" | "processing" | "wizard" | "confirmation";
@@ -71,6 +72,8 @@ export interface RfqState {
   /** True right after a saved draft was rehydrated on entering /create → show the continue/start-over
    *  prompt so the renter chooses to resume or reset (instead of silently dropping into the draft). */
   draftPrompt: boolean;
+  /** Server guest-parse cap was hit — Intake opens the account modal in response (signed-out only). */
+  guestLimit: boolean;
 }
 
 const initialState: RfqState = {
@@ -91,6 +94,7 @@ const initialState: RfqState = {
   seq: 100,
   agentOrigin: null,
   draftPrompt: false,
+  guestLimit: false,
 };
 
 type Action =
@@ -102,6 +106,7 @@ type Action =
   | { t: "PROCESS_START" }
   | { t: "PROCESS_SUCCESS"; draft: AgentDraft }
   | { t: "PROCESS_ERROR"; kind: ApiErrorKind; detail?: RfqState["errorDetail"] }
+  | { t: "GUEST_LIMIT" }
   | { t: "ENTER_WIZARD" }
   | { t: "RESUME_WIZARD" }
   | { t: "GO_INTAKE" }
@@ -164,13 +169,18 @@ function reducer(state: RfqState, a: Action): RfqState {
     case "SET_SIMULATE_ERROR":
       return { ...state, simulateError: a.value };
     case "PROCESS_START":
-      return { ...state, phase: "processing", busy: true, error: null, errorDetail: null };
+      return { ...state, phase: "processing", busy: true, error: null, errorDetail: null, guestLimit: false };
+    case "GUEST_LIMIT":
+      // Signed-out visitor hit the server parse cap → back to intake with the flag set; Intake opens the
+      // account modal (same UX as the client-side localStorage nudge), never an error screen.
+      return { ...state, busy: false, phase: "intake", error: null, errorDetail: null, guestLimit: true };
     case "PROCESS_SUCCESS":
       return {
         ...state,
         busy: false,
         error: null,
         draft: {
+          rfqId: a.draft.rfqId ?? null, // A5: anchor for the web_review correction fired at submit
           project: a.draft.project,
           items: a.draft.items,
           preferences: a.draft.preferences ?? defaultPreferences(), // agent-inferred Step-3 prefs when present
@@ -268,14 +278,24 @@ function reducer(state: RfqState, a: Action): RfqState {
     case "PATCH_ITEM_OPERATOR":
       return withDraft(state, (d) => mapItem(d, a.id, (i) => ({ ...i, operator: { ...i.operator, ...a.patch } })));
     case "SET_ITEM_CATEGORY":
-      // AC-21: changing category clears & re-prompts subcategory + measurement.
-      return withDraft(state, (d) =>
-        mapItem(d, a.id, (i) => ({
+      // AC-21: changing category clears & re-prompts subcategory + measurement. Also reset fuel to the
+      // default (diesel) — the old value (e.g. electric for a suspended platform) no longer fits the new
+      // equipment type (an excavator) — and drop the now-stale agent fuel hint for this item.
+      return withDraft(state, (d) => {
+        const d2 = mapItem(d, a.id, (i) => ({
           ...i,
           ref: { categoryId: a.categoryId, subcategoryId: null, measurementId: null },
+          fuelType: "diesel",
           resolved: false,
-        })),
-      );
+        }));
+        const noteKey = `line_items[${a.id.slice(1)}].fuel_type_preference`;
+        if (d2.fieldNotes && noteKey in d2.fieldNotes) {
+          const fieldNotes = { ...d2.fieldNotes };
+          delete fieldNotes[noteKey];
+          return { ...d2, fieldNotes };
+        }
+        return d2;
+      });
     case "SET_ITEM_SUBCATEGORY":
       // AC-21: changing subcategory clears & re-prompts measurement; reset operator default (AC-24).
       return withDraft(state, (d) =>
@@ -366,6 +386,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
         const draft = await processRfq({ text: s.text, files: s.files, simulateError: s.simulateError });
         dispatch({ t: "PROCESS_SUCCESS", draft });
       } catch (e) {
+        if (e instanceof ApiError && e.kind === "guest_limit") { dispatch({ t: "GUEST_LIMIT" }); return; }
         const detail =
           e instanceof ApiError
             ? { detail: e.detail, backendCode: e.backendCode, backendStatus: e.backendStatus, status: e.status }
@@ -405,14 +426,29 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
       const s = getState();
       if (!s.draft) return;
       dispatch({ t: "SUBMIT_START" });
+      // A5: did the renter edit the agent's original draft? Compared here (before submit) against the
+      // agentOrigin snapshot; the correction is fired AFTER a successful create — fire-and-forget, so it
+      // never blocks or fails the request. Only for real-agent drafts (rfqId present).
+      const finalItems = postableItems(s.draft.items); // AC-33/34: exclude no-match/removed
+      const origin = s.agentOrigin;
+      const editedFromDraft =
+        !!origin &&
+        JSON.stringify([s.draft.project, finalItems]) !== JSON.stringify([origin.project, postableItems(origin.items)]);
       try {
         const { requestId, requestIds, requestUuids } = await submitRequest({
           project: s.draft.project,
-          items: postableItems(s.draft.items), // AC-33/34: exclude no-match/removed
+          items: finalItems,
           preferences: s.draft.preferences,
           simulateError: s.simulateError,
         });
         dispatch({ t: "SUBMIT_SUCCESS", requestId, requestIds: requestIds ?? (requestId ? [requestId] : []), requestUuids: requestUuids ?? [] });
+        if (s.draft.rfqId && editedFromDraft) {
+          const patch = draftToRfqCorrection(
+            { project: s.draft.project, items: finalItems, preferences: s.draft.preferences },
+            s.taxonomy,
+          );
+          void postRfqCorrection(s.draft.rfqId, patch);
+        }
       } catch (e) {
         const detail =
           e instanceof ApiError

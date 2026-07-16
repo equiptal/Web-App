@@ -4,18 +4,17 @@ import { useEffect, useRef, useState, Fragment, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchRequestDetail, cancelRequest, updateRequest, fetchRequestSubmissions, setBidDeadline } from "@/lib/api/client";
-import { publicTaxonomyUrl, type RequestItem, type RequestRecord } from "@/lib/contract/requests";
+import { publicTaxonomyUrl, shortRef, statusMeta, type RequestItem, type RequestRecord } from "@/lib/contract/requests";
 import { RequestBids } from "@/components/requests/RequestBids";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { LocationMap } from "@/components/requests/LocationMap";
 import "@/components/requests/requests-proto.css";
 
-const STATUS_CLS: Record<string, string> = { OPEN: "st-open", ACTIVE: "st-active", ACCEPTED: "st-accepted", EXPIRED: "st-expired", CLOSED: "st-closed", ABANDONED: "st-closed" };
 
 function fmtDate(v: string | null | undefined, ar: boolean): string {
   if (!v) return "—";
   const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
 /**
@@ -32,7 +31,7 @@ export function requestDetailRows(r: RequestRecord, ar: boolean, L: (en: string,
     const x = map[s.toUpperCase()] ?? map[s.toLowerCase()];
     return x ? L(x[0], x[1]) : pretty(s);
   };
-  const qty = (n: unknown, unit: [string, string]) => (n == null ? null : `${Number(n).toLocaleString(ar ? "ar-SA" : "en-US")} ${L(unit[0], unit[1])}`);
+  const qty = (n: unknown, unit: [string, string]) => (n == null ? null : `${Number(n).toLocaleString(ar ? "ar-SA-u-ca-gregory" : "en-US")} ${L(unit[0], unit[1])}`);
   const rentalMap = { DAILY: ["Daily", "يومي"], WEEKLY: ["Weekly", "أسبوعي"], MONTHLY: ["Monthly", "شهري"], PER_JOB: ["Per job", "للمهمة"], LONG_TERM: ["Long term", "طويل الأمد"] } as Record<string, [string, string]>;
   const urgencyMap = { ASAP: ["ASAP", "عاجل"], SOON: ["Soon", "قريبًا"], FAR_FUTURE: ["Future", "مستقبلًا"] } as Record<string, [string, string]>;
   const payMap = { UPFRONT: ["Upfront", "مقدمًا"], DAILY: ["Daily", "يومي"], "NET-30": ["Net 30 days", "صافي ٣٠ يومًا"], "NET-60": ["Net 60 days", "صافي ٦٠ يومًا"], "END-OF-JOB": ["End of job", "نهاية المهمة"] } as Record<string, [string, string]>;
@@ -53,7 +52,7 @@ export function requestDetailRows(r: RequestRecord, ar: boolean, L: (en: string,
     [L("Payment method", "طريقة الدفع"), enumL(r.paymentMethod, {})],
     [L("Breakdown response", "زمن الاستجابة للأعطال"), enumL(r.breakdownResponseSla, slaMap)],
     [L("Maintenance", "الصيانة"), enumL(r.maintenanceResponsibility, maintMap)],
-    [L("Budget", "الميزانية"), r.budgetCeiling ? `${Number(r.budgetCeiling).toLocaleString(ar ? "ar-SA" : "en-US")} ${L("SAR", "ر.س")}` : null],
+    [L("Budget", "الميزانية"), r.budgetCeiling ? `${Number(r.budgetCeiling).toLocaleString(ar ? "ar-SA-u-ca-gregory" : "en-US")} ${L("SAR", "ر.س")}` : null],
     [L("Min. supplier rating", "أدنى تقييم للمؤجّر"), r.minimumSupplierRating ? `★ ${Number(r.minimumSupplierRating).toFixed(1)}` : null],
     [L("Delivery lead time", "مهلة التسليم"), enumL(r.deliveryLeadTime, {})],
     [L("Offer duration", "مدة العرض"), enumL(r.offerDuration, {})],
@@ -153,9 +152,9 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
     <div className="rproto" dir={ar ? "rtl" : "ltr"}>
       {/* status */}
       <div className="detail-status">
-        <span className={`stbadge ${STATUS_CLS[r.status] ?? "st-closed"}`}><span className="dot" />{r.status}</span>
+        {(() => { const sm = statusMeta(r.status); return <span className={`stbadge ${sm.cls}`}><span className="dot" />{ar ? sm.ar : sm.en}</span>; })()}
         <span className={`typebadge ${r.type === "DIRECT" ? "tb-direct" : "tb-broadcast"}`}><span className="material-icons-outlined">{r.type === "DIRECT" ? "person" : "campaign"}</span>{r.type}</span>
-        <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 700 }}>{r.displayId ?? r.shortCode ?? r.id}</span>
+        <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 700 }}>{r.displayId ?? r.shortCode ?? shortRef(r.id)}</span>
         {(r.bidCount ?? 0) > 0 && <span className="stbadge st-active" style={{ marginInlineStart: "auto" }}><span className="material-icons-outlined" style={{ fontSize: 13 }}>gavel</span>{r.bidCount} {L("bids", "عروض")}</span>}
       </div>
 
@@ -168,7 +167,7 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
             <>
               <span className="rt-stat sub">
                 {link?.bidDeadline
-                  ? new Date(link.bidDeadline).toLocaleString(ar ? "ar-SA" : "en-GB", { dateStyle: "medium", timeStyle: "short" })
+                  ? new Date(link.bidDeadline).toLocaleString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { dateStyle: "medium", timeStyle: "short" })
                   : L("No deadline", "بدون موعد")}
               </span>
               <button className="rt-copy" onClick={openDl}>
@@ -278,13 +277,13 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
       )}
 
       {showEdit && <EditRequestModal r={r} ar={ar} L={L} onClose={() => setShowEdit(false)} onSaved={() => { setShowEdit(false); void reload(); }} />}
-      {showCancel && <ConfirmCancelModal ar={ar} L={L} busy={busy} idLabel={r.displayId ?? r.shortCode ?? r.id} onClose={() => setShowCancel(false)} onConfirm={doCancel} />}
+      {showCancel && <ConfirmCancelModal ar={ar} L={L} busy={busy} idLabel={r.displayId ?? r.shortCode ?? shortRef(r.id)} onClose={() => setShowCancel(false)} onConfirm={doCancel} />}
     </div>
   );
 }
 
 /** Styled "cancel this request?" confirmation (replaces the browser prompt), matching the app's destructive dialog. */
-function ConfirmCancelModal({ ar, L, busy, idLabel, onClose, onConfirm }: { ar: boolean; L: (en: string, arr: string) => string; busy: boolean; idLabel: string; onClose: () => void; onConfirm: () => void }) {
+export function ConfirmCancelModal({ ar, L, busy, idLabel, onClose, onConfirm }: { ar: boolean; L: (en: string, arr: string) => string; busy: boolean; idLabel: string; onClose: () => void; onConfirm: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" dir={ar ? "rtl" : "ltr"} onClick={onClose}>
       <div className="w-full max-w-sm rounded-2xl bg-[var(--surface1)] p-5 text-center shadow-xl" onClick={(e) => e.stopPropagation()}>
@@ -332,7 +331,7 @@ const FUEL_OPTS: Opt[] = [{ v: "DIESEL", en: "Diesel", ar: "ديزل" }, { v: "P
 const NATIONALITY_OPTS: Opt[] = [{ v: "restricted", en: "Restricted", ar: "مقيّدة" }, { v: "any", en: "Any", ar: "أي" }];
 const BYWHO_OPTS: Opt[] = [{ v: "rentee", en: "Me (renter)", ar: "أنا (المستأجر)" }, { v: "supplier", en: "Supplier", ar: "المؤجّر" }];
 
-function EditRequestModal({ r, ar, L, onClose, onSaved }: { r: RequestRecord; ar: boolean; L: (en: string, arr: string) => string; onClose: () => void; onSaved: () => void }) {
+export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r: RequestRecord; ar: boolean; L: (en: string, arr: string) => string; onClose: () => void; onSaved: () => void; siblingIds?: string[] }) {
   const s = (v: unknown) => (v == null ? "" : String(v));
   const it = r.equipmentItems?.[0];
   // Project
@@ -404,6 +403,13 @@ function EditRequestModal({ r, ar, L, onClose, onSaved }: { r: RequestRecord; ar
     }
     try {
       await updateRequest(r.id, patch);
+      // Group edit: apply the SHARED (non-equipment) fields to the other member requests too, so a
+      // multi-item RFQ's project/preferences stay in sync without overwriting each item's equipment.
+      if (siblingIds && siblingIds.length) {
+        const shared = { ...(patch as Record<string, unknown>) };
+        delete shared.equipmentItems;
+        if (Object.keys(shared).length) await Promise.all(siblingIds.map((sid) => updateRequest(sid, shared).catch(() => {})));
+      }
       onSaved();
     } catch {
       setBusy(false);

@@ -10,6 +10,8 @@ export interface DealParty {
   id: number | null;
   name: string;
   isVerified: boolean;
+  /** Contact number. Server-gated: supplier.phone is always present; rentee.phone only once CLOSED. */
+  phone: string | null;
 }
 
 export type TermState = "fixed" | "soft_accepted" | "disputed" | "pending" | "agreed" | string;
@@ -45,11 +47,28 @@ export interface DealRoomView {
   rate: number | null;
   mobPrice: number | null;
   demobPrice: number | null;
+  /** Mobilization/demobilization RESPONSIBILITY (from the request item). When true the rentee arranges
+   *  it (supplier charges nothing) — the quotation must still state it. */
+  mobByRentee: boolean | null;
+  demobByRentee: boolean | null;
   periods: number | null;
   priceUnit: string | null;
   /** Units the RFQ asked for — the rate is PER-UNIT, so the rental total multiplies by this
    *  (consistent with the bid cards + quotations + the backend deal quotation). */
   numberOfUnits: number;
+  // ── deal-room/negotiation — per-type units + leg exclusion (shared backend) ──
+  /** Matched RENTAL count (drives coverage); `null` = single-supplier/single-unit "full request". */
+  agreedUnits: number | null;
+  /** Matched mob/demob unit counts (each ≤ rental); `null` = not yet negotiated. */
+  mobUnits: number | null;
+  demobUnits: number | null;
+  /** Persisted leg exclusion (both-sided) — render the excluded state from these, NOT local UI state. */
+  mobExcluded: boolean;
+  demobExcluded: boolean;
+  /** The requested rental count — the stepper cap for all three unit types (both roles). */
+  requestedUnits: number;
+  /** Request short code (REQ-NNNNN) for the room header label. */
+  shortCode: string | null;
   /** Who made the last counter ("rentee" | "supplier" | null). The renter is the rentee. */
   lastCounterBy: string | null;
   /** Convenience: is it the renter's turn to act (accept/counter)? */
@@ -61,6 +80,38 @@ export interface DealRoomView {
   /** True when the supplier opened the room first (chatted before the renter entered) — drives the
    *  "Supplier started this conversation" banner. Pairs with status==="OPEN" before the renter enters. */
   supplierFirstEntry: boolean;
+  /** Structured rental/equipment/operator details from the request item — surfaced on the quotation
+   *  (the negotiated Agreed/Fixed terms are separate). All optional; the quotation skips empty rows. */
+  details: DealItemDetails;
+}
+
+/** Request-item details for the quotation (mapped tolerantly from the raw deal-room payload's
+ *  `request` + `equipmentItems[0]`; field names best-effort, empties dropped by the renderer). */
+export interface DealItemDetails {
+  equipmentLabel: string | null;
+  equipmentLabelAr: string | null;
+  /** Capacity/size (e.g. "30 ton") — shown next to the equipment name, mirroring the request/bid cards. */
+  equipmentSize: string | null;
+  equipmentSizeAr: string | null;
+  location: string | null;
+  rentalType: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  workingHoursPerDay: number | null;
+  workingDaysPerWeek: number | null;
+  fulfillment: string | null;
+  urgency: string | null;
+  subletting: boolean | null;
+  localContent: boolean | null;
+  overtimeRate: string | null;
+  additionalNotes: string | null;
+  extendable: boolean | null;
+  operatorIncluded: boolean | null;
+  operatorNationality: string | null;
+  numberOfOperators: number | null;
+  nightShift: boolean | null;
+  equipmentCerts: string[];
+  operatorCerts: string[];
 }
 
 const n = (v: unknown): number | null => {
@@ -185,10 +236,11 @@ export function mapDealRoom(raw: unknown): DealRoomView {
   // legacy row disputes and shows a PHANTOM "Operator FAT" conflict. When the split rows are present they
   // are the real per-item FAT — drop the stale combined row so it can't manufacture a conflict.
   const hasSplitFat = rawTerms.some((t) => { const k = s(t.key); return k === "fat_food" || k === "fat_accommodation_transport"; });
-  // Priced line items (mob/demob pricing) are NOT negotiable term cards — they're settled on the counter
-  // flow's Price page (app parity: terms-journey "Priced"). `mobilization_lead_time` is retired/hidden
-  // from every deal-room surface. Drop all three from the terms list so they never render as term rows.
-  const PRICE_LINE_KEYS = new Set(["mobilization_pricing", "demobilization_pricing", "mobilization_lead_time"]);
+  // Priced line items (mob/demob PRICING) are NOT negotiable term cards — they're settled on the counter
+  // flow's Price page (rate card mobPrice/demobPrice), so drop them from the term rows.
+  // `mobilization_lead_time` is CONFLICT_ELIGIBLE in the app (deal-room.service CONFLICT_ELIGIBLE_KEYS —
+  // moved Priced → Negotiable), so it MUST render as a negotiable term and is NOT dropped here.
+  const PRICE_LINE_KEYS = new Set(["mobilization_pricing", "demobilization_pricing"]);
   const terms: DealTerm[] = rawTerms
     .filter((t) => s(t.key) !== "PRICE")
     .filter((t) => !PRICE_LINE_KEYS.has(s(t.key) ?? ""))
@@ -221,6 +273,44 @@ export function mapDealRoom(raw: unknown): DealRoomView {
   const offeredUnits = Array.isArray(bid.unitsOffered) && bid.unitsOffered.length > 0 ? bid.unitsOffered.length : null;
   const priceUnits = n(d.agreedUnits) ?? offeredUnits ?? requestedUnits;
 
+  // Structured item details for the quotation — read from the item first, then the request. Field
+  // names are best-effort (tolerant fallbacks); the quotation renderer skips whatever comes back empty.
+  const pick = (...keys: string[]): unknown => {
+    for (const k of keys) {
+      if (firstReqItem[k] != null && firstReqItem[k] !== "") return firstReqItem[k];
+      if (reqObj[k] != null && reqObj[k] !== "") return reqObj[k];
+    }
+    return null;
+  };
+  const bl = (v: unknown): boolean | null => (typeof v === "boolean" ? v : v === "true" ? true : v === "false" ? false : null);
+  const arr = (v: unknown): string[] => (Array.isArray(v) ? v.map((x) => String(x)).filter(Boolean) : []);
+  const details: DealItemDetails = {
+    // Equipment name = subtype (matches the request/bid cards); capacity = size. Fall back to the older keys.
+    equipmentLabel: s(pick("subtypeName", "label", "equipmentName", "name", "subcategoryName", "categoryName")),
+    equipmentLabelAr: s(pick("subtypeNameAr")),
+    equipmentSize: s(pick("capacityName", "size", "capacity")),
+    equipmentSizeAr: s(pick("capacityNameAr")),
+    location: s(pick("location", "city", "projectLocation", "siteLocation", "deliveryLocation")),
+    rentalType: s(pick("rentalType", "rentalBasis")),
+    startDate: s(pick("startDate", "deliveryDate", "estimatedStartDate", "requiredDate")),
+    endDate: s(pick("endDate", "returnDate")),
+    workingHoursPerDay: n(pick("workingHoursPerDay", "workingHours")),
+    workingDaysPerWeek: n(pick("workingDaysPerWeek", "workingDays")),
+    fulfillment: s(pick("fulfillmentType", "fulfillment")),
+    urgency: s(pick("urgency", "urgencyLevel")),
+    subletting: bl(pick("subletting", "sublettingAllowed")),
+    localContent: bl(pick("localContent", "localContentRequired", "requiresLocalContent")),
+    overtimeRate: s(pick("overtimeRate")),
+    additionalNotes: s(pick("additionalNotes", "notes", "additionalRequirements")),
+    extendable: bl(pick("extendable", "rentalExtendable")),
+    operatorIncluded: bl(pick("operatorIncluded", "operator", "withOperator")),
+    operatorNationality: s(pick("operatorNationality")),
+    numberOfOperators: n(pick("numberOfOperators", "operatorsCount", "operatorCount")),
+    nightShift: bl(pick("nightShiftRequired", "nightShift")),
+    equipmentCerts: arr(pick("safetyCertifications", "equipmentSafetyCertifications", "equipmentCerts")),
+    operatorCerts: arr(pick("operatorSafetyCertifications", "operatorCerts", "operatorCertifications")),
+  };
+
   return {
     id: String(d.id ?? ""),
     status,
@@ -232,19 +322,31 @@ export function mapDealRoom(raw: unknown): DealRoomView {
       id: n(sup.id),
       name: s(sup.companyName) ?? s(sup.storeName) ?? ([s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" ") || "Supplier"),
       isVerified: sup.isVerified === true,
+      phone: s(sup.phone),
     },
     rate: n(d.lastProposedRate) ?? n(bid.priceAmount),
     mobPrice: n(d.lastProposedMobPrice) ?? n(bid.mobPrice),
     demobPrice: n(d.lastProposedDemobPrice) ?? n(bid.demobPrice),
+    mobByRentee: bl(pick("mobilizationByRentee", "mobByRentee")),
+    demobByRentee: bl(pick("demobilizationByRentee", "demobByRentee")),
     // The Bid model has no `duration` (confirmed via /web:link-backend) — the request's estimated
     // duration is the source of truth.
     periods: n((d.request as Record<string, unknown>)?.estimatedDurationDays),
     priceUnit: s(d.lastProposedPriceUnit) ?? s(bid.priceUnit),
     numberOfUnits: priceUnits,
+    // deal-room/negotiation — per-type units + exclusion + header code (from the widened payload).
+    agreedUnits: n(d.agreedUnits),
+    mobUnits: n(d.mobUnits),
+    demobUnits: n(d.demobUnits),
+    mobExcluded: d.mobExcluded === true,
+    demobExcluded: d.demobExcluded === true,
+    requestedUnits,
+    shortCode: s(reqObj.shortCode),
     lastCounterBy,
     myTurn,
     terms,
     hasDisputedTerms,
     supplierFirstEntry: d.supplierFirstEntry === true,
+    details,
   };
 }

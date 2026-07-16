@@ -3,8 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import type { BidCard } from "@/lib/contract/bids";
 import type { BidFormData, BidFormItem, LinkBidSubmission, LinkBidItem } from "@/lib/contract/link-bids";
+import { CERT_TERM_KEYS, certCodesFromValue, certConfKey, prettyCert } from "@/lib/contract/link-bids";
 import { fetchBidFormData } from "@/lib/api/client";
 import { hasVatInclusiveNote, stripVatInclusiveNote } from "@/lib/contract/vat-inclusive";
+import { qualityFromSubmission } from "@/lib/contract/bid-quality";
+import { QualityRing } from "@/components/bid/QualityRing";
 import { BID_FORM_CSS } from "@/components/bid/bidFormStyles";
 
 /**
@@ -32,10 +35,24 @@ const TERM_LABEL: Record<TermKey, [string, string]> = {
 const UNIT_LABEL: Record<string, [string, string]> = {
   PER_DAY: ["day", "يوم"], PER_WEEK: ["week", "أسبوع"], PER_MONTH: ["month", "شهر"], PER_JOB: ["job", "مهمة"],
 };
+// Attachment type code → readable label (EN/AR) for the read-only viewer chips/thumbnails.
+const ATT_LABEL: Record<string, [string, string]> = {
+  front_photo: ["Front photo", "صورة أمامية"], serial_photo: ["Serial / plate", "الرقم التسلسلي"], hours_photo: ["Operating hours", "ساعات التشغيل"],
+  istimara: ["Istimara", "الاستمارة"], customs_card: ["Customs card", "البطاقة الجمركية"], sales_contract: ["Sales contract", "عقد البيع"], saso_registration: ["SASO registration", "تسجيل ساسو"], combined: ["Several documents (one file)", "عدة مستندات (ملف واحد)"],
+  tuv: ["TÜV", "فحص TÜV"], spsp: ["SPSP", "SPSP"], saso: ["SASO", "ساسو"], other: ["Other", "أخرى"],
+  operator_tuv: ["Operator TÜV", "فحص TÜV للمشغّل"], operator_spsp: ["Operator SPSP", "SPSP للمشغّل"], operator_saso: ["Operator SASO", "ساسو للمشغّل"], operator_other: ["Operator (other)", "المشغّل (أخرى)"],
+  cr: ["Commercial registration", "السجل التجاري"], vat_cert: ["VAT certificate", "شهادة الضريبة"], national_address: ["National address", "العنوان الوطني"], local_content: ["Local content", "المحتوى المحلي"], saso_heavy_equip: ["SASO heavy equipment", "ساسو للمعدات الثقيلة"],
+};
+// Classify an item's documents back into the same groups the form uploads them under.
+const OWNERSHIP_TYPES = new Set(["istimara", "customs_card", "sales_contract", "saso_registration", "combined"]);
+// Party-responsibility values read clearer as "On renter" / "On supplier" (matches the supplier form).
+const PARTY_CHOICE: Record<string, [string, string]> = { RENTER: ["On renter", "على المستأجر"], RENTEE: ["On renter", "على المستأجر"], SUPPLIER: ["On supplier", "على المؤجّر"], ME: ["On supplier", "على المؤجّر"] };
+const renterChoice = (v: string | null | undefined, ar: boolean): string => { const p = PARTY_CHOICE[String(v ?? "").trim().toUpperCase()]; return p ? (ar ? p[1] : p[0]) : String(v ?? ""); };
 
 export function SharedBidSubmissionModal({
   bid,
   submission,
+  focusItemId,
   ar,
   L,
   onClose,
@@ -43,14 +60,52 @@ export function SharedBidSubmissionModal({
 }: {
   bid: BidCard;
   submission: LinkBidSubmission | null;
+  /** When set, the viewer shows ONLY this request item (opened from a single item's bid card) instead
+   *  of every item in the group submission. */
+  focusItemId?: string;
   ar: boolean;
   L: (en: string, arr: string) => string;
   onClose: () => void;
   /** Export this submission as the app-parity quotation doc (same template as an on-platform bid). */
   onDownloadQuotation?: () => void;
+  /** web-app/006 — deal-room-style negotiate relay. Accepted from callers but currently unused: the
+   *  contact number is shown plainly for now, so there's no masked row to trigger it from. */
+  onNegotiate?: () => void;
 }) {
   const nf = (n: number) => new Intl.NumberFormat(ar ? "ar-EG" : "en-US").format(Math.round(n));
   const sar = L("SAR", "ر.س");
+  const attLabel = (t: string) => { const e = ATT_LABEL[t]; return e ? (ar ? e[1] : e[0]) : t.replace(/_/g, " "); };
+  // Read-only chip row for uploaded documents (open in a new tab to view / download).
+  const DocChips = ({ docs }: { docs?: { key: string; type: string; filename?: string | null }[] }) => (
+    !docs?.length ? null : (
+      <div className="ro-chips">
+        {docs.map((d, i) => (
+          <a key={i} className="ro-chip" href={d.key} target="_blank" rel="noopener noreferrer">
+            <span className="material-icons-outlined ic">description</span>
+            {attLabel(d.type)}{d.filename ? ` · ${d.filename}` : ""}
+            <span className="material-icons-outlined dl">download</span>
+          </a>
+        ))}
+      </div>
+    )
+  );
+  // A company field the supplier gave as text OR a document — render whichever they submitted, in place.
+  const coDoc = (type: string) => submission?.companyDocuments?.find((d) => d.type === type);
+  const CoField = ({ label, text, docType }: { label: string; text?: string | null; docType: string }) => {
+    if (text && text.trim()) return <RoField label={label} value={text} />;
+    const doc = coDoc(docType);
+    if (!doc) return <RoField label={label} value={null} />;
+    return (
+      <div className="field" style={{ marginBottom: 12 }}>
+        <label>{label}</label>
+        <a className="ro-chip" href={doc.key} target="_blank" rel="noopener noreferrer" style={{ marginTop: 2 }}>
+          <span className="material-icons-outlined ic">description</span>
+          {doc.filename || attLabel(doc.type)}
+          <span className="material-icons-outlined dl">download</span>
+        </a>
+      </div>
+    );
+  };
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -72,7 +127,7 @@ export function SharedBidSubmissionModal({
     return () => { alive = false; };
   }, [submission?.requestId]);
 
-  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
 
   // Match a form item to the supplier's submitted answers (group submissions cover several items;
   // fall back to the sole submitted item when the per-item link is missing — mirrors My Bids).
@@ -113,6 +168,11 @@ export function SharedBidSubmissionModal({
       .map((k) => ({ key: k, label: L(labels[k][0], labels[k][1]), value: rt[k] as string }));
   }, [form, submission, L]);
 
+  // When opened from a single item's card, show only that item (fall back to all if it doesn't match).
+  const focusedItems = focusItemId ? items.filter((it) => it.requestItemId === focusItemId) : items;
+  const shownItems = focusedItems.length ? focusedItems : items;
+  const singleItem = !!focusItemId && shownItems.length === 1 && items.length > 1;
+
   const itemSubtotal = (a?: LinkBidItem) => {
     if (!a) return 0;
     const q = a.numberOfUnits || 1;
@@ -120,7 +180,11 @@ export function SharedBidSubmissionModal({
   };
   const subtotal = (submission?.items ?? []).reduce((s, a) => s + itemSubtotal(a), 0);
   const vat = subtotal * 0.15;
-  const grandIncl = submission?.grandTotal ?? subtotal + vat;
+  // Focused on one item → total for THAT item only; otherwise the whole-submission grand total.
+  const shownIds = new Set(shownItems.map((it) => it.requestItemId));
+  const shownSubtotal = (submission?.items ?? []).filter((a) => shownIds.has(a.requestItemId)).reduce((s, a) => s + itemSubtotal(a), 0);
+  const grandIncl = singleItem ? shownSubtotal * 1.15 : (submission?.grandTotal ?? subtotal + vat);
+  const quality = submission ? qualityFromSubmission(submission) : null;
   // Supplier's quote expiry ("Valid until") + the renter's bid deadline ("Bids close").
   const validUntil = submission?.validUntil ?? null;
   const vDaysLeft = validUntil ? Math.ceil((new Date(validUntil).getTime() - Date.now()) / 86400000) : null;
@@ -165,6 +229,36 @@ export function SharedBidSubmissionModal({
           ) : (
             <div className={`bidpage${ar ? " rtl" : ""}`} dir={dir}>
               <div style={{ padding: "18px 18px 40px", maxWidth: 900, margin: "0 auto" }}>
+
+                {/* ── Bid quality — prominent, with the same breakdown the supplier saw while bidding ── */}
+                {quality && (
+                  <div className="qbanner">
+                    <QualityRing quality={quality} L={L} />
+                    <div className="qb-tx">
+                      <b>{L("Bid quality", "جودة العرض")}</b>
+                      <span>{L("How well this bid matches your request and how complete its documents and company details are.", "مدى مطابقة هذا العرض لطلبك ومدى اكتمال مستنداته وبيانات الشركة.")}</span>
+                      <div className="qb-parts">
+                        {([
+                          { icon: "rule", lb: L("Terms match", "مطابقة الشروط"), w: 40, v: quality.parts.terms },
+                          { icon: "photo_library", lb: L("Equipment docs", "مستندات المعدة"), w: 30, v: quality.parts.equipment },
+                          { icon: "business", lb: L("Company details", "بيانات الشركة"), w: 30, v: quality.parts.company },
+                        ] as const).map((p) => {
+                          const done = p.v >= 0.999;
+                          return (
+                            <div className={`qpart${done ? " done" : ""}`} key={p.lb}>
+                              <div className="qpart-h">
+                                <span className="qpart-lb"><span className="material-icons-outlined">{done ? "check_circle" : p.icon}</span>{p.lb}</span>
+                                <span className="qpart-pc">{Math.round(p.v * 100)}%</span>
+                              </div>
+                              <div className="qpart-track"><i style={{ width: `${Math.round(p.v * 100)}%` }} /></div>
+                              <span className="qpart-w">{L("weight", "الوزن")} {p.w}%</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* ── Meta strip (Quotation / RFQ / Issued / Valid until / Bids close) ── */}
                 {(submission.quotationRef || submission.rfqRef || submission.groupRef || submission.createdAt || validUntil || bidsClose) && (
@@ -225,8 +319,12 @@ export function SharedBidSubmissionModal({
                   </div>
                 )}
 
-                {/* ── Per item — terms table + pricing table (read-only) ── */}
-                {items.map((it, idx) => {
+                {/* ── Per item — terms table + pricing table (read-only). Focused to one item when opened
+                       from that item's bid card; else every item in the group submission. ── */}
+                {shownItems.map((it) => {
+                  // Real position in the full submission (not the filtered index) so a focused item still
+                  // reads e.g. "Item 2 of 3" rather than "Item 1 of 3".
+                  const idx = Math.max(0, items.findIndex((x) => x.requestItemId === it.requestItemId));
                   const a = ansFor(it.requestItemId);
                   const terms = TERM_KEYS.filter((k) => it.requiredTerms[k] != null);
                   const label = (ar ? it.labelAr : it.label) || it.label || L("Equipment", "المعدة");
@@ -257,23 +355,27 @@ export function SharedBidSubmissionModal({
                         <>
                           <div className="subhead"><span className="material-icons-outlined">fact_check</span>{L("Terms — supplier's answers", "الشروط — إجابات المؤجّر")}</div>
                           <div className="treqgrid">
-                            {terms.map((k) => {
-                              const ok = conf[k];
-                              const val = (k === "operatorCert" || k === "equipmentCert") ? (it.requiredTerms[k] ?? "").toUpperCase() : it.requiredTerms[k];
-                              return (
-                                <div key={k} className={`treqcell${ok === false ? " declined" : ""}`}>
-                                  <div className="tc-name">{L(TERM_LABEL[k][0], TERM_LABEL[k][1])}</div>
-                                  <div className="tc-rw"><span className="q">{L("Renter wants", "يطلب المستأجر")}:</span> <i>{val}</i></div>
-                                  <div className="tc-sw"><span className="q">{L("Supplier's answer", "إجابة المؤجّر")}:</span><RoAns ok={ok} L={L} /></div>
+                            {terms.flatMap((k) => {
+                              const cc = conf as Record<string, boolean | undefined>;
+                              const codes = CERT_TERM_KEYS.has(k) ? certCodesFromValue(it.requiredTerms[k]) : [];
+                              // A cert term with 2+ certs shows one card per cert (the supplier may hold TÜV but not SPSP).
+                              const rows = codes.length > 1
+                                ? codes.map((code) => ({ rk: certConfKey(k, code), ok: cc[certConfKey(k, code)] ?? conf[k], val: prettyCert(code) }))
+                                : [{ rk: k, ok: conf[k], val: (k === "operatorCert" || k === "equipmentCert") ? prettyCert(it.requiredTerms[k] ?? "") : renterChoice(it.requiredTerms[k], ar) }];
+                              return rows.map((row) => (
+                                <div key={row.rk} className={`treqcell${row.ok === true ? " ok" : ""}${row.ok === false ? " declined" : ""}`}>
+                                  <div className="tc-main"><div className="tc-name">{L(TERM_LABEL[k][0], TERM_LABEL[k][1])}</div></div>
+                                  <div className="tc-rw"><span className="q">{L("Renter's choice", "اختيار المستأجر")}</span> <i>{row.val}</i></div>
+                                  <div className="tc-sw"><span className="q">{L("Supplier's choice", "اختيار المؤجّر")}</span><RoAns ok={row.ok} L={L} /></div>
                                 </div>
-                              );
+                              ));
                             })}
                           </div>
                         </>
                       )}
 
                       <div className="subhead"><span className="material-icons-outlined">request_quote</span>{L("Pricing", "التسعير")}</div>
-                      <table className="ptbl">
+                      <div className="ptbl-wrap"><table className="ptbl">
                         <thead><tr><th>{L("Item", "البند")}</th><th className="num">{L("Unit", "الوحدة")}</th><th className="num">{L("Qty", "العدد")}</th><th className="num">{L("Price", "السعر")}</th><th className="num">{L("Total", "الإجمالي")}</th></tr></thead>
                         <tbody>
                           <tr>
@@ -299,12 +401,40 @@ export function SharedBidSubmissionModal({
                             </tr>
                           ) : null}
                         </tbody>
-                      </table>
+                      </table></div>
                       <div className="itot">
                         <span className="r">{L("Subtotal", "المجموع")}<b>{sub ? nf(sub) : "—"} {sar}</b></span>
                         <span className="r">{L("VAT 15%", "ضريبة ١٥٪")}<b>{sub ? nf(sub * 0.15) : "—"} {sar}</b></span>
                         <span className="r t">{L("Item total", "إجمالي البند")}<b>{sub ? nf(sub * 1.15) : "—"} {sar}</b></span>
                       </div>
+                      {(() => {
+                        const docs = a?.documents ?? [];
+                        const ownership = docs.filter((d) => OWNERSHIP_TYPES.has(d.type));
+                        const operatorCert = docs.filter((d) => d.type.startsWith("operator_"));
+                        const equipCert = docs.filter((d) => !OWNERSHIP_TYPES.has(d.type) && !d.type.startsWith("operator_"));
+                        if (!(a?.photos?.length || docs.length)) return null;
+                        return (
+                          <div className="ro-att">
+                            {a?.photos?.length ? (
+                              <div className="ro-grp">
+                                <div className="ro-att-h">{L("Equipment photos", "صور المعدة")}</div>
+                                <div className="ro-thumbs">
+                                  {a.photos.map((p, i) => (
+                                    <a key={i} className="ro-fig" href={p.key} target="_blank" rel="noopener noreferrer" title={p.filename ?? undefined}>
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img src={p.key} alt={attLabel(p.type)} />
+                                      <span className="ro-fig-lb">{attLabel(p.type)}</span>
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+                            {ownership.length ? <div className="ro-grp"><div className="ro-att-h">{L("Proof of ownership", "إثبات الملكية")}</div><DocChips docs={ownership} /></div> : null}
+                            {equipCert.length ? <div className="ro-grp"><div className="ro-att-h">{L("Equipment certificate", "شهادة المعدة")}</div><DocChips docs={equipCert} /></div> : null}
+                            {operatorCert.length ? <div className="ro-grp"><div className="ro-att-h">{L("Operator certificate", "شهادة المشغّل")}</div><DocChips docs={operatorCert} /></div> : null}
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })}
@@ -317,21 +447,34 @@ export function SharedBidSubmissionModal({
                   </div>
                 )}
 
-                {/* ── Grand total ── */}
-                <div className="grand"><span className="gk">{L("Grand total — all items (incl. VAT)", "الإجمالي الكلي — كل البنود (شامل الضريبة)")}</span><span className="gv">{nf(grandIncl)} {sar}</span></div>
+                {/* ── Total (this item when focused, else the whole submission) ── */}
+                <div className="grand"><span className="gk">{singleItem ? L("Item total (incl. VAT)", "إجمالي البند (شامل الضريبة)") : L("Grand total — all items (incl. VAT)", "الإجمالي الكلي — كل البنود (شامل الضريبة)")}</span><span className="gv">{nf(grandIncl)} {sar}</span></div>
 
                 {/* ── Supplier's details (read-only) ── */}
                 <div className="sec">
                   <div className="sec-h"><span className="material-icons-outlined hdic">badge</span><h3>{L("Supplier's details", "بيانات المؤجّر")}</h3></div>
                   <RoField label={L("Company name", "اسم الشركة")} value={submission.companyName} />
                   <div className="frow">
-                    <RoField label={L("CR number", "رقم السجل التجاري")} value={submission.crNumber} />
-                    <RoField label={L("VAT number", "الرقم الضريبي")} value={submission.vatNumber} />
+                    <CoField label={L("CR number", "رقم السجل التجاري")} text={submission.crNumber} docType="cr" />
+                    <CoField label={L("VAT number", "الرقم الضريبي")} text={submission.vatNumber} docType="vat_cert" />
                   </div>
-                  <RoField label={L("National address", "العنوان الوطني")} value={submission.nationalAddress} />
+                  <CoField label={L("National address", "العنوان الوطني")} text={submission.nationalAddress} docType="national_address" />
+                  {/* Contact info — shown plainly (the supplier's real phone). The masked "negotiate via
+                      relay" variant is deferred until the relay ships; for now the renter gets the number. */}
                   <RoField label={L("Contact info", "بيانات التواصل")} value={submission.contactInfo} />
                   {supplierNotes && <RoField label={L("Notes — for the whole quotation", "ملاحظات — لكامل عرض السعر")} value={supplierNotes} multiline />}
                 </div>
+
+                {/* ── Other company documents (CR/VAT/Address now render in their fields above) ── */}
+                {(() => {
+                  const extras = (submission.companyDocuments ?? []).filter((d) => !["cr", "vat_cert", "national_address"].includes(d.type));
+                  return extras.length ? (
+                    <div className="sec">
+                      <div className="sec-h"><span className="material-icons-outlined hdic">folder_open</span><h3>{L("Other company documents", "مستندات أخرى للشركة")}</h3></div>
+                      <DocChips docs={extras} />
+                    </div>
+                  ) : null;
+                })()}
 
                 <div style={{ textAlign: "center", fontSize: 11, fontWeight: 600, color: "#9AA7B8", padding: "4px 0 2px" }}>{L("Powered by", "مُشغّل بواسطة")} <b style={{ color: "var(--navy)", fontWeight: 800 }}>Moedatech</b></div>
               </div>

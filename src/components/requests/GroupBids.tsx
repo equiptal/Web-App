@@ -7,19 +7,34 @@ import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/cli
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
 import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
+import { SharedBidNegotiateRoom } from "@/components/requests/SharedBidNegotiateRoom";
+import { NEGOTIATE_ENABLED } from "@/lib/config/flags";
 import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
-import { bidSuppliers, bucketBidTerms, CERT_LABEL, type BidCard } from "@/lib/contract/bids";
+import { bidSuppliers, bucketBidTerms, CERT_LABEL, type BidCard, type TermRow } from "@/lib/contract/bids";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
+import { qualityFromSubmissionItem, type BidQuality, type QualityBand } from "@/lib/contract/bid-quality";
+import { QualityRing, BAND_COLOR } from "@/components/bid/QualityRing";
 import { computeBidQuote } from "@/lib/contract/comparison";
-import type { RequestGroup } from "@/lib/contract/requests";
+import { shortRef, type RequestGroup } from "@/lib/contract/requests";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { quotationDownloadName } from "@/lib/compare/quotation-token";
 import { renderQuotationSection, wrapQuotationPage, quotationLegal, type QuotationDoc, type QuotationLineItem, type QuotationCard } from "@/lib/quotation/render";
 
 /** A group bid = a request's bid tagged with which item (request) it belongs to. */
-type GroupBid = BidCard & { requestId: string; itemLabel: string; itemLabelAr: string; categoryId: string | null; itemImage: string | null };
+type GroupBid = BidCard & { requestId: string; itemLabel: string; itemLabelAr: string; categoryId: string | null; itemImage: string | null; quality?: BidQuality | null };
+
+/** The three quality dimensions the shared-link quality score is built from — each a filter option. */
+type QualityPart = "terms" | "equipment" | "company";
+const PART_META: { key: QualityPart; icon: string; en: string; ar: string }[] = [
+  { key: "terms", icon: "rule", en: "Matched the terms", ar: "طابق الشروط" },
+  { key: "equipment", icon: "photo_library", en: "Uploaded equipment docs", ar: "أرفق مستندات المعدة" },
+  { key: "company", icon: "business", en: "Filled company details", ar: "أكمل بيانات الشركة" },
+];
+// A bid "meets" a dimension: matched every required term / uploaded ≥1 equipment doc / filled ≥1 company detail.
+const partMeets = (q: BidQuality | null | undefined, p: QualityPart): boolean =>
+  !q ? false : p === "terms" ? q.parts.terms >= 0.999 : p === "equipment" ? q.parts.equipment > 0 : q.parts.company > 0;
 
 const SPILL: Record<string, { cls: string; dot: boolean; en: string; ar: string }> = {
   PENDING: { cls: "sp-pending", dot: true, en: "New", ar: "جديد" },
@@ -108,11 +123,16 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   const [submissions, setSubmissions] = useState<LinkBidSubmission[]>([]); // real off-platform submissions (all group items)
   const [groupRef, setGroupRef] = useState<string | null>(null); // RFQ-NNNNN group short code (agents bid-submissions) — stamped on the quotation
   const [submissionBid, setSubmissionBid] = useState<GroupBid | null>(null);
+  const [negotiateBid, setNegotiateBid] = useState<GroupBid | null>(null); // web-app/006 — deal-room-style negotiate view
   // Bid filter (source + refine), matching the bids-by-supplier prototype.
   const [filterOpen, setFilterOpen] = useState(false);
   const [fSource, setFSource] = useState<"all" | "link" | "platform" | "file">("all");
   const [fVerified, setFVerified] = useState(false);
   const [fKm, setFKm] = useState(false);
+  // Quality sub-filter (shared-link bids only) — filter by the three quality dimensions the score is
+  // built from: matched terms · uploaded equipment docs · filled company details. Multi-select (AND).
+  const [fqParts, setFqParts] = useState<Set<QualityPart>>(new Set());
+  const toggleQPart = (p: QualityPart) => setFqParts((prev) => { const n = new Set(prev); if (n.has(p)) n.delete(p); else n.add(p); return n; });
 
   useEffect(() => {
     let active = true;
@@ -203,6 +223,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
             itemLabelAr: gi?.item?.nameAr ?? it.label ?? "المعدة",
             categoryId: gi?.item?.categoryId ?? null,
             itemImage: gi?.item?.imageUrl ?? null,
+            quality: qualityFromSubmissionItem(s, it), // per-ITEM score (this item's terms/docs + company)
           };
         }),
       ),
@@ -262,13 +283,13 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       if (list) list.push(b);
       else bySupplier.set(key, [b]);
     }
-    const reqCode = String(groupRef ?? group.items[0]?.displayId ?? group.id).replace(/[^A-Za-z0-9-]/g, "");
+    const reqCode = String(groupRef ?? group.items[0]?.displayId ?? shortRef(group.id)).replace(/[^A-Za-z0-9-]/g, "");
 
     // Render one supplier's quotation in a single language; bilingual output stacks both per supplier.
     const renderSection = (supBids: GroupBid[], si: number, isAr: boolean) => {
       const L = (en: string, arr: string) => (isAr ? arr : en);
       const sar = L("SAR", "ر.س");
-      const dateStr = new Date().toLocaleDateString(isAr ? "ar-SA" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
+      const dateStr = new Date().toLocaleDateString(isAr ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
       // Rentee identity (app parity) — company name primary when verified, else personal name; plus the
       // renter's real CR/VAT/national address/phone/email from /api/me (value-or-"Verified" pill).
       // App parity (_RenteeBlock _partyHeader): company name is primary when the renter HAS a company
@@ -288,12 +309,12 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       const supInit = (sup.supplierName || "S").replace(/[^A-Za-z0-9]/g, "").slice(0, 3).toUpperCase() || "S";
       const qnum = `Q-${reqCode}-${supInit}${si + 1}`;
       const validRaw = supBids.map((b) => b.validUntil).filter(Boolean).sort()[0] ?? null;
-      const valid = validRaw ? new Date(validRaw).toLocaleDateString(isAr ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
-      const reqIds = [...new Set(supBids.map((b) => itemMap.get(b.requestId)?.displayId ?? b.requestId))];
+      const valid = validRaw ? new Date(validRaw).toLocaleDateString(isAr ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
+      const reqIds = [...new Set(supBids.map((b) => itemMap.get(b.requestId)?.displayId ?? shortRef(b.requestId)))];
       const reqLabel = reqIds.length === 1 ? reqIds[0] : `${reqIds[0]} +${reqIds.length - 1}`;
       const rentalBasis = itemMap.get(sup.requestId)?.rentalType ?? "";
       const reqItem = itemMap.get(sup.requestId);
-      const fmtRefDate = (d: string | null | undefined) => (d ? new Date(d).toLocaleDateString(isAr ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—");
+      const fmtRefDate = (d: string | null | undefined) => (d ? new Date(d).toLocaleDateString(isAr ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—");
       const startStr = fmtRefDate(reqItem?.startDate);
       const endStr = fmtRefDate(reqItem?.endDate);
       // Supplier identity rows (app parity): off-platform submissions carry real CR/VAT/address VALUES;
@@ -321,7 +342,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         ? L("Individual supplier · unverified", "مُورِّد فرد · غير موثَّق") : null;
 
       const eqLine = (b: GroupBid) => (b.equipment ? [b.equipment.make, b.equipment.model, b.equipment.year].filter(Boolean).join(" · ") : "—");
-      const labelOf = (b: GroupBid) => (ar ? b.itemLabelAr : b.itemLabel) || (itemMap.get(b.requestId)?.displayId ?? b.requestId);
+      const labelOf = (b: GroupBid) => (ar ? b.itemLabelAr : b.itemLabel) || (itemMap.get(b.requestId)?.displayId ?? shortRef(b.requestId));
       // App rule (014 CR #141): the bid is priced per billing period; the unit count is NOT multiplied
       // into the price (it's shown for information only). Open-ended → ∞ qty + one-period "as operated".
       const daysPerPeriod = (u: string | null) => { switch ((u ?? "PER_DAY").toUpperCase()) { case "PER_WEEK": return 7; case "PER_MONTH": return 26; case "PER_JOB": return 0; default: return 1; } };
@@ -372,8 +393,15 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         const demobTotal = (b.demobPrice ?? 0) * units;
         sub += lineSub + mobTotal + demobTotal;
         lineItems.push({ num: rowNum, label: `${L("Rental", "الإيجار")} — ${labelOf(b)}`, detail: eqLine(b) === "—" ? null : eqLine(b), unit: plabel, qty: qtyCell, price: priceCell, total: totalCell, totalNote });
-        if (b.mobPrice) lineItems.push({ num: null, label: L("Delivery to site", "النقل إلى الموقع"), detail: labelOf(b), unit: L("Trip", "رحلة"), qty: String(units), price: m2(b.mobPrice), total: m2(mobTotal) });
-        if (b.demobPrice) lineItems.push({ num: null, label: L("Return from site", "الإرجاع من الموقع"), detail: labelOf(b), unit: L("Trip", "رحلة"), qty: String(units), price: m2(b.demobPrice), total: m2(demobTotal) });
+        // Always show the mobilization/demobilization legs (deal-room + app parity): a real price when the
+        // supplier charges, else "By rentee" (the rentee arranges it) or "Included" — never silently dropped.
+        const ri = itemMap.get(b.requestId);
+        const logiRow = (label: string, price: number, total: number, byRentee: boolean): QuotationLineItem =>
+          price > 0
+            ? { num: null, label, detail: labelOf(b), unit: L("Trip", "رحلة"), qty: String(units), price: m2(price), total: m2(total) }
+            : { num: null, label, detail: byRentee ? L("Arranged by the rentee", "يُرتّبه المستأجر") : L("Included", "مشمول"), unit: "—", qty: "—", price: "—", total: byRentee ? L("By rentee", "على المستأجر") : L("Included", "مشمول") };
+        lineItems.push(logiRow(L("Delivery to site", "النقل إلى الموقع"), b.mobPrice ?? 0, mobTotal, ri?.mobByRentee === true));
+        lineItems.push(logiRow(L("Return from site", "الإرجاع من الموقع"), b.demobPrice ?? 0, demobTotal, ri?.demobByRentee === true));
       }
       const vat = sub * 0.15; // exact (not rounded) so the amount-in-words can show halalas — app parity
       const total = sub + vat;
@@ -424,7 +452,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
 
       const cards: QuotationCard[] = [];
       const projectRows = supBids.map((b) => ({
-        label: itemMap.get(b.requestId)?.displayId ?? b.requestId,
+        label: itemMap.get(b.requestId)?.displayId ?? shortRef(b.requestId),
         value: `${offeredUnits(b)} × ${labelOf(b)}`,
       }));
       projectRows.push({ label: L("Rental basis", "أساس الإيجار"), value: rentalBasis || "—" });
@@ -439,32 +467,62 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       const declaredNat = (b: GroupBid) => b.declaredTerms?.operatorNationality ?? b.requestTerms.operatorNationality;
       const eqCert = (b: GroupBid) => { const t = eqCertsText(b); return t ? t + agBadge(b, "safetycertifications") : null; };
 
-      const eqRows: { label: string; value: string }[] = [];
-      const addEq = (label: string, val: string | null) => { if (val) eqRows.push({ label, value: val }); };
-      if (supBids.length === 1) {
-        addEq(L("Operator", "المشغّل"), tfmt.operator(sup.requestTerms.operatorIncluded, declaredNat(sup)));
-        addEq(L("Equipment safety certifications", "شهادات سلامة المعدة"), eqCert(sup));
-        addEq(L("Fuel type", "نوع الوقود"), tfmt.fuel(sup.requestTerms.fuelType));
+      if (sup.viaSharedLink) {
+        // Off-platform (shared-link form) bids carry the FULL set of submitted terms in
+        // terms.equipment / terms.contract (each a Yes/No confirmation of the renter's requirement) —
+        // their requestTerms/declaredTerms are blank. Render every term the renter asked so the
+        // quotation captures the whole bid form, not just the four the platform path renders.
+        const linkVal = (r: TermRow): string | null => {
+          if (r.state === "grey") return null; // renter didn't ask this term → omit
+          if (r.state === "conflict") return L("Not provided", "غير متوفّر"); // supplier said No
+          // Confirmed: show the requested value the supplier committed to (parsed from the row's
+          // "Renter: X · Supplier: Yes" detail), falling back to a plain "Confirmed".
+          const d = (isAr ? r.detail?.ar : r.detail?.en) ?? "";
+          const req = (isAr ? d.split(" · المؤجّر")[0].replace(/^المستأجر:\s*/, "") : d.split(" · Supplier")[0].replace(/^Renter:\s*/, "")).trim();
+          return req && req !== "—" ? req : L("Confirmed", "مؤكّد");
+        };
+        const collect = (pick: (b: GroupBid) => TermRow[] | undefined) => {
+          const seen = new Set<string>();
+          const rows: { label: string; value: string }[] = [];
+          for (const b of supBids) for (const r of pick(b) ?? []) {
+            if (seen.has(r.key)) continue;
+            const v = linkVal(r);
+            if (v) { seen.add(r.key); rows.push({ label: isAr ? r.labelAr : r.labelEn, value: v }); }
+          }
+          return rows;
+        };
+        const eqRowsL = collect((b) => b.terms?.equipment);
+        const ctRowsL = collect((b) => b.terms?.contract);
+        if (eqRowsL.length) cards.push({ title: L("Equipment terms", "شروط المعدة"), rows: eqRowsL });
+        if (ctRowsL.length) cards.push({ title: L("Contract terms", "شروط العقد"), rows: ctRowsL });
       } else {
-        for (const b of supBids) {
-          const parts = [tfmt.operator(b.requestTerms.operatorIncluded, declaredNat(b)), eqCert(b), tfmt.fuel(b.requestTerms.fuelType)].filter(Boolean).join(" · ");
-          if (parts) eqRows.push({ label: labelOf(b), value: parts });
+        const eqRows: { label: string; value: string }[] = [];
+        const addEq = (label: string, val: string | null) => { if (val) eqRows.push({ label, value: val }); };
+        if (supBids.length === 1) {
+          addEq(L("Operator", "المشغّل"), tfmt.operator(sup.requestTerms.operatorIncluded, declaredNat(sup)));
+          addEq(L("Equipment safety certifications", "شهادات سلامة المعدة"), eqCert(sup));
+          addEq(L("Fuel type", "نوع الوقود"), tfmt.fuel(sup.requestTerms.fuelType));
+        } else {
+          for (const b of supBids) {
+            const parts = [tfmt.operator(b.requestTerms.operatorIncluded, declaredNat(b)), eqCert(b), tfmt.fuel(b.requestTerms.fuelType)].filter(Boolean).join(" · ");
+            if (parts) eqRows.push({ label: labelOf(b), value: parts });
+          }
         }
-      }
-      if (eqRows.length) cards.push({ title: L("Equipment terms", "شروط المعدة"), rows: eqRows });
+        if (eqRows.length) cards.push({ title: L("Equipment terms", "شروط المعدة"), rows: eqRows });
 
-      const dt = sup.declaredTerms;
-      const rt = sup.requestTerms;
-      const ctRows: { label: string; value: string }[] = [];
-      const addCt = (label: string, val: string | null) => { if (val) ctRows.push({ label, value: val }); };
-      const pay = tfmt.payTerms(dt?.paymentTerms ?? rt.paymentTerms);
-      addCt(L("Payment type", "نوع الدفع"), pay ? pay + agBadge(sup, "paymentterms") : null);
-      const sla = tfmt.sla(dt?.breakdownResponseSla ?? rt.breakdownResponseSla);
-      addCt(L("Breakdown response", "زمن الاستجابة للأعطال"), sla ? sla + agBadge(sup, "breakdownresponsesla") : null);
-      const ot = tfmt.overtime(dt?.overtimeRate ?? rt.overtimeRate);
-      addCt(L("Overtime", "العمل الإضافي"), ot ? ot + agBadge(sup, "overtimerate") : null);
-      addCt(L("Maintenance", "الصيانة"), tfmt.maint(rt.maintenanceResponsibility));
-      if (ctRows.length) cards.push({ title: L("Contract terms", "شروط العقد"), rows: ctRows });
+        const dt = sup.declaredTerms;
+        const rt = sup.requestTerms;
+        const ctRows: { label: string; value: string }[] = [];
+        const addCt = (label: string, val: string | null) => { if (val) ctRows.push({ label, value: val }); };
+        const pay = tfmt.payTerms(dt?.paymentTerms ?? rt.paymentTerms);
+        addCt(L("Payment type", "نوع الدفع"), pay ? pay + agBadge(sup, "paymentterms") : null);
+        const sla = tfmt.sla(dt?.breakdownResponseSla ?? rt.breakdownResponseSla);
+        addCt(L("Breakdown response", "زمن الاستجابة للأعطال"), sla ? sla + agBadge(sup, "breakdownresponsesla") : null);
+        const ot = tfmt.overtime(dt?.overtimeRate ?? rt.overtimeRate);
+        addCt(L("Overtime", "العمل الإضافي"), ot ? ot + agBadge(sup, "overtimerate") : null);
+        addCt(L("Maintenance", "الصيانة"), tfmt.maint(rt.maintenanceResponsibility));
+        if (ctRows.length) cards.push({ title: L("Contract terms", "شروط العقد"), rows: ctRows });
+      }
 
       const doc: QuotationDoc = {
         lang: isAr ? "ar" : "en",
@@ -536,15 +594,36 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   // Bid source: off-platform shared-link vs on-platform (no uploaded-file source on this surface yet).
   const sourceOf = (b: GroupBid): "link" | "platform" | "file" => (b.viaSharedLink ? "link" : "platform");
   const srcCount = (s: "all" | "link" | "platform" | "file") => (s === "all" ? allBids.length : allBids.filter((b) => sourceOf(b) === s).length);
-  const base = supplierKey === "all" ? [...allBids].sort((a, b) => a.requestId.localeCompare(b.requestId)) : allBids.filter((b) => (b.supplierId ?? b.supplierName) === supplierKey);
+  // Count of link bids that meet a given quality dimension (drives the sub-filter option counts).
+  const qPartCount = (p: QualityPart) => allBids.filter((b) => sourceOf(b) === "link" && (selectedItem === "all" || b.requestId === selectedItem) && partMeets(b.quality, p)).length;
+  // The quality sub-filter only applies to link bids and only when the source filter is "link".
+  const qualityActive = fSource === "link" && fqParts.size > 0;
+  // Verified/distance only apply to on-platform bids (off-platform link bids carry no verification/distance).
+  const refineActive = fSource === "platform";
+  // Renter bid-list order: in-app (platform) bids FIRST, then off-platform (shared-link) — and within the
+  // off-platform group, HIGHEST-QUALITY first (in-app bids have no shared-link quality score, so they keep
+  // a stable requestId order). requestId is the tiebreak everywhere so the list stays deterministic.
+  const orderForView = (list: GroupBid[]): GroupBid[] =>
+    [...list].sort((a, b) => {
+      const ra = sourceOf(a) === "platform" ? 0 : 1;
+      const rb = sourceOf(b) === "platform" ? 0 : 1;
+      if (ra !== rb) return ra - rb;
+      if (ra === 1) {
+        const q = (b.quality?.score ?? -1) - (a.quality?.score ?? -1); // off-platform: highest quality first
+        if (q !== 0) return q;
+      }
+      return a.requestId.localeCompare(b.requestId);
+    });
+  const base = supplierKey === "all" ? orderForView(allBids) : orderForView(allBids.filter((b) => (b.supplierId ?? b.supplierName) === supplierKey));
   const shown = base.filter(
     (b) =>
       (selectedItem === "all" || b.requestId === selectedItem) &&
       (fSource === "all" || sourceOf(b) === fSource) &&
-      (!fVerified || b.verified) &&
-      (!fKm || (b.distanceKm != null && b.distanceKm <= 50)),
+      (!qualityActive || [...fqParts].every((p) => partMeets(b.quality, p))) &&
+      (!(refineActive && fVerified) || b.verified) &&
+      (!(refineActive && fKm) || (b.distanceKm != null && b.distanceKm <= 50)),
   );
-  const fActive = (fSource !== "all" ? 1 : 0) + (fVerified ? 1 : 0) + (fKm ? 1 : 0);
+  const fActive = (fSource !== "all" ? 1 : 0) + (qualityActive ? fqParts.size : 0) + (refineActive && fVerified ? 1 : 0) + (refineActive && fKm ? 1 : 0);
   const selectedCount = allBids.filter((b) => selected.has(b.id)).length;
   // Item picker: one entry per request line + its bid count (off-platform included via allBids).
   const itemList = group.items.map((it) => ({
@@ -556,6 +635,21 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
     count: allBids.filter((b) => b.requestId === it.id).length,
   }));
   const selItem = itemList.find((i) => i.id === selectedItem) ?? null;
+  const multiItem = group.items.length > 1;
+  // Per-ITEM quality donut (shown above the bids when a specific item is picked in a multi-item group).
+  // Quality is a shared-link concept — on-platform bids carry no score — so this summarises the OFF-
+  // PLATFORM bids on the selected item: one bid → its score; several → the part-wise average (same
+  // 40/30/30 weighting recomputed), so the donut reads as "this item's bid quality".
+  const itemLinkQ = selectedItem === "all" ? [] : subCards.filter((b) => b.requestId === selectedItem && b.quality).map((b) => b.quality!);
+  const itemQuality: BidQuality | null = (() => {
+    if (!itemLinkQ.length) return null;
+    if (itemLinkQ.length === 1) return itemLinkQ[0];
+    const avg = (f: (q: BidQuality) => number) => itemLinkQ.reduce((s, q) => s + f(q), 0) / itemLinkQ.length;
+    const terms = avg((q) => q.parts.terms), equipment = avg((q) => q.parts.equipment), company = avg((q) => q.parts.company);
+    const score = Math.round(100 * (0.4 * terms + 0.3 * equipment + 0.3 * company));
+    const band: QualityBand = score >= 80 ? "high" : score >= 50 ? "mid" : "low";
+    return { score, band, parts: { terms, equipment, company } };
+  })();
   const shownSuppliers = new Set(shown.map((b) => b.supplierId ?? b.supplierName)).size;
   // Card width scales with how many bids there are: 1–2 grow to fill the row (no empty side margin);
   // 3+ take a fixed width so the third card peeks at the edge, hinting the horizontal scroll.
@@ -644,18 +738,38 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                     <span className="fp-n">{srcCount(key)}</span>
                   </div>
                 ))}
-                <div className="fp-div" />
-                <div className="fp-h">{L("Refine", "تنقية")}</div>
-                <div className={`fp-opt fp-check${fVerified ? " on" : ""}`} onClick={() => setFVerified((v) => !v)}>
-                  <span className="box"><span className="material-icons-outlined">check</span></span>
-                  <span className="material-icons-outlined fp-ic" style={{ color: "var(--success)" }}>verified_user</span>{L("Verified suppliers only", "المؤجّرون الموثّقون فقط")}
-                </div>
-                <div className={`fp-opt fp-check${fKm ? " on" : ""}`} onClick={() => setFKm((v) => !v)}>
-                  <span className="box"><span className="material-icons-outlined">check</span></span>
-                  <span className="material-icons-outlined fp-ic" style={{ color: "var(--navy-mid)" }}>place</span>{L("Within 50 km of site", "ضمن ٥٠ كم من الموقع")}
-                </div>
+                {/* Quality sub-filter — shared-link bids only; filter by the three quality dimensions. */}
+                {fSource === "link" && (
+                  <>
+                    <div className="fp-div" />
+                    <div className="fp-h">{L("Bid quality — show bids that…", "جودة العرض — أظهر العروض التي…")}</div>
+                    {PART_META.map((p) => (
+                      <div key={p.key} className={`fp-opt fp-check${fqParts.has(p.key) ? " on" : ""}`} onClick={() => toggleQPart(p.key)}>
+                        <span className="box"><span className="material-icons-outlined">check</span></span>
+                        <span className="material-icons-outlined fp-ic" style={{ color: "var(--action)" }}>{p.icon}</span>{L(p.en, p.ar)}
+                        <span className="fp-n">{qPartCount(p.key)}</span>
+                      </div>
+                    ))}
+                  </>
+                )}
+                {/* Refine (Verified · distance) — on-platform bids only; off-platform link bids carry no
+                    verification/distance, so these don't apply to them. */}
+                {fSource === "platform" && (
+                  <>
+                    <div className="fp-div" />
+                    <div className="fp-h">{L("Refine", "تنقية")}</div>
+                    <div className={`fp-opt fp-check${fVerified ? " on" : ""}`} onClick={() => setFVerified((v) => !v)}>
+                      <span className="box"><span className="material-icons-outlined">check</span></span>
+                      <span className="material-icons-outlined fp-ic" style={{ color: "var(--success)" }}>verified_user</span>{L("Verified suppliers only", "المؤجّرون الموثّقون فقط")}
+                    </div>
+                    <div className={`fp-opt fp-check${fKm ? " on" : ""}`} onClick={() => setFKm((v) => !v)}>
+                      <span className="box"><span className="material-icons-outlined">check</span></span>
+                      <span className="material-icons-outlined fp-ic" style={{ color: "var(--navy-mid)" }}>place</span>{L("Within 50 km of site", "ضمن ٥٠ كم من الموقع")}
+                    </div>
+                  </>
+                )}
                 <div className="fp-foot">
-                  <button className="clr" onClick={() => { setFSource("all"); setFVerified(false); setFKm(false); }}>{L("Clear all", "مسح الكل")}</button>
+                  <button className="clr" onClick={() => { setFSource("all"); setFqParts(new Set()); setFVerified(false); setFKm(false); }}>{L("Clear all", "مسح الكل")}</button>
                   <button className="done" onClick={() => setFilterOpen(false)}>{L("Done", "تم")}</button>
                 </div>
               </div>
@@ -664,7 +778,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         </div>
       </div>
 
-      <div data-select-ui style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "0 0 14px" }}>
+      <div data-select-ui style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "0 0 14px", flexWrap: "wrap" }}>
         <span style={{ fontSize: 13, fontWeight: 700, color: "#2a4f72" }}>
           {selectMode
             ? L("Tap bids to compare or export · click away to cancel", "اضغط على العروض للمقارنة أو التصدير · انقر خارجًا للإلغاء")
@@ -683,6 +797,48 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         </div>
       </div>
 
+      {shown.length === 0 && (
+        <div className="rempty" style={{ textAlign: "center", padding: "44px 20px" }}>
+          <span className="material-icons-outlined" style={{ fontSize: 36, color: "#9AA7B8" }}>filter_alt_off</span>
+          <div style={{ marginTop: 10, fontSize: 14.5, fontWeight: 800, color: "#1c3550" }}>{L("No bids match these filters", "لا توجد عروض مطابقة لعوامل التصفية")}</div>
+          <div style={{ marginTop: 4, fontSize: 12.5, fontWeight: 600, color: "#6b8fa8" }}>{L("Adjust or clear the source / quality filters to see more.", "عدّل أو امسح عوامل تصفية المصدر / الجودة لعرض المزيد.")}</div>
+          {fActive > 0 && <button onClick={() => { setFSource("all"); setFqParts(new Set()); setFVerified(false); setFKm(false); }} style={{ marginTop: 14, borderRadius: 10, border: "1px solid #d4e0ec", background: "#fff", color: "#1c3550", fontWeight: 800, fontSize: 13, padding: "9px 16px", cursor: "pointer", fontFamily: "inherit" }}>{L("Clear filters", "مسح عوامل التصفية")}</button>}
+        </div>
+      )}
+      {/* Per-item quality donut — appears above the bids when a specific item is picked in a multi-item
+          group (item first, then this item's off-platform bid quality). */}
+      {multiItem && selItem && itemQuality && shown.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 18, padding: "14px 18px", marginBottom: 14, borderRadius: 16, background: "#fff", border: "1px solid #d4e0ec", boxShadow: "0 1px 2px rgba(20,40,70,.04)" }}>
+          <style>{`.qring{display:inline-flex;flex-direction:column;align-items:center;gap:4px;flex:none}.qring-lb{font-size:11px;font-weight:800;letter-spacing:.2px}`}</style>
+          <QualityRing quality={itemQuality} L={L} size={76} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 900, color: "#1c3550" }}>{L(`Bid quality — ${selItem.name}`, `جودة العروض — ${selItem.name}`)}</div>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: "#6b8fa8", marginTop: 2 }}>
+              {itemLinkQ.length > 1
+                ? L(`Average across ${itemLinkQ.length} off-platform bids on this item`, `متوسط ${itemLinkQ.length} عروض خارج المنصة لهذا البند`)
+                : L("From the off-platform bid on this item", "من العرض خارج المنصة لهذا البند")}
+            </div>
+            {/* 40 / 30 / 30 breakdown — the three dimensions the score is built from. */}
+            <div style={{ display: "flex", gap: 16, marginTop: 10, flexWrap: "wrap" }}>
+              {([
+                { label: L("Terms", "الشروط"), w: "40%", v: itemQuality.parts.terms },
+                { label: L("Equipment docs", "مستندات المعدة"), w: "30%", v: itemQuality.parts.equipment },
+                { label: L("Company", "الشركة"), w: "30%", v: itemQuality.parts.company },
+              ]).map((p) => (
+                <div key={p.label} style={{ flex: "1 1 120px", minWidth: 120 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, fontSize: 11, fontWeight: 800, color: "#6b8fa8" }}>
+                    <span>{p.label} <span style={{ color: "#9AA7B8", fontWeight: 700 }}>· {p.w}</span></span>
+                    <span style={{ color: "#1c3550", fontVariantNumeric: "tabular-nums" }}>{Math.round(p.v * 100)}%</span>
+                  </div>
+                  <div style={{ marginTop: 5, height: 6, borderRadius: 6, background: "#eef2f6", overflow: "hidden" }}>
+                    <div style={{ height: "100%", borderRadius: 6, width: `${Math.round(p.v * 100)}%`, background: BAND_COLOR[itemQuality.band] }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       <div className="bids-snap" data-select-ui>
       {shown.map((b) => {
         if (b.viaSharedLink) {
@@ -697,9 +853,11 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
               cardFlex={cardFlex}
               onToggleSelect={() => toggleSelect(b.id)}
               onViewSubmission={() => setSubmissionBid(b)}
+              onNegotiate={NEGOTIATE_ENABLED ? () => setNegotiateBid(b) : undefined}
               itemLabel={ar ? b.itemLabelAr : b.itemLabel}
               itemImage={b.itemImage}
               categoryId={b.categoryId}
+              quality={b.quality}
             />
           );
         }
@@ -774,7 +932,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           <div
             key={b.id}
             onClick={selectMode ? () => toggleSelect(b.id) : undefined}
-            style={{ flex: cardFlex, minWidth: 320, scrollSnapAlign: "start", alignSelf: "flex-start", display: "flex", flexDirection: "column", position: "relative", background: isSel ? "#fff8f0" : "#fff", border: `1px solid ${isSel ? "#f79009" : "#d4e0ec"}`, borderRadius: 18, overflow: "hidden", boxShadow: isSel ? "inset 0 0 0 2px #f79009" : "0 1px 2px rgba(20,40,70,.04)", cursor: selectMode ? "pointer" : "default" }}
+            style={{ flex: cardFlex, minWidth: 0, scrollSnapAlign: "start", alignSelf: "flex-start", display: "flex", flexDirection: "column", position: "relative", background: isSel ? "#fff8f0" : "#fff", border: `1px solid ${isSel ? "#f79009" : "#d4e0ec"}`, borderRadius: 18, overflow: "hidden", boxShadow: isSel ? "inset 0 0 0 2px #f79009" : "0 1px 2px rgba(20,40,70,.04)", cursor: selectMode ? "pointer" : "default" }}
           >
             <div style={{ height: 4, background: banner.c }} />
             {banner && (
@@ -1011,10 +1169,25 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         <SharedBidSubmissionModal
           bid={submissionBid}
           submission={submissions.find((s) => s.id === submissionBid.submissionKey) ?? null}
+          focusItemId={submissionBid.requestItemId}
           ar={ar}
           L={L}
           onClose={() => setSubmissionBid(null)}
           onDownloadQuotation={() => downloadQuotation(ar, [submissionBid])}
+          onNegotiate={NEGOTIATE_ENABLED ? () => { const b = submissionBid; setSubmissionBid(null); setNegotiateBid(b); } : undefined}
+        />
+      )}
+
+      {/* web-app/006 — deal-room-style negotiate relay for an off-platform shared-link bid */}
+      {NEGOTIATE_ENABLED && negotiateBid && (
+        <SharedBidNegotiateRoom
+          bid={negotiateBid}
+          submission={submissions.find((s) => s.id === negotiateBid.submissionKey) ?? null}
+          itemLabel={ar ? negotiateBid.itemLabelAr : negotiateBid.itemLabel}
+          ar={ar}
+          L={L}
+          onClose={() => setNegotiateBid(null)}
+          onViewSubmission={() => { const b = negotiateBid; setNegotiateBid(null); setSubmissionBid(b); }}
         />
       )}
     </div>

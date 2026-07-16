@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { useT, useLocale } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
+import { postAuth, type AuthKind } from "@/components/auth/authClient";
+import { COUNTRY_CODES, SAUDI_DIAL } from "@/components/auth/PhoneEntry";
+import type { RenterUser } from "@/lib/contract/auth";
 
 interface Opt {
   value: string;
@@ -44,6 +47,9 @@ export function OnboardingForm({
   headline,
   subhead,
   requireEmail = false,
+  showEmail = true,
+  phoneVerify,
+  onSignIn,
 }: {
   next: string;
   /** When provided, called after the account is created instead of navigating (e.g. modal flow). */
@@ -54,12 +60,23 @@ export function OnboardingForm({
   /** When true, email is a required field (combined create gate). Default false keeps the standalone
    *  onboarding route's email optional. */
   requireEmail?: boolean;
+  /** When false, the email field is omitted entirely — the combined create gate collects (and the
+   *  backend persists) email at the phone/OTP step, so the register step must not ask for it again.
+   *  Default true keeps email on the standalone onboarding route + the mobile-handoff path. */
+  showEmail?: boolean;
+  /** Email-first (Modal 2, Case 1): no account/session yet. Render the phone field with an INLINE
+   *  Send-code + OTP right in this form; on submit we verify the phone with the onboardingToken (which
+   *  creates the account + session) and then save the profile. Absent = phone already verified (Case 2). */
+  phoneVerify?: { onboardingToken: string };
+  /** Case 1: if the typed phone already has an account, we show "sign in instead" — clicking it calls
+   *  this to drop back to Modal 1 (phone sign-in). */
+  onSignIn?: () => void;
 }) {
   const t = useT();
   const o = t.onboarding;
   const { locale } = useLocale();
   const router = useRouter();
-  const { user, refresh } = useSession();
+  const { user, refresh, signIn } = useSession();
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -73,6 +90,42 @@ export function OnboardingForm({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [fe, setFe] = useState<Record<string, string>>({});
+  // Inline phone verification (Case 1 only): the phone becomes an in-form field with Send-code + OTP +
+  // a Verify step. Verify ≠ create — the account is made only at "Create account" (complete-signup).
+  const [dial, setDial] = useState(SAUDI_DIAL);
+  const [phoneDigits, setPhoneDigits] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [phoneBusy, setPhoneBusy] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [phoneErr, setPhoneErr] = useState<AuthKind | null>(null);
+  // The onboarding token evolves: email✓ (from Modal 1) → phone✓ (after the inline Verify). The phone✓
+  // token is what complete-signup consumes.
+  const [activeToken, setActiveToken] = useState(phoneVerify?.onboardingToken ?? "");
+  const phoneE164 = `${dial}${phoneDigits.replace(/\D/g, "")}`;
+  const [sentPre, sentPost] = t.auth.codeSentTo.split("{phone}");
+  const resetPhone = () => { setOtpSent(false); setPhoneVerified(false); setOtpCode(""); setPhoneErr(null); };
+
+  const sendPhoneCode = async () => {
+    if (!phoneVerify || !phoneDigits.trim()) return;
+    setPhoneErr(null);
+    setPhoneBusy(true);
+    const r = await postAuth("/api/auth/request-code", { onboardingToken: activeToken, phone: phoneE164, countryCode: dial, otpMethod: "SMS" });
+    setPhoneBusy(false);
+    if (r.ok) { setOtpSent(true); setPhoneVerified(false); setOtpCode(""); }
+    else setPhoneErr(r.kind);
+  };
+
+  // Modal 2b: verify the phone against the token → receive the phone✓ token. Creates NOTHING.
+  const verifyPhone = async () => {
+    if (!phoneVerify || otpCode.replace(/\D/g, "").length < 4) return;
+    setPhoneErr(null);
+    setPhoneBusy(true);
+    const r = await postAuth("/api/auth/verify", { onboardingToken: activeToken, phone: phoneE164, code: otpCode.replace(/\D/g, "") });
+    setPhoneBusy(false);
+    if (r.ok && r.data.phoneVerified) { setActiveToken(String(r.data.onboardingToken ?? activeToken)); setPhoneVerified(true); }
+    else if (!r.ok) setPhoneErr(r.kind);
+  };
 
   useEffect(() => {
     const ar = locale === "ar";
@@ -103,18 +156,51 @@ export function OnboardingForm({
     if (lastName.trim().length < 2 || lastName.trim().length > 50) next_fe.lastName = o.errors.lastName;
     if (!city.trim()) next_fe.city = o.errors.city;
     if (!jobTitle.trim()) next_fe.jobTitle = o.errors.jobTitle;
-    // Email is optional by default, but required in the combined create gate. When present (either
-    // mode), it must be a valid address.
+    // Email is optional by default, required in the combined create gate, and omitted entirely when
+    // showEmail is false (already collected + persisted at the phone/OTP step). When shown + present,
+    // it must be a valid address.
     const emailVal = email.trim();
-    if (requireEmail && !emailVal) next_fe.email = o.errors.emailRequired;
-    else if (emailVal && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailVal)) next_fe.email = o.errors.email;
+    if (showEmail) {
+      if (requireEmail && !emailVal) next_fe.email = o.errors.emailRequired;
+      else if (emailVal && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailVal)) next_fe.email = o.errors.email;
+    }
     if (whatsapp.trim() && !/^(\+?966|0)?5\d{8}$/.test(whatsapp.replace(/\s/g, ""))) next_fe.whatsapp = o.errors.whatsapp;
+    // Case 1: the phone must be VERIFIED (inline) before the account can be created.
+    if (phoneVerify && !phoneVerified) next_fe.phone = o.errors.phone;
     if (Object.keys(next_fe).length) {
       setFe(next_fe);
       return;
     }
     setFe({});
     setBusy(true);
+    // Case 1 (email-first): CREATE the account atomically — phone✓ token + full profile in one call.
+    // Nothing was written until now, so an abandoned form leaves no account. No /profile/complete.
+    if (phoneVerify) {
+      const cr = await postAuth("/api/auth/complete-signup", {
+        onboardingToken: activeToken,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        city: city.trim(),
+        jobTitle: jobTitle.trim(),
+        companyName: companyName.trim() || undefined,
+        whatsapp: whatsapp.trim() || undefined,
+      });
+      setBusy(false);
+      if (!cr.ok) {
+        // Phone-specific errors show by the phone field (with the sign-in link for phone_taken);
+        // phone_not_verified also drops the ✓ so they re-verify. Others surface at the top.
+        if (cr.kind === "phone_not_verified") { setPhoneVerified(false); setPhoneErr("phone_not_verified"); }
+        else if (cr.kind === "phone_taken") setPhoneErr("phone_taken");
+        else setErr(t.auth.errors[cr.kind]);
+        return;
+      }
+      signIn(cr.data.user as RenterUser);
+      await refresh();
+      if (onDone) { onDone(); return; }
+      const dest = next.startsWith("/") && !next.startsWith("//") ? next : "/";
+      router.replace(dest);
+      return;
+    }
     let res: Response;
     try {
       res = await fetch("/api/profile/complete", {
@@ -126,7 +212,7 @@ export function OnboardingForm({
           city: city.trim(),
           jobTitle: jobTitle.trim(),
           companyName: companyName.trim() || undefined,
-          email: email.trim() || undefined,
+          email: showEmail ? email.trim() || undefined : undefined,
           whatsapp: whatsapp.trim() || undefined,
         }),
       });
@@ -180,12 +266,91 @@ export function OnboardingForm({
           </div>
         </div>
 
-        <div>
-          <label className={labelCls}>
-            {o.phone} <span className="ms-1 text-[11px] font-bold text-ok">✓ {o.verified}</span>
-          </label>
-          <input className={`${inputCls} bg-surface2 text-muted`} value={user?.phone ?? ""} readOnly dir="ltr" />
-        </div>
+        {phoneVerify ? (
+          // Case 1 (email-first): phone is a field here, verified INLINE (Send code → Verify). Verify
+          // creates nothing; the account is created on "Create account" (complete-signup), atomically.
+          <div>
+            <label className={labelCls}>
+              {o.phone} <span className="text-danger">*</span>
+              {phoneVerified && <span className="ms-2 text-[11px] font-bold text-ok">✓ {t.auth.phoneVerified}</span>}
+            </label>
+            <div className="flex gap-[10px]" dir="ltr">
+              <select
+                aria-label={t.auth.countryLabel}
+                value={dial}
+                onChange={(e) => { setDial(e.target.value); resetPhone(); }}
+                disabled={phoneVerified}
+                className="h-[46px] rounded-[10px] border border-border bg-surface px-[10px] text-[13.5px] font-bold text-navy outline-0 focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)] disabled:opacity-60"
+              >
+                {COUNTRY_CODES.map((c) => (
+                  <option key={c.dial} value={c.dial}>{c.flag} {c.dial}</option>
+                ))}
+              </select>
+              <input
+                className={`${inputCls} flex-1 ${phoneVerified ? "bg-surface2 text-muted" : ""}`}
+                type="tel"
+                inputMode="numeric"
+                maxLength={11}
+                value={phoneDigits}
+                onChange={(e) => { setPhoneDigits(e.target.value); resetPhone(); }}
+                readOnly={phoneVerified}
+                placeholder={t.auth.phonePlaceholder}
+                dir="ltr"
+              />
+            </div>
+            {phoneVerified ? null : !otpSent ? (
+              <button
+                type="button"
+                onClick={sendPhoneCode}
+                disabled={phoneBusy || !phoneDigits.trim()}
+                className="mt-[10px] inline-flex items-center gap-1.5 rounded-[10px] border border-brand px-4 py-2 text-[13px] font-bold text-brand transition hover:bg-brand-soft disabled:opacity-50"
+              >
+                <Icon name="sms" size={16} /> {phoneBusy ? t.auth.sending : t.auth.sendCode}
+              </button>
+            ) : (
+              <div className="mt-[10px]">
+                <p className="mb-2 text-[12px] text-muted">{sentPre}<b className="text-navy" dir="ltr">{phoneE164}</b>{sentPost}</p>
+                <div className="flex gap-[10px]">
+                  <input
+                    className={`${inputCls} flex-1`}
+                    inputMode="numeric"
+                    maxLength={4}
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    placeholder="1234"
+                    dir="ltr"
+                    style={{ letterSpacing: "0.35em", fontFamily: "var(--font-plex), monospace" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={verifyPhone}
+                    disabled={phoneBusy || otpCode.replace(/\D/g, "").length < 4}
+                    className="flex-none rounded-[10px] border border-brand bg-brand px-4 text-[13px] font-bold text-white transition hover:brightness-[1.04] disabled:opacity-50"
+                  >
+                    {phoneBusy ? t.auth.verifying : t.auth.verifyPhone}
+                  </button>
+                </div>
+                <button type="button" onClick={sendPhoneCode} className="mt-2 text-[12.5px] font-bold text-info">{t.auth.resend}</button>
+              </div>
+            )}
+            {fe.phone && <p className="mt-1 text-[12px] text-danger">{fe.phone}</p>}
+            {phoneErr && (
+              <p className="mt-1 text-[12px] text-danger">
+                {t.auth.errors[phoneErr]}
+                {phoneErr === "phone_taken" && onSignIn && (
+                  <> <button type="button" onClick={onSignIn} className="font-bold text-info underline">{t.auth.signInInstead}</button></>
+                )}
+              </p>
+            )}
+          </div>
+        ) : (
+          <div>
+            <label className={labelCls}>
+              {o.phone} <span className="ms-1 text-[11px] font-bold text-ok">✓ {o.verified}</span>
+            </label>
+            <input className={`${inputCls} bg-surface2 text-muted`} value={user?.phone ?? ""} readOnly dir="ltr" />
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-[12px] sm:grid-cols-2">
           <div>
@@ -217,19 +382,21 @@ export function OnboardingForm({
           <input className={inputCls} value={companyName} onChange={(e) => setCompanyName(e.target.value)} maxLength={200} placeholder={o.companyNamePlaceholder} />
         </div>
 
-        <div className="grid grid-cols-1 gap-[12px] sm:grid-cols-2">
-          <div>
-            <label className={labelCls}>
-              {o.email}{" "}
-              {requireEmail ? (
-                <span className="text-danger">*</span>
-              ) : (
-                <span className="text-[11px] font-medium text-muted">— {o.optional}</span>
-              )}
-            </label>
-            <input className={inputCls} type="email" value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" />
-            {fe.email && <p className="mt-1 text-[12px] text-danger">{fe.email}</p>}
-          </div>
+        <div className={`grid grid-cols-1 gap-[12px] ${showEmail ? "sm:grid-cols-2" : ""}`}>
+          {showEmail && (
+            <div>
+              <label className={labelCls}>
+                {o.email}{" "}
+                {requireEmail ? (
+                  <span className="text-danger">*</span>
+                ) : (
+                  <span className="text-[11px] font-medium text-muted">— {o.optional}</span>
+                )}
+              </label>
+              <input className={inputCls} type="email" value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" />
+              {fe.email && <p className="mt-1 text-[12px] text-danger">{fe.email}</p>}
+            </div>
+          )}
           <div>
             <label className={labelCls}>
               {o.whatsapp} <span className="text-[11px] font-medium text-muted">— {o.optional}</span>
@@ -245,7 +412,7 @@ export function OnboardingForm({
       <div className="border-t border-border p-[22px]">
         <button
           type="submit"
-          disabled={busy}
+          disabled={busy || (!!phoneVerify && !phoneVerified)}
           className="flex w-full items-center justify-center gap-[7px] rounded-[10px] border border-brand bg-brand px-[24px] py-[13px] text-[14.5px] font-bold text-brand-fg transition hover:brightness-[1.04] disabled:opacity-50"
         >
           {busy ? o.submitting : o.submit}

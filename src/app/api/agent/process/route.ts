@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { useRealAgent, serverEnv } from "@/lib/config/env";
 import { unwrapEnvelope, mansourReason } from "@/lib/api/agent-adapters";
+import { GUEST_PARSE_LIMIT, guestParseCookie, guestParseCount, hasSession } from "@/lib/access/guest-quota-server";
 import type { NormalizeRequest } from "@/lib/contract/agent";
 
 /**
@@ -25,6 +26,16 @@ export async function POST(req: Request) {
   const files = body.files ?? [];
   if (!hasText && files.length === 0) return NextResponse.json({ code: "empty" }, { status: 400 }); // AC-09
 
+  // Guest parse cap (server backstop): a signed-out visitor gets GUEST_PARSE_LIMIT real parses, then must
+  // sign in. Signed-in users are NEVER capped (any auth cookie → skip). Only real-agent runs count; the
+  // mock/dev path is unlimited. Blocked → { guestLimit:true } (the client shows the account prompt, not
+  // an error). The count is incremented ONLY on a successful job start below.
+  const guest = useRealAgent && !hasSession(req);
+  const usedParses = guest ? guestParseCount(req) : 0;
+  if (guest && usedParses >= GUEST_PARSE_LIMIT) {
+    return NextResponse.json({ guestLimit: true }, { status: 200 });
+  }
+
   if (useRealAgent && serverEnv.mansourUrl) {
     try {
       const payload: NormalizeRequest = {
@@ -48,7 +59,10 @@ export async function POST(req: Request) {
       const a = unwrapEnvelope(await res.json());
       const jobId = a.job_id ?? a.jobId ?? a.id;
       if (!jobId) return NextResponse.json({ code: "network", detail: "The AI assistant did not start a job.", backendStatus: res.status }, { status: 503 });
-      return NextResponse.json({ jobId: String(jobId) }, { status: 202 });
+      // Success → burn one guest credit (only for guests; signed-in users set no cookie).
+      const started = NextResponse.json({ jobId: String(jobId) }, { status: 202 });
+      if (guest) started.headers.append("Set-Cookie", guestParseCookie(usedParses + 1));
+      return started;
     } catch (err) {
       console.error("[agent] start job failed:", err);
       return NextResponse.json({ code: "network", detail: err instanceof Error ? err.message : undefined }, { status: 503 });

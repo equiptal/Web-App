@@ -172,7 +172,7 @@ export function CompareBids() {
     if (!items.length) return;
     const esc = (s: unknown) => String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
     const sar = L("SAR", "ر.س");
-    const dateStr = new Date().toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
+    const dateStr = new Date().toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
 
     const sections = items.map((it) => {
       const offers = offersFor(it);
@@ -211,6 +211,9 @@ export function CompareBids() {
         row(L("SASO certificate", "شهادة ساسو"), (o) => chk(o.bid.compliance.saso)),
         row(L("Equipment verification", "توثيق المعدة"), (o) => chk(o.bid.eqVerified)),
         row(L("Requirements met", "المتطلبات المستوفاة"), (o) => `${reqMet(o)} / 7`, (o) => reqMet(o) === maxReq && maxReq > 0),
+        // Trailing free-text row — surfaces every non-fixed quote term the supplier attached (folds in
+        // uploaded quotes' notes + extra_terms). Display-only: the comparison math stays on the fixed schema.
+        row(L("Notes", "ملاحظات"), (o) => esc(o.bid.note || "—")),
       ].join("");
       const sup = offers.map((o) => `<th>${esc(o.bid.supplierName)}${o.bid.verified ? " ✓" : ""}</th>`).join("");
       const summary = comparisonSummary(offers, ar, L);
@@ -428,6 +431,9 @@ function ItemComparison({ item, offers, ar, L }: { item: RequestListItem; offers
             <Row label={L("SASO certificate", "شهادة ساسو")} cell={(o) => chk(o.bid.compliance.saso)} />
             <Row label={L("Equipment verification", "توثيق المعدة")} cell={(o) => chk(o.bid.eqVerified)} />
             <RowWin label={L("Requirements met", "المتطلبات المستوفاة")} win={(o) => reqMet(o) === maxReq && maxReq > 0} cell={(o) => <span className="cfrac">{reqMet(o)} / 7</span>} />
+            {/* Trailing free-text row — every non-fixed quote term (uploaded quotes fold notes + extra_terms
+                into bid.note). Display-only; the comparison math stays on the fixed schema. */}
+            <Row label={L("Notes", "ملاحظات")} cell={(o) => <span className="cval">{o.bid.note || "—"}</span>} />
           </div>
         </div>
       </div>

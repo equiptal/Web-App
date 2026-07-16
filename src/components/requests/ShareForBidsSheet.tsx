@@ -168,7 +168,7 @@ export function ShareForBidsSheet({
               <div className="flex items-center gap-3 rounded-[11px] border border-border bg-surface px-3.5 py-3">
                 <Icon name="schedule" size={18} className="flex-none text-brand" />
                 <div className="flex-1">
-                  <b className="block text-[13px] font-semibold text-navy">{deadline ? new Date(deadline).toLocaleString(ar ? "ar-SA" : "en-GB", { dateStyle: "medium", timeStyle: "short" }) : L("No deadline set", "لا يوجد موعد نهائي")}</b>
+                  <b className="block text-[13px] font-semibold text-navy">{deadline ? new Date(deadline).toLocaleString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { dateStyle: "medium", timeStyle: "short" }) : L("No deadline set", "لا يوجد موعد نهائي")}</b>
                   <span className="text-[11.5px] font-normal text-muted">{deadline ? L("Suppliers see a countdown; the link closes then.", "يرى المؤجّرون عدّاً تنازلياً؛ يُغلق الرابط حينها.") : L("The link stays open until you close the request.", "يبقى الرابط مفتوحاً حتى تُغلق الطلب.")}</span>
                 </div>
                 <button onClick={openDl} className="flex-none rounded-lg px-4 py-1.5 text-[12.5px] font-bold text-brand" style={{ background: "#FFE0B3", border: "1px solid #F7A83D" }}>

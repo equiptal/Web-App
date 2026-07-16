@@ -5,6 +5,8 @@ import { bucketBidTerms, type BidCard } from "@/lib/contract/bids";
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { EquipImg } from "@/components/requests/EquipImg";
+import { BAND_COLOR } from "@/components/bid/QualityRing";
+import type { BidQuality } from "@/lib/contract/bid-quality";
 
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
 
@@ -23,14 +25,18 @@ export function SharedLinkBidCard({
   cardFlex,
   onToggleSelect,
   onViewSubmission,
+  onNegotiate,
   itemLabel,
   itemImage,
   categoryId,
+  quality,
 }: {
   bid: BidCard;
   ar: boolean;
   L: (en: string, arr: string) => string;
   isSel: boolean;
+  /** Bid-quality score (terms match + docs + company completeness) — shown as a compact ring row. */
+  quality?: BidQuality | null;
   /** Grouped My-Bids select flow: true = picking (whole-card select), false = resting. Omit for the
    *  legacy single-request view, which keeps an always-visible checkbox + the full card. */
   selectMode?: boolean;
@@ -38,6 +44,9 @@ export function SharedLinkBidCard({
   cardFlex?: string;
   onToggleSelect: () => void;
   onViewSubmission: () => void;
+  /** web-app/006 — opens the deal-room-style negotiate view (message relay to the off-platform supplier).
+   *  Omit to render only the "View bid submission" CTA (e.g. contexts without the negotiate flow). */
+  onNegotiate?: () => void;
   itemLabel?: string | null;
   itemImage?: string | null;
   categoryId?: string | null;
@@ -76,7 +85,7 @@ export function SharedLinkBidCard({
   const title = itemLabel || eqLine || L("Equipment", "المعدة");
   const agoShort = bid.agoDays === 1 ? L("1 day ago", "قبل يوم") : `${bid.agoDays ?? 2} ${L("days ago", "أيام مضت")}`;
   // Supplier's quote expiry ("Valid until") — surfaced as a chip so the renter sees how long the price holds.
-  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
   const validUntil = bid.validUntil ?? null;
   const daysLeft = validUntil ? Math.ceil((new Date(validUntil).getTime() - Date.now()) / 86400000) : null;
   const expired = daysLeft != null && daysLeft < 0;
@@ -86,7 +95,7 @@ export function SharedLinkBidCard({
   // App parity: the SAME shared tally the on-platform card + the Terms modal use (bucketBidTerms), so the
   // off-platform card count always equals the modal. Off-platform has no deal room → no "Pending review"
   // chip on the card (mirrors the terms modal's hidePending); Conflict / Matched only.
-  const termTally = bucketBidTerms(bid.terms, bid.negotiableTerms).counts;
+  const termTally = bucketBidTerms(bid.terms, bid.negotiableTerms, { all: true }).counts;
   const termChips = [
     { label: L("Conflict", "تعارض"), n: termTally.conflict, c: "#d9362a" },
     { label: L("Matched", "مطابق"), n: termTally.matched, c: "#1daf58" },
@@ -99,7 +108,7 @@ export function SharedLinkBidCard({
   return (
     <div
       onClick={picking ? onToggleSelect : undefined}
-      style={{ flex: cardFlex ?? "0 0 calc(44% - 8px)", minWidth: 320, scrollSnapAlign: "start", alignSelf: "flex-start", display: "flex", flexDirection: "column", position: "relative", background: "#fff", border: `1px solid ${isSel ? "#f79009" : "#d4e0ec"}`, borderRadius: 18, overflow: "hidden", boxShadow: "0 1px 2px rgba(20,40,70,.04)", outline: isSel ? "2px solid #f79009" : "none", outlineOffset: 2, cursor: picking ? "pointer" : "default" }}
+      style={{ flex: cardFlex ?? "0 0 calc(44% - 8px)", minWidth: 0, scrollSnapAlign: "start", alignSelf: "flex-start", display: "flex", flexDirection: "column", position: "relative", background: "#fff", border: `1px solid ${isSel ? "#f79009" : "#d4e0ec"}`, borderRadius: 18, overflow: "hidden", boxShadow: "0 1px 2px rgba(20,40,70,.04)", outline: isSel ? "2px solid #f79009" : "none", outlineOffset: 2, cursor: picking ? "pointer" : "default" }}
     >
       <div style={{ height: 4, background: "#d4780a" }} />
       {/* off-platform banner — replaces a status pill + the old "submitted" footer line */}
@@ -141,8 +150,16 @@ export function SharedLinkBidCard({
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 6 }}>
             <span style={{ width: 22, height: 22, borderRadius: "50%", background: "#1c3550", color: "#fff", fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{(bid.supplierName || "S").charAt(0).toUpperCase()}</span>
-            <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550" }}>{bid.supplierName}</span>
-            {bid.verified && <span className="material-icons-outlined" style={{ fontSize: 16, color: "#1daf58" }}>verified</span>}
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bid.supplierName}</span>
+            {bid.verified && <span className="material-icons-outlined" style={{ fontSize: 16, color: "#1daf58", flexShrink: 0 }}>verified</span>}
+            {/* Bid-quality score sits right beside the name (same spot as the app's verified tick) — a
+                solid band-coloured badge so it reads at a glance, without adding card height. */}
+            {quality && (
+              <span title={L(`Bid quality ${quality.score}% — terms match, documents & company details`, `جودة العرض ${quality.score}٪ — مطابقة الشروط والمستندات وبيانات الشركة`)}
+                style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 900, color: "#fff", background: BAND_COLOR[quality.band], padding: "3px 9px", borderRadius: 20, fontVariantNumeric: "tabular-nums", boxShadow: `0 1px 3px ${BAND_COLOR[quality.band]}59` }}>
+                <span className="material-icons-outlined" style={{ fontSize: 14 }}>workspace_premium</span>{quality.score}%
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -224,14 +241,25 @@ export function SharedLinkBidCard({
         )}
       </div>
 
-      {/* CTA — read-only submission viewer (no deal room for an off-platform supplier) */}
+      {/* CTA — view the read-only submission + (web-app/006) open the deal-room-style negotiate relay. */}
       {!picking && (
         <div style={{ marginTop: "auto", padding: "12px 16px 16px" }}>
-          <button onClick={onViewSubmission} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "14px", borderRadius: 14, border: "none", background: "#1c3550", color: "#fff", fontWeight: 800, fontSize: 15, cursor: "pointer", fontFamily: "inherit" }}>
-            <span className="material-icons-outlined" style={{ fontSize: 18 }}>visibility</span>{L("View bid submission", "عرض العرض المُقدَّم")}
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            {/* When negotiate is hidden this is the sole CTA → filled navy (primary), matching the in-app
+                bid card. When negotiate shows (dev), it's outlined so the orange Negotiate reads as primary. */}
+            <button onClick={onViewSubmission} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px 10px", borderRadius: 14, ...(onNegotiate ? { border: "1.5px solid #1c3550", background: "#fff", color: "#1c3550" } : { border: "none", background: "#1c3550", color: "#fff" }), fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
+              <span className="material-icons-outlined" style={{ fontSize: 18 }}>visibility</span>{L("View bid", "عرض العرض")}
+            </button>
+            {onNegotiate && (
+              <button onClick={onNegotiate} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px 10px", borderRadius: 14, border: "none", background: "#f79009", color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 2px 6px rgba(247,144,9,.32)" }}>
+                <span className="material-icons-outlined" style={{ fontSize: 18 }}>forum</span>{L("Negotiate", "تفاوض")}
+              </button>
+            )}
+          </div>
           <p style={{ fontSize: 11.5, color: "#9AA7B8", fontWeight: 600, textAlign: "center", margin: "9px 0 0" }}>
-            {L("Off-platform supplier — no deal room. View their submitted bid.", "مؤجّر خارج المنصة — لا توجد غرفة صفقة. اعرض عرضه المُقدَّم.")}
+            {onNegotiate
+              ? L("Message this supplier now — continue the deal with them in the app.", "راسل هذا المؤجّر الآن — وأكمل الصفقة معه في التطبيق.")
+              : L("Off-platform supplier — view their submitted bid.", "مؤجّر خارج المنصة — اعرض عرضه المُقدَّم.")}
           </p>
         </div>
       )}
@@ -245,6 +273,7 @@ export function SharedLinkBidCard({
           L={L}
           busy={false}
           hidePending  /* off-platform: no deal room → no "Pending review" state */
+          allTerms  /* count/show every required term the supplier answered (matches the submission view) */
           negotiateLabel={L("View bid submission", "عرض العرض المُقدَّم")}
           onNegotiate={() => { setTermsOpen(false); onViewSubmission(); }}
           onClose={() => setTermsOpen(false)}

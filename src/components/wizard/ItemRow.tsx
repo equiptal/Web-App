@@ -64,6 +64,17 @@ export function ItemRow({
     item.resolved || !(item.id.startsWith("a") && /^\d+$/.test(item.id.slice(1)))
       ? undefined
       : state.draft?.fieldNotes?.[`line_items[${item.id.slice(1)}].${f}`];
+  // Inform the renter when THIS item overrides a request-wide default (e.g. item fuel-responsibility =
+  // Supplier while "Settings for all equipment" = Me) — a silent variation is easy to miss otherwise.
+  const varyNote = (override: Party | null | undefined, shared: Party | null) => {
+    if (override == null || shared == null || override === shared) return null;
+    return (
+      <div style={{ marginTop: 5, display: "flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 700, color: "#d4780a" }}>
+        <span className="material-icons-outlined" style={{ fontSize: 14 }}>info</span>
+        {locale === "ar" ? `يختلف عن الإعداد العام للطلب (${t.options.party[shared]})` : `Overrides the request-wide default (${t.options.party[shared]})`}
+      </div>
+    );
+  };
   const [editingMatch, setEditingMatch] = useState(false);
   const [showDetails, setShowDetails] = useState(defaultOpen);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -357,20 +368,29 @@ export function ItemRow({
             <ChipField label={t.step2.perItem.fuelType} agent={agentMatches(item.fuelType, ai?.fuelType)} note={fn("fuel_type_preference")}>
               <Pchips<FuelType> value={item.fuelType} onChange={(v) => actions.patchItem(item.id, { fuelType: v })} options={opt(FUEL_TYPES, t.options.fuelType)} />
             </ChipField>
-            <ChipField label={t.step1.requestWide.fuelResponsibility} agent={agentMatches(item.fuelResponsibilityOverride, ai?.fuelResponsibilityOverride)} note={fn("diesel_included")}>
-              <Pchips<Party> value={item.fuelResponsibilityOverride ?? sharedFuelResp} onChange={(v) => actions.patchItem(item.id, { fuelResponsibilityOverride: v })} options={opt(PARTIES, t.options.party)} />
-            </ChipField>
+            <div>
+              <ChipField label={t.step1.requestWide.fuelResponsibility} agent={agentMatches(item.fuelResponsibilityOverride, ai?.fuelResponsibilityOverride)} note={fn("diesel_included")}>
+                <Pchips<Party> value={item.fuelResponsibilityOverride ?? sharedFuelResp} onChange={(v) => actions.patchItem(item.id, { fuelResponsibilityOverride: v })} options={opt(PARTIES, t.options.party)} />
+              </ChipField>
+              {varyNote(item.fuelResponsibilityOverride, sharedFuelResp)}
+            </div>
           </div>
 
           {/* Delivery / Return — per-item override of the request-wide setting (AC-25). Mansour sets
               these per line (mobilization/demobilization), so surface + allow editing them here. */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <ChipField label={t.step1.requestWide.delivery} agent={agentMatches(item.deliveryOverride, ai?.deliveryOverride)} note={fn("mobilization_by_rentee")}>
-              <Pchips<Party> value={item.deliveryOverride ?? sharedDelivery} onChange={(v) => actions.patchItem(item.id, { deliveryOverride: v })} options={opt(PARTIES, t.options.party)} />
-            </ChipField>
-            <ChipField label={t.step1.requestWide.return} agent={agentMatches(item.returnOverride, ai?.returnOverride)} note={fn("demobilization_by_rentee")}>
-              <Pchips<Party> value={item.returnOverride ?? sharedReturn} onChange={(v) => actions.patchItem(item.id, { returnOverride: v })} options={opt(PARTIES, t.options.party)} />
-            </ChipField>
+            <div>
+              <ChipField label={t.step1.requestWide.delivery} agent={agentMatches(item.deliveryOverride, ai?.deliveryOverride)} note={fn("mobilization_by_rentee")}>
+                <Pchips<Party> value={item.deliveryOverride ?? sharedDelivery} onChange={(v) => actions.patchItem(item.id, { deliveryOverride: v })} options={opt(PARTIES, t.options.party)} />
+              </ChipField>
+              {varyNote(item.deliveryOverride, sharedDelivery)}
+            </div>
+            <div>
+              <ChipField label={t.step1.requestWide.return} agent={agentMatches(item.returnOverride, ai?.returnOverride)} note={fn("demobilization_by_rentee")}>
+                <Pchips<Party> value={item.returnOverride ?? sharedReturn} onChange={(v) => actions.patchItem(item.id, { returnOverride: v })} options={opt(PARTIES, t.options.party)} />
+              </ChipField>
+              {varyNote(item.returnOverride, sharedReturn)}
+            </div>
           </div>
 
           {/* Equipment year (AC-28) — per-item override of the request-wide year. "Any" inherits it. */}
@@ -436,7 +456,7 @@ function Avatar({ glyph, conf }: { glyph: string; conf: "high" | "mid" | "low" }
 function RfqMatch({ raw, matched }: { raw: string | null; matched: React.ReactNode }) {
   const t = useT();
   return (
-    <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+    <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-1.5">
       <span className="flex min-w-0 flex-col gap-0.5 sm:w-[200px] sm:flex-none">
         <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted">{t.step2.fromRfq}</span>
         <span className="break-words text-[15px] font-bold leading-tight">{raw ? `“${raw}”` : "—"}</span>
@@ -444,7 +464,7 @@ function RfqMatch({ raw, matched }: { raw: string | null; matched: React.ReactNo
       {/* Mobile: vertical flow (RFQ ↓ matched). Desktop: horizontal arrow. */}
       <Icon name="arrow_downward" size={18} className="block flex-none text-muted/60 sm:hidden" />
       <Icon name="arrow_forward" size={20} className="hidden flex-none text-muted/60 rtl:scale-x-[-1] sm:block" />
-      <span className="flex min-w-0 flex-col gap-0.5 sm:flex-1">
+      <span className="flex min-w-0 flex-col gap-0.5 sm:min-w-[180px] sm:flex-1">
         <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted">{t.step2.matchedTo}</span>
         <span className="break-words text-[15px] font-extrabold leading-tight">{matched}</span>
       </span>

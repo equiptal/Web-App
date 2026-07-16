@@ -3,21 +3,18 @@
 import { useEffect, useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
-import { fetchRequestGroup, fetchRequestDetail } from "@/lib/api/client";
-import { parseAddress, publicTaxonomyUrl, type RequestRecord } from "@/lib/contract/requests";
+import { fetchRequestGroup, fetchRequestDetail, cancelRequest } from "@/lib/api/client";
+import { parseAddress, publicTaxonomyUrl, shortRef, statusMeta, type RequestRecord } from "@/lib/contract/requests";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { LocationMap } from "@/components/requests/LocationMap";
-import { Ditem, requestDetailRows } from "@/components/requests/RequestDetail";
+import { Ditem, requestDetailRows, ConfirmCancelModal, EditRequestModal } from "@/components/requests/RequestDetail";
 import "@/components/requests/requests-proto.css";
 
-const STATUS_CLS: Record<string, string> = {
-  OPEN: "st-open", ACTIVE: "st-active", ACCEPTED: "st-accepted", EXPIRED: "st-expired", CLOSED: "st-closed", ABANDONED: "st-closed", MIXED: "st-mixed",
-};
 
 function fmtDate(v: string | null | undefined, ar: boolean): string {
   if (!v) return "—";
   const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
 /**
@@ -32,6 +29,20 @@ export function RequestGroupDetail({ groupId, onTitle }: { groupId: string; onTi
   const router = useRouter();
   const [records, setRecords] = useState<RequestRecord[] | null>(null);
   const [error, setError] = useState(false);
+  // Group-level edit / cancel (applies to every member request in the RFQ).
+  const [showEdit, setShowEdit] = useState(false);
+  const [showCancel, setShowCancel] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const reload = () => setReloadKey((k) => k + 1);
+  const doCancel = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await Promise.all((records ?? []).map((r) => cancelRequest(r.id)));
+      router.push("/requests");
+    } catch { setBusy(false); setShowCancel(false); }
+  };
 
   useEffect(() => {
     let active = true;
@@ -59,7 +70,7 @@ export function RequestGroupDetail({ groupId, onTitle }: { groupId: string; onTi
     return () => {
       active = false;
     };
-  }, [groupId]);
+  }, [groupId, reloadKey]);
 
   const first = records?.[0];
   const loc = parseAddress(first?.projectAddressLabel ?? null);
@@ -101,11 +112,21 @@ export function RequestGroupDetail({ groupId, onTitle }: { groupId: string; onTi
           <div className="gx-meta">{title}{period !== "—" ? ` · ${period}` : ""}</div>
         </div>
         <div className="gx-badges">
-          <span className={`stbadge ${STATUS_CLS[overall] ?? "st-mixed"}`}><span className="dot" />{overall}</span>
+          {(() => { const sm = statusMeta(overall); return <span className={`stbadge ${sm.cls}`}><span className="dot" />{ar ? sm.ar : sm.en}</span>; })()}
           <span className={`typebadge ${type === "DIRECT" ? "tb-direct" : "tb-broadcast"}`}><span className="material-icons-outlined">{type === "DIRECT" ? "person" : "campaign"}</span>{type}</span>
           <span className="gx-bids"><span className="material-icons-outlined">gavel</span>{totalBids} {L("bids", "عروض")}</span>
         </div>
       </div>
+
+      {/* group-level edit / cancel — edit applies its shared fields to every item; cancel withdraws all */}
+      {(overall === "OPEN" || overall === "ACTIVE") && (
+        <div className="actionbar" style={{ marginBottom: 14 }}>
+          {overall === "OPEN" && totalBids === 0 && (
+            <button className="btn sm" disabled={busy} onClick={() => setShowEdit(true)}><span className="material-icons-outlined">edit</span> {L("Edit request", "تعديل الطلب")}</button>
+          )}
+          <button className="btn sm danger" disabled={busy} onClick={() => setShowCancel(true)}><span className="material-icons-outlined">close</span> {L("Cancel request", "إلغاء الطلب")}</button>
+        </div>
+      )}
 
       {/* shared project location */}
       <div className="dsec">
@@ -140,12 +161,12 @@ export function RequestGroupDetail({ groupId, onTitle }: { groupId: string; onTi
         <div className="dsec-h"><span className="material-icons-outlined">construction</span>{L("Equipment", "المعدات")} · {records.length} {L("items", "عناصر")}</div>
         {records.map((rec) => {
           const it = rec.equipmentItems?.[0];
-          const st = STATUS_CLS[rec.status] ?? "st-closed";
+          const sm = statusMeta(rec.status);
           return (
             <div className="dcard" key={rec.id} style={{ marginBottom: 12 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-                <span className={`stbadge ${st}`}><span className="dot" />{rec.status}</span>
-                <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 700 }}>{rec.displayId ?? rec.shortCode ?? rec.id}</span>
+                <span className={`stbadge ${sm.cls}`}><span className="dot" />{ar ? sm.ar : sm.en}</span>
+                <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 700 }}>{rec.displayId ?? rec.shortCode ?? shortRef(rec.id)}</span>
                 {(rec.bidCount ?? 0) > 0 && (
                   <button className="btn sm" style={{ marginInlineStart: "auto" }} onClick={() => router.push(`/requests/${rec.id}?view=bids`)}>
                     <span className="material-icons-outlined">gavel</span> {L("View bids", "عرض العروض")} ({rec.bidCount})
@@ -157,6 +178,9 @@ export function RequestGroupDetail({ groupId, onTitle }: { groupId: string; onTi
           );
         })}
       </div>
+
+      {showEdit && first && <EditRequestModal r={first} ar={ar} L={L} siblingIds={records.slice(1).map((r) => r.id)} onClose={() => setShowEdit(false)} onSaved={() => { setShowEdit(false); reload(); }} />}
+      {showCancel && first && <ConfirmCancelModal ar={ar} L={L} busy={busy} idLabel={first.displayId ?? first.shortCode ?? shortRef(first.id)} onClose={() => setShowCancel(false)} onConfirm={doCancel} />}
     </div>
   );
 }

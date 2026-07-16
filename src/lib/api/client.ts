@@ -2,7 +2,8 @@ import type { AgentDraft, RfqRequestPayload, Taxonomy } from "@/lib/contract";
 import type { RequestListItem, RequestRecord } from "@/lib/contract/requests";
 import type { BidCard } from "@/lib/contract/bids";
 import type { DealRoomView, DealRoomDocuments, QuotationView } from "@/lib/contract/deal-room";
-import type { ComputedBid, RecommendResult, BidAskResult, BidParseResult, AwardNudgeResult, PreferencePreset, RankingPreference, RankedBid, BidEventInput } from "@/lib/contract/agent-bids";
+import type { ComputedBid, RecommendResult, BidAskResult, BidParseResult, AwardNudgeResult, PreferencePreset, RankingPreference, RankedBid, BidEventInput, NormalizedBid, TermMatch, QuoteMatchCheck } from "@/lib/contract/agent-bids";
+import type { TransformRequestCtx } from "@/lib/contract/bid-form";
 import { mapBidFormData, mapLinkSubmissions, type BidFormData, type LinkBidSubmission, type SubmitBidFormPayload } from "@/lib/contract/link-bids";
 import type { PendingResponse, RespondBody, RespondResult } from "@/lib/contract/survey";
 import type { InboxBid } from "@/lib/contract/inbox";
@@ -17,7 +18,7 @@ export interface RecommendPayload {
 }
 
 /** Error kinds the UI distinguishes: empty/unreadable input (AC-09) vs connectivity (AC-10). */
-export type ApiErrorKind = "empty" | "network" | "unknown";
+export type ApiErrorKind = "empty" | "network" | "unknown" | "guest_limit";
 
 export class ApiError extends Error {
   kind: ApiErrorKind;
@@ -118,7 +119,12 @@ export async function processRfq(input: ProcessInput): Promise<AgentDraft> {
   // Tell the agent the UI locale so it writes free-text (notes/advisories/questions) in Arabic
   // even when the RFQ text is English. <html lang> is kept in sync with the locale by the i18n provider.
   const locale = typeof document !== "undefined" ? document.documentElement.lang : "en";
-  const { jobId } = await postJson<{ jobId: string }>("/api/agent/process", { ...input, locale }); // throws ApiError on empty/network
+  const started = await postJson<{ jobId?: string; guestLimit?: boolean }>("/api/agent/process", { ...input, locale }); // throws ApiError on empty/network
+  // Server guest-parse backstop (signed-out visitor over the free limit) — surface it as a distinct kind
+  // the UI maps to the sign-in/account prompt, NOT a scary error.
+  if (started.guestLimit) throw new ApiError("guest_limit");
+  const jobId = started.jobId;
+  if (!jobId) throw new ApiError("network");
   const deadline = Date.now() + PROCESS_TIMEOUT_MS;
   while (Date.now() < deadline) {
     let res: Response;
@@ -136,16 +142,56 @@ export async function processRfq(input: ProcessInput): Promise<AgentDraft> {
   throw new ApiError("network"); // timed out
 }
 
+/**
+ * A5 — teach Mansour from the renter's draft-vs-final edits (the web_review learning signal). Pure
+ * fire-and-forget: never awaited on the submit path, swallows every error, and uses `keepalive` so the
+ * POST survives the navigation to the confirmation screen. `patch` is the full corrected RFQ shape from
+ * `draftToRfqCorrection`; `corrector_id`/`source` are set server-side.
+ */
+export async function postRfqCorrection(rfqId: string, patch: unknown, reason?: string): Promise<void> {
+  try {
+    await fetch(`/api/agent/rfq/${encodeURIComponent(rfqId)}/correct`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ patch, reason }),
+      keepalive: true,
+    });
+  } catch {
+    /* learning is best-effort — a miss must never affect request creation */
+  }
+}
+
 /** Submit the assembled broadcast (AC-42/43). The server fans out one request per item, so
  *  `requestIds` carries every short code (`requestId` = the first, for back-compat). */
 /** The renter's own requests (web-app/request-details-bids). One row per item (backend fan-out). */
-export function fetchMyRequests(filter?: { status?: string; type?: string; groupId?: string }): Promise<{ requests: RequestListItem[] }> {
+export function fetchMyRequests(filter?: { status?: string; type?: string; groupId?: string; page?: number; limit?: number }): Promise<{ requests: RequestListItem[] }> {
   const qs = new URLSearchParams();
   if (filter?.status) qs.set("status", filter.status);
   if (filter?.type) qs.set("type", filter.type);
   if (filter?.groupId) qs.set("groupId", filter.groupId);
+  if (filter?.page) qs.set("page", String(filter.page));
+  if (filter?.limit) qs.set("limit", String(filter.limit));
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
   return getJson<{ requests: RequestListItem[] }>(`/api/me/requests${suffix}`);
+}
+
+/**
+ * Every request the renter has, across all pages. The list endpoint defaults to 20 newest and the
+ * response drops the pagination `total`, so a renter with many requests would hide bids on their older
+ * ones (they fall past page 1). The comparison needs the FULL set so no bid-bearing request is missed:
+ * page through at the backend max (100/page) until a short page signals the end. `filter` forwards
+ * status/type/groupId (never page/limit — those are managed here).
+ */
+export async function fetchAllMyRequests(filter?: { status?: string; type?: string; groupId?: string }): Promise<{ requests: RequestListItem[] }> {
+  const PAGE = 100; // backend caps `limit` at 100 (getPagination Math.min(100, …))
+  const all: RequestListItem[] = [];
+  for (let page = 1; ; page++) {
+    const { requests } = await fetchMyRequests({ ...filter, page, limit: PAGE });
+    all.push(...requests);
+    if (requests.length < PAGE) break; // last (short) page reached
+    if (page >= 50) break; // hard stop (≤5000 requests) — guards against an unexpected full-page loop
+  }
+  return { requests: all };
 }
 
 /** All requests in one submission group (multi-item view) — filtered by `requestGroupId`. */
@@ -227,7 +273,14 @@ export function fetchStreamToken(id: string): Promise<{ token: string | null; us
 }
 
 /** Counter the offer with a new rate. */
-export function proposeRate(id: string, body: { proposedRate: number; priceUnit: string; mobPrice?: number; demobPrice?: number; message?: string }): Promise<unknown> {
+export function proposeRate(
+  id: string,
+  body: {
+    proposedRate: number; priceUnit: string; mobPrice?: number; demobPrice?: number; message?: string;
+    // deal-room/negotiation — per-type unit counts (pending, ride the rate_proposal chat) + leg exclusion.
+    rentalUnits?: number; mobUnits?: number; demobUnits?: number; mobExcluded?: boolean; demobExcluded?: boolean;
+  },
+): Promise<unknown> {
   return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/rate-proposal`, body);
 }
 
@@ -239,10 +292,22 @@ export type TermUpdate = { termKey: string; action: string; value?: unknown };
  * locally-collected `termResolutions` are submitted together, and `agreedUnits` is only sent for
  * assembled multi-supplier deals (the web has none → omit it).
  */
-export function acceptDeal(id: string, contractType = "formal", opts?: { termResolutions?: TermUpdate[]; agreedUnits?: number }): Promise<unknown> {
+export function acceptDeal(
+  id: string,
+  contractType = "formal",
+  opts?: {
+    termResolutions?: TermUpdate[]; agreedUnits?: number;
+    // deal-room/negotiation — matched mob/demob unit counts + leg exclusion, written on accept.
+    mobUnits?: number; demobUnits?: number; mobExcluded?: boolean; demobExcluded?: boolean;
+  },
+): Promise<unknown> {
   const body: Record<string, unknown> = { contractType };
   if (opts?.termResolutions && opts.termResolutions.length) body.termResolutions = opts.termResolutions;
   if (opts?.agreedUnits != null) body.agreedUnits = opts.agreedUnits;
+  if (opts?.mobUnits != null) body.mobUnits = opts.mobUnits;
+  if (opts?.demobUnits != null) body.demobUnits = opts.demobUnits;
+  if (opts?.mobExcluded != null) body.mobExcluded = opts.mobExcluded;
+  if (opts?.demobExcluded != null) body.demobExcluded = opts.demobExcluded;
   return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/accept`, body);
 }
 
@@ -250,6 +315,12 @@ export function acceptDeal(id: string, contractType = "formal", opts?: { termRes
  *  NEGOTIATING and re-arms the bid so the renter can re-negotiate + re-confirm (re-issues the quotation). */
 export function releaseDeal(id: string, reason?: string): Promise<unknown> {
   return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/release`, reason ? { reason } : {});
+}
+
+/** Withdraw a pending acceptance (app parity: "withdraw acceptance"). Flips
+ *  AWAITING_SUPPLIER_CONFIRMATION → NEGOTIATING, clears reserved units, re-arms the bid. */
+export function withdrawAcceptance(id: string): Promise<unknown> {
+  return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/withdraw`, {});
 }
 
 /** Submit all locally-collected term resolutions at once (app parity — batched with the rate counter). */
@@ -361,6 +432,36 @@ export async function parseBid(payload: { message?: string; attachments?: { type
   }
 }
 
+/** Result of /bids/transform — a raw extracted bid + per-term signals for the renter-verify screen. */
+export interface BidTransformResult {
+  bid: NormalizedBid;
+  term_matches: TermMatch[];
+  match: QuoteMatchCheck;
+  has_request: boolean;
+}
+
+/** Quote → raw bid + term signals (renter then verifies). `request` optional — omit for a bare quote. */
+export async function transformBid(payload: { attachments: { type: string; filename?: string; data: string }[]; message?: string; request?: TransformRequestCtx | null }): Promise<{ agent: boolean; result?: BidTransformResult }> {
+  try {
+    const res = await fetch("/api/me/bids/transform", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), cache: "no-store" });
+    if (!res.ok) return { agent: false };
+    return (await res.json()) as { agent: boolean; result?: BidTransformResult };
+  } catch {
+    return { agent: false };
+  }
+}
+
+/** Commit the renter-verified draft → a comparison-ready bid (agent strips VAT + feeds the learn loop). */
+export async function commitBid(payload: { source_file: string | null; extracted: NormalizedBid; corrected: NormalizedBid; vat_mode: "incl" | "excl" }): Promise<{ agent: boolean; result?: { bid: NormalizedBid; changed: boolean } }> {
+  try {
+    const res = await fetch("/api/me/bids/commit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), cache: "no-store" });
+    if (!res.ok) return { agent: false };
+    return (await res.json()) as { agent: boolean; result?: { bid: NormalizedBid; changed: boolean } };
+  } catch {
+    return { agent: false };
+  }
+}
+
 /** Save the renter's ranking preference to their profile (durable once the agent's migration 0016 lands). */
 export async function saveBidPreference(payload: { preset: PreferencePreset; require_supplier?: string[]; free_text?: string | null }): Promise<{ ok: boolean }> {
   try {
@@ -416,6 +517,45 @@ export async function submitBidForm(token: string, payload: SubmitBidFormPayload
   return postJson<{ id: string }>(`/api/bid-form/${encodeURIComponent(token)}/submissions`, payload);
 }
 
+/** Content types + size the bid-form upload accepts (mirrors the agents backend). */
+export const BID_UPLOAD_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"] as const;
+export const BID_UPLOAD_MAX_BYTES = 10 * 1024 * 1024; // 10MB
+
+export interface BidUploadInput { file: File; folder: "photos" | "documents"; type: string }
+export interface BidUploadedFile { key: string; type: string; filename: string }
+
+/** Throws a user-facing reason if a file isn't an allowed type / is too big (AC-06). */
+export function validateBidFile(file: File): string | null {
+  if (!(BID_UPLOAD_TYPES as readonly string[]).includes(file.type)) return "unsupported_type";
+  if (file.size > BID_UPLOAD_MAX_BYTES) return "too_large";
+  return null;
+}
+
+/**
+ * Presign (via the BFF) then PUT each file straight to S3, returning the classified {key,type,filename}
+ * to include in the submit payload. Pre-validates type + size. Throws on a failed presign/PUT so the
+ * caller can surface it. `key` is the plain S3 key (NOT the presigned URL) — that's what submit expects.
+ */
+export async function uploadBidFiles(token: string, inputs: BidUploadInput[]): Promise<BidUploadedFile[]> {
+  if (!inputs.length) return [];
+  for (const i of inputs) {
+    const bad = validateBidFile(i.file);
+    if (bad) throw new Error(bad);
+  }
+  const presign = await postJson<{ uploads: { filename: string; key: string; url: string; contentType: string }[] }>(
+    `/api/bid-form/${encodeURIComponent(token)}/upload-urls`,
+    { files: inputs.map((i) => ({ filename: i.file.name, contentType: i.file.type, folder: i.folder })) },
+  );
+  const uploads = presign.uploads ?? [];
+  await Promise.all(
+    uploads.map(async (u, k) => {
+      const res = await fetch(u.url, { method: "PUT", headers: { "Content-Type": inputs[k].file.type }, body: inputs[k].file });
+      if (!res.ok) throw new Error("upload_failed");
+    }),
+  );
+  return uploads.map((u, k) => ({ key: u.key, type: inputs[k].type, filename: u.filename }));
+}
+
 /** Authed (renter): a request's off-platform submissions + link tracker (opened/submitted + token). */
 export async function fetchRequestSubmissions(
   requestId: string,
@@ -440,6 +580,12 @@ export async function fetchRequestSubmissions(
 /** Set / clear the request's optional bid-submission deadline (AC-04/05/06). `deadline` = ISO or null. */
 export async function setBidDeadline(requestId: string, deadline: string | null): Promise<{ deadline: string | null }> {
   return postJsonMethod<{ deadline: string | null }>(`/api/me/requests/${encodeURIComponent(requestId)}/share-link`, { deadline }, "PUT");
+}
+
+/** Renter's pre-conversion "Negotiate" message on an off-platform submission (relay → agents).
+ *  Appends `{ text, at }` to the submission's `rentee_messages`; ops is emailed on the first. */
+export async function postSubmissionMessage(requestId: string, submissionId: string, text: string): Promise<void> {
+  await postJson(`/api/me/requests/${encodeURIComponent(requestId)}/bid-submissions/${encodeURIComponent(submissionId)}/messages`, { text });
 }
 
 /** Set / clear the renter's company logo on the request's shared bid form. `logoUrl` = data URL or null. */

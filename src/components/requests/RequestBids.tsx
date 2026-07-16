@@ -7,6 +7,7 @@ import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/cli
 import type { BidCard } from "@/lib/contract/bids";
 import { computeBidQuote } from "@/lib/contract/comparison";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
+import { qualityFromSubmission, type BidQuality } from "@/lib/contract/bid-quality";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { CredentialPills } from "@/components/requests/CredentialPills";
 import { TermsPanel } from "@/components/requests/TermsPanel";
@@ -16,6 +17,8 @@ import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
 import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
+import { SharedBidNegotiateRoom } from "@/components/requests/SharedBidNegotiateRoom";
+import { NEGOTIATE_ENABLED } from "@/lib/config/flags";
 
 /** Lifecycle pill (matches the prototype SPILL). */
 const SPILL: Record<string, { cls: string; dot: boolean; en: string; ar: string }> = {
@@ -84,6 +87,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
   const [submissions, setSubmissions] = useState<LinkBidSubmission[]>([]);
   const [src, setSrc] = useState<"all" | "app" | "link">("all"); // source filter
   const [submissionBid, setSubmissionBid] = useState<BidCard | null>(null);
+  const [negotiateBid, setNegotiateBid] = useState<BidCard | null>(null); // web-app/006 — deal-room-style negotiate view
 
   const toggleSelect = (id: string) =>
     setSelected((prev) => {
@@ -142,7 +146,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
         td{padding:7px 0;border-bottom:1px solid #E4EDF5} td.v{text-align:${ar ? "left" : "right"};font-weight:700}
         tr.tot td{border-top:2px solid #D4E0EC;border-bottom:0;font-weight:800;padding-top:10px} tr.tot td.v{color:#F79009}
       </style></head><body>
-      <div class="brand"><span class="logo">MOEDA<i>TECH</i></span><span class="meta">${esc(L("Quotation", "عرض السعر"))}<br>${esc(new Date().toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "long", year: "numeric" }))}</span></div>
+      <div class="brand"><span class="logo">MOEDA<i>TECH</i></span><span class="meta">${esc(L("Quotation", "عرض السعر"))}<br>${esc(new Date().toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "long", year: "numeric" }))}</span></div>
       <h1>${L("Quotation", "عرض السعر")}</h1>
       <p class="sub">${esc(L("Bids on request", "عروض على الطلب"))} ${esc(requestId)} · ${chosen.length} ${L("bids", "عروض")}</p>
       ${sections}
@@ -198,17 +202,22 @@ export function RequestBids({ requestId }: { requestId: string }) {
   // Merge on-platform app bids with off-platform shared-link submissions (mapped to a BidCard shape).
   // A submission covers the whole group; on a single request, show only THIS request's item (one card).
   const linkLabels = new Map<string, string | null>(); // card id → item label (for the card title)
+  const linkQuality = new Map<string, BidQuality>(); // card id → bid-quality score (shown on the card)
   const linkCards = submissions.flatMap((s) => {
     const it = s.items.find((i) => i.requestId === requestId) ?? (s.items.length === 1 ? s.items[0] : null);
     if (!it) return [];
     const id = `link-${s.id}-${it.requestItemId}`;
     linkLabels.set(id, it.label ?? null);
+    linkQuality.set(id, qualityFromSubmission(s));
     return [{ ...submissionToBidCard(s, it), id }];
   });
   const merged = [...bids, ...linkCards];
-  const linkCount = linkCards.length;
-  const appCount = bids.length;
-  const allBids = merged.filter((b) => (src === "all" ? true : src === "link" ? b.viaSharedLink : !b.viaSharedLink));
+  // Off-platform = raw shared-link submissions OR app bids CONVERTED from one (web-app/006). Both are
+  // labelled + counted as off-platform, even though a converted bid is a first-class app bid with a deal room.
+  const isOff = (b: { viaSharedLink?: boolean; converted?: boolean }) => !!(b.viaSharedLink || b.converted);
+  const linkCount = merged.filter(isOff).length;
+  const appCount = merged.filter((b) => !isOff(b)).length;
+  const allBids = merged.filter((b) => (src === "all" ? true : src === "link" ? isOff(b) : !isOff(b)));
   if (merged.length === 0) return <div className="rempty">{L("No bids yet — suppliers' offers will appear here.", "لا توجد عروض بعد — ستظهر عروض المؤجّرين هنا.")}</div>;
 
   return (
@@ -248,7 +257,9 @@ export function RequestBids({ requestId }: { requestId: string }) {
               isSel={selected.has(b.id)}
               onToggleSelect={() => toggleSelect(b.id)}
               onViewSubmission={() => setSubmissionBid(b)}
+              onNegotiate={NEGOTIATE_ENABLED ? () => setNegotiateBid(b) : undefined}
               itemLabel={linkLabels.get(b.id) ?? null}
+              quality={linkQuality.get(b.id) ?? null}
             />
           );
         }
@@ -267,7 +278,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
           b.status === "COUNTER_OFFERED" ? L("Countered", "قدّم عرضاً مقابلاً")
           : b.status === "ACCEPTED" ? L("Accepted", "مقبول")
           : disabled ? L("Validity ended", "انتهت الصلاحية")
-          : b.submittedAt ? `${L("Submitted", "قُدّم")} · ${new Date(b.submittedAt).toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short" })}` : L("Submitted", "قُدّم");
+          : b.submittedAt ? `${L("Submitted", "قُدّم")} · ${new Date(b.submittedAt).toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short" })}` : L("Submitted", "قُدّم");
         const priceOpen = openPrice === b.id;
         const isSel = selected.has(b.id);
         return (
@@ -284,7 +295,12 @@ export function RequestBids({ requestId }: { requestId: string }) {
                 <div className="r1">
                   <span className="sname">{b.supplierName}</span>
                   <span className={`spill ${sp.cls}`}>{sp.dot && <span className="d" />}{ar ? sp.ar : sp.en}</span>
-                  <span className="src-chip src-app"><span className="material-icons-outlined">verified_user</span>{L("via Moedatech app", "عبر تطبيق معداتك")}</span>
+                  {b.converted ? (
+                    // web-app/006: a converted bid is a real app bid, but keep its OFF-PLATFORM origin label.
+                    <span className="src-chip" style={{ background: "var(--brand-soft, #fff4e5)", color: "var(--brand, #f79009)" }}><span className="material-icons-outlined">link</span>{L("via shared link", "عبر الرابط")}</span>
+                  ) : (
+                    <span className="src-chip src-app"><span className="material-icons-outlined">verified_user</span>{L("via Moedatech app", "عبر تطبيق معداتك")}</span>
+                  )}
                 </div>
                 <div className="bid-evt">{evt}</div>
                 <div className="credrow">
@@ -377,7 +393,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
 
             {/* lifecycle chips */}
             <div className="lc-chips">
-              {b.validUntil && <span className="lc-chip"><span className="material-icons-outlined">schedule</span>{L("Valid until", "صالح حتى")} {new Date(b.validUntil).toLocaleDateString(ar ? "ar-SA" : "en-GB", { day: "numeric", month: "short" })}</span>}
+              {b.validUntil && <span className="lc-chip"><span className="material-icons-outlined">schedule</span>{L("Valid until", "صالح حتى")} {new Date(b.validUntil).toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short" })}</span>}
               {b.distanceKm != null && <span className="lc-chip"><span className="material-icons-outlined">place</span>{Math.round(b.distanceKm)} {L("km", "كم")}</span>}
             </div>
 
@@ -424,9 +440,24 @@ export function RequestBids({ requestId }: { requestId: string }) {
         <SharedBidSubmissionModal
           bid={submissionBid}
           submission={submissions.find((s) => s.id === submissionBid.submissionKey) ?? null}
+          focusItemId={submissionBid.requestItemId}
           ar={ar}
           L={L}
           onClose={() => setSubmissionBid(null)}
+          onNegotiate={NEGOTIATE_ENABLED ? () => { const b = submissionBid; setSubmissionBid(null); setNegotiateBid(b); } : undefined}
+        />
+      )}
+
+      {/* web-app/006 — deal-room-style negotiate relay for an off-platform shared-link bid */}
+      {NEGOTIATE_ENABLED && negotiateBid && (
+        <SharedBidNegotiateRoom
+          bid={negotiateBid}
+          submission={submissions.find((s) => s.id === negotiateBid.submissionKey) ?? null}
+          itemLabel={linkLabels.get(negotiateBid.id) ?? null}
+          ar={ar}
+          L={L}
+          onClose={() => setNegotiateBid(null)}
+          onViewSubmission={() => { const b = negotiateBid; setNegotiateBid(null); setSubmissionBid(b); }}
         />
       )}
 

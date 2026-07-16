@@ -423,10 +423,17 @@ export const en = {
     blockTitle: "Create an account to continue", // AC-02
     blockBody: "RFQ creation is available to registered renters. Create an account to start a request.",
     createAccount: "Create account",
-    postTitle: "Create your account to post your request",
-    postBody: "Complete your details and your request will be posted right away.",
-    gateTitle: "Create your account to continue",
+    postTitle: "Complete your details",
+    postBody: "Just a few details to finish setting up your account.",
+    // Request-submit gate only — makes it clear the request posts right after (shown when submitting a request).
+    postBodyRequest: "Complete your details and your request will be posted right away.",
+    postGateTitle: "Sign in to post your request",
+    // General title for the sign-in/register modal — it serves BOTH new and returning accounts.
+    gateTitle: "Sign in to continue",
     gateSub: "Enter your phone number — we'll text a verification code. New or returning, just enter your number.",
+    // Guest AI-agent limit reached (per-device run cap). Neutral wording — no free/paid framing.
+    trialTitle: "You've reached your limit",
+    trialSub: "Sign in to continue.",
   },
   gate: {
     confirmLocation: "Confirm the location to continue.", // AC-12/16
@@ -487,6 +494,30 @@ export const en = {
     viaEmail: "Email",
     emailLabel: "Email address",
     emailInvalid: "Enter a valid email address.",
+    countryLabel: "Country",
+    smsSaudiOnly: "SMS isn't available outside Saudi Arabia — use Email to get your code.",
+    emailChoiceTitle: "Keep your saved email?",
+    emailChoiceBody: "This number already uses {stored}. Keep it, or switch to the one you just entered ({new})?",
+    emailKeep: "Keep current",
+    emailUseNew: "Use new",
+    emailSwitching: "Switching…",
+    emailSwitchError: "Couldn't switch your email — keeping the current one.",
+    withPhone: "Phone",
+    withEmail: "Email",
+    entryTitle: "Sign in or create your account",
+    entrySub: "Enter your phone or email — we'll send a verification code. New or returning, this is the only step.",
+    addPhoneTitle: "Add your phone number",
+    addPhoneSub: "Your phone is your account identity — we'll text a code to verify it.",
+    verifyCreate: "Verify & create account",
+    verifyPhone: "Verify",
+    phoneVerified: "Phone verified",
+    signInInstead: "Sign in instead",
+    emailRequiredTitle: "Add your email",
+    emailRequiredSub: "We'll use it for receipts and to help you sign in.",
+    emailSignInUnavailable: "We couldn't sign you in with this email — please use your phone number.",
+    finishTitle: "Finish your signup",
+    finishBody: "You're almost there — add your details to finish creating your account.",
+    finishCta: "Finish signup",
     sendCode: "Send code", // AC-01
     sending: "Sending…",
     signInFoot: "New here? Just enter your number — we'll set you up.",
@@ -504,6 +535,10 @@ export const en = {
       expired: "That code has expired. Request a new one.", // AC-11
       locked: "Too many attempts. Request a new code.", // AC-10
       send_failed: "We couldn't send the code. Please try again.", // AC-15
+      email_ambiguous: "This email is linked to more than one account — use a different email, or sign in with your phone.",
+      email_taken: "This email is already in use.",
+      phone_taken: "You already have an account with this number.",
+      phone_not_verified: "Please verify your phone number first.",
       offline: "You appear to be offline. Check your connection and try again.", // AC-24
       unknown: "Something went wrong. Please try again.",
     },
@@ -537,6 +572,7 @@ export const en = {
       email: "Enter a valid email address.",
       emailRequired: "A valid email address is required.",
       whatsapp: "Enter a valid Saudi mobile number.", // AC-04
+      phone: "Enter your phone number and verification code.",
       submit: "We couldn't save your details. Please try again.",
       offline: "You appear to be offline. Your details are kept — try again.", // AC-23
     },

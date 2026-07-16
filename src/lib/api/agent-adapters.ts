@@ -26,7 +26,17 @@ import {
   type MaintenanceSla,
   type BidWindow,
 } from "@/lib/contract";
-import type { RFQAgentOutput, RFQHeader, RFQLineItem, MissingFieldEntry } from "@/lib/contract/agent";
+import type { Taxonomy } from "@/lib/contract";
+import type {
+  RFQAgentOutput,
+  RFQHeader,
+  RFQLineItem,
+  MissingFieldEntry,
+  AgentRentalType,
+  AgentFuelType,
+  AgentOvertimeRate,
+  AgentOperatorLicenseLevel,
+} from "@/lib/contract/agent";
 
 /**
  * Mansour's `POST /rfq` envelope is double-nested and uses `ok` (not `success`):
@@ -59,7 +69,11 @@ export function extractAgentOutput(raw: unknown): RFQAgentOutput {
     if (isObj(a.data.result)) candidates.push(a.data.result);
   }
   const b = candidates.find((c) => "rfq_header" in c || "line_items" in c) ?? a;
+  // rfq_id is a sibling of the payload (envelope level or under `data`), NOT inside b — keep it so the
+  // wizard can fire a correction against it (A5 web_review learning loop).
+  const rfqIdRaw = a.rfq_id ?? (isObj(a.data) ? a.data.rfq_id : undefined) ?? b.rfq_id;
   return {
+    rfq_id: rfqIdRaw != null ? String(rfqIdRaw) : undefined,
     rfq_header: (b.rfq_header ?? {}) as RFQHeader,
     line_items: (Array.isArray(b.line_items) ? b.line_items : []) as RFQLineItem[],
     missing_required_fields: (Array.isArray(b.missing_required_fields)
@@ -174,6 +188,7 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
     if (fn?.field && typeof fn.note === "string" && fn.note.trim()) fieldNotes[fn.field] = fn.note.trim();
   }
   return {
+    rfqId: out.rfq_id ?? null, // A5: anchor for the web_review correction fired at submit
     project,
     items,
     preferences: toPreferences(out.rfq_header ?? {}), // AC-36/37/39/40: prefill Step-3 from the agent
@@ -280,6 +295,17 @@ function deriveVerdict(li: RFQLineItem): { verdict: Verdict; resolved: boolean }
   return needsCheck ? { verdict: "needs-validation", resolved: false } : { verdict: "confident", resolved: true };
 }
 
+/** One FAT side (Mansour's `*_by_rentee` boolean) → our Party. true = rentee/me covers it, false =
+ *  supplier; null/undefined ⇒ null so the caller can fall back to the legacy mirror. */
+function fatSide(v: boolean | null | undefined): Party | null {
+  return v == null ? null : v ? "me" : "supplier";
+}
+/** Legacy FAT fallback when a split field is absent — the single operator_accommodation_by_rentee
+ *  (supplier only when explicitly false; defaults to "me" otherwise, matching prior behaviour). */
+function legacyFatSide(li: RFQLineItem): Party {
+  return li.operator_accommodation_by_rentee === false ? "supplier" : "me";
+}
+
 function toItem(li: RFQLineItem, idx: number): EquipmentItem {
   const { verdict, resolved } = deriveVerdict(li);
   const ref = {
@@ -317,14 +343,19 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
       nationality: li.operator_nationality ?? null,
       certificate: agentCert, // AC-24/50: operator license level(s) (multi-select)
       certByAgent: agentCert.length > 0, // agent set it → project-level Safety cert won't override
-      // AC-24: F.A.T split — who covers the operator's Food vs Accommodation & Transport. Mansour still
-      // emits a single operator_accommodation_by_rentee (true = rentee/me, false = supplier), so both
-      // sides derive from it (supplier only when explicitly false) until the agent splits the signal.
-      fatFood: li.operator_accommodation_by_rentee === false ? "supplier" : "me",
-      fatAccommodationTransport: li.operator_accommodation_by_rentee === false ? "supplier" : "me",
+      // AC-24: F.A.T split — who covers the operator's Food vs Accommodation & Transport. Mansour now
+      // emits the two sides as SEPARATE signals (fat_food_by_rentee / fat_accommodation_transport_by_rentee,
+      // true = rentee/me, false = supplier); read each independently, falling back to the legacy single
+      // operator_accommodation_by_rentee only when the split field is absent.
+      fatFood: fatSide(li.fat_food_by_rentee) ?? legacyFatSide(li),
+      fatAccommodationTransport: fatSide(li.fat_accommodation_transport_by_rentee) ?? legacyFatSide(li),
+      // AC-24: whether FAT applies at all (operator included) — the agent's explicit signal, kept so the
+      // submit sends it rather than only deriving it from who-covers-what.
+      fatRequired: li.fat_required ?? null,
     },
     fuelType: (li.fuel_type_preference && FUEL_IN[li.fuel_type_preference]) || "diesel",
     additionalNotes: li.additional_notes ?? "", // AC-53: agent-extracted per-item notes (was dropped)
+    workType: li.work_type ?? undefined, // A7: prefill work type (crane-only; ItemRow gates via isCrane)
     deliveryOverride: li.mobilization_by_rentee == null ? null : li.mobilization_by_rentee ? "me" : "supplier",
     returnOverride: li.demobilization_by_rentee == null ? null : li.demobilization_by_rentee ? "me" : "supplier",
     // AC-26: supplier provides fuel ⇒ fuel responsibility = supplier (else me); null when Mansour didn't say.
@@ -380,4 +411,106 @@ function toPreferences(h: RFQHeader): Preferences {
   p.supplierFilters.sublettingAllowed = h.subletting ?? false;
   p.supplierFilters.bidWindow = (pick(h.offer_duration, BID_WINDOWS) as BidWindow | undefined) ?? null;
   return p;
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * A5 — reverse adapter: the renter's FINAL wizard draft → Mansour's RFQ shape, sent as the correction
+ * patch to POST /rfq/:id/correct (source "web_review"). The inverse of toItem/toProject: it re-expresses
+ * every wizard-editable field in Mansour's vocabulary so the learning loop can diff draft-vs-final. The
+ * correct endpoint types line_items loosely (z.record), so extra/absent keys are safe — we send the FULL
+ * corrected array (contract rule: full array, not a delta). Names resolve from the live taxonomy (the
+ * renter may have re-picked a node, leaving agentNames stale); ids come straight from the ref.
+ * ---------------------------------------------------------------------------------------------- */
+
+const RENTAL_OUT: Record<string, AgentRentalType> = { daily: "DAILY", weekly: "WEEKLY", monthly: "MONTHLY" };
+const FUEL_OUT: Record<string, AgentFuelType> = { diesel: "DIESEL", petrol: "PETROL", electric: "ELECTRIC" };
+const OVERTIME_OUT: Record<string, AgentOvertimeRate> = { without: "0", "1.5x": "1.5X", "2x": "2X" };
+const CERT_OUT: Record<string, AgentOperatorLicenseLevel> = { spsp: "SPSP", tuv: "TUV", "saso-technical": "SASO" };
+
+/** Party → Mansour's `*_by_rentee` boolean: me ⇒ true (rentee covers), supplier ⇒ false; null passes through. */
+function renteeSide(p: Party | null | undefined): boolean | null {
+  return p == null ? null : p === "me";
+}
+/** UI equipment-year ("2020" | "2020+" | "custom:2020" | "any") → the 4-digit year, or null. */
+function yearOut(v: string | null | undefined): number | null {
+  if (!v || v === "any") return null;
+  const m = v.match(/\d{4}/);
+  return m ? Number(m[0]) : null;
+}
+/** Resolve canonical (English) names for a taxonomy ref from the loaded tree. */
+function taxNames(
+  ref: { categoryId: string | null; subcategoryId: string | null; measurementId: string | null },
+  taxonomy: Taxonomy,
+): { category: string; subtype: string; capacity: string } {
+  const cat = taxonomy.find((c) => c.id === ref.categoryId);
+  const sub = cat?.subcategories.find((s) => s.id === ref.subcategoryId);
+  const meas = sub?.measurements.find((m) => m.id === ref.measurementId);
+  return { category: cat?.name ?? "", subtype: sub?.name ?? "", capacity: meas?.name ?? "" };
+}
+
+export interface RfqCorrectionPatch {
+  rfq_header: RFQHeader;
+  line_items: RFQLineItem[];
+}
+
+/** Build the correction patch (rfq_header + full line_items) from the renter's final draft. */
+export function draftToRfqCorrection(
+  input: { project: ProjectDetails; items: EquipmentItem[]; preferences: Preferences },
+  taxonomy: Taxonomy,
+): RfqCorrectionPatch {
+  const { project, items, preferences } = input;
+  const line_items: RFQLineItem[] = items.map((it) => {
+    const names = taxNames(it.ref, taxonomy);
+    const opIncluded = it.operatorNeeded === "yes";
+    // fuel responsibility → diesel_included (supplier ⇒ true); only meaningful for combustion fuels.
+    const fuelParty = it.fuelResponsibilityOverride ?? project.fuelResponsibility ?? null;
+    const dieselIncluded = (it.fuelType === "diesel" || it.fuelType === "petrol") && fuelParty ? fuelParty === "supplier" : null;
+    const accomTransport = opIncluded ? renteeSide(it.operator.fatAccommodationTransport) : null;
+    const licenseLevels = it.operator.certificate.map((c) => CERT_OUT[c]).filter((c): c is AgentOperatorLicenseLevel => !!c);
+    const safety = (it.safetyCertsOverride ?? project.certificates.safety).map((c) => CERT_OUT[c]).filter(Boolean) as string[];
+    return {
+      input_equipment: it.rawLabel ?? names.category ?? "",
+      category: names.category || it.agentNames?.category || "",
+      subtype: names.subtype || it.agentNames?.subtype || "",
+      capacity: names.capacity || it.agentNames?.capacity || it.rawSize || "",
+      capacity_input_value: it.rawSize ?? null,
+      quantity: it.quantity ?? 1,
+      operator_included: it.operatorNeeded === "yes" ? true : it.operatorNeeded === "no" ? false : null,
+      fuel_type_preference: FUEL_OUT[it.fuelType] ?? null,
+      mobilization_by_rentee: renteeSide(it.deliveryOverride ?? project.deliveryToSite),
+      demobilization_by_rentee: renteeSide(it.returnOverride ?? project.returnFromSite),
+      minimum_equipment_year: yearOut(it.equipmentYear ?? project.advanced.equipmentYear),
+      night_shift_required: opIncluded ? it.operator.nightShift : null,
+      operator_nationality: opIncluded ? it.operator.nationality ?? null : null,
+      operator_license_levels: licenseLevels.length ? licenseLevels : null,
+      fat_required: opIncluded ? it.operator.fatRequired ?? null : null,
+      fat_food_by_rentee: opIncluded ? renteeSide(it.operator.fatFood) : null,
+      fat_accommodation_transport_by_rentee: accomTransport,
+      operator_accommodation_by_rentee: accomTransport, // legacy mirror of accommodation/transport
+      diesel_included: dieselIncluded,
+      safety_certifications: safety.length ? safety : null,
+      additional_notes: it.additionalNotes || null,
+      work_type: it.workType?.trim() ? it.workType.trim() : null, // A7: teach Mansour on a renter's edit
+      category_id: it.ref.categoryId,
+      subtype_id: it.ref.subcategoryId,
+      capacity_id: it.ref.measurementId,
+    };
+  });
+  const rfq_header: RFQHeader = {
+    rental_type: project.timing.rentalBasis ? RENTAL_OUT[project.timing.rentalBasis] ?? null : null,
+    extendable: project.timing.extendable,
+    start_date: project.timing.startDate,
+    end_date: project.timing.endDate,
+    project_lat: project.location.lat ?? null,
+    project_lng: project.location.lng ?? null,
+    project_address_label: project.location.label,
+    working_hours_per_day: project.timing.hoursPerDay,
+    working_days_per_week: project.advanced.workingDaysPerWeek,
+    overtime_rate: OVERTIME_OUT[project.advanced.overtimeRate] ?? null,
+    budget_ceiling: preferences.budgetSar,
+    additional_notes: preferences.additionalNotes || null,
+    verified_suppliers_only: preferences.supplierFilters.verifiedOnly,
+    subletting: preferences.supplierFilters.sublettingAllowed,
+  };
+  return { rfq_header, line_items };
 }

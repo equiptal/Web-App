@@ -37,7 +37,13 @@ export function LoginFlow({ next }: { next: string }) {
       {phone === null ? (
         <PhoneEntry onCodeSent={onCodeSent} />
       ) : (
-        <CodeEntry phone={phone} channel={channel} onVerified={onVerified} onEditNumber={onEditNumber} />
+        <CodeEntry
+          dest={phone}
+          verifyPayload={{ phone }}
+          resendPayload={{ phone, otpMethod: channel.method }}
+          onVerified={(user) => onVerified(user)}
+          onEditNumber={onEditNumber}
+        />
       )}
     </div>
   );

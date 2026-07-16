@@ -12,13 +12,25 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   let contractType = "formal"; // app-parity default (was "platform")
   let agreedUnits: number | undefined;
   let termResolutions: { termKey: string; action: string; value?: unknown }[] | undefined;
+  // deal-room/negotiation — matched mob/demob unit counts + leg exclusion, forwarded to accept-all-terms.
+  let mobUnits: number | undefined;
+  let demobUnits: number | undefined;
+  let mobExcluded: boolean | undefined;
+  let demobExcluded: boolean | undefined;
   try {
-    const b = (await req.json()) as { contractType?: string; agreedUnits?: number; termResolutions?: typeof termResolutions };
+    const b = (await req.json()) as {
+      contractType?: string; agreedUnits?: number; termResolutions?: typeof termResolutions;
+      mobUnits?: number; demobUnits?: number; mobExcluded?: boolean; demobExcluded?: boolean;
+    };
     if (b?.contractType) contractType = b.contractType;
     // Multi-supplier assembly (app parity): only assembled deals send agreedUnits — the web has none.
     if (typeof b?.agreedUnits === "number" && b.agreedUnits > 0) agreedUnits = b.agreedUnits;
     // Locally-collected term resolutions submitted with the accept (app parity: accept-all-terms batches them).
     if (Array.isArray(b?.termResolutions) && b.termResolutions.length) termResolutions = b.termResolutions;
+    if (typeof b?.mobUnits === "number") mobUnits = b.mobUnits;
+    if (typeof b?.demobUnits === "number") demobUnits = b.demobUnits;
+    if (typeof b?.mobExcluded === "boolean") mobExcluded = b.mobExcluded;
+    if (typeof b?.demobExcluded === "boolean") demobExcluded = b.demobExcluded;
   } catch {
     /* default */
   }
@@ -26,6 +38,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const body: Record<string, unknown> = { contractType };
   if (agreedUnits != null) body.agreedUnits = agreedUnits;
   if (termResolutions) body.termResolutions = termResolutions;
+  if (mobUnits != null) body.mobUnits = mobUnits;
+  if (demobUnits != null) body.demobUnits = demobUnits;
+  if (mobExcluded != null) body.mobExcluded = mobExcluded;
+  if (demobExcluded != null) body.demobExcluded = demobExcluded;
   return withAuthedBackend(req, async (call) => {
     try {
       const raw = await call(`${base}/accept-all-terms`, { method: "POST", body: JSON.stringify(body) });

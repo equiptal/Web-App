@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { extractAgentOutput, jobStatus, agentOutputToDraft } from "@/lib/api/agent-adapters";
+import { extractAgentOutput, jobStatus, agentOutputToDraft, draftToRfqCorrection } from "@/lib/api/agent-adapters";
+import type { Taxonomy } from "@/lib/contract";
 
 // A line item shaped like live Mansour output.
 const confidentLine = {
@@ -148,5 +149,72 @@ describe("agentOutputToDraft", () => {
     const item = agentOutputToDraft(extractAgentOutput(jobPoll("done"))).items[0];
     expect(item.quantity).toBe(2);
     expect(item.operatorNeeded).toBe("yes");
+  });
+});
+
+describe("toItem — FAT split (A6/AC-24)", () => {
+  const opOf = (line: object) => agentOutputToDraft(extractAgentOutput(jobPoll("done", { ...confidentLine, ...line }))).items[0].operator;
+
+  it("reads each FAT side independently from the split fields", () => {
+    // food = supplier (false), accommodation/transport = rentee/me (true)
+    const op = opOf({ fat_food_by_rentee: false, fat_accommodation_transport_by_rentee: true, fat_required: true });
+    expect(op.fatFood).toBe("supplier");
+    expect(op.fatAccommodationTransport).toBe("me");
+    expect(op.fatRequired).toBe(true);
+  });
+
+  it("falls back to the legacy single mirror when the split fields are absent", () => {
+    const op = opOf({ operator_accommodation_by_rentee: false }); // supplier covers both
+    expect(op.fatFood).toBe("supplier");
+    expect(op.fatAccommodationTransport).toBe("supplier");
+  });
+
+  it("defaults each side to 'me' when nothing is stated", () => {
+    const op = opOf({});
+    expect(op.fatFood).toBe("me");
+    expect(op.fatAccommodationTransport).toBe("me");
+    expect(op.fatRequired ?? null).toBeNull();
+  });
+});
+
+describe("extractAgentOutput — rfq_id (A5)", () => {
+  it("surfaces rfq_id from the envelope so a correction can anchor to it", () => {
+    const raw = { ok: true, data: { id: "j", rfq_id: "RFQ-STORE-1", status: "done", result: { rfq_header: {}, line_items: [confidentLine], missing_required_fields: [] } } };
+    expect(extractAgentOutput(raw).rfq_id).toBe("RFQ-STORE-1");
+    expect(agentOutputToDraft(extractAgentOutput(raw)).rfqId).toBe("RFQ-STORE-1");
+  });
+});
+
+describe("draftToRfqCorrection — reverse mapper (A5)", () => {
+  const taxonomy: Taxonomy = [
+    { id: "c", name: "Excavator", nameAr: "حفار", subcategories: [
+      { id: "s", name: "Crawler Excavator", nameAr: "حفار جنزير", measurements: [{ id: "cap", name: "20 ton", nameAr: "20 طن" }] },
+    ] },
+  ];
+
+  it("re-expresses the final draft in Mansour's RFQ shape (ids, quantity, operator, FAT split)", () => {
+    const draft = agentOutputToDraft(
+      extractAgentOutput(jobPoll("done", { ...confidentLine, fat_food_by_rentee: false, fat_accommodation_transport_by_rentee: true })),
+    );
+    const patch = draftToRfqCorrection({ project: draft.project, items: draft.items, preferences: draft.preferences! }, taxonomy);
+    expect(patch.line_items).toHaveLength(1);
+    const li = patch.line_items[0];
+    expect(li.category_id).toBe("c");
+    expect(li.subtype_id).toBe("s");
+    expect(li.capacity_id).toBe("cap");
+    expect(li.category).toBe("Excavator"); // resolved from the live taxonomy, not stale agentNames
+    expect(li.quantity).toBe(2);
+    expect(li.operator_included).toBe(true);
+    // me ⇒ true (rentee covers), supplier ⇒ false
+    expect(li.fat_food_by_rentee).toBe(false);
+    expect(li.fat_accommodation_transport_by_rentee).toBe(true);
+    expect(li.operator_accommodation_by_rentee).toBe(true); // legacy mirror of accommodation/transport
+  });
+
+  it("reflects a renter's edit — re-picking the size changes capacity_id in the patch", () => {
+    const draft = agentOutputToDraft(extractAgentOutput(jobPoll("done")));
+    draft.items[0].ref = { ...draft.items[0].ref, measurementId: "cap" }; // (already cap; explicit for clarity)
+    const patch = draftToRfqCorrection({ project: draft.project, items: draft.items, preferences: draft.preferences! }, taxonomy);
+    expect(patch.line_items[0].capacity).toBe("20 ton");
   });
 });
