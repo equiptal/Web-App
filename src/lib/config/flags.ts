@@ -1,10 +1,16 @@
 /**
- * Client-side feature flags (inlined at build via NEXT_PUBLIC_*).
+ * Client-side feature flags.
  *
- * web-app/006 — off-platform negotiate. Gates the user-visible negotiate surface: the card's Negotiate
- * button, the masked-contact Negotiate CTA in the submission viewer, and the deal-room-style negotiate
- * view. OFF by default so it stays dark in prod until the supplier onboarding/convert flow is live.
- * Enable per-environment: set `NEXT_PUBLIC_ENABLE_NEGOTIATE=1` (Amplify staging env / local `.env.local`).
- * When off, the viewer shows the supplier's contact info as before — no behaviour change.
+ * web-app/006 — off-platform negotiate visibility. No env vars: gated by HOST so the feature stays DARK
+ * on the prod domain and is visible everywhere else (staging, Amplify preview builds, localhost). We
+ * match the prod host only (canonical) rather than enumerating staging domains, so new preview/staging
+ * URLs light up automatically. Evaluated in the browser; during SSR it defaults off — safe because the
+ * off-platform bid cards (the only place these gates apply) render client-side after their data loads,
+ * so there is no hydration flash.
+ *
+ * To LAUNCH on prod: set `NEGOTIATE_ENABLED = true` (or remove the host check).
  */
-export const NEGOTIATE_ENABLED = process.env.NEXT_PUBLIC_ENABLE_NEGOTIATE === "1";
+const PROD_HOSTS = new Set(["web.moedatech.net", "www.moedatech.net"]);
+
+export const NEGOTIATE_ENABLED =
+  typeof window !== "undefined" && !PROD_HOSTS.has(window.location.hostname);
