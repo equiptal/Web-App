@@ -293,10 +293,9 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
     [data, answers, vatIncluded, skipped],
   );
 
-  // Company name is the only required identity field; CR / VAT / National Address are optional and can
-  // be provided as text OR a document, so they don't gate submission. (Phone is no longer collected on
-  // the public form — the supplier is onboarded + reached via the app's deal room after conversion.)
-  const companyValid = !!company.companyName.trim();
+  // Company name + contact are the required identity; CR / VAT / National Address are optional and can
+  // be provided as text OR a document, so they don't gate submission.
+  const companyValid = !!(company.companyName.trim() && company.contactInfo.trim());
   // Only items the supplier says they can supply gate submission (skipped ones are dropped from the bid).
   const suppliedItems = (data?.items ?? []).filter((it) => !skipped.has(it.requestItemId));
   const itemsValid = suppliedItems.every((it) => num(answers[it.requestItemId]?.rentalRate ?? "") > 0);
@@ -785,7 +784,11 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                 text={company.nationalAddress} onText={(v) => setCompany({ ...company, nationalAddress: v })} textPlaceholder={L("National address", "العنوان الوطني")}
                 docs={coAddr} onDocs={setCoAddr} token={token} L={L} disabled={submitting} />
             </div>
-            <Field label={L("City", "المدينة")} L={L}><input value={company.city} onChange={(e) => setCompany({ ...company, city: e.target.value })} placeholder={L("e.g. Riyadh", "مثال: الرياض")} /></Field>
+            <div className="frow">
+              <Field label={L("Phone", "رقم الجوال")} req invalid={showErrors && !company.contactInfo.trim()} L={L}><input type="tel" inputMode="tel" value={company.contactInfo} onChange={(e) => setCompany({ ...company, contactInfo: e.target.value })} placeholder={L("e.g. 05XXXXXXXX", "مثال: 05XXXXXXXX")} /></Field>
+              <Field label={L("City", "المدينة")} L={L}><input value={company.city} onChange={(e) => setCompany({ ...company, city: e.target.value })} placeholder={L("e.g. Riyadh", "مثال: الرياض")} /></Field>
+            </div>
+            <p style={{ margin: "-4px 0 2px", fontSize: 11.5, color: "var(--muted)" }}>{L("Your phone lets you continue this bid in the Moedatech app later.", "رقمك يتيح لك متابعة هذا العرض في تطبيق مؤيداتك لاحقاً.")}</p>
             {QUOTE_EXPIRY_ENABLED && <Field label={L("Quote valid until", "صلاحية العرض حتى")} L={L}><input type="date" value={company.validUntil} onChange={(e) => setCompany({ ...company, validUntil: e.target.value })} /></Field>}
             <div className="notes-field"><label>{L("Notes — for the whole quotation", "ملاحظات — لكامل عرض السعر")}<span className="optx">{L("Optional", "اختياري")}</span></label><textarea value={company.notes} onChange={(e) => setCompany({ ...company, notes: e.target.value })} /></div>
 

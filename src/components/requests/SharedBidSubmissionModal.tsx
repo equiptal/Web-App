@@ -57,6 +57,7 @@ export function SharedBidSubmissionModal({
   L,
   onClose,
   onDownloadQuotation,
+  onNegotiate,
 }: {
   bid: BidCard;
   submission: LinkBidSubmission | null;
@@ -68,6 +69,9 @@ export function SharedBidSubmissionModal({
   onClose: () => void;
   /** Export this submission as the app-parity quotation doc (same template as an on-platform bid). */
   onDownloadQuotation?: () => void;
+  /** web-app/006 — open the deal-room-style negotiate view (from the masked contact row). The supplier's
+   *  raw number stays hidden; the renter reaches them through the relay instead. */
+  onNegotiate?: () => void;
 }) {
   const nf = (n: number) => new Intl.NumberFormat(ar ? "ar-EG" : "en-US").format(Math.round(n));
   const sar = L("SAR", "ر.س");
@@ -456,7 +460,25 @@ export function SharedBidSubmissionModal({
                     <CoField label={L("VAT number", "الرقم الضريبي")} text={submission.vatNumber} docType="vat_cert" />
                   </div>
                   <CoField label={L("National address", "العنوان الوطني")} text={submission.nationalAddress} docType="national_address" />
-                  <RoField label={L("Contact info", "بيانات التواصل")} value={submission.contactInfo} />
+                  {/* Contact info — MASKED. The supplier's raw number is hidden; the renter reaches them via
+                      the deal-room-style negotiate relay instead (opens the mock deal room in dev). */}
+                  <div className="field" style={{ marginBottom: 12 }}>
+                    <label>{L("Contact info", "بيانات التواصل")}</label>
+                    <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+                      <div style={{ flex: 1, minWidth: 0, minHeight: 42, display: "flex", alignItems: "center", gap: 9, border: "1px solid var(--border)", borderRadius: "var(--r-md)", padding: "10px 12px", fontSize: 15, fontWeight: 800, color: "var(--muted)", background: "var(--surface2)", letterSpacing: 3 }}>
+                        <span className="material-icons-outlined" style={{ fontSize: 17, letterSpacing: 0, flexShrink: 0 }}>lock</span>
+                        {submission.contactInfo ? "•••• •••• ••" : "—"}
+                      </div>
+                      {onNegotiate && submission.contactInfo && (
+                        <button onClick={onNegotiate} style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 7, padding: "0 16px", borderRadius: "var(--r-md)", border: "none", background: "var(--action)", color: "#fff", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 2px 6px rgba(247,144,9,.32)" }}>
+                          <span className="material-icons-outlined" style={{ fontSize: 18 }}>forum</span>{L("Negotiate", "تفاوض")}
+                        </button>
+                      )}
+                    </div>
+                    <p style={{ margin: "6px 0 0", fontSize: 11.5, color: "var(--muted)", fontWeight: 600 }}>
+                      {L("Contact details are hidden — negotiate with this supplier in the deal room and continue the deal in the app.", "بيانات التواصل مخفية — تفاوض مع هذا المؤجّر في غرفة الصفقة وأكمل الصفقة في التطبيق.")}
+                    </p>
+                  </div>
                   {supplierNotes && <RoField label={L("Notes — for the whole quotation", "ملاحظات — لكامل عرض السعر")} value={supplierNotes} multiline />}
                 </div>
 
