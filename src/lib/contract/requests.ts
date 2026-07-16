@@ -289,7 +289,7 @@ export function groupRequests(items: RequestListItem[]): RequestGroup[] {
       totalUnits: groupItems.reduce((s, i) => s + (i.item?.qty ?? 1), 0),
       asap: groupItems.some((i) => i.urgency === "ASAP"),
     };
-  });
+  }).sort((a, b) => (b.createdAt ? new Date(b.createdAt).getTime() : 0) - (a.createdAt ? new Date(a.createdAt).getTime() : 0)); // latest → oldest
 }
 
 /** Demo label fix: show the airport project by its real name ("Airport" → "King Khalid Airport"). */
