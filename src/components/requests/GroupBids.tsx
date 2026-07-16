@@ -770,6 +770,14 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         </div>
       </div>
 
+      {shown.length === 0 && (
+        <div className="rempty" style={{ textAlign: "center", padding: "44px 20px" }}>
+          <span className="material-icons-outlined" style={{ fontSize: 36, color: "#9AA7B8" }}>filter_alt_off</span>
+          <div style={{ marginTop: 10, fontSize: 14.5, fontWeight: 800, color: "#1c3550" }}>{L("No bids match these filters", "لا توجد عروض مطابقة لعوامل التصفية")}</div>
+          <div style={{ marginTop: 4, fontSize: 12.5, fontWeight: 600, color: "#6b8fa8" }}>{L("Adjust or clear the source / quality filters to see more.", "عدّل أو امسح عوامل تصفية المصدر / الجودة لعرض المزيد.")}</div>
+          {fActive > 0 && <button onClick={() => { setFSource("all"); setFqParts(new Set()); setFVerified(false); setFKm(false); }} style={{ marginTop: 14, borderRadius: 10, border: "1px solid #d4e0ec", background: "#fff", color: "#1c3550", fontWeight: 800, fontSize: 13, padding: "9px 16px", cursor: "pointer", fontFamily: "inherit" }}>{L("Clear filters", "مسح عوامل التصفية")}</button>}
+        </div>
+      )}
       <div className="bids-snap" data-select-ui>
       {shown.map((b) => {
         if (b.viaSharedLink) {
