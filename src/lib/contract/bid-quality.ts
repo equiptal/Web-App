@@ -89,26 +89,36 @@ export function computeBidQuality(input: QualityInput): BidQuality {
   return { score, band: bandOf(score), parts: { terms: clamp01(terms), equipment: clamp01(equipment), company: clamp01(company) } };
 }
 
-/** Adapter: build the quality input from a renter-side submission (classifying documents by type). */
-export function qualityFromSubmission(sub: LinkBidSubmission): BidQuality {
-  const items: QualityItemInput[] = (sub.items ?? []).map((it) => {
-    const docs = it.documents ?? [];
-    return {
-      requiredTerms: it.requiredTerms,
-      confirmations: (it.confirmations ?? {}) as Record<string, boolean | undefined>,
-      priced: (it.rentalRate ?? 0) > 0,
-      photoCount: (it.photos ?? []).length,
-      ownershipCount: docs.filter((d) => OWNERSHIP_TYPES.has(d.type)).length,
-      equipCertCount: docs.filter((d) => EQUIP_CERT_TYPES.has(d.type)).length,
-      operatorCertCount: docs.filter((d) => OPERATOR_CERT_TYPES.has(d.type)).length,
-    };
-  });
+type SubItem = LinkBidSubmission["items"][number];
+/** One submission item → quality input (classifying its documents by type). */
+function toItemInput(it: SubItem): QualityItemInput {
+  const docs = it.documents ?? [];
+  return {
+    requiredTerms: it.requiredTerms,
+    confirmations: (it.confirmations ?? {}) as Record<string, boolean | undefined>,
+    priced: (it.rentalRate ?? 0) > 0,
+    photoCount: (it.photos ?? []).length,
+    ownershipCount: docs.filter((d) => OWNERSHIP_TYPES.has(d.type)).length,
+    equipCertCount: docs.filter((d) => EQUIP_CERT_TYPES.has(d.type)).length,
+    operatorCertCount: docs.filter((d) => OPERATOR_CERT_TYPES.has(d.type)).length,
+  };
+}
+/** The submission's (shared) company details → quality input. */
+function toCompanyInput(sub: LinkBidSubmission): QualityCompanyInput {
   const coDocs = sub.companyDocuments ?? [];
-  const company: QualityCompanyInput = {
+  return {
     cr: !!sub.crNumber || coDocs.some((d) => d.type === "cr"),
     vat: !!sub.vatNumber || coDocs.some((d) => d.type === "vat_cert"),
     address: !!sub.nationalAddress || coDocs.some((d) => d.type === "national_address"),
     otherDocs: coDocs.some((d) => COMPANY_EXTRA_DOC_TYPES.has(d.type)),
   };
-  return computeBidQuality({ items, company });
+}
+/** Whole-submission quality (all items + company). Use for a single-item bid or a submission-level view. */
+export function qualityFromSubmission(sub: LinkBidSubmission): BidQuality {
+  return computeBidQuality({ items: (sub.items ?? []).map(toItemInput), company: toCompanyInput(sub) });
+}
+/** Per-ITEM quality — this one item's terms/docs + the submission's (shared) company details. Used on a
+ *  multi-item bid so each item card shows its own score. */
+export function qualityFromSubmissionItem(sub: LinkBidSubmission, item: SubItem): BidQuality {
+  return computeBidQuality({ items: [toItemInput(item)], company: toCompanyInput(sub) });
 }
