@@ -4,8 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
-import { useAuthGate } from "@/components/auth/AuthGate";
 import { AccountModal } from "@/components/onboarding/AccountModal";
+import { SignInPrompt } from "@/components/common/SignInPrompt";
 import { agentUses, bumpAgentUse, guestLimitReached, GUEST_AGENT_LIMIT } from "@/lib/access/agent-quota";
 import { fetchAllMyRequests, fetchBids, fetchRequestSubmissions, startDealRoom, recommendBids, askBids, parseBid, transformBid, captureBidEvents, fetchDealRoomDocuments, fetchBidDocuments, fetchDealRoom } from "@/lib/api/client";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
@@ -100,7 +100,6 @@ export function BidComparisonWorkspace() {
   const { locale } = useLocale();
   const t = useT();
   const { status } = useSession();
-  const { openAuth } = useAuthGate(); // app-wide sign-in modal (same as the header "Sign in" — no /login page)
   // A signed-out visitor gets the SAME comparison workspace, minus any request/group context: they
   // upload quotes (transformed through the same verify→template flow), compare them in the same matrix,
   // and use the same AI rank/ask — capped at a per-device free trial, then prompted to create an account.
@@ -933,21 +932,15 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
   // Comparison is an account-only feature (product decision): signed-out visitors get a hard "sign in to
   // compare" gate — no guest uploads/free tries. Creating an account flips the session to authed, which
   // re-renders straight into the real workspace below.
+  // Comparison is account-only: signed-out visitors get the SAME sign-in card as the other tabs
+  // (Inbox / Requests / Profile) via the shared SignInPrompt — same card + orange CTA + auth-modal path.
   if (anon)
     return (
-      <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-6 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl" style={{ background: C.actionDim, color: C.action }}>
-          <span className="material-icons-outlined" style={{ fontSize: 32 }}>balance</span>
-        </div>
-        <h2 className="mt-5 text-[20px] font-extrabold" style={{ color: C.navy }}>{L("Sign in to compare bids", "سجّل الدخول لمقارنة العروض")}</h2>
-        <p className="mt-2 text-[13.5px] font-medium leading-relaxed" style={{ color: C.muted }}>
-          {L("Sign in to line up suppliers’ offers side by side and pick the best one.", "سجّل الدخول لعرض عروض المورّدين جنباً إلى جنب واختيار الأفضل.")}
-        </p>
-        {/* Same sign-in button + path as the rest of the app (header "Sign in") — opens the shared auth modal. */}
-        <button type="button" onClick={() => openAuth()} className="mt-6 inline-flex items-center gap-2 rounded-lg px-6 py-2.5 text-[13.5px] font-extrabold text-white" style={{ background: C.rentee }}>
-          <span className="material-icons-outlined" style={{ fontSize: 18 }}>login</span>{t.shell.signIn}
-        </button>
-      </div>
+      <SignInPrompt
+        icon="balance"
+        title={L("Sign in to compare bids", "سجّل الدخول لمقارنة العروض")}
+        body={L("Sign in to line up suppliers’ offers side by side and pick the best one.", "سجّل الدخول لعرض عروض المورّدين جنباً إلى جنب واختيار الأفضل.")}
+      />
     );
   if (!anon && !groups) return <Spinner />;
   if (!anon && !locations.length) return <Box>{L("No requests to compare yet.", "لا توجد طلبات للمقارنة بعد.")}</Box>;
