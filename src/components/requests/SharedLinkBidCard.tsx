@@ -245,7 +245,9 @@ export function SharedLinkBidCard({
       {!picking && (
         <div style={{ marginTop: "auto", padding: "12px 16px 16px" }}>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={onViewSubmission} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px 10px", borderRadius: 14, border: "1.5px solid #1c3550", background: "#fff", color: "#1c3550", fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
+            {/* When negotiate is hidden this is the sole CTA → filled navy (primary), matching the in-app
+                bid card. When negotiate shows (dev), it's outlined so the orange Negotiate reads as primary. */}
+            <button onClick={onViewSubmission} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px 10px", borderRadius: 14, ...(onNegotiate ? { border: "1.5px solid #1c3550", background: "#fff", color: "#1c3550" } : { border: "none", background: "#1c3550", color: "#fff" }), fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
               <span className="material-icons-outlined" style={{ fontSize: 18 }}>visibility</span>{L("View bid", "عرض العرض")}
             </button>
             {onNegotiate && (
