@@ -31,6 +31,7 @@ export function BidTermsModal({
   onClose,
   hidePending,
   negotiable,
+  allTerms,
 }: {
   supplier: string;
   terms: { equipment: TermRow[]; contract: TermRow[]; supplier: TermRow[] };
@@ -45,10 +46,13 @@ export function BidTermsModal({
   /** The comparison's specific negotiable terms (safety cert, operator cert, FAT, fuel resp, …) — the
    *  app-accurate rows. When present they replace the vague equipment "certs"/"operator" lumped rows. */
   negotiable?: TermRow[];
+  /** Off-platform: count/show EVERY answered required term (not just the app's 6 negotiable ones), so the
+   *  tabs match the card tally + the full submission view. */
+  allTerms?: boolean;
 }) {
   // Shared bucketing (bids.ts bucketBidTerms) — the SAME logic the bid card's tally uses, so the tab
-  // counts here always equal the card's "Conflict N · Matched N" (T18 + B1, mobile-app parity).
-  const { byBucket } = bucketBidTerms(terms, negotiable);
+  // counts here always equal the card's "Conflict N · Matched N".
+  const { byBucket } = bucketBidTerms(terms, negotiable, { all: allTerms });
 
   const tabs: { key: Bucket; label: string; c: string; bg: string }[] = [
     { key: "conflict", label: L("Conflict", "تعارض"), c: "#d9362a", bg: "#fdecea" },

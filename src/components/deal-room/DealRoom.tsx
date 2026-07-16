@@ -191,6 +191,9 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const [flowMode, setFlowMode] = useState<"counter" | "accept" | null>(null);
   const [counterErr, setCounterErr] = useState<string | null>(null);
   const [showDocs, setShowDocs] = useState(false);
+  // Touch device → dial (tel:). Desktop/laptop → just SHOW the number (you can't place a call from a laptop).
+  const [canCall, setCanCall] = useState(false);
+  useEffect(() => { setCanCall(typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true); }, []);
   const [quoteBusy, setQuoteBusy] = useState(false);
   const [quoteErr, setQuoteErr] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -529,6 +532,9 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const closed = room.status === "CLOSED";
   const abandoned = room.status === "ABANDONED";
   const awaiting = room.status === "AWAITING_SUPPLIER_CONFIRMATION";
+  // Equipment title — real name + size (like the request/bid cards), not the bare "Equipment" fallback.
+  const eqName = (ar ? room.details.equipmentLabelAr || room.details.equipmentLabel : room.details.equipmentLabel) || L("Equipment", "المعدّة");
+  const eqSize = ar ? room.details.equipmentSizeAr || room.details.equipmentSize : room.details.equipmentSize || room.details.equipmentSizeAr;
   // Accept is gated (like the app) until every differing term is resolved — now satisfied by a LOCAL
   // resolution, not a server round-trip.
   const unresolvedDisputed = room.terms.filter((t) => t.state === "disputed" && !resolutions[t.key]);
@@ -554,7 +560,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
           <span className="meta">
             <span className="t">
               {room.shortCode && <span className="tb-code">{room.shortCode}</span>}
-              {room.details.equipmentLabel ?? L("Equipment", "المعدّة")}
+              {eqName}{eqSize ? ` · ${eqSize}` : ""}
               {room.numberOfUnits > 1 ? ` · ${room.numberOfUnits} ${L("units", "وحدة")}` : ""}
               {room.details.operatorIncluded ? ` · ${L("with operator", "مع عامل")}` : ""}
             </span>
@@ -570,10 +576,16 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
         {/* icon actions — documents + call */}
         <div className="tb-icons">
           <span className="tb-ic" role="button" tabIndex={0} title={L("Documents", "المستندات")} onClick={() => setShowDocs(true)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setShowDocs(true)}><span className="material-icons-outlined">description</span></span>
-          {/* deal-room/negotiation (B5): the rentee gets the supplier's number from the start (server-gated). */}
-          {room.supplier.phone
-            ? <a className="tb-ic call" href={`tel:${room.supplier.phone}`} title={L("Call", "اتصال")}><span className="material-icons-outlined">call</span></a>
-            : <span className="tb-ic call locked" title={L("Number unavailable", "الرقم غير متاح")}><span className="material-icons-outlined">call</span></span>}
+          {/* deal-room/negotiation (B5): the rentee gets the supplier's number from the start (server-gated).
+              Touch device → dial; desktop → show the number inline (no call possible from a laptop). */}
+          {!room.supplier.phone
+            ? <span className="tb-ic call locked" title={L("Number unavailable", "الرقم غير متاح")}><span className="material-icons-outlined">call</span></span>
+            : canCall
+              ? <a className="tb-ic call" href={`tel:${room.supplier.phone}`} title={L("Call", "اتصال")}><span className="material-icons-outlined">call</span></a>
+              : <span className="tb-ic call tb-phone" title={L("Supplier phone", "هاتف المؤجّر")} style={{ width: "auto", padding: "0 12px", gap: 7, whiteSpace: "nowrap" }}>
+                  <span className="material-icons-outlined">call</span>
+                  <span style={{ direction: "ltr", unicodeBidi: "plaintext", fontSize: 13.5, fontWeight: 800, userSelect: "all" }}>{room.supplier.phone}</span>
+                </span>}
         </div>
       </div>
 
@@ -1017,7 +1029,7 @@ function CounterFlow({
 
   // Pages reordered to spec §6: 0 = السعر (price), 1 = الشروط (terms), 2 = المراجعة (review).
   const canNext = page === 0 ? (editable ? rateValid : true) : page === 1 ? unresolvedCount === 0 : true;
-  const canSubmit = editable ? rateValid && ack : ack;
+  const canSubmit = editable ? rateValid : ack;
   const allMatched = unresolvedCount === 0;
   const doSubmit = () =>
     editable
@@ -1335,10 +1347,12 @@ function CounterFlow({
                   </select>
                 </label>
               )}
-              <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 14, fontSize: 12.5, fontWeight: 600, color: "var(--navy,#1c3550)" }}>
-                <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} style={{ marginTop: 2 }} />
-                {mode === "counter" ? L("I confirm this counter-offer is correct.", "أؤكّد أن هذا العرض المقابل صحيح.") : L("I confirm the agreed rate and terms.", "أؤكّد السعر والشروط المتفق عليها.")}
-              </label>
+              {mode === "accept" && (
+                <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 14, fontSize: 12.5, fontWeight: 600, color: "var(--navy,#1c3550)" }}>
+                  <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} style={{ marginTop: 2 }} />
+                  {L("I confirm the agreed rate and terms.", "أؤكّد السعر والشروط المتفق عليها.")}
+                </label>
+              )}
               {error && <p style={{ marginTop: 8, fontSize: 12.5, fontWeight: 700, color: "var(--danger,#d9362a)" }}>{error}</p>}
             </div>
           )}

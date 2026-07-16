@@ -707,10 +707,17 @@ const bucketOfTermState = (s: TermState): TermBucket =>
 export function bucketBidTerms(
   terms: { equipment: TermRow[]; contract: TermRow[]; supplier: TermRow[] },
   negotiable?: TermRow[],
+  opts?: { all?: boolean },
 ): { rows: TermRow[]; byBucket: Record<TermBucket, TermRow[]>; counts: Record<TermBucket, number> } {
-  const merged = [...(negotiable ?? []), ...terms.equipment, ...terms.contract, ...terms.supplier];
+  // `all` (off-platform shared-link bids): count EVERY required term the supplier answered — Yes = matched,
+  // No = conflict — so the card's tally matches the full submission view, not just the app's 6 negotiable
+  // terms. Excludes the CR/VAT `supplier` rows (those are company details, not term conflicts).
+  const merged = opts?.all
+    ? [...(negotiable ?? []), ...terms.equipment, ...terms.contract]
+    : [...(negotiable ?? []), ...terms.equipment, ...terms.contract, ...terms.supplier];
   const seen = new Set<string>();
   const rows = merged.filter((r) => {
+    if (opts?.all) return r.state !== "grey"; // every answered term (no COUNTED_TERM_GROUP gate, no group dedup)
     const group = COUNTED_TERM_GROUP[r.key];
     if (!group) return false; // only the app's 6 negotiable terms (in-app OR link-bid key name)
     // App parity: fuel_responsibility is counted only when the rentee actually declared it (an
