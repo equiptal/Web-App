@@ -11,7 +11,7 @@ import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
 import { bidSuppliers, bucketBidTerms, CERT_LABEL, type BidCard, type TermRow } from "@/lib/contract/bids";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
-import { qualityFromSubmission, type BidQuality } from "@/lib/contract/bid-quality";
+import { qualityFromSubmissionItem, type BidQuality } from "@/lib/contract/bid-quality";
 import { computeBidQuote } from "@/lib/contract/comparison";
 import { shortRef, type RequestGroup } from "@/lib/contract/requests";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
@@ -208,9 +208,8 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   // request so we can show the real equipment icon/image. Memoized so goCompare can include them too.
   const subCards: GroupBid[] = useMemo(
     () =>
-      submissions.flatMap((s) => {
-        const quality = qualityFromSubmission(s); // submission-level score, shown on each of its item cards
-        return s.items.map((it): GroupBid => {
+      submissions.flatMap((s) =>
+        s.items.map((it): GroupBid => {
           const gi = group.items.find((g) => g.id === it.requestId);
           return {
             ...submissionToBidCard(s, it),
@@ -220,10 +219,10 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
             itemLabelAr: gi?.item?.nameAr ?? it.label ?? "المعدة",
             categoryId: gi?.item?.categoryId ?? null,
             itemImage: gi?.item?.imageUrl ?? null,
-            quality,
+            quality: qualityFromSubmissionItem(s, it), // per-ITEM score (this item's terms/docs + company)
           };
-        });
-      }),
+        }),
+      ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [submissions, group.items, ar],
   );
@@ -592,7 +591,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   const sourceOf = (b: GroupBid): "link" | "platform" | "file" => (b.viaSharedLink ? "link" : "platform");
   const srcCount = (s: "all" | "link" | "platform" | "file") => (s === "all" ? allBids.length : allBids.filter((b) => sourceOf(b) === s).length);
   // Count of link bids that meet a given quality dimension (drives the sub-filter option counts).
-  const qPartCount = (p: QualityPart) => allBids.filter((b) => sourceOf(b) === "link" && partMeets(b.quality, p)).length;
+  const qPartCount = (p: QualityPart) => allBids.filter((b) => sourceOf(b) === "link" && (selectedItem === "all" || b.requestId === selectedItem) && partMeets(b.quality, p)).length;
   // The quality sub-filter only applies to link bids and only when the source filter is "link".
   const qualityActive = fSource === "link" && fqParts.size > 0;
   // Renter bid-list order: in-app (platform) bids FIRST, then off-platform (shared-link) — and within the
