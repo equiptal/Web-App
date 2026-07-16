@@ -257,7 +257,11 @@ function GroupChips({ groups, activeId, onPick, L, groupRefs }: { groups: Reques
             <button key={gr.id} onClick={() => onPick(gr.id)} style={{ flexShrink: 0, textAlign: "start", minWidth: 180, padding: "11px 15px", borderRadius: 14, cursor: "pointer", background: on ? "#1c3550" : "#fff", border: `1px solid ${on ? "#1c3550" : "#d4e0ec"}` }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                 <span style={{ fontSize: 14, fontWeight: 900, color: on ? "#fff" : "#1c3550" }}>{gr.groupRef ?? groupRefs[gr.id] ?? shortRef(gr.id)}</span>
-                <span style={{ fontSize: 11, fontWeight: 800, padding: "2px 8px", borderRadius: 20, background: on ? "rgba(255,255,255,.16)" : "#eff4f9", color: on ? "#fff" : "#6b8fa8" }}>{gr.items.length} {L("items", "عناصر")}</span>
+                {(() => {
+                  const s = STATUS[gr.overallStatus] ?? { cls: "st-mixed", en: gr.overallStatus, ar: gr.overallStatus };
+                  const dot = gr.overallStatus === "OPEN" || gr.overallStatus === "ACTIVE" || gr.overallStatus === "ACCEPTED" ? "#1daf58" : gr.overallStatus === "EXPIRED" ? "#d9362a" : "#9AA7B8";
+                  return <span style={{ display: "inline-flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap", fontSize: 11, fontWeight: 800, padding: "2px 9px", borderRadius: 20, background: on ? "rgba(255,255,255,.16)" : "#eff4f9", color: on ? "#fff" : "#2a4f72" }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: dot }} />{L(s.en, s.ar)}</span>;
+                })()}
               </div>
               <div style={{ fontSize: 12, fontWeight: 600, color: on ? "#C7D4E5" : "#6b8fa8", marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 165 }}>{gr.locationLabel}</div>
             </button>
