@@ -18,6 +18,7 @@ import { useSession } from "@/lib/session";
 import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
 import { SharedBidNegotiateRoom } from "@/components/requests/SharedBidNegotiateRoom";
+import { NEGOTIATE_ENABLED } from "@/lib/config/flags";
 
 /** Lifecycle pill (matches the prototype SPILL). */
 const SPILL: Record<string, { cls: string; dot: boolean; en: string; ar: string }> = {
@@ -256,7 +257,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
               isSel={selected.has(b.id)}
               onToggleSelect={() => toggleSelect(b.id)}
               onViewSubmission={() => setSubmissionBid(b)}
-              onNegotiate={() => setNegotiateBid(b)}
+              onNegotiate={NEGOTIATE_ENABLED ? () => setNegotiateBid(b) : undefined}
               itemLabel={linkLabels.get(b.id) ?? null}
               quality={linkQuality.get(b.id) ?? null}
             />
@@ -443,12 +444,12 @@ export function RequestBids({ requestId }: { requestId: string }) {
           ar={ar}
           L={L}
           onClose={() => setSubmissionBid(null)}
-          onNegotiate={() => { const b = submissionBid; setSubmissionBid(null); setNegotiateBid(b); }}
+          onNegotiate={NEGOTIATE_ENABLED ? () => { const b = submissionBid; setSubmissionBid(null); setNegotiateBid(b); } : undefined}
         />
       )}
 
       {/* web-app/006 — deal-room-style negotiate relay for an off-platform shared-link bid */}
-      {negotiateBid && (
+      {NEGOTIATE_ENABLED && negotiateBid && (
         <SharedBidNegotiateRoom
           bid={negotiateBid}
           submission={submissions.find((s) => s.id === negotiateBid.submissionKey) ?? null}

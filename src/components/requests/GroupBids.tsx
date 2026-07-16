@@ -8,6 +8,7 @@ import { BidTermsModal } from "@/components/requests/BidTermsModal";
 import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
 import { SharedBidNegotiateRoom } from "@/components/requests/SharedBidNegotiateRoom";
+import { NEGOTIATE_ENABLED } from "@/lib/config/flags";
 import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
 import { bidSuppliers, bucketBidTerms, CERT_LABEL, type BidCard, type TermRow } from "@/lib/contract/bids";
@@ -787,7 +788,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
               cardFlex={cardFlex}
               onToggleSelect={() => toggleSelect(b.id)}
               onViewSubmission={() => setSubmissionBid(b)}
-              onNegotiate={() => setNegotiateBid(b)}
+              onNegotiate={NEGOTIATE_ENABLED ? () => setNegotiateBid(b) : undefined}
               itemLabel={ar ? b.itemLabelAr : b.itemLabel}
               itemImage={b.itemImage}
               categoryId={b.categoryId}
@@ -1108,12 +1109,12 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           L={L}
           onClose={() => setSubmissionBid(null)}
           onDownloadQuotation={() => downloadQuotation(ar, [submissionBid])}
-          onNegotiate={() => { const b = submissionBid; setSubmissionBid(null); setNegotiateBid(b); }}
+          onNegotiate={NEGOTIATE_ENABLED ? () => { const b = submissionBid; setSubmissionBid(null); setNegotiateBid(b); } : undefined}
         />
       )}
 
       {/* web-app/006 — deal-room-style negotiate relay for an off-platform shared-link bid */}
-      {negotiateBid && (
+      {NEGOTIATE_ENABLED && negotiateBid && (
         <SharedBidNegotiateRoom
           bid={negotiateBid}
           submission={submissions.find((s) => s.id === negotiateBid.submissionKey) ?? null}
