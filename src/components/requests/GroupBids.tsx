@@ -13,7 +13,7 @@ import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
 import { bidSuppliers, bucketBidTerms, CERT_LABEL, type BidCard, type TermRow } from "@/lib/contract/bids";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
-import { qualityFromSubmission, type BidQuality } from "@/lib/contract/bid-quality";
+import { qualityFromSubmissionItem, type BidQuality } from "@/lib/contract/bid-quality";
 import { computeBidQuote } from "@/lib/contract/comparison";
 import { shortRef, type RequestGroup } from "@/lib/contract/requests";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
@@ -211,9 +211,8 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   // request so we can show the real equipment icon/image. Memoized so goCompare can include them too.
   const subCards: GroupBid[] = useMemo(
     () =>
-      submissions.flatMap((s) => {
-        const quality = qualityFromSubmission(s); // submission-level score, shown on each of its item cards
-        return s.items.map((it): GroupBid => {
+      submissions.flatMap((s) =>
+        s.items.map((it): GroupBid => {
           const gi = group.items.find((g) => g.id === it.requestId);
           return {
             ...submissionToBidCard(s, it),
@@ -223,10 +222,10 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
             itemLabelAr: gi?.item?.nameAr ?? it.label ?? "المعدة",
             categoryId: gi?.item?.categoryId ?? null,
             itemImage: gi?.item?.imageUrl ?? null,
-            quality,
+            quality: qualityFromSubmissionItem(s, it), // per-ITEM score (this item's terms/docs + company)
           };
-        });
-      }),
+        }),
+      ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [submissions, group.items, ar],
   );
@@ -595,7 +594,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   const sourceOf = (b: GroupBid): "link" | "platform" | "file" => (b.viaSharedLink ? "link" : "platform");
   const srcCount = (s: "all" | "link" | "platform" | "file") => (s === "all" ? allBids.length : allBids.filter((b) => sourceOf(b) === s).length);
   // Count of link bids that meet a given quality dimension (drives the sub-filter option counts).
-  const qPartCount = (p: QualityPart) => allBids.filter((b) => sourceOf(b) === "link" && partMeets(b.quality, p)).length;
+  const qPartCount = (p: QualityPart) => allBids.filter((b) => sourceOf(b) === "link" && (selectedItem === "all" || b.requestId === selectedItem) && partMeets(b.quality, p)).length;
   // The quality sub-filter only applies to link bids and only when the source filter is "link".
   const qualityActive = fSource === "link" && fqParts.size > 0;
   // Renter bid-list order: in-app (platform) bids FIRST, then off-platform (shared-link) — and within the
@@ -774,6 +773,14 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         </div>
       </div>
 
+      {shown.length === 0 && (
+        <div className="rempty" style={{ textAlign: "center", padding: "44px 20px" }}>
+          <span className="material-icons-outlined" style={{ fontSize: 36, color: "#9AA7B8" }}>filter_alt_off</span>
+          <div style={{ marginTop: 10, fontSize: 14.5, fontWeight: 800, color: "#1c3550" }}>{L("No bids match these filters", "لا توجد عروض مطابقة لعوامل التصفية")}</div>
+          <div style={{ marginTop: 4, fontSize: 12.5, fontWeight: 600, color: "#6b8fa8" }}>{L("Adjust or clear the source / quality filters to see more.", "عدّل أو امسح عوامل تصفية المصدر / الجودة لعرض المزيد.")}</div>
+          {fActive > 0 && <button onClick={() => { setFSource("all"); setFqParts(new Set()); setFVerified(false); setFKm(false); }} style={{ marginTop: 14, borderRadius: 10, border: "1px solid #d4e0ec", background: "#fff", color: "#1c3550", fontWeight: 800, fontSize: 13, padding: "9px 16px", cursor: "pointer", fontFamily: "inherit" }}>{L("Clear filters", "مسح عوامل التصفية")}</button>}
+        </div>
+      )}
       <div className="bids-snap" data-select-ui>
       {shown.map((b) => {
         if (b.viaSharedLink) {

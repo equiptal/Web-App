@@ -89,6 +89,10 @@ export interface DealRoomView {
  *  `request` + `equipmentItems[0]`; field names best-effort, empties dropped by the renderer). */
 export interface DealItemDetails {
   equipmentLabel: string | null;
+  equipmentLabelAr: string | null;
+  /** Capacity/size (e.g. "30 ton") — shown next to the equipment name, mirroring the request/bid cards. */
+  equipmentSize: string | null;
+  equipmentSizeAr: string | null;
   location: string | null;
   rentalType: string | null;
   startDate: string | null;
@@ -281,7 +285,11 @@ export function mapDealRoom(raw: unknown): DealRoomView {
   const bl = (v: unknown): boolean | null => (typeof v === "boolean" ? v : v === "true" ? true : v === "false" ? false : null);
   const arr = (v: unknown): string[] => (Array.isArray(v) ? v.map((x) => String(x)).filter(Boolean) : []);
   const details: DealItemDetails = {
-    equipmentLabel: s(pick("label", "equipmentName", "name", "subcategoryName", "categoryName")),
+    // Equipment name = subtype (matches the request/bid cards); capacity = size. Fall back to the older keys.
+    equipmentLabel: s(pick("subtypeName", "label", "equipmentName", "name", "subcategoryName", "categoryName")),
+    equipmentLabelAr: s(pick("subtypeNameAr")),
+    equipmentSize: s(pick("capacityName", "size", "capacity")),
+    equipmentSizeAr: s(pick("capacityNameAr")),
     location: s(pick("location", "city", "projectLocation", "siteLocation", "deliveryLocation")),
     rentalType: s(pick("rentalType", "rentalBasis")),
     startDate: s(pick("startDate", "deliveryDate", "estimatedStartDate", "requiredDate")),

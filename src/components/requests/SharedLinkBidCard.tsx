@@ -95,7 +95,7 @@ export function SharedLinkBidCard({
   // App parity: the SAME shared tally the on-platform card + the Terms modal use (bucketBidTerms), so the
   // off-platform card count always equals the modal. Off-platform has no deal room → no "Pending review"
   // chip on the card (mirrors the terms modal's hidePending); Conflict / Matched only.
-  const termTally = bucketBidTerms(bid.terms, bid.negotiableTerms).counts;
+  const termTally = bucketBidTerms(bid.terms, bid.negotiableTerms, { all: true }).counts;
   const termChips = [
     { label: L("Conflict", "تعارض"), n: termTally.conflict, c: "#d9362a" },
     { label: L("Matched", "مطابق"), n: termTally.matched, c: "#1daf58" },
@@ -271,6 +271,7 @@ export function SharedLinkBidCard({
           L={L}
           busy={false}
           hidePending  /* off-platform: no deal room → no "Pending review" state */
+          allTerms  /* count/show every required term the supplier answered (matches the submission view) */
           negotiateLabel={L("View bid submission", "عرض العرض المُقدَّم")}
           onNegotiate={() => { setTermsOpen(false); onViewSubmission(); }}
           onClose={() => setTermsOpen(false)}
