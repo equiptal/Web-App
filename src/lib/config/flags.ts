@@ -1,16 +1,15 @@
 /**
  * Client-side feature flags.
  *
- * web-app/006 — off-platform negotiate visibility. No env vars: gated by HOST so the feature stays DARK
- * on the prod domain and is visible everywhere else (staging, Amplify preview builds, localhost). We
- * match the prod host only (canonical) rather than enumerating staging domains, so new preview/staging
- * URLs light up automatically. Evaluated in the browser; during SSR it defaults off — safe because the
- * off-platform bid cards (the only place these gates apply) render client-side after their data loads,
- * so there is no hydration flash.
+ * web-app/006 — off-platform negotiate visibility. No env vars: gated by HOST. The feature is now
+ * DEV-ONLY — dark on prod (web/www.moedatech.net) AND staging, and only visible on localhost for
+ * development. (It was previously visible on staging too, but is hidden there until it's ready.)
+ * Evaluated in the browser; during SSR it defaults off — safe because the off-platform bid cards (the
+ * only place these gates apply) render client-side after their data loads, so there is no hydration flash.
  *
- * To LAUNCH on prod: set `NEGOTIATE_ENABLED = true` (or remove the host check).
+ * To LAUNCH: add the target host to `DEV_HOSTS`, or set `NEGOTIATE_ENABLED = true` outright.
  */
-const PROD_HOSTS = new Set(["web.moedatech.net", "www.moedatech.net"]);
+const DEV_HOSTS = new Set(["localhost", "127.0.0.1"]);
 
 export const NEGOTIATE_ENABLED =
-  typeof window !== "undefined" && !PROD_HOSTS.has(window.location.hostname);
+  typeof window !== "undefined" && DEV_HOSTS.has(window.location.hostname);
