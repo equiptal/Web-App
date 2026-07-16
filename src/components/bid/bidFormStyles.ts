@@ -14,14 +14,20 @@ export const BID_FORM_CSS = `
 .rlogo{width:44px;height:44px;border-radius:10px;flex:0 0 auto;background:linear-gradient(135deg,var(--rentee),#1E40AF);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
 .rlogo.rlogo-img{background:#fff;border:1px solid var(--border);overflow:hidden;padding:3px}
 .rlogo.rlogo-img img{width:100%;height:100%;object-fit:contain}
+.rmeta{min-width:0;flex:1 1 auto}
 .rmeta .rlabel{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.rmeta .rname{font-size:18.5px;font-weight:800;letter-spacing:-.3px;line-height:1.15}
-.rmeta .rsub{font-size:11.5px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:5px;margin-top:2px}
+.rmeta .rname{font-size:18.5px;font-weight:800;letter-spacing:-.3px;line-height:1.15;overflow-wrap:anywhere}
+.rmeta .rsub{font-size:11.5px;color:var(--muted);font-weight:600;display:flex;align-items:flex-start;gap:5px;margin-top:2px}
+.rmeta .rsub span:last-child{min-width:0;overflow-wrap:anywhere}
+.rmeta .rsub .material-icons-outlined{margin-top:1px;flex:0 0 auto}
 .rmeta .rsub .material-icons-outlined{font-size:13px;color:var(--success)}
 .pubbar .spacer{flex:1}
-.langtog{display:inline-flex;border:1.5px solid var(--navy);border-radius:9px;overflow:hidden;box-shadow:0 1px 4px rgba(28,53,80,.14)}
-.langtog button{border:0;background:var(--surface1);color:var(--navy);padding:8px 16px;font:inherit;font-weight:800;font-size:13.5px;cursor:pointer;transition:background .12s}
-.langtog button.on{background:var(--navy);color:#fff}
+/* Language toggle — a compact segmented pill: light track with the active side as a navy pill. */
+.langtog{display:inline-flex;align-items:center;gap:3px;flex:0 0 auto;background:#eef2f6;border:1px solid var(--border);border-radius:999px;padding:3px;box-shadow:inset 0 1px 2px rgba(28,53,80,.07)}
+.langtog button{border:0;background:transparent;color:var(--muted);min-width:40px;padding:6px 13px;font:inherit;font-weight:800;font-size:13px;line-height:1;cursor:pointer;border-radius:999px;transition:background .15s,color .15s}
+.langtog button:hover{color:var(--navy)}
+.langtog button.on{background:var(--navy);color:#fff;box-shadow:0 1px 3px rgba(28,53,80,.28)}
+.langtog button.on:hover{color:#fff}
 .wrap{max-width:1060px;margin:0 auto;padding:22px 24px 24px}
 .intro{margin:4px 0 18px}
 .intro h1{margin:0 0 5px;font-size:22px;font-weight:800;letter-spacing:-.4px}
@@ -261,7 +267,7 @@ export const BID_FORM_CSS = `
 .bidpage.inview .wrap{max-width:none;margin:0;padding:0}
 .bidpage.inview .miniseg button{cursor:default}
 @media (max-width:680px){.ro-grid{grid-template-columns:1fr 1fr}}
-@media (max-width:600px){.wrap{padding:16px 14px 22px}.pubbar-in{padding:10px 14px;gap:10px}.rmeta .rname{font-size:16px}.rlogo{width:40px;height:40px}.intro h1{font-size:19px}.sec{padding:14px}.item-hd{margin:-14px -14px 12px;padding:12px 14px}.item-hd .ibadge{display:none}
+@media (max-width:600px){.wrap{padding:16px 14px 22px}.pubbar-in{padding:10px 12px;gap:10px}.rmeta .rname{font-size:16px}.rlogo{width:40px;height:40px}.langtog button{min-width:36px;padding:6px 11px;font-size:12.5px}.intro h1{font-size:19px}.sec{padding:14px}.item-hd{margin:-14px -14px 12px;padding:12px 14px}.item-hd .ibadge{display:none}
 .tmtx-wrap{border:0;overflow:visible}.tmtx,.tmtx tbody{display:block;width:100%}.tmtx thead{display:none}.tmtx tr{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:10px;overflow:hidden}.tmtx td{display:block;border-bottom:1px solid var(--line);border-inline-start:1px solid var(--line);padding:11px 13px}.tmtx td:nth-child(odd){border-inline-start:0}.celllbl{display:block;font-size:10.5px;font-weight:800;text-transform:uppercase;color:var(--navy-mid);margin-bottom:5px}.cd-box{width:60px}.cd-box b{font-size:23px}
 /* tighter pricing table + 16px inputs (stops iOS focus-zoom); frow + attach cards stack */
 .ptbl td,.ptbl th{padding:9px 7px}.ptbl-in{width:84px}.frow{grid-template-columns:1fr}
