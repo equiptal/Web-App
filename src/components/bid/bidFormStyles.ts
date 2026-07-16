@@ -94,10 +94,10 @@ export const BID_FORM_CSS = `
 .item-hd .inm{font-size:17px;font-weight:800;letter-spacing:-.2px}
 .item-hd .imeta{font-size:13px;color:rgba(255,255,255,.72);font-weight:700}
 /* compact, self-sizing units pill — subtle tinted amber (single) / solid orange (multi); never stretches */
-.item-hd .units-chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;letter-spacing:.01em;color:rgba(255,255,255,.72);background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.20);border-radius:var(--r-full);padding:3px 10px;white-space:nowrap}
+.item-hd .units-chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;letter-spacing:.01em;color:#fff;background:var(--action);border:1px solid var(--action);border-radius:var(--r-full);padding:3px 11px;white-space:nowrap}
 .item-hd .units-chip .msym{font-size:14px}
 /* Multi-unit: still subtle/light-grey (not bright orange) — just a touch more visible than single. */
-.item-hd .units-chip.multi{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.26);color:rgba(255,255,255,.88)}
+.item-hd .units-chip.multi{background:var(--action);border-color:var(--action);color:#fff;box-shadow:0 1px 4px rgba(247,144,9,.5)}
 .item-hd .ibadge{margin-inline-start:auto;flex:0 0 auto;font-size:10.5px;font-weight:800;color:rgba(255,255,255,.85);background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:var(--r-full);padding:4px 11px;white-space:nowrap}
 /* Opt-out toggle — supplier bids on only the items they can supply (multi-item requests). */
 .supply-tog{display:flex;align-items:center;gap:11px;width:100%;background:var(--success-bg);border:1px solid rgba(29,175,88,.35);border-radius:var(--r-md);padding:11px 14px;margin-bottom:14px;cursor:pointer;font:inherit;text-align:start}

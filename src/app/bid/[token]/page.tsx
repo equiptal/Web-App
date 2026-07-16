@@ -567,10 +567,7 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
             return (
               <div className={`sec${skip ? " item-skipped" : ""}`} key={it.requestItemId}>
                 <div className="item-hd">
-                  <span className="item-ic">{it.imageUrl
-                    // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={it.imageUrl} alt="" className="item-ic-img" />
-                    : <span className="msym">{equipmentIcon(rawLabel)}</span>}</span>
+                  <span className="item-ic"><ItemThumb src={it.imageUrl} name={rawLabel} /></span>
                   <div className="inm-wrap"><span className="inm">{label}</span>{size && <span className="imeta">· {size}</span>}
                     <span className={`units-chip${q > 1 ? " multi" : ""}`}><span className="msym">{q > 1 ? "layers" : "package_2"}</span>×{q} {q === 1 ? L("unit", "وحدة") : L("units", "وحدات")}</span></div>
                   <span className="ibadge">{L(`Item ${idx + 1} of ${data.items.length}`, `البند ${idx + 1} من ${data.items.length}`)}</span>
@@ -837,6 +834,15 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
 
 function Cell({ k, children }: { k: string; children: React.ReactNode }) {
   return <div className="ro-cell"><div className="k">{k}</div><div className="v">{children}</div></div>;
+}
+
+// Equipment thumbnail: shows the taxonomy image when it loads; on 404 (common for web taxonomy URLs)
+// or when absent, falls back to a name-derived glyph — never a broken-image placeholder.
+function ItemThumb({ src, name }: { src?: string | null; name: string | null | undefined }) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) return <span className="msym">{equipmentIcon(name)}</span>;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt="" className="item-ic-img" onError={() => setFailed(true)} />;
 }
 
 function YesNo({ value, onChange, L }: { value: boolean | undefined; onChange: (v: boolean) => void; L: (e: string, a: string) => string }) {
