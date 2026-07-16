@@ -10,16 +10,17 @@ const nf = (n: number) => Math.round(n).toLocaleString("en-US");
 type NegMsg = { text: string; at: string; pending?: boolean; failed?: boolean };
 
 const SBNR_CSS = `
-.sbnr-ov{position:fixed;inset:0;z-index:1000;background:rgba(9,20,34,.55);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;padding:20px}
-.sbnr-shell{position:relative;width:min(760px,96vw);height:min(88vh,920px);background:#fff;border-radius:20px;box-shadow:0 24px 70px rgba(9,20,34,.42);display:flex;flex-direction:column;overflow:hidden}
-.sbnr-x{position:absolute;top:12px;inset-inline-end:12px;z-index:6;width:34px;height:34px;border-radius:50%;border:none;background:rgba(255,255,255,.92);color:#1c3550;display:grid;place-items:center;cursor:pointer;box-shadow:0 1px 4px rgba(20,40,70,.2)}
-.sbnr-x .material-icons-outlined{font-size:20px}
-.sbnr-dl{max-width:none!important;margin:0!important;min-height:0!important;flex:1;overflow:hidden;padding:16px 16px 0}
-.sbnr-dl .thread{overflow-y:auto;border-radius:var(--r-lg)}
-.sbnr-dl .composer{padding-bottom:14px}
-.sbnr-dl .ib.send.dis{opacity:.4;cursor:not-allowed}
+.sbnr-page{position:fixed;inset:0;z-index:1000;background:var(--surface2);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.sbnr-topnav{position:sticky;top:0;z-index:12;display:flex;align-items:center;gap:12px;height:56px;padding:0 16px;background:#fff;border-bottom:1px solid var(--border)}
+.sbnr-topnav .bk{width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:#fff;color:var(--navy);display:grid;place-items:center;cursor:pointer;flex:0 0 auto}
+.sbnr-topnav .bk .material-icons-outlined{font-size:20px}
+.sbnr-topnav .tt{font-size:15px;font-weight:800;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sbnr-inner{padding:16px 16px 0}
+.sbnr-inner .dlproto{min-height:calc(100vh - 76px)}
+.sbnr-inner .ib.send.dis{opacity:.4;cursor:not-allowed}
 .sbnr-err{background:var(--danger-bg);color:var(--danger);font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:10px;margin:0 0 8px;display:flex;align-items:center;gap:6px}
 .sbnr-err .material-icons-outlined{font-size:15px}
+[dir=rtl] .sbnr-topnav .bk .material-icons-outlined{transform:scaleX(-1)}
 `;
 
 /**
@@ -103,12 +104,15 @@ export function SharedBidNegotiateRoom({
   }
 
   return (
-    <div className="sbnr-ov" dir={ar ? "rtl" : "ltr"} onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="sbnr-page" dir={ar ? "rtl" : "ltr"}>
       <style>{SBNR_CSS}</style>
       <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" />
-      <div className="sbnr-shell" role="dialog" aria-modal="true">
-        <button className="sbnr-x" onClick={onClose} aria-label={L("Close", "إغلاق")}><span className="material-icons-outlined">close</span></button>
-        <div className="dlproto sbnr-dl" dir={ar ? "rtl" : "ltr"}>
+      <div className="sbnr-topnav">
+        <button className="bk" onClick={onClose} aria-label={L("Back", "رجوع")}><span className="material-icons-outlined">arrow_back</span></button>
+        <span className="tt">{companyName} · {L("Negotiate", "تفاوض")}</span>
+      </div>
+      <div className="sbnr-inner">
+        <div className="dlproto" dir={ar ? "rtl" : "ltr"}>
 
           {/* top bar — supplier chip · equipment/RFQ block · off-platform phase pill · view-submission icon */}
           <div className="topbar">
@@ -148,15 +152,6 @@ export function SharedBidNegotiateRoom({
                 <div className="pb-tools"><span style={{ fontSize: 12, color: "rgba(255,255,255,.72)", fontWeight: 700 }}>{L("Quoted total", "الإجمالي المُسعّر")}: {nf(submission.grandTotal)} {L("SAR", "ر.س")} · {L("incl. VAT", "شامل الضريبة")}</span></div>
               ) : null}
             </div>
-          </div>
-
-          {/* relay explainer */}
-          <div className="pb-strip">
-            <span className="material-icons-outlined">info</span>
-            {L(
-              "This supplier bid through your link and isn't on Moedatech yet. Your messages are saved and delivered to their deal room the moment they join — then you negotiate and close the deal in the app.",
-              "قدّم هذا المؤجّر عرضه عبر رابطك وليس على معداتك بعد. تُحفظ رسائلك وتُسلَّم إلى غرفة صفقته بمجرد انضمامه — عندها تتفاوضون وتُتمّون الصفقة في التطبيق.",
-            )}
           </div>
 
           {/* thread */}
