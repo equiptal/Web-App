@@ -2,7 +2,7 @@
 
 import { use, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { fetchBidFormData, submitBidForm, type BidUploadedFile } from "@/lib/api/client";
+import { fetchBidFormData, submitBidForm, ApiError, type BidUploadedFile } from "@/lib/api/client";
 import type { BidFormData, BidFormItem, BidPhotoKind, BidDocKind, CompanyDocKind, LinkBidConfirmations } from "@/lib/contract/link-bids";
 import { CERT_TERM_KEYS, certCodesFromValue, certConfKey, prettyCert } from "@/lib/contract/link-bids";
 import { buildSubmissionNotes, priceToStore } from "@/lib/contract/vat-inclusive";
@@ -218,7 +218,7 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
         for (const it of d.items) {
           // Default every required term to "Yes" — the supplier can flip any to "No"; the "Yes to all"
           // toggle reflects the live answers, so it starts on.
-          init[it.requestItemId] = { confirmations: allYesConf(it.requiredTerms), rentalRate: "", deliveryPrice: "", returnPrice: "", offeredUnits: String(it.numberOfUnits || 1) };
+          init[it.requestItemId] = { confirmations: allYesConf(it.requiredTerms), rentalRate: "", deliveryPrice: "", returnPrice: "", offeredUnits: String((it.remainingUnits ?? it.numberOfUnits) || 1) };
         }
         setAnswers(init);
         setContract(Object.fromEntries(d.contractTerms.map((c) => [c.key, true])));
@@ -241,8 +241,15 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
   });
   const setPrice = (id: string, field: "rentalRate" | "deliveryPrice" | "returnPrice", v: string) => setAnswers((p) => ({ ...p, [id]: { ...p[id], [field]: v } }));
   const setOffered = (id: string, v: string) => setAnswers((p) => ({ ...p, [id]: { ...p[id], offeredUnits: v } }));
-  // Units this line offers — parsed + clamped to 1..numberOfUnits; defaults to the full requested count.
-  const offeredQty = (it: BidFormItem, a?: Answer) => { const max = it.numberOfUnits || 1; const nq = Math.round(num(a?.offeredUnits ?? "")); return nq >= 1 && nq <= max ? nq : max; };
+  // Units still open to a shared-link supplier = numberOfUnits − units already held by other suppliers'
+  // accepted (AWAITING) + confirmed (CLOSED) deals (backend PR #484 via `remainingUnits`). Absent → the
+  // full requested count (no regression). Only multi-unit MULTIPLE_SUPPLIERS lines ever cap below it.
+  const remainingOf = (it: BidFormItem) => it.remainingUnits ?? it.numberOfUnits;
+  const isFullyCovered = (it: BidFormItem) => remainingOf(it) <= 0;
+  // Units this line offers — parsed + clamped to 1..remaining; defaults to the full remaining count.
+  const offeredQty = (it: BidFormItem, a?: Answer) => { const max = Math.max(1, remainingOf(it)); const nq = Math.round(num(a?.offeredUnits ?? "")); return nq >= 1 && nq <= max ? nq : max; };
+  // A line drops out of the bid when the supplier opts out (skip) OR it's already fully covered by others.
+  const isExcluded = (it: BidFormItem) => skipped.has(it.requestItemId) || isFullyCovered(it);
 
   // Per-item "Yes to all" — the toggle's on/off state is DERIVED from the live answers (see render), so
   // it never drifts; this just flips every term of THIS item on or off. Lives next to the Terms subhead.
@@ -267,7 +274,7 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
   const resetForm = () => {
     if (!data) return;
     const init: Record<string, Answer> = {};
-    for (const it of data.items) init[it.requestItemId] = { confirmations: allYesConf(it.requiredTerms), rentalRate: "", deliveryPrice: "", returnPrice: "", offeredUnits: String(it.numberOfUnits || 1) };
+    for (const it of data.items) init[it.requestItemId] = { confirmations: allYesConf(it.requiredTerms), rentalRate: "", deliveryPrice: "", returnPrice: "", offeredUnits: String((it.remainingUnits ?? it.numberOfUnits) || 1) };
     setAnswers(init);
     setContract(Object.fromEntries(data.contractTerms.map((c) => [c.key, true])));
     setAtt({});
@@ -289,15 +296,17 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
     return vatIncluded ? gross / 1.15 : gross;
   };
   const grand = useMemo(
-    () => (data?.items ?? []).filter((it) => !skipped.has(it.requestItemId)).reduce((s, it) => s + itemSubtotal(it, answers[it.requestItemId]) * 1.15, 0),
+    () => (data?.items ?? []).filter((it) => !isExcluded(it)).reduce((s, it) => s + itemSubtotal(it, answers[it.requestItemId]) * 1.15, 0),
     [data, answers, vatIncluded, skipped],
   );
 
   // Company name + contact are the required identity; CR / VAT / National Address are optional and can
   // be provided as text OR a document, so they don't gate submission.
   const companyValid = !!(company.companyName.trim() && company.contactInfo.trim());
-  // Only items the supplier says they can supply gate submission (skipped ones are dropped from the bid).
-  const suppliedItems = (data?.items ?? []).filter((it) => !skipped.has(it.requestItemId));
+  // Only items the supplier says they can supply gate submission (skipped + fully-covered are dropped).
+  const suppliedItems = (data?.items ?? []).filter((it) => !isExcluded(it));
+  // Every item already fully covered by other suppliers' accepted bids → nothing left to bid on.
+  const allCovered = !!data && data.items.length > 0 && data.items.every(isFullyCovered);
   const itemsValid = suppliedItems.every((it) => num(answers[it.requestItemId]?.rentalRate ?? "") > 0);
   // Every shown term (per-item + project) must be answered Yes/No — no silent grey/unanswered terms.
   const termsAnswered =
@@ -311,7 +320,7 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
 
   // Live bid-quality score (terms match + docs + completeness) — updates as the supplier fills the form.
   const quality = useMemo(() => {
-    const items = (data?.items ?? []).filter((it) => !skipped.has(it.requestItemId)).map((it) => {
+    const items = (data?.items ?? []).filter((it) => !isExcluded(it)).map((it) => {
       const a = answers[it.requestItemId];
       const at = att[it.requestItemId] ?? EMPTY_ATT;
       return {
@@ -350,7 +359,7 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
         // round-trip to the renter's submission view). The viewer surfaces it as a dedicated note.
         notes: buildSubmissionNotes(company.notes, vatIncluded),
         validUntil: company.validUntil ? new Date(company.validUntil).toISOString() : undefined,
-        items: data.items.filter((it) => !skipped.has(it.requestItemId)).map((it) => {
+        items: data.items.filter((it) => !isExcluded(it)).map((it) => {
           const a = answers[it.requestItemId];
           // Store VAT-exclusive prices. If the supplier priced VAT-inclusive, strip the 15% back out so
           // the renter side — which always adds VAT — lands on the same total.
@@ -368,10 +377,15 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
       });
       setSubmitted(true);
       window.scrollTo(0, 0);
-    } catch {
+    } catch (e) {
       setSubmitting(false);
+      // Refresh the form — a race (another supplier's units got accepted while this form was open) moves
+      // the cap, so reloading re-applies each item's `remainingUnits` (stepper max, defaults, fully-covered).
       fetchBidFormData(token).then((d) => setData(d)).catch(() => {});
-      alert(L("Could not submit — the request may have closed, or please try again.", "تعذّر الإرسال — قد يكون الطلب أُغلق، أو حاول مرة أخرى."));
+      // Surface the backend's specific reason (e.g. the units-cap 400/409 "Offer between 1 and N…") instead
+      // of a generic failure, so a race reads cleanly. Falls back to the generic message.
+      const msg = e instanceof ApiError ? (ar ? (e.messageAr ?? e.detail) : (e.detail ?? e.messageAr)) : null;
+      alert(msg || L("Could not submit — the request may have closed, or please try again.", "تعذّر الإرسال — قد يكون الطلب أُغلق، أو حاول مرة أخرى."));
     }
   }
 
@@ -555,7 +569,10 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
             const label = rawLabel.split(" / ").pop()?.trim() || L("Equipment", "المعدة");
             const size = (ar ? it.sizeAr : it.size) || it.size || null;
             const q = it.numberOfUnits || 1;
-            const oq = offeredQty(it, a); // units this line offers (≤ q)
+            const remaining = remainingOf(it); // units still open to this supplier (≤ q; backend cap)
+            const covered = Math.max(0, q - remaining); // units already held by other suppliers' accepted/confirmed deals
+            const fullyCovered = isFullyCovered(it); // remaining ≤ 0 → nothing left to bid on
+            const oq = offeredQty(it, a); // units this line offers (1..remaining)
             const unit = it.priceUnit ? (ar ? UNIT_LABEL[it.priceUnit]?.[1] : UNIT_LABEL[it.priceUnit]?.[0]) ?? it.priceUnit : L("unit", "وحدة");
             const sub = itemSubtotal(it, a);
             const line = (v: string) => (num(v) ? num(v) * oq : 0);
@@ -569,12 +586,14 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                 <div className="item-hd">
                   <span className="item-ic"><ItemThumb src={it.imageUrl} name={rawLabel} /></span>
                   <div className="inm-wrap"><span className="inm">{label}</span>{size && <span className="imeta">· {size}</span>}
-                    <span className={`units-chip${q > 1 ? " multi" : ""}`}><span className="msym">{q > 1 ? "layers" : "package_2"}</span>×{q} {q === 1 ? L("unit", "وحدة") : L("units", "وحدات")}</span></div>
+                    <span className={`units-chip${q > 1 ? " multi" : ""}`}><span className="msym">{q > 1 ? "layers" : "package_2"}</span>×{q} {q === 1 ? L("unit", "وحدة") : L("units", "وحدات")}</span>
+                    {fullyCovered && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 800, color: "#c0392b", background: "#fdecea", border: "1px solid #f3c0ba", borderRadius: 20, padding: "2px 9px" }}><span className="material-icons-outlined" style={{ fontSize: 14 }}>lock</span>{L("Fully covered", "مُغطّى بالكامل")}</span>}</div>
                   <span className="ibadge">{L(`Item ${idx + 1} of ${data.items.length}`, `البند ${idx + 1} من ${data.items.length}`)}</span>
                 </div>
 
-                {/* Opt-out: in a multi-item request the supplier bids on only what they can supply. */}
-                {multiItem && (
+                {/* Opt-out: in a multi-item request the supplier bids on only what they can supply. Hidden
+                    for a fully-covered item — there's nothing to opt into. */}
+                {multiItem && !fullyCovered && (
                   <button type="button" className={`supply-tog${skip ? " off" : ""}`} onClick={() => toggleSupply(it.requestItemId)}>
                     <span className="supply-sw"></span>
                     <span className="supply-tx">{skip ? L("You can't supply this item — tap to include it", "لا يمكنك توفير هذا البند — اضغط لإضافته") : L("I can supply this item", "أستطيع توفير هذا البند")}</span>
@@ -582,7 +601,12 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                   </button>
                 )}
 
-                {skip ? (
+                {fullyCovered ? (
+                  <div className="skip-note">
+                    <span className="material-icons-outlined">lock</span>
+                    <span>{L(`All ${q} units are already covered by other suppliers' accepted bids — there are no units left to bid on for this item.`, `جميع الوحدات (${q}) مُغطّاة بالفعل من عروض مؤجّرين آخرين المقبولة — لا توجد وحدات متبقية لتقديم عرض على هذا البند.`)}</span>
+                  </div>
+                ) : skip ? (
                   <div className="skip-note">
                     <span className="material-icons-outlined">block</span>
                     <span>{L("Not included in your bid. You won't price this item or confirm its terms — bid on the items you can supply.", "غير مُدرَج في عرضك. لن تُسعّر هذا البند أو تؤكّد شروطه — قدّم عرضك على البنود التي تستطيع توفيرها.")}</span>
@@ -592,9 +616,13 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                 {q > 1 && (
                   <div className="units-note" style={{ flexWrap: "wrap", gap: 10, alignItems: "center" }}>
                     <span className="material-icons-outlined un-lead">layers</span>
-                    <span className="un-tx" style={{ flex: 1, minWidth: 180 }}>{L(`Multi-unit item — the renter needs ${q} units. Set how many you can supply (bid on some or all); prices below multiply by this.`, `بند متعدد الوحدات — يحتاج المستأجر ${q} وحدات. حدّد كم وحدة تستطيع توفيرها (اعرض على بعضها أو كلّها)؛ تُضرب الأسعار أدناه بهذا العدد.`)}</span>
+                    <span className="un-tx" style={{ flex: 1, minWidth: 180 }}>{covered > 0
+                      ? L(`The renter needs ${q} units — ${covered} already covered by other suppliers. You can supply up to ${remaining} ${remaining === 1 ? "unit" : "units"}; prices below multiply by how many you offer.`, `يحتاج المستأجر ${q} وحدات — ${covered} مُغطّاة بالفعل من مؤجّرين آخرين. يمكنك توفير حتى ${remaining} ${remaining === 1 ? "وحدة" : "وحدات"}؛ تُضرب الأسعار أدناه بعدد ما تعرضه.`)
+                      : L(`Multi-unit item — the renter needs ${q} units. Set how many you can supply (bid on some or all); prices below multiply by this.`, `بند متعدد الوحدات — يحتاج المستأجر ${q} وحدات. حدّد كم وحدة تستطيع توفيرها (اعرض على بعضها أو كلّها)؛ تُضرب الأسعار أدناه بهذا العدد.`)}</span>
                     {/* Partial-bid control — an explicit −/+ stepper so it's unmistakable the supplier can
-                        choose to supply fewer than the N units the renter asked for. Drives the Qty below. */}
+                        choose to supply fewer than the units still open. Capped at `remaining` (units not
+                        already covered by others). Hidden when only 1 unit is left (no choice). */}
+                    {remaining > 1 && (
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 10, whiteSpace: "nowrap", background: "#fff", border: "1px solid #e6c690", borderRadius: 10, padding: "6px 12px" }}>
                       <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550" }}>{L("Units you can supply", "الوحدات المتاحة لديك")}</span>
                       <span style={{ display: "inline-flex", alignItems: "center", border: "2px solid #f79009", borderRadius: 9, overflow: "hidden" }}>
@@ -602,12 +630,13 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                           onClick={() => setOffered(it.requestItemId, String(Math.max(1, oq - 1)))}
                           style={{ width: 36, height: 36, border: "none", background: oq <= 1 ? "#f6efe2" : "#fff5e8", color: oq <= 1 ? "#c9b48c" : "#b45309", fontSize: 22, fontWeight: 900, cursor: oq <= 1 ? "default" : "pointer", lineHeight: 1, fontFamily: "inherit" }}>−</button>
                         <span style={{ minWidth: 38, textAlign: "center", fontSize: 16, fontWeight: 900, color: "#1c3550" }}>{oq}</span>
-                        <button type="button" aria-label={L("More units", "زيادة")} disabled={oq >= q}
-                          onClick={() => setOffered(it.requestItemId, String(Math.min(q, oq + 1)))}
-                          style={{ width: 36, height: 36, border: "none", background: oq >= q ? "#f6efe2" : "#fff5e8", color: oq >= q ? "#c9b48c" : "#b45309", fontSize: 22, fontWeight: 900, cursor: oq >= q ? "default" : "pointer", lineHeight: 1, fontFamily: "inherit" }}>+</button>
+                        <button type="button" aria-label={L("More units", "زيادة")} disabled={oq >= remaining}
+                          onClick={() => setOffered(it.requestItemId, String(Math.min(remaining, oq + 1)))}
+                          style={{ width: 36, height: 36, border: "none", background: oq >= remaining ? "#f6efe2" : "#fff5e8", color: oq >= remaining ? "#c9b48c" : "#b45309", fontSize: 22, fontWeight: 900, cursor: oq >= remaining ? "default" : "pointer", lineHeight: 1, fontFamily: "inherit" }}>+</button>
                       </span>
-                      <span style={{ color: "#6b8fa8", fontWeight: 800, fontSize: 14 }}>/ {q}</span>
+                      <span style={{ color: "#6b8fa8", fontWeight: 800, fontSize: 14 }}>/ {remaining}</span>
                     </span>
+                    )}
                   </div>
                 )}
 
@@ -794,7 +823,7 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
             <FileUploader token={token} folder="documents" kinds={companyExtraKinds} value={coExtra} onChange={setCoExtra} L={L} disabled={submitting} />
           </div>
 
-          {showErrors && !valid && <div className="submit-err"><span className="material-icons-outlined">error_outline</span>{!hasSupplied ? L("Mark at least one item as one you can supply — a bid can't be empty.", "حدّد بنداً واحداً على الأقل تستطيع توفيره — لا يمكن أن يكون العرض فارغاً.") : L("Please complete the highlighted items: answer every term, enter a rate for each item, and fill all company details.", "الرجاء إكمال العناصر المظللة: أجب عن كل شرط، وأدخل سعراً لكل بند، واملأ جميع بيانات الشركة.")}</div>}
+          {showErrors && !valid && <div className="submit-err"><span className="material-icons-outlined">error_outline</span>{!hasSupplied ? (allCovered ? L("Every item is already fully covered by other suppliers' accepted bids — there's nothing left to bid on.", "جميع البنود مُغطّاة بالفعل من عروض مؤجّرين آخرين المقبولة — لا يوجد ما يمكن تقديم عرض عليه.") : L("Mark at least one item as one you can supply — a bid can't be empty.", "حدّد بنداً واحداً على الأقل تستطيع توفيره — لا يمكن أن يكون العرض فارغاً.")) : L("Please complete the highlighted items: answer every term, enter a rate for each item, and fill all company details.", "الرجاء إكمال العناصر المظللة: أجب عن كل شرط، وأدخل سعراً لكل بند، واملأ جميع بيانات الشركة.")}</div>}
           <div className="submit-bar"><button className="btn primary lg" disabled={submitting} onClick={onSubmit}><span className="material-icons-outlined">send</span>{submitting ? L("Submitting…", "جارٍ الإرسال…") : L("Submit bid", "إرسال العرض")}</button>
             <div className="submit-note">{L("Once submitted, your bid is final and can't be edited from this link.", "بعد الإرسال، يصبح عرضك نهائياً ولا يمكن تعديله من هذا الرابط.")}</div>
           </div>

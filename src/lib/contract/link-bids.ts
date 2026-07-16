@@ -119,6 +119,10 @@ export interface BidFormItem {
   size?: string | null;
   sizeAr?: string | null;
   numberOfUnits: number;
+  /** Units still open for a shared-link supplier to offer = numberOfUnits − units already held by other
+   *  suppliers' accepted (AWAITING) + confirmed (CLOSED) deals, clamped ≥ 0. Backend (PR #484) sends it
+   *  per item; OPTIONAL — when absent (pre-deploy backend) the form falls back to numberOfUnits. */
+  remainingUnits?: number;
   /** Taxonomy image — same source the in-app bid/request cards render via EquipImg. Optional: the public
    *  bid-form endpoint doesn't send it yet (backend gap), so the item falls back to the name-derived glyph. */
   imageUrl?: string | null;
@@ -290,6 +294,7 @@ export function mapBidFormData(raw: unknown): BidFormData {
         size: s(i.size),
         sizeAr: s(i.sizeAr),
         numberOfUnits: n(i.numberOfUnits) ?? 1,
+        remainingUnits: n(i.remainingUnits) ?? undefined, // absent → page falls back to numberOfUnits
         imageUrl: s(i.imageUrl),
         priceUnit: s(i.priceUnit),
         deliveryBy: s(i.deliveryBy),

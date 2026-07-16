@@ -18,7 +18,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       cache: "no-store",
     });
     const json: unknown = await res.json().catch(() => null);
-    if (!res.ok) return NextResponse.json(json ?? { error: "submit_failed" }, { status: res.status });
+    if (!res.ok) {
+      // The agents backend returns `{ error: { message, messageAr, code } }`. Flatten it to the
+      // `{ detail, messageAr, backendCode }` shape the web ApiError reads, so specific reasons (e.g. the
+      // units-cap 400/409 "Offer between 1 and N units…") surface to the supplier instead of a generic fail.
+      const be = json && typeof json === "object" && "error" in json ? (json as { error?: { message?: string; messageAr?: string; code?: string } }).error : null;
+      return NextResponse.json(
+        { ...(json && typeof json === "object" ? json : {}), detail: be?.message, messageAr: be?.messageAr, backendCode: be?.code },
+        { status: res.status },
+      );
+    }
     const data = json && typeof json === "object" && "data" in json ? (json as { data: unknown }).data : json;
     return NextResponse.json(data, { status: 201 });
   } catch {
