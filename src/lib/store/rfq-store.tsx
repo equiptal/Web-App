@@ -278,14 +278,24 @@ function reducer(state: RfqState, a: Action): RfqState {
     case "PATCH_ITEM_OPERATOR":
       return withDraft(state, (d) => mapItem(d, a.id, (i) => ({ ...i, operator: { ...i.operator, ...a.patch } })));
     case "SET_ITEM_CATEGORY":
-      // AC-21: changing category clears & re-prompts subcategory + measurement.
-      return withDraft(state, (d) =>
-        mapItem(d, a.id, (i) => ({
+      // AC-21: changing category clears & re-prompts subcategory + measurement. Also reset fuel to the
+      // default (diesel) — the old value (e.g. electric for a suspended platform) no longer fits the new
+      // equipment type (an excavator) — and drop the now-stale agent fuel hint for this item.
+      return withDraft(state, (d) => {
+        const d2 = mapItem(d, a.id, (i) => ({
           ...i,
           ref: { categoryId: a.categoryId, subcategoryId: null, measurementId: null },
+          fuelType: "diesel",
           resolved: false,
-        })),
-      );
+        }));
+        const noteKey = `line_items[${a.id.slice(1)}].fuel_type_preference`;
+        if (d2.fieldNotes && noteKey in d2.fieldNotes) {
+          const fieldNotes = { ...d2.fieldNotes };
+          delete fieldNotes[noteKey];
+          return { ...d2, fieldNotes };
+        }
+        return d2;
+      });
     case "SET_ITEM_SUBCATEGORY":
       // AC-21: changing subcategory clears & re-prompts measurement; reset operator default (AC-24).
       return withDraft(state, (d) =>

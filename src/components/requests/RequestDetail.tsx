@@ -4,13 +4,12 @@ import { useEffect, useRef, useState, Fragment, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchRequestDetail, cancelRequest, updateRequest, fetchRequestSubmissions, setBidDeadline } from "@/lib/api/client";
-import { publicTaxonomyUrl, shortRef, type RequestItem, type RequestRecord } from "@/lib/contract/requests";
+import { publicTaxonomyUrl, shortRef, statusMeta, type RequestItem, type RequestRecord } from "@/lib/contract/requests";
 import { RequestBids } from "@/components/requests/RequestBids";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { LocationMap } from "@/components/requests/LocationMap";
 import "@/components/requests/requests-proto.css";
 
-const STATUS_CLS: Record<string, string> = { OPEN: "st-open", ACTIVE: "st-active", ACCEPTED: "st-accepted", EXPIRED: "st-expired", CLOSED: "st-closed", ABANDONED: "st-closed" };
 
 function fmtDate(v: string | null | undefined, ar: boolean): string {
   if (!v) return "—";
@@ -153,7 +152,7 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
     <div className="rproto" dir={ar ? "rtl" : "ltr"}>
       {/* status */}
       <div className="detail-status">
-        <span className={`stbadge ${STATUS_CLS[r.status] ?? "st-closed"}`}><span className="dot" />{r.status}</span>
+        {(() => { const sm = statusMeta(r.status); return <span className={`stbadge ${sm.cls}`}><span className="dot" />{ar ? sm.ar : sm.en}</span>; })()}
         <span className={`typebadge ${r.type === "DIRECT" ? "tb-direct" : "tb-broadcast"}`}><span className="material-icons-outlined">{r.type === "DIRECT" ? "person" : "campaign"}</span>{r.type}</span>
         <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 700 }}>{r.displayId ?? r.shortCode ?? shortRef(r.id)}</span>
         {(r.bidCount ?? 0) > 0 && <span className="stbadge st-active" style={{ marginInlineStart: "auto" }}><span className="material-icons-outlined" style={{ fontSize: 13 }}>gavel</span>{r.bidCount} {L("bids", "عروض")}</span>}
@@ -284,7 +283,7 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
 }
 
 /** Styled "cancel this request?" confirmation (replaces the browser prompt), matching the app's destructive dialog. */
-function ConfirmCancelModal({ ar, L, busy, idLabel, onClose, onConfirm }: { ar: boolean; L: (en: string, arr: string) => string; busy: boolean; idLabel: string; onClose: () => void; onConfirm: () => void }) {
+export function ConfirmCancelModal({ ar, L, busy, idLabel, onClose, onConfirm }: { ar: boolean; L: (en: string, arr: string) => string; busy: boolean; idLabel: string; onClose: () => void; onConfirm: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" dir={ar ? "rtl" : "ltr"} onClick={onClose}>
       <div className="w-full max-w-sm rounded-2xl bg-[var(--surface1)] p-5 text-center shadow-xl" onClick={(e) => e.stopPropagation()}>
@@ -332,7 +331,7 @@ const FUEL_OPTS: Opt[] = [{ v: "DIESEL", en: "Diesel", ar: "ديزل" }, { v: "P
 const NATIONALITY_OPTS: Opt[] = [{ v: "restricted", en: "Restricted", ar: "مقيّدة" }, { v: "any", en: "Any", ar: "أي" }];
 const BYWHO_OPTS: Opt[] = [{ v: "rentee", en: "Me (renter)", ar: "أنا (المستأجر)" }, { v: "supplier", en: "Supplier", ar: "المؤجّر" }];
 
-function EditRequestModal({ r, ar, L, onClose, onSaved }: { r: RequestRecord; ar: boolean; L: (en: string, arr: string) => string; onClose: () => void; onSaved: () => void }) {
+export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r: RequestRecord; ar: boolean; L: (en: string, arr: string) => string; onClose: () => void; onSaved: () => void; siblingIds?: string[] }) {
   const s = (v: unknown) => (v == null ? "" : String(v));
   const it = r.equipmentItems?.[0];
   // Project
@@ -404,6 +403,13 @@ function EditRequestModal({ r, ar, L, onClose, onSaved }: { r: RequestRecord; ar
     }
     try {
       await updateRequest(r.id, patch);
+      // Group edit: apply the SHARED (non-equipment) fields to the other member requests too, so a
+      // multi-item RFQ's project/preferences stay in sync without overwriting each item's equipment.
+      if (siblingIds && siblingIds.length) {
+        const shared = { ...(patch as Record<string, unknown>) };
+        delete shared.equipmentItems;
+        if (Object.keys(shared).length) await Promise.all(siblingIds.map((sid) => updateRequest(sid, shared).catch(() => {})));
+      }
       onSaved();
     } catch {
       setBusy(false);
