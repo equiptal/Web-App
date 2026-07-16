@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchMyRequests, fetchRequestSubmissions, fetchBids, bidShareUrl, setBidDeadline, setShareLinkLogo } from "@/lib/api/client";
-import { groupRequests, cappedFilled, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
+import { groupRequests, cappedFilled, shortRef, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
 import { GroupBids } from "@/components/requests/GroupBids";
 import { useHeaderBack } from "@/components/AppShell";
 import { ShareForBidsSheet } from "@/components/requests/ShareForBidsSheet";
@@ -256,8 +256,12 @@ function GroupChips({ groups, activeId, onPick, L, groupRefs }: { groups: Reques
           return (
             <button key={gr.id} onClick={() => onPick(gr.id)} style={{ flexShrink: 0, textAlign: "start", minWidth: 180, padding: "11px 15px", borderRadius: 14, cursor: "pointer", background: on ? "#1c3550" : "#fff", border: `1px solid ${on ? "#1c3550" : "#d4e0ec"}` }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                <span style={{ fontSize: 14, fontWeight: 900, color: on ? "#fff" : "#1c3550" }}>{gr.groupRef ?? groupRefs[gr.id] ?? gr.items[0]?.displayId ?? "RFQ"}</span>
-                <span style={{ fontSize: 11, fontWeight: 800, padding: "2px 8px", borderRadius: 20, background: on ? "rgba(255,255,255,.16)" : "#eff4f9", color: on ? "#fff" : "#6b8fa8" }}>{gr.items.length} {L("items", "عناصر")}</span>
+                <span style={{ fontSize: 14, fontWeight: 900, color: on ? "#fff" : "#1c3550" }}>{gr.groupRef ?? groupRefs[gr.id] ?? shortRef(gr.id)}</span>
+                {(() => {
+                  const s = STATUS[gr.overallStatus] ?? { cls: "st-mixed", en: gr.overallStatus, ar: gr.overallStatus };
+                  const dot = gr.overallStatus === "OPEN" || gr.overallStatus === "ACTIVE" || gr.overallStatus === "ACCEPTED" ? "#1daf58" : gr.overallStatus === "EXPIRED" ? "#d9362a" : "#9AA7B8";
+                  return <span style={{ display: "inline-flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap", fontSize: 11, fontWeight: 800, padding: "2px 9px", borderRadius: 20, background: on ? "rgba(255,255,255,.16)" : "#eff4f9", color: on ? "#fff" : "#2a4f72" }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: dot }} />{L(s.en, s.ar)}</span>;
+                })()}
               </div>
               <div style={{ fontSize: 12, fontWeight: 600, color: on ? "#C7D4E5" : "#6b8fa8", marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 165 }}>{gr.locationLabel}</div>
             </button>
@@ -303,7 +307,7 @@ export function GroupStrip({ group, ar, L, router, filledByItem = {} }: { group:
             <span style={{ flexShrink: 0, whiteSpace: "nowrap", fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 20, background: "rgba(29,175,88,.16)", color: "#7CE5A6" }}>● {ar ? ov.ar : ov.en}</span>
             {isBroadcast && <span style={{ flexShrink: 0, whiteSpace: "nowrap", fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 20, background: "rgba(255,255,255,.10)", color: "#C7D4E5" }}>📣 {L("Broadcast", "بثّ")}</span>}
           </div>
-          <div style={{ fontSize: 13, color: "#9DAFC6", marginTop: 5, fontWeight: 600 }}>{group.groupRef ?? link?.groupRef ?? group.items[0]?.displayId}{group.createdAt ? ` · ${fmtDate(group.createdAt, ar)}` : ""}</div>
+          <div style={{ fontSize: 13, color: "#9DAFC6", marginTop: 5, fontWeight: 600 }}>{group.groupRef ?? link?.groupRef ?? shortRef(group.id)}{group.createdAt ? ` · ${fmtDate(group.createdAt, ar)}` : ""}</div>
           <button onClick={() => router.push(`/requests/group/${encodeURIComponent(group.id)}`)} style={{ display: "inline-flex", alignItems: "center", gap: 6, alignSelf: "flex-start", marginTop: 8, padding: "6px 12px", borderRadius: 9, border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.06)", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>{L("View full request details", "عرض تفاصيل الطلب كاملة")} <span className="material-icons-outlined" style={{ fontSize: 15 }}>open_in_new</span></button>
           {isBroadcast && (
             <div style={{ marginTop: "auto", paddingTop: 11, borderTop: "1px solid rgba(255,255,255,.12)" }}>

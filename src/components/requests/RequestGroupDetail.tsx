@@ -4,7 +4,7 @@ import { useEffect, useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchRequestGroup, fetchRequestDetail } from "@/lib/api/client";
-import { parseAddress, publicTaxonomyUrl, type RequestRecord } from "@/lib/contract/requests";
+import { parseAddress, publicTaxonomyUrl, shortRef, type RequestRecord } from "@/lib/contract/requests";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { LocationMap } from "@/components/requests/LocationMap";
 import { Ditem, requestDetailRows } from "@/components/requests/RequestDetail";
@@ -145,7 +145,7 @@ export function RequestGroupDetail({ groupId, onTitle }: { groupId: string; onTi
             <div className="dcard" key={rec.id} style={{ marginBottom: 12 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
                 <span className={`stbadge ${st}`}><span className="dot" />{rec.status}</span>
-                <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 700 }}>{rec.displayId ?? rec.shortCode ?? rec.id}</span>
+                <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 700 }}>{rec.displayId ?? rec.shortCode ?? shortRef(rec.id)}</span>
                 {(rec.bidCount ?? 0) > 0 && (
                   <button className="btn sm" style={{ marginInlineStart: "auto" }} onClick={() => router.push(`/requests/${rec.id}?view=bids`)}>
                     <span className="material-icons-outlined">gavel</span> {L("View bids", "عرض العروض")} ({rec.bidCount})

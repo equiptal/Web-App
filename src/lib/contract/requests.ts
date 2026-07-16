@@ -176,12 +176,18 @@ export function extractRequestList(raw: unknown): RequestRecord[] {
   return Array.isArray(list) ? (list as RequestRecord[]) : [];
 }
 
+/** Clean short handle for a request/group with no backend RFQ-/REQ- code (old requests): the first 8
+ *  hex of the UUID, uppercased (e.g. "B51D4CA8"), so the UI shows a tidy id instead of a raw UUID. */
+export function shortRef(id: string | null | undefined): string {
+  return (id ?? "").replace(/-/g, "").slice(0, 8).toUpperCase() || "—";
+}
+
 export function mapRequestListItem(r: RequestRecord): RequestListItem {
   const it = r.equipmentItems?.[0] ?? null;
   return {
     id: r.id,
     requestGroupId: str(r.requestGroupId),
-    displayId: str(r.displayId) ?? str(r.shortCode) ?? r.id,
+    displayId: str(r.displayId) ?? str(r.shortCode) ?? shortRef(r.id),
     // RFQ group code from my-requests (T19). Defensive on the field name the backend adds.
     groupRef: str(r.groupRef) ?? str(r.requestGroupShortCode) ?? str(r.groupShortCode) ?? str(r.rfqRef) ?? null,
     type: r.type,
