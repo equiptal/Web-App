@@ -1720,12 +1720,9 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
             </div>
           </div>
 
-          {/* table footer — upload an offline quote / export the comparison (§6) */}
+          {/* table footer — export the comparison (§6) */}
           <div className="mt-3 flex flex-wrap items-center gap-2.5">
-            <span className="flex-1 text-[11.5px] font-semibold" style={{ color: C.muted, minWidth: 140 }}>{L(`Have an offline quote for ${(ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? "this item"}? Add it, or export this comparison.`, "لديك عرض خارج المنصة؟ أضِفه أو صدّر هذه المقارنة.")}</span>
-            <button onClick={() => setUploadOpen(true)} className="inline-flex items-center gap-1.5 rounded-[10px] border px-3.5 py-[9px] text-[12.5px] font-extrabold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>
-              <span className="material-icons-outlined" style={{ fontSize: 17 }}>upload_file</span>{L("Upload a quote", "رفع عرض سعر")}
-            </button>
+            <span className="flex-1 text-[11.5px] font-semibold" style={{ color: C.muted, minWidth: 140 }}>{L("Export this comparison as a PDF to share or keep.", "صدّر هذه المقارنة كملف PDF للمشاركة أو الحفظ.")}</span>
             <button onClick={exportPdf} className="inline-flex items-center gap-1.5 rounded-[10px] border px-3.5 py-[9px] text-[12.5px] font-extrabold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>
               <span className="material-icons-outlined" style={{ fontSize: 17 }}>picture_as_pdf</span>{L("Export PDF", "تصدير PDF")}
             </button>
