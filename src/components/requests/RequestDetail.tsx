@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, Fragment, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchRequestDetail, cancelRequest, updateRequest, fetchRequestSubmissions, setBidDeadline } from "@/lib/api/client";
-import { publicTaxonomyUrl, type RequestItem, type RequestRecord } from "@/lib/contract/requests";
+import { publicTaxonomyUrl, shortRef, type RequestItem, type RequestRecord } from "@/lib/contract/requests";
 import { RequestBids } from "@/components/requests/RequestBids";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { LocationMap } from "@/components/requests/LocationMap";
@@ -155,7 +155,7 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
       <div className="detail-status">
         <span className={`stbadge ${STATUS_CLS[r.status] ?? "st-closed"}`}><span className="dot" />{r.status}</span>
         <span className={`typebadge ${r.type === "DIRECT" ? "tb-direct" : "tb-broadcast"}`}><span className="material-icons-outlined">{r.type === "DIRECT" ? "person" : "campaign"}</span>{r.type}</span>
-        <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 700 }}>{r.displayId ?? r.shortCode ?? r.id}</span>
+        <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 700 }}>{r.displayId ?? r.shortCode ?? shortRef(r.id)}</span>
         {(r.bidCount ?? 0) > 0 && <span className="stbadge st-active" style={{ marginInlineStart: "auto" }}><span className="material-icons-outlined" style={{ fontSize: 13 }}>gavel</span>{r.bidCount} {L("bids", "عروض")}</span>}
       </div>
 
@@ -278,7 +278,7 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
       )}
 
       {showEdit && <EditRequestModal r={r} ar={ar} L={L} onClose={() => setShowEdit(false)} onSaved={() => { setShowEdit(false); void reload(); }} />}
-      {showCancel && <ConfirmCancelModal ar={ar} L={L} busy={busy} idLabel={r.displayId ?? r.shortCode ?? r.id} onClose={() => setShowCancel(false)} onConfirm={doCancel} />}
+      {showCancel && <ConfirmCancelModal ar={ar} L={L} busy={busy} idLabel={r.displayId ?? r.shortCode ?? shortRef(r.id)} onClose={() => setShowCancel(false)} onConfirm={doCancel} />}
     </div>
   );
 }

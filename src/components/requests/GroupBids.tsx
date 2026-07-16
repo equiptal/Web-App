@@ -14,7 +14,7 @@ import { bidSuppliers, bucketBidTerms, CERT_LABEL, type BidCard, type TermRow } 
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { qualityFromSubmission, type BidQuality } from "@/lib/contract/bid-quality";
 import { computeBidQuote } from "@/lib/contract/comparison";
-import type { RequestGroup } from "@/lib/contract/requests";
+import { shortRef, type RequestGroup } from "@/lib/contract/requests";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { quotationDownloadName } from "@/lib/compare/quotation-token";
@@ -282,7 +282,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       if (list) list.push(b);
       else bySupplier.set(key, [b]);
     }
-    const reqCode = String(groupRef ?? group.items[0]?.displayId ?? group.id).replace(/[^A-Za-z0-9-]/g, "");
+    const reqCode = String(groupRef ?? group.items[0]?.displayId ?? shortRef(group.id)).replace(/[^A-Za-z0-9-]/g, "");
 
     // Render one supplier's quotation in a single language; bilingual output stacks both per supplier.
     const renderSection = (supBids: GroupBid[], si: number, isAr: boolean) => {
@@ -309,7 +309,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       const qnum = `Q-${reqCode}-${supInit}${si + 1}`;
       const validRaw = supBids.map((b) => b.validUntil).filter(Boolean).sort()[0] ?? null;
       const valid = validRaw ? new Date(validRaw).toLocaleDateString(isAr ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
-      const reqIds = [...new Set(supBids.map((b) => itemMap.get(b.requestId)?.displayId ?? b.requestId))];
+      const reqIds = [...new Set(supBids.map((b) => itemMap.get(b.requestId)?.displayId ?? shortRef(b.requestId)))];
       const reqLabel = reqIds.length === 1 ? reqIds[0] : `${reqIds[0]} +${reqIds.length - 1}`;
       const rentalBasis = itemMap.get(sup.requestId)?.rentalType ?? "";
       const reqItem = itemMap.get(sup.requestId);
@@ -341,7 +341,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         ? L("Individual supplier · unverified", "مُورِّد فرد · غير موثَّق") : null;
 
       const eqLine = (b: GroupBid) => (b.equipment ? [b.equipment.make, b.equipment.model, b.equipment.year].filter(Boolean).join(" · ") : "—");
-      const labelOf = (b: GroupBid) => (ar ? b.itemLabelAr : b.itemLabel) || (itemMap.get(b.requestId)?.displayId ?? b.requestId);
+      const labelOf = (b: GroupBid) => (ar ? b.itemLabelAr : b.itemLabel) || (itemMap.get(b.requestId)?.displayId ?? shortRef(b.requestId));
       // App rule (014 CR #141): the bid is priced per billing period; the unit count is NOT multiplied
       // into the price (it's shown for information only). Open-ended → ∞ qty + one-period "as operated".
       const daysPerPeriod = (u: string | null) => { switch ((u ?? "PER_DAY").toUpperCase()) { case "PER_WEEK": return 7; case "PER_MONTH": return 26; case "PER_JOB": return 0; default: return 1; } };
@@ -451,7 +451,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
 
       const cards: QuotationCard[] = [];
       const projectRows = supBids.map((b) => ({
-        label: itemMap.get(b.requestId)?.displayId ?? b.requestId,
+        label: itemMap.get(b.requestId)?.displayId ?? shortRef(b.requestId),
         value: `${offeredUnits(b)} × ${labelOf(b)}`,
       }));
       projectRows.push({ label: L("Rental basis", "أساس الإيجار"), value: rentalBasis || "—" });
