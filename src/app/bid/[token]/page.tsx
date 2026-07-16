@@ -173,7 +173,7 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
   const [notFound, setNotFound] = useState(false);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [contract, setContract] = useState<Record<string, boolean>>({});
-  const [company, setCompany] = useState({ companyName: "", crNumber: "", vatNumber: "", nationalAddress: "", contactInfo: "", notes: "", validUntil: "" });
+  const [company, setCompany] = useState({ companyName: "", crNumber: "", vatNumber: "", nationalAddress: "", contactInfo: "", city: "", notes: "", validUntil: "" });
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
@@ -345,6 +345,7 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
         vatNumber: company.vatNumber.trim(),
         nationalAddress: company.nationalAddress.trim(),
         contactInfo: company.contactInfo.trim(),
+        city: company.city.trim() || undefined,
         // No backend flag for VAT-inclusive pricing — carry it as a tagged line in the notes (which
         // round-trip to the renter's submission view). The viewer surfaces it as a dedicated note.
         notes: buildSubmissionNotes(company.notes, vatIncluded),
@@ -780,7 +781,11 @@ export default function BidFormPage({ params }: { params: Promise<{ token: strin
                 text={company.nationalAddress} onText={(v) => setCompany({ ...company, nationalAddress: v })} textPlaceholder={L("National address", "العنوان الوطني")}
                 docs={coAddr} onDocs={setCoAddr} token={token} L={L} disabled={submitting} />
             </div>
-            <Field label={L("Contact info", "بيانات التواصل")} req invalid={showErrors && !company.contactInfo.trim()} L={L}><input value={company.contactInfo} onChange={(e) => setCompany({ ...company, contactInfo: e.target.value })} placeholder={L("Phone or email so the renter can reach you", "هاتف أو بريد ليتواصل معك المستأجر")} /></Field>
+            <div className="frow">
+              <Field label={L("Phone", "رقم الجوال")} req invalid={showErrors && !company.contactInfo.trim()} L={L}><input type="tel" inputMode="tel" value={company.contactInfo} onChange={(e) => setCompany({ ...company, contactInfo: e.target.value })} placeholder={L("e.g. 05XXXXXXXX", "مثال: 05XXXXXXXX")} /></Field>
+              <Field label={L("City", "المدينة")} L={L}><input value={company.city} onChange={(e) => setCompany({ ...company, city: e.target.value })} placeholder={L("e.g. Riyadh", "مثال: الرياض")} /></Field>
+            </div>
+            <p style={{ margin: "-4px 0 2px", fontSize: 11.5, color: "var(--muted)" }}>{L("Your phone lets you continue this bid in the Moedatech app later.", "رقمك يتيح لك متابعة هذا العرض في تطبيق مؤيداتك لاحقاً.")}</p>
             {QUOTE_EXPIRY_ENABLED && <Field label={L("Quote valid until", "صلاحية العرض حتى")} L={L}><input type="date" value={company.validUntil} onChange={(e) => setCompany({ ...company, validUntil: e.target.value })} /></Field>}
             <div className="notes-field"><label>{L("Notes — for the whole quotation", "ملاحظات — لكامل عرض السعر")}<span className="optx">{L("Optional", "اختياري")}</span></label><textarea value={company.notes} onChange={(e) => setCompany({ ...company, notes: e.target.value })} /></div>
 

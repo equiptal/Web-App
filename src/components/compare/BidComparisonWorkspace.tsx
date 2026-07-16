@@ -422,7 +422,7 @@ export function BidComparisonWorkspace() {
     // Renter-view order (parity with the bid list): in-app (platform) columns FIRST, off-platform
     // (shared-link / uploaded) after — a STABLE partition, so each group keeps the active ranking (preset
     // or agent). Under the default "Best" preset that leaves off-platform highest-quality-first.
-    const isOffPlatform = (c: BidColumn) => !!c.bid.viaSharedLink || String(c.bid.id).startsWith("link-") || String(c.bid.id).startsWith("upload:");
+    const isOffPlatform = (c: BidColumn) => !!c.bid.viaSharedLink || !!c.bid.converted || String(c.bid.id).startsWith("link-") || String(c.bid.id).startsWith("upload:");
     const inAppFirst = (list: BidColumn[]) => [...list.filter((c) => !isOffPlatform(c)), ...list.filter(isOffPlatform)];
     // The 4 preset criteria (Best / Lowest / Newest / Most trusted) are ALWAYS a deterministic web sort.
     // The agent order applies ONLY when a free-text query is active (the "Ask AI" box) — a preset never
@@ -1270,7 +1270,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                                     // orange "Off-platform · via your request link" / blue "Via Moedatech app".
                                     const chip = isUpload
                                       ? { bg: C.surface2, c: C.muted, icon: "description", text: L("Uploaded file", "ملف مرفوع") }
-                                      : c.bid.viaSharedLink
+                                      : (c.bid.viaSharedLink || c.bid.converted) // converted = off-platform origin (web-app/006)
                                         ? { bg: "#fff4e5", c: "#d4780a", icon: "link", text: L("Off-platform · via your request link", "خارج المنصة · عبر رابط طلبك") }
                                         : { bg: "#e6f2fb", c: "#1a7ec8", icon: "verified_user", text: L("Via Moedatech app", "عبر تطبيق معداتك") };
                                     return (

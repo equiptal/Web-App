@@ -17,6 +17,8 @@ import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
 import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
+import { SharedBidNegotiateRoom } from "@/components/requests/SharedBidNegotiateRoom";
+import { NEGOTIATE_ENABLED } from "@/lib/config/flags";
 
 /** Lifecycle pill (matches the prototype SPILL). */
 const SPILL: Record<string, { cls: string; dot: boolean; en: string; ar: string }> = {
@@ -85,6 +87,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
   const [submissions, setSubmissions] = useState<LinkBidSubmission[]>([]);
   const [src, setSrc] = useState<"all" | "app" | "link">("all"); // source filter
   const [submissionBid, setSubmissionBid] = useState<BidCard | null>(null);
+  const [negotiateBid, setNegotiateBid] = useState<BidCard | null>(null); // web-app/006 — deal-room-style negotiate view
 
   const toggleSelect = (id: string) =>
     setSelected((prev) => {
@@ -209,9 +212,12 @@ export function RequestBids({ requestId }: { requestId: string }) {
     return [{ ...submissionToBidCard(s, it), id }];
   });
   const merged = [...bids, ...linkCards];
-  const linkCount = linkCards.length;
-  const appCount = bids.length;
-  const allBids = merged.filter((b) => (src === "all" ? true : src === "link" ? b.viaSharedLink : !b.viaSharedLink));
+  // Off-platform = raw shared-link submissions OR app bids CONVERTED from one (web-app/006). Both are
+  // labelled + counted as off-platform, even though a converted bid is a first-class app bid with a deal room.
+  const isOff = (b: { viaSharedLink?: boolean; converted?: boolean }) => !!(b.viaSharedLink || b.converted);
+  const linkCount = merged.filter(isOff).length;
+  const appCount = merged.filter((b) => !isOff(b)).length;
+  const allBids = merged.filter((b) => (src === "all" ? true : src === "link" ? isOff(b) : !isOff(b)));
   if (merged.length === 0) return <div className="rempty">{L("No bids yet — suppliers' offers will appear here.", "لا توجد عروض بعد — ستظهر عروض المؤجّرين هنا.")}</div>;
 
   return (
@@ -251,6 +257,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
               isSel={selected.has(b.id)}
               onToggleSelect={() => toggleSelect(b.id)}
               onViewSubmission={() => setSubmissionBid(b)}
+              onNegotiate={NEGOTIATE_ENABLED ? () => setNegotiateBid(b) : undefined}
               itemLabel={linkLabels.get(b.id) ?? null}
               quality={linkQuality.get(b.id) ?? null}
             />
@@ -288,7 +295,12 @@ export function RequestBids({ requestId }: { requestId: string }) {
                 <div className="r1">
                   <span className="sname">{b.supplierName}</span>
                   <span className={`spill ${sp.cls}`}>{sp.dot && <span className="d" />}{ar ? sp.ar : sp.en}</span>
-                  <span className="src-chip src-app"><span className="material-icons-outlined">verified_user</span>{L("via Moedatech app", "عبر تطبيق معداتك")}</span>
+                  {b.converted ? (
+                    // web-app/006: a converted bid is a real app bid, but keep its OFF-PLATFORM origin label.
+                    <span className="src-chip" style={{ background: "var(--brand-soft, #fff4e5)", color: "var(--brand, #f79009)" }}><span className="material-icons-outlined">link</span>{L("via shared link", "عبر الرابط")}</span>
+                  ) : (
+                    <span className="src-chip src-app"><span className="material-icons-outlined">verified_user</span>{L("via Moedatech app", "عبر تطبيق معداتك")}</span>
+                  )}
                 </div>
                 <div className="bid-evt">{evt}</div>
                 <div className="credrow">
@@ -432,6 +444,20 @@ export function RequestBids({ requestId }: { requestId: string }) {
           ar={ar}
           L={L}
           onClose={() => setSubmissionBid(null)}
+          onNegotiate={NEGOTIATE_ENABLED ? () => { const b = submissionBid; setSubmissionBid(null); setNegotiateBid(b); } : undefined}
+        />
+      )}
+
+      {/* web-app/006 — deal-room-style negotiate relay for an off-platform shared-link bid */}
+      {NEGOTIATE_ENABLED && negotiateBid && (
+        <SharedBidNegotiateRoom
+          bid={negotiateBid}
+          submission={submissions.find((s) => s.id === negotiateBid.submissionKey) ?? null}
+          itemLabel={linkLabels.get(negotiateBid.id) ?? null}
+          ar={ar}
+          L={L}
+          onClose={() => setNegotiateBid(null)}
+          onViewSubmission={() => { const b = negotiateBid; setNegotiateBid(null); setSubmissionBid(b); }}
         />
       )}
 

@@ -582,6 +582,12 @@ export async function setBidDeadline(requestId: string, deadline: string | null)
   return postJsonMethod<{ deadline: string | null }>(`/api/me/requests/${encodeURIComponent(requestId)}/share-link`, { deadline }, "PUT");
 }
 
+/** Renter's pre-conversion "Negotiate" message on an off-platform submission (relay → agents).
+ *  Appends `{ text, at }` to the submission's `rentee_messages`; ops is emailed on the first. */
+export async function postSubmissionMessage(requestId: string, submissionId: string, text: string): Promise<void> {
+  await postJson(`/api/me/requests/${encodeURIComponent(requestId)}/bid-submissions/${encodeURIComponent(submissionId)}/messages`, { text });
+}
+
 /** Set / clear the renter's company logo on the request's shared bid form. `logoUrl` = data URL or null. */
 export async function setShareLinkLogo(requestId: string, logoUrl: string | null): Promise<unknown> {
   return postJsonMethod(`/api/me/requests/${encodeURIComponent(requestId)}/share-link`, { logoUrl }, "PUT");
