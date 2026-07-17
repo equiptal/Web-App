@@ -243,6 +243,12 @@ export function OnboardingForm({
   return (
     <form onSubmit={submit} noValidate>
       <div className="flex items-start gap-3 border-b border-border p-[22px]">
+        {/* Back to step 1 (OTP entry) — keeps the two steps tied so the user can return to the code step. */}
+        {onSignIn && (
+          <button type="button" onClick={onSignIn} aria-label={t.common.back} className="grid h-10 w-10 flex-none place-items-center rounded-[10px] border border-border text-navy-mid transition hover:bg-surface2">
+            <Icon name="arrow_back" size={20} className="rtl:-scale-x-100" />
+          </button>
+        )}
         <span className="grid h-10 w-10 flex-none place-items-center rounded-[10px] bg-brand-soft text-brand">
           <Icon name="person_add" size={22} />
         </span>
