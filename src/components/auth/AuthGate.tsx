@@ -53,6 +53,10 @@ export function AuthGateProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [opts, setOpts] = useState<OpenOpts>({});
   const [pending, setPending] = useState<Pending | null>(null);
+  // Whether THIS open should resume an abandoned email-first signup at Modal 2 (the profile step). Only
+  // the "Finish your signup" banner sets it — a plain "Sign in" always starts at Modal 1 (the OTP step),
+  // so the two steps stay tied and re-clicking Sign in never jumps mid-flow.
+  const [resume, setResume] = useState(false);
   const action = useRef<(() => void) | null>(null);
   const isComplete = status === "authed" && (user?.tier === "basic" || user?.tier === "verified");
 
@@ -86,6 +90,7 @@ export function AuthGateProvider({ children }: { children: ReactNode }) {
       if (isComplete) { act?.(); return; } // already a full account → no gate
       action.current = act ?? null;
       setOpts(o ?? {});
+      setResume(false); // Sign in / any gated action opens at Modal 1 (OTP), never mid-flow
       setOpen(true);
     },
     [isComplete],
@@ -114,7 +119,7 @@ export function AuthGateProvider({ children }: { children: ReactNode }) {
         onCreated={onCreated}
         title={opts.title}
         subtitle={opts.subtitle}
-        resumeToken={pending?.token}
+        resumeToken={resume ? pending?.token : undefined}
         onNeedsSignup={persistOnboarding}
       />
       {showBanner && (
@@ -125,7 +130,7 @@ export function AuthGateProvider({ children }: { children: ReactNode }) {
               <p className="text-[13px] font-extrabold text-navy">{t.auth.finishTitle}</p>
               <p className="truncate text-[12px] text-muted">{t.auth.finishBody}</p>
             </div>
-            <button onClick={() => setOpen(true)} className="flex-none rounded-[9px] bg-brand px-3 py-2 text-[12.5px] font-bold text-white transition hover:brightness-105">
+            <button onClick={() => { setResume(true); setOpen(true); }} className="flex-none rounded-[9px] bg-brand px-3 py-2 text-[12.5px] font-bold text-white transition hover:brightness-105">
               {t.auth.finishCta}
             </button>
             <button onClick={clearPending} aria-label={t.common.close} className="flex-none rounded-full p-1 text-muted hover:text-navy">
