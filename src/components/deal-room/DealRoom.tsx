@@ -5,13 +5,34 @@ import { StreamChat, type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
 import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, ApiError } from "@/lib/api/client";
 import { computeDealTotals, type DealRoomView, type DealTerm, type DealRoomDocument, type DealRoomDocuments, type QuotationView } from "@/lib/contract/deal-room";
+import { reconstructRounds, collapseRounds, latestRoundBy, withOpeningRound, type DealRound } from "@/lib/contract/deal-rounds";
 import { valText, type ResolutionsMap } from "@/components/deal-room/DealRoomTerms";
 import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
 import { renderQuotationSection, wrapQuotationPage, type QuotationDoc, type QuotationLineItem, type QuotationCard } from "@/lib/quotation/render";
 import "@/components/deal-room/deal-room-proto.css";
 
 type StreamAttachment = { type?: string; image_url?: string; thumb_url?: string; asset_url?: string; title?: string; mime_type?: string; file_size?: number; fallback?: string };
-type ChatMsg = { id: string; text?: string; user?: { id?: string }; created_at?: string | Date; attachments?: StreamAttachment[] };
+// `custom` carries the app's round payload (type:'rate_proposal', …) + location kind; i18n carries
+// Stream's message translations. Both are read defensively (reconstructRounds / the translate toggle).
+type ChatMsg = { id: string; text?: string; user?: { id?: string }; created_at?: string | Date; attachments?: StreamAttachment[]; custom?: Record<string, unknown>; i18n?: Record<string, unknown> };
+
+/** Deal-room rounds → the standing supplier/rentee snapshots, for the allMatched gate + history. */
+function roomOpeningRound(room: DealRoomView) {
+  return {
+    rate: room.rate, priceUnit: room.priceUnit, mobPrice: room.mobPrice, demobPrice: room.demobPrice,
+    rentalUnits: room.agreedUnits ?? room.numberOfUnits, mobUnits: room.mobUnits, demobUnits: room.demobUnits,
+    mobExcluded: room.mobExcluded, demobExcluded: room.demobExcluded,
+  };
+}
+const eqNum = (a: number | null, b: number | null) => (a == null || b == null ? a == b : Math.round(a) === Math.round(b));
+/** Total for one reconstructed round (reuses computeDealTotals with the round's full snapshot). */
+function roundTotals(room: DealRoomView, r: DealRound) {
+  return computeDealTotals(room, {
+    rate: r.rate, priceUnit: r.priceUnit, mobPrice: r.mobPrice, demobPrice: r.demobPrice,
+    rentalUnits: r.rentalUnits, mobUnits: r.mobUnits, demobUnits: r.demobUnits,
+    mobExcluded: r.mobExcluded, demobExcluded: r.demobExcluded,
+  });
+}
 
 const STREAM_KEY = process.env.NEXT_PUBLIC_STREAM_API_KEY ?? "";
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
@@ -51,8 +72,6 @@ function buildQuotationHtml(room: DealRoomView, q: QuotationView, renteeName: st
   const days = room.periods;
   const periodLabel = unit === "PER_WEEK" ? L("week", "أسبوع") : unit === "PER_MONTH" ? L("month", "شهر") : unit === "PER_JOB" ? L("job", "مهمة") : L("day", "يوم");
   const rentalTotal = t.rentalTotal;
-  const mobTotal = t.mobTotal;
-  const demobTotal = t.demobTotal;
   const subtotal = t.subtotal;
   const vat = t.vat;
   const total = t.grand;
@@ -222,6 +241,9 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const [myStreamId, setMyStreamId] = useState<string | null>(null);
   const [chatReady, setChatReady] = useState(false);
   const [text, setText] = useState("");
+  // deal-room/chat parity — per-message inline translation (incoming text only): id → translated text.
+  const [translations, setTranslations] = useState<Record<string, string>>({});
+  const [translating, setTranslating] = useState<string | null>(null);
   const channelRef = useRef<Channel | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const roomRefetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -496,6 +518,28 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     }
   }
 
+  // Inline translate (app parity): toggle an incoming message to the opposite script via Stream's
+  // translateMessage; a second tap restores the original. Best-effort — silent if translate is off.
+  async function translateMsg(m: ChatMsg) {
+    const body = (m.text ?? "").trim();
+    if (!body || translating) return;
+    if (translations[m.id]) { setTranslations((t) => { const n = { ...t }; delete n[m.id]; return n; }); return; }
+    const client = channelRef.current?.getClient?.();
+    if (!client) return;
+    const target = /[؀-ۿ]/.test(body) ? "en" : "ar";
+    setTranslating(m.id);
+    try {
+      const res = await client.translateMessage(m.id, target);
+      const i18n = ((res as { message?: { i18n?: Record<string, unknown> } })?.message?.i18n ?? {}) as Record<string, unknown>;
+      const tx = (i18n[`${target}_text`] as string) || "";
+      if (tx) setTranslations((t) => ({ ...t, [m.id]: tx }));
+    } catch {
+      /* translation unavailable — keep original */
+    } finally {
+      setTranslating(null);
+    }
+  }
+
   if (error) return <div className="dlproto"><div className="rempty">{L("Couldn’t open this deal room.", "تعذّر فتح غرفة الصفقة.")}</div></div>;
   if (!room) return <div className="dlproto"><div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 28 }}>progress_activity</span></div></div>;
 
@@ -544,10 +588,40 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   // Equipment title — real name + size (like the request/bid cards), not the bare "Equipment" fallback.
   const eqName = (ar ? room.details.equipmentLabelAr || room.details.equipmentLabel : room.details.equipmentLabel) || L("Equipment", "المعدّة");
   const eqSize = ar ? room.details.equipmentSizeAr || room.details.equipmentSize : room.details.equipmentSize || room.details.equipmentSizeAr;
-  // Accept is gated (like the app) until every differing term is resolved — now satisfied by a LOCAL
-  // resolution, not a server round-trip.
+  // deal-room/negotiation rounds — reconstructed from the chat's rate_proposal messages (app parity).
+  // Drive the allMatched accept gate, the turn badges, and the round-history log. Falls back to the
+  // room's standing values if the chat custom data isn't reachable (never breaks the live flow).
+  const rounds = withOpeningRound(collapseRounds(reconstructRounds(messages as unknown[])), roomOpeningRound(room));
+  const rRound = latestRoundBy(rounds, "rentee");
+  const sRound = latestRoundBy(rounds, "supplier");
+
+  // Accept gate — app parity `allMatched` (rentee perspective): every non-fixed term matched/accepted,
+  // AND the rentee's latest price+units round equals the supplier's (nothing left to change). When rounds
+  // can't be reconstructed, rRound/sRound are the room fallback so the price/units checks pass and the gate
+  // degrades to the term check — never stricter than the backend's disputed-only 409.
+  const termMatched = (t: DealTerm): boolean => {
+    if (t.state === "fixed" || t.state === "agreed" || t.state === "soft_accepted") return true;
+    const r = resolutions[t.key];
+    if (!r) return false;
+    if (r.action === "accept") return true;
+    return r.value != null && String(r.value) === String(t.supplierDeclared);
+  };
+  const termsMatched = room.terms.every(termMatched);
+  const priceMatches = !rRound || !sRound ? true
+    : eqNum(rRound.rate, sRound.rate) && (rRound.priceUnit ?? "") === (sRound.priceUnit ?? "") && eqNum(rRound.mobPrice, sRound.mobPrice) && eqNum(rRound.demobPrice, sRound.demobPrice);
+  const unitsMatch = !rRound || !sRound ? true
+    : eqNum(rRound.rentalUnits, sRound.rentalUnits) && eqNum(rRound.mobUnits, sRound.mobUnits) && eqNum(rRound.demobUnits, sRound.demobUnits) && rRound.mobExcluded === sRound.mobExcluded && rRound.demobExcluded === sRound.demobExcluded;
   const unresolvedDisputed = room.terms.filter((t) => t.state === "disputed" && !resolutions[t.key]);
-  const canAccept = unresolvedDisputed.length === 0;
+  const canAccept = termsMatched && priceMatches && unitsMatch;
+  // Show the Accept/Negotiate CTAs on the renter's turn OR whenever everything already matches (app parity
+  // deadlock-break: allMatched surfaces Accept even if it would otherwise read as the supplier's turn).
+  const live = !closed && !abandoned && !awaiting;
+  const showAct = live && (room.myTurn || canAccept);
+  const acceptBlockMsg = !termsMatched
+    ? L("Resolve the differing terms below before you can accept", "قم بحل الشروط المختلفة أدناه قبل القبول")
+    : L("Match the supplier's latest price and quantities before you can accept", "طابق أحدث سعر وكميات المورد قبل القبول");
+  // Turn cue (app `negotiateFresh` vs `negotiate`): the supplier countered last vs the renter's opening move.
+  const supplierCountered = room.myTurn && room.lastCounterBy === "supplier";
 
   return (
     <div className="dlproto" dir={ar ? "rtl" : "ltr"}>
@@ -633,22 +707,27 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
               {L("Details", "التفاصيل")}<span className="material-icons-outlined">expand_more</span>
             </button>
           </div>
+          {/* Turn cue (app parity): supplier countered → pulsing "New reply"; renter's opening move → "Your turn". */}
+          {showAct && (supplierCountered || room.myTurn) && (
+            <div className={`pb-turn${supplierCountered ? " alert" : ""}`}>{supplierCountered ? `🔔 ${L("New reply", "ردّ جديد")}` : `⚡ ${L("Your turn", "دورك")}`}</div>
+          )}
           {/* CTAs — centered below the price */}
           {closed ? (
             <div className="pb-btns">
               <button className="pb-btn accept" disabled={quoteBusy} onClick={downloadQuotation}><span className="material-icons-outlined">download</span>{L("Download quote", "تنزيل العرض")}</button>
               <button className="pb-btn ghost" onClick={() => setReleaseOpen(true)}><span className="material-icons-outlined">refresh</span>{L("Reopen", "إعادة فتح")}</button>
             </div>
-          ) : abandoned ? null : room.myTurn ? (
-            <div className="pb-btns">
-              <button className="pb-btn neg" disabled={busy} onClick={() => openFlow("counter")}><span className="material-icons-outlined">swap_horiz</span>{L("Negotiate", "تفاوض")}</button>
-              {/* Accept is gated exactly like the app: blocked while any term is disputed (acceptAllTerms 409s otherwise). */}
-              <button className="pb-btn accept" disabled={busy || !canAccept} onClick={() => openFlow("accept")}><span className="material-icons-outlined">check</span>{L("Accept", "قبول")}</button>
-            </div>
-          ) : awaiting ? (
+          ) : abandoned ? null : awaiting ? (
             <div className="pb-btns">
               {/* deal-room/negotiation — withdraw the pending acceptance (AWAITING → NEGOTIATING). */}
               <button className="pb-btn ghost" disabled={withdrawing} onClick={doWithdraw}><span className="material-icons-outlined">undo</span>{withdrawing ? L("Withdrawing…", "جارٍ السحب…") : L("Withdraw", "سحب القبول")}</button>
+            </div>
+          ) : showAct ? (
+            <div className="pb-btns">
+              {/* App parity: Negotiate always available; Accept surfaces via allMatched (deadlock-break) even
+                  when it'd otherwise be the supplier's turn, and stays gated until terms+price+units match. */}
+              <button className={`pb-btn neg${supplierCountered ? " pulse" : ""}`} disabled={busy} onClick={() => openFlow("counter")}><span className="material-icons-outlined">swap_horiz</span>{L("Negotiate", "تفاوض")}</button>
+              <button className="pb-btn accept" disabled={busy || !canAccept} onClick={() => openFlow("accept")}><span className="material-icons-outlined">check</span>{L("Accept", "قبول")}</button>
             </div>
           ) : null}
         </div>
@@ -673,8 +752,8 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
       </div>
 
       {/* below-bar strips */}
-      {!closed && !abandoned && room.myTurn && !canAccept && (
-        <div className="pb-strip"><span className="material-icons-outlined">error_outline</span>{L("Resolve the differing terms below before you can accept", "قم بحل الشروط المختلفة أدناه قبل القبول")}</div>
+      {showAct && !canAccept && (
+        <div className="pb-strip"><span className="material-icons-outlined">error_outline</span>{acceptBlockMsg}</div>
       )}
       {abandoned && (
         <div className="pb-strip danger"><span className="material-icons-outlined">cancel</span>{L("This deal room has been cancelled", "تم إلغاء غرفة الصفقة هذه")}</div>
@@ -703,11 +782,28 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
               );
             }
             const mine = m.user?.id === myStreamId;
+            const custom = m.custom ?? {};
+            const lat = Number(custom.lat), lng = Number(custom.lng);
+            const isLocation = custom.kind === "location" && Number.isFinite(lat) && Number.isFinite(lng);
+            const shownText = translations[m.id] ?? m.text;
+            const canTranslate = !mine && !isLocation && !!(m.text ?? "").trim();
+            // Attachments are downloadable/openable only once the deal is CLOSED (app parity: isDownloadEnabled).
+            const attName = (a: StreamAttachment) => a.title || (a.type === "image" ? L("Photo", "صورة") : a.type === "audio" || (a.mime_type || "").startsWith("audio/") ? L("Voice note", "ملاحظة صوتية") : L("Attachment", "مرفق"));
             return (
               <div className={`msg ${mine ? "mine" : "them"}`} key={m.id}>
-                {m.text}
+                {isLocation ? (
+                  <a href={`https://www.google.com/maps?q=${lat},${lng}`} target="_blank" rel="noopener noreferrer" className="msg-att-file msg-loc">
+                    <span className="material-icons-outlined">place</span>
+                    <span className="msg-att-name">{(shownText && String(shownText).trim()) || L("Shared location", "موقع مشترك")}</span>
+                  </a>
+                ) : shownText}
                 {m.attachments?.map((a, i) =>
-                  a.type === "image" ? (
+                  !closed ? (
+                    <span key={i} className="msg-att-lock" title={L("Available after the deal is confirmed", "متاح بعد تأكيد الصفقة")}>
+                      <span className="material-icons-outlined">lock</span>
+                      <span className="msg-att-name">{attName(a)}</span>
+                    </span>
+                  ) : a.type === "image" ? (
                     <a key={i} href={a.image_url || a.thumb_url} target="_blank" rel="noopener noreferrer" className="msg-att-img">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={a.thumb_url || a.image_url} alt={a.fallback || ""} />
@@ -720,6 +816,11 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
                       <span className="msg-att-name">{a.title || L("Attachment", "مرفق")}</span>
                     </a>
                   ),
+                )}
+                {canTranslate && (
+                  <button type="button" className="msg-tr" disabled={translating === m.id} onClick={() => void translateMsg(m)}>
+                    {translating === m.id ? L("Translating…", "جارٍ الترجمة…") : translations[m.id] ? L("Show original", "النص الأصلي") : L("Translate", "ترجمة")}
+                  </button>
                 )}
                 <div className="meta">{m.created_at ? new Date(m.created_at as string).toLocaleTimeString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { hour: "2-digit", minute: "2-digit" }) : ""}</div>
               </div>
@@ -1111,6 +1212,9 @@ function CounterFlow({
   const STEPS = [L("Price", "السعر"), L("Terms", "الشروط"), L("Review", "المراجعة")];
   const sheetTitle = `${room.details.equipmentLabel ?? L("Equipment", "المعدّة")}${rNU > 1 ? ` — ${rNU} ${L("units", "وحدات")}` : ""}`;
   const roomCode = room.shortCode ?? "";
+  // Reconstructed negotiation history (app parity) — drives the round number in the header + the Log list.
+  const flowRounds = withOpeningRound(collapseRounds(reconstructRounds(messages as unknown[])), roomOpeningRound(room));
+  const roundNo = flowRounds.length + 1;
   const today = new Date().toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
   const changedFrom = (cur: number, ref: number | null) => ref != null && Math.round(cur) !== Math.round(ref);
 
@@ -1173,7 +1277,7 @@ function CounterFlow({
           <div className="qp-head-r1">
             <div className="qp-htitle">
               <div className="t">{sheetTitle}</div>
-              <div className="s">{L("Negotiation room", "غرفة التفاوض")}{roomCode ? ` · ${roomCode}` : ""}</div>
+              <div className="s">{L("Negotiation room", "غرفة التفاوض")}{roomCode ? ` · ${roomCode}` : ""} · {L(`Round ${roundNo}`, `الجولة ${roundNo}`)}</div>
             </div>
             <div className="qp-htotal"><div className="k">{L("Your offer", "إجمالي عرضك")}</div><div className="v">{nf(total)} {sar}</div></div>
             <button className="qp-x" onClick={() => !busy && onClose()} aria-label={L("Close", "إغلاق")}><span className="material-icons-outlined">close</span></button>
@@ -1402,6 +1506,29 @@ function CounterFlow({
                 ))}
               </div>
               <div className="qp-body" style={{ background: "#fff", padding: "4px 0 8px" }}>
+                {/* Reconstructed price rounds (newest first) — role, rate, units, legs, total per round. */}
+                {logTab !== "terms" && flowRounds.length > 0 && (
+                  <div className="qp-rounds">
+                    {[...flowRounds].reverse().map((r, i) => {
+                      const rt = roundTotals(room, r);
+                      const per = ({ PER_DAY: L("day", "يوم"), PER_WEEK: L("week", "أسبوع"), PER_MONTH: L("month", "شهر"), PER_JOB: L("job", "مهمة") } as Record<string, string>)[rt.priceUnit] ?? L("day", "يوم");
+                      return (
+                        <div key={`rnd-${i}`} className="qp-round">
+                          <div className="qp-round-h">
+                            <span className={`qp-round-role ${r.role}`}>{r.role === "supplier" ? L("Supplier", "المورد") : L("You", "أنت")}</span>
+                            <span className="qp-round-tot">{nf(rt.grand)} {sar}</span>
+                          </div>
+                          <div className="qp-round-d">
+                            {nf(rt.rate)}/{per} · {rt.rentalUnits} {L("units", "وحدة")}
+                            {rt.mobExcluded ? ` · ${L("no mob", "بدون تعبئة")}` : rt.mobPrice ? ` · ${L("mob", "تعبئة")} ${nf(rt.mobPrice)}×${rt.mobUnitsN}` : ""}
+                            {rt.demobExcluded ? ` · ${L("no demob", "بدون إرجاع")}` : rt.demobPrice ? ` · ${L("demob", "إرجاع")} ${nf(rt.demobPrice)}×${rt.demobUnitsN}` : ""}
+                          </div>
+                          {r.at && <div className="qp-round-t">{new Date(r.at).toLocaleString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 {(() => {
                   // Real activity log — the deal room's system_bot narration (each counter / rate proposal /
                   // term action / lifecycle event), newest-first. Full structured per-round price history is

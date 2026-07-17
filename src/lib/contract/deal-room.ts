@@ -232,22 +232,32 @@ export interface DealTotals {
 /** SINGLE source of truth for deal-room money — used by BOTH the live price bar and the confirmed
  *  quotation so they can never drift (app parity: computeDealTotals). Prorated ÷26/÷7; PER_JOB and
  *  no-duration = one full period (rate × units); mob/demob use their OWN unit counts and honor leg
- *  exclusion; VAT 15%. `override` lets the quotation pass the agreed rate / price unit. */
-export function computeDealTotals(room: DealRoomView, override?: { rate?: number | null; priceUnit?: string | null }): DealTotals {
+ *  exclusion; VAT 15%. `override` lets the quotation pass the agreed rate / price unit, or a single
+ *  negotiation round pass its full snapshot (rate + prices + per-type units + exclusion). */
+export function computeDealTotals(
+  room: DealRoomView,
+  override?: {
+    rate?: number | null; priceUnit?: string | null;
+    mobPrice?: number | null; demobPrice?: number | null;
+    rentalUnits?: number | null; mobUnits?: number | null; demobUnits?: number | null;
+    mobExcluded?: boolean; demobExcluded?: boolean;
+  },
+): DealTotals {
+  const pick = <T,>(o: T | null | undefined, fb: T): T => (o == null ? fb : o);
   const rate = override?.rate ?? room.rate ?? 0;
   const priceUnit = (override?.priceUnit ?? room.priceUnit ?? "PER_DAY").toUpperCase();
   const dpp = DEAL_FREQ_DAYS[priceUnit] || 1;
   const hasDuration = room.periods != null && room.periods > 0;
   const periods = hasDuration ? (room.periods as number) : dpp; // duration in DAYS; no duration = one full period
-  const rentalUnits = room.agreedUnits ?? room.numberOfUnits ?? 1;
-  const mobUnitsN = Math.min(room.mobUnits ?? rentalUnits, rentalUnits);
-  const demobUnitsN = Math.min(room.demobUnits ?? rentalUnits, rentalUnits);
+  const rentalUnits = pick(override?.rentalUnits, room.agreedUnits ?? room.numberOfUnits ?? 1);
+  const mobUnitsN = Math.min(pick(override?.mobUnits, room.mobUnits ?? rentalUnits), rentalUnits);
+  const demobUnitsN = Math.min(pick(override?.demobUnits, room.demobUnits ?? rentalUnits), rentalUnits);
   const perDayRate = rate / dpp;
   const rentalTotal = priceUnit === "PER_JOB" ? rate * rentalUnits : perDayRate * periods * rentalUnits;
-  const mobPrice = room.mobPrice ?? 0;
-  const demobPrice = room.demobPrice ?? 0;
-  const mobExcluded = room.mobExcluded === true;
-  const demobExcluded = room.demobExcluded === true;
+  const mobPrice = pick(override?.mobPrice, room.mobPrice ?? 0);
+  const demobPrice = pick(override?.demobPrice, room.demobPrice ?? 0);
+  const mobExcluded = override?.mobExcluded ?? room.mobExcluded === true;
+  const demobExcluded = override?.demobExcluded ?? room.demobExcluded === true;
   const mobTotal = mobExcluded ? 0 : mobPrice * mobUnitsN;
   const demobTotal = demobExcluded ? 0 : demobPrice * demobUnitsN;
   const subtotal = rentalTotal + mobTotal + demobTotal;
