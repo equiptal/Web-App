@@ -284,13 +284,20 @@ export function mapDealRoom(raw: unknown): DealRoomView {
   };
   const bl = (v: unknown): boolean | null => (typeof v === "boolean" ? v : v === "true" ? true : v === "false" ? false : null);
   const arr = (v: unknown): string[] => (Array.isArray(v) ? v.map((x) => String(x)).filter(Boolean) : []);
+  // getDealRoom sends the request item's taxonomy as IDs only (no subtype/capacity names, unlike the bid
+  // list), so fall the equipment label back to the accepted bid's actual equipment (make + model). The
+  // app resolves the IDs from its taxonomy cache; the web has none here, so this is the sync source.
+  const bidEq = (bid.equipment ?? {}) as Record<string, unknown>;
+  const bidEqLabel = [s(bidEq.manufacturer), s(bidEq.modelName)].filter(Boolean).join(" ") || null;
   const details: DealItemDetails = {
-    // Equipment name = subtype (matches the request/bid cards); capacity = size. Fall back to the older keys.
-    equipmentLabel: s(pick("subtypeName", "label", "equipmentName", "name", "subcategoryName", "categoryName")),
+    // Equipment name = subtype (matches the request/bid cards); capacity = size. Fall back to the older
+    // keys, then to the accepted bid's equipment (make + model) since getDealRoom omits taxonomy names.
+    equipmentLabel: s(pick("subtypeName", "label", "equipmentName", "name", "subcategoryName", "categoryName")) ?? bidEqLabel,
     equipmentLabelAr: s(pick("subtypeNameAr")),
     equipmentSize: s(pick("capacityName", "size", "capacity")),
     equipmentSizeAr: s(pick("capacityNameAr")),
-    location: s(pick("location", "city", "projectLocation", "siteLocation", "deliveryLocation")),
+    // getDealRoom exposes the site as `projectAddressLabel`.
+    location: s(pick("location", "city", "projectLocation", "siteLocation", "deliveryLocation", "projectAddressLabel", "projectAddress")),
     rentalType: s(pick("rentalType", "rentalBasis")),
     startDate: s(pick("startDate", "deliveryDate", "estimatedStartDate", "requiredDate")),
     endDate: s(pick("endDate", "returnDate")),
