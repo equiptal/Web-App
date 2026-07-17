@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, Fragment } from "react";
 import { StreamChat, type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
 import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, ApiError } from "@/lib/api/client";
-import type { DealRoomView, DealTerm, DealRoomDocument, DealRoomDocuments, QuotationView } from "@/lib/contract/deal-room";
+import { computeDealTotals, type DealRoomView, type DealTerm, type DealRoomDocument, type DealRoomDocuments, type QuotationView } from "@/lib/contract/deal-room";
 import { valText, type ResolutionsMap } from "@/components/deal-room/DealRoomTerms";
 import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
 import { renderQuotationSection, wrapQuotationPage, type QuotationDoc, type QuotationLineItem, type QuotationCard } from "@/lib/quotation/render";
@@ -41,24 +41,21 @@ const CHAT_MAX_VIDEO = 25 * 1024 * 1024; // video
 function buildQuotationHtml(room: DealRoomView, q: QuotationView, renteeName: string, ar: boolean, L: (en: string, arr: string) => string): string {
   const lang = ar ? "ar" : "en";
   const sar = L("SAR", "ر.س");
-  const rate = q.agreedRate ?? room.rate ?? 0;
-  const unit = (q.priceUnit ?? room.priceUnit ?? "PER_DAY").toUpperCase();
-  const mob = room.mobPrice ?? 0;
-  const demob = room.demobPrice ?? 0;
-  const units = room.numberOfUnits || 1;
+  // EXACT same math as the live price bar (computeDealTotals) — prorated ÷26/÷7, PER_JOB / no-duration =
+  // one full period, mob/demob use their own counts + honor leg exclusion, VAT 15%. Guarantees the
+  // quotation total == the number the renter saw in the room.
+  const t = computeDealTotals(room, { rate: q.agreedRate ?? room.rate, priceUnit: q.priceUnit ?? room.priceUnit });
+  const rate = t.rate;
+  const unit = t.priceUnit;
+  const units = t.rentalUnits;
   const days = room.periods;
   const periodLabel = unit === "PER_WEEK" ? L("week", "أسبوع") : unit === "PER_MONTH" ? L("month", "شهر") : unit === "PER_JOB" ? L("job", "مهمة") : L("day", "يوم");
-  let durationFactor: number | null = null;
-  if (unit === "PER_JOB") durationFactor = 1;
-  else if (days != null) durationFactor = unit === "PER_WEEK" ? Math.ceil(days / 7) : unit === "PER_MONTH" ? Math.ceil(days / 30) : days;
-  const hasTotal = rate > 0 && durationFactor != null;
-  // Same money math as the live card: rental + mob + demob, all × units, + 15% VAT (offered units).
-  const rentalTotal = hasTotal ? rate * (durationFactor as number) * units : 0;
-  const mobTotal = mob * units;
-  const demobTotal = demob * units;
-  const subtotal = hasTotal ? rentalTotal + mobTotal + demobTotal : 0;
-  const vat = Math.round(subtotal * 0.15);
-  const total = subtotal + vat;
+  const rentalTotal = t.rentalTotal;
+  const mobTotal = t.mobTotal;
+  const demobTotal = t.demobTotal;
+  const subtotal = t.subtotal;
+  const vat = t.vat;
+  const total = t.grand;
   const dateStr = new Date().toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
   const qnum = (q.quotationNumber ?? "").slice(0, 8).toUpperCase() || "—";
   const contractType = q.contractType ?? room.contractType;
@@ -77,19 +74,32 @@ function buildQuotationHtml(room: DealRoomView, q: QuotationView, renteeName: st
 
   // Invoice line items (rental + delivery + return) — SAME 6-column table as the bid-card quotation.
   const lineItems: QuotationLineItem[] = [];
-  if (hasTotal) {
-    lineItems.push({ num: 1, label: L("Rental", "الإيجار"), detail: room.supplier.name, unit: periodLabel, qty: `${durationFactor}${units > 1 ? ` × ${units}` : ""}`, price: `${nf(rate)} / ${periodLabel}`, total: nf(rentalTotal) });
-  } else {
-    lineItems.push({ num: 1, label: L("Rental", "الإيجار"), detail: room.supplier.name, unit: periodLabel, qty: "∞", price: `${nf(rate)} / ${periodLabel}`, total: `${nf(rate)} / ${periodLabel}`, totalNote: L("As operated", "حسب التشغيل") });
-  }
-  // Mobilization/demobilization are ALWAYS shown — even when the rentee arranges them (supplier
-  // charges nothing), that must be stated on the quotation.
-  const logiRow = (label: string, price: number, priceTotal: number, byRentee: boolean): QuotationLineItem =>
-    price > 0
-      ? { num: null, label, detail: room.supplier.name, unit: L("Trip", "رحلة"), qty: String(units), price: nf(price), total: nf(priceTotal) }
-      : { num: null, label, detail: byRentee ? L("Arranged by the rentee", "يُرتّبه المستأجر") : L("Included", "مشمول"), unit: "—", qty: "—", price: "—", total: byRentee ? L("By rentee", "على المستأجر") : L("Included", "مشمول") };
-  lineItems.push(logiRow(L("Delivery to site", "النقل إلى الموقع"), mob, mobTotal, room.mobByRentee === true));
-  lineItems.push(logiRow(L("Return from site", "الإرجاع من الموقع"), demob, demobTotal, room.demobByRentee === true));
+  // Rental qty/price columns mirror the live price bar's factor logic: PER_JOB → units jobs; whole
+  // period count → "N × units"; a partial (day-count) duration → effective per-day rate × days.
+  const factorInt = Number.isInteger(t.periodCount) ? t.periodCount : null;
+  const partial = unit !== "PER_JOB" && t.hasDuration && factorInt == null;
+  const rentalQty = unit === "PER_JOB"
+    ? String(units)
+    : partial
+      ? `${room.periods} ${L("days", "يوم")}${units > 1 ? ` × ${units}` : ""}`
+      : `${factorInt ?? 1}${units > 1 ? ` × ${units}` : ""}`;
+  lineItems.push({
+    num: 1, label: L("Rental", "الإيجار"), detail: room.supplier.name,
+    unit: partial ? L("day", "يوم") : periodLabel,
+    qty: rentalQty,
+    price: partial ? `${nf(Math.round(t.perDayRate))} / ${L("day", "يوم")}` : `${nf(rate)} / ${periodLabel}`,
+    total: nf(rentalTotal),
+  });
+  // Mob/demob ALWAYS shown; honor each leg's OWN unit count + exclusion (excluded → "Not included",
+  // matching the price bar which contributes 0 for an excluded leg).
+  const logiRow = (label: string, excluded: boolean, price: number, unitsN: number, lineTotal: number, byRentee: boolean): QuotationLineItem =>
+    excluded
+      ? { num: null, label, detail: L("Not included", "غير مشمول"), unit: "—", qty: "—", price: "—", total: L("Not included", "غير مشمول") }
+      : price > 0
+        ? { num: null, label, detail: room.supplier.name, unit: L("Trip", "رحلة"), qty: String(unitsN), price: nf(price), total: nf(lineTotal) }
+        : { num: null, label, detail: byRentee ? L("Arranged by the rentee", "يُرتّبه المستأجر") : L("Included", "مشمول"), unit: "—", qty: "—", price: "—", total: byRentee ? L("By rentee", "على المستأجر") : L("Included", "مشمول") };
+  lineItems.push(logiRow(L("Delivery to site", "النقل إلى الموقع"), t.mobExcluded, t.mobPrice, t.mobUnitsN, t.mobTotal, room.mobByRentee === true));
+  lineItems.push(logiRow(L("Return from site", "الإرجاع من الموقع"), t.demobExcluded, t.demobPrice, t.demobUnitsN, t.demobTotal, room.demobByRentee === true));
 
   const cards: QuotationCard[] = [];
   // Structured rental/equipment details (from the request item) — rows with no value are skipped
@@ -472,9 +482,10 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     setBusy(true);
     try {
       // App parity (accept-all-terms): submit the locally-collected term resolutions together with the
-      // accept. contractType is chosen on the flow's Summary step (defaults to "formal"); agreedUnits is
-      // omitted (no assembled deals on web).
-      await acceptDeal(id, contractType, { termResolutions: resolutionUpdates() });
+      // accept. contractType is chosen on the flow's Summary step (defaults to "formal"). Send the
+      // accepted rental count as agreedUnits (the app sends it — records the count for multi-unit /
+      // partial-fulfilment requests instead of defaulting to the full offer).
+      await acceptDeal(id, contractType, { termResolutions: resolutionUpdates(), agreedUnits: room.agreedUnits ?? room.numberOfUnits });
       setResolutions({});
       await loadRoom();
       setFlowMode(null);
@@ -488,27 +499,25 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   if (error) return <div className="dlproto"><div className="rempty">{L("Couldn’t open this deal room.", "تعذّر فتح غرفة الصفقة.")}</div></div>;
   if (!room) return <div className="dlproto"><div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 28 }}>progress_activity</span></div></div>;
 
-  const rate = room.rate ?? 0;
-  // deal-room/negotiation — ÷period PRORATED math (matches the backend quotation + app): monthly ÷26 /
-  // weekly ÷7 / daily, × duration(days) × rental units; PER_JOB = rate × units. Mob/demob = price × their
-  // own unit count (0 when excluded). NO duration → assume ONE FULL PERIOD so the base rate is kept as-is
-  // (monthly stays monthly), NOT prorated down to a single day.
-  const FREQ_DAYS: Record<string, number> = { PER_DAY: 1, PER_WEEK: 7, PER_MONTH: 26 };
-  const basisU = (room.priceUnit ?? "PER_DAY").toUpperCase();
-  const dppRoom = FREQ_DAYS[basisU] || 1;
-  const hasDuration = room.periods != null && room.periods > 0;
-  const periods = hasDuration ? (room.periods as number) : dppRoom; // duration in DAYS; default = one full period
-  const rentalUnits = room.agreedUnits ?? room.numberOfUnits ?? 1;
-  const mobUnitsN = Math.min(room.mobUnits ?? rentalUnits, rentalUnits);
-  const demobUnitsN = Math.min(room.demobUnits ?? rentalUnits, rentalUnits);
+  // Single source of truth for the money — SHARED with the confirmed quotation via computeDealTotals so
+  // the price bar and the quotation can never diverge. Prorated ÷26/÷7; PER_JOB / no-duration = one full
+  // period; mob/demob use their own counts + honor exclusion; VAT 15%.
+  const totals = computeDealTotals(room);
+  const rate = totals.rate;
+  const basisU = totals.priceUnit;
+  const hasDuration = totals.hasDuration;
+  const periods = totals.periods; // duration in DAYS; no duration = one full period
+  const rentalUnits = totals.rentalUnits;
+  const mobUnitsN = totals.mobUnitsN;
+  const demobUnitsN = totals.demobUnitsN;
   const units = rentalUnits; // the rental count drives the card display
-  const perDayRate = rate / dppRoom;
-  const rentalTotal = basisU === "PER_JOB" ? rate * rentalUnits : perDayRate * periods * rentalUnits;
-  const mobTotal = room.mobExcluded ? 0 : (room.mobPrice ?? 0) * mobUnitsN;
-  const demobTotal = room.demobExcluded ? 0 : (room.demobPrice ?? 0) * demobUnitsN;
-  const subtotal = rentalTotal + mobTotal + demobTotal;
-  const vat = Math.round(subtotal * 0.15);
-  const grand = subtotal + vat;
+  const perDayRate = totals.perDayRate;
+  const rentalTotal = totals.rentalTotal;
+  const mobTotal = totals.mobTotal;
+  const demobTotal = totals.demobTotal;
+  const subtotal = totals.subtotal;
+  const vat = totals.vat;
+  const grand = totals.grand;
   // Billing-period label from the bid's price unit (same mapping the bid cards use).
   const periodLabel = (() => {
     switch ((room.priceUnit ?? "PER_DAY").toUpperCase()) {
@@ -520,7 +529,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   })();
   // Rental factor label: no duration / one full period → base rate as-is ("1,600/week"); a whole number
   // of periods → "× N"; a partial (day-count) duration → effective per-day rate × days ("229/day × 3 days").
-  const periodCount = periods / dppRoom;
+  const periodCount = totals.periodCount;
   const rentalLabel =
     basisU === "PER_JOB"
       ? nf(rate)
@@ -966,7 +975,9 @@ function CounterFlow({
   const dNU = Math.min(editable ? demobUnitsN : (room.demobUnits ?? rNU), rNU);
   const mEx = editable ? mobExcluded : room.mobExcluded;
   const dEx = editable ? demobExcluded : room.demobExcluded;
-  const rentalLine = perDay * periods * rNU;
+  // PER_JOB is a flat per-job price (no duration factor) — matches the main price bar + app. Everything
+  // else prorates ÷26/÷7 × duration(days).
+  const rentalLine = basis === "PER_JOB" ? rate * rNU : perDay * periods * rNU;
   const mobLine = mEx ? 0 : mob * mNU;
   const demobLine = dEx ? 0 : demob * dNU;
   const subtotal = rentalLine + mobLine + demobLine;
