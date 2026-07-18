@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/client";
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
+import { BidReadinessSection, BidEligibilityModal } from "@/components/requests/BidReadiness";
+import { computeBidReadiness } from "@/lib/contract/bid-readiness";
 import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
 import { SharedBidNegotiateRoom } from "@/components/requests/SharedBidNegotiateRoom";
@@ -105,6 +107,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   const [selectMode, setSelectMode] = useState(false); // prototype: pick bids to compare/export
   const [equipBid, setEquipBid] = useState<GroupBid | null>(null);
   const [termsBid, setTermsBid] = useState<GroupBid | null>(null);
+  const [eligBid, setEligBid] = useState<GroupBid | null>(null); // bid-readiness — eligibility view for a native bid's offered units
   const [langPick, setLangPick] = useState(false); // quotation language chooser (Arabic | English)
   // Bids captured the instant "Download quotations" is clicked. The language/verify modals aren't part
   // of the selection UI, so opening one trips the click-outside handler and CLEARS `selected` before the
@@ -941,6 +944,14 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
               )}
             </div>
 
+            {/* Bid readiness — per-offered-unit eligibility (app parity: RenteeReadinessSection). Native
+                bids only (computeBidReadiness null for off-platform → nothing). */}
+            {(() => { const rd = computeBidReadiness(b); return rd ? (
+              <div style={{ ...rowSep, padding: "12px 16px" }}>
+                <BidReadinessSection r={rd} L={L} onView={() => setEligBid(b)} />
+              </div>
+            ) : null; })()}
+
             {/* Terms row */}
             <div style={{ ...rowSep, display: "flex", alignItems: "center", gap: 12, padding: "13px 16px" }}>
               <div style={iconBox}><span className="material-icons-outlined" style={{ fontSize: 20, color: "#6b8fa8" }}>description</span></div>
@@ -1102,6 +1113,9 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           onClose={() => setTermsBid(null)}
         />
       )}
+
+      {/* bid-readiness — read-only eligibility view for a native bid's offered units */}
+      {eligBid && (() => { const rd = computeBidReadiness(eligBid); return rd ? <BidEligibilityModal r={rd} supplierName={eligBid.supplierName} ar={ar} L={L} onClose={() => setEligBid(null)} /> : null; })()}
 
       {/* Issue-quotation gate for an unverified renter (company name vs personal name). */}
       {quoteGate && (
