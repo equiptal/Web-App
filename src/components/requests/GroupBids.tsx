@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/client";
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
-import { BidReadinessSection, BidEligibilityModal } from "@/components/requests/BidReadiness";
+import { BidReadinessBadge, BidEligibilityModal } from "@/components/requests/BidReadiness";
 import { computeBidReadiness } from "@/lib/contract/bid-readiness";
 import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
@@ -939,18 +939,13 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
               <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Equipment", "المعدة")}</span>
               {/* No cert chips on the card — all equipment detail lives in the Details modal only. */}
               <div style={{ flex: 1 }} />
+              {/* Bid readiness — compact N/N + eye ON this row (opens the per-unit eligibility view); native
+                  bids only (computeBidReadiness null for off-platform). Replaces the old bulky section. */}
+              {!selectMode && (() => { const rd = computeBidReadiness(b); return rd ? <BidReadinessBadge r={rd} L={L} onClick={() => setEligBid(b)} /> : null; })()}
               {!selectMode && (
                 <button onClick={() => setEquipBid(b)} style={blueLink}>{L("Details", "التفاصيل")} ›</button>
               )}
             </div>
-
-            {/* Bid readiness — per-offered-unit eligibility (app parity: RenteeReadinessSection). Native
-                bids only (computeBidReadiness null for off-platform → nothing). */}
-            {(() => { const rd = computeBidReadiness(b); return rd ? (
-              <div style={{ ...rowSep, padding: "12px 16px" }}>
-                <BidReadinessSection r={rd} L={L} onView={() => setEligBid(b)} />
-              </div>
-            ) : null; })()}
 
             {/* Terms row */}
             <div style={{ ...rowSep, display: "flex", alignItems: "center", gap: 12, padding: "13px 16px" }}>
