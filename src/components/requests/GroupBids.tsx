@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/client";
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
+import { BidReadinessBadge, BidEligibilityModal } from "@/components/requests/BidReadiness";
+import { computeBidReadiness } from "@/lib/contract/bid-readiness";
 import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
 import { SharedBidNegotiateRoom } from "@/components/requests/SharedBidNegotiateRoom";
@@ -13,8 +15,7 @@ import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
 import { bidSuppliers, bucketBidTerms, CERT_LABEL, type BidCard, type TermRow } from "@/lib/contract/bids";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
-import { qualityFromSubmissionItem, type BidQuality, type QualityBand } from "@/lib/contract/bid-quality";
-import { QualityRing, BAND_COLOR } from "@/components/bid/QualityRing";
+import { qualityFromSubmissionItem, type BidQuality } from "@/lib/contract/bid-quality";
 import { computeBidQuote } from "@/lib/contract/comparison";
 import { shortRef, type RequestGroup } from "@/lib/contract/requests";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
@@ -106,6 +107,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   const [selectMode, setSelectMode] = useState(false); // prototype: pick bids to compare/export
   const [equipBid, setEquipBid] = useState<GroupBid | null>(null);
   const [termsBid, setTermsBid] = useState<GroupBid | null>(null);
+  const [eligBid, setEligBid] = useState<GroupBid | null>(null); // bid-readiness — eligibility view for a native bid's offered units
   const [langPick, setLangPick] = useState(false); // quotation language chooser (Arabic | English)
   // Bids captured the instant "Download quotations" is clicked. The language/verify modals aren't part
   // of the selection UI, so opening one trips the click-outside handler and CLEARS `selected` before the
@@ -635,21 +637,6 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
     count: allBids.filter((b) => b.requestId === it.id).length,
   }));
   const selItem = itemList.find((i) => i.id === selectedItem) ?? null;
-  const multiItem = group.items.length > 1;
-  // Per-ITEM quality donut (shown above the bids when a specific item is picked in a multi-item group).
-  // Quality is a shared-link concept — on-platform bids carry no score — so this summarises the OFF-
-  // PLATFORM bids on the selected item: one bid → its score; several → the part-wise average (same
-  // 40/30/30 weighting recomputed), so the donut reads as "this item's bid quality".
-  const itemLinkQ = selectedItem === "all" ? [] : subCards.filter((b) => b.requestId === selectedItem && b.quality).map((b) => b.quality!);
-  const itemQuality: BidQuality | null = (() => {
-    if (!itemLinkQ.length) return null;
-    if (itemLinkQ.length === 1) return itemLinkQ[0];
-    const avg = (f: (q: BidQuality) => number) => itemLinkQ.reduce((s, q) => s + f(q), 0) / itemLinkQ.length;
-    const terms = avg((q) => q.parts.terms), equipment = avg((q) => q.parts.equipment), company = avg((q) => q.parts.company);
-    const score = Math.round(100 * (0.4 * terms + 0.3 * equipment + 0.3 * company));
-    const band: QualityBand = score >= 80 ? "high" : score >= 50 ? "mid" : "low";
-    return { score, band, parts: { terms, equipment, company } };
-  })();
   const shownSuppliers = new Set(shown.map((b) => b.supplierId ?? b.supplierName)).size;
   // Card width scales with how many bids there are: 1–2 grow to fill the row (no empty side margin);
   // 3+ take a fixed width so the third card peeks at the edge, hinting the horizontal scroll.
@@ -805,40 +792,6 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           {fActive > 0 && <button onClick={() => { setFSource("all"); setFqParts(new Set()); setFVerified(false); setFKm(false); }} style={{ marginTop: 14, borderRadius: 10, border: "1px solid #d4e0ec", background: "#fff", color: "#1c3550", fontWeight: 800, fontSize: 13, padding: "9px 16px", cursor: "pointer", fontFamily: "inherit" }}>{L("Clear filters", "مسح عوامل التصفية")}</button>}
         </div>
       )}
-      {/* Per-item quality donut — appears above the bids when a specific item is picked in a multi-item
-          group (item first, then this item's off-platform bid quality). */}
-      {multiItem && selItem && itemQuality && shown.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 18, padding: "14px 18px", marginBottom: 14, borderRadius: 16, background: "#fff", border: "1px solid #d4e0ec", boxShadow: "0 1px 2px rgba(20,40,70,.04)" }}>
-          <style>{`.qring{display:inline-flex;flex-direction:column;align-items:center;gap:4px;flex:none}.qring-lb{font-size:11px;font-weight:800;letter-spacing:.2px}`}</style>
-          <QualityRing quality={itemQuality} L={L} size={76} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 900, color: "#1c3550" }}>{L(`Bid quality — ${selItem.name}`, `جودة العروض — ${selItem.name}`)}</div>
-            <div style={{ fontSize: 11.5, fontWeight: 700, color: "#6b8fa8", marginTop: 2 }}>
-              {itemLinkQ.length > 1
-                ? L(`Average across ${itemLinkQ.length} off-platform bids on this item`, `متوسط ${itemLinkQ.length} عروض خارج المنصة لهذا البند`)
-                : L("From the off-platform bid on this item", "من العرض خارج المنصة لهذا البند")}
-            </div>
-            {/* 40 / 30 / 30 breakdown — the three dimensions the score is built from. */}
-            <div style={{ display: "flex", gap: 16, marginTop: 10, flexWrap: "wrap" }}>
-              {([
-                { label: L("Terms", "الشروط"), w: "40%", v: itemQuality.parts.terms },
-                { label: L("Equipment docs", "مستندات المعدة"), w: "30%", v: itemQuality.parts.equipment },
-                { label: L("Company", "الشركة"), w: "30%", v: itemQuality.parts.company },
-              ]).map((p) => (
-                <div key={p.label} style={{ flex: "1 1 120px", minWidth: 120 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, fontSize: 11, fontWeight: 800, color: "#6b8fa8" }}>
-                    <span>{p.label} <span style={{ color: "#9AA7B8", fontWeight: 700 }}>· {p.w}</span></span>
-                    <span style={{ color: "#1c3550", fontVariantNumeric: "tabular-nums" }}>{Math.round(p.v * 100)}%</span>
-                  </div>
-                  <div style={{ marginTop: 5, height: 6, borderRadius: 6, background: "#eef2f6", overflow: "hidden" }}>
-                    <div style={{ height: "100%", borderRadius: 6, width: `${Math.round(p.v * 100)}%`, background: BAND_COLOR[itemQuality.band] }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
       <div className="bids-snap" data-select-ui>
       {shown.map((b) => {
         if (b.viaSharedLink) {
@@ -881,8 +834,15 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         const perUnit = !allUnitsIds.has(b.id); // default per-unit; a card is "all units" only if toggled
         const isSel = selected.has(b.id);
         // Card price — canonical quote: rate ÷ period-days × duration (weekly ÷7, monthly ÷26),
-        // mob/demob × units, VAT 15%. "Per unit" toggle prices one unit; else all offered units.
-        const u = priceOpen && perUnit ? 1 : offered;
+        // mob/demob × units, VAT 15%. The "all units" count is the LIVE deal-room count (agreedUnits →
+        // currentRentalUnits → offered → requested), mirroring computeBidQuote so the group card matches
+        // RequestBids + the deal room; the offered band above stays on unitsOffered. Per-unit toggle → 1.
+        const liveUnits =
+          (b.agreedUnits != null && b.agreedUnits > 0) ? b.agreedUnits
+          : (b.currentRentalUnits != null && b.currentRentalUnits > 0) ? b.currentRentalUnits
+          : (b.unitsOffered && b.unitsOffered > 0) ? b.unitsOffered
+          : (b.numberOfUnits || 1);
+        const u = priceOpen && perUnit ? 1 : liveUnits;
         const cq = computeBidQuote(b, { units: u, fallbackDays: group.items.find((it) => it.id === b.requestId)?.durationDays ?? null });
         const rental = cq.rentalSubtotal;
         const deliv = cq.mobTotal;
@@ -986,6 +946,9 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
               <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Equipment", "المعدة")}</span>
               {/* No cert chips on the card — all equipment detail lives in the Details modal only. */}
               <div style={{ flex: 1 }} />
+              {/* Bid readiness — compact N/N + eye ON this row (opens the per-unit eligibility view); native
+                  bids only (computeBidReadiness null for off-platform). Replaces the old bulky section. */}
+              {!selectMode && (() => { const rd = computeBidReadiness(b); return rd ? <BidReadinessBadge r={rd} L={L} onClick={() => setEligBid(b)} /> : null; })()}
               {!selectMode && (
                 <button onClick={() => setEquipBid(b)} style={blueLink}>{L("Details", "التفاصيل")} ›</button>
               )}
@@ -1025,9 +988,9 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
               </div>
               {priceOpen && !selectMode && (
                 <div style={{ marginTop: 12 }}>
-                  {offered > 1 && (
+                  {liveUnits > 1 && (
                     <div style={{ display: "inline-flex", background: "#eff4f9", borderRadius: 10, padding: 3, marginBottom: 12 }}>
-                      {([[false, L(`All ${offered} units`, `كل ${offered} وحدات`)], [true, L("Per unit", "لكل وحدة")]] as [boolean, string][]).map(([v, lab]) => (
+                      {([[false, L(`All ${liveUnits} units`, `كل ${liveUnits} وحدات`)], [true, L("Per unit", "لكل وحدة")]] as [boolean, string][]).map(([v, lab]) => (
                         <button key={String(v)} onClick={() => setAllUnitsIds((s) => { const n = new Set(s); if (v) n.delete(b.id); else n.add(b.id); return n; })} style={{ padding: "6px 13px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12.5, fontFamily: "inherit", background: perUnit === v ? "#1c3550" : "transparent", color: perUnit === v ? "#fff" : "#6b8fa8" }}>{lab}</button>
                       ))}
                     </div>
@@ -1152,6 +1115,9 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           onClose={() => setTermsBid(null)}
         />
       )}
+
+      {/* bid-readiness — read-only eligibility view for a native bid's offered units */}
+      {eligBid && (() => { const rd = computeBidReadiness(eligBid); return rd ? <BidEligibilityModal r={rd} supplierName={eligBid.supplierName} ar={ar} L={L} onClose={() => setEligBid(null)} /> : null; })()}
 
       {/* Issue-quotation gate for an unverified renter (company name vs personal name). */}
       {quoteGate && (

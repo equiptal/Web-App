@@ -16,10 +16,12 @@ export type BidStatus =
   | string;
 
 /** Safety/credential cert codes (app parity: CertType — LC/SASO/TÜV/SPSP). */
-export type CertCode = "TUV" | "SPSP" | "SASO" | "LC";
-// Labels per 013 acceptance (AC-01/02): LC → "محتوى محلي", SASO → "شهادة SASO".
+// ARAMCO added per the 2026-07 cert rule (TÜV + Aramco are the offered equipment certs; SPSP/SASO stay
+// for legacy data). Labels per 013 acceptance (AC-01/02): LC → "محتوى محلي", SASO → "شهادة SASO".
+export type CertCode = "TUV" | "ARAMCO" | "SPSP" | "SASO" | "LC";
 export const CERT_LABEL: Record<CertCode, { en: string; ar: string }> = {
   TUV: { en: "TÜV", ar: "TÜV" },
+  ARAMCO: { en: "Aramco Certified", ar: "معتمد من أرامكو" },
   SPSP: { en: "SPSP", ar: "SPSP" },
   SASO: { en: "SASO certificate", ar: "شهادة SASO" },
   LC: { en: "Local content", ar: "محتوى محلي" },
@@ -27,6 +29,7 @@ export const CERT_LABEL: Record<CertCode, { en: string; ar: string }> = {
 function toCert(raw: string): CertCode | null {
   const u = raw.trim().toUpperCase();
   if (u === "LC" || /LOCAL.?CONTENT/.test(u)) return "LC";
+  if (/ARAMCO/.test(u)) return "ARAMCO";
   if (/SASO/.test(u)) return "SASO";
   if (/TUV|TÜV/.test(u)) return "TUV";
   if (/SPSP/.test(u)) return "SPSP";
@@ -50,6 +53,7 @@ function certList(v: unknown): CertCode[] {
 function eqDocTypeToCert(type: string): CertCode | null {
   const t = type.trim().toLowerCase();
   if (t === "tuv" || t === "tüv") return "TUV";
+  if (t === "aramco" || t === "aramco_certified" || t === "aramco_certificate") return "ARAMCO";
   if (t === "spsp") return "SPSP";
   // saso AND saso_technical_inspection are the SASO safety cert (NOT ownership, NOT company SASO reg).
   if (t === "saso" || t === "saso_technical_inspection" || t === "saso-technical" || t === "saso_technical") return "SASO";
@@ -64,6 +68,54 @@ const OWNERSHIP_DOC_LABELS: Record<string, { key: string; labelEn: string; label
   sale_contract: { key: "sale_contract", labelEn: "Sale contract", labelAr: "عقد بيع" },
   saso_registration: { key: "saso_registration", labelEn: "SASO registration", labelAr: "تسجيل ساسو" },
 };
+
+/** A document on an offered unit (bid-readiness). URL is a short-lived presigned link (server-signed). */
+export interface OfferedUnitDoc { type: string; key: string; url: string | null; verifyStatus: string | null; expiryDate: string | null; }
+/** A photo on an offered unit — `slot` ∈ {front, serial, hours, …}. `url` is presigned. */
+export interface OfferedUnitPhoto { slot: string; key: string; url: string | null; }
+/** One equipment unit a supplier offered on a NATIVE app bid (bid-readiness — `offeredUnitsDetail`).
+ *  Ownership docs are stripped server-side for the renter. Absent on off-platform shared-link bids. */
+export interface OfferedUnitDetail {
+  equipmentId: string;
+  manufacturer: string | null;
+  modelName: string | null;
+  year: number | null;
+  fuelType: string | null;
+  licensePlateNumber: string | null;
+  subcategoryName: string | null;
+  subcategoryNameAr: string | null;
+  measurementName: string | null;
+  measurementNameAr: string | null;
+  documentKeys: OfferedUnitDoc[];
+  photoKeys: OfferedUnitPhoto[];
+}
+
+/** Parse the raw `offeredUnitsDetail` array (getBidList / getBidDetail) → typed units. undefined when
+ *  absent/empty (off-platform bids), so the readiness surface only renders for native app bids. */
+function mapOfferedUnits(raw: unknown): OfferedUnitDetail[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  const str = (v: unknown): string | null => (v == null || v === "" ? null : String(v));
+  const num = (v: unknown): number | null => (typeof v === "number" ? v : v != null && v !== "" && !isNaN(Number(v)) ? Number(v) : null);
+  return raw.map((u) => {
+    const o = (u ?? {}) as Record<string, unknown>;
+    const docs = (Array.isArray(o.documentKeys) ? o.documentKeys : Array.isArray(o.document_keys) ? o.document_keys : []) as unknown[];
+    const photos = (Array.isArray(o.photoKeys) ? o.photoKeys : Array.isArray(o.photo_keys) ? o.photo_keys : []) as unknown[];
+    return {
+      equipmentId: String(o.equipmentId ?? o.equipment_id ?? o.id ?? ""),
+      manufacturer: str(o.manufacturer ?? o.make),
+      modelName: str(o.modelName ?? o.model_name ?? o.model),
+      year: num(o.year),
+      fuelType: str(o.fuelType ?? o.fuel_type),
+      licensePlateNumber: str(o.licensePlateNumber ?? o.license_plate_number ?? o.plate),
+      subcategoryName: str(o.subcategoryName ?? o.subcategory_name),
+      subcategoryNameAr: str(o.subcategoryNameAr ?? o.subcategory_name_ar),
+      measurementName: str(o.measurementName ?? o.measurement_name),
+      measurementNameAr: str(o.measurementNameAr ?? o.measurement_name_ar),
+      documentKeys: docs.map((d) => { const x = (d ?? {}) as Record<string, unknown>; return { type: String(x.type ?? x.code ?? ""), key: String(x.key ?? ""), url: str(x.url), verifyStatus: str(x.verifyStatus ?? x.verify_status), expiryDate: str(x.expiryDate ?? x.expiry_date) }; }),
+      photoKeys: photos.map((p) => { const x = (p ?? {}) as Record<string, unknown>; return { slot: String(x.slot ?? x.type ?? ""), key: String(x.key ?? ""), url: str(x.url) }; }),
+    };
+  });
+}
 
 export interface BidCard {
   id: string;
@@ -90,6 +142,15 @@ export interface BidCard {
   /** Units THIS supplier offered to cover (bid.units_offered length). ≤ numberOfUnits. Drives
    *  fulfillment ("covers X of Y units"); defaults to numberOfUnits when the bid doesn't specify. */
   unitsOffered: number;
+  /** Live deal-room unit overlay (app parity: v3_bid_card `_liveRentalUnits`/`_buildPriceArgs`). The
+   *  negotiated rental count (agreedUnits, else the mid-negotiation currentRentalUnits) + per-leg mob/
+   *  demob counts + exclusion. null → not negotiated. Drives the card price so it tracks the deal room. */
+  agreedUnits?: number | null;
+  currentRentalUnits?: number | null;
+  mobUnits?: number | null;
+  demobUnits?: number | null;
+  mobExcluded?: boolean;
+  demobExcluded?: boolean;
   /** The request's equipment-year requirement (raw maxEquipmentAge — a min year like 2020, or an age). */
   reqMinYear: number | null;
   equipment: { id: string | null; make: string | null; model: string | null; year: number | null; imageUrl: string | null } | null;
@@ -134,6 +195,12 @@ export interface BidCard {
   /** LEVEL 2 (Equipment) proof-of-ownership docs the equipment carries (istimara / customs /
    *  sale_contract / saso_registration) — held documents, never a cert pill. */
   ownershipDocs: { key: string; labelEn: string; labelAr: string }[];
+  /** bid-readiness: the equipment units this supplier offered, with presigned doc/photo links. Only on
+   *  NATIVE app bids (getBidList / getBidDetail `offeredUnitsDetail`); undefined for off-platform bids. */
+  offeredUnitsDetail?: OfferedUnitDetail[];
+  /** Raw requested equipment-cert codes from the request item (lowercase, e.g. ["aramco","tuv"]) — kept
+   *  alongside `requiredCerts` (CertCode[]) so readiness can count certs the CertCode enum can't name. */
+  reqEquipmentCerts?: string[];
   /** LEVEL 3 (Operator): a declared deal-room term, NOT a held-doc pill. Rentee's required operator
    *  license level (request operatorLicenseLevel) + the supplier's declared position (t3Declarations). */
   operatorCertReq?: string | null;
@@ -226,6 +293,10 @@ export interface TermRow {
   /** The negotiated value once the term is AGREED in the deal room (from lockedTerms) — lets the cost
    *  responsibilities reflect what was actually settled, not the renter's original request side. */
   value?: string | null;
+  /** The RENTEE's required value for this term — used by the deal-room overlay to decide whether a
+   *  pending counter (counter.newValue) matches the renter's ask (→ matched) or differs (→ conflict),
+   *  matching the app's `contractState` (dealRoomValue vs rentee value). Only populated on counted terms. */
+  renteeValue?: string | null;
 }
 
 const n = (v: unknown): number | null => {
@@ -327,9 +398,9 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
   const safetyCertState: TermState = requiredCerts.length === 0 ? "grey" : deviationKeys.has("safety_certifications") ? "conflict" : certs;
 
   // Project rows reused by both the bid-card "Project" bucket and the comparison's negotiable set.
-  const rPayment: TermRow = { key: "payment_terms", labelEn: "Payment terms", labelAr: "شروط الدفع", state: negContractState("payment_terms") };
-  const rSla: TermRow = { key: "breakdown_response_sla", labelEn: "Breakdown response", labelAr: "زمن الاستجابة للأعطال", state: negContractState("breakdown_response_sla") };
-  const rOvertime: TermRow = { key: "overtime_rate", labelEn: "Overtime", labelAr: "العمل الإضافي", state: negContractState("overtime_rate") };
+  const rPayment: TermRow = { key: "payment_terms", labelEn: "Payment terms", labelAr: "شروط الدفع", state: negContractState("payment_terms"), renteeValue: s(req.paymentTerms) };
+  const rSla: TermRow = { key: "breakdown_response_sla", labelEn: "Breakdown response", labelAr: "زمن الاستجابة للأعطال", state: negContractState("breakdown_response_sla"), renteeValue: s(req.breakdownResponseSla) };
+  const rOvertime: TermRow = { key: "overtime_rate", labelEn: "Overtime", labelAr: "العمل الإضافي", state: negContractState("overtime_rate"), renteeValue: s(req.overtimeRate) };
   const rMaint: TermRow = { key: "maintenance_responsibility", labelEn: "Maintenance", labelAr: "الصيانة", state: maintenance };
 
   // Conflict detail (Renter: X · Supplier: Y) — app parity with link bids, so an in-app conflict in
@@ -378,13 +449,13 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
     // COMPARISON-only expanded set (the web side-by-side "Negotiable terms" section) — NOT on the bid
     // card. Carries the full deal-room negotiable + acknowledge terms with live overlay states.
     negotiable: [
-      { key: "operator_included", labelEn: "Operator included", labelAr: "تشمل مشغّل", state: operatorIncluded },
-      { key: "operator_nationality", labelEn: "Operator nationality", labelAr: "جنسية المشغّل", state: contractState("operator_nationality", opNat) },
-      { key: "operator_certification", labelEn: "Operator certification", labelAr: "شهادة المشغّل", state: operatorCertState, detail: opCertDetail },
-      { key: "safety_certifications", labelEn: "Equipment safety certificates", labelAr: "شهادات سلامة المعدة", state: safetyCertState, detail: safetyDetail },
-      { key: "fat_food", labelEn: "Operator FAT — Food", labelAr: "الإعاشة (F.A.T) — الطعام", state: contractState("fat_food", fatFood) },
-      { key: "fat_accommodation_transport", labelEn: "Operator FAT — Accommodation/Transport", labelAr: "الإعاشة (F.A.T) — الإقامة/النقل", state: contractState("fat_accommodation_transport", fatAccom) },
-      { key: "fuel_responsibility", labelEn: "Fuel responsibility", labelAr: "مسؤولية الوقود", state: contractState("fuel_responsibility", fuelResp) },
+      { key: "operator_included", labelEn: "Operator included", labelAr: "تشمل مشغّل", state: operatorIncluded, renteeValue: reqOperator ? "yes" : null },
+      { key: "operator_nationality", labelEn: "Operator nationality", labelAr: "جنسية المشغّل", state: contractState("operator_nationality", opNat), renteeValue: opNat },
+      { key: "operator_certification", labelEn: "Operator certification", labelAr: "شهادة المشغّل", state: operatorCertState, detail: opCertDetail, renteeValue: reqOpCert },
+      { key: "safety_certifications", labelEn: "Equipment safety certificates", labelAr: "شهادات سلامة المعدة", state: safetyCertState, detail: safetyDetail, renteeValue: requiredCerts.length ? requiredCerts.join(",") : null },
+      { key: "fat_food", labelEn: "Operator FAT — Food", labelAr: "الإعاشة (F.A.T) — الطعام", state: contractState("fat_food", fatFood), renteeValue: fatFood },
+      { key: "fat_accommodation_transport", labelEn: "Operator FAT — Accommodation/Transport", labelAr: "الإعاشة (F.A.T) — الإقامة/النقل", state: contractState("fat_accommodation_transport", fatAccom), renteeValue: fatAccom },
+      { key: "fuel_responsibility", labelEn: "Fuel responsibility", labelAr: "مسؤولية الوقود", state: contractState("fuel_responsibility", fuelResp), renteeValue: fuelResp },
       rPayment, rSla, rOvertime, rMaint,
       // mobilization_lead_time — CONFLICT_ELIGIBLE / Negotiable (app moved it Priced → Negotiable).
       { key: "mobilization_lead_time", labelEn: "Mobilization lead time", labelAr: "مهلة التعبئة", state: negContractState("mobilization_lead_time") },
@@ -508,6 +579,11 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     .map((t) => ({ key: s(t.termKey) ?? "", value: t.lockedValue }))
     .filter((t) => t.key);
   const unreadTerms = (Array.isArray(raw.unreadTerms) ? (raw.unreadTerms as unknown[]) : []).map(String);
+  // Pending counters WITH their proposed values (getBidList `counters: [{termKey, newValue}]`) — the
+  // deal-room overlay compares each to the rentee's ask to decide matched vs conflict (app parity).
+  const counters = (Array.isArray(raw.counters) ? (raw.counters as Record<string, unknown>[]) : [])
+    .map((c) => ({ key: s(c.termKey) ?? "", value: c.newValue }))
+    .filter((c) => c.key);
   const pm = (raw.progressMeter ?? {}) as Record<string, unknown>;
   const progress = { agreed: n(pm.agreed) ?? 0, total: n(pm.total) ?? 0 };
   // Distance — app parity (bid.service.ts:134-137): a bid's location is its custom pin
@@ -527,6 +603,21 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   const lockedKeys = new Set(lockedTerms.map((t) => normKey(t.key)));
   const lockedValByKey = new Map(lockedTerms.map((t) => [normKey(t.key), t.value != null && t.value !== "" ? String(t.value) : null]));
   const unreadKeys = new Set(unreadTerms.map(normKey));
+  const counterValByKey = new Map(counters.map((c) => [normKey(c.key), c.value != null && c.value !== "" ? String(c.value) : null]));
+  // Enum-insensitive equality for the counter overlay (app parity: normalizeTermEnum) — case/underscore
+  // agnostic + boolean/party synonyms (yes=true=included, no=false=excluded/not-included, renter=rentee).
+  const normTok = (v: string): string => {
+    let t = v.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (["true", "yes", "included"].includes(t)) t = "yes";
+    else if (["false", "no", "excluded", "notincluded"].includes(t)) t = "no";
+    else if (t === "renter") t = "rentee";
+    return t;
+  };
+  // Multi-value terms (cert sets, e.g. "TUV,ARAMCO") compare order-INSENSITIVELY (app parity: set
+  // equality on the backend) — split on separators, normalize each token, sort, rejoin. Single-value
+  // terms are a 1-token no-op, so party/enum comparisons are unchanged.
+  const normVal = (v: string | null | undefined): string =>
+    (v ?? "").split(/[,/;|]+/).map(normTok).filter(Boolean).sort().join(",");
   const lockedVal = (pred: (k: string) => boolean): string | null => {
     const t = lockedTerms.find((x) => pred(normKey(x.key)));
     return t && t.value != null && t.value !== "" ? String(t.value) : null;
@@ -539,6 +630,15 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
       // Locked → "agreed", and carry the negotiated value so the cost responsibilities reflect what was
       // actually settled in the deal room (e.g. accepting the supplier's FAT flips the side to supplier).
       if (lockedKeys.has(k)) return { ...r, state: "agreed" as TermState, value: lockedValByKey.get(k) ?? r.value ?? null };
+      // Pending counter (app parity: dealRoomValue = counter.newValue): compare to the rentee's ask —
+      // equal → matched, differ → conflict. Without a rentee value to compare, fall back to "negotiating".
+      const cv = counterValByKey.get(k);
+      if (cv != null) {
+        if (r.renteeValue != null && r.renteeValue !== "") {
+          return { ...r, value: cv, state: (normVal(cv) === normVal(r.renteeValue) ? "matched" : "conflict") as TermState };
+        }
+        return { ...r, value: cv, state: "negotiating" as TermState };
+      }
       if (unreadKeys.has(k)) return { ...r, state: "negotiating" as TermState };
       return r;
     });
@@ -575,6 +675,13 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     // An EMPTY array means the supplier didn't pick a subset → they bid the request as posted (covers
     // its full unit count), NOT 0 — otherwise the header tile reads 0/1 while the card says "covers 1 of 1".
     unitsOffered: Array.isArray(raw.unitsOffered) && raw.unitsOffered.length > 0 ? raw.unitsOffered.length : (n(raw.unitsOffered) ?? n(rqItem.numberOfUnits) ?? 1),
+    // Live deal-room unit overlay (app parity) — camel/snake, null when not negotiated.
+    agreedUnits: n(raw.agreedUnits ?? raw.agreed_units),
+    currentRentalUnits: n(raw.currentRentalUnits ?? raw.current_rental_units),
+    mobUnits: n(raw.mobUnits ?? raw.mob_units),
+    demobUnits: n(raw.demobUnits ?? raw.demob_units),
+    mobExcluded: raw.mobExcluded === true || raw.mob_excluded === true,
+    demobExcluded: raw.demobExcluded === true || raw.demob_excluded === true,
     reqMinYear: n(rqItem.maxEquipmentAge),
     equipment: eq
       ? { id: s(eq.id) ?? s(eq.equipmentId), make: s(eq.manufacturer) ?? s(eq.make), model: s(eq.model), year: n(eq.year), imageUrl: s(eq.imageUrl) ?? s(eq.primaryPhotoUrl) }
@@ -605,6 +712,8 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     companyCertCodes,
     equipmentCertCodes,
     ownershipDocs,
+    offeredUnitsDetail: mapOfferedUnits(raw.offeredUnitsDetail ?? raw.offered_units_detail),
+    reqEquipmentCerts: (Array.isArray(rqItem.safetyCertifications) ? (rqItem.safetyCertifications as unknown[]) : []).map((x) => String(x).trim().toLowerCase()).filter(Boolean),
     operatorCertReq,
     operatorCertDeclared,
     mobLeadTime: negMobLead ?? s(raw.mobLeadTime),

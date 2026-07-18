@@ -216,6 +216,67 @@ export function mapDealRoomDocuments(raw: unknown): DealRoomDocuments {
   };
 }
 
+/** Deal-room proration constants — monthly ÷26 (working days), weekly ÷7, daily ÷1 (app parity:
+ *  deal_room_pricing.dart kFreqDays). Deliberately diverges from the marketplace whole-period rule. */
+const DEAL_FREQ_DAYS: Record<string, number> = { PER_DAY: 1, PER_WEEK: 7, PER_MONTH: 26 };
+
+export interface DealTotals {
+  rate: number; priceUnit: string; perDayRate: number;
+  rentalUnits: number; mobUnitsN: number; demobUnitsN: number;
+  mobPrice: number; demobPrice: number; mobExcluded: boolean; demobExcluded: boolean;
+  periods: number; hasDuration: boolean; periodCount: number;
+  rentalTotal: number; mobTotal: number; demobTotal: number;
+  subtotal: number; vat: number; grand: number;
+}
+
+/** SINGLE source of truth for deal-room money — used by BOTH the live price bar and the confirmed
+ *  quotation so they can never drift (app parity: computeDealTotals). Prorated ÷26/÷7; PER_JOB and
+ *  no-duration = one full period (rate × units); mob/demob use their OWN unit counts and honor leg
+ *  exclusion; VAT 15%. `override` lets the quotation pass the agreed rate / price unit, or a single
+ *  negotiation round pass its full snapshot (rate + prices + per-type units + exclusion). */
+export function computeDealTotals(
+  room: DealRoomView,
+  override?: {
+    rate?: number | null; priceUnit?: string | null;
+    mobPrice?: number | null; demobPrice?: number | null;
+    rentalUnits?: number | null; mobUnits?: number | null; demobUnits?: number | null;
+    mobExcluded?: boolean; demobExcluded?: boolean;
+  },
+): DealTotals {
+  const pick = <T,>(o: T | null | undefined, fb: T): T => (o == null ? fb : o);
+  const rate = override?.rate ?? room.rate ?? 0;
+  const priceUnit = (override?.priceUnit ?? room.priceUnit ?? "PER_DAY").toUpperCase();
+  const dpp = DEAL_FREQ_DAYS[priceUnit] || 1;
+  const hasDuration = room.periods != null && room.periods > 0;
+  const periods = hasDuration ? (room.periods as number) : dpp; // duration in DAYS; no duration = one full period
+  const rentalUnits = pick(override?.rentalUnits, room.agreedUnits ?? room.numberOfUnits ?? 1);
+  const mobUnitsN = Math.min(pick(override?.mobUnits, room.mobUnits ?? rentalUnits), rentalUnits);
+  const demobUnitsN = Math.min(pick(override?.demobUnits, room.demobUnits ?? rentalUnits), rentalUnits);
+  const perDayRate = rate / dpp;
+  const rentalTotal = priceUnit === "PER_JOB" ? rate * rentalUnits : perDayRate * periods * rentalUnits;
+  const mobPrice = pick(override?.mobPrice, room.mobPrice ?? 0);
+  const demobPrice = pick(override?.demobPrice, room.demobPrice ?? 0);
+  const mobExcluded = override?.mobExcluded ?? room.mobExcluded === true;
+  const demobExcluded = override?.demobExcluded ?? room.demobExcluded === true;
+  const mobTotal = mobExcluded ? 0 : mobPrice * mobUnitsN;
+  const demobTotal = demobExcluded ? 0 : demobPrice * demobUnitsN;
+  const subtotal = rentalTotal + mobTotal + demobTotal;
+  const vat = Math.round(subtotal * 0.15);
+  const grand = subtotal + vat;
+  return { rate, priceUnit, perDayRate, rentalUnits, mobUnitsN, demobUnitsN, mobPrice, demobPrice, mobExcluded, demobExcluded, periods, hasDuration, periodCount: periods / dpp, rentalTotal, mobTotal, demobTotal, subtotal, vat, grand };
+}
+
+/** Terms the APP hides from the deal-room table (deal_room_models hidden keys) — hidden here for parity
+ *  so the web never renders rows / phantom conflicts the app suppresses. PRICE + mob/demob PRICING are
+ *  priced line items (settled on the counter Price page); the rest are handled elsewhere or retired on
+ *  the deal-room surface (certs, operator nationality, payment method, offer duration, fat, lead time). */
+const HIDDEN_DEAL_ROOM_TERM_KEYS = new Set<string>([
+  "PRICE", "mobilization_pricing", "demobilization_pricing",
+  "fulfillment_type", "required_attachments", "mobilization_lead_time",
+  "operator_nationality", "operator_certification", "safety_certifications",
+  "fat", "payment_method", "offer_duration",
+]);
+
 export function mapDealRoom(raw: unknown): DealRoomView {
   const d = (raw ?? {}) as Record<string, unknown>;
   const sup = (d.supplier ?? {}) as Record<string, unknown>;
@@ -230,21 +291,13 @@ export function mapDealRoom(raw: unknown): DealRoomView {
   // Terms — surface the negotiable ones (drop PRICE; the rate card owns it). Keep the rest so the
   // renter can see matches and resolve any differing (disputed) term before accepting all.
   const rawTerms = Array.isArray(d.terms) ? (d.terms as Record<string, unknown>[]) : [];
-  // The backend still emits the RETIRED combined `fat` term ("Operator FAT") alongside the newer split
-  // `fat_food` / `fat_accommodation_transport` rows (kept for in-flight rooms). On older bids the legacy
-  // control carried a stale default (e.g. `fat = supplier`) while the split values were correct, so the
-  // legacy row disputes and shows a PHANTOM "Operator FAT" conflict. When the split rows are present they
-  // are the real per-item FAT — drop the stale combined row so it can't manufacture a conflict.
-  const hasSplitFat = rawTerms.some((t) => { const k = s(t.key); return k === "fat_food" || k === "fat_accommodation_transport"; });
-  // Priced line items (mob/demob PRICING) are NOT negotiable term cards — they're settled on the counter
-  // flow's Price page (rate card mobPrice/demobPrice), so drop them from the term rows.
-  // `mobilization_lead_time` is CONFLICT_ELIGIBLE in the app (deal-room.service CONFLICT_ELIGIBLE_KEYS —
-  // moved Priced → Negotiable), so it MUST render as a negotiable term and is NOT dropped here.
-  const PRICE_LINE_KEYS = new Set(["mobilization_pricing", "demobilization_pricing"]);
+  // Hide exactly the keys the app strips from the deal-room terms table (HIDDEN_DEAL_ROOM_TERM_KEYS):
+  // priced line items (mob/demob pricing settle on the counter Price page) + keys handled elsewhere or
+  // retired on the deal-room surface (certs, operator nationality, payment method, offer duration, the
+  // legacy combined `fat`, mobilization lead time, fulfillment type, required attachments). This matches
+  // the app 1:1 so the web never shows extra rows or a phantom `fat`/cert conflict.
   const terms: DealTerm[] = rawTerms
-    .filter((t) => s(t.key) !== "PRICE")
-    .filter((t) => !PRICE_LINE_KEYS.has(s(t.key) ?? ""))
-    .filter((t) => !(hasSplitFat && s(t.key) === "fat"))
+    .filter((t) => !HIDDEN_DEAL_ROOM_TERM_KEYS.has(s(t.key) ?? ""))
     .map((t) => ({
       key: s(t.key) ?? "",
       label: s(t.label) ?? s(t.key) ?? "",
@@ -284,13 +337,20 @@ export function mapDealRoom(raw: unknown): DealRoomView {
   };
   const bl = (v: unknown): boolean | null => (typeof v === "boolean" ? v : v === "true" ? true : v === "false" ? false : null);
   const arr = (v: unknown): string[] => (Array.isArray(v) ? v.map((x) => String(x)).filter(Boolean) : []);
+  // getDealRoom sends the request item's taxonomy as IDs only (no subtype/capacity names, unlike the bid
+  // list), so fall the equipment label back to the accepted bid's actual equipment (make + model). The
+  // app resolves the IDs from its taxonomy cache; the web has none here, so this is the sync source.
+  const bidEq = (bid.equipment ?? {}) as Record<string, unknown>;
+  const bidEqLabel = [s(bidEq.manufacturer), s(bidEq.modelName)].filter(Boolean).join(" ") || null;
   const details: DealItemDetails = {
-    // Equipment name = subtype (matches the request/bid cards); capacity = size. Fall back to the older keys.
-    equipmentLabel: s(pick("subtypeName", "label", "equipmentName", "name", "subcategoryName", "categoryName")),
+    // Equipment name = subtype (matches the request/bid cards); capacity = size. Fall back to the older
+    // keys, then to the accepted bid's equipment (make + model) since getDealRoom omits taxonomy names.
+    equipmentLabel: s(pick("subtypeName", "label", "equipmentName", "name", "subcategoryName", "categoryName")) ?? bidEqLabel,
     equipmentLabelAr: s(pick("subtypeNameAr")),
     equipmentSize: s(pick("capacityName", "size", "capacity")),
     equipmentSizeAr: s(pick("capacityNameAr")),
-    location: s(pick("location", "city", "projectLocation", "siteLocation", "deliveryLocation")),
+    // getDealRoom exposes the site as `projectAddressLabel`.
+    location: s(pick("location", "city", "projectLocation", "siteLocation", "deliveryLocation", "projectAddressLabel", "projectAddress")),
     rentalType: s(pick("rentalType", "rentalBasis")),
     startDate: s(pick("startDate", "deliveryDate", "estimatedStartDate", "requiredDate")),
     endDate: s(pick("endDate", "returnDate")),

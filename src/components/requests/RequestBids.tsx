@@ -4,14 +4,13 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/client";
-import type { BidCard } from "@/lib/contract/bids";
+import { bucketBidTerms, type BidCard } from "@/lib/contract/bids";
 import { computeBidQuote } from "@/lib/contract/comparison";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { qualityFromSubmission, type BidQuality } from "@/lib/contract/bid-quality";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { CredentialPills } from "@/components/requests/CredentialPills";
 import { TermsPanel } from "@/components/requests/TermsPanel";
-import { TermClassBadges } from "@/components/requests/TermClassBadges";
 import { DealRoomBanner, SupplierDocs, EquipmentDocs } from "@/components/requests/BidCardExtras";
 import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
@@ -19,6 +18,8 @@ import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
 import { SharedBidNegotiateRoom } from "@/components/requests/SharedBidNegotiateRoom";
 import { NEGOTIATE_ENABLED } from "@/lib/config/flags";
+import { computeBidReadiness } from "@/lib/contract/bid-readiness";
+import { BidReadinessBadge, BidEligibilityModal } from "@/components/requests/BidReadiness";
 
 /** Lifecycle pill (matches the prototype SPILL). */
 const SPILL: Record<string, { cls: string; dot: boolean; en: string; ar: string }> = {
@@ -88,6 +89,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
   const [src, setSrc] = useState<"all" | "app" | "link">("all"); // source filter
   const [submissionBid, setSubmissionBid] = useState<BidCard | null>(null);
   const [negotiateBid, setNegotiateBid] = useState<BidCard | null>(null); // web-app/006 — deal-room-style negotiate view
+  const [eligBid, setEligBid] = useState<BidCard | null>(null); // bid-readiness — eligibility view for a native bid's offered units
 
   const toggleSelect = (id: string) =>
     setSelected((prev) => {
@@ -330,7 +332,24 @@ export function RequestBids({ requestId }: { requestId: string }) {
               onClick={() => setOpenTermsId(openTermsId === b.id ? null : b.id)}
             >
               <span className="tlab">{L("Terms", "الشروط")}</span>
-              <TermClassBadges terms={b.terms} ar={ar} />
+              {(() => {
+                // App parity: the Conflict · Pending review · Matched tally (bucketBidTerms — the SAME
+                // source the grouped card + Terms modal use), deal-room-overlaid via b.terms states.
+                const tc = bucketBidTerms(b.terms, b.negotiableTerms).counts;
+                return (
+                  <span style={{ display: "inline-flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                    {([
+                      { label: L("Conflict", "تعارض"), n: tc.conflict, c: "#d9362a" },
+                      { label: L("Pending review", "قيد المراجعة"), n: tc.pending, c: "#d4780a" },
+                      { label: L("Matched", "مطابق"), n: tc.matched, c: "#1daf58" },
+                    ] as const).map((t) => (
+                      <span key={t.label} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 800, color: t.n > 0 ? t.c : "#9AA7B8", whiteSpace: "nowrap" }}>
+                        <span style={{ width: 7, height: 7, borderRadius: "50%", background: t.n > 0 ? t.c : "#c3d2e0" }} />{t.label} {t.n}
+                      </span>
+                    ))}
+                  </span>
+                );
+              })()}
               {b.unreadTerms.length > 0 && <span className="dr-turn">{b.unreadTerms.length} {L("new", "جديد")}</span>}
               <span className="material-icons-outlined chev">expand_more</span>
             </button>
@@ -350,6 +369,13 @@ export function RequestBids({ requestId }: { requestId: string }) {
                 <div className="esub">{b.distanceKm != null ? `${Math.round(b.distanceKm)} ${L("km from the project", "كم من المشروع")}` : L("Distance not shared", "المسافة غير محددة")}</div>
                 {/* Equipment certs + proof-of-ownership docs on file (Level 2) */}
                 <EquipmentDocs equipmentCerts={b.equipmentCertCodes ?? []} ownershipDocs={b.ownershipDocs} ar={ar} />
+                {/* Bid readiness — compact N/N + eye ON this row (opens the per-unit eligibility view).
+                    stopPropagation so it doesn't also trigger the row's equipment-details tap. */}
+                {(() => { const rd = computeBidReadiness(b); return rd ? (
+                  <span onClick={(e) => e.stopPropagation()} style={{ display: "inline-flex", marginTop: 6 }}>
+                    <BidReadinessBadge r={rd} L={L} onClick={() => setEligBid(b)} />
+                  </span>
+                ) : null; })()}
               </div>
               {b.equipment?.id && (
                 <span className="equip-view">
@@ -460,6 +486,9 @@ export function RequestBids({ requestId }: { requestId: string }) {
           onViewSubmission={() => { const b = negotiateBid; setNegotiateBid(null); setSubmissionBid(b); }}
         />
       )}
+
+      {/* bid-readiness — read-only eligibility view for a native bid's offered units */}
+      {eligBid && (() => { const rd = computeBidReadiness(eligBid); return rd ? <BidEligibilityModal r={rd} supplierName={eligBid.supplierName} ar={ar} L={L} onClose={() => setEligBid(null)} /> : null; })()}
 
       {/* Issue-quotation gate for an unverified renter (company name vs personal name). */}
       {quoteGate && (

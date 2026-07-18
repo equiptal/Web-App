@@ -6,7 +6,7 @@ import type { BidFormData, BidFormItem, LinkBidSubmission, LinkBidItem } from "@
 import { CERT_TERM_KEYS, certCodesFromValue, certConfKey, prettyCert } from "@/lib/contract/link-bids";
 import { fetchBidFormData } from "@/lib/api/client";
 import { hasVatInclusiveNote, stripVatInclusiveNote } from "@/lib/contract/vat-inclusive";
-import { qualityFromSubmission } from "@/lib/contract/bid-quality";
+import { qualityFromSubmission, qualityFromSubmissionItem } from "@/lib/contract/bid-quality";
 import { QualityRing } from "@/components/bid/QualityRing";
 import { BID_FORM_CSS } from "@/components/bid/bidFormStyles";
 
@@ -184,7 +184,10 @@ export function SharedBidSubmissionModal({
   const shownIds = new Set(shownItems.map((it) => it.requestItemId));
   const shownSubtotal = (submission?.items ?? []).filter((a) => shownIds.has(a.requestItemId)).reduce((s, a) => s + itemSubtotal(a), 0);
   const grandIncl = singleItem ? shownSubtotal * 1.15 : (submission?.grandTotal ?? subtotal + vat);
-  const quality = submission ? qualityFromSubmission(submission) : null;
+  // Per-ITEM quality when opened from a single item's card (focusItemId) — this item's terms/docs +
+  // the shared company details; otherwise the whole-submission score.
+  const focusedSub = focusItemId ? submission?.items.find((a) => a.requestItemId === focusItemId) : null;
+  const quality = submission ? (focusedSub ? qualityFromSubmissionItem(submission, focusedSub) : qualityFromSubmission(submission)) : null;
   // Supplier's quote expiry ("Valid until") + the renter's bid deadline ("Bids close").
   const validUntil = submission?.validUntil ?? null;
   const vDaysLeft = validUntil ? Math.ceil((new Date(validUntil).getTime() - Date.now()) / 86400000) : null;

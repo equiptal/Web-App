@@ -16,6 +16,9 @@ import {
   computeSummary,
   defaultPreferences,
   defaultOperatorNeeded,
+  operatorCertDefault,
+  equipmentCertDefault,
+  isLiftingCategory,
   newManualItem,
   postableItems,
 } from "@/lib/contract";
@@ -274,7 +277,19 @@ function reducer(state: RfqState, a: Action): RfqState {
         })),
       }));
     case "PATCH_ITEM":
-      return withDraft(state, (d) => mapItem(d, a.id, (i) => ({ ...i, ...a.patch })));
+      return withDraft(state, (d) =>
+        mapItem(d, a.id, (i) => {
+          const next = { ...i, ...a.patch };
+          // App parity (operatorCertForEquipmentCerts): enabling the operator seeds a default operator
+          // cert — TÜV if the item's equipment cert is TÜV, else SPSP — only when none is set yet. The
+          // renter can still change it. Aramco (lifting) → SPSP; matches "per operator set to SPSP".
+          if (a.patch.operatorNeeded === "yes" && next.operator.certificate.length === 0) {
+            const equipCerts = next.safetyCertsOverride ?? d.project.certificates.safety ?? [];
+            return { ...next, operator: { ...next.operator, certificate: [operatorCertDefault(equipCerts)] } };
+          }
+          return next;
+        }),
+      );
     case "PATCH_ITEM_OPERATOR":
       return withDraft(state, (d) => mapItem(d, a.id, (i) => ({ ...i, operator: { ...i.operator, ...a.patch } })));
     case "SET_ITEM_CATEGORY":
@@ -282,12 +297,27 @@ function reducer(state: RfqState, a: Action): RfqState {
       // default (diesel) — the old value (e.g. electric for a suspended platform) no longer fits the new
       // equipment type (an excavator) — and drop the now-stale agent fuel hint for this item.
       return withDraft(state, (d) => {
-        const d2 = mapItem(d, a.id, (i) => ({
-          ...i,
-          ref: { categoryId: a.categoryId, subcategoryId: null, measurementId: null },
-          fuelType: "diesel",
-          resolved: false,
-        }));
+        const d2 = mapItem(d, a.id, (i) => {
+          const categoryChanged = i.ref.categoryId !== a.categoryId;
+          const next = {
+            ...i,
+            ref: { categoryId: a.categoryId, subcategoryId: null, measurementId: null },
+            fuelType: "diesel" as const,
+            resolved: false,
+          };
+          // App parity (_withCertRule): (re)picking the category re-seeds the category-based equipment
+          // cert — lifting → Aramco, else TÜV — and mirrors the operator cert (TÜV→TÜV / Aramco→SPSP)
+          // when the operator is on. Only on an actual category change, so per-item edits survive a no-op
+          // re-pick; a later request-wide "settings for all" pick still overrides via SET_CERTIFICATES.
+          if (categoryChanged) {
+            const equipCert = equipmentCertDefault(isLiftingCategory(next.ref, state.taxonomy));
+            next.safetyCertsOverride = [equipCert];
+            if (next.operatorNeeded === "yes") {
+              next.operator = { ...next.operator, certificate: [operatorCertDefault([equipCert])] };
+            }
+          }
+          return next;
+        });
         const noteKey = `line_items[${a.id.slice(1)}].fuel_type_preference`;
         if (d2.fieldNotes && noteKey in d2.fieldNotes) {
           const fieldNotes = { ...d2.fieldNotes };
@@ -299,12 +329,22 @@ function reducer(state: RfqState, a: Action): RfqState {
     case "SET_ITEM_SUBCATEGORY":
       // AC-21: changing subcategory clears & re-prompts measurement; reset operator default (AC-24).
       return withDraft(state, (d) =>
-        mapItem(d, a.id, (i) => ({
-          ...i,
-          ref: { ...i.ref, subcategoryId: a.subcategoryId, measurementId: null },
-          operatorNeeded: defaultOperatorNeeded(a.subcategoryId),
-          resolved: false,
-        })),
+        mapItem(d, a.id, (i) => {
+          const operatorNeeded = defaultOperatorNeeded(a.subcategoryId);
+          const next = {
+            ...i,
+            ref: { ...i.ref, subcategoryId: a.subcategoryId, measurementId: null },
+            operatorNeeded,
+            resolved: false,
+          };
+          // Same app-parity seed as the manual operator toggle (PATCH_ITEM): if the subcategory
+          // auto-enables the operator and no cert is set, default it (TÜV-or-SPSP by equipment cert).
+          if (operatorNeeded === "yes" && next.operator.certificate.length === 0) {
+            const equipCerts = next.safetyCertsOverride ?? d.project.certificates.safety ?? [];
+            return { ...next, operator: { ...next.operator, certificate: [operatorCertDefault(equipCerts)] } };
+          }
+          return next;
+        }),
       );
     case "SET_ITEM_MEASUREMENT":
       return withDraft(state, (d) =>

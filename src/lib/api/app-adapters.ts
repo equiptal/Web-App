@@ -51,6 +51,23 @@ function computeUrgency(startDate: string | null): "ASAP" | "SOON" | "FAR_FUTURE
   return "FAR_FUTURE";
 }
 
+/**
+ * Estimated rental duration in whole days — mobile CR-017 parity
+ * (`create_request_bloc.dart::_computeDurationDays`): `end.difference(start).inDays`, i.e. (end − start)
+ * floored to whole days, null when either date is missing. The backend does NOT derive duration from the
+ * dates — it stores this client value verbatim — and its schema requires ≥ 1, so we omit anything below a
+ * full day. Without this, web-created requests have no duration and every duration-based price (quotation,
+ * deal room, comparison "Est. rental") can't total.
+ */
+function computeDurationDays(startDate: string | null, endDate: string | null): number | undefined {
+  if (!startDate || !endDate) return undefined;
+  const s = new Date(startDate.length <= 10 ? `${startDate}T00:00:00Z` : startDate).getTime();
+  const e = new Date(endDate.length <= 10 ? `${endDate}T00:00:00Z` : endDate).getTime();
+  if (Number.isNaN(s) || Number.isNaN(e)) return undefined;
+  const d = Math.floor((e - s) / 86_400_000);
+  return d >= 1 ? d : undefined;
+}
+
 const FUEL_MAP: Record<string, CreateRequestItem["fuelTypePreference"]> = {
   diesel: "DIESEL",
   petrol: "PETROL",
@@ -139,6 +156,7 @@ const OFFER_DURATION_MAP: Record<string, string> = {
  */
 const CERT_TOKEN_MAP: Record<string, string> = {
   tuv: "tuv",
+  aramco: "aramco", // 2026-07 cert rule — Aramco-certified equipment (canonical code the app stores)
   spsp: "spsp",
   "saso-technical": "saso_technical_inspection",
   "saso-registration": "saso_registration",
@@ -183,6 +201,7 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
     rentalType: (project.timing.rentalBasis && RENTAL_MAP[project.timing.rentalBasis]) || "DAILY",
     startDate: toIsoDateTime(project.timing.startDate), // optional; omitted when unset → server defaults to now
     endDate: toIsoDateTime(project.timing.endDate),
+    estimatedDurationDays: computeDurationDays(project.timing.startDate, project.timing.endDate), // mobile CR-017 parity
     urgency: computeUrgency(project.timing.startDate), // mobile CR-017 parity (see computeUrgency)
     extendable: project.timing.extendable, // AC-13 (rule 6: needs the deployed `extendable` column)
     projectLat: project.location.lat,

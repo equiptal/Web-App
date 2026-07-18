@@ -8,10 +8,12 @@ import { AccountModal } from "@/components/onboarding/AccountModal";
 import { SignInPrompt } from "@/components/common/SignInPrompt";
 import { agentUses, bumpAgentUse, guestLimitReached, GUEST_AGENT_LIMIT } from "@/lib/access/agent-quota";
 import { fetchAllMyRequests, fetchBids, fetchRequestSubmissions, startDealRoom, recommendBids, askBids, parseBid, transformBid, captureBidEvents, fetchDealRoomDocuments, fetchBidDocuments, fetchDealRoom } from "@/lib/api/client";
-import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
+import { submissionToBidCard, submissionToBidDocuments, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { groupRequests, type RequestGroup } from "@/lib/contract/requests";
 import type { DealRoomDocuments, DealTerm } from "@/lib/contract/deal-room";
 import { CERT_LABEL, type BidCard, type CertCode, type TermRow, type TermState } from "@/lib/contract/bids";
+import { computeBidReadiness } from "@/lib/contract/bid-readiness";
+import { BidReadinessBadge, BidEligibilityModal } from "@/components/requests/BidReadiness";
 import { buildItemComparison, sortByPreset, displayQuote, responsibilityTone, rowWinners, type BidColumn, type Preset, type CostResponsibility, type RatePeriod, type PricesFor } from "@/lib/contract/comparison";
 import { bidColumnToComputed, normalizedBidToBidCard, presetToAgent, type RecommendResult, type NormalizedBid } from "@/lib/contract/agent-bids";
 import { BID_VERIFY_ENABLED } from "@/lib/flags";
@@ -135,6 +137,7 @@ export function BidComparisonWorkspace() {
   const [preset, setPreset] = useState<Preset>("best");
   const [period, setPeriod] = useState<RatePeriod>("PER_DAY"); // RATE PERIOD toggle (Day/Week/Month) — display + totals
   const [pricesFor, setPricesFor] = useState<PricesFor>("unit"); // PRICES FOR toggle — default PER UNIT
+  const [eligBid, setEligBid] = useState<BidCard | null>(null); // bid-readiness — eligibility view for a native bid
   // Default the RATE PERIOD to how the bids were actually quoted (the request's rental type) so a monthly
   // bid shows e.g. "SAR 120/month" instead of its per-day conversion "SAR 4/day". Runs once when bids
   // load; the renter can still toggle. (All bids share the request's rental unit.)
@@ -456,6 +459,15 @@ export function BidComparisonWorkspace() {
     ).then((entries) => { if (alive) setBidDocs((p) => ({ ...p, ...Object.fromEntries(entries) })); });
     return () => { alive = false; };
   }, [cols, bidDocs]);
+  // Off-platform (shared-link) bids have no /bids/{id}/documents endpoint — but the submission already
+  // carries every uploaded file as a presigned URL. Pre-load them into bidDocs (keyed by the per-item
+  // column id `link-<sub>-<item>`) so the comparison's doc rows/chips + viewer open them like app docs.
+  useEffect(() => {
+    if (!submissions.length) return;
+    const entries: Record<string, DealRoomDocuments> = {};
+    for (const s of submissions) for (const it of s.items) entries[`link-${s.id}-${it.requestItemId}`] = submissionToBidDocuments(s, it);
+    setBidDocs((p) => ({ ...p, ...entries }));
+  }, [submissions]);
   // The pick = the agent's pick when it maps to a visible column, else the top-ranked column. Either way it
   // tracks the current order, so the highlight moves when you re-rank.
   const pickIdRaw = rec?.recommendation.pick_bid_id != null ? String(rec.recommendation.pick_bid_id) : null;
@@ -556,9 +568,12 @@ export function BidComparisonWorkspace() {
     const findUrl = (d?: DealRoomDocuments) =>
       d ? [...d.companyDocuments, ...d.equipmentDocuments].find((x) => x.url && pred(x))?.url ?? null : null;
     let url = findUrl(bidDocs[c.bid.id]);
+    // Off-platform (link-) / uploaded (upload:) bids have no /bids/{id}/documents endpoint — their files
+    // are pre-loaded in bidDocs, so never hit the fetch (it would 404 on the synthetic id).
+    const synthetic = c.bid.id.startsWith("link-") || c.bid.id.startsWith("upload:");
     // Always (re)fetch when the cached set has no match — the cache may be empty from a transient
     // error (e.g. the endpoint was briefly down) or simply not loaded yet. This self-heals on click.
-    if (!url) {
+    if (!url && !synthetic) {
       try {
         const fresh = await fetchBidDocuments(c.bid.id);
         setBidDocs((p) => ({ ...p, [c.bid.id]: fresh }));
@@ -580,23 +595,28 @@ export function BidComparisonWorkspace() {
     const base = has ? { background: C.successBg, color: C.success } : { background: C.dangerBg, color: C.danger };
     const style = big ? { ...base, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: `1px solid ${has ? "rgba(29,175,88,.3)" : "rgba(217,54,42,.3)"}` } : base;
     const cls = big ? "inline-flex items-center gap-1 text-[11.5px]" : "inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold";
-    // Off-platform bids captured a VALUE (CR/VAT/national text), not a file — show the value, not a doc.
-    const linkVal = c.bid.viaSharedLink ? c.bid.linkDocs?.[hint] : undefined;
-    // Viewable only when there's something to open: a captured value (link bid) or a real file (app bid).
-    // Off-platform certs are acknowledged Yes/No — no file, no value — so no eye icon / no click.
-    const viewable = has && (linkVal != null || !c.bid.viaSharedLink);
+    // Off-platform: prefer the actual uploaded FILE (pre-loaded in bidDocs) when the supplier attached one;
+    // else fall back to the captured VALUE (CR/VAT/national text they typed instead of a file).
+    const dd = c.bid.viaSharedLink ? bidDocs[c.bid.id] : undefined;
+    const fileUrl = dd ? [...dd.equipmentDocuments, ...dd.companyDocuments].find((x) => x.url && docMatches(hint)(x))?.url ?? null : null;
+    const linkVal = c.bid.viaSharedLink && !fileUrl ? c.bid.linkDocs?.[hint] : undefined;
+    // Viewable when there's something to open: a real uploaded file, a captured value (link bid), or an
+    // app bid's presigned doc. Off-platform certs acknowledged Yes/No with no file/value → no eye.
+    const viewable = has && (fileUrl != null || linkVal != null || !c.bid.viaSharedLink);
     const inner = <><span className="material-icons-outlined" style={{ fontSize: 11 }}>{has ? "check" : "close"}</span>{label}{viewable && <span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>visibility</span>}</>;
     if (!viewable) return <span className={cls} style={style}>{inner}</span>;
-    const onClick = linkVal ? () => setDocView({ label, url: null, value: linkVal, loading: false }) : () => openDoc(c, hint, label);
+    const onClick = fileUrl ? () => setDocView({ label, url: fileUrl, loading: false }) : linkVal ? () => setDocView({ label, url: null, value: linkVal, loading: false }) : () => openDoc(c, hint, label);
     return <button type="button" onClick={onClick} title={linkVal ? L("View value", "عرض القيمة") : L("View document", "عرض المستند")} className={cls} style={style}>{inner}</button>;
   };
-  // Green ✓ / red × cert pill WITHOUT a doc-view eye — for declared certs (e.g. the operator's) that
-  // have no file to open. Same visual weight as the big docChip.
-  const certPill = (label: string, held: boolean) => (
-    <span className="inline-flex items-center gap-1 text-[11.5px]" style={{ background: held ? C.successBg : C.dangerBg, color: held ? C.success : C.danger, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: `1px solid ${held ? "rgba(29,175,88,.3)" : "rgba(217,54,42,.3)"}` }}>
-      <span className="material-icons-outlined" style={{ fontSize: 11 }}>{held ? "check" : "close"}</span>{label}
-    </span>
-  );
+  // Green ✓ / red × cert pill. `fileUrl` (off-platform operator cert) makes it a clickable eye that opens
+  // the uploaded file; without it, it's a plain declared-cert pill (no file to open). Same weight as docChip.
+  const certPill = (label: string, held: boolean, fileUrl?: string | null) => {
+    const style = { background: held ? C.successBg : C.dangerBg, color: held ? C.success : C.danger, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: `1px solid ${held ? "rgba(29,175,88,.3)" : "rgba(217,54,42,.3)"}` } as const;
+    const inner = <><span className="material-icons-outlined" style={{ fontSize: 11 }}>{held ? "check" : "close"}</span>{label}{fileUrl && <span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>visibility</span>}</>;
+    return fileUrl
+      ? <button type="button" onClick={() => setDocView({ label, url: fileUrl, loading: false })} title={L("View document", "عرض المستند")} className="inline-flex items-center gap-1 text-[11.5px]" style={style}>{inner}</button>
+      : <span className="inline-flex items-center gap-1 text-[11.5px]" style={style}>{inner}</span>;
+  };
   const grandTotal = (c: BidColumn) => Math.round(supplierStated(c) * (1 + VAT)) + renterAddBid(c);
   const hasCost = (c: BidColumn) => supplierStated(c) > 0 || renterAddBid(c) > 0;
   const grandList = cols.filter(hasCost).map(grandTotal);
@@ -620,6 +640,34 @@ export function BidComparisonWorkspace() {
     cols.forEach((c) => (c.bid.ownershipDocs ?? []).forEach((o) => { if (!seen.has(o.key)) seen.set(o.key, o); }));
     return [...seen.values()];
   })();
+  // Per-unit readiness re-source: the Equipment/Operator cert + Year rows read from the OFFERED UNITS
+  // (offeredUnitsDetail) when available — a cert counts as held only if it's present on EVERY offered
+  // unit (partial = "K/M"). Native app bids only; off-platform bids have no unit data (rd null) → the
+  // rows fall back to the bid-level codes. Memoized once per column.
+  const rdByBid = new Map(cols.map((c) => [c.bid.id, computeBidReadiness(c.bid)]));
+  const unitCert = (bidId: string, certCode: string, kind: "equipment" | "operator") => {
+    const rd = rdByBid.get(bidId);
+    if (!rd) return null; // off-platform / no unit data → caller uses the bid-level fallback
+    const want = certCode.toLowerCase();
+    const wantU = want.replace(/[\s-]+/g, "_");
+    const per = rd.units.map((u) => (kind === "equipment" ? u.equipmentCerts : u.operatorCerts).find((rc) => rc.code === want || rc.code === wantU));
+    const total = rd.units.length;
+    const held = per.filter((x) => x?.present).length;
+    const url = per.find((x) => x?.present && x.url)?.url ?? null;
+    return { held, total, all: total > 0 && held === total, none: held === 0, url };
+  };
+  // A green(all)/amber(partial "K/M")/red(none) chip for a per-unit cert status, doc-linked when present.
+  const unitCertChip = (label: string, st: { held: number; total: number; all: boolean; none: boolean; url: string | null }) => {
+    const tone = st.all ? { bg: C.successBg, c: C.success, bd: "rgba(29,175,88,.3)", icon: "check" }
+      : st.none ? { bg: C.dangerBg, c: C.danger, bd: "rgba(217,54,42,.3)", icon: "close" }
+      : { bg: "#fff3e0", c: "#d4780a", bd: "rgba(212,120,10,.35)", icon: "remove" };
+    const text = label + (!st.all && !st.none ? ` ${st.held}/${st.total}` : "");
+    const style = { display: "inline-flex", alignItems: "center", gap: 4, fontSize: "11.5px", fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: `1px solid ${tone.bd}`, background: tone.bg, color: tone.c } as const;
+    const inner = <><span className="material-icons-outlined" style={{ fontSize: 11 }}>{tone.icon}</span>{text}{st.url && <span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>visibility</span>}</>;
+    return st.url
+      ? <a href={st.url} target="_blank" rel="noopener noreferrer" style={style} title={L("View document", "عرض المستند")}>{inner}</a>
+      : <span style={style}>{inner}</span>;
+  };
   const bestTag = <span className="ms-1 inline-flex items-center gap-0.5 rounded-full px-[7px] py-0.5 align-middle text-[9.5px]" style={{ background: C.successBg, color: C.success, fontWeight: 900, letterSpacing: ".03em" }}>✓ {L("BEST", "الأفضل")}</span>;
   // §6 rule: only show cost responsibilities the REQUEST assigned (requestSide set) — not required → not shown.
   const requiredResp = RESP_META.filter((m) => cols.some((c) => c.costResponsibilities.find((x) => x.key === m.key)?.requestSide != null));
@@ -1279,6 +1327,8 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                             <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                               {companyDocChips(c.bid).map((d) => <span key={d.lbl}>{docChip(c, d.lbl, d.has, d.hint)}</span>)}
                             </div>
+                            {/* bid-readiness — equipment eligibility badge (native bids only) */}
+                            {(() => { const rd = computeBidReadiness(c.bid); return rd ? <div className="mt-1.5"><BidReadinessBadge r={rd} L={L} onClick={() => setEligBid(c.bid)} /></div> : null; })()}
                             {recog && <span className="mt-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-bold" style={{ background: C.renteeDim, color: "#1E4FB8", borderColor: "rgba(37,99,235,.28)" }}><span className="material-icons-outlined" style={{ fontSize: 13, color: C.rentee }}>history</span>{recog}</span>}
                           </div>
                         </th>
@@ -1536,7 +1586,13 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                           const v = yr ? (yr.state === "conflict" ? L("Not met", "غير مطابق") : c.bid.reqMinYear != null ? `≥ ${c.bid.reqMinYear}` : L("Confirmed", "مؤكّد")) : null;
                           return <Td key={c.bid.id} ok={!!yr && yr.state !== "conflict"} fail={yr?.state === "conflict"}>{v ? <span className="text-[14px]" style={{ fontWeight: 900 }}>{v}</span> : <span style={{ color: C.muted }}>—</span>}</Td>;
                         }
-                        return <Td key={c.bid.id} ok={yr?.state !== "conflict"} fail={yr?.state === "conflict"}><span className="text-[14px]" style={{ fontWeight: 900 }}>{c.bid.equipment?.year ?? "—"}</span>{yearWin.has(idx) && <span className="mt-0.5 block text-[11px]" style={{ color: C.success, fontWeight: 800 }}>{L("newest", "الأحدث")}</span>}</Td>;
+                        // NATIVE → below-min-year is read per OFFERED UNIT (readiness): fail if any offered
+                        // unit is below the request's min year; show "K/M below min" when partial.
+                        const rd = rdByBid.get(c.bid.id);
+                        const badUnits = rd ? rd.units.filter((u) => u.yearConflict).length : 0;
+                        const totUnits = rd ? rd.units.length : 0;
+                        const yearFail = rd ? badUnits > 0 : yr?.state === "conflict";
+                        return <Td key={c.bid.id} ok={!yearFail} fail={yearFail}><span className="text-[14px]" style={{ fontWeight: 900 }}>{c.bid.equipment?.year ?? "—"}</span>{rd && badUnits > 0 && <span className="mt-0.5 block text-[11px]" style={{ color: C.danger, fontWeight: 800 }}>{L(`${badUnits}/${totUnits} below min`, `${badUnits}/${totUnits} دون الحد`)}</span>}{!yearFail && yearWin.has(idx) && <span className="mt-0.5 block text-[11px]" style={{ color: C.success, fontWeight: 800 }}>{L("newest", "الأحدث")}</span>}</Td>;
                       })}
                     </tr>
                     <tr>
@@ -1551,6 +1607,19 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                       <tr>
                         <RowHead title={L("Equipment certificate", "شهادة المعدة")} sub={`${L("required", "مطلوب")}: ${requiredEquipCerts.map(certLabel).join(", ")}`} />
                         {cols.map((c) => {
+                          // NATIVE bid → source from the OFFERED UNITS (readiness): a cert is green only if
+                          // held on every offered unit, amber "K/M" if partial, red if none. Off-platform
+                          // bids (rd null) fall through to the bid-level codes below.
+                          if (rdByBid.get(c.bid.id)) {
+                            const st = requiredEquipCerts.map((cert) => ({ cert, s: unitCert(c.bid.id, cert, "equipment")! }));
+                            return (
+                              <Td key={c.bid.id} ok={st.every((x) => x.s.all)} fail={st.every((x) => x.s.none)}>
+                                <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
+                                  {st.map(({ cert, s }) => <span key={cert}>{unitCertChip(certLabel(cert), s)}</span>)}
+                                </span>
+                              </Td>
+                            );
+                          }
                           const codes = c.bid.equipmentCertCodes ?? [];
                           const allHeld = requiredEquipCerts.every((cert) => codes.includes(cert));
                           const noneHeld = requiredEquipCerts.every((cert) => !codes.includes(cert));
@@ -1619,6 +1688,21 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                       {cols.map((c) => {
                         const req = c.bid.operatorCertReq;
                         if (!req) return <Td key={c.bid.id}><span style={{ color: C.disabled, fontWeight: 600 }}>—</span></Td>;
+                        // NATIVE → source from the OFFERED UNITS (readiness): each requested operator cert is
+                        // green only if held on every offered unit (amber "K/M" partial, red none). Off-platform
+                        // bids (rd null) or natives with no operator-cert readiness fall through to the declared logic.
+                        const rdOp = rdByBid.get(c.bid.id);
+                        const opReqCerts = rdOp?.units[0]?.operatorCerts ?? [];
+                        if (rdOp && opReqCerts.length) {
+                          const st = opReqCerts.map((oc) => ({ oc, s: unitCert(c.bid.id, oc.code, "operator")! }));
+                          return (
+                            <Td key={c.bid.id} ok={st.every((x) => x.s.all)} fail={st.every((x) => x.s.none)}>
+                              <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
+                                {st.map(({ oc, s }) => <span key={oc.code}>{unitCertChip(L(oc.labelEn, oc.labelAr), s)}</span>)}
+                              </span>
+                            </Td>
+                          );
+                        }
                         // Reflect the truth (issue 3): green only when the DECLARED cert actually satisfies the
                         // REQUIRED one (e.g. required SPSP but supplier declared TÜV → red), or the deal room has
                         // AGREED it. A deal-room conflict, or a value mismatch that isn't yet agreed → red.
@@ -1632,10 +1716,13 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         // doesn't satisfy the requirement (e.g. required SPSP, declared TÜV), show it as a BLUE
                         // "extra" chip next to the red required one — so the renter sees what they DO hold.
                         const showExtra = !met && declaredOk && !!declared && !satisfiesReq;
+                        // Off-platform: the supplier's uploaded operator-cert file (operator_tuv/spsp/saso/other)
+                        // → make the pill a clickable eye that opens it, in this existing row.
+                        const opFile = c.bid.viaSharedLink ? bidDocs[c.bid.id]?.equipmentDocuments.find((d) => d.url && d.type?.startsWith("operator"))?.url ?? null : null;
                         return (
                           <Td key={c.bid.id} ok={met} fail={!met}>
                             <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
-                              {certPill(req, met)}
+                              {certPill(req, met, opFile)}
                               {showExtra && (
                                 <span className="inline-flex items-center gap-1 text-[11.5px]" title={L("Declared — doesn’t meet the requirement", "مُعلن — لا يفي بالمطلوب")} style={{ background: C.renteeDim, color: C.rentee, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: "1px solid rgba(37,99,235,.3)" }}>
                                   <span className="material-icons-outlined" style={{ fontSize: 11 }}>add</span>{declared}
@@ -1960,6 +2047,8 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
           </div>
         </div>
       )}
+      {/* bid-readiness — read-only eligibility view for a native bid's offered units */}
+      {eligBid && (() => { const rd = computeBidReadiness(eligBid); return rd ? <BidEligibilityModal r={rd} supplierName={eligBid.supplierName} ar={ar} L={L} onClose={() => setEligBid(null)} /> : null; })()}
     </div>
   );
 }

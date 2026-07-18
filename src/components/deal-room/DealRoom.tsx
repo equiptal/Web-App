@@ -4,14 +4,35 @@ import { useEffect, useRef, useState, Fragment } from "react";
 import { StreamChat, type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
 import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, ApiError } from "@/lib/api/client";
-import type { DealRoomView, DealTerm, DealRoomDocument, DealRoomDocuments, QuotationView } from "@/lib/contract/deal-room";
+import { computeDealTotals, type DealRoomView, type DealTerm, type DealRoomDocument, type DealRoomDocuments, type QuotationView } from "@/lib/contract/deal-room";
+import { reconstructRounds, collapseRounds, latestRoundBy, withOpeningRound, type DealRound } from "@/lib/contract/deal-rounds";
 import { valText, type ResolutionsMap } from "@/components/deal-room/DealRoomTerms";
 import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
 import { renderQuotationSection, wrapQuotationPage, type QuotationDoc, type QuotationLineItem, type QuotationCard } from "@/lib/quotation/render";
 import "@/components/deal-room/deal-room-proto.css";
 
 type StreamAttachment = { type?: string; image_url?: string; thumb_url?: string; asset_url?: string; title?: string; mime_type?: string; file_size?: number; fallback?: string };
-type ChatMsg = { id: string; text?: string; user?: { id?: string }; created_at?: string | Date; attachments?: StreamAttachment[] };
+// `custom` carries the app's round payload (type:'rate_proposal', …) + location kind; i18n carries
+// Stream's message translations. Both are read defensively (reconstructRounds / the translate toggle).
+type ChatMsg = { id: string; text?: string; user?: { id?: string }; created_at?: string | Date; attachments?: StreamAttachment[]; custom?: Record<string, unknown>; i18n?: Record<string, unknown> };
+
+/** Deal-room rounds → the standing supplier/rentee snapshots, for the allMatched gate + history. */
+function roomOpeningRound(room: DealRoomView) {
+  return {
+    rate: room.rate, priceUnit: room.priceUnit, mobPrice: room.mobPrice, demobPrice: room.demobPrice,
+    rentalUnits: room.agreedUnits ?? room.numberOfUnits, mobUnits: room.mobUnits, demobUnits: room.demobUnits,
+    mobExcluded: room.mobExcluded, demobExcluded: room.demobExcluded,
+  };
+}
+const eqNum = (a: number | null, b: number | null) => (a == null || b == null ? a == b : Math.round(a) === Math.round(b));
+/** Total for one reconstructed round (reuses computeDealTotals with the round's full snapshot). */
+function roundTotals(room: DealRoomView, r: DealRound) {
+  return computeDealTotals(room, {
+    rate: r.rate, priceUnit: r.priceUnit, mobPrice: r.mobPrice, demobPrice: r.demobPrice,
+    rentalUnits: r.rentalUnits, mobUnits: r.mobUnits, demobUnits: r.demobUnits,
+    mobExcluded: r.mobExcluded, demobExcluded: r.demobExcluded,
+  });
+}
 
 const STREAM_KEY = process.env.NEXT_PUBLIC_STREAM_API_KEY ?? "";
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
@@ -41,24 +62,19 @@ const CHAT_MAX_VIDEO = 25 * 1024 * 1024; // video
 function buildQuotationHtml(room: DealRoomView, q: QuotationView, renteeName: string, ar: boolean, L: (en: string, arr: string) => string): string {
   const lang = ar ? "ar" : "en";
   const sar = L("SAR", "ر.س");
-  const rate = q.agreedRate ?? room.rate ?? 0;
-  const unit = (q.priceUnit ?? room.priceUnit ?? "PER_DAY").toUpperCase();
-  const mob = room.mobPrice ?? 0;
-  const demob = room.demobPrice ?? 0;
-  const units = room.numberOfUnits || 1;
+  // EXACT same math as the live price bar (computeDealTotals) — prorated ÷26/÷7, PER_JOB / no-duration =
+  // one full period, mob/demob use their own counts + honor leg exclusion, VAT 15%. Guarantees the
+  // quotation total == the number the renter saw in the room.
+  const t = computeDealTotals(room, { rate: q.agreedRate ?? room.rate, priceUnit: q.priceUnit ?? room.priceUnit });
+  const rate = t.rate;
+  const unit = t.priceUnit;
+  const units = t.rentalUnits;
   const days = room.periods;
   const periodLabel = unit === "PER_WEEK" ? L("week", "أسبوع") : unit === "PER_MONTH" ? L("month", "شهر") : unit === "PER_JOB" ? L("job", "مهمة") : L("day", "يوم");
-  let durationFactor: number | null = null;
-  if (unit === "PER_JOB") durationFactor = 1;
-  else if (days != null) durationFactor = unit === "PER_WEEK" ? Math.ceil(days / 7) : unit === "PER_MONTH" ? Math.ceil(days / 30) : days;
-  const hasTotal = rate > 0 && durationFactor != null;
-  // Same money math as the live card: rental + mob + demob, all × units, + 15% VAT (offered units).
-  const rentalTotal = hasTotal ? rate * (durationFactor as number) * units : 0;
-  const mobTotal = mob * units;
-  const demobTotal = demob * units;
-  const subtotal = hasTotal ? rentalTotal + mobTotal + demobTotal : 0;
-  const vat = Math.round(subtotal * 0.15);
-  const total = subtotal + vat;
+  const rentalTotal = t.rentalTotal;
+  const subtotal = t.subtotal;
+  const vat = t.vat;
+  const total = t.grand;
   const dateStr = new Date().toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
   const qnum = (q.quotationNumber ?? "").slice(0, 8).toUpperCase() || "—";
   const contractType = q.contractType ?? room.contractType;
@@ -77,19 +93,32 @@ function buildQuotationHtml(room: DealRoomView, q: QuotationView, renteeName: st
 
   // Invoice line items (rental + delivery + return) — SAME 6-column table as the bid-card quotation.
   const lineItems: QuotationLineItem[] = [];
-  if (hasTotal) {
-    lineItems.push({ num: 1, label: L("Rental", "الإيجار"), detail: room.supplier.name, unit: periodLabel, qty: `${durationFactor}${units > 1 ? ` × ${units}` : ""}`, price: `${nf(rate)} / ${periodLabel}`, total: nf(rentalTotal) });
-  } else {
-    lineItems.push({ num: 1, label: L("Rental", "الإيجار"), detail: room.supplier.name, unit: periodLabel, qty: "∞", price: `${nf(rate)} / ${periodLabel}`, total: `${nf(rate)} / ${periodLabel}`, totalNote: L("As operated", "حسب التشغيل") });
-  }
-  // Mobilization/demobilization are ALWAYS shown — even when the rentee arranges them (supplier
-  // charges nothing), that must be stated on the quotation.
-  const logiRow = (label: string, price: number, priceTotal: number, byRentee: boolean): QuotationLineItem =>
-    price > 0
-      ? { num: null, label, detail: room.supplier.name, unit: L("Trip", "رحلة"), qty: String(units), price: nf(price), total: nf(priceTotal) }
-      : { num: null, label, detail: byRentee ? L("Arranged by the rentee", "يُرتّبه المستأجر") : L("Included", "مشمول"), unit: "—", qty: "—", price: "—", total: byRentee ? L("By rentee", "على المستأجر") : L("Included", "مشمول") };
-  lineItems.push(logiRow(L("Delivery to site", "النقل إلى الموقع"), mob, mobTotal, room.mobByRentee === true));
-  lineItems.push(logiRow(L("Return from site", "الإرجاع من الموقع"), demob, demobTotal, room.demobByRentee === true));
+  // Rental qty/price columns mirror the live price bar's factor logic: PER_JOB → units jobs; whole
+  // period count → "N × units"; a partial (day-count) duration → effective per-day rate × days.
+  const factorInt = Number.isInteger(t.periodCount) ? t.periodCount : null;
+  const partial = unit !== "PER_JOB" && t.hasDuration && factorInt == null;
+  const rentalQty = unit === "PER_JOB"
+    ? String(units)
+    : partial
+      ? `${room.periods} ${L("days", "يوم")}${units > 1 ? ` × ${units}` : ""}`
+      : `${factorInt ?? 1}${units > 1 ? ` × ${units}` : ""}`;
+  lineItems.push({
+    num: 1, label: L("Rental", "الإيجار"), detail: room.supplier.name,
+    unit: partial ? L("day", "يوم") : periodLabel,
+    qty: rentalQty,
+    price: partial ? `${nf(Math.round(t.perDayRate))} / ${L("day", "يوم")}` : `${nf(rate)} / ${periodLabel}`,
+    total: nf(rentalTotal),
+  });
+  // Mob/demob ALWAYS shown; honor each leg's OWN unit count + exclusion (excluded → "Not included",
+  // matching the price bar which contributes 0 for an excluded leg).
+  const logiRow = (label: string, excluded: boolean, price: number, unitsN: number, lineTotal: number, byRentee: boolean): QuotationLineItem =>
+    excluded
+      ? { num: null, label, detail: L("Not included", "غير مشمول"), unit: "—", qty: "—", price: "—", total: L("Not included", "غير مشمول") }
+      : price > 0
+        ? { num: null, label, detail: room.supplier.name, unit: L("Trip", "رحلة"), qty: String(unitsN), price: nf(price), total: nf(lineTotal) }
+        : { num: null, label, detail: byRentee ? L("Arranged by the rentee", "يُرتّبه المستأجر") : L("Included", "مشمول"), unit: "—", qty: "—", price: "—", total: byRentee ? L("By rentee", "على المستأجر") : L("Included", "مشمول") };
+  lineItems.push(logiRow(L("Delivery to site", "النقل إلى الموقع"), t.mobExcluded, t.mobPrice, t.mobUnitsN, t.mobTotal, room.mobByRentee === true));
+  lineItems.push(logiRow(L("Return from site", "الإرجاع من الموقع"), t.demobExcluded, t.demobPrice, t.demobUnitsN, t.demobTotal, room.demobByRentee === true));
 
   const cards: QuotationCard[] = [];
   // Structured rental/equipment details (from the request item) — rows with no value are skipped
@@ -191,6 +220,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const [flowMode, setFlowMode] = useState<"counter" | "accept" | null>(null);
   const [counterErr, setCounterErr] = useState<string | null>(null);
   const [showDocs, setShowDocs] = useState(false);
+  const [callOpen, setCallOpen] = useState(false); // call-supplier modal (shows the number + dial/copy)
   // Touch device → dial (tel:). Desktop/laptop → just SHOW the number (you can't place a call from a laptop).
   const [canCall, setCanCall] = useState(false);
   useEffect(() => { setCanCall(typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true); }, []);
@@ -212,6 +242,9 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const [myStreamId, setMyStreamId] = useState<string | null>(null);
   const [chatReady, setChatReady] = useState(false);
   const [text, setText] = useState("");
+  // deal-room/chat parity — per-message inline translation (incoming text only): id → translated text.
+  const [translations, setTranslations] = useState<Record<string, string>>({});
+  const [translating, setTranslating] = useState<string | null>(null);
   const channelRef = useRef<Channel | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const roomRefetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -472,9 +505,10 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     setBusy(true);
     try {
       // App parity (accept-all-terms): submit the locally-collected term resolutions together with the
-      // accept. contractType is chosen on the flow's Summary step (defaults to "formal"); agreedUnits is
-      // omitted (no assembled deals on web).
-      await acceptDeal(id, contractType, { termResolutions: resolutionUpdates() });
+      // accept. contractType is chosen on the flow's Summary step (defaults to "formal"). Send the
+      // accepted rental count as agreedUnits (the app sends it — records the count for multi-unit /
+      // partial-fulfilment requests instead of defaulting to the full offer).
+      await acceptDeal(id, contractType, { termResolutions: resolutionUpdates(), agreedUnits: room.agreedUnits ?? room.numberOfUnits });
       setResolutions({});
       await loadRoom();
       setFlowMode(null);
@@ -485,30 +519,50 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     }
   }
 
+  // Inline translate (app parity): toggle an incoming message to the opposite script via Stream's
+  // translateMessage; a second tap restores the original. Best-effort — silent if translate is off.
+  async function translateMsg(m: ChatMsg) {
+    const body = (m.text ?? "").trim();
+    if (!body || translating) return;
+    if (translations[m.id]) { setTranslations((t) => { const n = { ...t }; delete n[m.id]; return n; }); return; }
+    const client = channelRef.current?.getClient?.();
+    if (!client) return;
+    const target = /[؀-ۿ]/.test(body) ? "en" : "ar";
+    setTranslating(m.id);
+    try {
+      const res = await client.translateMessage(m.id, target);
+      const i18n = ((res as { message?: { i18n?: Record<string, unknown> } })?.message?.i18n ?? {}) as Record<string, unknown>;
+      const tx = (i18n[`${target}_text`] as string) || "";
+      if (tx) setTranslations((t) => ({ ...t, [m.id]: tx }));
+    } catch {
+      /* translation unavailable — keep original */
+    } finally {
+      setTranslating(null);
+    }
+  }
+
   if (error) return <div className="dlproto"><div className="rempty">{L("Couldn’t open this deal room.", "تعذّر فتح غرفة الصفقة.")}</div></div>;
   if (!room) return <div className="dlproto"><div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 28 }}>progress_activity</span></div></div>;
 
-  const rate = room.rate ?? 0;
-  // deal-room/negotiation — ÷period PRORATED math (matches the backend quotation + app): monthly ÷26 /
-  // weekly ÷7 / daily, × duration(days) × rental units; PER_JOB = rate × units. Mob/demob = price × their
-  // own unit count (0 when excluded). NO duration → assume ONE FULL PERIOD so the base rate is kept as-is
-  // (monthly stays monthly), NOT prorated down to a single day.
-  const FREQ_DAYS: Record<string, number> = { PER_DAY: 1, PER_WEEK: 7, PER_MONTH: 26 };
-  const basisU = (room.priceUnit ?? "PER_DAY").toUpperCase();
-  const dppRoom = FREQ_DAYS[basisU] || 1;
-  const hasDuration = room.periods != null && room.periods > 0;
-  const periods = hasDuration ? (room.periods as number) : dppRoom; // duration in DAYS; default = one full period
-  const rentalUnits = room.agreedUnits ?? room.numberOfUnits ?? 1;
-  const mobUnitsN = Math.min(room.mobUnits ?? rentalUnits, rentalUnits);
-  const demobUnitsN = Math.min(room.demobUnits ?? rentalUnits, rentalUnits);
+  // Single source of truth for the money — SHARED with the confirmed quotation via computeDealTotals so
+  // the price bar and the quotation can never diverge. Prorated ÷26/÷7; PER_JOB / no-duration = one full
+  // period; mob/demob use their own counts + honor exclusion; VAT 15%.
+  const totals = computeDealTotals(room);
+  const rate = totals.rate;
+  const basisU = totals.priceUnit;
+  const hasDuration = totals.hasDuration;
+  const periods = totals.periods; // duration in DAYS; no duration = one full period
+  const rentalUnits = totals.rentalUnits;
+  const mobUnitsN = totals.mobUnitsN;
+  const demobUnitsN = totals.demobUnitsN;
   const units = rentalUnits; // the rental count drives the card display
-  const perDayRate = rate / dppRoom;
-  const rentalTotal = basisU === "PER_JOB" ? rate * rentalUnits : perDayRate * periods * rentalUnits;
-  const mobTotal = room.mobExcluded ? 0 : (room.mobPrice ?? 0) * mobUnitsN;
-  const demobTotal = room.demobExcluded ? 0 : (room.demobPrice ?? 0) * demobUnitsN;
-  const subtotal = rentalTotal + mobTotal + demobTotal;
-  const vat = Math.round(subtotal * 0.15);
-  const grand = subtotal + vat;
+  const perDayRate = totals.perDayRate;
+  const rentalTotal = totals.rentalTotal;
+  const mobTotal = totals.mobTotal;
+  const demobTotal = totals.demobTotal;
+  const subtotal = totals.subtotal;
+  const vat = totals.vat;
+  const grand = totals.grand;
   // Billing-period label from the bid's price unit (same mapping the bid cards use).
   const periodLabel = (() => {
     switch ((room.priceUnit ?? "PER_DAY").toUpperCase()) {
@@ -520,7 +574,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   })();
   // Rental factor label: no duration / one full period → base rate as-is ("1,600/week"); a whole number
   // of periods → "× N"; a partial (day-count) duration → effective per-day rate × days ("229/day × 3 days").
-  const periodCount = periods / dppRoom;
+  const periodCount = totals.periodCount;
   const rentalLabel =
     basisU === "PER_JOB"
       ? nf(rate)
@@ -535,10 +589,40 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   // Equipment title — real name + size (like the request/bid cards), not the bare "Equipment" fallback.
   const eqName = (ar ? room.details.equipmentLabelAr || room.details.equipmentLabel : room.details.equipmentLabel) || L("Equipment", "المعدّة");
   const eqSize = ar ? room.details.equipmentSizeAr || room.details.equipmentSize : room.details.equipmentSize || room.details.equipmentSizeAr;
-  // Accept is gated (like the app) until every differing term is resolved — now satisfied by a LOCAL
-  // resolution, not a server round-trip.
+  // deal-room/negotiation rounds — reconstructed from the chat's rate_proposal messages (app parity).
+  // Drive the allMatched accept gate, the turn badges, and the round-history log. Falls back to the
+  // room's standing values if the chat custom data isn't reachable (never breaks the live flow).
+  const rounds = withOpeningRound(collapseRounds(reconstructRounds(messages as unknown[])), roomOpeningRound(room));
+  const rRound = latestRoundBy(rounds, "rentee");
+  const sRound = latestRoundBy(rounds, "supplier");
+
+  // Accept gate — app parity `allMatched` (rentee perspective): every non-fixed term matched/accepted,
+  // AND the rentee's latest price+units round equals the supplier's (nothing left to change). When rounds
+  // can't be reconstructed, rRound/sRound are the room fallback so the price/units checks pass and the gate
+  // degrades to the term check — never stricter than the backend's disputed-only 409.
+  const termMatched = (t: DealTerm): boolean => {
+    if (t.state === "fixed" || t.state === "agreed" || t.state === "soft_accepted") return true;
+    const r = resolutions[t.key];
+    if (!r) return false;
+    if (r.action === "accept") return true;
+    return r.value != null && String(r.value) === String(t.supplierDeclared);
+  };
+  const termsMatched = room.terms.every(termMatched);
+  const priceMatches = !rRound || !sRound ? true
+    : eqNum(rRound.rate, sRound.rate) && (rRound.priceUnit ?? "") === (sRound.priceUnit ?? "") && eqNum(rRound.mobPrice, sRound.mobPrice) && eqNum(rRound.demobPrice, sRound.demobPrice);
+  const unitsMatch = !rRound || !sRound ? true
+    : eqNum(rRound.rentalUnits, sRound.rentalUnits) && eqNum(rRound.mobUnits, sRound.mobUnits) && eqNum(rRound.demobUnits, sRound.demobUnits) && rRound.mobExcluded === sRound.mobExcluded && rRound.demobExcluded === sRound.demobExcluded;
   const unresolvedDisputed = room.terms.filter((t) => t.state === "disputed" && !resolutions[t.key]);
-  const canAccept = unresolvedDisputed.length === 0;
+  const canAccept = termsMatched && priceMatches && unitsMatch;
+  // Show the Accept/Negotiate CTAs on the renter's turn OR whenever everything already matches (app parity
+  // deadlock-break: allMatched surfaces Accept even if it would otherwise read as the supplier's turn).
+  const live = !closed && !abandoned && !awaiting;
+  const showAct = live && (room.myTurn || canAccept);
+  const acceptBlockMsg = !termsMatched
+    ? L("Resolve the differing terms below before you can accept", "قم بحل الشروط المختلفة أدناه قبل القبول")
+    : L("Match the supplier's latest price and quantities before you can accept", "طابق أحدث سعر وكميات المورد قبل القبول");
+  // Turn cue (app `negotiateFresh` vs `negotiate`): the supplier countered last vs the renter's opening move.
+  const supplierCountered = room.myTurn && room.lastCounterBy === "supplier";
 
   return (
     <div className="dlproto" dir={ar ? "rtl" : "ltr"}>
@@ -577,15 +661,10 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
         <div className="tb-icons">
           <span className="tb-ic" role="button" tabIndex={0} title={L("Documents", "المستندات")} onClick={() => setShowDocs(true)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setShowDocs(true)}><span className="material-icons-outlined">description</span></span>
           {/* deal-room/negotiation (B5): the rentee gets the supplier's number from the start (server-gated).
-              Touch device → dial; desktop → show the number inline (no call possible from a laptop). */}
+              A single Call button opens a modal with the number — dial on touch, copy on desktop. */}
           {!room.supplier.phone
             ? <span className="tb-ic call locked" title={L("Number unavailable", "الرقم غير متاح")}><span className="material-icons-outlined">call</span></span>
-            : canCall
-              ? <a className="tb-ic call" href={`tel:${room.supplier.phone}`} title={L("Call", "اتصال")}><span className="material-icons-outlined">call</span></a>
-              : <span className="tb-ic call tb-phone" title={L("Supplier phone", "هاتف المؤجّر")} style={{ width: "auto", padding: "0 12px", gap: 7, whiteSpace: "nowrap" }}>
-                  <span className="material-icons-outlined">call</span>
-                  <span style={{ direction: "ltr", unicodeBidi: "plaintext", fontSize: 13.5, fontWeight: 800, userSelect: "all" }}>{room.supplier.phone}</span>
-                </span>}
+            : <span className="tb-ic call" role="button" tabIndex={0} title={L("Call", "اتصال")} onClick={() => setCallOpen(true)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setCallOpen(true)}><span className="material-icons-outlined">call</span></span>}
         </div>
       </div>
 
@@ -624,22 +703,27 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
               {L("Details", "التفاصيل")}<span className="material-icons-outlined">expand_more</span>
             </button>
           </div>
+          {/* Turn cue (app parity): supplier countered → pulsing "New reply"; renter's opening move → "Your turn". */}
+          {showAct && (supplierCountered || room.myTurn) && (
+            <div className={`pb-turn${supplierCountered ? " alert" : ""}`}>{supplierCountered ? `🔔 ${L("New reply", "ردّ جديد")}` : `⚡ ${L("Your turn", "دورك")}`}</div>
+          )}
           {/* CTAs — centered below the price */}
           {closed ? (
             <div className="pb-btns">
               <button className="pb-btn accept" disabled={quoteBusy} onClick={downloadQuotation}><span className="material-icons-outlined">download</span>{L("Download quote", "تنزيل العرض")}</button>
               <button className="pb-btn ghost" onClick={() => setReleaseOpen(true)}><span className="material-icons-outlined">refresh</span>{L("Reopen", "إعادة فتح")}</button>
             </div>
-          ) : abandoned ? null : room.myTurn ? (
-            <div className="pb-btns">
-              <button className="pb-btn neg" disabled={busy} onClick={() => openFlow("counter")}><span className="material-icons-outlined">swap_horiz</span>{L("Negotiate", "تفاوض")}</button>
-              {/* Accept is gated exactly like the app: blocked while any term is disputed (acceptAllTerms 409s otherwise). */}
-              <button className="pb-btn accept" disabled={busy || !canAccept} onClick={() => openFlow("accept")}><span className="material-icons-outlined">check</span>{L("Accept", "قبول")}</button>
-            </div>
-          ) : awaiting ? (
+          ) : abandoned ? null : awaiting ? (
             <div className="pb-btns">
               {/* deal-room/negotiation — withdraw the pending acceptance (AWAITING → NEGOTIATING). */}
               <button className="pb-btn ghost" disabled={withdrawing} onClick={doWithdraw}><span className="material-icons-outlined">undo</span>{withdrawing ? L("Withdrawing…", "جارٍ السحب…") : L("Withdraw", "سحب القبول")}</button>
+            </div>
+          ) : showAct ? (
+            <div className="pb-btns">
+              {/* App parity: Negotiate always available; Accept surfaces via allMatched (deadlock-break) even
+                  when it'd otherwise be the supplier's turn, and stays gated until terms+price+units match. */}
+              <button className={`pb-btn neg${supplierCountered ? " pulse" : ""}`} disabled={busy} onClick={() => openFlow("counter")}><span className="material-icons-outlined">swap_horiz</span>{L("Negotiate", "تفاوض")}</button>
+              <button className="pb-btn accept" disabled={busy || !canAccept} onClick={() => openFlow("accept")}><span className="material-icons-outlined">check</span>{L("Accept", "قبول")}</button>
             </div>
           ) : null}
         </div>
@@ -664,8 +748,8 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
       </div>
 
       {/* below-bar strips */}
-      {!closed && !abandoned && room.myTurn && !canAccept && (
-        <div className="pb-strip"><span className="material-icons-outlined">error_outline</span>{L("Resolve the differing terms below before you can accept", "قم بحل الشروط المختلفة أدناه قبل القبول")}</div>
+      {showAct && !canAccept && (
+        <div className="pb-strip"><span className="material-icons-outlined">error_outline</span>{acceptBlockMsg}</div>
       )}
       {abandoned && (
         <div className="pb-strip danger"><span className="material-icons-outlined">cancel</span>{L("This deal room has been cancelled", "تم إلغاء غرفة الصفقة هذه")}</div>
@@ -694,11 +778,28 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
               );
             }
             const mine = m.user?.id === myStreamId;
+            const custom = m.custom ?? {};
+            const lat = Number(custom.lat), lng = Number(custom.lng);
+            const isLocation = custom.kind === "location" && Number.isFinite(lat) && Number.isFinite(lng);
+            const shownText = translations[m.id] ?? m.text;
+            const canTranslate = !mine && !isLocation && !!(m.text ?? "").trim();
+            // Attachments are downloadable/openable only once the deal is CLOSED (app parity: isDownloadEnabled).
+            const attName = (a: StreamAttachment) => a.title || (a.type === "image" ? L("Photo", "صورة") : a.type === "audio" || (a.mime_type || "").startsWith("audio/") ? L("Voice note", "ملاحظة صوتية") : L("Attachment", "مرفق"));
             return (
               <div className={`msg ${mine ? "mine" : "them"}`} key={m.id}>
-                {m.text}
+                {isLocation ? (
+                  <a href={`https://www.google.com/maps?q=${lat},${lng}`} target="_blank" rel="noopener noreferrer" className="msg-att-file msg-loc">
+                    <span className="material-icons-outlined">place</span>
+                    <span className="msg-att-name">{(shownText && String(shownText).trim()) || L("Shared location", "موقع مشترك")}</span>
+                  </a>
+                ) : shownText}
                 {m.attachments?.map((a, i) =>
-                  a.type === "image" ? (
+                  !closed ? (
+                    <span key={i} className="msg-att-lock" title={L("Available after the deal is confirmed", "متاح بعد تأكيد الصفقة")}>
+                      <span className="material-icons-outlined">lock</span>
+                      <span className="msg-att-name">{attName(a)}</span>
+                    </span>
+                  ) : a.type === "image" ? (
                     <a key={i} href={a.image_url || a.thumb_url} target="_blank" rel="noopener noreferrer" className="msg-att-img">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={a.thumb_url || a.image_url} alt={a.fallback || ""} />
@@ -711,6 +812,11 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
                       <span className="msg-att-name">{a.title || L("Attachment", "مرفق")}</span>
                     </a>
                   ),
+                )}
+                {canTranslate && (
+                  <button type="button" className="msg-tr" disabled={translating === m.id} onClick={() => void translateMsg(m)}>
+                    {translating === m.id ? L("Translating…", "جارٍ الترجمة…") : translations[m.id] ? L("Show original", "النص الأصلي") : L("Translate", "ترجمة")}
+                  </button>
                 )}
                 <div className="meta">{m.created_at ? new Date(m.created_at as string).toLocaleTimeString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { hour: "2-digit", minute: "2-digit" }) : ""}</div>
               </div>
@@ -810,6 +916,41 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
       )}
 
       {showDocs && <DocumentsModal id={id} ar={ar} L={L} supplierName={room.supplier.name} onClose={() => setShowDocs(false)} />}
+
+      {callOpen && room.supplier.phone && (
+        <CallModal ar={ar} L={L} phone={room.supplier.phone} name={room.supplier.name} canCall={canCall} onClose={() => setCallOpen(false)} />
+      )}
+    </div>
+  );
+}
+
+/** Call-supplier modal: shows the number, dials it (tel:) on a touch device, and copies it anywhere. */
+function CallModal({ ar, L, phone, name, canCall, onClose }: { ar: boolean; L: (en: string, arr: string) => string; phone: string; name: string; canCall: boolean; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(phone); setCopied(true); setTimeout(() => setCopied(false), 1600); } catch { /* clipboard blocked */ }
+  };
+  return (
+    <div dir={ar ? "rtl" : "ltr"} onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(16,38,63,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 60px rgba(16,38,63,.35)", padding: "26px 22px 22px", textAlign: "center" }}>
+        <span style={{ display: "inline-flex", width: 56, height: 56, borderRadius: "50%", background: "#e7f7ee", color: "#1daf58", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+          <span className="material-icons-outlined" style={{ fontSize: 28 }}>call</span>
+        </span>
+        <h3 style={{ fontSize: 16, fontWeight: 900, color: "#1c3550", margin: 0 }}>{L("Call supplier", "الاتصال بالمؤجّر")}</h3>
+        <p style={{ fontSize: 13, fontWeight: 600, color: "#6b8fa8", margin: "4px 0 16px" }}>{name}</p>
+        <div style={{ direction: "ltr", unicodeBidi: "plaintext", fontSize: 22, fontWeight: 900, color: "#1c3550", letterSpacing: 0.5, userSelect: "all", marginBottom: 18 }}>{phone}</div>
+        <div style={{ display: "flex", gap: 10 }}>
+          {canCall && (
+            <a href={`tel:${phone}`} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px", borderRadius: 13, border: "none", background: "#1daf58", color: "#fff", fontWeight: 800, fontSize: 14, textDecoration: "none" }}>
+              <span className="material-icons-outlined" style={{ fontSize: 18 }}>call</span>{L("Call", "اتصال")}
+            </a>
+          )}
+          <button onClick={copy} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px", borderRadius: 13, border: "1.5px solid #d4e0ec", background: "#fff", color: "#1c3550", fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
+            <span className="material-icons-outlined" style={{ fontSize: 18 }}>{copied ? "check" : "content_copy"}</span>{copied ? L("Copied", "تم النسخ") : L("Copy number", "نسخ الرقم")}
+          </button>
+        </div>
+        <button onClick={onClose} style={{ marginTop: 12, width: "100%", padding: "11px", borderRadius: 13, border: "none", background: "#eff4f9", color: "#6b8fa8", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" }}>{L("Close", "إغلاق")}</button>
+      </div>
     </div>
   );
 }
@@ -927,23 +1068,42 @@ function CounterFlow({
   onAccept: (contractType: string) => void;
 }) {
   const editable = mode === "counter";
+  // Reconstructed negotiation history (app parity) — the LIVE position is read off this, not just the
+  // room columns, so a supplier's unit counter is RECEIVED here (app resolveLivePosition). Also drives
+  // the round number, the "Supplier: N units" references, and the supplier-total on the compare card.
+  const flowRounds = withOpeningRound(collapseRounds(reconstructRounds(messages as unknown[])), roomOpeningRound(room));
+  const latestRound = flowRounds.length ? flowRounds[flowRounds.length - 1] : null;
+  const supRound = latestRoundBy(flowRounds, "supplier");
   // Accept is gated behind a binding-commitment warning first (app parity). Counter skips it.
   const [bindingOk, setBindingOk] = useState(mode === "counter");
   const [page, setPage] = useState(0); // 0 = Terms, 1 = Price, 2 = Summary
-  const [rateStr, setRateStr] = useState(room.rate ? String(room.rate) : "");
-  const [mobStr, setMobStr] = useState(room.mobPrice ? String(room.mobPrice) : "");
-  const [demobStr, setDemobStr] = useState(room.demobPrice ? String(room.demobPrice) : "");
+  // Price seeds from the LIVE position too (app resolveLivePosition: latest?.rate ?? room.lastProposedRate
+  // ?? bid.priceAmount). room.rate already collapses lastProposedRate → bid.priceAmount, so preferring the
+  // latest reconstructed round first guards against any lag between the DB column and the chat message.
+  const seedRate = latestRound?.rate ?? room.rate;
+  const seedMob = latestRound?.mobPrice ?? room.mobPrice;
+  const seedDemob = latestRound?.demobPrice ?? room.demobPrice;
+  const [rateStr, setRateStr] = useState(seedRate ? String(seedRate) : "");
+  const [mobStr, setMobStr] = useState(seedMob ? String(seedMob) : "");
+  const [demobStr, setDemobStr] = useState(seedDemob ? String(seedDemob) : "");
   const [contractType, setContractType] = useState(room.contractType ?? "formal");
   const [ack, setAck] = useState(false);
 
   // deal-room/negotiation — per-type unit counts (cap = requested; mob/demob ≤ rental) + leg exclusion.
+  // Seed from the LIVE position (app resolveLivePosition precedence: latest reconstructed round → room
+  // columns → offered/requested → clamp) so the supplier's countered units land on the rentee side.
   const cap = Math.max(1, room.requestedUnits || units || 1);
-  const dflt = Math.min(cap, room.agreedUnits ?? units ?? 1);
-  const [rentalUnits, setRentalUnits] = useState<number>(dflt);
-  const [mobUnitsN, setMobUnitsN] = useState<number>(room.mobUnits ?? dflt);
-  const [demobUnitsN, setDemobUnitsN] = useState<number>(room.demobUnits ?? dflt);
-  const [mobExcluded, setMobExcluded] = useState<boolean>(room.mobExcluded);
-  const [demobExcluded, setDemobExcluded] = useState<boolean>(room.demobExcluded);
+  const liveRental = Math.max(1, Math.min(cap, latestRound?.rentalUnits ?? room.agreedUnits ?? units ?? 1));
+  const liveMob = Math.max(0, Math.min(liveRental, latestRound?.mobUnits ?? room.mobUnits ?? liveRental));
+  const liveDemob = Math.max(0, Math.min(liveRental, latestRound?.demobUnits ?? room.demobUnits ?? liveRental));
+  const [rentalUnits, setRentalUnits] = useState<number>(liveRental);
+  const [mobUnitsN, setMobUnitsN] = useState<number>(liveMob);
+  const [demobUnitsN, setDemobUnitsN] = useState<number>(liveDemob);
+  const [mobExcluded, setMobExcluded] = useState<boolean>(latestRound?.mobExcluded ?? room.mobExcluded);
+  const [demobExcluded, setDemobExcluded] = useState<boolean>(latestRound?.demobExcluded ?? room.demobExcluded);
+  const [cmpOpen, setCmpOpen] = useState(false); // compare-card per-line breakdown toggle
+  // Confirm before a leg (delivery/return) is excluded from the offer — reversible, but the app confirms.
+  const [pendingEx, setPendingEx] = useState<null | { title: string; onYes: () => void }>(null);
   // Quotation-paper UI-only state (spec §6): collapsible دليل البنود categories + the السجل log modal.
   const [guideOpen, setGuideOpen] = useState<Record<string, boolean>>({});
   const [logOpen, setLogOpen] = useState(false);
@@ -966,7 +1126,9 @@ function CounterFlow({
   const dNU = Math.min(editable ? demobUnitsN : (room.demobUnits ?? rNU), rNU);
   const mEx = editable ? mobExcluded : room.mobExcluded;
   const dEx = editable ? demobExcluded : room.demobExcluded;
-  const rentalLine = perDay * periods * rNU;
+  // PER_JOB is a flat per-job price (no duration factor) — matches the main price bar + app. Everything
+  // else prorates ÷26/÷7 × duration(days).
+  const rentalLine = basis === "PER_JOB" ? rate * rNU : perDay * periods * rNU;
   const mobLine = mEx ? 0 : mob * mNU;
   const demobLine = dEx ? 0 : demob * dNU;
   const subtotal = rentalLine + mobLine + demobLine;
@@ -1086,20 +1248,24 @@ function CounterFlow({
     return [...m];
   };
 
-  // Supplier's standing offer total (compare card) — same ÷26 math on the room's on-table numbers.
-  const supTotal = (() => {
-    const rl = ((room.rate ?? 0) / (FREQ_DAYS[basis] ?? 1)) * periods * rNU;
-    const ml = room.mobExcluded ? 0 : (room.mobPrice ?? 0) * mNU;
-    const dl = room.demobExcluded ? 0 : (room.demobPrice ?? 0) * dNU;
-    const sub = rl + ml + dl;
-    return sub + Math.round(sub * 0.15);
-  })();
+  // Supplier's standing offer (compare card) — from the SUPPLIER's latest reconstructed round (their real
+  // offer INCL. their unit counts + leg exclusion), via the shared ÷26/÷7 + VAT math; falls back to the
+  // room's on-table numbers when no supplier round exists. This is why a supplier unit counter now moves it.
+  const supDeal = supRound ? roundTotals(room, supRound) : computeDealTotals(room);
+  const supTotal = supDeal.grand;
+  // "Supplier: {price}" references — read the supplier's own round (app parity: otherSide.rate/mobPrice/
+  // demobPrice), falling back to the room columns, exactly like the "Supplier: N units" refs beside them.
+  const refRate = supRound?.rate ?? room.rate;
+  const refMobPrice = supRound?.mobPrice ?? room.mobPrice;
+  const refDemobPrice = supRound?.demobPrice ?? room.demobPrice;
   const showCompare = editable && room.lastCounterBy === "supplier";
   const priceDiff = Math.abs(total - supTotal);
 
   const STEPS = [L("Price", "السعر"), L("Terms", "الشروط"), L("Review", "المراجعة")];
   const sheetTitle = `${room.details.equipmentLabel ?? L("Equipment", "المعدّة")}${rNU > 1 ? ` — ${rNU} ${L("units", "وحدات")}` : ""}`;
   const roomCode = room.shortCode ?? "";
+  // Round number in the header + the Log list — from the history reconstructed at the top of the flow.
+  const roundNo = flowRounds.length + 1;
   const today = new Date().toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
   const changedFrom = (cur: number, ref: number | null) => ref != null && Math.round(cur) !== Math.round(ref);
 
@@ -1128,13 +1294,13 @@ function CounterFlow({
   );
 
   // A price-table leg row (mob/demob): red ✕ exclude + trip stepper + green price box + المورد ref.
-  const legTr = (label: string, sub: string, priceStr: string, setPrice: (s: string) => void, u: number, setU: (v: number) => void, ex: boolean, setEx: (b: boolean) => void, refPrice: number | null) => {
+  const legTr = (label: string, sub: string, priceStr: string, setPrice: (s: string) => void, u: number, setU: (v: number) => void, ex: boolean, setEx: (b: boolean) => void, refPrice: number | null, refUnits: number | null, exTitle: string) => {
     const line = ex ? 0 : num(priceStr) * Math.min(u, rentalUnits);
     return (
       <tr className={ex ? "ex" : undefined}>
         <td>
           <div className="qp-itemcell">
-            {editable && !ex && <button type="button" className="qp-legx" title={L("Exclude", "استبعاد")} onClick={() => setEx(true)}>✕</button>}
+            {editable && !ex && <button type="button" className="qp-legx" title={L("Exclude", "استبعاد")} onClick={() => setPendingEx({ title: exTitle, onYes: () => setEx(true) })}>✕</button>}
             <div>
               <div className="lbl">{label}</div>
               <div className="sub">{sub}</div>
@@ -1143,13 +1309,32 @@ function CounterFlow({
           </div>
         </td>
         <td className="mut">{L("Trip", "رحلة")}</td>
-        <td>{ex ? "—" : <div className="qp-qty">{editable && <span className="hint">{L("Your choice", "خيارك")}</span>}{editable ? <Stepper value={Math.min(u, rentalUnits)} min={0} max={rentalUnits} onChange={setU} /> : <b>{Math.min(u, rentalUnits)}</b>}</div>}</td>
+        <td>{ex ? "—" : <div className="qp-qty">{editable && <span className="hint">{L("Your choice", "خيارك")}</span>}{editable ? <Stepper value={Math.min(u, rentalUnits)} min={0} max={rentalUnits} onChange={setU} /> : <b>{Math.min(u, rentalUnits)}</b>}{editable && refUnits != null && <div className={`qp-ref${changedFrom(Math.min(u, rentalUnits), refUnits) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {refUnits} {L("units", "وحدة")}</div>}</div>}</td>
         <td>
           {ex ? <span className="qp-excluded">{L("Excluded", "مستبعد")}</span>
             : editable ? <>{priceBox(priceStr, setPrice)}{refPrice != null && <div className={`qp-ref${changedFrom(num(priceStr), refPrice) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {nf(refPrice)}</div>}</>
             : <b className="tot">{money(num(priceStr))}</b>}
         </td>
         <td><b className="tot">{ex ? L("Not incl.", "غير مشمول") : money(line)}</b></td>
+      </tr>
+    );
+  };
+
+  // One row of the compare-card per-line breakdown (app _DeltaTable parity): your PER-UNIT price vs the
+  // supplier's per-unit price (rate / mobPrice / demobPrice) + the per-line difference. Units are shown
+  // separately in the qty steppers' "Supplier: N units" refs (app splits price vs count the same way).
+  // Excluded legs read "Not included".
+  const cmpRow = (label: string, mine: number, myEx: boolean, theirs: number, theirEx: boolean) => {
+    const bothEx = myEx && theirEx;
+    const oneEx = myEx !== theirEx;
+    const eq = Math.round(mine) === Math.round(theirs);
+    const noDiff = bothEx || (!oneEx && eq); // no meaningful per-unit difference to show
+    return (
+      <tr>
+        <td className="ln">{label}</td>
+        <td>{myEx ? <span className="na">{L("Not incl.", "غير مشمول")}</span> : nf(mine)}</td>
+        <td>{theirEx ? <span className="na">{L("Not incl.", "غير مشمول")}</span> : nf(theirs)}</td>
+        <td className={noDiff ? "na" : "gap"}>{bothEx ? "—" : oneEx ? "±" : eq ? "—" : nf(Math.abs(mine - theirs))}</td>
       </tr>
     );
   };
@@ -1162,7 +1347,7 @@ function CounterFlow({
           <div className="qp-head-r1">
             <div className="qp-htitle">
               <div className="t">{sheetTitle}</div>
-              <div className="s">{L("Negotiation room", "غرفة التفاوض")}{roomCode ? ` · ${roomCode}` : ""}</div>
+              <div className="s">{L("Negotiation room", "غرفة التفاوض")}{roomCode ? ` · ${roomCode}` : ""} · {L(`Round ${roundNo}`, `الجولة ${roundNo}`)}</div>
             </div>
             <div className="qp-htotal"><div className="k">{L("Your offer", "إجمالي عرضك")}</div><div className="v">{nf(total)} {sar}</div></div>
             <button className="qp-x" onClick={() => !busy && onClose()} aria-label={L("Close", "إغلاق")}><span className="material-icons-outlined">close</span></button>
@@ -1193,6 +1378,20 @@ function CounterFlow({
                     <div className="side me"><div className="k">{L("Your offer", "عرضك")}</div><div className="v">{nf(total)}</div></div>
                   </div>
                   <div className="conv"><span className="track" /><span className={`chip${priceDiff === 0 ? " ok" : ""}`}>{priceDiff === 0 ? L("Match ✓", "تطابق ✓") : `${L("Gap", "الفرق")} ${nf(priceDiff)}`}</span><span className="track" /></div>
+                  <button type="button" className="qp-cmp-toggle" onClick={() => setCmpOpen((o) => !o)} aria-expanded={cmpOpen}>
+                    <span>{cmpOpen ? L("Hide breakdown", "إخفاء التفاصيل") : L("Show breakdown", "عرض التفاصيل")}</span>
+                    <span className="material-icons-outlined">{cmpOpen ? "expand_less" : "expand_more"}</span>
+                  </button>
+                  {cmpOpen && (
+                    <div className="qp-scrollx"><table className="qp-cmp-tbl">
+                      <thead><tr><th>{L("Per-unit rate", "السعر لكل وحدة")}</th><th>{L("Yours", "عرضك")}</th><th>{L("Supplier", "المورد")}</th><th>{L("Difference", "الفرق")}</th></tr></thead>
+                      <tbody>
+                        {cmpRow(L("Base rental", "الإيجار الأساسي"), rate, false, supDeal.rate, false)}
+                        {cmpRow(L("Mobilization", "التعبئة"), mob, mEx, supDeal.mobPrice, supDeal.mobExcluded)}
+                        {cmpRow(L("Return — demob", "الإرجاع"), demob, dEx, supDeal.demobPrice, supDeal.demobExcluded)}
+                      </tbody>
+                    </table></div>
+                  )}
                 </div>
               )}
               {qhead()}
@@ -1203,12 +1402,12 @@ function CounterFlow({
                   <tr>
                     <td><div className="lbl">{L("Base rental", "الإيجار الأساسي")}</div><div className="sub">{room.details.equipmentLabel ?? periodLabel}</div></td>
                     <td className="mut">{hasDuration ? `${periods} ${L("days", "يوم")}` : "—"}</td>
-                    <td><div className="qp-qty">{editable && <span className="hint">{L("Your choice", "خيارك")}</span>}{editable ? <Stepper value={rentalUnits} min={1} max={cap} onChange={(v) => { setRentalUnits(v); setMobUnitsN((u) => Math.min(u, v)); setDemobUnitsN((u) => Math.min(u, v)); }} /> : <b>{rNU}</b>}<span className="qp-qmatch">✓ {L("Qty", "العدد")} {rNU}</span></div></td>
-                    <td>{editable ? <>{priceBox(rateStr, setRateStr)}{room.rate != null && <div className={`qp-ref${changedFrom(rate, room.rate) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {nf(room.rate)}</div>}</> : <b className="tot">{money(rate)}</b>}</td>
+                    <td><div className="qp-qty">{editable && <span className="hint">{L("Your choice", "خيارك")}</span>}{editable ? <Stepper value={rentalUnits} min={1} max={cap} onChange={(v) => { setRentalUnits(v); setMobUnitsN((u) => Math.min(u, v)); setDemobUnitsN((u) => Math.min(u, v)); }} /> : <b>{rNU}</b>}<span className="qp-qmatch">✓ {L("Qty", "العدد")} {rNU}</span>{editable && supRound?.rentalUnits != null && <div className={`qp-ref${changedFrom(rentalUnits, supRound.rentalUnits) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {supRound.rentalUnits} {L("units", "وحدة")}</div>}</div></td>
+                    <td>{editable ? <>{priceBox(rateStr, setRateStr)}{refRate != null && <div className={`qp-ref${changedFrom(rate, refRate) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {nf(refRate)}</div>}</> : <b className="tot">{money(rate)}</b>}</td>
                     <td><b className="tot">{money(rentalLine)}</b></td>
                   </tr>
-                  {legTr(L("Mobilization — mob", "التعبئة — موب"), L("delivery", "توصيل"), mobStr, setMobStr, mobUnitsN, setMobUnitsN, mobExcluded, setMobExcluded, room.mobPrice)}
-                  {legTr(L("Return — demob", "الإرجاع — ديموب"), L("pickup", "استلام"), demobStr, setDemobStr, demobUnitsN, setDemobUnitsN, demobExcluded, setDemobExcluded, room.demobPrice)}
+                  {legTr(L("Mobilization — mob", "التعبئة — موب"), L("delivery", "توصيل"), mobStr, setMobStr, mobUnitsN, setMobUnitsN, mobExcluded, setMobExcluded, refMobPrice, supRound?.mobUnits ?? null, L("Cancel mobilization (delivery to site) from the supplier?", "إلغاء التعبئة (النقل إلى الموقع) من المورد؟"))}
+                  {legTr(L("Return — demob", "الإرجاع — ديموب"), L("pickup", "استلام"), demobStr, setDemobStr, demobUnitsN, setDemobUnitsN, demobExcluded, setDemobExcluded, refDemobPrice, supRound?.demobUnits ?? null, L("Cancel demobilization (return from site) from the supplier?", "إلغاء الإرجاع (النقل من الموقع) من المورد؟"))}
                 </tbody>
               </table></div>
               <div className="qp-totals">
@@ -1381,6 +1580,26 @@ function CounterFlow({
           <div className="spacer" />
         </div>
 
+        {pendingEx && (
+          <div className="qp-scrim" style={{ zIndex: 75 }} dir={ar ? "rtl" : "ltr"} onClick={() => setPendingEx(null)}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 400, background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 60px rgba(16,38,63,.35)", padding: "22px 22px 20px", textAlign: "start" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                <h3 style={{ fontSize: 16.5, fontWeight: 900, color: "#1c3550", margin: 0, lineHeight: 1.45 }}>{pendingEx.title}</h3>
+                <span style={{ flexShrink: 0, display: "inline-flex", width: 42, height: 42, borderRadius: 12, background: "#fff4e5", color: "#d4780a", alignItems: "center", justifyContent: "center" }}>
+                  <span className="material-icons-outlined" style={{ fontSize: 24 }}>warning_amber</span>
+                </span>
+              </div>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "#6b8fa8", lineHeight: 1.7, margin: "10px 0 18px" }}>
+                {L("If you cancel, the supplier won't handle it — it becomes your responsibility: you arrange the transport and cover its cost, and it won't appear in the supplier's offer.", "عند الإلغاء لن يتكفّل المورد بها — تصبح على مسؤوليتك أنت: تنظّم النقل وتتحمّل تكلفته، ولن تظهر ضمن عرض المورد.")}
+              </p>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={() => setPendingEx(null)} style={{ flex: "0 0 auto", padding: "13px 22px", borderRadius: 13, border: "1.5px solid #d4e0ec", background: "#fff", color: "#1c3550", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" }}>{L("Go back", "تراجع")}</button>
+                <button onClick={() => { pendingEx.onYes(); setPendingEx(null); }} style={{ flex: 1, padding: "13px 12px", borderRadius: 13, border: "none", background: "#d9362a", color: "#fff", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{L("Yes, cancel it — on me", "نعم، ألغِها — عليّ أنا")}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {logOpen && (
           <div className="qp-scrim" style={{ zIndex: 70 }} onClick={() => setLogOpen(false)}>
             <div className="qp-sheet" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
@@ -1391,6 +1610,29 @@ function CounterFlow({
                 ))}
               </div>
               <div className="qp-body" style={{ background: "#fff", padding: "4px 0 8px" }}>
+                {/* Reconstructed price rounds (newest first) — role, rate, units, legs, total per round. */}
+                {logTab !== "terms" && flowRounds.length > 0 && (
+                  <div className="qp-rounds">
+                    {[...flowRounds].reverse().map((r, i) => {
+                      const rt = roundTotals(room, r);
+                      const per = ({ PER_DAY: L("day", "يوم"), PER_WEEK: L("week", "أسبوع"), PER_MONTH: L("month", "شهر"), PER_JOB: L("job", "مهمة") } as Record<string, string>)[rt.priceUnit] ?? L("day", "يوم");
+                      return (
+                        <div key={`rnd-${i}`} className="qp-round">
+                          <div className="qp-round-h">
+                            <span className={`qp-round-role ${r.role}`}>{r.role === "supplier" ? L("Supplier", "المورد") : L("You", "أنت")}</span>
+                            <span className="qp-round-tot">{nf(rt.grand)} {sar}</span>
+                          </div>
+                          <div className="qp-round-d">
+                            {nf(rt.rate)}/{per} · {rt.rentalUnits} {L("units", "وحدة")}
+                            {rt.mobExcluded ? ` · ${L("no mob", "بدون تعبئة")}` : rt.mobPrice ? ` · ${L("mob", "تعبئة")} ${nf(rt.mobPrice)}×${rt.mobUnitsN}` : ""}
+                            {rt.demobExcluded ? ` · ${L("no demob", "بدون إرجاع")}` : rt.demobPrice ? ` · ${L("demob", "إرجاع")} ${nf(rt.demobPrice)}×${rt.demobUnitsN}` : ""}
+                          </div>
+                          {r.at && <div className="qp-round-t">{new Date(r.at).toLocaleString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 {(() => {
                   // Real activity log — the deal room's system_bot narration (each counter / rate proposal /
                   // term action / lifecycle event), newest-first. Full structured per-round price history is
