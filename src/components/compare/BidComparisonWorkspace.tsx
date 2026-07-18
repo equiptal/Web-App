@@ -623,6 +623,34 @@ export function BidComparisonWorkspace() {
     cols.forEach((c) => (c.bid.ownershipDocs ?? []).forEach((o) => { if (!seen.has(o.key)) seen.set(o.key, o); }));
     return [...seen.values()];
   })();
+  // Per-unit readiness re-source: the Equipment/Operator cert + Year rows read from the OFFERED UNITS
+  // (offeredUnitsDetail) when available — a cert counts as held only if it's present on EVERY offered
+  // unit (partial = "K/M"). Native app bids only; off-platform bids have no unit data (rd null) → the
+  // rows fall back to the bid-level codes. Memoized once per column.
+  const rdByBid = new Map(cols.map((c) => [c.bid.id, computeBidReadiness(c.bid)]));
+  const unitCert = (bidId: string, certCode: string, kind: "equipment" | "operator") => {
+    const rd = rdByBid.get(bidId);
+    if (!rd) return null; // off-platform / no unit data → caller uses the bid-level fallback
+    const want = certCode.toLowerCase();
+    const wantU = want.replace(/[\s-]+/g, "_");
+    const per = rd.units.map((u) => (kind === "equipment" ? u.equipmentCerts : u.operatorCerts).find((rc) => rc.code === want || rc.code === wantU));
+    const total = rd.units.length;
+    const held = per.filter((x) => x?.present).length;
+    const url = per.find((x) => x?.present && x.url)?.url ?? null;
+    return { held, total, all: total > 0 && held === total, none: held === 0, url };
+  };
+  // A green(all)/amber(partial "K/M")/red(none) chip for a per-unit cert status, doc-linked when present.
+  const unitCertChip = (label: string, st: { held: number; total: number; all: boolean; none: boolean; url: string | null }) => {
+    const tone = st.all ? { bg: C.successBg, c: C.success, bd: "rgba(29,175,88,.3)", icon: "check" }
+      : st.none ? { bg: C.dangerBg, c: C.danger, bd: "rgba(217,54,42,.3)", icon: "close" }
+      : { bg: "#fff3e0", c: "#d4780a", bd: "rgba(212,120,10,.35)", icon: "remove" };
+    const text = label + (!st.all && !st.none ? ` ${st.held}/${st.total}` : "");
+    const style = { display: "inline-flex", alignItems: "center", gap: 4, fontSize: "11.5px", fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: `1px solid ${tone.bd}`, background: tone.bg, color: tone.c } as const;
+    const inner = <><span className="material-icons-outlined" style={{ fontSize: 11 }}>{tone.icon}</span>{text}{st.url && <span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>visibility</span>}</>;
+    return st.url
+      ? <a href={st.url} target="_blank" rel="noopener noreferrer" style={style} title={L("View document", "عرض المستند")}>{inner}</a>
+      : <span style={style}>{inner}</span>;
+  };
   const bestTag = <span className="ms-1 inline-flex items-center gap-0.5 rounded-full px-[7px] py-0.5 align-middle text-[9.5px]" style={{ background: C.successBg, color: C.success, fontWeight: 900, letterSpacing: ".03em" }}>✓ {L("BEST", "الأفضل")}</span>;
   // §6 rule: only show cost responsibilities the REQUEST assigned (requestSide set) — not required → not shown.
   const requiredResp = RESP_META.filter((m) => cols.some((c) => c.costResponsibilities.find((x) => x.key === m.key)?.requestSide != null));
@@ -1541,7 +1569,13 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                           const v = yr ? (yr.state === "conflict" ? L("Not met", "غير مطابق") : c.bid.reqMinYear != null ? `≥ ${c.bid.reqMinYear}` : L("Confirmed", "مؤكّد")) : null;
                           return <Td key={c.bid.id} ok={!!yr && yr.state !== "conflict"} fail={yr?.state === "conflict"}>{v ? <span className="text-[14px]" style={{ fontWeight: 900 }}>{v}</span> : <span style={{ color: C.muted }}>—</span>}</Td>;
                         }
-                        return <Td key={c.bid.id} ok={yr?.state !== "conflict"} fail={yr?.state === "conflict"}><span className="text-[14px]" style={{ fontWeight: 900 }}>{c.bid.equipment?.year ?? "—"}</span>{yearWin.has(idx) && <span className="mt-0.5 block text-[11px]" style={{ color: C.success, fontWeight: 800 }}>{L("newest", "الأحدث")}</span>}</Td>;
+                        // NATIVE → below-min-year is read per OFFERED UNIT (readiness): fail if any offered
+                        // unit is below the request's min year; show "K/M below min" when partial.
+                        const rd = rdByBid.get(c.bid.id);
+                        const badUnits = rd ? rd.units.filter((u) => u.yearConflict).length : 0;
+                        const totUnits = rd ? rd.units.length : 0;
+                        const yearFail = rd ? badUnits > 0 : yr?.state === "conflict";
+                        return <Td key={c.bid.id} ok={!yearFail} fail={yearFail}><span className="text-[14px]" style={{ fontWeight: 900 }}>{c.bid.equipment?.year ?? "—"}</span>{rd && badUnits > 0 && <span className="mt-0.5 block text-[11px]" style={{ color: C.danger, fontWeight: 800 }}>{L(`${badUnits}/${totUnits} below min`, `${badUnits}/${totUnits} دون الحد`)}</span>}{!yearFail && yearWin.has(idx) && <span className="mt-0.5 block text-[11px]" style={{ color: C.success, fontWeight: 800 }}>{L("newest", "الأحدث")}</span>}</Td>;
                       })}
                     </tr>
                     <tr>
@@ -1556,6 +1590,19 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                       <tr>
                         <RowHead title={L("Equipment certificate", "شهادة المعدة")} sub={`${L("required", "مطلوب")}: ${requiredEquipCerts.map(certLabel).join(", ")}`} />
                         {cols.map((c) => {
+                          // NATIVE bid → source from the OFFERED UNITS (readiness): a cert is green only if
+                          // held on every offered unit, amber "K/M" if partial, red if none. Off-platform
+                          // bids (rd null) fall through to the bid-level codes below.
+                          if (rdByBid.get(c.bid.id)) {
+                            const st = requiredEquipCerts.map((cert) => ({ cert, s: unitCert(c.bid.id, cert, "equipment")! }));
+                            return (
+                              <Td key={c.bid.id} ok={st.every((x) => x.s.all)} fail={st.every((x) => x.s.none)}>
+                                <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
+                                  {st.map(({ cert, s }) => <span key={cert}>{unitCertChip(certLabel(cert), s)}</span>)}
+                                </span>
+                              </Td>
+                            );
+                          }
                           const codes = c.bid.equipmentCertCodes ?? [];
                           const allHeld = requiredEquipCerts.every((cert) => codes.includes(cert));
                           const noneHeld = requiredEquipCerts.every((cert) => !codes.includes(cert));
@@ -1624,6 +1671,21 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                       {cols.map((c) => {
                         const req = c.bid.operatorCertReq;
                         if (!req) return <Td key={c.bid.id}><span style={{ color: C.disabled, fontWeight: 600 }}>—</span></Td>;
+                        // NATIVE → source from the OFFERED UNITS (readiness): each requested operator cert is
+                        // green only if held on every offered unit (amber "K/M" partial, red none). Off-platform
+                        // bids (rd null) or natives with no operator-cert readiness fall through to the declared logic.
+                        const rdOp = rdByBid.get(c.bid.id);
+                        const opReqCerts = rdOp?.units[0]?.operatorCerts ?? [];
+                        if (rdOp && opReqCerts.length) {
+                          const st = opReqCerts.map((oc) => ({ oc, s: unitCert(c.bid.id, oc.code, "operator")! }));
+                          return (
+                            <Td key={c.bid.id} ok={st.every((x) => x.s.all)} fail={st.every((x) => x.s.none)}>
+                              <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
+                                {st.map(({ oc, s }) => <span key={oc.code}>{unitCertChip(L(oc.labelEn, oc.labelAr), s)}</span>)}
+                              </span>
+                            </Td>
+                          );
+                        }
                         // Reflect the truth (issue 3): green only when the DECLARED cert actually satisfies the
                         // REQUIRED one (e.g. required SPSP but supplier declared TÜV → red), or the deal room has
                         // AGREED it. A deal-room conflict, or a value mismatch that isn't yet agreed → red.
