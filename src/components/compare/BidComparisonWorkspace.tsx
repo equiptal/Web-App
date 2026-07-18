@@ -8,7 +8,7 @@ import { AccountModal } from "@/components/onboarding/AccountModal";
 import { SignInPrompt } from "@/components/common/SignInPrompt";
 import { agentUses, bumpAgentUse, guestLimitReached, GUEST_AGENT_LIMIT } from "@/lib/access/agent-quota";
 import { fetchAllMyRequests, fetchBids, fetchRequestSubmissions, startDealRoom, recommendBids, askBids, parseBid, transformBid, captureBidEvents, fetchDealRoomDocuments, fetchBidDocuments, fetchDealRoom } from "@/lib/api/client";
-import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
+import { submissionToBidCard, submissionToBidDocuments, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { groupRequests, type RequestGroup } from "@/lib/contract/requests";
 import type { DealRoomDocuments, DealTerm } from "@/lib/contract/deal-room";
 import { CERT_LABEL, type BidCard, type CertCode, type TermRow, type TermState } from "@/lib/contract/bids";
@@ -456,6 +456,15 @@ export function BidComparisonWorkspace() {
     ).then((entries) => { if (alive) setBidDocs((p) => ({ ...p, ...Object.fromEntries(entries) })); });
     return () => { alive = false; };
   }, [cols, bidDocs]);
+  // Off-platform (shared-link) bids have no /bids/{id}/documents endpoint — but the submission already
+  // carries every uploaded file as a presigned URL. Pre-load them into bidDocs (keyed by the per-item
+  // column id `link-<sub>-<item>`) so the comparison's doc rows/chips + viewer open them like app docs.
+  useEffect(() => {
+    if (!submissions.length) return;
+    const entries: Record<string, DealRoomDocuments> = {};
+    for (const s of submissions) for (const it of s.items) entries[`link-${s.id}-${it.requestItemId}`] = submissionToBidDocuments(s, it);
+    setBidDocs((p) => ({ ...p, ...entries }));
+  }, [submissions]);
   // The pick = the agent's pick when it maps to a visible column, else the top-ranked column. Either way it
   // tracks the current order, so the highlight moves when you re-rank.
   const pickIdRaw = rec?.recommendation.pick_bid_id != null ? String(rec.recommendation.pick_bid_id) : null;
@@ -556,9 +565,12 @@ export function BidComparisonWorkspace() {
     const findUrl = (d?: DealRoomDocuments) =>
       d ? [...d.companyDocuments, ...d.equipmentDocuments].find((x) => x.url && pred(x))?.url ?? null : null;
     let url = findUrl(bidDocs[c.bid.id]);
+    // Off-platform (link-) / uploaded (upload:) bids have no /bids/{id}/documents endpoint — their files
+    // are pre-loaded in bidDocs, so never hit the fetch (it would 404 on the synthetic id).
+    const synthetic = c.bid.id.startsWith("link-") || c.bid.id.startsWith("upload:");
     // Always (re)fetch when the cached set has no match — the cache may be empty from a transient
     // error (e.g. the endpoint was briefly down) or simply not loaded yet. This self-heals on click.
-    if (!url) {
+    if (!url && !synthetic) {
       try {
         const fresh = await fetchBidDocuments(c.bid.id);
         setBidDocs((p) => ({ ...p, [c.bid.id]: fresh }));
@@ -580,14 +592,17 @@ export function BidComparisonWorkspace() {
     const base = has ? { background: C.successBg, color: C.success } : { background: C.dangerBg, color: C.danger };
     const style = big ? { ...base, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: `1px solid ${has ? "rgba(29,175,88,.3)" : "rgba(217,54,42,.3)"}` } : base;
     const cls = big ? "inline-flex items-center gap-1 text-[11.5px]" : "inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold";
-    // Off-platform bids captured a VALUE (CR/VAT/national text), not a file — show the value, not a doc.
-    const linkVal = c.bid.viaSharedLink ? c.bid.linkDocs?.[hint] : undefined;
-    // Viewable only when there's something to open: a captured value (link bid) or a real file (app bid).
-    // Off-platform certs are acknowledged Yes/No — no file, no value — so no eye icon / no click.
-    const viewable = has && (linkVal != null || !c.bid.viaSharedLink);
+    // Off-platform: prefer the actual uploaded FILE (pre-loaded in bidDocs) when the supplier attached one;
+    // else fall back to the captured VALUE (CR/VAT/national text they typed instead of a file).
+    const dd = c.bid.viaSharedLink ? bidDocs[c.bid.id] : undefined;
+    const fileUrl = dd ? [...dd.equipmentDocuments, ...dd.companyDocuments].find((x) => x.url && docMatches(hint)(x))?.url ?? null : null;
+    const linkVal = c.bid.viaSharedLink && !fileUrl ? c.bid.linkDocs?.[hint] : undefined;
+    // Viewable when there's something to open: a real uploaded file, a captured value (link bid), or an
+    // app bid's presigned doc. Off-platform certs acknowledged Yes/No with no file/value → no eye.
+    const viewable = has && (fileUrl != null || linkVal != null || !c.bid.viaSharedLink);
     const inner = <><span className="material-icons-outlined" style={{ fontSize: 11 }}>{has ? "check" : "close"}</span>{label}{viewable && <span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>visibility</span>}</>;
     if (!viewable) return <span className={cls} style={style}>{inner}</span>;
-    const onClick = linkVal ? () => setDocView({ label, url: null, value: linkVal, loading: false }) : () => openDoc(c, hint, label);
+    const onClick = fileUrl ? () => setDocView({ label, url: fileUrl, loading: false }) : linkVal ? () => setDocView({ label, url: null, value: linkVal, loading: false }) : () => openDoc(c, hint, label);
     return <button type="button" onClick={onClick} title={linkVal ? L("View value", "عرض القيمة") : L("View document", "عرض المستند")} className={cls} style={style}>{inner}</button>;
   };
   // Green ✓ / red × cert pill WITHOUT a doc-view eye — for declared certs (e.g. the operator's) that
@@ -1597,6 +1612,34 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         })}
                       </tr>
                     ))}
+                    {/* All files a shared-link supplier uploaded on the bid form — a complete, viewable index
+                        (photos, ownership, equip/operator certs, company docs). Shown only when an off-platform
+                        column actually has files, so pure on-platform comparisons are unchanged. Each opens the
+                        presigned file in the in-app viewer. */}
+                    {cols.some((c) => c.bid.viaSharedLink && bidDocs[c.bid.id] && (bidDocs[c.bid.id].equipmentDocuments.length + bidDocs[c.bid.id].companyDocuments.length) > 0) && (
+                      <tr>
+                        <RowHead title={L("Uploaded documents", "المستندات المرفوعة")} sub={L("all files the supplier attached", "كل الملفات التي أرفقها المؤجّر")} />
+                        {cols.map((c) => {
+                          const dd = bidDocs[c.bid.id];
+                          const files = dd ? [...dd.equipmentDocuments, ...dd.companyDocuments].filter((x) => x.url) : [];
+                          if (!files.length) return <Td key={c.bid.id}><span style={{ color: C.muted }}>—</span></Td>;
+                          return (
+                            <Td key={c.bid.id}>
+                              <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
+                                {files.map((f, i) => {
+                                  const lbl = (ar ? f.labelAr ?? f.label : f.label);
+                                  return (
+                                    <button key={i} type="button" onClick={() => setDocView({ label: lbl, url: f.url, loading: false })} title={L("View document", "عرض المستند")} className="inline-flex items-center gap-1 text-[11.5px]" style={{ background: C.renteeDim, color: C.rentee, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: "1px solid rgba(37,99,235,.3)" }}>
+                                      <span className="material-icons-outlined" style={{ fontSize: 11 }}>{f.fileType === "image" ? "image" : "description"}</span>{lbl}<span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>visibility</span>
+                                    </button>
+                                  );
+                                })}
+                              </span>
+                            </Td>
+                          );
+                        })}
+                      </tr>
+                    )}
                     {/* Operator included — acknowledge term. Green ✓ "Included" when the supplier includes an
                         operator, red ✗ "Not included" on a conflict (e.g. link supplier said No to a required
                         operator). Reflects the same truth the terms modal shows, inside the Equipment section. */}

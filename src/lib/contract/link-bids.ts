@@ -1,4 +1,5 @@
 import type { BidCard, CertCode, TermRow, TermState } from "@/lib/contract/bids";
+import type { DealRoomDocuments, DealRoomDocument } from "@/lib/contract/deal-room";
 
 /**
  * web-app/006 (expanded) — off-platform bid submissions captured through a request's shared link.
@@ -324,6 +325,37 @@ const termRow = (key: string, en: string, ar: string, ok?: boolean, reqVal?: str
  * `BidCard`. Off-platform: no supplier id/rating/distance/verified, no deal room; compliance comes
  * from the typed CR/VAT/national fields; per-item Yes/No confirmations become term states.
  */
+/** Uploaded-attachment type → [EN, AR] label (photos + ownership + equip/operator certs + company docs).
+ *  Mirrors the bid form's kind lists so the comparison labels each viewable file the same way. */
+export const DOC_TYPE_LABEL: Record<string, [string, string]> = {
+  front_photo: ["Front photo", "صورة أمامية"], serial_photo: ["Serial / plate", "الرقم التسلسلي"], hours_photo: ["Operating hours", "ساعات التشغيل"],
+  istimara: ["Istimara", "الاستمارة"], customs_card: ["Customs card", "البطاقة الجمركية"], sales_contract: ["Sales contract", "عقد البيع"], saso_registration: ["SASO registration", "تسجيل ساسو"], combined: ["Several documents (one file)", "عدة مستندات (ملف واحد)"],
+  tuv: ["TÜV", "فحص TÜV"], spsp: ["SPSP", "SPSP"], saso: ["SASO", "ساسو"], other: ["Other", "أخرى"],
+  operator_tuv: ["Operator TÜV", "فحص TÜV للمشغّل"], operator_spsp: ["Operator SPSP", "SPSP للمشغّل"], operator_saso: ["Operator SASO", "ساسو للمشغّل"], operator_other: ["Operator (other)", "المشغّل (أخرى)"],
+  cr: ["Commercial registration", "السجل التجاري"], vat_cert: ["VAT certificate", "شهادة الضريبة"], national_address: ["National address", "العنوان الوطني"], local_content: ["Local content", "المحتوى المحلي"], saso_heavy_equip: ["SASO heavy equipment", "ساسو للمعدات الثقيلة"],
+};
+/** Proof-of-ownership document types (the free-classify group on the form). */
+export const OWNERSHIP_DOC_TYPES = new Set(["istimara", "customs_card", "sales_contract", "saso_registration", "combined"]);
+
+const attToDoc = (a: BidAttachment): DealRoomDocument => {
+  const lbl = DOC_TYPE_LABEL[a.type];
+  const isImg = a.type.endsWith("_photo") || /\.(jpe?g|png|gif|webp)(\?|#|$)/i.test(a.filename ?? "") || /\.(jpe?g|png|gif|webp)(\?|#|$)/i.test(a.key ?? "");
+  return { type: a.type, label: lbl?.[0] ?? a.type.replace(/_/g, " "), labelAr: lbl?.[1] ?? null, url: a.key, fileType: isImg ? "image" : "pdf" };
+};
+
+/**
+ * Every file a shared-link supplier uploaded on the bid form → the same {company, equipment} document
+ * shape the comparison already renders (on read, each `BidAttachment.key` is a presigned URL). Equipment
+ * group = the item's photos + per-item documents (ownership + equip/operator certs); company group =
+ * the submission-level company docs. Lets the comparison surface every off-platform doc with a view eye.
+ */
+export function submissionToBidDocuments(sub: LinkBidSubmission, item?: LinkBidItem): DealRoomDocuments {
+  const it = item ?? sub.items[0] ?? null;
+  const equipment = [...(it?.photos ?? []), ...(it?.documents ?? [])].filter((a) => a.key).map(attToDoc);
+  const company = (sub.companyDocuments ?? []).filter((a) => a.key).map(attToDoc);
+  return { equipmentDocuments: equipment, companyDocuments: company };
+}
+
 export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem): BidCard {
   const it = item ?? sub.items[0] ?? null;
   const c = it?.confirmations ?? {};
@@ -385,7 +417,14 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
     requiredCerts: reqEqCertCodes,
     heldCertCodes: eqCertConfirmed,
     equipmentCertCodes: eqCertConfirmed,
-    ownershipDocs: [],
+    // Proof-of-ownership files the supplier uploaded on the form — keyed by TYPE (like on-platform bids)
+    // so the comparison's ownership row resolves each to its presigned URL via bidDocs (dedup by type).
+    ownershipDocs: (() => {
+      const seen = new Set<string>();
+      return (it?.documents ?? [])
+        .filter((d) => OWNERSHIP_DOC_TYPES.has(d.type) && d.key && !seen.has(d.type) && seen.add(d.type))
+        .map((d) => { const l = DOC_TYPE_LABEL[d.type]; return { key: d.type, labelEn: l?.[0] ?? d.type, labelAr: l?.[1] ?? d.type }; });
+    })(),
     operatorCertReq: up(rt.operatorCert) ?? null,
     // Show the confirmed VALUE (e.g. the requested license level) when the supplier said Yes, else "Not confirmed".
     operatorCertDeclared: c.operatorCert == null ? null : c.operatorCert ? (up(rt.operatorCert) ?? "Confirmed") : "Not confirmed",
@@ -439,7 +478,9 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
     quotedTotal: item ? (it?.total ?? null) : (sub.grandTotal ?? null),
     submissionKey: sub.id,
     requestItemId: it?.requestItemId,
-    // Captured company-doc VALUES (off-platform has no files) — keyed by the comparison's doc hints.
+    // Captured company-doc VALUES (CR/VAT/national text) — keyed by the comparison's doc hints. Used as
+    // a fallback view when the supplier typed a number instead of uploading a file (the files, when
+    // present, are surfaced via submissionToBidDocuments → the comparison's bidDocs + view eye).
     linkDocs: {
       ...(has(sub.crNumber) ? { commercial: sub.crNumber as string } : {}),
       ...(has(sub.vatNumber) ? { vat: sub.vatNumber as string } : {}),
