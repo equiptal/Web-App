@@ -17,6 +17,8 @@ import {
   defaultPreferences,
   defaultOperatorNeeded,
   operatorCertDefault,
+  equipmentCertDefault,
+  isLiftingCategory,
   newManualItem,
   postableItems,
 } from "@/lib/contract";
@@ -295,12 +297,27 @@ function reducer(state: RfqState, a: Action): RfqState {
       // default (diesel) — the old value (e.g. electric for a suspended platform) no longer fits the new
       // equipment type (an excavator) — and drop the now-stale agent fuel hint for this item.
       return withDraft(state, (d) => {
-        const d2 = mapItem(d, a.id, (i) => ({
-          ...i,
-          ref: { categoryId: a.categoryId, subcategoryId: null, measurementId: null },
-          fuelType: "diesel",
-          resolved: false,
-        }));
+        const d2 = mapItem(d, a.id, (i) => {
+          const categoryChanged = i.ref.categoryId !== a.categoryId;
+          const next = {
+            ...i,
+            ref: { categoryId: a.categoryId, subcategoryId: null, measurementId: null },
+            fuelType: "diesel" as const,
+            resolved: false,
+          };
+          // App parity (_withCertRule): (re)picking the category re-seeds the category-based equipment
+          // cert — lifting → Aramco, else TÜV — and mirrors the operator cert (TÜV→TÜV / Aramco→SPSP)
+          // when the operator is on. Only on an actual category change, so per-item edits survive a no-op
+          // re-pick; a later request-wide "settings for all" pick still overrides via SET_CERTIFICATES.
+          if (categoryChanged) {
+            const equipCert = equipmentCertDefault(isLiftingCategory(next.ref, state.taxonomy));
+            next.safetyCertsOverride = [equipCert];
+            if (next.operatorNeeded === "yes") {
+              next.operator = { ...next.operator, certificate: [operatorCertDefault([equipCert])] };
+            }
+          }
+          return next;
+        });
         const noteKey = `line_items[${a.id.slice(1)}].fuel_type_preference`;
         if (d2.fieldNotes && noteKey in d2.fieldNotes) {
           const fieldNotes = { ...d2.fieldNotes };

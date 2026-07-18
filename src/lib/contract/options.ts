@@ -44,6 +44,15 @@ export function operatorCertDefault(equipmentCerts: readonly SafetyCertificate[]
   return (equipmentCerts ?? []).some((c) => c === "tuv") ? "tuv" : "spsp";
 }
 
+/**
+ * Default equipment safety cert for a category, mirroring the app's cert rule (`_withCertRule`,
+ * create_request_bloc.dart): Aramco for lifting equipment, TÜV for every other category. Applied when
+ * an item's equipment type is (re)picked; the renter can still override it per item.
+ */
+export function equipmentCertDefault(isLifting: boolean): SafetyCertificate {
+  return isLifting ? "aramco" : "tuv";
+}
+
 export type Accommodation = "me" | "supplier"; // AC-24
 
 export type FuelType = "diesel" | "petrol" | "electric" | "hybrid"; // AC-26 default diesel
