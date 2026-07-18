@@ -19,7 +19,7 @@ import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmiss
 import { SharedBidNegotiateRoom } from "@/components/requests/SharedBidNegotiateRoom";
 import { NEGOTIATE_ENABLED } from "@/lib/config/flags";
 import { computeBidReadiness } from "@/lib/contract/bid-readiness";
-import { BidReadinessSection, BidEligibilityModal } from "@/components/requests/BidReadiness";
+import { BidReadinessBadge, BidEligibilityModal } from "@/components/requests/BidReadiness";
 
 /** Lifecycle pill (matches the prototype SPILL). */
 const SPILL: Record<string, { cls: string; dot: boolean; en: string; ar: string }> = {
@@ -369,6 +369,13 @@ export function RequestBids({ requestId }: { requestId: string }) {
                 <div className="esub">{b.distanceKm != null ? `${Math.round(b.distanceKm)} ${L("km from the project", "كم من المشروع")}` : L("Distance not shared", "المسافة غير محددة")}</div>
                 {/* Equipment certs + proof-of-ownership docs on file (Level 2) */}
                 <EquipmentDocs equipmentCerts={b.equipmentCertCodes ?? []} ownershipDocs={b.ownershipDocs} ar={ar} />
+                {/* Bid readiness — compact N/N + eye ON this row (opens the per-unit eligibility view).
+                    stopPropagation so it doesn't also trigger the row's equipment-details tap. */}
+                {(() => { const rd = computeBidReadiness(b); return rd ? (
+                  <span onClick={(e) => e.stopPropagation()} style={{ display: "inline-flex", marginTop: 6 }}>
+                    <BidReadinessBadge r={rd} L={L} onClick={() => setEligBid(b)} />
+                  </span>
+                ) : null; })()}
               </div>
               {b.equipment?.id && (
                 <span className="equip-view">
@@ -377,14 +384,6 @@ export function RequestBids({ requestId }: { requestId: string }) {
                 </span>
               )}
             </div>
-
-            {/* Bid readiness — per-offered-unit eligibility (app parity: RenteeReadinessSection). Native
-                bids only (computeBidReadiness null for off-platform → nothing). */}
-            {(() => { const rd = computeBidReadiness(b); return rd ? (
-              <div className="row-sep" style={{ padding: "12px 16px" }}>
-                <BidReadinessSection r={rd} L={L} onView={() => setEligBid(b)} />
-              </div>
-            ) : null; })()}
 
             {/* supplier note (app parity — BidModel.note) */}
             {b.note && (

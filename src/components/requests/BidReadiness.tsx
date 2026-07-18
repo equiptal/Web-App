@@ -20,13 +20,11 @@ const BAND: Record<ReadinessBand, { c: string; bg: string; bd: string }> = {
 
 const allReady = (r: BidReadiness) => r.band === "green" && r.readyCount >= r.committed && r.units.every((u) => !u.yearConflict);
 
-/** Compact readiness pill for the bid card. Click opens the eligibility view. */
+/** Compact readiness pill for the bid card's Equipment row: `<icon> N/N <eye>`. Click opens the
+ *  eligibility view — so it IS the "View eligibility" control, without a separate bulky section. */
 export function BidReadinessBadge({ r, L, onClick }: { r: BidReadiness; L: LFn; onClick?: () => void }) {
   const ready = allReady(r);
   const c = BAND[ready ? "green" : r.band];
-  const label = ready
-    ? L(`Ready ${r.committed}/${r.committed}`, `جاهز ${r.committed}/${r.committed}`)
-    : L(`${r.percent}% ready · ${r.readyCount}/${r.committed}`, `${r.percent}% جاهز · ${r.readyCount}/${r.committed}`);
   return (
     <button
       type="button"
@@ -35,7 +33,8 @@ export function BidReadinessBadge({ r, L, onClick }: { r: BidReadiness; L: LFn; 
       style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 20, border: `1px solid ${c.bd}`, background: c.bg, color: c.c, fontSize: 11.5, fontWeight: 800, cursor: onClick ? "pointer" : "default", fontFamily: "inherit", whiteSpace: "nowrap" }}
     >
       <span className="material-icons-outlined" style={{ fontSize: 14 }}>{ready ? "verified" : "fact_check"}</span>
-      {label}
+      <span style={{ fontVariantNumeric: "tabular-nums" }}>{r.readyCount}/{r.committed}</span>
+      {onClick && <span className="material-icons-outlined" style={{ fontSize: 14, opacity: 0.7 }}>visibility</span>}
     </button>
   );
 }
