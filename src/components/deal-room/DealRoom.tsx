@@ -1077,9 +1077,15 @@ function CounterFlow({
   // Accept is gated behind a binding-commitment warning first (app parity). Counter skips it.
   const [bindingOk, setBindingOk] = useState(mode === "counter");
   const [page, setPage] = useState(0); // 0 = Terms, 1 = Price, 2 = Summary
-  const [rateStr, setRateStr] = useState(room.rate ? String(room.rate) : "");
-  const [mobStr, setMobStr] = useState(room.mobPrice ? String(room.mobPrice) : "");
-  const [demobStr, setDemobStr] = useState(room.demobPrice ? String(room.demobPrice) : "");
+  // Price seeds from the LIVE position too (app resolveLivePosition: latest?.rate ?? room.lastProposedRate
+  // ?? bid.priceAmount). room.rate already collapses lastProposedRate → bid.priceAmount, so preferring the
+  // latest reconstructed round first guards against any lag between the DB column and the chat message.
+  const seedRate = latestRound?.rate ?? room.rate;
+  const seedMob = latestRound?.mobPrice ?? room.mobPrice;
+  const seedDemob = latestRound?.demobPrice ?? room.demobPrice;
+  const [rateStr, setRateStr] = useState(seedRate ? String(seedRate) : "");
+  const [mobStr, setMobStr] = useState(seedMob ? String(seedMob) : "");
+  const [demobStr, setDemobStr] = useState(seedDemob ? String(seedDemob) : "");
   const [contractType, setContractType] = useState(room.contractType ?? "formal");
   const [ack, setAck] = useState(false);
 
