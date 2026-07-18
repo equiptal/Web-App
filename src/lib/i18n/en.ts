@@ -164,8 +164,8 @@ export const en = {
   intake: {
     heading: "How would you like to create your request?",
     subheading: "Start from an existing RFQ document, or fill it in manually. You'll review everything before it's sent.",
-    optUploadTitle: "Upload / Paste RFQ",
-    optUploadDesc: "Paste text or upload a file — your AI assistant fills the form automatically.",
+    optUploadTitle: "Write / Upload RFQ",
+    optUploadDesc: "Write your request or upload a file — your AI assistant fills the form automatically.",
     recommended: "Recommended",
     beta: "Beta",
     optManualTitle: "Fill Manually",
@@ -180,8 +180,8 @@ export const en = {
     tabManual: "Manual", // AC-01 tentative
     tabLater: "LATER",
     manualNote: "Manual entry is coming in a later release.",
-    pasteLabel: "Paste your RFQ",
-    pastePlaceholder: "Paste your equipment list, email, or RFQ here…",
+    pasteLabel: "Write your RFQ",
+    pastePlaceholder: "Write your request in plain words — e.g. “I need a 30-ton forklift at King Khalid Airport, Riyadh, for 3 weeks starting next Sunday, with an operator and diesel included, delivered to site.”\n\nYou can also paste an email, or an equipment list.",
     uploadLabel: "Attach files too",
     uploadOptional: "optional — add as many as you like",
     dropTitle: "Drop files here, or",
