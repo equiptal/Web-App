@@ -1068,6 +1068,12 @@ function CounterFlow({
   onAccept: (contractType: string) => void;
 }) {
   const editable = mode === "counter";
+  // Reconstructed negotiation history (app parity) — the LIVE position is read off this, not just the
+  // room columns, so a supplier's unit counter is RECEIVED here (app resolveLivePosition). Also drives
+  // the round number, the "Supplier: N units" references, and the supplier-total on the compare card.
+  const flowRounds = withOpeningRound(collapseRounds(reconstructRounds(messages as unknown[])), roomOpeningRound(room));
+  const latestRound = flowRounds.length ? flowRounds[flowRounds.length - 1] : null;
+  const supRound = latestRoundBy(flowRounds, "supplier");
   // Accept is gated behind a binding-commitment warning first (app parity). Counter skips it.
   const [bindingOk, setBindingOk] = useState(mode === "counter");
   const [page, setPage] = useState(0); // 0 = Terms, 1 = Price, 2 = Summary
@@ -1078,13 +1084,18 @@ function CounterFlow({
   const [ack, setAck] = useState(false);
 
   // deal-room/negotiation — per-type unit counts (cap = requested; mob/demob ≤ rental) + leg exclusion.
+  // Seed from the LIVE position (app resolveLivePosition precedence: latest reconstructed round → room
+  // columns → offered/requested → clamp) so the supplier's countered units land on the rentee side.
   const cap = Math.max(1, room.requestedUnits || units || 1);
-  const dflt = Math.min(cap, room.agreedUnits ?? units ?? 1);
-  const [rentalUnits, setRentalUnits] = useState<number>(dflt);
-  const [mobUnitsN, setMobUnitsN] = useState<number>(room.mobUnits ?? dflt);
-  const [demobUnitsN, setDemobUnitsN] = useState<number>(room.demobUnits ?? dflt);
-  const [mobExcluded, setMobExcluded] = useState<boolean>(room.mobExcluded);
-  const [demobExcluded, setDemobExcluded] = useState<boolean>(room.demobExcluded);
+  const liveRental = Math.max(1, Math.min(cap, latestRound?.rentalUnits ?? room.agreedUnits ?? units ?? 1));
+  const liveMob = Math.max(0, Math.min(liveRental, latestRound?.mobUnits ?? room.mobUnits ?? liveRental));
+  const liveDemob = Math.max(0, Math.min(liveRental, latestRound?.demobUnits ?? room.demobUnits ?? liveRental));
+  const [rentalUnits, setRentalUnits] = useState<number>(liveRental);
+  const [mobUnitsN, setMobUnitsN] = useState<number>(liveMob);
+  const [demobUnitsN, setDemobUnitsN] = useState<number>(liveDemob);
+  const [mobExcluded, setMobExcluded] = useState<boolean>(latestRound?.mobExcluded ?? room.mobExcluded);
+  const [demobExcluded, setDemobExcluded] = useState<boolean>(latestRound?.demobExcluded ?? room.demobExcluded);
+  const [cmpOpen, setCmpOpen] = useState(false); // compare-card per-line breakdown toggle
   // Confirm before a leg (delivery/return) is excluded from the offer — reversible, but the app confirms.
   const [pendingEx, setPendingEx] = useState<null | { title: string; onYes: () => void }>(null);
   // Quotation-paper UI-only state (spec §6): collapsible دليل البنود categories + the السجل log modal.
@@ -1231,22 +1242,18 @@ function CounterFlow({
     return [...m];
   };
 
-  // Supplier's standing offer total (compare card) — same ÷26 math on the room's on-table numbers.
-  const supTotal = (() => {
-    const rl = ((room.rate ?? 0) / (FREQ_DAYS[basis] ?? 1)) * periods * rNU;
-    const ml = room.mobExcluded ? 0 : (room.mobPrice ?? 0) * mNU;
-    const dl = room.demobExcluded ? 0 : (room.demobPrice ?? 0) * dNU;
-    const sub = rl + ml + dl;
-    return sub + Math.round(sub * 0.15);
-  })();
+  // Supplier's standing offer (compare card) — from the SUPPLIER's latest reconstructed round (their real
+  // offer INCL. their unit counts + leg exclusion), via the shared ÷26/÷7 + VAT math; falls back to the
+  // room's on-table numbers when no supplier round exists. This is why a supplier unit counter now moves it.
+  const supDeal = supRound ? roundTotals(room, supRound) : computeDealTotals(room);
+  const supTotal = supDeal.grand;
   const showCompare = editable && room.lastCounterBy === "supplier";
   const priceDiff = Math.abs(total - supTotal);
 
   const STEPS = [L("Price", "السعر"), L("Terms", "الشروط"), L("Review", "المراجعة")];
   const sheetTitle = `${room.details.equipmentLabel ?? L("Equipment", "المعدّة")}${rNU > 1 ? ` — ${rNU} ${L("units", "وحدات")}` : ""}`;
   const roomCode = room.shortCode ?? "";
-  // Reconstructed negotiation history (app parity) — drives the round number in the header + the Log list.
-  const flowRounds = withOpeningRound(collapseRounds(reconstructRounds(messages as unknown[])), roomOpeningRound(room));
+  // Round number in the header + the Log list — from the history reconstructed at the top of the flow.
   const roundNo = flowRounds.length + 1;
   const today = new Date().toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
   const changedFrom = (cur: number, ref: number | null) => ref != null && Math.round(cur) !== Math.round(ref);
@@ -1276,7 +1283,7 @@ function CounterFlow({
   );
 
   // A price-table leg row (mob/demob): red ✕ exclude + trip stepper + green price box + المورد ref.
-  const legTr = (label: string, sub: string, priceStr: string, setPrice: (s: string) => void, u: number, setU: (v: number) => void, ex: boolean, setEx: (b: boolean) => void, refPrice: number | null, exTitle: string) => {
+  const legTr = (label: string, sub: string, priceStr: string, setPrice: (s: string) => void, u: number, setU: (v: number) => void, ex: boolean, setEx: (b: boolean) => void, refPrice: number | null, refUnits: number | null, exTitle: string) => {
     const line = ex ? 0 : num(priceStr) * Math.min(u, rentalUnits);
     return (
       <tr className={ex ? "ex" : undefined}>
@@ -1291,7 +1298,7 @@ function CounterFlow({
           </div>
         </td>
         <td className="mut">{L("Trip", "رحلة")}</td>
-        <td>{ex ? "—" : <div className="qp-qty">{editable && <span className="hint">{L("Your choice", "خيارك")}</span>}{editable ? <Stepper value={Math.min(u, rentalUnits)} min={0} max={rentalUnits} onChange={setU} /> : <b>{Math.min(u, rentalUnits)}</b>}</div>}</td>
+        <td>{ex ? "—" : <div className="qp-qty">{editable && <span className="hint">{L("Your choice", "خيارك")}</span>}{editable ? <Stepper value={Math.min(u, rentalUnits)} min={0} max={rentalUnits} onChange={setU} /> : <b>{Math.min(u, rentalUnits)}</b>}{editable && refUnits != null && <div className={`qp-ref${changedFrom(Math.min(u, rentalUnits), refUnits) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {refUnits} {L("units", "وحدة")}</div>}</div>}</td>
         <td>
           {ex ? <span className="qp-excluded">{L("Excluded", "مستبعد")}</span>
             : editable ? <>{priceBox(priceStr, setPrice)}{refPrice != null && <div className={`qp-ref${changedFrom(num(priceStr), refPrice) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {nf(refPrice)}</div>}</>
@@ -1301,6 +1308,17 @@ function CounterFlow({
       </tr>
     );
   };
+
+  // One row of the compare-card per-line breakdown (app _DeltaTable parity): your line-total (+ units)
+  // vs the supplier's line-total (+ units) + the per-line difference. Excluded legs read "Not included".
+  const cmpRow = (label: string, mine: number, myU: number, myEx: boolean, theirs: number, theirU: number, theirEx: boolean) => (
+    <tr>
+      <td className="ln">{label}</td>
+      <td>{myEx ? <span className="na">{L("Not incl.", "غير مشمول")}</span> : <>{nf(mine)}<span className="u"> · {myU}</span></>}</td>
+      <td>{theirEx ? <span className="na">{L("Not incl.", "غير مشمول")}</span> : <>{nf(theirs)}<span className="u"> · {theirU}</span></>}</td>
+      <td className={Math.round(mine) === Math.round(theirs) ? "na" : "gap"}>{Math.round(mine) === Math.round(theirs) ? "—" : nf(Math.abs(mine - theirs))}</td>
+    </tr>
+  );
 
   return (
     <div className="qp-scrim" dir={ar ? "rtl" : "ltr"} onClick={() => !busy && onClose()}>
@@ -1341,6 +1359,20 @@ function CounterFlow({
                     <div className="side me"><div className="k">{L("Your offer", "عرضك")}</div><div className="v">{nf(total)}</div></div>
                   </div>
                   <div className="conv"><span className="track" /><span className={`chip${priceDiff === 0 ? " ok" : ""}`}>{priceDiff === 0 ? L("Match ✓", "تطابق ✓") : `${L("Gap", "الفرق")} ${nf(priceDiff)}`}</span><span className="track" /></div>
+                  <button type="button" className="qp-cmp-toggle" onClick={() => setCmpOpen((o) => !o)} aria-expanded={cmpOpen}>
+                    <span>{cmpOpen ? L("Hide breakdown", "إخفاء التفاصيل") : L("Show breakdown", "عرض التفاصيل")}</span>
+                    <span className="material-icons-outlined">{cmpOpen ? "expand_less" : "expand_more"}</span>
+                  </button>
+                  {cmpOpen && (
+                    <div className="qp-scrollx"><table className="qp-cmp-tbl">
+                      <thead><tr><th>{L("Line", "البند")}</th><th>{L("Yours", "عرضك")}</th><th>{L("Supplier", "المورد")}</th><th>{L("Difference", "الفرق")}</th></tr></thead>
+                      <tbody>
+                        {cmpRow(L("Base rental", "الإيجار الأساسي"), rentalLine, rNU, false, supDeal.rentalTotal, supDeal.rentalUnits, false)}
+                        {cmpRow(L("Mobilization", "التعبئة"), mobLine, mNU, mEx, supDeal.mobTotal, supDeal.mobUnitsN, supDeal.mobExcluded)}
+                        {cmpRow(L("Return — demob", "الإرجاع"), demobLine, dNU, dEx, supDeal.demobTotal, supDeal.demobUnitsN, supDeal.demobExcluded)}
+                      </tbody>
+                    </table></div>
+                  )}
                 </div>
               )}
               {qhead()}
@@ -1351,12 +1383,12 @@ function CounterFlow({
                   <tr>
                     <td><div className="lbl">{L("Base rental", "الإيجار الأساسي")}</div><div className="sub">{room.details.equipmentLabel ?? periodLabel}</div></td>
                     <td className="mut">{hasDuration ? `${periods} ${L("days", "يوم")}` : "—"}</td>
-                    <td><div className="qp-qty">{editable && <span className="hint">{L("Your choice", "خيارك")}</span>}{editable ? <Stepper value={rentalUnits} min={1} max={cap} onChange={(v) => { setRentalUnits(v); setMobUnitsN((u) => Math.min(u, v)); setDemobUnitsN((u) => Math.min(u, v)); }} /> : <b>{rNU}</b>}<span className="qp-qmatch">✓ {L("Qty", "العدد")} {rNU}</span></div></td>
+                    <td><div className="qp-qty">{editable && <span className="hint">{L("Your choice", "خيارك")}</span>}{editable ? <Stepper value={rentalUnits} min={1} max={cap} onChange={(v) => { setRentalUnits(v); setMobUnitsN((u) => Math.min(u, v)); setDemobUnitsN((u) => Math.min(u, v)); }} /> : <b>{rNU}</b>}<span className="qp-qmatch">✓ {L("Qty", "العدد")} {rNU}</span>{editable && supRound?.rentalUnits != null && <div className={`qp-ref${changedFrom(rentalUnits, supRound.rentalUnits) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {supRound.rentalUnits} {L("units", "وحدة")}</div>}</div></td>
                     <td>{editable ? <>{priceBox(rateStr, setRateStr)}{room.rate != null && <div className={`qp-ref${changedFrom(rate, room.rate) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {nf(room.rate)}</div>}</> : <b className="tot">{money(rate)}</b>}</td>
                     <td><b className="tot">{money(rentalLine)}</b></td>
                   </tr>
-                  {legTr(L("Mobilization — mob", "التعبئة — موب"), L("delivery", "توصيل"), mobStr, setMobStr, mobUnitsN, setMobUnitsN, mobExcluded, setMobExcluded, room.mobPrice, L("Cancel mobilization (delivery to site) from the supplier?", "إلغاء التعبئة (النقل إلى الموقع) من المورد؟"))}
-                  {legTr(L("Return — demob", "الإرجاع — ديموب"), L("pickup", "استلام"), demobStr, setDemobStr, demobUnitsN, setDemobUnitsN, demobExcluded, setDemobExcluded, room.demobPrice, L("Cancel demobilization (return from site) from the supplier?", "إلغاء الإرجاع (النقل من الموقع) من المورد؟"))}
+                  {legTr(L("Mobilization — mob", "التعبئة — موب"), L("delivery", "توصيل"), mobStr, setMobStr, mobUnitsN, setMobUnitsN, mobExcluded, setMobExcluded, room.mobPrice, supRound?.mobUnits ?? null, L("Cancel mobilization (delivery to site) from the supplier?", "إلغاء التعبئة (النقل إلى الموقع) من المورد؟"))}
+                  {legTr(L("Return — demob", "الإرجاع — ديموب"), L("pickup", "استلام"), demobStr, setDemobStr, demobUnitsN, setDemobUnitsN, demobExcluded, setDemobExcluded, room.demobPrice, supRound?.demobUnits ?? null, L("Cancel demobilization (return from site) from the supplier?", "إلغاء الإرجاع (النقل من الموقع) من المورد؟"))}
                 </tbody>
               </table></div>
               <div className="qp-totals">
