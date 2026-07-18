@@ -8,7 +8,7 @@ import { AccountModal } from "@/components/onboarding/AccountModal";
 import { SignInPrompt } from "@/components/common/SignInPrompt";
 import { agentUses, bumpAgentUse, guestLimitReached, GUEST_AGENT_LIMIT } from "@/lib/access/agent-quota";
 import { fetchAllMyRequests, fetchBids, fetchRequestSubmissions, startDealRoom, recommendBids, askBids, parseBid, transformBid, captureBidEvents, fetchDealRoomDocuments, fetchBidDocuments, fetchDealRoom } from "@/lib/api/client";
-import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
+import { submissionToBidCard, submissionToBidDocuments, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { groupRequests, type RequestGroup } from "@/lib/contract/requests";
 import type { DealRoomDocuments, DealTerm } from "@/lib/contract/deal-room";
 import { CERT_LABEL, type BidCard, type CertCode, type TermRow, type TermState } from "@/lib/contract/bids";
@@ -459,6 +459,15 @@ export function BidComparisonWorkspace() {
     ).then((entries) => { if (alive) setBidDocs((p) => ({ ...p, ...Object.fromEntries(entries) })); });
     return () => { alive = false; };
   }, [cols, bidDocs]);
+  // Off-platform (shared-link) bids have no /bids/{id}/documents endpoint — but the submission already
+  // carries every uploaded file as a presigned URL. Pre-load them into bidDocs (keyed by the per-item
+  // column id `link-<sub>-<item>`) so the comparison's doc rows/chips + viewer open them like app docs.
+  useEffect(() => {
+    if (!submissions.length) return;
+    const entries: Record<string, DealRoomDocuments> = {};
+    for (const s of submissions) for (const it of s.items) entries[`link-${s.id}-${it.requestItemId}`] = submissionToBidDocuments(s, it);
+    setBidDocs((p) => ({ ...p, ...entries }));
+  }, [submissions]);
   // The pick = the agent's pick when it maps to a visible column, else the top-ranked column. Either way it
   // tracks the current order, so the highlight moves when you re-rank.
   const pickIdRaw = rec?.recommendation.pick_bid_id != null ? String(rec.recommendation.pick_bid_id) : null;
@@ -559,9 +568,12 @@ export function BidComparisonWorkspace() {
     const findUrl = (d?: DealRoomDocuments) =>
       d ? [...d.companyDocuments, ...d.equipmentDocuments].find((x) => x.url && pred(x))?.url ?? null : null;
     let url = findUrl(bidDocs[c.bid.id]);
+    // Off-platform (link-) / uploaded (upload:) bids have no /bids/{id}/documents endpoint — their files
+    // are pre-loaded in bidDocs, so never hit the fetch (it would 404 on the synthetic id).
+    const synthetic = c.bid.id.startsWith("link-") || c.bid.id.startsWith("upload:");
     // Always (re)fetch when the cached set has no match — the cache may be empty from a transient
     // error (e.g. the endpoint was briefly down) or simply not loaded yet. This self-heals on click.
-    if (!url) {
+    if (!url && !synthetic) {
       try {
         const fresh = await fetchBidDocuments(c.bid.id);
         setBidDocs((p) => ({ ...p, [c.bid.id]: fresh }));
@@ -583,23 +595,28 @@ export function BidComparisonWorkspace() {
     const base = has ? { background: C.successBg, color: C.success } : { background: C.dangerBg, color: C.danger };
     const style = big ? { ...base, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: `1px solid ${has ? "rgba(29,175,88,.3)" : "rgba(217,54,42,.3)"}` } : base;
     const cls = big ? "inline-flex items-center gap-1 text-[11.5px]" : "inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold";
-    // Off-platform bids captured a VALUE (CR/VAT/national text), not a file — show the value, not a doc.
-    const linkVal = c.bid.viaSharedLink ? c.bid.linkDocs?.[hint] : undefined;
-    // Viewable only when there's something to open: a captured value (link bid) or a real file (app bid).
-    // Off-platform certs are acknowledged Yes/No — no file, no value — so no eye icon / no click.
-    const viewable = has && (linkVal != null || !c.bid.viaSharedLink);
+    // Off-platform: prefer the actual uploaded FILE (pre-loaded in bidDocs) when the supplier attached one;
+    // else fall back to the captured VALUE (CR/VAT/national text they typed instead of a file).
+    const dd = c.bid.viaSharedLink ? bidDocs[c.bid.id] : undefined;
+    const fileUrl = dd ? [...dd.equipmentDocuments, ...dd.companyDocuments].find((x) => x.url && docMatches(hint)(x))?.url ?? null : null;
+    const linkVal = c.bid.viaSharedLink && !fileUrl ? c.bid.linkDocs?.[hint] : undefined;
+    // Viewable when there's something to open: a real uploaded file, a captured value (link bid), or an
+    // app bid's presigned doc. Off-platform certs acknowledged Yes/No with no file/value → no eye.
+    const viewable = has && (fileUrl != null || linkVal != null || !c.bid.viaSharedLink);
     const inner = <><span className="material-icons-outlined" style={{ fontSize: 11 }}>{has ? "check" : "close"}</span>{label}{viewable && <span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>visibility</span>}</>;
     if (!viewable) return <span className={cls} style={style}>{inner}</span>;
-    const onClick = linkVal ? () => setDocView({ label, url: null, value: linkVal, loading: false }) : () => openDoc(c, hint, label);
+    const onClick = fileUrl ? () => setDocView({ label, url: fileUrl, loading: false }) : linkVal ? () => setDocView({ label, url: null, value: linkVal, loading: false }) : () => openDoc(c, hint, label);
     return <button type="button" onClick={onClick} title={linkVal ? L("View value", "عرض القيمة") : L("View document", "عرض المستند")} className={cls} style={style}>{inner}</button>;
   };
-  // Green ✓ / red × cert pill WITHOUT a doc-view eye — for declared certs (e.g. the operator's) that
-  // have no file to open. Same visual weight as the big docChip.
-  const certPill = (label: string, held: boolean) => (
-    <span className="inline-flex items-center gap-1 text-[11.5px]" style={{ background: held ? C.successBg : C.dangerBg, color: held ? C.success : C.danger, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: `1px solid ${held ? "rgba(29,175,88,.3)" : "rgba(217,54,42,.3)"}` }}>
-      <span className="material-icons-outlined" style={{ fontSize: 11 }}>{held ? "check" : "close"}</span>{label}
-    </span>
-  );
+  // Green ✓ / red × cert pill. `fileUrl` (off-platform operator cert) makes it a clickable eye that opens
+  // the uploaded file; without it, it's a plain declared-cert pill (no file to open). Same weight as docChip.
+  const certPill = (label: string, held: boolean, fileUrl?: string | null) => {
+    const style = { background: held ? C.successBg : C.dangerBg, color: held ? C.success : C.danger, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: `1px solid ${held ? "rgba(29,175,88,.3)" : "rgba(217,54,42,.3)"}` } as const;
+    const inner = <><span className="material-icons-outlined" style={{ fontSize: 11 }}>{held ? "check" : "close"}</span>{label}{fileUrl && <span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>visibility</span>}</>;
+    return fileUrl
+      ? <button type="button" onClick={() => setDocView({ label, url: fileUrl, loading: false })} title={L("View document", "عرض المستند")} className="inline-flex items-center gap-1 text-[11.5px]" style={style}>{inner}</button>
+      : <span className="inline-flex items-center gap-1 text-[11.5px]" style={style}>{inner}</span>;
+  };
   const grandTotal = (c: BidColumn) => Math.round(supplierStated(c) * (1 + VAT)) + renterAddBid(c);
   const hasCost = (c: BidColumn) => supplierStated(c) > 0 || renterAddBid(c) > 0;
   const grandList = cols.filter(hasCost).map(grandTotal);
@@ -1699,10 +1716,13 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         // doesn't satisfy the requirement (e.g. required SPSP, declared TÜV), show it as a BLUE
                         // "extra" chip next to the red required one — so the renter sees what they DO hold.
                         const showExtra = !met && declaredOk && !!declared && !satisfiesReq;
+                        // Off-platform: the supplier's uploaded operator-cert file (operator_tuv/spsp/saso/other)
+                        // → make the pill a clickable eye that opens it, in this existing row.
+                        const opFile = c.bid.viaSharedLink ? bidDocs[c.bid.id]?.equipmentDocuments.find((d) => d.url && d.type?.startsWith("operator"))?.url ?? null : null;
                         return (
                           <Td key={c.bid.id} ok={met} fail={!met}>
                             <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
-                              {certPill(req, met)}
+                              {certPill(req, met, opFile)}
                               {showExtra && (
                                 <span className="inline-flex items-center gap-1 text-[11.5px]" title={L("Declared — doesn’t meet the requirement", "مُعلن — لا يفي بالمطلوب")} style={{ background: C.renteeDim, color: C.rentee, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: "1px solid rgba(37,99,235,.3)" }}>
                                   <span className="material-icons-outlined" style={{ fontSize: 11 }}>add</span>{declared}
