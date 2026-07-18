@@ -82,6 +82,10 @@ export interface CreateRequestPayload {
   /** Optional — omit and the server defaults to "now". Never invent one (ALIGNMENT rule 3). */
   startDate?: string;
   endDate?: string | null;
+  /** Whole-day rental duration (end − start), client-derived like the mobile app's CR-017 rule — the
+   *  backend stores it verbatim (it does NOT compute it from the dates) and needs it ≥ 1. Omitted when
+   *  the dates don't yield a full day. Drives all duration-based pricing (quotation / deal room / compare). */
+  estimatedDurationDays?: number;
   /** AC-13 rental extendable flag. Requires the `extendable` column (rule 6 migration). */
   extendable?: boolean;
   /**
