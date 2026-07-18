@@ -191,6 +191,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const [flowMode, setFlowMode] = useState<"counter" | "accept" | null>(null);
   const [counterErr, setCounterErr] = useState<string | null>(null);
   const [showDocs, setShowDocs] = useState(false);
+  const [callOpen, setCallOpen] = useState(false); // call-supplier modal (shows the number + dial/copy)
   // Touch device → dial (tel:). Desktop/laptop → just SHOW the number (you can't place a call from a laptop).
   const [canCall, setCanCall] = useState(false);
   useEffect(() => { setCanCall(typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true); }, []);
@@ -577,15 +578,10 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
         <div className="tb-icons">
           <span className="tb-ic" role="button" tabIndex={0} title={L("Documents", "المستندات")} onClick={() => setShowDocs(true)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setShowDocs(true)}><span className="material-icons-outlined">description</span></span>
           {/* deal-room/negotiation (B5): the rentee gets the supplier's number from the start (server-gated).
-              Touch device → dial; desktop → show the number inline (no call possible from a laptop). */}
+              A single Call button opens a modal with the number — dial on touch, copy on desktop. */}
           {!room.supplier.phone
             ? <span className="tb-ic call locked" title={L("Number unavailable", "الرقم غير متاح")}><span className="material-icons-outlined">call</span></span>
-            : canCall
-              ? <a className="tb-ic call" href={`tel:${room.supplier.phone}`} title={L("Call", "اتصال")}><span className="material-icons-outlined">call</span></a>
-              : <span className="tb-ic call tb-phone" title={L("Supplier phone", "هاتف المؤجّر")} style={{ width: "auto", padding: "0 12px", gap: 7, whiteSpace: "nowrap" }}>
-                  <span className="material-icons-outlined">call</span>
-                  <span style={{ direction: "ltr", unicodeBidi: "plaintext", fontSize: 13.5, fontWeight: 800, userSelect: "all" }}>{room.supplier.phone}</span>
-                </span>}
+            : <span className="tb-ic call" role="button" tabIndex={0} title={L("Call", "اتصال")} onClick={() => setCallOpen(true)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setCallOpen(true)}><span className="material-icons-outlined">call</span></span>}
         </div>
       </div>
 
@@ -810,6 +806,41 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
       )}
 
       {showDocs && <DocumentsModal id={id} ar={ar} L={L} supplierName={room.supplier.name} onClose={() => setShowDocs(false)} />}
+
+      {callOpen && room.supplier.phone && (
+        <CallModal ar={ar} L={L} phone={room.supplier.phone} name={room.supplier.name} canCall={canCall} onClose={() => setCallOpen(false)} />
+      )}
+    </div>
+  );
+}
+
+/** Call-supplier modal: shows the number, dials it (tel:) on a touch device, and copies it anywhere. */
+function CallModal({ ar, L, phone, name, canCall, onClose }: { ar: boolean; L: (en: string, arr: string) => string; phone: string; name: string; canCall: boolean; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(phone); setCopied(true); setTimeout(() => setCopied(false), 1600); } catch { /* clipboard blocked */ }
+  };
+  return (
+    <div dir={ar ? "rtl" : "ltr"} onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(16,38,63,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 60px rgba(16,38,63,.35)", padding: "26px 22px 22px", textAlign: "center" }}>
+        <span style={{ display: "inline-flex", width: 56, height: 56, borderRadius: "50%", background: "#e7f7ee", color: "#1daf58", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+          <span className="material-icons-outlined" style={{ fontSize: 28 }}>call</span>
+        </span>
+        <h3 style={{ fontSize: 16, fontWeight: 900, color: "#1c3550", margin: 0 }}>{L("Call supplier", "الاتصال بالمؤجّر")}</h3>
+        <p style={{ fontSize: 13, fontWeight: 600, color: "#6b8fa8", margin: "4px 0 16px" }}>{name}</p>
+        <div style={{ direction: "ltr", unicodeBidi: "plaintext", fontSize: 22, fontWeight: 900, color: "#1c3550", letterSpacing: 0.5, userSelect: "all", marginBottom: 18 }}>{phone}</div>
+        <div style={{ display: "flex", gap: 10 }}>
+          {canCall && (
+            <a href={`tel:${phone}`} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px", borderRadius: 13, border: "none", background: "#1daf58", color: "#fff", fontWeight: 800, fontSize: 14, textDecoration: "none" }}>
+              <span className="material-icons-outlined" style={{ fontSize: 18 }}>call</span>{L("Call", "اتصال")}
+            </a>
+          )}
+          <button onClick={copy} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px", borderRadius: 13, border: "1.5px solid #d4e0ec", background: "#fff", color: "#1c3550", fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
+            <span className="material-icons-outlined" style={{ fontSize: 18 }}>{copied ? "check" : "content_copy"}</span>{copied ? L("Copied", "تم النسخ") : L("Copy number", "نسخ الرقم")}
+          </button>
+        </div>
+        <button onClick={onClose} style={{ marginTop: 12, width: "100%", padding: "11px", borderRadius: 13, border: "none", background: "#eff4f9", color: "#6b8fa8", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" }}>{L("Close", "إغلاق")}</button>
+      </div>
     </div>
   );
 }
