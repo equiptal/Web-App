@@ -117,7 +117,15 @@ export interface BidQuote {
 }
 export function computeBidQuote(bid: BidCard, opts?: { fallbackDays?: number | null; units?: number }): BidQuote {
   const rate = num(bid.price) ?? 0;
-  const units = opts?.units ?? (bid.numberOfUnits || 1);
+  // Live deal-room rental count (app parity: v3_bid_card `_liveRentalUnits`) — the negotiated count wins
+  // so the card price tracks the deal room; falls back to the offered/requested count. An explicit
+  // opts.units (comparison unit toggle) still overrides.
+  const liveUnits =
+    (bid.agreedUnits != null && bid.agreedUnits > 0) ? bid.agreedUnits
+    : (bid.currentRentalUnits != null && bid.currentRentalUnits > 0) ? bid.currentRentalUnits
+    : (bid.unitsOffered && bid.unitsOffered > 0) ? bid.unitsOffered
+    : (bid.numberOfUnits || 1);
+  const units = opts?.units ?? liveUnits;
   const dpp = daysPerPeriod(bid.priceUnit);
   const fb = num(opts?.fallbackDays);
   // No stated duration and no request fallback → assume ONE FULL PERIOD (days = daysPerPeriod), so the
@@ -126,8 +134,12 @@ export function computeBidQuote(bid: BidCard, opts?: { fallbackDays?: number | n
   const periods = dpp === 0 ? 1 : days / dpp;
   const perUnitRental = dpp === 0 ? rate : (rate / dpp) * days;
   const rentalSubtotal = perUnitRental * units;
-  const mobTotal = (num(bid.mobPrice) ?? 0) * units;
-  const demobTotal = (num(bid.demobPrice) ?? 0) * units;
+  // Mob/demob use their OWN negotiated counts + exclusion (app parity), capped ≤ rental; default to the
+  // rental count when not negotiated (unchanged for un-negotiated bids).
+  const mobUnitsN = bid.mobExcluded ? 0 : Math.min(bid.mobUnits ?? units, units);
+  const demobUnitsN = bid.demobExcluded ? 0 : Math.min(bid.demobUnits ?? units, units);
+  const mobTotal = bid.mobExcluded ? 0 : (num(bid.mobPrice) ?? 0) * mobUnitsN;
+  const demobTotal = bid.demobExcluded ? 0 : (num(bid.demobPrice) ?? 0) * demobUnitsN;
   const subtotalPreVat = rentalSubtotal + mobTotal + demobTotal;
   const vat = subtotalPreVat * 0.15;
   return { units, days, periods, perUnitRental, rentalSubtotal, mobTotal, demobTotal, subtotalPreVat, vat, total: subtotalPreVat + vat };

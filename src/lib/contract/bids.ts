@@ -142,6 +142,15 @@ export interface BidCard {
   /** Units THIS supplier offered to cover (bid.units_offered length). ≤ numberOfUnits. Drives
    *  fulfillment ("covers X of Y units"); defaults to numberOfUnits when the bid doesn't specify. */
   unitsOffered: number;
+  /** Live deal-room unit overlay (app parity: v3_bid_card `_liveRentalUnits`/`_buildPriceArgs`). The
+   *  negotiated rental count (agreedUnits, else the mid-negotiation currentRentalUnits) + per-leg mob/
+   *  demob counts + exclusion. null → not negotiated. Drives the card price so it tracks the deal room. */
+  agreedUnits?: number | null;
+  currentRentalUnits?: number | null;
+  mobUnits?: number | null;
+  demobUnits?: number | null;
+  mobExcluded?: boolean;
+  demobExcluded?: boolean;
   /** The request's equipment-year requirement (raw maxEquipmentAge — a min year like 2020, or an age). */
   reqMinYear: number | null;
   equipment: { id: string | null; make: string | null; model: string | null; year: number | null; imageUrl: string | null } | null;
@@ -633,6 +642,13 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     // An EMPTY array means the supplier didn't pick a subset → they bid the request as posted (covers
     // its full unit count), NOT 0 — otherwise the header tile reads 0/1 while the card says "covers 1 of 1".
     unitsOffered: Array.isArray(raw.unitsOffered) && raw.unitsOffered.length > 0 ? raw.unitsOffered.length : (n(raw.unitsOffered) ?? n(rqItem.numberOfUnits) ?? 1),
+    // Live deal-room unit overlay (app parity) — camel/snake, null when not negotiated.
+    agreedUnits: n(raw.agreedUnits ?? raw.agreed_units),
+    currentRentalUnits: n(raw.currentRentalUnits ?? raw.current_rental_units),
+    mobUnits: n(raw.mobUnits ?? raw.mob_units),
+    demobUnits: n(raw.demobUnits ?? raw.demob_units),
+    mobExcluded: raw.mobExcluded === true || raw.mob_excluded === true,
+    demobExcluded: raw.demobExcluded === true || raw.demob_excluded === true,
     reqMinYear: n(rqItem.maxEquipmentAge),
     equipment: eq
       ? { id: s(eq.id) ?? s(eq.equipmentId), make: s(eq.manufacturer) ?? s(eq.make), model: s(eq.model), year: n(eq.year), imageUrl: s(eq.imageUrl) ?? s(eq.primaryPhotoUrl) }

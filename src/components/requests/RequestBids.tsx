@@ -4,14 +4,13 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/client";
-import type { BidCard } from "@/lib/contract/bids";
+import { bucketBidTerms, type BidCard } from "@/lib/contract/bids";
 import { computeBidQuote } from "@/lib/contract/comparison";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { qualityFromSubmission, type BidQuality } from "@/lib/contract/bid-quality";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { CredentialPills } from "@/components/requests/CredentialPills";
 import { TermsPanel } from "@/components/requests/TermsPanel";
-import { TermClassBadges } from "@/components/requests/TermClassBadges";
 import { DealRoomBanner, SupplierDocs, EquipmentDocs } from "@/components/requests/BidCardExtras";
 import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
@@ -20,7 +19,7 @@ import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmiss
 import { SharedBidNegotiateRoom } from "@/components/requests/SharedBidNegotiateRoom";
 import { NEGOTIATE_ENABLED } from "@/lib/config/flags";
 import { computeBidReadiness } from "@/lib/contract/bid-readiness";
-import { BidReadinessBadge, BidEligibilityModal } from "@/components/requests/BidReadiness";
+import { BidReadinessSection, BidEligibilityModal } from "@/components/requests/BidReadiness";
 
 /** Lifecycle pill (matches the prototype SPILL). */
 const SPILL: Record<string, { cls: string; dot: boolean; en: string; ar: string }> = {
@@ -314,7 +313,6 @@ export function RequestBids({ requestId }: { requestId: string }) {
                   )}
                   {b.rating != null && <span className="credpill cp-ok"><span className="material-icons-outlined">star</span>{b.rating.toFixed(1)}</span>}
                   <CredentialPills required={b.requiredCerts} held={b.heldCertCodes} ar={ar} />
-                  {(() => { const rd = computeBidReadiness(b); return rd ? <BidReadinessBadge r={rd} L={L} onClick={() => setEligBid(b)} /> : null; })()}
                 </div>
                 {/* Company documents on file (Level 1) — CR / VAT / National address + LC / SASO registration */}
                 <SupplierDocs compliance={b.compliance} companyCerts={b.companyCertCodes ?? []} ar={ar} />
@@ -334,7 +332,24 @@ export function RequestBids({ requestId }: { requestId: string }) {
               onClick={() => setOpenTermsId(openTermsId === b.id ? null : b.id)}
             >
               <span className="tlab">{L("Terms", "الشروط")}</span>
-              <TermClassBadges terms={b.terms} ar={ar} />
+              {(() => {
+                // App parity: the Conflict · Pending review · Matched tally (bucketBidTerms — the SAME
+                // source the grouped card + Terms modal use), deal-room-overlaid via b.terms states.
+                const tc = bucketBidTerms(b.terms, b.negotiableTerms).counts;
+                return (
+                  <span style={{ display: "inline-flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                    {([
+                      { label: L("Conflict", "تعارض"), n: tc.conflict, c: "#d9362a" },
+                      { label: L("Pending review", "قيد المراجعة"), n: tc.pending, c: "#d4780a" },
+                      { label: L("Matched", "مطابق"), n: tc.matched, c: "#1daf58" },
+                    ] as const).map((t) => (
+                      <span key={t.label} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 800, color: t.n > 0 ? t.c : "#9AA7B8", whiteSpace: "nowrap" }}>
+                        <span style={{ width: 7, height: 7, borderRadius: "50%", background: t.n > 0 ? t.c : "#c3d2e0" }} />{t.label} {t.n}
+                      </span>
+                    ))}
+                  </span>
+                );
+              })()}
               {b.unreadTerms.length > 0 && <span className="dr-turn">{b.unreadTerms.length} {L("new", "جديد")}</span>}
               <span className="material-icons-outlined chev">expand_more</span>
             </button>
@@ -362,6 +377,14 @@ export function RequestBids({ requestId }: { requestId: string }) {
                 </span>
               )}
             </div>
+
+            {/* Bid readiness — per-offered-unit eligibility (app parity: RenteeReadinessSection). Native
+                bids only (computeBidReadiness null for off-platform → nothing). */}
+            {(() => { const rd = computeBidReadiness(b); return rd ? (
+              <div className="row-sep" style={{ padding: "12px 16px" }}>
+                <BidReadinessSection r={rd} L={L} onView={() => setEligBid(b)} />
+              </div>
+            ) : null; })()}
 
             {/* supplier note (app parity — BidModel.note) */}
             {b.note && (
