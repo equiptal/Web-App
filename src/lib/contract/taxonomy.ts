@@ -36,6 +36,23 @@ export function taxName(node: { name: string; nameAr?: string | null } | undefin
   return locale === "ar" && node.nameAr ? node.nameAr : node.name;
 }
 
+/**
+ * Whether a ref's category is the "Lifting Equipment" taxonomy (cranes, forklifts, telehandlers, MEWPs …).
+ * Mirrors the app's `_isLiftingCategory` (create_request_bloc.dart): match the canonical category slug/id
+ * containing `lifting`, the English category name containing `lifting`, or the Arabic name containing `رفع`.
+ * Drives the 2026-07 cert rule (lifting → Aramco equipment cert, else TÜV).
+ */
+export function isLiftingCategory(
+  ref: { categoryId: string | null },
+  taxonomy: Taxonomy,
+): boolean {
+  const catId = (ref.categoryId ?? "").toLowerCase();
+  if (catId.includes("lifting")) return true;
+  const cat = taxonomy.find((c) => c.id === ref.categoryId);
+  if ((cat?.name ?? "").toLowerCase().includes("lifting")) return true;
+  return (cat?.nameAr ?? "").includes("رفع");
+}
+
 /** A point in the taxonomy. A complete match has all three; partial selections leave lower levels null. */
 export interface TaxonomyRef {
   categoryId: string | null;

@@ -34,6 +34,25 @@ export type OperatorNeeded = "yes" | "no"; // AC-24
 /** Operator certificate options mirror the Safety certificate set (AC-24, defaulted from AC-50). */
 export type OperatorCertificate = SafetyCertificate;
 
+/**
+ * Default operator certificate for an item, mirroring the app's `operatorCertForEquipmentCerts`
+ * (localized_labels.dart): TÜV when the item's equipment cert includes TÜV, otherwise SPSP. Since the
+ * lifting default equipment cert is Aramco, this yields SPSP for lifting and TÜV elsewhere. Seeded only
+ * when the operator is enabled and no operator cert is set yet — the renter can still change it.
+ */
+export function operatorCertDefault(equipmentCerts: readonly SafetyCertificate[] | null | undefined): OperatorCertificate {
+  return (equipmentCerts ?? []).some((c) => c === "tuv") ? "tuv" : "spsp";
+}
+
+/**
+ * Default equipment safety cert for a category, mirroring the app's cert rule (`_withCertRule`,
+ * create_request_bloc.dart): Aramco for lifting equipment, TÜV for every other category. Applied when
+ * an item's equipment type is (re)picked; the renter can still override it per item.
+ */
+export function equipmentCertDefault(isLifting: boolean): SafetyCertificate {
+  return isLifting ? "aramco" : "tuv";
+}
+
 export type Accommodation = "me" | "supplier"; // AC-24
 
 export type FuelType = "diesel" | "petrol" | "electric" | "hybrid"; // AC-26 default diesel

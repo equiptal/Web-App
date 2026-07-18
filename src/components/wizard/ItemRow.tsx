@@ -15,9 +15,11 @@ import {
   isCompleteRef,
   FUEL_TYPES,
   OPERATOR_CERTIFICATES,
+  SAFETY_CERTIFICATES,
   PARTIES,
   type FuelType,
   type OperatorCertificate,
+  type SafetyCertificate,
   type Party,
 } from "@/lib/contract";
 
@@ -407,10 +409,10 @@ export function ItemRow({
           {/* Equipment safety certificate (AC-50) — per-item; inherits the request-wide "settings for all"
               default until overridden (same model as fuel/delivery/return). NOT the operator cert above. */}
           <ChipField label={t.step1.certificates.safety} agent={agentMatches(item.safetyCertsOverride, ai?.safetyCertsOverride)}>
-            <SelChips<OperatorCertificate>
+            <SelChips<SafetyCertificate>
               values={itemSafety}
               onToggle={(v) => actions.patchItem(item.id, { safetyCertsOverride: toggle(itemSafety, v) })}
-              options={opt(OPERATOR_CERTIFICATES, t.options.safetyCert)}
+              options={opt(SAFETY_CERTIFICATES, t.options.safetyCert)}
             />
           </ChipField>
 

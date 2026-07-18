@@ -425,7 +425,13 @@ function toPreferences(h: RFQHeader): Preferences {
 const RENTAL_OUT: Record<string, AgentRentalType> = { daily: "DAILY", weekly: "WEEKLY", monthly: "MONTHLY" };
 const FUEL_OUT: Record<string, AgentFuelType> = { diesel: "DIESEL", petrol: "PETROL", electric: "ELECTRIC" };
 const OVERTIME_OUT: Record<string, AgentOvertimeRate> = { without: "0", "1.5x": "1.5X", "2x": "2X" };
+// Operator license levels — the strict agent enum (SPSP/TUV/SASO/CERTIFIED). Aramco is NOT one (it's an
+// equipment-only safety cert, app parity).
 const CERT_OUT: Record<string, AgentOperatorLicenseLevel> = { spsp: "SPSP", tuv: "TUV", "saso-technical": "SASO" };
+// Equipment safety certs ride the correction's loose `safety_certifications` string[] — include Aramco
+// (2026-07 cert rule) so a per-item Aramco pick survives the agent round-trip instead of being silently
+// dropped. Read-side normCert round-trips "ARAMCO" → "aramco" via SAFETY_CERTIFICATES.
+const SAFETY_CERT_OUT: Record<string, string> = { tuv: "TUV", aramco: "ARAMCO", spsp: "SPSP", "saso-technical": "SASO" };
 
 /** Party → Mansour's `*_by_rentee` boolean: me ⇒ true (rentee covers), supplier ⇒ false; null passes through. */
 function renteeSide(p: Party | null | undefined): boolean | null {
@@ -467,7 +473,7 @@ export function draftToRfqCorrection(
     const dieselIncluded = (it.fuelType === "diesel" || it.fuelType === "petrol") && fuelParty ? fuelParty === "supplier" : null;
     const accomTransport = opIncluded ? renteeSide(it.operator.fatAccommodationTransport) : null;
     const licenseLevels = it.operator.certificate.map((c) => CERT_OUT[c]).filter((c): c is AgentOperatorLicenseLevel => !!c);
-    const safety = (it.safetyCertsOverride ?? project.certificates.safety).map((c) => CERT_OUT[c]).filter(Boolean) as string[];
+    const safety = (it.safetyCertsOverride ?? project.certificates.safety).map((c) => SAFETY_CERT_OUT[c]).filter(Boolean) as string[];
     return {
       input_equipment: it.rawLabel ?? names.category ?? "",
       category: names.category || it.agentNames?.category || "",

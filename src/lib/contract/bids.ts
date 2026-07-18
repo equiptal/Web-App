@@ -293,6 +293,10 @@ export interface TermRow {
   /** The negotiated value once the term is AGREED in the deal room (from lockedTerms) — lets the cost
    *  responsibilities reflect what was actually settled, not the renter's original request side. */
   value?: string | null;
+  /** The RENTEE's required value for this term — used by the deal-room overlay to decide whether a
+   *  pending counter (counter.newValue) matches the renter's ask (→ matched) or differs (→ conflict),
+   *  matching the app's `contractState` (dealRoomValue vs rentee value). Only populated on counted terms. */
+  renteeValue?: string | null;
 }
 
 const n = (v: unknown): number | null => {
@@ -394,9 +398,9 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
   const safetyCertState: TermState = requiredCerts.length === 0 ? "grey" : deviationKeys.has("safety_certifications") ? "conflict" : certs;
 
   // Project rows reused by both the bid-card "Project" bucket and the comparison's negotiable set.
-  const rPayment: TermRow = { key: "payment_terms", labelEn: "Payment terms", labelAr: "شروط الدفع", state: negContractState("payment_terms") };
-  const rSla: TermRow = { key: "breakdown_response_sla", labelEn: "Breakdown response", labelAr: "زمن الاستجابة للأعطال", state: negContractState("breakdown_response_sla") };
-  const rOvertime: TermRow = { key: "overtime_rate", labelEn: "Overtime", labelAr: "العمل الإضافي", state: negContractState("overtime_rate") };
+  const rPayment: TermRow = { key: "payment_terms", labelEn: "Payment terms", labelAr: "شروط الدفع", state: negContractState("payment_terms"), renteeValue: s(req.paymentTerms) };
+  const rSla: TermRow = { key: "breakdown_response_sla", labelEn: "Breakdown response", labelAr: "زمن الاستجابة للأعطال", state: negContractState("breakdown_response_sla"), renteeValue: s(req.breakdownResponseSla) };
+  const rOvertime: TermRow = { key: "overtime_rate", labelEn: "Overtime", labelAr: "العمل الإضافي", state: negContractState("overtime_rate"), renteeValue: s(req.overtimeRate) };
   const rMaint: TermRow = { key: "maintenance_responsibility", labelEn: "Maintenance", labelAr: "الصيانة", state: maintenance };
 
   // Conflict detail (Renter: X · Supplier: Y) — app parity with link bids, so an in-app conflict in
@@ -445,13 +449,13 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
     // COMPARISON-only expanded set (the web side-by-side "Negotiable terms" section) — NOT on the bid
     // card. Carries the full deal-room negotiable + acknowledge terms with live overlay states.
     negotiable: [
-      { key: "operator_included", labelEn: "Operator included", labelAr: "تشمل مشغّل", state: operatorIncluded },
-      { key: "operator_nationality", labelEn: "Operator nationality", labelAr: "جنسية المشغّل", state: contractState("operator_nationality", opNat) },
-      { key: "operator_certification", labelEn: "Operator certification", labelAr: "شهادة المشغّل", state: operatorCertState, detail: opCertDetail },
-      { key: "safety_certifications", labelEn: "Equipment safety certificates", labelAr: "شهادات سلامة المعدة", state: safetyCertState, detail: safetyDetail },
-      { key: "fat_food", labelEn: "Operator FAT — Food", labelAr: "الإعاشة (F.A.T) — الطعام", state: contractState("fat_food", fatFood) },
-      { key: "fat_accommodation_transport", labelEn: "Operator FAT — Accommodation/Transport", labelAr: "الإعاشة (F.A.T) — الإقامة/النقل", state: contractState("fat_accommodation_transport", fatAccom) },
-      { key: "fuel_responsibility", labelEn: "Fuel responsibility", labelAr: "مسؤولية الوقود", state: contractState("fuel_responsibility", fuelResp) },
+      { key: "operator_included", labelEn: "Operator included", labelAr: "تشمل مشغّل", state: operatorIncluded, renteeValue: reqOperator ? "yes" : null },
+      { key: "operator_nationality", labelEn: "Operator nationality", labelAr: "جنسية المشغّل", state: contractState("operator_nationality", opNat), renteeValue: opNat },
+      { key: "operator_certification", labelEn: "Operator certification", labelAr: "شهادة المشغّل", state: operatorCertState, detail: opCertDetail, renteeValue: reqOpCert },
+      { key: "safety_certifications", labelEn: "Equipment safety certificates", labelAr: "شهادات سلامة المعدة", state: safetyCertState, detail: safetyDetail, renteeValue: requiredCerts.length ? requiredCerts.join(",") : null },
+      { key: "fat_food", labelEn: "Operator FAT — Food", labelAr: "الإعاشة (F.A.T) — الطعام", state: contractState("fat_food", fatFood), renteeValue: fatFood },
+      { key: "fat_accommodation_transport", labelEn: "Operator FAT — Accommodation/Transport", labelAr: "الإعاشة (F.A.T) — الإقامة/النقل", state: contractState("fat_accommodation_transport", fatAccom), renteeValue: fatAccom },
+      { key: "fuel_responsibility", labelEn: "Fuel responsibility", labelAr: "مسؤولية الوقود", state: contractState("fuel_responsibility", fuelResp), renteeValue: fuelResp },
       rPayment, rSla, rOvertime, rMaint,
       // mobilization_lead_time — CONFLICT_ELIGIBLE / Negotiable (app moved it Priced → Negotiable).
       { key: "mobilization_lead_time", labelEn: "Mobilization lead time", labelAr: "مهلة التعبئة", state: negContractState("mobilization_lead_time") },
@@ -575,6 +579,11 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     .map((t) => ({ key: s(t.termKey) ?? "", value: t.lockedValue }))
     .filter((t) => t.key);
   const unreadTerms = (Array.isArray(raw.unreadTerms) ? (raw.unreadTerms as unknown[]) : []).map(String);
+  // Pending counters WITH their proposed values (getBidList `counters: [{termKey, newValue}]`) — the
+  // deal-room overlay compares each to the rentee's ask to decide matched vs conflict (app parity).
+  const counters = (Array.isArray(raw.counters) ? (raw.counters as Record<string, unknown>[]) : [])
+    .map((c) => ({ key: s(c.termKey) ?? "", value: c.newValue }))
+    .filter((c) => c.key);
   const pm = (raw.progressMeter ?? {}) as Record<string, unknown>;
   const progress = { agreed: n(pm.agreed) ?? 0, total: n(pm.total) ?? 0 };
   // Distance — app parity (bid.service.ts:134-137): a bid's location is its custom pin
@@ -594,6 +603,16 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   const lockedKeys = new Set(lockedTerms.map((t) => normKey(t.key)));
   const lockedValByKey = new Map(lockedTerms.map((t) => [normKey(t.key), t.value != null && t.value !== "" ? String(t.value) : null]));
   const unreadKeys = new Set(unreadTerms.map(normKey));
+  const counterValByKey = new Map(counters.map((c) => [normKey(c.key), c.value != null && c.value !== "" ? String(c.value) : null]));
+  // Enum-insensitive equality for the counter overlay (app parity: normalizeTermEnum) — case/underscore
+  // agnostic + boolean/party synonyms (yes=true=included, no=false=excluded/not-included, renter=rentee).
+  const normVal = (v: string | null | undefined): string => {
+    let t = (v ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (["true", "yes", "included"].includes(t)) t = "yes";
+    else if (["false", "no", "excluded", "notincluded"].includes(t)) t = "no";
+    else if (t === "renter") t = "rentee";
+    return t;
+  };
   const lockedVal = (pred: (k: string) => boolean): string | null => {
     const t = lockedTerms.find((x) => pred(normKey(x.key)));
     return t && t.value != null && t.value !== "" ? String(t.value) : null;
@@ -606,6 +625,15 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
       // Locked → "agreed", and carry the negotiated value so the cost responsibilities reflect what was
       // actually settled in the deal room (e.g. accepting the supplier's FAT flips the side to supplier).
       if (lockedKeys.has(k)) return { ...r, state: "agreed" as TermState, value: lockedValByKey.get(k) ?? r.value ?? null };
+      // Pending counter (app parity: dealRoomValue = counter.newValue): compare to the rentee's ask —
+      // equal → matched, differ → conflict. Without a rentee value to compare, fall back to "negotiating".
+      const cv = counterValByKey.get(k);
+      if (cv != null) {
+        if (r.renteeValue != null && r.renteeValue !== "") {
+          return { ...r, value: cv, state: (normVal(cv) === normVal(r.renteeValue) ? "matched" : "conflict") as TermState };
+        }
+        return { ...r, value: cv, state: "negotiating" as TermState };
+      }
       if (unreadKeys.has(k)) return { ...r, state: "negotiating" as TermState };
       return r;
     });
