@@ -166,6 +166,21 @@ const num = (v: unknown): number | null => (typeof v === "number" && !Number.isN
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v : null);
 
 /**
+ * Rental duration in whole days from start/end — the fallback when the backend didn't store
+ * `estimatedDurationDays` (it's an optional create field the backend never derives from the dates, so
+ * older/agent-created requests lack it). Matches the mobile app: `end.difference(start).inDays` with the
+ * deal-room clamp `d < 1 ? 1`. Lets the comparison's duration-based "Est. rental" show for those requests.
+ */
+function durationDaysBetween(start: string | null, end: string | null): number | null {
+  if (!start || !end) return null;
+  const s = new Date(start.length <= 10 ? `${start}T00:00:00Z` : start).getTime();
+  const e = new Date(end.length <= 10 ? `${end}T00:00:00Z` : end).getTime();
+  if (Number.isNaN(s) || Number.isNaN(e)) return null;
+  const d = Math.floor((e - s) / 86_400_000);
+  return d < 1 ? 1 : d;
+}
+
+/**
  * Taxonomy images live in a constant, publicly-readable bucket (the mobile app's `S3Url._bucket`).
  * The backend returns them as URLs on a per-env bucket that the web can't read, so — exactly like the
  * app — we strip to the key and rebuild against the public bucket. Pass a key or a full URL.
@@ -221,7 +236,8 @@ export function mapRequestListItem(r: RequestRecord): RequestListItem {
     city: str(r.projectAddressLabel),
     startDate: str(r.startDate),
     endDate: str(r.endDate),
-    durationDays: num(r.estimatedDurationDays),
+    // Prefer the stored value; else derive from start/end (backend never computes it from the dates).
+    durationDays: num(r.estimatedDurationDays) ?? durationDaysBetween(str(r.startDate), str(r.endDate)),
     createdAt: str(r.createdAt),
     bidCount: num(r.bidCount) ?? 0,
     mobByRentee: it?.mobilizationByRentee ?? null,
