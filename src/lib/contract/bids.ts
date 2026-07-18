@@ -606,13 +606,18 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   const counterValByKey = new Map(counters.map((c) => [normKey(c.key), c.value != null && c.value !== "" ? String(c.value) : null]));
   // Enum-insensitive equality for the counter overlay (app parity: normalizeTermEnum) — case/underscore
   // agnostic + boolean/party synonyms (yes=true=included, no=false=excluded/not-included, renter=rentee).
-  const normVal = (v: string | null | undefined): string => {
-    let t = (v ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const normTok = (v: string): string => {
+    let t = v.toLowerCase().replace(/[^a-z0-9]/g, "");
     if (["true", "yes", "included"].includes(t)) t = "yes";
     else if (["false", "no", "excluded", "notincluded"].includes(t)) t = "no";
     else if (t === "renter") t = "rentee";
     return t;
   };
+  // Multi-value terms (cert sets, e.g. "TUV,ARAMCO") compare order-INSENSITIVELY (app parity: set
+  // equality on the backend) — split on separators, normalize each token, sort, rejoin. Single-value
+  // terms are a 1-token no-op, so party/enum comparisons are unchanged.
+  const normVal = (v: string | null | undefined): string =>
+    (v ?? "").split(/[,/;|]+/).map(normTok).filter(Boolean).sort().join(",");
   const lockedVal = (pred: (k: string) => boolean): string | null => {
     const t = lockedTerms.find((x) => pred(normKey(x.key)));
     return t && t.value != null && t.value !== "" ? String(t.value) : null;

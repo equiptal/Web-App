@@ -1253,6 +1253,11 @@ function CounterFlow({
   // room's on-table numbers when no supplier round exists. This is why a supplier unit counter now moves it.
   const supDeal = supRound ? roundTotals(room, supRound) : computeDealTotals(room);
   const supTotal = supDeal.grand;
+  // "Supplier: {price}" references — read the supplier's own round (app parity: otherSide.rate/mobPrice/
+  // demobPrice), falling back to the room columns, exactly like the "Supplier: N units" refs beside them.
+  const refRate = supRound?.rate ?? room.rate;
+  const refMobPrice = supRound?.mobPrice ?? room.mobPrice;
+  const refDemobPrice = supRound?.demobPrice ?? room.demobPrice;
   const showCompare = editable && room.lastCounterBy === "supplier";
   const priceDiff = Math.abs(total - supTotal);
 
@@ -1315,16 +1320,24 @@ function CounterFlow({
     );
   };
 
-  // One row of the compare-card per-line breakdown (app _DeltaTable parity): your line-total (+ units)
-  // vs the supplier's line-total (+ units) + the per-line difference. Excluded legs read "Not included".
-  const cmpRow = (label: string, mine: number, myU: number, myEx: boolean, theirs: number, theirU: number, theirEx: boolean) => (
-    <tr>
-      <td className="ln">{label}</td>
-      <td>{myEx ? <span className="na">{L("Not incl.", "غير مشمول")}</span> : <>{nf(mine)}<span className="u"> · {myU}</span></>}</td>
-      <td>{theirEx ? <span className="na">{L("Not incl.", "غير مشمول")}</span> : <>{nf(theirs)}<span className="u"> · {theirU}</span></>}</td>
-      <td className={Math.round(mine) === Math.round(theirs) ? "na" : "gap"}>{Math.round(mine) === Math.round(theirs) ? "—" : nf(Math.abs(mine - theirs))}</td>
-    </tr>
-  );
+  // One row of the compare-card per-line breakdown (app _DeltaTable parity): your PER-UNIT price vs the
+  // supplier's per-unit price (rate / mobPrice / demobPrice) + the per-line difference. Units are shown
+  // separately in the qty steppers' "Supplier: N units" refs (app splits price vs count the same way).
+  // Excluded legs read "Not included".
+  const cmpRow = (label: string, mine: number, myEx: boolean, theirs: number, theirEx: boolean) => {
+    const bothEx = myEx && theirEx;
+    const oneEx = myEx !== theirEx;
+    const eq = Math.round(mine) === Math.round(theirs);
+    const noDiff = bothEx || (!oneEx && eq); // no meaningful per-unit difference to show
+    return (
+      <tr>
+        <td className="ln">{label}</td>
+        <td>{myEx ? <span className="na">{L("Not incl.", "غير مشمول")}</span> : nf(mine)}</td>
+        <td>{theirEx ? <span className="na">{L("Not incl.", "غير مشمول")}</span> : nf(theirs)}</td>
+        <td className={noDiff ? "na" : "gap"}>{bothEx ? "—" : oneEx ? "±" : eq ? "—" : nf(Math.abs(mine - theirs))}</td>
+      </tr>
+    );
+  };
 
   return (
     <div className="qp-scrim" dir={ar ? "rtl" : "ltr"} onClick={() => !busy && onClose()}>
@@ -1371,11 +1384,11 @@ function CounterFlow({
                   </button>
                   {cmpOpen && (
                     <div className="qp-scrollx"><table className="qp-cmp-tbl">
-                      <thead><tr><th>{L("Line", "البند")}</th><th>{L("Yours", "عرضك")}</th><th>{L("Supplier", "المورد")}</th><th>{L("Difference", "الفرق")}</th></tr></thead>
+                      <thead><tr><th>{L("Per-unit rate", "السعر لكل وحدة")}</th><th>{L("Yours", "عرضك")}</th><th>{L("Supplier", "المورد")}</th><th>{L("Difference", "الفرق")}</th></tr></thead>
                       <tbody>
-                        {cmpRow(L("Base rental", "الإيجار الأساسي"), rentalLine, rNU, false, supDeal.rentalTotal, supDeal.rentalUnits, false)}
-                        {cmpRow(L("Mobilization", "التعبئة"), mobLine, mNU, mEx, supDeal.mobTotal, supDeal.mobUnitsN, supDeal.mobExcluded)}
-                        {cmpRow(L("Return — demob", "الإرجاع"), demobLine, dNU, dEx, supDeal.demobTotal, supDeal.demobUnitsN, supDeal.demobExcluded)}
+                        {cmpRow(L("Base rental", "الإيجار الأساسي"), rate, false, supDeal.rate, false)}
+                        {cmpRow(L("Mobilization", "التعبئة"), mob, mEx, supDeal.mobPrice, supDeal.mobExcluded)}
+                        {cmpRow(L("Return — demob", "الإرجاع"), demob, dEx, supDeal.demobPrice, supDeal.demobExcluded)}
                       </tbody>
                     </table></div>
                   )}
@@ -1390,11 +1403,11 @@ function CounterFlow({
                     <td><div className="lbl">{L("Base rental", "الإيجار الأساسي")}</div><div className="sub">{room.details.equipmentLabel ?? periodLabel}</div></td>
                     <td className="mut">{hasDuration ? `${periods} ${L("days", "يوم")}` : "—"}</td>
                     <td><div className="qp-qty">{editable && <span className="hint">{L("Your choice", "خيارك")}</span>}{editable ? <Stepper value={rentalUnits} min={1} max={cap} onChange={(v) => { setRentalUnits(v); setMobUnitsN((u) => Math.min(u, v)); setDemobUnitsN((u) => Math.min(u, v)); }} /> : <b>{rNU}</b>}<span className="qp-qmatch">✓ {L("Qty", "العدد")} {rNU}</span>{editable && supRound?.rentalUnits != null && <div className={`qp-ref${changedFrom(rentalUnits, supRound.rentalUnits) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {supRound.rentalUnits} {L("units", "وحدة")}</div>}</div></td>
-                    <td>{editable ? <>{priceBox(rateStr, setRateStr)}{room.rate != null && <div className={`qp-ref${changedFrom(rate, room.rate) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {nf(room.rate)}</div>}</> : <b className="tot">{money(rate)}</b>}</td>
+                    <td>{editable ? <>{priceBox(rateStr, setRateStr)}{refRate != null && <div className={`qp-ref${changedFrom(rate, refRate) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {nf(refRate)}</div>}</> : <b className="tot">{money(rate)}</b>}</td>
                     <td><b className="tot">{money(rentalLine)}</b></td>
                   </tr>
-                  {legTr(L("Mobilization — mob", "التعبئة — موب"), L("delivery", "توصيل"), mobStr, setMobStr, mobUnitsN, setMobUnitsN, mobExcluded, setMobExcluded, room.mobPrice, supRound?.mobUnits ?? null, L("Cancel mobilization (delivery to site) from the supplier?", "إلغاء التعبئة (النقل إلى الموقع) من المورد؟"))}
-                  {legTr(L("Return — demob", "الإرجاع — ديموب"), L("pickup", "استلام"), demobStr, setDemobStr, demobUnitsN, setDemobUnitsN, demobExcluded, setDemobExcluded, room.demobPrice, supRound?.demobUnits ?? null, L("Cancel demobilization (return from site) from the supplier?", "إلغاء الإرجاع (النقل من الموقع) من المورد؟"))}
+                  {legTr(L("Mobilization — mob", "التعبئة — موب"), L("delivery", "توصيل"), mobStr, setMobStr, mobUnitsN, setMobUnitsN, mobExcluded, setMobExcluded, refMobPrice, supRound?.mobUnits ?? null, L("Cancel mobilization (delivery to site) from the supplier?", "إلغاء التعبئة (النقل إلى الموقع) من المورد؟"))}
+                  {legTr(L("Return — demob", "الإرجاع — ديموب"), L("pickup", "استلام"), demobStr, setDemobStr, demobUnitsN, setDemobUnitsN, demobExcluded, setDemobExcluded, refDemobPrice, supRound?.demobUnits ?? null, L("Cancel demobilization (return from site) from the supplier?", "إلغاء الإرجاع (النقل من الموقع) من المورد؟"))}
                 </tbody>
               </table></div>
               <div className="qp-totals">
