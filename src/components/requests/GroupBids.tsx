@@ -834,8 +834,15 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         const perUnit = !allUnitsIds.has(b.id); // default per-unit; a card is "all units" only if toggled
         const isSel = selected.has(b.id);
         // Card price — canonical quote: rate ÷ period-days × duration (weekly ÷7, monthly ÷26),
-        // mob/demob × units, VAT 15%. "Per unit" toggle prices one unit; else all offered units.
-        const u = priceOpen && perUnit ? 1 : offered;
+        // mob/demob × units, VAT 15%. The "all units" count is the LIVE deal-room count (agreedUnits →
+        // currentRentalUnits → offered → requested), mirroring computeBidQuote so the group card matches
+        // RequestBids + the deal room; the offered band above stays on unitsOffered. Per-unit toggle → 1.
+        const liveUnits =
+          (b.agreedUnits != null && b.agreedUnits > 0) ? b.agreedUnits
+          : (b.currentRentalUnits != null && b.currentRentalUnits > 0) ? b.currentRentalUnits
+          : (b.unitsOffered && b.unitsOffered > 0) ? b.unitsOffered
+          : (b.numberOfUnits || 1);
+        const u = priceOpen && perUnit ? 1 : liveUnits;
         const cq = computeBidQuote(b, { units: u, fallbackDays: group.items.find((it) => it.id === b.requestId)?.durationDays ?? null });
         const rental = cq.rentalSubtotal;
         const deliv = cq.mobTotal;
@@ -986,9 +993,9 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
               </div>
               {priceOpen && !selectMode && (
                 <div style={{ marginTop: 12 }}>
-                  {offered > 1 && (
+                  {liveUnits > 1 && (
                     <div style={{ display: "inline-flex", background: "#eff4f9", borderRadius: 10, padding: 3, marginBottom: 12 }}>
-                      {([[false, L(`All ${offered} units`, `كل ${offered} وحدات`)], [true, L("Per unit", "لكل وحدة")]] as [boolean, string][]).map(([v, lab]) => (
+                      {([[false, L(`All ${liveUnits} units`, `كل ${liveUnits} وحدات`)], [true, L("Per unit", "لكل وحدة")]] as [boolean, string][]).map(([v, lab]) => (
                         <button key={String(v)} onClick={() => setAllUnitsIds((s) => { const n = new Set(s); if (v) n.delete(b.id); else n.add(b.id); return n; })} style={{ padding: "6px 13px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12.5, fontFamily: "inherit", background: perUnit === v ? "#1c3550" : "transparent", color: perUnit === v ? "#fff" : "#6b8fa8" }}>{lab}</button>
                       ))}
                     </div>
