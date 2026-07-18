@@ -1086,7 +1086,7 @@ function CounterFlow({
   const [mobExcluded, setMobExcluded] = useState<boolean>(room.mobExcluded);
   const [demobExcluded, setDemobExcluded] = useState<boolean>(room.demobExcluded);
   // Confirm before a leg (delivery/return) is excluded from the offer — reversible, but the app confirms.
-  const [pendingEx, setPendingEx] = useState<null | { legName: string; onYes: () => void }>(null);
+  const [pendingEx, setPendingEx] = useState<null | { title: string; onYes: () => void }>(null);
   // Quotation-paper UI-only state (spec §6): collapsible دليل البنود categories + the السجل log modal.
   const [guideOpen, setGuideOpen] = useState<Record<string, boolean>>({});
   const [logOpen, setLogOpen] = useState(false);
@@ -1276,13 +1276,13 @@ function CounterFlow({
   );
 
   // A price-table leg row (mob/demob): red ✕ exclude + trip stepper + green price box + المورد ref.
-  const legTr = (label: string, sub: string, priceStr: string, setPrice: (s: string) => void, u: number, setU: (v: number) => void, ex: boolean, setEx: (b: boolean) => void, refPrice: number | null, legName: string) => {
+  const legTr = (label: string, sub: string, priceStr: string, setPrice: (s: string) => void, u: number, setU: (v: number) => void, ex: boolean, setEx: (b: boolean) => void, refPrice: number | null, exTitle: string) => {
     const line = ex ? 0 : num(priceStr) * Math.min(u, rentalUnits);
     return (
       <tr className={ex ? "ex" : undefined}>
         <td>
           <div className="qp-itemcell">
-            {editable && !ex && <button type="button" className="qp-legx" title={L("Exclude", "استبعاد")} onClick={() => setPendingEx({ legName, onYes: () => setEx(true) })}>✕</button>}
+            {editable && !ex && <button type="button" className="qp-legx" title={L("Exclude", "استبعاد")} onClick={() => setPendingEx({ title: exTitle, onYes: () => setEx(true) })}>✕</button>}
             <div>
               <div className="lbl">{label}</div>
               <div className="sub">{sub}</div>
@@ -1355,8 +1355,8 @@ function CounterFlow({
                     <td>{editable ? <>{priceBox(rateStr, setRateStr)}{room.rate != null && <div className={`qp-ref${changedFrom(rate, room.rate) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {nf(room.rate)}</div>}</> : <b className="tot">{money(rate)}</b>}</td>
                     <td><b className="tot">{money(rentalLine)}</b></td>
                   </tr>
-                  {legTr(L("Mobilization — mob", "التعبئة — موب"), L("delivery", "توصيل"), mobStr, setMobStr, mobUnitsN, setMobUnitsN, mobExcluded, setMobExcluded, room.mobPrice, L("delivery", "التوصيل"))}
-                  {legTr(L("Return — demob", "الإرجاع — ديموب"), L("pickup", "استلام"), demobStr, setDemobStr, demobUnitsN, setDemobUnitsN, demobExcluded, setDemobExcluded, room.demobPrice, L("return", "الإرجاع"))}
+                  {legTr(L("Mobilization — mob", "التعبئة — موب"), L("delivery", "توصيل"), mobStr, setMobStr, mobUnitsN, setMobUnitsN, mobExcluded, setMobExcluded, room.mobPrice, L("Cancel mobilization (delivery to site) from the supplier?", "إلغاء التعبئة (النقل إلى الموقع) من المورد؟"))}
+                  {legTr(L("Return — demob", "الإرجاع — ديموب"), L("pickup", "استلام"), demobStr, setDemobStr, demobUnitsN, setDemobUnitsN, demobExcluded, setDemobExcluded, room.demobPrice, L("Cancel demobilization (return from site) from the supplier?", "إلغاء الإرجاع (النقل من الموقع) من المورد؟"))}
                 </tbody>
               </table></div>
               <div className="qp-totals">
@@ -1531,17 +1531,19 @@ function CounterFlow({
 
         {pendingEx && (
           <div className="qp-scrim" style={{ zIndex: 75 }} dir={ar ? "rtl" : "ltr"} onClick={() => setPendingEx(null)}>
-            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 60px rgba(16,38,63,.35)", padding: "24px 22px 20px", textAlign: "center" }}>
-              <span style={{ display: "inline-flex", width: 52, height: 52, borderRadius: "50%", background: "#fdecea", color: "#d9362a", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
-                <span className="material-icons-outlined" style={{ fontSize: 26 }}>remove_circle_outline</span>
-              </span>
-              <h3 style={{ fontSize: 16.5, fontWeight: 900, color: "#1c3550", margin: 0 }}>{L(`Exclude ${pendingEx.legName} from your offer?`, `استبعاد ${pendingEx.legName} من عرضك؟`)}</h3>
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#6b8fa8", lineHeight: 1.6, margin: "8px 0 18px" }}>
-                {L("The supplier won't provide this leg — you'll arrange it yourself. You can restore it anytime before sending your counter.", "لن يوفّر المؤجّر هذا البند — ستُرتّبه بنفسك. يمكنك استعادته في أي وقت قبل إرسال ردّك.")}
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 400, background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 60px rgba(16,38,63,.35)", padding: "22px 22px 20px", textAlign: "start" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                <h3 style={{ fontSize: 16.5, fontWeight: 900, color: "#1c3550", margin: 0, lineHeight: 1.45 }}>{pendingEx.title}</h3>
+                <span style={{ flexShrink: 0, display: "inline-flex", width: 42, height: 42, borderRadius: 12, background: "#fff4e5", color: "#d4780a", alignItems: "center", justifyContent: "center" }}>
+                  <span className="material-icons-outlined" style={{ fontSize: 24 }}>warning_amber</span>
+                </span>
+              </div>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "#6b8fa8", lineHeight: 1.7, margin: "10px 0 18px" }}>
+                {L("If you cancel, the supplier won't handle it — it becomes your responsibility: you arrange the transport and cover its cost, and it won't appear in the supplier's offer.", "عند الإلغاء لن يتكفّل المورد بها — تصبح على مسؤوليتك أنت: تنظّم النقل وتتحمّل تكلفته، ولن تظهر ضمن عرض المورد.")}
               </p>
               <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={() => setPendingEx(null)} style={{ flex: 1, padding: "12px", borderRadius: 13, border: "1.5px solid #d4e0ec", background: "#fff", color: "#1c3550", fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{L("Cancel", "إلغاء")}</button>
-                <button onClick={() => { pendingEx.onYes(); setPendingEx(null); }} style={{ flex: 1, padding: "12px", borderRadius: 13, border: "none", background: "#d9362a", color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{L("Exclude", "استبعاد")}</button>
+                <button onClick={() => setPendingEx(null)} style={{ flex: "0 0 auto", padding: "13px 22px", borderRadius: 13, border: "1.5px solid #d4e0ec", background: "#fff", color: "#1c3550", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" }}>{L("Go back", "تراجع")}</button>
+                <button onClick={() => { pendingEx.onYes(); setPendingEx(null); }} style={{ flex: 1, padding: "13px 12px", borderRadius: 13, border: "none", background: "#d9362a", color: "#fff", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{L("Yes, cancel it — on me", "نعم، ألغِها — عليّ أنا")}</button>
               </div>
             </div>
           </div>
