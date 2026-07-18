@@ -605,13 +605,15 @@ export function BidComparisonWorkspace() {
     const onClick = fileUrl ? () => setDocView({ label, url: fileUrl, loading: false }) : linkVal ? () => setDocView({ label, url: null, value: linkVal, loading: false }) : () => openDoc(c, hint, label);
     return <button type="button" onClick={onClick} title={linkVal ? L("View value", "عرض القيمة") : L("View document", "عرض المستند")} className={cls} style={style}>{inner}</button>;
   };
-  // Green ✓ / red × cert pill WITHOUT a doc-view eye — for declared certs (e.g. the operator's) that
-  // have no file to open. Same visual weight as the big docChip.
-  const certPill = (label: string, held: boolean) => (
-    <span className="inline-flex items-center gap-1 text-[11.5px]" style={{ background: held ? C.successBg : C.dangerBg, color: held ? C.success : C.danger, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: `1px solid ${held ? "rgba(29,175,88,.3)" : "rgba(217,54,42,.3)"}` }}>
-      <span className="material-icons-outlined" style={{ fontSize: 11 }}>{held ? "check" : "close"}</span>{label}
-    </span>
-  );
+  // Green ✓ / red × cert pill. `fileUrl` (off-platform operator cert) makes it a clickable eye that opens
+  // the uploaded file; without it, it's a plain declared-cert pill (no file to open). Same weight as docChip.
+  const certPill = (label: string, held: boolean, fileUrl?: string | null) => {
+    const style = { background: held ? C.successBg : C.dangerBg, color: held ? C.success : C.danger, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: `1px solid ${held ? "rgba(29,175,88,.3)" : "rgba(217,54,42,.3)"}` } as const;
+    const inner = <><span className="material-icons-outlined" style={{ fontSize: 11 }}>{held ? "check" : "close"}</span>{label}{fileUrl && <span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>visibility</span>}</>;
+    return fileUrl
+      ? <button type="button" onClick={() => setDocView({ label, url: fileUrl, loading: false })} title={L("View document", "عرض المستند")} className="inline-flex items-center gap-1 text-[11.5px]" style={style}>{inner}</button>
+      : <span className="inline-flex items-center gap-1 text-[11.5px]" style={style}>{inner}</span>;
+  };
   const grandTotal = (c: BidColumn) => Math.round(supplierStated(c) * (1 + VAT)) + renterAddBid(c);
   const hasCost = (c: BidColumn) => supplierStated(c) > 0 || renterAddBid(c) > 0;
   const grandList = cols.filter(hasCost).map(grandTotal);
@@ -1612,34 +1614,6 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         })}
                       </tr>
                     ))}
-                    {/* All files a shared-link supplier uploaded on the bid form — a complete, viewable index
-                        (photos, ownership, equip/operator certs, company docs). Shown only when an off-platform
-                        column actually has files, so pure on-platform comparisons are unchanged. Each opens the
-                        presigned file in the in-app viewer. */}
-                    {cols.some((c) => c.bid.viaSharedLink && bidDocs[c.bid.id] && (bidDocs[c.bid.id].equipmentDocuments.length + bidDocs[c.bid.id].companyDocuments.length) > 0) && (
-                      <tr>
-                        <RowHead title={L("Uploaded documents", "المستندات المرفوعة")} sub={L("all files the supplier attached", "كل الملفات التي أرفقها المؤجّر")} />
-                        {cols.map((c) => {
-                          const dd = bidDocs[c.bid.id];
-                          const files = dd ? [...dd.equipmentDocuments, ...dd.companyDocuments].filter((x) => x.url) : [];
-                          if (!files.length) return <Td key={c.bid.id}><span style={{ color: C.muted }}>—</span></Td>;
-                          return (
-                            <Td key={c.bid.id}>
-                              <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
-                                {files.map((f, i) => {
-                                  const lbl = (ar ? f.labelAr ?? f.label : f.label);
-                                  return (
-                                    <button key={i} type="button" onClick={() => setDocView({ label: lbl, url: f.url, loading: false })} title={L("View document", "عرض المستند")} className="inline-flex items-center gap-1 text-[11.5px]" style={{ background: C.renteeDim, color: C.rentee, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: "1px solid rgba(37,99,235,.3)" }}>
-                                      <span className="material-icons-outlined" style={{ fontSize: 11 }}>{f.fileType === "image" ? "image" : "description"}</span>{lbl}<span className="material-icons-outlined" style={{ fontSize: 11, opacity: 0.7 }}>visibility</span>
-                                    </button>
-                                  );
-                                })}
-                              </span>
-                            </Td>
-                          );
-                        })}
-                      </tr>
-                    )}
                     {/* Operator included — acknowledge term. Green ✓ "Included" when the supplier includes an
                         operator, red ✗ "Not included" on a conflict (e.g. link supplier said No to a required
                         operator). Reflects the same truth the terms modal shows, inside the Equipment section. */}
@@ -1675,10 +1649,13 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         // doesn't satisfy the requirement (e.g. required SPSP, declared TÜV), show it as a BLUE
                         // "extra" chip next to the red required one — so the renter sees what they DO hold.
                         const showExtra = !met && declaredOk && !!declared && !satisfiesReq;
+                        // Off-platform: the supplier's uploaded operator-cert file (operator_tuv/spsp/saso/other)
+                        // → make the pill a clickable eye that opens it, in this existing row.
+                        const opFile = c.bid.viaSharedLink ? bidDocs[c.bid.id]?.equipmentDocuments.find((d) => d.url && d.type?.startsWith("operator"))?.url ?? null : null;
                         return (
                           <Td key={c.bid.id} ok={met} fail={!met}>
                             <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
-                              {certPill(req, met)}
+                              {certPill(req, met, opFile)}
                               {showExtra && (
                                 <span className="inline-flex items-center gap-1 text-[11.5px]" title={L("Declared — doesn’t meet the requirement", "مُعلن — لا يفي بالمطلوب")} style={{ background: C.renteeDim, color: C.rentee, fontWeight: 800, padding: "5px 10px", borderRadius: 8, border: "1px solid rgba(37,99,235,.3)" }}>
                                   <span className="material-icons-outlined" style={{ fontSize: 11 }}>add</span>{declared}
