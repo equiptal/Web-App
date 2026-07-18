@@ -34,7 +34,10 @@ export function BidReadinessBadge({ r, L, onClick }: { r: BidReadiness; L: LFn; 
     >
       <span className="material-icons-outlined" style={{ fontSize: 14 }}>{ready ? "verified" : "fact_check"}</span>
       <span style={{ fontVariantNumeric: "tabular-nums" }}>{r.readyCount}/{r.committed}</span>
-      {onClick && <span className="material-icons-outlined" style={{ fontSize: 14, opacity: 0.7 }}>visibility</span>}
+      {onClick && <>
+        <span className="material-icons-outlined" style={{ fontSize: 14, opacity: 0.85 }}>visibility</span>
+        {L("View eligibility", "عرض الجاهزية")}
+      </>}
     </button>
   );
 }
