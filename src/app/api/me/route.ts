@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuthedBackend, appAuthErrorResponse } from "@/lib/api/app-backend-authed";
 import { clearAuthCookies } from "@/lib/api/auth-server";
 import { normalizeTier } from "@/lib/contract/auth";
+import { setUserCookie } from "@/lib/api/auth-server";
 import { supplierStatusToVerification, type RenterProfile } from "@/lib/contract/onboarding";
 
 interface BackendMe {
@@ -15,6 +16,8 @@ interface BackendMe {
   email?: string | null;
   whatsapp?: string | null;
   tier?: string;
+  /** mobile/016 — first-request slot flag; gates the home "Start Your Request" pop-up. */
+  hasUsedFirstRequestSlot?: boolean;
   crNumber?: string | null;
   commercialRegistrationNumber?: string | null;
   vatNumber?: string | null;
@@ -35,6 +38,8 @@ interface BackendMe {
 }
 interface BackendStatus {
   supplierStatus?: number | null;
+  /** Also carried on profile-status; used as the fallback if `/users/me` omits it. */
+  hasUsedFirstRequestSlot?: boolean;
 }
 
 /**
@@ -58,6 +63,9 @@ export async function GET(req: Request) {
         jobTitle: me.jobTitle ?? null,
         email: me.email ?? null,
         whatsapp: me.whatsapp ?? null,
+        // mobile/016 — the backend exposes this on BOTH /users/me and /users/me/profile-status; read
+        // either so the home pop-up gate works regardless of which one carries it.
+        hasUsedFirstRequestSlot: me.hasUsedFirstRequestSlot ?? status.hasUsedFirstRequestSlot ?? false,
         // Company identity for the quotation Rentee block — read from either the user or its profile,
         // tolerant of the backend's field naming. Null when absent (quotation falls back to the pill).
         crNumber: me.crNumber ?? me.commercialRegistrationNumber ?? me.supplierProfile?.crNumber ?? me.supplierProfile?.commercialRegistrationNumber ?? null,
@@ -79,10 +87,24 @@ export async function GET(req: Request) {
             .filter(Boolean)
             .join(", ") || null),
       };
-      return NextResponse.json({
+      const res = NextResponse.json({
         user,
         verification: { status: supplierStatusToVerification(status.supplierStatus) },
       });
+      // Heal a stale session tier. `useSession().tier` — which gates the sidebar card, the
+      // quotation download and the request-limit checks — comes from the `mt_user` cookie, and
+      // `/api/auth/session` reads that cookie without ever re-reading the backend. So a tier change
+      // made ELSEWHERE never reached this browser: most importantly, a member approved into a
+      // verified company inherits Verified server-side but kept seeing "Basic" here until they
+      // signed in again. This route already holds a fresh `/users/me`, so re-stamping costs nothing.
+      // Guarded, NOT unconditional: `normalizeTier` falls back to "guest" for anything it doesn't
+      // recognise, and this runs on every authed page load — so a response that omitted `tier` would
+      // silently demote the user to guest and the bad cookie would stick. Only re-stamp when the
+      // backend actually sent a tier; otherwise leave the existing cookie untouched.
+      if (typeof me.tier === "string" && me.tier) {
+        setUserCookie(res, { id: me.id, phone: me.phone, tier: normalizeTier(me.tier) });
+      }
+      return res;
     } catch (err) {
       return appAuthErrorResponse(err);
     }

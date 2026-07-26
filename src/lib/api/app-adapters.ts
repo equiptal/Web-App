@@ -1,5 +1,6 @@
 import type { Taxonomy } from "@/lib/contract";
-import { postableItems } from "@/lib/contract";
+import { postableItems, normalizeSafetyCert } from "@/lib/contract";
+import type { EquipmentItem } from "@/lib/contract";
 import type { RfqRequestPayload } from "@/lib/contract";
 import type { TaxonomyNode, CreateRequestPayload, CreateRequestItem } from "@/lib/contract/app";
 
@@ -13,6 +14,9 @@ export function nodesToTree(nodes: TaxonomyNode[]): Taxonomy {
     id: c.id,
     name: c.name,
     nameAr: c.name_ar, // carry Arabic display names (was dropped) so the UI can render them by locale
+    // Carry the canonical group tag — it's what `isLiftingCategory` reads to decide the 2026-07 cert
+    // rule (lifting → Aramco). Tags live on CATEGORY rows, so a subcategory inherits its parent's.
+    tag: c.tag,
     subcategories: subs
       .filter((s) => s.parent_id === c.id)
       .sort(bySort)
@@ -20,6 +24,7 @@ export function nodesToTree(nodes: TaxonomyNode[]): Taxonomy {
         id: s.id,
         name: s.name,
         nameAr: s.name_ar,
+        tag: s.tag ?? c.tag,
         measurements: meas
           .filter((m) => m.parent_id === s.id)
           .sort(bySort)
@@ -185,6 +190,9 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
   const safetyOtherText = project.certificates.safetyOther.trim();
   const toCertTokens = (certs: string[]): string[] =>
     [...new Set(certs.map((c) => CERT_TOKEN_MAP[c]).filter(Boolean) as string[])];
+  /** An item's effective free-text "Other" cert: its own, else the request-wide one it inherits. */
+  const itemOtherCert = (i: EquipmentItem): string =>
+    (i.safetyCertsOtherText ?? (i.safetyCertsOverride ? "" : safetyOtherText)).trim();
   // AC-50: "Other" certs → requiredCerts (canonical tokens); the local-content flag is its own boolean.
   const otherCerts = project.certificates.other;
   const localContent = otherCerts.includes("local-content");
@@ -237,7 +245,15 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
         fuelTypePreference: FUEL_MAP[i.fuelType],
         mobilizationByRentee: (i.deliveryOverride ?? project.deliveryToSite ?? "me") === "me",
         demobilizationByRentee: (i.returnOverride ?? project.returnFromSite ?? "me") === "me",
-        additionalNotes: i.additionalNotes || undefined, // AC-53 (rule 6: needs the deployed item column)
+        // AC-53, plus the item's genuinely-custom "Other" cert: free text can never match an equipment
+        // doc type (placing it in the gating list would silently kill bidding), so it rides to suppliers
+        // as a note — same treatment the request-wide free-text cert gets. A legacy code that DOES map
+        // is shipped as a token above instead, and never duplicated here.
+        additionalNotes: (() => {
+          const other = itemOtherCert(i);
+          const note = other && !CERT_TOKEN_MAP[normalizeSafetyCert(other)] ? `Additional certificate required: ${other}` : "";
+          return [i.additionalNotes?.trim(), note].filter(Boolean).join("\n") || undefined;
+        })(),
         // Part 1: free-text work type, crane subtypes only (≤255). Trimmed; omitted when blank.
         workType: i.workType?.trim() ? i.workType.trim().slice(0, 255) : undefined,
         maxEquipmentAge: toManufactureYear(i.equipmentYear ?? project.advanced.equipmentYear), // AC-28 per-item year, falls back to request-wide (undefined ⇒ key dropped)
@@ -281,6 +297,12 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
           const base = [...(i.safetyCertsOverride ?? project.certificates.safety)];
           if (operatorIncluded && i.operator.certificate.includes("saso-technical")) base.push("saso-technical");
           const tokens = toCertTokens(base);
+          // The item's free-text "Other": if it normalizes to a real doc type (a legacy `spsp` /
+          // `saso-technical` that `splitSafetyCerts` routed into the box) ship it as that token, so
+          // round-tripping a legacy cert through the text field never loses it. Genuinely custom text
+          // stays out of the gating list and rides as a per-item note instead (see itemOtherCertNote).
+          const otherToken = CERT_TOKEN_MAP[normalizeSafetyCert(itemOtherCert(i))];
+          if (otherToken && !tokens.includes(otherToken)) tokens.push(otherToken);
           return tokens.length ? tokens : undefined;
         })(),
       };

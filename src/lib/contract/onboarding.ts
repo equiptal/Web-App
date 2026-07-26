@@ -31,6 +31,12 @@ export interface RenterProfile {
   crNumber?: string | null;
   vatNumber?: string | null;
   nationalAddress?: string | null;
+  /**
+   * mobile/016 — `true` once this account has completed a first request (a real submit succeeded, or
+   * a trial's sample bids rendered). Gates the home "Start Your Request" pop-up, exactly as in the
+   * app. Account-level and persistent: it survives the trial's 60-min auto-delete.
+   */
+  hasUsedFirstRequestSlot?: boolean;
 }
 
 /** A master-data option (city / job title). */

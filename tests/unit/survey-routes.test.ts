@@ -1,3 +1,7 @@
+// NOTE — Outcome Survey is DISABLED (see docs/surveys-disabled.md). The two proxy suites below are
+// `describe.skip`: they assert the old backend-proxy behaviour and are kept verbatim so restoring the
+// feature is a matter of removing `.skip`. The active suite at the bottom pins the disabled contract.
+
 import { describe, it, expect, vi, afterEach } from "vitest";
 
 // Integration test for the Outcome Survey BFF routes: exercise the real `withAuthedBackend` proxy
@@ -26,7 +30,7 @@ function jsonReq(url: string, body: unknown) {
   return new Request(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 }
 
-describe("GET /api/me/surveys/pending", () => {
+describe.skip("GET /api/me/surveys/pending", () => {
   it("proxies GET /api/surveys/pending as the renter and returns the pending unit", async () => {
     const unit = {
       groupId: null,
@@ -64,7 +68,7 @@ describe("GET /api/me/surveys/pending", () => {
   });
 });
 
-describe("POST /api/me/surveys/{id}/respond", () => {
+describe.skip("POST /api/me/surveys/{id}/respond", () => {
   it("forwards the answer to /api/surveys/{id}/respond and returns the result", async () => {
     const fetchMock = backend({ success: true, data: { status: "CONFIRMED" } });
     vi.stubGlobal("fetch", fetchMock);
@@ -107,5 +111,29 @@ describe("POST /api/me/surveys/{id}/respond", () => {
     });
     expect(res.status).toBe(404);
     expect((await res.json()).backendCode).toBe("SURVEY_NOT_FOUND");
+  });
+});
+
+// ---- Active: the disabled contract -------------------------------------------------------------
+describe("Outcome Survey routes are disabled", () => {
+  it("GET /api/me/surveys/pending returns 404 and never calls the backend", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const res = await getPending(new Request("https://web.test/api/me/surveys/pending"));
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ code: "not_found" });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("POST /api/me/surveys/{id}/respond returns 404 and never calls the backend", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const res = await respond(
+      jsonReq(`https://web.test/api/me/surveys/${SURVEY_ID}/respond`, { action: "confirm" }),
+      { params: Promise.resolve({ id: SURVEY_ID }) },
+    );
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ code: "not_found" });
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useRfq } from "@/lib/store/rfq-store";
 import { useT } from "@/lib/i18n";
 import { Intake } from "@/components/screens/Intake";
@@ -18,6 +19,7 @@ import { Icon } from "@/components/ui";
 export function CreateSurface() {
   const { state, actions } = useRfq();
   const t = useT();
+  const router = useRouter();
 
   const screen = (() => {
     switch (state.phase) {
@@ -34,6 +36,26 @@ export function CreateSurface() {
 
   return (
     <>
+      {/* mobile/016 — trial-run ribbon. Stays above every phase of the flow (intake → wizard →
+          confirmation) so it's never ambiguous whether this submission reaches real suppliers. Switching
+          to a real request goes through the URL, which is the authority for the mode (see /create). */}
+      {state.isTrial && (
+        <div className="mb-4 flex flex-wrap items-center gap-2.5 rounded-[12px] border border-warn/35 bg-warn/[0.07] px-4 py-3">
+          <span className="grid h-7 w-7 flex-none place-items-center rounded-[8px] bg-warn/15 text-warn">
+            <Icon name="science" size={17} />
+          </span>
+          <span className="min-w-0 flex-1 text-[13px] font-semibold text-navy">{t.startRequest.modeBanner}</span>
+          {state.phase !== "confirmation" && (
+            <button
+              type="button"
+              onClick={() => router.replace("/create?mode=real")}
+              className="text-[12.5px] font-bold text-brand underline decoration-brand/40 underline-offset-2 transition hover:decoration-brand"
+            >
+              {t.startRequest.modeBannerSwitch}
+            </button>
+          )}
+        </div>
+      )}
       {screen}
       {state.draftPrompt && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">

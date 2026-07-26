@@ -19,6 +19,65 @@ export const SAFETY_CERTIFICATES: SafetyCertificate[] = ["tuv", "aramco", "other
 /** Operator per-item certificate options — Aramco is NOT an operator cert (equipment-only, app parity). */
 export const OPERATOR_CERTIFICATES: SafetyCertificate[] = ["tuv", "spsp", "saso-technical", "other"];
 
+/**
+ * Normalize a stored/legacy equipment-cert value to a canonical code. App parity:
+ * `normalizeEquipmentCertCode` (localized_labels.dart) — requests created before the current taxonomy
+ * stored display labels ("TUV", "SPSP", "SASO Technical"), so map those plus any casing/spacing variant
+ * onto the canonical code. An unrecognized value passes through lower-cased so nothing is dropped
+ * silently; {@link splitSafetyCerts} then routes it to the free-text "Other" box.
+ */
+export function normalizeSafetyCert(raw: string): string {
+  const key = raw.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  switch (key) {
+    case "tuv":
+    case "tuv_certificate":
+    case "tuv_inspection":
+      return "tuv";
+    case "aramco":
+    case "aramco_certified":
+    case "aramco_certificate":
+      return "aramco";
+    case "spsp":
+    case "spsp_certificate":
+    case "spsp_inspection":
+      return "spsp";
+    case "saso":
+    case "saso_technical":
+    case "saso_technical_inspection":
+      return "saso-technical";
+    case "saso_registration":
+      return "saso-registration";
+    default:
+      return key;
+  }
+}
+
+/**
+ * Split a stored cert list into the chips the UI offers and the single free-text "Other" value.
+ * App parity: the hydration in `equipment_step.dart` — canonical offered codes become chips, and the
+ * FIRST value that isn't offered (a legacy `spsp` / `saso-technical`, or genuinely custom text) becomes
+ * the "Other" text so it stays visible and editable instead of riding along invisibly.
+ */
+export function splitSafetyCerts(values: readonly string[] | null | undefined): {
+  chips: SafetyCertificate[];
+  otherText: string;
+} {
+  const chips: SafetyCertificate[] = [];
+  let otherText = "";
+  for (const raw of values ?? []) {
+    if (!raw?.trim()) continue;
+    const code = normalizeSafetyCert(raw);
+    if ((SAFETY_CERTIFICATES as readonly string[]).includes(code)) {
+      // Includes a literal "other" chip already in UI form — its text lives in the field, not the list.
+      if (!chips.includes(code as SafetyCertificate)) chips.push(code as SafetyCertificate);
+    } else if (!otherText) {
+      otherText = raw.trim();
+    }
+  }
+  if (otherText && !chips.includes("other")) chips.push("other");
+  return { chips, otherText };
+}
+
 export type OtherCertificate = "local-content" | "saso-registration"; // AC-50
 // `saso-registration` is intentionally NOT offered: request-level requiredCerts was removed in the
 // terms-field cleanup (terms-journey doc), so the backend drops it. Only local-content (its own boolean
@@ -35,13 +94,17 @@ export type OperatorNeeded = "yes" | "no"; // AC-24
 export type OperatorCertificate = SafetyCertificate;
 
 /**
- * Default operator certificate for an item, mirroring the app's `operatorCertForEquipmentCerts`
- * (localized_labels.dart): TÜV when the item's equipment cert includes TÜV, otherwise SPSP. Since the
- * lifting default equipment cert is Aramco, this yields SPSP for lifting and TÜV elsewhere. Seeded only
- * when the operator is enabled and no operator cert is set yet — the renter can still change it.
+ * The operator certificate the 2026-07 cert rule seeds — SPSP for EVERY equipment group, matching the
+ * app's `kDefaultOperatorCertCode` (localized_labels.dart). Aramco isn't an operator-cert option and
+ * TÜV isn't the operator standard, so the branch that picks the *equipment* cert (Aramco vs TÜV) does
+ * not fan into the operator cert. Seeded only when the operator is enabled and no operator cert is set
+ * yet — the renter can still change it.
  */
-export function operatorCertDefault(equipmentCerts: readonly SafetyCertificate[] | null | undefined): OperatorCertificate {
-  return (equipmentCerts ?? []).some((c) => c === "tuv") ? "tuv" : "spsp";
+export const DEFAULT_OPERATOR_CERT: OperatorCertificate = "spsp";
+
+/** @see DEFAULT_OPERATOR_CERT — kept as a function so call sites read as "the seeded default". */
+export function operatorCertDefault(): OperatorCertificate {
+  return DEFAULT_OPERATOR_CERT;
 }
 
 /**

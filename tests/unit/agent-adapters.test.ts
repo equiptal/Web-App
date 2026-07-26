@@ -91,7 +91,10 @@ describe("agentOutputToDraft — request-wide reconciliation (AC-25/26)", () => 
     );
     expect(d.project.certificates.safety).toEqual([]); // differ → no request-wide default
     expect(JSON.stringify(d.items[0].safetyCertsOverride)).toBe(JSON.stringify(["tuv"]));
-    expect(JSON.stringify(d.items[1].safetyCertsOverride)).toBe(JSON.stringify(["spsp"]));
+    // SPSP isn't an offered chip, so it lands in the item's free-text "Other" box (app parity) rather
+    // than sitting in the list with nothing to render it. See tests/unit/cert-rule.test.ts.
+    expect(JSON.stringify(d.items[1].safetyCertsOverride)).toBe(JSON.stringify(["other"]));
+    expect(d.items[1].safetyCertsOtherText).toBe("SPSP");
   });
 
   it("leaves the request-wide setting unselected (null) when items disagree", () => {

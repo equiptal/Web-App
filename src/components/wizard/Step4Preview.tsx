@@ -46,7 +46,9 @@ export function Step4Preview() {
     t.options.party[r.fuelResp],
     t.options.party[r.delivery],
     t.options.party[r.ret],
-    r.certificate.length ? r.certificate.map((c) => t.options.safetyCert[c]).join(", ") : "—",
+    r.certificate.length
+      ? r.certificate.map((c) => (c === "other" && r.certificateOther ? r.certificateOther : t.options.safetyCert[c])).join(", ")
+      : "—",
     r.notes || "—",
   ];
 
