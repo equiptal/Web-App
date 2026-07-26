@@ -15,6 +15,8 @@ interface BackendMe {
   email?: string | null;
   whatsapp?: string | null;
   tier?: string;
+  /** mobile/016 — first-request slot flag; gates the home "Start Your Request" pop-up. */
+  hasUsedFirstRequestSlot?: boolean;
   crNumber?: string | null;
   commercialRegistrationNumber?: string | null;
   vatNumber?: string | null;
@@ -35,6 +37,8 @@ interface BackendMe {
 }
 interface BackendStatus {
   supplierStatus?: number | null;
+  /** Also carried on profile-status; used as the fallback if `/users/me` omits it. */
+  hasUsedFirstRequestSlot?: boolean;
 }
 
 /**
@@ -58,6 +62,9 @@ export async function GET(req: Request) {
         jobTitle: me.jobTitle ?? null,
         email: me.email ?? null,
         whatsapp: me.whatsapp ?? null,
+        // mobile/016 — the backend exposes this on BOTH /users/me and /users/me/profile-status; read
+        // either so the home pop-up gate works regardless of which one carries it.
+        hasUsedFirstRequestSlot: me.hasUsedFirstRequestSlot ?? status.hasUsedFirstRequestSlot ?? false,
         // Company identity for the quotation Rentee block — read from either the user or its profile,
         // tolerant of the backend's field naming. Null when absent (quotation falls back to the pill).
         crNumber: me.crNumber ?? me.commercialRegistrationNumber ?? me.supplierProfile?.crNumber ?? me.supplierProfile?.commercialRegistrationNumber ?? null,

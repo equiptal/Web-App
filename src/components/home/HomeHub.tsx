@@ -6,6 +6,17 @@ import { useT, useLocale } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { BrowseSurface } from "@/components/stores/BrowseSurface";
 import { fetchActivity, type ActivityCounts } from "@/lib/api/client";
+import { StartYourRequestModal, type StartRequestChoice } from "@/components/home/StartYourRequestModal";
+import { useStartRequestGate } from "@/lib/access/start-request-gate";
+
+/**
+ * mobile/016 — once-per-tab guard for the AUTOMATIC first-request pop-up, mirroring the app's
+ * `TrialColdStartGuard`: it self-raises on the renter's first landing on home, and a client-side
+ * re-render or an in-tab return to home doesn't re-raise it. Dismissing leaves the server-side slot
+ * open, so it returns on the next visit (fresh tab / reload) — app parity (AC-20). Tapping
+ * **Create request** is a separate, explicit trigger and is NOT subject to this guard.
+ */
+const POPUP_SHOWN_KEY = "start-request-popup-shown";
 
 /** Gradient that darkens to the corner — shared by the hero and the store-card banners. */
 export const DARK_GRADIENT = "bg-gradient-to-br from-[#1e3a5f] to-[#0f1e2e]";
@@ -30,6 +41,9 @@ export function HomeHub() {
   const ar = locale === "ar";
   const router = useRouter();
   const [activity, setActivity] = useState<ActivityCounts | null>(null);
+  const [startPopup, setStartPopup] = useState(false);
+  // Reuses the activity count this screen already loads, so the gate costs one extra /api/me read.
+  const offerStartChoice = useStartRequestGate(activity?.openRequests ?? null);
 
   useEffect(() => {
     let active = true;
@@ -40,6 +54,37 @@ export function HomeHub() {
       active = false;
     };
   }, []);
+
+  // mobile/016 (AC-01/22/23) — self-raise the pop-up once per tab on landing, mirroring the app's
+  // cold-start trigger. The explicit "Create request" path below doesn't depend on this.
+  useEffect(() => {
+    if (offerStartChoice !== true) return;
+    try {
+      if (window.sessionStorage.getItem(POPUP_SHOWN_KEY) === "1") return;
+      window.sessionStorage.setItem(POPUP_SHOWN_KEY, "1");
+    } catch {
+      /* storage blocked → still show it, just without the once-per-tab guard */
+    }
+    setStartPopup(true);
+  }, [offerStartChoice]);
+
+  // "Create request": when the renter has nothing live, ask Trial-or-Real FIRST instead of dropping
+  // straight into the form. Otherwise (they already have active requests) go straight to /create as
+  // before. `offerStartChoice` is null while unknown → never blocks the button.
+  const onCreateRequest = () => {
+    if (offerStartChoice === true) {
+      setStartPopup(true);
+      return;
+    }
+    router.push("/create");
+  };
+
+  // Both choices go through the normal RFQ flow ("Write your RFQ"); `mode` only tells the flow whether
+  // the eventual submit is a trial. Dismissing does nothing — the slot stays open (AC-20).
+  const onChooseStart = (choice: StartRequestChoice) => {
+    setStartPopup(false);
+    router.push(`/create?mode=${choice}`);
+  };
 
   const newBids = activity?.newBids ?? 0;
 
@@ -63,7 +108,7 @@ export function HomeHub() {
           {/* Single entry into the RFQ input flow (web-app/002). */}
           <div className="flex flex-none flex-col gap-3 sm:flex-row lg:flex-col lg:items-stretch">
             <button
-              onClick={() => router.push("/create")}
+              onClick={onCreateRequest}
               className="inline-flex items-center justify-center gap-2 rounded-[12px] bg-brand px-6 py-3 text-[14px] font-semibold text-brand-fg transition hover:brightness-[1.04]"
             >
               <Icon name="add" size={16} /> {t.home.createRequest}
@@ -102,6 +147,9 @@ export function HomeHub() {
 
       {/* Suggested suppliers — filter bar always shown; View all only adds cards (AC-05/10/11/12/13) */}
       <BrowseSurface title={t.home.suppliersTitle} previewCount={8} />
+
+      {/* mobile/016 — first-request choice: Trial or Real, both into /create. */}
+      <StartYourRequestModal open={startPopup} onClose={() => setStartPopup(false)} onChoose={onChooseStart} />
     </div>
   );
 }

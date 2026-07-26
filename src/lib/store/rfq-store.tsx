@@ -77,6 +77,15 @@ export interface RfqState {
   draftPrompt: boolean;
   /** Server guest-parse cap was hit — Intake opens the account modal in response (signed-out only). */
   guestLimit: boolean;
+  /**
+   * mobile/016 — the renter picked "Trial Request" on the home pop-up, so this run submits with
+   * `isTrial: true`: the backend creates the request but never dispatches it to suppliers, attaches
+   * sample bids, and auto-deletes it after 60 min. Set from `/create?mode=trial` and persisted with the
+   * draft, so a mid-flow reload can't silently turn a trial into a real (dispatched) request.
+   */
+  isTrial: boolean;
+  /** The trial's 60-min expiry, echoed by the backend on submit (null for a real request). */
+  trialExpiresAt: string | null;
 }
 
 const initialState: RfqState = {
@@ -98,6 +107,8 @@ const initialState: RfqState = {
   agentOrigin: null,
   draftPrompt: false,
   guestLimit: false,
+  isTrial: false,
+  trialExpiresAt: null,
 };
 
 type Action =
@@ -133,8 +144,9 @@ type Action =
   | { t: "ADD_ITEM" }
   | { t: "REMOVE_ITEM"; id: string }
   | { t: "PATCH_PREFERENCES"; patch: DeepPrefPatch }
+  | { t: "SET_TRIAL"; isTrial: boolean }
   | { t: "SUBMIT_START" }
-  | { t: "SUBMIT_SUCCESS"; requestId: string; requestIds: string[]; requestUuids: string[] }
+  | { t: "SUBMIT_SUCCESS"; requestId: string; requestIds: string[]; requestUuids: string[]; trialExpiresAt?: string | null }
   | { t: "SUBMIT_ERROR"; kind: ApiErrorKind; detail?: RfqState["errorDetail"] }
   | { t: "HYDRATE"; saved: Partial<RfqState> }
   | { t: "RESET" };
@@ -388,8 +400,18 @@ function reducer(state: RfqState, a: Action): RfqState {
       });
     case "SUBMIT_START":
       return { ...state, busy: true, error: null, errorDetail: null };
+    case "SET_TRIAL":
+      return { ...state, isTrial: a.isTrial };
     case "SUBMIT_SUCCESS":
-      return { ...state, busy: false, phase: "confirmation", requestId: a.requestId, requestIds: a.requestIds, requestUuids: a.requestUuids };
+      return {
+        ...state,
+        busy: false,
+        phase: "confirmation",
+        requestId: a.requestId,
+        requestIds: a.requestIds,
+        requestUuids: a.requestUuids,
+        trialExpiresAt: a.trialExpiresAt ?? null,
+      };
     case "SUBMIT_ERROR":
       return { ...state, busy: false, error: a.kind, errorDetail: a.detail ?? null };
     case "RESET":
@@ -462,6 +484,9 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
 
     patchPreferences: (patch: DeepPrefPatch) => dispatch({ t: "PATCH_PREFERENCES", patch }),
 
+    /** mobile/016 — enter/leave trial mode for this run (set from `/create?mode=trial`). */
+    setTrial: (isTrial: boolean) => dispatch({ t: "SET_TRIAL", isTrial }),
+
     async submit() {
       const s = getState();
       if (!s.draft) return;
@@ -475,13 +500,21 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
         !!origin &&
         JSON.stringify([s.draft.project, finalItems]) !== JSON.stringify([origin.project, postableItems(origin.items)]);
       try {
-        const { requestId, requestIds, requestUuids } = await submitRequest({
+        const { requestId, requestIds, requestUuids, trialExpiresAt } = await submitRequest({
           project: s.draft.project,
           items: finalItems,
           preferences: s.draft.preferences,
           simulateError: s.simulateError,
+          // mobile/016 — sent only for a trial run; a real request's payload is unchanged.
+          ...(s.isTrial ? { isTrial: true } : {}),
         });
-        dispatch({ t: "SUBMIT_SUCCESS", requestId, requestIds: requestIds ?? (requestId ? [requestId] : []), requestUuids: requestUuids ?? [] });
+        dispatch({
+          t: "SUBMIT_SUCCESS",
+          requestId,
+          requestIds: requestIds ?? (requestId ? [requestId] : []),
+          requestUuids: requestUuids ?? [],
+          trialExpiresAt,
+        });
         if (s.draft.rfqId && editedFromDraft) {
           const patch = draftToRfqCorrection(
             { project: s.draft.project, items: finalItems, preferences: s.draft.preferences },
@@ -562,13 +595,15 @@ export function RfqProvider({ children }: { children: ReactNode }) {
 
   // Persist the editable draft + position whenever they change (skip processing/confirmation phases).
   // Stamp the owning user id so a later session can tell whose draft this is.
-  const { phase, step, draft, text, multiLocationDismissed, seq, agentOrigin } = state;
+  const { phase, step, draft, text, multiLocationDismissed, seq, agentOrigin, isTrial } = state;
   useEffect(() => {
     try {
       if (draft && (phase === "intake" || phase === "wizard")) {
         window.localStorage.setItem(
           DRAFT_STORAGE_KEY,
-          JSON.stringify({ phase, step, draft, text, multiLocationDismissed, seq, agentOrigin, userId: user?.id ?? null }),
+          // mobile/016 — `isTrial` rides along so a reload mid-flow resumes as a trial. Without it a
+          // rehydrated draft would submit as a REAL (dispatched) request the renter never asked for.
+          JSON.stringify({ phase, step, draft, text, multiLocationDismissed, seq, agentOrigin, isTrial, userId: user?.id ?? null }),
         );
       } else if (phase === "confirmation") {
         window.localStorage.removeItem(DRAFT_STORAGE_KEY); // request sent → clear the saved draft
@@ -576,7 +611,7 @@ export function RfqProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore quota/availability errors */
     }
-  }, [phase, step, draft, text, multiLocationDismissed, seq, agentOrigin, user]);
+  }, [phase, step, draft, text, multiLocationDismissed, seq, agentOrigin, isTrial, user]);
 
   // ---- Browser history ⇄ wizard position. The browser Back/Forward buttons step through the wizard
   // like the in-app Back/Next: each forward step pushes a history entry; Back/Forward fire popstate,

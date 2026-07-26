@@ -419,6 +419,27 @@ export const en = {
     laterNote: "Tracking bids and managing this request on the web is coming soon — for now you'll continue with bids in the Moedatech app as usual.",
     itemsSummary: "{count} items",
   },
+  /**
+   * mobile/016 — the "Start Your Request" first-request pop-up and the trial-mode surfaces it leads to.
+   * Copy is kept identical to the app's l10n keys (trialStartYourRequestTitle, trialRequestCardTitle, …)
+   * so a renter sees the same words on web and mobile.
+   */
+  startRequest: {
+    title: "Start Your Request",
+    trialTitle: "Trial Request",
+    trialBody: "Try the request flow with sample bids — nothing is sent to suppliers.",
+    realTitle: "Real Request",
+    realBody: "Send your request to real suppliers and get live bids.",
+    cancel: "CANCEL AND RETURN",
+    close: "Close",
+    /** Ribbon above the RFQ flow while trial mode is on. */
+    modeBanner: "Trial run — nothing will be sent to suppliers.",
+    modeBannerSwitch: "Switch to a real request",
+    /** Shown with the sample bids on a trial request. */
+    bidsBanner: "These are sample bids for your trial — no real suppliers were contacted.",
+    trialBadge: "TRIAL",
+    disappearsSoon: "TRIAL - DISAPPEARS SOON",
+  },
   guest: {
     blockTitle: "Create an account to continue", // AC-02
     blockBody: "RFQ creation is available to registered renters. Create an account to start a request.",

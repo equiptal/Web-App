@@ -121,9 +121,14 @@ export interface CreatedRequest {
   shortCode?: string;
   status?: string;
   matchedSupplierCount?: number;
+  /** mobile/016 — true when this was created as a trial (never dispatched to suppliers). */
+  isTrial?: boolean;
 }
 
 /** POST /agents/requests response — an ARRAY, one entry per equipment item (server-side fan-out). */
 export interface CreateRequestResult {
   requests: CreatedRequest[];
+  /** mobile/016 — echoed by the backend; `trialExpiresAt` is the ISO 60-min TTL (null for real). */
+  isTrial?: boolean;
+  trialExpiresAt?: string | null;
 }

@@ -334,9 +334,24 @@ export function resolveTerm(id: string, key: string, action: "accept" | "counter
 }
 
 export function submitRequest(
-  payload: RfqRequestPayload & { simulateError?: boolean },
-): Promise<{ requestId: string; requestIds?: string[]; requestUuids?: string[] }> {
-  return postJson<{ requestId: string; requestIds?: string[]; requestUuids?: string[] }>("/api/requests", payload);
+  payload: RfqRequestPayload & { simulateError?: boolean; isTrial?: boolean },
+): Promise<{
+  requestId: string;
+  requestIds?: string[];
+  requestUuids?: string[];
+  isTrial?: boolean;
+  trialExpiresAt?: string | null;
+}> {
+  return postJson("/api/requests", payload);
+}
+
+/**
+ * mobile/016 (AC-09) — tell the backend a trial's sample bids have rendered, which consumes the
+ * account's first-request slot so the home "Start Your Request" pop-up stops appearing. Fire once per
+ * trial, only after bids are actually on screen; failures are ignored (the slot just stays open).
+ */
+export function confirmTrialRendered(requestId: string): Promise<{ consumed?: boolean }> {
+  return postJson(`/api/me/requests/${encodeURIComponent(requestId)}/trial-rendered`, {});
 }
 
 /* ----------------- Outcome Survey (renter) — DISABLED ----------------- */

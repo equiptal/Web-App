@@ -24,10 +24,14 @@ async function sessionUserId(): Promise<string | null> {
  * POST /api/requests — submit the assembled broadcast request.
  * Real (AGENTS_API_URL + token set): maps the draft → create_request and POSTs /agents/requests as
  * the signed-in renter (web-app/001, AC-03), falling back to AGENTS_TEST_USER_ID only when there's
- * no session. Otherwise → mock. Body: RfqRequestPayload & { simulateError?: boolean }
+ * no session. Otherwise → mock. Body: RfqRequestPayload & { simulateError?, isTrial? }
+ *
+ * mobile/016 — `isTrial: true` (the renter picked "Trial Request" on the home pop-up) is forwarded to
+ * the agents backend, which creates the request WITHOUT dispatching it to suppliers, attaches sample
+ * bids from the demo supplier, and auto-deletes it after 60 min.
  */
 export async function POST(req: Request) {
-  let body: (RfqRequestPayload & { simulateError?: boolean }) | Record<string, never> = {};
+  let body: (RfqRequestPayload & { simulateError?: boolean; isTrial?: boolean }) | Record<string, never> = {};
   try {
     body = await req.json();
   } catch {
@@ -44,7 +48,12 @@ export async function POST(req: Request) {
   if (useRealApp && userId && "items" in body) {
     try {
       const payload = draftToCreateRequest(body as RfqRequestPayload, userId);
-      const data = await agentsPost<CreateRequestResult>("/agents/requests", payload);
+      // mobile/016 — sent only when true, so a real request's payload is byte-identical to before.
+      const isTrial = "isTrial" in body && body.isTrial === true;
+      const data = await agentsPost<CreateRequestResult>(
+        "/agents/requests",
+        isTrial ? { ...payload, isTrial: true } : payload,
+      );
       // The server fans out one request per equipment item → `requests[]`. Surface every code (for
       // display) AND the request UUIDs (the bid-link token resolves by UUID, never the shortCode).
       const codes = (data.requests ?? [])
@@ -54,7 +63,14 @@ export async function POST(req: Request) {
         .map((r) => r.requestId)
         .filter((c): c is string => !!c);
       return NextResponse.json(
-        { requestId: codes[0] ?? "RFQ", requestIds: codes.length ? codes : ["RFQ"], requestUuids: uuids },
+        {
+          requestId: codes[0] ?? "RFQ",
+          requestIds: codes.length ? codes : ["RFQ"],
+          requestUuids: uuids,
+          // mobile/016 — echoed back so the confirmation screen can say "this was a trial run".
+          isTrial,
+          trialExpiresAt: data.trialExpiresAt ?? null,
+        },
         { status: 201 },
       );
     } catch (err) {
