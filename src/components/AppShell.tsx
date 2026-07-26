@@ -7,7 +7,8 @@ import { useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import type { Locale } from "@/lib/i18n/config";
-import { SurveyProvider } from "@/components/surveys/SurveyProvider";
+// DISABLED — Outcome Survey feature switched off. See docs/surveys-disabled.md.
+// import { SurveyProvider } from "@/components/surveys/SurveyProvider";
 import { AuthGateProvider, useAuthGate } from "@/components/auth/AuthGate";
 import { PUBLIC_WEB_ENABLED } from "@/lib/flags";
 import { fetchDealRoomUnread } from "@/lib/api/client";
@@ -32,15 +33,18 @@ export function useHeaderBack(handler: (() => void) | null) {
   }, [handler, register]);
 }
 
-/** Public shell: hosts the Outcome Survey gate + the app-wide auth-gate modal (public-web has no
- *  `/login` page — sign-in/register is a modal fired by actions), so the chrome and pages can use both. */
+/** Public shell: hosts the app-wide auth-gate modal (public-web has no `/login` page — sign-in/register
+ *  is a modal fired by actions), so the chrome and pages can use it.
+ *  DISABLED: the Outcome Survey gate that used to wrap this is commented out — that <SurveyProvider>
+ *  was the ONLY survey trigger (it polled /api/me/surveys/pending on auth and auto-opened the modal
+ *  once per browser session). See docs/surveys-disabled.md. */
 export function AppShell(props: AppShellProps) {
   return (
-    <SurveyProvider>
+    // <SurveyProvider>
       <AuthGateProvider>
         <AppShellInner {...props} />
       </AuthGateProvider>
-    </SurveyProvider>
+    // </SurveyProvider>
   );
 }
 

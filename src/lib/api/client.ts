@@ -5,7 +5,7 @@ import type { DealRoomView, DealRoomDocuments, QuotationView } from "@/lib/contr
 import type { ComputedBid, RecommendResult, BidAskResult, BidParseResult, AwardNudgeResult, PreferencePreset, RankingPreference, RankedBid, BidEventInput, NormalizedBid, TermMatch, QuoteMatchCheck } from "@/lib/contract/agent-bids";
 import type { TransformRequestCtx } from "@/lib/contract/bid-form";
 import { mapBidFormData, mapLinkSubmissions, type BidFormData, type LinkBidSubmission, type SubmitBidFormPayload } from "@/lib/contract/link-bids";
-import type { PendingResponse, RespondBody, RespondResult } from "@/lib/contract/survey";
+// DISABLED (Outcome Survey): import type { PendingResponse, RespondBody, RespondResult } from "@/lib/contract/survey";
 import type { InboxBid } from "@/lib/contract/inbox";
 import type { NotificationList, NotificationFilter } from "@/lib/contract/notifications";
 
@@ -339,17 +339,20 @@ export function submitRequest(
   return postJson<{ requestId: string; requestIds?: string[]; requestUuids?: string[] }>("/api/requests", payload);
 }
 
-/* ----------------- Outcome Survey (renter) ----------------- */
+/* ----------------- Outcome Survey (renter) — DISABLED ----------------- */
+/* Feature switched off; see docs/surveys-disabled.md. Both callers lived in SurveyProvider,
+   which is itself commented out, so nothing references these.
 
-/** The next pending outcome survey for the renter (one unit at a time; null when none due). */
+/** The next pending outcome survey for the renter (one unit at a time; null when none due). *\/
 export function fetchPendingSurvey(): Promise<PendingResponse> {
   return getJson<PendingResponse>("/api/me/surveys/pending");
 }
 
-/** Submit the renter's answer to one survey. Idempotent server-side on already-resolved surveys. */
+/** Submit the renter's answer to one survey. Idempotent server-side on already-resolved surveys. *\/
 export function respondSurvey(surveyId: string, body: RespondBody): Promise<RespondResult> {
   return postJson<RespondResult>(`/api/me/surveys/${encodeURIComponent(surveyId)}/respond`, body);
 }
+*/
 
 /* ----------------- Inbox / deal-room-per-bid (renter) ----------------- */
 
