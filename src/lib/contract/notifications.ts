@@ -85,6 +85,11 @@ export function notificationHref(n: NotificationItem): string | null {
   }
   if (n.type.startsWith("deal.")) return dealRoomId ? `/deal-room/${dealRoomId}` : "/inbox";
   if (n.type.startsWith("verification.")) return "/verify";
+  // company.join_requested / join_approved / member_left / removed / promoted / demoted / dissolved.
+  // All open the hub — including `removed`/`dissolved`, where it correctly shows the join form and so
+  // explains why the firm's shared requests and equipment just vanished. Without this the owner's
+  // "New join request" would be a dead, unclickable row with no route to the Approve button.
+  if (n.type.startsWith("company.")) return "/company";
   // equipment.* / job.* / support.reply / admin.* / message.new / referral.* → display-only.
   return null;
 }

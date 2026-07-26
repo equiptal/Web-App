@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuthedBackend, appAuthErrorResponse } from "@/lib/api/app-backend-authed";
 import { clearAuthCookies } from "@/lib/api/auth-server";
 import { normalizeTier } from "@/lib/contract/auth";
+import { setUserCookie } from "@/lib/api/auth-server";
 import { supplierStatusToVerification, type RenterProfile } from "@/lib/contract/onboarding";
 
 interface BackendMe {
@@ -86,10 +87,24 @@ export async function GET(req: Request) {
             .filter(Boolean)
             .join(", ") || null),
       };
-      return NextResponse.json({
+      const res = NextResponse.json({
         user,
         verification: { status: supplierStatusToVerification(status.supplierStatus) },
       });
+      // Heal a stale session tier. `useSession().tier` — which gates the sidebar card, the
+      // quotation download and the request-limit checks — comes from the `mt_user` cookie, and
+      // `/api/auth/session` reads that cookie without ever re-reading the backend. So a tier change
+      // made ELSEWHERE never reached this browser: most importantly, a member approved into a
+      // verified company inherits Verified server-side but kept seeing "Basic" here until they
+      // signed in again. This route already holds a fresh `/users/me`, so re-stamping costs nothing.
+      // Guarded, NOT unconditional: `normalizeTier` falls back to "guest" for anything it doesn't
+      // recognise, and this runs on every authed page load — so a response that omitted `tier` would
+      // silently demote the user to guest and the bad cookie would stick. Only re-stamp when the
+      // backend actually sent a tier; otherwise leave the existing cookie untouched.
+      if (typeof me.tier === "string" && me.tier) {
+        setUserCookie(res, { id: me.id, phone: me.phone, tier: normalizeTier(me.tier) });
+      }
+      return res;
     } catch (err) {
       return appAuthErrorResponse(err);
     }

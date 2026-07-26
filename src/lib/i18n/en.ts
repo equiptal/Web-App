@@ -56,6 +56,12 @@ export const en = {
     stepsBasic: "2 of 3 steps · verify your company to unlock unlimited requests.",
     verifiedNote: "Your company is verified.",
     notifications: "Notifications",
+    company: "My Company",
+    // Short forms for the mobile bottom bar, which splits its width evenly across the tabs —
+    // the full labels truncate to stubs there ("Compare bids" already did before Company existed).
+    companyShort: "Company",
+    compareShort: "Compare",
+    dashboardShort: "Board",
   },
   notifications: {
     title: "Notifications",
@@ -439,6 +445,76 @@ export const en = {
     bidsBanner: "These are sample bids for your trial — no real suppliers were contacted.",
     trialBadge: "TRIAL",
     disappearsSoon: "TRIAL - DISAPPEARS SOON",
+  },
+  /**
+   * Multi-company membership (docs/plans/company-shared-visibility.md). Copy is character-identical
+   * to the app's `company*` arb keys so the two surfaces read the same — the consent and close-down
+   * wording in particular is load-bearing (both describe irreversible transfers).
+   */
+  company: {
+    myCompany: "My Company",
+    myCompanySubtitle: "Join a company or manage your team",
+    details: "Details",
+    share: "Share",
+    // No company yet → join by code.
+    joinTitle: "Join a company",
+    noCompany: "You're not part of a company yet. Enter an invite code from a company owner to join.",
+    enterCode: "Invite code",
+    joinButton: "Join",
+    joinRequestSent: "Join request sent — waiting for the owner to approve.",
+    invalidCode: "That invite code isn't valid.",
+    joinConsent:
+      "Equipment, requests and bids you add — including ones you already have — become this company's and stay with it if you later leave. Continue?",
+    // Pending membership.
+    pendingApproval: "Waiting for the owner to approve you.",
+    pendingBadge: "Awaiting approval",
+    pendingHint: "We'll notify you as soon as the owner approves your request.",
+    // Escape hatch from a valid-but-wrong invite code: the pending row otherwise blocks
+    // joining anywhere else until an owner happens to reject you.
+    cancelJoin: "Withdraw request",
+    cancelJoinConfirm:
+      "Withdraw your request to join this company? Nothing has been shared yet, so nothing is lost — and you'll be able to enter a different invite code straight away.",
+    cancelJoinDone: "Join request withdrawn.",
+    // Owner: invite code + join requests.
+    inviteTeam: "Invite your team",
+    inviteHint: "Share this code with your team so they can join.",
+    inviteCodeCopied: "Invite code copied",
+    inviteShareMessage: "Join my company on Moedatech with this invite code:",
+    inviteDownload: "Download the Moedatech app:",
+    // The other route to having a company: verify and one is created for you (app parity —
+    // companyCreateOwn* keys). Offered ABOVE the join form, as in the app.
+    createOwnTitle: "Add your own company",
+    createOwnDesc:
+      "Verify to create your own company and unlock full access — or join an existing company with an invite code below.",
+    createOwnCta: "Create your company",
+    pendingJoiners: "Pending join requests",
+    approve: "Approve",
+    remove: "Remove",
+    // Roster.
+    members: "Members",
+    roleOwner: "Owner",
+    roleMember: "Member",
+    you: "You",
+    verified: "Verified",
+    promote: "Make owner",
+    demote: "Remove owner role",
+    promoteConfirm:
+      "Make {name} an owner? They'll get full control of the company, including the invite code and member management.",
+    demoteConfirm: "Remove {name}'s owner role? They'll stay a member.",
+    // Exits.
+    leave: "Leave company",
+    leaveConfirm:
+      "Leave your company? You'll lose your access to the firm's requests, bids and equipment — including ones you created or brought in. This can't be undone without a new invite.",
+    promoteFirst: "You're the owner. Promote another member to owner before you leave.",
+    dissolve: "Close company",
+    dissolveConfirm:
+      "You're the only member, so leaving closes this company for good.\n\nNothing is lost: your equipment, requests, bids and past deals move back to your personal account and stay yours. But this can't be undone — the invite code stops working and the company's CR and VAT verification is retired, so you'd need to verify a new company to come back.\n\nAny deal rooms still in progress will be closed automatically and the other party notified.",
+    // Shared UI.
+    cancel: "Cancel",
+    retry: "Retry",
+    loadError: "Couldn't load your company. Please try again.",
+    signInTitle: "Sign in to manage your company",
+    signInBody: "Join a company with an invite code, or manage your team, once you sign in.",
   },
   guest: {
     blockTitle: "Create an account to continue", // AC-02

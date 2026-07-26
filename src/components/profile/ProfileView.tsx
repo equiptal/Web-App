@@ -9,6 +9,7 @@ import { PUBLIC_WEB_ENABLED } from "@/lib/flags";
 import { Icon } from "@/components/ui";
 import type { RenterProfile, VerificationStatus } from "@/lib/contract/onboarding";
 import { updateLanguage } from "@/lib/api/profile-client";
+import { MyCompanyCard } from "@/components/company/MyCompanyCard";
 import { EditProfileForm } from "./EditProfileForm";
 import { ChangePhoneModal } from "./ChangePhoneModal";
 import { DeleteAccountModal } from "./DeleteAccountModal";
@@ -152,7 +153,10 @@ export function ProfileView() {
       {/* Tier banner — basic renter → verify (verified shows the company card verified state below). */}
       {!loading && tier === "basic" && verification !== "pending" && verification !== "verified" && (
         <button
-          onClick={() => router.push("/verify")}
+          // → /company, matching the sidebar "Get verified" and the "Start verification" card below.
+          // This banner renders alongside that card, so pointing them at different destinations would
+          // give the same page two verification nudges that disagree.
+          onClick={() => router.push("/company")}
           className="mt-4 flex w-full items-center justify-between rounded-[12px] border border-brand/30 bg-brand-soft px-4 py-3 text-start transition hover:border-brand"
         >
           <div>
@@ -200,7 +204,13 @@ export function ProfileView() {
       )}
 
       {/* Company / verification card. */}
-      {!loading && profile && <CompanyCard status={verification} profile={profile} company={company} onGo={() => router.push("/verify")} />}
+      {!loading && profile && (
+        <CompanyCard status={verification} profile={profile} company={company} onGo={(href) => router.push(href)} />
+      )}
+
+      {/* "My Company" — the multi-user firm this account belongs to (separate concern from the
+          verification card above): join by invite code, or manage the team. Links to /company. */}
+      {!loading && profile && <MyCompanyCard />}
 
       {/* Rewards — coming soon (grayed, app parity). */}
       {!loading && (
@@ -324,7 +334,18 @@ type CompanyInfo = {
   docs: { crDocUrl: string | null; vatDocUrl: string | null; nationalAddressDocUrl: string | null } | null;
 };
 
-function CompanyCard({ status, profile, company, onGo }: { status: VerificationStatus; profile: RenterProfile; company: CompanyInfo | null; onGo: () => void }) {
+function CompanyCard({
+  status,
+  profile,
+  company,
+  onGo,
+}: {
+  status: VerificationStatus;
+  profile: RenterProfile;
+  company: CompanyInfo | null;
+  /** Destination differs by state — see the CTA below. */
+  onGo: (href: string) => void;
+}) {
   const t = useT();
   const { locale } = useLocale();
   const ar = locale === "ar";
@@ -397,7 +418,13 @@ function CompanyCard({ status, profile, company, onGo }: { status: VerificationS
   }
   const rejected = status === "rejected";
   return (
-    <button onClick={onGo} className={`${base} flex w-full items-center justify-between gap-3 text-start ${rejected ? "border-danger/30 bg-danger-soft hover:border-danger" : "border-brand/30 bg-brand-soft hover:border-brand"}`}>
+    <button
+      // "Start verification" → /company, the hub where they can verify into their OWN company or
+      // join an existing one with an invite code. A REJECTED submission is different: they already
+      // have a company to fix, so "Resubmit" goes straight back to the form.
+      onClick={() => onGo(rejected ? "/verify" : "/company")}
+      className={`${base} flex w-full items-center justify-between gap-3 text-start ${rejected ? "border-danger/30 bg-danger-soft hover:border-danger" : "border-brand/30 bg-brand-soft hover:border-brand"}`}
+    >
       <div>
         <p className="text-[13.5px] font-bold text-navy">{rejected ? p.companyRejectedTitle : p.companyNoneTitle}</p>
         <p className="text-[12.5px] text-muted">{rejected ? p.companyRejectedBody : p.companyNoneBody}</p>

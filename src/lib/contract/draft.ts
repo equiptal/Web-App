@@ -153,6 +153,12 @@ export interface EquipmentItem {
    *  `project.certificates.safety` (the "settings for all items" default), overridable per item —
    *  same globalize-with-override model as delivery/return/fuel. Distinct from the OPERATOR cert. */
   safetyCertsOverride?: SafetyCertificate[] | null;
+  /** Free-text cert for this item, shown when its "Other" chip is on. App parity: the per-item "Other"
+   *  safety-cert field in the app's Step 2 — a legacy/non-offered code (`spsp`, `saso-technical`) that
+   *  arrives on an item is split into here by `splitSafetyCerts` so it stays visible and editable
+   *  instead of riding along in the list with no chip to represent it. Distinct from the request-wide
+   *  `project.certificates.safetyOther`. */
+  safetyCertsOtherText?: string | null;
   /** AC-28: per-item equipment year override. null ⇒ inherit the request-wide year
    *  (`project.advanced.equipmentYear`). Value is "any" | a 4-digit year | "custom:<text>". */
   equipmentYear?: string | null;

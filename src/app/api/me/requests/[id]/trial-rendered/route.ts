@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { serverEnv } from "@/lib/config/env";
 import { agentsPost, AgentsBackendError } from "@/lib/api/agents-backend";
-import { USER_COOKIE } from "@/lib/api/auth-server";
-import type { RenterUser } from "@/lib/contract/auth";
+import { sessionUserId } from "@/lib/api/session-user";
 
 /**
  * POST /api/me/requests/:id/trial-rendered — mobile/016 (AC-09).
@@ -16,22 +13,10 @@ import type { RenterUser } from "@/lib/contract/auth";
  * signed-in renter's id — that endpoint verifies ownership against the request row, so a mismatch 403s.
  * Idempotent server-side: repeat calls, and calls on a non-trial request, are safe no-ops.
  */
-async function sessionUserId(): Promise<number | null> {
-  try {
-    const raw = (await cookies()).get(USER_COOKIE)?.value;
-    if (!raw) return null;
-    const user = JSON.parse(raw) as RenterUser;
-    return typeof user.id === "number" ? user.id : null;
-  } catch {
-    return null;
-  }
-}
-
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const fallback = serverEnv.agentsTestUserId ? Number(serverEnv.agentsTestUserId) : null;
-  const userId = (await sessionUserId()) ?? fallback;
-  if (!userId || Number.isNaN(userId)) {
+  const userId = await sessionUserId();
+  if (!userId) {
     return NextResponse.json({ code: "unauthorized" }, { status: 401 });
   }
   try {

@@ -94,6 +94,11 @@ export function ItemRow({
   // globalize-with-override model). Distinct from the operator cert below.
   const sharedSafety = state.draft?.project?.certificates?.safety ?? [];
   const itemSafety = item.safetyCertsOverride ?? sharedSafety;
+  // Free-text "Other" cert: the item's own text, else — while the item is still INHERITING the
+  // request-wide chips — the request-wide text, so an inherited "Other" chip isn't shown with an
+  // empty box. Typing here sets the item's own text without pinning the chips.
+  const itemSafetyOther =
+    item.safetyCertsOtherText ?? (item.safetyCertsOverride ? "" : (state.draft?.project?.certificates?.safetyOther ?? ""));
   // Part 1: the optional free-text "work type" is surfaced only for crane subtypes — mirror the mobile
   // gate (equipment_step.dart `_isCraneSelected`: the subtype's English name contains "crane").
   const isCrane = (subcategory?.name ?? "").toLowerCase().includes("crane");
@@ -407,13 +412,32 @@ export function ItemRow({
           </ChipField>
 
           {/* Equipment safety certificate (AC-50) — per-item; inherits the request-wide "settings for all"
-              default until overridden (same model as fuel/delivery/return). NOT the operator cert above. */}
+              default until overridden (same model as fuel/delivery/return). NOT the operator cert above.
+              "Other" reveals a free-text field, which is also where a legacy / non-offered code that
+              arrived on this item (spsp, saso-technical) surfaces — app parity, so nothing rides along
+              invisibly. */}
           <ChipField label={t.step1.certificates.safety} agent={agentMatches(item.safetyCertsOverride, ai?.safetyCertsOverride)}>
             <SelChips<SafetyCertificate>
               values={itemSafety}
-              onToggle={(v) => actions.patchItem(item.id, { safetyCertsOverride: toggle(itemSafety, v) })}
+              onToggle={(v) =>
+                actions.patchItem(item.id, {
+                  safetyCertsOverride: toggle(itemSafety, v),
+                  // Un-ticking "Other" drops its text, so the item can't submit a cert with no chip.
+                  ...(v === "other" && itemSafety.includes("other") ? { safetyCertsOtherText: null } : {}),
+                })
+              }
               options={opt(SAFETY_CERTIFICATES, t.options.safetyCert)}
             />
+            {itemSafety.includes("other") && (
+              <div className="mt-2">
+                <TextInput
+                  placeholder={t.step1.certificates.otherSafetyPlaceholder}
+                  maxLength={100}
+                  value={itemSafetyOther}
+                  onChange={(e) => actions.patchItem(item.id, { safetyCertsOtherText: e.target.value })}
+                />
+              </div>
+            )}
           </ChipField>
 
           {/* Attachments / accessories — admin-defined per subtype + free-text customs. */}

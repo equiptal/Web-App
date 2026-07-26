@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useLocale, useT } from "@/lib/i18n";
@@ -51,7 +51,7 @@ export function AppShell(props: AppShellProps) {
 function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
   const { locale, setLocale } = useLocale();
   const t = useT();
-  const { tier, status, signOut, user } = useSession();
+  const { tier, status, signOut, user, refresh: refreshSession } = useSession();
   const { openAuth } = useAuthGate();
   const router = useRouter();
   const pathname = usePathname();
@@ -73,16 +73,28 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
       return next;
     });
 
+  // Read through a ref so the /api/me effect below can compare against the CURRENT tier without
+  // listing `tier` as a dependency — that would re-fire the fetch on every tier change, and since
+  // the effect itself can change the tier (via refreshSession) that's a needless extra round-trip.
+  const tierRef = useRef(tier);
+  tierRef.current = tier;
+
   // The signed-in renter's display name (for the greeting + avatar initials) comes from /api/me.
   useEffect(() => {
     if (status !== "authed") return;
     fetch("/api/me", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
-      .then((d: { user?: { firstName?: string; lastName?: string } }) => {
+      .then((d: { user?: { firstName?: string; lastName?: string; tier?: string } }) => {
         setName([d.user?.firstName, d.user?.lastName].filter(Boolean).join(" "));
+        // /api/me re-stamped the cookie from a fresh read; if the tier moved (e.g. this member was
+        // just approved into a verified company), pull it into the live session so the sidebar card
+        // and the verified-only gates update now instead of on the next navigation.
+        if (d.user?.tier && d.user.tier !== tierRef.current) void refreshSession();
       })
       .catch(() => setName(""));
-  }, [status]);
+    // `refreshSession` is a stable useCallback([]) from SessionProvider, so listing it can't re-fire
+    // this effect; `tier` is deliberately read via tierRef instead of being a dependency.
+  }, [status, refreshSession]);
 
   // Unread deal-room messages (inbox badge) — role-scoped total from the app-backend.
   const [unread, setUnread] = useState(0);
@@ -106,10 +118,14 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
   const allNav = [
     { key: "home", icon: "home", label: t.shell.home, href: "/", gated: false },
     { key: "requests", icon: "grid_view", label: t.shell.requests, href: "/requests", gated: true },
-    { key: "compare", icon: "compare_arrows", label: t.shell.compare, href: "/compare", gated: true },
+    { key: "compare", icon: "compare_arrows", label: t.shell.compare, short: t.shell.compareShort, href: "/compare", gated: true },
     // Procurement dashboard is a demo surface — only the CCC mock account sees it.
-    ...(canSeeProcurementDashboard(user) ? [{ key: "dashboard", icon: "dashboard", label: t.shell.dashboard, href: "/dashboard", gated: true }] : []),
+    ...(canSeeProcurementDashboard(user) ? [{ key: "dashboard", icon: "dashboard", label: t.shell.dashboard, short: t.shell.dashboardShort, href: "/dashboard", gated: true }] : []),
     { key: "inbox", icon: "inbox", label: t.shell.inbox, href: "/inbox", gated: true },
+    // Multi-company membership — join a firm by invite code, or manage its roster. Present on the
+    // mobile bar too, via `short` — the bar divides its width evenly, so the long labels need short
+    // forms to stay legible once there are six or seven tabs.
+    { key: "company", icon: "business_center", label: t.shell.company, short: t.shell.companyShort, href: "/company", gated: true },
     { key: "profile", icon: "person", label: t.shell.profile, href: "/profile", gated: true },
   ];
   // All tabs are visible to everyone (guests included) — each account-bound tab renders a guest
@@ -286,11 +302,14 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
           <Link
             key={it.key}
             href={it.href}
-            className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-bold transition ${
+            // min-w-0 lets flex-1 actually shrink these below their content width, so 6-7 tabs
+            // divide the bar evenly instead of overflowing it.
+            className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 px-0.5 py-2 text-[10.5px] font-bold transition ${
               isActive(it.href) ? "text-brand" : "text-muted"
             }`}
           >
-            <Icon name={it.icon} size={22} /> <span className="max-w-full truncate">{it.label}</span>
+            <Icon name={it.icon} size={21} />
+            <span className="max-w-full truncate">{"short" in it && it.short ? it.short : it.label}</span>
           </Link>
         ))}
       </nav>
@@ -319,7 +338,10 @@ function TierCard({ tier, onGo }: { tier: string; onGo: (href: string) => void }
       <small className="block text-[11px] leading-snug text-white/55">{note}</small>
       {!verified && (
         <button
-          onClick={() => onGo(guest ? "/onboarding" : "/verify")}
+          // Basic → /company (the hub: create your own company by verifying, OR join one with an
+          // invite code) rather than dropping straight into the verification form. Guests still go to
+          // /onboarding — personal identity comes first, and their CTA reads "Complete profile".
+          onClick={() => onGo(guest ? "/onboarding" : "/company")}
           className="mt-[11px] w-full rounded-[10px] bg-brand px-3 py-2 text-[12px] font-bold text-white"
         >
           {guest ? t.home.nudgeGuestCta : t.home.nudgeBasicCta}
