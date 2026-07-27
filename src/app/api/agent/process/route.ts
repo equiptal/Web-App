@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { useRealAgent, serverEnv } from "@/lib/config/env";
 import { unwrapEnvelope, mansourReason } from "@/lib/api/agent-adapters";
+import { mansourHeaders } from "@/lib/api/mansour-relay";
 import { GUEST_PARSE_LIMIT, guestParseCookie, guestParseCount, hasSession } from "@/lib/access/guest-quota-server";
+import { userIdFromRequest } from "@/lib/api/bids-relay";
 import type { NormalizeRequest } from "@/lib/contract/agent";
 
 /**
@@ -42,11 +44,19 @@ export async function POST(req: Request) {
         message: body.text || undefined,
         attachments: files.filter((f) => f.data).map((f) => ({ type: f.type, filename: f.name, data: stripDataUrl(f.data as string) })),
         source: "web_rfq", // triggers the web policy (non-blocking optional fields, basis constrained)
+        // Who this RFQ belongs to, from the mt_user cookie (same helper the correct
+        // route already uses). Two reasons this matters: the corpus previously
+        // attributed every web RFQ to the "web-app" default, and Mansour's per-caller
+        // rate limiter keys on created_by — without it, ALL website traffic arriving
+        // through this one BFF looks like a single caller and would be throttled
+        // together. Guests have no cookie and correctly fall through to the
+        // GUEST_PARSE_LIMIT cap above.
+        ...(userIdFromRequest(req) ? { created_by: userIdFromRequest(req)! } : {}),
         language: body.locale === "ar" ? "ar" : undefined, // free-text in Arabic when the UI is Arabic
       };
       const res = await fetch(`${serverEnv.mansourUrl}/rfq/jobs`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: mansourHeaders(),
         body: JSON.stringify(payload),
         cache: "no-store",
       });

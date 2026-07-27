@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { useRealAgent, serverEnv } from "@/lib/config/env";
 import { userIdFromRequest } from "@/lib/api/bids-relay";
+import { mansourHeaders } from "@/lib/api/mansour-relay";
 
 /**
  * POST /api/agent/rfq/:id/correct — relay a renter's draft-vs-final edit to Mansour's RFQ learning loop
@@ -28,7 +29,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     const res = await fetch(`${serverEnv.mansourUrl}/rfq/${encodeURIComponent(id)}/correct`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: mansourHeaders(),
       body: JSON.stringify({
         patch: body.patch,
         reason: body.reason ?? "renter edited before submit",

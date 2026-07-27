@@ -133,4 +133,9 @@ export interface NormalizeRequest {
   source?: "web_rfq" | "api";
   /** UI locale → the agent writes free-text (notes/advisories/questions) in Arabic when "ar". */
   language?: "ar" | "en";
+  /** Marketplace user id of the renter this RFQ belongs to (from the mt_user cookie).
+   *  Omitted for signed-out visitors. Without it the agent attributes every web RFQ
+   *  to its "web-app" default, and its per-caller rate limiter — which keys on this —
+   *  sees all website traffic through the BFF as one caller. */
+  created_by?: string;
 }

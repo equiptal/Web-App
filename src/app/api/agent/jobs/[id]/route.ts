@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { useRealAgent, serverEnv } from "@/lib/config/env";
 import { buildMockDraft } from "@/lib/api/mock-draft";
 import { agentOutputToDraft, extractAgentOutput, isExtractionEmpty, jobStatus, mansourReason, reasonFromBody } from "@/lib/api/agent-adapters";
+import { mansourGetHeaders } from "@/lib/api/mansour-relay";
 
 /**
  * GET /api/agent/jobs/:id — poll an RFQ parse job.
@@ -17,7 +18,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
 
   try {
-    const res = await fetch(`${serverEnv.mansourUrl}/rfq/jobs/${encodeURIComponent(id)}`, { cache: "no-store" });
+    const res = await fetch(`${serverEnv.mansourUrl}/rfq/jobs/${encodeURIComponent(id)}`, {
+      headers: mansourGetHeaders(),
+      cache: "no-store",
+    });
     if (res.status === 202) return NextResponse.json({ status: "pending" });
     if (!res.ok) {
       const reason = await mansourReason(res);
