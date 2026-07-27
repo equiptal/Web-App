@@ -10,11 +10,14 @@ import { serverEnv } from "@/lib/config/env";
 export class AgentsBackendError extends Error {
   status: number;
   code?: string;
-  constructor(status: number, message: string, code?: string) {
+  /** Arabic copy from the backend envelope, when it sent one — surfaced verbatim in the UI. */
+  messageAr?: string;
+  constructor(status: number, message: string, code?: string, messageAr?: string) {
     super(message);
     this.name = "AgentsBackendError";
     this.status = status;
     this.code = code;
+    this.messageAr = messageAr;
   }
 }
 
@@ -32,17 +35,22 @@ async function agentsFetch<T>(path: string, init?: RequestInit): Promise<T> {
     cache: "no-store",
   });
   if (!res.ok) {
-    // Pull the backend's error code/message out of `{ error: { code, message } }` (or the body).
+    // Pull the backend's error code/message out of `{ error: { code, message, messageAr } }` (or the body).
     let code: string | undefined;
     let message: string | undefined;
+    let messageAr: string | undefined;
     try {
-      const body = (await res.json()) as { error?: { code?: string; message?: string }; message?: string };
+      const body = (await res.json()) as {
+        error?: { code?: string; message?: string; messageAr?: string };
+        message?: string;
+      };
       code = body.error?.code;
       message = body.error?.message ?? body.message;
+      messageAr = body.error?.messageAr;
     } catch {
       /* non-JSON body */
     }
-    throw new AgentsBackendError(res.status, message ?? `agents-backend ${path} → HTTP ${res.status}`, code);
+    throw new AgentsBackendError(res.status, message ?? `agents-backend ${path} → HTTP ${res.status}`, code, messageAr);
   }
   const json: unknown = await res.json();
   if (json && typeof json === "object" && "data" in json) {
@@ -53,3 +61,5 @@ async function agentsFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const agentsGet = <T>(path: string) => agentsFetch<T>(path);
 export const agentsPost = <T>(path: string, body: unknown) => agentsFetch<T>(path, { method: "POST", body: JSON.stringify(body) });
+/** No body by design — DELETE bodies are unreliable across proxies; put params in the query string. */
+export const agentsDelete = <T>(path: string) => agentsFetch<T>(path, { method: "DELETE" });

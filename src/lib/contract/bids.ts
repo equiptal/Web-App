@@ -520,8 +520,23 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   // CANONICAL verified signal across the platform (bid card / profile / limits): supplierStatus === 2
   // (1=pending, 2=verified/approved, 3=rejected — see onboarding.ts supplierStatusToVerification).
   // `isVerified` is an INDEPENDENT column that can diverge from the verification tier, so we do NOT
-  // OR it in here — that produced false "Verified" badges. A supplier is verified iff status === 2.
-  const supVerified = n(sup.supplierStatus) === 2;
+  // OR it in here — that produced false "Verified" badges.
+  //
+  // Verification is ROLE-AGNOSTIC and, since company-shared visibility, INHERITED: an active member
+  // of a verified company is verified without their own ops approval. `supplier.company` is the
+  // company relation the backend now selects; unlike `isVerified` it can't diverge, because it IS the
+  // firm's approved verification. Dissolving a company nulls the member's `companyId`, so a closed
+  // firm stops conferring this on its own.
+  const supCompany = (sup.company ?? null) as { name?: unknown; isVerified?: unknown; deletedAt?: unknown } | null;
+  const supVerified =
+    n(sup.supplierStatus) === 2 || (supCompany?.isVerified === true && !supCompany.deletedAt);
+  // The firm's brand, used only when that firm is actually verified — same G5 precedence the backend
+  // applies in `resolveCounterpartyDisplayName` (company identity wins over the actor's own
+  // SupplierProfile). A supplier who joined by invite code has no `supplierProfile.companyName` of
+  // their own, so without this they'd render under their PERSONAL name and be classified as an
+  // individual, with no sign they bid on behalf of a verified company.
+  const supCompanyBrand =
+    supCompany?.isVerified === true && !supCompany.deletedAt ? s(supCompany.name) : undefined;
   // Company docs are read from the supplier's REAL verification fields projected in the bid list
   // (crNumber / vatNumber / national-address parts / localContentDocKey / sasoHeavyEquipDocKey). Show a
   // doc ONLY when its actual field is present — NEVER inferred from "verified" (a verified supplier can
@@ -659,7 +674,11 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     converted: raw.converted === true, // web-app/006: materialized from an off-platform submission → labelled/counted off-platform
 
     supplierId: sup.id != null ? String(sup.id) : null,
-    supplierName: s(raw.supplierDisplayName) ?? s(sup.companyName) ?? ([s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" ") || "Supplier"),
+    supplierName:
+      s(raw.supplierDisplayName) ??
+      supCompanyBrand ??
+      s(sup.companyName) ??
+      ([s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" ") || "Supplier"),
     verified: supVerified,
     rating: n(sup.rating) ?? n(prof.rating),
     distanceKm,
@@ -688,7 +707,8 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
       : null,
     eqVerified,
     compliance: {
-      entityType: s(prof.companyName) ? "company" : "individual",
+      // A member of a verified firm IS a company entity, even with no company name of their own.
+      entityType: (supCompanyBrand ?? s(prof.companyName)) ? "company" : "individual",
       activityLicense: hasCr,
       taxNumber: hasVat,
       nationalAddress: hasNationalAddr,

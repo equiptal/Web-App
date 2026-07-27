@@ -29,6 +29,8 @@ export interface SpecRow {
   ret: Party;
   /** EQUIPMENT safety certificate(s) (per-item, inheriting the request-wide default). */
   certificate: SafetyCertificate[];
+  /** Text behind the "other" chip above — rendered in its place so the export names the real cert. */
+  certificateOther: string;
   notes: string;
 }
 
@@ -56,6 +58,7 @@ export function buildSpecRows(draft: RfqDraft, taxonomy: Taxonomy): SpecRow[] {
       ret: item.returnOverride ?? draft.project.returnFromSite ?? "me",
       // EQUIPMENT safety cert — per-item override, else the request-wide "settings for all" default.
       certificate: item.safetyCertsOverride ?? draft.project.certificates.safety,
+      certificateOther: (item.safetyCertsOtherText ?? (item.safetyCertsOverride ? "" : draft.project.certificates.safetyOther)).trim(),
       notes: item.additionalNotes,
     };
   });

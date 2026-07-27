@@ -9,6 +9,7 @@ import {
   defaultOperatorNeeded,
   computeSummary,
   SAFETY_CERTIFICATES,
+  splitSafetyCerts,
   PAYMENT_TERMS,
   PAYMENT_METHODS,
   MAINTENANCE_RESPONSIBILITIES,
@@ -16,6 +17,7 @@ import {
   type FuelType,
   type RentalBasis,
   type OvertimeRate,
+  type SafetyCertificate,
   type Verdict,
   type Party,
   type OperatorCertificate,
@@ -175,7 +177,11 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
   // from the OPERATOR cert (item.operator.certificate → operatorLicenseLevel), which stays per-item.
   const certKey = (c: OperatorCertificate[] | null | undefined) => (c && c.length ? [...c].sort().join(",") : "");
   const itemSafety = items.map((i) => i.safetyCertsOverride ?? []);
-  const allSameSafety = items.length > 0 && itemSafety.every((c) => certKey(c) === certKey(itemSafety[0]));
+  // An item carrying a free-text "Other" cert is never globalized: that text is per-item (the
+  // request-wide box holds its own), so lifting the chips would strand the text on an item whose
+  // chips now come from the request-wide default.
+  const anyOtherText = items.some((i) => (i.safetyCertsOtherText ?? "").trim() !== "");
+  const allSameSafety = !anyOtherText && items.length > 0 && itemSafety.every((c) => certKey(c) === certKey(itemSafety[0]));
   if (allSameSafety && itemSafety[0].length) {
     project.certificates.safety = itemSafety[0]; // uniform → globalize + inherit per item
     for (const i of items) i.safetyCertsOverride = null;
@@ -262,10 +268,16 @@ function normCert(value: string | null | undefined): OperatorCertificate | undef
   }
   return picked;
 }
-/** Coerce the agent's safety_certifications (single value OR array OR null) to a normalized list. */
-function safetyList(v: string[] | string | null | undefined): OperatorCertificate[] {
-  const raw = Array.isArray(v) ? v : v ? [v] : [];
-  return raw.map((c) => normCert(c)).filter((c): c is OperatorCertificate => c != null);
+/**
+ * Coerce the agent's safety_certifications (single value OR array OR null) into the per-item chip set
+ * plus the free-text "Other" value. App parity: a cert that isn't one of the offered chips (a legacy
+ * `spsp` / `saso-technical`, or an unrecognized token) is routed to the "Other" box rather than sitting
+ * in the list with nothing to render it — before this, such a value was invisible in Step 2 yet still
+ * submitted, and toggling a chip silently produced a two-cert item.
+ */
+function safetySplit(v: string[] | string | null | undefined): { chips: SafetyCertificate[]; otherText: string } {
+  const raw = (Array.isArray(v) ? v : v ? [v] : []).filter((c): c is string => typeof c === "string" && c.trim() !== "");
+  return splitSafetyCerts(raw);
 }
 /** Mansour's per-item operator cert(s) from the OPERATOR license level(s): prefer the full array
  *  (operator_license_levels), fall back to the singular. The chip is multi-select, so we return ALL.
@@ -314,6 +326,7 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
     measurementId: li.capacity_id ?? null,
   };
   const operatorNeeded = li.operator_included == null ? defaultOperatorNeeded(ref.subcategoryId) : li.operator_included ? "yes" : "no";
+  const safety = safetySplit(li.safety_certifications); // chips + free-text "Other" (app parity)
   const agentCert = toOperatorCert(li); // AC-50: operator cert(s) the agent set from the RFQ (empty if none)
   return {
     id: `a${idx}`,
@@ -335,7 +348,8 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
     // max_equipment_age) — a 4-digit year the wizard's YearField renders; null ⇒ "any".
     equipmentYear: (li.minimum_equipment_year ?? li.max_equipment_age) != null ? String(li.minimum_equipment_year ?? li.max_equipment_age) : null,
     // AC-50: per-item EQUIPMENT safety certs (reconciled to request-wide below when every item agrees).
-    safetyCertsOverride: safetyList(li.safety_certifications),
+    safetyCertsOverride: safety.chips,
+    safetyCertsOtherText: safety.otherText || null,
     operatorNeeded,
     operator: {
       ...defaultOperatorDetails(),

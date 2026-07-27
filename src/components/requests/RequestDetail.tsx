@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState, Fragment, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
-import { fetchRequestDetail, cancelRequest, updateRequest, fetchRequestSubmissions, setBidDeadline } from "@/lib/api/client";
+import { useT } from "@/lib/i18n";
+import { fetchRequestDetail, cancelRequest, updateRequest, fetchRequestSubmissions, setBidDeadline, confirmTrialRendered } from "@/lib/api/client";
 import { publicTaxonomyUrl, shortRef, statusMeta, type RequestItem, type RequestRecord } from "@/lib/contract/requests";
 import { RequestBids } from "@/components/requests/RequestBids";
 import { EquipImg } from "@/components/requests/EquipImg";
@@ -68,6 +69,7 @@ export function requestDetailRows(r: RequestRecord, ar: boolean, L: (en: string,
 
 export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: string) => void }) {
   const { locale } = useLocale();
+  const t = useT();
   const ar = locale === "ar";
   const L = (en: string, arr: string) => (ar ? arr : en);
   const router = useRouter();
@@ -128,6 +130,19 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
     if (onTitle && it) onTitle((ar ? it.subtypeNameAr ?? it.subtypeName : it.subtypeName) ?? "");
   }, [r, ar, onTitle]);
 
+  // mobile/016 (AC-09) — this is a trial and its sample bids exist, i.e. the renter is looking at the
+  // thing the trial promised: consume the first-request slot exactly once so the home "Start Your
+  // Request" pop-up stops appearing. If a trial somehow has no bids we never fire, so the slot stays
+  // open and the pop-up returns (AC-15). Fire-and-forget — the endpoint is idempotent server-side.
+  const trialConfirmedRef = useRef(false);
+  const isTrial = r?.isTrial === true;
+  const trialHasBids = (r?.bidCount ?? 0) > 0;
+  useEffect(() => {
+    if (!isTrial || !trialHasBids || trialConfirmedRef.current) return;
+    trialConfirmedRef.current = true;
+    void confirmTrialRendered(id).catch(() => {});
+  }, [id, isTrial, trialHasBids]);
+
   // Deep-link straight to the bids list — e.g. the group detail's "View bids" links to ?view=bids.
   // Read after mount (not during render) to avoid a hydration mismatch.
   useEffect(() => {
@@ -155,8 +170,22 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
         {(() => { const sm = statusMeta(r.status); return <span className={`stbadge ${sm.cls}`}><span className="dot" />{ar ? sm.ar : sm.en}</span>; })()}
         <span className={`typebadge ${r.type === "DIRECT" ? "tb-direct" : "tb-broadcast"}`}><span className="material-icons-outlined">{r.type === "DIRECT" ? "person" : "campaign"}</span>{r.type}</span>
         <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 700 }}>{r.displayId ?? r.shortCode ?? shortRef(r.id)}</span>
+        {/* mobile/016 — a trial vanishes at its 60-min TTL; label it like the app's My-Requests card. */}
+        {isTrial && (
+          <span className="typebadge" style={{ background: "rgba(247,144,9,.12)", color: "#B45309", borderColor: "rgba(247,144,9,.35)" }}>
+            <span className="material-icons-outlined">science</span>{t.startRequest.disappearsSoon}
+          </span>
+        )}
         {(r.bidCount ?? 0) > 0 && <span className="stbadge st-active" style={{ marginInlineStart: "auto" }}><span className="material-icons-outlined" style={{ fontSize: 13 }}>gavel</span>{r.bidCount} {L("bids", "عروض")}</span>}
       </div>
+
+      {/* mobile/016 — sample-bid disclosure: these bids came from the demo supplier, not real ones. */}
+      {isTrial && (
+        <div className="rd-track" style={{ marginTop: 8, background: "rgba(247,144,9,.07)", borderColor: "rgba(247,144,9,.35)" }}>
+          <span className="material-icons-outlined" style={{ color: "#B45309" }}>info</span>
+          <span className="rt-lbl" style={{ fontWeight: 600 }}>{t.startRequest.bidsBanner}</span>
+        </div>
+      )}
 
       {/* AC-06 — bid-submission deadline (set / adjust / clear) */}
       {r.type === "BROADCAST" && (
