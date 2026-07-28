@@ -179,7 +179,9 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
         </div>
       )}
 
-      {selectedEq && <EquipmentDetailModal equipmentId={selectedEq} onClose={() => setSelectedEq(null)} />}
+      {selectedEq && (
+        <EquipmentDetailModal equipmentId={selectedEq} storeId={id} storeName={detail.name} onClose={() => setSelectedEq(null)} />
+      )}
       {showDocs && <StoreDocsModal isVerified={detail.isVerified} onClose={() => setShowDocs(false)} />}
     </div>
   );

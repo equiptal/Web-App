@@ -182,6 +182,9 @@ function keyField(v: unknown, field: "type" | "slot"): string[] {
 
 export function mapEquipmentDetail(raw: Raw): EquipmentDetail {
   const store = raw.store && typeof raw.store === "object" ? (raw.store as Raw) : {};
+  // The authed `/equipment/{id}` sends yard as flat `yardName`/`yardCity`; the public store-equipment
+  // projection (guest path) nests it as `yard{name,city}` — accept both.
+  const yard = raw.yard && typeof raw.yard === "object" ? (raw.yard as Raw) : {};
   return {
     id: String(raw.id ?? ""),
     category: str(raw.categoryName),
@@ -200,9 +203,9 @@ export function mapEquipmentDetail(raw: Raw): EquipmentDetail {
     isVerified: raw.verificationStatus === "VERIFIED",
     photos: allKeyUrls(raw.photoKeys),
     docTypes: keyField(raw.documentKeys, "type"),
-    yardName: str(raw.yardName),
-    yardCity: str(raw.yardCity),
-    storeName: str(store.name),
+    yardName: str(raw.yardName) ?? str(yard.name),
+    yardCity: str(raw.yardCity) ?? str(yard.city),
+    storeName: str(store.name) ?? str(store.companyName) ?? str(raw.storeName),
   };
 }
 

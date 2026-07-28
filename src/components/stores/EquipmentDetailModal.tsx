@@ -10,8 +10,22 @@ import type { EquipmentDetail } from "@/lib/contract/stores";
  * header, make/model, verified badge, specs grid, document/photo status, and a Request CTA). Opened
  * when a renter taps an equipment card on a store detail. Documents are shown as status only (no
  * contents — AC-19); the Request CTA routes to the RFQ flow (web-app/002, AC-07).
+ *
+ * `storeId`/`storeName` come from the store detail that opened the modal: the id lets the BFF resolve
+ * the listing from the PUBLIC store-equipment projection for signed-out visitors (the backend has no
+ * public equipment-detail route), and the name fills the header, which that projection omits.
  */
-export function EquipmentDetailModal({ equipmentId, onClose }: { equipmentId: string; onClose: () => void }) {
+export function EquipmentDetailModal({
+  equipmentId,
+  storeId,
+  storeName,
+  onClose,
+}: {
+  equipmentId: string;
+  storeId?: string;
+  storeName?: string;
+  onClose: () => void;
+}) {
   const t = useT();
   const { locale } = useLocale();
   const ar = locale === "ar";
@@ -21,14 +35,15 @@ export function EquipmentDetailModal({ equipmentId, onClose }: { equipmentId: st
 
   useEffect(() => {
     const ctrl = new AbortController();
-    fetch(`/api/equipment/${encodeURIComponent(equipmentId)}`, { cache: "no-store", signal: ctrl.signal })
+    const qs = storeId ? `?storeId=${encodeURIComponent(storeId)}` : "";
+    fetch(`/api/equipment/${encodeURIComponent(equipmentId)}${qs}`, { cache: "no-store", signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
       .then((d: EquipmentDetail) => setEq(d))
       .catch((e) => {
         if (e?.name !== "AbortError") setError(true);
       });
     return () => ctrl.abort();
-  }, [equipmentId]);
+  }, [equipmentId, storeId]);
 
   const category = eq ? (ar ? eq.categoryAr : eq.category) : null;
   const subcategory = eq ? (ar ? eq.subcategoryAr : eq.subcategory) : null;
@@ -45,7 +60,7 @@ export function EquipmentDetailModal({ equipmentId, onClose }: { equipmentId: st
       >
         {/* Header / close */}
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <span className="text-[14px] font-extrabold text-navy">{eq?.storeName ?? ""}</span>
+          <span className="text-[14px] font-extrabold text-navy">{eq?.storeName ?? storeName ?? ""}</span>
           <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface2" aria-label={t.store.close}>
             <Icon name="close" size={18} />
           </button>

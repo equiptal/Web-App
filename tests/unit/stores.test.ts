@@ -166,6 +166,35 @@ describe("stores mappers (web-app/004)", () => {
     expect(d.storeName).toBe("SANY Store");
   });
 
+  it("public projection: equipment detail takes yard name/city from the nested `yard` (guest path)", () => {
+    // Shape of one item from `GET /public/stores/{id}/equipment` — the guest fallback for the
+    // equipment modal (no public equipment-detail route). No flat yardName/yardCity, no `store`.
+    const d = mapEquipmentDetail({
+      id: "d499d708",
+      categoryName: "Telehandler",
+      categoryNameAr: "رافعة تلسكوبية",
+      subcategoryName: "Telehandler",
+      measurementName: "24 m",
+      manufacturer: "Manitou",
+      modelName: "manitou",
+      year: 2024,
+      fuelType: "DIESEL",
+      price: null,
+      priceUnit: null,
+      verificationStatus: "VERIFIED",
+      photoKeys: [{ key: "https://x/p1.jpg?sig=1", slot: "front" }],
+      documentKeys: [],
+      yard: { id: "y1", name: "riyadh", city: "Riyadh" },
+    });
+    expect(d.yardName).toBe("riyadh");
+    expect(d.yardCity).toBe("Riyadh");
+    expect(d.photos).toEqual(["https://x/p1.jpg?sig=1"]);
+    expect(d.isVerified).toBe(true);
+    expect(d.price).toBeNull(); // → price-on-request
+    expect(d.operatingHours).toBeNull(); // not in the public projection
+    expect(d.storeName).toBeNull(); // filled from the store page's own name
+  });
+
   it("maps the taxonomy tree keeping id/name/nameAr/children", () => {
     const tree = mapTaxonomy([
       {
