@@ -28,8 +28,11 @@ describe("daysPerPeriod", () => {
 });
 
 describe("computeBidQuote (shared quote math — comparison ↔ quotation parity)", () => {
+  // `unitsOffered` is set alongside `numberOfUnits` in these cases on purpose: the supplier's OFFERED
+  // count is what the quote scales by (see the precedence test below), and the shared `bc()` fixture
+  // defaults it to 1. Leaving it out silently priced every case at one unit.
   it("weekly rate ÷7 × duration × units", () => {
-    const q = computeBidQuote(bc({ price: 700, priceUnit: "PER_WEEK", duration: 14, numberOfUnits: 2 }));
+    const q = computeBidQuote(bc({ price: 700, priceUnit: "PER_WEEK", duration: 14, numberOfUnits: 2, unitsOffered: 2 }));
     expect(q.perUnitRental).toBe(1400); // 700 / 7 × 14
     expect(q.rentalSubtotal).toBe(2800); // × 2 units
   });
@@ -40,19 +43,36 @@ describe("computeBidQuote (shared quote math — comparison ↔ quotation parity
   });
 
   it("PER_JOB is a flat rate (no duration), × units", () => {
-    const q = computeBidQuote(bc({ price: 5000, priceUnit: "PER_JOB", duration: 30, numberOfUnits: 2 }));
+    const q = computeBidQuote(bc({ price: 5000, priceUnit: "PER_JOB", duration: 30, numberOfUnits: 2, unitsOffered: 2 }));
     expect(q.perUnitRental).toBe(5000);
     expect(q.rentalSubtotal).toBe(10000);
   });
 
   it("mobilization/demobilization are per-unit (× units); VAT is 15% of the pre-VAT subtotal", () => {
-    const q = computeBidQuote(bc({ price: 100, priceUnit: "PER_DAY", duration: 10, numberOfUnits: 2, mobPrice: 800, demobPrice: 800 }));
+    const q = computeBidQuote(bc({ price: 100, priceUnit: "PER_DAY", duration: 10, numberOfUnits: 2, unitsOffered: 2, mobPrice: 800, demobPrice: 800 }));
     expect(q.rentalSubtotal).toBe(2000); // 100 × 10 × 2
     expect(q.mobTotal).toBe(1600); // 800 × 2
     expect(q.demobTotal).toBe(1600);
     expect(q.subtotalPreVat).toBe(5200);
     expect(q.vat).toBeCloseTo(780); // 15%
     expect(q.total).toBeCloseTo(5980);
+  });
+
+  // The guard that was missing. When the live-unit price landed (6a5890e) the resolution order changed
+  // and nothing pinned it, so the three cases above quietly halved instead of failing loudly on the
+  // real change. Assert the ORDER itself, not just one arm of it.
+  it("resolves units by precedence: agreedUnits → currentRentalUnits → unitsOffered → numberOfUnits", () => {
+    const base = { price: 100, priceUnit: "PER_DAY" as const, duration: 1 };
+    // Nothing negotiated and nothing offered → fall back to the requested count.
+    expect(computeBidQuote(bc({ ...base, numberOfUnits: 9, unitsOffered: 0 })).units).toBe(9);
+    // An offered count beats the requested count.
+    expect(computeBidQuote(bc({ ...base, numberOfUnits: 9, unitsOffered: 4 })).units).toBe(4);
+    // A mid-negotiation deal-room count beats the offered count.
+    expect(computeBidQuote(bc({ ...base, numberOfUnits: 9, unitsOffered: 4, currentRentalUnits: 3 })).units).toBe(3);
+    // An agreed count beats everything derived from the bid.
+    expect(computeBidQuote(bc({ ...base, numberOfUnits: 9, unitsOffered: 4, currentRentalUnits: 3, agreedUnits: 2 })).units).toBe(2);
+    // ...but the comparison's own unit toggle still overrides all of them.
+    expect(computeBidQuote(bc({ ...base, numberOfUnits: 9, unitsOffered: 4, agreedUnits: 2 }), { units: 1 }).units).toBe(1);
   });
 
   it("a units override and a duration fallback are honored", () => {
