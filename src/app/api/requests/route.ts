@@ -1,24 +1,10 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { useRealApp, serverEnv } from "@/lib/config/env";
 import { agentsPost, AgentsBackendError } from "@/lib/api/agents-backend";
-import { USER_COOKIE } from "@/lib/api/auth-server";
+import { sessionUserId } from "@/lib/api/session-user";
 import { draftToCreateRequest } from "@/lib/api/app-adapters";
 import type { RfqRequestPayload } from "@/lib/contract";
 import type { CreateRequestResult } from "@/lib/contract/app";
-import type { RenterUser } from "@/lib/contract/auth";
-
-/** AC-03: the signed-in renter's real backend id (web-app/001), or null when there's no session. */
-async function sessionUserId(): Promise<string | null> {
-  try {
-    const raw = (await cookies()).get(USER_COOKIE)?.value;
-    if (!raw) return null;
-    const user = JSON.parse(raw) as RenterUser;
-    return typeof user.id === "number" ? String(user.id) : null;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * POST /api/requests — submit the assembled broadcast request.
@@ -43,7 +29,19 @@ export async function POST(req: Request) {
   }
 
   // AC-03: submit as the signed-in renter; the env test user is only a no-session fallback.
-  const userId = (await sessionUserId()) ?? serverEnv.agentsTestUserId;
+  //
+  // This route DELIBERATELY keeps that fallback while the owner-guarded routes dropped theirs. Here
+  // `userId` is CREATOR ATTRIBUTION, not an authorization decision — it grants no read or delete
+  // access to anyone else's data — and removing it would silently reroute a session-less submit into
+  // the mock branch below, which answers 201 with a fabricated RFQ code. Failing a real submission by
+  // pretending it succeeded is worse than attributing it to the configured test user.
+  //
+  // The impersonation vector is still closed: `sessionUserId()` now returns only backend-VERIFIED ids,
+  // so a forged cookie can no longer pick whose name a request is filed under — the worst case is
+  // today's no-session behaviour. Open question for the UI owner: a session-less submit on a deployed
+  // environment should probably 401 so the auth gate opens, instead of landing on the test user.
+  const verifiedId = await sessionUserId();
+  const userId = verifiedId != null ? String(verifiedId) : serverEnv.agentsTestUserId;
 
   if (useRealApp && userId && "items" in body) {
     try {

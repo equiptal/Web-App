@@ -12,7 +12,12 @@ import { sessionUserId } from "@/lib/api/session-user";
  * instead of a generic failure. Import only from route handlers.
  */
 
-/** The renter's own id is never taken from the request body — see `sessionUserId`. */
+/**
+ * The acting renter, or a 401 response to return as-is. The id comes from a token the backend has
+ * verified (see `sessionUserId`) — never from the request body, and never from the unsigned `mt_user`
+ * cookie — so a caller cannot nominate somebody else and act as them. On a deployed environment this
+ * 401s whenever there is no real session; the test-user shortcut is local-dev only.
+ */
 export async function requireActor(): Promise<{ userId: number } | { response: NextResponse }> {
   const userId = await sessionUserId();
   if (!userId) return { response: NextResponse.json({ code: "unauthorized" }, { status: 401 }) };

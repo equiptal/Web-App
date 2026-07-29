@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { serverEnv } from "@/lib/config/env";
 import { agentsPost, AgentsBackendError } from "@/lib/api/agents-backend";
-import { USER_COOKIE } from "@/lib/api/auth-server";
-import type { RenterUser } from "@/lib/contract/auth";
+import { sessionUserId } from "@/lib/api/session-user";
 
 /**
  * POST /api/me/requests/:id/bid-submissions/:submissionId/messages — the renter's pre-conversion
@@ -11,17 +8,11 @@ import type { RenterUser } from "@/lib/contract/auth";
  * endpoint `POST /agents/requests/{id}/bid-submissions/{submissionId}/messages`, forwarding the
  * signed-in renter's id for the owner guard. The backend appends `{ text, at }` to the submission's
  * `rentee_messages` and emails the ops distribution on the first message (cue to onboard + convert).
+ *
+ * The id comes from the SHARED `sessionUserId()` (a backend-verified token — never the unsigned
+ * `mt_user` cookie), and no session is refused rather than proxied without a `userId`: this writes a
+ * message onto someone's submission and emails ops, so an unowned call is never harmless.
  */
-async function sessionUserId(): Promise<string | null> {
-  try {
-    const raw = (await cookies()).get(USER_COOKIE)?.value;
-    if (!raw) return null;
-    const user = JSON.parse(raw) as RenterUser;
-    return typeof user.id === "number" ? String(user.id) : null;
-  } catch {
-    return null;
-  }
-}
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string; submissionId: string }> }) {
   const { id, submissionId } = await params;
@@ -37,8 +28,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: { code: "invalid", message: "A message is required" } }, { status: 400 });
   }
 
-  const userId = (await sessionUserId()) ?? serverEnv.agentsTestUserId;
-  const qs = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+  const userId = await sessionUserId();
+  if (userId == null) return NextResponse.json({ error: { code: "unauthorized", message: "Sign in to send a message" } }, { status: 401 });
+  const qs = `?userId=${userId}`;
   try {
     const data = await agentsPost<unknown>(
       `/agents/requests/${encodeURIComponent(id)}/bid-submissions/${encodeURIComponent(submissionId)}/messages${qs}`,

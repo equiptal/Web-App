@@ -1,30 +1,21 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { serverEnv } from "@/lib/config/env";
 import { agentsGet, AgentsBackendError } from "@/lib/api/agents-backend";
-import { USER_COOKIE } from "@/lib/api/auth-server";
-import type { RenterUser } from "@/lib/contract/auth";
+import { sessionUserId } from "@/lib/api/session-user";
 
 /**
  * GET /api/me/requests/:id/submissions — the request's off-platform shared-link submissions + link
  * tracker (opened/submitted counts + share token). Proxies the agents service-token endpoint
  * `GET /agents/requests/{id}/bid-submissions`, forwarding the signed-in renter's id for the owner guard.
+ *
+ * The id comes from the SHARED `sessionUserId()` (a backend-verified token — never the unsigned
+ * `mt_user` cookie), and no session is refused rather than proxied without a `userId`: this returns
+ * another renter's incoming bids, so the guard is a confidentiality boundary, not a convenience.
  */
-async function sessionUserId(): Promise<string | null> {
-  try {
-    const raw = (await cookies()).get(USER_COOKIE)?.value;
-    if (!raw) return null;
-    const user = JSON.parse(raw) as RenterUser;
-    return typeof user.id === "number" ? String(user.id) : null;
-  } catch {
-    return null;
-  }
-}
-
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const userId = (await sessionUserId()) ?? serverEnv.agentsTestUserId;
-  const qs = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+  const userId = await sessionUserId();
+  if (userId == null) return NextResponse.json({ code: "unauthorized" }, { status: 401 });
+  const qs = `?userId=${userId}`;
   try {
     const raw = await agentsGet<unknown>(`/agents/requests/${encodeURIComponent(id)}/bid-submissions${qs}`);
     return NextResponse.json(raw);

@@ -1,31 +1,23 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { serverEnv } from "@/lib/config/env";
 import { AgentsBackendError } from "@/lib/api/agents-backend";
-import { USER_COOKIE } from "@/lib/api/auth-server";
-import type { RenterUser } from "@/lib/contract/auth";
+import { sessionUserId } from "@/lib/api/session-user";
 
 /**
  * PUT /api/me/requests/:id/share-link — set/clear the request's bid-submission deadline (AC-04/05/06).
  * Proxies the agents service-token endpoint `PUT /agents/requests/{id}/share-link`, forwarding the
  * renter's id for the owner guard. Body: `{ deadline: ISO | null }`.
+ *
+ * The id comes from the SHARED `sessionUserId()` (a backend-verified token — never the unsigned
+ * `mt_user` cookie), and no session is refused rather than proxied without a `userId`. That parameter
+ * is the whole owner check from our side: name someone else and you move THEIR bid deadline.
  */
-async function sessionUserId(): Promise<string | null> {
-  try {
-    const raw = (await cookies()).get(USER_COOKIE)?.value;
-    if (!raw) return null;
-    const user = JSON.parse(raw) as RenterUser;
-    return typeof user.id === "number" ? String(user.id) : null;
-  } catch {
-    return null;
-  }
-}
-
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!serverEnv.agentsApiUrl || !serverEnv.agentsApiToken) return NextResponse.json({ error: "not_configured" }, { status: 503 });
-  const userId = (await sessionUserId()) ?? serverEnv.agentsTestUserId;
-  const qs = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+  const userId = await sessionUserId();
+  if (userId == null) return NextResponse.json({ code: "unauthorized" }, { status: 401 });
+  const qs = `?userId=${userId}`;
   const body = await req.text();
   try {
     const res = await fetch(`${serverEnv.agentsApiUrl}/agents/requests/${encodeURIComponent(id)}/share-link${qs}`, {
