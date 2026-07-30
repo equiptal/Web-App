@@ -17,6 +17,12 @@ interface VerifyResponse {
   phoneVerified?: boolean;
   onboardingToken?: string;
   email?: string | null;
+  // The account exists but is SELF-DELETED (`deletedAt` set). The backend deliberately authenticates
+  // it anyway — `POST /users/me/restore` is itself an authed endpoint, so the tokens are the only way
+  // back in. Dropping this flag (as we used to) hands the renter a session that looks healthy while
+  // every tier-gated call 403s; a real renter read that as "suspended for policy violations"
+  // (prod, 2026-07-30). Threaded to the client so the code step can prompt restore-or-sign-out.
+  accountDeleted?: boolean;
 }
 
 /**
@@ -27,6 +33,8 @@ interface VerifyResponse {
  *  - new email → `needsSignup` + onboardingToken (no session).
  *  - Modal 2b phone verify → `{ phoneVerified, onboardingToken }` (no session, no account) — the web
  *    threads that phone✓ token into `/api/auth/complete-signup`.
+ *  - a self-deleted account → cookies ARE set (restore needs the token) and `accountDeleted: true` comes
+ *    back, so the code step gates on the restore prompt instead of adopting the session.
  */
 export async function POST(req: Request) {
   let body: { phone?: string; code?: string; otpEmail?: string; onboardingToken?: string; role?: string } = {};
@@ -73,7 +81,7 @@ export async function POST(req: Request) {
     // web compares it to the one typed this login to offer a keep/switch prompt (W-1). Not part of the
     // session identity (RenterUser), so it doesn't touch the mt_user cookie.
     const storedEmail = typeof data.user.email === "string" && data.user.email.trim() ? data.user.email.trim() : null;
-    const res = NextResponse.json({ user, storedEmail });
+    const res = NextResponse.json({ user, storedEmail, ...(data.accountDeleted ? { accountDeleted: true } : {}) });
     setAuthCookies(res, data, user);
     return res;
   } catch (err) {

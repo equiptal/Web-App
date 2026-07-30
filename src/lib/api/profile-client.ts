@@ -75,3 +75,11 @@ export function updateLanguage(language: Locale) {
 export function deleteAccount() {
   return send("/api/me", "DELETE");
 }
+
+/**
+ * Undo a self-deletion. Runs on the session the deleted account was just given at verify (the backend
+ * lets a deleted account authenticate for exactly this call). Used by the sign-in restore prompt.
+ */
+export function restoreAccount() {
+  return send("/api/me/restore", "POST");
+}

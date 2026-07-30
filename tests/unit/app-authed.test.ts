@@ -22,6 +22,7 @@ vi.mock("next/headers", () => ({
 import { GET as me } from "@/app/api/me/route";
 import { POST as completeProfile } from "@/app/api/profile/complete/route";
 import { POST as submitVerification } from "@/app/api/verification/submit/route";
+import { POST as restore } from "@/app/api/me/restore/route";
 
 const reply = (status: number, body: unknown) => ({ ok: status < 400, status, json: async () => body });
 
@@ -94,6 +95,52 @@ describe("POST /api/profile/complete", () => {
     const res = await completeProfile(req);
     expect(res.status).toBe(400);
     expect((await res.json()).code).toBe("validation");
+  });
+});
+
+describe("self-deleted account (E12004)", () => {
+  it("maps a gated 403 to code:account_deleted, not unknown/502", async () => {
+    // Before the backend split this code out, a deleted account got E15007 and the form printed the
+    // backend's "suspended due to policy violations" copy at the renter (prod, 2026-07-30).
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, _init?: RequestInit) =>
+        String(url).includes("/users/me/company")
+          ? reply(403, { success: false, error: { code: "E12004", message: "This account was deleted." } })
+          : reply(200, { success: true, data: {} }),
+      ),
+    );
+    const req = new Request("http://localhost/api/verification/submit", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ authorityRole: "owner", companyName: "Acme", crDocKey: "k1", vatDocKey: "k2" }),
+    });
+    const res = await submitVerification(req);
+    expect(res.status).toBe(403);
+    expect((await res.json()).code).toBe("account_deleted");
+  });
+
+  it("POST /api/me/restore calls the backend restore endpoint with the session bearer", async () => {
+    const fetchMock = vi.fn(async (url: string, _init?: RequestInit) =>
+      String(url).includes("/users/me/restore") ? reply(200, { success: true, data: {} }) : reply(404, {}),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await restore(new Request("http://localhost/api/me/restore", { method: "POST" }));
+    expect((await res.json()).ok).toBe(true);
+    const call = fetchMock.mock.calls.find((c) => String(c[0]).includes("/users/me/restore"))!;
+    expect((call[1] as RequestInit).method).toBe("POST");
+    expect((call[1] as RequestInit).headers).toMatchObject({ Authorization: "Bearer idt" });
+  });
+
+  it("POST /api/me/restore surfaces a backend refusal instead of reporting success", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => reply(409, { success: false, error: { code: "E12003", message: "already deleted" } })),
+    );
+    const res = await restore(new Request("http://localhost/api/me/restore", { method: "POST" }));
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect((await res.json()).ok).toBeUndefined();
   });
 });
 

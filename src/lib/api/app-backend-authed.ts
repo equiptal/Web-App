@@ -20,6 +20,7 @@ import {
 export type AppAuthErrorKind =
   | "unauthorized" // E2000/E2001 / HTTP 401 — token missing/expired (triggers refresh)
   | "forbidden" // E2004
+  | "account_deleted" // E12004 — self-deleted account: restore it, retrying can't help
   | "validation" // E3000/E3004/VALIDATION_ERROR — map to field errors
   | "not_found" // E4001
   | "conflict" // E5002
@@ -30,6 +31,11 @@ const CODE_TO_KIND: Record<string, AppAuthErrorKind> = {
   E2000: "unauthorized",
   E2001: "unauthorized",
   E2004: "forbidden",
+  // Every tier-gated endpoint rejects a self-deleted account with E12004. The sign-in restore prompt
+  // normally catches this first, but a session that predates the deletion (deleted in the mobile app
+  // while the web cookies live on) lands here — so it gets its own kind rather than falling through to
+  // "unknown", which would report a 502 for a well-defined 403.
+  E12004: "account_deleted",
   E3000: "validation",
   E3004: "validation",
   VALIDATION_ERROR: "validation",
@@ -40,6 +46,7 @@ const CODE_TO_KIND: Record<string, AppAuthErrorKind> = {
 const KIND_STATUS: Record<AppAuthErrorKind, number> = {
   unauthorized: 401,
   forbidden: 403,
+  account_deleted: 403,
   validation: 400,
   not_found: 404,
   conflict: 409,
