@@ -17,7 +17,9 @@ import { BidReadinessBadge, BidEligibilityModal } from "@/components/requests/Bi
 import { qualityFromSubmissionItem, type BidQuality } from "@/lib/contract/bid-quality";
 import { QualityBadge } from "@/components/bid/QualityRing";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
-import { buildItemComparison, sortByPreset, displayQuote, responsibilityTone, rowWinners, type BidColumn, type Preset, type CostResponsibility, type RatePeriod, type PricesFor } from "@/lib/contract/comparison";
+import { buildItemComparison, sortByPreset, displayQuote, responsibilityTone, rowWinners, type BidColumn, type Money, type Preset, type CostResponsibility, type RatePeriod, type PricesFor } from "@/lib/contract/comparison";
+import { ExportTemplateDialog } from "@/components/compare/ExportTemplateDialog";
+import { buildExportPayload, rankingSourceOf, type ExportPayload } from "@/lib/contract/export-templates";
 import { bidColumnToComputed, normalizedBidToBidCard, presetToAgent, type RecommendResult, type NormalizedBid } from "@/lib/contract/agent-bids";
 import { BID_VERIFY_ENABLED } from "@/lib/flags";
 import { bidQuoteToFormDraft, type BidFormDraft, type TransformRequestCtx } from "@/lib/contract/bid-form";
@@ -138,6 +140,7 @@ export function BidComparisonWorkspace() {
   const [submissions, setSubmissions] = useState<LinkBidSubmission[]>([]); // off-platform shared-link bids for the active item
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [preset, setPreset] = useState<Preset>("best");
+  const [exportOpen, setExportOpen] = useState(false);
   const [period, setPeriod] = useState<RatePeriod>("PER_DAY"); // RATE PERIOD toggle (Day/Week/Month) — display + totals
   const [pricesFor, setPricesFor] = useState<PricesFor>("unit"); // PRICES FOR toggle — default PER UNIT
   const [eligBid, setEligBid] = useState<BidCard | null>(null); // bid-readiness — eligibility view for a native bid
@@ -947,6 +950,47 @@ export function BidComparisonWorkspace() {
     } else {
       setChat((c) => [...c, { role: "mansour", text: L("I couldn't reach the assistant just now — the ranking above is from your stated data.", "تعذّر الوصول للمساعد الآن — الترتيب أعلاه من بياناتك المذكورة.") }]);
     }
+  }
+
+  /**
+   * Build the payload for an export into the company's own .xlsx template.
+   *
+   * We send the FIGURES because the comparison maths lives here, not in the backend —
+   * re-deriving it there would let the exported sheet disagree with this screen. The backend
+   * resolves supplier/renter identity (CR/VAT) itself and ignores anything we send for it.
+   *
+   * `stated` rides along on every money value: `false` means the supplier didn't say, and its
+   * value is 0 — flattened to a number the sheet would print SAR 0, which reads as "this costs
+   * nothing" in a document going to finance.
+   */
+  function buildTemplatePayload(): ExportPayload | null {
+    if (!cols.length) return null;
+    const totals: Record<string, { grandTotal?: Money; mobDemob?: Money }> = {};
+    for (const c of cols) {
+      totals[String(c.bid.id)] = {
+        grandTotal: { value: grandTotal(c), stated: hasCost(c) },
+        mobDemob: { value: mobDemobTotal(c), stated: c.mob.stated || c.demob.stated },
+      };
+    }
+    return buildExportPayload({
+      requestId: String(activeItem ?? ""),
+      // The workspace's active item IS the request — `activeItem` is the id used everywhere
+      // else (analytics, askBids). There is no separate item id to send.
+      itemId: null,
+      columns: cols,
+      totals,
+      header: {
+        requestDisplayId: group?.items[0]?.displayId ?? null,
+        itemName: (ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? null,
+        location: loc?.label ?? null,
+        durationDays,
+        units,
+      },
+      rankingSource: rankingSourceOf(preset, freeApplied, agentLive, Boolean(rec?.ranking?.length)),
+      rec,
+      agentLive,
+      lang: ar ? "ar" : "en",
+    });
   }
 
   // Export the current comparison as a print-ready sheet (Save as PDF from the print dialog).
@@ -1817,11 +1861,11 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
             </div>
           </div>
 
-          {/* table footer — export the comparison (§6) */}
+          {/* table footer — export the comparison (§6), in our layout or the company's own template */}
           <div className="mt-3 flex flex-wrap items-center gap-2.5">
-            <span className="flex-1 text-[11.5px] font-semibold" style={{ color: C.muted, minWidth: 140 }}>{L("Export this comparison as a PDF to share or keep.", "صدّر هذه المقارنة كملف PDF للمشاركة أو الحفظ.")}</span>
-            <button onClick={exportPdf} className="inline-flex items-center gap-1.5 rounded-[10px] border px-3.5 py-[9px] text-[12.5px] font-extrabold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>
-              <span className="material-icons-outlined" style={{ fontSize: 17 }}>picture_as_pdf</span>{L("Export PDF", "تصدير PDF")}
+            <span className="flex-1 text-[11.5px] font-semibold" style={{ color: C.muted, minWidth: 140 }}>{L("Export this comparison to share or keep — in our layout or your company's own template.", "صدّر هذه المقارنة للمشاركة أو الحفظ — بتنسيقنا أو بقالب شركتك.")}</span>
+            <button onClick={() => setExportOpen(true)} className="inline-flex items-center gap-1.5 rounded-[10px] px-3.5 py-[9px] text-[12.5px] font-extrabold text-white" style={{ background: C.action }}>
+              <span className="material-icons-outlined" style={{ fontSize: 17 }}>ios_share</span>{L("Export", "تصدير")}
             </button>
           </div>
 
@@ -1888,6 +1932,17 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
           </div>
         </div>
       )}
+
+      {/* ── export: our layout, or the company's own .xlsx template ── */}
+      <ExportTemplateDialog
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        ar={ar}
+        L={L}
+        buildPayload={buildTemplatePayload}
+        onBuiltinExport={exportPdf}
+        toast={toast}
+      />
 
       {/* ── confirm-before-adding a flagged uploaded quote (match.needs_confirmation) ── */}
       {verify && (
