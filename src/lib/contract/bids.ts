@@ -537,6 +537,11 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   // individual, with no sign they bid on behalf of a verified company.
   const supCompanyBrand =
     supCompany?.isVerified === true && !supCompany.deletedAt ? s(supCompany.name) : undefined;
+  // The supplier's OWN company-name field (`supplierProfile.companyName` — what they typed in their
+  // profile), scanned across the projection shapes like the doc keys above. This is the name we display:
+  // `supplier.company.name` is the row ops created in the VERIFICATION queue, and the two drift (an ops
+  // typo / a placeholder / a legal-entity string), so the profile field is the supplier's own identity.
+  const supProfileCompanyName = profSources.map((o) => s(o.companyName) ?? s(o.company_name)).find(Boolean);
   // Company docs are read from the supplier's REAL verification fields projected in the bid list
   // (crNumber / vatNumber / national-address parts / localContentDocKey / sasoHeavyEquipDocKey). Show a
   // doc ONLY when its actual field is present — NEVER inferred from "verified" (a verified supplier can
@@ -674,10 +679,13 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     converted: raw.converted === true, // web-app/006: materialized from an off-platform submission → labelled/counted off-platform
 
     supplierId: sup.id != null ? String(sup.id) : null,
+    // Company name FIRST — the supplier's own profile field, not the verification-queue company row
+    // (nor the backend's `supplierDisplayName`, which resolves that row ahead of the profile). Falls
+    // back to the verified firm's brand, then the backend's resolved name, then the person's name.
     supplierName:
-      s(raw.supplierDisplayName) ??
+      supProfileCompanyName ??
       supCompanyBrand ??
-      s(sup.companyName) ??
+      s(raw.supplierDisplayName) ??
       ([s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" ") || "Supplier"),
     verified: supVerified,
     rating: n(sup.rating) ?? n(prof.rating),
@@ -708,7 +716,7 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     eqVerified,
     compliance: {
       // A member of a verified firm IS a company entity, even with no company name of their own.
-      entityType: (supCompanyBrand ?? s(prof.companyName)) ? "company" : "individual",
+      entityType: (supProfileCompanyName ?? supCompanyBrand) ? "company" : "individual",
       activityLicense: hasCr,
       taxNumber: hasVat,
       nationalAddress: hasNationalAddr,

@@ -285,8 +285,11 @@ export function VerificationFlow() {
     }
     setBusy(false);
     if (!res.ok) {
-      const d = (await res.json().catch(() => ({}))) as { detail?: string };
-      setErr(d.detail || v.errors.submit);
+      const d = (await res.json().catch(() => ({}))) as { detail?: string; code?: string };
+      // A self-deleted account (E12004 → `account_deleted`) is refused by every tier-gated endpoint. The
+      // backend's own copy can't tell them what to do about it, so use ours — retrying the form is futile,
+      // the way back is sign-in, where the restore prompt lives.
+      setErr(d.code === "account_deleted" ? v.errors.accountDeleted : d.detail || v.errors.submit);
       return;
     }
     setStatus("pending"); // AC-13

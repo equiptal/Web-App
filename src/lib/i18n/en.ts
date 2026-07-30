@@ -626,6 +626,13 @@ export const en = {
     resend: "Resend code", // AC-12
     resent: "A new code has been sent.", // AC-12
     signOut: "Sign out", // AC-19
+    // Restore gate — a verified sign-in on a self-deleted account (app parity: restoreAccount* strings).
+    restoreTitle: "Welcome back!",
+    restoreBody: "You deleted this account earlier. Restore it to get your profile, requests and bids back — everything is still here.",
+    restoreConfirm: "Yes, restore my account",
+    restoring: "Restoring…",
+    restoreDeny: "No, sign out",
+    restoreError: "We couldn't restore your account. Please try again.",
     errors: {
       invalid_phone: "Enter a valid phone number.",
       invalid_code: "That code isn't right. Try again.", // AC-09
@@ -724,6 +731,9 @@ export const en = {
       nationalAddress: "The National Address document is required.", // required to match the app (company_verification_page.dart:302 + '*' label); AC-10 lists only CR/VAT
       docType: "Only JPEG, PNG, WebP, or PDF files are accepted.", // AC-11
       submit: "We couldn't submit. Please try again.",
+      // E12004: this account was deleted, so every gated call is refused until it's restored. Retrying
+      // the form can never work — send them through sign-in, where the restore prompt is waiting.
+      accountDeleted: "This account was deleted. Sign out and sign in again to restore it, then submit.",
       offline: "You appear to be offline. Your input is kept — try again.", // AC-23
     },
   },

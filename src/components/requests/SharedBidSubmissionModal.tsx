@@ -9,6 +9,11 @@ import { hasVatInclusiveNote, stripVatInclusiveNote } from "@/lib/contract/vat-i
 import { qualityFromSubmission, qualityFromSubmissionItem } from "@/lib/contract/bid-quality";
 import { QualityRing } from "@/components/bid/QualityRing";
 import { BID_FORM_CSS } from "@/components/bid/bidFormStyles";
+// The `.slb-*` overlay/modal styles live here and are scoped under `.rproto`. Import them (and put
+// `rproto` on the overlay below) so this viewer works on ANY page — the bid-comparison workspace opens
+// it too, and it isn't inside the requests page shell. Without this the overlay renders unstyled:
+// no fixed positioning, so it lands below the page and looks like nothing opened.
+import "@/components/requests/requests-proto.css";
 
 /**
  * web-app/006 — read-only viewer of an off-platform bid submitted through the renter's shared link.
@@ -205,7 +210,7 @@ export function SharedBidSubmissionModal({
   const supplierNotes = stripVatInclusiveNote(submission?.notes);
 
   return (
-    <div className="slb-overlay" dir={dir} onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="rproto slb-overlay" dir={dir} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="slb-modal" role="dialog" aria-modal="true">
         <style>{BID_FORM_CSS}</style>
         <style>{`@media print{body *{visibility:hidden!important}.slb-modal,.slb-modal *{visibility:visible!important}.slb-overlay{position:static!important;background:#fff!important;padding:0!important;overflow:visible!important}.slb-modal{position:absolute!important;inset-inline-start:0;top:0;width:100%!important;height:auto!important;max-height:none!important;box-shadow:none!important}.qprint{max-height:none!important;overflow:visible!important;background:#fff!important}.qprint-hide,.slb-head-x{display:none!important}}`}</style>

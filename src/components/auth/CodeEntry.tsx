@@ -4,6 +4,7 @@ import { useRef, useState, type ClipboardEvent, type FormEvent, type KeyboardEve
 import { postAuth, type AuthKind } from "./authClient";
 import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
+import { RestoreAccountPrompt } from "./RestoreAccountPrompt";
 import type { RenterUser } from "@/lib/contract/auth";
 
 const OTP_FONT: React.CSSProperties = { fontFamily: "var(--font-plex), monospace" };
@@ -12,7 +13,9 @@ const OTP_FONT: React.CSSProperties = { fontFamily: "var(--font-plex), monospace
  * Code-entry screen (AC-02/09/10/11/12/13/15/24) — identity-agnostic. The caller passes the identity to
  * verify/resend against (`{ phone }` or `{ otpEmail }`) and a `dest` label for the "sent to" line.
  * Verify branches on the response: an email-first NEW user comes back with `needsSignup` (no session) →
- * `onNeedsSignup`; otherwise a session is set → `onVerified(user, storedEmail)` (storedEmail feeds W-1).
+ * `onNeedsSignup`; a SELF-DELETED account comes back with `accountDeleted` → the restore prompt gates
+ * the hand-off (the session is held, not adopted, until they restore); otherwise a session is set →
+ * `onVerified(user, storedEmail)` (storedEmail feeds W-1).
  * 4-box input with filled state, resend (no cooldown — AC-12), and back (AC-13).
  */
 export function CodeEntry({
@@ -40,6 +43,9 @@ export function CodeEntry({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<AuthKind | null>(null);
   const [resent, setResent] = useState(false);
+  // Verified, but the account is self-deleted: the identity is held here (NOT handed to `onVerified`,
+  // which would adopt the session) until the renter restores or signs out.
+  const [deleted, setDeleted] = useState<{ user: RenterUser; storedEmail: string | null } | null>(null);
 
   const code = boxes.join("");
   const [sentPre, sentPost] = a.codeSentTo.split("{phone}");
@@ -84,6 +90,11 @@ export function CodeEntry({
         return;
       }
       const storedEmail = typeof r.data.storedEmail === "string" ? r.data.storedEmail : null;
+      // Deleted account → gate on restore before the session is adopted.
+      if (r.data.accountDeleted === true) {
+        setDeleted({ user: r.data.user as RenterUser, storedEmail });
+        return;
+      }
       onVerified(r.data.user as RenterUser, storedEmail);
       return;
     }
@@ -102,6 +113,20 @@ export function CodeEntry({
       setErr(r.kind);
     }
   };
+
+  // Restore gate — replaces the code form once a deleted account has verified.
+  if (deleted) {
+    return (
+      <RestoreAccountPrompt
+        onRestored={() => onVerified(deleted.user, deleted.storedEmail)}
+        onDeclined={() => {
+          setDeleted(null);
+          resetBoxes();
+          onEditNumber(); // cookies already cleared — back to the identity step
+        }}
+      />
+    );
+  }
 
   return (
     <form onSubmit={verify} noValidate>

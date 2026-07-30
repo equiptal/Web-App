@@ -77,6 +77,52 @@ describe("POST /api/auth/verify (AC-03/04/05)", () => {
     expect(res.cookies.get("mt_user")?.value).toContain("\"id\":7");
   });
 
+  it("threads accountDeleted through for a self-deleted account, with cookies still set", async () => {
+    // The backend authenticates a deleted account on purpose (restore is an authed call), so the tokens
+    // must be set — but the flag has to reach the client, or the renter gets a session that looks healthy
+    // while every tier-gated call 403s (the prod "suspended due to policy violations" report).
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          data: {
+            user: { id: 2668, phone: "+966500000000", tier: "basic" },
+            accessToken: "acc",
+            refreshToken: "ref",
+            idToken: "idt",
+            expiresIn: 3600,
+            accountDeleted: true,
+          },
+        }),
+      }),
+    );
+
+    const res = await verify(jsonReq({ phone: "+966500000000", code: "1234" }));
+    const json = (await res.json()) as { accountDeleted?: boolean; user: { id: number } };
+    expect(json.accountDeleted).toBe(true);
+    expect(json.user.id).toBe(2668);
+    expect(res.cookies.get("mt_id")?.value).toBe("idt"); // restore needs the bearer
+  });
+
+  it("omits accountDeleted for a healthy account", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          data: { user: { id: 7, phone: "+966500000000", tier: "basic" }, accessToken: "acc" },
+        }),
+      }),
+    );
+    const res = await verify(jsonReq({ phone: "+966500000000", code: "1234" }));
+    expect((await res.json()).accountDeleted).toBeUndefined();
+  });
+
   it("maps a wrong code to the invalid_code error (AC-09)", async () => {
     vi.stubGlobal(
       "fetch",
