@@ -458,23 +458,28 @@
 .rproto .slb-view-btn .material-icons-outlined { font-size: 18px; }
 .rproto .slb-offnote { font-size: 11px; color: var(--muted); font-weight: 600; text-align: center; margin: 7px 0 0; line-height: 1.4; }
 
-/* read-only submission viewer (modal) */
-.rproto .slb-overlay { position: fixed; inset: 0; z-index: 400; background: rgba(28, 53, 80, 0.45); display: flex; align-items: flex-start; justify-content: center; padding: 24px; overflow: auto; }
-.rproto .slb-modal { width: 880px; max-width: 100%; height: 92vh; display: flex; flex-direction: column; background: var(--surface1); border-radius: 18px; box-shadow: 0 30px 70px rgba(28, 53, 80, 0.35); margin: auto; overflow: hidden; }
-.rproto .slb-head { display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px; background: linear-gradient(150deg, var(--navy), var(--navy-deep)); color: #fff; }
-.rproto .slb-head-ic { width: 40px; height: 40px; border-radius: var(--r-md); background: linear-gradient(135deg, var(--action), #ffa733); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
-.rproto .slb-head-ic .material-icons-outlined { font-size: 22px; color: #fff; }
-.rproto .slb-head-tx { flex: 1; min-width: 0; }
-.rproto .slb-head-tx h3 { margin: 0; font-size: 16px; font-weight: 800; }
-.rproto .slb-head-tx p { margin: 2px 0 0; font-size: 12px; color: rgba(255, 255, 255, 0.7); }
-.rproto .slb-head-x { margin-inline-start: auto; width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.1); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; }
-.rproto .slb-banner { display: flex; align-items: center; gap: 8px; background: var(--action-dim); color: #8a5a06; font-size: 12px; font-weight: 700; padding: 10px 18px; border-bottom: 1px solid rgba(247, 144, 9, 0.2); }
-.rproto .slb-banner .material-icons-outlined { font-size: 16px; color: var(--action); }
-.rproto .slb-frame { flex: 1; width: 100%; border: 0; background: #fff; }
-.rproto .slb-foot { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-top: 1px solid var(--surface3); }
-.rproto .slb-foot-sp { flex: 1; }
-.rproto .slb-add { display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: var(--r-md); background: var(--rentee); color: #fff; font: inherit; font-weight: 800; font-size: 13px; padding: 11px 18px; cursor: pointer; }
-.rproto .slb-add .material-icons-outlined { font-size: 18px; }
+/* read-only submission viewer (modal) — NOT scoped under `.rproto`, unlike the rest of this sheet.
+   SharedBidSubmissionModal puts `rproto` on the overlay itself (for the palette variables) and is opened
+   from pages outside the requests shell too — the bid-comparison workspace. A descendant selector
+   (`.rproto .slb-overlay`) silently misses there, leaving the overlay unpositioned: it lands below the
+   page and reads as "nothing opened". `max-width: none` undoes the .rproto page-shell width so the
+   backdrop stays full-bleed above 1440px. */
+.slb-overlay { position: fixed; inset: 0; z-index: 400; max-width: none; background: rgba(28, 53, 80, 0.45); display: flex; align-items: flex-start; justify-content: center; padding: 24px; overflow: auto; }
+.slb-modal { width: 880px; max-width: 100%; height: 92vh; display: flex; flex-direction: column; background: var(--surface1); border-radius: 18px; box-shadow: 0 30px 70px rgba(28, 53, 80, 0.35); margin: auto; overflow: hidden; }
+.slb-head { display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px; background: linear-gradient(150deg, var(--navy), var(--navy-deep)); color: #fff; }
+.slb-head-ic { width: 40px; height: 40px; border-radius: var(--r-md); background: linear-gradient(135deg, var(--action), #ffa733); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.slb-head-ic .material-icons-outlined { font-size: 22px; color: #fff; }
+.slb-head-tx { flex: 1; min-width: 0; }
+.slb-head-tx h3 { margin: 0; font-size: 16px; font-weight: 800; }
+.slb-head-tx p { margin: 2px 0 0; font-size: 12px; color: rgba(255, 255, 255, 0.7); }
+.slb-head-x { margin-inline-start: auto; width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.1); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; }
+.slb-banner { display: flex; align-items: center; gap: 8px; background: var(--action-dim); color: #8a5a06; font-size: 12px; font-weight: 700; padding: 10px 18px; border-bottom: 1px solid rgba(247, 144, 9, 0.2); }
+.slb-banner .material-icons-outlined { font-size: 16px; color: var(--action); }
+.slb-frame { flex: 1; width: 100%; border: 0; background: #fff; }
+.slb-foot { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-top: 1px solid var(--surface3); }
+.slb-foot-sp { flex: 1; }
+.slb-add { display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: var(--r-md); background: var(--rentee); color: #fff; font: inherit; font-weight: 800; font-size: 13px; padding: 11px 18px; cursor: pointer; }
+.slb-add .material-icons-outlined { font-size: 18px; }
 
 /* shared-link tracker strip on the request detail */
 .rproto .rd-track { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; padding: 13px 16px; border-radius: var(--r-lg); background: linear-gradient(150deg, var(--navy), var(--navy-deep)); color: #fff; }
