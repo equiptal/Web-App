@@ -32,6 +32,31 @@ describe("mapBidList — supplierId", () => {
   });
 });
 
+describe("mapBidList — supplierName precedence", () => {
+  it("shows the supplier's profile company name over the verification-queue company row", () => {
+    const out = mapBidList({
+      activeBids: [{
+        id: "b1",
+        supplierDisplayName: "Ops Typo Co", // backend resolves company.name first — we don't
+        supplier: {
+          id: 7, firstName: "Yara", lastName: "Test", supplierStatus: 2,
+          supplierProfile: { companyName: "Al Ghadeer Est." },
+          company: { name: "Ops Typo Co", isVerified: true },
+        },
+      }],
+    });
+    expect(out[0].supplierName).toBe("Al Ghadeer Est.");
+    expect(out[0].verified).toBe(true); // name source doesn't touch the verified signal
+  });
+
+  it("falls back to the verified firm's brand, then the person's name", () => {
+    const brand = mapBidList({ activeBids: [{ id: "b1", supplier: { id: 7, firstName: "Yara", lastName: "Test", company: { name: "Gulf Co", isVerified: true } } }] });
+    expect(brand[0].supplierName).toBe("Gulf Co");
+    const person = mapBidList({ activeBids: [{ id: "b1", supplier: { id: 7, firstName: "Yara", lastName: "Test" } }] });
+    expect(person[0].supplierName).toBe("Yara Test");
+  });
+});
+
 describe("mapBidList — compliance block", () => {
   it("maps supplier credentials (CR/VAT/certs/company) + equipment verification", () => {
     const out = mapBidList({
