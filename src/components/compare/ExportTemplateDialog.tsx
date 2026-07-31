@@ -308,6 +308,7 @@ function PickerStage(p: {
   onDelete: (id: string) => void; onPickFile: () => void;
 }) {
   const { L, rows, scope, busy } = p;
+  const [confirmId, setConfirmId] = useState<string | null>(null);
   return (
     <div>
       <button
@@ -362,13 +363,54 @@ function PickerStage(p: {
                 <GhostBtn onClick={() => p.onReview(r.id)} disabled={busy}>{L("Edit", "تعديل")}</GhostBtn>
               )}
               {ready && <PrimaryBtn onClick={() => p.onExport(r.id)} disabled={busy}>{L("Export", "تصدير")}</PrimaryBtn>}
-              <button onClick={() => p.onDelete(r.id)} disabled={busy} title={L("Delete", "حذف")} className="grid h-8 w-8 place-items-center rounded-full disabled:opacity-40" style={{ color: C.muted }}>
+              <button
+                onClick={() => setConfirmId(r.id)}
+                disabled={busy}
+                title={L("Delete", "حذف")}
+                className="grid h-8 w-8 place-items-center rounded-full disabled:opacity-40"
+                style={{ color: C.muted }}
+              >
                 <span className="material-icons-outlined" style={{ fontSize: 18 }}>delete_outline</span>
               </button>
             </div>
           );
         })}
       </div>
+
+      {/* Deleting is confirmed because a template is a COMPANY asset, not a personal one — a
+          colleague set it up and others may export with it daily. The wording says whose it is
+          rather than asking a generic "are you sure". */}
+      {confirmId && (
+        <div className="mt-2 rounded-[12px] border p-3" style={{ borderColor: C.danger, background: C.dangerBg }}>
+          <p className="text-[13px] font-bold" style={{ color: C.danger }}>
+            {scope === "company"
+              ? L("Delete this template for the whole company?", "حذف هذا القالب لكامل الشركة؟")
+              : L("Delete this template?", "حذف هذا القالب؟")}
+          </p>
+          <p className="mt-0.5 text-[12px]" style={{ color: C.navyMid }}>
+            {scope === "company"
+              ? L(
+                  "Everyone in your company loses it, along with the answers given when it was set up. Uploading it again means reviewing the mapping from scratch.",
+                  "سيفقده كل من في شركتك، مع الإجابات التي أُدخلت عند إعداده. إعادة رفعه تعني مراجعة التخصيص من جديد."
+                )
+              : L(
+                  "The answers given when it was set up are lost too. Uploading it again means reviewing the mapping from scratch.",
+                  "ستفقد أيضاً الإجابات التي أُدخلت عند إعداده. إعادة رفعه تعني مراجعة التخصيص من جديد."
+                )}
+          </p>
+          <div className="mt-2.5 flex justify-end gap-2">
+            <GhostBtn onClick={() => setConfirmId(null)} disabled={busy}>{L("Cancel", "إلغاء")}</GhostBtn>
+            <button
+              onClick={() => { const id = confirmId; setConfirmId(null); p.onDelete(id); }}
+              disabled={busy}
+              className="rounded-[10px] px-3.5 py-[9px] text-[12.5px] font-extrabold text-white disabled:opacity-40"
+              style={{ background: C.danger }}
+            >
+              {L("Delete", "حذف")}
+            </button>
+          </div>
+        </div>
+      )}
 
       <button
         onClick={p.onPickFile} disabled={busy}
