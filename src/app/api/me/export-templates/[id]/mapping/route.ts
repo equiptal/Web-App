@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { withAuthedBackend, appAuthErrorResponse } from "@/lib/api/app-backend-authed";
+import { agentsPatch, AgentsBackendError } from "@/lib/api/agents-backend";
+import { sessionUserId } from "@/lib/api/session-user";
 
 /**
  * PATCH /api/me/export-templates/:id/mapping — apply the user's decisions on the reconciliation
@@ -8,21 +9,26 @@ import { withAuthedBackend, appAuthErrorResponse } from "@/lib/api/app-backend-a
  * Resolutions persist on the stored mapping, which is what makes a template CONVERGE: resolve
  * "Mob/Demob" once and that cell fills on every export afterwards, rather than the question
  * being re-asked each time. The backend re-validates the edited mapping, so an invalid
- * correction comes back as a 400 with the specific problem rather than being stored.
+ * correction comes back with the specific problem rather than being stored.
  */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const body = await req.text();
-  return withAuthedBackend(req, async (call) => {
-    try {
-      return NextResponse.json(
-        await call<unknown>(`/export-templates/${encodeURIComponent(id)}/mapping`, {
-          method: "PATCH",
-          body,
-        })
-      );
-    } catch (err) {
-      return appAuthErrorResponse(err);
-    }
-  });
+  const userId = await sessionUserId();
+  if (userId == null) return NextResponse.json({ code: "unauthorized" }, { status: 401 });
+  try {
+    const body = await req.json();
+    return NextResponse.json(
+      await agentsPatch<unknown>(
+        `/agents/export-templates/${encodeURIComponent(id)}/mapping?userId=${userId}`,
+        body
+      )
+    );
+  } catch (err) {
+    const status = err instanceof AgentsBackendError ? err.status || 502 : 500;
+    const payload =
+      err instanceof AgentsBackendError
+        ? { code: err.code, message: err.message, messageAr: err.messageAr, details: err.details }
+        : { message: "Request failed" };
+    return NextResponse.json(payload, { status });
+  }
 }

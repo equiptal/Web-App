@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { withAuthedBackend, appAuthErrorResponse } from "@/lib/api/app-backend-authed";
+import { agentsGet, agentsDelete, AgentsBackendError } from "@/lib/api/agents-backend";
+import { sessionUserId } from "@/lib/api/session-user";
 
 /**
  * GET    /api/me/export-templates/:id — the review screen's payload: status plus the two-way
@@ -11,27 +12,40 @@ import { withAuthedBackend, appAuthErrorResponse } from "@/lib/api/app-backend-a
  * existence is not confirmed to someone who cannot see it.
  */
 
-export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  return withAuthedBackend(req, async (call) => {
-    try {
-      return NextResponse.json(
-        await call<unknown>(`/export-templates/${encodeURIComponent(id)}`)
-      );
-    } catch (err) {
-      return appAuthErrorResponse(err);
-    }
-  });
+function unauthorized() {
+  return NextResponse.json({ code: "unauthorized" }, { status: 401 });
 }
 
-export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+function relayError(err: unknown) {
+  const status = err instanceof AgentsBackendError ? err.status || 502 : 500;
+  const body =
+    err instanceof AgentsBackendError
+      ? { code: err.code, message: err.message, messageAr: err.messageAr, details: err.details }
+      : { message: "Request failed" };
+  return NextResponse.json(body, { status });
+}
+
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return withAuthedBackend(req, async (call) => {
-    try {
-      await call<unknown>(`/export-templates/${encodeURIComponent(id)}`, { method: "DELETE" });
-      return new NextResponse(null, { status: 204 });
-    } catch (err) {
-      return appAuthErrorResponse(err);
-    }
-  });
+  const userId = await sessionUserId();
+  if (userId == null) return unauthorized();
+  try {
+    return NextResponse.json(
+      await agentsGet<unknown>(`/agents/export-templates/${encodeURIComponent(id)}?userId=${userId}`)
+    );
+  } catch (err) {
+    return relayError(err);
+  }
+}
+
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const userId = await sessionUserId();
+  if (userId == null) return unauthorized();
+  try {
+    await agentsDelete<unknown>(`/agents/export-templates/${encodeURIComponent(id)}?userId=${userId}`);
+    return new NextResponse(null, { status: 204 });
+  } catch (err) {
+    return relayError(err);
+  }
 }
