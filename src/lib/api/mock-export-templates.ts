@@ -221,6 +221,9 @@ export function mockReconciliation(id: string) {
     candidate: (u.candidate as string | null) ?? null,
     // The real backend expands this from the catalogue; the key is close enough to read.
     candidateLabel: (u.candidate as string | null) ?? null,
+    // Carried through so accepting applies the chain the mapper worked out, matching the
+    // real reconciliation payload rather than silently defaulting to identity.
+    candidateDerivations: (u.candidateDerivations as string[] | null) ?? null,
     confidence: Number(u.confidence ?? 0),
     why: String(u.why ?? ""),
     resolved: u.resolution != null,

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { agentsGet, agentsDelete, AgentsBackendError } from "@/lib/api/agents-backend";
 import { sessionUserId } from "@/lib/api/session-user";
-import { useRealApp } from "@/lib/config/env";
+import { mockExportTemplates } from "@/lib/config/env";
 import { mockDelete, mockReconciliation } from "@/lib/api/mock-export-templates";
 
 /**
@@ -31,7 +31,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const userId = await sessionUserId();
   if (userId == null) return unauthorized();
-  if (!useRealApp) {
+  if (mockExportTemplates) {
     const view = mockReconciliation(id);
     return view
       ? NextResponse.json(view)
@@ -50,7 +50,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const userId = await sessionUserId();
   if (userId == null) return unauthorized();
-  if (!useRealApp) {
+  if (mockExportTemplates) {
     mockDelete(id);
     return new NextResponse(null, { status: 204 });
   }

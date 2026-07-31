@@ -156,6 +156,28 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
     }
   }
 
+  /**
+   * Finish the review, then export.
+   *
+   * A template only becomes `ready` when resolutions are saved, so exporting straight from the
+   * review screen would leave it stuck at `needs_review` and fall back to the built-in export.
+   * That bit hardest in the BEST case: a mapping with no differences at all gives the user
+   * nothing to resolve, so nothing would ever mark it ready. Saving first — even with no
+   * changes — is the explicit "I have reviewed this".
+   */
+  async function confirmReviewThenExport(templateId: string) {
+    setBusy(true);
+    try {
+      await applyResolutions(templateId, {});
+    } catch (e) {
+      toast(errText(e));
+      setBusy(false);
+      return;
+    }
+    setBusy(false);
+    await runExport(templateId);
+  }
+
   /* ── export ─────────────────────────────────────────────────────────────────────── */
 
   async function runExport(templateId: string) {
@@ -258,7 +280,7 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
           <ReviewStage
             L={L} view={review} busy={busy}
             onResolve={resolve} onDrop={dropField}
-            onDone={() => runExport(review.templateId)}
+            onDone={() => confirmReviewThenExport(review.templateId)}
           />
         )}
 
@@ -392,7 +414,7 @@ function ReviewStage(p: {
             {/* The common case: a naming mismatch the mapper already spotted. One click and
                 this cell fills on every future export. */}
             {u.candidate && (
-              <PrimaryBtn disabled={busy} onClick={() => p.onResolve(u.cell, { kind: "acceptCandidate", derivation: "identity" })}>
+              <PrimaryBtn disabled={busy} onClick={() => p.onResolve(u.cell, { kind: "acceptCandidate", derivations: u.candidateDerivations ?? ["identity"] })}>
                 {L(`Use "${u.candidateLabel}"`, `استخدم "${u.candidateLabel}"`)}
               </PrimaryBtn>
             )}

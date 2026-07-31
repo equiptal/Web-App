@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { agentsGet, agentsPost, agentsPatch, AgentsBackendError } from "@/lib/api/agents-backend";
 import { mansourPost } from "@/lib/api/bids-relay";
 import { sessionUserId } from "@/lib/api/session-user";
-import { useRealApp } from "@/lib/config/env";
+import { mockExportTemplates } from "@/lib/config/env";
 import {
   MOCK_DERIVATIONS,
   MOCK_VOCABULARY,
@@ -42,7 +42,7 @@ export async function GET() {
   const userId = await sessionUserId();
   if (userId == null) return unauthorized();
   // No agents backend configured → in-memory dev mode, so the UI is walkable without infra.
-  if (!useRealApp) return NextResponse.json(mockList(userId));
+  if (mockExportTemplates) return NextResponse.json(mockList(userId));
   try {
     // `failed` rows come back on purpose: the picker shows why a template is unusable
     // instead of silently omitting it.
@@ -100,7 +100,7 @@ export async function POST(req: Request) {
    * The MAPPING below is still a real call to Mansour, so the review screen shows genuine
    * candidates and reasoning — only storage and the parsed file are faked. */
   let created: CreateResult;
-  if (!useRealApp) {
+  if (mockExportTemplates) {
     const row = mockCreate(userId, String(body.name ?? "Untitled"), String(body.originalFileName ?? ""));
     const sample = mockDumpFor(String(body.originalFileName ?? ""));
     created = {
@@ -130,7 +130,7 @@ export async function POST(req: Request) {
   try {
     let mapped = await ask();
 
-    if (!useRealApp) {
+    if (mockExportTemplates) {
       mockSetSpec(created.id, (mapped?.spec as Record<string, unknown>) ?? null, mapped?.error);
       return NextResponse.json({
         id: created.id,
@@ -142,10 +142,15 @@ export async function POST(req: Request) {
     }
 
     if (!mapped?.ok || !mapped.spec) {
-      // The row already exists, so record why instead of leaving a template stuck at `mapping`.
+      /* Record the real cause rather than pushing a placeholder spec through the validator,
+       * which would bury it under shape complaints the user cannot act on. The row already
+       * exists, so it must not be left stuck at `mapping` either. */
       await agentsPatch<StoreResult>(
         `/agents/export-templates/${encodeURIComponent(created.id)}/spec?userId=${userId}`,
-        { spec: { unmappable: true }, model: mapped?.model }
+        {
+          failureReason: mapped?.error ?? "the mapping service did not return a mapping",
+          model: mapped?.model,
+        }
       ).catch(() => undefined);
       return NextResponse.json(
         { id: created.id, name: created.name, status: "failed", mappingError: mapped?.error ?? "the mapper did not return a mapping" },

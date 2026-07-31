@@ -45,6 +45,8 @@ export interface TheirsUnfilledRow {
   theirLabel: string;
   candidate: string | null;
   candidateLabel: string | null;
+  /** The transforms accepting this candidate will apply, in order. */
+  candidateDerivations?: string[] | null;
   confidence: number;
   why: string;
   resolved: boolean;
@@ -77,8 +79,17 @@ export interface ReconciliationView {
  * written straight into a procurement document is worse than a blank cell.
  */
 export type UnfilledResolution =
-  | { kind: "acceptCandidate"; derivation: "identity" }
-  | { kind: "mapTo"; field: string; derivation: "identity" }
+  /**
+   * `derivations` is an ordered CHAIN, matching the backend. A cell headed
+   * "Rate/day (excl. VAT)" fed from a monthly VAT-inclusive quote needs
+   * ["rate.perDay","vat.exclude"] — one transform could only ever do half of it.
+   *
+   * For `acceptCandidate` the backend prefers the chain the mapper already worked out
+   * (`candidateDerivations` on the stored spec), so ["identity"] here is a safe default
+   * rather than an override.
+   */
+  | { kind: "acceptCandidate"; derivations: string[] }
+  | { kind: "mapTo"; field: string; derivations: string[] }
   | { kind: "constant"; value: string }
   | { kind: "promptAtExport"; label: string }
   | { kind: "notStated" }
@@ -86,7 +97,7 @@ export type UnfilledResolution =
 
 export type NoHomeResolution =
   | { kind: "drop" }
-  | { kind: "mapToCell"; cell: string; derivation: "identity" }
+  | { kind: "mapToCell"; cell: string; derivations: string[] }
   | { kind: "overflow" };
 
 export interface BlankCell {
