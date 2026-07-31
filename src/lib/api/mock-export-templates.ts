@@ -157,7 +157,17 @@ export const MOCK_DERIVATIONS = [
 export function mockList(userId: number) {
   const templates = [...store.values()]
     .filter((t) => t.createdByUserId === userId)
-    .map(({ spec: _spec, ...row }) => row)
+    // The stored spec is deliberately not returned in the list — the picker only needs the
+    // summary, and the review screen fetches the full view by id.
+    .map((t) => ({
+      id: t.id,
+      name: t.name,
+      status: t.status,
+      originalFileName: t.originalFileName,
+      createdByUserId: t.createdByUserId,
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt,
+    }))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   return { templates, scope: "personal" as const, mock: true };
 }
