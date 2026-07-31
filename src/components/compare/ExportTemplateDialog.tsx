@@ -453,6 +453,17 @@ function ReviewStage(p: {
             )}
       </p>
 
+      {/* The template predates a change on our side. Said plainly, because the alternative is
+          the user discovering blank cells in a document they already sent to finance. */}
+      {(view.staleFields?.length ?? 0) > 0 && (
+        <div className="mb-3 rounded-[12px] p-3 text-[12.5px]" style={{ background: C.warningBg, color: C.warning }}>
+          ⚠ {L(
+            `This template refers to ${view.staleFields!.length} field(s) we no longer have, so those cells will export blank. Upload the template again to refresh it.`,
+            `يشير هذا القالب إلى ${view.staleFields!.length} حقل لم يعد متوفراً، لذا ستُصدَّر تلك الخلايا فارغة. أعد رفع القالب لتحديثه.`
+          )}
+        </div>
+      )}
+
       {rows.length === 0 && homeless.length === 0 && (
         <div className="rounded-[12px] p-3 text-[13px]" style={{ background: C.successBg, color: C.navy }}>
           {L("Everything lines up — nothing to answer.", "كل شيء متطابق — لا شيء للإجابة عليه.")}

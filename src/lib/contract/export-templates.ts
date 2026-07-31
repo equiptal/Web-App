@@ -70,6 +70,11 @@ export interface ReconciliationView {
   oursNoHome: OursNoHomeRow[];
   unresolvedCount: number;
   mappingError?: string | null;
+  /**
+   * Fields this saved mapping points at that no longer exist. The template predates a change on
+   * our side, and those cells will export blank until it is re-uploaded.
+   */
+  staleFields?: string[];
 }
 
 /**
