@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { agentsGet, agentsPost, AgentsBackendError } from "@/lib/api/agents-backend";
+import { agentsGet, agentsPost, agentsPatch, AgentsBackendError } from "@/lib/api/agents-backend";
+import { mansourPost } from "@/lib/api/bids-relay";
 import { sessionUserId } from "@/lib/api/session-user";
 
 /**
  * GET  /api/me/export-templates — the caller's bid-comparison export templates, for the picker.
- * POST /api/me/export-templates — register an uploaded template and run the mapping pass.
+ * POST /api/me/export-templates — register an uploaded template and get it mapped.
  *
  * Proxies the agents backend's `/agents/export-templates`, which is service-token authed and
  * takes the renter id as `?userId=` — the same shape as `/agents/bids/{id}/documents`.
@@ -40,15 +41,103 @@ export async function GET() {
   }
 }
 
+interface CreateResult {
+  id: string;
+  name: string;
+  status: string;
+  mapping: {
+    dump: unknown;
+    sheetNames: string[];
+    vocabulary: unknown[];
+    derivations: string[];
+  };
+}
+
+interface StoreResult {
+  id: string;
+  status: string;
+  validationErrors?: string[];
+}
+
+interface MapResult {
+  ok?: boolean;
+  model?: string;
+  spec?: unknown;
+  error?: string;
+  terminal?: boolean;
+}
+
+/**
+ * Registering a template is three hops, all server-side, so the browser still makes one call:
+ *
+ *   1. agents backend  → parse the workbook, return the cell dump + field catalogue
+ *   2. Mansour         → map it (this app already holds those credentials for /bids/*)
+ *   3. agents backend  → validate the spec against the real sheet and store it
+ *
+ * Mansour is called from here rather than from the agents backend deliberately: the web is
+ * already the thing that talks to Mansour, so no new service-to-service credentials have to
+ * be provisioned. The vocabulary still lives in exactly one place (it travels in step 1's
+ * response), and no spec is usable until step 3 has checked it.
+ */
 export async function POST(req: Request) {
   const userId = await sessionUserId();
   if (userId == null) return unauthorized();
+
+  let created: CreateResult;
   try {
     const body = await req.json();
-    // Runs the mapping inline — seconds, not milliseconds. The client shows a progress state.
-    return NextResponse.json(
-      await agentsPost<unknown>(`/agents/export-templates?userId=${userId}`, body)
+    created = await agentsPost<CreateResult>(`/agents/export-templates?userId=${userId}`, body);
+  } catch (err) {
+    // Format rejections (a renamed PDF, a .docx, an oversized file) surface here.
+    return relayError(err);
+  }
+
+  const ask = (previousErrors?: string[]) =>
+    mansourPost<MapResult>("/templates/map", {
+      dump: created.mapping.dump,
+      sheetNames: created.mapping.sheetNames,
+      vocabulary: created.mapping.vocabulary,
+      derivations: created.mapping.derivations,
+      ...(previousErrors?.length ? { previousErrors } : {}),
+    });
+
+  try {
+    let mapped = await ask();
+    if (!mapped?.ok || !mapped.spec) {
+      // The row already exists, so record why instead of leaving a template stuck at `mapping`.
+      await agentsPatch<StoreResult>(
+        `/agents/export-templates/${encodeURIComponent(created.id)}/spec?userId=${userId}`,
+        { spec: { unmappable: true }, model: mapped?.model }
+      ).catch(() => undefined);
+      return NextResponse.json(
+        { id: created.id, name: created.name, status: "failed", mappingError: mapped?.error ?? "the mapper did not return a mapping" },
+        { status: 200 }
+      );
+    }
+
+    let stored = await agentsPatch<StoreResult>(
+      `/agents/export-templates/${encodeURIComponent(created.id)}/spec?userId=${userId}`,
+      { spec: mapped.spec, model: mapped.model }
     );
+
+    // One corrective retry: the mapper gets the validator's exact complaints rather than a
+    // blind re-roll. A refusal is terminal and is not retried.
+    if (stored.status === "failed" && stored.validationErrors?.length && !mapped.terminal) {
+      mapped = await ask(stored.validationErrors);
+      if (mapped?.ok && mapped.spec) {
+        stored = await agentsPatch<StoreResult>(
+          `/agents/export-templates/${encodeURIComponent(created.id)}/spec?userId=${userId}`,
+          { spec: mapped.spec, model: mapped.model }
+        );
+      }
+    }
+
+    return NextResponse.json({
+      id: created.id,
+      name: created.name,
+      status: stored.status,
+      mappingError: stored.validationErrors?.join("\n") ?? null,
+    });
   } catch (err) {
     return relayError(err);
   }

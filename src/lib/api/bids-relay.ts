@@ -11,18 +11,33 @@ import { serverEnv, useRealAgent } from "@/lib/config/env";
 
 /** POST a body to `{MANSOUR_URL}/bids/<path>`; returns the unwrapped `data`, or null on any miss. */
 export async function relayToMansour<T>(path: string, body: unknown): Promise<T | null> {
+  return mansourPost<T>(`/bids/${path}`, body);
+}
+
+/**
+ * POST to any Mansour path (leading slash included) — same transport and credentials as the
+ * `/bids/*` relay above.
+ *
+ * Generalized because export-template mapping lives at `/templates/map`, not under `/bids`.
+ * Reusing the credentials this app already holds is the whole point: nothing new has to be
+ * provisioned for a call the web can already make.
+ *
+ * Returns `null` on any miss (unconfigured / HTTP error / `ok:false`), the same contract every
+ * other Mansour caller here relies on.
+ */
+export async function mansourPost<T>(path: string, body: unknown): Promise<T | null> {
   if (!useRealAgent || !serverEnv.mansourUrl) return null;
   try {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (serverEnv.bidsApiToken) headers.Authorization = `Bearer ${serverEnv.bidsApiToken}`;
-    const res = await fetch(`${serverEnv.mansourUrl}/bids/${path}`, {
+    const res = await fetch(`${serverEnv.mansourUrl}${path}`, {
       method: "POST",
       headers,
       body: JSON.stringify(body),
       cache: "no-store",
     });
     if (!res.ok) {
-      console.error(`[bids] /bids/${path} HTTP`, res.status);
+      console.error(`[mansour] ${path} HTTP`, res.status);
       return null;
     }
     const json = (await res.json()) as { ok?: boolean; data?: T } | T;
@@ -31,7 +46,7 @@ export async function relayToMansour<T>(path: string, body: unknown): Promise<T 
     }
     return json as T;
   } catch (err) {
-    console.error(`[bids] /bids/${path} failed:`, err);
+    console.error(`[mansour] ${path} failed:`, err);
     return null;
   }
 }
