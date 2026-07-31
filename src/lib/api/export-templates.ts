@@ -90,13 +90,15 @@ export async function uploadTemplate(
   file: File,
   name: string
 ): Promise<{ id: string; name: string; status: string; mappingError: string | null }> {
-  if (!file.name.toLowerCase().endsWith(".xlsx")) {
+  if (!/\.(xlsx|csv)$/i.test(file.name)) {
     throw new TemplateError(
-      "Only Excel (.xlsx) templates are supported.",
-      "ندعم قوالب Excel (.xlsx) فقط.",
+      "Only Excel (.xlsx) and .csv templates are supported.",
+      "ندعم قوالب Excel (.xlsx) و .csv فقط.",
       400
     );
   }
+  // Must match the content type the presigned PUT was signed for, or S3 rejects the upload.
+  const isCsv = /\.csv$/i.test(file.name);
 
   const presigned = await json<{ uploadUrl: string; s3Key: string }>(
     await fetch(`${BASE}/upload-url`, {
@@ -110,7 +112,9 @@ export async function uploadTemplate(
     method: "PUT",
     body: file,
     headers: {
-      "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "content-type": isCsv
+        ? "text/csv"
+        : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     },
   });
   if (!put.ok) {
@@ -177,7 +181,7 @@ export async function downloadExport(url: string, fileName: string): Promise<voi
   const objectUrl = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = objectUrl;
-  a.download = fileName.toLowerCase().endsWith(".xlsx") ? fileName : `${fileName}.xlsx`;
+  a.download = /\.(xlsx|csv)$/i.test(fileName) ? fileName : `${fileName}.xlsx`;
   document.body.appendChild(a);
   a.click();
   a.remove();

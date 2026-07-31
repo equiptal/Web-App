@@ -99,7 +99,7 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
 
   function pickFile(f: File) {
     setPendingFile(f);
-    setNameDraft(f.name.replace(/\.xlsx$/i, ""));
+    setNameDraft(f.name.replace(/\.(xlsx|csv)$/i, ""));
     setStage("naming");
   }
 
@@ -292,7 +292,7 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
         )}
 
         <input
-          ref={fileInput} type="file" accept=".xlsx" className="hidden"
+          ref={fileInput} type="file" accept=".xlsx,.csv" className="hidden"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) pickFile(f); e.currentTarget.value = ""; }}
         />
       </div>
@@ -355,6 +355,12 @@ function PickerStage(p: {
               {r.status === "needs_review" && (
                 <GhostBtn onClick={() => p.onReview(r.id)} disabled={busy}>{L("Review", "مراجعة")}</GhostBtn>
               )}
+              {/* A saved template stays editable: reopening the review screen lets the user
+                  change what a cell maps to, or fix a constant they typed, with no AI involved
+                  — it is just the stored mapping. Without this the first answers were permanent. */}
+              {ready && (
+                <GhostBtn onClick={() => p.onReview(r.id)} disabled={busy}>{L("Edit", "تعديل")}</GhostBtn>
+              )}
               {ready && <PrimaryBtn onClick={() => p.onExport(r.id)} disabled={busy}>{L("Export", "تصدير")}</PrimaryBtn>}
               <button onClick={() => p.onDelete(r.id)} disabled={busy} title={L("Delete", "حذف")} className="grid h-8 w-8 place-items-center rounded-full disabled:opacity-40" style={{ color: C.muted }}>
                 <span className="material-icons-outlined" style={{ fontSize: 18 }}>delete_outline</span>
@@ -370,7 +376,7 @@ function PickerStage(p: {
         style={{ borderColor: C.border, color: C.navyMid }}
       >
         <span className="material-icons-outlined" style={{ fontSize: 18 }}>upload_file</span>
-        {L("Upload a template (.xlsx)", "ارفع قالباً (.xlsx)")}
+        {L("Upload a template (.xlsx or .csv)", "ارفع قالباً (.xlsx أو .csv)")}
       </button>
     </div>
   );
@@ -384,29 +390,47 @@ function ReviewStage(p: {
 }) {
   const { L, view, busy } = p;
   const [constants, setConstants] = useState<Record<string, string>>({});
-  const unresolved = view.theirsUnfilled.filter((u) => !u.resolved);
+  /* Show ANSWERED rows too, not just open ones. Filtering them out meant a fully-resolved
+   * template opened for editing showed "Everything lines up" with nothing to change — the
+   * user could see their answers had been saved but never revise one. */
+  const rows = view.theirsUnfilled;
+  const openCount = rows.filter((u) => !u.resolved).length;
   const homeless = view.oursNoHome.filter((n) => !n.resolved);
 
   return (
     <div>
       <p className="mb-3 text-[13px]" style={{ color: C.muted }}>
-        {L(
-          "We matched what we could. These are the differences — you only answer them once.",
-          "طابقنا ما أمكن. هذه هي الفروقات — تجيب عنها مرة واحدة فقط."
-        )}
+        {view.status === "ready"
+          ? L(
+              "Your saved answers. Change any of them — this does not re-read the template.",
+              "إجاباتك المحفوظة. يمكنك تغيير أي منها — لن تتم إعادة قراءة القالب."
+            )
+          : L(
+              "We matched what we could. These are the differences — you only answer them once.",
+              "طابقنا ما أمكن. هذه هي الفروقات — تجيب عنها مرة واحدة فقط."
+            )}
       </p>
 
-      {unresolved.length === 0 && homeless.length === 0 && (
+      {rows.length === 0 && homeless.length === 0 && (
         <div className="rounded-[12px] p-3 text-[13px]" style={{ background: C.successBg, color: C.navy }}>
-          {L("Everything lines up.", "كل شيء متطابق.")}
+          {L("Everything lines up — nothing to answer.", "كل شيء متطابق — لا شيء للإجابة عليه.")}
         </div>
       )}
 
-      {unresolved.map((u) => (
-        <div key={u.cell} className="mb-2 rounded-[12px] border p-3" style={{ borderColor: C.border }}>
+      {rows.map((u) => (
+        <div
+          key={u.cell}
+          className="mb-2 rounded-[12px] border p-3"
+          style={{ borderColor: u.resolved ? C.successBg : C.border }}
+        >
           <div className="flex items-baseline gap-2">
             <span className="text-[13.5px] font-bold" style={{ color: C.navy }}>{u.theirLabel}</span>
             <span className="text-[11px]" style={{ color: C.disabled }}>{u.cell}</span>
+            {u.resolved && (
+              <span className="text-[11px] font-bold" style={{ color: C.success }}>
+                ✓ {L("answered", "تمت الإجابة")}
+              </span>
+            )}
           </div>
           <p className="mt-0.5 text-[12px]" style={{ color: C.muted }}>{u.why}</p>
 
@@ -464,8 +488,8 @@ function ReviewStage(p: {
 
       <div className="mt-4 flex items-center justify-between">
         <span className="text-[12px]" style={{ color: C.muted }}>
-          {view.unresolvedCount > 0
-            ? L(`${view.unresolvedCount} left — you can export anyway`, `${view.unresolvedCount} متبقية — يمكنك التصدير الآن`)
+          {openCount > 0
+            ? L(`${openCount} left — you can export anyway`, `${openCount} متبقية — يمكنك التصدير الآن`)
             : L("All set", "جاهز")}
         </span>
         <PrimaryBtn onClick={p.onDone} disabled={busy}>{L("Export", "تصدير")}</PrimaryBtn>
@@ -532,7 +556,7 @@ function PreflightStage(p: {
 
       <div className="mt-4 flex justify-end gap-2">
         <GhostBtn onClick={p.onBack}>{L("Back", "رجوع")}</GhostBtn>
-        <PrimaryBtn onClick={p.onDownload}>{L("Download .xlsx", "تنزيل .xlsx")}</PrimaryBtn>
+        <PrimaryBtn onClick={p.onDownload}>{L("Download", "تنزيل")}</PrimaryBtn>
       </div>
     </div>
   );
