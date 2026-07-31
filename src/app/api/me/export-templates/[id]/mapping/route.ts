@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { agentsPatch, AgentsBackendError } from "@/lib/api/agents-backend";
 import { sessionUserId } from "@/lib/api/session-user";
+import { useRealApp } from "@/lib/config/env";
+import { mockResolve } from "@/lib/api/mock-export-templates";
 
 /**
  * PATCH /api/me/export-templates/:id/mapping — apply the user's decisions on the reconciliation
@@ -17,6 +19,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (userId == null) return NextResponse.json({ code: "unauthorized" }, { status: 401 });
   try {
     const body = await req.json();
+    if (!useRealApp) {
+      const view = mockResolve(id, body);
+      return view
+        ? NextResponse.json(view)
+        : NextResponse.json({ message: "Template not found" }, { status: 404 });
+    }
     return NextResponse.json(
       await agentsPatch<unknown>(
         `/agents/export-templates/${encodeURIComponent(id)}/mapping?userId=${userId}`,

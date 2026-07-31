@@ -2,6 +2,15 @@ import { NextResponse } from "next/server";
 import { agentsGet, agentsPost, agentsPatch, AgentsBackendError } from "@/lib/api/agents-backend";
 import { mansourPost } from "@/lib/api/bids-relay";
 import { sessionUserId } from "@/lib/api/session-user";
+import { useRealApp } from "@/lib/config/env";
+import {
+  MOCK_DERIVATIONS,
+  MOCK_VOCABULARY,
+  mockCreate,
+  mockDumpFor,
+  mockList,
+  mockSetSpec,
+} from "@/lib/api/mock-export-templates";
 
 /**
  * GET  /api/me/export-templates — the caller's bid-comparison export templates, for the picker.
@@ -32,6 +41,8 @@ function relayError(err: unknown) {
 export async function GET() {
   const userId = await sessionUserId();
   if (userId == null) return unauthorized();
+  // No agents backend configured → in-memory dev mode, so the UI is walkable without infra.
+  if (!useRealApp) return NextResponse.json(mockList(userId));
   try {
     // `failed` rows come back on purpose: the picker shows why a template is unusable
     // instead of silently omitting it.
@@ -83,13 +94,28 @@ export async function POST(req: Request) {
   const userId = await sessionUserId();
   if (userId == null) return unauthorized();
 
+  const body = await req.json();
+
+  /* Dev mode: keep the row in memory and hand the mapper one of the built-in sample layouts.
+   * The MAPPING below is still a real call to Mansour, so the review screen shows genuine
+   * candidates and reasoning — only storage and the parsed file are faked. */
   let created: CreateResult;
-  try {
-    const body = await req.json();
-    created = await agentsPost<CreateResult>(`/agents/export-templates?userId=${userId}`, body);
-  } catch (err) {
-    // Format rejections (a renamed PDF, a .docx, an oversized file) surface here.
-    return relayError(err);
+  if (!useRealApp) {
+    const row = mockCreate(userId, String(body.name ?? "Untitled"), String(body.originalFileName ?? ""));
+    const sample = mockDumpFor(String(body.originalFileName ?? ""));
+    created = {
+      id: row.id,
+      name: row.name,
+      status: row.status,
+      mapping: { ...sample, vocabulary: MOCK_VOCABULARY, derivations: MOCK_DERIVATIONS },
+    };
+  } else {
+    try {
+      created = await agentsPost<CreateResult>(`/agents/export-templates?userId=${userId}`, body);
+    } catch (err) {
+      // Format rejections (a renamed PDF, a .docx, an oversized file) surface here.
+      return relayError(err);
+    }
   }
 
   const ask = (previousErrors?: string[]) =>
@@ -103,6 +129,18 @@ export async function POST(req: Request) {
 
   try {
     let mapped = await ask();
+
+    if (!useRealApp) {
+      mockSetSpec(created.id, (mapped?.spec as Record<string, unknown>) ?? null, mapped?.error);
+      return NextResponse.json({
+        id: created.id,
+        name: created.name,
+        status: mapped?.spec ? "needs_review" : "failed",
+        mappingError: mapped?.spec ? null : mapped?.error ?? "the mapper did not return a mapping",
+        mock: true,
+      });
+    }
+
     if (!mapped?.ok || !mapped.spec) {
       // The row already exists, so record why instead of leaving a template stuck at `mapping`.
       await agentsPatch<StoreResult>(

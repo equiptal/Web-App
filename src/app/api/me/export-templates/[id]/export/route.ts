@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { agentsPost, AgentsBackendError } from "@/lib/api/agents-backend";
 import { sessionUserId } from "@/lib/api/session-user";
+import { useRealApp } from "@/lib/config/env";
 
 /**
  * POST /api/me/export-templates/:id/export — render the comparison into the caller's template.
@@ -21,6 +22,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const userId = await sessionUserId();
   if (userId == null) return NextResponse.json({ code: "unauthorized" }, { status: 401 });
+  if (!useRealApp) {
+    /* Rendering needs exceljs and the stored workbook, both of which live in the backend —
+     * so this is the one step dev mode cannot fake. Returned as the standard not-ready signal
+     * so the dialog degrades to the built-in export exactly as it would in production. */
+    return NextResponse.json(
+      {
+        code: "E3000",
+        message: "Connect the agents backend to download a filled template.",
+        messageAr: "اربط خدمة الوكلاء لتنزيل القالب المعبّأ.",
+        details: { reason: "template_not_ready", templateStatus: "mock", fallback: "builtin_export" },
+      },
+      { status: 400 }
+    );
+  }
   try {
     const body = await req.json();
     return NextResponse.json(

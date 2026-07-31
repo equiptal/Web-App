@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { agentsGet, agentsDelete, AgentsBackendError } from "@/lib/api/agents-backend";
 import { sessionUserId } from "@/lib/api/session-user";
+import { useRealApp } from "@/lib/config/env";
+import { mockDelete, mockReconciliation } from "@/lib/api/mock-export-templates";
 
 /**
  * GET    /api/me/export-templates/:id — the review screen's payload: status plus the two-way
@@ -29,6 +31,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const userId = await sessionUserId();
   if (userId == null) return unauthorized();
+  if (!useRealApp) {
+    const view = mockReconciliation(id);
+    return view
+      ? NextResponse.json(view)
+      : NextResponse.json({ message: "Template not found" }, { status: 404 });
+  }
   try {
     return NextResponse.json(
       await agentsGet<unknown>(`/agents/export-templates/${encodeURIComponent(id)}?userId=${userId}`)
@@ -42,6 +50,10 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const userId = await sessionUserId();
   if (userId == null) return unauthorized();
+  if (!useRealApp) {
+    mockDelete(id);
+    return new NextResponse(null, { status: 204 });
+  }
   try {
     await agentsDelete<unknown>(`/agents/export-templates/${encodeURIComponent(id)}?userId=${userId}`);
     return new NextResponse(null, { status: 204 });
