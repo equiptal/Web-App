@@ -10,6 +10,7 @@ import {
   getTemplate,
   listTemplates,
   uploadTemplate,
+  waitForMapping,
 } from "@/lib/api/export-templates";
 import type {
   ExportPayload,
@@ -69,6 +70,8 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
   const [nameDraft, setNameDraft] = useState("");
   const [promptValues, setPromptValues] = useState<Record<string, string>>({});
   const fileInput = useRef<HTMLInputElement>(null);
+  /** Cancels an in-flight mapping poll when the dialog closes or another upload starts. */
+  const pollAbort = useRef<AbortController | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -81,12 +84,21 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      // Closed — stop any mapping poll still running. The job itself carries on server-side
+      // and the row keeps its status, so the result is waiting on the next open.
+      pollAbort.current?.abort();
+      pollAbort.current = null;
+      return;
+    }
     setStage("picker");
     setResult(null);
     setReview(null);
     void refresh();
   }, [open, refresh]);
+
+  // Unmount is the same story as close, minus the chance to re-render.
+  useEffect(() => () => pollAbort.current?.abort(), []);
 
   if (!open) return null;
 
@@ -107,21 +119,42 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
     if (!pendingFile || !nameDraft.trim()) return;
     setBusy(true);
     setStage("mapping");
+
+    // Closing the dialog must stop the poll — otherwise it keeps running against a dialog
+    // nobody is looking at and can drag the user back into a stage they left.
+    pollAbort.current?.abort();
+    const abort = new AbortController();
+    pollAbort.current = abort;
+
     try {
-      const created = await uploadTemplate(pendingFile, nameDraft.trim());
+      let created = await uploadTemplate(pendingFile, nameDraft.trim());
+
+      /* Registering only STARTS the mapping — a real template takes 20-60s, longer than the
+       * SSR gateway allows, so it runs as a job and we poll. The `mapping` stage above is what
+       * the user sees meanwhile. */
+      if (created.status === "mapping" && created.jobId) {
+        created = await waitForMapping(created.id, created.jobId, { signal: abort.signal });
+      }
       await refresh();
-      if (created.status === "failed") {
-        // Keep the row so the user can see why, but send them back rather than into an
-        // empty review screen.
-        toast(created.mappingError
-          ? L("We couldn't read that template's layout.", "تعذّر قراءة تنسيق هذا القالب.")
-          : L("Mapping failed.", "فشل التخصيص."));
+
+      if (created.status === "failed" || created.status === "mapping") {
+        /* Keep the row so the user can see why in the picker, but send them back rather than
+         * into an empty review screen. The reason is appended verbatim: a wrong environment
+         * and an unreadable sheet used to read identically here, and only one is about their
+         * file. `mapping` still showing means we stopped waiting, not that it failed. */
+        const detail = created.mappingError;
+        toast(
+          detail
+            ? `${L("Mapping didn't finish.", "لم يكتمل التخصيص.")} ${detail}`
+            : L("Mapping failed.", "فشل التخصيص.")
+        );
         setStage("picker");
         return;
       }
       setReview(await getTemplate(created.id));
       setStage("review");
     } catch (e) {
+      if ((e as { name?: string })?.name === "AbortError") return; // dialog closed; not an error
       toast(errText(e));
       setStage("picker");
     } finally {
@@ -270,8 +303,14 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
           <div className="py-10 text-center">
             <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: C.action, borderTopColor: "transparent" }} />
             <p className="text-[14px] font-bold" style={{ color: C.navy }}>{L("Reading your template…", "جارٍ قراءة القالب…")}</p>
+            {/* Says "up to a minute" because it genuinely is — 20-60s on a real sheet. An
+                unqualified spinner at that length reads as a hang and gets refreshed away,
+                which is how the duplicate-name conflicts started. */}
             <p className="mt-1 text-[12.5px]" style={{ color: C.muted }}>
-              {L("Working out where each figure belongs. This happens once.", "نحدد مكان كل رقم. يحدث هذا مرة واحدة فقط.")}
+              {L(
+                "Working out where each figure belongs. This can take up to a minute, and only happens once.",
+                "نحدد مكان كل رقم. قد يستغرق هذا حتى دقيقة، ويحدث مرة واحدة فقط."
+              )}
             </p>
           </div>
         )}

@@ -79,17 +79,28 @@ export async function deleteTemplate(id: string): Promise<void> {
   if (!res.ok) await parseError(res);
 }
 
+/** What registering a template returns. `mapping` means the job is running — poll it. */
+export interface RegisterResult {
+  id: string;
+  name: string;
+  status: string;
+  mappingError: string | null;
+  /** Present while `status === "mapping"`. Feed it to `waitForMapping`. */
+  jobId?: string;
+}
+
 /**
  * Upload a template and register it. Three steps behind one call: presign → PUT to S3 →
- * register (which runs the AI mapping and can take several seconds).
+ * register, which STARTS the mapping and returns `status: "mapping"` with a job id.
+ *
+ * Registering deliberately does not wait for the mapping — it takes 20-60s on a real template
+ * and the SSR gateway cuts off at ~30s, which used to surface as a 504 while the work carried
+ * on invisibly. Call `waitForMapping` with the returned `jobId`.
  *
  * The `.xlsx` check here is a courtesy so the user finds out before the upload; the real gate
  * is server-side on register, where a renamed `.docx` or `.pdf` is caught by actually parsing.
  */
-export async function uploadTemplate(
-  file: File,
-  name: string
-): Promise<{ id: string; name: string; status: string; mappingError: string | null }> {
+export async function uploadTemplate(file: File, name: string): Promise<RegisterResult> {
   if (!/\.(xlsx|csv)$/i.test(file.name)) {
     throw new TemplateError(
       "Only Excel (.xlsx) and .csv templates are supported.",
@@ -125,13 +136,66 @@ export async function uploadTemplate(
     );
   }
 
-  return json(
+  return json<RegisterResult>(
     await fetch(BASE, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name, s3Key: presigned.s3Key, originalFileName: file.name }),
     })
   );
+}
+
+/** One poll. Returns `mapping` while the job runs — with a possibly NEW jobId after a retry. */
+async function pollMapping(id: string, jobId: string): Promise<RegisterResult> {
+  return json<RegisterResult>(
+    await fetch(
+      `${BASE}/${encodeURIComponent(id)}/mapping?jobId=${encodeURIComponent(jobId)}`,
+      { cache: "no-store" }
+    )
+  );
+}
+
+/**
+ * Poll until the mapping settles, then return its final state.
+ *
+ * `jobId` is re-read from every response on purpose: a spec the validator rejects triggers one
+ * corrective retry, which is a NEW job. Polling the original id after that would wait on a job
+ * that is already done and never see the correction land.
+ *
+ * The ceiling is a real answer, not a safety net — at `POLL_MS` intervals it allows several
+ * minutes, well past the slowest observed mapping, and stopping with "it's taking too long"
+ * beats a spinner with no end. The row keeps its own status either way, so a template that
+ * finishes after we stop watching is still there on the next open.
+ */
+export async function waitForMapping(
+  id: string,
+  jobId: string,
+  opts: { signal?: AbortSignal } = {}
+): Promise<RegisterResult> {
+  const POLL_MS = 2500;
+  const MAX_WAIT_MS = 5 * 60 * 1000;
+  const deadline = Date.now() + MAX_WAIT_MS;
+
+  let currentJob = jobId;
+  for (;;) {
+    if (opts.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    await new Promise((r) => setTimeout(r, POLL_MS));
+    if (opts.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+
+    const next = await pollMapping(id, currentJob);
+    if (next.status !== "mapping") return next;
+    if (next.jobId) currentJob = next.jobId;
+
+    if (Date.now() > deadline) {
+      return {
+        id,
+        name: next.name ?? "",
+        status: "mapping",
+        mappingError: "This is taking longer than expected. It may still finish — check back shortly.",
+        jobId: currentJob,
+      };
+    }
+  }
 }
 
 export async function applyResolutions(

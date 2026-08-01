@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { agentsGet, agentsPost, agentsPatch, AgentsBackendError } from "@/lib/api/agents-backend";
-import { mansourPost } from "@/lib/api/bids-relay";
+import { mansourCall } from "@/lib/api/bids-relay";
 import { sessionUserId } from "@/lib/api/session-user";
 import { mockExportTemplates } from "@/lib/config/env";
 import {
@@ -70,20 +70,20 @@ interface StoreResult {
   validationErrors?: string[];
 }
 
-interface MapResult {
-  ok?: boolean;
-  model?: string;
-  spec?: unknown;
-  error?: string;
-  terminal?: boolean;
-}
-
 /**
- * Registering a template is three hops, all server-side, so the browser still makes one call:
+ * Registering a template starts three hops, but this route only performs the first two:
  *
  *   1. agents backend  → parse the workbook, return the cell dump + field catalogue
- *   2. Mansour         → map it (this app already holds those credentials for /bids/*)
- *   3. agents backend  → validate the spec against the real sheet and store it
+ *   2. Mansour         → START a mapping job, get an id back immediately
+ *   3. agents backend  → validate the spec and store it  ← done by GET …/[id]/mapping
+ *
+ * ── Why the mapping is a job rather than an awaited call ─────────────────────────────
+ * Mapping a real template takes 20-60s: 66 vocabulary fields, a few hundred cells, and a spec
+ * covering every match plus the two-way reconciliation. This route runs on Amplify SSR, behind
+ * a gateway that gives up at ~30s. Awaiting it returned 504 to the browser while the work
+ * carried on invisibly — the row got created, the user retried, and hit a duplicate-name 409
+ * against a row they could not see. So we hand back `status: "mapping"` in about a second and
+ * the client polls, exactly as `/rfq/jobs` already works for RFQ normalization.
  *
  * Mansour is called from here rather than from the agents backend deliberately: the web is
  * already the thing that talks to Mansour, so no new service-to-service credentials have to
@@ -97,8 +97,8 @@ export async function POST(req: Request) {
   const body = await req.json();
 
   /* Dev mode: keep the row in memory and hand the mapper one of the built-in sample layouts.
-   * The MAPPING below is still a real call to Mansour, so the review screen shows genuine
-   * candidates and reasoning — only storage and the parsed file are faked. */
+   * The MAPPING is still a real job on Mansour, so the review screen shows genuine candidates
+   * and reasoning — only storage and the parsed file are faked. */
   let created: CreateResult;
   if (mockExportTemplates) {
     const row = mockCreate(userId, String(body.name ?? "Untitled"), String(body.originalFileName ?? ""));
@@ -118,70 +118,40 @@ export async function POST(req: Request) {
     }
   }
 
-  const ask = (previousErrors?: string[]) =>
-    mansourPost<MapResult>("/templates/map", {
-      dump: created.mapping.dump,
-      sheetNames: created.mapping.sheetNames,
-      vocabulary: created.mapping.vocabulary,
-      derivations: created.mapping.derivations,
-      ...(previousErrors?.length ? { previousErrors } : {}),
-    });
+  const started = await mansourCall<{ job_id: string }>("POST", "/templates/jobs", {
+    dump: created.mapping.dump,
+    sheetNames: created.mapping.sheetNames,
+    vocabulary: created.mapping.vocabulary,
+    derivations: created.mapping.derivations,
+  });
 
-  try {
-    let mapped = await ask();
-
+  /* Could not even START the job — an ops fault (wrong MANSOUR_URL, agent down), not the
+   * user's file. Settle the row now with the real reason rather than leaving it at `mapping`
+   * for a poller that will never see it change. */
+  if (!started.ok) {
     if (mockExportTemplates) {
-      mockSetSpec(created.id, (mapped?.spec as Record<string, unknown>) ?? null, mapped?.error);
-      return NextResponse.json({
-        id: created.id,
-        name: created.name,
-        status: mapped?.spec ? "needs_review" : "failed",
-        mappingError: mapped?.spec ? null : mapped?.error ?? "the mapper did not return a mapping",
-        mock: true,
-      });
-    }
-
-    if (!mapped?.ok || !mapped.spec) {
-      /* Record the real cause rather than pushing a placeholder spec through the validator,
-       * which would bury it under shape complaints the user cannot act on. The row already
-       * exists, so it must not be left stuck at `mapping` either. */
+      mockSetSpec(created.id, null, started.reason);
+    } else {
       await agentsPatch<StoreResult>(
         `/agents/export-templates/${encodeURIComponent(created.id)}/spec?userId=${userId}`,
-        {
-          failureReason: mapped?.error ?? "the mapping service did not return a mapping",
-          model: mapped?.model,
-        }
+        { failureReason: started.reason }
       ).catch(() => undefined);
-      return NextResponse.json(
-        { id: created.id, name: created.name, status: "failed", mappingError: mapped?.error ?? "the mapper did not return a mapping" },
-        { status: 200 }
-      );
     }
-
-    let stored = await agentsPatch<StoreResult>(
-      `/agents/export-templates/${encodeURIComponent(created.id)}/spec?userId=${userId}`,
-      { spec: mapped.spec, model: mapped.model }
-    );
-
-    // One corrective retry: the mapper gets the validator's exact complaints rather than a
-    // blind re-roll. A refusal is terminal and is not retried.
-    if (stored.status === "failed" && stored.validationErrors?.length && !mapped.terminal) {
-      mapped = await ask(stored.validationErrors);
-      if (mapped?.ok && mapped.spec) {
-        stored = await agentsPatch<StoreResult>(
-          `/agents/export-templates/${encodeURIComponent(created.id)}/spec?userId=${userId}`,
-          { spec: mapped.spec, model: mapped.model }
-        );
-      }
-    }
-
     return NextResponse.json({
       id: created.id,
       name: created.name,
-      status: stored.status,
-      mappingError: stored.validationErrors?.join("\n") ?? null,
+      status: "failed",
+      mappingError: started.reason,
+      ...(mockExportTemplates ? { mock: true } : {}),
     });
-  } catch (err) {
-    return relayError(err);
   }
+
+  return NextResponse.json({
+    id: created.id,
+    name: created.name,
+    status: "mapping",
+    jobId: started.data.job_id,
+    mappingError: null,
+    ...(mockExportTemplates ? { mock: true } : {}),
+  });
 }
