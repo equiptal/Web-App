@@ -135,6 +135,14 @@ export interface EquipmentItem {
   resolved: boolean;
   /** AC-30/32: a no-match item the renter removed/actioned is excluded from the broadcast (AC-33). */
   removed: boolean;
+  /**
+   * AC-31: the renter asked us to source this no-match item ("Provide it for me?" → WhatsApp). The row
+   * STAYS visible in a pending state — deleting it on the hand-off (the original behaviour) made the
+   * equipment vanish the moment the renter came back from WhatsApp, contradicting the message we
+   * prefill ("…so it is added to my request"). Still never posted: `postableItems` drops every
+   * no-match item regardless (AC-33), and `itemBlocksAdvance` lets it through.
+   */
+  sourcingRequested?: boolean;
 
   // Per-item options:
   quantity: number; // AC-55 default 1, min 1
