@@ -270,37 +270,31 @@ export function TemplateSheetGrid(props: TemplateSheetGridProps) {
 function Legend({
   L, openCount, filledCount, sheet,
 }: { L: LFn; openCount: number; filledCount: number; sheet: string }) {
-  const items = [
-    {
-      bg: C.successBg, fg: C.success,
-      label: L(
-        `${filledCount} cells we fill for you — the green “→ …” says what goes in`,
-        `${filledCount} خلية سنعبّئها لك — النص الأخضر "→ …" يوضح ما سيُكتب فيها`
-      ),
-    },
-    {
-      bg: C.actionDim, fg: C.warning,
-      label: L(`${openCount} we couldn't work out — click to answer`, `${openCount} لم نستطع تحديدها — اضغط للإجابة`),
-    },
-    { bg: C.lockBg, fg: C.lock, label: L("your formulas — never touched", "معادلاتك — لا نلمسها أبداً") },
-  ];
   return (
     <div className="mb-2">
-      {/* Says plainly whose sheet this is. Without it the grid reads as some generic table and
-          the colours look decorative rather than meaning anything. */}
-      <p className="mb-1.5 text-[13px]" style={{ color: C.navy }}>
+      {/* Says whose sheet this is and how to read one cell. Without it the grid looks like a
+          generic table and the arrows read as decoration. */}
+      <p className="mb-1 text-[13px]" style={{ color: C.navy }}>
         {L(
-          `This is your own template ("${sheet}"), with your text left exactly as it is. The colours show what each export will do to it.`,
-          `هذا قالبك أنت ("${sheet}") بنصّه كما هو. تُظهر الألوان ما سيفعله كل تصدير به.`
+          `Your template ("${sheet}") â your own text is untouched. Under each cell we fill, the arrow says which Moedatech figure goes there, and below it the value it will have.`,
+          `ÙØ§ÙØ¨Ù ("${sheet}") â ÙØµÙÙ ÙÙØ§ ÙÙ. Ø£Ø³ÙÙ ÙÙ Ø®ÙÙØ© Ø³ÙØ¹Ø¨ÙØ¦ÙØ§Ø ÙÙØ¶Ø­ Ø§ÙØ³ÙÙ Ø£Ù Ø±ÙÙ Ø³ÙÙÙØªØ¨ ÙÙÙØ§Ø Ø«Ù Ø§ÙÙÙÙØ© ÙÙØ³ÙØ§.`
         )}
       </p>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        {items.map((i) => (
-          <span key={i.label} className="flex items-center gap-1.5 text-[11.5px]" style={{ color: C.muted }}>
-            <span className="inline-block h-3 w-3 shrink-0 rounded-[3px]" style={{ background: i.bg, border: `1px solid ${i.fg}33` }} />
-            {i.label}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px]" style={{ color: C.muted }}>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 shrink-0 rounded-[3px]" style={{ background: C.successBg, border: `1px solid ${C.success}33` }} />
+          {L(`${filledCount} cells we fill`, `${filledCount} Ø®ÙÙØ© Ø³ÙØ¹Ø¨ÙØ¦ÙØ§`)}
+        </span>
+        {openCount > 0 && (
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 shrink-0 rounded-[3px]" style={{ background: C.actionDim, border: `1px solid ${C.warning}33` }} />
+            {L(`${openCount} need your choice`, `${openCount} ØªØ­ØªØ§Ø¬ Ø§Ø®ØªÙØ§Ø±Ù`)}
           </span>
-        ))}
+        )}
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 shrink-0 rounded-[3px]" style={{ background: C.lockBg, border: `1px solid ${C.lock}33` }} />
+          {L("your formulas â never touched", "ÙØ¹Ø§Ø¯ÙØ§ØªÙ â ÙØ§ ÙÙÙØ³ÙØ§ Ø£Ø¨Ø¯Ø§Ù")}
+        </span>
       </div>
     </div>
   );
@@ -335,16 +329,22 @@ function GridCell(p: {
    * way to tell whose words were on screen. What we will write goes underneath, in colour, as
    * an annotation ON their template rather than a replacement for it. */
   const theirs = cell?.value ?? "";
+  /* One line, always the same question: what does Moedatech put here?
+   *
+   * This used to say "✓ answered" for a resolved cell, which tells the user a question is
+   * closed but not what the export will now do — the one thing they came here to find out.
+   * An answered cell names its answer exactly like a mapped one. */
   const note =
     kind === "filled"
       ? `→ ${cell?.fieldLabel ?? cell?.field ?? ""}`
       : kind === "unfilled"
         ? cell?.unfilled?.resolved
-          ? L("✓ answered", "✓ تمت الإجابة")
-          : L("? needs you", "؟ بحاجة إليك")
+          ? `→ ${cell.resolvedAs ?? cell.unfilled.theirLabel}`
+          : L("? click to choose", "؟ اضغط للاختيار")
         : null;
 
-  const noteColor = kind === "filled" ? C.success : C.warning;
+  const answered = kind === "filled" || Boolean(cell?.unfilled?.resolved);
+  const noteColor = answered ? C.success : C.warning;
   const clickable = kind === "filled" || kind === "unfilled";
 
   /* The figure itself, when a preview exists. This is the whole point of the screen: seeing
@@ -358,7 +358,7 @@ function GridCell(p: {
       : String(pv)
     : null;
   // "We write here, but there is no data for it" — distinct from not having asked yet.
-  const emptyOnExport = p.hasPreview && kind === "filled" && !hasValue;
+  const emptyOnExport = p.hasPreview && answered && !hasValue;
 
   return (
     <td
@@ -398,7 +398,7 @@ function GridCell(p: {
       )}
       {emptyOnExport && (
         <div className="truncate text-[10.5px] italic" style={{ color: C.disabled }}>
-          {L("(no data — stays blank)", "(لا توجد بيانات — تبقى فارغة)")}
+          {L("not provided — blank", "غير متوفر — فارغة")}
         </div>
       )}
       {kind === "filled" && cell?.derivations?.length && cell.derivations[0] !== "identity" ? (

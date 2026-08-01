@@ -150,6 +150,12 @@ export interface SheetCellView {
    * keeps what it had — which the grid must distinguish from "we never asked".
    */
   previewValue?: string | number | boolean | null;
+  /**
+   * For an answered cell: what it now does, in plain English — "Supplier name",
+   * `always "N/A"`, "you fill this in". Named so the grid can say what the export will do
+   * rather than merely that a question was closed.
+   */
+  resolvedAs?: string | null;
   unfilled?: {
     theirLabel: string;
     candidate: string | null;
