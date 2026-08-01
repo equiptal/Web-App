@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useT, useLocale } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
@@ -302,11 +303,11 @@ export function VerificationFlow() {
   // AC-19 verified / AC-13-14/20 pending — terminal states, no form.
   if (status === "verified") {
     return (
-      <StatePanel icon="verified" tone="ok" title={v.verifiedTitle} body={v.verifiedBody} />
+      <StatePanel icon="verified" tone="ok" title={v.verifiedTitle} body={v.verifiedBody} homeLabel={t.onboarding.backToHome} />
     );
   }
   if (status === "pending") {
-    return <StatePanel icon="hourglass_top" tone="info" title={v.pendingTitle} body={v.pendingBody} />;
+    return <StatePanel icon="hourglass_top" tone="info" title={v.pendingTitle} body={v.pendingBody} homeLabel={t.onboarding.backToHome} />;
   }
 
   // none → submit; rejected → resubmit (AC-17/18), with a generic banner (no reason, AC-17).
@@ -481,7 +482,7 @@ export function VerificationFlow() {
   );
 }
 
-function StatePanel({ icon, tone, title, body }: { icon: string; tone: "ok" | "info"; title: string; body: string }) {
+function StatePanel({ icon, tone, title, body, homeLabel }: { icon: string; tone: "ok" | "info"; title: string; body: string; homeLabel?: string }) {
   return (
     <div className="p-[40px] text-center">
       <span className={`mx-auto grid h-14 w-14 place-items-center rounded-full ${tone === "ok" ? "bg-ok-soft text-ok" : "bg-info-soft text-info"}`}>
@@ -489,6 +490,16 @@ function StatePanel({ icon, tone, title, body }: { icon: string; tone: "ok" | "i
       </span>
       <h1 className="mt-4 text-[20px] font-extrabold text-navy">{title}</h1>
       <p className="mx-auto mt-2 max-w-sm text-[13.5px] text-muted">{body}</p>
+      {/* Terminal state (pending/verified): the form is gone, so give the renter an explicit way home
+          instead of leaving the browser back button as the only exit. */}
+      {homeLabel && (
+        <Link
+          href="/"
+          className="mt-6 inline-flex items-center gap-2 rounded-[10px] bg-navy px-5 py-2.5 text-[13.5px] font-bold text-white transition hover:brightness-110"
+        >
+          <Icon name="home" size={18} /> {homeLabel}
+        </Link>
+      )}
     </div>
   );
 }

@@ -651,6 +651,7 @@ export const en = {
     step1: "Create account",
     step2: "Verify company",
     later: "later",
+    backToHome: "Back to home",
     title: "Create your account",
     subtitle: "Complete your details to start requesting equipment from verified suppliers.",
     firstName: "First name",
