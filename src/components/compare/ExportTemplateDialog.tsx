@@ -77,6 +77,8 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
   const fileInput = useRef<HTMLInputElement>(null);
   /** Cancels an in-flight mapping poll when the dialog closes or another upload starts. */
   const pollAbort = useRef<AbortController | null>(null);
+  /** Which stage of the mapping the user is watching. -1 once it has finished. */
+  const [mapStep, setMapStep] = useState(0);
 
   const refresh = useCallback(async () => {
     try {
@@ -155,6 +157,13 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
     const abort = new AbortController();
     pollAbort.current = abort;
 
+    /* The agent does not report sub-progress, so the stages are PACED rather than measured —
+     * same approach as the RFQ processing screen. They are honest about the order of work and
+     * deliberately stop at the last one instead of pretending to finish: a bar that fills and
+     * then waits is worse than one that admits it is still going. */
+    setMapStep(0);
+    const paced = setInterval(() => setMapStep((n) => Math.min(n + 1, MAPPING_STAGES - 1)), 6000);
+
     try {
       let created = await uploadTemplate(pendingFile, nameDraft.trim());
 
@@ -187,6 +196,7 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
       toast(errText(e));
       setStage("picker");
     } finally {
+      clearInterval(paced);
       setBusy(false);
       setPendingFile(null);
     }
@@ -336,21 +346,7 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
           </div>
         )}
 
-        {stage === "mapping" && (
-          <div className="py-10 text-center">
-            <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: C.action, borderTopColor: "transparent" }} />
-            <p className="text-[14px] font-bold" style={{ color: C.navy }}>{L("Reading your template…", "جارٍ قراءة القالب…")}</p>
-            {/* Says "up to a minute" because it genuinely is — 20-60s on a real sheet. An
-                unqualified spinner at that length reads as a hang and gets refreshed away,
-                which is how the duplicate-name conflicts started. */}
-            <p className="mt-1 text-[12.5px]" style={{ color: C.muted }}>
-              {L(
-                "Working out where each figure belongs. This can take up to a minute, and only happens once.",
-                "نحدد مكان كل رقم. قد يستغرق هذا حتى دقيقة، ويحدث مرة واحدة فقط."
-              )}
-            </p>
-          </div>
-        )}
+        {stage === "mapping" && <MappingProgress L={L} step={mapStep} />}
 
         {stage === "review" && review && (
           <ReviewStage
@@ -377,6 +373,92 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
 }
 
 /* ────────────────────────────────────── stages ──────────────────────────────────────── */
+
+
+/** How many stages the mapping walks through. Kept beside the component that lists them. */
+const MAPPING_STAGES = 4;
+
+/**
+ * What the agent is doing, while it does it.
+ *
+ * Mapping a real template takes 20-60s, and an undifferentiated spinner for that long reads as
+ * a hang — which is how the duplicate-name conflicts started, with people refreshing something
+ * that was working. Same shape as the RFQ processing screen, so the two agents feel like one
+ * product rather than two.
+ *
+ * The stages are PACED, not measured: the agent returns one answer at the end and reports no
+ * sub-progress. They are truthful about the ORDER of the work, and the last one keeps spinning
+ * rather than completing — a bar that fills and then sits there is worse than one that admits
+ * it is still going.
+ */
+function MappingProgress({ L, step }: { L: LFn; step: number }) {
+  const stages = [
+    L("Reading your spreadsheet", "قراءة جدولك"),
+    L("Understanding what each column means", "فهم معنى كل عمود"),
+    L("Matching it to Moedatech's figures", "مطابقته بأرقام معدّاتك"),
+    L("Checking what it could not place", "مراجعة ما لم يستطع تحديده"),
+  ];
+  const pct = Math.round(((step + 1) / stages.length) * 100);
+
+  return (
+    <div className="mx-auto max-w-[440px] py-6 text-center">
+      <div
+        className="relative mx-auto mb-5 grid h-[76px] w-[76px] place-items-center rounded-full border bg-white"
+        style={{ borderColor: C.border }}
+      >
+        <span
+          className="absolute -inset-px rounded-full border-[3px] border-transparent motion-safe:animate-spin"
+          style={{ borderTopColor: C.action, borderRightColor: C.action }}
+        />
+        <span className="text-[30px]">🤖</span>
+      </div>
+
+      <h3 className="text-[17px] font-extrabold" style={{ color: C.navy }}>
+        {L("Reading your template", "جارٍ قراءة قالبك")}
+      </h3>
+      <p className="mb-5 mt-1 text-[13px]" style={{ color: C.muted }}>
+        {L(
+          "This happens once. Every export after it is instant.",
+          "يحدث هذا مرة واحدة. كل تصدير بعده فوري."
+        )}
+      </p>
+
+      <div className="mx-auto mb-5 flex max-w-[320px] flex-col gap-3 text-start">
+        {stages.map((label, i) => {
+          const state = i < step ? "done" : i === step ? "active" : "todo";
+          return (
+            <div
+              key={label}
+              className="flex items-center gap-2.5 text-[13px] font-semibold"
+              style={{ color: state === "todo" ? C.disabled : state === "active" ? C.navy : C.navyMid }}
+            >
+              <span
+                className="grid h-[20px] w-[20px] flex-none place-items-center rounded-full text-[10px] font-extrabold"
+                style={
+                  state === "done"
+                    ? { background: C.success, color: "#FFFFFF" }
+                    : state === "active"
+                      ? { border: `2px solid ${C.action}`, borderTopColor: "transparent" }
+                      : { border: `2px solid ${C.border}` }
+                }
+              >
+                {state === "done" ? "✓" : ""}
+              </span>
+              <span className={state === "active" ? "motion-safe:animate-pulse" : ""}>{label}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mx-auto h-1.5 max-w-[320px] overflow-hidden rounded-full" style={{ background: C.surface2 }}>
+        <div
+          className="h-full rounded-full transition-[width] duration-700"
+          style={{ width: `${pct}%`, background: C.action }}
+        />
+      </div>
+    </div>
+  );
+}
 
 function PickerStage(p: {
   L: LFn; ar: boolean; rows: ExportTemplateSummaryRow[] | null; scope: "company" | "personal"; busy: boolean;
