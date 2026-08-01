@@ -285,7 +285,14 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
       className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
       onClick={(e) => e.target === e.currentTarget && !busy && onClose()}
     >
-      <div className="max-h-[86vh] w-full max-w-[620px] overflow-auto rounded-2xl bg-white p-5 shadow-xl">
+      {/* The review shows the user's whole spreadsheet, so it gets the screen. At 620px their
+          template was a letterbox they had to scroll in two directions to read, which is the
+          opposite of the point — the grid only helps if you can take it in at a glance. */}
+      <div
+        className={`max-h-[92vh] w-full overflow-auto rounded-2xl bg-white p-5 shadow-xl ${
+          stage === "review" ? "max-w-[1400px]" : "max-w-[620px]"
+        }`}
+      >
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-[16px] font-extrabold" style={{ color: C.navy }}>{title}</h2>
           <button onClick={onClose} disabled={busy} className="grid h-8 w-8 place-items-center rounded-full disabled:opacity-40" style={{ color: C.muted }}>

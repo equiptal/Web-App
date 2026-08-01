@@ -120,11 +120,16 @@ export function TemplateSheetGrid(props: TemplateSheetGridProps) {
 
   return (
     <div>
-      <Legend L={L} openCount={openQuestions.length} filledCount={view.cells.filter((c) => c.kind === "filled").length} />
+      <Legend
+        L={L}
+        sheet={view.sheet}
+        openCount={openQuestions.length}
+        filledCount={view.cells.filter((c) => c.kind === "filled").length}
+      />
 
       <div
         className="overflow-auto rounded-[12px] border"
-        style={{ borderColor: C.border, maxHeight: 340 }}
+        style={{ borderColor: C.border, maxHeight: "58vh" }}
       >
         <table className="border-collapse text-[11.5px]" style={{ minWidth: "100%" }}>
           <thead>
@@ -256,20 +261,41 @@ export function TemplateSheetGrid(props: TemplateSheetGridProps) {
 
 /* ─────────────────────────────────────── pieces ─────────────────────────────────────── */
 
-function Legend({ L, openCount, filledCount }: { L: LFn; openCount: number; filledCount: number }) {
+function Legend({
+  L, openCount, filledCount, sheet,
+}: { L: LFn; openCount: number; filledCount: number; sheet: string }) {
   const items = [
-    { bg: C.successBg, fg: C.success, label: L(`${filledCount} filled automatically`, `${filledCount} تُعبّأ تلقائياً`) },
-    { bg: C.actionDim, fg: C.warning, label: L(`${openCount} need you`, `${openCount} بحاجة إليك`) },
-    { bg: C.lockBg, fg: C.lock, label: L("their formula — untouched", "معادلتهم — لا نلمسها") },
+    {
+      bg: C.successBg, fg: C.success,
+      label: L(
+        `${filledCount} cells we fill for you — the green “→ …” says what goes in`,
+        `${filledCount} خلية سنعبّئها لك — النص الأخضر "→ …" يوضح ما سيُكتب فيها`
+      ),
+    },
+    {
+      bg: C.actionDim, fg: C.warning,
+      label: L(`${openCount} we couldn't work out — click to answer`, `${openCount} لم نستطع تحديدها — اضغط للإجابة`),
+    },
+    { bg: C.lockBg, fg: C.lock, label: L("your formulas — never touched", "معادلاتك — لا نلمسها أبداً") },
   ];
   return (
-    <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-      {items.map((i) => (
-        <span key={i.label} className="flex items-center gap-1.5 text-[11.5px]" style={{ color: C.muted }}>
-          <span className="inline-block h-3 w-3 rounded-[3px]" style={{ background: i.bg, border: `1px solid ${i.fg}33` }} />
-          {i.label}
-        </span>
-      ))}
+    <div className="mb-2">
+      {/* Says plainly whose sheet this is. Without it the grid reads as some generic table and
+          the colours look decorative rather than meaning anything. */}
+      <p className="mb-1.5 text-[13px]" style={{ color: C.navy }}>
+        {L(
+          `This is your own template ("${sheet}"), with your text left exactly as it is. The colours show what each export will do to it.`,
+          `هذا قالبك أنت ("${sheet}") بنصّه كما هو. تُظهر الألوان ما سيفعله كل تصدير به.`
+        )}
+      </p>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        {items.map((i) => (
+          <span key={i.label} className="flex items-center gap-1.5 text-[11.5px]" style={{ color: C.muted }}>
+            <span className="inline-block h-3 w-3 shrink-0 rounded-[3px]" style={{ background: i.bg, border: `1px solid ${i.fg}33` }} />
+            {i.label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -283,7 +309,7 @@ function GridCell(p: {
   selected: boolean;
   onSelect: () => void;
 }) {
-  const { cell, selected } = p;
+  const { cell, selected, L } = p;
   const kind = cell?.kind ?? "label";
   const unresolved = kind === "unfilled" && !cell?.unfilled?.resolved;
 
@@ -296,36 +322,54 @@ function GridCell(p: {
           ? { background: C.lockBg, color: C.lock }
           : { background: "#FFFFFF", color: C.navy };
 
-  // A filled cell shows OUR field name, not their (usually blank) text — the whole question
-  // the review answers is "what lands here".
-  const text =
+  /* THEIR text stays the headline, always. An earlier version replaced it with our field name
+   * on filled cells, so the grid stopped reading like the user's own sheet and there was no
+   * way to tell whose words were on screen. What we will write goes underneath, in colour, as
+   * an annotation ON their template rather than a replacement for it. */
+  const theirs = cell?.value ?? "";
+  const note =
     kind === "filled"
-      ? cell?.fieldLabel ?? cell?.field ?? ""
+      ? `→ ${cell?.fieldLabel ?? cell?.field ?? ""}`
       : kind === "unfilled"
         ? cell?.unfilled?.resolved
-          ? cell.unfilled.theirLabel
-          : `? ${cell?.unfilled?.theirLabel ?? ""}`
-        : cell?.value ?? "";
+          ? L("✓ answered", "✓ تمت الإجابة")
+          : L("? needs you", "؟ بحاجة إليك")
+        : null;
 
+  const noteColor = kind === "filled" ? C.success : C.warning;
   const clickable = kind === "filled" || kind === "unfilled";
 
   return (
     <td
       onClick={clickable ? p.onSelect : undefined}
-      title={cell?.ref}
+      title={
+        kind === "filled"
+          ? `${cell?.ref} — ${L("we fill this with", "سنملأها بـ")} ${cell?.fieldLabel ?? ""}`
+          : kind === "formula"
+            ? `${cell?.ref} — ${L("your formula, left alone", "معادلتك، لا نلمسها")}`
+            : cell?.ref
+      }
       rowSpan={p.rowSpan}
       colSpan={p.colSpan}
       className={`border-b border-r px-2 py-1 align-top ${clickable ? "cursor-pointer" : ""}`}
       style={{
         ...style,
         borderColor: C.border,
-        maxWidth: 150,
+        maxWidth: 200,
         outline: selected ? `2px solid ${C.action}` : undefined,
         outlineOffset: -2,
-        fontWeight: cell?.bold ? 700 : 400,
       }}
     >
-      <div className="truncate">{text}</div>
+      {theirs && (
+        <div className="truncate" style={{ fontWeight: cell?.bold ? 700 : 400 }}>
+          {kind === "formula" ? `ƒ ${theirs}` : theirs}
+        </div>
+      )}
+      {note && (
+        <div className="truncate text-[10.5px] font-bold" style={{ color: noteColor }}>
+          {note}
+        </div>
+      )}
       {kind === "filled" && cell?.derivations?.length && cell.derivations[0] !== "identity" ? (
         <div className="truncate text-[10px]" style={{ color: C.muted }}>
           {cell.derivations.join(" → ")}
