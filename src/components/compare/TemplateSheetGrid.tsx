@@ -57,7 +57,13 @@ export interface TemplateSheetGridProps {
   view: SheetView;
   busy: boolean;
   /** Our visible fields with nowhere to go — shown as a closing warning, not a question. */
-  homeless: Array<{ field: string; label: string; resolved: boolean }>;
+  homeless: Array<{
+    field: string;
+    label: string;
+    candidateCell?: string | null;
+    why?: string | null;
+    resolved: boolean;
+  }>;
   /** Every field the user may point a cell at, for the "put something else here" picker. */
   vocabulary: Array<{ key: string; label: string }>;
   onResolveUnfilled: (cell: string, r: UnfilledResolution) => void;
@@ -204,21 +210,42 @@ export function TemplateSheetGrid(props: TemplateSheetGridProps) {
               "لا يوجد مكان لهذه في قالبك، لذا لن تظهر في الملف المُصدَّر:"
             )}
           </p>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {/* Each one carries the mapper's argument. "No place for this" on its own is
+              unarguable — the reason is what lets the user tell a correct call from a lazy
+              one, and the candidate cell turns disagreeing into one click. */}
+          <div className="mt-2 flex flex-col gap-1.5">
             {homeless.map((n) => (
-              <span
+              <div
                 key={n.field}
-                className="rounded-full px-2.5 py-1 text-[12px]"
-                style={{ background: "#FFFFFF", color: C.navyMid, border: `1px solid ${C.border}` }}
+                className="rounded-[10px] px-2.5 py-1.5"
+                style={{ background: "#FFFFFF", border: `1px solid ${C.border}` }}
               >
-                {n.label}
-              </span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-[12.5px] font-bold" style={{ color: C.navyMid }}>{n.label}</span>
+                  {n.candidateCell && (
+                    <button
+                      onClick={() => {
+                        setConstant("");
+                        setSelected(n.candidateCell as string);
+                      }}
+                      className="text-[11px] underline"
+                      style={{ color: C.action }}
+                      title={L("Jump to that cell", "انتقل إلى تلك الخلية")}
+                    >
+                      {L(`closest: ${n.candidateCell}`, `الأقرب: ${n.candidateCell}`)}
+                    </button>
+                  )}
+                </div>
+                {n.why && (
+                  <p className="mt-0.5 text-[11.5px]" style={{ color: C.muted }}>{n.why}</p>
+                )}
+              </div>
             ))}
           </div>
           <p className="mt-2 text-[11.5px]" style={{ color: C.muted }}>
             {L(
-              "To include one, click the cell in your sheet where it belongs and choose it there.",
-              "لتضمين أي منها، اضغط على الخلية المناسبة في ورقتك واخترها من هناك."
+              "Disagree? Click the cell in your sheet where it belongs and choose it there.",
+              "غير موافق؟ اضغط على الخلية المناسبة في ورقتك واخترها من هناك."
             )}
           </p>
         </div>

@@ -57,6 +57,14 @@ export interface OursNoHomeRow {
   field: string;
   label: string;
   candidateCell: string | null;
+  /**
+   * The mapper's argument: the closest thing it found, and why that is not this field.
+   *
+   * Shown because "no place for this" without a reason is unarguable — the user cannot tell a
+   * correct call from a lazy one. Null on templates mapped before the mapper was required to
+   * justify itself, and on fields displaced by the user's own correction.
+   */
+  why?: string | null;
   resolved: boolean;
 }
 

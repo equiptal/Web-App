@@ -232,6 +232,9 @@ export function mockReconciliation(id: string) {
     field: String(n.field ?? ""),
     label: String(n.field ?? ""),
     candidateCell: (n.candidateCell as string | null) ?? null,
+    // The mapper's argument for calling this homeless — carried through so dev mode shows the
+    // same warning panel the real backend produces.
+    why: (n.why as string | null) ?? null,
     resolved: n.resolution != null,
   }));
 
