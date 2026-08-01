@@ -319,14 +319,18 @@ export const en = {
     removeConfirm: "Remove this item from the request?",
     noMatch: {
       provide: "Provide it for me?", // AC-30/31 tentative
-      cancel: "Cancel", // AC-30/32 tentative
-      explainer: "We couldn't find this in our catalogue.",
+      // Both explainers state the outcome up front: a no-match item never goes out to suppliers
+      // (AC-33), whether or not the renter messages us — so the row shouldn't imply otherwise.
+      explainer: "We couldn't find this in our catalogue — it won't be included in this request.",
       // Shown when the equipment IS in the catalogue but the requested SIZE isn't yet (a genuine new size).
-      newSizeExplainer: "We carry this equipment, but not this size yet — message us to add it, or remove the item.",
+      newSizeExplainer: "We carry this equipment, but not this size yet — message us to add it. It won't be included in this request.",
       // AC-31: prefilled WhatsApp message to Moedatech support requesting the equipment be sourced.
       whatsappMessage: 'Hi Moedatech, I\'m creating an RFQ and need equipment that isn\'t available in the app: "{item}". Please add/source it for me so it is added to my request. Thank you!',
       // New-size variant: equipment exists, the size doesn't — ask support to add the size.
       whatsappMessageSize: 'Hi Moedatech, I\'m creating an RFQ for "{item}" but the size I need isn\'t in the app yet. Please add this size so it can be added to my request. Thank you!',
+      // AC-31: shown in place of the action once the renter has been handed off to WhatsApp — the item
+      // stays put so returning from WhatsApp doesn't look like it was dropped.
+      requested: "We got your message — we'll add this and contact you on WhatsApp.",
     },
     perItem: {
       quantity: "Quantity",

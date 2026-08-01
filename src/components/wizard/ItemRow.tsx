@@ -152,25 +152,54 @@ export function ItemRow({
                 )
               }
             />
+            {/* The explainer always states the outcome ("won't be included") — messaging us or not makes
+                no difference to the request itself, since `postableItems` drops every no-match item. */}
             <p className="mt-1 text-xs text-muted">{newSizeOnly ? t.step2.noMatch.newSizeExplainer : t.step2.noMatch.explainer}</p>
+            {/* Once we've handed off to WhatsApp the row STAYS, now acknowledged — so coming back from
+                WhatsApp doesn't read as the equipment having been silently dropped. */}
+            {item.sourcingRequested && (
+              <p className="mt-1 flex items-start gap-1.5 text-xs font-medium text-ok">
+                <Icon name="check_circle" size={15} /> {t.step2.noMatch.requested}
+              </p>
+            )}
           </div>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2 sm:justify-end">
-          <Button
-            variant="secondary"
-            onClick={() => {
-              const tmpl = newSizeOnly ? t.step2.noMatch.whatsappMessageSize : t.step2.noMatch.whatsappMessage;
-              const msg = fmt(tmpl, { item: rawDisplay ?? item.rawLabel ?? "" });
-              window.open(`https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
-              actions.removeItem(item.id);
-            }}
+          {/* Same corner X + confirm modal as every other item row — removing is tidying the list, not a
+              decision about the request (the item is excluded either way). */}
+          <button
+            className="grid h-8 w-8 flex-none place-items-center rounded-lg border border-border text-muted hover:border-danger hover:text-danger"
+            title={t.common.remove}
+            onClick={() => setConfirmRemove(true)}
           >
-            <Icon name="chat" size={15} /> {t.step2.noMatch.provide}
-          </Button>
-          <Button variant="ghost" onClick={() => actions.removeItem(item.id)}>
-            {t.step2.noMatch.cancel}
-          </Button>
+            <Icon name="close" size={17} />
+          </button>
         </div>
+        {/* The one action, and it's optional: message us, or leave it. It no longer deletes the item —
+            that's what made the equipment vanish on returning from WhatsApp. */}
+        {!item.sourcingRequested && (
+          <div className="mt-3 flex flex-wrap gap-2 sm:justify-end">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                const tmpl = newSizeOnly ? t.step2.noMatch.whatsappMessageSize : t.step2.noMatch.whatsappMessage;
+                const msg = fmt(tmpl, { item: rawDisplay ?? item.rawLabel ?? "" });
+                window.open(`https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
+                actions.requestSourcing(item.id);
+              }}
+            >
+              <Icon name="chat" size={15} /> {t.step2.noMatch.provide}
+            </Button>
+          </div>
+        )}
+        <Modal open={confirmRemove} onClose={() => setConfirmRemove(false)} title={t.step2.removeConfirm}>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setConfirmRemove(false)}>
+              {t.common.cancel}
+            </Button>
+            <Button variant="danger" onClick={() => { actions.removeItem(item.id); setConfirmRemove(false); }}>
+              {t.common.remove}
+            </Button>
+          </div>
+        </Modal>
       </li>
     );
   }

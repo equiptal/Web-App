@@ -66,4 +66,12 @@ describe("postableItems (AC-33/34/43)", () => {
     const items = [makeItem({ id: "a" }), makeItem({ id: "b", verdict: "no-match" }), makeItem({ id: "c", removed: true })];
     expect(postableItems(items).map((i) => i.id)).toEqual(["a"]);
   });
+  // AC-31: "Provide it for me?" keeps the no-match row on screen (it used to delete it, so the item
+  // vanished on return from WhatsApp). Staying visible must NOT make it postable or a blocker.
+  it("drops a sourcing-requested no-match item, and it never blocks Step 2", () => {
+    const sourcing = makeItem({ id: "b", verdict: "no-match", sourcingRequested: true });
+    expect(postableItems([makeItem({ id: "a" }), sourcing]).map((i) => i.id)).toEqual(["a"]);
+    expect(itemBlocksAdvance(sourcing)).toBe(false);
+    expect(gateStep2([makeItem({ id: "a" }), sourcing]).ok).toBe(true);
+  });
 });

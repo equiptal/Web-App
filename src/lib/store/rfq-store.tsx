@@ -145,6 +145,7 @@ type Action =
   | { t: "APPROVE_SUGGESTION"; id: string }
   | { t: "ADD_ITEM" }
   | { t: "REMOVE_ITEM"; id: string }
+  | { t: "REQUEST_SOURCING"; id: string }
   | { t: "PATCH_PREFERENCES"; patch: DeepPrefPatch }
   | { t: "SET_TRIAL"; isTrial: boolean }
   | { t: "SUBMIT_START" }
@@ -467,6 +468,11 @@ export function reducer(state: RfqState, a: Action): RfqState {
       });
     case "REMOVE_ITEM":
       return withDraft(state, (d) => mapItem(d, a.id, (i) => ({ ...i, removed: true })));
+    case "REQUEST_SOURCING":
+      // AC-31: hand off to WhatsApp WITHOUT deleting the item — it stays on screen as "we're on it",
+      // so coming back from WhatsApp doesn't look like the equipment was silently dropped. It still
+      // never posts (no-match is excluded by `postableItems`) and still never blocks Step 2.
+      return withDraft(state, (d) => mapItem(d, a.id, (i) => ({ ...i, sourcingRequested: true, removed: false })));
     case "PATCH_PREFERENCES":
       return withDraft(state, (d) => {
         const p = d.preferences;
@@ -578,6 +584,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
     approveSuggestion: (id: string) => dispatch({ t: "APPROVE_SUGGESTION", id }),
     addItem: () => dispatch({ t: "ADD_ITEM" }),
     removeItem: (id: string) => dispatch({ t: "REMOVE_ITEM", id }),
+    requestSourcing: (id: string) => dispatch({ t: "REQUEST_SOURCING", id }),
 
     patchPreferences: (patch: DeepPrefPatch) => dispatch({ t: "PATCH_PREFERENCES", patch }),
 
