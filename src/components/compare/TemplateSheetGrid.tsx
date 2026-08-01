@@ -55,15 +55,6 @@ function colName(index: number): string {
 export interface TemplateSheetGridProps {
   L: LFn;
   view: SheetView;
-  /**
-   * The real value each cell gets, keyed by ref — from a render of the CURRENT comparison.
-   *
-   * Empty when the preview could not be produced (dev mode, or a template with no mapping
-   * yet), in which case cells fall back to naming the field. Showing the field name is a
-   * weaker answer than showing the figure, but it is honest; a stale or invented number
-   * would not be.
-   */
-  values?: Map<string, string | number | boolean | null>;
   busy: boolean;
   /** Our visible fields with nowhere to go — shown as a closing warning, not a question. */
   homeless: Array<{
@@ -127,6 +118,11 @@ export function TemplateSheetGrid(props: TemplateSheetGridProps) {
   const openQuestions = view.cells.filter((c) => c.kind === "unfilled" && !c.unfilled?.resolved);
   const cell = selected ? byRef.get(selected) ?? null : null;
 
+  /* Whether the figures were resolved at all. Without this, a cell we fill but have no data
+     for is indistinguishable from one we simply never priced — and "blank because the supplier
+     didn't say" is a different message from "blank because we haven't looked". */
+  const hasPreview = view.cells.some((c) => c.previewValue !== undefined);
+
   return (
     <div>
       <Legend
@@ -175,8 +171,7 @@ export function TemplateSheetGrid(props: TemplateSheetGridProps) {
                       L={L}
                       ref_={ref}
                       cell={byRef.get(ref)}
-                      preview={props.values?.get(ref)}
-                      hasPreview={Boolean(props.values?.size)}
+                      hasPreview={hasPreview}
                       rowSpan={span?.rs}
                       colSpan={span?.cs}
                       selected={selected === ref}
@@ -315,9 +310,7 @@ function GridCell(p: {
   L: LFn;
   ref_: string;
   cell?: SheetCellView;
-  /** What an export puts here, from a render of the current comparison. */
-  preview?: string | number | boolean | null;
-  /** Whether a preview exists at all — distinguishes "writes nothing" from "we don't know". */
+  /** Whether values were resolved at all — distinguishes "writes nothing" from "never asked". */
   hasPreview?: boolean;
   rowSpan?: number;
   colSpan?: number;
@@ -357,11 +350,12 @@ function GridCell(p: {
   /* The figure itself, when a preview exists. This is the whole point of the screen: seeing
    * "SAR 48,300" is what lets someone judge the export, and "Total (incl. VAT)" is not. Shown
    * only for cells we write — a preview value on their own label would be meaningless. */
-  const hasValue = p.preview !== undefined && p.preview !== null && p.preview !== "";
+  const pv = cell?.previewValue;
+  const hasValue = pv !== undefined && pv !== null && pv !== "";
   const valueText = hasValue
-    ? typeof p.preview === "number"
-      ? p.preview.toLocaleString()
-      : String(p.preview)
+    ? typeof pv === "number"
+      ? pv.toLocaleString()
+      : String(pv)
     : null;
   // "We write here, but there is no data for it" — distinct from not having asked yet.
   const emptyOnExport = p.hasPreview && kind === "filled" && !hasValue;

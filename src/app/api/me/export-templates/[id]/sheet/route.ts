@@ -1,20 +1,24 @@
 import { NextResponse } from "next/server";
-import { agentsGet, AgentsBackendError } from "@/lib/api/agents-backend";
+import { agentsPost, AgentsBackendError } from "@/lib/api/agents-backend";
 import { sessionUserId } from "@/lib/api/session-user";
 import { mockExportTemplates } from "@/lib/config/env";
 import { mockSheetView } from "@/lib/api/mock-export-templates";
 
 /**
- * GET /api/me/export-templates/:id/sheet — the user's own template as an annotated grid.
+ * POST /api/me/export-templates/:id/sheet — their template as an annotated, FILLED grid.
  *
- * Backs the review screen, which draws THEIR spreadsheet with our answers in place rather than
- * a list of questions about cell references they have to go and find themselves.
+ * Backs the review screen: their own spreadsheet, with each cell saying what an export does to
+ * it and what value it actually receives for the comparison in the body.
  *
- * Separate from the reconciliation `GET /:id` because the backend re-reads the workbook out of
- * S3 to build this. The picker and the export both call that one and neither should pay for a
- * parse they don't need.
+ * POST rather than GET because it carries that comparison. One endpoint rather than a separate
+ * preview — describing the cells and filling them are the same question, and splitting them
+ * meant two round trips, two workbook reads server-side, and two shapes that could disagree
+ * about which cells exist.
+ *
+ * A body is optional: without it the grid still names the field feeding each cell, which is
+ * what a template with nothing to export needs.
  */
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const userId = await sessionUserId();
   if (userId == null) return NextResponse.json({ code: "unauthorized" }, { status: 401 });
@@ -27,9 +31,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
 
   try {
+    const body = await req.json().catch(() => ({}));
     return NextResponse.json(
-      await agentsGet<unknown>(
-        `/agents/export-templates/${encodeURIComponent(id)}/sheet?userId=${userId}`
+      await agentsPost<unknown>(
+        `/agents/export-templates/${encodeURIComponent(id)}/sheet?userId=${userId}`,
+        body
       )
     );
   } catch (err) {

@@ -11,7 +11,6 @@ import type {
   ExportTemplateList,
   MappedCorrection,
   NoHomeResolution,
-  PreviewResult,
   ReconciliationView,
   SheetView,
   UnfilledResolution,
@@ -202,25 +201,23 @@ export async function waitForMapping(
 }
 
 /**
- * This comparison resolved into their template — the real value for every cell.
+ * Their template as a grid: what each cell receives, AND the real value it gets.
  *
- * Same payload as the export, sent earlier. Lets the review show the figures that will be
- * written rather than the names of the fields feeding them.
+ * POST because it carries the comparison to resolve. One call rather than two — describing
+ * the cells and filling them are the same question, and splitting them meant two round trips,
+ * two workbook reads on the server, and two shapes that could disagree about which cells exist.
+ *
+ * `payload` is optional: without it the grid still says which field feeds each cell, which is
+ * what a template with nothing to export needs.
  */
-export async function previewWithTemplate(id: string, payload: ExportPayload): Promise<PreviewResult> {
-  return json<PreviewResult>(
-    await fetch(`${BASE}/${encodeURIComponent(id)}/preview`, {
+export async function getTemplateSheet(id: string, payload?: ExportPayload): Promise<SheetView> {
+  return json<SheetView>(
+    await fetch(`${BASE}/${encodeURIComponent(id)}/sheet`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(payload ?? {}),
+      cache: "no-store",
     })
-  );
-}
-
-/** The user's template as a grid, annotated with what an export writes into each cell. */
-export async function getTemplateSheet(id: string): Promise<SheetView> {
-  return json<SheetView>(
-    await fetch(`${BASE}/${encodeURIComponent(id)}/sheet`, { cache: "no-store" })
   );
 }
 
