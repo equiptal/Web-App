@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { useLocale, useT } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n/config";
 import { Icon } from "@/components/ui";
@@ -27,21 +28,32 @@ export function OnboardingShell({ step, children }: { step: 1 | 2; children: Rea
   return (
     <div dir={locale === "ar" ? "rtl" : "ltr"} className="min-h-screen bg-surface2">
       <div className="flex h-[60px] items-center justify-between border-b border-border bg-surface px-6">
-        <div className="flex items-center">
+        {/* Logo links home — the onboarding/verify screens have no sidebar, so this (and the explicit
+            "Back to home" button) are the only in-app way out. Without them a submitted renter is
+            stuck on the pending screen with only the browser back button. */}
+        <Link href="/" className="flex items-center rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-navy/40" aria-label={t.shell.home}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/moedatech-logo.png" alt="Moedatech" className="h-7 w-auto" />
+        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-[12.5px] font-bold text-navy-mid transition hover:bg-surface2"
+          >
+            <Icon name="home" size={16} /> {t.onboarding.backToHome}
+          </Link>
+          <span className="inline-flex overflow-hidden rounded-md border border-border">
+            {(["en", "ar"] as Locale[]).map((l) => (
+              <button
+                key={l}
+                onClick={() => setLocale(l)}
+                className={`px-2.5 py-1 text-xs font-bold ${locale === l ? "bg-navy text-white" : "bg-surface text-muted"}`}
+              >
+                {l === "en" ? "EN" : "ع"}
+              </button>
+            ))}
+          </span>
         </div>
-        <span className="inline-flex overflow-hidden rounded-md border border-border">
-          {(["en", "ar"] as Locale[]).map((l) => (
-            <button
-              key={l}
-              onClick={() => setLocale(l)}
-              className={`px-2.5 py-1 text-xs font-bold ${locale === l ? "bg-navy text-white" : "bg-surface text-muted"}`}
-            >
-              {l === "en" ? "EN" : "ع"}
-            </button>
-          ))}
-        </span>
       </div>
 
       <div className={`mx-auto px-5 py-8 ${step === 2 ? "max-w-3xl" : "max-w-lg"}`}>

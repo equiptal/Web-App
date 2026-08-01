@@ -8,6 +8,7 @@ import { parseAddress, publicTaxonomyUrl, shortRef, statusMeta, type RequestReco
 import { EquipImg } from "@/components/requests/EquipImg";
 import { LocationMap } from "@/components/requests/LocationMap";
 import { Ditem, requestDetailRows, ConfirmCancelModal, EditRequestModal } from "@/components/requests/RequestDetail";
+import { useHeaderBack } from "@/components/AppShell";
 import "@/components/requests/requests-proto.css";
 
 
@@ -27,6 +28,8 @@ export function RequestGroupDetail({ groupId, onTitle }: { groupId: string; onTi
   const ar = locale === "ar";
   const L = (en: string, arr: string) => (ar ? arr : en);
   const router = useRouter();
+  // In-app Back arrow in the AppShell header → the Requests list (drill-down, not browser-back only).
+  useHeaderBack(() => router.push("/requests"));
   const [records, setRecords] = useState<RequestRecord[] | null>(null);
   const [error, setError] = useState(false);
   // Group-level edit / cancel (applies to every member request in the RFQ).

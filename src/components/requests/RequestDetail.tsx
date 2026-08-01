@@ -9,6 +9,7 @@ import { publicTaxonomyUrl, shortRef, statusMeta, type RequestItem, type Request
 import { RequestBids } from "@/components/requests/RequestBids";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { LocationMap } from "@/components/requests/LocationMap";
+import { useHeaderBack } from "@/components/AppShell";
 import "@/components/requests/requests-proto.css";
 
 
@@ -73,6 +74,9 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
   const ar = locale === "ar";
   const L = (en: string, arr: string) => (ar ? arr : en);
   const router = useRouter();
+  // In-app Back arrow in the AppShell header → the Requests list (this is a drill-down, so don't
+  // leave the browser back button as the only way up).
+  useHeaderBack(() => router.push("/requests"));
   const [r, setR] = useState<RequestRecord | null>(null);
   const [error, setError] = useState(false);
   const [view, setView] = useState<"details" | "bids">("details");

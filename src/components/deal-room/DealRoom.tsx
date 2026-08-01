@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, Fragment } from "react";
+import { useRouter } from "next/navigation";
 import { StreamChat, type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
+import { useHeaderBack } from "@/components/AppShell";
 import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, ApiError } from "@/lib/api/client";
 import { computeDealTotals, type DealRoomView, type DealTerm, type DealRoomDocument, type DealRoomDocuments, type QuotationView } from "@/lib/contract/deal-room";
 import { reconstructRounds, collapseRounds, latestRoundBy, withOpeningRound, type DealRound } from "@/lib/contract/deal-rounds";
@@ -209,6 +211,10 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const { locale } = useLocale();
   const ar = locale === "ar";
   const L = (en: string, arr: string) => (ar ? arr : en);
+  const router = useRouter();
+  // In-app Back arrow in the AppShell header → the Inbox (the deal-room list). A deal room is a
+  // drill-down, so this gives an explicit way up instead of relying on the browser back button.
+  useHeaderBack(() => router.push("/inbox"));
 
   const [room, setRoom] = useState<DealRoomView | null>(null);
   const [error, setError] = useState(false);
