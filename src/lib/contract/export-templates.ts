@@ -154,6 +154,25 @@ export interface SheetCellView {
   };
 }
 
+/** What an export would actually put in one cell of their template. */
+export interface PreviewCell {
+  ref: string;
+  /** Null means nothing is written — the cell keeps whatever their template had. */
+  value: string | number | boolean | null;
+  field?: string;
+}
+
+/**
+ * The whole comparison resolved into their sheet, before committing to a file.
+ *
+ * Produced by running the real renderer and watching it, so what the grid shows is what the
+ * download contains. `summary` is the same pre-flight the export returns.
+ */
+export interface PreviewResult {
+  cells: PreviewCell[];
+  summary: PreflightSummary | null;
+}
+
 export interface SheetView {
   sheet: string;
   rowCount: number;

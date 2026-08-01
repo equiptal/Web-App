@@ -55,6 +55,15 @@ function colName(index: number): string {
 export interface TemplateSheetGridProps {
   L: LFn;
   view: SheetView;
+  /**
+   * The real value each cell gets, keyed by ref — from a render of the CURRENT comparison.
+   *
+   * Empty when the preview could not be produced (dev mode, or a template with no mapping
+   * yet), in which case cells fall back to naming the field. Showing the field name is a
+   * weaker answer than showing the figure, but it is honest; a stale or invented number
+   * would not be.
+   */
+  values?: Map<string, string | number | boolean | null>;
   busy: boolean;
   /** Our visible fields with nowhere to go — shown as a closing warning, not a question. */
   homeless: Array<{
@@ -166,6 +175,8 @@ export function TemplateSheetGrid(props: TemplateSheetGridProps) {
                       L={L}
                       ref_={ref}
                       cell={byRef.get(ref)}
+                      preview={props.values?.get(ref)}
+                      hasPreview={Boolean(props.values?.size)}
                       rowSpan={span?.rs}
                       colSpan={span?.cs}
                       selected={selected === ref}
@@ -304,6 +315,10 @@ function GridCell(p: {
   L: LFn;
   ref_: string;
   cell?: SheetCellView;
+  /** What an export puts here, from a render of the current comparison. */
+  preview?: string | number | boolean | null;
+  /** Whether a preview exists at all — distinguishes "writes nothing" from "we don't know". */
+  hasPreview?: boolean;
   rowSpan?: number;
   colSpan?: number;
   selected: boolean;
@@ -339,6 +354,18 @@ function GridCell(p: {
   const noteColor = kind === "filled" ? C.success : C.warning;
   const clickable = kind === "filled" || kind === "unfilled";
 
+  /* The figure itself, when a preview exists. This is the whole point of the screen: seeing
+   * "SAR 48,300" is what lets someone judge the export, and "Total (incl. VAT)" is not. Shown
+   * only for cells we write — a preview value on their own label would be meaningless. */
+  const hasValue = p.preview !== undefined && p.preview !== null && p.preview !== "";
+  const valueText = hasValue
+    ? typeof p.preview === "number"
+      ? p.preview.toLocaleString()
+      : String(p.preview)
+    : null;
+  // "We write here, but there is no data for it" — distinct from not having asked yet.
+  const emptyOnExport = p.hasPreview && kind === "filled" && !hasValue;
+
   return (
     <td
       onClick={clickable ? p.onSelect : undefined}
@@ -366,8 +393,18 @@ function GridCell(p: {
         </div>
       )}
       {note && (
-        <div className="truncate text-[10.5px] font-bold" style={{ color: noteColor }}>
+        <div className="truncate text-[10.5px]" style={{ color: noteColor }}>
           {note}
+        </div>
+      )}
+      {valueText && (
+        <div className="truncate text-[12.5px] font-bold" style={{ color: C.navy }} title={valueText}>
+          {valueText}
+        </div>
+      )}
+      {emptyOnExport && (
+        <div className="truncate text-[10.5px] italic" style={{ color: C.disabled }}>
+          {L("(no data — stays blank)", "(لا توجد بيانات — تبقى فارغة)")}
         </div>
       )}
       {kind === "filled" && cell?.derivations?.length && cell.derivations[0] !== "identity" ? (

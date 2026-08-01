@@ -10,6 +10,7 @@ import {
   getTemplate,
   getTemplateSheet,
   listTemplates,
+  previewWithTemplate,
   uploadTemplate,
   waitForMapping,
 } from "@/lib/api/export-templates";
@@ -70,6 +71,8 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
   const [scope, setScope] = useState<"company" | "personal">("personal");
   const [review, setReview] = useState<ReconciliationView | null>(null);
   const [sheet, setSheet] = useState<SheetView | null>(null);
+  /** Real values per cell for the current comparison — null when no preview was possible. */
+  const [values, setValues] = useState<Map<string, string | number | boolean | null> | null>(null);
   const [result, setResult] = useState<ExportResult | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [nameDraft, setNameDraft] = useState("");
@@ -95,14 +98,27 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
    * fatal — the card list still answers every question, and losing the drawing beats losing
    * the ability to review at all.
    */
-  const loadReview = useCallback(async (templateId: string) => {
-    const [view, grid] = await Promise.all([
-      getTemplate(templateId),
-      getTemplateSheet(templateId).catch(() => null),
-    ]);
-    setReview(view);
-    setSheet(grid);
-  }, []);
+  const loadReview = useCallback(
+    async (templateId: string) => {
+      const payload = buildPayload();
+      const [view, grid, preview] = await Promise.all([
+        getTemplate(templateId),
+        getTemplateSheet(templateId).catch(() => null),
+        /* The real figures for THIS comparison. Best-effort: a template that failed to
+         * preview still gets a reviewable grid showing which field feeds each cell, which is
+         * a weaker answer than the number but an honest one. */
+        payload ? previewWithTemplate(templateId, payload).catch(() => null) : Promise.resolve(null),
+      ]);
+      setReview(view);
+      setSheet(grid);
+      setValues(
+        preview?.cells?.length
+          ? new Map(preview.cells.map((c) => [c.ref, c.value]))
+          : null
+      );
+    },
+    [buildPayload]
+  );
 
   useEffect(() => {
     if (!open) {
@@ -116,6 +132,7 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
     setResult(null);
     setReview(null);
     setSheet(null);
+    setValues(null);
     void refresh();
   }, [open, refresh]);
 
@@ -347,7 +364,7 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
 
         {stage === "review" && review && (
           <ReviewStage
-            L={L} view={review} sheet={sheet} busy={busy}
+            L={L} view={review} sheet={sheet} values={values} busy={busy}
             onResolve={resolve} onDrop={dropField} onCorrectMapped={correctMapped}
             onDone={() => confirmReviewThenExport(review.templateId)}
           />
@@ -494,13 +511,15 @@ function PickerStage(p: {
 }
 
 function ReviewStage(p: {
-  L: LFn; view: ReconciliationView; sheet: SheetView | null; busy: boolean;
+  L: LFn; view: ReconciliationView; sheet: SheetView | null;
+  values: Map<string, string | number | boolean | null> | null;
+  busy: boolean;
   onResolve: (cell: string, r: UnfilledResolution) => void;
   onDrop: (field: string) => void;
   onCorrectMapped: (cell: string, change: MappedCorrection) => void;
   onDone: () => void;
 }) {
-  const { L, view, sheet, busy } = p;
+  const { L, view, sheet, values, busy } = p;
   const [constants, setConstants] = useState<Record<string, string>>({});
   /* Show ANSWERED rows too, not just open ones. Filtering them out meant a fully-resolved
    * template opened for editing showed "Everything lines up" with nothing to change — the
@@ -541,6 +560,7 @@ function ReviewStage(p: {
         <TemplateSheetGrid
           L={L}
           view={sheet}
+          values={values ?? undefined}
           busy={busy}
           homeless={homeless}
           /* Exactly the fields not currently placed anywhere — which is what "put something

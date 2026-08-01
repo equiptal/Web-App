@@ -11,6 +11,7 @@ import type {
   ExportTemplateList,
   MappedCorrection,
   NoHomeResolution,
+  PreviewResult,
   ReconciliationView,
   SheetView,
   UnfilledResolution,
@@ -198,6 +199,22 @@ export async function waitForMapping(
       };
     }
   }
+}
+
+/**
+ * This comparison resolved into their template — the real value for every cell.
+ *
+ * Same payload as the export, sent earlier. Lets the review show the figures that will be
+ * written rather than the names of the fields feeding them.
+ */
+export async function previewWithTemplate(id: string, payload: ExportPayload): Promise<PreviewResult> {
+  return json<PreviewResult>(
+    await fetch(`${BASE}/${encodeURIComponent(id)}/preview`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+  );
 }
 
 /** The user's template as a grid, annotated with what an export writes into each cell. */
