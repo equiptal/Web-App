@@ -407,6 +407,9 @@ export function mockSheetView(id: string) {
     rowCount: Math.max(dump.rowCount, ...cells.map((c) => c.r as number), 1),
     colCount: Math.max(dump.colCount, ...cells.map((c) => c.c as number), 1),
     cells,
+    // Carried through like the real view: exceljs repeats a merge's value in every cell it
+    // covers, so a mock without them would render duplicates the real backend does not.
+    merges: (dump as { merges?: string[] }).merges ?? [],
     ...(block ? { supplierBlock: { anchor: block.anchor, axis: block.axis, stride: block.stride, sampleCount: block.sampleCount } } : {}),
     mock: true,
   };

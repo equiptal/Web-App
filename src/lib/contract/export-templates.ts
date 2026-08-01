@@ -151,6 +151,14 @@ export interface SheetView {
   rowCount: number;
   colCount: number;
   cells: SheetCellView[];
+  /**
+   * Merged ranges ("A19:B21"), drawn as one cell.
+   *
+   * exceljs reports a merge's value in EVERY cell it covers, so ignoring these renders
+   * "Prepared By:" four times across two columns and three rows — the user's own template
+   * looking like corrupted output.
+   */
+  merges?: string[];
   supplierBlock?: { anchor: string; axis: string; stride: number; sampleCount: number };
 }
 

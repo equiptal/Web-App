@@ -32,6 +32,15 @@ const C = {
   lockBg: "#F1F3F5", lock: "#8A94A0",
 };
 
+/** "D7" → { r: 7, c: 4 }. Null for anything that isn't a plain A1 reference. */
+function parseRef(ref: string): { r: number; c: number } | null {
+  const m = /^([A-Za-z]+)(\d+)$/.exec(ref.trim());
+  if (!m) return null;
+  let c = 0;
+  for (const ch of m[1].toUpperCase()) c = c * 26 + (ch.charCodeAt(0) - 64);
+  return { r: parseInt(m[2], 10), c };
+}
+
 function colName(index: number): string {
   let n = index;
   let out = "";
@@ -66,6 +75,34 @@ export function TemplateSheetGrid(props: TemplateSheetGridProps) {
     for (const c of view.cells) m.set(c.ref, c);
     return m;
   }, [view.cells]);
+
+  /**
+   * Merged ranges, resolved to "this cell spans NxM" and "this cell is covered — don't draw".
+   *
+   * exceljs repeats a merge's value in every cell it covers, so drawing them individually
+   * turns one "Prepared By:" heading into six identical cells. The user reads that as their
+   * template being mangled, which is worse than showing no grid at all.
+   */
+  const { spans, covered } = useMemo(() => {
+    const spans = new Map<string, { rs: number; cs: number }>();
+    const covered = new Set<string>();
+    for (const range of view.merges ?? []) {
+      const [a, b] = range.split(":");
+      const s = parseRef(a);
+      const e = parseRef(b ?? a);
+      if (!s || !e) continue;
+      const r0 = Math.min(s.r, e.r), r1 = Math.max(s.r, e.r);
+      const c0 = Math.min(s.c, e.c), c1 = Math.max(s.c, e.c);
+      spans.set(`${colName(c0)}${r0}`, { rs: r1 - r0 + 1, cs: c1 - c0 + 1 });
+      for (let r = r0; r <= r1; r++) {
+        for (let c = c0; c <= c1; c++) {
+          if (r === r0 && c === c0) continue;
+          covered.add(`${colName(c)}${r}`);
+        }
+      }
+    }
+    return { spans, covered };
+  }, [view.merges]);
 
   /* Draw only as far as there is content. An inflated usedRange is common in real templates
      (a stray format 200 rows down) and would otherwise render a screen of empty cells. */
@@ -109,12 +146,17 @@ export function TemplateSheetGrid(props: TemplateSheetGridProps) {
                 </td>
                 {Array.from({ length: maxC }, (_, ci) => {
                   const ref = `${colName(ci + 1)}${ri + 1}`;
+                  // Swallowed by a merge above/left of it — the spanning cell already drew it.
+                  if (covered.has(ref)) return null;
+                  const span = spans.get(ref);
                   return (
                     <GridCell
                       key={ref}
                       L={L}
                       ref_={ref}
                       cell={byRef.get(ref)}
+                      rowSpan={span?.rs}
+                      colSpan={span?.cs}
                       selected={selected === ref}
                       onSelect={() => {
                         setConstant("");
@@ -209,6 +251,8 @@ function GridCell(p: {
   L: LFn;
   ref_: string;
   cell?: SheetCellView;
+  rowSpan?: number;
+  colSpan?: number;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -242,6 +286,8 @@ function GridCell(p: {
     <td
       onClick={clickable ? p.onSelect : undefined}
       title={cell?.ref}
+      rowSpan={p.rowSpan}
+      colSpan={p.colSpan}
       className={`border-b border-r px-2 py-1 align-top ${clickable ? "cursor-pointer" : ""}`}
       style={{
         ...style,
