@@ -8,6 +8,7 @@ import {
   downloadExport,
   exportWithTemplate,
   getTemplate,
+  getTemplateSheet,
   listTemplates,
   uploadTemplate,
   waitForMapping,
@@ -16,9 +17,12 @@ import type {
   ExportPayload,
   ExportResult,
   ExportTemplateSummaryRow,
+  MappedCorrection,
   ReconciliationView,
+  SheetView,
   UnfilledResolution,
 } from "@/lib/contract/export-templates";
+import { TemplateSheetGrid } from "./TemplateSheetGrid";
 
 /**
  * Export a bid comparison into the company's OWN spreadsheet template.
@@ -65,6 +69,7 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
   const [rows, setRows] = useState<ExportTemplateSummaryRow[] | null>(null);
   const [scope, setScope] = useState<"company" | "personal">("personal");
   const [review, setReview] = useState<ReconciliationView | null>(null);
+  const [sheet, setSheet] = useState<SheetView | null>(null);
   const [result, setResult] = useState<ExportResult | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [nameDraft, setNameDraft] = useState("");
@@ -83,6 +88,22 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
     }
   }, []);
 
+  /**
+   * Open the review for a template: its reconciliation AND its annotated sheet.
+   *
+   * The grid IS the review, so both are fetched together. A sheet that fails to load is not
+   * fatal — the card list still answers every question, and losing the drawing beats losing
+   * the ability to review at all.
+   */
+  const loadReview = useCallback(async (templateId: string) => {
+    const [view, grid] = await Promise.all([
+      getTemplate(templateId),
+      getTemplateSheet(templateId).catch(() => null),
+    ]);
+    setReview(view);
+    setSheet(grid);
+  }, []);
+
   useEffect(() => {
     if (!open) {
       // Closed — stop any mapping poll still running. The job itself carries on server-side
@@ -94,6 +115,7 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
     setStage("picker");
     setResult(null);
     setReview(null);
+    setSheet(null);
     void refresh();
   }, [open, refresh]);
 
@@ -151,7 +173,7 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
         setStage("picker");
         return;
       }
-      setReview(await getTemplate(created.id));
+      await loadReview(created.id);
       setStage("review");
     } catch (e) {
       if ((e as { name?: string })?.name === "AbortError") return; // dialog closed; not an error
@@ -165,11 +187,16 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
 
   /* ── review ─────────────────────────────────────────────────────────────────────── */
 
-  async function resolve(cell: string, resolution: UnfilledResolution) {
+  /** Save a decision, then re-read both halves so the grid reflects it immediately. */
+  async function saveResolution(body: Parameters<typeof applyResolutions>[1]) {
     if (!review) return;
     setBusy(true);
     try {
-      setReview(await applyResolutions(review.templateId, { theirsUnfilled: { [cell]: resolution } }));
+      const view = await applyResolutions(review.templateId, body);
+      setReview(view);
+      // The sheet's annotations come from the spec this just changed, so it must be re-read —
+      // otherwise a corrected cell keeps showing the old field until the dialog is reopened.
+      setSheet(await getTemplateSheet(review.templateId).catch(() => null));
     } catch (e) {
       toast(errText(e));
     } finally {
@@ -177,17 +204,13 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
     }
   }
 
-  async function dropField(field: string) {
-    if (!review) return;
-    setBusy(true);
-    try {
-      setReview(await applyResolutions(review.templateId, { oursNoHome: { [field]: { kind: "drop" } } }));
-    } catch (e) {
-      toast(errText(e));
-    } finally {
-      setBusy(false);
-    }
-  }
+  const resolve = (cell: string, resolution: UnfilledResolution) =>
+    saveResolution({ theirsUnfilled: { [cell]: resolution } });
+
+  const correctMapped = (cell: string, change: MappedCorrection) =>
+    saveResolution({ mapped: { [cell]: change } });
+
+  const dropField = (field: string) => saveResolution({ oursNoHome: { [field]: { kind: "drop" } } });
 
   /**
    * Finish the review, then export.
@@ -275,7 +298,7 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
             L={L} ar={ar} rows={rows} scope={scope} busy={busy}
             onUseBuiltin={() => { onBuiltinExport(); onClose(); }}
             onExport={runExport}
-            onReview={async (id) => { setBusy(true); try { setReview(await getTemplate(id)); setStage("review"); } finally { setBusy(false); } }}
+            onReview={async (id) => { setBusy(true); try { await loadReview(id); setStage("review"); } finally { setBusy(false); } }}
             onDelete={async (id) => { setBusy(true); try { await deleteTemplate(id); await refresh(); } catch (e) { toast(errText(e)); } finally { setBusy(false); } }}
             onPickFile={() => fileInput.current?.click()}
           />
@@ -317,8 +340,8 @@ export function ExportTemplateDialog(props: ExportTemplateDialogProps) {
 
         {stage === "review" && review && (
           <ReviewStage
-            L={L} view={review} busy={busy}
-            onResolve={resolve} onDrop={dropField}
+            L={L} view={review} sheet={sheet} busy={busy}
+            onResolve={resolve} onDrop={dropField} onCorrectMapped={correctMapped}
             onDone={() => confirmReviewThenExport(review.templateId)}
           />
         )}
@@ -464,12 +487,13 @@ function PickerStage(p: {
 }
 
 function ReviewStage(p: {
-  L: LFn; view: ReconciliationView; busy: boolean;
+  L: LFn; view: ReconciliationView; sheet: SheetView | null; busy: boolean;
   onResolve: (cell: string, r: UnfilledResolution) => void;
   onDrop: (field: string) => void;
+  onCorrectMapped: (cell: string, change: MappedCorrection) => void;
   onDone: () => void;
 }) {
-  const { L, view, busy } = p;
+  const { L, view, sheet, busy } = p;
   const [constants, setConstants] = useState<Record<string, string>>({});
   /* Show ANSWERED rows too, not just open ones. Filtering them out meant a fully-resolved
    * template opened for editing showed "Everything lines up" with nothing to change — the
@@ -503,13 +527,31 @@ function ReviewStage(p: {
         </div>
       )}
 
-      {rows.length === 0 && homeless.length === 0 && (
-        <div className="rounded-[12px] p-3 text-[13px]" style={{ background: C.successBg, color: C.navy }}>
-          {L("Everything lines up — nothing to answer.", "كل شيء متطابق — لا شيء للإجابة عليه.")}
-        </div>
-      )}
+      {/* The review, drawn on THEIR sheet. Reading "DESCRIPTION B3" off a list means holding
+          two things in your head — what we're asking, and where B3 is in a file you can't see.
+          The card list below is kept only for when the sheet can't be drawn. */}
+      {sheet ? (
+        <TemplateSheetGrid
+          L={L}
+          view={sheet}
+          busy={busy}
+          homeless={homeless}
+          /* Exactly the fields not currently placed anywhere — which is what "put something
+             else here" can legitimately offer, so no catalogue copy is needed client-side. */
+          vocabulary={view.oursNoHome.map((n) => ({ key: n.field, label: n.label }))}
+          onResolveUnfilled={p.onResolve}
+          onCorrectMapped={p.onCorrectMapped}
+          onDropHomeless={p.onDrop}
+        />
+      ) : (
+        <>
+          {rows.length === 0 && homeless.length === 0 && (
+            <div className="rounded-[12px] p-3 text-[13px]" style={{ background: C.successBg, color: C.navy }}>
+              {L("Everything lines up — nothing to answer.", "كل شيء متطابق — لا شيء للإجابة عليه.")}
+            </div>
+          )}
 
-      {rows.map((u) => (
+          {rows.map((u) => (
         <div
           key={u.cell}
           className="mb-2 rounded-[12px] border p-3"
@@ -558,24 +600,26 @@ function ReviewStage(p: {
         </div>
       ))}
 
-      {homeless.length > 0 && (
-        <div className="mt-3">
-          <p className="mb-1 text-[12px] font-bold uppercase tracking-wide" style={{ color: C.muted }}>
-            {L("No place in your template", "لا مكان لها في قالبك")}
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {homeless.map((n) => (
-              <button
-                key={n.field} disabled={busy} onClick={() => p.onDrop(n.field)}
-                className="rounded-full border px-2.5 py-1 text-[12px] disabled:opacity-50"
-                style={{ borderColor: C.border, color: C.navyMid }}
-                title={L("Leave it out", "استبعدها")}
-              >
-                {n.label} ×
-              </button>
-            ))}
-          </div>
-        </div>
+          {homeless.length > 0 && (
+            <div className="mt-3">
+              <p className="mb-1 text-[12px] font-bold uppercase tracking-wide" style={{ color: C.muted }}>
+                {L("No place in your template", "لا مكان لها في قالبك")}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {homeless.map((n) => (
+                  <button
+                    key={n.field} disabled={busy} onClick={() => p.onDrop(n.field)}
+                    className="rounded-full border px-2.5 py-1 text-[12px] disabled:opacity-50"
+                    style={{ borderColor: C.border, color: C.navyMid }}
+                    title={L("Leave it out", "استبعدها")}
+                  >
+                    {n.label} ×
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <div className="mt-4 flex items-center justify-between">

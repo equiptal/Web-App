@@ -9,8 +9,10 @@ import type {
   ExportPayload,
   ExportResult,
   ExportTemplateList,
+  MappedCorrection,
   NoHomeResolution,
   ReconciliationView,
+  SheetView,
   UnfilledResolution,
 } from "@/lib/contract/export-templates";
 
@@ -198,11 +200,20 @@ export async function waitForMapping(
   }
 }
 
+/** The user's template as a grid, annotated with what an export writes into each cell. */
+export async function getTemplateSheet(id: string): Promise<SheetView> {
+  return json<SheetView>(
+    await fetch(`${BASE}/${encodeURIComponent(id)}/sheet`, { cache: "no-store" })
+  );
+}
+
 export async function applyResolutions(
   id: string,
   body: {
     theirsUnfilled?: Record<string, UnfilledResolution>;
     oursNoHome?: Record<string, NoHomeResolution>;
+    /** Corrections to cells the mapper already filled. `field: null` clears one. */
+    mapped?: Record<string, MappedCorrection>;
     name?: string;
   }
 ): Promise<ReconciliationView> {

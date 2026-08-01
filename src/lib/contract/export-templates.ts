@@ -105,6 +105,67 @@ export type NoHomeResolution =
   | { kind: "mapToCell"; cell: string; derivations: string[] }
   | { kind: "overflow" };
 
+/* ───────────────────────── the sheet view (the review grid) ────────────────────────── */
+
+/**
+ * One cell of the user's OWN template, annotated with what an export will do to it.
+ *
+ * Resolved server-side. Header cells are absolute, but supplier cells are offsets from an
+ * anchor repeated on a stride — the same arithmetic the renderer does. A second copy of that
+ * in the browser would be a second thing to keep correct, and when the two drift the review
+ * shows one layout while the downloaded file contains another.
+ */
+export interface SheetCellView {
+  ref: string;
+  /** 1-based, so the grid lays out without re-parsing A1 refs. */
+  r: number;
+  c: number;
+  /** Their text. Empty for a blank write target — which is most cells we fill. */
+  value: string;
+  bold?: boolean;
+  /**
+   * - `label`    — their own text; untouched.
+   * - `filled`   — we write here on every export.
+   * - `unfilled` — the mapper could not decide; needs an answer.
+   * - `formula`  — theirs and protected; overwriting would break their totals.
+   */
+  kind: "label" | "filled" | "unfilled" | "formula";
+  field?: string;
+  fieldLabel?: string;
+  derivations?: string[];
+  /** Which column of the supplier repeat this is (0-based), when applicable. */
+  supplierIndex?: number;
+  unfilled?: {
+    theirLabel: string;
+    candidate: string | null;
+    candidateLabel: string | null;
+    candidateDerivations: string[] | null;
+    confidence: number;
+    why: string;
+    resolved: boolean;
+  };
+}
+
+export interface SheetView {
+  sheet: string;
+  rowCount: number;
+  colCount: number;
+  cells: SheetCellView[];
+  supplierBlock?: { anchor: string; axis: string; stride: number; sampleCount: number };
+}
+
+/**
+ * A correction to a cell the mapper already filled. `field: null` clears it.
+ *
+ * Without this the review is only half a review: the user could answer what the mapper was
+ * unsure about but not fix what it was confidently wrong about — and a wrong figure under
+ * someone else's heading is worse than a blank, because nothing flags it.
+ */
+export interface MappedCorrection {
+  field: string | null;
+  derivations?: string[];
+}
+
 export interface BlankCell {
   cell: string;
   label: string;

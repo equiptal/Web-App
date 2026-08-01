@@ -280,3 +280,134 @@ export function mockResolve(
   row.updatedAt = new Date().toISOString();
   return mockReconciliation(id);
 }
+
+/* ────────────────────────────── the annotated sheet view ────────────────────────────── */
+
+const A1 = /^([A-Za-z]+)(\d+)$/;
+
+function parseRef(ref: string): { r: number; c: number } | null {
+  const m = A1.exec(ref.trim());
+  if (!m) return null;
+  let c = 0;
+  for (const ch of m[1].toUpperCase()) c = c * 26 + (ch.charCodeAt(0) - 64);
+  return { r: parseInt(m[2], 10), c };
+}
+
+function colName(index: number): string {
+  let n = index;
+  let out = "";
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    out = String.fromCharCode(65 + rem) + out;
+    n = Math.floor((n - 1) / 26);
+  }
+  return out || "A";
+}
+
+/**
+ * The dev-mode twin of the backend's `getSheetView`.
+ *
+ * Deliberately mirrors the same resolution order — supplier offsets walked from the anchor on
+ * the stride, then unfilled flags overriding mappings — because a mock that annotates cells
+ * differently from the real thing would make the grid look right locally and wrong in staging,
+ * which is worse than having no mock at all.
+ */
+export function mockSheetView(id: string) {
+  const row = store.get(id);
+  if (!row) return null;
+
+  const { dump } = mockDumpFor(row.originalFileName ?? "");
+  const spec = (row.spec ?? null) as {
+    sheet?: string;
+    header?: Array<{ cell: string; field: string; derivations?: string[] }>;
+    supplierBlock?: {
+      anchor: string;
+      axis: string;
+      stride: number;
+      sampleCount: number;
+      fields?: Array<{ offset: { r: number; c: number }; field: string; derivations?: string[] }>;
+    };
+    theirsUnfilled?: Array<Record<string, unknown>>;
+  } | null;
+
+  const annotation = new Map<string, Record<string, unknown>>();
+
+  for (const h of spec?.header ?? []) {
+    annotation.set(h.cell, {
+      kind: "filled",
+      field: h.field,
+      fieldLabel: MOCK_VOCABULARY.find((v) => v.key === h.field)?.label ?? h.field,
+      derivations: h.derivations ?? ["identity"],
+    });
+  }
+
+  const block = spec?.supplierBlock;
+  const anchor = block ? parseRef(block.anchor) : null;
+  if (block && anchor) {
+    for (let i = 0; i < (block.sampleCount ?? 0); i++) {
+      const step = i * (block.stride || 1);
+      for (const f of block.fields ?? []) {
+        const at =
+          block.axis === "column"
+            ? { r: anchor.r + f.offset.r, c: anchor.c + f.offset.c + step }
+            : { r: anchor.r + f.offset.r + step, c: anchor.c + f.offset.c };
+        annotation.set(`${colName(at.c)}${at.r}`, {
+          kind: "filled",
+          field: f.field,
+          fieldLabel: MOCK_VOCABULARY.find((v) => v.key === f.field)?.label ?? f.field,
+          derivations: f.derivations ?? ["identity"],
+          supplierIndex: i,
+        });
+      }
+    }
+  }
+
+  // Unfilled beats filled on a contested cell — showing it settled would hide the question.
+  for (const u of spec?.theirsUnfilled ?? []) {
+    annotation.set(String(u.cell), {
+      kind: "unfilled",
+      unfilled: {
+        theirLabel: String(u.theirLabel ?? ""),
+        candidate: (u.candidate as string | null) ?? null,
+        candidateLabel:
+          MOCK_VOCABULARY.find((v) => v.key === u.candidate)?.label ??
+          ((u.candidate as string | null) ?? null),
+        candidateDerivations: (u.candidateDerivations as string[] | null) ?? null,
+        confidence: Number(u.confidence ?? 0),
+        why: String(u.why ?? ""),
+        resolved: u.resolution != null,
+      },
+    });
+  }
+
+  const cells: Array<Record<string, unknown>> = [];
+  const seen = new Set<string>();
+  for (const cell of dump.cells as Array<{ ref: string; value: string; bold?: boolean }>) {
+    const at = parseRef(cell.ref);
+    if (!at) continue;
+    seen.add(cell.ref);
+    const ann = annotation.get(cell.ref);
+    cells.push({ ref: cell.ref, r: at.r, c: at.c, value: cell.value, bold: cell.bold, kind: "label", ...(ann ?? {}) });
+  }
+  // Blank write targets have no dump entry, and they are the cells the review is most about.
+  for (const [ref, ann] of annotation) {
+    if (seen.has(ref)) continue;
+    const at = parseRef(ref);
+    if (!at) continue;
+    cells.push({ ref, r: at.r, c: at.c, value: "", kind: "label", ...ann });
+  }
+  cells.sort((a, b) =>
+    (a.r as number) === (b.r as number)
+      ? (a.c as number) - (b.c as number)
+      : (a.r as number) - (b.r as number)
+  );
+
+  return {
+    sheet: spec?.sheet ?? dump.sheetName,
+    rowCount: Math.max(dump.rowCount, ...cells.map((c) => c.r as number), 1),
+    colCount: Math.max(dump.colCount, ...cells.map((c) => c.c as number), 1),
+    cells,
+    ...(block ? { supplierBlock: { anchor: block.anchor, axis: block.axis, stride: block.stride, sampleCount: block.sampleCount } } : {}),
+    mock: true,
+  };
+}
