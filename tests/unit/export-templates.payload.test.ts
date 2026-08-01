@@ -194,3 +194,58 @@ describe("export payload — shape", () => {
     expect(typeof out.header.exportDate).toBe("string");
   });
 });
+
+/**
+ * The exported sheet must not contradict the screen the user just approved.
+ *
+ * `displayQuote` (what the table renders) falls back to `rate x units` when the request has no
+ * duration, so the screen shows a rental total. `computeRental` refuses to assume a period and
+ * reports "not stated". Both rules are defensible on their own; disagreeing is not — it shipped
+ * as a template cell reading "no data" under a row the user could see filled in.
+ */
+describe("buildExportPayload — the screen's figures win", () => {
+  it("sends the table's rental when the caller supplies one", () => {
+    const out = buildExportPayload(
+      baseInput({
+        totals: {
+          b1: {
+            grandTotal: { value: 41400, stated: true },
+            mobDemob: { value: 1000, stated: true },
+            rental: { value: 35000, stated: true },
+          },
+        },
+      })
+    );
+    expect(out.suppliers[0].fields.rentalTotal).toEqual({ value: 35000, stated: true });
+  });
+
+  // The case that broke: no duration, so our own derivation gives up, but the table still shows
+  // a figure. Falling back to the derivation here is what produced the contradiction.
+  it("prefers the table's rental over a not-stated derivation", () => {
+    const out = buildExportPayload(
+      baseInput({
+        columns: [col("b1", {}, { rental: { value: 0, stated: false } })],
+        totals: {
+          b1: {
+            grandTotal: { value: 8050, stated: true },
+            mobDemob: { value: 1000, stated: true },
+            rental: { value: 6000, stated: true },
+          },
+        },
+      })
+    );
+    const rt = out.suppliers[0].fields.rentalTotal as { value: number; stated: boolean };
+    expect(rt.stated).toBe(true);
+    expect(rt.value).toBe(6000);
+  });
+
+  it("falls back to the derived rental when the caller sends none", () => {
+    const out = buildExportPayload(
+      baseInput({
+        columns: [col("b1", {}, { rental: { value: 27000, stated: true } })],
+        totals: { b1: { grandTotal: { value: 41400, stated: true } } },
+      })
+    );
+    expect(out.suppliers[0].fields.rentalTotal).toEqual({ value: 27000, stated: true });
+  });
+});

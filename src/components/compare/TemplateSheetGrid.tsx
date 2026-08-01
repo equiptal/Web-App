@@ -315,11 +315,16 @@ function GridCell(p: {
   const kind = cell?.kind ?? "label";
   const unresolved = kind === "unfilled" && !cell?.unfilled?.resolved;
 
+  /* Green means exactly one thing: WE WRITE A VALUE IN THIS CELL.
+   *
+   * It used to tint headings too, because the mapping annotation lived on them — so a reader
+   * could not tell which cells actually receive data and the shading looked arbitrary. Their
+   * headings are plain white now, with a mapping note; only cells that change are green. */
   const style =
     kind === "filled"
       ? { background: C.successBg, color: C.navy }
       : kind === "unfilled"
-        ? { background: unresolved ? C.actionDim : C.successBg, color: unresolved ? C.warning : C.navy }
+        ? { background: unresolved ? C.actionDim : C.successBg, color: C.navy }
         : kind === "formula"
           ? { background: C.lockBg, color: C.lock }
           : { background: "#FFFFFF", color: C.navy };
@@ -329,43 +334,39 @@ function GridCell(p: {
    * way to tell whose words were on screen. What we will write goes underneath, in colour, as
    * an annotation ON their template rather than a replacement for it. */
   const theirs = cell?.value ?? "";
-  /* One line, always the same question: what does Moedatech put here?
+
+  /* TWO kinds of cell, and they must not be confused.
    *
-   * This used to say "✓ answered" for a resolved cell, which tells the user a question is
-   * closed but not what the export will now do — the one thing they came here to find out.
-   * An answered cell names its answer exactly like a mapped one. */
-  const note =
-    kind === "filled"
-      ? `→ ${cell?.fieldLabel ?? cell?.field ?? ""}`
-      : kind === "unfilled"
-        ? cell?.unfilled?.resolved
-          ? `→ ${cell.resolvedAs ?? cell.unfilled.theirLabel}`
-          : L("? click to choose", "؟ اضغط للاختيار")
-        : null;
+   * A HEADING carries the mapping â "your wording -> our figure". It is stated once, here,
+   * because a supplier field repeats down every bid column and annotating each of those
+   * printed the same sentence three or seven times over.
+   *
+   * A VALUE cell carries only the value. That is what the user is checking. */
+  const mapping = cell?.mapsTo ?? null;
+  const isValueCell = kind === "filled" || kind === "unfilled";
+
+  const question =
+    kind === "unfilled" && !cell?.unfilled?.resolved
+      ? L("? click to choose", "Ø Ø§Ø¶ØºØ· ÙÙØ§Ø®ØªÙØ§Ø±")
+      : null;
 
   const answered = kind === "filled" || Boolean(cell?.unfilled?.resolved);
-  const noteColor = answered ? C.success : C.warning;
-  const clickable = kind === "filled" || kind === "unfilled";
+  const clickable = isValueCell || Boolean(mapping);
 
-  /* The figure itself, when a preview exists. This is the whole point of the screen: seeing
-   * "SAR 48,300" is what lets someone judge the export, and "Total (incl. VAT)" is not. Shown
-   * only for cells we write — a preview value on their own label would be meaningless. */
+  /* The figure. Seeing "48,300" is what lets someone judge the export; "Total (incl. VAT)"
+   * does not. */
   const pv = cell?.previewValue;
   const hasValue = pv !== undefined && pv !== null && pv !== "";
-  const valueText = hasValue
-    ? typeof pv === "number"
-      ? pv.toLocaleString()
-      : String(pv)
-    : null;
-  // "We write here, but there is no data for it" — distinct from not having asked yet.
+  const valueText = hasValue ? (typeof pv === "number" ? pv.toLocaleString() : String(pv)) : null;
+  // "We write here but have no figure" â different from a cell we never touch.
   const emptyOnExport = p.hasPreview && answered && !hasValue;
 
   return (
     <td
       onClick={clickable ? p.onSelect : undefined}
       title={
-        kind === "filled"
-          ? `${cell?.ref} — ${L("we fill this with", "سنملأها بـ")} ${cell?.fieldLabel ?? ""}`
+        mapping
+          ? `${cell?.ref} — ${L("we map this row to", "نربط هذا الصف بـ")} ${mapping.fieldLabel}`
           : kind === "formula"
             ? `${cell?.ref} — ${L("your formula, left alone", "معادلتك، لا نلمسها")}`
             : cell?.ref
@@ -376,21 +377,31 @@ function GridCell(p: {
       style={{
         ...style,
         borderColor: C.border,
-        maxWidth: 200,
+        maxWidth: 220,
         outline: selected ? `2px solid ${C.action}` : undefined,
         outlineOffset: -2,
       }}
     >
+      {/* THEIR text. Always first, always verbatim — this is their sheet. */}
       {theirs && (
         <div className="truncate" style={{ fontWeight: cell?.bold ? 700 : 400 }}>
           {kind === "formula" ? `ƒ ${theirs}` : theirs}
         </div>
       )}
-      {note && (
-        <div className="truncate text-[10.5px]" style={{ color: noteColor }}>
-          {note}
+
+      {/* The mapping, on the heading that names it. The robot marks it as the agent's reading
+          of their sheet rather than something they wrote. */}
+      {mapping && (
+        <div className="mt-0.5 truncate text-[10.5px]" style={{ color: C.success }}>
+          {"🤖 → "}
+          {mapping.fieldLabel}
+          {mapping.derivations?.length && mapping.derivations[0] !== "identity"
+            ? ` (${mapping.derivations.join(" → ")})`
+            : ""}
         </div>
       )}
+
+      {/* A value cell carries the figure and nothing else. */}
       {valueText && (
         <div className="truncate text-[12.5px] font-bold" style={{ color: C.navy }} title={valueText}>
           {valueText}
@@ -398,14 +409,21 @@ function GridCell(p: {
       )}
       {emptyOnExport && (
         <div className="truncate text-[10.5px] italic" style={{ color: C.disabled }}>
-          {L("not provided — blank", "غير متوفر — فارغة")}
+          {L("no value", "لا توجد قيمة")}
         </div>
       )}
-      {kind === "filled" && cell?.derivations?.length && cell.derivations[0] !== "identity" ? (
-        <div className="truncate text-[10px]" style={{ color: C.muted }}>
-          {cell.derivations.join(" → ")}
+
+      {/* Still needs the user. The only thing that should pull the eye. */}
+      {question && (
+        <div className="truncate text-[10.5px] font-bold" style={{ color: C.warning }}>
+          {question}
         </div>
-      ) : null}
+      )}
+      {kind === "unfilled" && cell?.unfilled?.resolved && !valueText && (
+        <div className="truncate text-[10.5px]" style={{ color: C.muted }}>
+          {cell.resolvedAs ?? ""}
+        </div>
+      )}
     </td>
   );
 }

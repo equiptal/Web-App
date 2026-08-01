@@ -156,6 +156,14 @@ export interface SheetCellView {
    * rather than merely that a question was closed.
    */
   resolvedAs?: string | null;
+  /**
+   * Set on the cell that LABELS a mapping — their heading, not the cell we write into.
+   *
+   * A supplier field repeats down every bid column, so annotating value cells printed
+   * "-> Rental rate" once per supplier and the grid looked duplicated. The mapping is one fact
+   * about one row of their sheet, so it is stated once, on the heading that names that row.
+   */
+  mapsTo?: { field: string; fieldLabel: string; derivations: string[]; scope: "header" | "supplier" } | null;
   unfilled?: {
     theirLabel: string;
     candidate: string | null;
@@ -270,8 +278,16 @@ export interface BuildExportPayloadInput {
   itemId?: string | null;
   /** In the order shown on screen — the backend assigns `rank` from this order. */
   columns: BidColumn[];
-  /** Totals as the workspace computed them, keyed by bid id. */
-  totals: Record<string, { grandTotal?: Money; mobDemob?: Money }>;
+  /**
+   * Totals AS THE SCREEN SHOWED THEM, keyed by bid id.
+   *
+   * `rental` matters as much as the others. `computeRental` refuses to total a rental with no
+   * duration (correctly — it will not invent a period), but `displayQuote` falls back to
+   * `rate x units` and the table therefore SHOWS a figure. Taking the rental from here keeps
+   * the sheet agreeing with the screen the user just approved; deriving it independently is
+   * how the export came to say "no data" under a row the table had filled in.
+   */
+  totals: Record<string, { grandTotal?: Money; mobDemob?: Money; rental?: Money }>;
   header: {
     requestDisplayId?: string | null;
     itemName?: string | null;
@@ -372,7 +388,8 @@ export function buildExportPayload(input: BuildExportPayloadInput): ExportPayloa
         grandTotalInclVat: money(t.grandTotal),
         rentalRate: col.bid.price != null ? { value: col.bid.price, stated: true } : undefined,
         rateUnit: rateUnitOf(col),
-        rentalTotal: money(col.rental),
+        // The screen's figure wins over our stricter re-derivation — see BuildExportPayloadInput.
+        rentalTotal: money(t.rental) ?? money(col.rental),
         mobilizationTotal: money(col.mob),
         demobilizationTotal: money(col.demob),
         mobDemobTotal: money(t.mobDemob),

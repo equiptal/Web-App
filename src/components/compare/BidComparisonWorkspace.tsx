@@ -965,11 +965,17 @@ export function BidComparisonWorkspace() {
    */
   function buildTemplatePayload(): ExportPayload | null {
     if (!cols.length) return null;
-    const totals: Record<string, { grandTotal?: Money; mobDemob?: Money }> = {};
+    const totals: Record<string, { grandTotal?: Money; mobDemob?: Money; rental?: Money }> = {};
     for (const c of cols) {
+      /* The rental EXACTLY as this table renders it. displayQuote falls back to rate x units
+       * when the request has no duration, so the screen shows a total; computeRental refuses
+       * to assume a period and reports "not stated". Sending our own figure is what stops the
+       * exported sheet reading "no data" under a row the user can see filled in. */
+      const q = dq(c);
       totals[String(c.bid.id)] = {
         grandTotal: { value: grandTotal(c), stated: hasCost(c) },
         mobDemob: { value: mobDemobTotal(c), stated: c.mob.stated || c.demob.stated },
+        rental: { value: q.subtotal - q.mobDemob, stated: c.bid.price != null },
       };
     }
     return buildExportPayload({
