@@ -141,6 +141,13 @@ export interface SheetCellView {
   field?: string;
   fieldLabel?: string;
   derivations?: string[];
+  /**
+   * Field keys already folded into this cell alongside `field`.
+   *
+   * Needed so "add another figure here" preserves what is there — without it, adding a second
+   * extra silently dropped the first.
+   */
+  alsoFields?: string[];
   /** Which column of the supplier repeat this is (0-based), when applicable. */
   supplierIndex?: number;
   /**
@@ -163,7 +170,14 @@ export interface SheetCellView {
    * "-> Rental rate" once per supplier and the grid looked duplicated. The mapping is one fact
    * about one row of their sheet, so it is stated once, on the heading that names that row.
    */
-  mapsTo?: { field: string; fieldLabel: string; derivations: string[]; scope: "header" | "supplier" } | null;
+  mapsTo?: {
+    field: string;
+    fieldLabel: string;
+    derivations: string[];
+    scope: "header" | "supplier";
+    /** Extra fields summed or joined into the same cell, as labels for display. */
+    alsoLabels?: string[];
+  } | null;
   unfilled?: {
     theirLabel: string;
     candidate: string | null;
@@ -201,6 +215,17 @@ export interface SheetView {
 export interface MappedCorrection {
   field: string | null;
   derivations?: string[];
+  /**
+   * Extra fields folded into the SAME cell.
+   *
+   * Plenty of company sheets have one column called "Price" meaning everything together,
+   * while we hold rental, mobilization and demobilization separately. One field per cell
+   * forced a choice between them, so the number in their sheet was quietly not the number
+   * they meant.
+   */
+  also?: Array<{ field: string; derivations?: string[] }>;
+  /** 'sum' adds money/numbers, 'join' concatenates text. Defaults to 'sum'. */
+  combine?: "sum" | "join";
 }
 
 export interface BlankCell {
@@ -218,6 +243,8 @@ export interface PreflightSummary {
   omittedSuppliers: string[];
   filledCells: number;
   blankCells: BlankCell[];
+  /** Parts of a combined cell that had no value and were counted as zero. */
+  assumedZero?: Array<{ label: string; count: number }>;
   droppedFields: Array<{ field: string; label: string }>;
 }
 

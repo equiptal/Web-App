@@ -667,6 +667,23 @@ function PreflightStage(p: {
         {s.insertedColumns > 0 && ` (${s.insertedColumns} ${L("added", "مضافة")})`} · {s.filledCells} {L("cells filled", "خلية معبأة")}
       </p>
 
+      {/* Counting a missing part as zero is the product decision; saying so is what keeps it
+          safe. A total that quietly understates itself by an unstated mobilization cost, in a
+          document going to finance for sign-off, is the most expensive thing this can get
+          wrong â so it is named, with how many suppliers it affected. */}
+      {(s.assumedZero?.length ?? 0) > 0 && (
+        <Warn>
+          {L(
+            `Counted as 0 where the supplier didn't state it: ${s
+              .assumedZero!.map((z) => `${z.label} (${z.count})`)
+              .join(", ")}`,
+            `Ø­ÙØ³Ø¨Øª ØµÙØ±Ø§Ù Ø­ÙØ« ÙÙ ÙØ°ÙØ±ÙØ§ Ø§ÙÙÙØ±ÙØ¯: ${s
+              .assumedZero!.map((z) => `${z.label} (${z.count})`)
+              .join("Ø ")}`
+          )}
+        </Warn>
+      )}
+
       {s.omittedSuppliers.length > 0 && (
         <Warn>{L(`Left out: ${s.omittedSuppliers.join(", ")}`, `مستبعدون: ${s.omittedSuppliers.join("، ")}`)}</Warn>
       )}

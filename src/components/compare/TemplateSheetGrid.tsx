@@ -394,7 +394,10 @@ function GridCell(p: {
       {mapping && (
         <div className="mt-0.5 truncate text-[10.5px]" style={{ color: C.success }}>
           {"🤖 → "}
-          {mapping.fieldLabel}
+          {/* A combined cell says so: "Rental cost + Mobilization + Demobilization". Their
+              column reads "Price", and the whole point is that the user can see WHICH of our
+              figures add up to it. */}
+          {[mapping.fieldLabel, ...(mapping.alsoLabels ?? [])].join(" + ")}
           {mapping.derivations?.length && mapping.derivations[0] !== "identity"
             ? ` (${mapping.derivations.join(" → ")})`
             : ""}
@@ -465,25 +468,69 @@ function CellPanel(p: {
         <button onClick={p.onClose} className="text-[16px] leading-none" style={{ color: C.disabled }} aria-label="close">×</button>
       </div>
 
-      {cell.kind === "filled" ? (
+      {cell.kind === "filled" || (cell.kind === "label" && !cell.mapsTo) ? (
         <>
-          <p className="mt-1 text-[12.5px]" style={{ color: C.navyMid }}>
-            {L(
-              `This cell will be filled with "${cell.fieldLabel ?? cell.field}".`,
-              `ستُعبّأ هذه الخلية بـ "${cell.fieldLabel ?? cell.field}".`
-            )}
-          </p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <GhostBtn disabled={busy} onClick={p.onClose}>{L("Correct — keep it", "صحيح — أبقِها")}</GhostBtn>
-            <GhostBtn disabled={busy} onClick={() => p.onCorrectMapped(cell.ref, { field: null })}>
-              {L("Leave this cell empty", "اترك هذه الخلية فارغة")}
-            </GhostBtn>
-          </div>
+          {cell.kind === "filled" ? (
+            <p className="mt-1 text-[12.5px]" style={{ color: C.navyMid }}>
+              {L(
+                `We put "${cell.fieldLabel ?? cell.field}" here.`,
+                `ÙØ¶Ø¹ "${cell.fieldLabel ?? cell.field}" ÙÙØ§.`
+              )}
+            </p>
+          ) : (
+            /* An empty cell the agent left alone. The mapper is allowed to miss one; the user
+               must still be able to say "put it here", or the template is the agent's rather
+               than theirs. */
+            <p className="mt-1 text-[12.5px]" style={{ color: C.navyMid }}>
+              {L(
+                "Nothing goes here yet. Pick a figure to put in it:",
+                "ÙØ§ Ø´ÙØ¡ ÙÙØ§ Ø¨Ø¹Ø¯. Ø§Ø®ØªØ± Ø±ÙÙØ§Ù ÙÙØ¶Ø¹Ù:"
+              )}
+            </p>
+          )}
+
+          {cell.kind === "filled" && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <GhostBtn disabled={busy} onClick={p.onClose}>
+                {L("Correct â keep it", "ØµØ­ÙØ­ â Ø£Ø¨ÙÙÙØ§")}
+              </GhostBtn>
+              <GhostBtn disabled={busy} onClick={() => p.onCorrectMapped(cell.ref, { field: null })}>
+                {L("Leave this cell empty", "Ø§ØªØ±Ù ÙØ°Ù Ø§ÙØ®ÙÙØ© ÙØ§Ø±ØºØ©")}
+              </GhostBtn>
+            </div>
+          )}
+
           <FieldPicker
             L={L} busy={busy} vocabulary={vocabulary}
-            label={L("or put something else here", "أو ضع شيئاً آخر هنا")}
+            label={
+              cell.kind === "filled"
+                ? L("or put something else here", "Ø£Ù Ø¶Ø¹ Ø´ÙØ¦Ø§Ù Ø¢Ø®Ø± ÙÙØ§")
+                : L("pick a figureâ¦", "Ø§Ø®ØªØ± Ø±ÙÙØ§Ùâ¦")
+            }
             onPick={(field) => p.onCorrectMapped(cell.ref, { field, derivations: ["identity"] })}
           />
+
+          {/* Add MORE into the same cell. Company sheets often have one "Price" column meaning
+              rental + mob + demob together; one field per cell forced us to pick one and report
+              the rest as homeless, so their number was quietly not what they meant. */}
+          {cell.kind === "filled" && cell.field && (
+            <FieldPicker
+              L={L} busy={busy} vocabulary={vocabulary}
+              label={L(
+                "+ add another figure into this same cell",
+                "+ Ø£Ø¶Ù Ø±ÙÙØ§Ù Ø¢Ø®Ø± Ø¥ÙÙ ÙÙØ³ Ø§ÙØ®ÙÙØ©"
+              )}
+              onPick={(extra) =>
+                p.onCorrectMapped(cell.ref, {
+                  field: cell.field as string,
+                  derivations: cell.derivations?.length ? cell.derivations : ["identity"],
+                  // Keep what is already folded in; this adds to it rather than replacing it.
+                  also: [...(cell.alsoFields ?? []).map((f) => ({ field: f })), { field: extra }],
+                  combine: "sum",
+                })
+              }
+            />
+          )}
         </>
       ) : (
         <>
