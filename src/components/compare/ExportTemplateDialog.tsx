@@ -596,7 +596,10 @@ function ReviewStage(p: {
    * user could see their answers had been saved but never revise one. */
   const rows = view.theirsUnfilled;
   const openCount = rows.filter((u) => !u.resolved).length;
-  const homeless = view.oursNoHome.filter((n) => !n.resolved);
+  /* ALL of them, answered or not. "Answered" here means the user chose to drop the field —
+     it still will not appear in the export, so hiding it once decided turns the closing
+     warning into a list that empties itself as you read it. */
+  const homeless = view.oursNoHome;
 
   return (
     <div>

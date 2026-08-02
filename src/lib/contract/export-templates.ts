@@ -151,6 +151,11 @@ export interface SheetCellView {
   /** Which column of the supplier repeat this is (0-based), when applicable. */
   supplierIndex?: number;
   /**
+   * True when this cell belongs to a supplier slot this comparison has no bid for — a
+   * template with room for four vendors used on three. Rendered as spare, not as broken.
+   */
+  unusedSupplierSlot?: boolean;
+  /**
    * What an export of the CURRENT comparison actually writes here.
    *
    * Present only when a comparison was sent. `null` means we write nothing and their template

@@ -276,7 +276,7 @@ function Legend({
           generic table and the arrows read as decoration. */}
       <p className="mb-1 text-[13px]" style={{ color: C.navy }}>
         {L(
-          `Your template ("${sheet}") â your own text is untouched. Under each cell we fill, the arrow says which Moedatech figure goes there, and below it the value it will have.`,
+          `Your template ("${sheet}") — your own text is untouched. 🤖 marks what the agent worked out. Click ANY cell to change what goes in it, or to put a figure in an empty one.`,
           `ÙØ§ÙØ¨Ù ("${sheet}") â ÙØµÙÙ ÙÙØ§ ÙÙ. Ø£Ø³ÙÙ ÙÙ Ø®ÙÙØ© Ø³ÙØ¹Ø¨ÙØ¦ÙØ§Ø ÙÙØ¶Ø­ Ø§ÙØ³ÙÙ Ø£Ù Ø±ÙÙ Ø³ÙÙÙØªØ¨ ÙÙÙØ§Ø Ø«Ù Ø§ÙÙÙÙØ© ÙÙØ³ÙØ§.`
         )}
       </p>
@@ -321,7 +321,9 @@ function GridCell(p: {
    * could not tell which cells actually receive data and the shading looked arbitrary. Their
    * headings are plain white now, with a mapping note; only cells that change are green. */
   const style =
-    kind === "filled"
+    cell?.unusedSupplierSlot
+      ? { background: "#FFFFFF", color: C.disabled }
+      : kind === "filled"
       ? { background: C.successBg, color: C.navy }
       : kind === "unfilled"
         ? { background: unresolved ? C.actionDim : C.successBg, color: C.navy }
@@ -343,7 +345,6 @@ function GridCell(p: {
    *
    * A VALUE cell carries only the value. That is what the user is checking. */
   const mapping = cell?.mapsTo ?? null;
-  const isValueCell = kind === "filled" || kind === "unfilled";
 
   const question =
     kind === "unfilled" && !cell?.unfilled?.resolved
@@ -351,7 +352,11 @@ function GridCell(p: {
       : null;
 
   const answered = kind === "filled" || Boolean(cell?.unfilled?.resolved);
-  const clickable = isValueCell || Boolean(mapping);
+  /* EVERY cell is clickable except their formulas. The empty-cell field picker already
+     existed in the panel but nothing could open it: only mapped and unfilled cells were
+     clickable, so "you can put a figure anywhere" was true in the backend and unreachable in
+     the UI. */
+  const clickable = kind !== "formula";
 
   /* The figure. Seeing "48,300" is what lets someone judge the export; "Total (incl. VAT)"
    * does not. */
@@ -359,7 +364,11 @@ function GridCell(p: {
   const hasValue = pv !== undefined && pv !== null && pv !== "";
   const valueText = hasValue ? (typeof pv === "number" ? pv.toLocaleString() : String(pv)) : null;
   // "We write here but have no figure" â different from a cell we never touch.
-  const emptyOnExport = p.hasPreview && answered && !hasValue;
+  /* Only where it tells the user something. A spare supplier slot is not "missing data", and
+     repeating the phrase down every column of one turns a normal template into a wall of
+     warnings. */
+  const emptyOnExport =
+    p.hasPreview && answered && !hasValue && !cell?.unusedSupplierSlot;
 
   return (
     <td
@@ -413,6 +422,12 @@ function GridCell(p: {
       {emptyOnExport && (
         <div className="truncate text-[10.5px] italic" style={{ color: C.disabled }}>
           {L("no value", "لا توجد قيمة")}
+        </div>
+      )}
+      {/* A spare slot in THEIR template, not a gap in our data. */}
+      {cell?.unusedSupplierSlot && cell.field && (
+        <div className="truncate text-[10.5px] italic" style={{ color: C.disabled }}>
+          {L("spare column â no bid", "Ø¹ÙÙØ¯ Ø¥Ø¶Ø§ÙÙ â ÙØ§ ÙÙØ¬Ø¯ Ø¹Ø±Ø¶")}
         </div>
       )}
 
