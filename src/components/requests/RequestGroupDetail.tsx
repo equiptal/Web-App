@@ -4,10 +4,10 @@ import { useEffect, useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
 import { fetchRequestGroup, fetchRequestDetail, cancelRequest } from "@/lib/api/client";
-import { parseAddress, publicTaxonomyUrl, shortRef, statusMeta, type RequestRecord } from "@/lib/contract/requests";
+import { parseAddress, publicTaxonomyUrl, shortRef, statusMeta, groupRefOf, cancellableItems, isCancellable, statusSummary, representativeStatus, cancelBlockedReason, type RequestRecord } from "@/lib/contract/requests";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { LocationMap } from "@/components/requests/LocationMap";
-import { Ditem, requestDetailRows, ConfirmCancelModal, EditRequestModal } from "@/components/requests/RequestDetail";
+import { Ditem, requestDetailRows, ConfirmCancelModal, EditRequestModal, type CancelScope } from "@/components/requests/RequestDetail";
 import { useHeaderBack } from "@/components/AppShell";
 import "@/components/requests/requests-proto.css";
 
@@ -32,19 +32,38 @@ export function RequestGroupDetail({ groupId, onTitle }: { groupId: string; onTi
   useHeaderBack(() => router.push("/requests"));
   const [records, setRecords] = useState<RequestRecord[] | null>(null);
   const [error, setError] = useState(false);
-  // Group-level edit / cancel (applies to every member request in the RFQ).
+  // Group-level edit (applies its shared fields to every member request in the RFQ).
   const [showEdit, setShowEdit] = useState(false);
-  const [showCancel, setShowCancel] = useState(false);
   const [busy, setBusy] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const reload = () => setReloadKey((k) => k + 1);
+  // Cancel: `null` item → every cancellable member of the RFQ; a record → that item alone. Only OPEN/ACTIVE
+  // members are ever sent, since the backend refuses the rest (and refusing one used to fail the batch).
+  const [cancelItem, setCancelItem] = useState<RequestRecord | null | undefined>(undefined); // undefined = closed
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [blockedItem, setBlockedItem] = useState<string | null>(null);
+  const closeCancel = () => { setCancelItem(undefined); setBusy(false); setCancelError(null); };
   const doCancel = async () => {
-    if (busy) return;
+    if (busy || cancelItem === undefined) return;
+    const targets = cancelItem ? [cancelItem] : cancellableItems(records ?? []);
+    if (!targets.length) return closeCancel();
     setBusy(true);
-    try {
-      await Promise.all((records ?? []).map((r) => cancelRequest(r.id)));
-      router.push("/requests");
-    } catch { setBusy(false); setShowCancel(false); }
+    setCancelError(null);
+    // allSettled, not all: a blocked or failing sibling must not discard the ones that succeeded.
+    const results = await Promise.allSettled(targets.map((r) => cancelRequest(r.id)));
+    const failed = results.filter((r) => r.status === "rejected").length;
+    setBusy(false);
+    if (failed === 0) {
+      // Stay on the page and reload — cancelled requests keep their row (backend sets CANCELLED rather
+      // than soft-deleting), so the item badges flipping to "Cancelled" is the confirmation.
+      closeCancel();
+      reload();
+    } else {
+      if (failed < targets.length) reload();
+      setCancelError(failed === targets.length
+        ? L("Couldn’t cancel. Please try again.", "تعذّر الإلغاء. الرجاء المحاولة مرة أخرى.")
+        : L(`${targets.length - failed} of ${targets.length} items were withdrawn. ${failed} couldn’t be cancelled.`, `تم سحب ${targets.length - failed} من ${targets.length} بنود. تعذّر إلغاء ${failed}.`));
+    }
   };
 
   useEffect(() => {
@@ -88,8 +107,7 @@ export function RequestGroupDetail({ groupId, onTitle }: { groupId: string; onTi
   if (!records.length || !first) return <div className="rproto"><div className="rempty">{L("Request not found.", "الطلب غير موجود.")}</div></div>;
 
   const period = first.startDate ? (first.endDate ? `${fmtDate(first.startDate, ar)} – ${fmtDate(first.endDate, ar)}` : fmtDate(first.startDate, ar)) : "—";
-  const statuses = [...new Set(records.map((r) => r.status))];
-  const overall = statuses.length === 1 ? statuses[0] : "MIXED";
+  const cancellable = cancellableItems(records);
   const totalBids = records.reduce((s, r) => s + (r.bidCount ?? 0), 0);
   const type = first.type;
   const leadItem = first.equipmentItems?.[0];
@@ -115,19 +133,23 @@ export function RequestGroupDetail({ groupId, onTitle }: { groupId: string; onTi
           <div className="gx-meta">{title}{period !== "—" ? ` · ${period}` : ""}</div>
         </div>
         <div className="gx-badges">
-          {(() => { const sm = statusMeta(overall); return <span className={`stbadge ${sm.cls}`}><span className="dot" />{ar ? sm.ar : sm.en}</span>; })()}
+          {(() => { const rep = representativeStatus(records); return <span className={`stbadge ${rep ? statusMeta(rep).cls : "st-mixed"}`}><span className="dot" />{statusSummary(records, ar)}</span>; })()}
           <span className={`typebadge ${type === "DIRECT" ? "tb-direct" : "tb-broadcast"}`}><span className="material-icons-outlined">{type === "DIRECT" ? "person" : "campaign"}</span>{type}</span>
           <span className="gx-bids"><span className="material-icons-outlined">gavel</span>{totalBids} {L("bids", "عروض")}</span>
         </div>
       </div>
 
-      {/* group-level edit / cancel — edit applies its shared fields to every item; cancel withdraws all */}
-      {(overall === "OPEN" || overall === "ACTIVE") && (
+      {/* group-level edit / cancel — edit applies its shared fields to every item (so it stays gated on the
+          whole RFQ being untouched); cancel withdraws every item the backend still accepts, not all-or-nothing */}
+      {cancellable.length > 0 && (
         <div className="actionbar" style={{ marginBottom: 14 }}>
-          {overall === "OPEN" && totalBids === 0 && (
+          {records.every((r) => r.status === "OPEN") && totalBids === 0 && (
             <button className="btn sm" disabled={busy} onClick={() => setShowEdit(true)}><span className="material-icons-outlined">edit</span> {L("Edit request", "تعديل الطلب")}</button>
           )}
-          <button className="btn sm danger" disabled={busy} onClick={() => setShowCancel(true)}><span className="material-icons-outlined">close</span> {L("Cancel request", "إلغاء الطلب")}</button>
+          <button className="btn sm danger" disabled={busy} onClick={() => setCancelItem(null)}>
+            <span className="material-icons-outlined">close</span>
+            {cancellable.length === records.length ? L("Cancel request", "إلغاء الطلب") : L(`Cancel remaining (${cancellable.length})`, `إلغاء المتبقية (${cancellable.length})`)}
+          </button>
         </div>
       )}
 
@@ -175,7 +197,23 @@ export function RequestGroupDetail({ groupId, onTitle }: { groupId: string; onTi
                     <span className="material-icons-outlined">gavel</span> {L("View bids", "عرض العروض")} ({rec.bidCount})
                   </button>
                 )}
+                {/* Per-item cancel — always shown, disabled with a reason, so one accepted line can't hide
+                    the control on its still-open siblings. */}
+                {(() => {
+                  const can = isCancellable(rec.status);
+                  const label = can ? L("Cancel item", "إلغاء البند") : cancelBlockedReason(rec.status, ar);
+                  return (
+                    <button className="btn sm danger" style={{ marginInlineStart: (rec.bidCount ?? 0) > 0 ? undefined : "auto", opacity: can ? 1 : 0.5 }}
+                      aria-disabled={!can} title={label} disabled={busy}
+                      onClick={() => (can ? setCancelItem(rec) : setBlockedItem((p) => (p === rec.id ? null : rec.id)))}>
+                      <span className="material-icons-outlined">close</span> {L("Cancel item", "إلغاء البند")}
+                    </button>
+                  );
+                })()}
               </div>
+              {blockedItem === rec.id && !isCancellable(rec.status) && (
+                <div style={{ margin: "0 0 10px", padding: "8px 12px", borderRadius: 10, background: "#FFF7ED", border: "1px solid #FDE8CC", fontSize: 12.5, fontWeight: 700, lineHeight: 1.5, color: "#92400e" }}>{cancelBlockedReason(rec.status, ar)}</div>
+              )}
               {it ? <Ditem item={it} ar={ar} L={L} /> : <div className="notes">—</div>}
             </div>
           );
@@ -183,7 +221,21 @@ export function RequestGroupDetail({ groupId, onTitle }: { groupId: string; onTi
       </div>
 
       {showEdit && first && <EditRequestModal r={first} ar={ar} L={L} siblingIds={records.slice(1).map((r) => r.id)} onClose={() => setShowEdit(false)} onSaved={() => { setShowEdit(false); reload(); }} />}
-      {showCancel && first && <ConfirmCancelModal ar={ar} L={L} busy={busy} idLabel={first.displayId ?? first.shortCode ?? shortRef(first.id)} onClose={() => setShowCancel(false)} onConfirm={doCancel} />}
+      {cancelItem !== undefined && (() => {
+        // The RFQ code, not the first item's REQ id — group-scope copy names what is being withdrawn.
+        const rfqLabel = groupRefOf(first) ?? first.displayId ?? first.shortCode ?? shortRef(first.id);
+        const recLabel = (r: RequestRecord) => {
+          const i = r.equipmentItems?.[0];
+          const base = i ? [ar ? i.subtypeNameAr ?? i.subtypeName : i.subtypeName, ar ? i.capacityNameAr ?? i.capacityName : i.capacityName].filter(Boolean).join(" · ") : "";
+          return base || (i ? (ar ? i.categoryNameAr ?? i.categoryName : i.categoryName) : null) || L("This item", "هذا البند");
+        };
+        const scope: CancelScope = cancelItem
+          ? { kind: "item", idLabel: cancelItem.displayId ?? cancelItem.shortCode ?? shortRef(cancelItem.id), itemLabel: recLabel(cancelItem), others: records.length - 1 }
+          : cancellable.length === records.length
+            ? { kind: "all", idLabel: rfqLabel, total: records.length }
+            : { kind: "remaining", idLabel: rfqLabel, total: records.length, count: cancellable.length };
+        return <ConfirmCancelModal ar={ar} L={L} busy={busy} scope={scope} error={cancelError} onClose={closeCancel} onConfirm={doCancel} />;
+      })()}
     </div>
   );
 }

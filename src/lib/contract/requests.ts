@@ -30,11 +30,87 @@ export const REQUEST_STATUS: Record<string, { cls: string; en: string; ar: strin
   CLOSED: { cls: "st-closed", en: "Closed", ar: "مغلق" },
   ABANDONED: { cls: "st-closed", en: "Cancelled", ar: "ملغى" },
   CANCELLED: { cls: "st-closed", en: "Cancelled", ar: "ملغى" },
-  MIXED: { cls: "st-mixed", en: "Mixed", ar: "متعدد" },
 };
 /** Status badge class + bilingual label, with a safe fallback for any unknown status. */
 export function statusMeta(s: string): { cls: string; en: string; ar: string } {
   return REQUEST_STATUS[s] ?? { cls: "st-mixed", en: s, ar: s };
+}
+
+/**
+ * The backend accepts `DELETE /rentees/me/requests/{id}` only while a request is OPEN or ACTIVE —
+ * anything else throws REQUEST_CANCEL_NOT_ALLOWED (app backend `request.service.ts:cancelRequest`).
+ * Every cancel affordance gates on THIS, per item. It must never gate on a group-level roll-up: a
+ * fanned-out RFQ where one item was accepted still has cancellable siblings, and rolling the statuses
+ * up to a single value used to hide the ✕ for the whole RFQ and strand them.
+ */
+export function isCancellable(status: RequestStatus | null | undefined): boolean {
+  return status === "OPEN" || status === "ACTIVE";
+}
+
+/** The members of a group the backend will actually cancel. Empty ⇒ nothing to cancel. */
+export function cancellableItems<T extends { status: RequestStatus }>(items: T[]): T[] {
+  return items.filter((i) => isCancellable(i.status));
+}
+
+/** One status present in a group, with how many of the group's items carry it. */
+export interface StatusCount {
+  status: RequestStatus;
+  count: number;
+}
+
+/** Distinct statuses in a group with item counts, most-common first (first appearance breaks ties). */
+export function statusCounts(items: { status: RequestStatus }[]): StatusCount[] {
+  const order: RequestStatus[] = [];
+  const n = new Map<RequestStatus, number>();
+  for (const i of items) {
+    if (!n.has(i.status)) order.push(i.status);
+    n.set(i.status, (n.get(i.status) ?? 0) + 1);
+  }
+  // Array.prototype.sort is stable, so equal counts keep first-appearance order.
+  return order.map((status) => ({ status, count: n.get(status)! })).sort((a, b) => b.count - a.count);
+}
+
+/**
+ * The status label for a whole RFQ. A uniform group reads exactly as one request does ("Open"); a group
+ * whose items differ spells the split out — "Open (2) · Accepted (1)" — instead of the old opaque
+ * "Mixed", which told the renter nothing and hid that something live was still inside. Two segments max,
+ * overflow as "· +N".
+ */
+export function statusSummary(items: { status: RequestStatus }[], ar: boolean, maxSegments = 2): string {
+  const counts = statusCounts(items);
+  if (!counts.length) return "—";
+  const label = (s: RequestStatus) => (ar ? statusMeta(s).ar : statusMeta(s).en);
+  if (counts.length === 1) return label(counts[0].status);
+  const shown = counts.slice(0, maxSegments).map((c) => `${label(c.status)} (${c.count})`);
+  const hidden = counts.length - shown.length;
+  return hidden > 0 ? `${shown.join(" · ")} · +${hidden}` : shown.join(" · ");
+}
+
+/** The status a group's badge/dot takes its colour from: a live (cancellable) one when present — the
+ *  actionable signal — else the most common. Null for an empty group. */
+export function representativeStatus(items: { status: RequestStatus }[]): RequestStatus | null {
+  const counts = statusCounts(items);
+  return counts.find((c) => isCancellable(c.status))?.status ?? counts[0]?.status ?? null;
+}
+
+/** Why one item can't be cancelled — shown inline when the renter taps its disabled ✕, so a greyed-out
+ *  control always explains itself (a tooltip wouldn't, on touch). */
+export function cancelBlockedReason(status: RequestStatus, ar: boolean): string {
+  switch (status) {
+    case "ACCEPTED":
+    case "PARTIALLY_ACCEPTED":
+      return ar ? "تم قبول عرض لهذا البند، لذلك لا يمكن إلغاؤه." : "A bid was accepted for this item, so it can’t be cancelled.";
+    case "EXPIRED":
+    case "FORCE_EXPIRED":
+      return ar ? "انتهت صلاحية هذا البند، لذلك لا يمكن إلغاؤه." : "This item has expired, so it can’t be cancelled.";
+    case "CANCELLED":
+    case "ABANDONED":
+      return ar ? "هذا البند ملغى بالفعل." : "This item is already cancelled.";
+    default: {
+      const m = statusMeta(status);
+      return ar ? `لا يمكن إلغاء بند حالته "${m.ar}".` : `An item that is “${m.en}” can’t be cancelled.`;
+    }
+  }
 }
 export type Urgency = "ASAP" | "SOON" | "FAR_FUTURE" | string;
 
@@ -154,8 +230,6 @@ export interface RequestGroup {
   address: string | null;
   createdAt: string | null;
   type: RequestType;
-  /** Single shared status, or "MIXED" when the group's items differ. */
-  overallStatus: RequestStatus | "MIXED";
   totalBids: number;
   /** Sum of every item's unit count across the group ("N total equipment"). */
   totalUnits: number;
@@ -221,14 +295,19 @@ export function shortRef(id: string | null | undefined): string {
   return (id ?? "").replace(/-/g, "").slice(0, 8).toUpperCase() || "—";
 }
 
+/** The RFQ group short code (`RFQ-NNNNN`) off a raw record — defensive on the field name the backend
+ *  uses (T19). Null for an old record that predates it; callers fall back to the REQ id. */
+export function groupRefOf(r: RequestRecord): string | null {
+  return str(r.groupRef) ?? str(r.requestGroupShortCode) ?? str(r.groupShortCode) ?? str(r.rfqRef) ?? null;
+}
+
 export function mapRequestListItem(r: RequestRecord): RequestListItem {
   const it = r.equipmentItems?.[0] ?? null;
   return {
     id: r.id,
     requestGroupId: str(r.requestGroupId),
     displayId: str(r.displayId) ?? str(r.shortCode) ?? shortRef(r.id),
-    // RFQ group code from my-requests (T19). Defensive on the field name the backend adds.
-    groupRef: str(r.groupRef) ?? str(r.requestGroupShortCode) ?? str(r.groupShortCode) ?? str(r.rfqRef) ?? null,
+    groupRef: groupRefOf(r),
     type: r.type,
     status: r.status,
     urgency: (str(r.urgency) as Urgency) ?? null,
@@ -289,7 +368,6 @@ export function groupRequests(items: RequestListItem[]): RequestGroup[] {
     const address = first.city; // RequestListItem.city holds the full project address label
     const { city, neighbourhood } = parseAddress(address);
     const locationLabel = prettyLocation(city ? (neighbourhood ? `${city} — ${neighbourhood}` : city) : (address ?? "—"));
-    const statuses = [...new Set(groupItems.map((i) => i.status))];
     return {
       id: first.requestGroupId ?? first.id,
       groupRef: groupItems.find((i) => i.groupRef)?.groupRef ?? null,
@@ -300,7 +378,6 @@ export function groupRequests(items: RequestListItem[]): RequestGroup[] {
       address,
       createdAt: first.createdAt,
       type: first.type,
-      overallStatus: statuses.length === 1 ? statuses[0] : "MIXED",
       totalBids: groupItems.reduce((s, i) => s + i.bidCount, 0),
       totalUnits: groupItems.reduce((s, i) => s + (i.item?.qty ?? 1), 0),
       asap: groupItems.some((i) => i.urgency === "ASAP"),
