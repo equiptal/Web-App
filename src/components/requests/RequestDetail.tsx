@@ -310,26 +310,64 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
       )}
 
       {showEdit && <EditRequestModal r={r} ar={ar} L={L} onClose={() => setShowEdit(false)} onSaved={() => { setShowEdit(false); void reload(); }} />}
-      {showCancel && <ConfirmCancelModal ar={ar} L={L} busy={busy} idLabel={r.displayId ?? r.shortCode ?? shortRef(r.id)} onClose={() => setShowCancel(false)} onConfirm={doCancel} />}
+      {showCancel && <ConfirmCancelModal ar={ar} L={L} busy={busy} scope={{ kind: "single", idLabel: r.displayId ?? r.shortCode ?? shortRef(r.id) }} onClose={() => setShowCancel(false)} onConfirm={doCancel} />}
     </div>
   );
 }
 
-/** Styled "cancel this request?" confirmation (replaces the browser prompt), matching the app's destructive dialog. */
-export function ConfirmCancelModal({ ar, L, busy, idLabel, onClose, onConfirm }: { ar: boolean; L: (en: string, arr: string) => string; busy: boolean; idLabel: string; onClose: () => void; onConfirm: () => void }) {
+/**
+ * What a cancel confirmation is about. A fanned-out RFQ makes the scope genuinely ambiguous — the same
+ * ✕ could mean "withdraw this one line" or "withdraw all five" — so the copy AND the confirm button both
+ * name it. Never let a click that meant to trim one item read as cancelling the whole RFQ.
+ *  - `single`    — one request on its own detail page (`/requests/{id}`).
+ *  - `all`       — a whole RFQ, every item cancellable.
+ *  - `remaining` — a whole RFQ where only some items are cancellable (the rest accepted/expired/closed).
+ *  - `item`      — one item inside a multi-item RFQ.
+ */
+export type CancelScope =
+  | { kind: "single"; idLabel: string }
+  | { kind: "all"; idLabel: string; total: number }
+  | { kind: "remaining"; idLabel: string; total: number; count: number }
+  | { kind: "item"; idLabel: string; itemLabel: string; others: number };
+
+/** Styled cancel confirmation (replaces the browser prompt), matching the app's destructive dialog. */
+export function ConfirmCancelModal({ ar, L, busy, scope, error, onClose, onConfirm }: { ar: boolean; L: (en: string, arr: string) => string; busy: boolean; scope: CancelScope; error?: string | null; onClose: () => void; onConfirm: () => void }) {
+  // A one-item "all" is just a single request — "All 1 items" would be nonsense.
+  const s: CancelScope = scope.kind === "all" && scope.total <= 1 ? { kind: "single", idLabel: scope.idLabel } : scope;
+  const id = <span className="font-bold text-[var(--navy)]">{s.idLabel}</span>;
+  const UNDO = L("This can’t be undone.", "لا يمكن التراجع عن هذا الإجراء.");
+  const NO_BIDS = L("and suppliers can no longer bid", "ولن يتمكن المؤجّرون من تقديم عروض");
+
+  const title = s.kind === "item" ? L("Cancel this item?", "إلغاء هذا البند؟")
+    : s.kind === "remaining" ? L("Cancel remaining items?", "إلغاء البنود المتبقية؟")
+    : L("Cancel this request?", "إلغاء هذا الطلب؟");
+
+  const body = s.kind === "single" ? <>{ar ? <>الطلب {id} سيتم سحبه {NO_BIDS}. {UNDO}</> : <>Request {id} will be withdrawn {NO_BIDS}. {UNDO}</>}</>
+    : s.kind === "all" ? <>{ar ? <>سيتم سحب جميع البنود ({s.total}) في {id} {NO_BIDS}. {UNDO}</> : <>All {s.total} items in {id} will be withdrawn {NO_BIDS}. {UNDO}</>}</>
+    : s.kind === "remaining" ? <>{ar ? <>سيتم سحب {s.count} من {s.total} بنود في {id}. لن تتأثر البنود الأخرى ({s.total - s.count}). {UNDO}</> : <>{s.count} of {s.total} items in {id} will be withdrawn. The other {s.total - s.count} will not be affected. {UNDO}</>}</>
+    : <>{ar ? <><span className="font-bold text-[var(--navy)]">{s.itemLabel}</span> ({id}) سيتم سحبه{s.others > 0 ? <>. لن تتأثر البنود الأخرى في هذا الطلب ({s.others})</> : null}. {UNDO}</> : <><span className="font-bold text-[var(--navy)]">{s.itemLabel}</span> ({id}) will be withdrawn{s.others > 0 ? <>. The other {s.others} {s.others === 1 ? "item" : "items"} in this request {s.others === 1 ? "is" : "are"} not affected</> : null}. {UNDO}</>}</>;
+
+  const confirmLabel = s.kind === "item" ? L("Cancel item", "إلغاء البند")
+    : s.kind === "all" ? L(`Cancel all ${s.total} items`, `إلغاء جميع البنود (${s.total})`)
+    : s.kind === "remaining" ? L(`Cancel ${s.count} ${s.count === 1 ? "item" : "items"}`, `إلغاء ${s.count} من البنود`)
+    : L("Cancel request", "إلغاء الطلب");
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" dir={ar ? "rtl" : "ltr"} onClick={onClose}>
       <div className="w-full max-w-sm rounded-2xl bg-[var(--surface1)] p-5 text-center shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#fdecec]">
           <span className="material-icons-outlined" style={{ color: "#d64545", fontSize: 26 }}>report_problem</span>
         </div>
-        <h3 className="text-[17px] font-extrabold text-[var(--navy)]">{L("Cancel this request?", "إلغاء هذا الطلب؟")}</h3>
-        <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--muted)]">
-          {L("Request", "الطلب")} <span className="font-bold text-[var(--navy)]">{idLabel}</span> {L("will be withdrawn and suppliers can no longer bid. This can’t be undone.", "سيتم سحبه ولن يتمكن المؤجّرون من تقديم عروض. لا يمكن التراجع عن هذا الإجراء.")}
-        </p>
+        <h3 className="text-[17px] font-extrabold text-[var(--navy)]">{title}</h3>
+        <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--muted)]">{body}</p>
+        {error && <p className="mt-3 rounded-[10px] bg-[#fdecec] px-3 py-2 text-[12.5px] font-bold leading-relaxed text-[#b03636]">{error}</p>}
         <div className="mt-5 flex gap-2.5">
-          <button className="flex-1 rounded-[10px] border border-[var(--border)] px-4 py-2.5 text-[13px] font-bold text-[var(--navy)]" disabled={busy} onClick={onClose}>{L("Keep request", "الإبقاء على الطلب")}</button>
-          <button className="flex-1 rounded-[10px] bg-[#d64545] px-4 py-2.5 text-[13px] font-bold text-white disabled:opacity-50" disabled={busy} onClick={onConfirm}>{busy ? L("Cancelling…", "جارٍ الإلغاء…") : L("Cancel request", "إلغاء الطلب")}</button>
+          <button className="flex-1 rounded-[10px] border border-[var(--border)] px-4 py-2.5 text-[13px] font-bold text-[var(--navy)]" disabled={busy} onClick={onClose}>
+            {error ? L("Close", "إغلاق") : s.kind === "item" ? L("Keep item", "الإبقاء على البند") : L("Keep request", "الإبقاء على الطلب")}
+          </button>
+          <button className="flex-1 rounded-[10px] bg-[#d64545] px-4 py-2.5 text-[13px] font-bold text-white disabled:opacity-50" disabled={busy} onClick={onConfirm}>
+            {busy ? L("Cancelling…", "جارٍ الإلغاء…") : error ? L("Try again", "إعادة المحاولة") : confirmLabel}
+          </button>
         </div>
       </div>
     </div>
