@@ -103,6 +103,32 @@ describe("shared quotation renderer", () => {
     expect(html).toContain("pill-ver");
   });
 
+  // A pre-confirmation draft must be unmistakable once it leaves the browser as a PDF — the whole
+  // failure mode is a renter (or a third party they forward it to) reading it as a committed deal.
+  it("marks a draft with a badge + watermark and suppresses the signed block", () => {
+    const doc = dealDoc();
+    doc.draftLabel = "Draft — not final";
+    const html = renderQuotationSection(doc);
+    expect(html).toContain('class="q-draft"');
+    expect(html).toContain('class="q-wm"');
+    expect(html).toContain("Draft — not final");
+    expect(html).not.toContain("Electronically signed");
+  });
+
+  it("keeps the signed block on a final quotation (draft marking is opt-in)", () => {
+    const html = renderQuotationSection(dealDoc());
+    expect(html).not.toContain('class="q-draft"');
+    expect(html).not.toContain('class="q-wm"');
+    expect(html).toContain("Electronically signed");
+  });
+
+  it("suppresses the signed block for a draft even when showSigned is explicitly true", () => {
+    const doc = dealDoc();
+    doc.draftLabel = "Draft";
+    doc.showSigned = true;
+    expect(renderQuotationSection(doc)).not.toContain("Electronically signed");
+  });
+
   it("escapes HTML in values (no injection)", () => {
     const doc = bidDoc();
     doc.supplier.name = "<script>alert(1)</script>";

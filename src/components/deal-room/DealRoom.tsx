@@ -54,20 +54,35 @@ const CHAT_ACCEPT = [
 const CHAT_MAX_MEDIA = 10 * 1024 * 1024; // images + documents
 const CHAT_MAX_VIDEO = 25 * 1024 * 1024; // video
 
+/** Who the rentee party is, for the quotation's party block (from `/api/me` — the renter is themselves). */
+type RenteeIdentity = { name: string; phone: string | null; email: string | null };
+
 /**
- * Client-rendered confirmed-deal quotation (the backend server PDF is disabled — the client renders it
+ * Client-rendered deal-room quotation (the backend server PDF is disabled — the client renders it
  * now, app parity). Values mirror the app's `extractQuotationData`: rental = agreedRate × durationFactor
  * (PER_DAY = duration days, PER_WEEK = ceil(days/7), PER_MONTH = ceil(days/30), PER_JOB = 1); estimated
- * total = (rental + mobilization + demobilization) × units; VAT 15%. Agreed values come from the confirmed
- * Quotation row (+ the deal room for mob/demob/units/fixed terms/supplier name; renter name from /api/me).
+ * total = (rental + mobilization + demobilization) × units; VAT 15%.
+ *
+ * TWO kinds, and the distinction is the point:
+ *
+ *   • `final` (room CLOSED) — the signed document. Agreed values come from the confirmed Quotation
+ *     row (+ the deal room for mob/demob/units/fixed terms/supplier name).
+ *
+ *   • `draft` (before CLOSED) — there is no Quotation row yet, so EVERYTHING comes from the live deal
+ *     room. `q` is null. This is deliberately built from the room and not from the bid: the bid only
+ *     tracks the negotiated PRICE (the backend writes price counters back to `bid.priceAmount`), so a
+ *     bid-derived document silently misses negotiated unit counts, excluded delivery/return legs and
+ *     non-price terms — i.e. it can state the right number for the wrong deal. The room has all of it.
+ *     Rendered with a DRAFT badge + watermark and no quotation number; see `draftLabel` in render.ts.
  */
-function buildQuotationHtml(room: DealRoomView, q: QuotationView, renteeName: string, ar: boolean, L: (en: string, arr: string) => string): string {
+function buildQuotationHtml(room: DealRoomView, q: QuotationView | null, rentee: RenteeIdentity, ar: boolean, L: (en: string, arr: string) => string, kind: "final" | "draft"): string {
+  const draft = kind === "draft";
   const lang = ar ? "ar" : "en";
   const sar = L("SAR", "ر.س");
   // EXACT same math as the live price bar (computeDealTotals) — prorated ÷26/÷7, PER_JOB / no-duration =
   // one full period, mob/demob use their own counts + honor leg exclusion, VAT 15%. Guarantees the
   // quotation total == the number the renter saw in the room.
-  const t = computeDealTotals(room, { rate: q.agreedRate ?? room.rate, priceUnit: q.priceUnit ?? room.priceUnit });
+  const t = computeDealTotals(room, { rate: q?.agreedRate ?? room.rate, priceUnit: q?.priceUnit ?? room.priceUnit });
   const rate = t.rate;
   const unit = t.priceUnit;
   const units = t.rentalUnits;
@@ -78,8 +93,10 @@ function buildQuotationHtml(room: DealRoomView, q: QuotationView, renteeName: st
   const vat = t.vat;
   const total = t.grand;
   const dateStr = new Date().toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
-  const qnum = (q.quotationNumber ?? "").slice(0, 8).toUpperCase() || "—";
-  const contractType = q.contractType ?? room.contractType;
+  // A DRAFT must NOT carry a quotation number — an issued reference is precisely what makes a document
+  // read as final. Cite the REQUEST code instead: a reference to the negotiation, not to a quotation.
+  const qnum = draft ? (room.shortCode || "—") : ((q?.quotationNumber ?? "").slice(0, 8).toUpperCase() || "—");
+  const contractType = q?.contractType ?? room.contractType;
 
   const valFmt = (v: unknown): string => {
     if (v == null || v === "") return "—";
@@ -158,17 +175,30 @@ function buildQuotationHtml(room: DealRoomView, q: QuotationView, renteeName: st
   const priceExtras: { label: string; value: string }[] = [];
   if (dd.overtimeRate) priceExtras.push({ label: L("Overtime rate", "سعر العمل الإضافي"), value: /^\d+(\.\d+)?$/.test(dd.overtimeRate) ? `${dd.overtimeRate}x` : dd.overtimeRate });
   const seenCost = new Set<string>();
-  for (const term of q.agreedTerms) if (isCost(term.key) && !seenCost.has(term.key)) { seenCost.add(term.key); priceExtras.push({ label: ar ? term.labelAr : term.label, value: valFmt(term.value) }); }
+  for (const term of q?.agreedTerms ?? []) if (isCost(term.key) && !seenCost.has(term.key)) { seenCost.add(term.key); priceExtras.push({ label: ar ? term.labelAr : term.label, value: valFmt(term.value) }); }
   for (const term of room.terms) if (isCost(term.key) && !seenCost.has(term.key)) { seenCost.add(term.key); priceExtras.push({ label: ar ? term.labelAr : term.label, value: valFmt(term.value ?? term.platformDefault) }); }
 
-  const agreedRows = q.agreedTerms.filter((t) => t.key !== "PRICE" && !isCost(t.key)).map((t) => ({ label: ar ? t.labelAr : t.label, value: valFmt(t.value) }));
-  if (agreedRows.length) cards.push({ title: L("Agreed terms", "الشروط المتفق عليها"), rows: agreedRows });
-  const fixedRows = room.terms.filter((t) => t.state === "fixed" && !isCost(t.key)).map((t) => ({ label: ar ? t.labelAr : t.label, value: valFmt(t.value ?? t.platformDefault) }));
+  // FINAL reads the agreed snapshot off the Quotation row. DRAFT has no snapshot, so it derives from the
+  // room's live term states — and SPLITS them. A term the two sides haven't settled has no agreed value,
+  // so listing its current value under "Agreed" would assert something untrue; those get their own card.
+  const roomRows = (ts: DealTerm[]) => ts.filter((tm) => tm.key !== "PRICE" && !isCost(tm.key)).map((tm) => ({ label: ar ? tm.labelAr : tm.label, value: valFmt(tm.value ?? tm.platformDefault) }));
+  if (draft) {
+    const settledRows = roomRows(room.terms.filter((tm) => tm.state === "agreed" || tm.state === "soft_accepted"));
+    if (settledRows.length) cards.push({ title: L("Agreed so far", "ما اتُّفق عليه حتى الآن"), rows: settledRows });
+    const openRows = room.terms
+      .filter((tm) => tm.key !== "PRICE" && !isCost(tm.key) && (tm.state === "disputed" || tm.state === "pending"))
+      .map((tm) => ({ label: ar ? tm.labelAr : tm.label, value: L("Under negotiation", "قيد التفاوض") }));
+    if (openRows.length) cards.push({ title: L("Still under negotiation", "لا يزال قيد التفاوض"), rows: openRows });
+  } else {
+    const agreedRows = (q?.agreedTerms ?? []).filter((tm) => tm.key !== "PRICE" && !isCost(tm.key)).map((tm) => ({ label: ar ? tm.labelAr : tm.label, value: valFmt(tm.value) }));
+    if (agreedRows.length) cards.push({ title: L("Agreed terms", "الشروط المتفق عليها"), rows: agreedRows });
+  }
+  const fixedRows = roomRows(room.terms.filter((tm) => tm.state === "fixed"));
   if (fixedRows.length) cards.push({ title: L("Fixed terms", "الشروط الثابتة"), rows: fixedRows });
 
   const doc: QuotationDoc = {
     lang,
-    title: L("Equipment rental quotation", "عرض سعر تأجير معدات"),
+    title: draft ? L("Draft quotation", "مسودة عرض سعر") : L("Equipment rental quotation", "عرض سعر تأجير معدات"),
     quotationNumber: qnum,
     dateStr,
     supplier: {
@@ -178,18 +208,22 @@ function buildQuotationHtml(room: DealRoomView, q: QuotationView, renteeName: st
         { label: L("National Address", "العنوان الوطني"), verified: room.supplier.isVerified },
         { label: L("CR #", "س.ت"), verified: room.supplier.isVerified },
         { label: L("VAT #", "ض.ق.م"), verified: room.supplier.isVerified },
-        { label: L("Phone", "الهاتف"), value: q.supplierPhone },
-        { label: L("Email", "البريد"), value: q.supplierEmail },
+        // Pre-close there's no Quotation row: the room always carries the supplier's phone
+        // (server-gated, see DealParty.phone). Supplier email isn't on the deal-room projection yet.
+        { label: L("Phone", "الهاتف"), value: q?.supplierPhone ?? room.supplier.phone },
+        { label: L("Email", "البريد"), value: q?.supplierEmail },
       ],
       // Verified shows on the CR/VAT rows ("✓ Verified") — no standalone orphan party chip.
       chips: [],
     },
     rentee: {
       label: L("Rentee", "المُستأجِر"),
-      name: renteeName,
+      name: rentee.name,
       idRows: [
-        { label: L("Phone", "الهاتف"), value: q.renteePhone },
-        { label: L("Email", "البريد"), value: q.renteeEmail },
+        // The rentee IS the viewer, so /api/me backfills their own contact pre-close (the room gates
+        // rentee.phone to CLOSED).
+        { label: L("Phone", "الهاتف"), value: q?.renteePhone ?? rentee.phone },
+        { label: L("Email", "البريد"), value: q?.renteeEmail ?? rentee.email },
       ],
       chips: [],
     },
@@ -201,10 +235,19 @@ function buildQuotationHtml(room: DealRoomView, q: QuotationView, renteeName: st
     totals: { subtotal, vat, total },
     cards,
     showSigned: false,
-    // Short disclaimer instead of the full legal clause list + signed block (app parity).
-    legal: [L("This quotation is generated electronically via Moedatech, valid for 7 days from the issue date. Prices exclude anything not listed above; VAT at 15% applies per Saudi tax law.", "صدر هذا العرض إلكترونيًا عبر منصة معداتك، وهو ساري المفعول لمدة ٧ أيام من تاريخ الإصدار. الأسعار لا تشمل ما لم يُذكر أعلاه، وتُطبَّق ضريبة القيمة المضافة بنسبة ١٥٪ وفقًا للنظام السعودي.")],
+    draftLabel: draft ? L("Draft — not final", "مسودة — غير نهائية") : null,
+    // Short disclaimer instead of the full legal clause list + signed block (app parity). A draft gets a
+    // DIFFERENT one: no validity period (it isn't an offer, so there's nothing to expire) and an explicit
+    // statement that neither party is bound — the renter may forward this file to a third party.
+    legal: draft
+      ? [L("This is a DRAFT of a deal still under negotiation — it is not a quotation, not an offer, and not binding on either party. The supplier has not confirmed it, and the price, quantities and terms can still change. A final quotation is issued only once both sides confirm.", "هذه مسودة لصفقة لا تزال قيد التفاوض — وهي ليست عرض سعر ولا إيجابًا، وغير ملزمة لأي من الطرفين. لم يؤكّدها المؤجّر بعد، وقد تتغيّر الأسعار والكميات والشروط. يُصدَر عرض السعر النهائي فقط بعد تأكيد الطرفين.")]
+      : [L("This quotation is generated electronically via Moedatech, valid for 7 days from the issue date. Prices exclude anything not listed above; VAT at 15% applies per Saudi tax law.", "صدر هذا العرض إلكترونيًا عبر منصة معداتك، وهو ساري المفعول لمدة ٧ أيام من تاريخ الإصدار. الأسعار لا تشمل ما لم يُذكر أعلاه، وتُطبَّق ضريبة القيمة المضافة بنسبة ١٥٪ وفقًا للنظام السعودي.")],
   };
-  return wrapQuotationPage(renderQuotationSection(doc), { lang, title: L("Confirmed Quotation", "عرض سعر مؤكّد") });
+  // The window title is what the browser offers as the print/save filename — so it must carry DRAFT too.
+  const pageTitle = draft
+    ? `${L("DRAFT", "مسودة")} · ${room.shortCode || L("Deal room", "غرفة الصفقة")}`
+    : L("Confirmed Quotation", "عرض سعر مؤكّد");
+  return wrapQuotationPage(renderQuotationSection(doc), { lang, title: pageTitle });
 }
 
 export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) => void }) {
@@ -295,33 +338,42 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   // agreedTerms, contractType, phones/emails) + the deal room (mob/demob, units, fixed terms, supplier
   // name) + the renter's name (/api/me), matching the app's extractQuotationData. If a real presigned
   // pdfUrl ever exists it's opened as-is (fallback).
-  async function downloadQuotation() {
+  async function downloadQuotation(kind: "final" | "draft") {
     if (quoteBusy || !room) return;
     setQuoteBusy(true);
     setQuoteErr(null);
     try {
-      const q = await fetchQuotation(id);
-      if (q.pdfUrl) {
-        window.open(q.pdfUrl, "_blank", "noopener,noreferrer");
-        return;
+      // FINAL only: the Quotation row is created by the SUPPLIER's confirm, so requesting it before the
+      // room is CLOSED would fail and land in the catch below as "couldn't load". A draft never asks.
+      let q: QuotationView | null = null;
+      if (kind === "final") {
+        q = await fetchQuotation(id);
+        if (q.pdfUrl) {
+          window.open(q.pdfUrl, "_blank", "noopener,noreferrer");
+          return;
+        }
       }
-      let renteeName = "";
+      let rentee: RenteeIdentity = { name: "", phone: null, email: null };
       try {
         const meRes = await fetch("/api/me", { cache: "no-store" });
         if (meRes.ok) {
-          const d = (await meRes.json()) as { user?: { firstName?: string | null; lastName?: string | null; companyName?: string | null } };
+          const d = (await meRes.json()) as { user?: { firstName?: string | null; lastName?: string | null; companyName?: string | null; phone?: string | null; email?: string | null } };
           const u = d.user ?? {};
-          renteeName = (u.companyName?.trim() || [u.firstName, u.lastName].filter(Boolean).join(" ")) ?? "";
+          rentee = {
+            name: (u.companyName?.trim() || [u.firstName, u.lastName].filter(Boolean).join(" ")) ?? "",
+            phone: u.phone ?? null,
+            email: u.email ?? null,
+          };
         }
       } catch {
-        /* name is best-effort */
+        /* identity is best-effort */
       }
       const w = window.open("", "_blank");
       if (!w) {
         setQuoteErr(L("Allow pop-ups to open the quotation.", "اسمح بالنوافذ المنبثقة لفتح عرض السعر."));
         return;
       }
-      w.document.write(buildQuotationHtml(room, q, renteeName, ar, L));
+      w.document.write(buildQuotationHtml(room, q, rentee, ar, L, kind));
       w.document.close();
     } catch (e) {
       setQuoteErr(errMsg(e, L("Couldn’t load the quotation.", "تعذّر تحميل عرض السعر.")));
@@ -716,7 +768,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
           {/* CTAs — centered below the price */}
           {closed ? (
             <div className="pb-btns">
-              <button className="pb-btn accept" disabled={quoteBusy} onClick={downloadQuotation}><span className="material-icons-outlined">download</span>{L("Download quote", "تنزيل العرض")}</button>
+              <button className="pb-btn accept" disabled={quoteBusy} onClick={() => downloadQuotation("final")}><span className="material-icons-outlined">download</span>{L("Download quote", "تنزيل العرض")}</button>
               <button className="pb-btn ghost" onClick={() => setReleaseOpen(true)}><span className="material-icons-outlined">refresh</span>{L("Reopen", "إعادة فتح")}</button>
             </div>
           ) : abandoned ? null : awaiting ? (
@@ -732,6 +784,20 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
               <button className="pb-btn accept" disabled={busy || !canAccept} onClick={() => openFlow("accept")}><span className="material-icons-outlined">check</span>{L("Accept", "قبول")}</button>
             </div>
           ) : null}
+          {/* Pre-confirmation DRAFT of the quotation (app parity: the rentee's "معاينة" link). Built from
+              the LIVE room, so it reflects negotiated units, excluded legs and term states — not just the
+              price. Deliberately SECONDARY: whatever the state's real CTA is stays primary (Withdraw keeps
+              precedence while AWAITING). Hidden once CLOSED (the signed download takes over) and for an
+              abandoned room, which has no deal to quote. */}
+          {!closed && !abandoned && (
+            <div className="pb-draft-row">
+              <button type="button" className="pb-draft" disabled={quoteBusy} onClick={() => downloadQuotation("draft")}>
+                <span className="material-icons-outlined">description</span>
+                {quoteBusy ? L("Preparing…", "جارٍ التجهيز…") : L("Preview quotation", "معاينة عرض السعر")}
+              </button>
+              {quoteErr && <span className="pb-draft-err">{quoteErr}</span>}
+            </div>
+          )}
         </div>
 
         {breakdown && (
@@ -835,7 +901,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
       {/* composer */}
       {closed ? (
         <div className="composer ro quote-bar">
-          <button type="button" className="dl-quote" onClick={downloadQuotation} disabled={quoteBusy}>
+          <button type="button" className="dl-quote" onClick={() => downloadQuotation("final")} disabled={quoteBusy}>
             <span className="material-icons-outlined">{quoteBusy ? "hourglass_top" : "download"}</span>
             {quoteBusy ? L("Preparing quotation…", "يتم تجهيز عرض السعر…") : L("Download quotation", "تنزيل عرض السعر")}
           </button>

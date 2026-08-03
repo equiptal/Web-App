@@ -89,14 +89,29 @@ export interface QuotationDoc {
   legal: string[];
   /** Appended after the amount-in-words (app parity: "Estimate for one day · Final amount as operated"). */
   amountWordsSuffix?: string;
+  /**
+   * When set, the document renders as a **DRAFT**: this label as a header badge AND as a diagonal
+   * watermark across the page, and the "electronically signed" block is suppressed unconditionally.
+   *
+   * A pre-confirmation quotation is not a document anyone may rely on — the supplier can still
+   * counter. An unmarked one is how a renter concludes the deal is done (and how a third party
+   * receiving the PDF concludes it is binding), so the marking lives HERE, in the shared renderer,
+   * rather than in each caller where it could be forgotten.
+   */
+  draftLabel?: string | null;
 }
 
 /** Formal quotation stylesheet — ported verbatim from prototypes/requests-grouped.html. */
 export const QUOTATION_STYLE = `
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:'Inter','Segoe UI',Roboto,sans-serif;color:#1c3550;background:#f1f5f9;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  .q-doc{max-width:780px;margin:18px auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 6px 24px rgba(28,53,80,.1);page-break-after:always;}
+  .q-doc{position:relative;max-width:780px;margin:18px auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 6px 24px rgba(28,53,80,.1);page-break-after:always;}
   .q-doc:last-child{page-break-after:auto;}
+  /* DRAFT marking (pre-confirmation quotations) — amber badge in the header + a diagonal watermark
+     over the whole page, so an exported/printed draft can never be mistaken for the signed document. */
+  .q-draft{display:inline-block;margin-top:9px;font-size:10.5px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#ffd08a;background:rgba(247,144,9,.2);border:1px solid rgba(247,144,9,.55);border-radius:100px;padding:3px 11px;}
+  .q-wm{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;overflow:hidden;pointer-events:none;}
+  .q-wm b{transform:rotate(-32deg);font-size:76px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;color:rgba(247,144,9,.13);}
   .q-head{background:linear-gradient(135deg,#1c3550,#12263a);color:#fff;padding:26px 34px;}
   .q-head-row{display:flex;align-items:center;gap:14px;}
   .q-logo{flex:0 0 auto;width:44px;height:44px;border-radius:10px;background:#fff;padding:6px;object-fit:contain;}
@@ -292,10 +307,15 @@ export function renderQuotationSection(doc: QuotationDoc): string {
         .join("")}</div>`
     : "";
   const logo = doc.logoUrl ? `<img class="q-logo" src="${esc(doc.logoUrl)}" alt="" />` : "";
-  const signed = doc.showSigned === false ? "" : `<div class="signed"><span class="sig-check">✓</span><div class="sig-txt"><b>${esc(L("Electronically signed via the Moedatech platform", "موقّع إلكترونيًا عبر منصة معداتك"))}</b><div>${esc(doc.quotationNumber)} · ${esc(doc.dateStr)}</div></div></div>`;
+  // A draft is never "electronically signed" — suppress the trust block regardless of `showSigned`.
+  const signed = doc.draftLabel || doc.showSigned === false ? "" : `<div class="signed"><span class="sig-check">✓</span><div class="sig-txt"><b>${esc(L("Electronically signed via the Moedatech platform", "موقّع إلكترونيًا عبر منصة معداتك"))}</b><div>${esc(doc.quotationNumber)} · ${esc(doc.dateStr)}</div></div></div>`;
+
+  const draftBadge = doc.draftLabel ? `<div><span class="q-draft">${esc(doc.draftLabel)}</span></div>` : "";
+  const draftMark = doc.draftLabel ? `<div class="q-wm" aria-hidden="true"><b>${esc(doc.draftLabel)}</b></div>` : "";
 
   return `<section class="q-doc" dir="${isAr ? "rtl" : "ltr"}" lang="${isAr ? "ar" : "en"}">
-    <div class="q-head"><div class="q-head-row">${logo}<div style="flex:1"><div class="q-title">${esc(doc.title)}</div><div class="q-sub"><span class="qn">${esc(doc.quotationNumber)}</span><span>${esc(doc.dateStr)}</span></div></div></div></div>
+    ${draftMark}
+    <div class="q-head"><div class="q-head-row">${logo}<div style="flex:1"><div class="q-title">${esc(doc.title)}</div><div class="q-sub"><span class="qn">${esc(doc.quotationNumber)}</span><span>${esc(doc.dateStr)}</span></div>${draftBadge}</div></div></div>
     <div class="q-body">
       <div class="parties">${partyHtml(doc.supplier, L)}${partyHtml(doc.rentee, L)}</div>
       ${metaHtml ? `<div class="metastrip">${metaHtml}</div>` : ""}
