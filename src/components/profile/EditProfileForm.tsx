@@ -96,6 +96,12 @@ export function EditProfileForm({
     if (!jobTitle.trim()) next_fe.jobTitle = t.onboarding.errors.jobTitle;
     if (email.trim() && !EMAIL_RE.test(email.trim())) next_fe.email = t.onboarding.errors.email;
     if (whatsapp.trim() && !WA_RE.test(whatsapp.replace(/\s/g, ""))) next_fe.whatsapp = t.onboarding.errors.whatsapp;
+    // Optionals can be ADDED here but not removed: updateProfileSchema has no partial-clear, so the BFF
+    // drops empty values and the backend keeps what it has. Blanking a stored value would therefore save
+    // "successfully" while the old value survived — say so up front rather than showing a phantom delete.
+    if (profile.email && !email.trim()) next_fe.email = p.cantClear;
+    if (profile.whatsapp && !whatsapp.trim()) next_fe.whatsapp = p.cantClear;
+    if (profile.companyName && !companyName.trim()) next_fe.companyName = p.cantClear;
     if (Object.keys(next_fe).length) {
       setFe(next_fe);
       return;
@@ -128,6 +134,18 @@ export function EditProfileForm({
       companyName: companyName.trim() || null,
     });
   };
+
+  // "optional" describes an EMPTY field only — once a value is stored it can't be cleared here (above).
+  const optionalTag = (stored: string | null | undefined) =>
+    stored ? null : <span className="text-[11px] font-medium text-muted">— {p.optional}</span>;
+
+  // Optionals show `cantClear` as soon as a stored value is blanked — not only on submit — so the field
+  // is never left looking emptied when the save can't empty it. Submit-time errors still take priority.
+  const noteFor = (key: string, stored: string | null | undefined, v: string) =>
+    fe[key] ?? (stored && !v.trim() ? p.cantClear : null);
+  const emailNote = noteFor("email", profile.email, email);
+  const whatsappNote = noteFor("whatsapp", profile.whatsapp, whatsapp);
+  const companyNote = noteFor("companyName", profile.companyName, companyName);
 
   const inputCls =
     "h-[46px] w-full rounded-[10px] border border-border bg-surface px-[14px] text-[14px] text-navy outline-0 focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)]";
@@ -173,25 +191,26 @@ export function EditProfileForm({
 
       <div>
         <label className={labelCls}>
-          {p.companyName} <span className="text-[11px] font-medium text-muted">— {p.optional}</span>
+          {p.companyName} {optionalTag(profile.companyName)}
         </label>
         <input className={inputCls} value={companyName} onChange={(e) => setCompanyName(e.target.value)} maxLength={200} placeholder={p.companyNamePlaceholder} />
+        {companyNote && <p className="mt-1 text-[12px] text-danger">{companyNote}</p>}
       </div>
 
       <div className="grid grid-cols-1 gap-[12px] sm:grid-cols-2">
         <div>
           <label className={labelCls}>
-            {p.email} <span className="text-[11px] font-medium text-muted">— {p.optional}</span>
+            {p.email} {optionalTag(profile.email)}
           </label>
           <input className={inputCls} type="email" value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" />
-          {fe.email && <p className="mt-1 text-[12px] text-danger">{fe.email}</p>}
+          {emailNote && <p className="mt-1 text-[12px] text-danger">{emailNote}</p>}
         </div>
         <div>
           <label className={labelCls}>
-            {p.whatsapp} <span className="text-[11px] font-medium text-muted">— {p.optional}</span>
+            {p.whatsapp} {optionalTag(profile.whatsapp)}
           </label>
           <input className={inputCls} inputMode="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+9665XXXXXXXX" dir="ltr" />
-          {fe.whatsapp && <p className="mt-1 text-[12px] text-danger">{fe.whatsapp}</p>}
+          {whatsappNote && <p className="mt-1 text-[12px] text-danger">{whatsappNote}</p>}
         </div>
       </div>
 
