@@ -7,8 +7,9 @@ import { useLocale } from "@/lib/i18n";
 import { useHeaderBack } from "@/components/AppShell";
 import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, ApiError } from "@/lib/api/client";
 import { computeDealTotals, type DealRoomView, type DealTerm, type DealRoomDocument, type DealRoomDocuments, type QuotationView } from "@/lib/contract/deal-room";
-import { reconstructRounds, collapseRounds, latestRoundBy, withOpeningRound, type DealRound } from "@/lib/contract/deal-rounds";
+import { reconstructRounds, collapseRounds, latestRoundBy, withOpeningRound, chatCardOfMessage, buildChatCardView, respondedProposalIds, latestProposalId, type DealRound } from "@/lib/contract/deal-rounds";
 import { valText, type ResolutionsMap } from "@/components/deal-room/DealRoomTerms";
+import { ChatCard } from "@/components/deal-room/ChatCard";
 import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
 import { renderQuotationSection, wrapQuotationPage, type QuotationDoc, type QuotationLineItem, type QuotationCard } from "@/lib/quotation/render";
 import "@/components/deal-room/deal-room-proto.css";
@@ -601,6 +602,11 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const rounds = withOpeningRound(collapseRounds(reconstructRounds(messages as unknown[])), roomOpeningRound(room));
   const rRound = latestRoundBy(rounds, "rentee");
   const sRound = latestRoundBy(rounds, "supplier");
+  // DRCARD — which rate proposals a later `rate_response` has settled, and which one is still the live
+  // offer. Both derived from the stream, not from local state, so a reload shows the same
+  // settled/actionable split and only the standing offer is ever actionable.
+  const respondedIds = respondedProposalIds(messages as unknown[]);
+  const lastProposalId = latestProposalId(messages as unknown[]);
 
   // Accept gate — app parity `allMatched` (rentee perspective): every non-fixed term matched/accepted,
   // AND the rentee's latest price+units round equals the supplier's (nothing left to change). When rounds
@@ -773,8 +779,37 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
           <div className="sysev">{L("No messages yet — say hello 👋", "لا رسائل بعد — ابدأ المحادثة 👋")}</div>
         ) : (
           messages.map((m) => {
+            // deal-room/negotiation — the structured `custom` payload FIRST (DRCARD). This branch has to
+            // precede the `system_bot` check below: all six negotiation card types are posted by
+            // `system_bot`, so the early return used to swallow them into one grey pill, showing English
+            // `text` in an Arabic chat and dropping a counter-offer's figures entirely.
+            const card = chatCardOfMessage(m);
+            if (card) {
+              const view = buildChatCardView(card, {
+                ar, L, terms: room.terms, at: m.created_at,
+                responded: respondedIds.has(m.id),
+                superseded: card.type === "rate_proposal" && lastProposalId !== null && lastProposalId !== m.id,
+                live,
+              });
+              return (
+                <ChatCard
+                  key={m.id}
+                  view={view}
+                  ar={ar}
+                  L={L}
+                  busy={busy}
+                  onAccept={() => openFlow("accept")}
+                  onCounter={() => openFlow("counter")}
+                  onTranslate={(m.text ?? "").trim() ? () => void translateMsg(m) : undefined}
+                  translating={translating === m.id}
+                  translation={translations[m.id]}
+                />
+              );
+            }
             // deal-room/negotiation — system narration (posted by the backend's `system_bot`) renders as a
-            // centered chip (prototype's role-tinted narration), NOT a left/right bubble.
+            // centered chip (prototype's role-tinted narration), NOT a left/right bubble. An UNKNOWN
+            // `custom.type` lands here too: a card type added later degrades to this pill rather than
+            // vanishing from the conversation.
             if (m.user?.id === "system_bot") {
               return (
                 <div className="sysev" key={m.id}>
