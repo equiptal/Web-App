@@ -120,6 +120,58 @@
 .dlproto .sysev { align-self: center; display: inline-flex; align-items: center; gap: 7px; background: rgba(107, 143, 168, 0.16); border: 1px solid rgba(107, 143, 168, 0.28); color: var(--navy-mid); border-radius: var(--r-full); padding: 6px 13px; font-size: 12px; font-weight: 700; margin: 8px 0; max-width: 90%; text-align: center; }
 .dlproto .sysev .material-icons-outlined { font-size: 15px; }
 .dlproto .sysev.ok { background: var(--success-bg); border-color: rgba(29, 175, 88, 0.3); color: var(--success); }
+/* negotiation chat cards (DRCARD) — the structured `custom` payload rendered as itself. These used to
+   collapse into the single `.sysev` pill above: one identical grey chip for a rate proposal, a rate
+   acceptance, a term accept, a counter and a term edit. Each tone below is what makes them distinct.
+   Centered like `.sysev` (they are narration, not a party bubble) but a card, since they carry values. */
+/* The tone stripe is on the inline-START edge so it mirrors correctly under `dir=rtl`. */
+.dlproto .chatcard { align-self: center; width: min(340px, 92%); margin: 8px 0; padding: 11px 13px; background: var(--surface1); border: 1px solid var(--border); border-inline-start: 3px solid var(--border); border-radius: 14px; box-shadow: 0 1px 3px rgba(9, 20, 34, 0.06); }
+.dlproto .cc-head { display: flex; align-items: center; gap: 7px; }
+.dlproto .cc-head .material-icons-outlined { font-size: 17px; flex: 0 0 auto; }
+.dlproto .cc-title { font-size: 12.5px; font-weight: 800; color: var(--navy); line-height: 1.35; }
+.dlproto .cc-rows { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+.dlproto .cc-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.dlproto .cc-k { font-size: 11.5px; font-weight: 700; color: var(--muted); }
+.dlproto .cc-v { font-size: 13px; font-weight: 800; color: var(--navy); text-align: end; }
+/* A numeric run marked `dir=ltr` must not inherit the RTL bubble's alignment. */
+.dlproto .chatcard .cc-v[dir="ltr"] { font-family: "IBM Plex Sans", monospace; }
+/* old → new. The glyph itself comes from the component (`←` in Arabic), so nothing here assumes LTR. */
+.dlproto .cc-trans { margin-top: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; font-weight: 700; }
+.dlproto .cc-old { color: var(--muted); text-decoration: line-through; }
+.dlproto .cc-arrow { color: var(--muted); font-weight: 800; }
+.dlproto .cc-new { color: var(--navy); font-weight: 800; }
+.dlproto .cc-acts { margin-top: 10px; display: flex; gap: 7px; }
+.dlproto .cc-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 5px; border: 1px solid transparent; border-radius: var(--r-md, 12px); padding: 8px 10px; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
+.dlproto .cc-btn .material-icons-outlined { font-size: 15px; }
+.dlproto .cc-btn.accept { background: var(--action); color: #fff; }
+.dlproto .cc-btn.ghost { background: var(--surface2); border-color: var(--border); color: var(--navy); }
+.dlproto .cc-btn:disabled { opacity: 0.6; cursor: default; }
+.dlproto .cc-outcome { margin-top: 9px; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; }
+.dlproto .cc-outcome .material-icons-outlined { font-size: 15px; }
+.dlproto .cc-out-accepted { color: var(--success); }
+/* A superseded offer is history, not an outcome to celebrate — muted, and struck through like `.cc-old`. */
+.dlproto .cc-out-history { color: var(--muted); }
+.dlproto .cc-out-history ~ .cc-foot { opacity: 0.85; }
+.dlproto .chatcard:has(.cc-out-history) .cc-rows .cc-v { color: var(--muted); text-decoration: line-through; }
+/* The translated `message.text`, surfaced on request — the card's own strings are already localised. */
+.dlproto .cc-note { margin-top: 9px; padding: 8px 10px; background: var(--surface2); border-radius: 10px; font-size: 12.5px; font-weight: 600; line-height: 1.45; color: var(--navy-mid); }
+.dlproto .cc-foot { margin-top: 8px; display: flex; align-items: center; gap: 10px; }
+.dlproto .cc-tr { background: none; border: 0; padding: 0; font: inherit; font-size: 11px; font-weight: 800; color: var(--info); cursor: pointer; }
+.dlproto .cc-tr:disabled { opacity: 0.6; cursor: default; }
+.dlproto .cc-at { margin-inline-start: auto; font-size: 10.5px; font-weight: 700; color: var(--muted); }
+/* six distinct tones — a rate proposal, a rate acceptance, and the four term actions */
+.dlproto .cc-rate { border-inline-start-color: var(--action); }
+.dlproto .cc-rate .cc-head .material-icons-outlined { color: var(--action); }
+.dlproto .cc-accepted { border-inline-start-color: var(--success); background: var(--success-bg); }
+.dlproto .cc-accepted .cc-head .material-icons-outlined, .dlproto .cc-accepted .cc-title { color: var(--success); }
+.dlproto .cc-term-ok { border-inline-start-color: var(--success); }
+.dlproto .cc-term-ok .cc-head .material-icons-outlined { color: var(--success); }
+.dlproto .cc-term-counter { border-inline-start-color: var(--warning); }
+.dlproto .cc-term-counter .cc-head .material-icons-outlined { color: var(--warning); }
+.dlproto .cc-term-edit { border-inline-start-color: var(--info); }
+.dlproto .cc-term-edit .cc-head .material-icons-outlined { color: var(--info); }
+.dlproto .cc-term-reopen { border-inline-start-color: var(--muted); }
+.dlproto .cc-term-reopen .cc-head .material-icons-outlined { color: var(--muted); }
 .dlproto .msg { max-width: 70%; margin: 5px 0; padding: 10px 14px; border-radius: 14px; font-size: 13.5px; line-height: 1.45; }
 .dlproto .msg .meta { font-size: 10.5px; font-weight: 700; margin-top: 5px; opacity: 0.7; }
 .dlproto .msg.them { align-self: flex-start; background: var(--surface1); border: 1px solid var(--border); border-start-start-radius: 5px; color: var(--navy); }
