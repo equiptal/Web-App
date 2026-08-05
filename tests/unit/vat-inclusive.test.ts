@@ -5,6 +5,8 @@ import {
   buildSubmissionNotes,
   hasVatInclusiveNote,
   stripVatInclusiveNote,
+  vatLines,
+  VAT_RATE,
 } from "@/lib/contract/vat-inclusive";
 
 /**
@@ -113,5 +115,40 @@ describe("end-to-end: supplier form → submission → renter viewer", () => {
     expect(view.vatInclusive).toBe(true);
     expect(view.shownNotes).toBe("Crane ready");
     expect(view.grandIncl).toBe(300); // matches the supplier's 300 gross entry
+  });
+});
+
+describe("vatLines — the breakdown must reconcile with the STORED total (RMAP AC-216)", () => {
+  it("derives VAT as total − subtotal, so the rows always sum to the stored figure", () => {
+    // The classic rounding trap: 86.96 + 43.48 = 130.44 net, ×1.15 = 150.006 — but the supplier's
+    // stored gross is the round 150 he actually typed. Recomputing the tax would print a total the
+    // supplier never sent, on the screen the renter uses to decide.
+    const lines = vatLines(130.44, 150);
+    expect(lines.total).toBe(150);
+    expect(lines.subtotal + lines.vat).toBeCloseTo(lines.total, 10);
+    expect(lines.vat).not.toBe(130.44 * VAT_RATE);
+  });
+
+  it("reconciles for any stored total, however the supplier rounded it", () => {
+    for (const [subtotal, gross] of [[100, 115], [130.44, 150], [3333.33, 3833.33], [0, 0]] as const) {
+      const lines = vatLines(subtotal, gross);
+      expect(lines.subtotal + lines.vat).toBeCloseTo(lines.total, 10);
+      expect(lines.total).toBe(gross);
+    }
+  });
+
+  it("falls back to ×1.15 only when no total was stored — rows written before the field existed", () => {
+    for (const stored of [null, undefined]) {
+      const lines = vatLines(200, stored);
+      expect(lines.subtotal).toBe(200);
+      expect(lines.total).toBeCloseTo(230, 10);
+      expect(lines.vat).toBeCloseTo(30, 10);
+      expect(lines.subtotal + lines.vat).toBeCloseTo(lines.total, 10);
+    }
+  });
+
+  it("never returns a negative VAT for a gross that equals its net (a zero-rated or free line)", () => {
+    expect(vatLines(0, 0)).toEqual({ subtotal: 0, vat: 0, total: 0 });
+    expect(vatLines(500, 500).vat).toBe(0);
   });
 });
