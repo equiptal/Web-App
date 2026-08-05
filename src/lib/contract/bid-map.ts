@@ -25,10 +25,17 @@ import type { BidCard, OfferedUnitDetail, UnitLocationSource } from "./bids";
  */
 export type UnitAvailability = "confirmed" | "unconfirmed" | "absent";
 
-/** §6.3.1 / §6.3.2 fills. Kept next to the states they belong to so a surface cannot invent a third. */
+/**
+ * §6.3.1 / §6.3.2 fills. Kept next to the states they belong to so a surface cannot invent a third.
+ *
+ * **The prototype's pair, not §6.3.1's** (`design.md` §7 decision 1, settled 2026-08-06). The spec asks
+ * for `#12904A` / `#C62A2A` on the header chip while the prototype's pin, machine chip and composition
+ * bar all use `#16A34A` / `#D9362A`. AC-168 requires all four surfaces to be the *same* red, so there
+ * can only be one pair — and the prototype's is the one three of the four already draw.
+ */
 export const AVAILABILITY_COLOUR: Record<"confirmed" | "unconfirmed", string> = {
-  confirmed: "#12904A",
-  unconfirmed: "#C62A2A",
+  confirmed: "#16A34A",
+  unconfirmed: "#D9362A",
 };
 
 /**
@@ -72,8 +79,16 @@ export function unitAvailability(unit: Pick<OfferedUnitDetail, "locationSource">
     case "bid_yard":
     case "listing_yard":
       return "unconfirmed";
-    case "unidentified":
+    // A REGISTERED machine whose every location level is null (its yard was deleted — `bids.yard_id`
+    // is ON DELETE SET NULL). The supplier never committed it to this bid from a named yard, so it is
+    // `unconfirmed`, NOT `absent`: it still has photos and documents, so its readiness band is
+    // meaningful and AC-58 strips indicators only for `unidentified`. It simply cannot be plotted —
+    // that is `isPlottable`'s job, which reads coordinates and never this function.
     case "none":
+      return "unconfirmed";
+    // No machine at all — padding in `unitsOffered` beyond the machines named. Nothing to score, no
+    // yard to confirm, never drawn (§6.2, §6.6, AC-58).
+    case "unidentified":
       return "absent";
   }
 }

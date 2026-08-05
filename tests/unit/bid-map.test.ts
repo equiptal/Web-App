@@ -68,9 +68,14 @@ describe("unitAvailability — the single source of the map's colour (AC-18, §6
     expect(unitAvailability(registered)).toBe("unconfirmed");
   });
 
-  it("is absent for unidentified and for none — neither can be drawn, so neither carries a colour", () => {
+  it("is absent ONLY for unidentified — there is no machine to colour (AC-58, §6.6)", () => {
     expect(unitAvailability(unit({ locationSource: "unidentified" }))).toBe("absent");
-    expect(unitAvailability(unit({ locationSource: "none" }))).toBe("absent");
+  });
+
+  it("is unconfirmed for none — a REGISTERED machine whose yard was deleted still has documents", () => {
+    // §7.3 distinguishes the two deliberately: `unidentified` is no machine, `none` is a real machine
+    // with an unknown location. It cannot be plotted (isPlottable), but it is not indicator-less.
+    expect(unitAvailability(unit({ locationSource: "none" }))).toBe("unconfirmed");
   });
 
   it("never turns green off the yardConfirmed boolean — supplier-side it is just yardId != null", () => {
@@ -239,8 +244,10 @@ describe("unitIndicators — two independent signals (AC-55→58)", () => {
     expect(unitIndicators(unit({ locationSource: "unidentified" }), readiness("red"))).toEqual({ readinessBand: null, availability: "absent" });
   });
 
-  it("shows neither for a unit with no resolvable location either", () => {
-    expect(unitIndicators(unit({ locationSource: "none" }), readiness("green"))).toEqual({ readinessBand: null, availability: "absent" });
+  it("KEEPS the readiness band for a registered machine with no resolvable location (AC-58 is about unidentified only)", () => {
+    // Its yard was deleted, so it cannot be plotted — but it still holds photos and documents, so the
+    // band is meaningful and the pair stays visible in the panel and the list.
+    expect(unitIndicators(unit({ locationSource: "none" }), readiness("green"))).toEqual({ readinessBand: "green", availability: "unconfirmed" });
   });
 
   it("reports readiness as UNAVAILABLE, never red, when there is nothing to score (AC-59)", () => {
