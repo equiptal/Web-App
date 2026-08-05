@@ -1,0 +1,271 @@
+/* ── 00-tokens-and-shell.txt ─────────────────────────────────────
+ * App CSS + keyframes, the RTL shell template with its `{{slots}}`, the colour tokens (C), Arabic numeral helpers and the fixture data.
+ *
+ * Verbatim from deal-room-rentee-map-v2.html. REFERENCE ONLY — prototype code uses
+ * React.createElement, inline styles and fixture data. Read it for STRUCTURE,
+ * GEOMETRY and ORDER; build with this repo's conventions. design.md is the distilled
+ * version, this is the receipt.
+ */
+
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;font-family:'IBM Plex Sans Arabic',system-ui,sans-serif;background:#BFD0E0}
+  a{color:#2563EB;text-decoration:none}
+  a:hover{color:#1E4A7A}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#C8D8E8;border-radius:6px;border:2px solid transparent;background-clip:padding-box}
+  ::-webkit-scrollbar-thumb:hover{background:#A9BFD3;background-clip:padding-box}
+  @keyframes dpPulse{0%{transform:translateX(-50%) scale(.55);opacity:.9}70%{transform:translateX(-50%) scale(1.3);opacity:0}100%{opacity:0}}
+  @keyframes dpRing{0%{transform:scale(.9);opacity:.6}100%{transform:scale(1.5);opacity:0}}
+  @keyframes dpVbadge{0%,100%{transform:scale(1)}50%{transform:scale(1.16)}}
+  @keyframes dpFade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes dpModal{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
+  @keyframes dpToast{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+  @keyframes dpPing{0%{box-shadow:0 0 0 0 rgba(243,167,122,.5)}70%{box-shadow:0 0 0 8px rgba(243,167,122,0)}100%{box-shadow:0 0 0 0 rgba(243,167,122,0)}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</helmet>
+<div dir="rtl" lang="ar" style="height:100vh;display:flex;flex-direction:column;background:#F5F8FC;color:#0F2238;overflow:hidden;font-size:14px">
+
+  <!-- ═══ TOP BAR ═══ -->
+  {{ devBarEl }}
+
+  <header style="height:62px;flex-shrink:0;background:#fff;border-bottom:1px solid #E4EDF5;display:flex;align-items:center;gap:18px;padding:0 22px;z-index:30;box-shadow:0 1px 3px rgba(15,34,56,.05)">
+    {{ supplierChip }}
+    <div style="width:1px;height:30px;background:#E4EDF5"></div>
+    {{ requestSummary }}
+    <div style="flex:1"></div>
+    {{ modeToggleEl }}
+  </header>
+
+  {{ itemStripEl }}
+
+  <!-- ═══ MAP CANVAS (full-bleed) + floating tools ═══ -->
+  <div style="flex:1;position:relative;min-height:0">
+    <main id="dpMap" style="position:absolute;inset:0;overflow:hidden;background:radial-gradient(120% 90% at 50% 30%,#DDE9E0 0%,#C9DACB 100%)">
+      <div id="dpLeaflet" style="position:absolute;inset:0;z-index:0;background:#DDE9E0"></div>
+      {{ mapLegend }}
+      <!-- floating guide (always visible driver) -->
+      <div id="dpGuide" style="position:absolute;top:18px;left:18px;width:392px;max-width:calc(100% - 130px);z-index:24">
+        {{ guideEl }}
+      </div>
+      <!-- edge tool rail -->
+      {{ railEl }}
+      <!-- slide-in drawer -->
+      {{ drawerEl }}
+    </main>
+  </div>
+
+  <!-- ═══ PRICE BAR ═══ -->
+  <footer id="dpPrice" style="flex-shrink:0;background:#0F2238;color:#fff;z-index:20">
+    {{ priceBarEl }}
+  </footer>
+
+  {{ quoteModalEl }}
+  {{ agreeModalEl }}
+  {{ supplierModalEl }}
+  {{ supplierViewModalEl }}
+  {{ tourEl }}
+  {{ toastEl }}
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;100%&quot;,&quot;height&quot;:&quot;100%&quot;}}">
+const h = React.createElement;
+const C = {
+  bg:'#F5F8FC', white:'#fff', blue:'#2563EB', blueLt:'rgba(37,99,235,.08)', blueBd:'rgba(37,99,235,.22)',
+  green:'#16A34A', greenLt:'rgba(22,163,74,.09)', greenBd:'rgba(22,163,74,.25)',
+  red:'#D9362A', redLt:'rgba(217,54,42,.09)', redBd:'rgba(217,54,42,.22)',
+  amber:'#D4780A', amberLt:'rgba(212,120,10,.10)', amberBd:'rgba(212,120,10,.25)',
+  navy:'#1C3550', deep:'#0F2238', muted:'#6B8FA8', border:'#C8D8E8', blt:'#E4EDF5', surface:'#EFF4F9', s2:'#F8FAFC'
+};
+const AR = n => Number(n).toLocaleString('ar-EG');
+const toAr = n => String(n).replace(/\d/g, d=>'٠١٢٣٤٥٦٧٨٩'[d]);
+const fmtEN = n => Math.round(n).toLocaleString('en-US');
+const DAY_RATE=3000, OPERATOR=3000, MOB=1500, DEMOB=1000;
+const FREQ_UNIT={daily:'يوم',weekly:'أسبوع',monthly:'شهر'};
+const FREQ_DAYS={daily:1,weekly:7,monthly:30};
+const SUP_PAY={schedule:'مقدّم 100%',method:'تحويل بنكي'};
+const PAY_SCHEDULES=['مقدّم 100%','نصف عند التسليم ونصف عند الإرجاع','دفعات شهرية'];
+const PAY_METHODS=['تحويل بنكي','شيك','ضمان بنكي'];
+const FLEET=[
+  {serial:'FD30T-114522',model:'FD30',maker:'',year:'٢٠١٨',spec:'رافعة شوكية ٣ طن',fit:'bad',fuel:'ديزل',load:'٣ طن',att:'شوكات تمديد',yard:'ساحة القصيم',km:'١٨٥',
+    map:{pin:['11%','12%'],chip:['33%','36%'],truck:['13%','19%'],route:'M322,112 C 334,240 236,330 158,430'}},
+  {serial:'FD30T-118207',model:'كوماتسو FD30',maker:'كوماتسو',year:'٢٠٢٠',spec:'رافعة شوكية ٣ طن',fit:'ok',certOnFile:true,fuel:'ديزل',load:'٣ طن',att:'شوكات تمديد',yard:'ساحة السلي — الرياض',km:'١٢',
+    map:{pin:['44%','21%'],chip:['49%','37%'],truck:['46%','29%'],route:'M305,382 C 255,398 192,418 158,430'}},
+  {serial:'8FD35-77140',model:'تويوتا 8FD35',maker:'تويوتا',year:'٢٠٢١',spec:'رافعة شوكية ٣٫٥ طن',fit:'ok',fuel:'ديزل',load:'٣٫٥ طن',att:'',yard:'ساحة الخرج',km:'٩٥',
+    map:{pin:['85%','44%'],chip:['66%','51%'],truck:['83%','53%'],route:'M215,730 C 195,630 168,520 158,430'}},
+  {serial:'C500-90233',model:'كاتربيلر C500',maker:'كاتربيلر',year:'٢٠٢٢',spec:'مولّد كهرباء ٥٠٠ ك.ف.أ',fit:'ok',certOnFile:true,fuel:'ديزل',load:'٥٠٠ ك.ف.أ',att:'لوحة توزيع',yard:'ساحة السلي — الرياض',km:'١٢',
+    map:{pin:['44%','21%'],chip:['49%','37%'],truck:['46%','29%'],route:'M305,382 C 255,398 192,418 158,430'}},
+  {serial:'XAS110-4471',model:'أطلس كوبكو XAS',maker:'أطلس كوبكو',year:'٢٠٢٠',spec:'ضاغط هواء ٣٩٠ ق.د.م',fit:'ok',fuel:'ديزل',load:'٣٩٠ CFM',att:'خرطوم ٢٠م',yard:'ساحة الخرج',km:'٩٥',
+    map:{pin:['85%','44%'],chip:['66%','51%'],truck:['83%','53%'],route:'M215,730 C 195,630 168,520 158,430'}},
+];
+// multi-item request: each entry maps to a FLEET unit + its own qty + supplier opening rate
+const MULTI_ITEMS=[
+  {fleet:0, icon:'🏗️', qty:2, supRate:3000},
+  {fleet:3, icon:'⚡', qty:1, supRate:2200},
+  {fleet:4, icon:'💨', qty:3, supRate:650},
+];
+const REQ_ID='REQ-1043', RFQ_ID='RFQ-0012';
+// ── term taxonomy: 5 categories, 4 behaviour types ──
+const CATS=[
+  {key:'price',   emoji:'🚚', label:'السعر واللوجستيات'},
+  {key:'operator',emoji:'👷', label:'المشغّل'},
+  {key:'equip',   emoji:'🏗️', label:'المعدّة'},
+  {key:'work',    emoji:'🗓️', label:'العمل'},
+  {key:'pay',     emoji:'💳', label:'الدفع والتجاري'},
+];
+const CATMAP={}; CATS.forEach(c=>CATMAP[c.key]=c);
+const TTYPE={
+  neg:   {lbl:'قابل للتفاوض',       c:'#2563EB', bg:'rgba(37,99,235,.08)', bd:'rgba(37,99,235,.22)'},
+  ack:   {lbl:'للإقرار · قراءة فقط', c:'#6B8FA8', bg:'#F1F5FA',            bd:'#DCE6F0'},
+  info:  {lbl:'للعلم · مرحلة العرض', c:'#D4780A', bg:'rgba(212,120,10,.10)',bd:'rgba(212,120,10,.28)'},
+  priced:{lbl:'مُسعّر · خطوة السعر',  c:'#16A34A', bg:'rgba(22,163,74,.09)', bd:'rgba(22,163,74,.28)'},
+};
+const SITE=[24.6908,46.6853];                 // برج العليا · الرياض
+const YARDS=[[26.026,44.020],[24.660,46.828],[24.155,47.335]]; // القصيم · السلي(الرياض) · الخرج
+// ── all suppliers bidding on this request ──
+// `units` = the machines the supplier actually IDENTIFIED (one EquipmentListing row each: serial,
+// docs, year, its own yard). `ghost` = units offered commercially but NOT registered — they have no
+// serial, no documents, no readiness and NO location of their own.
+//   offered count = units.length + ghost   ← what the bid sells
+//   identified    = units.length           ← what can be pinned, documented, readiness-checked
+// The two are different numbers and the UI must never conflate them.
+/* An off-platform submission. Fields mirror `link_bid_submissions` + the renter mapper exactly:
+   no equipmentId, no yardId, no coordinates, no serial/model/year — but photos, documents,
+   confirmations and per-item pricing all exist. `city` and `companyDocuments` require the two
+   SELECT additions noted in spec §6.12.1. */
+const OFF_PLATFORM={id:'op1',name:'مؤسسة النخبة لتأجير المعدات',initials:'نخ',offPlatform:true,
+  city:'الرياض · الشفا',km:null,rate:2520,eta:null,verified:false,status:'new',deals:null,offered:2,fleet:[],
+  co:[24.60,46.72],
+  submission:{
+    quotationRef:'Q-2026-0043', createdAt:'٥ أغسطس ٢٠٢٦', validUntil:'١٢ أغسطس ٢٠٢٦',
+    crNumber:'١٠١٠······', vatNumber:null,   // masked placeholders; VAT deliberately absent → company details 3/4
+    nationalAddress:'الرياض · حي الشفا · وحدة ١٢',
+    contactInfo:'٠٥٥ ··· ····',
+    // The tag is how the real implementation carries "priced VAT-inclusive" without a column.
+    // It must NEVER be displayed — stripVatTag() removes the whole line (vat-inclusive.ts parity).
+    notes:'[VAT-INCLUSIVE] Prices were quoted VAT-inclusive (15% VAT already included).\nيمكننا التسليم خلال ٤٨ ساعة، والسعر قابل للنقاش على العقود الطويلة.',
+    grandTotal:9476,                                   // VAT-inclusive, as stored
+    companyDocuments:[{k:'السجل التجاري',type:'cr',s:'ok'},{k:'العنوان الوطني',type:'national_address',s:'ok'}],
+    items:[{ label:'رافعة شوكية ٣ طن', reqMeasurement:'٣ طن - ٥ طن (قياسي)',   // the REQUEST's measurement — a submission has no such field
+      certs:['TÜV','الاستمارة'],           // acknowledged in the form — not verified
+      offeredUnits:2, numberOfUnits:1,
+      rentalRate:2520, deliveryPrice:800, returnPrice:800, total:9476,   // (2520+800+800)×2×1.15
+      photos:3,
+      // `type` matters: bid-quality.ts classifies documents into buckets by type, not by count.
+      documents:[{k:'شهادة سلامة المعدّة',type:'tuv',s:'ok'},{k:'تأمين المعدّة',type:'other',s:'ok'},
+                 {k:'الاستمارة (رخصة السير)',type:'istimara',s:'ok'}],
+      terms:[['مدة الإيجار','١٤ يوم','١٤ يوم',true],['المشغّل','مع عامل','مع عامل',true],
+             ['المسكن والنقل','على المستأجر','على المستأجر',true],
+             ['الدفع','٣٠ يوم','عند التسليم',false]] }],
+    messages:[{who:'sup',txt:'أرسلنا عرضنا، وجاهزون لأي استفسار.'}]
+  }};
+const SUPPLIERS=[
+  {id:'s1',name:'أبراج الخليج للمعدات',initials:'أخ',co:[24.7136,46.6753],city:'الرياض · العليا',km:12,rate:3000,rating:'٤٫٨',deals:'١٢',verified:true,status:'new',eta:'٤ ساعات',
+   offered:3,fleet:[
+     {id:'eq-fd30t118207',serial:'FD30T-118207',year:'٢٠٢٠',yard:'ساحة السلي — الرياض',ll:[24.660,46.828],km:12,confirmed:true, cert:true, inBid:true},
+     {id:'eq-fd30t114522',serial:'FD30T-114522',year:'٢٠١٨',yard:'ساحة النسيم',        ll:[24.745,46.885],km:19,confirmed:false,cert:false,inBid:true},
+     {id:'eq-fd30t120944',serial:'FD30T-120944',year:'٢٠٢٢',yard:'ساحة السلي — الرياض',ll:[24.664,46.821],km:13,confirmed:false,cert:true, inBid:false},
+   ]},
+  {id:'s2',name:'الدرعية للمقاولات',initials:'در',co:[24.7330,46.5750],city:'الرياض · الدرعية',km:21,rate:2950,rating:'٤٫٤',deals:'٨',verified:true,status:'new',eta:'٦ ساعات',
+   offered:1,fleet:[
+     {id:'eq-8fd3044120',serial:'8FD30-44120',year:'٢٠٢١',yard:'ساحة الدرعية',ll:[24.735,46.575],km:21,confirmed:true,cert:true,inBid:true},
+   ]},
+  {id:'s3',name:'رافعات الرياض الشمالية',initials:'رش',co:[24.8250,46.6400],city:'الرياض · النخيل',km:28,rate:3200,rating:'٤٫٩',deals:'٢١',verified:true,status:'seen',eta:'٨ ساعات',
+   offered:2,fleet:[
+     {id:'eq-fg35n9014',serial:'FG35N-9014',year:'٢٠٢٢',yard:'ساحة النخيل',ll:[24.905,46.590],km:28,confirmed:true, cert:true,inBid:true},
+     {id:'eq-fg35n9027',serial:'FG35N-9027',year:'٢٠٢٢',yard:'ساحة النخيل',ll:[24.905,46.590],km:28,confirmed:false,cert:true,inBid:true},
+     {id:'eq-fg35n9033',serial:'FG35N-9033',year:'٢٠٢١',yard:'ساحة الملز',  ll:[24.678,46.742],km:9, confirmed:false,cert:false,inBid:false},
+   ]},
+  // ← 4 units sold, 2 machines owned: 2 CLAIMED. Plus one alternative not in the offer.
+  {id:'s4',name:'مؤسسة الخرج الصناعية',initials:'خر',co:[24.1550,47.3050],city:'الخرج',km:95,rate:2750,rating:'٤٫٢',deals:'٦',verified:false,status:'neg',eta:'يوم واحد',
+   offered:4,fleet:[
+     {id:'eq-8fd3577140',serial:'8FD35-77140',year:'٢٠٢١',yard:'ساحة الخرج',        ll:[24.155,47.335],km:95,confirmed:true, cert:true, inBid:true},
+     {id:'eq-8fd3577168',serial:'8FD35-77168',year:'٢٠١٩',yard:'ساحة السلي — الرياض',ll:[24.668,46.812],km:12,confirmed:false,cert:false,inBid:true},
+     {id:'eq-8fd3577201',serial:'8FD35-77201',year:'٢٠٢٣',yard:'ساحة الخرج',        ll:[24.151,47.329],km:94,confirmed:false,cert:true, inBid:false},
+   ]},
+  {id:'s5',name:'المجمعة للمعدات الثقيلة',initials:'مج',co:[25.9050,45.3600],city:'المجمعة',km:155,rate:2600,rating:'٤٫٠',deals:'٤',verified:true,status:'new',eta:'يومان',
+   offered:1,fleet:[
+     {id:'eq-h30a2255',serial:'H30A-2255',year:'٢٠٢٠',yard:'ساحة المجمعة',ll:[25.905,45.360],km:155,confirmed:false,cert:false,inBid:false},
+   ]},
+  OFF_PLATFORM,
+  {id:'s6',name:'القصيم للتأجير',initials:'قص',co:[26.0260,44.0200],city:'القصيم · بريدة',km:185,rate:2400,rating:'٣٫٩',deals:'٣',verified:false,status:'new',eta:'يومان',
+   offered:2,fleet:[
+     {id:'eq-fd2531002',serial:'FD25-31002',year:'٢٠١٧',yard:'ساحة القصيم',ll:[26.026,44.020],km:185,confirmed:false,cert:false,inBid:true},
+   ]},
+];
+/* ── the three levels, now derived from the FLEET + the offered count ──────────────────────────
+   confirmed : machine in this bid whose yard the supplier confirmed in bid readiness   → green
+   located   : machine in this bid, positioned at its fleet yard, unconfirmed            → red
+   claimed   : offered − machines-in-bid. No machine, no location, drawn nowhere.
+   alternatives: machines he owns that are NOT in this offer — the renter can ask for them. */
+function fleetOf(s){ return s.fleet||[]; }
+function inBidOf(s){ return fleetOf(s).filter(u=>u.inBid); }
+function altsOf(s){ return fleetOf(s).filter(u=>!u.inBid); }
+function unitsOf(s){ return inBidOf(s); }
+function offeredOf(s){ return s.offered!=null ? s.offered : inBidOf(s).length; }
+/* Units the MAP should show for a supplier. The bid's original count until the supplier approves a
+   different one as the unit term in the quotation — an unapproved counter-offer must not silently
+   rewrite what the offer says. `agreed` is the approved count, or null while still negotiating. */
+function shownUnitsOf(s,agreed){ return (agreed!=null) ? agreed : offeredOf(s); }
+function identifiedOf(s){ return inBidOf(s).length; }
+function confirmedOf(s){ return inBidOf(s).filter(u=>u.confirmed).length; }
+function locatedOf(s){ return inBidOf(s).filter(u=>!u.confirmed).length; }
+function claimedOf(s){ return Math.max(0, offeredOf(s) - inBidOf(s).length); }
+function levelsOf(s){ return {confirmed:confirmedOf(s),located:locatedOf(s),claimed:claimedOf(s),offered:offeredOf(s),alts:altsOf(s).length}; }
+function siteCountOf(s){ return new Set(inBidOf(s).map(u=>u.ll.join(','))).size; }
+function kmRangeOf(s){ const k=inBidOf(s).map(u=>u.km); return k.length?[Math.min.apply(null,k),Math.max.apply(null,k)]:[s.km,s.km]; }
+// Which suppliers bid on which item. SEPARATE bids — the same firm appearing under two items is two
+// independent offers with their own price, terms and deal room, not one bid spanning items.
+const ITEM_BIDS=[[0,1,2,3,5],[1,3,4],[0,2,3,4]];
+const INCOMING_BID={id:'s7',name:'مصنع الرياض للرفع',initials:'مر',co:[24.6500,46.7200],city:'الرياض · الصناعية',km:16,rate:2680,rating:'٤٫٦',deals:'٧',verified:true,status:'new',eta:'٥ ساعات',
+   offered:2,fleet:[
+     {id:'eq-fd30t131880',serial:'FD30T-131880',year:'٢٠٢٢',yard:'ساحة الصناعية',ll:[24.641,46.735],km:16,confirmed:true, cert:true, inBid:true},
+     {id:'eq-fd30t131905',serial:'FD30T-131905',year:'٢٠٢١',yard:'ساحة الصناعية',ll:[24.648,46.729],km:17,confirmed:false,cert:true, inBid:true},
+   ]};
+const SUPSTAT={new:{lbl:'عرض جديد',c:'#D4780A',bg:'rgba(212,120,10,.10)'},seen:{lbl:'تمت المشاهدة',c:'#6B8FA8',bg:'#F1F5FA'},neg:{lbl:'قيد التفاوض',c:'#2563EB',bg:'rgba(37,99,235,.08)'}};
+function freshState(){ return {
+  stage:'fresh', availabilityAsked:false, availabilityConfirmed:false,
+  docs:[{id:'safety',name:'شهادة سلامة المعدّة',certType:'TÜV',sub:'كما حُدّدت في طلبك',state:'claimed',askedByMe:false,deferred:false}],
+  myDocs:[{id:'iban',name:'الآيبان البنكي',state:'claimed'},{id:'addr',name:'العنوان الوطني',state:'missing'}],
+  qty:1, days:14, operator:true, unitIdx:0, eligibleAsked:false, fitAccepted:false,
+  price:{ sup:{rate:DAY_RATE,mob:MOB,demob:DEMOB,incMob:true,incDemob:true,overtime:450}, rounds:[], agreed:null, agreedPos:null, turn:'rentee', draft:null },
+  terms:[
+    // 🚚 السعر واللوجستيات — مُسعّرة (تُتفاوض في خطوة السعر)
+    {id:'price_main',cat:'price',en:'PRICE (from bid rate)',name:'السعر — من سعر العرض',desc:'الإيجار اليومي الأساسي المشتق من سعر العرض — لكل عرض',type:'priced',ack:true,priced:true,supDefault:'٣٬٠٠٠ ر.س / يوم',opts:[],state:'agreed',agreedVal:'٣٬٠٠٠ ر.س / يوم'},
+    {id:'mob',cat:'price',en:'mobilization_pricing',name:'تسعير التعبئة (موب)',desc:'رسوم نقل المعدّة إلى الموقع — لكل بند',type:'priced',ack:true,priced:true,supDefault:'١٬٥٠٠ ر.س',opts:[],state:'agreed',agreedVal:'١٬٥٠٠ ر.س'},
+    {id:'demob',cat:'price',en:'demobilization_pricing',name:'تسعير الإرجاع (ديموب)',desc:'رسوم إعادة المعدّة من الموقع — لكل بند',type:'priced',ack:true,priced:true,supDefault:'١٬٠٠٠ ر.س',opts:[],state:'agreed',agreedVal:'١٬٠٠٠ ر.س'},
+    // 👷 المشغّل
+    {id:'operator_inc',cat:'operator',en:'operator_included',name:'شمول المشغّل',desc:'هل يشمل التأجير مشغّلاً معتمداً — للطلب كامل',type:'neg',supDefault:'مشمول',opts:['بدون مشغّل'],state:'open',agreedVal:null},
+    {id:'fat_food',cat:'operator',en:'fat_food',name:'إعاشة المشغّل — الطعام',desc:'من يوفّر وجبات المشغّل طوال المدة — لكل بند',type:'neg',supDefault:'على المستأجر',opts:['على المورد','بدل نقدي'],state:'open',agreedVal:null},
+    {id:'fat_stay',cat:'operator',en:'fat_accommodation_transport',name:'إعاشة المشغّل — السكن والتنقّل',desc:'سكن المشغّل وتنقّله من وإلى الموقع — لكل بند',type:'neg',supDefault:'على المستأجر',opts:['على المورد','مناصفة'],state:'open',agreedVal:null},
+    {id:'overtime',cat:'work',en:'overtime_multiplier',name:'الساعات الإضافية (أوفرتايم)',desc:'مُعامل أجر ساعة العمل خارج الدوام الرسمي — للطلب كامل',type:'neg',supDefault:'١٫٥×',opts:['بدون','٢×'],state:'open',agreedVal:null},
+    // 🏗️ المعدّة
+    {id:'fuel',cat:'equip',en:'fuel_responsibility',name:'مسؤولية الوقود',desc:'من يغطّي تكلفة الوقود طوال المدة — للطلب كامل',type:'neg',supDefault:'على المستأجر',opts:['على المورد','مناصفة'],state:'open',agreedVal:null},
+    {id:'maintenance',cat:'equip',en:'maintenance_responsibility',name:'مسؤولية الصيانة',desc:'الصيانة الدورية والطارئة طوال المدة — للطلب كامل',type:'ack',ack:true,supDefault:'على المورد',opts:[],state:'agreed',agreedVal:'على المورد'},
+    {id:'breakdown_sla',cat:'equip',en:'breakdown_response_sla',name:'زمن الاستجابة للأعطال',desc:'أقصى مهلة لإصلاح أو استبدال البند عند تعطّله — للطلب كامل',type:'neg',supDefault:'٢٤ ساعة',opts:['١٢ ساعة','٨ ساعات','٤٨ ساعة'],state:'open',agreedVal:null},
+    // 🗓️ العمل — كلها للإقرار (قراءة فقط)
+    {id:'working_days',cat:'work',en:'working_days',name:'أيام العمل',desc:'أيام التشغيل المعتمدة — حقل الطلب',type:'ack',ack:true,supDefault:'الأحد–الخميس',opts:[],state:'agreed',agreedVal:'الأحد–الخميس'},
+    {id:'working_hours',cat:'work',en:'working_hours',name:'ساعات العمل',desc:'نافذة الدوام اليومية — حقل الطلب',type:'ack',ack:true,supDefault:'٧ص–٣م · ٨ ساعات',opts:[],state:'agreed',agreedVal:'٧ص–٣م · ٨ ساعات'},
+    {id:'night',cat:'work',en:'night_shift',name:'الوردية الليلية',desc:'إتاحة تشغيل المعدّة في وردية ليلية — للطلب كامل',type:'neg',supDefault:'متاح',opts:['غير متاح'],state:'open',agreedVal:null},
+    {id:'crosshire',cat:'work',en:'crosshire (schema: subletting)',name:'التأجير من الباطن',desc:'إعادة تأجير المعدّة لطرف ثالث — حقل الطلب',type:'ack',ack:true,supDefault:'غير مسموح دون موافقة كتابية',opts:[],state:'agreed',agreedVal:'غير مسموح دون موافقة كتابية'},
+    {id:'local_content',cat:'work',en:'local_content',name:'المحتوى المحلي',desc:'نسبة المحتوى المحلي المطلوبة — حقل الطلب',type:'ack',ack:true,supDefault:'محتوى محلي ≥ ٤٠٪',opts:[],state:'agreed',agreedVal:'محتوى محلي ≥ ٤٠٪'},
+    // 💳 الدفع والتجاري
+    {id:'payment_terms',cat:'pay',en:'payment_terms',name:'شروط الدفع',desc:'جدول سداد قيمة الاتفاق — للطلب كامل',type:'neg',supDefault:'مقدّم ١٠٠٪',opts:['نصف عند التسليم ونصف عند الإرجاع','دفعات شهرية'],state:'open',agreedVal:null},
+    {id:'offer_duration',cat:'pay',en:'offer_duration',name:'مدة صلاحية العرض',desc:'المهلة قبل انتهاء صلاحية عرض المورد — مرحلة العرض فقط',type:'info',ack:true,supDefault:'٧ أيام',opts:[],state:'agreed',agreedVal:'صالح ٧ أيام من تاريخ العرض'},
+    {id:'fulfillment',cat:'pay',en:'fulfillment_type',name:'نوع التوريد',desc:'آلية التوريد — مع مرونة تعديل عدد الوحدات في الطلب متعدد الوحدات',type:'ack',ack:true,fulfill:true,supDefault:'توريد كامل',opts:[],state:'agreed',agreedVal:'توريد كامل'},
+  ],
+  approved:false,
+  chips:[{who:'sup',txt:'تمت مطابقة معدّتك تلقائياً مع هذا الطلب'}],
+  // middleware trigger layer — one nudge per type per room; ✕ mutes the type for the room
+  assist:{fired:{}, muted:{}},
+};}
+
+// The `dpGuide` step was dropped: that container is empty now (guideEl is null), so its spotlight
+// measured a zero-height element and drew a stray blue bar over the map.
+const TOUR=[
+  {id:'dpRail',t:'أدواتك',x:'المعدّة · التوثيق · المحادثة. افتح أيّها عند الحاجة كلوحة جانبية، ثم أغلقها لتعود الخريطة كاملة.'},
+  {id:'dpLegend',t:'الخريطة — مكان الصفقة',x:'من ساحة المعدّة إلى موقعك، والمسافة هي الرقم الأساسي. اللون = تأكيد المورد: كهرماني ← أخضر ✓.'},
+  {id:'dpPrice',t:'شريط السعر',x:'السعر ظاهر دائماً هنا. افتح «عرض الأسعار» للتفاوض بالجولات والعروض المقابلة.'},
+];
+class Component extends DCLogic {
