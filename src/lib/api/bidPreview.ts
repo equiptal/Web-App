@@ -15,10 +15,12 @@ import { serverEnv } from "@/lib/config/env";
  *   - the copy has to come from the backend, not from strings duplicated here, so the card and the
  *     app-sent email version of the same card can't drift apart.
  *
- * Backend contract: `GET /public/bid-form/{token}/preview` on the main Moedatech-App backend —
- * public, no auth, side-effect free (deliberately NOT `GET /public/bid-form/{token}`, which bumps the
- * share link's `opened_count` and would count every unfurl bot as a supplier opening the link).
- * See docs/api-docs/mobile-backend-api.md §28 in Moedatech-App.
+ * Backend contract: `GET /public/bid-form/{token}/preview` on the **agents** backend — the same
+ * service and the same host this page already fetches the form itself from (see
+ * `app/api/bid-form/[token]/route.ts`), so the whole page depends on one API, not two. Public, no
+ * auth, side-effect free — deliberately NOT `GET /public/bid-form/{token}`, which bumps the share
+ * link's `opened_count` and would count every unfurl bot as a supplier opening the link.
+ * See docs/api-docs/agents-backend-api.md in Moedatech-App.
  */
 
 /** The link is `/bid/{slug}-{groupId}`; the token the backend resolves is the trailing UUID. */
@@ -59,8 +61,8 @@ function isPreview(v: unknown): v is BidPreview {
  * the page for.
  */
 export async function fetchBidPreview(token: string, lang: "en" | "ar"): Promise<BidPreview | null> {
-  if (!serverEnv.appApiUrl) return null;
-  const base = serverEnv.appApiUrl.replace(/\/$/, "");
+  if (!serverEnv.agentsApiUrl) return null;
+  const base = serverEnv.agentsApiUrl.replace(/\/$/, "");
   try {
     const res = await fetch(
       `${base}/public/bid-form/${encodeURIComponent(token)}/preview?lang=${lang}`,
