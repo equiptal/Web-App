@@ -29,6 +29,14 @@ export async function PUT(req: Request) {
       if (str(body.email)) payload.email = str(body.email);
       if (str(body.whatsapp)) payload.whatsapp = str(body.whatsapp);
       if (str(body.companyName)) payload.companyName = str(body.companyName);
+      // Company logo, forwarded on PRESENCE rather than truthiness: the other
+      // optionals above are dropped when empty, but `""` is meaningful here — it
+      // is how the Remove button clears a saved logo. Omitting the key entirely
+      // leaves the stored logo untouched, so an unrelated profile edit can never
+      // wipe it.
+      if (typeof body.companyLogoKey === "string") {
+        payload.companyLogoKey = str(body.companyLogoKey);
+      }
 
       const result = await call<{ message?: string; messageAr?: string; tier?: string }>("/profile/me", {
         method: "PUT",

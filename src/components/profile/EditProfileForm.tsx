@@ -42,10 +42,17 @@ export function EditProfileForm({
   profile,
   onSaved,
   onCancel,
+  currentLogoUrl,
 }: {
   profile: RenterProfile;
   onSaved: (next: RenterProfile) => void;
   onCancel: () => void;
+  /**
+   * Presigned URL of the logo already on file, shown as the initial preview.
+   * Comes from `/api/verification` (`companyLogoUrl`) via ProfileView — the logo
+   * bucket is not public, so it cannot be derived from a key client-side.
+   */
+  currentLogoUrl?: string | null;
 }) {
   const t = useT();
   const p = t.profile;
@@ -64,6 +71,17 @@ export function EditProfileForm({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [fe, setFe] = useState<Record<string, string>>({});
+
+  // Company logo. `companyLogoKey` is only set once the user actually touches the
+  // logo: a new S3 key, or "" to clear. It stays undefined otherwise so an
+  // ordinary profile edit never disturbs the saved logo.
+  //
+  // This is the surface that makes the logo recoverable. Verification freezes the
+  // company block once approved, but the logo is branding rather than evidence,
+  // so `PUT /profile/me` accepts it at any status with no re-review.
+  const [companyLogoKey, setCompanyLogoKey] = useState<string | undefined>(undefined);
+  const [logoPreview, setLogoPreview] = useState<string | null>(currentLogoUrl ?? null);
+  const [logoBusy, setLogoBusy] = useState(false);
 
   useEffect(() => {
     const load = async (path: string, set: (o: Opt[]) => void) => {
@@ -86,6 +104,67 @@ export function EditProfileForm({
   // Ensure the current stored value is always selectable even if it's not in the fetched list.
   const withCurrent = (opts: Opt[], v: string) =>
     v && !opts.some((o) => o.value === v) ? [{ value: v, label: v }, ...opts] : opts;
+
+  /**
+   * Downscales the picked image to 220px on its longest side, re-encodes as PNG,
+   * and uploads it through the same presigned doc flow the verification form uses
+   * (`/api/profile/doc-upload-url` → PUT). Holds the returned KEY; the save then
+   * sends `companyLogoKey`.
+   *
+   * Uploading on pick — rather than on submit — keeps the save path synchronous
+   * and matches VerificationFlow.
+   */
+  const onPickLogo = (file: File) => {
+    setErr(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const image = new Image();
+      image.onload = () => {
+        const max = 220;
+        let { width, height } = image;
+        if (width >= height && width > max) {
+          height = Math.round((height * max) / width);
+          width = max;
+        } else if (height > width && height > max) {
+          width = Math.round((width * max) / height);
+          height = max;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(image, 0, 0, width, height);
+        canvas.toBlob(async (blob) => {
+          if (!blob) return;
+          setLogoBusy(true);
+          try {
+            const r = await fetch("/api/profile/doc-upload-url", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ filename: "company-logo.png", contentType: "image/png" }),
+            });
+            if (!r.ok) throw new Error("upload-url");
+            const { url, key } = (await r.json()) as { url: string; key: string };
+            const put = await fetch(url, {
+              method: "PUT",
+              body: blob,
+              headers: { "Content-Type": "image/png" },
+            });
+            if (!put.ok) throw new Error("put");
+            setCompanyLogoKey(key);
+            setLogoPreview(canvas.toDataURL("image/png"));
+          } catch {
+            setErr(p.companyLogoError);
+          } finally {
+            setLogoBusy(false);
+          }
+        }, "image/png");
+      };
+      image.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -111,6 +190,8 @@ export function EditProfileForm({
       email: email.trim() || undefined,
       whatsapp: whatsapp.trim() || undefined,
       companyName: companyName.trim() || undefined,
+      // Undefined unless the logo was touched — see the state declaration.
+      companyLogoKey,
     });
     setBusy(false);
     if (!r.ok) {
@@ -176,6 +257,54 @@ export function EditProfileForm({
           {p.companyName} <span className="text-[11px] font-medium text-muted">— {p.optional}</span>
         </label>
         <input className={inputCls} value={companyName} onChange={(e) => setCompanyName(e.target.value)} maxLength={200} placeholder={p.companyNamePlaceholder} />
+      </div>
+
+      {/* Company logo. Editable at any verification status — it is branding, not
+          evidence — so this is where a renter who verified without one adds it. */}
+      <div>
+        <label className={labelCls}>
+          {p.companyLogo} <span className="text-[11px] font-medium text-muted">— {p.optional}</span>
+        </label>
+        <div className="flex items-center gap-3 rounded-[10px] border border-border bg-surface px-[14px] py-3">
+          <span className="grid h-12 w-12 flex-none place-items-center overflow-hidden rounded-[10px] border border-border bg-surface2">
+            {logoBusy ? (
+              <Icon name="hourglass_empty" size={20} className="text-muted" />
+            ) : logoPreview ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={logoPreview} alt="" className="h-full w-full object-contain" />
+            ) : (
+              <Icon name="image" size={20} className="text-muted" />
+            )}
+          </span>
+          <span className="flex-1 text-[12px] text-muted">{p.companyLogoNote}</span>
+          <label className="flex-none cursor-pointer rounded-lg border border-brand bg-surface px-3 py-1.5 text-[12.5px] font-bold text-brand">
+            {logoBusy ? p.saving : logoPreview ? p.companyLogoChange : p.companyLogoUpload}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={logoBusy}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) onPickLogo(f);
+              }}
+            />
+          </label>
+          {logoPreview && !logoBusy && (
+            <button
+              type="button"
+              /* "" (not undefined) — the backend treats an empty string as
+                 "clear it" and an omitted field as "leave unchanged". */
+              onClick={() => {
+                setCompanyLogoKey("");
+                setLogoPreview(null);
+              }}
+              className="flex-none rounded-lg border border-border px-3 py-1.5 text-[12.5px] font-bold text-danger"
+            >
+              {p.companyLogoRemove}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-[12px] sm:grid-cols-2">

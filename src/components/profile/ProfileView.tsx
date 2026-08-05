@@ -95,6 +95,16 @@ export function ProfileView() {
     setEditing(false);
     setSavedToast(true);
     setTimeout(() => setSavedToast(false), 2200);
+    // The logo may have changed. Its presigned URL only comes from the backend,
+    // so re-read it rather than trying to derive one — otherwise the company card
+    // keeps showing the previous logo (or a removed one) until a full reload.
+    fetch("/api/verification", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { submission?: { companyLogoUrl?: string | null } } | null) => {
+        if (!d?.submission) return;
+        setCompany((c) => (c ? { ...c, logoUrl: d.submission!.companyLogoUrl ?? null } : c));
+      })
+      .catch(() => {});
   };
 
   const switchLang = async (l: Locale) => {
@@ -189,7 +199,12 @@ export function ProfileView() {
           )}
 
           {editing ? (
-            <EditProfileForm profile={profile} onSaved={onSaved} onCancel={() => setEditing(false)} />
+            <EditProfileForm
+              profile={profile}
+              onSaved={onSaved}
+              onCancel={() => setEditing(false)}
+              currentLogoUrl={company?.logoUrl ?? null}
+            />
           ) : (
             <dl className="grid grid-cols-1 gap-y-3 sm:grid-cols-2 sm:gap-x-5">
               <Field label={`${p.firstName} / ${p.lastName}`} value={fullName || "—"} />

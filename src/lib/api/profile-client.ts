@@ -15,6 +15,15 @@ export interface ProfileUpdatePayload {
   email?: string;
   whatsapp?: string;
   companyName?: string;
+  /**
+   * Company logo S3 key. The logo is branding, not verification evidence, so the
+   * backend accepts it on `PUT /profile/me` at any `supplierStatus` — this is how
+   * a renter who verified without a logo adds one later, with no re-review.
+   *
+   * Send the key to set it, `""` to clear it, and OMIT the field to leave the
+   * saved logo untouched (unrelated profile edits must never wipe it).
+   */
+  companyLogoKey?: string;
 }
 
 type Ok<T = Record<string, unknown>> = { ok: true } & T;
