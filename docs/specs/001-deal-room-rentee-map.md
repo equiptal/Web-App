@@ -52,26 +52,37 @@ the renter (see §7).
 
 **In**
 - Map canvas (Leaflet — `react-leaflet` is already a dependency) scoped to exactly one requested item.
-- One pin per bid, expanding to per-unit pins on selection when a bid's units sit at more than one
-  confirmed yard.
-- Distance rings + bands relative to the project site.
-- Confirmed-vs-assumed location indicator, on both pin and list card.
-- Side list of bids with price / distance / rating sort.
+- Map opens on the **project location only** — no supplier pins, no bid pins (§6.2).
+- **Bid list is the entry point**: scrollable, cheapest-first, nearest as the only alternative sort (§6.2).
+- Selecting a **supplier** reveals **that supplier's qualifying fleet** as one pin per registered machine,
+  each individually selectable (§6.2).
+- **Distance filter** over the list and map together, defaulting to "all" (§6.10).
+- Confirmed-vs-unconfirmed availability, as one colour scale — green / red — on pin, chip and list (§6.9).
 - Item strip for multi-item RFQs (switches which member request is in view).
-- Live updates: new and edited bids appear with no user action.
-- Selecting a bid opens its existing deal room — unchanged negotiate behaviour.
-- Bottom price bar — the **existing** deal-room price bar re-hosted in the map footer, visible
-  only while a bid is selected (§6.1).
-- Map opens on the **project location only** — no supplier pins (§6.2).
-- Bid list as the entry point: scrollable, cheapest-first (§6.2).
-- Supplier selection reveals **that supplier’s qualifying fleet** on the map (§6.2).
-- **Merged machine panel** — eligibility + that machine’s documents in one place (§6.3).
-- Separate supplier panel for company documents (§6.4).
-- Three equipment-scoped requests delivered as structured chat cards (§6.3, §7.13).
-- Chat available once a supplier is selected (§6.2).
-- Per-unit pins: a selected bid fans out to one pin per identified machine; unidentified units
-  cluster as one hollow marker at the bid's anchor.
-- Unit selection on the quotation stepper, persisted as `agreedUnitIds` (§6.4, §7.6).
+- **Merged machine panel** — three tabs over one sticky identity header: availability & fit, equipment
+  documents, company documents (§6.3).
+- **Two equipment-scoped requests** — confirm availability, request a different machine — plus document
+  requests raised from the document tabs, all delivered as structured chat cards (§6.7, §7.13).
+- Chat available once a supplier is selected (§6.2), with arrival surfaces that work while the renter is
+  on the map (§6.8).
+- Bottom price bar — the **existing** deal-room bar re-hosted, unchanged except one label (§6.1).
+- Off-platform submissions merged into the same list, never plotted, with their own panel, modal and
+  read-only bar (§6.13).
+
+**Explicitly NOT in scope — retired during the 2026-08-04 direction change, listed so they are not
+re-derived from an old AC:**
+
+| Retired | Replaced by |
+|---|---|
+| One pin per bid, expanding to per-unit pins | machine pins on supplier selection (§6.2) |
+| Bid fan-out into per-unit pins, and location collapse | machines are drawn individually (§6.2). Note this is **not** the ~74px marker declutter of §6.2, which is live |
+| Distance **rings** (30/120/220 km) and ring colour by band | colour means **availability**; distance is a filter (§6.10) |
+| Rating sort | removed — cheapest-first and nearest only |
+| **Live/push updates** | refetch on mount, focus and post-send (§7.5) |
+| Unidentified units drawn as a hollow marker | **never drawn** — a count has no place on a map (§6.2) |
+| `agreedUnitIds` on the quotation stepper | withdrawn — the quotation agrees *how many*, never *which* (§7.6) |
+| A separate supplier panel owning company documents | company documents are the machine panel's third tab (§6.3.4) |
+| `add_to_offer` as a request kind | `alternative` covers it (§6.7.1) |
 
 **Out**
 - Supplier pins on the map, and therefore supplier company coordinates. Removed by decision: the
@@ -93,7 +104,8 @@ the renter (see §7).
 - Off-platform / `converted` bid locations — deferred by decision; they resolve to "no location".
 - Cross-item supplier coverage ("this supplier covers 2 of your 3 items") — impossible on this
   surface (§4 assumption 2) and deliberately dropped; a separate feature if wanted.
-- Per-unit selection or acceptance. A unit pin is detail *within* an offer, never its own offer.
+- Per-unit **acceptance**. A machine is individually *selectable* — that is how its panel opens —
+  but it is never independently acceptable or priceable: the offer is the unit of agreement.
 - Any change to how `distanceKm` is computed on existing bid cards.
 
 **Assumptions**
@@ -101,52 +113,49 @@ the renter (see §7).
 - **A0 — the shipped app is the source of truth; the prototype illustrates layout only.** Where the two
   disagree, the app wins. This applies most sharply to the **bottom price bar**, which the prototype
   reworked and then reverted: §6.1 is normative, the prototype's bar is to be ignored entirely.
-0. **The shipped app is the source of truth; the prototype only illustrates layout.** Where the two
-   disagree, existing behaviour wins and the prototype element is dropped rather than built. Any
-   prototype element with no existing counterpart is out of scope unless separately requested.
-1. `request.projectLat/Lng` is the site pin. When absent, pins still plot and bands go neutral.
+1. `request.projectLat/Lng` is the site pin. When absent, machine pins still plot once a supplier is
+   selected, but every distance reads "—" and the nearest sort is disabled (§5 degraded paths).
 2. A bid belongs to exactly one `EquipmentRequest`, and the backend fans a multi-item RFQ into one
    request per item (`requests.ts:8-10`). Therefore **one bid covers exactly one item, always**.
 3. `createBid` refuses a bid with no resolvable location, so a bid with no coordinates at all is
    rare — it arises mainly when a supplier deletes a yard after bidding (`bids.yard_id` is
    `ON DELETE SET NULL`, migration `20260311104221`).
-4. Most bids yield a single pin. Per-unit pins appear only where the supplier used the readiness
-   card; empty-array and legacy numeric `unitsOffered` produce one pin, i.e. today's behaviour.
+4. A supplier's fleet is drawn from his **registered, qualifying machines**, not from `unitsOffered`
+   — so a bid with an empty or legacy-numeric `unitsOffered` still yields pins, and its claimed
+   count is shown in the composition bar (§6.3.2) rather than on the map.
 
 ## 5. Flows
 
 **Happy path — single-item RFQ**
 1. Renter opens the bids surface for a request and switches to the map view.
-2. Map fits to the project site plus every plottable bid; distance rings (30 / 120 / 220 km) draw
-   around the site.
-3. Each bid renders as one pin: supplier initials, daily rate, distance, ring coloured by band,
-   and a confirmed (✓) or assumed (~) marker.
-4. Renter sorts the side list by price, distance or rating; hovering a card highlights its pin.
-5. Renter selects a pin or card → that bid's deal room opens.
+2. The map fits to the **project site alone**. No supplier or bid pins are drawn (§6.2).
+3. The bid list is the entry point: cheapest-first by default, nearest as the only other sort,
+   each row carrying price, distance, unit count and its off-platform tag where applicable.
+4. Selecting a **supplier** draws that supplier's qualifying fleet — one pin per registered machine,
+   coloured green (confirmed) or red (not confirmed), each individually selectable. The chat button
+   appears at this point and not before.
+5. Selecting a **machine** opens the merged panel (§6.3): availability & fit, equipment documents,
+   company documents, over one sticky identity header. The equipment button appears at this point.
+6. Equipment-scoped requests and document requests are composed here and sent as structured chat
+   cards bound to that `equipmentId` (§6.7, §7.13).
 
 **Multi-item RFQ**
 1. An item strip renders above the map, one chip per member request of the RFQ group.
 2. Selecting item *N* swaps the map and list to that item's bids. The map is never all-items.
 
-**Per-unit fan-out**
-1. A bid whose units sit at more than one confirmed yard shows a unit-count badge and a
-   multi-location tag, with distance as a range and the band taken from the **farthest** unit.
-2. Selecting that bid fans its pins out to each unit's real location, tied by a dashed connector,
-   each labelled "unit *i* of *n*" with its own yard name and confirmed/assumed marker. Other bids
-   dim. Selecting any sibling selects the whole bid.
-
-**Live update**
-1. While the map is visible the client subscribes to bid events for that request.
-2. A supplier submits or edits a bid → the pin appears or updates in place, list count increments,
-   no reload, no scroll jump, and the current selection is preserved.
-3. If the subscription is unavailable or drops, the client falls back to a 20s poll.
-4. When the surface is hidden or unmounted, subscription and poll both stop.
+**Freshness — no realtime mechanism (§7.5)**
+1. The client refetches on mount, on window focus, and after it sends a request card.
+2. A bid that arrived since the last fetch appears in the list on the next refetch, with the
+   new-bid treatment of §6.11. It adds no pins — bids are not plotted.
+3. There is no subscription, no poll and no socket. AC-190 states this as a requirement so it is
+   not reintroduced as an "obvious" improvement.
 
 **Degraded paths**
-- No bids → site pin alone, empty state, no side panel.
-- Bid with no resolvable location → no pin; listed with "Location not shared" and excluded from
-  distance sorting.
-- Request with no project coordinates → pins plot, bands neutral, distances render "—".
+- No bids → site pin alone, empty state, no bid list.
+- Bid with no resolvable location → listed normally, tagged "Location not shared", exempt from the
+  distance filter (§6.10) and sorted last under nearest.
+- Request with no project coordinates → distances render "—", never 0, and the nearest sort is
+  disabled rather than silently meaningless.
 
 ## 6. Web surface — implement in `Web-App`
 
@@ -197,8 +206,9 @@ opens, scoped to it.
 
 #### The bid list — the actual entry point
 
-Scrollable, full height beside the map, **sorted cheapest-rate first** by default, with the existing
-sort options. Each row carries the supplier, rate, distance, and the offered-vs-registered split.
+Scrollable, full height beside the map, **sorted cheapest-rate first** by default, with **nearest** as
+the only alternative sort (AC-24 — rating is retired). Each row carries the supplier, rate, distance,
+and the offered-vs-registered split.
 Selecting a row is what populates the map.
 
 #### Machine pins
@@ -423,6 +433,12 @@ Supplier: Al-Kharj Industrial                        [company docs →]
    … that item's deal-room conversation …
 ```
 
+- **The tab key is the BID, not the item.** `@@unique([requestId, bidOwnerKey, equipmentId])`
+  (`schema.prisma:1260`) makes a bid unique per *equipment*, not per item — so one supplier may hold
+  **two bids on the same item**, each with its own deal room and its own Stream channel. Keying tabs by
+  item collapses them and leaves the second room unreachable. Key by `bidId`; label by item; where two
+  tabs would carry the same item label, disambiguate with the machine (serial or model), because the
+  rate alone changes as they negotiate.
 - **Tabs appear only when the supplier has more than one bid in this RFQ group.** A single-bid
   supplier gets the conversation with no tab strip — no new chrome for the common case.
 - **Per-tab unread badge**, so an unanswered message on the Generator is visible while reading the
@@ -477,7 +493,7 @@ Rules:
 - On the map, the pin ring already encodes **yard confirmation** (§6.3). Readiness rides as a small
   second mark on the pin, so the two never compete for one colour.
 - **Unidentified units get neither.** No machine means no documents to score and no yard to confirm;
-  they show the hollow marker and nothing else. A red readiness badge would wrongly imply a machine
+  they are **not drawn at all** (§6.2). A red readiness badge would wrongly imply a machine
   exists and is failing.
 - **Off-platform bids get neither.** `computeBidReadiness` returns null without `offeredUnitsDetail`
   (native bids only) — render the absence, not a red state.
@@ -494,9 +510,11 @@ Rules:
   | `bidMap.view` | Map | خريطة |
   | `bidMap.listView` | List | قائمة |
   | `bidMap.yourSite` | Your site | موقعك |
-  | `bidMap.bandNear` | Near · ≤30 km | قريب · ≤ ٣٠ كم |
-  | `bidMap.bandMid` | Mid · 30–120 km | متوسط · ٣٠ – ١٢٠ كم |
-  | `bidMap.bandFar` | Far · >120 km | بعيد · > ١٢٠ كم |
+  | `bidMap.distAll` | All distances | الكل |
+  | `bidMap.dist50` | Within 50 km | ≤ ٥٠ كم |
+  | `bidMap.dist100` | Within 100 km | ≤ ١٠٠ كم |
+  | `bidMap.dist200` | Within 200 km | ≤ ٢٠٠ كم |
+  | `bidMap.distCount` | {shown} of {total} offers | {shown} من {total} عروض |
   | `bidMap.confirmed` | Confirmed by supplier | مؤكّد من المورد |
   | `bidMap.assumed` | Not confirmed | غير مؤكّد |
   | `bidMap.noLocation` | Location not shared | لم يُشارك الموقع |
@@ -1129,7 +1147,7 @@ A **completeness-and-agreement** score, never a trust score, and it must not be 
 Every input is self-declared: a submission can reach 100 with nothing verified. That is why §6.13.7's
 unverified callout sits above it.
 
-## 7. Backend contract — implement in `Moedatech-App`## 7. Backend contract — implement in `Moedatech-App`## 7. Backend contract — implement in `Moedatech-App`
+## 7. Backend contract — implement in `Moedatech-App`
 
 > **Self-contained hand-off.** Written to be pasted into a session that cannot read the `Web-App`
 > repo.
@@ -1387,27 +1405,6 @@ What remains is narrower, and it matters for the map: the count the map shows fo
   the schema comment marks it **display only**.
 - No new field. This is a read rule, not a write.
 
-#### 7.14.1 Shipping without supplier notice — decided, and what it does not excuse
-
-**Decided 2026-08-05: ship it silently.** No in-app notice, no email, no opt-out per document type, and no
-carve-out for `sale_contract`. Suppliers are not told; the full ownership set becomes renter-visible and
-openable.
-
-**This is a product decision and it is recorded, not argued.** Two things it does *not* change:
-
-1. **The contradictory rule in the code must still be deleted or rewritten** (AC-102). `rentee.service.ts:449`
-   currently reads *"Ownership docs stay supplier-private and must never surface on rentee screens
-   (istimara / customs / sale-contract / saso-registration)."* Leaving that comment next to code that
-   surfaces them guarantees a future reader re-implements the filter believing it is a regression. Shipping
-   quietly to suppliers is a choice; shipping quietly to the next engineer is a bug.
-2. **The disclosure is still real.** `sale_contract` can show the purchase price of a machine to the party
-   negotiating its rental rate. If that becomes contentious after launch, the mitigation is a per-type
-   exclusion — cheap to add, since the filter constant (`RENTEE_HIDDEN_DOC_TYPES`) still exists and only
-   its application to the renter path is being removed.
-
-**Not specified here, deliberately:** whether the supplier-facing terms or privacy copy already cover this.
-That is outside a technical spec's reach and was not asserted either way.
-
 ### 7.7 Validation rules
 
 - Coordinates are returned as numbers; `Decimal` columns must be coerced (`Number(...)`), matching
@@ -1419,7 +1416,8 @@ That is outside a technical spec's reach and was not asserted either way.
 
 ### 7.8 Data model delta
 
-**One nullable column:** `DealRoom.agreedUnitIds Json?` (§7.6). Nothing else — every other field
+**No new column.** `agreedUnitIds` was specced here and **withdrawn** (§7.6) — the quotation agrees
+*how many* units, never *which machines*, so there is nothing to persist. Every other field
 already exists: `Bid.equipmentLat/Lng`, `Bid.yardId`, `Bid.unitsOffered`
 (JSON), `EquipmentListing.yardId`, `Yard.latitude/longitude/name/city`,
 `EquipmentRequest.projectLat/Lng`. One additive migration for the column.
@@ -1430,21 +1428,20 @@ already exists: `Bid.equipmentLat/Lng`, `Bid.yardId`, `Bid.unitsOffered`
 |---|---|---|---|
 | `FORBIDDEN` | caller may not read this request's bids (existing) | You don't have access to this request. | ليس لديك صلاحية على هذا الطلب. |
 | `REQUEST_NOT_FOUND` | unknown request (existing) | Request not found. | الطلب غير موجود. |
-| `VALIDATION_ERROR` | `agreedUnitIds` contains an id that is not among the bid's identified machines (existing code, new use) | That machine isn't part of this offer. | هذه المعدّة ليست ضمن هذا العرض. |
+| `VALIDATION_ERROR` | request card fails §7.13.3 — unknown `equipmentId`, retired `add_to_offer` kind, or missing `bidId` | That request isn't valid for this offer. | هذا الطلب غير صالح لهذا العرض. |
 
 No new error codes.
 
 ### 7.10 Backward compatibility
 
 - **Mobile consumes the same `getBidList` response.** Every change is **additive** — new fields on
-  the bid and on `offeredUnitsDetail`, plus one nullable column. No field is renamed, retyped or
+  the bid and on `offeredUnitsDetail`. **No new column** (§7.6). No field is renamed, retyped or
   removed, and the existing dedupe is deliberately preserved (§7.2).
 - `distanceKm` on the bid must not change value for any existing bid. Coordinates are additive only.
 - **The ownership filter (§7.2) is a behaviour change**, and intentionally so: a bid that today
   surfaces a competitor's machine will, after this, surface no machine for that entry. Its offered
   *count* is unaffected. Expect a small number of production bids to show fewer identified units —
   that is the leak closing, not a regression.
-- `agreedUnitIds` is null for every existing deal, which must read exactly as today.
 
 ### 7.11 ~~Defect — ownership documents leak through the deal-room endpoint~~ *(WITHDRAWN — see §7.14)*
 
@@ -1503,7 +1500,7 @@ matching that request's item, each carrying:
 | `yardName`, `lat`, `lng`, `distanceKm` | the pin |
 | `yardConfirmed` | green vs red |
 | `inBid` | filled pin vs hollow “you could ask for this” |
-| document / photo presence | the panel — subject to `RENTEE_HIDDEN_DOC_TYPES` and §7.11 |
+| `documents[]`, `photos[]` | the panel — the **same shape as `offeredUnitsDetail`** (see below), with **no** renter-facing type filter (§7.14) |
 
 - **Scope:** only suppliers who have **actually bid** on this request. This must not become a way to
   browse an arbitrary company's fleet.
@@ -1511,6 +1508,24 @@ matching that request's item, each carrying:
   sides agree on what “qualifying” means.
 - **Ownership:** company-aware (`ownerScopeWhere`), so a member’s firm-shared machines are included
   and nobody else’s are.
+
+**Two definitions the field table above cannot carry, and both change what the renter sees:**
+
+- **`yardConfirmed` is a property of THIS BID's `unitsOffered` entry, never of the listing.** A machine
+  is confirmed because the supplier placed it at a yard *for this offer*. Reading it off the equipment
+  listing turns every pin green, because a listed machine always sits somewhere. Where the machine is
+  not in this bid (`inBid: false`) there is no entry, so `yardConfirmed` is **false** — not null and
+  not inherited.
+- **Which coordinates to send follows from that.** Confirmed → the **bid entry's yard**. Unconfirmed →
+  the machine's **registered yard** (§7.3 precedence). The two can differ, and sending the wrong one
+  puts a green pin at a place the supplier never committed to. §6.2 states this in prose; it is
+  normative here.
+
+**Return each machine in the `offeredUnitsDetail` shape** — the same `documents[]` and `photos[]`
+structure, not an ad-hoc "presence" summary. One payload then feeds **both** the pin's readiness bar
+and the document tab of a machine that is *not* in the offer. A presence-only summary cannot fill that
+tab, and the alternative — a second fetch when the renter opens a not-in-offer machine — puts a
+network round-trip inside a tab switch.
 
 ### 7.13 Change 6 — the rentee request card, and how a request is bound to one machine *(new backend work, small)*
 
@@ -1543,7 +1558,7 @@ Accept and persist one new card type on the renter → supplier direction:
   scope: 'equipment' | 'company',
   equipmentId: string | null,                   // required when scope='equipment', null when 'company'
   serial: string | null,                        // display only — never used to resolve
-  kind: 'availability' | 'document' | 'alternative' | 'add_to_offer',
+  kind: 'availability' | 'document' | 'alternative',   // 'add_to_offer' is RETIRED (§6.7.1)
   docTypes?: string[] }                         // document requests only; one card, many documents
 ```
 
@@ -1561,8 +1576,9 @@ Accept and persist one new card type on the renter → supplier direction:
 
 - `equipmentId` **must** resolve to a listing owned by the bidding supplier, in the same tenant. Reuse
   the ownership scoping from §7.2 — the same check that stops a bid quoting someone else's machine.
-- `equipmentId` **need not be in `unitsOffered`.** Asking about a machine the supplier did *not* offer
-  is a legitimate request (`kind: 'add_to_offer'`); rejecting it would remove the feature.
+- `equipmentId` **need not be in `unitsOffered`.** Asking about a machine the supplier did not offer is
+  legitimate — it is an `alternative` request — so do not reject on that basis.
+- **`add_to_offer` must be rejected.** The kind is retired (§6.7.1); no surface produces it (AC-182).
 - `scope='equipment'` with a null `equipmentId`, or `scope='company'` with a non-null one, is a
   `400` — a malformed card is worse than no card, because it renders as a question about nothing.
 - `docTypes` entries must be known document types. An unknown type cannot be resolved in §7.13.4, so
@@ -1577,11 +1593,10 @@ every render**, not from anything stored on the request:
 |---|---|---|
 | `availability` | yes | that unit's `yardConfirmed` is true |
 | `document` | yes | every `docTypes` entry appears in that unit's `documentKeys` |
-| `add_to_offer` | yes | that `equipmentId` now appears in the bid's `unitsOffered` |
 | `alternative` | **no** | nothing observable identifies "a different machine instead of this one" |
 
 This is why the supplier can answer by **doing the thing** rather than by replying, and why the
-renter's card updates without a refresh (§7.5 already pushes the bid event that triggers the refetch).
+renter's card updates on the next **refetch** — which a send already triggers (§7.5.1). Nothing is pushed.
 
 **Precedence is normative, and layer 3 is not optional.** `alternative` has no observable
 counterpart, so a card of that kind read *"waiting for the supplier"* indefinitely — including when a
@@ -1645,6 +1660,27 @@ urls. `getDealRoomDocuments` already returns them and needs no change.
   re-implements the filter later believing it was a regression.
 - Suppliers were never told their ownership papers would be visible to renters. Whether that needs
   surfacing to them is open question 14.
+#### 7.14.1 Shipping without supplier notice — decided, and what it does not excuse
+
+**Decided 2026-08-05: ship it silently.** No in-app notice, no email, no opt-out per document type, and no
+carve-out for `sale_contract`. Suppliers are not told; the full ownership set becomes renter-visible and
+openable.
+
+**This is a product decision and it is recorded, not argued.** Two things it does *not* change:
+
+1. **The contradictory rule in the code must still be deleted or rewritten** (AC-102). `rentee.service.ts:449`
+   currently reads *"Ownership docs stay supplier-private and must never surface on rentee screens
+   (istimara / customs / sale-contract / saso-registration)."* Leaving that comment next to code that
+   surfaces them guarantees a future reader re-implements the filter believing it is a regression. Shipping
+   quietly to suppliers is a choice; shipping quietly to the next engineer is a bug.
+2. **The disclosure is still real.** `sale_contract` can show the purchase price of a machine to the party
+   negotiating its rental rate. If that becomes contentious after launch, the mitigation is a per-type
+   exclusion — cheap to add, since the filter constant (`RENTEE_HIDDEN_DOC_TYPES`) still exists and only
+   its application to the renter path is being removed.
+
+**Not specified here, deliberately:** whether the supplier-facing terms or privacy copy already cover this.
+That is outside a technical spec's reach and was not asserted either way.
+
 ## 8. Acceptance criteria
 
 | ID | Layer | Given / When / Then |
@@ -1682,7 +1718,7 @@ urls. `getDealRoomDocuments` already returns them and needs no change.
 | RMAP-AC-208 | web | **Given** more than one downloadable document is selected **When** the renter presses download **Then** he is asked whether he wants separate files or one merged PDF, and neither is chosen for him |
 | RMAP-AC-209 | web | **Given** exactly one document is selected **When** the renter presses download **Then** it downloads directly with no prompt |
 | RMAP-AC-210 | web | **Given** the merge option is not implemented **When** the prompt renders **Then** that option is hidden rather than shown and failing |
-| RMAP-AC-207 | app-backend | **Given** the submission path **When** VAT handling is reviewed **Then** no inclusive/exclusive flag exists on the form or the table, and the fixed rule (components exclusive, totals ×1.15 inclusive) is what the UI labels against |
+| RMAP-AC-207 | web | **Given** VAT handling **When** it is implemented **Then** it reads the existing `[VAT-INCLUSIVE]` signal via `hasVatInclusiveNote()` — an inclusive/exclusive choice DOES exist on the public form (§6.13.2) |
 | RMAP-AC-196 | web | **Given** any off-platform money figure **When** it renders **Then** it carries a VAT label derived from which field it came from — components as pre-VAT, totals as VAT-inclusive — and no figure is ever shown bare |
 | RMAP-AC-197 | web | **Given** an off-platform submission **When** the map renders **Then** it has no pin at all, and the colour key states that off-platform offers carry no location |
 | RMAP-AC-198 | web | **Given** an off-platform submission **When** the composition bar renders **Then** its units use a state distinct from count-only padding, reflecting that photos and documents exist without a registered listing |
@@ -1709,23 +1745,27 @@ urls. `getDealRoomDocuments` already returns them and needs no change.
 | RMAP-AC-190 | web | **Given** no realtime mechanism exists **When** the renter opens the page, refocuses the window, or sends a request **Then** the data refetches — these three triggers are the whole freshness mechanism, not a fallback |
 | RMAP-AC-229 | web | **Given** the bid list **When** it renders **Then** a manual refresh affordance is available, since nothing else guarantees freshness while the page sits open |
 | RMAP-AC-230 | web | **Given** any copy about arrival or a state change **When** it is written **Then** it never implies instantaneous updating |
+| RMAP-AC-231 | web | **Given** one supplier holding **two bids on the same item** **When** the chat tabs render **Then** both appear — neither room is unreachable — and the two same-labelled tabs are disambiguated by machine (serial or model), never by rate |
+| RMAP-AC-232 | app-backend | **Given** the fleet endpoint **When** `yardConfirmed` is resolved **Then** it comes from **this bid's** `unitsOffered` entry, never from the equipment listing; a machine with `inBid: false` reports `false`, not null and not the listing's value |
+| RMAP-AC-233 | app-backend | **Given** a fleet machine **When** its coordinates are chosen **Then** confirmed uses the **bid entry's yard** and unconfirmed the machine's **registered yard** (§7.3), so a green pin never sits at a location the supplier did not commit to for this offer |
+| RMAP-AC-234 | app-backend | **Given** the fleet endpoint **When** it returns a machine **Then** each carries the full `offeredUnitsDetail` shape — `documents[]` and `photos[]` — so the same payload fills both the readiness bar and the document tab of a not-in-offer machine, with no second fetch on tab switch |
 | RMAP-AC-12 | app-backend | **Given** a user who fails `canAccessRequest` **When** they request a bid-events token for that request **Then** it is refused with `FORBIDDEN` |
 | RMAP-AC-13 | app-backend | **Given** an active member of the request's owning company **When** they request a token **Then** it is granted, matching `getBidList`'s T6 behaviour |
 | ~~RMAP-AC-14~~ | ~~web~~ | **SUPERSEDED 2026-08-04 — do not implement.** Was: a bid whose units share one location draws exactly one badged pin. Suppliers are no longer pinned at all (§6.2); machines are. |
 | ~~RMAP-AC-15~~ | ~~web~~ | **SUPERSEDED 2026-08-04 — do not implement.** Was: a multi-location bid collapses to one pin with a range. Same reason as AC-14. |
-| RMAP-AC-16 | web | **Given** a multi-location bid **When** it is selected **Then** its pins fan out one per distinct location, labelled "unit *i* of *n*" with that yard's name, all carrying the same supplier identity, and other bids dim |
-| RMAP-AC-17 | web | **Given** a fanned-out sibling pin **When** it is selected **Then** the whole bid is selected — a unit is never selectable as an independent offer |
+| ~~RMAP-AC-16~~ | ~~web~~ | **SUPERSEDED 2026-08-04 — do not implement.** Was: pins fan out per location on selection. Bids are no longer pinned; machines are, individually (§6.2). |
+| ~~RMAP-AC-17~~ | ~~web~~ | **SUPERSEDED 2026-08-04 — do not implement.** Was: selecting a sibling pin selects the whole bid. A machine pin now selects **that machine** — it is the machine panel's subject (§6.3). |
 | RMAP-AC-18 | web | **Given** a unit with `locationSource: 'unit_yard'` **When** rendered **Then** it shows the confirmed indicator; **Given** any of `bid_pin`/`bid_yard`/`listing_yard` **Then** it shows the not-confirmed indicator, distinguishable on both pin and list card |
 | RMAP-AC-19 | web | **Given** a bid with `locationSource: 'none'` (including off-platform bids) **When** the map renders **Then** no pin is drawn, the card is tagged "Location not shared / لم يُشارك الموقع", and it is excluded from distance sorting |
-| RMAP-AC-20 | web | **Given** a distance **When** its band is computed **Then** ≤30 km green, >30 and ≤120 km amber, >120 km slate |
-| RMAP-AC-21 | web | **Given** a request with no `projectLat/Lng` **When** the map renders **Then** pins still plot, all bands are neutral, and distances read "—" not 0 |
-| RMAP-AC-22 | web | **Given** a multi-item RFQ **When** item *N* is selected in the strip **Then** only that member request's bids are pinned and listed, and the count badge matches; there is no all-items view |
+| ~~RMAP-AC-20~~ | ~~web~~ | **SUPERSEDED — do not implement.** Was: distance bands coloured green/amber/slate. Colour means **availability** (§6.9.1); distance is a filter with bands 50/100/200 km (§6.10), and those bands carry no colour. |
+| RMAP-AC-21 | web | **Given** a request with no `projectLat/Lng` **When** the map renders **Then** machine pins still plot on supplier selection, every distance reads "—" and never 0, and the nearest sort is disabled rather than ordering arbitrarily |
+| RMAP-AC-22 | web | **Given** a multi-item RFQ **When** item *N* is selected in the strip **Then** only that member request's bids are listed and only its suppliers' fleets are plottable, and the count badge matches; there is no all-items view |
 | RMAP-AC-23 | web | **Given** a single-item RFQ **When** the map opens **Then** no item strip renders |
-| RMAP-AC-24 | web | **Given** the bid list **When** sorted by distance **Then** null-distance bids sort last, never first; price and rating sorts are unaffected by null distance |
-| RMAP-AC-25 | web | **Given** the map is open and subscribed **When** a `bid.created` event arrives **Then** the pin appears and the count increments with no reload, no scroll jump, and the current selection preserved |
-| RMAP-AC-26 | web | **Given** the subscription is unavailable or drops **When** the map is open **Then** a 20s poll takes over and still surfaces new bids |
-| RMAP-AC-27 | web | **Given** the map is hidden (tab hidden or unmounted) **When** time passes **Then** both subscription and poll are suspended, resuming only when visible again |
-| RMAP-AC-28 | web | **Given** a pin or list card **When** activated **Then** that bid's existing deal room opens — `dealRoomId` when present, else the current create-or-fetch path; negotiate behaviour unchanged |
+| RMAP-AC-24 | web | **Given** the bid list **When** sorted by nearest **Then** null-distance bids sort last, never first; the price sort — the default — is unaffected by null distance. Only these two sorts exist; **rating is retired** (§6.2) |
+| ~~RMAP-AC-25~~ | ~~web~~ | **WITHDRAWN — there is no subscription and no `bid.created` event** (§7.5). New bids surface on refetch (AC-169, AC-190). |
+| ~~RMAP-AC-26~~ | ~~web~~ | **WITHDRAWN — no subscription, therefore no poll fallback** (§7.5.1). |
+| ~~RMAP-AC-27~~ | ~~web~~ | **WITHDRAWN — nothing to suspend; there is no background channel** (§7.5.1). |
+| ~~RMAP-AC-28~~ | ~~web~~ | **SUPERSEDED — do not implement.** Was: activating a pin opens that bid's deal room. Selecting a supplier reveals his fleet and enables chat in place (§6.2); the renter never leaves the map. |
 | RMAP-AC-29 | web | **Given** a request with zero bids **When** the map opens **Then** the site pin renders alone with an empty state and no bid panel |
 | RMAP-AC-30 | web | **Given** Arabic locale **When** the map renders **Then** the shell is RTL, the panel sits on the inline-end edge, pin content sets `direction:rtl`, and numerals follow the existing convention |
 | RMAP-AC-31 | web | **Given** no bid is selected **When** the map renders **Then** the footer price bar is not rendered at all — no aggregate, average or "best offer" state exists |
@@ -1738,20 +1778,20 @@ urls. `getDealRoomDocuments` already returns them and needs no change.
 | RMAP-AC-35 | web | **Given** the footer's accept action **When** activated **Then** the existing accept flow opens and `doAccept` receives `contractType` + `termResolutions` from its Summary step |
 | RMAP-AC-36 | web | **Given** a selected off-platform (converted/link) bid **When** the footer renders **Then** it shows the flat `quotedTotal` with no rental/mob/demob breakdown rows |
 | RMAP-AC-37 | web | **Given** a bid offering more units than it identifies machines **When** its pin and card render **Then** both counts appear and are labelled distinctly — offered vs identified — and no element presents the offered count as a number of machines |
-| RMAP-AC-38 | web | **Given** unidentified units **When** the bid is expanded **Then** they render as exactly **one** hollow marker at the bid's anchor carrying their count — never one marker per unit — and it states the location is the bid's origin, not theirs |
-| RMAP-AC-39 | web | **Given** the hollow marker is selected **When** the equipment panel would open **Then** it shows an explanation instead of a panel, since no machine, documents or readiness exist |
+| ~~RMAP-AC-38~~ | ~~web~~ | **SUPERSEDED 2026-08-04 — do not implement.** Was: unidentified units render as one hollow marker. §6.2 is normative: **claimed units are never drawn**; their count lives in the composition bar (§6.3.2). |
+| ~~RMAP-AC-39~~ | ~~web~~ | **SUPERSEDED 2026-08-04 — do not implement.** Depended on AC-38's hollow marker, which is never drawn. |
 | RMAP-AC-40 | web | **Given** a unit whose `locationSource` is `unit_yard` **When** the equipment panel renders **Then** it shows that unit's own serial, year, certificates, photos and yard — not the bid's primary machine |
-| RMAP-AC-41 | web | **Given** an ownership-type document (`istimara`, `customs`, `customs_card`, `sale_contract`, `sales_contract`, `saso_registration`) **When** the panel renders its row **Then** the verified state shows with **no** View action |
+| ~~RMAP-AC-41~~ | ~~web~~ | **WITHDRAWN — contradicts §7.14.** Ownership documents are **fully viewable** by the renter with a working control (AC-101→103). This row encodes the hide-and-filter design that §7.11 withdrew. |
 | RMAP-AC-42 | web | **Given** a bid declaring a certificate that a specific offered machine lacks **When** the panel renders that machine **Then** the discrepancy is stated explicitly |
 | RMAP-AC-43 | web | **Given** the equipment panel **When** it renders **Then** it exposes no accept, swap or request action — it is read-only |
-| RMAP-AC-44 | web | **Given** the quotation stepper **When** the renter changes the unit count **Then** a modal opens listing the bid's identified machines, and only those |
-| RMAP-AC-45 | web | **Given** the selection modal **When** the renter selects fewer machines than the agreed count **Then** it is accepted and the unnamed remainder is stated plainly |
-| RMAP-AC-46 | web | **Given** a selection **When** the renter counters **Then** `selectedUnits` travels with `proposeRate` and appears in the round history alongside the count |
-| RMAP-AC-47 | app-backend | **Given** `acceptDeal` with a valid `selectedUnits` **When** it commits **Then** `DealRoom.agreedUnitIds` holds exactly that array and `agreedUnits` keeps its own value |
-| RMAP-AC-48 | app-backend | **Given** `selectedUnits` containing an id not among the bid's identified machines **When** submitted **Then** it is rejected with `VALIDATION_ERROR` and nothing is persisted |
-| RMAP-AC-49 | app-backend | **Given** `selectedUnits` in any shape other than `string[]` **When** submitted **Then** it is rejected rather than coerced |
-| RMAP-AC-50 | app-backend | **Given** a deal with `agreedUnitIds` set **When** the quotation is generated **Then** it names each machine's serial, and states the count of any unidentified remainder |
-| RMAP-AC-51 | app-backend | **Given** an existing deal with `agreedUnitIds` null **When** any surface reads it **Then** behaviour is identical to before this change |
+| ~~RMAP-AC-44~~ | ~~web~~ | **WITHDRAWN — orphaned by §7.6.** Per-unit binding is not persisted (`agreedUnitIds` withdrawn, no new column), and the backend half (AC-47→51) is already gone, so this UI would have had nowhere to send its output. Which machines are supplied is settled with the supplier in chat. |
+| ~~RMAP-AC-45~~ | ~~web~~ | **WITHDRAWN — orphaned by §7.6.** Per-unit binding is not persisted (`agreedUnitIds` withdrawn, no new column), and the backend half (AC-47→51) is already gone, so this UI would have had nowhere to send its output. Which machines are supplied is settled with the supplier in chat. |
+| ~~RMAP-AC-46~~ | ~~web~~ | **WITHDRAWN — orphaned by §7.6.** Per-unit binding is not persisted (`agreedUnitIds` withdrawn, no new column), and the backend half (AC-47→51) is already gone, so this UI would have had nowhere to send its output. Which machines are supplied is settled with the supplier in chat. |
+| ~~RMAP-AC-47~~ | ~~app-backend~~ | **WITHDRAWN — `agreedUnitIds` is not implemented** (§7.6: the quotation agrees *how many*, never *which*). |
+| ~~RMAP-AC-48~~ | ~~app-backend~~ | **WITHDRAWN — `agreedUnitIds` is not implemented** (§7.6: the quotation agrees *how many*, never *which*). |
+| ~~RMAP-AC-49~~ | ~~app-backend~~ | **WITHDRAWN — `agreedUnitIds` is not implemented** (§7.6: the quotation agrees *how many*, never *which*). |
+| ~~RMAP-AC-50~~ | ~~app-backend~~ | **WITHDRAWN — `agreedUnitIds` is not implemented** (§7.6: the quotation agrees *how many*, never *which*). |
+| ~~RMAP-AC-51~~ | ~~app-backend~~ | **WITHDRAWN — `agreedUnitIds` is not implemented** (§7.6: the quotation agrees *how many*, never *which*). |
 | RMAP-AC-55 | web | **Given** an identified unit **When** it renders on the pin, the panel and the list card **Then** it shows a readiness band (`green`/`yellow`/`red` from `computeBidReadiness`) **and** a separate yard-confirmed indicator, as two independent signals |
 | RMAP-AC-56 | web | **Given** a bid with exactly one unit **When** it renders **Then** both indicators still show — neither is conditional on the bid being multi-unit |
 | RMAP-AC-57 | web | **Given** a unit that is fully documented but whose yard is unconfirmed (or the reverse) **When** it renders **Then** the two indicators disagree visibly and neither is masked by the other |
@@ -1760,16 +1800,16 @@ urls. `getDealRoomDocuments` already returns them and needs no change.
 | RMAP-AC-60 | web | **Given** the documents panel **When** it opens **Then** it renders a company tab (from `supplierProfile` via `fetchDealRoomDocuments.companyDocuments`) and an equipment tab, each with a badge counting documents needing action |
 | RMAP-AC-61 | web | **Given** a multi-unit bid **When** the renter selects a different unit pin **Then** the equipment tab re-scopes to that machine's own `documentKeys`; it must **not** read the deal-room endpoint's `equipmentDocuments`, which returns only the bid's primary machine |
 | RMAP-AC-61b | web | **Given** the company tab **When** the renter selects a different unit pin **Then** it does **not** change — company documents describe the supplier, not a machine |
-| RMAP-AC-61c | web | **Given** a machine with ownership papers on file **When** the equipment tab renders **Then** a presence row shows them with their verify status and **no** View or Download control |
-| RMAP-AC-61f | app-backend | **Given** a unit whose listing holds ownership documents **When** `offeredUnitsDetail` is built **Then** `ownershipDocs` reports type, verifyStatus and expiryDate only — the response contains **no** `key` and **no** `url` for those documents, and `documentKeys` still excludes them |
-| RMAP-AC-61g | app-backend | **Given** a unit with no ownership documents **When** built **Then** `ownershipDocs` is an empty array, and the UI shows no presence row rather than a false negative |
-| RMAP-AC-61d | app-backend | **Given** a renter calls `getDealRoomDocuments` **When** the supplier's equipment documents are assembled **Then** `RENTEE_HIDDEN_DOC_TYPES` (istimara, customs, customs_card, sale_contract, sales_contract, saso_registration) are excluded, matching the rule already enforced on `offeredUnitsDetail` |
-| RMAP-AC-61e | app-backend | **Given** a **supplier** calls the same endpoint **When** documents are assembled **Then** the exclusion does **not** apply — the filter is renter-facing only |
+| ~~RMAP-AC-61c~~ | ~~web~~ | **WITHDRAWN — contradicts §7.14.** Ownership documents are **fully viewable** by the renter with a working control (AC-101→103). This row encodes the hide-and-filter design that §7.11 withdrew. |
+| ~~RMAP-AC-61f~~ | ~~app-backend~~ | **WITHDRAWN — contradicts §7.14.** Ownership documents are **fully viewable** by the renter with a working control (AC-101→103). This row encodes the hide-and-filter design that §7.11 withdrew. |
+| ~~RMAP-AC-61g~~ | ~~app-backend~~ | **WITHDRAWN — contradicts §7.14.** Ownership documents are **fully viewable** by the renter with a working control (AC-101→103). This row encodes the hide-and-filter design that §7.11 withdrew. |
+| ~~RMAP-AC-61d~~ | ~~app-backend~~ | **WITHDRAWN — contradicts §7.14.** Ownership documents are **fully viewable** by the renter with a working control (AC-101→103). This row encodes the hide-and-filter design that §7.11 withdrew. |
+| ~~RMAP-AC-61e~~ | ~~app-backend~~ | **WITHDRAWN — contradicts §7.14.** Ownership documents are **fully viewable** by the renter with a working control (AC-101→103). This row encodes the hide-and-filter design that §7.11 withdrew. |
 | RMAP-AC-62 | web | **Given** documents are ticked **When** the renter presses Download **Then** each ticked document downloads via its presigned `url`; no merged PDF is produced |
 | RMAP-AC-63 | web | **Given** documents are ticked **When** the renter presses Request **Then** the chat opens with a prefilled message naming exactly those documents, and nothing is persisted as a request record |
-| RMAP-AC-64 | web | **Given** the supplier subsequently uploads a requested document **When** the next live update arrives **Then** it appears in the list and the §6.6 readiness band recounts, with no user action |
+| RMAP-AC-64 | web | **Given** the supplier subsequently uploads a requested document **When** the next **refetch** returns (mount, focus, or post-send — §7.5.1) **Then** the readiness and document counts update with no further action |
 | RMAP-AC-65 | web | **Given** both surfaces are visible **When** the readiness count and the document count differ **Then** each is labelled by its own question and neither is presented as a subset of the other |
-| RMAP-AC-66 | web | **Given** a supplier with bids on two or more items of the same RFQ group **When** the chat panel opens **Then** it shows one tab per item that supplier bid on, each mounting that item's own deal-room channel |
+| RMAP-AC-66 | web | **Given** a supplier with two or more bids in the same RFQ group **When** the chat panel opens **Then** it shows one tab **per bid**, keyed by `bidId` and labelled by item, each mounting that bid's own deal-room channel |
 | RMAP-AC-67 | web | **Given** a supplier with exactly one bid in the RFQ group **When** the chat panel opens **Then** no tab strip renders — the conversation shows directly |
 | RMAP-AC-68 | web | **Given** an unread message on an item the renter is not currently reading **When** the chat panel renders **Then** that item's tab carries an unread badge |
 | RMAP-AC-69 | web | **Given** a tab whose bid has no deal room yet (`dealRoomId` null) **When** the renter opens it **Then** the existing create-or-fetch path runs, identically to opening that bid elsewhere |
@@ -1787,12 +1827,12 @@ urls. `getDealRoomDocuments` already returns them and needs no change.
 | RMAP-AC-81 | web | **Given** a machine is selected **When** it renders **Then** it carries a selection indicator distinguishing it from its siblings, and exactly one machine is selected at a time |
 | RMAP-AC-82 | web | **Given** no supplier is selected **When** the rail renders **Then** chat is unavailable; **Given** a supplier is selected **Then** chat becomes available |
 | RMAP-AC-83 | web | **Given** a machine is selected **When** its panel opens **Then** identity, fit against the request, readiness, **that machine's** documents and availability all appear in one panel — no eligibility/verification split |
-| RMAP-AC-84 | web | **Given** the machine panel **When** it renders **Then** it shows no company-level documents; those open from the supplier row in the bid list |
-| RMAP-AC-85 | web | **Given** an in-offer machine whose yard is **not** confirmed **When** its panel renders **Then** three actions are offered with *ask to confirm availability* as the primary |
-| RMAP-AC-86 | web | **Given** an in-offer machine whose yard **is** confirmed **When** its panel renders **Then** the availability action is absent and two actions remain |
-| RMAP-AC-87 | web | **Given** a machine not in the offer **When** its panel renders **Then** *ask to add this machine to the offer* is the primary action |
-| RMAP-AC-88 | web | **Given** *ask for a document* is triggered **When** the picker opens **Then** it lists only that machine's missing or unverified document types |
-| RMAP-AC-89 | web | **Given** any of the three actions **When** triggered **Then** the chat opens with the request card pre-composed and **unsent**, and the renter sends it explicitly |
+| RMAP-AC-84 | web | **Given** the machine panel **When** it renders **Then** company documents are its **third tab** (§6.3.4), scoped to the supplier while the other two tabs are scoped to the machine — they are **not** on a separate supplier surface, and §6.4 carries profile only |
+| RMAP-AC-85 | web | **Given** an in-offer machine whose yard is **not** confirmed **When** its panel renders **Then** the availability & fit tab shows **exactly two stacked full-width request rows** — «اطلب تأكيد التوفّر» then «اطلب معدّة أخرى» — under a lead-in stating both may be sent, and «اطلب تأكيد التوفّر» appears in **exactly one place** in the panel (§6.3.6) |
+| RMAP-AC-86 | web | **Given** an in-offer machine whose yard **is** confirmed **When** its panel renders **Then** «اطلب تأكيد التوفّر» is absent and **one** row remains — «اطلب معدّة أخرى», which is always available (§6.3.6) |
+| RMAP-AC-87 | web | **Given** a machine the supplier owns but did **not** offer **When** its panel renders **Then** the request offered is an `alternative` (§6.7.1) — there is **no** *add to the offer* action, because no surface may compose the retired `add_to_offer` kind (AC-182) |
+| RMAP-AC-88 | web | **Given** a document is wanted **When** the renter looks for how to ask **Then** the request is raised **per row inside the document tabs** (§6.7.2) — there is no document action in the request rows and no separate picker; §6.3.6 states there is now exactly one route where three once existed |
+| RMAP-AC-89 | web | **Given** either request row, or a document request raised from a document tab **When** triggered **Then** the chat opens with the request card pre-composed and **unsent**, and the renter sends it explicitly |
 | RMAP-AC-90 | web | **Given** a request is sent **When** the message is built **Then** it carries `{type:'rentee_request', kind, equipmentId, serial}` plus `docType` for a document request — the machine travels as data, not only in the text |
 | RMAP-AC-91 | app-backend | **Given** a rentee request card is posted **When** it reaches Stream **Then** it uses the existing `customData` channel and a new card `type`, leaving the existing vocabulary (`term_accepted`, `counter`, `term_updated`, `rate_proposal`, `rate_response`) unchanged |
 | RMAP-AC-92 | app-backend | **Given** the new card type **When** unread counting runs **Then** its membership of `UNREAD_INFLATING_CARD_TYPES` is an explicit decision, not an accident of omission |
@@ -1800,7 +1840,7 @@ urls. `getDealRoomDocuments` already returns them and needs no change.
 | RMAP-AC-94 | app-backend | **Given** a renter and a supplier who has bid on their request **When** the fleet endpoint is called **Then** it returns that supplier's active matching machines with `equipmentId`, `serialNumber`, `year`, `yardName`, `lat`, `lng`, `distanceKm`, `yardConfirmed`, `inBid` and document presence |
 | RMAP-AC-95 | app-backend | **Given** a supplier who has **not** bid on the request **When** the fleet endpoint is called for them **Then** it is refused — this must not become a way to browse an arbitrary company's fleet |
 | RMAP-AC-96 | app-backend | **Given** a company member's firm-shared machines **When** the fleet is listed **Then** they are included via `ownerScopeWhere`, and no other company's machines are |
-| RMAP-AC-97 | web | **Given** the supplier confirms a yard after an availability request **When** the next live update arrives **Then** that pin turns red → green with no user action and no further message |
+| RMAP-AC-97 | web | **Given** the supplier confirms a yard after an availability request **When** the next **refetch** returns (§7.5.1) **Then** the pin recolours and the request card resolves, with no other input |
 | RMAP-AC-98 | web | **Given** Arabic locale **When** list, map and panel render **Then** the layout is RTL, the list sits on the correct inline edge, and pin content sets `direction:rtl` |
 | RMAP-AC-99 | web | **Given** a request with no bids **When** the map view opens **Then** the project pin renders alone with an empty-state message and no list rows |
 | RMAP-AC-100 | web | **Given** a selected supplier with **no** locatable machines (all claimed, or every yard deleted) **When** the map updates **Then** no machine pins are drawn and the panel states why, rather than showing an empty map with no explanation |
@@ -1812,7 +1852,7 @@ urls. `getDealRoomDocuments` already returns them and needs no change.
 | RMAP-AC-106 | app-backend | **Given** a renter sends several requests in quick succession **When** notifications are dispatched **Then** they coalesce rather than arriving as one ping per request |
 | RMAP-AC-107 | app-backend | **Given** two suppliers each own a listing carrying the identical `serialNumber` **When** a `rentee_request` naming one `equipmentId` is posted **Then** it resolves to exactly that listing, and the other supplier's listing is never matched |
 | RMAP-AC-108 | app-backend | **Given** a `rentee_request` whose `equipmentId` belongs to a listing the bidding supplier does not own **When** the card is posted **Then** it is rejected with `403`, and no message is written to the channel |
-| RMAP-AC-109 | app-backend | **Given** a `rentee_request` with `kind: 'add_to_offer'` naming a machine absent from `unitsOffered` **When** the card is posted **Then** it is accepted — not-currently-offered is a valid subject |
+| ~~RMAP-AC-109~~ | ~~app-backend~~ | **WITHDRAWN — `add_to_offer` is retired** (§6.7.1); `alternative` covers the intent. |
 | RMAP-AC-110 | app-backend | **Given** `scope: 'equipment'` with a null `equipmentId`, or `scope: 'company'` with a non-null one **When** the card is posted **Then** it is rejected with `400` |
 | RMAP-AC-111 | app-backend | **Given** a `rentee_request` is posted **When** the response returns **Then** it carries a backend-minted `ref` and the Stream `message.id`, so a reply can thread to it via `parent_id` |
 | RMAP-AC-112 | app-backend | **Given** a supplier reply card carries `{ inReplyTo, equipmentId, resolution: 'declined' }` **When** it is stored **Then** both fields survive round-trip, so a refusal is representable even though it changes no state |
@@ -1826,14 +1866,14 @@ urls. `getDealRoomDocuments` already returns them and needs no change.
 | RMAP-AC-120 | web | **Given** a document list longer than the panel **When** the renter scrolls it **Then** the select-all bar and the request/download footer stay visible |
 | RMAP-AC-121 | web | **Given** an `alternative` request, whose kind has no observable counterpart, and a supplier reply echoing `resolution: 'declined'` **When** the request card renders **Then** it reads refused — not "waiting for the supplier" |
 | RMAP-AC-122 | web | **Given** a derivable request kind and an echoed `resolution` that disagrees with the machine's state **When** the card renders **Then** the derived state wins over the echo |
-| RMAP-AC-123 | web | **Given** an `add_to_offer` request whose `equipmentId` later appears in `unitsOffered` **When** the card renders **Then** it reads answered, derived — no reply message required |
+| ~~RMAP-AC-123~~ | ~~web~~ | **WITHDRAWN — `add_to_offer` is retired** (§6.7.1). |
 | RMAP-AC-124 | web | **Given** a reply arrives while the chat panel is **not** the visible panel **When** it lands **Then** an in-view notification appears carrying the request's `ref` and the machine's serial, and the rail chat button shows an unread count |
 | RMAP-AC-125 | web | **Given** a reply arrives while the chat panel **is** visible **When** it lands **Then** no notification is shown and no unread count accrues |
 | RMAP-AC-126 | web | **Given** an unread count and a visible notification **When** the renter opens the chat **Then** both clear in that one action |
 | RMAP-AC-127 | web | **Given** a reply echoing `resolution: 'declined'` **When** the notification renders **Then** it is colour-keyed to refusal, not to success |
 | RMAP-AC-128 | web | **Given** the supplier confirms a yard and sends **no** message **When** the renter is on the map **Then** the pin recolours, the availability legend recounts, and the notification still fires — it is triggered by the state change, not by a message |
-| RMAP-AC-129 | web | **Given** the colour key is shown **When** it renders **Then** it presents **both** scales together — supplier dot (green/grey/red) and machine pin (green/amber) — each labelled with what it colours |
-| RMAP-AC-130 | web | **Given** the two scales **When** their labels are compared **Then** no single meaning is represented by two different colours across map states |
+| RMAP-AC-129 | web | **Given** the colour key is shown **When** it renders **Then** it presents exactly **one** scale — green confirmed, red not confirmed — and no supplier-level aggregate (§6.9.1) |
+| RMAP-AC-130 | web | **Given** the single colour scale **When** its labels are compared across map states **Then** no meaning is represented by two different colours — the pre-selection and post-selection legends must teach the same green/red, never red then amber (§6.9.1) |
 | RMAP-AC-131 | web | **Given** a supplier is selected, so machine pins are on the map **When** the renter looks for the colour key **Then** it is visible and not occluded by the bid-list panel in either LTR or RTL |
 | RMAP-AC-132 | web | **Given** the colour key **When** the panel first renders **Then** it is collapsed, and expanding it does not scroll the bid list out of view |
 | RMAP-AC-133 | web | **Given** a machine whose yard is **not** confirmed **When** its panel opens **Then** the first thing shown is a sentence naming the actor and cause, explicitly stating that unconfirmed does **not** mean unavailable, with the request-confirmation action inline |
@@ -1907,7 +1947,7 @@ urls. `getDealRoomDocuments` already returns them and needs no change.
 
 | ID | Layer | Given / When / Then |
 |---|---|---|
-| RMAP-AC-169 | web | **Given** a new bid arrives **When** it lands **Then** the list grows, the header and top-bar counts increment, and its pins join the map with no user action and no manual refresh |
+| RMAP-AC-169 | web | **Given** a new bid arrives **When** a refetch returns it (mount, focus, or post-send — §7.5.1) **Then** the list grows and the header and top-bar counts increment. It adds **no pins** — bids are not plotted (§6.2) — and nothing appears without a refetch (AC-190) |
 | RMAP-AC-170 | web | **Given** cheapest-first sorting and an arriving bid cheaper than some existing offers **When** it lands **Then** the list re-sorts so the row sits in price order — it does not append |
 | RMAP-AC-171 | web | **Given** a newly arrived bid **When** the list renders **Then** its row carries a temporary "just arrived" marker |
 | RMAP-AC-172 | web | **Given** the arrival notice **When** the renter clicks it **Then** the row is scrolled into view and pulsed, the popup is dismissed, and no supplier is selected and no panel is opened |
@@ -1934,8 +1974,8 @@ urls. `getDealRoomDocuments` already returns them and needs no change.
 
 **Superseded by the 2026-08-04 revision** (kept, not deleted, since they were approved earlier):
 `AC-14`/`AC-15` — collapsed-then-fan-out supplier pins; suppliers are no longer pinned.
-`AC-31`→`AC-36` in part — the footer now appears on **supplier** selection, not bid selection.
-`AC-60`→`AC-65` in part — the documents panel is merged into the machine panel (§6.3) and the
+`AC-31`→`AC-36`: read *bid selection* as **supplier selection** throughout — the footer appears when a supplier is selected (§6.1). No other clause in those rows changes.
+`AC-60`→`AC-65`: read *documents panel* as **the machine panel's document tabs** (§6.3.4). The
 supplier panel (§6.4).
 
 ## 9. Test cases
@@ -1949,19 +1989,19 @@ supplier panel (§6.4).
 | RMAP-TC-05 | AC-08 | app-backend | same | two entries, same `equipmentId`, different yards → both returned |
 | RMAP-TC-06 | AC-09 | app-backend | `.../rentee-bid-list.characterization.test.ts` | golden-file: bid-level `distanceKm` unchanged across a fixture set |
 | RMAP-TC-07 | AC-10 | app-backend | `.../rentee-unit-location.test.ts` | `yardId` present + `yardConfirmed:false` → returns `false` |
-| RMAP-TC-08 | AC-11 | app-backend | `.../bid-events.test.ts` | create/update/withdraw each emit once, payload has only `{bidId, requestId, kind}` |
+| ~~RMAP-TC-08~~ | ~~AC-11~~ | — | — | **WITHDRAWN — no bid events are emitted** (§7.5). |
 | RMAP-TC-09 | AC-12, AC-13 | app-backend | same | non-owner → `FORBIDDEN`; company member → granted |
-| RMAP-TC-10 | AC-14, AC-15 | web | `tests/unit/bid-map.test.ts` | `groupPinsByLocation`: single-location bid → 1 pin; multi → 1 collapsed pin, range + farthest band |
-| RMAP-TC-11 | AC-16, AC-17 | web | same | `bidPins(bid, site)` expanded → one pin per distinct location, each tagged with its bid id |
+| ~~RMAP-TC-10~~ | ~~AC-14, AC-15~~ | — | — | **WITHDRAWN — `groupPinsByLocation` has no caller.** Bids are not plotted and machines are drawn individually, so there is nothing to group (§6.2). |
+| ~~RMAP-TC-11~~ | ~~AC-16, AC-17~~ | — | — | **WITHDRAWN — bids are not pinned and there is no fan-out** (§6.2). |
 | RMAP-TC-12 | AC-18 | web | same | `unit_yard` → confirmed; each of the other three → not confirmed |
 | RMAP-TC-13 | AC-19 | web | same | `none` → excluded from pins, present in list, excluded from distance sort |
-| RMAP-TC-14 | AC-20 | web | same | `distanceBand`: boundaries at exactly 30 and 120 |
-| RMAP-TC-15 | AC-21 | web | same | null site → pins retained, bands neutral, distance null (not 0) |
+| ~~RMAP-TC-14~~ | ~~AC-20~~ | — | — | **WITHDRAWN — no distance-coloured bands** (§6.9.1). Filter thresholds are covered by TC-125. |
+| RMAP-TC-15 | AC-21 | web | same | null site → machine pins retained, distance null (not 0, not NaN), nearest sort reported unavailable |
 | RMAP-TC-16 | AC-22, AC-23 | web | same | `bidsForItem` returns only that requestId's bids; single-item group → strip suppressed |
-| RMAP-TC-17 | AC-24 | web | same | `sortBids('dist')` puts nulls last; price/rating order unchanged by nulls |
-| RMAP-TC-18 | AC-25 | web | same | event reducer: applying a `bid.created` adds one pin, preserves `selectedBidId` |
-| RMAP-TC-19 | AC-26, AC-27 | web | same | poll scheduler: starts on subscription failure, stops on hidden, restarts on visible |
-| RMAP-TC-20 | AC-28 | web | `tests/unit/bids.test.ts` | deal-room target resolution: `dealRoomId` when set, else create-or-fetch path |
+| RMAP-TC-17 | AC-24 | web | same | `sortBids('dist')` puts nulls last; the price order is unchanged by nulls; only these two sorts are exposed |
+| ~~RMAP-TC-18~~ | ~~AC-25~~ | — | — | **WITHDRAWN — no event reducer exists** (§7.5). Refetch is covered by TC-108. |
+| ~~RMAP-TC-19~~ | ~~AC-26, AC-27~~ | — | — | **WITHDRAWN — no poll scheduler exists** (§7.5.1). |
+| ~~RMAP-TC-20~~ | ~~AC-28~~ | — | — | **WITHDRAWN — the renter does not navigate to a deal room from the map** (§6.2). |
 | RMAP-TC-21 | AC-31 | web | `tests/unit/bid-map.test.ts` | footer visibility selector returns null with no selection, the room's totals with one |
 | RMAP-TC-22 | AC-32 | web | `tests/unit/deal-room.test.ts` *(or existing totals suite)* | same room fixture → footer figures equal `computeDealTotals` output; no recomputation in the component layer |
 | RMAP-TC-23 | AC-33 | web | same | status/turn mapping table over `status` × `lastCounterBy` |
@@ -1981,6 +2021,9 @@ supplier panel (§6.4).
 | RMAP-TC-124 | AC-222, AC-223, AC-224 | web | `tests/unit/vat-inclusive.test.ts` *(extend — 11 tests already pass)* | a tagged submission surfaces the note on bar and modal; displayed notes never contain the marker; no helper is duplicated |
 | RMAP-TC-123 | AC-217, AC-219, AC-220, AC-221 | web | `tests/unit/bid-quality.test.ts` *(extend the existing suite if present)* | score matches `bid-quality.ts` for a fixture set; contact/company-name are excluded from the company part; photos-without-ownership scores 0.5 on the equipment part; the label carries no trust/verification wording |
 | RMAP-TC-125 | AC-225, AC-226, AC-227, AC-228 | web | `tests/unit/bid-map.test.ts` | default band is all; a band filters list and map identically and reports N of M; a `none`-location bid survives every band; clearing restores the full set |
+| RMAP-TC-126 | AC-231, AC-66 | web | `tests/unit/bid-map.test.ts` | two bids from one supplier on one item → two tabs keyed by `bidId`, both reachable, labels disambiguated by serial and stable as rates change |
+| RMAP-TC-127 | AC-232, AC-233 | app-backend | `.../rentee-unit-location.test.ts` | `yardConfirmed` reads the bid entry not the listing; `inBid:false` → false; confirmed emits the bid entry's yard and unconfirmed the registered yard, asserted where the two differ |
+| RMAP-TC-128 | AC-234 | app-backend | same | fleet rows carry `documents[]` and `photos[]` matching the `offeredUnitsDetail` shape for both in-offer and not-in-offer machines |
 | RMAP-TC-117 | AC-204 | web | `tests/unit/off-platform.test.ts` | applying a distance filter leaves off-platform rows listed and unfiltered |
 | RMAP-TC-118 | AC-205 | app-backend | `.../stream-cards.test.ts` | an unanswered request keeps producing the supplier-side surfacing across repeated reads with no status column written |
 | RMAP-TC-116 | AC-203 | web | same | a converted submission is excluded from the submission list and present in the bid list exactly once |
@@ -1989,26 +2032,26 @@ supplier panel (§6.4).
 | ~~RMAP-TC-109~~ | ~~AC-187~~ | — | — | **WITHDRAWN with §7.5** — no Stream connection to share. |
 | RMAP-TC-106 | AC-183, AC-185 | app-backend | `apps/backend/src/tests/services/bid-ownership.test.ts` | submit and edit both reject a foreign `equipmentId` in `unitsOffered` with `EQUIPMENT_OWNERSHIP` and write nothing; a same-company colleague's machine is accepted |
 | RMAP-TC-27 | AC-37 | web | `tests/unit/bid-map.test.ts` | `unitCounts()`: offered 4 / identified 2 / unidentified 2 from a padded array |
-| RMAP-TC-28 | AC-38, AC-39 | web | same | pin builder emits one ghost marker with count N, never N markers; ghost carries no panel payload |
+| ~~RMAP-TC-28~~ | ~~AC-38, AC-39~~ | — | — | **WITHDRAWN — claimed units are never drawn** (§6.2); the count is asserted on the composition bar instead (TC-58). |
 | RMAP-TC-29 | AC-40 | web | same | panel selector keyed by unit returns that unit's own serial/year/certs, not the bid primary's |
-| RMAP-TC-30 | AC-41 | web | same | ownership doc types map to a viewable:false row |
+| ~~RMAP-TC-30~~ | ~~AC-41~~ | — | — | **WITHDRAWN — no `viewable:false` row exists** (§7.14). Viewability is asserted by TC-69/TC-70. |
 | RMAP-TC-31 | AC-42 | web | same | bid declares TÜV, unit lacks it → discrepancy flag raised |
-| RMAP-TC-32 | AC-44, AC-45 | web | same | modal options = identified machines only; selecting 2 of 3 agreed is valid and reports a remainder of 1 |
-| RMAP-TC-33 | AC-47, AC-48, AC-49 | app-backend | `.../deal-room-agreed-units.test.ts` | valid array persists; foreign id → `VALIDATION_ERROR`; non-`string[]` shape rejected |
-| RMAP-TC-34 | AC-50 | app-backend | `.../quotation.test.ts` | quotation names serials for identified units and counts the remainder |
-| RMAP-TC-35 | AC-51 | app-backend | same | null `agreedUnitIds` → output byte-identical to pre-change golden file |
+| ~~RMAP-TC-32~~ | ~~AC-44, AC-45~~ | — | — | **WITHDRAWN — no unit-selection modal exists** (§7.6). |
+| ~~RMAP-TC-33~~ | ~~AC-47, AC-48, AC-49~~ | — | — | **WITHDRAWN — `agreedUnitIds` is not implemented** (§7.6). |
+| ~~RMAP-TC-34~~ | ~~AC-50~~ | — | — | **WITHDRAWN — the quotation agrees a count, not named machines** (§7.6). |
+| ~~RMAP-TC-35~~ | ~~AC-51~~ | — | — | **WITHDRAWN — `agreedUnitIds` is not implemented** (§7.6). |
 | RMAP-TC-36b | AC-32b, AC-32c, AC-32d | web | `tests/unit/bid-map.test.ts` | hero rate = `priceAll ? rate*units : rate`, defaults to per-unit; no toggle at units=1; mob/demob/VAT/totals identical across both toggle states |
 | RMAP-TC-36 | AC-34, AC-35 | web | `tests/unit/bid-map.test.ts` | footer action dispatch: negotiate → `submitCounter` payload; accept → `doAccept` carrying `contractType` + `termResolutions` |
 | RMAP-TC-37 | AC-43 | web | same | the panel's action list is empty for every unit state — guards against an action being added back |
-| RMAP-TC-38 | AC-46 | web | same | counter payload builder includes `selectedUnits` and preserves it in the round snapshot |
-| RMAP-TC-45b | AC-61d, AC-61e | app-backend | `.../deal-room-documents.test.ts` | renter call excludes every RENTEE_HIDDEN_DOC_TYPE; supplier call returns them unchanged |
-| RMAP-TC-45 | AC-60, AC-61, AC-61b, AC-61c | web | `tests/unit/bid-map.test.ts` | equipment tab resolves from the selected unit's `documentKeys` and changes with the selection; company tab is selection-invariant; no ownership-type row is emitted |
+| ~~RMAP-TC-38~~ | ~~AC-46~~ | — | — | **WITHDRAWN — `selectedUnits` is never sent** (§7.6). |
+| ~~RMAP-TC-45b~~ | ~~AC-61d, AC-61e~~ | — | — | **WITHDRAWN — the renter-facing exclusion was removed** (§7.14); TC-69 asserts no residual filter. |
+| RMAP-TC-45 | AC-60, AC-61, AC-61b | web | `tests/unit/bid-map.test.ts` | equipment tab resolves from the selected unit's `documentKeys` and changes with the selection; company tab is selection-invariant |
 | RMAP-TC-46 | AC-62, AC-63 | web | same | ticked set → N download targets; request builder emits a message naming exactly the ticked documents and returns no persisted payload |
 | RMAP-TC-47 | AC-64 | web | same | adding a document to `equipmentDocuments` raises the readiness `done` count on the next compute |
 | RMAP-TC-49 | AC-66, AC-67, AC-70 | web | `tests/unit/bid-map.test.ts` | `supplierChatTabs(groupBids, supplierKey)`: 2 bids → 2 tabs in item order; 1 bid → no tabs; two company members with equal `supplierCompanyId` → one counterparty |
 | RMAP-TC-50 | AC-68 | web | same | per-tab unread badge derives from that channel's unread count, not the aggregate |
 | RMAP-TC-51 | AC-69, AC-71 | web | same | tab with null `dealRoomId` resolves to the create-or-fetch target; switching tab leaves map selection and active item untouched |
-| RMAP-TC-51b | AC-61f, AC-61g | app-backend | `.../rentee-unit-location.test.ts` | ownershipDocs reports type/verifyStatus/expiryDate with no key or url; empty array when the machine has none |
+| ~~RMAP-TC-51b~~ | ~~AC-61f, AC-61g~~ | — | — | **WITHDRAWN — `ownershipDocs` carries keys and urls like any other type** (§7.14); covered by TC-69. |
 | RMAP-TC-52 | AC-72, AC-99 | web | `tests/unit/bid-map.test.ts` | first-screen selector returns the project pin only, for both a populated and an empty bid list |
 | RMAP-TC-53 | AC-73, AC-74 | web | same | list is cheapest-first by default; selecting sets exactly one active row |
 | RMAP-TC-54 | AC-75, AC-100 | web | same | `fleetPins(bid)` returns only that supplier’s machines; a supplier with no locatable machines yields zero pins and a stated reason |
@@ -2017,9 +2060,9 @@ supplier panel (§6.4).
 | RMAP-TC-57 | AC-79, AC-80 | web | same | readiness bar segments = present/required; taxonomy image falls back category → generic, never empty |
 | RMAP-TC-58 | AC-81 | web | same | selecting a second machine deselects the first |
 | RMAP-TC-59 | AC-82 | web | same | chat availability is false with no supplier, true with one |
-| RMAP-TC-60 | AC-83, AC-84 | web | same | panel payload contains machine docs and omits company docs |
-| RMAP-TC-61 | AC-85, AC-86, AC-87 | web | same | `machineActions(machine)` over the three states: 3 with availability primary, 2 without, 2 with add-to-offer primary |
-| RMAP-TC-62 | AC-88 | web | same | document picker lists only missing/unverified types for that machine |
+| RMAP-TC-60 | AC-83, AC-84 | web | same | panel payload exposes all three tabs: machine identity/fit, machine documents, and company documents scoped to the supplier |
+| RMAP-TC-61 | AC-85, AC-86, AC-87 | web | same | `machineActions(machine)` over the three states: in-offer unconfirmed → 2 rows, availability first; in-offer confirmed → 1 row; not-in-offer → `alternative`, and **no** action of kind `add_to_offer` in any state |
+| RMAP-TC-62 | AC-88 | web | same | the document tabs expose a per-row request for types that are neither verified nor deferred; the request rows expose no document action |
 | RMAP-TC-63 | AC-89, AC-90 | web | same | action → pre-composed unsent card; payload carries kind, equipmentId, serial, and docType only for document requests |
 | RMAP-TC-64 | AC-91, AC-92 | app-backend | `.../stream-cards.test.ts` | new type accepted via customData; existing vocabulary unchanged; unread membership asserted explicitly |
 | RMAP-TC-65 | AC-93 | app-backend | same | foreign or non-matching equipmentId rejected |
@@ -2031,16 +2074,16 @@ supplier panel (§6.4).
 | RMAP-TC-71 | AC-104, AC-105, AC-106 | app-backend | `.../stream-cards.test.ts` | card inflates unread; notification carries equipmentId; N rapid requests coalesce |
 | RMAP-TC-72 | AC-107 | app-backend | `.../stream-cards.test.ts` | two suppliers, one shared `serialNumber` → the card resolves by id to one listing only |
 | RMAP-TC-73 | AC-108, AC-110 | app-backend | same | foreign `equipmentId` → 403 and no message written; both scope/id mismatches → 400 |
-| RMAP-TC-74 | AC-109 | app-backend | same | `add_to_offer` for a machine outside `unitsOffered` is accepted |
+| ~~RMAP-TC-74~~ | ~~AC-109~~ | — | — | **WITHDRAWN — `add_to_offer` is retired.** |
 | RMAP-TC-75 | AC-111, AC-112 | app-backend | same | post returns `ref` + `message.id`; a reply carrying `inReplyTo`/`resolution:'declined'` round-trips intact |
 | RMAP-TC-76 | AC-113, AC-114, AC-115 | web | `tests/unit/bid-map.test.ts` | card view-model resolves identity from `equipmentId`; flipping `yardConfirmed` flips the derived status with no other input; 1-of-3 document count recomputes from `documentKeys` |
 | RMAP-TC-77 | AC-116, AC-117 | web | same | four ticked documents produce one card with four `docTypes`; company scope yields null `equipmentId` |
 | RMAP-TC-78 | AC-119 | web | same | fit rows built from the selected unit: 2018 unit fails the year gate, 2020 unit passes, same request fixture |
 | RMAP-TC-79 | AC-118, AC-120 | web | **manual** | draft and sent cards render identically; sticky select-all bar and footer — no component harness in this repo |
-| RMAP-TC-80 | AC-121, AC-122, AC-123 | web | `tests/unit/bid-map.test.ts` | precedence table: non-derivable kind + declined echo → refused; derivable kind + contradicting echo → derived wins; `add_to_offer` answered from `unitsOffered` alone |
+| RMAP-TC-80 | AC-121, AC-122 | web | `tests/unit/bid-map.test.ts` | precedence table: non-derivable kind + declined echo → refused; derivable kind + contradicting echo → derived wins |
 | RMAP-TC-81 | AC-124, AC-125, AC-126 | web | same | notification selector returns a payload only when the chat panel is not visible; carries ref + serial; opening the chat zeroes unread and clears the notification in one call |
 | RMAP-TC-82 | AC-127, AC-128 | web | same | declined resolution maps to the refusal colour key; a `yardConfirmed` flip with no message still produces a notification payload |
-| RMAP-TC-83 | AC-129, AC-130 | web | `tests/unit/bid-map.test.ts` | the key's model exposes both scales with distinct labels; assert no meaning string maps to two colours across the supplier and machine scales |
+| RMAP-TC-83 | AC-129, AC-130 | web | `tests/unit/bid-map.test.ts` | the key model exposes one scale and no aggregate; no meaning maps to two colours |
 | RMAP-TC-84 | AC-133, AC-134, AC-136 | web | same | explainer selector returns actor/cause/next-step per state; the unconfirmed copy contains the "not unavailable" clause; tile label names its measure |
 | RMAP-TC-85 | AC-135 | web | same | with the explainer present, `machineActions` for an unconfirmed unit contains no `availability` entry |
 | RMAP-TC-86 | AC-131, AC-132 | web | **manual** | key visible and unoccluded with a supplier selected, in both directions; collapsed by default — no component harness in this repo |
@@ -2069,10 +2112,10 @@ supplier panel (§6.4).
 | RMAP-TC-44 | AC-58, AC-59 | web | same | unidentified unit → both indicators absent; `computeBidReadiness` null → readiness unavailable, not `red` |
 | RMAP-TC-39 | AC-29, AC-30 | web | **manual** | zero-bid empty state; Arabic RTL layout, panel edge, pin `direction:rtl` — no component harness exists in this repo (see caveat) |
 
-**Testability caveat, stated plainly.** `RMAP-TC-10` … `RMAP-TC-19` are written against pure
+**Testability caveat, stated plainly.** The pure-function cases — `RMAP-TC-12`, `TC-13`, `TC-15`, `TC-16`, `TC-17` and their successors — are written against pure
 functions precisely so vitest can cover them. This repo has **no component-test harness** — no
-`@testing-library`, no jsdom setup — so the *rendered* result of AC-16 (fan-out animation and
-connector), AC-29 (empty state) and AC-30 (RTL layout) cannot be asserted automatically today and
+`@testing-library`, no jsdom setup — so the *rendered* result of AC-29 (empty state), AC-30 (RTL layout)
+and the machine-panel tabs (AC-52→AC-70) cannot be asserted automatically today and
 are **manual-verify**. Adding a component-test harness is out of scope here; if it is wanted, it
 should be its own ticket rather than smuggled into this feature.
 
@@ -2116,6 +2159,10 @@ settled point or assumes an unanswered one was handled.
 | Date | Change |
 |---|---|
 | 2026-08-03 | Spec created. |
+| 2026-08-05 | **Coverage audit for stale content — every retired concept grepped across the document rather than spot-checked, after three contradictions were found by inspection.** The largest pocket was **§4 Scope "In", which was never updated through the 2026-08-04 direction change** and still listed one-pin-per-bid, per-unit fan-out, distance rings, rating sort, live updates, a hollow marker for unidentified units, `agreedUnitIds`, a supplier panel owning company documents, and "three equipment-scoped requests". §4 rewritten, and a **"Retired / Replaced by" table added** so an old AC cannot be re-derived from it. §5's flow steps for rings and one-pin-per-bid struck; the "Per-unit fan-out" and "Live update" headings marked retired. **AC-16/17** (fan-out; "a unit is never selectable") and **AC-38/39** (hollow marker) struck — both directly contradicted §6.2, and AC-17 contradicted the machine panel's entire premise. **`agreedUnitIds`** was withdrawn in §7.6 but still live in §7.8's data-model delta and AC-47→51 — all cleared. **`add_to_offer`** was retired in §6.7.1 but still specced in §7.13's payload, validation and derivable table, plus AC-109/123 and TC-74 — all cleared, with an explicit "must be rejected" rule. **AC-129** still demanded both colour scales, **AC-207** still asserted no VAT flag exists, and **AC-64/97** still referenced "the next live update" — all corrected. Structural fix: **§7.14.1 was nested inside §7.6** and has been moved under §7.14. |
+| 2026-08-05 | **Second staleness sweep — the retired set derived FROM the document rather than from memory.** The first sweep grepped sixteen concepts I remembered, which is the same failure mode as reading it. This one extracted every identifier named in a struck line and looked for live uses, and flagged numeric constants carrying two values. It found a **whole surviving realtime subsystem the first sweep never grepped for** — §5 subscribed to bid events, fell back to a **20s poll**, and suspended on hide, with **AC-25/26/27** and TC-18/19 implementing it, all contradicting §7.5. It also found **AC-20 colouring pins green/amber/slate by distance band**, contradicting §6.9.1 where colour means availability; the **i18n keys `bandNear/bandMid/bandFar` still carrying 30/120/220 km** while the live filter (§6.10) uses 50/100/200; **AC-28** still opening a deal room on pin activation; AC-21/22 still assuming bids are pinned; §4 assumption 4 describing per-unit pins; a **duplicated assumption A0/0**; and the §4 "Out" line denying per-unit selection, which the machine panel contradicts. **§5 was rewritten wholesale** — the previous sweep had struck its prose, which left half-struck sentences still reading as instructions. Two corrupt artefacts fixed: the **§7 heading was tripled** by an earlier replace-all, and the work plan listed **"W16 live updates" as merely blocked** when it is withdrawn, under an ID since reassigned to Notification surfaces. |
+| 2026-08-05 | **Third staleness sweep — retired concepts written as PROSE.** Found by the product owner, not by either auditor: **AC-87 asked for *«add this machine to the offer»* as a primary action** — an action whose payload §6.7.1 retires and AC-182 forbids. Neither earlier sweep could see it: v1 grepped remembered concepts, v2 grepped backticked identifiers and numeric constants, and AC-87 spells the identifier out in English. Its neighbours were stale the same way: **AC-84 placed company documents outside the machine panel**, which is the retired separate-supplier-panel model (§6.3.4 makes them tab 3); **AC-85/89 specified «three actions»** and **AC-86 «two remain»** when §6.3.6 defines two rows and one respectively; **AC-88 specified a document picker** when §6.3.6 says the three routes to a document request collapsed into one, inside the document tabs; and **AC-130 read «the two scales»** after the one-scale decision. TC-60/61/62 rewritten with them — TC-61 had asserted *«2 with add-to-offer primary»*. |
+| 2026-08-05 | **Fourth sweep — orphans and contradictions found by the product owner.** Three groups. **(a) Orphaned by §7.6:** AC-44/45/46 specified a renter-side modal picking specific machines and sending `selectedUnits` with `proposeRate`, but the backend half (AC-47→51) was already withdrawn — the UI survived with nowhere to send its output. Struck with TC-32/38. **(b) Contradicting §7.14:** AC-41 and AC-61c denied a View control, AC-61f/g specified `ownershipDocs` with no key or url, and AC-61d/e applied `RENTEE_HIDDEN_DOC_TYPES` renter-side — all the hide-and-filter design that §7.11 withdrew. Struck with TC-30/45b/51b; TC-45 lost its ownership clause; TC-69/70 already assert the current behaviour and were kept. **(c) Stale prose:** §6.2 offered "the existing sort options" after rating was retired; §7.13.4 had an empty table row where `add_to_offer` was removed **and still claimed §7.5 "pushes the bid event"**; §8's tail said AC-31→36 and AC-60→65 were superseded "in part", which cannot be implemented, now stated as a concrete substitution; §9's caveat still cited TC-10…TC-19 as pure-function examples after they were struck. **Three gaps filled where the spec was silent rather than wrong (AC-231→234, TC-126→128):** `yardConfirmed` must derive from **this bid's** `unitsOffered` entry — read off the listing, every pin turns green — and the coordinates follow from it; the fleet endpoint must return the `offeredUnitsDetail` shape so one payload feeds both the readiness bar and a not-in-offer machine's document tab; and **chat tabs must key on `bidId`, not the item** — `@@unique([requestId, bidOwnerKey, equipmentId])` (`schema.prisma:1260`) permits one supplier two bids on one item, so an item-keyed tab strip leaves the second deal room unreachable. |
 | 2026-08-05 | **Realtime withdrawn entirely — §7.5 requires no backend work.** Reversing the earlier decision to keep live arrival via `sendUserCustomEvent`: bids arrive over hours or days, so the renter is almost never on this screen when one lands, and a push path costs a Stream dependency plus a `/compare` connection that does not exist today. The original *"live like Uber"* framing belonged to a design where **supplier pins arrived on the map**, which §6.2 removed — nothing on screen is inherently live any more. AC-11 and AC-186→189 withdrawn along with TC-107/109; **the three refetch triggers (mount · window focus · after the renter sends a request) are promoted from fallbacks to the entire, normative mechanism** (§7.5.1), with post-send called out as load-bearing because it is the one moment the renter is actually watching for the self-closing loop. A **manual refresh affordance is now required** (AC-229) and **no copy may imply instantaneous updating** (AC-230). §6.11 reworded so "arrival" means *the refetch returned something new*, and the just-arrived marker is defined as new **to the renter** rather than recent. §7.5.2 records the three things that consequently update only on a trigger, and notes that the withdrawn user-event design remains the cheap route if this is revisited — it was dropped on cost/benefit, not feasibility. |
 | 2026-08-05 | **Logic/requirements review of this document — six defects found and fixed.** (1) **§6.1 contradicted §6.13.9**: it stated the bottom bar is unchanged while §6.13 specifies a separate read-only bar; a carve-out now says so where a §6.1-only reader will see it. (2) **The distance filter was approved (open question 5) but never specified** — the sole AC covered only *excluding* off-platform from it. New **§6.10** defines the control, bands, a **default of "all"** (a renter who cannot see all his offers cannot tell few bids from a narrow filter), list-and-map-together scoping, the rule that **unknown distance is never treated as far**, a stated "N of M" count, and one-tap clearing (AC-225→228). Sections 6.10→6.12 renumbered to 6.11→6.13 with all cross-references updated. (3) **§6.13.5's heading said "a third state" while its own table listed four.** (4) **§6.3.2's bucket table omitted the off-platform fill**, so the two composition tables disagreed; the amber hatch is now specified there and distinguished from the grey one. (5) **AC-14 and AC-15 were still live rows** in the acceptance table while only a prose note called them superseded — an implementer building from the table would have built supplier pins, which the direction change removed. Struck through like AC-08b. (6) **Two absent-data conventions** (em-dash in tiles, «— غير مُدخل» in rows) were in use without a stated rule; now documented as one normative pair. |
 | 2026-08-05 | **Final pre-implementation review — every `file:line` reference in this document was checked against the code, and it found more that was already built.** (1) **The VAT-inclusive toggle EXISTS** and §6.13.2's claim that no such signal could be read was **wrong**: `src/lib/contract/vat-inclusive.ts` (42 lines) gives the public form a toggle, stores every submission **net** by stripping 15% on submit, and carries the fact as a `[VAT-INCLUSIVE]` tag in `notes` — consumed today by `SharedBidSubmissionModal.tsx:209/:451` and covered by 11 passing tests. Section rewritten; **open question 19 closed as already solved**; AC-222→224 added, including the requirement to `stripVatInclusiveNote()` before ever displaying notes. (2) A new **⚠️ already-exists banner** heads §6.12, listing the ~1,100 lines of shipped code that earlier revisions specced as new work — `SharedBidSubmissionModal` (538), `SharedLinkBidCard` (293), `BidEquipmentModal` (222), `BidTermsModal`, `bid-quality.ts`, `vat-inclusive.ts`, `link-bids.ts`, `QualityRing.tsx` — and states that what is genuinely new is hosting them on the map/compare surface. (3) Two stale references corrected: the location-card branch is `DealRoom.tsx:890`, not `:855`, and the mobile blocs live under `features/marketplace/`, not `features/bid_form/` or `features/bid_readiness/`. |
