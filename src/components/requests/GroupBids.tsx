@@ -13,7 +13,7 @@ import { SharedBidNegotiateRoom } from "@/components/requests/SharedBidNegotiate
 import { NEGOTIATE_ENABLED } from "@/lib/config/flags";
 import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
-import { bidSuppliers, bucketBidTerms, CERT_LABEL, type BidCard, type TermRow } from "@/lib/contract/bids";
+import { bidSuppliers, bidSupplierKey, bucketBidTerms, CERT_LABEL, type BidCard, type TermRow } from "@/lib/contract/bids";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { qualityFromSubmissionItem, type BidQuality } from "@/lib/contract/bid-quality";
 import { computeBidQuote } from "@/lib/contract/comparison";
@@ -616,7 +616,9 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       }
       return a.requestId.localeCompare(b.requestId);
     });
-  const base = supplierKey === "all" ? orderForView(allBids) : orderForView(allBids.filter((b) => (b.supplierId ?? b.supplierName) === supplierKey));
+  // Must use the SAME key `bidSuppliers` built the chips from (company → member → name, AC-70), or a
+  // chip counts bids its own filter then drops.
+  const base = supplierKey === "all" ? orderForView(allBids) : orderForView(allBids.filter((b) => bidSupplierKey(b) === supplierKey));
   const shown = base.filter(
     (b) =>
       (selectedItem === "all" || b.requestId === selectedItem) &&
@@ -637,7 +639,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
     count: allBids.filter((b) => b.requestId === it.id).length,
   }));
   const selItem = itemList.find((i) => i.id === selectedItem) ?? null;
-  const shownSuppliers = new Set(shown.map((b) => b.supplierId ?? b.supplierName)).size;
+  const shownSuppliers = new Set(shown.map(bidSupplierKey)).size;
   // Card width scales with how many bids there are: 1–2 grow to fill the row (no empty side margin);
   // 3+ take a fixed width so the third card peeks at the edge, hinting the horizontal scroll.
   const cardFlex = shown.length <= 2 ? "1 1 0" : "0 0 calc(44% - 8px)";

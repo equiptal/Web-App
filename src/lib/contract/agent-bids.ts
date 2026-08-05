@@ -289,6 +289,7 @@ export function normalizedBidToBidCard(
     id: nb.bid_id ?? `upload:${nb.source_file ?? nb.supplier_name ?? "quote"}`,
     status: "PENDING",
     supplierId: nb.supplier_user_id != null ? String(nb.supplier_user_id) : null,
+    supplierCompanyId: null, // an uploaded quote carries no platform company — it groups by its own name
     supplierName: nb.supplier_name ?? "Uploaded quote",
     verified: false,
     rating: null,

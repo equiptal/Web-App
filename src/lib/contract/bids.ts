@@ -69,6 +69,22 @@ const OWNERSHIP_DOC_LABELS: Record<string, { key: string; labelEn: string; label
   saso_registration: { key: "saso_registration", labelEn: "SASO registration", labelAr: "تسجيل ساسو" },
 };
 
+/**
+ * Which level of the §7.3 location precedence produced a unit's (or a bid's) coordinates. Highest
+ * wins: anything the supplier did for THIS BID outranks a fleet default, and anything done per UNIT
+ * outranks anything done per bid.
+ *
+ * `unit_yard` is the ONLY level that counts as confirmed — it is the one the supplier can reach only
+ * by committing this machine to this bid through the readiness card, naming the yard it leaves from.
+ * Levels 2–4 are inferred, so they are all "not confirmed" no matter how precise the coordinate is.
+ *
+ * `unidentified` and `none` must NEVER be merged: `unidentified` means there is no machine at all
+ * (the offered count exceeds the machines named — array padding), so there is nothing to document,
+ * inspect or locate; `none` means a real, registered machine whose every location level is null
+ * (e.g. its yard row was deleted). The renter's exposure differs completely.
+ */
+export type UnitLocationSource = "unit_yard" | "bid_pin" | "bid_yard" | "listing_yard" | "unidentified" | "none";
+
 /** A document on an offered unit (bid-readiness). URL is a short-lived presigned link (server-signed). */
 export interface OfferedUnitDoc { type: string; key: string; url: string | null; verifyStatus: string | null; expiryDate: string | null; }
 /** A photo on an offered unit — `slot` ∈ {front, serial, hours, …}. `url` is presigned. */
@@ -88,6 +104,28 @@ export interface OfferedUnitDetail {
   measurementNameAr: string | null;
   documentKeys: OfferedUnitDoc[];
   photoKeys: OfferedUnitPhoto[];
+  /* ── §7.2 per-unit location. ADDITIVE and OPTIONAL on purpose: the backend change (RMAP T1) has not
+   * shipped, and the mobile app parses the same payload, so every reader must treat "absent" as a
+   * legitimate answer rather than a malformed unit. `bid-map.ts` normalises the absences in one place. */
+  /** The yard this unit leaves from, per §7.3 level 1. */
+  yardId?: string | null;
+  yardName?: string | null;
+  yardCity?: string | null;
+  /**
+   * The supplier ticked this unit's yard on the readiness card. **Reported verbatim (§7.7 / AC-10),
+   * never rendered.** Supplier-side it is derived from `yardId != null`
+   * (`bid_readiness_bloc.dart:442` sets it from the yard's presence, `:245` pre-fills that yard from
+   * the machine's registered one), so it is true for every readiness-written entry and carries nothing
+   * `locationSource === 'unit_yard'` does not already say. Colour comes from `unitAvailability()` in
+   * `bid-map.ts` — do not read this for it.
+   */
+  yardConfirmed?: boolean;
+  lat?: number | null;
+  lng?: number | null;
+  /** This unit's own distance to the request's project site, from the same `haversineKm` the bid's
+   *  distance uses — so a unit's distance is directly comparable to its bid's. */
+  distanceKm?: number | null;
+  locationSource?: UnitLocationSource;
 }
 
 /** Parse the raw `offeredUnitsDetail` array (getBidList / getBidDetail) → typed units. undefined when
@@ -96,10 +134,18 @@ function mapOfferedUnits(raw: unknown): OfferedUnitDetail[] | undefined {
   if (!Array.isArray(raw) || raw.length === 0) return undefined;
   const str = (v: unknown): string | null => (v == null || v === "" ? null : String(v));
   const num = (v: unknown): number | null => (typeof v === "number" ? v : v != null && v !== "" && !isNaN(Number(v)) ? Number(v) : null);
+  const LOCATION_SOURCES: UnitLocationSource[] = ["unit_yard", "bid_pin", "bid_yard", "listing_yard", "unidentified", "none"];
+  // An unrecognised level reads as ABSENT, not as a made-up one: a level we can't name must never be
+  // guessed into `unit_yard`, which is the only value that turns a pin green.
+  const src = (v: unknown): UnitLocationSource | undefined => {
+    const t = String(v ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+    return LOCATION_SOURCES.find((x) => x === t);
+  };
   return raw.map((u) => {
     const o = (u ?? {}) as Record<string, unknown>;
     const docs = (Array.isArray(o.documentKeys) ? o.documentKeys : Array.isArray(o.document_keys) ? o.document_keys : []) as unknown[];
     const photos = (Array.isArray(o.photoKeys) ? o.photoKeys : Array.isArray(o.photo_keys) ? o.photo_keys : []) as unknown[];
+    const yard = ((o.yard ?? {}) as Record<string, unknown>) ?? {};
     return {
       equipmentId: String(o.equipmentId ?? o.equipment_id ?? o.id ?? ""),
       manufacturer: str(o.manufacturer ?? o.make),
@@ -113,6 +159,18 @@ function mapOfferedUnits(raw: unknown): OfferedUnitDetail[] | undefined {
       measurementNameAr: str(o.measurementNameAr ?? o.measurement_name_ar),
       documentKeys: docs.map((d) => { const x = (d ?? {}) as Record<string, unknown>; return { type: String(x.type ?? x.code ?? ""), key: String(x.key ?? ""), url: str(x.url), verifyStatus: str(x.verifyStatus ?? x.verify_status), expiryDate: str(x.expiryDate ?? x.expiry_date) }; }),
       photoKeys: photos.map((p) => { const x = (p ?? {}) as Record<string, unknown>; return { slot: String(x.slot ?? x.type ?? ""), key: String(x.key ?? ""), url: str(x.url) }; }),
+      // §7.2 per-unit location, camel/snake tolerant like every other field here. The backend flattens
+      // the yard onto the unit; a nested `yard: {…}` is accepted too so an older/other projection of the
+      // same data still parses. `yardConfirmed` stays undefined when absent — `false` would assert the
+      // supplier declined to confirm, which is not what a missing field means.
+      yardId: str(o.yardId ?? o.yard_id ?? yard.id),
+      yardName: str(o.yardName ?? o.yard_name ?? yard.name),
+      yardCity: str(o.yardCity ?? o.yard_city ?? yard.city),
+      yardConfirmed: typeof (o.yardConfirmed ?? o.yard_confirmed) === "boolean" ? Boolean(o.yardConfirmed ?? o.yard_confirmed) : undefined,
+      lat: num(o.lat ?? o.latitude ?? yard.latitude ?? yard.lat),
+      lng: num(o.lng ?? o.longitude ?? yard.longitude ?? yard.lng),
+      distanceKm: num(o.distanceKm ?? o.distance_km),
+      locationSource: src(o.locationSource ?? o.location_source),
     };
   });
 }
@@ -124,6 +182,14 @@ export interface BidCard {
    *  as the winner. Distinct from a deal-room accept (`status === "ACCEPTED"`); both = a decided winner. */
   wonViaSurvey?: boolean;
   supplierId: string | null;
+  /**
+   * The FIRM behind the bidding member (`Bid.supplierCompanyId`). Two colleagues of one company are ONE
+   * counterparty (AC-70) — the backend already models it that way: `supplierBidScopeWhere` scopes bids
+   * by company, and the deal room adds every active colleague of both firms to the same Stream channel.
+   * Group by this FIRST (see `bidSupplierKey`), never by `supplierId` alone. Null for a supplier with no
+   * company, and on older payloads.
+   */
+  supplierCompanyId: string | null;
   supplierName: string;
   verified: boolean;
   rating: number | null;
@@ -198,6 +264,12 @@ export interface BidCard {
   /** bid-readiness: the equipment units this supplier offered, with presigned doc/photo links. Only on
    *  NATIVE app bids (getBidList / getBidDetail `offeredUnitsDetail`); undefined for off-platform bids. */
   offeredUnitsDetail?: OfferedUnitDetail[];
+  /* ── §7.4 bid-level coordinates (RMAP T3). The BID is never plotted (AC-169 — every pin is a machine);
+   * these exist so a unit with no location of its own can fall back down the §7.3 chain inside the
+   * panel, and so `distanceKm` has a stated origin. Levels 2–4 only: a bid can never be `unit_yard`. */
+  lat?: number | null;
+  lng?: number | null;
+  locationSource?: UnitLocationSource;
   /** Raw requested equipment-cert codes from the request item (lowercase, e.g. ["aramco","tuv"]) — kept
    *  alongside `requiredCerts` (CertCode[]) so readiness can count certs the CertCode enum can't name. */
   reqEquipmentCerts?: string[];
@@ -304,6 +376,10 @@ const n = (v: unknown): number | null => {
   return typeof x === "number" && !Number.isNaN(x) ? x : null;
 };
 const s = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v : null);
+/** An ID that may arrive as a string OR a number (Prisma int columns) → a string, or null. Deliberately
+ *  rejects booleans and objects, which would otherwise stringify into a plausible-looking key. */
+const sid = (v: unknown): string | null =>
+  typeof v === "number" && Number.isFinite(v) ? String(v) : typeof v === "string" && v.trim() ? v : null;
 /** First present number across several candidate keys (camelCase + snake_case payloads). */
 const pickNum = (o: Record<string, unknown>, ...keys: string[]): number | null => {
   for (const k of keys) { const x = n(o[k]); if (x != null) return x; }
@@ -527,7 +603,7 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   // company relation the backend now selects; unlike `isVerified` it can't diverge, because it IS the
   // firm's approved verification. Dissolving a company nulls the member's `companyId`, so a closed
   // firm stops conferring this on its own.
-  const supCompany = (sup.company ?? null) as { name?: unknown; isVerified?: unknown; deletedAt?: unknown } | null;
+  const supCompany = (sup.company ?? null) as { id?: unknown; name?: unknown; isVerified?: unknown; deletedAt?: unknown } | null;
   const supVerified =
     n(sup.supplierStatus) === 2 || (supCompany?.isVerified === true && !supCompany.deletedAt);
   // The firm's brand, used only when that firm is actually verified — same G5 precedence the backend
@@ -619,6 +695,22 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   const reqLat = pickNum(rq, "projectLat", "project_lat", "lat");
   const reqLng = pickNum(rq, "projectLng", "project_lng", "lng");
   const distanceKm = n(raw.distanceKm) ?? haversineKm(bidLat, bidLng, reqLat, reqLng);
+  // §7.4 — prefer the server's own resolution; fall back to the chain ABOVE, which is already the §7.3
+  // level 2→4 ladder the distance is measured on. Deriving the level here (rather than leaving it
+  // undefined until T3 ships) keeps `lat`/`lng`/`locationSource` in step with `distanceKm` on today's
+  // payloads. A bid can never be `unit_yard` — that level is per-unit and per-bid commitment, which is
+  // exactly why a bid's coordinates can never turn a pin green.
+  const bidLocationSource: UnitLocationSource | undefined =
+    ((): UnitLocationSource | undefined => {
+      const reported = s(raw.locationSource ?? raw.location_source);
+      if (reported === "bid_pin" || reported === "bid_yard" || reported === "listing_yard" || reported === "none") return reported;
+      if (pickNum(raw, "equipmentLat", "equipment_lat") != null && pickNum(raw, "equipmentLng", "equipment_lng") != null) return "bid_pin";
+      if (pickNum(bidYard, "latitude", "lat") != null && pickNum(bidYard, "longitude", "lng") != null) return "bid_yard";
+      if (pickNum(eqYard, "latitude", "lat") != null && pickNum(eqYard, "longitude", "lng") != null) return "listing_yard";
+      return "none";
+    })();
+  // Never a half-resolved point (AC-06): one missing side voids both.
+  const bidHasPoint = bidLat != null && bidLng != null;
 
   const lockedKeys = new Set(lockedTerms.map((t) => normKey(t.key)));
   const lockedValByKey = new Map(lockedTerms.map((t) => [normKey(t.key), t.value != null && t.value !== "" ? String(t.value) : null]));
@@ -679,6 +771,16 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     converted: raw.converted === true, // web-app/006: materialized from an off-platform submission → labelled/counted off-platform
 
     supplierId: sup.id != null ? String(sup.id) : null,
+    // AC-70. `Bid.supplierCompanyId` already reaches the browser — `getBidList` spreads the bid row —
+    // it was simply never read, so two colleagues of one firm read as two counterparties. Ids can arrive
+    // as numbers, so stringify rather than `s()`. Fall back to the joined company/profile shapes, since
+    // which one carries the id depends on the projection.
+    supplierCompanyId:
+      sid(raw.supplierCompanyId ?? raw.supplier_company_id) ??
+      sid(sup.companyId ?? sup.company_id) ??
+      sid(supCompany?.id) ??
+      profSources.map((o) => sid(o.companyId ?? o.company_id)).find((x) => x != null) ??
+      null,
     // Company name FIRST — the supplier's own profile field, not the verification-queue company row
     // (nor the backend's `supplierDisplayName`, which resolves that row ahead of the profile). Falls
     // back to the verified firm's brand, then the backend's resolved name, then the person's name.
@@ -741,6 +843,9 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
     equipmentCertCodes,
     ownershipDocs,
     offeredUnitsDetail: mapOfferedUnits(raw.offeredUnitsDetail ?? raw.offered_units_detail),
+    lat: bidHasPoint ? bidLat : null,
+    lng: bidHasPoint ? bidLng : null,
+    locationSource: bidHasPoint ? bidLocationSource : "none",
     reqEquipmentCerts: (Array.isArray(rqItem.safetyCertifications) ? (rqItem.safetyCertifications as unknown[]) : []).map((x) => String(x).trim().toLowerCase()).filter(Boolean),
     operatorCertReq,
     operatorCertDeclared,
@@ -789,7 +894,8 @@ function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   };
 }
 
-/** One supplier in a group's bid set (Level-2 filter chip) — keyed by id, falling back to name. */
+/** One COUNTERPARTY in a group's bid set (Level-2 filter chip) — a firm where one exists, else the
+ *  individual, else the name. See `bidSupplierKey`. */
 export interface BidSupplier {
   key: string;
   name: string;
@@ -797,12 +903,28 @@ export interface BidSupplier {
   count: number;
 }
 
-/** Distinct suppliers across a bid list, in first-appearance order, with per-supplier counts. */
+/**
+ * The single counterparty key for a bid: **company → member → name** (AC-70).
+ *
+ * A firm is one counterparty even when two of its members each submitted a bid, because that is how the
+ * backend already models it — `supplierBidScopeWhere` scopes a supplier's bids by company, and the deal
+ * room adds every active colleague of both firms to the same Stream channel, so the two members are
+ * literally reading and writing the same conversation. Grouping by `supplierId` showed them as two
+ * separate counterparties the renter had to negotiate with twice.
+ *
+ * Every surface that groups, filters or counts suppliers must key off THIS function, or the chip counts
+ * and the rows behind them will disagree.
+ */
+export function bidSupplierKey(bid: BidCard): string {
+  return bid.supplierCompanyId ?? bid.supplierId ?? bid.supplierName;
+}
+
+/** Distinct counterparties across a bid list, in first-appearance order, with per-counterparty counts. */
 export function bidSuppliers(bids: BidCard[]): BidSupplier[] {
   const order: string[] = [];
   const map = new Map<string, BidSupplier>();
   for (const b of bids) {
-    const key = b.supplierId ?? b.supplierName;
+    const key = bidSupplierKey(b);
     const existing = map.get(key);
     if (existing) {
       existing.count += 1;

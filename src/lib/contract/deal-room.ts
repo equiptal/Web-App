@@ -53,8 +53,16 @@ export interface DealRoomView {
   demobByRentee: boolean | null;
   periods: number | null;
   priceUnit: string | null;
-  /** Units the RFQ asked for — the rate is PER-UNIT, so the rental total multiplies by this
-   *  (consistent with the bid cards + quotations + the backend deal quotation). */
+  /**
+   * The PRICE-BASIS unit count — `agreedUnits ?? bid.unitsOffered.length ?? request.numberOfUnits`
+   * (see the assignment, `priceUnits`), NOT the count the RFQ asked for. The rate is per-unit, so the
+   * rental total multiplies by this, matching the bid cards, the quotations and the backend deal
+   * quotation, all of which scale by what the SUPPLIER offered rather than what was requested.
+   *
+   * The requested count is `requestedUnits` on this same view. The two differ on every partial bid, so
+   * the old "units the RFQ asked for" comment named the wrong one of the two fields (AC-191).
+   * Deliberately NOT renamed — every consumer reads it as the price basis already.
+   */
   numberOfUnits: number;
   // ── deal-room/negotiation — per-type units + leg exclusion (shared backend) ──
   /** Matched RENTAL count (drives coverage); `null` = single-supplier/single-unit "full request". */

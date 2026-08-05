@@ -3,7 +3,7 @@ import { buildItemComparison, computeBidQuote, daysPerPeriod, sortByPreset, disp
 import type { BidCard, TermRow } from "@/lib/contract/bids";
 
 const bc = (p: Partial<BidCard>): BidCard => ({
-  id: "b", status: "PENDING", supplierId: null, supplierName: "S", verified: false, rating: null,
+  id: "b", status: "PENDING", supplierId: null, supplierCompanyId: null, supplierName: "S", verified: false, rating: null,
   distanceKm: null, submittedAt: null, validUntil: null, price: null, mobPrice: null, demobPrice: null,
   priceUnit: null, duration: null, numberOfUnits: 1, unitsOffered: 1, reqMinYear: null, equipment: null, eqVerified: false,
   compliance: { entityType: "individual", activityLicense: false, taxNumber: false, nationalAddress: false, safety: false, saso: false, localContent: false },
