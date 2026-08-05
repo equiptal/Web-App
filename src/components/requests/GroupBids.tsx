@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
-import { useLocale } from "@/lib/i18n";
-import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/client";
+import { useLocale, useT } from "@/lib/i18n";
+import { fetchBids, fetchRequestDetail, fetchRequestSubmissions, startDealRoom } from "@/lib/api/client";
+import { BidMapWorkspace } from "@/components/map/BidMapWorkspace";
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
 import { BidReadinessBadge, BidEligibilityModal } from "@/components/requests/BidReadiness";
 import { computeBidReadiness } from "@/lib/contract/bid-readiness";
@@ -17,7 +18,7 @@ import { bidSuppliers, bidSupplierKey, bucketBidTerms, CERT_LABEL, type BidCard,
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { qualityFromSubmissionItem, type BidQuality } from "@/lib/contract/bid-quality";
 import { computeBidQuote } from "@/lib/contract/comparison";
-import { shortRef, type RequestGroup } from "@/lib/contract/requests";
+import { shortRef, type RequestGroup, type RequestRecord } from "@/lib/contract/requests";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { quotationDownloadName } from "@/lib/compare/quotation-token";
@@ -79,6 +80,7 @@ function offerSuffix(uiState: string | null, L: (en: string, ar: string) => stri
  */
 export function GroupBids({ group, initialItemId }: { group: RequestGroup; initialItemId?: string | null }) {
   const { locale } = useLocale();
+  const t = useT();
   const ar = locale === "ar";
   const L = (en: string, arr: string) => (ar ? arr : en);
   // Period label from the bid's billing unit — for the collapsed "rate / period" on the card.
@@ -94,6 +96,18 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
 
   const [bids, setBids] = useState<GroupBid[] | null>(null);
   const [error, setError] = useState(false);
+  // ── RMAP T11/T13 · map view + freshness ────────────────────────────────────────────────────────
+  // Map state (view mode, the selected bid) is LOCAL to this component by design (spec §6.6 "Store —
+  // none"), and every fetch on this screen is owned here — the map workspace never fetches (A4).
+  const [view, setView] = useState<"list" | "map">("list");
+  const [mapBidId, setMapBidId] = useState<string | null>(null); // selection is row state; it creates NO deal room (D-A)
+  const [freshIds, setFreshIds] = useState<Set<string>>(new Set()); // arrived since the last fetch (AC-171)
+  const [refreshing, setRefreshing] = useState(false);
+  const [reqDetail, setReqDetail] = useState<RequestRecord | null>(null); // the active item's request — the project pin's only source
+  const bidsRef = useRef<GroupBid[] | null>(null); // current list, for the arrival diff without re-running the fetch
+  const lastFetchRef = useRef(0);
+  const refreshingRef = useRef(false);
+  const freshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [supplierKey, setSupplierKey] = useState<string>("all");
   const [selectedItem, setSelectedItem] = useState<string>(initialItemId ?? "all"); // scope bids to one request item
   const [itemMenuOpen, setItemMenuOpen] = useState(false);
@@ -151,29 +165,42 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
     return () => { active = false; };
   }, []);
 
+  // One fetch of every item's bids, merged and tagged with the item they belong to. Extracted so the
+  // mount load and the §7.5.1 refetch triggers run the SAME request — a second implementation is how
+  // the list and the map end up disagreeing about what has arrived.
+  const fetchGroupBids = useCallback(
+    () =>
+      Promise.all(
+        group.items.map((it) =>
+          fetchBids(it.id)
+            .then((d) =>
+              d.bids.map((b): GroupBid => ({
+                ...b,
+                requestId: it.id,
+                itemLabel: it.item?.name ?? it.displayId,
+                itemLabelAr: it.item?.nameAr ?? it.displayId,
+                categoryId: it.item?.categoryId ?? null,
+                itemImage: it.item?.imageUrl ?? null,
+              })),
+            )
+            .catch(() => [] as GroupBid[]),
+        ),
+      ).then((lists) => lists.flat()),
+    [group.items],
+  );
+
   useEffect(() => {
     let active = true;
     setBids(null);
     setError(false);
     setSupplierKey("all");
     setSelected(new Set());
-    Promise.all(
-      group.items.map((it) =>
-        fetchBids(it.id)
-          .then((d) =>
-            d.bids.map((b): GroupBid => ({
-              ...b,
-              requestId: it.id,
-              itemLabel: it.item?.name ?? it.displayId,
-              itemLabelAr: it.item?.nameAr ?? it.displayId,
-              categoryId: it.item?.categoryId ?? null,
-              itemImage: it.item?.imageUrl ?? null,
-            })),
-          )
-          .catch(() => [] as GroupBid[]),
-      ),
-    )
-      .then((lists) => active && setBids(lists.flat()))
+    fetchGroupBids()
+      .then((list) => {
+        if (!active) return;
+        lastFetchRef.current = Date.now();
+        setBids(list);
+      })
       .catch(() => active && setError(true));
     // Off-platform shared-link submissions are stored once per GROUP (a single bid covers all items),
     // so fetch them once by the group id — not per item (which would duplicate them). Best-effort.
@@ -182,10 +209,77 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
     return () => {
       active = false;
     };
-  }, [group.id, group.items]);
+  }, [group.id, group.items, fetchGroupBids]);
 
   // Scope to the item the renter tapped "View Bids" on (or "all" when entering via "View all bids").
   useEffect(() => { setSelectedItem(initialItemId ?? "all"); }, [initialItemId, group.id]);
+
+  /* ── RMAP §7.5.1 · freshness ─────────────────────────────────────────────────────────────────────
+     There is NO push (§7.5 withdrawn), so refetch is the entire mechanism, not a fallback: on mount,
+     on window focus, after the renter sends, plus a manual affordance (AC-190, AC-229). "Arrival"
+     means *the refetch returned a bid that was not there before* — nothing here claims recency, and no
+     copy on the surface implies instant updating (AC-230).
+
+     A 15s staleness window keeps a burst of focus events (alt-tab, devtools, a modal closing) from
+     firing a fan-out of one request per item; the manual button forces past it. */
+  const STALE_MS = 15_000;
+  const FRESH_MS = 9_000; // how long a newly arrived row keeps its «وصل الآن» marker
+
+  useEffect(() => { bidsRef.current = bids; }, [bids]);
+  useEffect(() => () => { if (freshTimerRef.current) clearTimeout(freshTimerRef.current); }, []);
+
+  const refreshBids = useCallback(
+    async (force: boolean) => {
+      if (refreshingRef.current) return;
+      if (!force && Date.now() - lastFetchRef.current < STALE_MS) return;
+      refreshingRef.current = true;
+      setRefreshing(true);
+      try {
+        const next = await fetchGroupBids();
+        lastFetchRef.current = Date.now();
+        const known = new Set((bidsRef.current ?? []).map((b) => b.id));
+        const arrived = next.filter((b) => !known.has(b.id)).map((b) => b.id);
+        // Replace the list wholesale: the sort is applied to the NEW array on render, so an arriving
+        // bid lands in price order instead of appending to the bottom of a cheapest-first list (AC-170).
+        setBids(next);
+        if (arrived.length && bidsRef.current) {
+          setFreshIds(new Set(arrived));
+          if (freshTimerRef.current) clearTimeout(freshTimerRef.current);
+          freshTimerRef.current = setTimeout(() => setFreshIds(new Set()), FRESH_MS);
+        }
+      } catch {
+        // Keep what we have — a failed refresh must never empty a list the renter is reading.
+      } finally {
+        setRefreshing(false);
+        refreshingRef.current = false;
+      }
+    },
+    [fetchGroupBids],
+  );
+
+  // Focus refetch is confined to the map view so list view keeps today's behaviour exactly.
+  useEffect(() => {
+    if (view !== "map") return;
+    const onFocus = () => { void refreshBids(false); };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [view, refreshBids]);
+
+  // Opening the map is a "mount" of this surface — same staleness guard, so switching back and forth
+  // does not hammer the API.
+  useEffect(() => { if (view === "map") void refreshBids(false); }, [view, refreshBids]);
+
+  // The project pin's only source. Every item of a group shares one project location (a group is one
+  // submission fanned out), but this scopes to the ACTIVE item so it stays exact if that ever changes.
+  const siteItemId = selectedItem !== "all" ? selectedItem : group.items[0]?.id ?? null;
+  useEffect(() => {
+    if (view !== "map" || !siteItemId) return;
+    let active = true;
+    fetchRequestDetail(siteItemId)
+      .then((r) => { if (active) setReqDetail(r); })
+      .catch(() => { if (active) setReqDetail(null); });
+    return () => { active = false; };
+  }, [view, siteItemId]);
 
   // B4: while comparing, a click anywhere outside the selection UI (toolbar / cards / action bar, all
   // tagged data-select-ui) exits selection — replaces the old Cancel button.
@@ -671,6 +765,17 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           })}
         </div>
         <div style={{ width: 1, height: 34, background: "#D7DEE8", flexShrink: 0 }} />
+        {/* RMAP T11 — list | map. Map view replaces the bid-card grid with the map workspace; the item
+            selector and the filter beside it keep scoping both views, so the map needs no strip of its
+            own (AC-22, AC-23). */}
+        <div className="bm-toggle">
+          {([["list", t.bidMap.listView, "view_agenda"], ["map", t.bidMap.view, "map"]] as const).map(([k, label, icon]) => (
+            <button key={k} type="button" className={view === k ? "on" : undefined} onClick={() => setView(k)}>
+              <span className="material-icons-outlined">{icon}</span>
+              {label}
+            </button>
+          ))}
+        </div>
         {/* item picker */}
         <div style={{ position: "relative", flexShrink: 0 }}>
           <button onClick={() => { setItemMenuOpen((o) => !o); setFilterOpen(false); }} title={L("Filter by item", "تصفية حسب البند")} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 11, border: "1.5px solid #1c3550", background: "#1c3550", color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer" }}>
@@ -767,6 +872,22 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         </div>
       </div>
 
+      {/* RMAP T12 — map view REPLACES the bid-card grid. Everything above (chips · item · filter) still
+          scopes it, and the modals below still open from it, so this is a swap of one surface, not a
+          second screen. `shown` is the same filtered list the grid renders. */}
+      {view === "map" && (
+        <BidMapWorkspace
+          bids={shown}
+          request={reqDetail}
+          selectedBidId={mapBidId}
+          onSelectBid={setMapBidId}
+          freshBidIds={freshIds}
+          onRefresh={() => { void refreshBids(true); }}
+          refreshing={refreshing}
+        />
+      )}
+
+      {view === "list" && (<>
       <div data-select-ui style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "0 0 14px", flexWrap: "wrap" }}>
         <span style={{ fontSize: 13, fontWeight: 700, color: "#2a4f72" }}>
           {selectMode
@@ -1067,6 +1188,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           </button>
         </div>
       )}
+      </>)}
 
       {/* Quotation language chooser — one PDF in the chosen language (no 2-in-1). */}
       {langPick && (
