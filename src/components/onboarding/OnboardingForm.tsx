@@ -38,15 +38,20 @@ const FALLBACK_JOBS: Opt[] = [
 
 /**
  * Account-creation form (web-app/003 Flow 1, AC-01/02/03/04/05/06). Prototype design, app/AC fields:
- * first/last name, city + job-title selectors (master-data), optional email + WhatsApp; phone read-only.
- * Submit → `/api/profile/complete` → guest becomes basic → refresh session → return to `next` or home.
+ * first/last name, city + job-title selectors (master-data), email (required unless already collected at
+ * the OTP step) + optional WhatsApp; phone read-only.
+ * Submit → `/api/profile/complete` → guest becomes basic → refresh session → `onDone` or `next`.
+ *
+ * Rendered ONLY by AccountModal now. The standalone /onboarding route that also mounted it was removed:
+ * it was a second profile-creation surface reachable from the sidebar tier nudge, and the only one that
+ * let a phone-first account be completed without an email.
  */
 export function OnboardingForm({
   next,
   onDone,
   headline,
   subhead,
-  requireEmail = false,
+  requireEmail = true,
   showEmail = true,
   phoneVerify,
   onSignIn,
@@ -57,12 +62,15 @@ export function OnboardingForm({
   /** Optional header overrides (e.g. "Create your account to post your request"). */
   headline?: string;
   subhead?: string;
-  /** When true, email is a required field (combined create gate). Default false keeps the standalone
-   *  onboarding route's email optional. */
+  /** Whether email is a required field. Defaults to REQUIRED: every account is meant to end with both
+   *  a phone and an email (AccountModal's invariant), and this form is the only place a phone-first user
+   *  supplies one. The default used to be false for the standalone /onboarding route — which made that
+   *  route the single way to finish a profile with no email. The route is gone; the default now matches
+   *  the invariant so a future caller can't reintroduce the hole by omitting the prop. */
   requireEmail?: boolean;
   /** When false, the email field is omitted entirely — the combined create gate collects (and the
    *  backend persists) email at the phone/OTP step, so the register step must not ask for it again.
-   *  Default true keeps email on the standalone onboarding route + the mobile-handoff path. */
+   *  Default true keeps email on the phone-first path + the mobile-handoff path. */
   showEmail?: boolean;
   /** Email-first (Modal 2, Case 1): no account/session yet. Render the phone field with an INLINE
    *  Send-code + OTP right in this form; on submit we verify the phone with the onboardingToken (which

@@ -180,7 +180,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
 
         {/* Tier-status footer card (AC-06/08) — hidden when collapsed (no room for the CTA) and for
             signed-out visitors (its guest→profile nudge assumes a session). */}
-        {!collapsed && status === "authed" && <TierCard tier={tier} onGo={(href) => router.push(href)} />}
+        {!collapsed && status === "authed" && <TierCard tier={tier} onGo={(href) => router.push(href)} onCompleteProfile={() => openAuth()} />}
       </aside>
 
       {/* Main column */}
@@ -319,7 +319,7 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
 }
 
 /** Sidebar tier-status card: tier label + progress + a tier-appropriate CTA (AC-06/08). */
-function TierCard({ tier, onGo }: { tier: string; onGo: (href: string) => void }) {
+function TierCard({ tier, onGo, onCompleteProfile }: { tier: string; onGo: (href: string) => void; onCompleteProfile: () => void }) {
   const t = useT();
   const verified = tier === "verified";
   const guest = tier === "guest";
@@ -339,9 +339,14 @@ function TierCard({ tier, onGo }: { tier: string; onGo: (href: string) => void }
       {!verified && (
         <button
           // Basic → /company (the hub: create your own company by verifying, OR join one with an
-          // invite code) rather than dropping straight into the verification form. Guests still go to
-          // /onboarding — personal identity comes first, and their CTA reads "Complete profile".
-          onClick={() => onGo(guest ? "/onboarding" : "/company")}
+          // invite code) rather than dropping straight into the verification form.
+          //
+          // A GUEST opens the account modal instead of navigating. It is the only profile-creation
+          // surface: `hasGuestSession` lands them straight on the profile step with email REQUIRED,
+          // keeping the "every account ends with both phone + email" invariant. This used to push to
+          // /onboarding, which rendered the same form with `requireEmail` defaulted off — so the one
+          // route that skipped the email requirement was the one the chrome linked to.
+          onClick={() => (guest ? onCompleteProfile() : onGo("/company"))}
           className="mt-[11px] w-full rounded-[10px] bg-brand px-3 py-2 text-[12px] font-bold text-white"
         >
           {guest ? t.home.nudgeGuestCta : t.home.nudgeBasicCta}
