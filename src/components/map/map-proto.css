@@ -1,0 +1,411 @@
+/* Deal-room rentee map (RMAP T11–T15) — ported from `deal-room-rentee-map-v2.html` via
+   `docs/implementation-plans/deal-room-rentee-map/design.md` §1/§4.1/§5 and the verbatim prototype
+   source in `prototype/02-bid-panel.js`.
+
+   Same convention as compare-proto.css / deal-room-proto.css: every STATIC rule lives here, and only
+   genuinely state-dependent values (a computed colour, a percentage) stay inline in the component.
+   State that is enumerable — selected / dimmed / cheapest / flashing — is a class, not an inline
+   style, so the row's five looks are readable in one place instead of a nested ternary.
+
+   Tokens (design.md §5), inlined rather than shared because this surface's palette is the prototype's
+   and deliberately not the app's `--rentee`/`--success` set:
+     deep #0F2238 · navy #1C3550 · muted #6B8FA8 · border #C8D8E8 · blt #E4EDF5 · surface #EFF4F9
+     s2 #F8FAFC · blue #2563EB · green #16A34A · red #D9362A · amber #D4780A                       */
+
+.bidmap {
+  position: relative;
+  height: min(78vh, 820px);
+  min-height: 520px;
+  border: 1px solid #e4edf5;
+  border-radius: 18px;
+  overflow: hidden;
+  font-size: 14px;
+  color: #0f2238;
+}
+
+/* The map is full-bleed and the tools float over it (design.md §1) — never a two-column split. */
+.bidmap .bm-canvas {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 30%, #dde9e0 0%, #c9dacb 100%);
+}
+.bidmap .bm-leaflet { position: absolute; inset: 0; z-index: 0; background: #dde9e0; }
+.bidmap .bm-leaflet .leaflet-container { height: 100%; width: 100%; background: #dde9e0; font: inherit; }
+
+/* Site pin — a `divIcon`, so Leaflet's own LTR canvas is overridden per pin (AC-30, AC-98). */
+.bm-sitepin { direction: rtl; display: flex; flex-direction: column; align-items: center; }
+.bm-sitepin .bm-sitedot {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #2563eb;
+  border: 3px solid #fff;
+  box-shadow: 0 4px 12px rgba(15, 34, 56, 0.32);
+}
+.bm-sitepin .bm-sitedot::after {
+  content: "";
+  position: absolute;
+  inset: -9px;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.28);
+  animation: dpPulse 2.2s ease-out infinite;
+}
+.bm-sitepin .bm-sitelabel {
+  margin-top: 6px;
+  white-space: nowrap;
+  background: #fff;
+  border: 1px solid #e4edf5;
+  border-radius: 8px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #0f2238;
+  box-shadow: 0 2px 8px rgba(15, 34, 56, 0.18);
+}
+
+/* A request with no `projectLat/Lng` still renders the canvas (AC-21) — it just says so. */
+.bidmap .bm-nosite {
+  position: absolute;
+  z-index: 10;
+  top: 18px;
+  inset-inline-start: 18px;
+  max-width: 300px;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid #e4edf5;
+  border-radius: 12px;
+  padding: 10px 13px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b8fa8;
+  box-shadow: 0 8px 24px rgba(15, 34, 56, 0.14);
+}
+
+/* ── Bid panel (design.md §1) ────────────────────────────────────────────────────────────────────
+   The prototype uses PHYSICAL `left: 18px` on an RTL page, i.e. the INLINE-END edge, which is also
+   what AC-30/AC-98 require in words. `inset-inline-end` reproduces the Arabic arrangement exactly and
+   mirrors it in English, where the rail and drawer (inline-start, T33/T18) mirror with it — so the two
+   never trade places. */
+.bidmap .bm-panel {
+  position: absolute;
+  z-index: 24;
+  top: 18px;
+  inset-inline-end: 18px;
+  width: 392px;
+  max-width: calc(100% - 130px);
+  max-height: calc(100% - 36px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(10px);
+  border: 1px solid #e4edf5;
+  border-radius: 18px;
+  box-shadow: 0 16px 44px rgba(15, 34, 56, 0.18);
+  animation: dpFade 0.18s ease;
+}
+
+.bidmap .bm-head { flex-shrink: 0; padding: 13px 15px 11px; border-bottom: 1px solid #e4edf5; }
+.bidmap .bm-head-row { display: flex; align-items: center; gap: 8px; }
+.bidmap .bm-title { font-size: 13.5px; font-weight: 700; color: #0f2238; }
+.bidmap .bm-count {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  border-radius: 7px;
+  padding: 2px 7px;
+}
+.bidmap .bm-spacer { flex: 1; }
+/* Manual refresh — required by AC-229, because nothing else guarantees freshness while the page sits
+   open. Deliberately the prototype's «⚡ عرض جديد» slot, which was a simulator button. */
+.bidmap .bm-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(22, 163, 74, 0.09);
+  border: 1px solid rgba(22, 163, 74, 0.25);
+  color: #16a34a;
+  border-radius: 8px;
+  padding: 3px 9px;
+  font-size: 9.5px;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
+}
+.bidmap .bm-refresh:disabled { cursor: default; opacity: 0.6; }
+.bidmap .bm-refresh .material-icons-outlined { font-size: 13px; }
+.bidmap .bm-sub { font-size: 10.5px; color: #6b8fa8; font-weight: 600; margin-top: 5px; line-height: 1.6; }
+.bidmap .bm-note { font-size: 9.5px; color: #6b8fa8; font-weight: 600; margin-top: 4px; line-height: 1.6; }
+
+/* Sort tabs — exactly two (D-D, AC-24). Rating is retired and there is no distance band (D-C). */
+.bidmap .bm-sorts { display: flex; gap: 5px; margin-top: 10px; background: #eff4f9; padding: 3px; border-radius: 10px; }
+.bidmap .bm-sort {
+  flex: 1;
+  background: transparent;
+  border: 1px solid transparent;
+  color: #6b8fa8;
+  border-radius: 8px;
+  padding: 6px 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+.bidmap .bm-sort.on {
+  background: #fff;
+  border-color: rgba(37, 99, 235, 0.22);
+  color: #2563eb;
+  box-shadow: 0 1px 3px rgba(15, 34, 56, 0.08);
+}
+/* No project location → the nearest sort is DISABLED, not silently meaningless (AC-21). */
+.bidmap .bm-sort:disabled { cursor: default; opacity: 0.45; }
+
+.bidmap .bm-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  background: #f8fafc;
+}
+
+/* ── Bid row (design.md §4.1) ─────────────────────────────────────────────────────────────────── */
+.bidmap .bm-row {
+  position: relative;
+  flex-shrink: 0;
+  width: 100%;
+  text-align: start;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  background: #fff;
+  border: 1.5px solid #e4edf5;
+  border-radius: 14px;
+  /* asymmetric on purpose: the extra inline-start padding is the accent bar's room */
+  padding: 12px 13px 12px 17px;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: 0 2px 6px rgba(15, 34, 56, 0.05);
+  overflow: hidden;
+  transition: 0.15s;
+}
+.bidmap .bm-row.cheap { border-color: rgba(22, 163, 74, 0.25); }
+.bidmap .bm-row.on {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: #2563eb;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.18);
+}
+/* Selection is single and replacing, so the others must visibly recede (AC-74). */
+.bidmap .bm-row.dim { opacity: 0.55; }
+.bidmap .bm-row.flash { animation: dpPing 1.2s ease-out 2; border-color: #2563eb; }
+
+/* Selection is ROW STATE — an accent bar plus a tick, never a "select" button. Logical insets, per the
+   prototype, so the accent hugs the reading edge in both directions. */
+.bidmap .bm-row .bm-acc { position: absolute; inset-inline-start: 0; top: 0; bottom: 0; width: 4px; background: #2563eb; }
+.bidmap .bm-row .bm-tick {
+  position: absolute;
+  top: 10px;
+  inset-inline-start: 10px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #2563eb;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* A list mutation the renter did not trigger has to be findable (§6.11, AC-171). */
+.bidmap .bm-row .bm-fresh {
+  position: absolute;
+  top: 10px;
+  inset-inline-end: 12px;
+  font-size: 8.5px;
+  font-weight: 800;
+  color: #fff;
+  background: #16a34a;
+  border-radius: 20px;
+  padding: 2px 8px;
+}
+
+.bidmap .bm-idline { display: flex; align-items: center; gap: 10px; }
+.bidmap .bm-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 12.5px;
+  flex-shrink: 0;
+}
+.bidmap .bm-supname { font-size: 12.5px; font-weight: 700; color: #0f2238; display: flex; gap: 4px; align-items: center; }
+.bidmap .bm-supsub { font-size: 10px; color: #6b8fa8; font-weight: 600; margin-top: 2px; }
+.bidmap .bm-offbadge {
+  flex-shrink: 0;
+  font-size: 8.5px;
+  font-weight: 800;
+  color: #8a4f08;
+  background: rgba(212, 120, 10, 0.1);
+  border: 1px solid rgba(212, 120, 10, 0.25);
+  border-radius: 20px;
+  padding: 2px 7px;
+}
+
+.bidmap .bm-figs { display: flex; align-items: flex-end; gap: 10px; border-top: 1px dashed #e4edf5; padding-top: 9px; }
+.bidmap .bm-flab { font-size: 9px; font-weight: 700; color: #6b8fa8; margin-bottom: 1px; }
+.bidmap .bm-rate { font-size: 17px; font-weight: 800; color: #0f2238; letter-spacing: -0.2px; }
+.bidmap .bm-rateunit { font-size: 10px; font-weight: 600; color: #6b8fa8; margin-inline-start: 3px; }
+.bidmap .bm-cheapest {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9.5px;
+  color: #16a34a;
+  font-weight: 800;
+  margin-top: 3px;
+  background: rgba(22, 163, 74, 0.09);
+  border: 1px solid rgba(22, 163, 74, 0.25);
+  border-radius: 20px;
+  padding: 1px 7px;
+}
+.bidmap .bm-dist { text-align: end; flex-shrink: 0; }
+.bidmap .bm-distval { font-size: 12.5px; font-weight: 800; color: #1c3550; }
+.bidmap .bm-distnote { font-size: 9.5px; color: #6b8fa8; font-weight: 600; margin-top: 2px; }
+
+/* Offered vs identified — what has paperwork behind it and what is only a claim (§6.12, AC-37). */
+.bidmap .bm-units {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-self: stretch;
+  background: #f8fafc;
+  border: 1px solid #e4edf5;
+  border-radius: 10px;
+  padding: 8px 9px;
+}
+.bidmap .bm-units .u-off { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; color: #0f2238; }
+.bidmap .bm-units .u-id { display: flex; align-items: center; gap: 6px; font-size: 9.5px; font-weight: 700; color: #16a34a; }
+.bidmap .bm-units .u-un { display: flex; align-items: center; gap: 6px; font-size: 9.5px; font-weight: 700; color: #8a4f08; }
+
+/* ── Colour key (T15) — hosted INSIDE the panel, below the scroll area. Never a floating overlay: at a
+   low z-index with `inset-inline-end` it renders BEHIND this panel in RTL, which is how the key became
+   invisible in the one state that needed it (§6.9.2, AC-131). `flex-shrink: 0` outside the scroller is
+   also what keeps expanding it from scrolling the list away (AC-132). */
+.bidmap .bm-key { flex-shrink: 0; border-top: 1px solid #e4edf5; background: #fff; }
+.bidmap .bm-key-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: 0;
+  padding: 9px 14px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.bidmap .bm-key-q {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  color: #2563eb;
+  font-size: 10px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bidmap .bm-key-lbl { flex: 1; text-align: start; font-size: 10.5px; font-weight: 800; color: #0f2238; }
+.bidmap .bm-key-chev { color: #6b8fa8; font-size: 11px; transition: 0.15s; }
+.bidmap .bm-key-chev.open { transform: rotate(90deg); }
+.bidmap .bm-key-body { padding: 0 14px 12px; }
+.bidmap .bm-key-h { font-size: 9.5px; font-weight: 800; color: #6b8fa8; margin-bottom: 7px; }
+.bidmap .bm-key-row { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
+.bidmap .bm-key-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 7.5px;
+  font-weight: 900;
+}
+.bidmap .bm-key-txt { font-size: 10px; font-weight: 700; color: #1c3550; }
+.bidmap .bm-key-clause {
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid #e4edf5;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #6b8fa8;
+  line-height: 1.7;
+}
+.bidmap .bm-key-clause + .bm-key-clause { margin-top: 6px; padding-top: 0; border-top: 0; }
+
+/* Zero bids → the site pin alone, an empty state, and NO bid list (AC-29, AC-99). */
+.bidmap .bm-empty {
+  position: absolute;
+  z-index: 24;
+  top: 18px;
+  inset-inline-end: 18px;
+  width: 392px;
+  max-width: calc(100% - 130px);
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid #e4edf5;
+  border-radius: 18px;
+  box-shadow: 0 16px 44px rgba(15, 34, 56, 0.18);
+  padding: 18px;
+  text-align: center;
+}
+.bidmap .bm-empty-t { font-size: 13.5px; font-weight: 800; color: #0f2238; }
+.bidmap .bm-empty-s { font-size: 11px; font-weight: 600; color: #6b8fa8; margin-top: 6px; line-height: 1.7; }
+
+/* ── T11 · view toggle ─────────────────────────────────────────────────────────────────────────── */
+.bm-toggle { display: flex; gap: 4px; flex-shrink: 0; background: #eff4f9; padding: 3px; border-radius: 11px; }
+.bm-toggle button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #6b8fa8;
+  border-radius: 9px;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
+}
+.bm-toggle button.on { background: #fff; border-color: #d4e0ec; color: #1c3550; box-shadow: 0 1px 3px rgba(15, 34, 56, 0.08); }
+.bm-toggle button .material-icons-outlined { font-size: 17px; }
+
+/* Prototype keyframes (design.md §5), all disabled under `prefers-reduced-motion`. */
+@keyframes dpPulse { 0% { transform: scale(0.55); opacity: 0.9; } 70% { transform: scale(1.3); opacity: 0; } 100% { opacity: 0; } }
+@keyframes dpFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes dpPing {
+  0% { box-shadow: 0 0 0 0 rgba(243, 167, 122, 0.5); }
+  70% { box-shadow: 0 0 0 8px rgba(243, 167, 122, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(243, 167, 122, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Pseudo-elements too — the site pin's ping is a `::after`, which `*` does not match. */
+  .bidmap *, .bidmap *::before, .bidmap *::after,
+  .bm-sitepin, .bm-sitepin *, .bm-sitepin *::before, .bm-sitepin *::after {
+    animation: none !important;
+  }
+}
