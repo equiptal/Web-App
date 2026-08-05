@@ -351,7 +351,10 @@ describe("colourKeyModel — exactly one scale (AC-129/130/167/168)", () => {
   it("carries no amber and no supplier-level aggregate", () => {
     const entries = colourKeyModel().scales.flatMap((s) => s.entries);
     expect(entries).toHaveLength(2);
-    expect(entries.map((e) => e.colour.toLowerCase())).toEqual(["#12904a", "#c62a2a"]);
+    // The PROTOTYPE's pair, not §6.3.1's `#12904A`/`#C62A2A` (design.md §7 decision 1, 2026-08-06):
+    // AC-168 requires all four surfaces to be the same red, so exactly one pair can exist, and this is
+    // the one the pin, the machine chip and the composition bar already draw.
+    expect(entries.map((e) => e.colour.toLowerCase())).toEqual(["#16a34a", "#d9362a"]);
   });
 
   it("colours a pin and its panel chip from the same table, so the four surfaces cannot diverge (AC-168)", () => {

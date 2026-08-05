@@ -818,6 +818,64 @@ export const en = {
     deleteError: "We couldn't delete your account. Please try again.",
     offline: "You appear to be offline. Please try again.",
   },
+  /**
+   * Deal-room rentee map (RMAP, spec §6.6). Every string on the map surface, in one block.
+   *
+   * Terminology: the supplier is **«المؤجّر»**, never «المورد» — decision 5 in the RMAP design
+   * reference. The shipped app uses «المؤجّر» 79 times against 21, so the spec's own wording is
+   * superseded and this block is the reference for the rest of the feature.
+   *
+   * Freshness copy (AC-230): nothing here may imply that offers update on their own. There is no
+   * push — `freshnessNote` states the three triggers explicitly (§7.5.1).
+   */
+  bidMap: {
+    // T11 — the view toggle
+    view: "Map",
+    listView: "List",
+    // Map canvas
+    yourSite: "Your site",
+    noSiteLocation: "This request has no project location",
+    noBids: "No bids on this item yet",
+    // Availability vocabulary — ONE scale (§6.9.1)
+    confirmed: "Confirmed",
+    assumed: "Not confirmed",
+    noLocation: "Location not shared",
+    unitOf: "Unit {i} of {n}",
+    multiLocation: "{n} locations",
+    unitsConfirmed: "{c} confirmed · {a} not confirmed",
+    // T13 — the bid list panel
+    title: "Offers received",
+    pickSupplier: "Pick a lessor from the list to see their machines",
+    sortPrice: "Lowest price",
+    sortNearest: "Nearest",
+    sortNearestOff: "Nearest — needs a project location",
+    rate: "Offer price",
+    ratePer: "SAR / {unit}",
+    perDay: "day",
+    perWeek: "week",
+    perMonth: "month",
+    perJob: "job",
+    distance: "Distance",
+    km: "km",
+    cheapest: "Lowest price of all offers",
+    offPlatform: "Off-platform",
+    justArrived: "Just arrived",
+    unitsOfferedLine: "{n} offered",
+    unitsIdentifiedLine: "{n} identified — serial, documents and location",
+    unitsUnidentifiedLine: "{n} unidentified — readiness can't be checked",
+    refresh: "Refresh",
+    refreshing: "Refreshing…",
+    freshnessNote: "Offers update when you open this page, come back to it, or press refresh.",
+    // T15 — the colour key, hosted inside the panel
+    keyToggle: "What do the colours mean?",
+    keyHeading: "Every pin on the map is one machine",
+    keyConfirmed: "Confirmed — the lessor confirmed its yard in the offer readiness",
+    keyUnconfirmed: "Not confirmed — he hasn't confirmed it yet",
+    keyNotUnavailable:
+      "“Not confirmed” does not mean unavailable — it means the lessor hasn't named its yard in the offer readiness yet. Ask him to confirm from the machine panel.",
+    keyCountOnly: "Units added as a count only don't appear on the map — no machine is registered for them.",
+    keyOffPlatform: "Off-platform offers carry no location, so they get no pin.",
+  },
   survey: {
     navTitle: "Surveys",
     badgeAria: "You have a survey waiting",
