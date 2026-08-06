@@ -874,6 +874,25 @@ export const en = {
     keyNotUnavailable:
       "“Not confirmed” does not mean unavailable — it means the lessor hasn't named its yard in the offer readiness yet. Ask him to confirm from the machine panel.",
     keyCountOnly: "Units added as a count only don't appear on the map — no machine is registered for them.",
+    // T16 — the machine pin. The SHORT wording, which coexists with the panel chip's longer phrasing
+    // by decision (design.md §7 decision 2): one fact, two lengths — 9px inside a 132px marker can't
+    // carry "Availability confirmed".
+    pinAvailable: "Available",
+    pinUnconfirmed: "Not confirmed",
+    pinRequestable: "You can request it",
+    pinDocs: "docs",
+    loadingFleet: "Loading this lessor's machines…",
+    // What the map is NOT showing, in words. Silence would read as "this lessor has no machines".
+    claimedNotDrawn: "{n} of the offered units aren't on the map",
+    claimedNotDrawnWhy:
+      "They were added as a count only — no machine is registered for them, so they have no location, documents or serial to show.",
+    noLocatable: "None of this lessor's machines can be placed",
+    noLocatableWhy:
+      "He hasn't shared a yard for any machine that fits this request, so nothing can be drawn. Ask him to confirm a yard.",
+    offPlatformNoPins: "An off-platform offer has no pin",
+    offPlatformNoPinsWhy: "It was submitted through your shared link, so it carries no registered machine and no location.",
+    fleetFailed: "The machines couldn't be loaded",
+    fleetFailedWhy: "This isn't a statement about the offer. Press refresh to try again.",
     keyOffPlatform: "Off-platform offers carry no location, so they get no pin.",
   },
   survey: {

@@ -65,6 +65,130 @@
   box-shadow: 0 2px 8px rgba(15, 34, 56, 0.18);
 }
 
+/* ── Machine pin (design.md §4.2) ────────────────────────────────────────────────────────────────
+   132×86, anchored [66,86] by the `divIcon` itself. Every value below is static geometry; the colour,
+   the border STYLE (solid in-offer / dashed not-in-offer), the halo and each bar segment's fill are
+   state-dependent and stay inline in `MapCanvas.machineIcon`.
+
+   `direction: rtl` is set on the pin, not inherited: Leaflet draws its own LTR canvas (AC-30, AC-98).
+
+   Deliberately ABSENT, both by decision (design.md §7): the prototype's numeric index badge (١ ٢ ٣ at
+   `bottom:-6px` — decision 3, the invented per-unit index §6.3.3 bans) and its taxonomy EMOJI in the
+   circle (decision 4 — AC-80 wants the request item's taxonomy image, then the category image, then a
+   generic icon, never a broken image). */
+.bm-pin {
+  direction: rtl;
+  width: 132px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  font-family: inherit;
+}
+.bm-pin .bm-pin-c {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+/* The icon is ALWAYS in the DOM and the image is painted OVER it — a `divIcon` is an HTML string with
+   no React lifecycle, so `EquipImg`'s `onError` swap is unavailable. A 404 simply never paints and the
+   glyph shows through: the same fallback chain, with no broken-image state to reach (AC-80). */
+.bm-pin .bm-pin-glyph { font-size: 20px; color: #fff; line-height: 1; }
+.bm-pin .bm-pin-img {
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background-color: transparent;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 62%;
+}
+/* Not offered on this bid: a white circle with a dashed ring and a “+” — «you can request it». */
+.bm-pin .bm-pin-plus { font-size: 17px; font-weight: 900; line-height: 1; }
+.bm-pin .bm-pin-tick {
+  position: absolute;
+  top: -7px;
+  inset-inline-end: -7px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #2563eb;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+  box-sizing: border-box;
+}
+/* Readiness — the SECOND, independent channel (AC-55→58): one segment per required document, filled to
+   the band's colour. Never merged with the availability colour above it; when the two disagree, that
+   disagreement is the information. */
+.bm-pin .bm-pin-bar { margin-top: 7px; width: 66px; display: flex; gap: 2px; }
+.bm-pin .bm-pin-seg { flex: 1; height: 4px; border-radius: 2px; }
+.bm-pin .bm-pin-chip {
+  margin-top: 5px;
+  background: #fff;
+  border-radius: 8px;
+  padding: 2px 8px;
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+  color: #0f2238;
+  box-shadow: 0 2px 8px rgba(15, 34, 56, 0.18);
+}
+
+/* Loading the selected bid's fleet — the map says it is working rather than looking empty (§6.2). */
+.bidmap .bm-mapbusy {
+  position: absolute;
+  z-index: 12;
+  top: 18px;
+  inset-inline-start: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid #e4edf5;
+  border-radius: 20px;
+  padding: 7px 13px;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #1c3550;
+  box-shadow: 0 8px 24px rgba(15, 34, 56, 0.14);
+}
+.bidmap .bm-mapbusy .bm-spin {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(37, 99, 235, 0.25);
+  border-top-color: #2563eb;
+  animation: bmSpin 0.8s linear infinite;
+}
+@keyframes bmSpin { to { transform: rotate(360deg); } }
+
+/* What the map is NOT showing, stated in words: the claimed-unit shortfall that is never drawn
+   (AC-77), a supplier with nothing locatable (AC-100), an off-platform bid with no pin (AC-197). */
+.bidmap .bm-info {
+  position: absolute;
+  z-index: 12;
+  bottom: 18px;
+  inset-inline-start: 18px;
+  max-width: min(330px, calc(100% - 130px));
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid #e4edf5;
+  border-radius: 12px;
+  padding: 10px 13px;
+  box-shadow: 0 8px 24px rgba(15, 34, 56, 0.14);
+}
+.bidmap .bm-info-t { font-size: 10.5px; font-weight: 800; color: #0f2238; }
+.bidmap .bm-info-s { font-size: 9.5px; font-weight: 600; color: #6b8fa8; margin-top: 4px; line-height: 1.7; }
+
 /* A request with no `projectLat/Lng` still renders the canvas (AC-21) — it just says so. */
 .bidmap .bm-nosite {
   position: absolute;
