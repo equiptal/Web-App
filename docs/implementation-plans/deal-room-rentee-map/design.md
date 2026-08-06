@@ -105,12 +105,16 @@ non-selected rows while something IS selected → opacity .55 ; transition .15s
 circle        44×44; radius 50%
   in offer    background = confirmed ? #16A34A : #D9362A ; border 3px SOLID #fff
   not offered background #fff ; border 3px DASHED <ring colour> ; content is a “+” in the ring colour
-  content     the request item's taxonomy emoji (in-offer)
+  content     ⚠ the prototype draws the taxonomy EMOJI here. DO NOT — decision 4 (§7): AC-80 wants the
+              request item's taxonomy IMAGE → category image → generic icon, never a broken image.
+              Built as: the icon glyph is always present and the image paints OVER it, so a 404 simply
+              never paints and no broken state exists (a divIcon is an HTML string — no onError).
 halo          selected → 0 0 0 4px rgba(37,99,235,.35), 0 6px 16px rgba(15,34,56,.32)
               else     → 0 5px 14px rgba(15,34,56,.3)
 tick          selected only: 18px blue circle, top:-7px, insetInlineEnd:-7px, 2px white border
-index badge   in-offer only: min-width 17px, h 17px, bg #0F2238, bottom:-6px, insetInlineStart:-6px,
-              9px/800, 2px white border            ← see Conflicts #3
+index badge   ⚠ DROPPED — decision 3 (§7). The prototype puts ١ ٢ ٣ on in-offer pins; §6.3.3 bans that
+              invented per-unit index, and the ban applies identically here. Values kept only so the
+              prototype diff reads clean: min-width 17px, h 17px, bg #0F2238, bottom/insetInlineStart -6px
 readiness bar margin-top 7px; width 66px; gap 2px; one segment per required document
               segment h 4px, radius 2px; filled = band colour; empty = rgba(15,34,56,.14)
 label chip    margin-top 5px; bg #fff; border 1px (dashed when not offered) ring colour; radius 8px
