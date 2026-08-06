@@ -70,7 +70,19 @@ const certLabel = (code: string): { labelEn: string; labelAr: string } => {
   return { labelEn: l.en, labelAr: l.ar };
 };
 
-function computeUnit(
+/**
+ * Score ONE machine against the request's asks. **Exported for RMAP T16**, which scores fleet machines
+ * the bid never offered: those have no `BidCard` of their own, so `computeBidReadiness` (which reads
+ * the request-side asks off a bid) cannot reach them. There must be exactly one scorer — a second one
+ * would let the pin's readiness bar and the bid card's readiness badge disagree about the same machine.
+ *
+ * The request-side arguments are the SAME three `computeBidReadiness` derives; use
+ * `readinessInputsFor` to derive them so the normalisation cannot drift either.
+ *
+ * `computeBidReadiness`'s behaviour is unchanged by this export — the mobile app mirrors that function
+ * in `bid_readiness.dart`, and only the name and visibility of this helper moved.
+ */
+export function computeUnitReadiness(
   unit: OfferedUnitDetail,
   reqEquipCerts: string[],
   reqOperatorCerts: string[],
@@ -131,18 +143,45 @@ function computeUnit(
   };
 }
 
+/** The three request-side asks a machine is scored against. */
+export interface ReadinessInputs {
+  /** Canonicalised equipment-cert codes the request asked for. */
+  equipCerts: string[];
+  /** Operator-cert tokens the request asked for (the raw licence-level string, split). */
+  operatorCerts: string[];
+  /** The raw equipment-year requirement (a min year like 2020, or an age). */
+  minYear: number | null;
+}
+
+/**
+ * Derive the request-side asks from anything carrying them. Extracted verbatim out of
+ * `computeBidReadiness` so RMAP T16 can score a fleet machine the bid never offered with exactly the
+ * same normalisation — `normCert` folds `saso_technical_inspection` into `saso`, and the operator ask
+ * is one free-text field that has to be split before it can be matched.
+ */
+export function readinessInputsFor(src: {
+  reqEquipmentCerts?: string[] | null;
+  operatorCertReq?: string | null;
+  reqMinYear?: number | null;
+}): ReadinessInputs {
+  return {
+    equipCerts: (src.reqEquipmentCerts ?? []).map(normCert),
+    operatorCerts: String(src.operatorCertReq ?? "")
+      .split(/[,/]/)
+      .map((s) => s.trim())
+      .filter(Boolean),
+    minYear: src.reqMinYear ?? null,
+  };
+}
+
 /** Compute readiness for a bid. Returns null for off-platform / non-unit bids (no `offeredUnitsDetail`). */
 export function computeBidReadiness(bid: BidCard): BidReadiness | null {
   const detail = bid.offeredUnitsDetail;
   if (!detail || detail.length === 0) return null;
 
-  const reqEquipCerts = (bid.reqEquipmentCerts ?? []).map(normCert);
-  const reqOperatorCerts = String(bid.operatorCertReq ?? "")
-    .split(/[,/]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const { equipCerts: reqEquipCerts, operatorCerts: reqOperatorCerts } = readinessInputsFor(bid);
 
-  const units = detail.map((u) => computeUnit(u, reqEquipCerts, reqOperatorCerts, bid.reqMinYear));
+  const units = detail.map((u) => computeUnitReadiness(u, reqEquipCerts, reqOperatorCerts, bid.reqMinYear));
   const sumDone = units.reduce((a, u) => a + u.done, 0);
   const sumTotal = units.reduce((a, u) => a + u.total, 0);
   const percent = sumTotal > 0 ? Math.round((sumDone / sumTotal) * 100) : 100;
