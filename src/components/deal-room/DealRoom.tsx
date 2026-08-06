@@ -890,7 +890,11 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
             const isLocation = custom.kind === "location" && Number.isFinite(lat) && Number.isFinite(lng);
             const shownText = translations[m.id] ?? m.text;
             const canTranslate = !mine && !isLocation && !!(m.text ?? "").trim();
-            // Attachments are downloadable/openable only once the deal is CLOSED (app parity: isDownloadEnabled).
+            // Attachments are open to both parties at ANY status. A file the counterparty deliberately
+            // sent in chat is the recipient's to keep — a renter has to be able to save a quotation while
+            // they're deciding on it, which is precisely when the room is NOT closed. The old lock (open
+            // only once `closed`, app parity with mobile's isDownloadEnabled) was never protection either:
+            // images were viewable inline the whole time, so it only added friction.
             const attName = (a: StreamAttachment) => a.title || (a.type === "image" ? L("Photo", "صورة") : a.type === "audio" || (a.mime_type || "").startsWith("audio/") ? L("Voice note", "ملاحظة صوتية") : L("Attachment", "مرفق"));
             return (
               <div className={`msg ${mine ? "mine" : "them"}`} key={m.id}>
@@ -901,12 +905,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
                   </a>
                 ) : shownText}
                 {m.attachments?.map((a, i) =>
-                  !closed ? (
-                    <span key={i} className="msg-att-lock" title={L("Available after the deal is confirmed", "متاح بعد تأكيد الصفقة")}>
-                      <span className="material-icons-outlined">lock</span>
-                      <span className="msg-att-name">{attName(a)}</span>
-                    </span>
-                  ) : a.type === "image" ? (
+                  a.type === "image" ? (
                     <a key={i} href={a.image_url || a.thumb_url} target="_blank" rel="noopener noreferrer" className="msg-att-img">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={a.thumb_url || a.image_url} alt={a.fallback || ""} />
@@ -916,7 +915,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
                   ) : (
                     <a key={i} href={a.asset_url} target="_blank" rel="noopener noreferrer" className="msg-att-file">
                       <span className="material-icons-outlined">{(a.mime_type || "").includes("pdf") ? "picture_as_pdf" : "insert_drive_file"}</span>
-                      <span className="msg-att-name">{a.title || L("Attachment", "مرفق")}</span>
+                      <span className="msg-att-name">{attName(a)}</span>
                     </a>
                   ),
                 )}
