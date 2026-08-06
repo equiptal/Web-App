@@ -41,6 +41,47 @@ const STREAM_KEY = process.env.NEXT_PUBLIC_STREAM_API_KEY ?? "";
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
 type LFn = (en: string, arr: string) => string;
 
+/** A chat attachment's filename. `attName` produces a LOCALISED label for the bubble ("مرفق"), which is
+ *  the wrong thing to write to disk — prefer the real title, then the name off the URL. */
+function attFilename(a: StreamAttachment): string {
+  const title = (a.title ?? "").trim();
+  if (title) return title;
+  const path = (a.asset_url || a.image_url || a.thumb_url || "").split(/[?#]/)[0];
+  const last = decodeURIComponent(path.split("/").pop() ?? "");
+  return last || "attachment";
+}
+
+/**
+ * SAVE a chat attachment to the device, as opposed to opening it.
+ *
+ * The bubble's anchor navigates to the file, which for a PDF or an image means the browser renders it in
+ * a tab — you can read it, but there's no in-page way to keep a copy. This fetches the bytes and hands
+ * the browser a blob with a filename, the same idiom the export/quotation downloads use.
+ *
+ * `download` on a plain anchor would NOT do: the attachment lives on Stream's CDN, and browsers ignore
+ * the attribute cross-origin.
+ *
+ * Falls back to opening the URL if the fetch is refused (a CDN that sends no CORS headers). That's the
+ * behaviour the anchor already gives, so the button can never be worse than not having it.
+ */
+async function saveAttachment(url: string, filename: string): Promise<void> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(objectUrl);
+  } catch {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+}
+
 // Deal-room chat attachments — matched EXACTLY to the mobile app (chat_input_bar.dart): images +
 // documents ≤ 10 MB, video ≤ 25 MB, and ONE attachment per message. The web used to allow any file,
 // any size, multiple at once — these bring it in line.
@@ -904,21 +945,35 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
                     <span className="msg-att-name">{(shownText && String(shownText).trim()) || L("Shared location", "موقع مشترك")}</span>
                   </a>
                 ) : shownText}
-                {m.attachments?.map((a, i) =>
-                  a.type === "image" ? (
-                    <a key={i} href={a.image_url || a.thumb_url} target="_blank" rel="noopener noreferrer" className="msg-att-img">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={a.thumb_url || a.image_url} alt={a.fallback || ""} />
-                    </a>
-                  ) : a.type === "audio" || (a.mime_type || "").startsWith("audio/") ? (
-                    <audio key={i} controls preload="none" src={a.asset_url} className="msg-att-audio" style={{ display: "block", maxWidth: "100%", marginTop: 6 }} />
-                  ) : (
-                    <a key={i} href={a.asset_url} target="_blank" rel="noopener noreferrer" className="msg-att-file">
-                      <span className="material-icons-outlined">{(a.mime_type || "").includes("pdf") ? "picture_as_pdf" : "insert_drive_file"}</span>
-                      <span className="msg-att-name">{attName(a)}</span>
-                    </a>
-                  ),
-                )}
+                {m.attachments?.map((a, i) => {
+                  // The element itself OPENS the attachment (image fullsize, PDF in the browser's viewer,
+                  // voice note inline). Saving is a separate, explicit action beside it — opening a file
+                  // is not keeping it, and the anchor alone gave no way to keep it.
+                  const src = a.asset_url || a.image_url || a.thumb_url || "";
+                  return (
+                    <Fragment key={i}>
+                      {a.type === "image" ? (
+                        <a href={a.image_url || a.thumb_url} target="_blank" rel="noopener noreferrer" className="msg-att-img">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={a.thumb_url || a.image_url} alt={a.fallback || ""} />
+                        </a>
+                      ) : a.type === "audio" || (a.mime_type || "").startsWith("audio/") ? (
+                        <audio controls preload="none" src={a.asset_url} className="msg-att-audio" style={{ display: "block", maxWidth: "100%", marginTop: 6 }} />
+                      ) : (
+                        <a href={a.asset_url} target="_blank" rel="noopener noreferrer" className="msg-att-file">
+                          <span className="material-icons-outlined">{(a.mime_type || "").includes("pdf") ? "picture_as_pdf" : "insert_drive_file"}</span>
+                          <span className="msg-att-name">{attName(a)}</span>
+                        </a>
+                      )}
+                      {src && (
+                        <button type="button" className="msg-att-dl" onClick={() => void saveAttachment(src, attFilename(a))}>
+                          <span className="material-icons-outlined">download</span>
+                          {L("Save", "حفظ")}
+                        </button>
+                      )}
+                    </Fragment>
+                  );
+                })}
                 {canTranslate && (
                   <button type="button" className="msg-tr" disabled={translating === m.id} onClick={() => void translateMsg(m)}>
                     {translating === m.id ? L("Translating…", "جارٍ الترجمة…") : translations[m.id] ? L("Show original", "النص الأصلي") : L("Translate", "ترجمة")}
