@@ -1,6 +1,7 @@
 import type { AgentDraft, RfqRequestPayload, Taxonomy } from "@/lib/contract";
 import type { RequestListItem, RequestRecord } from "@/lib/contract/requests";
 import type { BidCard } from "@/lib/contract/bids";
+import type { FleetMachine } from "@/lib/contract/fleet";
 import type { DealRoomView, DealRoomDocuments, QuotationView } from "@/lib/contract/deal-room";
 import type { ComputedBid, RecommendResult, BidAskResult, BidParseResult, AwardNudgeResult, PreferencePreset, RankingPreference, RankedBid, BidEventInput, NormalizedBid, TermMatch, QuoteMatchCheck } from "@/lib/contract/agent-bids";
 import type { TransformRequestCtx } from "@/lib/contract/bid-form";
@@ -234,6 +235,17 @@ export function updateRequest(id: string, patch: Record<string, unknown>): Promi
 /** Bids received on a request (active then expired). */
 export function fetchBids(requestId: string): Promise<{ bids: BidCard[] }> {
   return getJson<{ bids: BidCard[] }>(`/api/me/requests/${encodeURIComponent(requestId)}/bids`);
+}
+
+/**
+ * RMAP T16 — every qualifying machine the BID's supplier owns, for the map's fleet pins.
+ *
+ * Keyed by BID, not by supplier: one firm can hold several bids on one request, and `inBid` /
+ * `yardConfirmed` differ between them — so a supplier-keyed cache would show one bid's offer on
+ * another's map. Callers cache by `bidId` for the same reason.
+ */
+export function fetchBidFleet(bidId: string): Promise<{ machines: FleetMachine[] }> {
+  return getJson<{ machines: FleetMachine[] }>(`/api/me/bids/${encodeURIComponent(bidId)}/fleet`);
 }
 
 /** Accept a supplier's bid. */

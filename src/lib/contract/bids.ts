@@ -128,51 +128,62 @@ export interface OfferedUnitDetail {
   locationSource?: UnitLocationSource;
 }
 
+const OFFERED_UNIT_LOCATION_SOURCES: UnitLocationSource[] = ["unit_yard", "bid_pin", "bid_yard", "listing_yard", "unidentified", "none"];
+/** An unrecognised level reads as ABSENT, not as a made-up one: a level we can't name must never be
+ *  guessed into `unit_yard`, which is the only value that turns a pin green. */
+function offeredUnitLocationSource(v: unknown): UnitLocationSource | undefined {
+  const t = String(v ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  return OFFERED_UNIT_LOCATION_SOURCES.find((x) => x === t);
+}
+
+/**
+ * ONE raw `offeredUnitsDetail` entry → a typed unit, camel/snake tolerant.
+ *
+ * Exported because the §7.12 fleet endpoint (`GET /marketplace/bids/{bidId}/fleet`) serves rows of
+ * exactly this shape — the backend projects both through the same `projectOfferedUnit` — plus three
+ * extra fields. `fleet.ts` extends this rather than re-deriving it, so a bid's units and its supplier's
+ * fleet can never be parsed into two subtly different objects.
+ */
+export function mapOfferedUnit(raw: unknown): OfferedUnitDetail {
+  const str = (v: unknown): string | null => (v == null || v === "" ? null : String(v));
+  const num = (v: unknown): number | null => (typeof v === "number" ? v : v != null && v !== "" && !isNaN(Number(v)) ? Number(v) : null);
+  const o = (raw ?? {}) as Record<string, unknown>;
+  const docs = (Array.isArray(o.documentKeys) ? o.documentKeys : Array.isArray(o.document_keys) ? o.document_keys : []) as unknown[];
+  const photos = (Array.isArray(o.photoKeys) ? o.photoKeys : Array.isArray(o.photo_keys) ? o.photo_keys : []) as unknown[];
+  const yard = ((o.yard ?? {}) as Record<string, unknown>) ?? {};
+  return {
+    equipmentId: String(o.equipmentId ?? o.equipment_id ?? o.id ?? ""),
+    manufacturer: str(o.manufacturer ?? o.make),
+    modelName: str(o.modelName ?? o.model_name ?? o.model),
+    year: num(o.year),
+    fuelType: str(o.fuelType ?? o.fuel_type),
+    licensePlateNumber: str(o.licensePlateNumber ?? o.license_plate_number ?? o.plate),
+    subcategoryName: str(o.subcategoryName ?? o.subcategory_name),
+    subcategoryNameAr: str(o.subcategoryNameAr ?? o.subcategory_name_ar),
+    measurementName: str(o.measurementName ?? o.measurement_name),
+    measurementNameAr: str(o.measurementNameAr ?? o.measurement_name_ar),
+    documentKeys: docs.map((d) => { const x = (d ?? {}) as Record<string, unknown>; return { type: String(x.type ?? x.code ?? ""), key: String(x.key ?? ""), url: str(x.url), verifyStatus: str(x.verifyStatus ?? x.verify_status), expiryDate: str(x.expiryDate ?? x.expiry_date) }; }),
+    photoKeys: photos.map((p) => { const x = (p ?? {}) as Record<string, unknown>; return { slot: String(x.slot ?? x.type ?? ""), key: String(x.key ?? ""), url: str(x.url) }; }),
+    // §7.2 per-unit location, camel/snake tolerant like every other field here. The backend flattens
+    // the yard onto the unit; a nested `yard: {…}` is accepted too so an older/other projection of the
+    // same data still parses. `yardConfirmed` stays undefined when absent — `false` would assert the
+    // supplier declined to confirm, which is not what a missing field means.
+    yardId: str(o.yardId ?? o.yard_id ?? yard.id),
+    yardName: str(o.yardName ?? o.yard_name ?? yard.name),
+    yardCity: str(o.yardCity ?? o.yard_city ?? yard.city),
+    yardConfirmed: typeof (o.yardConfirmed ?? o.yard_confirmed) === "boolean" ? Boolean(o.yardConfirmed ?? o.yard_confirmed) : undefined,
+    lat: num(o.lat ?? o.latitude ?? yard.latitude ?? yard.lat),
+    lng: num(o.lng ?? o.longitude ?? yard.longitude ?? yard.lng),
+    distanceKm: num(o.distanceKm ?? o.distance_km),
+    locationSource: offeredUnitLocationSource(o.locationSource ?? o.location_source),
+  };
+}
+
 /** Parse the raw `offeredUnitsDetail` array (getBidList / getBidDetail) → typed units. undefined when
  *  absent/empty (off-platform bids), so the readiness surface only renders for native app bids. */
 function mapOfferedUnits(raw: unknown): OfferedUnitDetail[] | undefined {
   if (!Array.isArray(raw) || raw.length === 0) return undefined;
-  const str = (v: unknown): string | null => (v == null || v === "" ? null : String(v));
-  const num = (v: unknown): number | null => (typeof v === "number" ? v : v != null && v !== "" && !isNaN(Number(v)) ? Number(v) : null);
-  const LOCATION_SOURCES: UnitLocationSource[] = ["unit_yard", "bid_pin", "bid_yard", "listing_yard", "unidentified", "none"];
-  // An unrecognised level reads as ABSENT, not as a made-up one: a level we can't name must never be
-  // guessed into `unit_yard`, which is the only value that turns a pin green.
-  const src = (v: unknown): UnitLocationSource | undefined => {
-    const t = String(v ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
-    return LOCATION_SOURCES.find((x) => x === t);
-  };
-  return raw.map((u) => {
-    const o = (u ?? {}) as Record<string, unknown>;
-    const docs = (Array.isArray(o.documentKeys) ? o.documentKeys : Array.isArray(o.document_keys) ? o.document_keys : []) as unknown[];
-    const photos = (Array.isArray(o.photoKeys) ? o.photoKeys : Array.isArray(o.photo_keys) ? o.photo_keys : []) as unknown[];
-    const yard = ((o.yard ?? {}) as Record<string, unknown>) ?? {};
-    return {
-      equipmentId: String(o.equipmentId ?? o.equipment_id ?? o.id ?? ""),
-      manufacturer: str(o.manufacturer ?? o.make),
-      modelName: str(o.modelName ?? o.model_name ?? o.model),
-      year: num(o.year),
-      fuelType: str(o.fuelType ?? o.fuel_type),
-      licensePlateNumber: str(o.licensePlateNumber ?? o.license_plate_number ?? o.plate),
-      subcategoryName: str(o.subcategoryName ?? o.subcategory_name),
-      subcategoryNameAr: str(o.subcategoryNameAr ?? o.subcategory_name_ar),
-      measurementName: str(o.measurementName ?? o.measurement_name),
-      measurementNameAr: str(o.measurementNameAr ?? o.measurement_name_ar),
-      documentKeys: docs.map((d) => { const x = (d ?? {}) as Record<string, unknown>; return { type: String(x.type ?? x.code ?? ""), key: String(x.key ?? ""), url: str(x.url), verifyStatus: str(x.verifyStatus ?? x.verify_status), expiryDate: str(x.expiryDate ?? x.expiry_date) }; }),
-      photoKeys: photos.map((p) => { const x = (p ?? {}) as Record<string, unknown>; return { slot: String(x.slot ?? x.type ?? ""), key: String(x.key ?? ""), url: str(x.url) }; }),
-      // §7.2 per-unit location, camel/snake tolerant like every other field here. The backend flattens
-      // the yard onto the unit; a nested `yard: {…}` is accepted too so an older/other projection of the
-      // same data still parses. `yardConfirmed` stays undefined when absent — `false` would assert the
-      // supplier declined to confirm, which is not what a missing field means.
-      yardId: str(o.yardId ?? o.yard_id ?? yard.id),
-      yardName: str(o.yardName ?? o.yard_name ?? yard.name),
-      yardCity: str(o.yardCity ?? o.yard_city ?? yard.city),
-      yardConfirmed: typeof (o.yardConfirmed ?? o.yard_confirmed) === "boolean" ? Boolean(o.yardConfirmed ?? o.yard_confirmed) : undefined,
-      lat: num(o.lat ?? o.latitude ?? yard.latitude ?? yard.lat),
-      lng: num(o.lng ?? o.longitude ?? yard.longitude ?? yard.lng),
-      distanceKm: num(o.distanceKm ?? o.distance_km),
-      locationSource: src(o.locationSource ?? o.location_source),
-    };
-  });
+  return raw.map(mapOfferedUnit);
 }
 
 export interface BidCard {
