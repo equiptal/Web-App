@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/ui";
+import { copyBidLink } from "@/lib/bidCardHtml";
 
 // Flip to true once the `logo_url` migration is applied + the agents backend redeployed.
 const LOGO_ENABLED = false;
@@ -93,9 +94,21 @@ export function ShareForBidsSheet({
     ? L(`${renter} invites you to submit a bid (RFQ) for their equipment request: ${shareUrl}`, `يدعوك ${renter} لتقديم عرض سعر (طلب عروض أسعار) على طلب معداته: ${shareUrl}`)
     : L(`You're invited to submit a bid (RFQ) for an equipment request: ${shareUrl}`, `أنت مدعوٌّ لتقديم عرض سعر (طلب عروض أسعار) على طلب معدات: ${shareUrl}`);
 
+  /**
+   * Copies the link as BOTH the rich card and the plain URL — one clipboard write, two flavours.
+   *
+   * Gmail never builds a preview for a pasted URL (it refuses to fetch the page), so the only way a
+   * renter's emailed link shows a card is to put the card itself on the clipboard. Gmail's composer
+   * keeps pasted HTML, so it renders. WhatsApp and SMS take the plain flavour instead and unfurl the
+   * URL themselves, so nothing that works today changes.
+   *
+   * Degrades to the plain URL on its own if anything fails — see `copyBidLink`.
+   */
   const copyLink = () => {
     if (!shareUrl) return;
-    navigator.clipboard?.writeText(shareUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); }).catch(() => {});
+    copyBidLink(shareUrl, ar ? "ar" : "en")
+      .catch(() => false)
+      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); });
   };
   const shareVia = (kind: "WhatsApp" | "Email" | "SMS" | "More") => {
     const enc = encodeURIComponent(message);
