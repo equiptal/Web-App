@@ -189,7 +189,7 @@ machine. Draft and sent states render through the **same component** (AC-118).
 
 No stored status, no counter. Precedence, in order:
 
-1. Derivable kinds (`availability`, `document`, `add_to_offer`) → **state answers**, and overrides any echo.
+1. Derivable kinds (`availability`, `document`) → **state answers**, and overrides any echo. (`add_to_offer` is retired — 001 §6.7.1 — and must be rejected by validation.)
 2. Non-derivable (`alternative`) → the **echoed `resolution` answers**.
 3. Neither → genuinely open.
 
@@ -334,7 +334,7 @@ W6 is the only Phase 2 item that does not wait on the backend — start it in pa
 | Item | Blocked by | Where recorded |
 |---|---|---|
 | W7 pin colours | per-unit `yardConfirmed` + coordinates | 001 §7.2, AC-01→10 |
-| W16 live updates | bid events on `bids_{requestId}` | 001 §7.5, AC-11 |
+| ~~Live updates~~ *(this row once read "W16", an ID now held by W16 · Notification surfaces)* | **CANCELLED — not blocked, withdrawn.** There is no realtime mechanism (001 §7.5.1); freshness is refetch on mount/focus/post-send. Do not schedule this. | 001 §7.5.1, AC-190 |
 | Ownership documents viewable | product decision **made**, backend change not done | 001 §7.14, AC-101→103 |
 | Cross-room "my open requests" | deliberately not built — no table | 001 §7.13.5, open question 12 |
 | `term_reopened` unread | unclear whether its exclusion is deliberate | 002 open question 1 |
