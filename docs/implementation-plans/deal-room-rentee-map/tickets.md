@@ -385,16 +385,30 @@ or a photo — especially on a phone.
 **AC** 75, 76 · **New 2026-08-08.** Splits out of V8, which carried the operator's paperwork as a single
 row named "operator safety certificate" inside the machine's documents.
 
-- **A third group with its own rows and its own attention count.** An operator's papers are a different
-  subject with a different obligation; five documents behind one row hid both what was held and what was
-  owed.
+- **A third group with its own rows** ~~and its own attention count~~. An operator's papers are a
+  different subject with a different obligation; five documents behind one row hid both what was held and
+  what was owed. The count is withdrawn — see the bullet below.
 - ~~Every row is **viewable, downloadable and requestable** on the same terms as any other (V15 /
   AC-69)~~ — **withdrawn by the owner, later on 2026-08-08. These rows are a STATUS, not a document
   list:** present or not, green or red, and nothing else. No view, no download, no url. **Nothing
   validates an operator document on upload**, so handing the renter a file to open presents an unchecked
   upload as verified evidence, and this surface exists to answer *can I trust this?* — presence is a fact
-  the platform can stand behind, the contents are not. Requestable exactly when absent (AC-73's amended
-  rule); the group keeps its heading, its rows and its own attention count.
+  the platform can stand behind, the contents are not. ~~Requestable exactly when absent (AC-73's amended
+  rule); the group keeps its heading, its rows and its own attention count.~~
+- **Narrowed again by the owner, same day — the group is a STATUS ONLY and participates in nothing.**
+  *"Operator docs cannot be viewed or requested and are not part of docs — they are just a view of what
+  the supplier has."* What shipped after the first ruling still put a **checkbox on every missing
+  certificate** and composed it into the batch ask, and still counted the group. Both go: **no checkbox in
+  any mode, no place in either batch, no select-all key, no `docTypes` to ask with, and no attention
+  count** — neither its own pill nor a contribution to the tab's badge. The group keeps its **heading, its
+  rows, and green/red per certificate**. Mechanically it is two fields, not a third flag: the rows already
+  carried no url, and now carry `requestable: false`, so `docRowMode` answers `null` and every mechanism
+  on the tab already ignores a `null`-mode row.
+- **`DocGroup.attention` becomes `number | null`, and the operator's is `null`.** Not `0`: the pill reads
+  *"N rows need action from you"*, so a number promises an act that no longer exists here, while a zero
+  prints «لا ينقص شيء» in green over a red row. `null` means *this group makes no claim* — `DocRowList`
+  renders no pill and `EquipmentDetail` adds nothing (`g.attention ?? 0`). The type change is what forces
+  every reader to decide rather than inheriting a silent zero.
 - **Read `computeUnitReadiness`'s `operatorCerts` — `present`, ignoring `url` — not a second bucketing of
   `documentKeys`.** That is also what settles the row set: the scorer maps over the certs *this request
   asked for*, so an operator paper nobody asked about raises no row. `isOperatorDoc` still keeps a held
@@ -493,11 +507,28 @@ V15's row controls (AC-69).
   live and carrying the count; the disabled one keeps the same shape, greyed with a paler border, muted
   text, 70% opacity, `not-allowed` cursor.
 - **Select-all follows the mode:** «حدّد كل المتاح» / «حدّد كل الناقص», with «إلغاء التحديد (n)» back to
-  neutral. At neutral both links may appear rather than one mode being chosen for the renter.
+  neutral. ~~At neutral both links may appear rather than one mode being chosen for the renter.~~
+- **ONE link, never two — corrected 2026-08-08 against the owner's own prototype**, which draws a single
+  «حدّد كل المتاح» beside «إلغاء التحديد (٢)». **At neutral the majority of the group's tickable rows picks
+  the link:** *"if more than half is available then download; if more than half is missing, the request
+  will be the enabled one."* Two things the ruling left open and this ticket settles: an exact **tie** goes
+  to «حدّد كل المتاح», because download acts only on the renter's own screen while a request reaches the
+  lessor, so the undecided case should carry no outward consequence; and the majority is over the
+  **tickable** rows (`downloadKeys` / `requestKeys`, already filtered by `selectable`), because a held
+  paper with no url and every operator certificate are in neither list — counting them could hand the
+  majority to a link that then selected nothing. The loser is a **fallback, not a discard**: when the
+  preferred list is fully ticked the other is offered if it has rows left, so a group can never have
+  tickable rows and no way to tick them at once. **The footer is untouched** — at neutral both buttons
+  stay visible and disabled (AC-77).
+- **The active footer button is NAVY `#1C3550`**, the prototype's own `navy` token (`design-v3.md` §2 —
+  the fill its selected chips carry), not the `#2563EB` it shipped as. This does **not** reopen AC-33,
+  which rules on `.mp-act` beside a red availability chip where navy reads as switched off; these two
+  buttons sit under the row list with no chip near them.
 - **The per-row download control is removed; view is kept** (narrows AC-69, corrected in 004a).
 - **What did NOT change:** *you can only ask for what is not there* — `requestable` is still
-  `status === "missing"` and `batchDocumentRequest` still drops anything else — and a **held row with no
-  url** is tickable in **no** mode.
+  `status === "missing"` **for every family that is asked for at all** (the operator's is not, V16) and
+  `batchDocumentRequest` still drops anything else — and a **held row with no url** is tickable in **no**
+  mode.
 - **The company panel is the single-mode case and needed no fork.** Its rows are never requestable, so
   `selectionModeOf` can only answer `download` or neutral, the dimming path is unreachable, and its
   select-all reads «حدّد كل المتاح». It gets **no** request control, disabled or otherwise (AC-71/72).

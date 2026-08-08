@@ -68,8 +68,12 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest }: 
   // Every group's outstanding rows, so the tab badge agrees with the headings inside it. The groups are
   // request-dependent — a paper nobody asked for is not outstanding, and cannot be counted here — so
   // the badge reads the same `request` the grid above it is scored against.
+  //
+  // **A group whose `attention` is `null` adds nothing** — it is not zero, it is a group that makes no
+  // such claim (the operator's, owner 2026-08-08). The badge counts what the renter can act on, and there
+  // is nothing to act on there; counting it would send him to a tab and then to rows with no controls.
   const docAttention = useMemo(
-    () => equipmentDocGroups(machine, request).reduce((n, g) => n + g.attention, 0),
+    () => equipmentDocGroups(machine, request).reduce((n, g) => n + (g.attention ?? 0), 0),
     [machine, request],
   );
 

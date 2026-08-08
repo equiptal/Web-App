@@ -17,9 +17,10 @@
  *     onRequest={(draft) => compose(draft)}    // PanelRequestDraft — V11 owns the composer
  *   />
  *
- * **Up to three groups, each with its own attention count** — photos · documents · **the operator's
- * documents**, which are a section of their own and not one row buried in the equipment's papers. The
- * counts count **rows needing action, never totals**, and a group with nothing to say does not render.
+ * **Up to three groups** — photos · documents · **the operator's documents**, which are a section of
+ * their own and not one row buried in the equipment's papers. The first two carry an attention count of
+ * **rows needing action, never totals**; the operator's carries none (see below). A group with nothing to
+ * say does not render.
  *
  * **A row is red only if the request required it** (owner, 2026-08-08). A paper the lessor holds that
  * nobody asked for still shows and still opens, with no verdict and no tick — there is nothing to
@@ -38,10 +39,14 @@
  * last tick returns to neutral and re-enables everything, which is free here because the mode is
  * derived rather than stored. Every judgement is the model's; this component paints it.
  *
- * **The operator's group is a status, not a document list** (owner, same day). Its rows say only whether
- * each certificate is on file — no view, no download, no url — because nothing validates an operator
- * document on upload and this surface must not present an unchecked file as evidence. Those rows simply
- * arrive carrying no files, so the shared row grammar below needs no special case.
+ * **The operator's group is a status, not a document list** (owner, same day, narrowed later the same
+ * day). Its rows say only whether each certificate is on file — *"they are just a view of what the
+ * supplier has"* — and it **participates in nothing else on this tab**: no checkbox in either mode, no
+ * place in either batch, no select-all key, and no attention count of its own or in the tab badge above.
+ * Nothing validates an operator document on upload, so presence is the only claim the platform can stand
+ * behind and there is nothing here for the renter to act on. Those rows simply arrive with no files and
+ * `requestable: false`, so the shared row grammar below needs no special case — `docRowMode` answers
+ * `null` and every mechanism on this page already ignores a `null`-mode row.
  *
  * **Presence only.** `documentKeys` entries carry `verifyStatus` and `expiryDate`; this tab renders
  * neither, and the model never reads them. §6.6: a machine's paper is either there or it isn't, and a

@@ -38,9 +38,11 @@
  *
  * **The operator's certificates are the deliberate exception** (owner, 2026-08-08): they are a status —
  * on file or not — and expose no file at all, because nothing validates an operator document on upload
- * and a file the renter can open reads as evidence that was checked. Nothing here enforces that; those
- * rows simply arrive with no url, and a row with no url has already exposed no controls since V15. One
- * mechanism, not a second flag.
+ * and a file the renter can open reads as evidence that was checked. Narrowed the same day to **no
+ * checkbox and no ask either**: the group is outside the document machinery, not a quieter part of it.
+ * Nothing here enforces any of that; those rows simply arrive with no url and `requestable: false`, so
+ * their `mode` is `null` — and a `null`-mode row has drawn the held spacer, no tick and no controls since
+ * V15/V16. One mechanism, not a second flag.
  *
  * **Usage** — the caller owns selection state and the batch send; this renders and reports ticks.
  *
@@ -59,6 +61,7 @@
 import {
   arDigits,
   docRowActions,
+  type Bilingual,
   type CompanyDocStatus,
   type DocFile,
   type PresenceStatus,
@@ -140,8 +143,11 @@ export function DocRowList({
   L,
 }: {
   groupLabel: string;
-  /** Rows needing action — **never a total** (§6.1, AC-42). */
-  attention: number;
+  /** Rows needing action — **never a total** (§6.1, AC-42). **`null` renders no pill at all**, for a
+   *  group that makes no attention claim: the operator's certificates, which the renter cannot tick, ask
+   *  for or open, so neither a count nor a green "nothing outstanding" would be true of them
+   *  (`DocGroup.attention`). The heading itself stays. */
+  attention: number | null;
   /**
    * **The mode arrives already applied**, in each row's `selectable` — there is deliberately no `mode`
    * prop. One selection spans every group on the equipment tab, so the mode is the caller's to compute
@@ -171,35 +177,61 @@ export function DocRowList({
   const notAllOn = (keys: string[]) => keys.length > 0 && !keys.every((k) => selected!.has(k));
   const pickedKeys = hasSelection ? rows.filter((r) => selected!.has(r.key)).map((r) => r.key) : [];
 
+  // **ONE select-all link, never two** (owner, from his own prototype, 2026-08-08). Once a mode holds,
+  // the other mode's rows are unselectable and its key list is **empty**, so the ordering below resolves
+  // to that mode's own link without needing to be told which mode it is in.
+  //
+  // **At NEUTRAL the MAJORITY decides** (owner's ruling, same day): *"if more than half is available then
+  // download; if more than half is missing, the request will be the enabled one."* The link offered is
+  // the one most of the group's rows would answer, so the common act is the one click away.
+  //
+  // **The majority is counted over the TICKABLE rows, and it has to be.** `downloadKeys` / `requestKeys`
+  // are already `r.mode === m && r.selectable !== false` — so a held paper whose url the projection did
+  // not carry, and every operator certificate, are outside both counts. They are also outside both key
+  // lists, so counting them could hand the majority to a link that then selected nothing: a group of six
+  // operator rows and two held papers would offer «حدّد كل الناقص» and tick nothing at all.
+  //
+  // **A tie falls to «حدّد كل المتاح».** "More than half" leaves 50/50 undecided, and download is the
+  // side with no outward consequence — it arms «تنزيل», whose worst outcome is files the renter could
+  // already open landing on his own disk, against «اطلب من المؤجّر إرساله», whose worst outcome reaches
+  // the lessor. It also matches the company panel, whose single kind of row has only ever offered «حدّد
+  // كل المتاح».
+  //
+  // The loser is a **fallback, not a discard**: when the preferred list is already fully ticked the other
+  // is offered if it has anything left, so a group can never end up with tickable rows and no way to tick
+  // them at once. (While a mode holds the other list is empty, so this only ever fires at neutral.)
+  const byMajority: { keys: string[]; label: Bilingual }[] = [
+    { keys: downloadKeys, label: { en: "Select all available", ar: "حدّد كل المتاح" } },
+    { keys: requestKeys, label: { en: "Select all missing", ar: "حدّد كل الناقص" } },
+  ];
+  if (requestKeys.length > downloadKeys.length) byMajority.reverse();
+  const selectAll = hasSelection ? (byMajority.find((s) => notAllOn(s.keys)) ?? null) : null;
+
   return (
     <div className="mp-grp">
       <div className="mp-grp-h">
         <span>{groupLabel}</span>
-        <span className={`mp-att-pill${attention === 0 ? " done" : ""}`}>
-          {attention === 0
-            ? L("nothing outstanding", "لا ينقص شيء")
-            : L(`${attention} need attention`, `${arDigits(attention)} بحاجة إلى إجراء`)}
-        </span>
+        {attention !== null && (
+          <span className={`mp-att-pill${attention === 0 ? " done" : ""}`}>
+            {attention === 0
+              ? L("nothing outstanding", "لا ينقص شيء")
+              : L(`${attention} need attention`, `${arDigits(attention)} بحاجة إلى إجراء`)}
+          </span>
+        )}
       </div>
 
       {/* No bar at all when this list does not tick, and none when it ticks but nothing here CAN be
           ticked — never a disabled "Select all". A control whose only reachable outcome is an empty
           batch is the dead control AC-69 forbids, moved one step later.
 
-          At NEUTRAL both links can appear, because there is no mode yet for select-all to follow and
-          picking one for the renter would decide his mode for him. Once a mode holds, the other list is
-          empty and only its own link is left — which is also why the company panel, having one kind of
-          row, only ever shows «حدّد كل المتاح». */}
-      {hasSelection && (pickedKeys.length > 0 || notAllOn(downloadKeys) || notAllOn(requestKeys)) && (
+          ~~At NEUTRAL both links can appear~~ — withdrawn by the owner on 2026-08-08, against his own
+          prototype: **select-all follows the mode and there is one link.** Which one it is at neutral is
+          decided in `selectAll` above. */}
+      {hasSelection && (pickedKeys.length > 0 || selectAll) && (
         <div className="mp-selbar">
-          {notAllOn(downloadKeys) && (
-            <button type="button" className="mp-linkbtn" onClick={() => onToggleAll!(downloadKeys, true)}>
-              {L("Select all available", "حدّد كل المتاح")}
-            </button>
-          )}
-          {notAllOn(requestKeys) && (
-            <button type="button" className="mp-linkbtn" onClick={() => onToggleAll!(requestKeys, true)}>
-              {L("Select all missing", "حدّد كل الناقص")}
+          {selectAll && (
+            <button type="button" className="mp-linkbtn" onClick={() => onToggleAll!(selectAll.keys, true)}>
+              {L(selectAll.label.en, selectAll.label.ar)}
             </button>
           )}
           {pickedKeys.length > 0 && (

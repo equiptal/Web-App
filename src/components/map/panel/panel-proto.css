@@ -258,8 +258,8 @@
   cursor: pointer;
 }
 .mp-linkbtn:disabled { color: #c8d8e8; cursor: default; }
-/* «إلغاء التحديد (n)» — the way back to neutral. Quieter than the two select-alls beside it: undoing is
-   never the act being offered, only the one that must stay reachable. */
+/* «إلغاء التحديد (n)» — the way back to neutral. Quieter than the select-all beside it: undoing is never
+   the act being offered, only the one that must stay reachable. */
 .mp-linkbtn.muted { color: #6b8fa8; }
 
 .mp-row {
@@ -437,6 +437,13 @@
 .mp-act .tx b { display: block; font-size: 12px; font-weight: 700; color: #1c3550; }
 .mp-act .tx span { display: block; font-size: 9.5px; font-weight: 600; color: #6b8fa8; margin-top: 1px; }
 
+/* NAVY, not blue (owner, 2026-08-08, from his own prototype screenshot: «تنزيل (٢)» is the panel's dark
+   navy fill). `#1C3550` is the prototype's own `navy` token — design-v3.md §2, the same fill its selected
+   chips carry — read from that palette rather than sampled by eye.
+
+   This does NOT reopen AC-33, which is about `.mp-act` a few rules above: that control sits beside a red
+   availability chip where navy reads as switched off, and it stays blue. These two buttons sit under a
+   list of ticked rows with no chip near them, and the renter has just acted to light one of them. */
 .mp-send {
   width: 100%;
   margin-top: 8px;
@@ -444,9 +451,9 @@
   /* A border the same colour as the fill, so the ACTIVE and DISABLED buttons are exactly the same size.
      The disabled one keeps its shape and only changes colour — a control that shrinks when it goes dead
      makes the panel move under the renter's first tick. */
-  border: 1px solid #2563eb;
+  border: 1px solid #1c3550;
   border-radius: 11px;
-  background: #2563eb;
+  background: #1c3550;
   color: #fff;
   font-family: inherit;
   font-size: 11.5px;

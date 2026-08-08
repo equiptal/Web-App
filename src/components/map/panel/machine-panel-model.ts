@@ -536,6 +536,14 @@ export interface DocRow {
    * A **held** row is tickable too — for a different batch, downloading. `requestable` is now one half
    * of {@link docRowMode}, which is what the checkbox column reads; the rule above is unchanged by that
    * and a held paper is still never requestable.
+   *
+   * **One family is `false` in BOTH states — the operator's certificates** (owner, 2026-08-08, narrowing
+   * AC-75). *"Operator docs cannot be viewed or requested and are not part of docs — they are just a view
+   * of what the supplier has."* An absent operator certificate is therefore **not** a gap the renter may
+   * put in an ask, which is the one place the sentence above bends: *you can only ask for what is not
+   * there* still holds, but this family is outside the asking machinery altogether. See
+   * {@link operatorStatusRows} for why — nothing validates an operator document on upload, so presence is
+   * the only claim the platform can stand behind, and a status is all this group states.
    */
   requestable: boolean;
 }
@@ -546,8 +554,20 @@ export interface DocGroup {
   key: DocGroupKey;
   label: Bilingual;
   rows: DocRow[];
-  /** **Rows needing action, never a total** (§6.1, AC-42). Zero means nothing is outstanding. */
-  attention: number;
+  /**
+   * **Rows needing action, never a total** (§6.1, AC-42). Zero means nothing is outstanding.
+   *
+   * **`null` means this group makes no attention claim at all**, and exactly one does: the operator's
+   * (owner, 2026-08-08). The count's whole sentence is *"N rows here need action from you"* — and there
+   * is no action on that group: no tick, no ask, no file. A number would have to lie in one direction or
+   * the other, and both lies are worse than silence: counting the absent certificates promises an act the
+   * renter cannot perform, while reporting zero prints «لا ينقص شيء» in green over rows that are red.
+   * The group keeps its heading and its green/red rows, which is what the owner asked it to keep.
+   *
+   * It is `null` rather than `0` so every reader has to decide what to do with it —
+   * {@link DocRowList} renders no pill, and the tab badge adds nothing.
+   */
+  attention: number | null;
 }
 
 /** Rows needing action. The one definition, used by both document surfaces. */
@@ -649,8 +669,13 @@ export type SelectionMode = "download" | "request";
  *   else). *You can only ask for what is not there* survives untouched.
  * - **`"download"`** — the paper is there **and reachable**, i.e. {@link docRowActions} finds a url.
  * - **`null`** — neither. A **held row with no url** is the one that matters: the projection carried the
- *   paper but not its link, and the operator's certificates carry no url *by design* (AC-75). Nothing
- *   can be saved and nothing can be asked, so it is untickable in **every** mode, exactly as it is today.
+ *   paper but not its link. Nothing can be saved and nothing can be asked, so it is untickable in
+ *   **every** mode, exactly as it is today.
+ *
+ * **The operator's certificates are `null` in both states** (owner, 2026-08-08, narrowing AC-75). They
+ * carry no url, so the held ones were already here; the absent ones join them now that they are not
+ * `requestable` either. That is the whole of "no checkbox, ever" — it falls out of the two fields the
+ * row carries rather than needing a third one this function could forget to read.
  */
 export function docRowMode(row: {
   downloadUrl: string | null;
@@ -843,18 +868,19 @@ const OPERATOR_CERT_ROW_LABEL: Record<string, Bilingual> = {
  * exactly the one that is there — while the outgoing type names the category. Swapping in precise keys
  * once someone confirms the catalogue is a one-line change to these two maps.
  *
- * ⚠️ **Known gap, unchanged by this file and reported rather than papered over.** `documentAskSatisfied`
- * matches an ask to a held paper by exact `canonicalDocType` equality, and the operator category resolves
- * to `operator_license` while a machine's own operator papers are typed `operator_tuv` / `operating_license`
- * — none of which canonicalise to it. So an operator document ask reads *waiting* even after the lessor
- * uploads. That is true of today's `operator_safety_certificate` fallback too, so nothing here regresses
- * it; the fix is one alias (`operating_license → operator_license`) or catalogue rows per operator cert,
- * and it belongs with whoever owns `DOC_TYPE_ALIASES`. `tuv` and `spsp` do not have this problem: both
- * sides fold to `tuv_cert` / `spsp_cert`, which is why they are named precisely above.
+ * ~~⚠️ **Known gap** — `documentAskSatisfied` matches an ask to a held paper by exact `canonicalDocType`
+ * equality, and the operator category resolves to `operator_license` while a machine's own operator papers
+ * are typed `operator_tuv` / `operating_license`, none of which canonicalise to it, so an operator document
+ * ask reads *waiting* even after the lessor uploads.~~ **Out of this file's reach since 2026-08-08**: the
+ * operator's certificates are a status and are never asked for from here (see {@link operatorStatusRows}),
+ * so this surface emits no operator ask for that mismatch to strand. The gap is kept written down rather
+ * than deleted because it is real for whoever *does* raise one — the fix is one alias
+ * (`operating_license → operator_license`) or catalogue rows per operator cert, and it belongs with
+ * whoever owns `DOC_TYPE_ALIASES`. `tuv` and `spsp` never had the problem: both sides fold to
+ * `tuv_cert` / `spsp_cert`, which is why they are named precisely above.
  */
 const EQUIPMENT_ASK_TYPE: Record<string, string> = { tuv: "tuv", spsp: "spsp" };
 const equipmentAskType = (code: string): string => EQUIPMENT_ASK_TYPE[code] ?? "equipment_safety_certificate";
-const operatorAskType = (): string => "operator_safety_certificate";
 
 const filesOf = (docs: OfferedUnitDoc[]): DocFile[] =>
   docs.filter((d) => d.url).map((d) => ({ type: d.type, label: docTypeLabel(d.type), url: d.url as string }));
@@ -924,13 +950,22 @@ function unionCodes(requested: string[], held: Map<string, OfferedUnitDoc[]>): s
  * bid-readiness card already shows them — *present or not, green or red, and nothing else.* No view, no
  * download, no file access.
  *
- * **The reason.** Nothing validates an operator document on upload. Handing the renter a file to open
- * presents an unchecked upload as if it were verified evidence, and this surface exists to answer *can I
- * trust this?* — so it must not imply a check that never happened. **Presence is a fact the platform can
- * stand behind; the contents are not.**
+ * **And no ask either** — the ruling, narrowed the same day, in the owner's words: *"operator docs cannot
+ * be viewed or requested and are not part of docs — they are just a view of what the supplier has."* The
+ * rows had kept a checkbox on the missing ones and composed into the batch ask; that is withdrawn. This
+ * group is **outside the document machinery**: no tick in any mode, no place in any batch, and no
+ * attention count (see {@link DocGroup.attention}). It states what the lessor holds and stops there.
  *
- * So the rows carry no `files` and no `downloadUrl`, which is what makes `docRowActions` return nothing
- * for them — one mechanism, not a second flag the component could forget to read.
+ * **The reason is the same for both halves.** Nothing validates an operator document on upload. Handing
+ * the renter a file to open presents an unchecked upload as if it were verified evidence, and this
+ * surface exists to answer *can I trust this?* — so it must not imply a check that never happened.
+ * **Presence is a fact the platform can stand behind; the contents are not.** A surface that cannot
+ * vouch for the file is not a surface to act on, so the renter is given the fact and no controls.
+ *
+ * So the rows carry no `files`, no `downloadUrl` and `requestable: false`, which is what makes
+ * `docRowActions` return nothing and `docRowMode` return `null` for them in **both** states — one
+ * mechanism, not a third flag the component could forget to read. `docTypes` is empty for the same
+ * reason: nothing composes an ask out of these rows, so there is no type to name.
  *
  * **Read from the scorer, never re-derived.** `computeUnitReadiness().operatorCerts` already carries
  * exactly this shape (`{code, labelEn, labelAr, present, url}`); this reads **`present` and ignores
@@ -970,8 +1005,11 @@ function operatorStatusRows(certs: readonly { code: string; present: boolean }[]
       // No url, ever — see above. Not "none happened to be signed": none is offered.
       downloadUrl: null,
       files: [],
-      docTypes: [operatorAskType()],
-      requestable: !cert.present,
+      // Names no ask, because there is no ask. `batchDocumentRequest` would drop the row on
+      // `requestable` alone; leaving a type here would be a payload waiting for a caller.
+      docTypes: [],
+      // Never requestable, held or absent (owner, 2026-08-08) — this family is not asked for at all.
+      requestable: false,
     });
   }
   return rows;
@@ -992,7 +1030,9 @@ function operatorStatusRows(certs: readonly { code: string; present: boolean }[]
  * column collapses to one sentence (owner, same day): **you can only ask for what is not there.**
  *
  * **The operator's group is the one exception, and it is a different kind of row** — a status, not a
- * document list: present or absent, and no file access at all. See {@link operatorStatusRows}.
+ * document list: present or absent, no file access, **no tick, no ask and no attention count**. The table
+ * above does not govern it at all; it is a statement of what the lessor holds, and the renter acts on
+ * none of it. See {@link operatorStatusRows}.
  *
  * **Why the row set was fixed, and what survives of that.** The earlier note read: *"a row per uploaded
  * file would make the list shorter the worse the supplier's file is, which is backwards."* That
@@ -1116,7 +1156,10 @@ export function equipmentDocGroups(machine: FleetMachine, request: MatchRequest)
   ]
     // A group with nothing to say is not a heading with an empty body — it is absent.
     .filter((g) => g.rows.length > 0)
-    .map((g) => ({ ...g, attention: attentionCount(g.rows) }));
+    // **The operator's group makes no attention claim** (owner, 2026-08-08). Its rows are red or green
+    // and that is the whole statement; a count would promise an act that no longer exists on them. See
+    // `DocGroup.attention` for why `null` rather than `0`.
+    .map((g) => ({ ...g, attention: g.key === "operator" ? null : attentionCount(g.rows) }));
 }
 
 /* ───────────────────────────── V9 — company documents ───────────────────────────── */

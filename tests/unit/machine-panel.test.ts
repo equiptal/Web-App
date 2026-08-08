@@ -37,6 +37,7 @@ import {
   presentPhotoSlots,
   selectionModeOf,
   type CompanyDocKey,
+  type DocGroup,
   type DocRow,
   type MatchCellKey,
   type MatchCellState,
@@ -314,7 +315,9 @@ describe("equipmentDocGroups — the groups, and each one's own attention count 
     const g = groupBy(machine({ photos: [{ slot: "front" }], docs: [{ type: "tuv" }] }), asking(["tuv"], "spsp"));
     expect(g.photos.attention).toBe(1); // the plate shot, and nothing else — meter and side are not required
     expect(g.documents.attention).toBe(1); // ownership; the asked-for TÜV is on the file
-    expect(g.operator.attention).toBe(1); // the asked-for operator SPSP is not
+    // The operator's group makes NO claim (owner, 2026-08-08) — its missing SPSP is red on the row and
+    // counted nowhere, because the count promises an action and this group offers none.
+    expect(g.operator.attention).toBeNull();
   });
 
   it("reports zero attention when everything required is on the file", () => {
@@ -322,7 +325,9 @@ describe("equipmentDocGroups — the groups, and each one's own attention count 
       machine({ photos: ALL_FOUR, docs: [{ type: "istimara" }, { type: "tuv" }, { type: "operator_tuv" }] }),
       asking(["tuv"], "tuv"),
     );
-    expect(groups.map((g) => g.attention)).toEqual([0, 0, 0]);
+    // The operator's group is `null` even here, where every certificate it names IS on the file — the
+    // group never makes a claim, rather than making one that happens to be zero.
+    expect(groups.map((g) => g.attention)).toEqual([0, 0, null]);
   });
 
   it("answers an asked-for licence with a held `operating_license` — it carries no `operator_` prefix", () => {
@@ -455,26 +460,28 @@ describe("a document already on the file is never requestable", () => {
     expect([plate.status, plate.requestable]).toEqual(["missing", true]);
   });
 
-  it("holds for the operator's certificates too", () => {
-    const g = groupBy(machine({ docs: [{ type: "operator_tuv" }] }), asking([], "tuv, spsp"));
-    expect(g.operator.rows.map((r) => [r.status, r.requestable])).toEqual([
-      ["present", false],
-      ["missing", true],
-    ]);
-  });
+  /* A test here asserted that the operator's certificates follow this rule too — a missing one being
+   * `requestable: true`. **Deleted, not inverted** (owner, 2026-08-08): that family is outside the rule
+   * rather than a case of it, and the assertion that replaces it lives with the rest of the group's
+   * inertness below ("the operator's group participates in nothing"). Inverting it here would have left
+   * the operator inside a describe block about what may be asked for. */
 
-  it("makes requestable and missing the SAME set, in every group", () => {
+  it("makes requestable and missing the SAME set, in every group that can be asked of", () => {
     const g = equipmentDocGroups(
       machine({ photos: [{ slot: "front" }], docs: [{ type: "istimara" }, { type: "operator_tuv" }] }),
       asking(["tuv"], "tuv, spsp"),
     );
-    for (const row of g.flatMap((x) => x.rows)) expect(row.requestable).toBe(row.status === "missing");
+    // The operator's group is excluded BY NAME rather than by a filter that happens to skip it, so the
+    // exception stays visible: it is not asked for at all, in either state.
+    for (const group of g.filter((x) => x.key !== "operator")) {
+      for (const row of group.rows) expect(row.requestable).toBe(row.status === "missing");
+    }
   });
 
   it("a group with nothing missing offers nothing to tick", () => {
-    const g = groupBy(machine({ docs: [{ type: "operator_tuv" }] }), asking([], "tuv"));
-    expect(g.operator.attention).toBe(0);
-    expect(g.operator.rows.filter((r) => r.requestable)).toEqual([]);
+    const g = groupBy(machine({ docs: [{ type: "istimara" }, { type: "tuv" }] }), asking(["tuv"]));
+    expect(g.documents.attention).toBe(0);
+    expect(g.documents.rows.filter((r) => r.requestable)).toEqual([]);
   });
 });
 
@@ -501,7 +508,8 @@ describe("the operator's section on a job with NO operator", () => {
       ["doc:operator:tuv", "missing"],
       ["doc:operator:spsp", "missing"],
     ]);
-    expect(g.operator.attention).toBe(2);
+    // Red on the rows, and no count — the group states a fact and offers no act (owner, 2026-08-08).
+    expect(g.operator.attention).toBeNull();
   });
 });
 
@@ -593,24 +601,13 @@ describe("a row holding several files exposes EVERY one of them", () => {
   });
 });
 
-describe("the batch ask raised from the operator's section (AC-38)", () => {
-  it("names the machine and the operator types, and nothing the renter did not tick", () => {
-    const g = groupBy(machine({ docs: [] }), asking(["tuv"], "tuv,spsp"));
-    // Every row goes in unfiltered — the model, not the caller, decides what may be asked for.
-    const rows = [...g.documents.rows, ...g.operator.rows];
-    const draft = batchDocumentRequest("eq-1", rows, new Set(g.operator.rows.map((r) => r.key)));
-    expect(draft).toEqual({
-      kind: "document",
-      equipmentId: "eq-1",
-      // Coarse BY DESIGN — see `EQUIPMENT_ASK_TYPE`: only names proven to resolve into the backend's
-      // document catalogue are sent, and the operator category is the only proven operator name.
-      docTypes: ["operator_safety_certificate"],
-      labels: [
-        { en: "Operator TÜV", ar: "شهادة TÜV للمشغّل" },
-        { en: "Operator SPSP", ar: "شهادة SPSP للمشغّل" },
-      ],
-    });
-  });
+describe("the batch ask raised from the equipment's papers (AC-38)", () => {
+  /* A test here asserted the batch ask raised FROM the operator's section — that ticking its rows
+   * composed a draft naming `operator_safety_certificate`. **Deleted rather than inverted** (owner,
+   * 2026-08-08): *"operator docs cannot be viewed or requested and are not part of docs."* There is no
+   * such ask to describe, so the assertion belongs with the group's inertness, not here. What replaces
+   * it is stronger — that no operator row can reach the composer however the selection was arrived at —
+   * and it lives in "the operator's group participates in nothing" below. */
 
   it("an equipment ask names the precise cert where the catalogue is known to accept it", () => {
     const g = groupBy(machine({ docs: [] }), asking(["tuv", "spsp", "aramco"]));
@@ -624,10 +621,10 @@ describe("the batch ask raised from the operator's section (AC-38)", () => {
   });
 
   it("asks for the paper, not for a second copy of one already on the file", () => {
-    const g = groupBy(machine({ docs: [{ type: "operator_tuv" }] }), asking([], "tuv"));
-    // The asked-for operator TÜV is on the file, so nothing here is askable: the batch is null and the
-    // send control disables itself from the same value it would have sent.
-    expect(batchDocumentRequest("eq-1", g.operator.rows, new Set(g.operator.rows.map((r) => r.key)))).toBeNull();
+    const g = groupBy(machine({ docs: [{ type: "istimara" }, { type: "tuv" }] }), asking(["tuv"]));
+    // Every required paper is on the file, so nothing here is askable: the batch is null and the send
+    // control disables itself from the same value it would have sent.
+    expect(batchDocumentRequest("eq-1", g.documents.rows, new Set(g.documents.rows.map((r) => r.key)))).toBeNull();
   });
 
   it("drops a held row from the ask even when it was somehow ticked", () => {
@@ -643,13 +640,16 @@ describe("the batch ask raised from the operator's section (AC-38)", () => {
 describe("the operator's certificates say present or absent, and expose no file", () => {
   const held = () => groupBy(machine({ docs: [{ type: "operator_tuv" }] }), asking([], "tuv, spsp")).operator;
 
-  it("states presence, green or red, with the group's own attention count", () => {
+  it("states presence, green or red, and makes no attention claim at all", () => {
     const g = held();
     expect(g.rows.map((r) => [r.key, r.status, r.statusLine.en])).toEqual([
       ["doc:operator:tuv", "present", "on the machine's file"],
       ["doc:operator:spsp", "missing", "no document yet"],
     ]);
-    expect(g.attention).toBe(1);
+    // ~~`attention` was 1 here~~ — withdrawn 2026-08-08 with the group's requestability. The count reads
+    // "N rows need action from you", and there is no action on this group; `null` is the component's
+    // instruction to render no pill, which is not the same as a green «لا ينقص شيء» over a red row.
+    expect(g.attention).toBeNull();
   });
 
   it("exposes NO url — not on the held row, and not on the missing one", () => {
@@ -703,6 +703,88 @@ describe("the operator's certificates say present or absent, and expose no file"
     const g = groupBy(machine({ docs: [{ type: "operator_tuv" }] }), asking([], "tuv"));
     expect(g.documents.rows.map((r) => r.key)).toEqual(["doc:ownership"]);
     expect(JSON.stringify(g.documents)).not.toContain("operator_tuv");
+  });
+});
+
+/* ─── the same ruling, narrowed the same day: the group is a STATUS and NOTHING ELSE (owner) ───
+ *
+ * *"Operator docs cannot be viewed or requested and are not part of docs — they are just a view of what
+ * the supplier has."* The rows had kept a checkbox while missing and composed into the batch ask. That is
+ * withdrawn, and what these assert is the negative that follows: **a group that renders must participate
+ * in nothing.** Not "is usually skipped" — unreachable from every mechanism on the tab, however the
+ * selection was arrived at.
+ */
+describe("the operator's group participates in nothing", () => {
+  /** Two operator certs asked for, one held; alongside a machine with a real mix of tickable rows, so a
+   *  selection built over EVERYTHING has both modes available to it. */
+  const mixedWithOperator = () =>
+    equipmentDocGroups(
+      machine({ photos: [{ slot: "front" }], docs: [{ type: "istimara" }, { type: "operator_tuv" }] }),
+      asking(["tuv"], "tuv, spsp"),
+    );
+  const operatorKeys = (groups: DocGroup[]) =>
+    groups.flatMap((g) => g.rows).filter((r) => r.key.startsWith("doc:operator:")).map((r) => r.key);
+
+  it("no operator row is requestable, in either state", () => {
+    const rows = mixedWithOperator().find((g) => g.key === "operator")!.rows;
+    expect(rows.map((r) => [r.status, r.requestable])).toEqual([
+      ["present", false],
+      ["missing", false],
+    ]);
+  });
+
+  it("no operator row is selectable, in any mode — neutral, download or request", () => {
+    const groups = mixedWithOperator();
+    const rows = groups.flatMap((g) => g.rows);
+    for (const mode of [null, "download", "request"] as const) {
+      const selectable = rows.filter((r) => docRowSelectable(r, mode)).map((r) => r.key);
+      expect(selectable.filter((k) => k.startsWith("doc:operator:"))).toEqual([]);
+    }
+  });
+
+  it("neither select-all key list can reach one", () => {
+    const rows = mixedWithOperator().flatMap((g) => g.rows);
+    // The two lists the select-all link is built from — `DocRowList` filters on exactly this.
+    const available = rows.filter((r) => docRowMode(r) === "download").map((r) => r.key);
+    const missing = rows.filter((r) => docRowMode(r) === "request").map((r) => r.key);
+    expect([...available, ...missing].filter((k) => k.startsWith("doc:operator:"))).toEqual([]);
+    // And a select-all run cannot pull one in as a side effect: the operator's own keys select nothing.
+    expect(operatorKeys(mixedWithOperator())).not.toEqual([]);
+  });
+
+  it("the batch composer names none of them, even with every row on the tab ticked", () => {
+    const groups = mixedWithOperator();
+    const rows = groups.flatMap((g) => g.rows);
+    const draft = batchDocumentRequest("eq-1", rows, new Set(rows.map((r) => r.key)));
+    // The plate photo and the asked-for TÜV are missing and go in; the two operator rows do not, and the
+    // withdrawn `operator_safety_certificate` cannot appear from any row.
+    expect(draft && draft.kind === "document" && draft.docTypes).toEqual(["plate", "tuv"]);
+    expect(JSON.stringify(draft)).not.toContain("operator");
+  });
+
+  it("ticking ONLY the operator's rows composes nothing at all — no ask and no download", () => {
+    const groups = mixedWithOperator();
+    const rows = groups.flatMap((g) => g.rows);
+    const ticked = new Set(operatorKeys(groups));
+    expect(batchDocumentRequest("eq-1", rows, ticked)).toBeNull();
+    expect(docDownloadBatch(rows, ticked)).toEqual([]);
+    // It cannot even put the tab into a mode, so it can never dim the rows that DO act.
+    expect(selectionModeOf(rows, ticked)).toBeNull();
+  });
+
+  it("carries no doc type to ask with — there is no payload waiting for a caller", () => {
+    for (const row of mixedWithOperator().find((g) => g.key === "operator")!.rows) {
+      expect(row.docTypes).toEqual([]);
+    }
+  });
+
+  it("adds nothing to the tab's attention badge, which sums the groups", () => {
+    const groups = mixedWithOperator();
+    // `EquipmentDetail` sums `g.attention ?? 0`. The plate photo and the missing TÜV are the whole badge;
+    // the missing operator SPSP is red on its row and counted nowhere.
+    expect(groups.reduce((n, g) => n + (g.attention ?? 0), 0)).toBe(2);
+    expect(groups.find((g) => g.key === "operator")!.attention).toBeNull();
+    expect(groups.filter((g) => g.attention === null).map((g) => g.key)).toEqual(["operator"]);
   });
 });
 
@@ -916,11 +998,16 @@ describe("selection is a MODE, inferred from the first tick", () => {
     }
   });
 
-  it("the operator's certificates carry no url by design, so they never tick for download", () => {
+  it("the operator's certificates tick in NEITHER mode — held or absent", () => {
     const g = groupBy(machine({ docs: [{ type: "operator_tuv" }] }), asking([], "tuv, spsp"));
     const [held, gap] = g.operator.rows;
     expect(docRowMode(held)).toBeNull(); // present, and deliberately unopenable (AC-75)
-    expect(docRowMode(gap)).toBe("request"); // absent, so still askable
+    // ~~`docRowMode(gap)` was `"request"` — absent, so still askable~~. Withdrawn 2026-08-08: this family
+    // is not asked for at all, so the absent row is `null` for the same reason the held one is.
+    expect(docRowMode(gap)).toBeNull();
+    for (const mode of [null, "download", "request"] as const) {
+      for (const row of g.operator.rows) expect(docRowSelectable(row, mode)).toBe(false);
+    }
   });
 
   it("select-all is per mode: each list holds only the rows that mode can act on", () => {
