@@ -91,12 +91,19 @@ function catalogueKey(raw: unknown): CompanyDocumentKey | null {
   return null;
 }
 
-/** An ISO date, or null. A date the wire could not express is a GAP, never a printed `null` and never
- *  a fabricated "expired" — the same ruling the backend's expiry parser holds. */
+/**
+ * An ISO date, or null.
+ *
+ * **Only ISO is trusted**, mirroring the backend's `parseLegacyExpiry` and for its reason: Saudi
+ * paperwork often prints HIJRI dates, and `new Date('1448/07/15')` yields something — just not the
+ * date on the document. Anything else becomes a GAP, which renders as a missing line rather than as a
+ * "valid until" the renter would act on, or a false "expired" on a certificate that is very likely
+ * fine.
+ */
 function isoDate(v: unknown): string | null {
   const raw = s(v);
-  if (!raw) return null;
-  const d = new Date(raw);
+  if (!raw || !/^\d{4}-\d{2}-\d{2}/.test(raw)) return null;
+  const d = new Date(raw.slice(0, 10));
   return Number.isNaN(d.getTime()) ? null : raw.slice(0, 10);
 }
 

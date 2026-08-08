@@ -4,12 +4,14 @@ import {
   composeAlternativeRequest,
   composeAvailabilityRequest,
   canonicalDocType,
+  companyDocAskSatisfied,
   composeRenteeRequest,
   documentAskSatisfied,
   parseRenteeRequestCard,
   parseRenteeRequestReply,
   renteeRequestState,
   type RenteeRequestCardPayload,
+  type RequestTargetCompany,
   type RequestTargetMachine,
 } from "@/lib/contract/rentee-request";
 
@@ -234,5 +236,102 @@ describe("renteeRequestState — the machine is the verdict (RM3-AC-18)", () => 
 
   it("a machine missing from the fleet reads unknown — we claim neither an answer nor a debt", () => {
     expect(renteeRequestState(ask(), null, null)).toBe("unknown");
+  });
+});
+
+/* ────────── the company half: a paper that belongs to the firm, not to a machine ────────── */
+
+const firm = (over: Partial<RequestTargetCompany> = {}): RequestTargetCompany => ({
+  docKeys: [],
+  ...over,
+});
+
+const companyAsk = (docTypes: string[]) =>
+  ask({ kind: "document", scope: "company", equipmentId: null, docTypes });
+
+describe("companyDocAskSatisfied — two storage systems behind four papers", () => {
+  it("a catalogue paper on the firm's file answers the ask", () => {
+    expect(companyDocAskSatisfied(firm({ docKeys: ["cr"] }), ["cr"])).toBe(true);
+    expect(companyDocAskSatisfied(firm({ docKeys: [] }), ["cr"])).toBe(false);
+  });
+
+  it("both sides go through the SAME alias table — the panel says `vat`, the catalogue says `vat_cert`", () => {
+    expect(companyDocAskSatisfied(firm({ docKeys: ["vat"] }), ["vat_cert"])).toBe(true);
+    expect(companyDocAskSatisfied(firm({ docKeys: ["vat_cert"] }), ["vat"])).toBe(true);
+  });
+
+  it("answered as a WHOLE — one card carries many papers, and a partial file is not an answer", () => {
+    const f = firm({ docKeys: ["cr", "vat_cert"] });
+    expect(companyDocAskSatisfied(f, ["cr", "vat_cert"])).toBe(true);
+    expect(companyDocAskSatisfied(f, ["cr", "national_address"])).toBe(false);
+  });
+
+  it("an ask naming nothing is a question about nothing", () => {
+    expect(companyDocAskSatisfied(firm({ docKeys: ["cr"] }), [])).toBe(false);
+  });
+
+  /* AC-70 — local content is a HELD CERT, and the legacy column is still populated. Resolving it
+   * against `docKeys` alone would leave the newly-requestable key permanently unanswered, which is
+   * exactly the failure `assertKnownDocTypes` refuses unknown types to prevent. */
+  it("local content resolves from the canonical `held_cert_docs.LC`", () => {
+    expect(companyDocAskSatisfied(firm({ heldCertDocs: { LC: "docs/lc.pdf" } }), ["local_content"])).toBe(true);
+  });
+
+  it("local content resolves from the LEGACY `local_content_doc_key` ALONE", () => {
+    expect(companyDocAskSatisfied(firm({ localContentDocKey: "docs/lc.pdf" }), ["local_content"])).toBe(true);
+  });
+
+  it("local content resolves from a mapped bid's `companyCertCodes` — mapBid already dual-read it", () => {
+    expect(companyDocAskSatisfied(firm({ certCodes: ["LC", "SASO"] }), ["local_content"])).toBe(true);
+    expect(companyDocAskSatisfied(firm({ certCodes: ["lc"] }), ["local_content"])).toBe(true);
+  });
+
+  it("a lowercase map key still counts — the map has more than one writer", () => {
+    expect(companyDocAskSatisfied(firm({ heldCertDocs: { lc: "docs/lc.pdf" } }), ["local_content"])).toBe(true);
+  });
+
+  it("no local-content file anywhere reads UNANSWERED, and SASO never stands in for it", () => {
+    expect(companyDocAskSatisfied(firm({ heldCertDocs: { SASO: "docs/saso.pdf" }, certCodes: ["SASO"] }), ["local_content"]))
+      .toBe(false);
+    expect(companyDocAskSatisfied(firm({ heldCertDocs: { LC: "" } }), ["local_content"])).toBe(false);
+    expect(companyDocAskSatisfied(firm({ localContentDocKey: "  " }), ["local_content"])).toBe(false);
+  });
+});
+
+describe("renteeRequestState — a company-scope document ask", () => {
+  it("reads ANSWERED off the firm's file, with no reply ever posted", () => {
+    expect(renteeRequestState(companyAsk(["local_content"]), null, null, firm({ certCodes: ["LC"] })))
+      .toBe("answered");
+  });
+
+  it("reads WAITING when the paper is not on the file — never refused", () => {
+    expect(renteeRequestState(companyAsk(["local_content"]), null, null, firm())).toBe("waiting");
+  });
+
+  it("DERIVED STATE WINS here too: a provided reply the firm's file does not corroborate reads waiting", () => {
+    expect(renteeRequestState(companyAsk(["cr"]), null, { resolution: "provided" }, firm())).toBe("waiting");
+  });
+
+  it("a refusal is still the reply's alone", () => {
+    expect(renteeRequestState(companyAsk(["cr"]), null, { resolution: "declined" }, firm())).toBe("refused");
+    expect(renteeRequestState(companyAsk(["cr"]), null, { resolution: "declined" }, firm({ docKeys: ["cr"] })))
+      .toBe("answered");
+  });
+
+  it("OMITTING the firm changes nothing — the ask falls back to the reply, exactly as before", () => {
+    // The whole point of the optional argument: `/deal-room/[id]` has no company read in hand and must
+    // keep behaving as it did rather than reading every company paper as missing.
+    expect(renteeRequestState(companyAsk(["local_content"]), null, null)).toBe("waiting");
+    expect(renteeRequestState(companyAsk(["local_content"]), null, { resolution: "provided" })).toBe("answered");
+  });
+
+  it("the shortfall `alternative` is STILL reply-only, even with the firm in hand", () => {
+    const card = ask({ kind: "alternative", scope: "company", equipmentId: null });
+    expect(renteeRequestState(card, null, null, firm({ docKeys: ["cr"], certCodes: ["LC"] }))).toBe("waiting");
+  });
+
+  it("an EQUIPMENT ask never reads a company paper as its answer", () => {
+    const card = ask({ kind: "document", equipmentId: "eq-1", docTypes: ["local_content"] });
+    expect(renteeRequestState(card, machine(), null, firm({ certCodes: ["LC"] }))).toBe("waiting");
   });
 });
