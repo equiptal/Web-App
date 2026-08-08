@@ -340,25 +340,43 @@ function distanceIcon(km: number, ar: boolean, unit: string): L.DivIcon {
 }
 
 /**
- * The machine marker — `design-v3.md` §4, value for value.
+ * The machine marker — the decoded v3 prototype's `unitIcon`, value for value.
  *
- * Everything static (the 132×124 box, the 96×78 stage, the 62 px ground disc, the 44 px object, the
+ * Everything static (the 132×124 box, the 96×78 stage, the 62 px ground disc, the 94×74 object, the
  * label's padding and weight) lives in `map-proto.css`; only genuinely state-dependent values — the
- * availability colour, the halo, the lift — are inline, which is this repo's `*-proto.css` convention.
+ * availability colour, the halo, the lift, the two drop-shadows — are inline, which is this repo's
+ * `*-proto.css` convention.
  *
- * The machine stands ON the map: a tinted ground disc ringed in its availability colour, a contact
- * shadow, then the object. **Selection is a blue ring on the disc and a lift, not a new colour** — the
- * only two colours on this canvas are availability's.
+ * ── The machine is a FREE-STANDING OBJECT (owner's ruling, 2026-08-08) ────────────────────────────
+ * The prototype draws it as `machineArt(u)` at **94 × 74, `object-fit: contain`, with no container,
+ * no fill and no ring**: it rests `translateY(-4px)` under `drop-shadow(0 7px 7px rgba(15,34,56,.30))`
+ * and, when selected, lifts on `dpLift .55s cubic-bezier(.34,1.4,.64,1) forwards` under
+ * `drop-shadow(0 14px 12px rgba(15,34,56,.34))`.
+ *
+ * This drew a **44 px circle filled with the availability colour**, white-ringed, holding a Material
+ * glyph with the taxonomy image painted over it at 62 %. The justification cited here was
+ * *"`design.md` §7 decision 4 — taxonomy image, not emoji"*, **and that citation was invalid**:
+ * decision 4 was written against the **v2** prototype, whose pin held an emoji. v3's pin holds a PNG
+ * and has no badge at all. The decision authorises *an image instead of an emoji*; it never
+ * authorised *a small filled badge instead of a large free-standing object*.
+ *
+ * Everything around the object was already right and is untouched: the ground disc carrying the
+ * availability colour, the selected halo, the contact shadow, the availability label and the selected
+ * name tag. The disc (62 px) and the shadow (44 px) were always sized for the wider object.
+ *
+ * **Selection is a blue ring on the disc, a lift and a tick — never a new colour.** The only two
+ * colours on this canvas are availability's.
  *
  * **No numeric index badge** (`design.md` §7 decision 3): §6.3.3 banned exactly this invented per-unit
  * index, because nothing links a bid to a numbered unit and a renter asking "what about unit 2?" names
  * something the supplier cannot resolve.
  *
- * **No emoji** (§7 decision 4): the request item's taxonomy IMAGE, falling back to the category image,
- * then a generic icon, and never a broken image (AC-80). A `divIcon` renders an HTML string with no
- * React lifecycle, so the `onError` swap `EquipImg` uses is not available — instead the icon glyph is
- * always in the DOM and the image is painted OVER it as a background. A URL that 404s simply never
- * paints and the glyph shows through, which is the same fallback chain with no failure mode.
+ * **The fallback chain is unchanged** (AC-80): the request item's taxonomy IMAGE, falling back to the
+ * category image, then a generic icon, and never a broken image. A `divIcon` renders an HTML string
+ * with no React lifecycle, so `EquipImg`'s `onError` swap is unavailable — the icon is therefore
+ * always in the DOM and the image is painted OVER it as a background, so a URL that 404s simply never
+ * paints and the icon shows through. The icon is muted slate rather than the availability colour,
+ * because a fallback is not a statement about availability; `map-proto.css` records the one residual.
  */
 function machineIcon(
   pin: MachinePin,
@@ -374,6 +392,12 @@ function machineIcon(
   // reason, no cause and no location-source explanation (AC-20, AC-30).
   const state = pin.availability === "confirmed" ? t.bidMap.pinAvailable : t.bidMap.pinUnconfirmed;
 
+  // The object's own motion and shadow, both prototype values. `drop-shadow`, not `box-shadow`: it has
+  // to follow the machine's silhouette, which is the point of shadowing the art rather than a box.
+  const art = selected
+    ? "animation:dpLift .55s cubic-bezier(.34,1.4,.64,1) forwards;filter:drop-shadow(0 14px 12px rgba(15,34,56,.34))"
+    : "transform:translateY(-4px);filter:drop-shadow(0 7px 7px rgba(15,34,56,.30))";
+
   return L.divIcon({
     className: "", // no Leaflet default box — the marker is entirely our own markup
     iconSize: [PIN_W, PIN_H],
@@ -384,13 +408,13 @@ function machineIcon(
       (selected ? `<span class="bm-pin-halo" style="border:2px solid ${ring}"></span>` : "") +
       `<span class="bm-pin-disc" style="background:${tint};border:2.5px solid ${ring}${selected ? ";box-shadow:0 0 0 3px rgba(37,99,235,.55)" : ""}"></span>` +
       `<span class="bm-pin-shadow"></span>` +
-      `<span class="bm-pin-c" style="background:${ring};border:3px solid #fff;box-shadow:${
-        selected ? "0 12px 14px rgba(15,34,56,.34)" : "0 6px 8px rgba(15,34,56,.30)"
-      }${selected ? ";animation:dpLift .55s cubic-bezier(.34,1.4,.64,1) forwards" : ";transform:translateY(-4px)"}">` +
+      `<span class="bm-pin-art" style="${art}">` +
       `<span class="bm-pin-glyph material-icons-outlined">${esc(iconName)}</span>` +
       (src ? `<span class="bm-pin-img" style="background-image:url('${src}')"></span>` : "") +
-      (selected ? `<span class="bm-pin-tick">✓</span>` : "") +
       `</span>` +
+      // A sibling of the object, not a child: the object carries a `filter`, which would make it the
+      // containing block and drag the tick along with the lift.
+      (selected ? `<span class="bm-pin-tick">✓</span>` : "") +
       `</div>` +
       `<div class="bm-pin-chip" style="background:${ring};border:1px solid ${ring}${selected ? ";transform:scale(1.06)" : ""}">${esc(state)}</div>` +
       // Only the focused marker names itself — the map stays quiet until the renter has chosen (AC-34).

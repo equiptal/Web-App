@@ -99,14 +99,18 @@
 
    `direction: rtl` is set on the pin, not inherited: Leaflet draws its own LTR canvas (AC-30, AC-98).
 
-   Deliberately ABSENT, all four by decision:
+   Deliberately ABSENT, all three by decision:
      · the prototype's numeric index badge (`design.md` §7 decision 3 — the invented per-unit index
        §6.3.3 bans, because nothing links a bid to a numbered unit);
-     · its taxonomy EMOJI in the circle (decision 4 — AC-80 wants the request item's taxonomy image,
-       then the category image, then a generic icon, never a broken image);
      · **the readiness bar and the document count**, which v3 moved into the machine's detail — the
        prototype says so in as many words: *"a pin on a simple map says what it is and nothing else"*;
-     · **the hollow not-in-offer variant**, gone with V10's offered-only pin set. */
+     · **the hollow not-in-offer variant**, gone with V10's offered-only pin set.
+
+   A fourth used to be listed here — *"its taxonomy EMOJI in the circle, `design.md` §7 decision 4"* —
+   and it was **false for v3**. Decision 4 was written against the **v2** prototype, whose pin held an
+   emoji inside a filled badge; **v3's pin holds a PNG and has no badge at all**. So the decision
+   authorises *an image instead of an emoji* — it never authorised *a small filled circle instead of a
+   large free-standing object*, which is what this file drew until 2026-08-08 (owner's ruling). */
 .bm-pin {
   direction: rtl;
   width: 132px;
@@ -159,37 +163,66 @@
   background: radial-gradient(closest-side, rgba(15, 34, 56, 0.42), transparent);
   filter: blur(1px);
 }
-.bm-pin .bm-pin-c {
+/* ── The machine itself — a FREE-STANDING OBJECT, 94 × 74, `object-fit: contain` ──────────────────
+   The prototype (decoded 4477–4480) draws the machine as a bare image with **no container, no fill
+   and no ring**: it rests on the ground disc rather than sitting inside a badge. The disc, the halo
+   and the contact shadow above are already sized for an object this wide — 62 px and 44 px against a
+   44 px circle never made sense, and that mismatch is what gave the old marker away.
+
+   The lift and the two drop-shadows are state-dependent and stay inline in `MapCanvas.machineIcon`.
+   `filter: drop-shadow` here rather than `box-shadow`: the shadow has to follow the machine's own
+   silhouette, which is the whole reason the prototype shadows the art and not a box. */
+.bm-pin .bm-pin-art {
   position: relative;
-  width: 44px;
-  height: 44px;
-  margin-bottom: 12px;
-  border-radius: 50%;
+  width: 94px;
+  height: 74px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-sizing: border-box;
 }
-/* The icon is ALWAYS in the DOM and the image is painted OVER it — a `divIcon` is an HTML string with
-   no React lifecycle, so `EquipImg`'s `onError` swap is unavailable. A 404 simply never paints and the
-   glyph shows through: the same fallback chain, with no broken-image state to reach (AC-80). */
-.bm-pin .bm-pin-glyph { font-size: 20px; color: #fff; line-height: 1; }
+/* THE FALLBACK, and why it is built this way (AC-80).
+   A `divIcon` is an HTML string handed to Leaflet — there is no React lifecycle, so `EquipImg`'s
+   `onError` swap is unavailable, and an `<img>` that 404s is a broken-image glyph on the map. So the
+   taxonomy icon is ALWAYS in the DOM and the image is painted OVER it as a background: a URL that
+   404s simply never paints and the icon shows through. Same chain (request-item image → category
+   image → generic icon), with no failure state to reach.
+
+   The icon is muted SLATE, never the availability colour: colour on this canvas means availability
+   and nothing else, and a fallback is not a statement about a machine's availability. Residual, and
+   accepted: a taxonomy PNG with large transparent regions lets the icon read faintly behind it. That
+   is a watermark, not a broken image, and it is the price of having no lifecycle to hook. */
+.bm-pin .bm-pin-glyph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 46px;
+  line-height: 1;
+  color: rgba(22, 48, 79, 0.5);
+}
 .bm-pin .bm-pin-img {
   position: absolute;
-  inset: 3px;
-  border-radius: 50%;
+  inset: 0;
   background-color: transparent;
-  background-position: center;
+  background-position: center bottom;
   background-repeat: no-repeat;
-  background-size: 62%;
+  /* `contain` is the prototype's `object-fit: contain`, value for value — a machine is never cropped
+     to fit its marker. */
+  background-size: contain;
 }
+/* Anchored to the STAGE, not to the object: the object carries a `filter`, which would make it the
+   containing block and drag the tick around with the lift. */
 .bm-pin .bm-pin-tick {
   position: absolute;
-  top: -7px;
-  inset-inline-end: -7px;
+  top: -2px;
+  inset-inline-end: 0;
   width: 18px;
   height: 18px;
   border-radius: 50%;
+  /* Blue, like every other selection cue on this surface — and like the blue ring the disc takes.
+     The prototype's own tick is `C.blue`, which in its palette IS the navy; ours follows AC-33's
+     blue instead, the same override the ask control records. */
   background: #2563eb;
   color: #fff;
   font-size: 10px;
