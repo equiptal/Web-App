@@ -8,6 +8,18 @@
  * reachable, callers use the room-payload values (never break the live flow).
  */
 
+import {
+  RENTEE_REQUEST_CARD_TYPE,
+  RENTEE_REQUEST_REPLY_CARD_TYPE,
+  parseRenteeRequestCard,
+  parseRenteeRequestReply,
+  renteeRequestState,
+  type RenteeRequestCardPayload,
+  type RenteeRequestReplyPayload,
+  type RenteeRequestState,
+  type RequestTargetMachine,
+} from "./rentee-request";
+
 export type RoundRole = "supplier" | "rentee";
 
 export interface DealRound {
@@ -122,7 +134,11 @@ export function withOpeningRound(
 //     render blanks the whole conversation — a far worse failure than an ugly pill.
 //   • `termKey` is ALWAYS localised. `PRICE` is not a user-facing string.
 
-/** The `custom.type` vocabulary, parsed into exactly what each card carries. */
+/** The `custom.type` vocabulary, parsed into exactly what each card carries.
+ *
+ *  **Extended, not forked, by V11.** The negotiation vocabulary and the request loop travel in the
+ *  same channel and must render as cards in the same list (004a §2, RM3-AC-48) — a second parser
+ *  would mean a message is a card in one tab's renderer and a bare grey pill in the other's. */
 export type ChatCard =
   | {
       type: "rate_proposal"; rate: number; priceUnit: string; byRole: RoundRole;
@@ -134,7 +150,11 @@ export type ChatCard =
   | { type: "term_accepted"; termKey: string; value: unknown }
   | { type: "counter"; termKey: string; oldValue: unknown; newValue: unknown }
   | { type: "term_updated"; termKey: string; oldValue: unknown; newValue: unknown }
-  | { type: "term_reopened"; termKey: string };
+  | { type: "term_reopened"; termKey: string }
+  /** The renter's ask about one machine (spec 004 §7.3). */
+  | { type: "rentee_request"; card: RenteeRequestCardPayload }
+  /** The supplier's answer to one ask, threaded by its `ref`. */
+  | { type: "rentee_request_reply"; reply: RenteeRequestReplyPayload };
 
 /** Strict number — unlike `num()` above, a numeric STRING is not a rate. A card is either fully
  *  structured or it is not a card; the lenient coercion belongs to round reconstruction, where a
@@ -187,6 +207,16 @@ export function parseChatCard(custom: unknown): ChatCard | null {
     case "term_reopened":
       if (!termKey) return null;
       return { type, termKey };
+    // The request loop. Both payloads are parsed by the module that owns their contract, so the
+    // wire shape has one reader; a card either parses whole or falls back to `message.text`.
+    case RENTEE_REQUEST_CARD_TYPE: {
+      const parsed = parseRenteeRequestCard({ ...c, type: RENTEE_REQUEST_CARD_TYPE });
+      return parsed ? { type: RENTEE_REQUEST_CARD_TYPE, card: parsed } : null;
+    }
+    case RENTEE_REQUEST_REPLY_CARD_TYPE: {
+      const parsed = parseRenteeRequestReply({ ...c, type: RENTEE_REQUEST_REPLY_CARD_TYPE });
+      return parsed ? { type: RENTEE_REQUEST_REPLY_CARD_TYPE, reply: parsed } : null;
+    }
     default:
       return null;
   }
@@ -325,8 +355,10 @@ export interface ChatCardView {
   kind: ChatCard["type"];
   /** Material icon name. */
   icon: string;
-  /** Class suffix — the six types must be visually distinct (AC-06/AC-07). */
-  tone: "rate" | "accepted" | "term-ok" | "term-counter" | "term-edit" | "term-reopen";
+  /** Class suffix — the types must be visually distinct (AC-06/AC-07). `ask`/`ask-reply` are V11's
+   *  request loop; they are deliberately their own tones rather than borrowing a negotiation one,
+   *  because a question about a machine is not a move on the price. */
+  tone: "rate" | "accepted" | "term-ok" | "term-counter" | "term-edit" | "term-reopen" | "ask" | "ask-reply";
   title: string;
   rows: ChatCardRow[];
   /** An old → new move. The renderer picks the arrow glyph from direction; never a hardcoded `→`. */
@@ -337,8 +369,12 @@ export interface ChatCardView {
   actions: boolean;
   /** Settled outcome text, shown in place of the actions. */
   outcome: string | null;
-  /** How the outcome reads — an acceptance is good news, a superseded offer is just history. */
-  outcomeTone: "accepted" | "history";
+  /** How the outcome reads — an acceptance is good news, a superseded offer is just history, an
+   *  unanswered ask is neither (and must never read as a refusal — RM3-AC-20's rule, applied to the
+   *  card). */
+  outcomeTone: "accepted" | "history" | "waiting" | "refused";
+  /** Material icon for the outcome line, when the tone's default is not specific enough. */
+  outcomeIcon: string | null;
 }
 
 export interface ChatCardCtx {
@@ -354,6 +390,22 @@ export interface ChatCardCtx {
   superseded: boolean;
   /** The room is still negotiable — a closed/abandoned/awaiting room offers no card actions. */
   live: boolean;
+  /**
+   * V11 — what the request loop needs to state a card's verdict.
+   *
+   * **Optional on purpose.** `/deal-room/[id]` renders the same conversation with no fleet in hand,
+   * and a request card there still states the ask, the machine and the reference; it simply cannot
+   * say whether the machine has since satisfied it. Showing less beats guessing.
+   */
+  requestCtx?: {
+    /** The machine as the fleet response holds it **right now** — re-read on every render, because
+     *  nothing about a request's state is stored (RM3-AC-18). Null when it is not in the response. */
+    machine: (equipmentId: string) => (RequestTargetMachine & { label?: string | null }) | null;
+    /** The supplier's answer carrying this `ref`, if he posted one. */
+    reply: (ref: string) => { resolution: "provided" | "declined" | "unavailable" } | null;
+    /** A wire document type → the renter's word for it, so a card never prints `operating_license`. */
+    docLabel?: (docType: string) => string;
+  };
 }
 
 const cnf = (n: number) => Math.round(n).toLocaleString("en-US");
@@ -378,7 +430,7 @@ export function buildChatCardView(card: ChatCard, ctx: ChatCardCtx): ChatCardVie
       ? ""
       : d.toLocaleTimeString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { hour: "2-digit", minute: "2-digit" });
   })();
-  const base = { at, transition: null, actions: false, outcome: null, outcomeTone: "accepted" } as const;
+  const base = { at, transition: null, actions: false, outcome: null, outcomeTone: "accepted", outcomeIcon: null } as const;
   const label = (k: string) => chatCardTermLabel(k, terms, ar);
   const val = (v: unknown, k: string) => chatCardValue(v, k, terms, ar, L);
 
@@ -447,5 +499,102 @@ export function buildChatCardView(card: ChatCard, ctx: ChatCardCtx): ChatCardVie
         title: L("Term reopened for negotiation", "أُعيد فتح البند للتفاوض"),
         rows: [{ label: L("Term", "البند"), value: label(card.termKey) }],
       };
+    case RENTEE_REQUEST_CARD_TYPE:
+      return renteeRequestCardView(card.card, ctx, base);
+    case RENTEE_REQUEST_REPLY_CARD_TYPE:
+      return {
+        ...base,
+        kind: card.type, icon: "reply", tone: "ask-reply",
+        title: L("The lessor answered", "ردّ المؤجّر"),
+        rows: [
+          { label: L("Reference", "المرجع"), value: card.reply.inReplyTo, ltr: true },
+          { label: L("Answer", "الردّ"), value: RESOLUTION_WORD[card.reply.resolution](L) },
+        ],
+      };
   }
+}
+
+/** The supplier's three possible answers, in the renter's words. `unavailable` is deliberately not
+ *  folded into `declined`: "I won't" and "I can't" are different answers, and only one of them is
+ *  worth asking again later. */
+const RESOLUTION_WORD: Record<"provided" | "declined" | "unavailable", (L: LFn) => string> = {
+  provided: (L) => L("Done", "تم"),
+  declined: (L) => L("Declined", "اعتذر"),
+  unavailable: (L) => L("Not available", "غير متوفّرة"),
+};
+
+/** The ask itself — «اطلب تأكيد التوفّر» / «اطلب مستنداً» / «اطلب معدّة أخرى», as it reads in the
+ *  conversation, with its verdict re-derived from the machine on every render (RM3-AC-18). */
+function renteeRequestCardView(
+  payload: RenteeRequestCardPayload,
+  ctx: ChatCardCtx,
+  base: Omit<ChatCardView, "kind" | "icon" | "tone" | "title" | "rows">,
+): ChatCardView {
+  const { L, ar } = ctx;
+  const resolved = payload.equipmentId ? ctx.requestCtx?.machine(payload.equipmentId) ?? null : null;
+  // No request context at all — `/deal-room/[id]` renders this conversation with no fleet in hand.
+  // The card still states the ask, the machine and the reference; it simply says nothing about
+  // whether it was answered, because it has nothing to derive that from.
+  const state: RenteeRequestState | null = ctx.requestCtx
+    ? renteeRequestState(payload, resolved, ctx.requestCtx.reply(payload.ref))
+    : null;
+
+  const title = ((): string => {
+    switch (payload.kind) {
+      case "availability": return L("You asked him to confirm availability", "طلبت منه تأكيد التوفّر");
+      case "document": return L("You asked for a document", "طلبت مستنداً");
+      case "alternative":
+        // The shortfall ask names no machine — it asks FOR one. Saying "instead of" would describe a
+        // swap the renter never proposed.
+        return payload.equipmentId
+          ? L("You asked for a different machine", "طلبت معدّة أخرى")
+          : L("You asked him to add the missing units", "طلبت منه إضافة الوحدات الناقصة");
+    }
+  })();
+
+  const rows: ChatCardRow[] = [{ label: L("Reference", "المرجع"), value: payload.ref, ltr: true }];
+  // The machine, named the way the renter sees it — the label from the fleet row when we hold it,
+  // else the serial the backend stamped. A card that named only an id would be unreadable.
+  const machineName = resolved?.label ?? payload.serial;
+  if (machineName) rows.push({ label: L("Machine", "المعدّة"), value: machineName, ltr: !resolved?.label });
+  if (payload.docTypes?.length) {
+    const naming = ctx.requestCtx?.docLabel;
+    rows.push({
+      label: L("Documents", "المستندات"),
+      value: payload.docTypes.map((t) => naming?.(t) ?? t).join(ar ? " · " : " · "),
+    });
+  }
+
+  const outcome = ((): { text: string; tone: ChatCardView["outcomeTone"]; icon: string } | null => {
+    switch (state) {
+      case null:
+        return null;
+      case "answered":
+        return { text: L("Answered — his file now shows it", "تم الردّ — ظهر على ملفه"), tone: "accepted", icon: "task_alt" };
+      case "refused":
+        return { text: L("He declined", "اعتذر المؤجّر"), tone: "refused", icon: "do_not_disturb_on" };
+      case "unavailable":
+        return { text: L("He answered: not available", "ردّ: غير متوفّرة"), tone: "refused", icon: "do_not_disturb_on" };
+      case "unknown":
+        // Not in the fleet response — we cannot check, so we neither claim he owes an answer nor
+        // strike the card through as history (`.cc-out-history` does exactly that to a superseded
+        // offer, and this ask is not superseded; it is uncheckable).
+        return { text: L("This machine isn't in his current list", "هذه المعدّة ليست ضمن قائمته الحالية"), tone: "waiting", icon: "help_outline" };
+      default:
+        // NEVER "he refused". An unanswered ask is unanswered.
+        return { text: L("Waiting for his answer", "بانتظار ردّه"), tone: "waiting", icon: "schedule" };
+    }
+  })();
+
+  return {
+    ...base,
+    kind: RENTEE_REQUEST_CARD_TYPE,
+    icon: payload.kind === "document" ? "description" : payload.kind === "availability" ? "event_available" : "swap_calls",
+    tone: "ask",
+    title,
+    rows,
+    outcome: outcome?.text ?? null,
+    outcomeTone: outcome?.tone ?? "history",
+    outcomeIcon: outcome?.icon ?? null,
+  };
 }

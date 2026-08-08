@@ -184,7 +184,9 @@
 .bidmap .bm-info {
   position: absolute;
   z-index: 12;
-  bottom: 18px;
+  /* Clears the chat dock, which now owns this corner (§6.9). The box states what the map is NOT
+     showing, so it must never be the thing a floating control hides. */
+  bottom: 74px;
   inset-inline-start: 18px;
   max-width: min(330px, calc(100% - 130px));
   background: rgba(255, 255, 255, 0.97);
@@ -611,6 +613,210 @@
 
 /* T11's `[list │ map]` toggle is gone with V1: the surface is a ROUTE keyed by `bidId`, entered by
    opening a bid, so there is no view mode to switch and nothing for a toggle to switch between. */
+
+/* ── V11 · a failed ask, stated ──────────────────────────────────────────────────────────────────
+   A question the renter believes he asked, and did not, is the worst outcome on this surface — so a
+   send that fails says so in the panel rather than only in a console. */
+.bidmap .bm-sendfail {
+  flex-shrink: 0;
+  margin: 9px 15px 0;
+  padding: 8px 11px;
+  border-radius: 10px;
+  background: rgba(217, 45, 32, 0.07);
+  border: 1px solid rgba(217, 45, 32, 0.24);
+  color: #9a2820;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1.6;
+}
+
+/* ── V12 · the price footer (§6.10) ──────────────────────────────────────────────────────────────
+   It closes the panel column: `flex-shrink: 0` beside `.bm-body`'s `flex: 1`, so التفاصيل expanding
+   takes vertical space FROM the equipment list rather than overlaying it. There is nowhere to
+   overlay to — the panel is a fixed-width column, not a page. */
+.bidmap .bm-foot {
+  flex-shrink: 0;
+  border-top: 1px solid #e4edf5;
+  background: #fff;
+  padding: 10px 15px 12px;
+}
+.bidmap .bm-foot-bar { display: flex; align-items: center; gap: 10px; }
+.bidmap .bm-foot-figs { flex: 1; min-width: 0; }
+.bidmap .bm-foot-rate { display: flex; align-items: baseline; gap: 5px; }
+.bidmap .bm-foot-amt { font-size: 17px; font-weight: 800; color: #0f2238; font-family: "IBM Plex Sans", monospace; }
+.bidmap .bm-foot-unit { font-size: 10.5px; font-weight: 700; color: #6b8fa8; }
+/* The SOURCE of the figure, never the state of the conversation. */
+.bidmap .bm-foot-src { display: block; margin-top: 2px; font-size: 9.5px; font-weight: 700; color: #6b8fa8; }
+.bidmap .bm-foot-det {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: none;
+  border: 0;
+  padding: 4px 2px;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #2563eb;
+  cursor: pointer;
+}
+.bidmap .bm-foot-det .material-icons-outlined { font-size: 16px; }
+.bidmap .bm-foot-cta {
+  flex-shrink: 0;
+  background: #2563eb;
+  border: 0;
+  color: #fff;
+  border-radius: 10px;
+  padding: 9px 13px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.bidmap .bm-foot-cta:disabled { opacity: 0.55; cursor: default; }
+/* The one place the offered count and the agreed count are reconciled (RM3-AC-66). Neutral, because
+   a renegotiated count is not a problem — it is simply two correct numbers needing one sentence. */
+.bidmap .bm-foot-units {
+  margin-top: 8px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  background: #eff4f9;
+  border: 1px solid #e4edf5;
+  font-size: 10px;
+  font-weight: 700;
+  color: #1c3550;
+  line-height: 1.6;
+}
+.bidmap .bm-foot-break { margin-top: 10px; border-top: 1px dashed #e4edf5; padding-top: 9px; }
+.bidmap .bm-foot-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 3px 0; }
+.bidmap .bm-foot-k { font-size: 10.5px; font-weight: 700; color: #6b8fa8; min-width: 0; }
+.bidmap .bm-foot-v { font-size: 11.5px; font-weight: 800; color: #1c3550; font-family: "IBM Plex Sans", monospace; }
+.bidmap .bm-foot-row.is-strong .bm-foot-k, .bidmap .bm-foot-row.is-strong .bm-foot-v { color: #0f2238; font-weight: 800; }
+.bidmap .bm-foot-row.is-strong { border-top: 1px solid #eff4f9; margin-top: 3px; padding-top: 6px; }
+.bidmap .bm-foot-row.is-muted .bm-foot-v { color: #6b8fa8; }
+.bidmap .bm-foot-note { margin-top: 7px; font-size: 9.5px; font-weight: 600; color: #6b8fa8; line-height: 1.7; }
+
+/* ── V12 · the chat dock (§6.9) ──────────────────────────────────────────────────────────────────
+   Floating over the surface, on the inline-START edge — the panel owns the END edge, and a dock that
+   shared it would sit on top of the price footer. There is no edge rail (RM3-AC-23). */
+.bidmap .bm-dock {
+  position: absolute;
+  z-index: 30;
+  bottom: 18px;
+  inset-inline-start: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #0f2238;
+  border: 0;
+  color: #fff;
+  border-radius: 22px;
+  padding: 10px 16px;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(15, 34, 56, 0.28);
+}
+.bidmap .bm-dock.is-open { background: #2563eb; }
+.bidmap .bm-dock .material-icons-outlined { font-size: 17px; }
+.bidmap .bm-dock-badge {
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: #f3a77a;
+  color: #3a1f0b;
+  font-size: 10px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+}
+/* The arrival bubble (004a §2.1) — anchored to the dock, above it, and dismissible. */
+.bidmap .bm-dock-notice {
+  position: absolute;
+  z-index: 30;
+  bottom: 62px;
+  inset-inline-start: 18px;
+  max-width: min(300px, calc(100% - 130px));
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  background: #fff;
+  border: 1px solid #e4edf5;
+  border-radius: 12px;
+  padding: 9px 10px;
+  box-shadow: 0 10px 28px rgba(15, 34, 56, 0.18);
+}
+.bidmap .bm-dock-notice-body { flex: 1; min-width: 0; background: none; border: 0; padding: 0; font: inherit; text-align: start; cursor: pointer; }
+.bidmap .bm-dock-notice-t { font-size: 10.5px; font-weight: 800; color: #0f2238; line-height: 1.5; }
+/* `↩ ref · serial` — a reference and a serial are both LTR runs inside an RTL bubble. */
+.bidmap .bm-dock-notice-s { direction: ltr; text-align: start; margin-top: 3px; font-size: 9.5px; font-weight: 700; color: #2563eb; font-family: "IBM Plex Sans", monospace; }
+.bidmap .bm-dock-notice-x { flex-shrink: 0; background: none; border: 0; padding: 0; color: #6b8fa8; cursor: pointer; line-height: 1; }
+.bidmap .bm-dock-notice-x .material-icons-outlined { font-size: 15px; }
+
+/* The conversation itself. A floating column, not a rail, and not inside the panel: a tab strip in a
+   392px column would truncate every item name. */
+.bidmap .bm-chat {
+  position: absolute;
+  z-index: 31;
+  bottom: 62px;
+  inset-inline-start: 18px;
+  width: min(360px, calc(100% - 60px));
+  max-height: min(64%, 460px);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid #e4edf5;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 16px 40px rgba(15, 34, 56, 0.24);
+}
+/* The dock carries `.dlproto` so `ChatCard` renders EXACTLY as it does in the deal room — same
+   markup, same tones, one stylesheet (RM3-AC-48). That class also carries the deal-room PAGE's own
+   geometry (`max-width: 1120px`, `margin: 0 auto`, `min-height: calc(100vh - 140px)`), which is meant
+   for a full-width route and would blow a floating 360px panel out of the viewport. Overridden here
+   rather than by splitting the stylesheet: the variables and the card rules are what we want, and
+   they are defined on the same selector as the layout. */
+.bidmap .bm-chat.dlproto { max-width: none; margin: 0; min-height: 0; }
+.bidmap .bm-chat-head { flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #e4edf5; }
+.bidmap .bm-chat-who { flex: 1; min-width: 0; font-size: 12px; font-weight: 800; color: #0f2238; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bidmap .bm-chat-x { background: none; border: 0; padding: 0; color: #6b8fa8; cursor: pointer; line-height: 1; }
+.bidmap .bm-chat-x .material-icons-outlined { font-size: 18px; }
+/* Rendered ONLY when this counterparty holds more than one bid in the RFQ group (RM3-AC-44). */
+.bidmap .bm-chat-tabs { flex-shrink: 0; display: flex; gap: 5px; padding: 8px 10px; overflow-x: auto; border-bottom: 1px solid #eff4f9; }
+.bidmap .bm-chat-tab {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #eff4f9;
+  border: 1px solid #e4edf5;
+  border-radius: 16px;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #1c3550;
+  cursor: pointer;
+  max-width: 160px;
+}
+.bidmap .bm-chat-tab.is-on { background: rgba(37, 99, 235, 0.1); border-color: rgba(37, 99, 235, 0.3); color: #2563eb; }
+.bidmap .bm-chat-tab-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bidmap .bm-chat-tab-n { flex-shrink: 0; min-width: 15px; height: 15px; border-radius: 8px; background: #f3a77a; color: #3a1f0b; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; }
+.bidmap .bm-chat-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; padding: 10px 12px; }
+.bidmap .bm-chat-note { margin: auto 0; text-align: center; font-size: 10.5px; font-weight: 600; color: #6b8fa8; line-height: 1.8; padding: 14px 6px; }
+.bidmap .bm-chat-compose { flex-shrink: 0; display: flex; align-items: center; gap: 7px; padding: 9px 10px; border-top: 1px solid #e4edf5; }
+.bidmap .bm-chat-input { flex: 1; min-width: 0; border: 1px solid #e4edf5; border-radius: 18px; padding: 8px 12px; font: inherit; font-size: 11.5px; color: #0f2238; background: #fff; }
+.bidmap .bm-chat-input:disabled { background: #f7fafc; }
+.bidmap .bm-chat-send { flex-shrink: 0; background: #2563eb; border: 0; color: #fff; border-radius: 50%; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.bidmap .bm-chat-send:disabled { opacity: 0.5; cursor: default; }
+.bidmap .bm-chat-send .material-icons-outlined { font-size: 17px; }
+/* The send glyph points the way the message travels, so it mirrors with the script. */
+.bidmap[dir="rtl"] .bm-chat-send .material-icons-outlined, [dir="rtl"] .bidmap .bm-chat-send .material-icons-outlined { transform: scaleX(-1); }
 
 /* Prototype keyframes (design.md §5), all disabled under `prefers-reduced-motion`. */
 @keyframes dpPulse { 0% { transform: scale(0.55); opacity: 0.9; } 70% { transform: scale(1.3); opacity: 0; } 100% { opacity: 0; } }

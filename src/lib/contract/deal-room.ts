@@ -243,7 +243,14 @@ export interface DealTotals {
  *  exclusion; VAT 15%. `override` lets the quotation pass the agreed rate / price unit, or a single
  *  negotiation round pass its full snapshot (rate + prices + per-type units + exclusion). */
 export function computeDealTotals(
-  room: DealRoomView,
+  /** Only the price basis, not a whole room — so the equipment-verification surface's footer (spec 004
+   *  §6.10, V12) can price a bid that has **no room yet** from the bid's own figures, using this one
+   *  function rather than a second implementation that would eventually disagree with it. */
+  room: Pick<
+    DealRoomView,
+    | "rate" | "priceUnit" | "periods" | "agreedUnits" | "numberOfUnits"
+    | "mobUnits" | "demobUnits" | "mobPrice" | "demobPrice" | "mobExcluded" | "demobExcluded"
+  >,
   override?: {
     rate?: number | null; priceUnit?: string | null;
     mobPrice?: number | null; demobPrice?: number | null;

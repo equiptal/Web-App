@@ -172,6 +172,16 @@
 .dlproto .cc-term-edit .cc-head .material-icons-outlined { color: var(--info); }
 .dlproto .cc-term-reopen { border-inline-start-color: var(--muted); }
 .dlproto .cc-term-reopen .cc-head .material-icons-outlined { color: var(--muted); }
+/* V11 — the request loop. Its own two tones: an ask about a machine is not a move on the price, and
+   collapsing it into `.cc-rate` would put a question and an offer in the same colour. */
+.dlproto .cc-ask { border-inline-start-color: var(--action); background: rgba(37, 99, 235, 0.04); }
+.dlproto .cc-ask .cc-head .material-icons-outlined { color: var(--action); }
+.dlproto .cc-ask-reply { border-inline-start-color: var(--info); }
+.dlproto .cc-ask-reply .cc-head .material-icons-outlined { color: var(--info); }
+/* An unanswered ask is neither good news nor history — it is simply open, so it is muted rather than
+   tinted with either. A refusal is amber, never red: red on this feature means availability only. */
+.dlproto .cc-out-waiting { color: var(--muted); }
+.dlproto .cc-out-refused { color: var(--warning); }
 .dlproto .msg { max-width: 70%; margin: 5px 0; padding: 10px 14px; border-radius: 14px; font-size: 13.5px; line-height: 1.45; }
 .dlproto .msg .meta { font-size: 10.5px; font-weight: 700; margin-top: 5px; opacity: 0.7; }
 .dlproto .msg.them { align-self: flex-start; background: var(--surface1); border: 1px solid var(--border); border-start-start-radius: 5px; color: var(--navy); }

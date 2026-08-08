@@ -76,7 +76,9 @@ export function ChatCard({
         </div>
       ) : view.outcome ? (
         <div className={`cc-outcome cc-out-${view.outcomeTone}`}>
-          <span className="material-icons-outlined">{view.outcomeTone === "accepted" ? "task_alt" : "history"}</span>
+          {/* The view names its own glyph where the tone's default would be wrong — a request still
+              waiting is neither an acceptance nor history. */}
+          <span className="material-icons-outlined">{view.outcomeIcon ?? (view.outcomeTone === "accepted" ? "task_alt" : "history")}</span>
           {view.outcome}
         </div>
       ) : null}

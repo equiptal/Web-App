@@ -425,6 +425,7 @@ describe("DRCARD — the registry covers every modelled type", () => {
   it("builds a view for each member of the union", () => {
     const kinds: ChatCard["type"][] = [
       "rate_proposal", "rate_response", "term_accepted", "counter", "term_updated", "term_reopened",
+      "rentee_request", "rentee_request_reply",
     ];
     const built = kinds.map((k) => {
       const custom =
@@ -432,9 +433,70 @@ describe("DRCARD — the registry covers every modelled type", () => {
         : k === "rate_response" ? { type: k, response: "accepted" }
         : k === "term_accepted" ? { type: k, termKey: "insurance", value: true }
         : k === "term_reopened" ? { type: k, termKey: "insurance" }
+        : k === "rentee_request" ? RENTEE_REQUEST
+        : k === "rentee_request_reply" ? { type: k, inReplyTo: "RQ-7F3A", equipmentId: "eq-1", resolution: "provided" }
         : { type: k, termKey: "insurance", oldValue: true, newValue: false };
       return buildChatCardView(parseChatCard(custom)!, ctx()).kind;
     });
     expect(built).toEqual(kinds);
+  });
+});
+
+/**
+ * V11/V12 — the request loop travels in the SAME channel as the negotiation vocabulary, and
+ * RM3-AC-48 says every custom type renders as a card in every tab, never as a bare grey pill. It is
+ * asserted through the same `parseChatCard` the negotiation types use, because the union was extended
+ * rather than forked: a second parser is how a message becomes a card in one renderer and a pill in
+ * the other.
+ */
+const RENTEE_REQUEST = {
+  type: "rentee_request",
+  ref: "RQ-7F3A",
+  scope: "equipment",
+  equipmentId: "eq-1",
+  serial: "SER-9",
+  kind: "availability",
+};
+
+describe("DRCARD — the request loop parses through the same reader (RM3-AC-48)", () => {
+  it("renders the renter's ask as a card, naming the machine and the reference", () => {
+    const view = buildChatCardView(parseChatCard(RENTEE_REQUEST)!, ctx());
+    expect(view.tone).toBe("ask");
+    expect(view.rows.map((r) => r.value)).toContain("RQ-7F3A");
+    // The serial is the fallback name — the fleet's own label wins when a request context supplies it.
+    expect(view.rows.map((r) => r.value)).toContain("SER-9");
+  });
+
+  it("states NO verdict without a request context — the deal-room route holds no fleet", () => {
+    // Showing less beats guessing: `/deal-room/[id]` can say what was asked, not whether it landed.
+    expect(buildChatCardView(parseChatCard(RENTEE_REQUEST)!, ctx()).outcome).toBeNull();
+  });
+
+  it("re-derives the verdict from the machine when one is supplied (RM3-AC-18)", () => {
+    const withFleet = (locationSource: string) =>
+      buildChatCardView(parseChatCard(RENTEE_REQUEST)!, ctx({
+        requestCtx: {
+          machine: () => ({ locationSource, documentKeys: [], label: "CAT 320" }),
+          reply: () => null,
+        },
+      }));
+    expect(withFleet("listing_yard").outcomeTone).toBe("waiting");
+    expect(withFleet("unit_yard").outcomeTone).toBe("accepted");
+    // The fleet's label replaces the stamped serial once we hold the row.
+    expect(withFleet("unit_yard").rows.map((r) => r.value)).toContain("CAT 320");
+  });
+
+  it("renders the supplier's answer as its own card, never folded into the ask", () => {
+    const view = buildChatCardView(
+      parseChatCard({ type: "rentee_request_reply", inReplyTo: "RQ-7F3A", equipmentId: "eq-1", resolution: "declined" })!,
+      ctx(),
+    );
+    expect(view.tone).toBe("ask-reply");
+    expect(view.rows.map((r) => r.value)).toContain("RQ-7F3A");
+  });
+
+  it("falls back to `message.text` for a malformed ask rather than rendering half a card", () => {
+    expect(parseChatCard({ type: "rentee_request", kind: "availability" })).toBeNull();
+    expect(parseChatCard({ type: "rentee_request_reply", inReplyTo: "RQ-1", resolution: "shrug" })).toBeNull();
   });
 });

@@ -148,8 +148,10 @@ function BidEquipment({ bidId }: { bidId: string }) {
       bid={bid}
       request={request}
       refreshing={refreshing}
-      // V4's send and V9's company panel land with the tickets that own them. Passing nothing keeps
-      // both controls visible and inert rather than pretending an ask was sent.
+      // The surface owns its own writes now (V11/V12): the four requests, the chat dock's first
+      // message and the footer's hand-off each create the deal room themselves, and none of them
+      // needs a handler from here. V9's company panel still lands with the ticket that owns it, so
+      // its entry stays visible and inert rather than pretending a panel opened.
     />
   );
 }

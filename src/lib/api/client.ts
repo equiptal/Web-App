@@ -8,6 +8,7 @@ import type { TransformRequestCtx } from "@/lib/contract/bid-form";
 import { mapBidFormData, mapLinkSubmissions, type BidFormData, type LinkBidSubmission, type SubmitBidFormPayload } from "@/lib/contract/link-bids";
 // DISABLED (Outcome Survey): import type { PendingResponse, RespondBody, RespondResult } from "@/lib/contract/survey";
 import type { InboxBid } from "@/lib/contract/inbox";
+import type { RenteeRequestDraft } from "@/lib/contract/rentee-request";
 import type { NotificationList, NotificationFilter } from "@/lib/contract/notifications";
 
 /** Body of POST /api/me/bids/recommend. user_id is attached server-side. */
@@ -264,9 +265,25 @@ export function acceptBid(bidId: string): Promise<unknown> {
   return postJson(`/api/me/bids/${encodeURIComponent(bidId)}/accept`, {});
 }
 
-/** Create (or fetch) the deal room for a bid → its id. */
+/** Create (or fetch) the deal room for a bid → its id.
+ *
+ *  **This WRITES.** A `DealRoom` row freezes the supplier's offered count (`BID_OFFER_LOCKED`), so it
+ *  is called only by the three room-creating acts (004a §4.5): negotiate/accept, sending a request
+ *  card, and sending the first chat message. Never by opening, selecting or reading. */
 export function startDealRoom(bidId: string): Promise<{ id: string }> {
   return postJson<{ id: string }>("/api/me/deal-rooms", { bidId });
+}
+
+/** V11 — post one `rentee_request` card into a deal room's conversation (spec 004 §6.7).
+ *  `ref` is minted and `serial` stamped server-side; neither is accepted from here (§7.3). */
+export function sendRenteeRequest(
+  dealRoomId: string,
+  draft: RenteeRequestDraft,
+): Promise<{ ref: string; messageId: string }> {
+  return postJson<{ ref: string; messageId: string }>(
+    `/api/me/deal-rooms/${encodeURIComponent(dealRoomId)}/requests`,
+    draft,
+  );
 }
 
 /** A deal room the renter is party to. */

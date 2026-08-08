@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * RMAP V1–V4 — the deal-room equipment-verification surface: a **fixed-width panel with the map
+ * RMAP V1–V4 + V11/V12 — the deal-room equipment-verification surface: a **fixed-width panel with the map
  * filling the rest** (spec 004 §5). v2's floating overlay is gone with the offers list it hosted; v3
  * scopes the view to ONE bid, so the panel is a column of that bid's own verification content and the
  * map is what is left over.
@@ -17,13 +17,19 @@
  * bid — a supplier-keyed cache would draw bid A's offer on bid B's map. The cache is dropped when the
  * bid itself refetches, since a resubmitted bid can change which machines it names.
  *
- * **Nothing here writes.** No deal room is created by opening, selecting or reading (004a §4.5) — a
- * `DealRoom` row freezes the supplier's offered count, and this surface is a read.
+ * **Nothing here writes until the renter asks it to.** No deal room is created by opening, selecting
+ * or reading (004a §4.5) — a `DealRoom` row freezes the supplier's offered count. The three acts that
+ * DO create one are all explicit and all the renter's: sending a request card (V11), sending the
+ * first chat message (V12's dock), and negotiating (V12's footer, which hands off to the existing
+ * flow at `/deal-room/[id]`).
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import { ChatDock } from "@/components/map/ChatDock";
 import type { MachinePin } from "@/components/map/MapCanvas";
+import { PriceFooter } from "@/components/map/PriceFooter";
+import { useRenteeRequestSender } from "@/components/map/useRenteeRequestSender";
 import type { BidCard } from "@/lib/contract/bids";
 import { fetchBidFleet } from "@/lib/api/client";
 import {
@@ -60,11 +66,11 @@ export interface BidMapWorkspaceProps {
   /** T16 exposes the machine selection upward for the equipment detail (V7), which does not exist yet.
    *  Kept a callback rather than a lifted prop so nothing above has to hold state it cannot yet use. */
   onSelectMachine?: (equipmentId: string | null) => void;
-  /** V4's action. The composed card is handed UP rather than posted here: the POST is
-   *  `/deal-rooms/{dealRoomId}/requests`, and the send is what creates the room (004a §4.5) — that
-   *  path lands with the chat dock (V11/V12). Until it does the action renders disabled, which shows
-   *  less rather than claiming an ask was sent. */
-  onRequestAlternative?: (draft: RenteeRequestDraft) => void;
+  /** Fired AFTER a request card is in the conversation (V11), never instead of sending it. The
+   *  surface owns the send — `useRenteeRequestSender` does create-or-fetch then post — so a caller
+   *  that wants to react (a toast, an analytics event) can, without being able to change what was
+   *  sent or whether it was. */
+  onRequestSent?: (draft: RenteeRequestDraft, ref: string | null) => void;
   /** V9's company-document panel, which is not built here (a parallel ticket owns `map/panel/`). The
    *  header's entry renders either way; without a handler it is inert rather than absent. */
   onOpenCompanyDocs?: () => void;
@@ -75,7 +81,7 @@ export function BidMapWorkspace({
   request,
   refreshing,
   onSelectMachine,
-  onRequestAlternative,
+  onRequestSent,
   onOpenCompanyDocs,
 }: BidMapWorkspaceProps) {
   const t = useT();
@@ -88,6 +94,16 @@ export function BidMapWorkspace({
   /** Exactly one machine is selected at a time (AC-81) — a single id, so a second ring is not
    *  representable. Cleared on every bid change (AC-177). */
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
+
+  /* ── V11 · the one sender behind all four requests (§6.7) ──────────────────────────────────────
+     Create-or-fetch the room, then post. Handed to the shortfall alert below, and exported as a hook
+     so the surfaces that mount inside `bm-body` (V5's list, V7's detail, V8/V9's document rows) wire
+     one prop instead of each repeating the room-creating sequence. */
+  const sender = useRenteeRequestSender(bid);
+  /** Local acknowledgement for the shortfall control only — an ask the renter just made should not
+   *  look unasked. It is NOT the card's state: the card in the conversation derives its own on every
+   *  render (RM3-AC-18), and this button knows nothing about it. */
+  const [shortfallSent, setShortfallSent] = useState(false);
 
   const selectedBidId = bid?.id ?? null;
   // An off-platform submission has no listings, no yards and no coordinates — there is nothing to
@@ -159,6 +175,21 @@ export function BidMapWorkspace({
   // The request item this bid answers — the source of the pills' type word (RM3-AC-08) and of the
   // pin's taxonomy image.
   const item = request?.equipmentItems?.[0] ?? null;
+
+  /** The price basis' duration — `estimatedDurationDays`, which is EXACTLY the field `mapDealRoom`
+   *  reads into `periods`. Reading a different one would make the footer's figures disagree with the
+   *  deal room's for the same room (RM3-AC-24). */
+  const requestDurationDays =
+    typeof request?.estimatedDurationDays === "number" ? request.estimatedDurationDays : null;
+
+  /** The RFQ group, resolved the way `inboxGroupKey` resolves it: the fan-out group when the request
+   *  has one, else the request itself — which simply means "this bid has no siblings". Read through
+   *  the record's index signature because `RequestRecord` does not type the field. */
+  const requestGroupKey = ((): string | null => {
+    if (!request) return null;
+    const raw = request.requestGroupId;
+    return typeof raw === "string" && raw.trim() ? raw : request.id;
+  })();
 
   /* ── pins ──────────────────────────────────────────────────────────────────────────────────────
      Only this bid's supplier's machines are ever assembled here (AC-75) — the endpoint is bid-scoped,
@@ -358,19 +389,46 @@ export function BidMapWorkspace({
                   // NULL `equipmentId` — there is no machine to name — which the backend pairs with
                   // `scope: "company"`. `add_to_offer` is retired and rejected server-side, and is
                   // unreachable from here by construction (RM3-AC-07).
-                  onClick={() => onRequestAlternative?.(composeShortfallRequest())}
-                  disabled={!onRequestAlternative}
+                  //
+                  // Sending is ALSO what creates the deal room when the bid has none (004a §4.5) —
+                  // which is why this is the one control on the panel that writes, and why opening
+                  // the surface still does not.
+                  onClick={() => {
+                    const draft = composeShortfallRequest();
+                    void sender.send(draft).then((ok) => {
+                      if (!ok) return;
+                      setShortfallSent(true);
+                      onRequestSent?.(draft, sender.lastRef);
+                    });
+                  }}
+                  disabled={sender.busy || shortfallSent}
                 >
-                  {t.bidMap.shortfallAction}
+                  {sender.busy ? t.bidMap.shortfallSending : shortfallSent ? t.bidMap.shortfallSent : t.bidMap.shortfallAction}
                 </button>
+              </div>
+            )}
+
+            {/* A failed ask is stated, never swallowed: the renter must not be left believing a
+                question reached the lessor when it did not. */}
+            {sender.error && (
+              <div className="bm-sendfail" role="alert">
+                {sender.error === "invalid" ? t.bidMap.requestInvalid : t.bidMap.requestFailed}
               </div>
             )}
 
             {/* The panel body. V5–V9 mount here: the equipment list, the landing pre-selection, the
                 machine detail, its documents and the company panel — all owned by the `map/panel/`
                 ticket, which is why this ticket leaves a slot rather than a placeholder component.
-                The price footer (V12) closes the column below it. */}
+                Each of those surfaces raises one of the four requests; they wire `onRequest` to
+                `sender.send` (V11) and post nothing themselves. */}
             <div className="bm-body" />
+
+            {/* ── V12 · the price footer ─────────────────────────────────────────────────────────
+                Figures and a hand-off, NOT a re-host: §6.10's "bar" is a three-page negotiation
+                wizard bound to `DealRoom.tsx`'s local state (004a §4a.1). التفاصيل expands this in
+                place, taking vertical space from the list above rather than overlaying it — the
+                panel is a fixed-width column, so there is nowhere to overlay to. */}
+            <PriceFooter bid={bid} durationDays={requestDurationDays} />
           </>
         ) : (
           // No bid resolved yet. The route renders its own not-found/loading states, so this is only
@@ -378,6 +436,22 @@ export function BidMapWorkspace({
           <div className="bm-body" />
         )}
       </aside>
+
+      {/* ── V12 · the chat dock ─────────────────────────────────────────────────────────────────
+          Floating, persistent, and the ONLY global action — there is no edge rail (RM3-AC-23). It
+          renders over the whole surface rather than inside the panel, because a tab strip inside a
+          392px column would truncate every item name. */}
+      {bid && !offPlatform && (
+        <ChatDock
+          bid={bid}
+          groupKey={requestGroupKey}
+          // Only the anchor bid's fleet exists on this surface, and that is what a request card's
+          // state is derived from (RM3-AC-18). A sibling tab's cards state the ask and claim nothing
+          // about the answer.
+          fleet={fleet}
+          sendNonce={sender.nonce}
+        />
+      )}
     </div>
   );
 }

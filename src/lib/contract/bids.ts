@@ -929,8 +929,12 @@ export interface BidSupplier {
  *
  * Every surface that groups, filters or counts suppliers must key off THIS function, or the chip counts
  * and the rows behind them will disagree.
+ *
+ * Structurally typed rather than `BidCard`-typed: the chat dock groups its tabs from `InboxBid` rows
+ * (004a §2), and one counterparty key with two implementations is exactly how a firm becomes two
+ * counterparties on one screen and one on another.
  */
-export function bidSupplierKey(bid: BidCard): string {
+export function bidSupplierKey(bid: Pick<BidCard, "supplierCompanyId" | "supplierId" | "supplierName">): string {
   return bid.supplierCompanyId ?? bid.supplierId ?? bid.supplierName;
 }
 

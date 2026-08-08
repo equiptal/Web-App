@@ -854,6 +854,12 @@ export const en = {
     // V4 — the shortfall alert. It states the DIFFERENCE, not the offered total.
     shortfall: "{n} in this offer have no registered machine — they don't appear on the map",
     shortfallAction: "Ask him to add them",
+    // V11 — the send. Sending is also what creates the deal room, so the control acknowledges that a
+    // question left, and a failure says so rather than letting the renter assume it arrived.
+    shortfallSending: "Sending…",
+    shortfallSent: "Asked",
+    requestFailed: "The request didn't reach the lessor. Try again.",
+    requestInvalid: "This request can't be sent as it is.",
     // Map canvas
     yourSite: "Your site",
     noSiteLocation: "This request has no project location",
@@ -916,6 +922,46 @@ export const en = {
     fleetFailed: "The machines couldn't be loaded",
     fleetFailedWhy: "This isn't a statement about the offer. Press refresh to try again.",
     keyOffPlatform: "Off-platform offers carry no location, so they get no pin.",
+  },
+  /* ── V12 · the chat dock (spec 004 §6.9, 004a §2) ──
+     One supplier, a tab per item. The unread badge is REST, so nothing here may imply immediacy. */
+  chatDock: {
+    title: "Chat",
+    close: "Close the chat",
+    dismiss: "Dismiss",
+    itemFallback: "This item",
+    // A tab whose bid has no room is compose-only — the room is created by SENDING, never by opening.
+    composeOnly: "No messages yet. Your first message starts the conversation with the lessor.",
+    empty: "No messages yet.",
+    unavailable: "Chat isn't available right now.",
+    placeholder: "Write a message…",
+    // The notice is refresh-timed (mount · focus · post-send · the poll). It states that a reply IS
+    // there — never that it just arrived, which is a recency it cannot know.
+    noticeTitle: "You have a reply from the lessor",
+  },
+  /* ── V12 · the price footer (spec 004 §6.10, 004a §4a.1 + §4a.4) ──
+     Figures and a hand-off. It never edits a figure and never re-implements negotiation. */
+  priceFooter: {
+    perPeriod: "SAR / {unit}",
+    day: "day",
+    week: "week",
+    month: "month",
+    job: "job",
+    openingOffer: "Opening offer",
+    fromDealRoom: "From the deal room",
+    details: "Details",
+    negotiate: "Negotiate",
+    continueNegotiation: "Continue in the deal room",
+    // The one place the offered and the agreed count are reconciled (RM3-AC-66).
+    unitsDiffer: "Priced on {agreed} agreed units — the offer was made of {offered}.",
+    rentalLine: "Rental — {rate} / {unit} × {n} × {periods}",
+    mobilisation: "Mobilisation",
+    demobilisation: "Demobilisation",
+    excluded: "Not charged",
+    subtotal: "Subtotal",
+    vat: "VAT 15%",
+    total: "Total",
+    noDuration: "This request has no duration, so the figures cover one full period.",
   },
   survey: {
     navTitle: "Surveys",

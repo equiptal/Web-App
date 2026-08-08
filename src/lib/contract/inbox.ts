@@ -18,6 +18,13 @@ export interface InboxBid {
   agreedUnits: number | null;
   unitsOffered: number;
   supplierName: string;
+  /** The bidding MEMBER, and the FIRM behind him. The chat dock groups its tabs by
+   *  `bidSupplierKey` (company → member → name), because two colleagues of one firm are ONE
+   *  counterparty — the backend puts them in the same Stream channel (004a §2, RM3-AC-45). Both are
+   *  raw `Bid` columns the received-bids projection spreads, and both read null on an older payload,
+   *  in which case the grouping falls back to the name. */
+  supplierId: string | null;
+  supplierCompanyId: string | null;
   supplierLogoUrl: string | null;
   equipmentName: string | null;
   /** For 2-level inbox grouping: RFQ group (fan-out `requestGroupId`) then equipment type. `groupId`
@@ -58,6 +65,8 @@ function mapRow(raw: Record<string, unknown>): InboxBid {
     agreedUnits: n(raw.agreedUnits),
     unitsOffered: Array.isArray(raw.unitsOffered) ? raw.unitsOffered.length : (n(raw.unitsOffered) ?? 1),
     supplierName: s(raw.supplierDisplayName) ?? s(raw.supplierName) ?? "Supplier",
+    supplierId: s(raw.supplierId) ?? s(raw.supplier_id),
+    supplierCompanyId: s(raw.supplierCompanyId) ?? s(raw.supplier_company_id),
     supplierLogoUrl: s(raw.supplierLogoUrl),
     equipmentName,
     request: {

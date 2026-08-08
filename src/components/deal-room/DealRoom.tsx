@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
-import { StreamChat, type Channel } from "stream-chat";
+import { type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
+import { STREAM_API_KEY, acquireStream, releaseStream } from "@/lib/chat/stream-connection";
 import { useHeaderBack } from "@/components/AppShell";
 import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, ApiError } from "@/lib/api/client";
 import { computeDealTotals, type DealRoomView, type DealTerm, type DealRoomDocument, type DealRoomDocuments, type QuotationView } from "@/lib/contract/deal-room";
@@ -37,7 +38,6 @@ function roundTotals(room: DealRoomView, r: DealRound) {
   });
 }
 
-const STREAM_KEY = process.env.NEXT_PUBLIC_STREAM_API_KEY ?? "";
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
 type LFn = (en: string, arr: string) => string;
 
@@ -357,16 +357,22 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
 
 
   // Live chat (GetStream).
+  //
+  // The connection is taken from the shared, REFERENCE-COUNTED module rather than owned here. It used
+  // to be `StreamChat.getInstance(...)` + an unconditional `disconnectUser()` on unmount — which is
+  // safe only while exactly one component ever connects. The chat dock on the equipment-verification
+  // surface (004a §4a.3) breaks that: whichever of the two unmounted first would silently kill the
+  // other's channels. Now the last release disconnects, and this component's cleanup is a release.
   useEffect(() => {
-    if (!STREAM_KEY) return;
-    let client: StreamChat | null = null;
+    if (!STREAM_API_KEY) return;
+    let held = false;
     let cancelled = false;
     (async () => {
       try {
         const tok = await fetchStreamToken(id);
         if (cancelled || !tok.token || !tok.userId || !tok.channelId) return;
-        client = StreamChat.getInstance(STREAM_KEY);
-        await client.connectUser({ id: tok.userId }, tok.token);
+        const client = await acquireStream(tok.userId, tok.token);
+        held = true;
         if (cancelled) return;
         setMyStreamId(tok.userId);
         const ch = client.channel("messaging", tok.channelId);
@@ -391,7 +397,8 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
       cancelled = true;
       channelRef.current = null;
       if (roomRefetchTimer.current) clearTimeout(roomRefetchTimer.current);
-      client?.disconnectUser().catch(() => {});
+      // Release, never disconnect: another surface may still be reading the same client.
+      if (held) releaseStream();
     };
     // loadRoom just re-reads fetchDealRoom(id) (id stable) — don't re-open the chat connection for it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -771,7 +778,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
 
       {/* thread */}
       <div className="thread">
-        {!STREAM_KEY ? (
+        {!STREAM_API_KEY ? (
           <div className="sysev">{L("Chat is unavailable.", "المحادثة غير متاحة.")}</div>
         ) : !chatReady ? (
           <div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 22 }}>progress_activity</span></div>
