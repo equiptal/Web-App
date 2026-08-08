@@ -137,9 +137,27 @@ So the answer is two steps, and the card must carry both:
 | 1 | **add the equipment** (existing form) | none — a new listing exists |
 | 2 | **commit it into a claimed slot** in readiness | `unitsOffered` gains a real `equipmentId` in place of padding |
 
-**Step 2 is a SAME-COUNT edit** — 3 offered stays 3, and the composition moves from 1 registered + 2
-claimed to 2 + 1 — so the server permits it with a room open (`bid.service.ts:412-418`). The shortfall
-alert then falls by one, which is the renter-visible answer.
+**Step 2 SHOULD be a same-count edit** — 3 offered stays 3, the composition moves from 1 registered + 2
+claimed to 2 + 1 — and the server would permit that with a room open (`bid.service.ts:412-418`).
+
+**⚠ It is not, today, because of §3.2d.** Verified while building the supplier side:
+
+```
+stored      unitsOffered = [A, A, A]        offered count = 3
+rehydrate   readiness de-dupes              selected = [A]
+commit B    the newly registered machine    selected = [A, B]
+_persist    writes selected.length          2 entries  ≠  3  →  BID_OFFER_LOCKED
+```
+
+So committing into what the supplier believes is a claimed slot is a **count change against the stored
+array**, and the write is refused the moment a deal room exists — which the renter's ask itself created.
+
+**Therefore §3.2d is not a latent defect; it BLOCKS this loop.** Until readiness preserves the offered
+count, the shortfall ask cannot be answered at all after a room exists.
+
+The supplier client degrades honestly rather than lying: the write fails, the sheet surfaces the
+backend's real error, and **no reply is posted** — so the renter's card never claims an answer that did
+not happen. But the request stays unanswerable.
 
 | ID | Layer | Criterion |
 |---|---|---|
