@@ -7,18 +7,42 @@ composition bar and a 3-tab panel; v3 has one bid, count pills and a 2-tab detai
 ## How the file was opened
 
 `Deal Room Map.html` is 5,086,460 bytes on 394 lines. The app is **not** in the last `<style>` block —
-it is an **escaped JS string** inside the final `<script>`, which starts at byte **4,633,495** and runs
-to EOF: 452,965 escaped bytes → **424,043 chars / 4,488 lines** once `\n`, `\"`, `\'`, `\uXXXX` and the
-HTML entities are decoded. It is a **class** with methods (`eqCard`, `unitIcon`, `siteIcon`,
-`rEquipGroups`, `coDocsBody`, `rCompanyPanel`), not the plain `function` declarations the ticket
-predicted — `React.createElement` aliased to `h`, no JSX. The static CSS (all `@keyframes`) is in the
-**last `<style>` block at byte 4,627,210**, which is separate from the app string.
+it is an **escaped JS string** inside the final `<script>`, which runs to EOF. It is a **class** with
+methods (`eqCard`, `unitIcon`, `siteIcon`, `rEquipGroups`, `coDocsBody`, `rCompanyPanel`), not the
+plain `function` declarations the ticket predicted — `React.createElement` aliased to `h`, no JSX. The
+static CSS (all `@keyframes`, plus the interaction language) is in the **last `<style>` block**, which
+is separate from the app string.
 
-Line numbers below are into the decoded app text.
+**Offsets — state the unit.** The file is UTF-8 with a great deal of Arabic in it, so a byte offset and
+a character index are two different numbers for the same place, and quoting one as the other has
+already cost one reader an afternoon:
+
+| | byte offset | char index |
+|---|---|---|
+| final `<script …>` tag | **4,633,495** | **4,633,423** |
+| last `<style>` tag | **4,627,210** | **4,627,164** |
+
+Decoding the script's body as what it is — a JSON/JS double-quoted string literal, `JSON.parse` on it
+rather than a chain of regex replacements — yields **423,886 chars / 4,482 lines**. An earlier pass
+recorded 424,043 / 4,488 from a looser unescape; the figure above is the exact one, and the line
+numbers below agree with it.
+
+**The line numbers below are correct** and are into that decoded app text — `siteIcon` at 262,
+`machineArt` at 448, `unitIcon` at 454, `eqCard` at 3959, `rEquipGroups` at 4463. They have been
+re-verified against a fresh decode (2026-08-09). If a reader's own decode disagrees by a line or two,
+it is the unescape that differs, not this table.
 
 ---
 
-## 1 · Palette (`const C`, decoded line 4)
+## 1 · Palette (`const C`, decoded lines 6–11)
+
+> **This table is right, and `map-proto.css` copied two of its rows down wrong.** Until 2026-08-09 the
+> stylesheet's own token comment named `deep` and `blt` and then used `#0F2238` and `#E4EDF5`. Both of
+> those colours *do* occur in the prototype — `#0F2238` as the site label's ink and the dark slab's end
+> stop, `#E4EDF5` on other surfaces entirely (a progress ring's track, another panel's `V.line`) —
+> which is presumably how each got taken for the token beside it. They are `#16304F` and `#E1E9F1`.
+> Everything on the panel inherited the error: card titles, chip text, the distance chip's numerals,
+> the pin's name tag, card borders, dividers, tag borders. Read the values off THIS table.
 
 ```
 bg      #EDF2F7   white  #fff
@@ -117,6 +141,13 @@ Sort and filter, verbatim from 4478:
 `L.divIcon({ className:'', iconSize:[132,124], iconAnchor:[66,124] })` — **132 × 124**, anchored at the
 bottom centre (v2's was 132 × 86).
 
+> **⚠ The "machine art" row of the table below is the whole marker, and it was not built that way.**
+> The machine is a **free-standing image**: 94 × 74, `object-fit: contain`, **no container, no fill,
+> no ring, no badge**. It rests directly on the ground disc. Until 2026-08-09 `MapCanvas` drew a 44 px
+> circle filled with the availability colour, white-ringed, holding a Material glyph with the taxonomy
+> image painted over it at 62 % — which is why the 62 px disc and the 44 px contact shadow beneath it
+> looked oversized. See §9's corrected row for the invalid justification that allowed it.
+
 Stack, bottom-up, inside a `96 × 78` relative box:
 
 | Layer | Values |
@@ -182,7 +213,21 @@ font-size:10px; font-weight:800; color:#16304F; box-shadow:0 2px 8px rgba(15,34,
 **Leader line (709).** When de-collision moved a pin off its yard:
 `color:#A9BCCC; weight:1; opacity:.8; interactive:false`.
 
-## 7 · Animations — the last `<style>` block, byte 4,627,210
+## 7 · Animations — the last `<style>` block (byte 4,627,210 / char 4,627,164)
+
+**There are SIXTEEN keyframes, not eleven.** This section listed eleven and five were missing —
+`dpRing`, `dpPanelIn`, `dpModal`, `dpToast`, `dpSheen` — and two of those drive surfaces we ship, so
+the gap was not academic:
+
+```css
+@keyframes dpRing   { 0%{transform:scale(.9);opacity:.6} 100%{transform:scale(1.5);opacity:0} }
+@keyframes dpPanelIn{ from{opacity:.4;transform:translateX(-18px)} to{opacity:1;transform:translateX(0)} }
+@keyframes dpModal  { from{opacity:0;transform:scale(.97)} to{opacity:1;transform:scale(1)} }
+@keyframes dpToast  { from{opacity:0;transform:translate(-50%,10px)} to{opacity:1;transform:translate(-50%,0)} }
+@keyframes dpSheen  { 0%{transform:translateX(-120%)} 55%,100%{transform:translateX(220%)} }
+```
+
+The eleven already recorded:
 
 ```css
 @keyframes dpCardIn { from{opacity:0;transform:translateY(9px)} to{opacity:1;transform:translateY(0)} }
@@ -200,18 +245,100 @@ font-size:10px; font-weight:800; color:#16304F; box-shadow:0 2px 8px rgba(15,34,
 @keyframes dpFade  { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
 ```
 
-Interaction language, written once (not per control):
+Interaction language, written once (not per control). The prototype's own comment says why: *"ONE
+interaction language for the whole surface. Every control answers a pointer the same way… Written once
+here rather than as fifty inline handlers — this is behaviour, not theme."* **This extract used to be
+abridged** — it dropped the `cursor` rule, both `.dpRow`/`.dpCell` transitions, the `input:focus` ring
+and the tap-highlight line, which between them are most of what makes the surface feel pressable. In
+full, verbatim:
 
 ```css
 button{transition:background .14s ease,border-color .14s ease,box-shadow .14s ease,transform .09s ease,color .14s ease}
+button:not(:disabled){cursor:pointer}
 button:not(:disabled):hover {filter:brightness(.975)}
 button:not(:disabled):active{transform:translateY(1px) scale(.995)}
 button:focus-visible{outline:2px solid #16304F;outline-offset:2px}
+.dpRow{transition:background .15s ease,border-color .15s ease,box-shadow .15s ease,transform .15s ease}
 .dpRow:hover{box-shadow:0 4px 14px rgba(15,34,56,.10);transform:translateY(-1px)}
+.dpCell{transition:box-shadow .15s ease,transform .15s ease}
+.dpCell:hover{box-shadow:0 3px 12px rgba(15,34,56,.09);transform:translateY(-1px)}
 .dpArt{transition:transform .35s cubic-bezier(.22,.9,.3,1)}
 .dpCard:hover .dpArt{transform:scale(1.06)}
+.dpFlow{animation:dpDash 2.4s linear infinite}
+input:focus{border-color:#16304F!important;box-shadow:0 0 0 3px rgba(22,48,79,.13)}
+input,.dpRow,.dpCell{-webkit-tap-highlight-color:transparent}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 ```
+
+Note the prototype's reduced-motion switch names **`animation` only** — the block above is mostly
+*transitions*, which it therefore leaves running. We extend it: the movement is dropped and the colour
+change kept, because a control that stops answering a press altogether is worse for the reader that
+setting exists for than one that answers quietly.
+
+## 7a · The chat dock and the arrival bubble — `rChatDock` 3859, `rChatPop` 3881
+
+Absent from this document until 2026-08-09, and drawn quite differently in the app as a result.
+
+**Dock (3871–3878).** `background:#16304F; border:2px solid #fff; border-radius:999px;
+padding:13px 20px 13px 17px; font-size:13.5px; font-weight:800; box-shadow:0 10px 28px rgba(9,20,34,.32)`.
+The white ring is load-bearing: the dock floats over a live map, and a borderless dark pill disappears
+against a dark patch of basemap. Unread badge: `22×22; border-radius:999px; background:C.red; color:#fff;
+font-size:11.5px; font-weight:900` with **`animation:dpPing 1.8s ease-out infinite`** — `dpPing`'s ring
+stays its warm `rgba(243,167,122,…)`, because a red ring on a red disc reads as a smear.
+
+**Arrival bubble (3881–3900).** A **filled** card, not a tinted or outlined one — the prototype's
+comment is explicit: *"Filled, not tinted: this competes with a full map for attention, so an outlined
+card lost."* `width:296px; background:#1D4ED8` (**`#B26206` when `kind==='refusal'`**);
+`border:2px solid #fff; border-radius:15px; padding:11px 12px; box-shadow:0 14px 36px rgba(9,20,34,.34);
+animation:dpFade .22s ease`. A tail at `bottom:-8px; inset-inline-start:26px; 14×14;
+border-bottom+border-left 2px #fff; rotate(-45deg)` points at the dock. Inside: a kind pill
+(`10px/800 #fff` on `rgba(255,255,255,.22)`, r20, `2px 8px`), a `✕`, the counterparty at `12px/900`
+ellipsised, the body at `11px/600 rgba(255,255,255,.93)` clamped to **2 lines**, and
+`↩ ref · serial` at `9.5px/800 rgba(255,255,255,.78)` in `ui-monospace`, `direction:ltr`.
+
+Kind labels (1704): `reply` «رد على طلبك» · `refusal` «رفض طلبك» · `chat` «رسالة جديدة` · `bid`
+«عرض جديد».
+
+## 7b · The basemap and the map options — `initLeaflet` 271–275, `baseUrl` 3836–3840
+
+```js
+L.map(el,{zoomControl:false,attributionControl:true,scrollWheelZoom:true,wheelPxPerZoomLevel:90,
+  zoomSnap:.5,zoomDelta:.5,inertia:true,inertiaDeceleration:2800,doubleClickZoom:true,
+  minZoom:5,maxZoom:16,worldCopyJump:false,keyboard:true})
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+  {maxZoom:19,subdomains:'abcd',attribution:'&copy; OpenStreetMap, &copy; CARTO'})
+```
+
+**CARTO voyager, not OSM standard.** Every colour judgement on the canvas — the `#6E869C` route, the
+`#A9BCCC` leader, the white chips and the white pin tag — was made against voyager's pale ground.
+Voyager's terms require **both** credits, OSM for the data and CARTO for the rendering.
+
+## 7c · The count pills — `rOfferLine` 3763–3766
+
+```
+span: display:inline-flex; align-items:baseline; gap:5px; background:#fff;
+      border:1px solid #E1E9F1; border-radius:999px; padding:4px 11px; white-space:nowrap
+  number: font-size:13px; font-weight:800; color:#16304F
+  label : font-size:10.5px; font-weight:700; color:#6B8FA8
+```
+
+**Both pills are identical.** Neither is tinted, and the comment says why the shape exists at all:
+*"the number is the thing being read, the label tells you which count it is. A run-on sentence made
+both numbers invisible."*
+
+## 7d · The list-foot ask — 2643–2649
+
+At the foot of the scrolling list, after the machines: `background:#fff; border:1.5px dashed #C8D8E8;
+color:C.navy; border-radius:12px; padding:11px; font-size:12px; font-weight:800`, reading
+«اطلب من المورد إضافة {type} أخرى». Composes an `alternative` request with **no machine named**. This
+surface says **«المؤجّر»** for «المورد», per the repo-wide convention in §9.
+
+## 7e · «خارج المدينة» — `CITY_KM` 344, `outOfCity` 345
+
+`CITY_KM() = 45`; `outOfCity(u) = u.km > CITY_KM()`. Presentation only — it filters nothing, sorts
+nothing and colours no pin. It surfaces in three places: as a chip «خارج مدينة الطلب» in the machine
+detail (4251), as plain «· خارج المدينة» text in the card's state row (4026), and as a second pill
+beside the map's distance chip (704).
 
 ## 8 · What the prototype does NOT have — the landing pulse (V6 / AC-35)
 
@@ -233,7 +360,31 @@ animates, so only the ring after it grows and fades — the card cannot appear t
 | `#12904A` / `#C62A2A` on the card and pin | `#16A34A` / `#D9362A` (`AVAILABILITY_COLOUR`) | §7 decision 1; AC-19/168 need one derivation and one red |
 | `اطلب التأكيد` in navy `#16304F` | `#2563EB` | AC-33 — beside a red chip, navy reads as disabled |
 | numeric index badge on the pin | nothing | §7 decision 3 / §6.3.3 — an invented per-unit index the supplier cannot resolve |
-| taxonomy emoji in the pin | the request item's taxonomy **image** → category image → glyph | §7 decision 4, AC-80 |
+| ~~taxonomy emoji in the pin~~ **✗ WRONG — see below** | ~~the request item's taxonomy **image** → category image → glyph~~ | ~~§7 decision 4, AC-80~~ |
+| taxonomy image sourced from `assets/equipment/*.png` by serial prefix (`machineArt`, 448–453) | the request item's taxonomy image → category image → a glyph fallback painted **behind** it | §7 decision 4 / AC-80, which is about **where the image comes from**, not about the marker's shape |
 | «معروضة في اللوحة» on the selected pin | «في هذا العرض» / *In this offer* | §6.4 asks for an **in-offer** tag; the prototype's copy is about the panel |
 | «المورد» | **«المؤجّر»** | repo-wide convention |
 | hollow/dashed not-in-offer marker | nothing | V10 — offered machines only |
+| «‹» hard-coded on the card's التفاصيل control | a chevron that **flips with the locale** (`‹` / `›`) | Ours, by decision (owner, 2026-08-09). The prototype is an RTL-only document, so its chevron is RTL-forward by default; in an English locale «Details ‹» points back at the text it is meant to lead away from. |
+
+### ⚠ The struck-through row above, and what it cost
+
+**«taxonomy emoji in the pin» is false for v3.** It is true of the **v2** prototype, which `design.md`
+§7 decision 4 was written against — v2's pin held an emoji inside a filled circular badge. **v3's pin
+holds a PNG and has no badge at all** (`machineArt` at 448, interpolated at 477 as a bare `<img>` at
+94 × 74 with `object-fit: contain`, no wrapper).
+
+Repeating the v2 claim here turned decision 4 into a licence it never granted. `map-proto.css` and
+`MapCanvas.machineIcon` both cited *"design.md §7 decision 4 — taxonomy image, not emoji"* as the
+authority for drawing a **44 px circle filled with the availability colour, white-ringed**, with the
+taxonomy image laid over a Material glyph at 62 %. Decision 4 says the picture should be *an image
+rather than an emoji*. It says nothing about the pin's size, its fill or its ring — and on those the
+prototype is unambiguous and §4 above already recorded it correctly.
+
+Corrected in the implementation on 2026-08-09 (owner's ruling): the machine is drawn as the prototype
+draws it, and the fallback chain AC-80 does require is kept by painting the image over an
+always-present glyph, since a `divIcon` has no React lifecycle to hang an `onError` on.
+
+**The lesson for this document**: when a row says "the prototype draws X", it must be a statement
+about *the file this document is named after*. §9 is the only section here that reaches back to v2,
+and it is the only section that has been wrong.
