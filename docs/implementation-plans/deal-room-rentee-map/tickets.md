@@ -202,7 +202,10 @@ photo group is not four fixed slots.
   badge**: a machine's paper is either there or it isn't, and a badge invites judging a supplier on a
   state the platform sets.
 - Select-all + a checkbox per row; **requesting is a batch action**, one card carrying several types.
-  **This is the only document surface that can be requested from** (V9 no longer is).
+  **This is the only document surface that can be requested from** (V9 no longer is — though it does tick
+  again, for a batch download; 004a §8.1).
+- **Every row here stays tickable, including one with no url** — that is the paper being asked for. Do
+  not copy V9's `selectable: false` rule; it follows from V9's verb, not from the row.
 - **Reuse:** `documentKeys` on `FleetMachine`; T4 already unfiltered ownership types.
 
 ### V9 · Company panel `[UI]`
@@ -212,8 +215,23 @@ content · **SASO registration**.
 **No IBAN** — banking detail, not something a renter verifies a lessor by (product decision 2026-08-08).
 - **Revised 2026-08-08 — read and open only.** This ticket described the same select-all + checkbox +
   batch «اطلب مستنداً» as V8, and it shipped that way for a few hours. **A document request names a
-  machine**, so the checkboxes, the select-all bar and the send button are gone (AC-71/72, spec 004a §8).
-  Listing, verification state, expiry, **view and download** are all unchanged.
+  machine**, so the **send button and the ask are gone** (AC-71/72, spec 004a §8). Listing, verification
+  state, expiry, **view and download** are all unchanged.
+- **Revised again the same day — the ticks come back, the ask does not** (004a §8.1). The revision above
+  also said *"the checkboxes and the select-all bar are gone"*, which withdrew more than was decided.
+  **Select-all and a checkbox per row are restored**, and the batch beneath them is **download**:
+  - a **row with no url is listed but not selectable** — nothing to save, and a tick that yields nothing
+    when the batch runs is the dead control AC-69 forbids, one step later. (`DocRowView.selectable`
+    carries this; the equipment tab leaves it set, because there an absent paper is the row worth
+    ticking.)
+  - the batch **saves** rather than opens. Five `target="_blank"` views from one click is five popups,
+    of which the browser lets one through — a control that silently does one thing when five were asked
+    for. **View stays per-row**, where a click is a gesture and the tab always opens.
+  - it fetches each selected file and saves it through an object url, so **no popup permission** is
+    involved and every file reports its own success; the panel says how many landed. (This needs the
+    bucket to answer the app's origin with CORS; when it does not, the failure is **counted and stated**,
+    never swallowed.)
+  - **no request control anywhere on the panel** — that half is unchanged and is the load-bearing one.
 - **Company rows carry verification state and expiry** — verified, valid-until, renews-annually, or
   no-document-yet in red. This asymmetry with V8 is deliberate: a company paper is checked and expires.
 - **local content and SASO are held certs**, not catalogue documents (`held_cert_docs.LC` / `.SASO`,
@@ -242,7 +260,9 @@ label (*مؤكّد توفرها* / *لم يؤكد توفرها بعد*) · dista
 | اطلب إضافتها | the shortfall alert (V4) |
 
 - **Revised 2026-08-08.** The document row above read *"equipment (V8) and company (V9)"*. A document
-  request names a machine, so the company arm is withdrawn — see V9 and spec 004a §8. The rule is held
+  request names a machine, so the company arm is withdrawn — see V9 and spec 004a §8. V9's checkboxes
+  came back later that day (004a §8.1) and this table is **unaffected**: they feed a batch **download**,
+  which raises no request and appears nowhere in this list. The rule is held
   by the payload **type**: `RenteeRequestDraft`'s `document` arm requires `scope: "equipment"` and a
   non-nullable `equipmentId`, so the withdrawn ask cannot be written down, and `RenteeAsk` has no
   `scope` field for a caller to assert one with.
@@ -340,6 +360,9 @@ or a photo — especially on a phone.
   because the wording invites the opposite reading.
 - **Company rows are opened, not asked for** (2026-08-08). V15 gives them view + download; V9's request
   affordance is withdrawn. The two are independent and only one changed.
+- **The per-row pair is what a BATCH cannot be** (004a §8.1). V9's restored select-all saves the ticked
+  papers; it does not open them, because several `target="_blank"` opens from one click are popups and
+  only the first survives. View is per-row precisely because that is where it works.
 
 ### V16 · The operator's documents — their own group `[UI]`
 **AC** 75, 76 · **New 2026-08-08.** Splits out of V8, which carried the operator's paperwork as a single

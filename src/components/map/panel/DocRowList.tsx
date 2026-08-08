@@ -9,11 +9,16 @@
  * a shared component makes visible: the `statusLine` and the `dot` a caller passes, and whether it
  * passes selection at all.
  *
- * **Selection is now OPTIONAL, and that is the 2026-08-08 reversal in one prop.** A document request
- * names a machine, so only the equipment tab may raise one; the company panel omits `selected` /
- * `onToggle` / `onToggleAll` and its rows render with no tick and no select-all bar. §6.6's "both use
- * the same grammar" was true of the batch ask and is no longer — the shared grammar is now the ROW
- * (dot, name, status line, view, download), which is all a read-only list needs.
+ * **Selection is OPTIONAL, and what a tick MEANS is the caller's** — that is the 2026-08-08 pair of
+ * rulings in two props. A document request names a machine, so only the equipment tab may raise one and
+ * §6.6's "both use the same grammar" is no longer true of *asking*. But both lists tick: the company
+ * panel supplies `selected` / `onToggle` / `onToggleAll` too, and its batch **downloads** the selection
+ * instead of requesting it (AC-72). The shared grammar is the ROW and the TICK; the verb underneath the
+ * list is not shared, and never was.
+ *
+ * **`DocRowView.selectable` is how the two lists disagree about which rows may be ticked.** The company
+ * panel clears it on a paper with no url — nothing to save. The equipment tab leaves it set even then,
+ * because an absent paper is precisely the row it wants ticked.
  *
  * **Every row this component draws is openable** (004a §7, AC-69). All three document families on this
  * surface — the machine's papers, the machine's photos, and the firm's papers — arrive here, so the
@@ -53,6 +58,13 @@ export interface DocRowView {
    *  honest signal that this paper is missing. The cell keeps its width in CSS, so a row without a file
    *  is the same shape as one with it — the renter reads this list by its shape before its words. */
   downloadUrl: string | null;
+  /** May this row be ticked? **Defaults to true**, so every existing caller is unchanged.
+   *
+   *  The company panel sets it `false` on a paper with no url: its batch action *saves* files, so a tick
+   *  on a row with nothing behind it is a dead control (AC-69) — the same failure the empty actions cell
+   *  exists to avoid, moved one step later. The equipment tab leaves it alone, because there an **absent**
+   *  paper is exactly the row worth ticking: ticking it asks for it. */
+  selectable?: boolean;
 }
 
 const DOT_GLYPH: Record<DotState, string> = {
@@ -75,15 +87,17 @@ export function DocRowList({
   /** Rows needing action — **never a total** (§6.1, AC-42). */
   attention: number;
   rows: DocRowView[];
-  /** Ticked keys. **Omitted on a list that cannot be requested from** — the company panel — and then
-   *  no tick, no select-all bar, and nothing on the row but reading and opening it. */
+  /** Ticked keys. **Omit all three** — `selected`, `onToggle`, `onToggleAll` — for a list with no batch
+   *  action at all, and then no tick, no select-all bar, and nothing on the row but reading and opening
+   *  it. Both lists on this surface do supply them; what the batch then does is theirs to decide. */
   selected?: ReadonlySet<string>;
   onToggle?: (key: string) => void;
   /** Select-all / clear-all over THIS group's keys. */
   onToggleAll?: (keys: string[], select: boolean) => void;
   L: (en: string, ar: string) => string;
 }) {
-  const keys = rows.map((r) => r.key);
+  // Select-all covers only the rows that CAN be ticked, so "all" never means keys with no checkbox.
+  const keys = rows.filter((r) => r.selectable !== false).map((r) => r.key);
   // All three arrive together or not at all: a tick with no handler is a control that silently fails.
   const selectable = !!selected && !!onToggle && !!onToggleAll;
   const allOn = selectable && keys.length > 0 && keys.every((k) => selected!.has(k));
@@ -115,10 +129,11 @@ export function DocRowList({
       )}
 
       {rows.map((r) => {
-        const picked = selectable && selected!.has(r.key);
+        const tickable = selectable && r.selectable !== false;
+        const picked = tickable && selected!.has(r.key);
         return (
           <div key={r.key} className={`mp-row${picked ? " picked" : ""}${r.dot === "missing" ? " missing" : ""}`}>
-            {selectable && (
+            {tickable && (
               <button
                 type="button"
                 className={`mp-tick${picked ? " on" : ""}`}

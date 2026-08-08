@@ -12,6 +12,15 @@
 
 import { describe, expect, it } from "vitest";
 import { mapFleet, type FleetMachine } from "@/lib/contract/fleet";
+// The company panel's *decisions* are pure functions exported beside the component — which rows may be
+// ticked, what a batch covers, what each saved file is called. Imported as a namespace as well, because
+// "this module exports no request path" is itself one of the claims (AC-72).
+import * as companyPanelModule from "@/components/map/panel/CompanyPanel";
+import {
+  companyDownloadBatch,
+  companyDownloadFileName,
+  companySelectableKeys,
+} from "@/components/map/panel/CompanyPanel";
 import {
   attentionCount,
   batchDocumentRequest,
@@ -23,6 +32,7 @@ import {
   matchGrid,
   photoSlotOf,
   presentPhotoSlots,
+  type CompanyDocKey,
   type MatchCellKey,
   type MatchCellState,
   type MatchRequest,
@@ -436,8 +446,9 @@ describe("batchDocumentRequest — one request naming several types (AC-38)", ()
   /* A test here asserted that a `"company"` scope nulled the equipmentId, because company papers
    * belong to the firm. The product owner withdrew the company-scope document request on 2026-08-08 —
    * a document request names a machine — so the `scope` parameter is gone, the id is non-nullable, and
-   * the test is deleted rather than inverted. The company panel is now read-and-open only; see
-   * `CompanyPanel.tsx`. */
+   * the test is deleted rather than inverted. The company panel's ticks came back later the same day —
+   * for a batch **download**, not an ask (AC-72) — and are covered at the bottom of this file; nothing
+   * about the composer changed with them. See `CompanyPanel.tsx`. */
 
   it("never emits the retired `add_to_offer` kind", () => {
     const draft = batchDocumentRequest("eq-1", rows, new Set(["a"]));
@@ -507,5 +518,102 @@ describe("companyDocRows — verification AND expiry, unlike the equipment rows 
   it("ignores an unparseable expiry rather than printing it raw", () => {
     const row = companyDocRows({ verified: true, docs: { cr: { present: true, expiryDate: "not-a-date" } } })[0];
     expect(row.statusLine.en).toBe("verified");
+  });
+});
+
+/* ───────── the company panel's selection — ticks that DOWNLOAD, never ask (AC-72) ───────── */
+
+/**
+ * The panel lost its ticks on 2026-08-08 with the company-scope request, and got them back the same day
+ * for a different verb: a renter wants a firm's CR **and** its VAT certificate, and select-all is the
+ * thing that stops him clicking five rows one at a time.
+ *
+ * The two claims below are the whole of it. **What the batch covers** — the ticked rows that have a url,
+ * never one more — because a control that saves four of the five files it counted is the failure a batch
+ * "view" would have been (five `window.open`s, four blocked). And **no request control**, which is the
+ * half that did not come back: `CompanyPanel` has no `onRequest` prop, and a company row still carries
+ * no requestable document types for one to name.
+ */
+describe("the company panel's batch — download, and only over rows with a file (AC-69, AC-72)", () => {
+  const withUrls = (keys: CompanyDocKey[]) =>
+    companyDocRows({
+      verified: true,
+      docs: Object.fromEntries(
+        COMPANY_DOC_KEYS.map((k) => [k, { present: keys.includes(k), downloadUrl: keys.includes(k) ? `https://x/${k}.pdf` : null }]),
+      ),
+    });
+
+  it("supplies selection: every row carrying a url may be ticked", () => {
+    const rows = withUrls([...COMPANY_DOC_KEYS]);
+    expect(companySelectableKeys(rows)).toEqual(COMPANY_DOC_KEYS);
+  });
+
+  it("a row with NO url is not selectable — a tick that saves nothing is a dead control", () => {
+    const rows = withUrls(["cr", "vat"]);
+    expect(companySelectableKeys(rows)).toEqual(["cr", "vat"]);
+    // The three papers the firm has not filed are still LISTED — they are just not tickable.
+    expect(rows).toHaveLength(COMPANY_DOC_KEYS.length);
+    expect(rows.filter((r) => !r.downloadUrl).map((r) => r.key)).toEqual(["national_address", "local_content", "saso"]);
+  });
+
+  it("a paper present but url-less (an unsigned key) is listed and still not selectable", () => {
+    const rows = companyDocRows({ verified: true, docs: { cr: { present: true } } });
+    expect(rows.find((r) => r.key === "cr")?.statusLine.en).toBe("verified");
+    expect(companySelectableKeys(rows)).toEqual([]);
+  });
+
+  it("the batch covers EXACTLY the selected rows that have urls — in the list's order", () => {
+    const rows = withUrls(["cr", "vat", "saso"]);
+    const batch = companyDownloadBatch(rows, new Set(["saso", "cr", "national_address"]));
+    expect(batch.map((t) => t.key)).toEqual(["cr", "saso"]);
+    expect(batch.map((t) => t.url)).toEqual(["https://x/cr.pdf", "https://x/saso.pdf"]);
+    expect(batch.map((t) => t.label.en)).toEqual(["Commercial registration", "SASO registration"]);
+  });
+
+  it("a tick that survived a row losing its url drops out of the batch, so the count cannot overstate", () => {
+    const before = withUrls(["cr", "vat"]);
+    const selected = new Set(companySelectableKeys(before));
+    expect(companyDownloadBatch(before, selected)).toHaveLength(2);
+    // Same selection, a payload where VAT is no longer signed: the batch shrinks with it.
+    expect(companyDownloadBatch(withUrls(["cr"]), selected).map((t) => t.key)).toEqual(["cr"]);
+  });
+
+  it("selecting nothing yields an empty batch, so the send control has one source of truth", () => {
+    expect(companyDownloadBatch(withUrls([...COMPANY_DOC_KEYS]), new Set())).toEqual([]);
+  });
+
+  it("names each saved file after the row the renter read, keeping the url's extension", () => {
+    expect(companyDownloadFileName("Commercial registration", "https://s3/x/abc-123.pdf?sig=1")).toBe(
+      "Commercial registration.pdf",
+    );
+    expect(companyDownloadFileName("السجل التجاري", "https://s3/x/abc-123.PNG")).toBe("السجل التجاري.png");
+  });
+
+  it("omits the extension rather than guessing one — a wrong extension opens the wrong app", () => {
+    expect(companyDownloadFileName("VAT certificate", "https://s3/x/abc-123?sig=1")).toBe("VAT certificate");
+  });
+
+  it("never lets a label become a path — a batch writes files, and '/' is not a name", () => {
+    expect(companyDownloadFileName("CR / VAT", "https://s3/x/a.pdf")).toBe("CR VAT.pdf");
+  });
+
+  /* The load-bearing half of the reversal, unchanged: the ticks are back, the ASK is not. */
+  it("carries NO request control: no company row names a requestable document type", () => {
+    for (const row of companyDocRows({ verified: true, docs: { cr: { present: true, downloadUrl: "https://x/cr.pdf" } } })) {
+      expect(row).not.toHaveProperty("docTypes");
+    }
+  });
+
+  it("exports a download path and no request path — a tick feeds nothing else", () => {
+    expect(Object.keys(companyDownloadBatch(withUrls(["cr"]), new Set(["cr"]))[0]).sort()).toEqual([
+      "key",
+      "label",
+      "url",
+    ]);
+    const exported = Object.keys(companyPanelModule);
+    expect(exported).toContain("CompanyPanel");
+    // V8 takes an `onRequest` and composes a `PanelRequestDraft`; V9 has no such thing to export, and
+    // this is the assertion that fails the day somebody re-adds one.
+    expect(exported.filter((n) => /request|ask|compose/i.test(n))).toEqual([]);
   });
 });

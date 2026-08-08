@@ -407,7 +407,7 @@ rather than left to be reconciled by a reader. What changes:
 | | Before | Now |
 |---|---|---|
 | Equipment document rows | select-all, tick per row, batch «اطلب مستنداً» | **unchanged** |
-| Company document rows | the same select-all, tick and batch ask | **read and open only** — no tick, no select-all, no send |
+| Company document rows | the same select-all, tick and batch ask | **read and open only** — no request control. ~~no tick, no select-all, no send~~ **corrected in §8.1: the tick and select-all are back, and the batch downloads** |
 | `rentee_request` `document` kind | `scope: equipment` with an id, **or** `scope: company` with none | **`scope: equipment` with an id, always** |
 | The shortfall's «اطلب إضافتها» | `alternative`, `scope: company`, null id | **unchanged — this is the one surviving company-scope ask** |
 
@@ -423,7 +423,8 @@ could act on:
 **Viewing and downloading company documents is unchanged and must keep working.** The panel still lists
 CR · VAT · national address · local content · SASO, still shows verification state and expiry, and still
 opens and downloads each paper (V15 / AC-69). V14's read (§7.1) is untouched. **Only the ask is
-withdrawn.**
+withdrawn** — and §8.1 records that the first implementation of this ruling withdrew the selection UI
+along with the ask, which was more than was decided here.
 
 **The rule is enforced by the type, not by a guard.** `RenteeRequestDraft`'s `document` arm requires
 `scope: "equipment"` and a non-nullable `equipmentId`, so `kind: 'document'` with a null id cannot be
@@ -434,7 +435,40 @@ routes around — an unrepresentable state is not.
 | ID | Layer | Criterion |
 |---|---|---|
 | RM3-AC-71 | web | **Given** a document request **When** it is composed **Then** it names a machine — `scope: "equipment"` with a non-empty `equipmentId` — and a `document` ask carrying no machine is **unrepresentable in the payload type** and refused at runtime by the one composer, whatever scope a caller asserts. **A company paper is read, not requested** |
-| RM3-AC-72 | web | **Given** the company document panel **When** it renders **Then** every paper is listed with its verification state, its expiry and its view/download pair — and there is **no checkbox, no select-all and no request control** anywhere on it |
+| RM3-AC-72 | web | **Given** the company document panel **When** it renders **Then** every paper is listed with its verification state, its expiry and its view/download pair; **a paper carrying a url also carries a checkbox**, the panel carries **select-all** over those papers, and the batch action beneath them **opens or saves the selection**. **When** a paper carries no url **Then** it is listed but **not selectable**. And there is **no request control anywhere on the panel**. *(Corrected 2026-08-08, hours after it was written. It read "there is **no checkbox, no select-all and no request control** anywhere on it" — see §8.1: withdrawing the ask took the selection UI with it, and the owner has restored the ticks for a different verb.)* |
+
+### 8.1 The ticks come back — for opening, not for asking
+
+**Product decision, 2026-08-08, later the same day.** Withdrawing the company-scope *request* above took
+the company panel's **checkboxes and select-all** away with it. That was one step too far, and this
+section reverses that half and only that half.
+
+| | After §8 | Now |
+|---|---|---|
+| Company row — **checkbox** | ~~none~~ | **one per row that carries a url** |
+| Company panel — **select-all** | ~~none~~ | **restored**, over the rows that carry a url |
+| The batch beneath them | ~~none~~ | **opens or saves the selection** — never a request |
+| Company row — **request control** | none | **none. Unchanged, and this is the load-bearing half** |
+| `rentee_request` `document` kind | `scope: equipment` with an id, always | **unchanged** |
+
+**Why the ticks were wrong to remove.** A renter checking a firm wants its CR **and** its VAT
+certificate. Select-all exists precisely to stop him clicking five rows one at a time, and that argument
+never depended on what the button underneath the list did. What was withdrawn was the **verb**, not the
+selection.
+
+**Why the batch SAVES rather than OPENS.** Each row's url is a presigned link and the per-row **view**
+opens a new tab. Five of those from one click is five popups: a browser lets the first through and
+blocks the rest, so a "view all" control would tell the renter it opened five papers and open one. That
+is a control that silently does one thing when five were asked for — the exact failure AC-69 forbids at
+row level, moved up to the group. So:
+
+- the **batch downloads**, fetching each selected file and saving it, reporting how many landed; and
+- **view stays per row**, where a click is a user gesture and the tab always opens.
+
+**A row with no url is listed but cannot be ticked.** There is nothing to open or save behind it. AC-69
+already refuses a dead control on such a row; a tick that yields nothing when the batch runs is that
+same dead control one step later. (The **equipment** tab's rule is the opposite one and stays that way:
+there, an absent paper is exactly the row worth ticking, because ticking it asks for it.)
 
 ## 9 · One rule for every document row — decided 2026-08-08
 
