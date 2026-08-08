@@ -233,6 +233,10 @@ wizard** bound to `page`/`editable`/`canNext`/`canSubmit`/`busy`/`doSubmit` insi
 component. It is not embeddable.
 - **Build** the figures from **`computeDealTotals`** (`lib/contract/deal-room.ts`, pure and reusable):
   rate · source (*عرض افتتاحي*) · **التفاصيل** breakdown.
+- **التفاصيل EXPANDS the bar in place** — it is not a popover or a separate sheet. Opening it grows the
+  footer into a breakdown panel (rental × units · mobilisation · demobilisation · subtotal · VAT ·
+  total), and closing it returns the bar to its resting height. The panel is a fixed-width column, so
+  the expansion takes vertical space from the equipment list rather than overlaying it.
 - **Negotiate/accept opens the existing flow** at `/deal-room/[id]`. Never re-implement it here.
 - **No-room case:** most bids have `dealRoomId === null` — show the **bid's own** figures, no status
   line, and let negotiate be what creates the room.

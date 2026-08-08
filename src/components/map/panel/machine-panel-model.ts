@@ -119,12 +119,15 @@ export function photoSlotOf(slot: string): PhotoSlot | null {
 /**
  * Ownership / registration document types.
  *
- * **The renter's projection strips every one of them.** `rentee.service.ts`'s
- * `RENTEE_HIDDEN_DOC_TYPES` removes `istimara` · `customs` · `customs_card` · `sale_contract` ·
- * `sales_contract` · `saso_registration` before an offered unit ever reaches this client, which is
- * precisely why `bid-readiness.ts` excludes proof-of-ownership from scoring — counting it "would hold
- * every supplier permanently short". This set is still matched, because a machine that *does* carry one
- * must read as holding it; nothing here may treat the absence as a failure. See `ownershipCell`.
+ * **These now REACH the renter.** `rentee.service.ts` used to strip `istimara` · `customs` ·
+ * `customs_card` · `sale_contract` · `sales_contract` · `saso_registration` via
+ * `RENTEE_HIDDEN_DOC_TYPES`; that constant and its filter were deleted when the product owner decided
+ * ownership papers are renter-visible with usable urls. So a missing one is the supplier's omission,
+ * not a redaction, and `ownershipCell` reads it red.
+ *
+ * (`bid-readiness.ts` still excludes proof-of-ownership from its readiness SCORE. That exclusion is
+ * about a band that would otherwise hold every supplier short; it is not a statement that the renter
+ * cannot see the document.)
  */
 const OWNERSHIP_TYPES = new Set([
   "istimara",
@@ -307,23 +310,25 @@ function photosCell(machine: FleetMachine): MatchCell {
 }
 
 /**
- * Proof of ownership / registration. Green when held — **grey, never red, when not**.
+ * Proof of ownership / registration. Green when held, **red when not**.
  *
- * The renter's own projection deletes ownership papers before they leave the backend
- * (`RENTEE_HIDDEN_DOC_TYPES`, `rentee.service.ts:449`), so an absence here is the platform's redaction
- * and not the supplier's omission. Red would put a failure mark on every machine on the platform for
- * something the renter was never allowed to see — the identical trap `bid-readiness.ts` documents when
- * it excludes proof-of-ownership from readiness scoring. The cell still states the finding plainly, so
- * a renter who wants the paper can ask for it from the documents tab.
+ * Corrected 2026-08-08. An earlier revision made this grey, reasoning that the renter's projection
+ * strips ownership papers (`RENTEE_HIDDEN_DOC_TYPES`) so an absence would be the platform's redaction
+ * rather than the supplier's omission. **That filter is gone** — the product owner decided ownership
+ * documents are renter-visible with usable urls, and `rentee.service.ts` no longer contains the
+ * constant or its filter. So an absent ownership paper is now a real gap the supplier can close, which
+ * is exactly what red is for, and the documents tab can request it.
  *
- * If the projection is ever unfiltered for this surface, this becomes a one-word change to `"red"`.
+ * (`bid-readiness.ts` still excludes proof-of-ownership from its SCORE — that is a different question.
+ * A band that counted a redacted paper would hold every supplier permanently short; this cell states a
+ * fact about one machine and can be acted on.)
  */
 function ownershipCell(machine: FleetMachine): MatchCell {
   const held = machine.documentKeys.filter(isOwnershipDoc);
   return {
     key: "ownership",
     label: { en: "Proof of ownership", ar: "إثبات الملكية" },
-    state: held.length > 0 ? "green" : "grey",
+    state: held.length > 0 ? "green" : "red",
     finding:
       held.length > 0
         ? { en: "on the machine's file", ar: "على ملف المعدّة" }

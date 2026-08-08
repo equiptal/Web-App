@@ -180,19 +180,21 @@ describe("equipment photos — the fraction the spec asks for", () => {
   });
 });
 
-describe("proof of ownership — grey when absent, never red", () => {
+describe("proof of ownership — green when held, RED when absent", () => {
   it("greens when the machine's file carries one", () => {
     const c = cellsBy(machine({ docs: [{ type: "istimara" }] }), {}).ownership;
     expect(c.state).toBe("green");
     expect(c.en).toBe("on the machine's file");
   });
 
-  it("greys — NOT reds — when it does not", () => {
-    // The renter's projection deletes ownership papers before they leave the backend
-    // (`RENTEE_HIDDEN_DOC_TYPES`), which is why `bid-readiness.ts` excludes them from scoring too.
-    // Red would put a failure mark on every machine for something the renter may not be shown.
+  it("reds when it does not — the paper reaches the renter now, so an absence is a real gap", () => {
+    // An earlier revision made this grey, on the premise that `RENTEE_HIDDEN_DOC_TYPES` strips
+    // ownership papers before they reach this client. That filter was DELETED when ownership documents
+    // became renter-visible with usable urls, so a missing one is the supplier's omission — actionable,
+    // and requestable from the documents tab. (`bid-readiness.ts` still excludes it from the readiness
+    // SCORE; that is about a band, not about visibility.)
     const c = cellsBy(machine({ docs: [{ type: "tuv" }] }), {}).ownership;
-    expect(c.state).toBe("grey");
+    expect(c.state).toBe("red");
     expect(c.en).toContain("not on the file");
   });
 });
