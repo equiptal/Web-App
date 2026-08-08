@@ -340,14 +340,22 @@
   cursor: default;
 }
 
+/* **46 × 40, landscape** (2026-08-09), the prototype's own tile — not the 34 × 34 square this was.
+   A machine photo and a scanned certificate are both wider than they are tall, so a square crops both
+   to the point where the renter cannot tell one certificate from another and the tile stops being a
+   thumbnail and becomes an icon. The extra 12 px of width is what makes it identify the file.
+
+   HELD is a solid hairline over white — a real document sits there. MISSING is DASHED over the panel's
+   own grey: an empty frame, drawn the way an empty frame is drawn, so the absence reads before the
+   words do. */
 .mp-thumb {
   position: relative;
   flex-shrink: 0;
-  width: 34px;
-  height: 34px;
+  width: 46px;
+  height: 40px;
   border: 1px solid #e1e9f1;
-  border-radius: 9px;
-  background: #f8fafc;
+  border-radius: 8px;
+  background: #fff;
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -355,19 +363,23 @@
   font-size: 14px;
   color: #6b8fa8;
 }
+.mp-thumb.missing { border: 1px dashed #c8d8e8; background: #f8fafc; }
 .mp-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-/* The status dot. Green present · **red** needs action (§missing) · blue on-file is a COMPANY-only
-   look (§6.6). */
+/* The status badge sits INSIDE the tile (2026-08-09), tucked into its bottom leading corner, rather
+   than hanging off the corner on a white ring. Outside, it needed that ring to survive whatever it
+   overlapped and it widened the row by its own overhang; inside, the tile clips it and the badge and
+   the picture read as one object — which is what it is a statement about.
+
+   Green present · **red** needs action (§missing) · blue on-file is a COMPANY-only look (§6.6). */
 .mp-thumb .dot {
   position: absolute;
-  bottom: -3px;
-  inset-inline-end: -3px;
-  width: 15px;
-  height: 15px;
-  border: 2px solid #fff;
+  bottom: 2px;
+  inset-inline-start: 2px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  font-size: 8.5px;
-  font-weight: 800;
+  font-size: 8px;
+  font-weight: 900;
   color: #fff;
   display: flex;
   align-items: center;
@@ -404,31 +416,35 @@
   gap: 6px;
 }
 
-/* Ghost is the RESTING weight — that is a second, third… file's view on a row that holds several. The
-   row model names exactly one action `primary` and it is always the FIRST file's view, so the fill below
-   follows `.primary`: the stylesheet then states what the model states, and the two cannot drift. */
+/* **ONE weight, an outline, in the prototype's own navy** — `rgba(22, 48, 79, .07)` over
+   `rgba(22, 48, 79, .22)` with `#16304F` ink, which is `C.blueLt` / `C.blueBd` / `C.blue` read off the
+   decoded source. The prototype's per-row control is that outline on every row, and only that.
+
+   ~~Primary — filled, because looking is what the renter came here to do.~~ **Withdrawn 2026-08-09.**
+   Two things were wrapped in one rule and neither has a record behind it. The FILL said the first
+   file on a row outranks the second, which is a claim about a lessor's upload order, not about the
+   renter's question — on a row holding an istimara and a customs card there is no primary paper. And
+   the blue HUE was this file's `#2563EB` reaching a control the prototype paints navy; AC-33 buys the
+   blue override for `.mp-act`, one control beside a red availability chip, and nothing wider.
+
+   What IS documented survives untouched: the narrowing to view-only, with the per-row download glyph
+   withdrawn in favour of the batch (AC-69, 2026-08-08). */
 .mp-doc {
   width: 30px;
   height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(37, 99, 235, 0.22);
+  border: 1px solid rgba(22, 48, 79, 0.22);
   border-radius: 9px;
-  background: rgba(37, 99, 235, 0.08);
-  color: #2563eb;
+  background: rgba(22, 48, 79, 0.07);
+  color: #16304f;
   font-family: inherit;
   font-size: 14px;
   font-weight: 800;
   line-height: 1;
   cursor: pointer;
   text-decoration: none;
-}
-/* Primary — filled, because looking is what the renter came here to do. */
-.mp-doc.primary {
-  border-color: #2563eb;
-  background: #2563eb;
-  color: #fff;
 }
 
 /* ═══════════════════════════ actions ═══════════════════════════ */

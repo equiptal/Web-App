@@ -283,7 +283,16 @@ export function DocRowList({
               )
             )}
 
-            <span className="mp-thumb">
+            {/* **Text before thumbnail** (2026-08-09). The prototype and the owner's screenshot both
+                read tick · text · thumbnail from the leading edge, and we had the thumbnail second.
+                On eight rows that is not a detail: the names no longer start at one shared inset, so
+                the column the renter actually scans is the one that zig-zags. */}
+            <span className="mp-rowtx">
+              <b>{r.name}</b>
+              <span className={r.dot === "missing" ? "att" : undefined}>{r.status}</span>
+            </span>
+
+            <span className={`mp-thumb${r.dot === "missing" ? " missing" : ""}`}>
               {r.thumbUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={r.thumbUrl} alt={r.name} />
@@ -291,11 +300,6 @@ export function DocRowList({
                 <span aria-hidden="true">{r.dot === "missing" ? "—" : "📄"}</span>
               )}
               <span className={`dot ${r.dot}`} aria-hidden="true">{DOT_GLYPH[r.dot]}</span>
-            </span>
-
-            <span className="mp-rowtx">
-              <b>{r.name}</b>
-              <span className={r.dot === "missing" ? "att" : undefined}>{r.status}</span>
             </span>
 
             {/* AC-69, narrowed 2026-08-08 — **view only**, and none at all when there is no url. The
@@ -318,7 +322,13 @@ export function DocRowList({
                 return (
                   <a
                     key={`${a.kind}:${i}`}
-                    className={`mp-doc ${a.kind}${a.primary ? " primary" : ""}`}
+                    // ~~`a.primary` used to add `.primary`, a solid blue fill.~~ Withdrawn 2026-08-09
+                    // against the prototype, which draws one outline on every row (`panel-proto.css`
+                    // §.mp-doc). `DocAction.primary` itself is untouched — it is the model's statement
+                    // that the first file's view is the row's act, and the batch and the tests read it.
+                    // It simply no longer buys a different LOOK, because on a row holding two papers
+                    // there is no primary paper to look at.
+                    className={`mp-doc ${a.kind}`}
                     href={a.href}
                     // A presigned url on a private bucket: a new tab is the whole viewer. No modal —
                     // that would need MIME sniffing and a PDF strategy, which is a bigger decision
