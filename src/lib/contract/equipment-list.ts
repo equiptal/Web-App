@@ -554,6 +554,11 @@ export type SelectionAction =
    *  left it. Never a toggle: pressing «التفاصيل» on the selected card must not clear the selection
    *  the detail is about to be about. */
   | { kind: "open"; id: string }
+  /** V6's landing pre-selection (RM3-AC-34). A set, never a toggle — there is nothing to toggle
+   *  against, and it is the surface choosing rather than the renter. It is an action here rather than
+   *  a bare assignment so that EVERY mover of the selection is this one function: a writer outside it
+   *  is a second rule, and a second rule is how the two surfaces start disagreeing. */
+  | { kind: "land"; id: string }
   /** The route resolved a different bid (AC-177). */
   | { kind: "bid-change" }
   /** A filter hid the selected machine (RM3-AC-28e) — a ring with no card and no pin. */
@@ -572,6 +577,7 @@ export function nextSelection(current: string | null, action: SelectionAction): 
     case "press":
       return current === action.id ? null : action.id;
     case "open":
+    case "land":
       return action.id;
     case "bid-change":
     case "hidden":

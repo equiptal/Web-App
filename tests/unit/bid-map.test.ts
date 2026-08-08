@@ -16,6 +16,7 @@ import {
   unitCountLabel,
   unitCounts,
   unitIndicators,
+  type RequestTypeSource,
 } from "@/lib/contract/bid-map";
 import { bidSuppliers, bidSupplierKey, mapBidList, type BidCard, type OfferedUnitDetail, type UnitLocationSource } from "@/lib/contract/bids";
 import type { UnitReadiness } from "@/lib/contract/bid-readiness";
@@ -320,7 +321,7 @@ describe("englishTypePlural — the type word agrees with the count (RM3-AC-08)"
 describe("requestTypeWord — the type word comes from the REQUEST's own type (RM3-AC-08)", () => {
   /** The trap: one object carrying BOTH vocabularies, with different words in each. The request calls
    *  it a Forklift; the fleet row calls it an Excavator. Only one of them may reach the pill. */
-  const trap = {
+  const trap: RequestTypeSource & Record<string, string> = {
     subtypeName: "Forklift",
     subtypeNameAr: "رافعة شوكية",
     capacityName: "3 ton",
@@ -354,8 +355,11 @@ describe("requestTypeWord — the type word comes from the REQUEST's own type (R
   it("returns an empty word for a shape that only a MACHINE could satisfy", () => {
     // The structural half of the same claim. A fleet row handed to this function produces nothing —
     // loudly wrong rather than plausibly wrong, which is the whole point of the parameter type.
+    // The cast is the assertion: TypeScript refuses this call outright ("no properties in common"),
+    // which is the type-level half of the same rule — and it is forced through here so the RUNTIME
+    // half is proved too, since Vitest transpiles without typechecking and would not have caught it.
     const machineOnly = { subcategoryName: "Excavator", subcategoryNameAr: "حفّارة", measurementName: "20 ton" };
-    expect(requestTypeWord(machineOnly, 3)).toEqual({ en: "", ar: "" });
+    expect(requestTypeWord(machineOnly as RequestTypeSource, 3)).toEqual({ en: "", ar: "" });
   });
 
   it("says nothing when the request has no item at all, rather than inventing a noun", () => {
@@ -366,8 +370,10 @@ describe("requestTypeWord — the type word comes from the REQUEST's own type (R
 
   it("falls back across locales within the REQUEST, never across to the machine", () => {
     // A request node with only one of the two names filled in still answers — from the request.
-    expect(requestTypeWord({ subtypeNameAr: "رافعة شوكية", subcategoryName: "Excavator" }, 3).en).toBe("رافعة شوكية");
-    expect(requestTypeWord({ subtypeName: "Forklift", subcategoryNameAr: "حفّارة" }, 3).ar).toBe("Forklift");
+    const arOnly: RequestTypeSource & Record<string, string> = { subtypeNameAr: "رافعة شوكية", subcategoryName: "Excavator" };
+    const enOnly: RequestTypeSource & Record<string, string> = { subtypeName: "Forklift", subcategoryNameAr: "حفّارة" };
+    expect(requestTypeWord(arOnly, 3).en).toBe("رافعة شوكية");
+    expect(requestTypeWord(enOnly, 3).ar).toBe("Forklift");
   });
 
   it("keeps a capacity that is not a word intact, exactly as the taxonomy wrote it", () => {

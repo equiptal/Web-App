@@ -374,7 +374,7 @@ export function BidMapWorkspace({
     // Null is a real answer: nothing primary and nothing confirmed → nothing is selected, because an
     // accent and a nine-second pulse on an arbitrary card read as a recommendation.
     if (!id) return;
-    setSelectedMachineId(id);
+    setSelectedMachineId((cur) => nextSelection(cur, { kind: "land", id }));
     setCueId(id);
     onSelectMachine?.(id);
     // `onSelectMachine` is the parent's callback; re-running on its identity would re-land.

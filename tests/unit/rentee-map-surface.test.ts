@@ -1,0 +1,362 @@
+/**
+ * **The rentee map's structural criteria** — RM3-AC-02, AC-06, AC-15, AC-26, AC-33, AC-34, AC-35,
+ * AC-49.
+ *
+ * These eight are facts about the SURFACE rather than about a model: what the header is allowed to
+ * list, which value reaches both drawing surfaces, which branch renders when the offer is empty, what
+ * the landing effect touches, and what the stylesheet says about a cue's iteration count. None of them
+ * can be reduced to a pure function without inventing one, and this suite mounts no DOM — so they are
+ * asserted against the source and the stylesheet, which is the strongest thing available and is what
+ * §E asks for ("assert the model, not a render") applied one level out.
+ *
+ * ── Two rules this file obeys, both of them lessons from the first pass ──────────────────────────
+ *
+ * **1 · Comments are stripped before every assertion.** These files explain their rules using the
+ * words the rules forbid — `BidMapWorkspace.tsx`'s header says the panel carries no "contact details,
+ * deals count, IBAN, CR and VAT" in exactly those words — so a naive grep reports a violation on the
+ * sentence that states the prohibition. The stripper has a positive control of its own.
+ *
+ * **2 · Every negative carries a positive control.** A source assertion that passed because the file
+ * moved, the anchor was renamed or the region resolved empty is the green-over-a-hole this ticket
+ * exists to remove. Each region is proved non-empty and proved to contain what it SHOULD before it is
+ * swept for what it must not.
+ *
+ * ── Scope note ───────────────────────────────────────────────────────────────────────────────────
+ * `src/components/map/panel/**` is owned by other work in flight and is deliberately not read here.
+ */
+
+import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { LANDING_CUE_MS, REQUEST_ACTION_COLOUR, SHORTFALL_COLOUR } from "@/lib/contract/bid-map";
+
+const ROOT = process.cwd();
+const read = (rel: string) => readFileSync(resolve(ROOT, rel), "utf8");
+
+/** Block, line and JSX comments removed. String literals are left alone: a string holding a forbidden
+ *  identifier is a real read waiting to happen, not prose. */
+function strip(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+}
+
+/** The text between two anchors, comments already stripped. Throws rather than returning "" when an
+ *  anchor has moved — a silently empty region is how a source assertion goes vacuous. */
+function region(src: string, from: string, to: string): string {
+  const clean = strip(src);
+  const start = clean.indexOf(from);
+  const end = clean.indexOf(to, start + from.length);
+  if (start < 0 || end < 0) throw new Error(`anchor moved: ${JSON.stringify(from)} … ${JSON.stringify(to)}`);
+  return clean.slice(start, end + to.length);
+}
+
+/** One CSS rule's declaration block, by exact selector. */
+function cssBlock(css: string, selector: string): string {
+  const at = css.indexOf(selector);
+  if (at < 0) throw new Error(`selector missing: ${selector}`);
+  const open = css.indexOf("{", at);
+  const close = css.indexOf("}", open);
+  return css.slice(open + 1, close);
+}
+
+const WORKSPACE = "src/components/map/BidMapWorkspace.tsx";
+const LIST = "src/components/map/EquipmentList.tsx";
+const CANVAS = "src/components/map/MapCanvas.tsx";
+const DOCK = "src/components/map/ChatDock.tsx";
+const CSS = "src/components/map/map-proto.css";
+
+describe("the stripper does not eat the code it is cleaning", () => {
+  it("keeps executable lines and removes only prose", () => {
+    expect(strip("const a = 1; // iban\nconst b = 2;")).toContain("const b = 2");
+    expect(strip("const a = 1; // iban\nconst b = 2;")).not.toContain("iban");
+    expect(strip("/* deals count */ const a = 1;")).toBe("  const a = 1;");
+    expect(strip('const u = "https://x/y";')).toContain("https://x/y");
+  });
+
+  it("throws rather than returning an empty region when an anchor moves", () => {
+    expect(() => region("const a = 1;", "<header>", "</header>")).toThrow(/anchor moved/);
+  });
+});
+
+/* ═════════════════════════ RM3-AC-02 · the header states identity, not credentials ═════════════════════════ */
+
+describe("the panel header lists identity and nothing else (RM3-AC-02)", () => {
+  const header = region(read(WORKSPACE), '<header className="bm-head">', "</header>");
+
+  it("states the three things it SHOULD — the positive control", () => {
+    // Without these the sweep below would pass over any header at all, including an empty one.
+    expect(header).toMatch(/bid\.supplierName/);
+    expect(header).toMatch(/companyDocuments/);
+    expect(header.length).toBeGreaterThan(200);
+  });
+
+  it("renders the verified chip ONLY when the firm is verified", () => {
+    // The chip is a claim about the platform's own check. Rendering it unconditionally would make
+    // every supplier look verified, which is the one way this header can mislead.
+    expect(header).toMatch(/\{bid\.verified\s*&&/);
+    expect(header).toMatch(/verifiedCompany/);
+  });
+
+  it("carries no contact detail, no deals count, no IBAN, no CR and no VAT", () => {
+    // They live in the company panel (V9). A header that lists credentials invites judging the
+    // supplier before reading his machines.
+    const FORBIDDEN = [
+      /phone|mobile|whatsapp/i,
+      /\bemail\b/i,
+      /contact/i,
+      /deals?count|dealscount|completedDeals|dealsCount/i,
+      /\biban\b/i,
+      /crNumber|commercialRegistration|\bcrNo\b/i,
+      /\bvat\b/i,
+      /rating|reviews?/i,
+    ];
+    for (const bad of FORBIDDEN) expect(header, String(bad)).not.toMatch(bad);
+  });
+
+  it("keeps those fields available on the bid, so the negative is a CHOICE and not an absence", () => {
+    // The positive control on the rule. If `BidCard` ever stopped carrying them this AC would become
+    // vacuously true — it is not: they are on the contract, one interpolation from the header.
+    const bids = strip(read("src/lib/contract/bids.ts"));
+    expect(bids).toMatch(/crNumber|vatNumber|iban|dealsCount|supplierPhone/i);
+  });
+});
+
+/* ═════════════════════════ RM3-AC-15 · one selection value, both surfaces ═════════════════════════ */
+
+describe("one selected id reaches the map and the list alike (RM3-AC-15)", () => {
+  const workspace = strip(read(WORKSPACE));
+
+  it("holds exactly ONE machine-selection state — a second ring is not representable", () => {
+    const selectionStates = [...workspace.matchAll(/const \[(\w*[Ss]elect\w*), set\w+\] = useState/g)].map((m) => m[1]);
+    expect(selectionStates).toEqual(["selectedMachineId"]);
+  });
+
+  it("hands that same value to MapCanvas and to EquipmentList", () => {
+    // The mutation this catches: either surface re-pointed at a different variable. They would still
+    // both render, and would disagree about which machine the renter is looking at.
+    expect(region(read(WORKSPACE), "<MapCanvas", "/>")).toMatch(/selectedMachineId=\{selectedMachineId\}/);
+    expect(region(read(WORKSPACE), "<EquipmentList", "scrollRef=")).toMatch(/selectedId=\{selectedMachineId\}/);
+  });
+
+  it("routes every change to that value through the one reducer", () => {
+    // Five movers — press, open, land, bid change, filtered-out — and every one of them is the
+    // reducer's answer. A `setSelectedMachineId` with no matching `nextSelection` is the rule written
+    // a second time, which is how the two surfaces start disagreeing.
+    const calls = workspace.match(/nextSelection\(/g) ?? [];
+    const sets = [...workspace.matchAll(/setSelectedMachineId\(([^\n]*)/g)].map((m) => m[1].trim());
+    expect(calls).toHaveLength(5);
+    expect(sets).toHaveLength(calls.length);
+    // …and none of them is handed a raw id, which is the shape a bypass would take.
+    for (const arg of sets) expect(arg, arg).not.toMatch(/^(id|m\.equipmentId|equipmentId|null)\s*\)/);
+    expect(workspace).toMatch(/const next = nextSelection\(selectedMachineId, \{ kind: "press", id \}\)/);
+  });
+
+  it("turns that id into the card's pressed state in the list", () => {
+    const list = strip(read(LIST));
+    expect(list).toMatch(/selected=\{selectedId === m\.equipmentId\}/);
+    expect(list).toMatch(/aria-pressed=\{selected\}/);
+  });
+
+  it("turns the same id into the marker's selected state on the canvas", () => {
+    const canvas = strip(read(CANVAS));
+    expect(canvas).toMatch(/const selected = selectedId === pin\.id/);
+    // …and the canvas derives no selection of its own to disagree with it.
+    expect(canvas).not.toMatch(/useState<string \| null>/);
+  });
+});
+
+/* ═════════════════════════ RM3-AC-26 · the lessor's empty state ═════════════════════════ */
+
+describe("an offer with no registered machine states so, with no card furniture (RM3-AC-26)", () => {
+  const list = strip(read(LIST));
+
+  it("renders the explanatory branch, keyed off the model's own answer", () => {
+    // The mutation this catches: deleting the branch. The model test for `listEmptyState` stays green
+    // when it is deleted, because the model still answers correctly — nothing reads it.
+    expect(list).toMatch(/listEmptyState\(view\)/);
+    expect(list).toMatch(/empty === "no-machines"/);
+    expect(list).toMatch(/bm-eqnone/);
+    expect(list).toMatch(/eqNoneRegistered/);
+  });
+
+  it("returns early from that branch, so no list, no card and no chip is reachable behind it", () => {
+    const branch = region(read(LIST), 'if (empty === "no-machines") {', "  }");
+    expect(branch).toMatch(/return \(/);
+    // No `<ul>`, no card element, no photo cell, no chip — "no empty card furniture" as a structural
+    // fact rather than as a look.
+    for (const furniture of ["bm-eqlist", "bm-eq-photo", "bm-eq-chip", "EquipmentCard", "<ul"]) {
+      expect(branch, furniture).not.toContain(furniture);
+    }
+  });
+
+  it("stays distinguishable from the FILTERED empty state (RM3-AC-28e)", () => {
+    // Different branch, different class, different copy — and only the filtered one carries a way out.
+    expect(list).toMatch(/empty === "filtered"/);
+    expect(list).toMatch(/bm-eqfnone/);
+    const filtered = region(read(LIST), '{empty === "filtered" ? (', ") : (");
+    expect(filtered).toMatch(/eqFilterEmpty/);
+    expect(filtered).toMatch(/onClearFilters/);
+    // …and the lessor's state offers no such escape, because there is nothing to escape from.
+    const lessor = region(read(LIST), 'if (empty === "no-machines") {', "  }");
+    expect(lessor).not.toMatch(/onClearFilters|eqFilterClear/);
+  });
+
+  it("wears no card furniture in the stylesheet either — no outline, no shadow, no card ground", () => {
+    const css = read(CSS);
+    const bare = cssBlock(css, ".bidmap .bm-eqnone {");
+    for (const property of ["border", "box-shadow", "background"]) {
+      expect(bare, property).not.toMatch(new RegExp(`(^|;)\\s*${property}\\s*:`));
+    }
+    // The positive control, and the AC-28e contrast in one: the FILTERED state deliberately does have
+    // furniture, so "no furniture" is a property of this rule and not of the stylesheet in general.
+    const furnished = cssBlock(css, ".bidmap .bm-eqfnone {");
+    expect(furnished).toMatch(/border\s*:/);
+    expect(furnished).toMatch(/background\s*:/);
+  });
+});
+
+/* ═════════════════════════ RM3-AC-34 / AC-35 · the landing effect and the finite cue ═════════════════════════ */
+
+describe("landing orients the renter and navigates nowhere (RM3-AC-34)", () => {
+  const landing = region(read(WORKSPACE), "if (landedForBid.current === bid.id) return;", "}, [bid, fleet, listed]);");
+
+  it("sets the selection and the cue — the positive control on the region", () => {
+    expect(landing).toMatch(/landingSelectionId\(/);
+    expect(landing).toMatch(/setSelectedMachineId\(\(cur\) => nextSelection\(cur, \{ kind: "land", id \}\)\)/);
+    expect(landing).toMatch(/setCueId\(id\)/);
+  });
+
+  it("never opens a detail — `detailId` is untouched by the whole effect", () => {
+    // "No detail opens" is the half of AC-34 nothing asserted. A `setDetailId(id)` here would take the
+    // renter off the map he has just arrived at, before he has chosen anything.
+    expect(landing).not.toMatch(/setDetailId/);
+    expect(landing).not.toMatch(/setCompanyOpen/);
+  });
+
+  it("selects nothing at all when there is nothing to recommend", () => {
+    // `landingSelectionId` returning null is a real answer — an accent and a nine-second pulse on an
+    // arbitrary card read as a recommendation — and the effect must return before setting anything.
+    expect(landing).toMatch(/if \(!id\) return;/);
+    expect(landing.indexOf("if (!id) return;")).toBeLessThan(landing.indexOf("setSelectedMachineId("));
+  });
+
+  it("runs once per bid, so a fleet refetch cannot re-land over a choice already made", () => {
+    expect(landing).toMatch(/landedForBid\.current = bid\.id/);
+  });
+});
+
+describe("the landing cue is finite (RM3-AC-35)", () => {
+  const css = read(CSS);
+  const cue = cssBlock(css, ".bidmap .bm-eq.cue {");
+
+  it("runs the cue keyframes exactly 6 times", () => {
+    const shorthand = (cue.match(/animation\s*:\s*([^;]+)/) ?? [])[1] ?? "";
+    expect(shorthand).toContain("bmCue");
+    const bmCue = shorthand.split(",").find((part) => part.includes("bmCue")) as string;
+    expect(bmCue.trim().split(/\s+/)).toContain("6");
+  });
+
+  it("contains no `infinite` on that animation, anywhere in its rule", () => {
+    expect(cue).not.toMatch(/infinite/);
+  });
+
+  it("still HAS the keyframes it names — the positive control", () => {
+    // Deleting `@keyframes bmCue` would make "no infinite" vacuously true.
+    expect(css).toMatch(/@keyframes bmCue\s*\{/);
+    // …and the stylesheet does use `infinite` elsewhere, so the assertion above is discriminating.
+    expect(css).toMatch(/animation:[^;]*infinite/);
+  });
+
+  it("takes the class back off after LANDING_CUE_MS, so the cue cannot be restarted", () => {
+    const timer = region(read(WORKSPACE), "if (!cueId) return;", "}, [cueId]);");
+    expect(timer).toMatch(/setTimeout\(\(\) => setCueId\(null\), LANDING_CUE_MS\)/);
+    expect(timer).toMatch(/clearTimeout\(timer\)/);
+    expect(Number.isFinite(LANDING_CUE_MS)).toBe(true);
+  });
+
+  /* **Manual, and labelled so.** AC-35's second clause — *"the resting shadow is preserved across the
+     cue, so the card never appears to shift"* — is a rendered-appearance fact. What CAN be asserted is
+     that the keyframes never animate geometry and always carry the resting shadow first; the
+     perceptual claim itself stays a visual check in T41. */
+  it("animates no geometry, and carries the resting shadow in every keyframe (the assertable part)", () => {
+    const frames = css.slice(css.indexOf("@keyframes bmCue"), css.indexOf("}", css.indexOf("100%", css.indexOf("@keyframes bmCue"))));
+    expect(frames).toMatch(/0%/);
+    expect(frames).toMatch(/100%/);
+    for (const stop of frames.split("\n").filter((l) => /\d+%/.test(l))) {
+      expect(stop, stop).toMatch(/var\(--eq-rest\)/);
+      expect(stop, stop).not.toMatch(/transform|margin|width|height|top|left/);
+    }
+  });
+});
+
+/* ═════════════════════════ RM3-AC-06 / AC-33 · the two colour rules, in the stylesheet ═════════════════════════ */
+
+describe("the surface's stylesheet carries the same colour tokens the models do", () => {
+  const css = read(CSS);
+  const hex = (s: string) => s.toLowerCase();
+
+  it("paints the shortfall alert orange, and nowhere near availability's red (RM3-AC-06)", () => {
+    const alert = cssBlock(css, ".bidmap .bm-short {");
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(SHORTFALL_COLOUR.slice(i, i + 2), 16));
+    // The stylesheet writes the token as an rgba tint, so it is matched by channel rather than by hex.
+    expect(alert).toContain(`rgba(${r}, ${g}, ${b}`);
+    // And the availability red is not in the alert at all, in either notation.
+    expect(hex(alert)).not.toContain("d9362a");
+    expect(alert).not.toContain("rgba(217, 54, 42");
+    // The icon and the heading are the same warm family, never the red.
+    expect(hex(cssBlock(css, ".bidmap .bm-short-ic {"))).toContain(hex(SHORTFALL_COLOUR));
+  });
+
+  it("paints the card's ask blue, never navy (RM3-AC-33)", () => {
+    const ask = cssBlock(css, ".bidmap .bm-eq .bm-eq-ask {");
+    expect(hex(ask)).toContain(hex(REQUEST_ACTION_COLOUR));
+    for (const navy of ["#16304f", "#1c3550", "#0f2238"]) expect(hex(ask)).not.toContain(navy);
+  });
+
+  it("has an availability red the stylesheet really does draw — the positive control", () => {
+    // Both assertions above are negatives about `#D9362A`. If the surface had stopped using it, they
+    // would be vacuous.
+    expect(hex(css)).toContain("d9362a");
+  });
+});
+
+/* ═════════════════════════ RM3-AC-49 · switching tab changes nothing else ═════════════════════════ */
+
+describe("the chat dock's tab strip touches no map state (RM3-AC-49)", () => {
+  const dock = strip(read(DOCK));
+
+  it("is mounted with four props, none of which can write to the surface", () => {
+    const mounted = region(read(WORKSPACE), "<ChatDock", "/>");
+    const props = [...mounted.matchAll(/^\s*(\w+)=/gm)].map((m) => m[1]);
+    expect(props.sort()).toEqual(["bid", "fleet", "groupKey", "sendNonce"]);
+    // A setter handed down here is the one edit that would make a tab press move the map.
+    expect(mounted).not.toMatch(/setSelected|setDetail|setFilter|setCue|onSelectMachine|setCompanyOpen/);
+  });
+
+  it("declares no prop it could use to reach back — the component's own contract", () => {
+    const contract = region(read(DOCK), "export interface ChatDockProps {", "}");
+    expect(contract).toMatch(/bid: BidCard/); // the positive control: the region is the real interface
+    expect(contract).not.toMatch(/=>/); // no callback of any kind
+    expect(contract).not.toMatch(/select|detail|filter|marker|map|cue/i);
+  });
+
+  it("holds no selection, filter, detail or marker state of its own", () => {
+    const states = [...dock.matchAll(/const \[(\w+), set\w+\] = useState/g)].map((m) => m[1]);
+    expect(states.length).toBeGreaterThan(4); // it does hold state — the sweep is not vacuous
+    expect(states).toContain("activeBidId"); // …including the tab it is switching between
+    for (const state of states) {
+      expect(state, state).not.toMatch(/selectedMachine|detailId|filterIds|cueId|companyOpen|marker/i);
+    }
+  });
+
+  it("imports nothing that could derive or draw a marker", () => {
+    for (const forbidden of ["machineMarkers", "MapCanvas", "nextSelection", "equipmentListView", "equipmentCardModel"]) {
+      expect(dock, forbidden).not.toContain(forbidden);
+    }
+  });
+
+  it("changes the tab and nothing else — the only writer on a tab press is its own activeBidId", () => {
+    const onTab = [...dock.matchAll(/onClick=\{\(\) => \{?([^}]*)/g)].map((m) => m[1]).join(" ");
+    expect(onTab.length).toBeGreaterThan(0);
+    expect(onTab).not.toMatch(/setSelectedMachineId|setDetailId|setFilterIds|setCueId/);
+  });
+});
