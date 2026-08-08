@@ -61,24 +61,48 @@ write it posts **nothing** (AC-57) — a reply must never claim an answer the da
 The secondary is **S4** — the refusal, which has no other way to reach the renter, because a "no"
 changes no state anywhere.
 
-**⚠ One mapping to settle.** The mockup uses two different refusals, and `rentee_request_reply`
-carries `resolution: provided | declined | unavailable`:
+**Settled by the owner, 2026-08-08: there is exactly ONE refusal, and it is `unavailable`.
+`declined` is never offered and never emitted.**
 
-- **«غير متوفّرة»** (availability) — the machine cannot serve this bid → `unavailable`.
-- **«لا أملكه»** (documents) — *I do not have that paper*. That is closer to `unavailable` (it does
-  not exist) than to `declined` (I will not give it to you), but the two read very differently to the
-  renter, and `declined` is the one his card renders as **refused** rather than *waiting*.
+Both secondary buttons — «غير متوفّرة» on an availability card and «لا أملكه» on a document card —
+post `resolution: 'unavailable'`. The wording differs because the thing being refused differs; the
+meaning does not.
 
-**Decide before S4 ships.** Whichever is chosen, the renter's card must not read *waiting for the
-lessor* for either (RM3-AC-55).
+**Why one and not two.** `declined` means *I have it and will not give it to you*; `unavailable`
+means *it does not exist*. Only the second is a fact the lessor can state about himself. The first is
+a motive, and asking a lessor to declare one on a marketplace invites him to say nothing at all —
+which is the outcome this whole loop exists to prevent. A refusal that costs him nothing to send is a
+refusal the renter actually receives.
+
+**Consequences to hold to:**
+
+- **No UI anywhere emits `declined`.** Not this card, not a composer, not a debug path.
+- **Readers keep handling it.** `rentee_request_reply`'s `resolution` stays a three-value union and
+  the renter's card keeps rendering `declined` as refused. It costs nothing, and a reader that
+  crashed on a value the contract permits would be a worse failure than a branch nobody reaches.
+- **`unavailable` is a definitive ANSWER, not a non-answer.** The renter's card must read refused —
+  never *waiting for the lessor* (RM3-AC-55). Getting this wrong leaves him waiting for a reply he
+  already has, which is the exact failure the reply card was introduced to fix.
+
+**RM3-AC-54 is now wrong** — it says a refusal carries `resolution: 'declined'`. It must say
+`unavailable`, and the spec should state that `declined` is contract-legal but never produced.
 
 ---
 
 ## 3 · S6 — the bid card carries the pending request
 
-**New, from the mockup.** Today the lessor's bid card CTA is driven by the 6-state lifecycle:
-`bidUiStateFromWire(bid.uiState)` → `BidStatePill` + a CTA that opens the deal room
-(`v3_bid_card.dart`). It says things like *your turn* and *open the deal*.
+**New, from the mockup. Shipped 2026-08-08 (`40aeb3f9`).**
+
+**⚠ Corrected while building it: the lessor's card is `_BidCard` in `my_bids_page.dart`, not
+`v3_bid_card.dart`.** This section originally named the latter and was wrong — that file is the
+**renter's** view of a lessor's bid (`markBidViewedByRentee`, a header showing `bid.supplier`,
+«ملاحظة المورد», `MyOffersBloc`). Every `renteeRequestTargetFor` destination is lessor tooling, so a
+«حدّد الساحة» CTA placed there would have sent the renter into sheets he cannot use.
+
+The consequence is that the lifecycle machinery this section assumed does not exist on the lessor's
+card: `MyBidItemModel` carries no `uiState`, and there is no `BidStatePill`. The label a pending ask
+displaces is «فتح غرفة الصفقة» / «عرض التفاصيل», driven by `_shouldOpenDealRoom`. The rule is
+unchanged in spirit — a pending request beats the general state.
 
 **The change:** when a request is unanswered, the same button says **what the renter asked for** —
 «حدّد الساحة», «ارفع المستندات» — in place, in the existing button, with only the label and the
@@ -101,6 +125,29 @@ is the reason S6 is not a label change. The bids list does not read chat message
 
 The second is smaller at the client and matches how every other lifecycle signal already reaches this
 card. It is a backend change, so it needs its own ticket.
+
+**Decided 2026-08-08: client-side, and the backend ticket is dropped.** The request cards are already
+in Stream and the app already parses them (`5f9751b4`), so one `queryChannels` covers every room on
+screen and reuses one vocabulary instead of inventing a second. No schema change, no endpoint.
+
+**1b · How it reads them — one query per list load, no live connection.** Two alternatives were
+weighed and rejected:
+
+- **A live connection**, so the button changes the moment the renter sends. Rejected because the
+  deal-room page already builds its own client and disposes it on exit, and two live connections for
+  one user fight. The web side hit exactly this: leaving the deal room tore down the chat dock's
+  channels, because the client is effectively a singleton and the cleanup disconnected
+  unconditionally. Making it safe means hoisting the connection to app level and reference-counting it
+  everywhere — risking the conversation he is *in* to refresh a button on a list.
+- **One query per bid.** Ten cards on screen, ten calls per refresh, for the same answer.
+
+**The cost, stated rather than hidden:** a request arriving while he is looking at the list does not
+change the button until he refreshes. Acceptable because a request is not answered in the same second
+it arrives — he finds it on his next look, which is when he would have acted anyway.
+
+**Not a one-way door.** The reading logic is identical either way; only where the connection lives
+changes. The case that would justify moving is lessors *waiting* on that list like a dispatch queue,
+and nothing in the flows says they do.
 
 **2 · What wins when both are live?** A request can be unanswered *while* it is also his turn to
 counter. Recommended: **the request wins while unanswered** — it is a specific question about a named
