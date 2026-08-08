@@ -147,23 +147,36 @@ describe("attachments — grey by decision, never red", () => {
   });
 });
 
-describe("equipment photos — the fraction the spec asks for", () => {
-  it("greens only at four of four", () => {
-    const c = cellsBy(machine({ photos: ALL_FOUR }), {}).photos;
-    expect(c.state).toBe("green");
-    expect(c.en).toBe("4 of 4 uploaded");
+// Scored on the REQUIRED slots — front + plate — since the owner ruled on 2026-08-08 that this cell
+// follows the documents group. Before that, a machine carrying both mandatory shots and no meter photo
+// read "nothing outstanding" in the documents tab and red "2 of 4 uploaded" here, on one screen.
+describe("equipment photos — the fraction, over the slots the lessor is actually held to", () => {
+  it("greens on the two REQUIRED slots, whether or not the optional two were uploaded", () => {
+    const both = cellsBy(machine({ photos: [{ slot: "front" }, { slot: "serial" }] }), {}).photos;
+    expect(both.state).toBe("green");
+    expect(both.en).toBe("2 of 2 uploaded");
+    // All four reads the same: the optional shots are not a higher score, they are simply optional.
+    const all = cellsBy(machine({ photos: ALL_FOUR }), {}).photos;
+    expect(all.state).toBe("green");
+    expect(all.en).toBe("2 of 2 uploaded");
   });
 
-  it("reds at three of four and says so — a '3 of 4' that read green would contradict itself", () => {
+  it("does not fail a machine for a shot nobody requires", () => {
+    // front + plate + side, no meter. The old rule called this "3 of 4" and red.
     const c = cellsBy(machine({ photos: [{ slot: "front" }, { slot: "serial" }, { slot: "equipment" }] }), {}).photos;
+    expect(c.state).toBe("green");
+  });
+
+  it("reds when a REQUIRED shot is missing, and says which fraction is short", () => {
+    const c = cellsBy(machine({ photos: [{ slot: "front" }, { slot: "equipment" }] }), {}).photos;
     expect(c.state).toBe("red");
-    expect(c.en).toBe("3 of 4 uploaded");
+    expect(c.en).toBe("1 of 2 uploaded");
   });
 
   it("reds at none, and reports zero rather than omitting the cell", () => {
     const c = cellsBy(machine({ photos: [] }), {}).photos;
     expect(c.state).toBe("red");
-    expect(c.en).toBe("0 of 4 uploaded");
+    expect(c.en).toBe("0 of 2 uploaded");
   });
 
   it("folds the wire's slot vocabulary onto the four the renter is shown", () => {

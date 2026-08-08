@@ -321,21 +321,22 @@ function attachmentsCell(request: MatchRequest): MatchCell {
  * Equipment photos — the one cell whose finding is a fraction, and the spec's own example ("3 of 4
  * uploaded").
  *
- * Green needs **all four**. `computeUnitReadiness.photosPresent` is a lower bar (front + plate are the
- * two mandatory slots), and it is not read here: this cell reports the four slots the renter is shown,
- * so a "3 of 4" that rendered green would contradict its own text on screen.
+ * **Scored on the REQUIRED slots only — `front` + plate. Owner's ruling, 2026-08-08.**
  *
- * ⚠️ **Left as it is, and it now disagrees with the photos GROUP one tab away.** Since 2026-08-08 the
- * document groups require only the two slots the lessor is actually held to (`REQUIRED_PHOTO_SLOTS`,
- * mirroring `bid_readiness.dart`), so a machine with front + plate and no meter shot reads "nothing
- * outstanding" in the documents tab and **red, "2 of 4 uploaded"** in this cell. Changing this cell
- * moves §6.5 / AC-36, which neither the owner's ruling nor this ticket touched — so the divergence is
- * written down here and reported rather than resolved by guess. Whichever way it goes, both surfaces
- * must move together.
+ * It used to demand all four. Once the documents group started requiring only the two slots the lessor
+ * is actually held to (`REQUIRED_PHOTO_SLOTS`, mirroring `bid_readiness.dart`), the two surfaces
+ * contradicted each other on one screen: a machine with front + plate and no meter shot read "nothing
+ * outstanding" in the documents tab and **red, "2 of 4 uploaded"** in this cell. The owner ruled that
+ * the cell follows the group, so the grid stops failing a machine on shots nobody requires — which is
+ * the rule every other cell already obeys: *a cell nobody asked about cannot fail*.
+ *
+ * The fraction is therefore over the **required** slots, not over `PHOTO_SLOTS`. A renter who wants to
+ * know whether the optional shots exist reads the group, where they appear when they are uploaded.
  */
 function photosCell(machine: FleetMachine): MatchCell {
-  const have = presentPhotoSlots(machine).length;
-  const total = PHOTO_SLOTS.length;
+  const present = new Set<PhotoSlot>(presentPhotoSlots(machine));
+  const have = [...REQUIRED_PHOTO_SLOTS].filter((s) => present.has(s)).length;
+  const total = REQUIRED_PHOTO_SLOTS.size;
   return {
     key: "photos",
     label: { en: "Equipment photos", ar: "صور المعدّة" },

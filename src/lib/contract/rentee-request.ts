@@ -152,6 +152,21 @@ const DOC_TYPE_ALIASES: Record<string, string> = {
   equipment_safety_certificate: "safety_cert",
   operator_safety_certificate: "operator_license",
   proof_of_ownership: "ownership_letter",
+  // The operator's LICENCE, under all three spellings one paper is written in.
+  //
+  // Without these an operator ask could never read as answered. The ask names the catalogue key
+  // `operator_license`; a machine's own `documentKeys[].type` carries **`operating_license`** — note
+  // the missing `operator_` prefix, the same trap `OPERATOR_TYPES` exists for — so the renter asked,
+  // the lessor uploaded, and the card stayed «بانتظار ردّه» forever. It is the failure
+  // `assertKnownDocTypes`' comment warns about reached through the other door: a type that validates
+  // on the way OUT but can never be matched on the way BACK.
+  //
+  // Only the licence is folded. `operator_tuv` / `operator_spsp` / `operator_id` /
+  // `operator_insurance` are different papers, and mapping them here would let an operator ID answer
+  // a request for a licence — a reply claiming an answer the data does not show.
+  operating_license: "operator_license",
+  operator_license: "operator_license",
+  operator_licence: "operator_license",
   // Names that differ from the catalogue by one word.
   vat: "vat_cert",
   customs_card: "custom_card",
