@@ -41,8 +41,22 @@ export function ChatCard({
   // RTL: the transition reads in the flow direction, so the glyph follows the script rather than being
   // a hardcoded `→` that would point out of the sentence in Arabic.
   const arrow = ar ? "←" : "→";
+  /**
+   * **Only the request loop gets the full card. Owner's ruling, 2026-08-08.**
+   *
+   * The renter's ask and the lessor's answer are a conversation he is *in* — they carry a question,
+   * two buttons and a state he is waiting on. The negotiation vocabulary is narration of moves he
+   * already made or already saw on the price bar. Giving both the same white card made the thread read
+   * as a wall of equally-important boxes, and the one thing needing his attention stopped standing out.
+   *
+   * **This is a treatment, not a content change.** Every string still comes from the payload
+   * (`buildChatCardView`), so the quiet events keep what `923b90f` fixed: Arabic in an Arabic thread
+   * rather than the backend's English `message.text`, a counter that actually shows its figures, and a
+   * translate control. Reverting them to `.sysev` would bring all three defects back.
+   */
+  const prominent = view.tone === "ask" || view.tone === "ask-reply";
   return (
-    <div className={`chatcard cc-${view.tone}`}>
+    <div className={`chatcard ${prominent ? "cc-prominent" : "cc-quiet"} cc-${view.tone}`}>
       <div className="cc-head">
         <span className="material-icons-outlined">{view.icon}</span>
         <span className="cc-title">{view.title}</span>

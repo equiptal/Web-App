@@ -159,6 +159,35 @@
 .dlproto .cc-tr { background: none; border: 0; padding: 0; font: inherit; font-size: 11px; font-weight: 800; color: var(--info); cursor: pointer; }
 .dlproto .cc-tr:disabled { opacity: 0.6; cursor: default; }
 .dlproto .cc-at { margin-inline-start: auto; font-size: 10.5px; font-weight: 700; color: var(--muted); }
+/* ── Two weights, one component (owner's ruling 2026-08-08) ──────────────────────────────────────
+   The request and its reply keep the card. The negotiation vocabulary steps back to a quiet line: it
+   narrates moves the renter already made, or already saw on the price bar, and when everything wore
+   the same white card the one thing waiting on him stopped standing out.
+
+   Only the CHROME changes. Every string still comes from the payload, so the quiet events keep their
+   Arabic, their figures and their translate control — the three things `923b90f` fixed. */
+.dlproto .chatcard.cc-quiet {
+  width: min(300px, 88%);
+  margin: 5px 0;
+  padding: 7px 11px;
+  background: transparent;
+  border-color: transparent;
+  /* The tone stripe survives at half width: it is the only thing distinguishing an acceptance from a
+     counter at a glance, and losing it would make the thread unreadable rather than merely quieter. */
+  border-inline-start-width: 2px;
+  border-radius: 8px;
+  box-shadow: none;
+}
+.dlproto .chatcard.cc-quiet .cc-title { font-size: 11.5px; font-weight: 700; color: var(--navy-mid); }
+.dlproto .chatcard.cc-quiet .cc-head .material-icons-outlined { font-size: 15px; }
+.dlproto .chatcard.cc-quiet .cc-rows { margin-top: 5px; gap: 2px; }
+.dlproto .chatcard.cc-quiet .cc-k { font-size: 10.5px; }
+.dlproto .chatcard.cc-quiet .cc-v { font-size: 11.5px; font-weight: 700; }
+.dlproto .chatcard.cc-quiet .cc-foot { margin-top: 5px; }
+/* `.cc-accepted` paints a success wash; at this weight that reads as a highlight, which is the
+   emphasis this rule exists to remove. The stripe already carries the meaning. */
+.dlproto .chatcard.cc-quiet.cc-accepted { background: transparent; }
+
 /* six distinct tones — a rate proposal, a rate acceptance, and the four term actions */
 .dlproto .cc-rate { border-inline-start-color: var(--action); }
 .dlproto .cc-rate .cc-head .material-icons-outlined { color: var(--action); }
