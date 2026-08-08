@@ -377,8 +377,8 @@ legible; the left column is what is true now.
 | | State when audited | State now |
 |---|---|---|
 | Equipment documents — data | ✅ real. `getSupplierFleet` presigns via `batchSignItems`; ownership papers are deliberately unfiltered for the renter | ✅ unchanged |
-| Equipment documents — controls | ⚠️ download only. No view | ✅ **view + download** (V15, AC-69) — **except the operator's certificates, which expose neither** (AC-75, owner 2026-08-08) |
-| Company documents — controls | ⚠️ download only. No view | ✅ **view + download** (V15, AC-69) |
+| Equipment documents — controls | ⚠️ download only. No view | ✅ **view** per row (V15, AC-69) — **download moved to the batch** (§8.2, owner 2026-08-08) — and **the operator's certificates expose neither** (AC-75) |
+| Company documents — controls | ⚠️ download only. No view | ✅ **view** per row, **download in the batch** (V15, AC-69, §8.1, §8.2) |
 | **Company documents — data** | ❌ **none.** `CompanyPanel` takes `docs` as a prop and no route can fill it | ✅ **served.** `GET /marketplace/bids/{bidId}/company-documents`, presigned via `batchSignItems`, gated by the **same predicate as the fleet read**, bid-scoped with no company id accepted from the client (V14) |
 
 **AC-68 is satisfied.** The last row *was* the real finding: `getMyCompany` serves a supplier's *own*
@@ -401,7 +401,7 @@ row with nothing to click.
 | ID | Layer | Criterion |
 |---|---|---|
 | RM3-AC-68 | backend | **Given** a renter who can reach a bid's request **When** he opens the company panel **Then** the bid's supplier's company documents are served **bid-scoped** — no company id accepted from the client — gated by the same predicate as the fleet read, with presigned urls, verification state and expiry |
-| RM3-AC-69 | web | **Given** any document row at either level **When** it carries a url **Then** it exposes **view** and **download**, view primary — and **When** it carries none **Then** it exposes neither, never a dead control. *(Unchanged by the 2026-08-08 operator ruling and worth saying why: the operator's rows carry **no url by design** (AC-75), so this criterion is satisfied by its second clause rather than exempted from. "A renter must be able to view and download every document this surface names" above is now false of one family — the operator's — and that is deliberate, not an omission.)* |
+| RM3-AC-69 | web | **Given** any document row at either level **When** it carries a url **Then** it exposes **view**, and **When** it carries none **Then** it exposes nothing, never a dead control. *(**Narrowed 2026-08-08 by the owner's UI design — it required "view AND download, view primary".** The per-row **download** control is withdrawn: downloading is now the **batch** action beneath the list (§8.2), so a per-row download would be a second control for one act, one of which the renter has to learn is redundant. **View survives, and that is the point of keeping it** — the renter must still be able to look at one paper without selecting anything. Also unchanged by the earlier operator ruling, and worth saying why: the operator's rows carry **no url by design** (AC-75), so this criterion is satisfied by its second clause rather than exempted from — "a renter must be able to view every document this surface names" is now false of one family, deliberately.)* |
 | RM3-AC-70 | backend | **Given** local content **When** the company documents are assembled for **display** **Then** it resolves from `held_cert_docs.LC` **or** the legacy `local_content_doc_key` — so the panel can list, show and open it — because it is a held cert and not a catalogue document. The same dual-read serves SASO from `held_cert_docs.SASO` / `saso_heavy_equip_doc_key`. *(Re-scoped 2026-08-08, the day it was written. It was authored to make a company-scope document **request** resolvable: a held cert has no `DocumentInstance`, so an ask answered against catalogue keys alone would hang open forever. That ask is withdrawn — a document request names a machine, AC-71 — so the criterion now stands on display alone, which is what it was always really about. Nothing about the backend read changes.)* |
 
 ## 8 · A document request names a machine — decided 2026-08-08
@@ -443,7 +443,7 @@ routes around — an unrepresentable state is not.
 | ID | Layer | Criterion |
 |---|---|---|
 | RM3-AC-71 | web | **Given** a document request **When** it is composed **Then** it names a machine — `scope: "equipment"` with a non-empty `equipmentId` — and a `document` ask carrying no machine is **unrepresentable in the payload type** and refused at runtime by the one composer, whatever scope a caller asserts. **A company paper is read, not requested** |
-| RM3-AC-72 | web | **Given** the company document panel **When** it renders **Then** every paper is listed with its verification state, its expiry and its view/download pair; **a paper carrying a url also carries a checkbox**, the panel carries **select-all** over those papers, and the batch action beneath them **opens or saves the selection**. **When** a paper carries no url **Then** it is listed but **not selectable**. And there is **no request control anywhere on the panel**. *(Corrected 2026-08-08, hours after it was written. It read "there is **no checkbox, no select-all and no request control** anywhere on it" — see §8.1: withdrawing the ask took the selection UI with it, and the owner has restored the ticks for a different verb.)* |
+| RM3-AC-72 | web | **Given** the company document panel **When** it renders **Then** every paper is listed with its verification state, its expiry and its **view** control; **a paper carrying a url also carries a checkbox**, the panel carries **select-all** — reading «حدّد كل المتاح» — over those papers, and the **single** batch action beneath them **saves the selection**. **When** a paper carries no url **Then** it is listed but **not selectable**. And there is **no request control anywhere on the panel**. *(Corrected twice on 2026-08-08. First, hours after it was written: it read "there is **no checkbox, no select-all and no request control** anywhere on it" — see §8.1, withdrawing the ask took the selection UI with it and the owner restored the ticks for a different verb. Then again for the mode split of §8.2: the row's **download** control is gone with every other row's (AC-69), and this panel is the **single-mode** case — a company row is never requestable, so its checkbox column has exactly one meaning and can never mix. It gets **no** disabled request button; the equipment tab's second footer button would name an act this panel refuses to offer.)* |
 
 ### 8.1 The ticks come back — for opening, not for asking
 
@@ -479,6 +479,51 @@ same dead control one step later. (The **equipment** tab's rule is the near-oppo
 way: there, a **missing** paper is exactly the row worth ticking, because ticking it asks for it. Stated
 as *missing*, not *url-less* — see §9: a paper can be on the file with no signed link, and the
 operator's rows carry no link at all.)
+
+### 8.2 One checkbox column, two mutually exclusive modes — owner's UI design, 2026-08-08
+
+**Selection stops being one thing.** There is **one** checkbox column on the equipment documents tab and
+its meaning is set by **the first tick**:
+
+| Ticked set | Mode | Tickable | Live footer button |
+|---|---|---|---|
+| empty | **neutral** | every row any batch can answer | **neither** — both visible, both disabled |
+| a **held** row was ticked first | **download** | the held rows | «تنزيل», carrying the count |
+| a **missing** row was ticked first | **request** | the missing rows | «اطلب من المؤجّر إرساله», carrying the count |
+
+The kind that does not match the mode **dims to 45% and stops responding**, so a selection can never mix.
+Clearing the last tick returns to neutral and re-enables everything.
+
+**What this does NOT change.** *You can only ask for what is not there* (§9) survives exactly: a held
+paper is **never requestable**. What changes is that a held row becomes **tickable** — for a different
+act. A **held row with no url** is untickable in **every** mode, as it already was: nothing to save and
+nothing to ask.
+
+**Both footer buttons stay visible**, only the supported one live. The disabled one keeps the same
+**shape** — greyed, a paler border, muted text, 70% opacity, `not-allowed` cursor. Hiding it would make
+the panel change shape under the renter's first tick and hide the fact that one column does two things.
+
+**Select-all follows the mode** — «حدّد كل المتاح» / «حدّد كل الناقص» — with «إلغاء التحديد (n)» to clear
+back to neutral. At neutral, where there is no mode to follow, **both** links may appear rather than one
+being chosen for the renter.
+
+**A dimmed row must be inert, not merely faded.** Its input is `disabled`, marked `aria-disabled`, and
+out of the tab order. A control that looks dead but still takes a click is worse than one that looks
+alive.
+
+**The company panel is the single-mode case and needs no fork.** A company row is never requestable, so
+its only possible mode is *download*: the dimming path is unreachable, the select-all reads
+«حدّد كل المتاح», and there is **no** request control — company papers are read, not requested (AC-71,
+AC-72).
+
+| ID | Layer | Criterion |
+|---|---|---|
+| RM3-AC-77 | web | **Given** the equipment documents tab with nothing ticked **Then** every row a batch can answer is tickable and **both** footer buttons render disabled; **When** the renter ticks a **held** row **Then** the selection is in **download** mode, the missing rows dim to 45% and become inert (`disabled`, `aria-disabled`, out of the tab order), «تنزيل» goes live carrying the count and the request button stays disabled; **When** he ticks a **missing** row first **Then** the mirror holds, «اطلب من المؤجّر إرساله» goes live and the held rows go inert; **When** he clears the last tick **Then** the selection returns to **neutral** and every row is tickable again. **And** a **held row with no url** is tickable in **no** mode, and a **held** row is requestable in **none** |
+| RM3-AC-78 | web | **Given** a selection in either mode **When** select-all is used **Then** it covers **only that mode's rows** — «حدّد كل المتاح» over the held, «حدّد كل الناقص» over the missing — and «إلغاء التحديد (n)» clears back towards neutral; **When** the live button reports a count **Then** it is the count the batch beneath it would actually act on, and the other batch is empty. **And** however a selection was arrived at, a document **request** still names only rows whose status is **missing** |
+
+| ID | AC | Layer | Where | What it pins |
+|---|---|---|---|---|
+| RM3-TC-26 | AC-77, AC-78 | web | `tests/unit/machine-panel.test.ts` | **New 2026-08-08 (§8.2).** The mode is inferred from the first tick and is a **pure function of the rows and the ticked set** — no stored mode: a held row ticks *download*, a missing row ticks *request*, nothing ticked is neutral; while a mode holds the other kind is untickable, and clearing the last tick restores all of them; a held row with **no url** and the operator's certificates are tickable in neither mode; select-all's two key lists are disjoint and neither can reach the other's rows; each batch is **empty** for the other mode's selection, a row holding several files yields one target per file named apart, and a request draft composed over **every** row still names only the missing ones |
 
 ## 9 · One rule for every document row — decided 2026-08-08
 

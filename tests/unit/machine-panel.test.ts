@@ -26,16 +26,22 @@ import {
   batchDocumentRequest,
   companyDocRows,
   COMPANY_DOC_KEYS,
+  docDownloadBatch,
   docRowActions,
+  docRowMode,
+  docRowSelectable,
   equipmentDocGroups,
   heroPhotoUrl,
   matchGrid,
   photoSlotOf,
   presentPhotoSlots,
+  selectionModeOf,
   type CompanyDocKey,
+  type DocRow,
   type MatchCellKey,
   type MatchCellState,
   type MatchRequest,
+  type SelectionMode,
 } from "@/components/map/panel/machine-panel-model";
 
 /* ─────────────────────────────────── fixtures ─────────────────────────────────── */
@@ -69,6 +75,9 @@ const machine = (raw: RawMachine = {}): FleetMachine =>
       inBid: true,
     },
   ])[0];
+
+/** A `DocFile` as a row carries one — enough shape for `docRowActions` / `docRowMode` to read. */
+const file = (type: string, url: string) => ({ type, label: { en: type, ar: type }, url });
 
 /** The four slots as the BACKEND spells them — front · serial · equipment · operating_hours. */
 const ALL_FOUR = [{ slot: "front" }, { slot: "serial" }, { slot: "operating_hours" }, { slot: "equipment" }];
@@ -404,7 +413,10 @@ describe("a document nobody asked for is never shown as missing (owner, 2026-08-
     const row = g.documents.rows.find((r) => r.key === "doc:equipment_cert:tuv")!;
     expect(row.status).toBe("on_file"); // not "present" — nothing was passed, because nothing was asked
     expect(row.statusLine.en).toBe("on the machine's file · not required");
-    expect(docRowActions(row).map((a) => a.kind)).toEqual(["view", "download"]);
+    expect(docRowActions(row).map((a) => a.kind)).toEqual(["view"]);
+    // Not requestable, and yet tickable — for the OTHER batch. Being on the file is what makes it
+    // downloadable, which is the 2026-08-08 mode split seen from the not-required row.
+    expect(docRowMode(row)).toBe("download");
   });
 
   it("a held-but-unrequested row raises NOBODY's attention count", () => {
@@ -534,12 +546,7 @@ describe("a row holding several files exposes EVERY one of them", () => {
     );
     const row = g.documents.rows.find((r) => r.key === "doc:ownership")!;
     expect(row.files.map((f) => f.url)).toEqual(["https://x/ist", "https://x/cus"]);
-    expect(docRowActions(row).map((a) => a.href)).toEqual([
-      "https://x/ist",
-      "https://x/ist",
-      "https://x/cus",
-      "https://x/cus",
-    ]);
+    expect(docRowActions(row).map((a) => a.href)).toEqual(["https://x/ist", "https://x/cus"]);
     // The invariant survives the second file: exactly one primary, and it is the first file's view.
     expect(docRowActions(row).filter((a) => a.primary)).toHaveLength(1);
     expect(docRowActions(row).filter((a) => a.primary)[0]).toMatchObject({ kind: "view", href: "https://x/ist" });
@@ -557,7 +564,7 @@ describe("a row holding several files exposes EVERY one of them", () => {
     );
     const row = g.documents.rows.find((r) => r.key === "doc:equipment_cert:tuv")!;
     expect(row.files.map((f) => f.url)).toEqual(["https://x/tuv-a", "https://x/tuv-b"]);
-    expect(docRowActions(row)).toHaveLength(4);
+    expect(docRowActions(row)).toHaveLength(2);
   });
 
   it("names each file after its own type, so two controls are never two unlabelled twins", () => {
@@ -582,7 +589,7 @@ describe("a row holding several files exposes EVERY one of them", () => {
     );
     const row = g.documents.rows.find((r) => r.key === "doc:ownership")!;
     expect(row.status).toBe("present"); // the paper IS on the file; only its link is absent
-    expect(docRowActions(row).map((a) => a.href)).toEqual(["https://x/cus", "https://x/cus"]);
+    expect(docRowActions(row).map((a) => a.href)).toEqual(["https://x/cus"]);
   });
 });
 
@@ -699,17 +706,25 @@ describe("the operator's certificates say present or absent, and expose no file"
   });
 });
 
-/* ──────────── V15 — view and download on every document (004a §7, RM3-AC-69) ──────────── */
+/* ──────────── V15 — every document is VIEWABLE (004a §7, RM3-AC-69, narrowed 2026-08-08) ────────────
+ *
+ * The per-row **download** is withdrawn by the owner's UI design of 2026-08-08: downloading is the batch
+ * action now, so a row keeps exactly one control — view — and AC-69 is narrowed to match rather than
+ * left contradicting the code. The second clause is untouched: a row with no url exposes NOTHING.
+ */
 
-describe("docRowActions — view first, download second, and neither without a url (AC-69)", () => {
-  it("a row WITH a url exposes both controls", () => {
+describe("docRowActions — view, and neither a download glyph nor a dead button (AC-69)", () => {
+  it("a row WITH a url exposes exactly one control, and it is view", () => {
     const actions = docRowActions({ downloadUrl: "https://x/cr.pdf" });
-    expect(actions.map((a) => a.kind)).toEqual(["view", "download"]);
-    for (const a of actions) expect(a.href).toBe("https://x/cr.pdf");
+    expect(actions.map((a) => a.kind)).toEqual(["view"]);
+    expect(actions[0].href).toBe("https://x/cr.pdf");
   });
 
-  it("view comes FIRST — the common act must not be the effortful one", () => {
-    expect(docRowActions({ downloadUrl: "https://x/cr.pdf" })[0].kind).toBe("view");
+  it("carries NO per-row download — the withdrawn control cannot come back by accident", () => {
+    const row = { downloadUrl: "https://x/a.pdf", files: [file("istimara", "https://x/a.pdf")] };
+    expect(docRowActions(row).map((a) => a.kind)).toEqual(["view"]);
+    // The `download` flag went with the control; nothing on an action can ask a browser to save.
+    for (const a of docRowActions(row)) expect(a).not.toHaveProperty("download");
   });
 
   it("view is the ONLY primary", () => {
@@ -717,11 +732,7 @@ describe("docRowActions — view first, download second, and neither without a u
     expect(actions.filter((a) => a.primary).map((a) => a.kind)).toEqual(["view"]);
   });
 
-  it("only DOWNLOAD asks the browser to save — view renders", () => {
-    expect(docRowActions({ downloadUrl: "https://x/cr.pdf" }).map((a) => a.download)).toEqual([false, true]);
-  });
-
-  it("a row WITHOUT a url exposes NEITHER control — never a dead button", () => {
+  it("a row WITHOUT a url exposes NO control — never a dead button", () => {
     expect(docRowActions({ downloadUrl: null })).toEqual([]);
   });
 
@@ -731,11 +742,11 @@ describe("docRowActions — view first, download second, and neither without a u
 });
 
 describe("every document family on this surface is openable (AC-69)", () => {
-  it("equipment PAPERS — a held paper gets both controls, an absent one gets none", () => {
+  it("equipment PAPERS — a held paper gets view, an absent one gets nothing", () => {
     const g = groupBy(machine({ docs: [{ type: "istimara" }] }), asking(["tuv"], "tuv"));
     const ownership = g.documents.rows.find((r) => r.key === "doc:ownership")!;
     const cert = g.documents.rows.find((r) => r.key === "doc:equipment_cert:tuv")!;
-    expect(docRowActions(ownership).map((a) => a.kind)).toEqual(["view", "download"]);
+    expect(docRowActions(ownership).map((a) => a.kind)).toEqual(["view"]);
     expect(docRowActions(cert)).toEqual([]);
     // The operator's rows are the deliberate exception — never openable, held or not (ruling 1).
     expect(g.operator.rows.flatMap((r) => docRowActions(r))).toEqual([]);
@@ -744,19 +755,19 @@ describe("every document family on this surface is openable (AC-69)", () => {
   it("equipment PHOTOS — a separate group, and just as openable as a paper", () => {
     const [photos] = equipmentDocGroups(machine({ photos: [{ slot: "front" }] }), NO_ASKS);
     const front = photos.rows.find((r) => r.key === "photo:front")!;
-    expect(docRowActions(front).map((a) => a.kind)).toEqual(["view", "download"]);
+    expect(docRowActions(front).map((a) => a.kind)).toEqual(["view"]);
     expect(docRowActions(front)[0].href).toBe("https://x/front");
     // The three slots the machine has no photo for stay unopenable rather than dead.
     for (const row of photos.rows.filter((r) => r.key !== "photo:front")) expect(docRowActions(row)).toEqual([]);
   });
 
-  it("COMPANY papers — same pair, and a row with no url still has nothing to press", () => {
+  it("COMPANY papers — same control, and a row with no url still has nothing to press", () => {
     const rows = companyDocRows({
       verified: true,
       docs: { cr: { present: true, downloadUrl: "https://x/cr.pdf" }, vat: { present: true } },
     });
     const by = (k: string) => rows.find((r) => r.key === k)!;
-    expect(docRowActions(by("cr")).map((a) => a.kind)).toEqual(["view", "download"]);
+    expect(docRowActions(by("cr")).map((a) => a.kind)).toEqual(["view"]);
     // Present but with no url, and absent entirely, come out the same way: nothing to press.
     expect(docRowActions(by("vat"))).toEqual([]);
     expect(docRowActions(by("national_address"))).toEqual([]);
@@ -767,7 +778,7 @@ describe("every document family on this surface is openable (AC-69)", () => {
       verified: true,
       docs: { saso: { present: true, downloadUrl: "https://x/saso.pdf" } },
     }).find((r) => r.key === "saso")!;
-    expect(docRowActions(withUrl).map((a) => a.kind)).toEqual(["view", "download"]);
+    expect(docRowActions(withUrl).map((a) => a.kind)).toEqual(["view"]);
     expect(docRowActions(withUrl)[0].href).toBe("https://x/saso.pdf");
 
     const absent = companyDocRows({ verified: true, docs: {} }).find((r) => r.key === "saso")!;
@@ -780,7 +791,7 @@ describe("every document family on this surface is openable (AC-69)", () => {
       COMPANY_DOC_KEYS.map((k) => [k, { present: true, downloadUrl: `https://x/${k}.pdf` }]),
     );
     for (const row of companyDocRows({ verified: true, docs })) {
-      expect(docRowActions(row).map((a) => a.kind)).toEqual(["view", "download"]);
+      expect(docRowActions(row).map((a) => a.kind)).toEqual(["view"]);
     }
     for (const row of companyDocRows({ verified: true, docs: {} })) {
       expect(docRowActions(row)).toEqual([]);
@@ -806,6 +817,178 @@ describe("every document family on this surface is openable (AC-69)", () => {
       expect(Object.keys(row).sort()).toEqual(
         ["docTypes", "downloadUrl", "files", "key", "label", "requestable", "status", "statusLine", "thumbUrl"],
       );
+    }
+  });
+});
+
+/* ───── V16 — one checkbox column, two mutually exclusive modes (owner's UI design, 2026-08-08) ───── */
+
+/**
+ * Selection stopped being one thing. **One checkbox column, meaning set by the first tick:** a **held**
+ * row ticks for *download*, a **missing** row ticks for *request*, and the other kind goes inert so the
+ * two can never mix.
+ *
+ * The whole of it is pure and lives in the model, which is why it is asserted here and not through a
+ * component harness (this repo's vitest env is `node`). The components paint what these four functions
+ * return: `docRowMode` (which batch a row's tick would feed), `selectionModeOf` (which mode the ticked
+ * set is in), `docRowSelectable` (may this row be ticked *right now*) and `docDownloadBatch` (what the
+ * live «تنزيل» would actually save).
+ *
+ * **The rule from `850401f` survives untouched** and is re-asserted at the end: a request draft still
+ * names only rows that are **missing**.
+ */
+describe("selection is a MODE, inferred from the first tick", () => {
+  /** front photo held · plate photo missing · ownership held · TÜV asked for and missing. */
+  const mixed = () =>
+    equipmentDocGroups(
+      machine({ photos: [{ slot: "front" }], docs: [{ type: "istimara" }] }),
+      asking(["tuv"]),
+    ).flatMap((g) => g.rows);
+
+  const HELD_PHOTO = "photo:front";
+  const MISSING_PHOTO = "photo:plate";
+  const HELD_PAPER = "doc:ownership";
+  const MISSING_PAPER = "doc:equipment_cert:tuv";
+
+  const rowAt = (rows: DocRow[], key: string) => rows.find((r) => r.key === key)!;
+  const selectableKeys = (rows: DocRow[], mode: SelectionMode | null) =>
+    rows.filter((r) => docRowSelectable(r, mode)).map((r) => r.key);
+  /** The draft, narrowed — `PanelRequestDraft` is a union and only its `document` arm names papers. */
+  const docDraft = (rows: DocRow[], selected: ReadonlySet<string>) => {
+    const draft = batchDocumentRequest("eq-1", rows, selected);
+    if (draft?.kind !== "document") throw new Error("expected a document draft");
+    return draft;
+  };
+
+  it("a HELD row ticks for download, a MISSING row ticks for request", () => {
+    const rows = mixed();
+    expect(docRowMode(rowAt(rows, HELD_PHOTO))).toBe("download");
+    expect(docRowMode(rowAt(rows, HELD_PAPER))).toBe("download");
+    expect(docRowMode(rowAt(rows, MISSING_PHOTO))).toBe("request");
+    expect(docRowMode(rowAt(rows, MISSING_PAPER))).toBe("request");
+  });
+
+  it("the mode is the FIRST tick's kind, whichever kind that was", () => {
+    const rows = mixed();
+    expect(selectionModeOf(rows, new Set([HELD_PAPER]))).toBe("download");
+    expect(selectionModeOf(rows, new Set([MISSING_PAPER]))).toBe("request");
+  });
+
+  it("nothing ticked is NEUTRAL, and every row that any batch can answer is tickable", () => {
+    const rows = mixed();
+    expect(selectionModeOf(rows, new Set())).toBeNull();
+    expect(selectableKeys(rows, null)).toEqual([HELD_PHOTO, MISSING_PHOTO, HELD_PAPER, MISSING_PAPER]);
+  });
+
+  it("while DOWNLOAD holds, the missing rows stop responding", () => {
+    const rows = mixed();
+    const mode = selectionModeOf(rows, new Set([HELD_PHOTO]));
+    expect(selectableKeys(rows, mode)).toEqual([HELD_PHOTO, HELD_PAPER]);
+    expect(docRowSelectable(rowAt(rows, MISSING_PAPER), mode)).toBe(false);
+  });
+
+  it("while REQUEST holds, the held rows stop responding", () => {
+    const rows = mixed();
+    const mode = selectionModeOf(rows, new Set([MISSING_PAPER]));
+    expect(selectableKeys(rows, mode)).toEqual([MISSING_PHOTO, MISSING_PAPER]);
+    expect(docRowSelectable(rowAt(rows, HELD_PAPER), mode)).toBe(false);
+  });
+
+  it("clearing the last tick returns to neutral and re-enables everything", () => {
+    const rows = mixed();
+    const held = new Set([MISSING_PAPER]);
+    expect(selectionModeOf(rows, held)).toBe("request");
+    held.delete(MISSING_PAPER);
+    // Neutral is not a reset somebody has to remember — the mode is derived, so it falls out.
+    expect(selectionModeOf(rows, held)).toBeNull();
+    expect(selectableKeys(rows, selectionModeOf(rows, held))).toHaveLength(4);
+  });
+
+  it("a HELD row with NO url is tickable in NEITHER mode — nothing to save and nothing to ask", () => {
+    const rows = equipmentDocGroups(machine({ docs: [{ type: "istimara", url: null }] }), NO_ASKS).flatMap(
+      (g) => g.rows,
+    );
+    const ownership = rowAt(rows, HELD_PAPER);
+    expect([ownership.status, ownership.requestable]).toEqual(["present", false]);
+    expect(docRowMode(ownership)).toBeNull();
+    for (const mode of [null, "download", "request"] as const) {
+      expect(docRowSelectable(ownership, mode)).toBe(false);
+    }
+  });
+
+  it("the operator's certificates carry no url by design, so they never tick for download", () => {
+    const g = groupBy(machine({ docs: [{ type: "operator_tuv" }] }), asking([], "tuv, spsp"));
+    const [held, gap] = g.operator.rows;
+    expect(docRowMode(held)).toBeNull(); // present, and deliberately unopenable (AC-75)
+    expect(docRowMode(gap)).toBe("request"); // absent, so still askable
+  });
+
+  it("select-all is per mode: each list holds only the rows that mode can act on", () => {
+    const rows = mixed();
+    // «حدّد كل المتاح» and «حدّد كل الناقص» are these two lists; neither can reach the other's rows.
+    const available = rows.filter((r) => docRowMode(r) === "download").map((r) => r.key);
+    const missing = rows.filter((r) => docRowMode(r) === "request").map((r) => r.key);
+    expect(available).toEqual([HELD_PHOTO, HELD_PAPER]);
+    expect(missing).toEqual([MISSING_PHOTO, MISSING_PAPER]);
+    expect(available.filter((k) => missing.includes(k))).toEqual([]);
+
+    // Select-all over one of them leaves the OTHER list entirely untickable, so the control that is
+    // most likely to mix a selection is the one that provably cannot.
+    const mode = selectionModeOf(rows, new Set(available));
+    for (const key of missing) expect(docRowSelectable(rowAt(rows, key), mode)).toBe(false);
+  });
+
+  it("the count follows the LIVE button — each batch is empty for the other mode's selection", () => {
+    const rows = mixed();
+
+    const saving = new Set([HELD_PHOTO, HELD_PAPER]);
+    expect(docDownloadBatch(rows, saving).map((t) => t.url)).toEqual(["https://x/front", "https://x/istimara"]);
+    expect(batchDocumentRequest("eq-1", rows, saving)).toBeNull();
+
+    const asking_ = new Set([MISSING_PHOTO, MISSING_PAPER]);
+    expect(docDownloadBatch(rows, asking_)).toEqual([]);
+    expect(docDraft(rows, asking_).labels).toHaveLength(2);
+  });
+
+  it("a row holding SEVERAL files contributes one target each, named apart", () => {
+    const rows = equipmentDocGroups(
+      machine({
+        docs: [
+          { type: "istimara", url: "https://x/ist" },
+          { type: "customs_card", url: "https://x/cus" },
+        ],
+      }),
+      NO_ASKS,
+    ).flatMap((g) => g.rows);
+    const batch = docDownloadBatch(rows, new Set([HELD_PAPER]));
+    expect(batch.map((t) => t.url)).toEqual(["https://x/ist", "https://x/cus"]);
+    // Two files of one row would otherwise land on disk under one name.
+    expect(batch.map((t) => t.label.en)).toEqual(["Registration (Istimara) 1", "Customs card 2"]);
+    expect(batch.map((t) => t.label.ar)).toEqual(["الاستمارة ١", "البطاقة الجمركية ٢"]);
+  });
+
+  it("a single-file row keeps the ROW's own name — nothing is numbered that has no sibling", () => {
+    const rows = mixed();
+    expect(docDownloadBatch(rows, new Set([HELD_PAPER])).map((t) => t.label.en)).toEqual([
+      "Proof of ownership / registration",
+    ]);
+  });
+
+  it("the download batch drops a ticked row that has no file, so its count cannot overstate", () => {
+    const rows = equipmentDocGroups(machine({ docs: [{ type: "istimara", url: null }] }), NO_ASKS).flatMap(
+      (g) => g.rows,
+    );
+    expect(docDownloadBatch(rows, new Set([HELD_PAPER]))).toEqual([]);
+  });
+
+  /* The rule from 850401f, re-asserted from the mode's side: it must not regress. */
+  it("a request draft still names ONLY missing rows, however the selection was arrived at", () => {
+    const rows = mixed();
+    // Every row ticked at once — a state the UI refuses, which is exactly why the model is asked.
+    const draft = docDraft(rows, new Set(rows.map((r) => r.key)));
+    expect(draft.labels.map((l) => l.en)).toEqual(["Plate / serial", "TÜV certificate"]);
+    for (const label of draft.labels) {
+      expect(rows.filter((r) => r.label.en === label.en).every((r) => r.status === "missing")).toBe(true);
     }
   });
 });

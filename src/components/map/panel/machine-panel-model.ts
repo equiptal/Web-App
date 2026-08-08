@@ -531,6 +531,11 @@ export interface DocRow {
    *
    * So this is `status === "missing"` and nothing else, and `batchDocumentRequest` enforces it on the
    * way out, so the checkbox and the ask cannot disagree.
+   *
+   * **It is no longer the same question as "may this row be ticked"** (owner's UI design, 2026-08-08).
+   * A **held** row is tickable too — for a different batch, downloading. `requestable` is now one half
+   * of {@link docRowMode}, which is what the checkbox column reads; the rule above is unchanged by that
+   * and a held paper is still never requestable.
    */
   requestable: boolean;
 }
@@ -555,24 +560,27 @@ export function attentionCount(rows: { status: PresenceStatus | CompanyDocStatus
 /**
  * What a document row lets the renter do with the file behind it.
  *
- * **View is primary, download secondary.** A renter checking paperwork wants to *look* — "download" is
- * the wrong first act for a PDF or a photo, especially on a phone. Reversing the two would make the
- * common act the effortful one.
+ * **View, and nothing else** (owner's UI design, 2026-08-08). The row used to expose a **view /
+ * download** pair; the per-row download is withdrawn because **downloading is now the batch action**
+ * (see {@link docDownloadBatch}). A tick on a held row means "save this", and the footer saves the
+ * selection; a second, per-row way to do the same thing would be two controls for one act, one of which
+ * the renter has to learn is redundant.
+ *
+ * **View survives, and that is the point of keeping it** — a renter must still be able to *look* at one
+ * paper without selecting anything. Looking is the common act on this surface; making it go through a
+ * selection would make the common act the effortful one.
+ *
+ * This narrows RM3-AC-69, which required both controls on every row that carries a url. The AC is
+ * corrected in `004a` rather than left contradicting the code.
  */
-export type DocActionKind = "view" | "download";
+export type DocActionKind = "view";
 
 export interface DocAction {
   kind: DocActionKind;
-  /** The row's one presigned url. View and download point at the **same** object; only the verb
-   *  differs, because a presigned url's signature covers its query string — there is no second url to
-   *  ask S3 for an attachment disposition after the fact. */
+  /** The file's presigned url. */
   href: string;
-  /** The row's primary act. Exactly one action carries it, and it is always `view`. */
+  /** The row's primary act. Exactly one action carries it, and it is always the FIRST file's view. */
   primary: boolean;
-  /** Sets the anchor's `download` attribute. A cross-origin bucket ignores it unless the object was
-   *  signed with `Content-Disposition: attachment`, in which case the browser saves instead of
-   *  rendering — harmless either way, which is why both anchors also open in a new tab. */
-  download: boolean;
   /** Which file of the row this control opens. Null on a row that carries only a bare `downloadUrl`
    *  (the firm's papers), where there is exactly one file and nothing to disambiguate. When a row holds
    *  several, the component titles each control with this label so two identical glyphs are not two
@@ -581,17 +589,21 @@ export interface DocAction {
 }
 
 /**
- * The controls one document row exposes (AC-69).
+ * The controls one document row exposes (AC-69, as narrowed 2026-08-08).
  *
  * **A row with no file exposes none** — never a dead control. That absence is also the honest signal
- * that a paper is missing, which is the one row the renter can act on: he ticks it and asks.
+ * that a paper is missing, which is the one row the renter can ask for.
  *
- * **A row holding several files exposes the pair for each of them.** The alternative — a row per file —
- * was rejected: it would put the *files* in the list where the list's job is to show *slots*, so a
- * lessor who uploaded nothing would produce no rows and the renter would see a short, clean list
+ * **A row holding several files exposes one control for each of them.** The alternative — a row per
+ * file — was rejected: it would put the *files* in the list where the list's job is to show *slots*, so
+ * a lessor who uploaded nothing would produce no rows and the renter would see a short, clean list
  * instead of a gap. Keeping one row per slot preserves that, keeps the attention count meaning "rows
- * needing action", and keeps selection meaning "the type I am asking for" rather than "the copy I want
- * a second of". The files are outputs of the row, not rows.
+ * needing action", and keeps selection meaning "the slot I am acting on" rather than "the copy I want".
+ * The files are outputs of the row, not rows.
+ *
+ * **It is also the one definition of "this row has a reachable file"** — {@link docRowMode} asks it
+ * rather than re-testing `downloadUrl`/`files`, so a row can never be tickable-for-download while
+ * exposing nothing to open.
  *
  * Deliberately shape-typed rather than taking `DocRow | CompanyDocRow`, because it must serve all three
  * families this surface names — the machine's papers, its photos, and the firm's papers — and they
@@ -602,17 +614,132 @@ export function docRowActions(row: { downloadUrl: string | null; files?: readonl
   if (files.length > 0) {
     // Exactly one action carries `primary`, and it is the FIRST file's view — the invariant holds
     // however many files the row turns out to hold.
-    return files.flatMap((file, i) => [
-      { kind: "view" as const, href: file.url, primary: i === 0, download: false, file },
-      { kind: "download" as const, href: file.url, primary: false, download: true, file },
-    ]);
+    return files.map((file, i) => ({ kind: "view" as const, href: file.url, primary: i === 0, file }));
   }
   const href = row.downloadUrl;
   if (!href) return [];
-  return [
-    { kind: "view", href, primary: true, download: false, file: null },
-    { kind: "download", href, primary: false, download: true, file: null },
-  ];
+  return [{ kind: "view", href, primary: true, file: null }];
+}
+
+/* ───────── V16 — one checkbox column, two mutually exclusive modes (owner, 2026-08-08) ───────── */
+
+/**
+ * What a tick currently *means*.
+ *
+ * Selection stopped being one thing on 2026-08-08. There is **one checkbox column**, and its meaning is
+ * set by the first tick: tick a **held** row and you are downloading, tick a **missing** row and you are
+ * requesting. The other kind dims and stops responding, so a selection can never mix — which is what
+ * lets one column feed two different batches without ever composing a payload that is half an ask and
+ * half a save.
+ *
+ * **The mode is inferred, never stored.** It is a pure function of the rows and the ticked set
+ * ({@link selectionModeOf}), so there is no second piece of state to keep in step with the selection and
+ * no way for a component to believe it is in one mode while holding the other's keys. Clearing the last
+ * tick returns to `null` — neutral — by construction rather than by a reset the caller has to remember.
+ */
+export type SelectionMode = "download" | "request";
+
+/**
+ * Which batch this row's tick would feed, or `null` for a row no batch can answer.
+ *
+ * The three cases, and the rule under all of them is the one this surface already had —
+ * *a tick must be answerable by the batch underneath it*:
+ *
+ * - **`"request"`** — the paper is not there (`requestable`, which is `status === "missing"` and nothing
+ *   else). *You can only ask for what is not there* survives untouched.
+ * - **`"download"`** — the paper is there **and reachable**, i.e. {@link docRowActions} finds a url.
+ * - **`null`** — neither. A **held row with no url** is the one that matters: the projection carried the
+ *   paper but not its link, and the operator's certificates carry no url *by design* (AC-75). Nothing
+ *   can be saved and nothing can be asked, so it is untickable in **every** mode, exactly as it is today.
+ */
+export function docRowMode(row: {
+  downloadUrl: string | null;
+  files?: readonly DocFile[];
+  requestable?: boolean;
+}): SelectionMode | null {
+  // A missing row has no files by construction, so the order is not a tie-break — it is a statement that
+  // absence is the stronger fact.
+  if (row.requestable) return "request";
+  return docRowActions(row).length > 0 ? "download" : null;
+}
+
+/**
+ * May this row be ticked **right now**?
+ *
+ * The single seam the components read (`DocRowView.selectable`), extended to take the mode rather than
+ * grown a parallel mechanism. At neutral (`mode === null`) every row with a mode of its own is tickable;
+ * once a mode holds, only its own kind is.
+ */
+export function docRowSelectable(
+  row: { downloadUrl: string | null; files?: readonly DocFile[]; requestable?: boolean },
+  mode: SelectionMode | null,
+): boolean {
+  const own = docRowMode(row);
+  return own !== null && (mode === null || mode === own);
+}
+
+/**
+ * The mode a ticked set is in — **the first tick's kind**, and `null` when nothing is ticked.
+ *
+ * Reading it off the set rather than storing "what the renter clicked first" is deliberate and is what
+ * makes the neutral return free: a set that can never mix has exactly one kind in it, so *any* ticked
+ * row answers the question and list order is a stable way to pick one. Ticks that name no row, or rows
+ * that lost their url since being ticked, are skipped rather than trusted.
+ */
+export function selectionModeOf(
+  rows: readonly { key: string; downloadUrl: string | null; files?: readonly DocFile[]; requestable?: boolean }[],
+  selected: ReadonlySet<string>,
+): SelectionMode | null {
+  for (const row of rows) {
+    if (!selected.has(row.key)) continue;
+    const mode = docRowMode(row);
+    if (mode) return mode;
+  }
+  return null;
+}
+
+/** One file a download batch will save: the row it came from, its localisable name, and its url. */
+export interface DocDownloadTarget {
+  key: string;
+  label: Bilingual;
+  url: string;
+}
+
+/**
+ * Exactly what a «تنزيل» run will fetch — **the ticked rows that are in download mode, expanded to every
+ * file behind them**, in the list's own order.
+ *
+ * Filtering here rather than trusting the selection set is what makes the control honest: a row that
+ * lost its url between the tick and the click simply is not counted, so the button's number and the
+ * files that land are the same number. It is the download side's `batchDocumentRequest` — one rule read
+ * twice, never two rules that can drift.
+ *
+ * A row holding several files contributes several targets, each named after **its own** file and
+ * numbered, because a lessor can file two papers of the same type and a batch of identically-named
+ * files is a batch the renter cannot tell apart on disk.
+ */
+export function docDownloadBatch(
+  rows: readonly { key: string; label: Bilingual; downloadUrl: string | null; files?: readonly DocFile[]; requestable?: boolean }[],
+  selected: ReadonlySet<string>,
+): DocDownloadTarget[] {
+  const out: DocDownloadTarget[] = [];
+  for (const row of rows) {
+    if (!selected.has(row.key) || docRowMode(row) !== "download") continue;
+    const actions = docRowActions(row);
+    const multi = actions.length > 1;
+    actions.forEach((a, i) => {
+      const nth = i + 1;
+      out.push({
+        key: row.key,
+        label:
+          multi && a.file
+            ? { en: `${a.file.label.en} ${nth}`, ar: `${a.file.label.ar} ${arDigits(nth)}` }
+            : row.label,
+        url: a.href,
+      });
+    });
+  }
+  return out;
 }
 
 const PHOTO_LABEL: Record<PhotoSlot, Bilingual> = {

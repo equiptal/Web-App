@@ -258,6 +258,9 @@
   cursor: pointer;
 }
 .mp-linkbtn:disabled { color: #c8d8e8; cursor: default; }
+/* «إلغاء التحديد (n)» — the way back to neutral. Quieter than the two select-alls beside it: undoing is
+   never the act being offered, only the one that must stay reachable. */
+.mp-linkbtn.muted { color: #6b8fa8; }
 
 .mp-row {
   display: flex;
@@ -272,6 +275,11 @@
 .mp-row.picked { border-color: #2563eb; background: rgba(37, 99, 235, 0.08); }
 .mp-row.missing { border-color: rgba(212, 120, 10, 0.25); background: rgba(212, 120, 10, 0.06); }
 .mp-row.picked.missing { border-color: #2563eb; background: rgba(37, 99, 235, 0.08); }
+/* The OTHER mode's rows while a selection holds (owner's UI design, 2026-08-08). 45%: faint enough that
+   the eye skips them, legible enough that the renter can still read what he is not allowed to tick — the
+   row has not gone away, it is out of scope for THIS selection. The tick inside it is genuinely
+   `disabled`, so this is a colour restating an inert control, never the only thing stopping a click. */
+.mp-row.dim { opacity: 0.45; }
 
 .mp-tick {
   flex-shrink: 0;
@@ -289,6 +297,9 @@
   cursor: pointer;
 }
 .mp-tick.on { border-color: #2563eb; background: #2563eb; }
+/* The other mode's checkbox. `disabled` already refuses the click and drops it out of the tab order;
+   this only makes the cursor say so before the renter tries. */
+.mp-tick:disabled { cursor: not-allowed; }
 /* A row nothing required carries no tick. Its width is HELD rather than collapsed, so the row still
    lines up with the rows above and below it — an unrequired paper reads as one more document on the
    file, not as a differently-shaped thing that got in by mistake. `display: inline-block` because the
@@ -342,17 +353,17 @@
 .mp-rowtx span { display: block; font-size: 9.5px; font-weight: 600; color: #6b8fa8; margin-top: 2px; }
 .mp-rowtx span.att { color: #d4780a; }
 
-/* V15 / AC-69 — view and download on every document row.
+/* AC-69, narrowed 2026-08-08 — **view** on every document row that carries a file, and nothing else.
+   The per-row download glyph is gone: downloading is the batch action now.
 
-   The cell keeps its width whether it holds two controls or none, so a row with no file is the same
-   SHAPE as a row with one and only its glyphs are absent. That is what lets an empty cell read as
-   "there is nothing here" rather than as a control the renter failed to find. `justify-content` is
-   direction-relative under `dir=rtl`, so the pair sits on the trailing edge in Arabic as in English —
-   and view, being first in the DOM, stays first in reading order in both. */
+   The cell keeps its width whether it holds a control or none, so a row with no file is the same SHAPE
+   as a row with one and only its glyph is absent. That is what lets an empty cell read as "there is
+   nothing here" rather than as a control the renter failed to find. `justify-content` is
+   direction-relative under `dir=rtl`, so it sits on the trailing edge in Arabic as in English. */
 .mp-acts {
   flex-shrink: 0;
-  min-width: 66px;
-  /* A row can hold SEVERAL files, so the cell can hold several pairs — it wraps rather than pushing the
+  min-width: 34px;
+  /* A row can hold SEVERAL files, so the cell can hold several glyphs — it wraps rather than pushing the
      row's name out of the way, and is capped so the name and status line keep the majority of the row.
      The renter identifies a row before he acts on it. */
   max-width: 42%;
@@ -363,9 +374,9 @@
   gap: 6px;
 }
 
-/* Ghost is the RESTING weight — that is the download control. The row model names exactly one action
-   `primary` and it is always VIEW, so the fill below follows `.primary` rather than `.view`: the
-   stylesheet then states what the model states, and the two cannot drift apart. */
+/* Ghost is the RESTING weight — that is a second, third… file's view on a row that holds several. The
+   row model names exactly one action `primary` and it is always the FIRST file's view, so the fill below
+   follows `.primary`: the stylesheet then states what the model states, and the two cannot drift. */
 .mp-doc {
   width: 30px;
   height: 30px;
@@ -430,7 +441,10 @@
   width: 100%;
   margin-top: 8px;
   padding: 11px 16px;
-  border: 0;
+  /* A border the same colour as the fill, so the ACTIVE and DISABLED buttons are exactly the same size.
+     The disabled one keeps its shape and only changes colour — a control that shrinks when it goes dead
+     makes the panel move under the renter's first tick. */
+  border: 1px solid #2563eb;
   border-radius: 11px;
   background: #2563eb;
   color: #fff;
@@ -439,7 +453,33 @@
   font-weight: 800;
   cursor: pointer;
 }
-.mp-send:disabled { background: #e4edf5; color: #9aa7b8; cursor: default; }
+/* Greyed, with a PALER border than its own fill, muted text and 70% opacity — the owner's own
+   description of the button that stays visible beside the live one. `not-allowed` is what tells a renter
+   who tries it that it is the selection, not the button, that has to change. */
+.mp-send:disabled {
+  background: #eef4fa;
+  border-color: #dbe6f0;
+  color: #9aa7b8;
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* BOTH footer buttons, side by side and both always present (owner's UI design, 2026-08-08). The ask
+   carries the longer label, so it takes the larger share rather than wrapping to two lines beside a
+   one-word «تنزيل». Flex is direction-agnostic, so the pair reads download-then-ask in both locales. */
+.mp-sendrow {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin-top: 8px;
+}
+.mp-sendrow .mp-send {
+  margin-top: 0;
+  flex: 1 1 0;
+  min-width: 0;
+  padding-inline: 10px;
+}
+.mp-sendrow .mp-send.wide { flex: 1.9 1 0; }
 
 .mp-note {
   margin-top: 8px;

@@ -357,23 +357,29 @@ half is genuinely presigned end-to-end (`getSupplierFleet` → `batchSignItems`)
 **verb**: a renter checking paperwork wants to *look*, and "download" is the wrong first action for a PDF
 or a photo — especially on a phone.
 
-- **Both levels** — equipment documents and company documents — expose **view** and **download**.
+- **Both levels** — equipment documents and company documents — expose **view** ~~and **download**~~.
+  **Narrowed 2026-08-08 by the owner's UI design (V17):** the per-row **download** is withdrawn from
+  every family — downloading is the **batch** action now, and two controls for one act is one the renter
+  has to learn is redundant. **View survives, and that is the point**: he must still be able to look at
+  one paper without selecting anything.
 - **One family is exempt, by a later owner ruling (2026-08-08): the operator's certificates** (V16).
   They expose neither control and carry no url, because nothing validates an operator document on upload
   and an openable file reads as evidence that was checked. Nothing in this ticket enforces that — those
   rows simply arrive with no url, and the rule below already renders neither control for such a row. One
   mechanism, not a second flag.
-- **View is primary, download secondary.** Reversing them makes the common act the effortful one.
-- **A row with no `downloadUrl` renders neither control** — never a dead button. That is also the honest
-  signal that a paper is absent, which is the one row the renter can act on.
+- **View is primary** — it was always the point of the ticket; with download gone it is the only
+  control, and on a row holding several files the FIRST file's view is the one that carries `primary`.
+- **A row with no `downloadUrl` renders NO control** — never a dead button. That is also the honest
+  signal that a paper is absent, which is the one row the renter can ask for.
 - §6.6's "presence only" governs **verification state**, not reachability: an equipment row still shows
   no verify badge. Presence-only was never meant to mean unopenable, and this ticket says so explicitly
   because the wording invites the opposite reading.
-- **Company rows are opened, not asked for** (2026-08-08). V15 gives them view + download; V9's request
-  affordance is withdrawn. The two are independent and only one changed.
-- **The per-row pair is what a BATCH cannot be** (004a §8.1). V9's restored select-all saves the ticked
-  papers; it does not open them, because several `target="_blank"` opens from one click are popups and
-  only the first survives. View is per-row precisely because that is where it works.
+- **Company rows are opened, not asked for** (2026-08-08). V15 gives them view; V9's request affordance
+  is withdrawn. The two are independent and only one changed.
+- **Per-row VIEW is what a batch cannot be** (004a §8.1). The select-all beneath the list saves the
+  ticked papers; it does not open them, because several `target="_blank"` opens from one click are
+  popups and only the first survives. View is per-row precisely because that is where it works — and
+  that division is what makes the withdrawn per-row download redundant rather than missed.
 
 ### V16 · The operator's documents — their own group `[UI]`
 **AC** 75, 76 · **New 2026-08-08.** Splits out of V8, which carried the operator's paperwork as a single
@@ -455,11 +461,48 @@ assertion per `RM3-AC-*` rather than trusting a string in a test name. A coverag
 
 ---
 
+### V17 · One checkbox column, two mutually exclusive modes `[UI]`
+**AC** 77, 78 (004a §8.2) · **New 2026-08-08, owner's UI design.** Re-scopes V8's selection and narrows
+V15's row controls (AC-69).
+
+- **Selection becomes a MODE, set by the first tick.** Tick a **held** row and you are downloading; tick
+  a **missing** row and you are requesting. The other kind **dims to 45% and stops responding**, so the
+  selection can never mix.
+- **The mode decision is PURE and in the model** — `docRowMode` / `selectionModeOf` / `docRowSelectable`
+  / `docDownloadBatch` in `machine-panel-model.ts`, the same reason `docRowActions` and
+  `batchDocumentRequest` live there: this repo's vitest env is `node`, so the whole rule is testable
+  without a component harness. **The mode is derived, never stored** — one less piece of state to keep in
+  step with the selection, and the return to neutral on the last untick falls out instead of being a
+  reset somebody has to remember.
+- **`DocRowView.selectable` was extended to take the mode, not joined by a second flag.** It is still the
+  one answer to "may I tick this?", and the rule under it is unchanged: *a tick must be answerable by the
+  batch underneath it*.
+- **A dimmed row is INERT, not merely faded.** `disabled` + `aria-disabled` + out of the tab order. A
+  control that looks dead but still takes a click is worse than one that looks alive.
+- **Both footer buttons stay visible** — «تنزيل» and «اطلب من المؤجّر إرساله» — only the supported one
+  live and carrying the count; the disabled one keeps the same shape, greyed with a paler border, muted
+  text, 70% opacity, `not-allowed` cursor.
+- **Select-all follows the mode:** «حدّد كل المتاح» / «حدّد كل الناقص», with «إلغاء التحديد (n)» back to
+  neutral. At neutral both links may appear rather than one mode being chosen for the renter.
+- **The per-row download control is removed; view is kept** (narrows AC-69, corrected in 004a).
+- **What did NOT change:** *you can only ask for what is not there* — `requestable` is still
+  `status === "missing"` and `batchDocumentRequest` still drops anything else — and a **held row with no
+  url** is tickable in **no** mode.
+- **The company panel is the single-mode case and needed no fork.** Its rows are never requestable, so
+  `selectionModeOf` can only answer `download` or neutral, the dimming path is unreachable, and its
+  select-all reads «حدّد كل المتاح». It gets **no** request control, disabled or otherwise (AC-71/72).
+- **New shared module** `panel/doc-download.ts` — the browser half of the batch (fetch → blob → anchor),
+  because two components now run it and the alternative was the equipment tab importing `CompanyPanel`
+  for three helpers. `companyDownloadFileName` / `runCompanyDownloadBatch` stay exported under their own
+  names, where 004's TC-25 looks for them.
+- ⚠️ **Wording.** The owner wrote «اطلب من المورد إرساله»; this surface says **«المؤجّر» and never
+  «المورد»**, so «اطلب من المؤجّر إرساله» ships. One word overrules it.
+
 ## Coverage
 
 All 42 `RM3-AC-*` map to V1–V13, except **AC-27**, which is backend and **already satisfied** by T1/T5.
-**Updated 2026-08-08:** the series now runs to **RM3-AC-76** — 68–70 map to V14/V15, 71–72 to V9/V11,
-and 73–76 to V8/V16.
+**Updated 2026-08-08:** the series now runs to **RM3-AC-78** — 68–70 map to V14/V15, 71–72 to V9/V11,
+73–76 to V8/V16, and **77–78 to V17**.
 
 ## Sequence
 

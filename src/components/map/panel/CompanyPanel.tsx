@@ -50,45 +50,57 @@
  * asymmetry is deliberate (§6.6): a machine's paper is either there or it isn't, but a company's paper
  * is *checked* and it *expires* — hiding that would strand the renter with a CR that lapsed last month.
  *
- * **Every row with a url is openable** — **view** first, download second (004a §7, AC-69). The pair is
- * `DocRowList`'s, written once for all three document families this surface names, so the firm's papers
- * and the machine's behave identically; only the status line differs, which is the point.
+ * **Every row with a url is openable** — **view**, and view only (004a §7, AC-69, narrowed 2026-08-08).
+ * The control is `DocRowList`'s, written once for all three document families this surface names, so the
+ * firm's papers and the machine's behave identically; only the status line differs, which is the point.
+ * The **per-row download glyph is gone** on both lists: saving is what the batch beneath does, and a
+ * second per-row way to do it is one the renter has to learn is redundant.
+ *
+ * **One mode, and no fork in the shared component.** The equipment tab's checkbox column carries two
+ * mutually exclusive modes (download / request); here a row is never requestable, so `selectionModeOf`
+ * can only answer `download` or neutral, the dimming path is unreachable, and the select-all bar shows
+ * the one link its rows support — «حدّد كل المتاح». The single-mode case fell out of the general one;
+ * nothing had to be forked or special-cased for it.
  *
  * **Built without IBAN.** Spec §6.1 and AC-41 both list it; the product owner has since said to remove
  * it, and this is built to that decision — **the spec still needs editing**. Showing a supplier's bank
  * details is not reversible after the fact; adding the row back later is one line.
  */
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { DocRowList } from "./DocRowList";
+import { downloadFileName, runDownloadBatch, useDownloadBatch } from "./doc-download";
 import {
   arDigits,
   attentionCount,
   companyDocRows,
+  docDownloadBatch,
+  docRowMode,
+  docRowSelectable,
+  selectionModeOf,
   type CompanyDocInput,
   type CompanyDocKey,
   type CompanyDocRow,
+  type DocDownloadTarget,
 } from "./machine-panel-model";
 import "./panel-proto.css";
 
 /* ───────────────────── what the batch acts on — pure, so it is testable ───────────────────── */
 
-/** One file the batch will save: the row it came from, its localisable name, and its presigned url. */
-export interface CompanyDownloadTarget {
-  key: CompanyDocKey;
-  label: { en: string; ar: string };
-  url: string;
-}
+/** One file the batch will save: the row it came from, its localisable name, and its presigned url.
+ *  Shared with the equipment tab's own download batch — one shape, one runner. */
+export type CompanyDownloadTarget = DocDownloadTarget;
 
 /**
  * The keys a renter is allowed to tick — **only rows that carry a url**.
  *
- * The equipment tab's rule is the opposite one, and deliberately so: there, an absent paper is exactly
- * the row worth ticking, because ticking it *asks for it*. Here the tick feeds a download, so a row with
- * no file behind it can only disappoint.
+ * This is `docRowMode` read at the company panel: a company row is never requestable, so its only
+ * possible mode is `download`, and **the panel therefore has exactly one mode and can never mix**
+ * (owner's UI design, 2026-08-08). The equipment tab reaches the same rule from the other side, where an
+ * absent paper is the row worth ticking because ticking it *asks for it*.
  */
 export function companySelectableKeys(rows: readonly CompanyDocRow[]): CompanyDocKey[] {
-  return rows.filter((r) => !!r.downloadUrl).map((r) => r.key);
+  return rows.filter((r) => docRowMode(r) === "download").map((r) => r.key);
 }
 
 /**
@@ -96,96 +108,24 @@ export function companySelectableKeys(rows: readonly CompanyDocRow[]): CompanyDo
  *
  * Filtering here rather than trusting the selection set is what makes the control honest — a paper that
  * lost its url between the tick and the click simply is not counted, so the button's number and the
- * files that land are the same number.
+ * files that land are the same number. `docDownloadBatch` is the one implementation, shared with the
+ * equipment tab; a company row carries exactly one file, so the general "every file behind the row"
+ * expansion collapses to one target per row here.
  */
 export function companyDownloadBatch(
   rows: readonly CompanyDocRow[],
   selected: ReadonlySet<string>,
 ): CompanyDownloadTarget[] {
-  return rows
-    .filter((r) => selected.has(r.key) && !!r.downloadUrl)
-    .map((r) => ({ key: r.key, label: r.label, url: r.downloadUrl as string }));
+  return docDownloadBatch(rows, selected);
 }
 
-/**
- * What the saved file is called. The presigned key is a uuid, so a batch of five would land as five
- * unreadable names; the row's own label is what the renter just read on screen.
- *
- * The extension is copied off the url's path when it looks like one, and omitted otherwise — a wrong
- * extension is worse than none, because it makes the operating system open the file with the wrong app.
- */
-export function companyDownloadFileName(label: string, url: string): string {
-  let ext = "";
-  try {
-    const path = new URL(url, "https://x.invalid").pathname;
-    const m = /\.([a-z0-9]{2,5})$/i.exec(path);
-    if (m) ext = `.${m[1].toLowerCase()}`;
-  } catch {
-    /* an unparseable url still downloads; it just gets no extension */
-  }
-  // Anything a file system would read as a path separator, and the characters Windows refuses.
-  const safe = label.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim() || "document";
-  return `${safe}${ext}`;
-}
+/** @see downloadFileName — kept under the panel's own name because this is where the batch was born and
+ *  where the spec's TC-25 looks for it. */
+export const companyDownloadFileName = downloadFileName;
 
-/** How a finished run reads. `failed > 0` is always shown — a partial batch that says nothing is the
- *  exact failure the popup-blocked "view all" would have been. */
-type BatchState =
-  | { phase: "idle" }
-  | { phase: "running"; done: number; total: number }
-  | { phase: "done"; saved: number; failed: number };
-
-/**
- * Save one presigned file without navigating and without opening a tab.
- *
- * `<a download href={presignedUrl}>` will not do: the bucket is cross-origin and the objects are not
- * signed with an attachment disposition, so the browser ignores `download` and **navigates the panel
- * away**. Fetching to a blob and pointing the anchor at an object url keeps the download same-origin
- * from the browser's point of view, which is what makes `download` binding.
- *
- * Depends on the bucket answering the app's origin with CORS headers. When it does not, the fetch
- * rejects — which is why the caller counts failures and says so, instead of leaving the renter to guess.
- */
-async function saveOne(target: CompanyDownloadTarget, name: string): Promise<void> {
-  const res = await fetch(target.url, { credentials: "omit", mode: "cors" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const blob = await res.blob();
-  const objectUrl = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = objectUrl;
-  a.download = name;
-  a.rel = "noopener";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  // Revoked late: Safari and Firefox still need the object url alive when the save actually starts.
-  setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
-}
-
-/**
- * Run the batch **one file at a time**, reporting progress, and never let one failure kill the rest.
- *
- * Sequential rather than parallel because a browser's own "download several files?" prompt is per-run,
- * and because a serial run gives a truthful running count.
- */
-export async function runCompanyDownloadBatch(
-  targets: readonly CompanyDownloadTarget[],
-  labelOf: (t: CompanyDownloadTarget) => string,
-  onProgress: (done: number) => void,
-): Promise<{ saved: number; failed: number }> {
-  let saved = 0;
-  let failed = 0;
-  for (const t of targets) {
-    try {
-      await saveOne(t, companyDownloadFileName(labelOf(t), t.url));
-      saved += 1;
-    } catch {
-      failed += 1;
-    }
-    onProgress(saved + failed);
-  }
-  return { saved, failed };
-}
+/** @see runDownloadBatch — the browser half now lives in `doc-download.ts`, because the equipment tab
+ *  runs the same batch and the alternative was importing a component file for its helpers. */
+export const runCompanyDownloadBatch = runDownloadBatch;
 
 export interface CompanyPanelProps {
   companyName: string;
@@ -205,7 +145,12 @@ export function CompanyPanel({ companyName, verified, docs, ar, L, onBack }: Com
   const attention = attentionCount(rows);
 
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set<string>());
-  const [batch, setBatch] = useState<BatchState>({ phase: "idle" });
+
+  // **One mode, always** — a company row is never requestable, so `selectionModeOf` can only ever answer
+  // `download` or neutral, and the mixing this machinery exists to prevent cannot arise here. Reading it
+  // through the same functions the equipment tab uses is what keeps the two panels one grammar rather
+  // than a shared component with a fork in it.
+  const mode = selectionModeOf(rows, selected);
 
   // A key with no url never enters the set. `companyDownloadBatch` filters again on the way out, so the
   // guard is belt-and-braces — but keeping the set clean is what makes the button's count truthful.
@@ -231,26 +176,19 @@ export function CompanyPanel({ companyName, verified, docs, ar, L, onBack }: Com
     });
 
   const targets = companyDownloadBatch(rows, selected);
-  const running = batch.phase === "running";
+
+  const labelOf = useCallback((t: DocDownloadTarget) => L(t.label.en, t.label.ar), [L]);
+  const onDone = useCallback(({ failed }: { failed: number }) => {
+    if (failed === 0) setSelected(new Set<string>());
+  }, []);
+  const { state: batch, running, run } = useDownloadBatch(labelOf, onDone);
 
   const sendLabel =
     batch.phase === "running"
       ? L(`Saving ${batch.done} of ${batch.total}…`, `يُحفظ ${arDigits(batch.done)} من ${arDigits(batch.total)}…`)
       : targets.length === 0
-        ? L("Download documents — tick what you need", "نزّل المستندات — حدّد ما تحتاجه")
-        : L(`Download ${targets.length} documents`, `نزّل ${arDigits(targets.length)} مستندات`);
-
-  const download = async () => {
-    if (running || targets.length === 0) return;
-    setBatch({ phase: "running", done: 0, total: targets.length });
-    const { saved, failed } = await runCompanyDownloadBatch(
-      targets,
-      (t) => L(t.label.en, t.label.ar),
-      (done) => setBatch({ phase: "running", done, total: targets.length }),
-    );
-    setBatch({ phase: "done", saved, failed });
-    if (failed === 0) setSelected(new Set<string>());
-  };
+        ? L("Download", "تنزيل")
+        : L(`Download (${targets.length})`, `تنزيل (${arDigits(targets.length)})`);
 
   return (
     <div className="mp mp-over" dir={ar ? "rtl" : "ltr"}>
@@ -284,7 +222,9 @@ export function CompanyPanel({ companyName, verified, docs, ar, L, onBack }: Com
               thumbUrl: null,
               downloadUrl: r.downloadUrl,
               // No file behind it, so nothing for a batch to save — and never a tick that does nothing.
-              selectable: !!r.downloadUrl,
+              // `download` or `null`, never `request`: this panel has one mode by construction.
+              mode: docRowMode(r),
+              selectable: docRowSelectable(r, mode),
             }))}
             selected={selected}
             onToggle={toggle}
@@ -292,9 +232,15 @@ export function CompanyPanel({ companyName, verified, docs, ar, L, onBack }: Com
             L={L}
           />
 
-          {/* The batch is DOWNLOAD, never a request (AC-72). Same `.mp-send` affordance the equipment
-              tab uses, so the renter reads it the same way — the verb is what differs. */}
-          <button type="button" className="mp-send" disabled={running || targets.length === 0} onClick={download}>
+          {/* The batch is DOWNLOAD, never a request (AC-72), and there is only ever ONE button here —
+              the equipment tab's disabled second button would name an act this panel refuses to offer.
+              Same `.mp-send` affordance, so the renter reads it the same way; the verb is what differs. */}
+          <button
+            type="button"
+            className="mp-send"
+            disabled={running || targets.length === 0}
+            onClick={() => run(targets)}
+          >
             {sendLabel}
           </button>
 

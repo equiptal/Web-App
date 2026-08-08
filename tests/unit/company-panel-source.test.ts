@@ -91,13 +91,15 @@ describe("companyPanelSource — what the company panel is actually fed", () => 
     }
   });
 
-  it("REGRESSION: every row the read produced opens and downloads (AC-69) — which the presence fallback cannot", () => {
+  it("REGRESSION: every row the read produced opens (AC-69) — which the presence fallback cannot", () => {
     const rows = companyDocRows({ verified: true, docs: companyPanelSource(fullRead(), bidLike()).docs });
     expect(rows).toHaveLength(COMPANY_DOC_KEYS.length);
     for (const r of rows) {
       expect(r.status, `${r.key} still reads as missing`).not.toBe("missing");
-      // Two controls — view then download — both pointed at the one presigned url.
-      expect(docRowActions(r).map((a) => a.kind)).toEqual(["view", "download"]);
+      // One control — view — pointed at the presigned url. The per-row DOWNLOAD glyph was withdrawn on
+      // 2026-08-08 (downloading is the batch's job); what this regression pins is that the row is
+      // reachable at all, which is what the presence fallback cannot make it.
+      expect(docRowActions(r).map((a) => a.kind)).toEqual(["view"]);
     }
 
     // …and the shipped behaviour, for contrast: presence only, so not one control exists.
