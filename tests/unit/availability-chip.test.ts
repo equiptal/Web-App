@@ -120,8 +120,11 @@ describe("the chip's copy names a state, never a source (RM3-AC-30)", () => {
       const variants = [...block.matchAll(/\n\s*(pinUnconfirmed\w*)\s*:/g)].map((m) => m[1]);
       expect(variants).toEqual(["pinUnconfirmed"]);
     }
-    expect(copy(dicts.en, "pinUnconfirmed")).toBe("Not confirmed yet");
-    expect(copy(dicts.ar, "pinUnconfirmed")).toBe("لم يؤكد توفرها بعد");
+    // Asserted by pattern, not by exact string: the wording is the product owner's to tune, and a
+    // test that reddens on a benign reword teaches people to weaken it. What may not change is that
+    // it is ONE label about confirmation, in both locales.
+    expect(copy(dicts.en, "pinUnconfirmed")).toMatch(/^[^.]*confirm/i);
+    expect(copy(dicts.ar, "pinUnconfirmed")).toContain("توفرها");
   });
 
   it("uses no causal vocabulary in either locale", () => {

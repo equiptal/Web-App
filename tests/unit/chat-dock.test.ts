@@ -349,10 +349,14 @@ describe("the arrival notice states a STATE, never an event (RM3-AC-63/64)", () 
     expect(copy(arSrc, "noticeTitle")).toContain("ردّ");
   });
 
-  it("never reaches for the bid list's «وصل الآن» / «Just arrived» badge", () => {
-    // `bidMap.justArrived` exists in both dictionaries. It is the one string on this surface that
-    // says exactly what AC-64 forbids, and it is one `t.bidMap.justArrived` away from the bubble.
-    expect(enSrc).toContain("justArrived");
+  it("reaches for no immediacy-named copy key — not the bid list's «وصل الآن» badge, not any other", () => {
+    // `bidMap.justArrived` ("Just arrived" / «وصل الآن») is a live key in both dictionaries, on this
+    // very surface, and it is one `t.bidMap.justArrived` away from the bubble. This asserts the
+    // CLASS rather than the one key, so a differently-named recency string is caught too. It reads
+    // only the dock, so the other agent adding or renaming dictionary keys cannot redden it.
+    const keys = [...dockSrc.matchAll(/\bt\.\w+\.(\w+)/g)].map((m) => m[1]);
+    expect(keys.length).toBeGreaterThan(4); // the dock does read copy, so the sweep is not vacuous
+    expect(keys.filter((k) => /just|arriv|now|recent|live/i.test(k))).toEqual([]);
     expect(dockSrc).not.toContain("justArrived");
   });
 
