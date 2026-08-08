@@ -9,6 +9,8 @@ import { extractBidToken, buildBidMetadata, type BidPreview } from "@/lib/api/bi
  * regression here — a broken tag just silently stops unfurling. Hence these.
  */
 
+const STAGING = "https://webstaging.moedatech.net";
+
 const EN = {
   title: "Bid request: Excavator ×3, Crane ×1",
   description: "Riyadh · Daily rental · 12 Sep – 12 Oct · Bids close 12 Sep",
@@ -20,11 +22,11 @@ const AR = {
 
 const preview: BidPreview = {
   token: "11111111-2222-3333-4444-555555555555",
-  url: "https://web.moedatech.net/bid/11111111-2222-3333-4444-555555555555",
+  url: `${STAGING}/bid/11111111-2222-3333-4444-555555555555`,
   status: "open",
   // One asset for every surface: the backend resolves this to the same file this app serves, and the
   // emailed card renders it too.
-  imageUrl: "https://web.moedatech.net/og-bid.png",
+  imageUrl: `${STAGING}/og-bid.png`,
   siteName: "Moedatech",
   ...EN,
   en: EN,
@@ -50,7 +52,7 @@ describe("extractBidToken", () => {
 
 describe("buildBidMetadata", () => {
   it("Given a preview, When building metadata, Then og:* carry the backend's copy", () => {
-    const m = buildBidMetadata({ preview, slug: "excavator-riyadh-11111111-2222-3333-4444-555555555555", lang: "en" });
+    const m = buildBidMetadata({ preview, slug: "excavator-riyadh-11111111-2222-3333-4444-555555555555", lang: "en" , origin: STAGING });
 
     expect(m.title).toBe(EN.title);
     expect(m.openGraph?.title).toBe(EN.title);
@@ -59,29 +61,58 @@ describe("buildBidMetadata", () => {
     // a supplier meeting this link twice sees one picture.
     expect((m.openGraph as { images?: { url: string }[] }).images?.[0].url).toBe(preview.imageUrl);
     // The shared URL, not the extracted token — clients relabel the card if the canonical disagrees.
-    expect(m.openGraph?.url).toBe("/bid/excavator-riyadh-11111111-2222-3333-4444-555555555555");
-    expect(m.alternates?.canonical).toBe("/bid/excavator-riyadh-11111111-2222-3333-4444-555555555555");
+    expect(m.openGraph?.url).toBe(`${STAGING}/bid/excavator-riyadh-11111111-2222-3333-4444-555555555555`);
+    expect(m.alternates?.canonical).toBe(`${STAGING}/bid/excavator-riyadh-11111111-2222-3333-4444-555555555555`);
   });
 
   it("Given ?lang=ar, When building metadata, Then the locale and the canonical keep the language", () => {
-    const m = buildBidMetadata({ preview: { ...preview, title: preview.ar.title, description: preview.ar.description }, slug: "abc-11111111-2222-3333-4444-555555555555", lang: "ar" });
+    const m = buildBidMetadata({ preview: { ...preview, title: preview.ar.title, description: preview.ar.description }, slug: "abc-11111111-2222-3333-4444-555555555555", lang: "ar", origin: STAGING });
 
     expect(m.title).toBe(AR.title);
     expect((m.openGraph as { locale?: string }).locale).toBe("ar_SA");
-    expect(m.alternates?.canonical).toBe("/bid/abc-11111111-2222-3333-4444-555555555555?lang=ar");
+    expect(m.alternates?.canonical).toBe(`${STAGING}/bid/abc-11111111-2222-3333-4444-555555555555?lang=ar`);
   });
 
   it("Given no preview, When building metadata, Then it falls back to generic copy that leaks nothing", () => {
-    const m = buildBidMetadata({ preview: null, slug: "11111111-2222-3333-4444-555555555555", lang: "en" });
+    const m = buildBidMetadata({ preview: null, slug: "11111111-2222-3333-4444-555555555555", lang: "en" , origin: STAGING });
 
     expect(m.title).toBe("Bid request");
     expect(m.description).toBe("Submit a bid on an equipment request — no account needed.");
-    // Same card image either way — an unreachable backend costs the copy, never the branding.
-    expect((m.openGraph as { images?: { url: string }[] }).images?.[0].url).toBe("/og-bid.png");
+    // Branding survives an unreachable backend — and the fallback image is made absolute from the
+    // request host too, so it can never point at prod from a staging page.
+    expect((m.openGraph as { images?: { url: string }[] }).images?.[0].url).toBe(`${STAGING}/og-bid.png`);
+  });
+
+  it("Given a staging host, When building metadata, Then no URL points at production", () => {
+    /**
+     * The bug this exists for. `metadataBase` in the root layout is hardcoded to
+     * `https://web.moedatech.net`, so any RELATIVE metadata URL resolved to production regardless of
+     * which host served the page. A staging link therefore advertised a prod canonical; WhatsApp
+     * followed it, prod answered 200 with its generic site-wide card, and the shared link unfurled as
+     * "Moedatech - WebApp" rather than the request. Every URL here must carry the request's own host.
+     */
+    const m = buildBidMetadata({ preview, slug: "eq-rental-11111111-2222-3333-4444-555555555555", lang: "en", origin: STAGING });
+
+    const urls = [
+      m.alternates?.canonical,
+      m.openGraph?.url,
+      (m.openGraph as { images?: { url: string }[] }).images?.[0].url,
+    ].map(String);
+
+    for (const u of urls) {
+      expect(u.startsWith("https://")).toBe(true);        // absolute, so metadataBase never applies
+      expect(u).not.toContain("web.moedatech.net/bid");   // never the prod canonical
+      expect(u.includes("webstaging.moedatech.net")).toBe(true);
+    }
+  });
+
+  it("Given no host header, When building metadata, Then it degrades to relative rather than throwing", () => {
+    const m = buildBidMetadata({ preview, slug: "x-11111111-2222-3333-4444-555555555555", lang: "en", origin: null });
+    expect(m.alternates?.canonical).toBe("/bid/x-11111111-2222-3333-4444-555555555555");
   });
 
   it("Given no preview in Arabic, When building metadata, Then the fallback is Arabic too", () => {
-    const m = buildBidMetadata({ preview: null, slug: "x", lang: "ar" });
+    const m = buildBidMetadata({ preview: null, slug: "x", lang: "ar" , origin: STAGING });
 
     expect(m.title).toBe("طلب عروض");
     expect(m.description).toContain("دون الحاجة إلى حساب");
