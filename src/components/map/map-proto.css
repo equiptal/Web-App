@@ -46,6 +46,36 @@
   color: #16304f;
 }
 
+/* ── ONE interaction language for the whole surface ──────────────────────────────────────────────
+   The prototype writes this once, at the top of its stylesheet, rather than as fifty inline handlers,
+   and says why in as many words: *"this is behaviour, not theme."* Every control on the surface
+   answers a pointer the same way — it warms on hover and gives a millimetre under the press — and
+   until now this surface had none of it. A map with two dozen pressable things where nothing
+   acknowledges a press reads as a picture of an interface.
+
+   Scoped to `.bidmap` rather than written bare: the prototype is a whole document, this is one route
+   inside an app that has its own button vocabulary everywhere else.
+
+   `focus-visible` is `deep`, matching the outline the card's stretched select button already draws,
+   so keyboard focus is one ring and not two designs. */
+.bidmap button {
+  transition: background 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease, transform 0.09s ease, color 0.14s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.bidmap button:not(:disabled) { cursor: pointer; }
+.bidmap button:not(:disabled):hover { filter: brightness(0.975); }
+.bidmap button:not(:disabled):active { transform: translateY(1px) scale(0.995); }
+.bidmap button:focus-visible { outline: 2px solid #16304f; outline-offset: 2px; }
+/* Rows and cells the renter picks from — the prototype's shared names for a pressable row (documents,
+   eligibility cells, list items). Kept under the prototype's own class names so a surface that mounts
+   inside this panel inherits the vocabulary instead of re-deriving it. */
+.bidmap .dpRow { transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease; }
+.bidmap .dpRow:hover { box-shadow: 0 4px 14px rgba(15, 34, 56, 0.1); transform: translateY(-1px); }
+.bidmap .dpCell { transition: box-shadow 0.15s ease, transform 0.15s ease; }
+.bidmap .dpCell:hover { box-shadow: 0 3px 12px rgba(15, 34, 56, 0.09); transform: translateY(-1px); }
+.bidmap input:focus { border-color: #16304f; box-shadow: 0 0 0 3px rgba(22, 48, 79, 0.13); }
+.bidmap input, .bidmap .dpRow, .bidmap .dpCell { -webkit-tap-highlight-color: transparent; }
+
 /* The ground under the tiles, seen while they load and in the gutters of a fit. Pale, because the
    basemap is CARTO voyager — the green here was standing in for OSM standard's landmass, and a canvas
    that flashes green and settles pale reads as two maps. */
@@ -1496,4 +1526,12 @@
   .bm-pin, .bm-pin *, .bm-flow {
     animation: none !important;
   }
+  /* The interaction language is motion too, and the prototype's own kill switch only names
+     `animation`. A control must still ANSWER a press — losing the acknowledgement entirely would make
+     the surface unusable for the reader this setting exists for — so the colour change survives and
+     only the movement is dropped. */
+  .bidmap button, .bidmap .dpRow, .bidmap .dpCell { transition-property: background, border-color, box-shadow, color; }
+  .bidmap button:not(:disabled):active { transform: none; }
+  .bidmap .dpRow:hover, .bidmap .dpCell:hover { transform: none; }
+  .bidmap .bm-eq:hover .bm-eq-art { transform: none; }
 }
