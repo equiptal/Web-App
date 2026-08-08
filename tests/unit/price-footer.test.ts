@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { computeDealTotals } from "@/lib/contract/deal-room";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { computeDealTotals, mapDealRoom } from "@/lib/contract/deal-room";
+import { unitCounts } from "@/lib/contract/bid-map";
 import { priceFooterModel, type PriceFooterBid } from "@/lib/contract/price-footer";
 
 /**
@@ -109,5 +112,212 @@ describe("the no-room case — the common one", () => {
 
   it("never prices on zero units, however the bid was projected", () => {
     expect(priceFooterModel(bid({ unitsOffered: 0 }), 10).pricedUnits).toBe(1);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+   RM3-AC-24 · THE INPUTS, NOT ONLY THE ARITHMETIC
+
+   The first suite in this file hand-feeds `priceFooterModel` and `computeDealTotals` the same numbers
+   and asserts they agree. That proves the arithmetic is deterministic — which it would be even if the
+   footer read entirely the wrong fields off the bid. AC-24's claim is about the INPUTS: that the
+   footer reads the price basis through the same accessors `mapDealRoom` reads them through, so two
+   surfaces over ONE room cannot state two different totals.
+
+   Two accessors carry the whole risk:
+     · the unit count — `agreedUnits ?? unitsOffered.length`, NOT the RFQ's `numberOfUnits`;
+     · the duration  — the request's `estimatedDurationDays`, and no other duration-shaped field.
+
+   So this drives BOTH from a single raw deal-room payload, with three DIFFERENT plausible counts on
+   it (agreed 2 · offered 3 · requested 7) and a decoy duration, and asserts they land on the same
+   figures. Reading any one of them wrongly moves a number.
+   ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+
+describe("the footer reads the same inputs as `mapDealRoom`, not merely the same formula (RM3-AC-24)", () => {
+  /** One room, as the deal-room endpoint delivers it. */
+  const RAW = {
+    id: "dr-1",
+    status: "NEGOTIATING",
+    // The negotiation agreed TWO units. The lessor had offered three. The RFQ asked for seven.
+    agreedUnits: 2,
+    mobUnits: null,
+    demobUnits: null,
+    mobExcluded: false,
+    demobExcluded: false,
+    bid: {
+      priceAmount: 1000,
+      priceUnit: "PER_DAY",
+      unitsOffered: ["u1", "u2", "u3"],
+      mobPrice: 500,
+      demobPrice: 400,
+    },
+    request: {
+      estimatedDurationDays: 10,
+      // Decoys. Both are duration-shaped, both are plausible, and reading either would change the
+      // rental total by a factor of three. `mapDealRoom` reads `estimatedDurationDays` and so must
+      // the footer.
+      durationDays: 30,
+      estimatedDuration: 30,
+      equipmentItems: [{ numberOfUnits: 7 }],
+    },
+  };
+
+  const view = mapDealRoom(RAW);
+
+  /** The same room as the bid list projects it — `unitsOffered` is the ARRAY'S LENGTH (`mapBid`). */
+  const footerBid: PriceFooterBid = {
+    price: RAW.bid.priceAmount,
+    priceUnit: RAW.bid.priceUnit,
+    unitsOffered: RAW.bid.unitsOffered.length,
+    agreedUnits: RAW.agreedUnits,
+    mobPrice: RAW.bid.mobPrice,
+    demobPrice: RAW.bid.demobPrice,
+    mobUnits: RAW.mobUnits,
+    demobUnits: RAW.demobUnits,
+    mobExcluded: RAW.mobExcluded,
+    demobExcluded: RAW.demobExcluded,
+    dealRoomId: RAW.id,
+  };
+
+  it("the fixture actually distinguishes the three counts and the two durations", () => {
+    // Without this the parity below could hold by coincidence rather than by agreement.
+    expect([RAW.agreedUnits, RAW.bid.unitsOffered.length, RAW.request.equipmentItems[0].numberOfUnits])
+      .toEqual([2, 3, 7]);
+    expect(RAW.request.estimatedDurationDays).not.toBe(RAW.request.durationDays);
+  });
+
+  it("prices on the count `mapDealRoom` prices on — `agreedUnits`, not the offer and not the RFQ", () => {
+    const model = priceFooterModel(footerBid, RAW.request.estimatedDurationDays);
+    // `numberOfUnits` on the view IS `mapDealRoom`'s `priceUnits`: agreedUnits → unitsOffered.length
+    // → request numberOfUnits. The footer must land on the same rung of that ladder.
+    expect(view.numberOfUnits).toBe(2);
+    expect(model.pricedUnits).toBe(view.numberOfUnits);
+    // And it is the AGREED count, not either of the other two on the same payload.
+    expect(model.pricedUnits).not.toBe(RAW.bid.unitsOffered.length);
+    expect(model.pricedUnits).not.toBe(view.requestedUnits);
+  });
+
+  it("falls back down the SAME ladder when nothing was agreed — to the offer, never to the RFQ", () => {
+    const unagreed = mapDealRoom({ ...RAW, agreedUnits: null });
+    const model = priceFooterModel({ ...footerBid, agreedUnits: null }, RAW.request.estimatedDurationDays);
+    expect(unagreed.numberOfUnits).toBe(3); // `unitsOffered.length`, not the requested 7
+    expect(model.pricedUnits).toBe(unagreed.numberOfUnits);
+    expect(model.pricedUnits).not.toBe(unagreed.requestedUnits);
+  });
+
+  it("prices over the duration `mapDealRoom` reads — `estimatedDurationDays`, past two decoys", () => {
+    const model = priceFooterModel(footerBid, RAW.request.estimatedDurationDays);
+    expect(view.periods).toBe(10);
+    expect(model.totals.periods).toBe(view.periods);
+    // The decoy is not merely unequal — it would visibly change the money, which is what makes the
+    // assertion above load-bearing rather than cosmetic.
+    const onDecoy = priceFooterModel(footerBid, RAW.request.durationDays);
+    expect(onDecoy.totals.rentalTotal).not.toBe(model.totals.rentalTotal);
+  });
+
+  it("produces EVERY figure the deal-room bar produces for this room, from the room's own fields", () => {
+    const model = priceFooterModel(footerBid, RAW.request.estimatedDurationDays);
+    // Fed from the VIEW — i.e. from what the deal room itself computed off the raw payload. If the
+    // footer had reached for a different field on the bid, this is where the two would part.
+    expect(model.totals).toEqual(
+      computeDealTotals({
+        rate: view.rate,
+        priceUnit: view.priceUnit,
+        periods: view.periods,
+        agreedUnits: view.agreedUnits,
+        numberOfUnits: view.numberOfUnits,
+        mobUnits: view.mobUnits,
+        demobUnits: view.demobUnits,
+        mobPrice: view.mobPrice,
+        demobPrice: view.demobPrice,
+        mobExcluded: view.mobExcluded,
+        demobExcluded: view.demobExcluded,
+      }),
+    );
+    // 1000/day × 10 days × 2 agreed units — stated outright so a change of basis cannot hide inside a
+    // deep-equal that moved on both sides at once.
+    expect(model.totals.rentalTotal).toBe(20000);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+   RM3-AC-66 · THE DIFFERENCE IS STATED **ONCE**
+
+   The existing test proves `unitsDiffer` is computed correctly. The AC's other half — *and nowhere
+   else* — was unasserted, and it is the half that fails in practice: two unexplained unit figures on
+   one screen is the defect the rule exists to stop, and it arrives when a SECOND surface starts
+   reading `agreedUnits`.
+   ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+
+const MAP_DIR = resolve(process.cwd(), "src/components/map");
+
+/** Comments removed — these files discuss `agreedUnits` at length precisely to explain why they do
+ *  not read it, and a rule stated in prose must not fail its own test. */
+const stripComments = (source: string): string =>
+  source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
+
+function mapFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) out.push(...mapFiles(p));
+    else if (/\.tsx?$/.test(name)) out.push(p.replace(/\\/g, "/"));
+  }
+  return out;
+}
+
+describe("the difference between offered and agreed is stated ONCE (RM3-AC-66)", () => {
+  const files = mapFiles(MAP_DIR);
+
+  it("found the surface it is sweeping", () => {
+    expect(files.some((f) => f.endsWith("/PriceFooter.tsx"))).toBe(true);
+    expect(files.length).toBeGreaterThan(8);
+  });
+
+  it("is derived by ONE component, and by no other — `unitsDiffer` has a single reader", () => {
+    const readers = files.filter((f) =>
+      /\bunitsDiffer\b|\bpricedUnits\b/.test(stripComments(readFileSync(f, "utf8"))),
+    );
+    expect(readers.map((f) => f.split("/").pop())).toEqual(["PriceFooter.tsx"]);
+  });
+
+  it("is not even NAMED by any other component — `agreedUnits` reaches no other surface", () => {
+    // Stronger than expected, and worth stating: after comments are stripped, NO component under the
+    // map tree references `agreedUnits` at all. `BidMapWorkspace` and `bid-map.ts` both discuss it —
+    // to record that they must not read it — and neither does. The count pills reach their figure
+    // through `unitsOffered` alone, so there is no second place a difference could be computed.
+    const namers = files.filter((f) => /\bagreedUnits\b/.test(stripComments(readFileSync(f, "utf8"))));
+    expect(namers.map((f) => f.split("/").pop())).toEqual([]);
+    const pillModel = stripComments(readFileSync(resolve(process.cwd(), "src/lib/contract/bid-map.ts"), "utf8"));
+    expect(pillModel).not.toMatch(/\bagreedUnits\b/);
+  });
+
+  it("is RENDERED in exactly one place, from one flag", () => {
+    const footer = readFileSync(resolve(MAP_DIR, "PriceFooter.tsx"), "utf8");
+    expect(footer.match(/model\.unitsDiffer/g) ?? []).toHaveLength(1);
+    // And the sentence itself exists in exactly one copy key per locale.
+    for (const locale of ["src/lib/i18n/en.ts", "src/lib/i18n/ar.ts"]) {
+      const dict = readFileSync(resolve(process.cwd(), locale), "utf8");
+      expect(dict.match(/\n\s*unitsDiffer\s*:/g) ?? []).toHaveLength(1);
+    }
+  });
+
+  it("cannot be stated by the count pills — their model has no agreed count to state it from", () => {
+    // The structural half, and the red-able one: `unitCounts` takes `Pick<BidCard,"unitsOffered">`.
+    // Handing it a bid whose negotiation agreed a DIFFERENT count changes nothing, because there is
+    // no accessor for it. A pill that started reading `agreedUnits` would move `offered` to 2.
+    const fleet = [{ inBid: true }, { inBid: true }, { inBid: false }];
+    const plain = unitCounts({ unitsOffered: 5 }, fleet);
+    const negotiated = unitCounts({ unitsOffered: 5, agreedUnits: 2 } as Parameters<typeof unitCounts>[0], fleet);
+    expect(plain.offered).toBe(5);
+    expect(negotiated).toEqual(plain);
+    expect(Object.keys(plain).sort()).toEqual(["claimed", "offered", "owned", "registered"]);
+    for (const forbidden of ["agreedUnits", "unitsDiffer", "pricedUnits"]) expect(forbidden in plain).toBe(false);
+  });
+
+  it("says nothing when there is nothing to say — no room, no agreement, no second figure", () => {
+    // The common case. A footer that stated a difference here would be stating it about an offer
+    // nobody has negotiated.
+    expect(priceFooterModel(bid({ agreedUnits: null }), 10).unitsDiffer).toBe(false);
   });
 });
