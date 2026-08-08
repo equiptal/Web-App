@@ -26,6 +26,16 @@
  * chase on a document the renter is looking straight at. A paper nobody asked for and nobody holds is
  * not a row. All of that judgement is `equipmentDocGroups`'; this component paints it.
  *
+ * **You can only ask for what is not there** (owner, same day). A tick appears on a **missing** row and
+ * on no other, and a group with nothing missing shows no batch control at all rather than one that
+ * composes an empty ask. The rule lives in the model (`DocRow.requestable`, enforced again inside
+ * `batchDocumentRequest`), so this component never decides who may be ticked.
+ *
+ * **The operator's group is a status, not a document list** (owner, same day). Its rows say only whether
+ * each certificate is on file — no view, no download, no url — because nothing validates an operator
+ * document on upload and this surface must not present an unchecked file as evidence. Those rows simply
+ * arrive carrying no files, so the shared row grammar below needs no special case.
+ *
  * **Presence only.** `documentKeys` entries carry `verifyStatus` and `expiryDate`; this tab renders
  * neither, and the model never reads them. §6.6: a machine's paper is either there or it isn't, and a
  * verification badge would invite the renter to judge a supplier on a state the platform sets. The
@@ -87,12 +97,12 @@ export function EquipmentDocuments({ machine, request, ar, L, onRequest }: Equip
       return next;
     });
 
-  // Only requestable rows can reach the composer. `DocRowList` already hides the tick on the others, so
-  // this is the belt to that braces: a selection can never carry a row the renter had no business
-  // asking for, however the set was arrived at.
-  const askableRows = useMemo(() => groups.flatMap((g) => g.rows).filter((r) => r.requestable), [groups]);
-  const draft = batchDocumentRequest("equipment", machine.equipmentId, askableRows, selected);
-  const pickedCount = askableRows.filter((r) => selected.has(r.key)).length;
+  // ONE filter, in the model. `batchDocumentRequest` drops a row that is not requestable, so the tick,
+  // the count on the button and the payload are the same rule read once — a second pre-filter here
+  // would be a place for them to drift apart. The count comes off the draft for the same reason.
+  const allRows = useMemo(() => groups.flatMap((g) => g.rows), [groups]);
+  const draft = batchDocumentRequest("equipment", machine.equipmentId, allRows, selected);
+  const pickedCount = draft?.kind === "document" ? draft.labels.length : 0;
 
   return (
     <div>

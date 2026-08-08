@@ -9,11 +9,17 @@
  * presence-only, company rows carry verification and expiry) is exactly the thing a shared component
  * makes visible: it is the `statusLine` and the `dot` the caller passes, and nothing else.
  *
- * **Every row this component draws is openable** (004a §7, AC-69). All three document families on this
- * surface — the machine's papers, the machine's photos, and the firm's papers — arrive here, so the
- * view/download pair is written once, here, and cannot drift between them. §6.6's "presence only"
- * governs **verification state**, not reachability (004a §7.2): an equipment row still carries no
- * verify badge and no expiry, and it is still opened with one click.
+ * **Every row that carries a file is openable** (004a §7, AC-69). The document families on this surface —
+ * the machine's papers, the machine's photos, and the firm's papers — arrive here, so the view/download
+ * pair is written once, here, and cannot drift between them. §6.6's "presence only" governs
+ * **verification state**, not reachability (004a §7.2): an equipment row still carries no verify badge
+ * and no expiry, and it is still opened with one click.
+ *
+ * **The operator's certificates are the deliberate exception** (owner, 2026-08-08): they are a status —
+ * on file or not — and expose no file at all, because nothing validates an operator document on upload
+ * and a file the renter can open reads as evidence that was checked. Nothing here enforces that; those
+ * rows simply arrive with no url, and a row with no url has already exposed no controls since V15. One
+ * mechanism, not a second flag.
  *
  * **Usage** — the caller owns selection state and the batch send; this renders and reports ticks.
  *
@@ -49,13 +55,14 @@ export interface DocRowView {
    *  before its words. */
   downloadUrl: string | null;
   /** **Every** file behind this row, when the caller has them. A machine's paper row can hold several
-   *  (two operator certificates, a TÜV and an insurance under one heading) and each gets its own
-   *  view/download pair — the row used to expose the first url and silently drop the rest. Absent for
-   *  the firm's papers, which carry one file and only a `downloadUrl`. */
+   *  (an istimara AND a customs card under one ownership heading, two TÜV uploads under one certificate)
+   *  and each gets its own view/download pair — the row used to expose the first url and silently drop
+   *  the rest. Absent for the firm's papers, which carry one file and only a `downloadUrl`. */
   files?: readonly DocFile[];
-  /** May this row be ticked? Defaults to true. False on a row nothing required — the renter can read
-   *  and open it, but there is nothing to ask for, so it carries no checkbox rather than a checkbox
-   *  that composes an ask the lessor can only answer "it is already there". */
+  /** May this row be ticked? Defaults to true. **False on a row that is not missing** — the renter can
+   *  read and open it, but there is nothing to ask for, so it carries no checkbox rather than a checkbox
+   *  that composes an ask the lessor can only answer "it is already there" (owner, 2026-08-08). The
+   *  caller decides; this component never second-guesses it. */
   selectable?: boolean;
 }
 
@@ -85,7 +92,7 @@ export function DocRowList({
   onToggleAll: (keys: string[], select: boolean) => void;
   L: (en: string, ar: string) => string;
 }) {
-  // Select-all reaches only the rows that can be asked for. A row nobody required has no tick, so
+  // Select-all reaches only the rows that can be asked for. A row that is not selectable has no tick, so
   // including it here would leave "Select all" permanently unable to reach the all-on state.
   const keys = rows.filter((r) => r.selectable !== false).map((r) => r.key);
   const allOn = keys.length > 0 && keys.every((k) => selected.has(k));
@@ -102,12 +109,16 @@ export function DocRowList({
         </span>
       </div>
 
-      <div className="mp-selbar">
-        <button type="button" className="mp-linkbtn" onClick={() => onToggleAll(keys, !allOn)} disabled={keys.length === 0}>
-          {allOn ? L("Clear all", "إلغاء التحديد") : L("Select all", "تحديد الكل")}
-        </button>
-        {pickedHere > 0 && <span>{L(`${pickedHere} selected`, `${arDigits(pickedHere)} محدَّد`)}</span>}
-      </div>
+      {/* A group with nothing to tick shows NO bar — not a disabled "Select all". A control that can
+          only compose an empty ask is the dead control AC-69 forbids, one step later. */}
+      {keys.length > 0 && (
+        <div className="mp-selbar">
+          <button type="button" className="mp-linkbtn" onClick={() => onToggleAll(keys, !allOn)}>
+            {allOn ? L("Clear all", "إلغاء التحديد") : L("Select all", "تحديد الكل")}
+          </button>
+          {pickedHere > 0 && <span>{L(`${pickedHere} selected`, `${arDigits(pickedHere)} محدَّد`)}</span>}
+        </div>
+      )}
 
       {rows.map((r) => {
         const selectable = r.selectable !== false;

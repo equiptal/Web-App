@@ -478,10 +478,14 @@ export type PresenceStatus = "present" | "on_file" | "missing";
 /**
  * One file behind a document row.
  *
- * **A row can hold several.** A lessor may file two operator safety certificates, or a TÜV *and* an
- * insurance under one heading; the row is still one row, and every file it holds is reachable. Before
- * this existed the row exposed `held.find((d) => d.url)?.url` — the first url and no other — so the
- * second and third papers a lessor had actually uploaded were unreachable from the renter's panel.
+ * **A row can hold several.** A lessor may file an istimara *and* a customs card under one ownership
+ * heading, or two TÜV uploads under one certificate; the row is still one row, and every file it holds
+ * is reachable. Before this existed the row exposed `held.find((d) => d.url)?.url` — the first url and
+ * no other — so the second and third papers a lessor had actually uploaded were unreachable from the
+ * renter's panel.
+ *
+ * (The operator's rows are not one of these. They carry no files at all — see
+ * {@link operatorStatusRows} — so the multi-file treatment never reaches them.)
  */
 export interface DocFile {
   /** The wire type this file was uploaded as (`operator_tuv`, `istimara`, `front` …). */
@@ -510,12 +514,18 @@ export interface DocRow {
   /** The wire type(s) this row stands for — what a batch request names when the row is ticked. */
   docTypes: string[];
   /**
-   * May the renter tick this row and ask for it?
+   * May the renter tick this row and ask for it? **Exactly when the paper is not there** — the whole
+   * rule in one sentence: *you can only ask for what is not there* (owner's ruling, 2026-08-08).
    *
-   * **False on a row nothing required**, because the batch ask exists to chase a paper the renter needs
-   * and a paper nobody asked for has nothing to chase — the renter is looking straight at it, and an ask
-   * naming it could only be answered "it is already on the file". True on every required row, held or
-   * not: a renter may still want a legible re-scan of a paper that is there.
+   * Two halves, and both now say the same thing. A paper **nobody required** has nothing to chase: the
+   * renter is looking straight at it, and an ask naming it could only be answered "it is already on the
+   * file". A paper that **is** required and **is** held is the same sentence: the lessor can see it on
+   * his own file, so the ask reads as noise. An earlier revision left a required-and-held row tickable,
+   * reasoning that a renter might want a legible re-scan; the owner withdrew that — the batch ask exists
+   * to chase an *absent* paper, and a re-scan is a conversation, not a document request.
+   *
+   * So this is `status === "missing"` and nothing else, and `batchDocumentRequest` enforces it on the
+   * way out, so the checkbox and the ask cannot disagree.
    */
   requestable: boolean;
 }
@@ -755,7 +765,8 @@ function certRow(args: {
     downloadUrl: files[0]?.url ?? null,
     files,
     docTypes: held.length > 0 ? [...new Set(held.map((d) => d.type))] : [askType],
-    requestable: required,
+    // You can only ask for what is not there — held or unrequired, there is nothing to chase.
+    requestable: status === "missing",
   };
 }
 
@@ -774,6 +785,66 @@ function unionCodes(requested: string[], held: Map<string, OfferedUnitDoc[]>): s
 }
 
 /**
+ * The operator's certificates as **a status, and only a status** (owner's ruling, 2026-08-08).
+ *
+ * These rows briefly rendered like the equipment's papers: a row per certificate with a view/download
+ * pair for every file the lessor had filed. **The owner withdrew that.** They are shown the way the
+ * bid-readiness card already shows them — *present or not, green or red, and nothing else.* No view, no
+ * download, no file access.
+ *
+ * **The reason.** Nothing validates an operator document on upload. Handing the renter a file to open
+ * presents an unchecked upload as if it were verified evidence, and this surface exists to answer *can I
+ * trust this?* — so it must not imply a check that never happened. **Presence is a fact the platform can
+ * stand behind; the contents are not.**
+ *
+ * So the rows carry no `files` and no `downloadUrl`, which is what makes `docRowActions` return nothing
+ * for them — one mechanism, not a second flag the component could forget to read.
+ *
+ * **Read from the scorer, never re-derived.** `computeUnitReadiness().operatorCerts` already carries
+ * exactly this shape (`{code, labelEn, labelAr, present, url}`); this reads **`present` and ignores
+ * `url`** rather than bucketing `documentKeys` a second time. That also settles the row set: the scorer
+ * maps over the certs **this request asked for**, so an operator paper nobody asked about is not a row —
+ * which is the required/not-required rule this file already obeys everywhere else, arrived at from the
+ * other side. (It could not be otherwise now: with no verdict, no count and no file behind it, an
+ * unrequested row would be a line of text with nothing to say and nothing to do.)
+ *
+ * A machine's own held operator papers are still recognised — `isOperatorDoc` keeps them out of the
+ * equipment certs and out of the unclassified bucket, so a held `operator_tuv` cannot reappear as an
+ * openable equipment row through the other door.
+ */
+function operatorStatusRows(certs: readonly { code: string; present: boolean }[]): DocRow[] {
+  // The scorer canonicalises the ASK; `operatorCertCode` folds the three licence spellings on top of it,
+  // so "operator licence" asked for under two names is ONE row. When it is, the row is present if ANY of
+  // the folded asks was satisfied — the licence is on the file or it is not, and the spelling the renter
+  // happened to type cannot make it two different papers with two different verdicts.
+  const order: string[] = [];
+  const present = new Map<string, boolean>();
+  for (const cert of certs) {
+    const code = operatorCertCode(cert.code);
+    if (code === "") continue;
+    if (!present.has(code)) order.push(code);
+    present.set(code, (present.get(code) ?? false) || cert.present);
+  }
+  const rows: DocRow[] = [];
+  for (const code of order) {
+    const cert = { present: present.get(code) as boolean };
+    rows.push({
+      key: `doc:operator:${code}`,
+      label: OPERATOR_CERT_ROW_LABEL[code] ?? docTypeLabel(code),
+      status: cert.present ? "present" : "missing",
+      statusLine: cert.present ? PRESENT_DOC : ABSENT_DOC,
+      thumbUrl: null,
+      // No url, ever — see above. Not "none happened to be signed": none is offered.
+      downloadUrl: null,
+      files: [],
+      docTypes: [operatorAskType()],
+      requestable: !cert.present,
+    });
+  }
+  return rows;
+}
+
+/**
  * The document groups of §6.6 — **photos · documents · the operator's documents** — each with its own
  * attention count.
  *
@@ -781,10 +852,14 @@ function unionCodes(requested: string[], held: Map<string, OfferedUnitDoc[]>): s
  *
  * | | held | absent |
  * |---|---|---|
- * | **required** | shown, green, openable | **red, "no document yet"**, counted, requestable |
- * | **not required** | shown, openable, no verdict, **not counted** | **not rendered at all** |
+ * | **required** | shown, green, openable, **not requestable** | **red, "no document yet"**, counted, requestable |
+ * | **not required** | shown, openable, no verdict, **not counted**, not requestable | **not rendered at all** |
  *
- * So the row set is `(what this request requires) ∪ (what this machine holds)`.
+ * So the row set is `(what this request requires) ∪ (what this machine holds)`, and the requestable
+ * column collapses to one sentence (owner, same day): **you can only ask for what is not there.**
+ *
+ * **The operator's group is the one exception, and it is a different kind of row** — a status, not a
+ * document list: present or absent, and no file access at all. See {@link operatorStatusRows}.
  *
  * **Why the row set was fixed, and what survives of that.** The earlier note read: *"a row per uploaded
  * file would make the list shorter the worse the supplier's file is, which is backwards."* That
@@ -814,10 +889,10 @@ function unionCodes(requested: string[], held: Map<string, OfferedUnitDoc[]>): s
  * deleted. See the note on `ownershipCell`.)
  *
  * **A request with no operator needs no special case.** No operator asked for ⇒ no operator certs
- * requested ⇒ nothing in that family is required ⇒ absent operator papers render no rows, so the group
- * is empty and is not returned at all. If the lessor happens to hold operator papers anyway they still
- * show, openable, with no verdict — the renter can read them, and the lessor is not marked down for a
- * check nobody ran.
+ * requested ⇒ the scorer reports none ⇒ the group is empty and is not returned at all. Operator papers
+ * the lessor happens to hold do not summon a row of their own: with the operator group reduced to a
+ * status the renter never asked for, there is nothing such a row could say. The lessor is still not
+ * marked down for a check nobody ran — an absent row is not a red one.
  */
 export function equipmentDocGroups(machine: FleetMachine, request: MatchRequest): DocGroup[] {
   // The SAME derivation the match grid scores with — never a second reading of the request.
@@ -851,7 +926,8 @@ export function equipmentDocGroups(machine: FleetMachine, request: MatchRequest)
       downloadUrl: files[0]?.url ?? null,
       files,
       docTypes: [held[0]?.slot ?? slot],
-      requestable: required,
+      // A shot that is already uploaded is not a shot to ask for, whoever required it.
+      requestable: status === "missing",
     });
   }
 
@@ -897,19 +973,8 @@ export function equipmentDocGroups(machine: FleetMachine, request: MatchRequest)
     );
   }
 
-  /* ── the operator's documents — their own section, their own count ── */
-  const operatorHeld = heldByCode(machine.documentKeys.filter(isOperatorDoc), operatorCertCode);
-  const operatorRequested = readiness.operatorCerts.map((c) => operatorCertCode(c.code));
-  const operatorRequiredSet = new Set(operatorRequested);
-  const operatorRows: DocRow[] = unionCodes(operatorRequested, operatorHeld).map((code) =>
-    certRow({
-      key: `doc:operator:${code}`,
-      label: OPERATOR_CERT_ROW_LABEL[code] ?? docTypeLabel(code),
-      held: operatorHeld.get(code) ?? [],
-      required: operatorRequiredSet.has(code),
-      askType: operatorAskType(),
-    }),
-  );
+  /* ── the operator's documents — a STATUS, not a document list ── */
+  const operatorRows: DocRow[] = operatorStatusRows(readiness.operatorCerts);
 
   return [
     { key: "photos" as const, label: { en: "Photos", ar: "الصور" }, rows: photoRows },
@@ -1072,15 +1137,22 @@ export type PanelRequestDraft =
       labels: Bilingual[];
     };
 
-/** Build the one batch document request for a set of ticked rows. Returns null when nothing is ticked,
- *  so a caller can disable its send control from the same source of truth that builds the payload. */
+/**
+ * Build the one batch document request for a set of ticked rows. Returns null when nothing askable is
+ * ticked, so a caller can disable its send control from the same source of truth that builds the payload.
+ *
+ * **The ask covers only what is missing** (owner, 2026-08-08). A row that is not `requestable` is
+ * dropped here, however the selection set was arrived at — the checkbox and the payload are then the
+ * same rule read twice rather than two rules that can drift. A row that carries no `requestable` field
+ * at all is left alone, because it is not one of `equipmentDocGroups`' rows.
+ */
 export function batchDocumentRequest(
   scope: "equipment" | "company",
   equipmentId: string | null,
-  rows: { key: string; label: Bilingual; docTypes: string[] }[],
+  rows: { key: string; label: Bilingual; docTypes: string[]; requestable?: boolean }[],
   selected: ReadonlySet<string>,
 ): PanelRequestDraft | null {
-  const picked = rows.filter((r) => selected.has(r.key));
+  const picked = rows.filter((r) => r.requestable !== false && selected.has(r.key));
   if (picked.length === 0) return null;
   return {
     kind: "document",
