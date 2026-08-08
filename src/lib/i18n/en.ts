@@ -861,7 +861,9 @@ export const en = {
     requestFailed: "The request didn't reach the lessor. Try again.",
     requestInvalid: "This request can't be sent as it is.",
     // Map canvas
-    yourSite: "Your site",
+    // The prototype's copy verbatim: «مشروعك». "Your site" names a place on a map; the pin names the
+    // PROJECT, which is the thing every distance on this surface is measured from.
+    yourSite: "Your project",
     noSiteLocation: "This request has no project location",
     noBids: "No bids on this item yet",
     // Availability vocabulary — ONE scale (§6.9.1)

@@ -446,15 +446,22 @@ export default function MapCanvas({
   const t = useT();
   const { dir } = useLocale();
 
+  /* The project pin — `siteIcon()`, decoded lines 262–265, value for value. `[40,52]` with the anchor
+     at `[20,40]`, which is the teardrop's point rather than its centre: the pin marks the spot it
+     touches. The label overflows the 40 px box symmetrically, which is what the prototype does too.
+
+     The glyph is a location mark inside a shape that is itself a location mark. That doubling is the
+     prototype's (it uses 📍); kept, with a Material glyph rather than an emoji so the surface has one
+     icon family. */
   const icon = useMemo(
     () =>
       L.divIcon({
         className: "", // no Leaflet default box — the pin is entirely our own markup
-        iconSize: [140, 46],
-        iconAnchor: [70, 18],
+        iconSize: [40, 52],
+        iconAnchor: [20, 40],
         html:
           `<div class="bm-sitepin" dir="rtl" style="direction:rtl">` +
-          `<span class="bm-sitedot"></span>` +
+          `<span class="bm-sitedot"><span class="bm-siteglyph material-icons-outlined">place</span></span>` +
           `<span class="bm-sitelabel">${esc(t.bidMap.yourSite)}${addressLabel ? ` · ${esc(addressLabel)}` : ""}</span>` +
           `</div>`,
       }),

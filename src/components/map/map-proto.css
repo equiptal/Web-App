@@ -56,39 +56,53 @@
 .bidmap .bm-leaflet { position: absolute; inset: 0; z-index: 0; background: #dde9e0; }
 .bidmap .bm-leaflet .leaflet-container { height: 100%; width: 100%; background: #dde9e0; font: inherit; }
 
-/* Site pin — a `divIcon`, so Leaflet's own LTR canvas is overridden per pin (AC-30, AC-98). */
+/* ── The project pin — `siteIcon()`, decoded lines 262–265 ────────────────────────────────────────
+   A `divIcon`, so Leaflet's own LTR canvas is overridden per pin (AC-30, AC-98).
+
+   It is a **teardrop**, not a dot, and it does **not** pulse. What stood here was an 18 px blue disc
+   with an infinite `dpPulse` ring — a second thing breathing on a canvas where the only breathing
+   things are meant to be the unanswered availability dot and the selected machine's halo. The
+   prototype's pin is silent: it marks a place, and a place does not need announcing twice. */
 .bm-sitepin { direction: rtl; display: flex; flex-direction: column; align-items: center; }
 .bm-sitepin .bm-sitedot {
   position: relative;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #2563eb;
-  border: 3px solid #fff;
-  box-shadow: 0 4px 12px rgba(15, 34, 56, 0.32);
+  width: 32px;
+  height: 32px;
+  /* Three round corners and one square: rotated -45° that square corner becomes the point, and the
+     `iconAnchor` of [20,40] is where it lands. */
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: #16304f;
+  border: 2px solid #fff;
+  box-sizing: border-box;
+  /* Blue-cast, and deliberately not a neutral drop: the prototype's own value. */
+  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.bm-sitepin .bm-sitedot::after {
-  content: "";
-  position: absolute;
-  inset: -9px;
-  border-radius: 50%;
-  background: rgba(37, 99, 235, 0.28);
-  animation: dpPulse 2.2s ease-out infinite;
-}
+/* Counter-rotated so the glyph reads upright inside a rotated container. */
+.bm-sitepin .bm-siteglyph { transform: rotate(45deg); font-size: 15px; color: #fff; line-height: 1; }
 .bm-sitepin .bm-sitelabel {
   margin-top: 6px;
   white-space: nowrap;
   background: #fff;
-  border: 1px solid #e1e9f1;
+  /* NO border — the prototype's label is a bare white chip on a shadow, and a hairline around it made
+     it read as one more bordered control among the machine chips. */
   border-radius: 8px;
   padding: 2px 8px;
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 700;
   /* Genuinely `#0F2238` and NOT the `deep` token — the prototype hard-codes this one ink on the site
-     label (`siteIcon`, decoded line 265), which is how `#0F2238` got mistaken for `deep` in the first
-     place. Left literal so correcting `deep` cannot silently move it. */
+     label (decoded line 265), which is how `#0F2238` got mistaken for `deep` in the first place. Left
+     literal so correcting `deep` cannot silently move it. */
   color: #0f2238;
-  box-shadow: 0 2px 8px rgba(15, 34, 56, 0.18);
+  box-shadow: 0 2px 6px rgba(15, 34, 56, 0.2);
+  /* Ours, not the prototype's: the label may carry the request's own address string after «مشروعك»,
+     and an unbounded one would run the width of the map. */
+  max-width: 230px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── Machine marker (V10 — `design-v3.md` §4, value for value) ───────────────────────────────────
@@ -1230,7 +1244,9 @@
 
 /* Prototype keyframes — `design.md` §5 plus `design-v3.md` §7, verbatim. All disabled under
    `prefers-reduced-motion`. */
-@keyframes dpPulse { 0% { transform: scale(0.55); opacity: 0.9; } 70% { transform: scale(1.3); opacity: 0; } 100% { opacity: 0; } }
+/* `dpPulse` is deliberately NOT here. It exists in the prototype's stylesheet, but on this surface it
+   only ever drove the project pin's ring — and the prototype's project pin is a silent teardrop. A
+   keyframe kept for completeness is a keyframe the next reader goes looking for a user of. */
 @keyframes dpFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes dpPing {
   0% { box-shadow: 0 0 0 0 rgba(243, 167, 122, 0.5); }
