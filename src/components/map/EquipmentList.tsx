@@ -18,8 +18,13 @@
  *  - **One chip, never a chip plus a band** (AC-32) — and **four rows that always occupy their line**,
  *    empty or not, so a machine with fewer papers is a shorter LINE and not a shorter CARD. Every card
  *    in the list is the same height, which is what makes it scannable down a column.
- *  - **Colour comes from `unitAvailability()` only** (AC-19) — never from the `yardConfirmed` boolean,
+ *  - **Colour comes from `availabilityView()` only** (AC-19) — never from the `yardConfirmed` boolean,
  *    which supplier-side is just `yardId != null` and would turn every chip green.
+ *
+ * **All three are decided in `equipment-card-model.ts`, not here.** They are negative rules — *no
+ * serial, no capacity, no second band, never navy* — and a negative is not provable against a render.
+ * This file receives an `EquipmentCardModel` and paints it; what a card is allowed to KNOW is swept
+ * with `Object.keys` over that model instead.
  *
  * **The card body selects; «التفاصيل» opens.** Pressing a card focuses its marker and nothing else
  * (AC-15) — the renter is orienting himself on the map, and a press that navigated away from the map
@@ -35,10 +40,10 @@
  */
 
 import { useEffect, useMemo, useRef, type ReactNode, type RefObject } from "react";
-import { AVAILABILITY_COLOUR, arabicIndicDigits, isOutOfCity, unitAvailability } from "@/lib/contract/bid-map";
-import type { EquipmentListView } from "@/lib/contract/equipment-list";
+import { arabicIndicDigits } from "@/lib/contract/bid-map";
+import { listEmptyState, type EquipmentListView } from "@/lib/contract/equipment-list";
 import type { FleetMachine } from "@/lib/contract/fleet";
-import { certificateChips, heroPhotoUrl } from "@/components/map/panel";
+import { equipmentCardModel } from "@/components/map/equipment-card-model";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 
 export interface EquipmentListProps {
@@ -106,11 +111,16 @@ export function EquipmentList({
     box.scrollTo({ top: Math.max(0, top - 6), behavior: "smooth" });
   }, [selectedId, scrollRef]);
 
+  // Which of the two explanatory states the list is in — decided by `listEmptyState`, never by two
+  // independent conditions here that could both be true at once.
+  const empty = listEmptyState(view);
+
   // RM3-AC-26 — a price and a count were given, and that is the whole statement. No empty card
-  // furniture: a greyed-out card outline would suggest a machine that failed to load. Keyed off
-  // `view.total`, never off what is on screen: this state is a fact about the LESSOR, and a filter
-  // that happened to hide everything must not be able to reach it (RM3-AC-28e).
-  if (view.total === 0) {
+  // furniture: no <ul>, no card outline, no chip and no photo cell — a greyed-out card would suggest
+  // a machine that failed to load. Keyed off `view.total`, never off what is on screen: this state is
+  // a fact about the LESSOR, and a filter that happened to hide everything must not be able to reach
+  // it (RM3-AC-28e).
+  if (empty === "no-machines") {
     return (
       <div className="bm-eqnone">
         <div className="bm-eqnone-t">{t.bidMap.eqNoneRegistered}</div>
@@ -187,7 +197,7 @@ export function EquipmentList({
           would read as "this lessor has nothing" — a claim about him rather than about the chips, and
           the exact confusion RM3-AC-26's state exists to avoid. The two are deliberately unalike in
           wording, in colour and in the fact that only this one carries an action. */}
-      {view.machines.length === 0 ? (
+      {empty === "filtered" ? (
         <div className="bm-eqfnone" role="status">
           <div className="bm-eqfnone-t">{t.bidMap.eqFilterEmpty}</div>
           <div className="bm-eqfnone-s">
@@ -243,21 +253,16 @@ function EquipmentCard({
   onOpenDetail: (id: string) => void;
   onAskAvailability?: (machine: FleetMachine) => void;
 }) {
-  const availability = unitAvailability(machine);
-  const confirmed = availability === "confirmed";
-  // `absent` never reaches here — `offeredMachines` drops it — but the colour map has only two keys, so
-  // the fall-through resolves to the one that claims less.
-  const colour = AVAILABILITY_COLOUR[confirmed ? "confirmed" : "unconfirmed"];
-  const photo = heroPhotoUrl(machine);
-  const certs = useMemo(() => certificateChips(machine), [machine]);
-
-  const name = [machine.manufacturer, machine.modelName].filter(Boolean).join(" ").trim();
-  const kind = (ar ? machine.subcategoryNameAr ?? machine.subcategoryName : machine.subcategoryName ?? machine.subcategoryNameAr) ?? "";
-  const title = [name || kind, machine.year != null ? (ar ? arabicIndicDigits(machine.year) : String(machine.year)) : null]
-    .filter(Boolean)
-    .join(" · ");
-
-  const km = typeof machine.distanceKm === "number" && Number.isFinite(machine.distanceKm) ? Math.round(machine.distanceKm) : null;
+  // Everything this card states — and everything it is allowed to know — is one model call. The chip
+  // is `availabilityView`'s, which is the SAME call `machineMarkers` makes for this machine's pin
+  // (AC-19), and the model carries no serial, no capacity and no second band for the card to reach
+  // for even by accident (AC-12, AC-32).
+  const card = useMemo(() => equipmentCardModel(machine), [machine]);
+  const { chip, certs, photo, askAvailability } = card;
+  const confirmed = chip.availability === "confirmed";
+  const colour = chip.colour;
+  const title = ar ? card.title.ar : card.title.en;
+  const km = card.km;
 
   return (
     <li
@@ -332,10 +337,15 @@ function EquipmentCard({
               {confirmed ? <span aria-hidden="true">✓</span> : <span className="bm-eq-dot" aria-hidden="true" />}
               {confirmed ? t.bidMap.eqChipConfirmed : t.bidMap.eqChipUnconfirmed}
             </span>
-            {!confirmed && (
+            {/* The ask exists on an unconfirmed card and does not exist on a confirmed one (AC-13) —
+                `askAvailability` is the model's answer, not a condition re-derived here. Its colour
+                is the model's too: blue, never navy (AC-33), because beside a red chip navy reads as
+                disabled and this is the one control the renter is supposed to press. */}
+            {askAvailability && (
               <button
                 type="button"
                 className="bm-eq-ask"
+                style={{ color: askAvailability.colour }}
                 title={t.bidMap.eqAskConfirmWhy}
                 onClick={() => onAskAvailability?.(machine)}
                 disabled={!onAskAvailability}
@@ -346,7 +356,7 @@ function EquipmentCard({
             {/* The yard is outside the request city's own radius — the fact that turns a delivery into
                 a mobilisation. It qualifies the offer, so it sits with the state and not with the
                 number it is derived from. */}
-            {isOutOfCity(machine.distanceKm) && <span className="bm-eq-far">{t.bidMap.eqOutOfCity}</span>}
+            {card.outOfCity && <span className="bm-eq-far">{t.bidMap.eqOutOfCity}</span>}
           </div>
 
           {/* 3 · distance from the project. Numerals are `dir="ltr"` — an Arabic-Indic figure inside an

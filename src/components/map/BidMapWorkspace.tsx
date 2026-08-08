@@ -49,13 +49,20 @@ import { companyPanelSource, type CompanyDocsPayload } from "@/lib/contract/comp
 import {
   arabicIndicDigits,
   countCase,
-  englishTypePlural,
   isPlottable,
-  unitAvailability,
+  LANDING_CUE_MS,
+  requestTypeWord,
+  shortfallAlert,
   unitCountLabel,
   unitCounts,
 } from "@/lib/contract/bid-map";
-import { equipmentListView, landingSelectionId, offeredMachines } from "@/lib/contract/equipment-list";
+import {
+  equipmentListView,
+  landingSelectionId,
+  machineMarkers,
+  nextSelection,
+  offeredMachines,
+} from "@/lib/contract/equipment-list";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import {
   composeDocumentRequest,
@@ -66,11 +73,6 @@ import {
 import { publicTaxonomyUrl, type RequestRecord } from "@/lib/contract/requests";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import "@/components/map/map-proto.css";
-
-/** How long the landing attention cue runs before the card rests — 6 × 1.5s, the `bmCue` keyframes'
- *  own budget plus a beat, so the class leaves the DOM after the animation has already finished
- *  rather than cutting it short (RM3-AC-35). */
-const LANDING_CUE_MS = 9_400;
 
 // `leaflet` reaches for `window` at import time, so the canvas is client-only — the same handling
 // `MapLocationPicker`/`GoogleMapLocationPicker` need in this repo.
@@ -245,7 +247,7 @@ export function BidMapWorkspace({
   // takeovers: a detail left open across a bid change would show one bid's machine over another's
   // counts.
   useEffect(() => {
-    setSelectedMachineId(null);
+    setSelectedMachineId((cur) => nextSelection(cur, { kind: "bid-change" }));
     setCueId(null);
     setDetailId(null);
     setCompanyOpen(false);
@@ -310,23 +312,12 @@ export function BidMapWorkspace({
   const view = useMemo(() => equipmentListView(listed, bid, filterIds), [listed, bid, filterIds]);
   const visible = view.machines;
 
-  const machines: MachinePin[] = useMemo(
-    () =>
-      visible
-        // AC-19/AC-22: a machine with no usable coordinates is not plotted. `isPlottable` reads
-        // coordinates only — never the availability, and never `yardConfirmed`.
-        .filter((m) => isPlottable(m))
-        .map((m) => ({
-          id: m.equipmentId,
-          lat: m.lat as number,
-          lng: m.lng as number,
-          // `absent` cannot reach here — `offeredMachines` already dropped it — and the marker type has
-          // no third state, so the fall-through resolves to the one that claims less.
-          availability: unitAvailability(m) === "confirmed" ? ("confirmed" as const) : ("unconfirmed" as const),
-          distanceKm: typeof m.distanceKm === "number" && Number.isFinite(m.distanceKm) ? m.distanceKm : null,
-        })),
-    [visible],
-  );
+  /* The marker set is `machineMarkers(view.machines)` and nothing else — the FILTERED list minus what
+     cannot be drawn (AC-15, AC-21, AC-22). The derivation lives in the model beside the list's own,
+     so each marker's availability is the SAME `availabilityView` call the card's chip is built on
+     (AC-19): one fact, two renderings, no possible disagreement. `isPlottable` reads coordinates
+     only — never the availability, never the filter and never `yardConfirmed`. */
+  const machines: MachinePin[] = useMemo(() => machineMarkers(visible), [visible]);
 
   // AC-80 decision 4: the REQUEST ITEM's taxonomy image, falling back to the category image, then a
   // generic icon inside the pin. The taxonomy bucket differs per env, so the URL is rebuilt against
@@ -336,8 +327,10 @@ export function BidMapWorkspace({
 
   const selectMachine = useCallback(
     (id: string) => {
-      // Re-clicking the selected marker deselects it — the only way back to an unselected map.
-      const next = selectedMachineId === id ? null : id;
+      // The ONE selection rule, for both surfaces (AC-15): re-pressing the selected machine deselects
+      // it — the only way back to an unselected map — and the value this returns is what reaches
+      // `EquipmentList.selectedId` and `MapCanvas.selectedMachineId` alike.
+      const next = nextSelection(selectedMachineId, { kind: "press", id });
       setSelectedMachineId(next);
       // The renter has acted, so the landing cue has done its job and stops immediately. Waiting out
       // the remaining seconds would pulse a card he has already moved past.
@@ -356,7 +349,7 @@ export function BidMapWorkspace({
     if (!selectedMachineId) return;
     if (view.machines.some((m) => m.equipmentId === selectedMachineId)) return;
     if (!listed.some((m) => m.equipmentId === selectedMachineId)) return;
-    setSelectedMachineId(null);
+    setSelectedMachineId((cur) => nextSelection(cur, { kind: "hidden" }));
     setCueId(null);
     onSelectMachine?.(null);
     // `onSelectMachine` is the parent's callback; re-running on its identity would clear a selection
@@ -459,15 +452,15 @@ export function BidMapWorkspace({
      footer prices on what was agreed, these pills describe what was offered (RM3-AC-65/67). */
   const counts = bid && fleet ? unitCounts(bid, fleet) : null;
   const kase = counts ? countCase(counts) : null;
+  /** V4's alert, or null. It carries the DIFFERENCE and not the offered total (RM3-AC-05), and its
+   *  own orange (RM3-AC-06) — both decided in the model, so neither is re-derived at the render. */
+  const shortfall = counts ? shortfallAlert(counts) : null;
 
-  /** The type word, from the REQUEST's taxonomy and agreeing in number with the count (RM3-AC-08).
-   *  English inflects the subtype's head noun; Arabic keeps one literal form, the same product
-   *  decision `unitCountLabel` records — the taxonomy stores a single form per node. */
+  /** The type word, from the REQUEST's taxonomy — `item` is `request.equipmentItems[0]` and a fleet
+   *  row cannot satisfy `RequestTypeSource` — and agreeing in number with the count (RM3-AC-08). */
   const typeWord = (n: number): string => {
-    const subtype = (ar ? item?.subtypeNameAr ?? item?.subtypeName : item?.subtypeName ?? item?.subtypeNameAr) ?? null;
-    const capacity = (ar ? item?.capacityNameAr ?? item?.capacityName : item?.capacityName ?? item?.capacityNameAr) ?? null;
-    const head = ar ? subtype ?? "" : englishTypePlural(subtype, n);
-    return [head, capacity].filter(Boolean).join(" ").trim();
+    const word = requestTypeWord(item, n);
+    return ar ? word.ar : word.en;
   };
   /** The bare numeral, in the reader's digits. */
   const num = (n: number): string => (ar ? arabicIndicDigits(n) : String(n));
@@ -620,12 +613,14 @@ export function BidMapWorkspace({
                 and a shortfall is an incomplete offer, not an unavailable machine (RM3-AC-06). It
                 states the DIFFERENCE — not the offered total — and the consequence: those units are
                 not on the map, because a claimed unit has no location, no documents and no serial. */}
-            {counts && kase === "short" && (
+            {shortfall && (
               <div className="bm-short" role="status">
                 <span className="bm-short-ic material-icons-outlined">error_outline</span>
                 <div className="bm-short-body">
                   <div className="bm-short-t">
-                    {fmt(t.bidMap.shortfall, { n: ar ? unitCountLabel(counts.claimed) : `${counts.claimed}` })}
+                    {/* `shortfall.claimed` — the DIFFERENCE. `counts.offered` is the sentence's one
+                        plausible wrong number and is not reachable from this model at all. */}
+                    {fmt(t.bidMap.shortfall, { n: ar ? unitCountLabel(shortfall.claimed) : `${shortfall.claimed}` })}
                   </div>
                   <div className="bm-short-s">{t.bidMap.claimedNotDrawnWhy}</div>
                 </div>
@@ -682,8 +677,10 @@ export function BidMapWorkspace({
                   onSelect={selectMachine}
                   onOpenDetail={(id) => {
                     // Opening a detail also focuses that machine, so coming back out leaves the map
-                    // where the renter left it rather than on the previous selection.
-                    setSelectedMachineId(id);
+                    // where the renter left it rather than on the previous selection. `open`, never
+                    // `press`: opening the detail of the ALREADY selected card must not toggle the
+                    // selection off underneath the panel it is about to fill.
+                    setSelectedMachineId((cur) => nextSelection(cur, { kind: "open", id }));
                     setCueId(null);
                     setDetailId(id);
                     onSelectMachine?.(id);

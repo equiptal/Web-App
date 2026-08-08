@@ -17,7 +17,7 @@
  * the marker set arguing with the cards about what the lessor offered.
  */
 
-import { arabicIndicDigits, unitAvailability } from "./bid-map";
+import { arabicIndicDigits, availabilityView, isPlottable, unitAvailability, type MapPoint } from "./bid-map";
 import { computeUnitReadiness, readinessInputsFor, type UnitReadiness } from "./bid-readiness";
 import type { FleetMachine } from "./fleet";
 
@@ -499,4 +499,107 @@ export function equipmentListView(
     total: listed.length,
     emptiedByFilter: active.length > 0 && machines.length === 0 && listed.length > 0,
   };
+}
+
+/* ══════════════════════════ the map's half of the same list (§6.8, RM3-AC-15/19/21) ══════════════════════════ */
+
+/**
+ * One marker, reduced to exactly what the canvas draws. Structurally the component's `MachinePin`,
+ * declared here because the SET is a model decision and the marker is only its rendering.
+ */
+export interface MachineMarker extends MapPoint {
+  /** `equipmentId` — the selection key, and the de-collision key. */
+  id: string;
+  lat: number;
+  lng: number;
+  /** From {@link availabilityView}, which is also what the card's chip is built on — so the two are
+   *  one fact and not two agreeing derivations (RM3-AC-19). */
+  availability: "confirmed" | "unconfirmed";
+  /** Distance to the project, for the chip riding this machine's route. Null → no chip, never a 0. */
+  distanceKm: number | null;
+}
+
+/**
+ * **The marker set: the list, minus what cannot be drawn** (§6.8, RM3-AC-15, AC-21, AC-22).
+ *
+ * `machines` must be `equipmentListView(...).machines` — the FILTERED list. That is rule 4 stated as
+ * code rather than as a comment on the caller: a machine leaves the map with its card, and the ONE
+ * difference between the two sets is `isPlottable`, which reads coordinates and never the
+ * availability, never the filter and never `yardConfirmed`.
+ *
+ * One marker per plottable offered machine — no supplier pins, no bid pins, no claimed-unit ghost
+ * (AC-22, AC-72): an `absent` unit never reaches here, because `offeredMachines` dropped it, and a
+ * machine with no coordinates is not given an invented position.
+ */
+export function machineMarkers(machines: readonly FleetMachine[]): MachineMarker[] {
+  return machines.filter((m) => isPlottable(m)).map((m) => ({
+    id: m.equipmentId,
+    lat: m.lat as number,
+    lng: m.lng as number,
+    availability: availabilityView(m).availability,
+    distanceKm: typeof m.distanceKm === "number" && Number.isFinite(m.distanceKm) ? m.distanceKm : null,
+  }));
+}
+
+/* ══════════════════════════════ the selection, as one reducer (RM3-AC-15) ══════════════════════════════ */
+
+/**
+ * Everything that can move the machine selection. There is no `select` that only ever sets: a press is
+ * a TOGGLE, and spelling that out here is what stops one surface from toggling while the other sets.
+ */
+export type SelectionAction =
+  /** The renter pressed a card or a marker. */
+  | { kind: "press"; id: string }
+  /** «التفاصيل ›» — opening a machine also focuses it, so coming back out leaves the map where he
+   *  left it. Never a toggle: pressing «التفاصيل» on the selected card must not clear the selection
+   *  the detail is about to be about. */
+  | { kind: "open"; id: string }
+  /** The route resolved a different bid (AC-177). */
+  | { kind: "bid-change" }
+  /** A filter hid the selected machine (RM3-AC-28e) — a ring with no card and no pin. */
+  | { kind: "hidden" };
+
+/**
+ * **The one selection rule, for both surfaces** (RM3-AC-15).
+ *
+ * `id → id`, **re-press → null**, bid change → null, hidden → null. Exactly one machine id is selected
+ * at any moment, and the same value reaches `EquipmentList.selectedId` and `MapCanvas.selectedMachineId`
+ * — which is the whole of AC-15 as rewritten. Re-pressing the current one clearing it is the only way
+ * back to an unselected map, and it is why a press cannot be a plain assignment.
+ */
+export function nextSelection(current: string | null, action: SelectionAction): string | null {
+  switch (action.kind) {
+    case "press":
+      return current === action.id ? null : action.id;
+    case "open":
+      return action.id;
+    case "bid-change":
+    case "hidden":
+      return null;
+  }
+}
+
+/* ══════════════════════════ the two empty states, which must never be confused ══════════════════════════ */
+
+/**
+ * Which explanatory state the list is in, or `null` when it has cards to draw.
+ *
+ * **`no-machines` is a fact about the LESSOR** (RM3-AC-26): he gave a price and a count and registered
+ * no machine against them. That is the whole statement — and it is keyed off `total`, the UNFILTERED
+ * offer, so a chip that happened to hide everything can never reach it.
+ *
+ * **`filtered` is a fact about the CHIPS the renter pressed** (RM3-AC-28e). It names them and offers
+ * the way out. The two must never be mistakable for each other: «لا توجد نتائج» over an offer that
+ * really is empty reads as a verdict on the lessor, and the lessor's own state carrying a «امسح
+ * التصفية» button would offer an escape from something that is not a filter.
+ *
+ * Order matters: `total === 0` wins, because with nothing offered there is nothing a filter could have
+ * hidden — and `equipmentListView` already refuses to set `emptiedByFilter` in that case.
+ */
+export type ListEmptyState = "no-machines" | "filtered";
+
+export function listEmptyState(view: Pick<EquipmentListView, "total" | "machines" | "emptiedByFilter">): ListEmptyState | null {
+  if (view.total === 0) return "no-machines";
+  if (view.machines.length === 0) return "filtered";
+  return null;
 }

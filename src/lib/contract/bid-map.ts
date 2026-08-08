@@ -112,6 +112,91 @@ export function unitAvailability(unit: Pick<OfferedUnitDetail, "locationSource">
   }
 }
 
+/**
+ * **The availability fact, resolved once, for every surface that draws it.**
+ *
+ * `unitAvailability` answers *what state is this machine in*; `AVAILABILITY_COLOUR` answers *what
+ * colour does that state wear*. Every caller needed BOTH and every caller paired them itself — the
+ * card chip, the card's photo hairline, the marker's disc and the marker's caption each wrote their
+ * own `unitAvailability(m) === "confirmed" ? … : …`. Four spellings of one fact is exactly the shape
+ * a disagreement arrives in, and RM3-AC-19 is the criterion that forbids it: the pin and the card
+ * chip must be the same derivation, not two derivations that currently agree.
+ *
+ * **`absent` collapses to `unconfirmed` here, and that is deliberate.** Nothing that reaches a card or
+ * a marker can be `absent` — `offeredMachines` drops it before either — but the colour map has two
+ * keys, so the fall-through has to resolve somewhere, and it resolves to the state that claims LESS.
+ * A caller that needs the three-state answer calls `unitAvailability` directly; a caller that is about
+ * to paint something calls this.
+ *
+ * **Never reads `yardConfirmed`** — `unitAvailability`'s doc block above records the full reason.
+ */
+export interface AvailabilityView {
+  availability: "confirmed" | "unconfirmed";
+  colour: string;
+}
+
+export function availabilityView(unit: Pick<OfferedUnitDetail, "locationSource">): AvailabilityView {
+  const availability = unitAvailability(unit) === "confirmed" ? "confirmed" : "unconfirmed";
+  return { availability, colour: AVAILABILITY_COLOUR[availability] };
+}
+
+/**
+ * **The blue every ask on this surface wears** (RM3-AC-33) — the card's «اطلب التأكيد» and the
+ * shortfall alert's «اطلب إضافتها».
+ *
+ * Blue, **never navy**. Beside a red chip a navy control reads as disabled, and this is the one thing
+ * on an unconfirmed card the renter is supposed to press. It is a constant rather than a CSS literal
+ * so the rule is assertable: `map-proto.css` carries the same value, and a test binds the two.
+ */
+export const REQUEST_ACTION_COLOUR = "#2563EB";
+
+/**
+ * **The shortfall alert's one colour** (RM3-AC-06) — ORANGE, and never either availability colour.
+ *
+ * Red on this surface means availability and nothing else. A shortfall is an INCOMPLETE OFFER, not an
+ * unavailable machine, and painting both red collapses two different problems into one signal. Stated
+ * here rather than only in the stylesheet for the same reason as {@link REQUEST_ACTION_COLOUR}: a
+ * colour rule that lives only in CSS cannot be asserted, and this one is a criterion.
+ */
+export const SHORTFALL_COLOUR = "#D4780A";
+
+/**
+ * The shortfall alert, or null when there is no shortfall (§6.3, RM3-AC-05/06).
+ *
+ * **`claimed` — the DIFFERENCE — is the whole content of this model.** The alert says *"N units were
+ * quoted with no machine behind them"*; it must never state the OFFERED total, which would read as
+ * *"the whole offer is unbacked"* and is the larger, wrong number in every case where the two differ.
+ * The offered count is deliberately not carried here at all, so the copy has nothing else to reach
+ * for.
+ *
+ * It renders on `countCase === "short"` and on nothing else, so its ABSENCE reliably means nothing is
+ * claimed (RM3-AC-05) — including for a one-unit offer, which is `single` however the arithmetic
+ * lands.
+ */
+export interface ShortfallAlert {
+  /** `offered − registered`, clamped — never `offered`. */
+  claimed: number;
+  /** Orange. Named on the model so a caller cannot reach for the availability red instead. */
+  colour: string;
+}
+
+export function shortfallAlert(counts: Pick<UnitCounts, "offered" | "claimed">): ShortfallAlert | null {
+  if (countCase(counts) !== "short") return null;
+  return { claimed: counts.claimed, colour: SHORTFALL_COLOUR };
+}
+
+/**
+ * **How long V6's landing attention cue runs before the card rests** (RM3-AC-35).
+ *
+ * 6 × 1.5s — the `bmCue` keyframes' own budget — plus a beat, so the class leaves the DOM after the
+ * animation has already finished rather than cutting it short. **Finite, and a real number**: the cue
+ * is an event that ends, and a cue that loops stops being a cue and becomes decoration.
+ *
+ * It lives here rather than in `BidMapWorkspace` so the constant is importable by a node test without
+ * dragging React, Leaflet and a stylesheet in behind it.
+ */
+export const LANDING_CUE_MS = 9_400;
+
 /* ─────────────────────────────────────── position ─────────────────────────────────────── */
 
 export interface UnitLocation {
@@ -419,4 +504,44 @@ export function englishTypePlural(name: string | null | undefined, n: number): s
   else plural = `${last}s`;
   words[words.length - 1] = plural;
   return words.join(" ");
+}
+
+/**
+ * The **request item's** four taxonomy fields, and nothing else — the only shape the count pills' type
+ * word may be built from.
+ *
+ * Named `subtype*` / `capacity*` because that is what the REQUEST calls them. A fleet row calls the
+ * same ideas `subcategoryName` and `measurementName`, so a machine handed to {@link requestTypeWord}
+ * satisfies none of these fields and produces an empty word rather than a plausible wrong one. That
+ * mismatch is the point of the type: the failure is loud instead of silent.
+ */
+export interface RequestTypeSource {
+  subtypeName?: string | null;
+  subtypeNameAr?: string | null;
+  capacityName?: string | null;
+  capacityNameAr?: string | null;
+}
+
+/**
+ * **The count pills' type word — from the REQUEST's own type, never the machine's** (RM3-AC-08).
+ *
+ * The pills say *"N Forklifts 3 ton"*: the renter asked for forklifts, and the number counts what he
+ * asked for. Reading the word off the machines instead would be wrong in the two cases that matter —
+ * a supplier answering a forklift request with a machine the taxonomy files under a neighbouring
+ * subtype would rename the renter's own request in front of him, and «٠ لدى المؤجّر» has no machine to
+ * read a word off at all. The request always has one, and it is the one the renter recognises.
+ *
+ * Returns both locales; the caller picks, exactly as `certificateChips` does. English inflects the
+ * subtype's head noun to agree with `n` ({@link englishTypePlural}); Arabic keeps one literal form,
+ * the same product decision `unitCountLabel` records — the taxonomy stores a single form per node.
+ * The capacity rides along unchanged in both: `3 ton` is a measurement, not a counted noun.
+ */
+export function requestTypeWord(item: RequestTypeSource | null | undefined, n: number): { en: string; ar: string } {
+  const join = (head: string | null, capacity: string | null) => [head, capacity].filter(Boolean).join(" ").trim();
+  const enSubtype = item?.subtypeName ?? item?.subtypeNameAr ?? null;
+  const arSubtype = item?.subtypeNameAr ?? item?.subtypeName ?? null;
+  return {
+    en: join(englishTypePlural(enSubtype, n), item?.capacityName ?? item?.capacityNameAr ?? null),
+    ar: join(arSubtype, item?.capacityNameAr ?? item?.capacityName ?? null),
+  };
 }
