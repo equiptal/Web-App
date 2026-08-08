@@ -108,7 +108,10 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest }: 
           {L("The machine", "المعدّة")}
         </button>
         <button type="button" role="tab" aria-selected={tab === "documents"} className={`mp-tab${tab === "documents" ? " on" : ""}`} onClick={() => setTab("documents")}>
-          {L("Its documents", "مستنداتها")}
+          {/* «المستندات», the prototype's and the screenshot's word — not «مستنداتها». The possessive
+              was ours; on a panel that is already one machine, whose documents these are is not in
+              question, and the pronoun only made the tab longer than its neighbour. */}
+          {L("Documents", "المستندات")}
           {docAttention > 0 && <span className="mp-att">{ar ? arDigits(docAttention) : docAttention}</span>}
         </button>
       </div>
