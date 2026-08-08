@@ -193,7 +193,8 @@ operator safety cert).
 
 ### V9 · Company panel `[UI]`
 **AC** 40, 41 · Opens over the whole panel with its own dark header (name · verified chip · back).
-A **document list, not a profile**: CR · VAT certificate · **IBAN** · national address · local content.
+A **document list, not a profile**: CR · VAT certificate · national address · local content.
+**No IBAN** — banking detail, not something a renter verifies a lessor by (product decision 2026-08-08).
 - **Company rows carry verification state and expiry** — verified, valid-until, renews-annually, or
   no-document-yet in red. This asymmetry with V8 is deliberate: a company paper is checked and expires.
 - Attention count on the group heading counts **rows needing action**, never a total.

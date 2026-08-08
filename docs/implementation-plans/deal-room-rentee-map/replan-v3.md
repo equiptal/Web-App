@@ -110,7 +110,7 @@ The rescope's timing was lucky: everything it deletes was either unbuilt or is a
 | **V6** | **Landing pre-selection** — the offer's confirmed machine selected on arrival, pin lifted with halo + in-offer tag, **no detail opens**; finite ~6-cycle pulse preserving the resting shadow | 34, 35 |
 | **V7** | **Equipment detail** — hero photo + back, two tabs, availability/distance/yard line, and the **six-cell match grid against this request** (green / grey / red, each stating its finding) | 14, 36, 37 |
 | **V8** | **Equipment documents** — two groups (photos · documents), each with its own attention count, **presence only, never verification**, select-all + per-row checkbox, batch request | 16, 38, 39, 42 |
-| **V9** | **Company panel** — overlay with its own dark header; batch-selectable document list incl. **IBAN**; **verification state + expiry**; attention count, never a total | 40, 41 |
+| **V9** | **Company panel** — overlay with its own dark header; batch-selectable document list, **no IBAN**; **verification state + expiry**; attention count, never a total | 40, 41 |
 | **V10** | **Map v3** — project pin, one marker per **offered** machine, availability label, distance chip, dotted route; card ↔ marker focus stays in step; `absent` units not drawn; colour from `unitAvailability` only | 15, 19, 20, 21, 22 |
 | **V11** | **Requests** — the four asks, each bound to one `equipmentId` (null for the shortfall), state derived per render | 17, 18 |
 | **V12** | **Chat dock + price footer** — persistent dock with the unread badge, no rail; footer at the panel bottom re-hosting the existing bar | 23, 24 |

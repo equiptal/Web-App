@@ -101,8 +101,11 @@ chip + back). It is a **document list**, not a profile page:
 - **company rows carry verification state and expiry** — verified, valid-until, renews-annually, or
   no-document-yet in red
 
-Company documents include **CR, VAT certificate, IBAN, national address and local content**. IBAN
-belongs here, with the other company papers — an earlier draft moved it out, which was wrong.
+Company documents include **CR, VAT certificate, national address and local content**.
+
+**IBAN is excluded — product decision, 2026-08-08.** It is banking detail, not a paper a renter verifies a
+lessor by, and this panel exists to answer *can I trust this counterparty's documents*. It stays in the
+full company profile. An earlier draft of this section argued the opposite; that argument is withdrawn.
 
 ### 6.2 The counts — three cases, three sentences
 
@@ -376,7 +379,7 @@ card state must be derived by re-reading the machine (§6.7).
 | RM3-AC-38 | web | **Given** either document surface **When** it renders **Then** it offers select-all, a checkbox per row, a thumbnail with a status dot, and per-row download — and requesting is a **batch** action over the ticked rows |
 | RM3-AC-39 | web | **Given** equipment document rows **When** they render **Then** they show **presence only** — uploaded / not uploaded / on file / none yet — and **never** a verification badge |
 | RM3-AC-40 | web | **Given** company document rows **When** they render **Then** they **do** show verification state and expiry, because a company paper is checked and does expire |
-| RM3-AC-41 | web | **Given** the company panel **When** it renders **Then** it carries CR, VAT, **IBAN**, national address and local content, with an attention count that counts rows needing action, never a total |
+| RM3-AC-41 | web | **Given** the company panel **When** it renders **Then** it carries CR, VAT, national address and local content — **and no IBAN** — with an attention count that counts rows needing action, never a total |
 | RM3-AC-42 | web | **Given** the equipment documents tab **When** it renders **Then** photos and documents are **two groups**, each with its own attention count |
 
 ## 9. Test plan
@@ -402,7 +405,7 @@ card state must be derived by re-reading the machine (§6.7).
 | RM3-TC-16 | AC-32, AC-33 | web | same | the card model emits one availability chip carrying commitment, no second band; the request action's token is the blue one |
 | RM3-TC-17 | AC-34, AC-35 | web | same | initial state selects the offer's confirmed machine with no detail open; the attention cue is finite (~6 cycles) and not a persistent loop |
 | RM3-TC-18 | AC-36, AC-37 | web | same | detail model exposes hero photo, two tabs and six match cells; a missing requirement yields red and a not-required one yields grey |
-| RM3-TC-19 | AC-38, AC-39, AC-40, AC-41, AC-42 | web | same | both surfaces expose select-all + per-row selection and a batch request; equipment rows carry presence only and no verification field; company rows carry verification + expiry and include IBAN; photos and documents are separate groups, each counting only rows needing action |
+| RM3-TC-19 | AC-38, AC-39, AC-40, AC-41, AC-42 | web | same | both surfaces expose select-all + per-row selection and a batch request; equipment rows carry presence only and no verification field; company rows carry verification + expiry and **exclude IBAN**; photos and documents are separate groups, each counting only rows needing action |
 
 ## 10. Open
 
