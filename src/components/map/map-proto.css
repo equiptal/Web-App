@@ -485,20 +485,30 @@
    nothing here is a bar: the composition bar was v2's, and it made a supplier's shortfall a shape to
    interpret rather than a number to read. */
 .bidmap .bm-counts { flex-shrink: 0; display: flex; flex-wrap: wrap; gap: 6px; padding: 11px 15px 0; }
+/* BOTH PILLS ARE THE SAME WHITE PILL (decoded 3763–3766), and the difference between them is the word
+   they carry, not their colour.
+
+   The offer pill used to be blue here. The comment defending it argued that the offered count "is the
+   number the renter is actually deciding about" — but it cited nothing, and the pills sit side by side
+   precisely so the TWO numbers can be compared. Colouring one of a matched pair makes it the answer
+   and the other the footnote, which is the opposite of what a comparison is for. Blue is also this
+   surface's ACTION colour, and neither pill is an action.
+
+   The number is what is being read, so the number carries the weight; the label only says which count
+   it is. That is why the pill is two spans and not one sentence — a run-on line made both numbers
+   invisible, which is the whole reason §6.2 asked for pills. */
 .bidmap .bm-pill {
   display: inline-flex;
-  align-items: center;
-  border-radius: 20px;
-  padding: 5px 11px;
-  font-size: 11px;
-  font-weight: 800;
+  align-items: baseline;
+  gap: 5px;
+  background: #fff;
+  border: 1px solid #e1e9f1;
+  border-radius: 999px;
+  padding: 4px 11px;
   white-space: nowrap;
 }
-/* What he OWNS that fits this request — never his whole yard (004a §4.1). */
-.bidmap .bm-pill-owned { color: #1c3550; background: #eff4f9; border: 1px solid #e1e9f1; }
-/* What THIS offer is made of. Blue, the surface's action colour, because it is the number the renter
-   is actually deciding about — and never green or red, which are availability's alone. */
-.bidmap .bm-pill-offer { color: #2563eb; background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.22); }
+.bidmap .bm-pill-n { font-size: 13px; font-weight: 800; color: #16304f; }
+.bidmap .bm-pill-l { font-size: 10.5px; font-weight: 700; color: #6b8fa8; }
 
 /* ── V4 · shortfall alert (§6.3) ─────────────────────────────────────────────────────────────────
    ORANGE (#d4780a), never red. Red on this surface means availability and nothing else; a shortfall

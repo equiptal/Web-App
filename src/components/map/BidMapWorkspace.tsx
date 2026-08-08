@@ -472,6 +472,23 @@ export function BidMapWorkspace({
   /** The bare numeral, in the reader's digits. */
   const num = (n: number): string => (ar ? arabicIndicDigits(n) : String(n));
 
+  /**
+   * One count pill: the NUMBER, then the label saying which count it is (§6.2, decoded 3763–3766).
+   *
+   * Two spans rather than one interpolated sentence, because the number is the thing being read and
+   * has to carry the weight — a run-on line made both numbers invisible, which is why §6.2 asked for
+   * pills at all. The dictionary keeps ONE key per pill and the template is split on `{n}`, so word
+   * order stays the translator's; a locale that moved `{n}` off the front would read oddly but would
+   * not break. The numeral is `dir="ltr"`: an Arabic-Indic figure inside an RTL run still reads left
+   * to right.
+   */
+  const countPill = (template: string, n: number, vars: Record<string, string> = {}) => (
+    <span className="bm-pill">
+      <span className="bm-pill-n" dir="ltr">{num(n)}</span>
+      <span className="bm-pill-l">{fmt(template.split("{n}").join("").trim(), vars)}</span>
+    </span>
+  );
+
   /* ── what the map is NOT showing, in words ─────────────────────────────────────────────────────
      Every one of these is a case where drawing nothing is correct and silence is not: an empty map
      otherwise reads as "this lessor has no machines", which is a claim the data does not support.
@@ -585,15 +602,15 @@ export function BidMapWorkspace({
                 claim a number the surface does not have. */}
             {counts && (
               <div className="bm-counts">
-                <span className="bm-pill bm-pill-owned">
-                  {fmt(t.bidMap.countOwned, { n: num(counts.owned), type: typeWord(counts.owned) })}
-                </span>
+                {countPill(t.bidMap.countOwned, counts.owned, { type: typeWord(counts.owned) })}
                 {/* The offer pill is the multi-unit comparison: owned ≠ offered, and both are shown
                     because the comparison IS the point (§6.2). A single-unit offer renders the owned
-                    pill alone (RM3-AC-03). */}
-                {kase !== "single" && (
-                  <span className="bm-pill bm-pill-offer">{fmt(t.bidMap.countInOffer, { n: num(counts.offered) })}</span>
-                )}
+                    pill alone (RM3-AC-03).
+
+                    It is the SAME white pill as the one beside it. It used to be blue; colouring one
+                    of a matched pair makes it the answer and the other the footnote, which is the
+                    opposite of what a comparison is for — `map-proto.css` carries the full note. */}
+                {kase !== "single" && countPill(t.bidMap.countInOffer, counts.offered)}
               </div>
             )}
 
