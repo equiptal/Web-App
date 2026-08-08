@@ -1,13 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
-  AVAILABILITY_COLOUR,
   MIN_PIN_GAP_PX,
-  colourKeyModel,
-  compositionBuckets,
   decollide,
   isPlottable,
   resolveUnitLocation,
-  sortBids,
   unitAvailability,
   unitCountLabel,
   unitCounts,
@@ -17,10 +13,14 @@ import { bidSuppliers, bidSupplierKey, mapBidList, type BidCard, type OfferedUni
 import type { UnitReadiness } from "@/lib/contract/bid-readiness";
 
 /**
- * S2 — the pure selectors behind the deal-room rentee map (spec 001 §6.2, §6.3.2, §6.6, §6.9, §6.11).
- * Covers RMAP-TC-12, TC-27 and the sort half of TC-17, plus the colour-key and de-collision rules the
- * spec states in prose. Every assertion here is a rule three surfaces share, so a break means the pin,
- * the chip and the bar have started to disagree.
+ * The pure selectors behind the deal-room equipment-verification surface (spec 004 §6.4, §6.8, §7.2).
+ *
+ * Trimmed for **v3**: `compositionBuckets`, `sortBids` and `colourKeyModel` were retired with the
+ * rescope — v3 shows one bid, so there is no offers list to sort, the composition bar is replaced by
+ * count pills plus a shortfall alert, and the colour scale is stated in copy rather than a legend.
+ *
+ * What remains is a rule that several surfaces share, so a break here means the pin and the card's
+ * chip have started to disagree about the same machine.
  */
 
 const unit = (p: Partial<OfferedUnitDetail> = {}): OfferedUnitDetail => ({
@@ -150,84 +150,6 @@ describe("unitCounts — offered vs identified, deliberately unreconciled (AC-37
   });
 });
 
-describe("compositionBuckets — zero buckets omitted (AC-143/144/145)", () => {
-  it("splits a 3-unit offer into ready / unconfirmed / unregistered with the counts printed", () => {
-    const buckets = compositionBuckets(
-      bid({
-        unitsOffered: 3,
-        offeredUnitsDetail: [located("unit_yard", { equipmentId: "A" }), located("listing_yard", { equipmentId: "B" })],
-      }),
-    );
-    expect(buckets).toEqual([
-      { kind: "ready", count: 1 },
-      { kind: "unconfirmed", count: 1 },
-      { kind: "unregistered", count: 1 },
-    ]);
-  });
-
-  it("OMITS a zero-count bucket entirely rather than emitting a zero-width segment", () => {
-    const buckets = compositionBuckets(bid({ unitsOffered: 1, offeredUnitsDetail: [located("unit_yard", { equipmentId: "A" })] }));
-    expect(buckets).toEqual([{ kind: "ready", count: 1 }]);
-    expect(buckets.map((b) => b.kind)).not.toContain("unconfirmed");
-    expect(buckets.every((b) => b.count > 0)).toBe(true);
-  });
-
-  it("emits no buckets at all for an offer of zero units", () => {
-    expect(compositionBuckets(bid({ unitsOffered: 0 }))).toEqual([]);
-  });
-
-  it("puts a registered-but-unlocatable machine in unconfirmed, not in the unregistered hatch", () => {
-    // `none` IS a registered machine the supplier did not confirm; it simply has no pin to compare to.
-    const buckets = compositionBuckets(bid({ unitsOffered: 1, offeredUnitsDetail: [unit({ equipmentId: "A", locationSource: "none" })] }));
-    expect(buckets).toEqual([{ kind: "unconfirmed", count: 1 }]);
-  });
-
-  it("gives an off-platform submission its own fourth state, distinct from count-only padding (AC-198)", () => {
-    const buckets = compositionBuckets(bid({ unitsOffered: 2, viaSharedLink: true }));
-    expect(buckets).toEqual([{ kind: "offPlatform", count: 2 }]);
-  });
-
-  it("keeps the bar's segments summing to the quoted count", () => {
-    const b = bid({
-      unitsOffered: 5,
-      offeredUnitsDetail: [located("unit_yard", { equipmentId: "A" }), located("bid_pin", { equipmentId: "B" })],
-    });
-    expect(compositionBuckets(b).reduce((sum, x) => sum + x.count, 0)).toBe(5);
-  });
-});
-
-describe("sortBids — price and nearest only, nulls last (AC-24, TC-17)", () => {
-  const rows = [
-    bid({ id: "far-cheap", price: 100, distanceKm: 300 }),
-    bid({ id: "no-distance", price: 150, distanceKm: null }),
-    bid({ id: "near-dear", price: 400, distanceKm: 10 }),
-  ];
-
-  it("puts null-distance bids LAST under nearest, never first", () => {
-    expect(sortBids(rows, "nearest").map((b) => b.id)).toEqual(["near-dear", "far-cheap", "no-distance"]);
-  });
-
-  it("leaves the price order unaffected by a null distance", () => {
-    expect(sortBids(rows, "price").map((b) => b.id)).toEqual(["far-cheap", "no-distance", "near-dear"]);
-  });
-
-  it("puts a null price last too — unknown is never cheapest", () => {
-    const withNullPrice = [bid({ id: "unknown", price: null }), bid({ id: "cheap", price: 50 })];
-    expect(sortBids(withNullPrice, "price").map((b) => b.id)).toEqual(["cheap", "unknown"]);
-  });
-
-  it("returns the input order when every distance is null (no project location — AC-21)", () => {
-    const noSite = [bid({ id: "a" }), bid({ id: "b" }), bid({ id: "c" })];
-    expect(sortBids(noSite, "nearest").map((b) => b.id)).toEqual(["a", "b", "c"]);
-  });
-
-  it("is stable on ties and does not mutate the caller's array", () => {
-    const tied = [bid({ id: "a", price: 100 }), bid({ id: "b", price: 100 }), bid({ id: "c", price: 90 })];
-    expect(sortBids(tied, "price").map((b) => b.id)).toEqual(["c", "a", "b"]);
-    expect(tied.map((b) => b.id)).toEqual(["a", "b", "c"]);
-  });
-});
-
 describe("unitIndicators — two independent signals (AC-55→58)", () => {
   it("shows BOTH for a single-unit bid — neither is conditional on being multi-unit (AC-56)", () => {
     expect(unitIndicators(located("unit_yard"), readiness("green"))).toEqual({ readinessBand: "green", availability: "confirmed" });
@@ -318,54 +240,6 @@ describe("decollide — screen-space fan-out (§6.2)", () => {
     expect(decollide([{ id: "a", lat: 1, lng: 2 }], project)).toEqual([
       { point: { id: "a", lat: 1, lng: 2 }, x: 2, y: 1, anchorX: 2, anchorY: 1, displaced: false },
     ]);
-  });
-});
-
-describe("colourKeyModel — exactly one scale (AC-129/130/167/168)", () => {
-  it("exposes ONE scale, whose subject is a machine", () => {
-    const key = colourKeyModel();
-    expect(key.scales).toHaveLength(1);
-    expect(key.scales[0].subject).toBe("machine");
-  });
-
-  it("teaches green = confirmed and red = not confirmed, and nothing else", () => {
-    const [scale] = colourKeyModel().scales;
-    expect(scale.entries).toEqual([
-      { availability: "confirmed", meaning: "confirmed", colour: AVAILABILITY_COLOUR.confirmed },
-      { availability: "unconfirmed", meaning: "not_confirmed", colour: AVAILABILITY_COLOUR.unconfirmed },
-    ]);
-  });
-
-  it("maps no meaning to two colours and no colour to two meanings — never red then amber", () => {
-    const entries = colourKeyModel().scales.flatMap((s) => s.entries);
-    const byMeaning = new Map<string, Set<string>>();
-    const byColour = new Map<string, Set<string>>();
-    for (const e of entries) {
-      (byMeaning.get(e.meaning) ?? byMeaning.set(e.meaning, new Set()).get(e.meaning)!).add(e.colour);
-      (byColour.get(e.colour) ?? byColour.set(e.colour, new Set()).get(e.colour)!).add(e.meaning);
-    }
-    for (const colours of byMeaning.values()) expect(colours.size).toBe(1);
-    for (const meanings of byColour.values()) expect(meanings.size).toBe(1);
-  });
-
-  it("carries no amber and no supplier-level aggregate", () => {
-    const entries = colourKeyModel().scales.flatMap((s) => s.entries);
-    expect(entries).toHaveLength(2);
-    // The PROTOTYPE's pair, not §6.3.1's `#12904A`/`#C62A2A` (design.md §7 decision 1, 2026-08-06):
-    // AC-168 requires all four surfaces to be the same red, so exactly one pair can exist, and this is
-    // the one the pin, the machine chip and the composition bar already draw.
-    expect(entries.map((e) => e.colour.toLowerCase())).toEqual(["#16a34a", "#d9362a"]);
-  });
-
-  it("colours a pin and its panel chip from the same table, so the four surfaces cannot diverge (AC-168)", () => {
-    const unconfirmed = located("listing_yard");
-    const colourFor = (u: OfferedUnitDetail) => {
-      const a = unitAvailability(u);
-      return a === "absent" ? null : AVAILABILITY_COLOUR[a];
-    };
-    expect(colourFor(unconfirmed)).toBe(AVAILABILITY_COLOUR.unconfirmed);
-    expect(colourFor(located("unit_yard"))).toBe(AVAILABILITY_COLOUR.confirmed);
-    expect(colourFor(unit({ locationSource: "unidentified" }))).toBeNull();
   });
 });
 

@@ -24,8 +24,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { BidListPanel, type MapBid } from "@/components/map/BidListPanel";
 import type { MachinePin } from "@/components/map/MapCanvas";
+import type { BidCard } from "@/lib/contract/bids";
 import { fetchBidFleet } from "@/lib/api/client";
 import { isPlottable, unitAvailability, unitCountLabel, unitCounts } from "@/lib/contract/bid-map";
 import { computeUnitReadiness, readinessInputsFor } from "@/lib/contract/bid-readiness";
@@ -38,21 +38,22 @@ import "@/components/map/map-proto.css";
 // `MapLocationPicker`/`GoogleMapLocationPicker` need in this repo.
 const MapCanvas = dynamic(() => import("@/components/map/MapCanvas"), { ssr: false });
 
+/** A bid this surface can resolve. v3 scopes the view to exactly ONE of these (spec 004 §4). */
+export type MapBid = BidCard & { itemLabel?: string; itemLabelAr?: string };
+
 export interface BidMapWorkspaceProps {
   /** Bids for the active item scope, already filtered by `GroupBids`. */
   bids: MapBid[];
   /** The active item's request record — the only source of the project pin. Null while it loads, or
    *  when the request has no project location at all (AC-21). */
   request: RequestRecord | null;
-  /** Map state lives in `GroupBids` (§6.6 "Store — none"), so selection is lifted, not local. */
+  /** The bid this surface resolves. v3 scopes the view to exactly one (spec 004 §4 assumption 2); it is
+   *  lifted rather than local so an entry point can address the surface by `bidId` (V1). */
   selectedBidId: string | null;
-  onSelectBid: (bidId: string) => void;
-  freshBidIds: ReadonlySet<string>;
-  onRefresh: () => void;
+  /** Drives the fleet cache invalidation on the falling edge — see the effect below. */
   refreshing: boolean;
-  /** T16 exposes the machine selection upward for the rail (T33) and the machine panel (T18), which do
-   *  not exist yet. Kept a callback rather than a lifted prop so nothing above has to hold state it
-   *  cannot yet use — the next tranche promotes it. */
+  /** T16 exposes the machine selection upward for the machine panel (V7), which does not exist yet.
+   *  Kept a callback rather than a lifted prop so nothing above has to hold state it cannot yet use. */
   onSelectMachine?: (equipmentId: string | null) => void;
 }
 
@@ -60,18 +61,12 @@ export function BidMapWorkspace({
   bids,
   request,
   selectedBidId,
-  onSelectBid,
-  freshBidIds,
-  onRefresh,
   refreshing,
   onSelectMachine,
 }: BidMapWorkspaceProps) {
   const t = useT();
   const { locale } = useLocale();
   const ar = locale === "ar";
-  // Hovering a row highlights that supplier's pins (prototype `hoverSup`). Surfaced on the canvas as a
-  // data attribute; the pin-level highlight itself is not part of this tranche.
-  const [hoveredBidId, setHoveredBidId] = useState<string | null>(null);
   /** bidId → its supplier's qualifying fleet. Keyed by BID for the reason in the file header. */
   const [fleetByBid, setFleetByBid] = useState<Record<string, FleetMachine[]>>({});
   const [loadingBidId, setLoadingBidId] = useState<string | null>(null);
@@ -224,7 +219,7 @@ export function BidMapWorkspace({
     // No `dir` here: the shell's direction is the locale's, and every offset in `map-proto.css` is a
     // logical property, so the panel lands on the inline-end edge in both (AC-30, AC-98).
     <div className="bidmap">
-      <div className="bm-canvas" data-hovered-bid={hoveredBidId ?? ""}>
+      <div className="bm-canvas">
         <MapCanvas
           site={site}
           addressLabel={request?.projectAddressLabel ?? null}
@@ -252,24 +247,16 @@ export function BidMapWorkspace({
           </div>
         )}
 
-        {bids.length === 0 ? (
-          // Zero bids → the site pin alone, an empty state, and no bid list (AC-29, AC-99).
+        {bids.length === 0 && (
+          // Zero bids → the site pin alone with an empty state (RM3-AC-26).
           <div className="bm-empty">
             <div className="bm-empty-t">{t.bidMap.noBids}</div>
             <div className="bm-empty-s">{t.bidMap.freshnessNote}</div>
           </div>
-        ) : (
-          <BidListPanel
-            bids={bids}
-            selectedBidId={selectedBidId}
-            onSelectBid={onSelectBid}
-            onHoverBid={setHoveredBidId}
-            freshBidIds={freshBidIds}
-            hasSite={site != null}
-            onRefresh={onRefresh}
-            refreshing={refreshing}
-          />
         )}
+        {/* The panel slot. v2's offers list (`BidListPanel`) was deleted with the rescope to v3 — this
+            surface is scoped to ONE bid, so there is nothing to list. V2–V9 build the verification panel
+            here: header, counts, shortfall alert, equipment list, detail and documents. */}
       </div>
     </div>
   );

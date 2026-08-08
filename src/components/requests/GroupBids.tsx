@@ -100,14 +100,15 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   // Map state (view mode, the selected bid) is LOCAL to this component by design (spec §6.6 "Store —
   // none"), and every fetch on this screen is owned here — the map workspace never fetches (A4).
   const [view, setView] = useState<"list" | "map">("list");
-  const [mapBidId, setMapBidId] = useState<string | null>(null); // selection is row state; it creates NO deal room (D-A)
-  const [freshIds, setFreshIds] = useState<Set<string>>(new Set()); // arrived since the last fetch (AC-171)
+  // The bid the verification surface resolves. v3 scopes that surface to ONE bid, and V1 makes it
+  // addressable by `bidId`, so this is a temporary in-page entry until the route lands. Selecting
+  // creates NO deal room (a `DealRoom` row would freeze the supplier's offered count).
+  const [mapBidId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [reqDetail, setReqDetail] = useState<RequestRecord | null>(null); // the active item's request — the project pin's only source
   const bidsRef = useRef<GroupBid[] | null>(null); // current list, for the arrival diff without re-running the fetch
   const lastFetchRef = useRef(0);
   const refreshingRef = useRef(false);
-  const freshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [supplierKey, setSupplierKey] = useState<string>("all");
   const [selectedItem, setSelectedItem] = useState<string>(initialItemId ?? "all"); // scope bids to one request item
   const [itemMenuOpen, setItemMenuOpen] = useState(false);
@@ -223,10 +224,8 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
      A 15s staleness window keeps a burst of focus events (alt-tab, devtools, a modal closing) from
      firing a fan-out of one request per item; the manual button forces past it. */
   const STALE_MS = 15_000;
-  const FRESH_MS = 9_000; // how long a newly arrived row keeps its «وصل الآن» marker
 
   useEffect(() => { bidsRef.current = bids; }, [bids]);
-  useEffect(() => () => { if (freshTimerRef.current) clearTimeout(freshTimerRef.current); }, []);
 
   const refreshBids = useCallback(
     async (force: boolean) => {
@@ -242,11 +241,10 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         // Replace the list wholesale: the sort is applied to the NEW array on render, so an arriving
         // bid lands in price order instead of appending to the bottom of a cheapest-first list (AC-170).
         setBids(next);
-        if (arrived.length && bidsRef.current) {
-          setFreshIds(new Set(arrived));
-          if (freshTimerRef.current) clearTimeout(freshTimerRef.current);
-          freshTimerRef.current = setTimeout(() => setFreshIds(new Set()), FRESH_MS);
-        }
+        // The «وصل الآن» marker belonged to v2's offers list, which the v3 rescope deleted — this
+        // surface shows one bid, so there is no list for an arrival to appear in. The detection is
+        // kept (it costs nothing and V-tickets may want it) but nothing consumes it today.
+        void arrived;
       } catch {
         // Keep what we have — a failed refresh must never empty a list the renter is reading.
       } finally {
@@ -880,9 +878,6 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           bids={shown}
           request={reqDetail}
           selectedBidId={mapBidId}
-          onSelectBid={setMapBidId}
-          freshBidIds={freshIds}
-          onRefresh={() => { void refreshBids(true); }}
           refreshing={refreshing}
         />
       )}
