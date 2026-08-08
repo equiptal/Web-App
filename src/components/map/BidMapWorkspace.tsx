@@ -51,7 +51,12 @@ import {
 } from "@/lib/contract/bid-map";
 import { landingSelectionId, offeredMachines } from "@/lib/contract/equipment-list";
 import type { FleetMachine } from "@/lib/contract/fleet";
-import { composeMachineRequest, composeShortfallRequest, type RenteeRequestDraft } from "@/lib/contract/rentee-request";
+import {
+  composeDocumentRequest,
+  composeMachineRequest,
+  composeShortfallRequest,
+  type RenteeRequestDraft,
+} from "@/lib/contract/rentee-request";
 import { publicTaxonomyUrl, type RequestRecord } from "@/lib/contract/requests";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import "@/components/map/map-proto.css";
@@ -313,7 +318,10 @@ export function BidMapWorkspace({
    *  only then tell a listener it happened. One seam means one place that can create a room and one
    *  place that reports a failure — `sender.error` below is the whole of that reporting. */
   const sendDraft = useCallback(
-    (draft: RenteeRequestDraft) => {
+    (draft: RenteeRequestDraft | null) => {
+      // Null is an ask the backend would refuse — an availability ask naming no machine. The composer
+      // is the one authority on that, so nothing is sent and no error is invented.
+      if (!draft) return;
       void sender.send(draft).then((ok) => {
         if (ok) onRequestSent?.(draft, sender.lastRef);
       });
@@ -321,15 +329,18 @@ export function BidMapWorkspace({
     [sender, onRequestSent],
   );
 
-  /* ── the four asks, as ONE handler ──────────────────────────────────────────────────────────────
-     V7/V8/V9 describe an ask in their own vocabulary (`PanelRequestDraft`); the wire wants
+  /* ── the asks, as ONE handler ───────────────────────────────────────────────────────────────────
+     V7/V8 describe an ask in their own vocabulary (`PanelRequestDraft`); the wire wants
      `RenteeRequestDraft`, where the scope is derived from the id rather than passed beside it. One
-     translation, here, so no component can compose a scope/id pair the backend refuses. */
+     translation, here, so no component can compose a scope/id pair the backend refuses.
+
+     V9's company panel no longer arrives here at all: a document request names a machine, so the
+     firm's papers are read and opened rather than asked for (product owner, 2026-08-08). */
   const sendPanelRequest = useCallback(
     (draft: PanelRequestDraft) => {
       sendDraft(
         draft.kind === "document"
-          ? composeMachineRequest("document", draft.equipmentId, draft.docTypes)
+          ? composeDocumentRequest(draft.equipmentId, draft.docTypes)
           : composeMachineRequest(draft.kind, draft.equipmentId),
       );
     },
@@ -610,7 +621,6 @@ export function BidMapWorkspace({
             ar={ar}
             L={L}
             onBack={() => setCompanyOpen(false)}
-            onRequest={sendPanelRequest}
           />
         )}
       </aside>

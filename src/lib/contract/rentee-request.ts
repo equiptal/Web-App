@@ -23,6 +23,9 @@ export type RenteeRequestKind = "availability" | "document" | "alternative";
  * `equipment` names one machine and REQUIRES an `equipmentId`; `company` carries none and requires the
  * id to be null. The backend validates the pair against itself, so the two halves are represented here
  * as one composed value rather than two free fields a caller could mismatch.
+ *
+ * **`company` now survives for exactly one ask — the shortfall's `alternative`** (product owner,
+ * 2026-08-08). See {@link RenteeRequestDraft}.
  */
 export type RenteeRequestScope = "equipment" | "company";
 
@@ -33,16 +36,43 @@ export type RenteeRequestScope = "equipment" | "company";
  */
 export const RETIRED_REQUEST_KINDS: readonly string[] = ["add_to_offer"];
 
-/** The body of `POST /marketplace/deal-rooms/{dealRoomId}/requests`. `ref` and `serial` are minted and
- *  stamped server-side and are deliberately absent — a client-supplied one could name a different
- *  machine than the id, or thread onto another conversation's question (§7.3). */
-export interface RenteeRequestDraft {
-  scope: RenteeRequestScope;
-  equipmentId: string | null;
-  kind: RenteeRequestKind;
-  /** Document requests only — ONE card carries MANY types (§6.6), never one card per type. */
-  docTypes?: string[];
-}
+/**
+ * The body of `POST /marketplace/deal-rooms/{dealRoomId}/requests`. `ref` and `serial` are minted and
+ * stamped server-side and are deliberately absent — a client-supplied one could name a different
+ * machine than the id, or thread onto another conversation's question (§7.3).
+ *
+ * ── **A document request NAMES A MACHINE** (product owner, 2026-08-08) ─────────────────────────────
+ *
+ * A union rather than four independent fields, because the one combination this reversal withdraws —
+ * `kind: "document"` with a null `equipmentId` — must be a **type error**, not a runtime guard. A
+ * guard is a thing a future caller routes around; an unrepresentable state is not.
+ *
+ * The company panel briefly composed exactly that combination: the renter could ask the firm for its
+ * CR. That is withdrawn. A company paper is now **read, never requested** — the panel still lists,
+ * opens and downloads all five (AC-69), and only the *ask* is gone.
+ *
+ * **`scope: "company"` therefore survives for `alternative` and nothing else.** The shortfall ask
+ * («اطلب إضافتها») names no machine because there is no machine to name — a claimed unit is a count
+ * with nothing registered behind it, so the ask is *for* a machine rather than *about* one. It is core
+ * to §6.3 and is deliberately left representable.
+ */
+export type RenteeRequestDraft =
+  | {
+      scope: "equipment";
+      equipmentId: string;
+      kind: "document";
+      /** ONE card carries MANY types (§6.6), never one card per type. Never empty. */
+      docTypes: string[];
+    }
+  | {
+      scope: "equipment";
+      equipmentId: string;
+      kind: "availability" | "alternative";
+      /** `docTypes` on a non-document kind is refused outright by the backend. */
+      docTypes?: never;
+    }
+  /** The shortfall ask, and ONLY the shortfall ask. */
+  | { scope: "company"; equipmentId: null; kind: "alternative"; docTypes?: never };
 
 /**
  * The shortfall alert's action (§6.3, RM3-AC-07): *"ask him to add them"*.
@@ -57,31 +87,38 @@ export function composeShortfallRequest(): RenteeRequestDraft {
 }
 
 /**
- * The other three asks (§6.7, RM3-AC-17): «اطلب تأكيد التوفّر» from the card and the detail,
- * «اطلب معدّة أخرى» from inside a detail, and «اطلب مستنداً» as ONE batch card over the ticked rows.
+ * The two asks that are *about* a machine (§6.7, RM3-AC-17): «اطلب تأكيد التوفّر» from the card and
+ * the detail, and «اطلب معدّة أخرى» from inside a detail.
  *
  * **The scope is derived from the id, never passed alongside it.** The backend validates the pair
  * against itself — `equipment` requires an `equipmentId`, `company` requires it to be null — so
- * representing them as two free fields is representing a state the server refuses. A named machine is
- * an `equipment` ask; no machine is a `company` one.
+ * representing them as two free fields is representing a state the server refuses.
+ *
+ * `document` is **not** a kind this function accepts, and that is the point: a document ask names a
+ * machine, so it has its own composer whose id parameter is non-nullable. Null here for an
+ * `availability` ask that names nothing — the backend refuses it, and a caller disables its control
+ * from the same value it would have sent.
  *
  * Every ask carries the machine **as data**, not only in prose (AC-17). `ref` and `serial` stay absent:
  * both are minted and stamped server-side, and a client-supplied one could name a different machine
  * than the id.
  */
 export function composeMachineRequest(
-  kind: RenteeRequestKind,
+  kind: "availability" | "alternative",
   equipmentId: string | null,
-  docTypes?: string[],
-): RenteeRequestDraft {
-  const id = (equipmentId ?? "").trim() || null;
-  const draft: RenteeRequestDraft = { scope: id ? "equipment" : "company", equipmentId: id, kind };
-  if (kind === "document") {
-    // De-duped and emptied of blanks here rather than at the call site: the batch is assembled from
-    // row labels, and two rows can name the same wire type.
-    draft.docTypes = [...new Set((docTypes ?? []).map((s) => s.trim()).filter((s) => s !== ""))];
-  }
-  return draft;
+): RenteeRequestDraft | null {
+  return composeRenteeRequest({ kind, equipmentId });
+}
+
+/**
+ * «اطلب مستنداً» as ONE batch card over the ticked rows (§6.6).
+ *
+ * **`equipmentId` is `string`, not `string | null`** — that signature IS the rule the product owner set
+ * on 2026-08-08: a document request names a machine. There is no company arm to fall back to, so a
+ * caller with no machine in hand cannot compile rather than composing an ask nobody can answer.
+ */
+export function composeDocumentRequest(equipmentId: string, docTypes: string[]): RenteeRequestDraft | null {
+  return composeRenteeRequest({ kind: "document", equipmentId, docTypes });
 }
 
 /** True when a kind may still be sent. The retired list is checked FIRST on the backend, so a caller
@@ -96,17 +133,20 @@ export function isSendableKind(kind: string): kind is RenteeRequestKind {
 /**
  * An ask as a SURFACE describes it, before it is a payload.
  *
- * Structurally satisfied by `PanelRequestDraft` (the machine detail, the document tabs and the
- * company panel all hand one up), and by the shortfall alert's own composition — so the four
- * surfaces of §6.7 share one composer and the backend's scope/id/docTypes coherence rules are
- * enforced in exactly one place. Kept structural rather than importing the panel's type: a contract
- * module must not depend on a component directory.
+ * Structurally satisfied by `PanelRequestDraft` (the machine detail and the equipment document tab
+ * hand one up), and by the shortfall alert's own composition — so the asks of §6.7 share one composer
+ * and the backend's scope/id/docTypes coherence rules are enforced in exactly one place. Kept
+ * structural rather than importing the panel's type: a contract module must not depend on a component
+ * directory.
+ *
+ * **There is no `scope` field, and there must not be one.** Scope follows from whether a machine is
+ * named: an id means `equipment`, no id means the shortfall's `company`. A surface that could pass
+ * `scope: "company"` beside a `document` kind is exactly the composer path the 2026-08-08 reversal
+ * withdrew.
  */
 export interface RenteeAsk {
   kind: string;
   equipmentId?: string | null;
-  /** Only the document ask distinguishes them; the others follow from whether an id is named. */
-  scope?: RenteeRequestScope;
   docTypes?: string[];
 }
 
@@ -127,16 +167,15 @@ export interface RenteeAsk {
  * wrong paper would have the supplier upload the wrong paper.
  *
  * **`local_content` and `saso` need no alias and never did** — both are already lower-snake, so they
- * survive normalisation verbatim. What they lacked was a catalogue ROW; both were added 2026-08-08 as
- * `segment: 'company'`, which is what turned them from flat 400s into sendable asks. See the note on
- * {@link companyDocAskSatisfied} for the other half — a key that validates but cannot be answered is
- * worse than the 400 was.
+ * survive normalisation verbatim. They are also no longer *askable*: since 2026-08-08 a document
+ * request names a machine, and both are company papers the panel merely displays. They stay in this
+ * note because a listing can still carry a `saso`-stemmed type of its own — see the warning below.
  *
  * ⚠️ **No alias is added for any SASO spelling, and that is the point.** `saso` (the firm's
  * registration), `saso_registration` and `saso_inspection` (a machine's papers) and the bare `saso` a
  * listing can carry for its safety cert are FOUR different things sharing a stem. Folding any of them
  * together would have the supplier upload the wrong paper — so each is left exactly as written, and
- * the scope of the ask decides which resolver reads it.
+ * only the machine's own `documentKeys` ever answer an ask.
  */
 const DOC_TYPE_ALIASES: Record<string, string> = {
   // The four photo slots §6.6 shows, as the wire stores them.
@@ -181,33 +220,42 @@ export function canonicalDocType(docType: string): string {
 export function composeRenteeRequest(ask: RenteeAsk): RenteeRequestDraft | null {
   if (!isSendableKind(ask.kind)) return null;
   const kind = ask.kind;
-  const equipmentId = ask.equipmentId ?? null;
-  // The backend pairs the two halves against each other and refuses a mismatch, so the pair is
-  // composed here rather than accepted from a caller that could name one without the other.
-  const scope: RenteeRequestScope = ask.scope ?? (equipmentId ? "equipment" : "company");
-  if (scope === "equipment" && !equipmentId) return null;
+  // Blanks collapse to "no machine named": a surface handing up `"   "` means the same thing as one
+  // handing up null, and the backend would refuse both.
+  const equipmentId = (ask.equipmentId ?? "").trim() || null;
+
   if (kind === "document") {
+    // **A document ask names a machine** (product owner, 2026-08-08). The company arm is withdrawn:
+    // a company paper is read from the panel, never requested. Refused here as well as being
+    // unrepresentable in `RenteeRequestDraft`, because this function's input is untyped prose from a
+    // surface — the BFF route parses a JSON body through it.
+    if (!equipmentId) return null;
     const docTypes = [
       ...new Set((ask.docTypes ?? []).map(canonicalDocType).filter((t) => t !== "")),
     ];
     // "A document ask naming NOTHING is a question about nothing" — the service's own words. The
     // renter's status line could never resolve it, so the ask would hang open forever.
     if (docTypes.length === 0) return null;
-    return { scope, equipmentId: scope === "company" ? null : equipmentId, kind, docTypes };
+    return { scope: "equipment", equipmentId, kind, docTypes };
   }
+
+  // The one surviving company-scope ask: the shortfall's «اطلب إضافتها», which asks FOR a machine and
+  // so has none to name (§6.3, RM3-AC-07).
+  if (!equipmentId) return kind === "alternative" ? { scope: "company", equipmentId: null, kind } : null;
+
   // `docTypes` on a non-document kind is refused outright, so it is dropped rather than carried.
-  return { scope, equipmentId: scope === "company" ? null : equipmentId, kind };
+  return { scope: "equipment", equipmentId, kind };
 }
 
 /** The availability ask — «اطلب تأكيد التوفّر», raised from the card (V5) and the detail (V7). */
 export function composeAvailabilityRequest(equipmentId: string): RenteeRequestDraft | null {
-  return composeRenteeRequest({ kind: "availability", equipmentId, scope: "equipment" });
+  return composeRenteeRequest({ kind: "availability", equipmentId });
 }
 
 /** «اطلب معدّة أخرى» about ONE machine — raised inside a detail. The shortfall's own version names no
  *  machine and has its own composer above. */
 export function composeAlternativeRequest(equipmentId: string | null): RenteeRequestDraft | null {
-  return composeRenteeRequest({ kind: "alternative", equipmentId, scope: equipmentId ? "equipment" : "company" });
+  return composeRenteeRequest({ kind: "alternative", equipmentId });
 }
 
 /* ─────────────────────────── V11 · the card, and reading it back ─────────────────────────── */
@@ -298,41 +346,20 @@ export interface RequestTargetMachine {
   photoKeys?: { slot: string }[];
 }
 
-/**
- * The FIRM, as a company-scope request's state is derived from it.
+/*
+ * ── `RequestTargetCompany` is GONE, and the reason belongs here ──────────────────────────────────
  *
- * A company paper belongs to the firm, not to a machine, so a `document` ask raised from the company
- * panel carries `equipmentId: null` and there is no machine to read it off. Without this it could only
- * ever be answered by the supplier posting a reply card — and he does not, because he acts from his own
- * profile rather than from the conversation.
+ * It described the FIRM as a company-scope document request's state was derived from it: the
+ * catalogue papers on `supplier_profiles.*_doc_key`, plus the `held_cert_docs.LC` / `.SASO` dual-read
+ * with its legacy columns. It existed because a company paper belongs to the firm and there is no
+ * machine to read it off.
  *
- * Structurally satisfied by a `BidCard` (`companyCertCodes` + `compliance`) and by
- * `CompanyDocsPayload` from `company-documents.ts` — deliberately, so the derivation reads the same
- * rows the panel renders.
+ * The product owner withdrew the company-scope document request on 2026-08-08. With no such request
+ * there is nothing to derive, so the type, `companyDocAskSatisfied` and the `company` arm of
+ * `renteeRequestState` are deleted rather than left as an unreachable branch. Company papers are still
+ * listed, opened and downloaded by the panel (V15 / AC-69) — that read is `company-documents.ts`'s and
+ * is untouched. Only the ask is gone.
  */
-export interface RequestTargetCompany {
-  /** Company papers on file, by CATALOGUE key (`cr` · `vat_cert` · `national_address`). Canonicalised
-   *  on the way in, so the panel's `vat` and the catalogue's `vat_cert` land on one string. */
-  docKeys?: string[] | null;
-  /**
-   * Company-level cert codes as `mapBid` resolves them (`LC`, `SASO`, …). `mapBid` already performs the
-   * dual-read described below, so a caller holding a mapped bid can pass this and nothing else.
-   */
-  certCodes?: string[] | null;
-  /**
-   * `supplier_profiles.held_cert_docs` — the canonical `{LC: …, SASO: …}` map, for a caller reading a
-   * raw profile projection rather than a mapped bid.
-   */
-  heldCertDocs?: Record<string, unknown> | null;
-  /**
-   * Legacy `supplier_profiles.local_content_doc_key`. **Still populated, and still dual-read by the
-   * backend's `resolveHeldCerts`** — dropping it here would read a paper the supplier has filed as
-   * missing, for every firm not yet re-migrated.
-   */
-  localContentDocKey?: string | null;
-  /** Legacy `supplier_profiles.saso_heavy_equip_doc_key` — the SASO half of the same dual-read. */
-  sasoHeavyEquipDocKey?: string | null;
-}
 
 /**
  * What a card reads as, right now.
@@ -369,58 +396,6 @@ export function documentAskSatisfied(machine: RequestTargetMachine, docTypes: st
   return wanted.every((t) => held.has(t));
 }
 
-/**
- * Every requested COMPANY paper present on the firm's file.
- *
- * The company half of {@link documentAskSatisfied}, and the reason it exists separately: the four
- * company papers are not one storage system but **two**.
- *
- * - `cr` · `vat_cert` · `national_address` are catalogue documents — their files sit on
- *   `supplier_profiles.*_doc_key` and they arrive here as `docKeys`.
- * - **`local_content` and `saso` are held certs.** Their files live in
- *   `supplier_profiles.held_cert_docs.LC` / `.SASO`, with the legacy `local_content_doc_key` /
- *   `saso_heavy_equip_doc_key` columns still populated alongside. Nothing ever writes a
- *   `DocumentInstance` for either, so an ask resolved against `docKeys` alone would hang open
- *   **forever** — the exact failure `assertKnownDocTypes` refuses unknown types to prevent, arriving
- *   through the back door the moment the catalogue rows were added.
- *
- * Every source is read, mirroring the backend's `resolveHeldCerts` dual-read rather than dropping the
- * legacy half: a caller may hand over a mapped bid's `certCodes` (where `mapBid` already did the
- * dual-read), the raw `heldCertDocs` map, or a legacy column alone.
- *
- * ⚠️ **`saso` here is the FIRM's registration, and this function is the ONLY thing that says so.** A
- * listing's `documentKeys[].type` can carry a bare `saso` meaning the machine's safety cert
- * (`EQUIPMENT_CERT_TYPES`), and the retired `saso_registration` term already conflated the two once.
- * They are separated by SCOPE and by nothing else: an equipment ask routes to
- * {@link documentAskSatisfied} and reads a machine's list; a company ask routes here and reads a
- * firm's certs. **No alias folds either onto the other** — `canonicalDocType` leaves every SASO
- * spelling exactly as it found it, so an alias can never make the wrong paper look like an answer.
- */
-export function companyDocAskSatisfied(company: RequestTargetCompany, docTypes: string[]): boolean {
-  const held = new Set((company.docKeys ?? []).map((k) => canonicalDocType(String(k))));
-  if (heldCertOnFile(company, "LC")) held.add("local_content");
-  if (heldCertOnFile(company, "SASO")) held.add("saso");
-  const wanted = docTypes.map(canonicalDocType).filter((t) => t !== "");
-  if (wanted.length === 0) return false;
-  // Answered as a WHOLE, exactly like the machine half: one card carries many types.
-  return wanted.every((t) => held.has(t));
-}
-
-/** The held-cert dual-read, in one place. Case-insensitive on the map key for the same reason
- *  `resolveHeldCerts` uppercases before testing membership — the map has more than one writer, and a
- *  lowercase `lc` must not read as "no certificate". */
-function heldCertOnFile(company: RequestTargetCompany, cert: "LC" | "SASO"): boolean {
-  if ((company.certCodes ?? []).some((c) => String(c).trim().toUpperCase() === cert)) return true;
-  const map = company.heldCertDocs;
-  if (map && typeof map === "object" && !Array.isArray(map)) {
-    for (const [k, v] of Object.entries(map)) {
-      if (k.trim().toUpperCase() === cert && v) return true;
-    }
-  }
-  const legacy = cert === "LC" ? company.localContentDocKey : company.sasoHeavyEquipDocKey;
-  return typeof legacy === "string" && legacy.trim() !== "";
-}
-
 /** A raw `photoKeys[].slot` → the catalogue's photo key, or null when it is none of the four.
  *  Folded on synonyms rather than enumerated: the wire stores `serial` / `equipment` /
  *  `operating_hours`, and a differently-spelled projection of the same shot must still count. */
@@ -439,8 +414,7 @@ function photoDocKey(slot: string): string | null {
  * | kind | how it is answered |
  * |---|---|
  * | `availability` | that unit's `locationSource` becomes `unit_yard` — the supplier named the yard it leaves from |
- * | `document` (a machine) | every requested type appears in `documentKeys` |
- * | `document` (the firm) | every requested paper is on the COMPANY's file — see {@link companyDocAskSatisfied} |
+ * | `document` | every requested type appears in that MACHINE's `documentKeys` — there is no other kind of document ask (2026-08-08) |
  * | `alternative` | **not derivable.** Swapping a machine leaves nothing observable that says "a different one instead", which is the whole reason the reply card exists (004a §3.2) |
  *
  * **Derived state wins where both exist** (§7.13.4 / RM3-AC-58): the reply is a *record* of what was
@@ -451,15 +425,14 @@ function photoDocKey(slot: string): string | null {
  * The reply is still consulted for the two things the machine cannot say: a refusal, and an
  * `alternative`'s outcome.
  *
- * `company` is optional and OMITTING IT CHANGES NOTHING: a company-scope ask then falls back to the
- * reply alone, exactly as it did before there was a company read to derive from. A caller with the
- * firm's papers in hand passes them and the loop closes without the supplier ever posting a reply.
+ * **There is no company arm.** A card naming no machine is the shortfall's `alternative` — or, on a
+ * card posted in the hours before 2026-08-08, a withdrawn company document ask. Neither is derivable,
+ * so both fall back to the reply.
  */
 export function renteeRequestState(
   card: Pick<RenteeRequestCardPayload, "kind" | "equipmentId" | "docTypes">,
   machine: RequestTargetMachine | null,
   reply: Pick<RenteeRequestReplyPayload, "resolution"> | null,
-  company?: RequestTargetCompany | null,
 ): RenteeRequestState {
   const fromReply = (): RenteeRequestState => {
     if (!reply) return "waiting";
@@ -481,14 +454,10 @@ export function renteeRequestState(
   // can speak for it.
   if (card.kind === "alternative") return fromReply();
 
-  // A COMPANY-scope ask names no machine, because a company paper belongs to the firm. It is still
-  // derivable — from the firm's file rather than a machine's — provided the caller holds it. Without
-  // the firm's papers there is nothing to read, so it falls back to the reply exactly as before.
-  if (!card.equipmentId) {
-    if (card.kind !== "document" || !company) return fromReply();
-    const docTypes = card.docTypes ?? [];
-    return derivable(docTypes.length > 0 && companyDocAskSatisfied(company, docTypes));
-  }
+  // No machine named. Since 2026-08-08 nothing composable lands here except the shortfall's
+  // `alternative` (already returned above); a document card with a null id can only be one of the
+  // withdrawn company asks posted before the reversal, and there is nothing to derive it from.
+  if (!card.equipmentId) return fromReply();
 
   // The machine is not in the fleet response — sold, unlisted, or simply not fetched yet. Saying
   // "waiting" would claim the supplier owes an answer we cannot check for.

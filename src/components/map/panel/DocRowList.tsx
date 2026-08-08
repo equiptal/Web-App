@@ -5,9 +5,15 @@
  *
  * §6.6: *"Both use the same grammar: select-all, a checkbox per row, a thumbnail with a status dot, a
  * name, a status line, and download."* Written once, because the moment the two lists are typed out
- * separately they start drifting — and the ONE thing that must differ between them (equipment rows are
- * presence-only, company rows carry verification and expiry) is exactly the thing a shared component
- * makes visible: it is the `statusLine` and the `dot` the caller passes, and nothing else.
+ * separately they start drifting — and the things that must differ between them are exactly the things
+ * a shared component makes visible: the `statusLine` and the `dot` a caller passes, and whether it
+ * passes selection at all.
+ *
+ * **Selection is now OPTIONAL, and that is the 2026-08-08 reversal in one prop.** A document request
+ * names a machine, so only the equipment tab may raise one; the company panel omits `selected` /
+ * `onToggle` / `onToggleAll` and its rows render with no tick and no select-all bar. §6.6's "both use
+ * the same grammar" was true of the batch ask and is no longer — the shared grammar is now the ROW
+ * (dot, name, status line, view, download), which is all a read-only list needs.
  *
  * **Every row this component draws is openable** (004a §7, AC-69). All three document families on this
  * surface — the machine's papers, the machine's photos, and the firm's papers — arrive here, so the
@@ -69,15 +75,19 @@ export function DocRowList({
   /** Rows needing action — **never a total** (§6.1, AC-42). */
   attention: number;
   rows: DocRowView[];
-  selected: ReadonlySet<string>;
-  onToggle: (key: string) => void;
+  /** Ticked keys. **Omitted on a list that cannot be requested from** — the company panel — and then
+   *  no tick, no select-all bar, and nothing on the row but reading and opening it. */
+  selected?: ReadonlySet<string>;
+  onToggle?: (key: string) => void;
   /** Select-all / clear-all over THIS group's keys. */
-  onToggleAll: (keys: string[], select: boolean) => void;
+  onToggleAll?: (keys: string[], select: boolean) => void;
   L: (en: string, ar: string) => string;
 }) {
   const keys = rows.map((r) => r.key);
-  const allOn = keys.length > 0 && keys.every((k) => selected.has(k));
-  const pickedHere = keys.filter((k) => selected.has(k)).length;
+  // All three arrive together or not at all: a tick with no handler is a control that silently fails.
+  const selectable = !!selected && !!onToggle && !!onToggleAll;
+  const allOn = selectable && keys.length > 0 && keys.every((k) => selected!.has(k));
+  const pickedHere = selectable ? keys.filter((k) => selected!.has(k)).length : 0;
 
   return (
     <div className="mp-grp">
@@ -90,26 +100,35 @@ export function DocRowList({
         </span>
       </div>
 
-      <div className="mp-selbar">
-        <button type="button" className="mp-linkbtn" onClick={() => onToggleAll(keys, !allOn)} disabled={keys.length === 0}>
-          {allOn ? L("Clear all", "إلغاء التحديد") : L("Select all", "تحديد الكل")}
-        </button>
-        {pickedHere > 0 && <span>{L(`${pickedHere} selected`, `${arDigits(pickedHere)} محدَّد`)}</span>}
-      </div>
+      {selectable && (
+        <div className="mp-selbar">
+          <button
+            type="button"
+            className="mp-linkbtn"
+            onClick={() => onToggleAll!(keys, !allOn)}
+            disabled={keys.length === 0}
+          >
+            {allOn ? L("Clear all", "إلغاء التحديد") : L("Select all", "تحديد الكل")}
+          </button>
+          {pickedHere > 0 && <span>{L(`${pickedHere} selected`, `${arDigits(pickedHere)} محدَّد`)}</span>}
+        </div>
+      )}
 
       {rows.map((r) => {
-        const picked = selected.has(r.key);
+        const picked = selectable && selected!.has(r.key);
         return (
           <div key={r.key} className={`mp-row${picked ? " picked" : ""}${r.dot === "missing" ? " missing" : ""}`}>
-            <button
-              type="button"
-              className={`mp-tick${picked ? " on" : ""}`}
-              aria-pressed={picked}
-              aria-label={L(`Select ${r.name}`, `تحديد ${r.name}`)}
-              onClick={() => onToggle(r.key)}
-            >
-              {picked ? "✓" : ""}
-            </button>
+            {selectable && (
+              <button
+                type="button"
+                className={`mp-tick${picked ? " on" : ""}`}
+                aria-pressed={picked}
+                aria-label={L(`Select ${r.name}`, `تحديد ${r.name}`)}
+                onClick={() => onToggle!(r.key)}
+              >
+                {picked ? "✓" : ""}
+              </button>
+            )}
 
             <span className="mp-thumb">
               {r.thumbUrl ? (

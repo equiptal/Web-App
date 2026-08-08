@@ -22,6 +22,11 @@
  * verification badge would invite the renter to judge a supplier on a state the platform sets. The
  * asymmetry with the company panel (V9), which *does* show verification and expiry, is deliberate.
  *
+ * **This is the ONLY document surface that can raise a request** (product owner, 2026-08-08): a
+ * document request names a machine, and the company panel's rows are read-and-open only. The
+ * checkboxes and the batch button below are untouched by that reversal — they were always about a
+ * machine.
+ *
  * **Presence only never meant unopenable** (004a §7.2, AC-69). It governs verification STATE. Both
  * groups here — the photos and the papers — carry the same **view / download** pair as the company
  * panel, view first, because a machine's papers are exactly what the renter came to look at. The
@@ -70,7 +75,7 @@ export function EquipmentDocuments({ machine, ar, L, onRequest }: EquipmentDocum
     });
 
   const allRows = useMemo(() => groups.flatMap((g) => g.rows), [groups]);
-  const draft = batchDocumentRequest("equipment", machine.equipmentId, allRows, selected);
+  const draft = batchDocumentRequest(machine.equipmentId, allRows, selected);
   const pickedCount = allRows.filter((r) => selected.has(r.key)).length;
 
   return (

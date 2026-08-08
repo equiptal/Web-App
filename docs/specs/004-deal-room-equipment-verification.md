@@ -95,13 +95,33 @@ else — the header states identity, not a profile.
 chip + back). It is a **document list**, not a profile page:
 
 - an **attention count** on the group heading — how many rows need something, never a total
-- **select-all**, plus a checkbox on every row: documents are handled in **batches**, because a renter
-  asking for papers asks for several at once
-- each row: thumbnail with a status dot · name · a status line · **download**
+- ~~**select-all**, plus a checkbox on every row: documents are handled in **batches**, because a renter
+  asking for papers asks for several at once~~ — **withdrawn 2026-08-08.** This list has no selection
+  and no send. A document request names a machine (AC-71), so there is nothing here to tick; the
+  batching argument survives, but only on the equipment tab where it applies (§6.6)
+- each row: thumbnail with a status dot · name · a status line · **view + download** (§7 / AC-69)
 - **company rows carry verification state and expiry** — verified, valid-until, renews-annually, or
   no-document-yet in red
 
-Company documents include **CR, VAT certificate, national address and local content**.
+Company documents are **five** papers: **CR · VAT certificate · national address · local content ·
+SASO registration** — all read-only: listed, opened and downloaded, never requested.
+
+**Corrected 2026-08-08 — this section named four.** SASO registration was missing, and AC-41 was
+missing it too.
+
+**Two storage systems, one list, and the renter must not be able to tell.** `cr`, `vat_cert` and
+`national_address` are **catalogue documents**; **local content and SASO are held certs** — their files
+live in `supplier_profiles.held_cert_docs.LC` / `.SASO`, with the legacy `local_content_doc_key` and
+`saso_heavy_equip_doc_key` columns still populated and still dual-read. Nothing ever writes a
+`DocumentInstance` for either. This is written down because it is the reason the two were absent for so
+long, and because a renter verifying a firm does not care which table a paper sits in: all five render
+identically, and all five open.
+
+⚠️ **`saso` names several different papers across the tree, and this row is the FIRM's registration.**
+A machine's own certificate can carry a bare `saso` too, and `saso_registration` / `saso_inspection` are
+a listing's papers again. They are separated by **scope** and by nothing else — the company list is
+resolved against the firm and never against a listing — and **no alias folds any spelling onto another**,
+because an alias would have the supplier upload the wrong paper.
 
 **IBAN is excluded — product decision, 2026-08-08.** It is banking detail, not a paper a renter verifies a
 lessor by, and this panel exists to answer *can I trust this counterparty's documents*. It stays in the
@@ -173,6 +193,12 @@ Opening the details replaces the panel with that machine:
    operator certificates. Each reads green (satisfied), grey (not required) or **red (missing)**, and
    each states the actual finding — "3 of 4 uploaded", "on the machine's file", "not on the file".
 
+> **The photo cell's "N of 4" is a completeness VERDICT, not a row count.** It survives §6.6's
+> 2026-08-08 rule unchanged, and the two must not be confused: the grid scores the machine against the
+> request and reports a fraction over all four slots, while the documents tab renders **rows** and
+> counts only the ones that render. A reader arriving from §6.6 would otherwise expect this fraction to
+> shrink to the required slots; it does not. Neither number is normative for the other.
+
 **The detail answers "does this machine fit my request", not "what is this machine".** A specification
 dump would list attributes the renter must then judge himself; the grid does the judging and shows its
 working. Anything that is merely descriptive belongs on the card, not here.
@@ -182,14 +208,61 @@ Selecting a machine focuses its map marker; selecting a marker focuses its card.
 ### 6.6 Documents
 
 **Equipment documents** are the machine detail's second tab; **company documents** are the company
-panel (§6.1). Both use the same grammar: select-all, a checkbox per row, a thumbnail with a status
-dot, a name, a status line, and download.
+panel (§6.1). Both use the same **row** grammar: a thumbnail with a status dot, a name, a status line,
+and view + download.
 
-**Equipment documents come in two groups**, each with its own attention count:
+**Corrected 2026-08-08 — the two lists no longer share the same *selection* grammar.** This section
+said *"Both use the same grammar: select-all, a checkbox per row…"* and built to it; the product owner
+has since decided that **a document request names a machine**, so the company list carries **no
+checkboxes, no select-all and no batch ask**. That argument — that one shared grammar should govern both
+lists — is withdrawn: it was a statement about the *rows*, and it was over-extended into a statement
+about *asking*. The shared part survives (a company row still opens and downloads exactly as an
+equipment row does, §7 / AC-69); only the ask is withdrawn. See §8 of the addendum (004a) for the rule
+stated positively.
 
-- **photos** — front, plate, meter, side
-- **documents** — proof of ownership / registration, equipment safety certificate, operator safety
-  certificate
+#### One rule for every document row — owner's ruling, 2026-08-08
+
+**This replaces the fixed-row design this section used to specify**, and it applies to **photos, proof
+of ownership, equipment certificates and operator documents alike. No family is exempt.**
+
+| | Held | Absent |
+|---|---|---|
+| **Required** | shown · green · openable | **red, «لا يوجد مستند بعد» / "no document yet"** · counted in the attention count · **requestable** |
+| **Not required** | shown · openable · **no verdict, no colour, not counted** | **not rendered at all** |
+
+**"Required" means either of two things:**
+
+1. **asked for by this request** — the equipment and operator certificates, exactly as
+   `computeUnitReadiness` derives them by mapping over the request's own asks; or
+2. **platform-mandatory regardless of the request** — the `front` and `serial`/plate photos, and proof
+   of ownership: the set `bid_readiness.dart` holds the lessor to whether or not the renter asked.
+
+**Why the fixed rows were wrong.** The platform already refuses to fail a party on something nobody
+asked for. `matchGrid` greys an unasked cell in as many words — *"a cell nobody asked about cannot
+fail"* — and **both** readiness scorers build their certificate list by mapping over the request's asks
+rather than over a catalogue. §6.6's fixed rows were the one place that rule broke: they rendered a
+red, counted, requestable row for a paper the renter had never asked for and the platform does not
+mandate, which is a verdict nobody is entitled to.
+
+**The property the fixed rows protected survives.** The reason they were specced was that the renter
+must be able to see what is **missing** — a list of what a supplier happens to have uploaded answers no
+question. That still holds, because every *required* row renders whether it is held or not. What
+disappears is only the row that was never anyone's obligation.
+
+An earlier draft of this section argued that a fixed row set was the only way to show absence; that
+argument is withdrawn — it conflated "absent" with "owed".
+
+**Equipment documents come in THREE groups**, each with its own attention count:
+
+- **photos** — `front` and `serial`/plate are **required** and go red when absent; `meter` and `side`
+  render **only when uploaded**
+- **documents** — proof of ownership / registration (required), equipment safety certificates
+- **operator documents** — their own group, §6.6a
+
+**Corrected 2026-08-08 — this section specced TWO groups**, with the operator's paperwork as a single
+row inside the second. That is withdrawn: an operator's documents are a different subject with a
+different obligation, and burying five of them behind one row named "operator safety certificate" hid
+both what was held and what was owed. See §6.6a.
 
 **The two levels carry different status, and this is deliberate:**
 
@@ -202,8 +275,36 @@ A machine's paper is either there or it isn't; that is all the renter can act on
 badge here would invite him to judge a supplier on a state the platform sets. A company's paper has a
 real lifecycle — it is checked, and it expires — so hiding that would strand him.
 
-**Requesting is a batch action, not a per-row button.** The renter ticks what he wants and asks once;
-one card carrying several types beats several cards carrying one each.
+**Requesting is a batch action, not a per-row button — on the equipment tab, which is the only list
+that can be requested from.** The renter ticks what he wants and asks once; one card carrying several
+types beats several cards carrying one each. The company list has nothing to tick: its papers are read,
+not requested.
+
+### 6.6a The operator's documents — their own group
+
+**Added 2026-08-08.** §6.6 listed "operator safety certificate" as one row among the machine's papers.
+It is now a **third group with its own rows and its own attention count**, and every row in it is
+viewable, downloadable and requestable on the same terms as any other (§6.6's rule, §7 / AC-69).
+
+The backend's operator vocabulary, verbatim, because it is not guessable from the pattern:
+
+`operating_license` · `operator_tuv` · `operator_spsp` · `operator_id` · `operator_insurance`
+
+⚠️ **`operating_license` carries no `operator_` prefix.** Anything that identifies an operator paper by
+that prefix drops the licence — the most important one in the set.
+
+Which of these are **required** follows §6.6's rule: the operator certificates this request asked for,
+as `computeUnitReadiness` derives them. An operator document nobody asked for renders when it is held
+and does not render when it is not.
+
+#### The defect this group fixes — the first file only
+
+Recorded because it was silent, and because it is not confined to the operator's papers. The paper rows
+resolved their link as `held.find(d => d.url)?.url` — **the first file that carries a url, and nothing
+after it.** A machine holding **two** ownership documents, **two** equipment certificates or **two**
+operator papers rendered one link and **silently dropped the rest**. Nothing on screen said a second
+file existed, so the renter read a complete row over an incomplete disclosure. Every file a row covers
+must be reachable.
 
 ### 6.7 The four requests
 
@@ -211,11 +312,21 @@ one card carrying several types beats several cards carrying one each.
 |---|---|
 | **اطلب تأكيد التوفّر** | the card, and the detail |
 | **اطلب معدّة أخرى** | bottom of the list (dashed), and inside each detail |
-| **اطلب مستنداً** | per document row — equipment and company |
+| **اطلب مستنداً** | per document row — **equipment only** (corrected 2026-08-08; this row read "equipment and company") |
 | **اطلب إضافتها** | the shortfall alert (§6.3) |
 
 Each is bound to one `equipmentId` (null for the shortfall ask) and posted as a `rentee_request` card.
 **Card state is derived on every render** by re-reading the machine — never stored on the message.
+
+**Why the company ask went.** It was specced on the symmetry of §6.6's row grammar rather than on
+anything a supplier could act on: a company paper belongs to the firm, so the ask names no machine, and
+the only thing that could ever close it is the supplier editing his own profile — which he does from his
+profile, not from a conversation. Meanwhile the renter can already *see* every company paper and open it
+(§7 / AC-69), so the question the ask was meant to answer is answered by looking. **A document request
+names a machine; a company paper is read, not requested.** Stated as an AC in the addendum, §8.
+
+Note that `null` in the row above remains correct for **one** ask only — the shortfall's
+«اطلب إضافتها», which asks *for* a machine and so has none to name. That is unchanged.
 
 ### 6.8 Map
 
@@ -354,7 +465,7 @@ card state must be derived by re-reading the machine (§6.7).
 | RM3-AC-13 | web | **Given** a card whose availability is unconfirmed **When** it renders **Then** it offers **اطلب التأكيد** directly, without opening the detail |
 | RM3-AC-14 | web | **Given** التفاصيل **When** activated **Then** the panel shows that machine's full specification, its **actual documents**, and اطلب معدّة أخرى |
 | RM3-AC-15 | web | **Given** a machine is focused **When** the map renders **Then** its marker is distinguished; **Given** a marker is activated **Then** its card is focused — the two stay in step |
-| RM3-AC-16 | web | **Given** any document row **When** it renders **Then** it offers open, download and request — and **no verification status** on equipment documents |
+| RM3-AC-16 | web | **Given** any **equipment** document row **When** it renders **Then** it offers open, download and request — and **no verification status**. *(Re-scoped 2026-08-08. This read "any document row": a company row now offers open and download but **not** request, AC-71/72.)* |
 | RM3-AC-17 | web | **Given** any of the four requests **When** composed **Then** it carries the machine as data (`equipmentId`), not only in prose, and is sent explicitly by the renter |
 | RM3-AC-18 | web | **Given** a request card **When** its state renders **Then** it is derived by re-reading the machine, with nothing persisted on the message |
 | RM3-AC-19 | web | **Given** a machine **When** its pin AND its card chip render **Then** both take their colour from `unitAvailability(unit)` (derived from `locationSource`) and **never** from the `yardConfirmed` boolean, so the two can never disagree |
@@ -376,11 +487,11 @@ card state must be derived by re-reading the machine (§6.7).
 | RM3-AC-35 | web | **Given** that pre-selected card **When** it draws attention **Then** it pulses roughly six times over about nine seconds and then rests, preserving its resting shadow so the card never appears to shift |
 | RM3-AC-36 | web | **Given** the equipment detail **When** it opens **Then** it shows a hero photo, two tabs (machine · documents), an availability/distance/yard line, and a **match grid against this request** — not a specification dump |
 | RM3-AC-37 | web | **Given** the match grid **When** it renders **Then** each cell states its actual finding and reads green, grey (not required) or **red** when missing |
-| RM3-AC-38 | web | **Given** either document surface **When** it renders **Then** it offers select-all, a checkbox per row, a thumbnail with a status dot, and per-row download — and requesting is a **batch** action over the ticked rows |
+| RM3-AC-38 | web | **Given** the **equipment** document surface **When** it renders **Then** it offers select-all, a checkbox per row, a thumbnail with a status dot, and per-row view + download — and requesting is a **batch** action over the ticked rows. *(Re-scoped 2026-08-08. This read "either document surface": the company panel offered the same select-all and batch ask. It no longer does — a document request names a machine, RM3-AC-71 — and its rows carry the thumbnail, status dot, status line and view/download only.)* |
 | RM3-AC-39 | web | **Given** equipment document rows **When** they render **Then** they show **presence only** — uploaded / not uploaded / on file / none yet — and **never** a verification badge |
 | RM3-AC-40 | web | **Given** company document rows **When** they render **Then** they **do** show verification state and expiry, because a company paper is checked and does expire |
-| RM3-AC-41 | web | **Given** the company panel **When** it renders **Then** it carries CR, VAT, national address and local content — **and no IBAN** — with an attention count that counts rows needing action, never a total |
-| RM3-AC-42 | web | **Given** the equipment documents tab **When** it renders **Then** photos and documents are **two groups**, each with its own attention count |
+| RM3-AC-41 | web | **Given** the company panel **When** it renders **Then** it carries CR, VAT, national address, local content **and SASO registration** — **and no IBAN** — with an attention count that counts rows needing action, never a total. *(Corrected 2026-08-08: this named four papers. The panel lists **five**; SASO was the missing one. See §6.1 for why local content and SASO are not catalogue documents.)* |
+| RM3-AC-42 | web | **Given** the equipment documents tab **When** it renders **Then** photos, documents and **operator documents** are **three groups**, each with its own attention count — and the count is over **the rows that actually render**, never a fixed slot total. *(Rewritten 2026-08-08. This read "photos and documents are two groups": the operator's papers were one row inside the second group, and the photo group was a fixed four slots counted "N of 4". Under §6.6's rule the operator gets its own group (§6.6a) and `meter`/`side` render only when uploaded, so a fixed denominator would count rows that are not on screen.)* |
 
 ## 9. Test plan
 
@@ -393,19 +504,23 @@ card state must be derived by re-reading the machine (§6.7).
 | RM3-TC-05 | AC-09, AC-10 | web | same | list is flat, ascending by km, and excludes `inBid:false` machines |
 | RM3-TC-06 | AC-11, AC-12, AC-13 | web | same | card model fields exactly; no serial/load; confirm action present only when unconfirmed |
 | RM3-TC-07 | AC-14, AC-15 | web | same | detail model carries specification + documents; focus round-trips card ↔ marker |
-| RM3-TC-08 | AC-16 | web | same | every document row exposes three actions; equipment rows expose no status |
+| RM3-TC-08 | AC-16 | web | same | every **equipment** document row exposes open, download and request, and exposes no verification status. *(Re-scoped 2026-08-08 with AC-16: a company row exposes open and download and **no** request — asserted by TC-21.)* |
 | RM3-TC-09 | AC-17, AC-18 | web | `tests/unit/deal-room-cards.test.ts` | payload carries `equipmentId`; state recomputed from a mutated machine with nothing read off the message |
 | RM3-TC-10 | AC-19, AC-20, AC-21, AC-22 | web | `tests/unit/bid-map.test.ts` | one colour scale; unconfirmed copy contains no refusal wording; claimed units produce no marker |
 | RM3-TC-11 | AC-23, AC-24 | web | manual | chat dock persistent, no rail; footer figures match the deal-room bar for the same room |
-| RM3-TC-12 | AC-25, AC-26 | web | `tests/unit/link-bids.test.ts` | an off-platform bid never routes to this surface; a platform offer with no registered machines renders the explanatory state with no empty furniture |
-
+| RM3-TC-12 | AC-25, AC-26 | web | `tests/unit/bid-equipment-access.test.ts` | an off-platform bid never routes to this surface; a platform offer with no registered machines renders the explanatory state with no empty furniture. *(Re-pointed 2026-08-08. This named `tests/unit/link-bids.test.ts`, which only ever asserted that the mapper sets `viaSharedLink` — it never tested routing, so AC-25 had **no** coverage. Worth stating why the guard it was meant to cover was dead: the guard tested `bid.viaSharedLink`, which the route's own mapper never sets, and an off-platform id is `link-…` — a different entity whose fetch cannot succeed. A real off-platform deep link therefore landed on "this offer couldn't be loaded" rather than on its own surface.)* |
 | RM3-TC-13 | AC-27 | app-backend | `.../rentee-unit-location.test.ts` | `yardConfirmed` reads the bid entry, not the listing |
 | RM3-TC-14 | AC-28, AC-29, AC-30 | web | `tests/unit/bid-map.test.ts` | the view model exposes no distance-band state, no quality figure, and the unconfirmed chip carries no reason/cause field |
 | RM3-TC-15 | AC-31 | web | same | `claimed` is `offered − registered` across fixtures — including registered > offered, which must clamp to zero rather than render a negative shortfall |
 | RM3-TC-16 | AC-32, AC-33 | web | same | the card model emits one availability chip carrying commitment, no second band; the request action's token is the blue one |
 | RM3-TC-17 | AC-34, AC-35 | web | same | initial state selects the offer's confirmed machine with no detail open; the attention cue is finite (~6 cycles) and not a persistent loop |
 | RM3-TC-18 | AC-36, AC-37 | web | same | detail model exposes hero photo, two tabs and six match cells; a missing requirement yields red and a not-required one yields grey |
-| RM3-TC-19 | AC-38, AC-39, AC-40, AC-41, AC-42 | web | same | both surfaces expose select-all + per-row selection and a batch request; equipment rows carry presence only and no verification field; company rows carry verification + expiry and **exclude IBAN**; photos and documents are separate groups, each counting only rows needing action |
+| RM3-TC-19 | AC-38, AC-39, AC-40, AC-41, AC-42, AC-71, AC-72 | web | same | the **equipment** surface exposes select-all + per-row selection and a batch request; the **company** surface exposes neither — no tick, no select-all, no send — while still listing every paper with its status and its view/download pair; equipment rows carry presence only and no verification field; company rows carry verification + expiry and **exclude IBAN** and **include SASO**; photos, documents and operator documents are **three** groups, each counting only rows needing action. *(Rewritten 2026-08-08 twice over: it read "both surfaces expose select-all + per-row selection and a batch request", which the company reversal makes false, and it named two groups and four company papers.)* |
+| RM3-TC-20 | AC-71 | web | `tests/unit/rentee-request-loop.test.ts` | a `document` ask composed with a null, absent, empty or whitespace `equipmentId` is refused, including when it names only company papers (`cr`, `local_content`, `saso`); a `scope` asserted by a caller is not honoured because there is no scope input; the shortfall's company-scope `alternative` still composes |
+| RM3-TC-21 | AC-72 | web | `tests/unit/machine-panel.test.ts` | the company row model carries no requestable document types, and the batch composer takes a machine id it cannot be handed a null for; every company row still resolves its view + download pair |
+| RM3-TC-22 | AC-73, AC-74 | web | same | over a machine holding some papers and missing others: every **required** row renders in both states and is counted only when absent; a **not-required** absent paper produces **no row**; a not-required held paper produces a row with no colour and no place in the count; the photo group's count equals the number of rows it rendered |
+| RM3-TC-23 | AC-75 | web | same | the operator's papers form their own group with its own attention count; `operating_license` is present in it despite carrying no `operator_` prefix |
+| RM3-TC-24 | AC-76 | web | same | a machine holding two ownership documents, two equipment certificates or two operator papers exposes **every** file — never the first alone |
 
 ## 10. Open
 
@@ -423,6 +538,7 @@ All resolved. Kept as a record so a later change does not reopen them by acciden
 
 | Date | Change |
 |---|---|
+| 2026-08-08 | **Alignment pass — five owner rulings, each reversing something this spec asserted.** (1) **A document request names a machine.** §6.1, §6.6, §6.7, AC-16, AC-38, AC-41's panel and TC-19 all described a company-scope document ask with select-all and a batch request; the company panel is now **read and open only**, and the payload type cannot express a `document` ask with no machine. Viewing and downloading company papers is untouched (AC-71, AC-72; 004a §8). (2) **One rule for every document row**, replacing §6.6's fixed rows: a *required* paper renders held or not — red, counted and requestable when absent — and a *not-required* one renders only when held, with no verdict and no place in the count. The fixed rows were the single place the platform's own "a cell nobody asked about cannot fail" rule broke (AC-73). (3) **The photo group is no longer four fixed slots**: `front` and plate are required, `meter` and `side` render only when uploaded, and the count is over the rows that render — AC-42 rewritten, "of 4" withdrawn as a normative count (AC-74). (4) **The operator's documents are a third group** (§6.6a) rather than one row inside the machine's papers, with the backend's five-term vocabulary written down because `operating_license` carries no `operator_` prefix (AC-75); recorded with the silent defect it fixes — rows resolved `held.find(d => d.url)?.url`, the **first file only**, so a second ownership, equipment or operator paper was dropped without a trace (AC-76). (5) **SASO is the fifth company paper** — AC-41 named four; local content and SASO are **held certs**, not catalogue documents. Also: **TC-12 re-pointed** from `link-bids.test.ts` (which only ever asserted the mapper sets `viaSharedLink`, never routing) to `bid-equipment-access.test.ts`, and TC-08 re-scoped. Six ACs and five TCs added. |
 | 2026-08-08 | **Verified against the prototype — three sections were wrong and are rewritten.** The spec had been written from the element list after rendering only two states, so §6.1, §6.5 and §6.6 described intentions rather than the design. Rendering the remaining states found: the **equipment detail** is a hero photo, two tabs and a **six-cell match grid against this request** — not the specification dump specced; the **company panel** is a batch-selectable document list that **includes IBAN**, which the spec had wrongly moved to a profile; and documents are **batch-selected**, not three buttons per row, with a deliberate asymmetry the spec had flattened — **equipment rows carry presence only, company rows carry verification and expiry**. Four later design changes folded in (AC-32→35): availability and commitment as **one chip** so cards keep equal height; the request action **blue**, since navy read as disabled beside a red chip; **landing pre-selection** of the offer's confirmed machine with no detail opening; and a **finite ~6-cycle** attention pulse that preserves its resting shadow. Twelve ACs and four TCs added. Still unopened: the document modal, and the chat dock beyond its badge. |
 | 2026-08-08 | **Made self-contained.** All references to spec 001 removed. §7 replaced a four-row "see 001 §7.12 / AC-232→234" table with the real contract read from code: the fleet route and `mapFleet` → `FleetMachine` with a field-by-field map of every card element; the full `locationSource` → availability ladder; and the request-card rules from `rentee-request.service.ts`. A spec anchored to code cannot drift with another document, and this one no longer depends on which branch's 001 the reader has. |
 | 2026-08-08 | **Realigned against decisions and audited.** Five open questions closed: off-platform is **out of scope entirely** — an earlier draft designed a replacement submission view, now withdrawn, and its answer to question 1 was itself stale; the **distance filter** and **bid quality** are removed (AC-28, AC-29); the unconfirmed chip carries **no reason** (AC-30); `claimed = offered − registered` is normative and the prototype's demo-forced figures are not (AC-31). A "do not reinstate" table records why each removal happened. **One contradiction with shipped code fixed:** the spec implied `yardConfirmed` drives pin colour, but `bid-map.ts:74` states *"Never read the `yardConfirmed` boolean for colour"* — supplier-side it is only `yardId != null`, so it is true for every readiness-written entry. Colour comes from `unitAvailability()` via `locationSource`; had this shipped, every pin would have been green (AC-19, AC-22, AC-27). Also corrected an invented test path (`off-platform.test.ts` → `link-bids.test.ts`). Verified: every field the card promises exists on `FleetMachine`/`OfferedUnitDetail`, and the fleet endpoint is already wired in the web. |

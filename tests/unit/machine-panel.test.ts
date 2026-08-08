@@ -420,27 +420,27 @@ describe("batchDocumentRequest — one request naming several types (AC-38)", ()
   ];
 
   it("is null when nothing is ticked, so the send control has one source of truth", () => {
-    expect(batchDocumentRequest("equipment", "eq-1", rows, new Set())).toBeNull();
+    expect(batchDocumentRequest("eq-1", rows, new Set())).toBeNull();
   });
 
   it("emits ONE draft carrying every ticked type, deduped", () => {
-    const draft = batchDocumentRequest("equipment", "eq-1", rows, new Set(["a", "b", "c"]));
+    const draft = batchDocumentRequest("eq-1", rows, new Set(["a", "b", "c"]));
     expect(draft).toEqual({
       kind: "document",
       equipmentId: "eq-1",
-      scope: "equipment",
       docTypes: ["tuv", "istimara"],
       labels: [rows[0].label, rows[1].label, rows[2].label],
     });
   });
 
-  it("nulls the equipmentId for company papers — they belong to the firm, not a machine", () => {
-    const draft = batchDocumentRequest("company", "eq-1", rows, new Set(["a"]));
-    expect(draft && draft.kind === "document" && draft.equipmentId).toBeNull();
-  });
+  /* A test here asserted that a `"company"` scope nulled the equipmentId, because company papers
+   * belong to the firm. The product owner withdrew the company-scope document request on 2026-08-08 —
+   * a document request names a machine — so the `scope` parameter is gone, the id is non-nullable, and
+   * the test is deleted rather than inverted. The company panel is now read-and-open only; see
+   * `CompanyPanel.tsx`. */
 
   it("never emits the retired `add_to_offer` kind", () => {
-    const draft = batchDocumentRequest("equipment", "eq-1", rows, new Set(["a"]));
+    const draft = batchDocumentRequest("eq-1", rows, new Set(["a"]));
     expect(draft?.kind).toBe("document");
   });
 });

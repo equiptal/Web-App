@@ -137,27 +137,32 @@ So the answer is two steps, and the card must carry both:
 | 1 | **add the equipment** (existing form) | none — a new listing exists |
 | 2 | **commit it into a claimed slot** in readiness | `unitsOffered` gains a real `equipmentId` in place of padding |
 
-**Step 2 SHOULD be a same-count edit** — 3 offered stays 3, the composition moves from 1 registered + 2
-claimed to 2 + 1 — and the server would permit that with a room open (`bid.service.ts:412-418`).
+**Step 2 IS a same-count edit** — 3 offered stays 3, the composition moves from 1 registered + 2 claimed
+to 2 + 1 — and the server permits that with a room open (`bid.service.ts:412-418`).
 
-**⚠ It is not, today, because of §3.2d.** Verified while building the supplier side:
+**⚠️ Corrected 2026-08-08 — this section said "It is not, today, because of §3.2d", and that is no
+longer true.** The paragraph below is the argument as it stood, kept because it is why §3.2d was raised
+at all:
 
-```
-stored      unitsOffered = [A, A, A]        offered count = 3
-rehydrate   readiness de-dupes              selected = [A]
-commit B    the newly registered machine    selected = [A, B]
-_persist    writes selected.length          2 entries  ≠  3  →  BID_OFFER_LOCKED
-```
+> ```
+> stored      unitsOffered = [A, A, A]        offered count = 3
+> rehydrate   readiness de-dupes              selected = [A]
+> commit B    the newly registered machine    selected = [A, B]
+> _persist    writes selected.length          2 entries  ≠  3  →  BID_OFFER_LOCKED
+> ```
+>
+> So committing into what the supplier believes is a claimed slot is a **count change against the stored
+> array**, and the write is refused the moment a deal room exists — which the renter's ask itself
+> created. **Therefore §3.2d is not a latent defect; it BLOCKS this loop.**
 
-So committing into what the supplier believes is a claimed slot is a **count change against the stored
-array**, and the write is refused the moment a deal room exists — which the renter's ask itself created.
+**§3.2d is fixed** (see it for the detail): mobile `bid_readiness_bloc.dart` now holds the offered
+**count** apart from the **set** of machines and persists `max(offeredCount, selected.length)` slots. So
+committing a machine into a claimed slot writes the same number of entries it read, the edit is a
+same-count edit, and it succeeds with a deal room open. **The shortfall ask is answerable.**
 
-**Therefore §3.2d is not a latent defect; it BLOCKS this loop.** Until readiness preserves the offered
-count, the shortfall ask cannot be answered at all after a room exists.
-
-The supplier client degrades honestly rather than lying: the write fails, the sheet surfaces the
-backend's real error, and **no reply is posted** — so the renter's card never claims an answer that did
-not happen. But the request stays unanswerable.
+The supplier client still degrades honestly if a write does fail for any other reason: the sheet
+surfaces the backend's real error and **no reply is posted** — so the renter's card never claims an
+answer that did not happen.
 
 | ID | Layer | Criterion |
 |---|---|---|
@@ -165,23 +170,33 @@ not happen. But the request stays unanswerable.
 | RM3-AC-60 | mobile | **Given** the new machine is committed into a claimed slot **When** the bid is saved **Then** the offered COUNT is unchanged, so the write is a same-count edit and succeeds with a deal room open |
 | RM3-AC-61 | web | **Given** a machine registered but not committed **When** the renter's surface refetches **Then** the shortfall is **unchanged** — the count follows committed machines, never the supplier's fleet size |
 
-### 3.2d Pre-existing defect this path depends on — the padding collapse
+### 3.2d ~~Pre-existing defect this path depends on~~ — the padding collapse, **FIXED 2026-08-08**
 
-Independent of this feature, and it corrupts the counts above.
+**This section described an open defect. It is closed.** The description is kept because §3.2c's
+argument, the shortfall loop and RM3-AC-60 all rest on understanding it — a reader who found only
+"fixed" would not know what was fixed or why the loop was ever in doubt.
+
+**What it was.** Independent of this feature, and it corrupted the counts above.
 
 - **The bid form pads:** `while (ids.length < count) ids.add(state.equipmentId)`
   (`bid_form_bloc.dart:1566`) — a 3-unit offer with one machine stores **three identical entries**.
-- **Readiness de-duplicates on rehydrate:** `if (id == null || selected.contains(id)) continue` — so
-  `selected` becomes `[A]`, length 1.
-- **`_persist` writes `unitsOffered` from `selected`** — **one** entry.
+- **Readiness de-duplicated on rehydrate:** `if (id == null || selected.contains(id)) continue` — so
+  `selected` became `[A]`, length 1.
+- **`_persist` wrote `unitsOffered` from `selected`** — **one** entry.
 
-**A supplier who opens the readiness card and touches anything silently drops his own offered count from
-3 to 1.** Before a deal room exists it happens quietly; after one, the same write is refused with
-`BID_OFFER_LOCKED` and he sees an error he cannot act on.
+**A supplier who opened the readiness card and touched anything silently dropped his own offered count
+from 3 to 1.** Before a deal room existed it happened quietly; after one, the same write was refused
+with `BID_OFFER_LOCKED` and he saw an error he could not act on. For this surface it meant the shortfall
+could disappear because **the offer shrank**, not because it was filled.
 
-For this surface it means the shortfall can disappear because **the offer shrank**, not because it was
-filled. **Needs its own supplier-side ticket** — readiness must preserve the offered count, filling
-claimed slots rather than collapsing them.
+**How it is fixed.** `bid_readiness_bloc.dart` now keeps the offered **count** as a value of its own,
+separate from the de-duplicated **set** of machines, and persists `max(offeredCount, selected.length)`
+slots. De-duplication still protects the set; it no longer decides the count. A supplier who commits a
+newly registered machine into a claimed slot therefore writes the same number of entries he read, which
+is a same-count edit and is permitted with a deal room open.
+
+**Consequence for this spec:** §3.2c's blocking claim is withdrawn, RM3-AC-60 is satisfiable, and the
+supplier-side ticket this section asked for is no longer outstanding.
 
 ### 3.3 The supplier's app cannot do any of this today
 
@@ -342,17 +357,25 @@ carry the whole burden. A row the renter cannot open reduces this panel to a rum
 
 ### 7.1 What is actually built, checked rather than assumed
 
-| | State |
-|---|---|
-| Equipment documents — data | ✅ real. `getSupplierFleet` presigns via `batchSignItems`; ownership papers are deliberately unfiltered for the renter |
-| Equipment documents — controls | ⚠️ download only. No view |
-| Company documents — controls | ⚠️ download only. No view |
-| **Company documents — data** | ❌ **none.** `CompanyPanel` takes `docs` as a prop and no route can fill it |
+**Updated 2026-08-08 — V14 and V15 shipped, and this table was the audit that produced them.** The
+original state is kept in the right-hand column so the finding that justified the tickets is still
+legible; the left column is what is true now.
 
-The last row is the real finding. `getMyCompany` serves a supplier's *own* company and
-`partner/company.ts` is the partner/admin surface; **neither is reachable by a renter**. So V9's four
-rows are structurally always "no document yet" — not a missing link on a present document, but a panel
-with no data behind it.
+| | State when audited | State now |
+|---|---|---|
+| Equipment documents — data | ✅ real. `getSupplierFleet` presigns via `batchSignItems`; ownership papers are deliberately unfiltered for the renter | ✅ unchanged |
+| Equipment documents — controls | ⚠️ download only. No view | ✅ **view + download** (V15, AC-69) |
+| Company documents — controls | ⚠️ download only. No view | ✅ **view + download** (V15, AC-69) |
+| **Company documents — data** | ❌ **none.** `CompanyPanel` takes `docs` as a prop and no route can fill it | ✅ **served.** `GET /marketplace/bids/{bidId}/company-documents`, presigned via `batchSignItems`, gated by the **same predicate as the fleet read**, bid-scoped with no company id accepted from the client (V14) |
+
+**AC-68 is satisfied.** The last row *was* the real finding: `getMyCompany` serves a supplier's *own*
+company and `partner/company.ts` is the partner/admin surface, so **neither was reachable by a renter**
+and V9's rows were structurally always "no document yet" — not a missing link on a present document, but
+a panel with no data behind it. That is fixed. The claim "❌ none" is withdrawn rather than deleted,
+because it is the whole argument for why V14 exists.
+
+**This did not survive as a request path.** The company read is a *read*: the panel lists, opens and
+downloads. A renter cannot ask the firm for a paper — see §8.
 
 ### 7.2 Presence-only was never meant to mean unopenable
 
@@ -366,4 +389,96 @@ row with nothing to click.
 |---|---|---|
 | RM3-AC-68 | backend | **Given** a renter who can reach a bid's request **When** he opens the company panel **Then** the bid's supplier's company documents are served **bid-scoped** — no company id accepted from the client — gated by the same predicate as the fleet read, with presigned urls, verification state and expiry |
 | RM3-AC-69 | web | **Given** any document row at either level **When** it carries a url **Then** it exposes **view** and **download**, view primary — and **When** it carries none **Then** it exposes neither, never a dead control |
-| RM3-AC-70 | backend | **Given** local content **When** the company documents are assembled **Then** it resolves from `held_cert_docs.LC` **or** the legacy `local_content_doc_key`, because it is a held cert and not a catalogue document |
+| RM3-AC-70 | backend | **Given** local content **When** the company documents are assembled for **display** **Then** it resolves from `held_cert_docs.LC` **or** the legacy `local_content_doc_key` — so the panel can list, show and open it — because it is a held cert and not a catalogue document. The same dual-read serves SASO from `held_cert_docs.SASO` / `saso_heavy_equip_doc_key`. *(Re-scoped 2026-08-08, the day it was written. It was authored to make a company-scope document **request** resolvable: a held cert has no `DocumentInstance`, so an ask answered against catalogue keys alone would hang open forever. That ask is withdrawn — a document request names a machine, AC-71 — so the criterion now stands on display alone, which is what it was always really about. Nothing about the backend read changes.)* |
+
+## 8 · A document request names a machine — decided 2026-08-08
+
+**Product decision.** The renter can ask about a **machine's** papers. He can no longer ask for the
+**firm's**.
+
+This reverses part of §6.6 and §6.7 of 004 and part of §7 above, and those places are corrected in situ
+rather than left to be reconciled by a reader. What changes:
+
+| | Before | Now |
+|---|---|---|
+| Equipment document rows | select-all, tick per row, batch «اطلب مستنداً» | **unchanged** |
+| Company document rows | the same select-all, tick and batch ask | **read and open only** — no tick, no select-all, no send |
+| `rentee_request` `document` kind | `scope: equipment` with an id, **or** `scope: company` with none | **`scope: equipment` with an id, always** |
+| The shortfall's «اطلب إضافتها» | `alternative`, `scope: company`, null id | **unchanged — this is the one surviving company-scope ask** |
+
+**Why.** The company ask was specced on the symmetry of §6.6's row grammar, not on anything a supplier
+could act on:
+
+- A company paper belongs to the **firm**, so the ask names no machine and threads onto no unit.
+- The only act that closes it is the supplier editing his **own profile**, which he does from his
+  profile and not from a conversation — so the loop 004a exists to close never closed for this kind.
+- And the renter can already **see** every company paper and open it (§7 / AC-69). The question the ask
+  was meant to answer is answered by looking.
+
+**Viewing and downloading company documents is unchanged and must keep working.** The panel still lists
+CR · VAT · national address · local content · SASO, still shows verification state and expiry, and still
+opens and downloads each paper (V15 / AC-69). V14's read (§7.1) is untouched. **Only the ask is
+withdrawn.**
+
+**The rule is enforced by the type, not by a guard.** `RenteeRequestDraft`'s `document` arm requires
+`scope: "equipment"` and a non-nullable `equipmentId`, so `kind: 'document'` with a null id cannot be
+written down; `composeDocumentRequest` takes `equipmentId: string` for the same reason; and there is no
+`scope` input on `RenteeAsk` for a caller to assert one with. A guard is something a future caller
+routes around — an unrepresentable state is not.
+
+| ID | Layer | Criterion |
+|---|---|---|
+| RM3-AC-71 | web | **Given** a document request **When** it is composed **Then** it names a machine — `scope: "equipment"` with a non-empty `equipmentId` — and a `document` ask carrying no machine is **unrepresentable in the payload type** and refused at runtime by the one composer, whatever scope a caller asserts. **A company paper is read, not requested** |
+| RM3-AC-72 | web | **Given** the company document panel **When** it renders **Then** every paper is listed with its verification state, its expiry and its view/download pair — and there is **no checkbox, no select-all and no request control** anywhere on it |
+
+## 9 · One rule for every document row — decided 2026-08-08
+
+**Product decision**, written up normatively in 004 §6.6 and §6.6a. Restated here with its ACs because
+it replaces a design this addendum's §7 was written on top of.
+
+Every document row, in **every** family — photos, proof of ownership, equipment certificates, operator
+documents — obeys one rule:
+
+| | Held | Absent |
+|---|---|---|
+| **Required** | shown · green · openable | **red, "no document yet"** · counted · requestable |
+| **Not required** | shown · openable · no verdict, no colour, not counted | **not rendered** |
+
+**Required** = asked for by this request (the certs, as `computeUnitReadiness` derives them) **or**
+platform-mandatory regardless of the request (`front` and `serial`/plate photos, proof of ownership —
+the set `bid_readiness.dart` holds the lessor to).
+
+The rationale, and the withdrawal, are in 004 §6.6: the platform already refuses to fail a party on
+something nobody asked for, and the fixed rows were the one place that rule broke.
+
+| ID | Layer | Criterion |
+|---|---|---|
+| RM3-AC-73 | web | **Given** any document row in any family **When** the tab renders **Then** a **required** paper renders whether held or not — green when held, red and counted and requestable when absent — and a **not-required** paper renders only when it is held, carrying no verdict, no colour and no place in the attention count |
+| RM3-AC-74 | web | **Given** the photo group **When** it renders **Then** `front` and `serial`/plate render whether uploaded or not and go **red** when absent, `meter` and `side` render **only when uploaded**, and the group's count is over the rows that actually render — never "of 4" |
+| RM3-AC-75 | web | **Given** the equipment documents tab **When** it renders **Then** the operator's papers are a **third group** with their own rows and their own attention count, each viewable, downloadable and requestable — covering `operating_license` · `operator_tuv` · `operator_spsp` · `operator_id` · `operator_insurance`, and **not** identified by an `operator_` prefix, which `operating_license` does not carry |
+| RM3-AC-76 | web | **Given** a row whose family holds **more than one** file **When** it renders **Then** every held file is reachable — a row must never expose the first file and silently drop the rest |
+
+## 10 · A known and accepted divergence — proof of ownership in the readiness fraction
+
+**Owner's ruling, 2026-08-08: follow existing behaviour, do not change it.** Recorded here so the next
+reader finds a decision rather than a bug, and so a tester does not raise it.
+
+The two readiness scorers count a different denominator:
+
+| | Denominator | Proof of ownership |
+|---|---|---|
+| web `bid-readiness.ts` | `total = 1 + certs` | **excluded** |
+| mobile `bid_readiness.dart` | `total = 2 + certs` | **included** |
+
+So a machine with no ownership paper reads **50% to the lessor and 100% to the renter**.
+
+**The consequence, stated plainly:** after §9's rule the documents tab marks that paper **red** —
+required, absent — while the readiness band beside it can read **green**. That is the accepted state.
+The row is a fact about one paper; the band is a fraction over a different set.
+
+⚠️ **The web comment's stated reason is stale.** It says the exclusion exists because *"the backend
+strips it from the renter's `offeredUnitsDetail`"* — but `RENTEE_HIDDEN_DOC_TYPES` has been deleted and
+ownership papers now reach the renter with usable urls. The exclusion no longer rests on redaction. It
+rests on the band argument alone: a fraction that counted a paper the renter cannot influence would hold
+every supplier permanently short of 100%, which is a different claim from "this machine is missing a
+document" and is not what the band is for.

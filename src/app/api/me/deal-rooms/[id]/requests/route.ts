@@ -27,10 +27,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     /* empty body — falls through to the invalid_request below */
   }
 
+  // `scope` is deliberately NOT read off the body. It is derived from whether a machine is named — an
+  // id means `equipment`, none means the shortfall's `alternative` — so a client cannot ask for a
+  // company-scope document by asserting one. A document request names a machine (product owner,
+  // 2026-08-08).
   const draft = composeRenteeRequest({
     kind: String(raw.kind ?? ""),
     equipmentId: typeof raw.equipmentId === "string" ? raw.equipmentId : null,
-    scope: raw.scope === "company" ? "company" : raw.scope === "equipment" ? "equipment" : undefined,
     docTypes: Array.isArray(raw.docTypes) ? raw.docTypes.map((t) => String(t)) : undefined,
   });
   if (!draft) return NextResponse.json({ code: "invalid_request" }, { status: 400 });

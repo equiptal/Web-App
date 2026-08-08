@@ -50,7 +50,7 @@ Nothing here cost implementation time except where **C** says otherwise.
 | T15 colour key | v3 states the scale in copy; no legend component | — |
 | T18–T20 panel shell / composition bar / machine chips | v2's 3-tab panel + composition bar + serial chips; v3 has count pills, a shortfall alert, and a 2-tab detail | **V2 V3 V4 V7** |
 | T21 availability & fit tab | becomes the **six-cell match grid** | **V7** |
-| T22 document tabs | regrouped: presence-only equipment docs vs verification+expiry company docs, batch-selected | **V8 V9** |
+| T22 document tabs | regrouped: presence-only equipment docs vs verification+expiry company docs, batch-selected — **the company half of "batch-selected" was withdrawn 2026-08-08, see V9** | **V8 V9** |
 | T26 notice bubble / popup / `+N` | v3 keeps only the dock's unread badge | **V12** |
 | T27 chat tabs per item | one bid ⇒ one room ⇒ no tabs | — |
 | T29–T32 off-platform hosting | §6.11 — off-platform **never opens this surface** | **V13** (routing only) |
@@ -182,21 +182,42 @@ halo and an in-offer tag — and **no detail opens**. The renter is oriented, no
   *"what is this machine"* — no specification dump.
 
 ### V8 · Equipment documents `[UI]`
-**AC** 16, 38, 39, 42 · The detail's second tab. **Two groups**, each with its own attention count:
-**photos** (front, plate, meter, side) and **documents** (proof of ownership, equipment safety cert,
-operator safety cert).
+**AC** 16, 38, 39, 42, 73, 74 · The detail's second tab.
+
+**Revised 2026-08-08.** This ticket read: *"**Two groups**, each with its own attention count: **photos**
+(front, plate, meter, side) and **documents** (proof of ownership, equipment safety cert, operator safety
+cert)."* Both halves of that are now wrong — the operator's papers are their own group (**V16**), and the
+photo group is not four fixed slots.
+
+- **Three groups**, each with its own attention count: **photos** · **documents** (proof of ownership,
+  equipment safety certificates) · **operator documents** (V16).
+- **One rule for every row** (spec §6.6, AC-73): a **required** paper renders whether held or not —
+  green when held, **red, counted and requestable** when absent; a **not-required** paper renders **only
+  when held**, with no verdict, no colour and no place in the count. Required = asked for by this
+  request (`computeUnitReadiness`) **or** platform-mandatory (`front`, `serial`/plate, proof of
+  ownership).
+- **Photos:** `front` and `serial`/plate are required and go red when absent; `meter` and `side` render
+  only when uploaded. **The count is over the rows that render — never "of 4"** (AC-74).
 - **Presence only** — uploaded / not uploaded / on the machine's file / none yet. **Never a verification
   badge**: a machine's paper is either there or it isn't, and a badge invites judging a supplier on a
   state the platform sets.
 - Select-all + a checkbox per row; **requesting is a batch action**, one card carrying several types.
+  **This is the only document surface that can be requested from** (V9 no longer is).
 - **Reuse:** `documentKeys` on `FleetMachine`; T4 already unfiltered ownership types.
 
 ### V9 · Company panel `[UI]`
-**AC** 40, 41 · Opens over the whole panel with its own dark header (name · verified chip · back).
-A **document list, not a profile**: CR · VAT certificate · national address · local content.
+**AC** 40, 41, 72 · Opens over the whole panel with its own dark header (name · verified chip · back).
+A **document list, not a profile**: **five** papers — CR · VAT certificate · national address · local
+content · **SASO registration**.
 **No IBAN** — banking detail, not something a renter verifies a lessor by (product decision 2026-08-08).
+- **Revised 2026-08-08 — read and open only.** This ticket described the same select-all + checkbox +
+  batch «اطلب مستنداً» as V8, and it shipped that way for a few hours. **A document request names a
+  machine**, so the checkboxes, the select-all bar and the send button are gone (AC-71/72, spec 004a §8).
+  Listing, verification state, expiry, **view and download** are all unchanged.
 - **Company rows carry verification state and expiry** — verified, valid-until, renews-annually, or
   no-document-yet in red. This asymmetry with V8 is deliberate: a company paper is checked and expires.
+- **local content and SASO are held certs**, not catalogue documents (`held_cert_docs.LC` / `.SASO`,
+  plus the legacy columns). The renter cannot tell, and must not have to.
 - Attention count on the group heading counts **rows needing action**, never a total.
 
 ### V10 · Map `[UI]`
@@ -211,14 +232,22 @@ label (*مؤكّد توفرها* / *لم يؤكد توفرها بعد*) · dista
 - Selecting a card focuses its marker and vice-versa (AC-15).
 
 ### V11 · The four requests `[UI][CT]`
-**AC** 17, 18
+**AC** 17, 18, 71
 
 | Request | Raised from |
 |---|---|
 | اطلب تأكيد التوفّر | the card (V5) and the detail (V7) |
 | اطلب معدّة أخرى | bottom of the list (dashed) and inside each detail |
-| اطلب مستنداً | per document row — equipment (V8) and company (V9) |
+| اطلب مستنداً | per document row — **equipment (V8) only** |
 | اطلب إضافتها | the shortfall alert (V4) |
+
+- **Revised 2026-08-08.** The document row above read *"equipment (V8) and company (V9)"*. A document
+  request names a machine, so the company arm is withdrawn — see V9 and spec 004a §8. The rule is held
+  by the payload **type**: `RenteeRequestDraft`'s `document` arm requires `scope: "equipment"` and a
+  non-nullable `equipmentId`, so the withdrawn ask cannot be written down, and `RenteeAsk` has no
+  `scope` field for a caller to assert one with.
+- **`scope: "company"` survives for exactly one ask** — the shortfall's «اطلب إضافتها», which asks *for*
+  a machine and so has none to name. Do not remove it.
 
 - **Reuse:** T6's `rentee_request` service — `ref` minted server-side, `serial` stamped from the
   resolved listing, `equipmentId` ownership-checked **before** the message exists.
@@ -284,9 +313,15 @@ data at all.
 - Rows carry **verification state and expiry** (V9's asymmetry with V8 is deliberate: a company paper is
   checked and does expire).
 - **Two storage systems, one response.** `cr` / `vat_cert` / `national_address` are catalogue documents;
-  **local content is a held cert** (`held_cert_docs.LC`, plus the legacy `local_content_doc_key` column
-  still dual-read by `resolveHeldCerts`). Read both, and mirror that dual-read rather than dropping the
-  legacy column.
+  **local content and SASO are held certs** (`held_cert_docs.LC` / `.SASO`, plus the legacy
+  `local_content_doc_key` / `saso_heavy_equip_doc_key` columns still dual-read by `resolveHeldCerts`).
+  Read both, and mirror that dual-read rather than dropping the legacy column.
+- **AC-70 is a DISPLAY criterion, not a request one** (re-scoped 2026-08-08). The dual-read exists so the
+  panel can show and open a held cert. It was briefly also the way a company-scope document request got
+  resolved; that request is withdrawn (V9, V11, spec 004a §8), and nothing about the read changes.
+- **Shipped.** `GET /marketplace/bids/{bidId}/company-documents` exists, presigns via `batchSignItems`
+  and is gated by the fleet read's predicate. 004a §7.1's "Company documents — data: ❌ none" is
+  corrected there.
 
 ### V15 · View, not only download — every document row `[UI]`
 **AC** 69
@@ -303,6 +338,26 @@ or a photo — especially on a phone.
 - §6.6's "presence only" governs **verification state**, not reachability: an equipment row still shows
   no verify badge. Presence-only was never meant to mean unopenable, and this ticket says so explicitly
   because the wording invites the opposite reading.
+- **Company rows are opened, not asked for** (2026-08-08). V15 gives them view + download; V9's request
+  affordance is withdrawn. The two are independent and only one changed.
+
+### V16 · The operator's documents — their own group `[UI]`
+**AC** 75, 76 · **New 2026-08-08.** Splits out of V8, which carried the operator's paperwork as a single
+row named "operator safety certificate" inside the machine's documents.
+
+- **A third group with its own rows and its own attention count.** An operator's papers are a different
+  subject with a different obligation; five documents behind one row hid both what was held and what was
+  owed.
+- Every row is **viewable, downloadable and requestable** on the same terms as any other (V15 / AC-69),
+  and obeys V8's required/not-required rule (AC-73).
+- **The backend's vocabulary, verbatim:** `operating_license` · `operator_tuv` · `operator_spsp` ·
+  `operator_id` · `operator_insurance`.
+- ⚠️ **`operating_license` carries no `operator_` prefix.** Identifying the family by that prefix drops
+  the licence — the most important paper in the set. Do not filter by prefix.
+- **Fixes a silent defect that is not confined to this group** (AC-76): paper rows resolved their link as
+  `held.find(d => d.url)?.url` — **the first file only**. A machine holding two ownership documents, two
+  equipment certificates or two operator papers rendered one link and dropped the rest with nothing on
+  screen to say so.
 
 ---
 

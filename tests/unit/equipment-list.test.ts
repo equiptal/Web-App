@@ -16,7 +16,7 @@ import { describe, expect, it } from "vitest";
 import { unitAvailability } from "@/lib/contract/bid-map";
 import { landingSelectionId, offeredMachines } from "@/lib/contract/equipment-list";
 import { mapFleet, type FleetMachine } from "@/lib/contract/fleet";
-import { composeMachineRequest, isSendableKind } from "@/lib/contract/rentee-request";
+import { composeDocumentRequest, composeMachineRequest, isSendableKind } from "@/lib/contract/rentee-request";
 import { certificateChips } from "@/components/map/panel/machine-panel-model";
 
 /* ─────────────────────────────────── fixtures ─────────────────────────────────── */
@@ -204,7 +204,9 @@ describe("composeMachineRequest — RM3-AC-17 / AC-07", () => {
     });
   });
 
-  it("scopes an ask with no machine to `company` — the pair the backend accepts", () => {
+  it("scopes an `alternative` with no machine to `company` — the pair the backend accepts", () => {
+    // The shortfall's sibling, and the ONLY surviving company-scope ask (product owner, 2026-08-08):
+    // it asks FOR a machine, so there is none to name.
     expect(composeMachineRequest("alternative", null)).toEqual({
       scope: "company",
       equipmentId: null,
@@ -217,26 +219,33 @@ describe("composeMachineRequest — RM3-AC-17 / AC-07", () => {
     });
   });
 
+  it("refuses an availability ask that names no machine — there is nothing to confirm", () => {
+    expect(composeMachineRequest("availability", null)).toBeNull();
+  });
+
   it("carries the machine as DATA, not only in prose", () => {
     const draft = composeMachineRequest("availability", "eq-9");
-    expect(draft.equipmentId).toBe("eq-9");
+    expect(draft?.equipmentId).toBe("eq-9");
   });
 
   it("puts several document types on ONE card, deduped and blank-free", () => {
-    const draft = composeMachineRequest("document", "eq-1", ["tuv", "tuv", " ", "istimara"]);
-    expect(draft.docTypes).toEqual(["tuv", "istimara"]);
+    // `composeDocumentRequest` and not `composeMachineRequest`: a document ask names a machine, so its
+    // id parameter is non-nullable and it has its own composer (2026-08-08).
+    const draft = composeDocumentRequest("eq-1", ["tuv", "tuv", " ", "istimara"]);
+    expect(draft?.docTypes).toEqual(["tuv_cert", "istimara"]);
   });
 
   it("adds no `docTypes` to a kind that has none", () => {
-    expect(composeMachineRequest("availability", "eq-1").docTypes).toBeUndefined();
+    expect(composeMachineRequest("availability", "eq-1")?.docTypes).toBeUndefined();
   });
 
   it("cannot emit the retired kind", () => {
     // `add_to_offer` is rejected with a 400 server-side; nothing on this surface may compose it.
     expect(isSendableKind("add_to_offer")).toBe(false);
-    for (const kind of ["availability", "document", "alternative"] as const) {
-      expect(isSendableKind(composeMachineRequest(kind, "eq-1").kind)).toBe(true);
+    for (const kind of ["availability", "alternative"] as const) {
+      expect(isSendableKind(composeMachineRequest(kind, "eq-1")!.kind)).toBe(true);
     }
+    expect(isSendableKind(composeDocumentRequest("eq-1", ["tuv"])!.kind)).toBe(true);
   });
 });
 

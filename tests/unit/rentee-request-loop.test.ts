@@ -4,14 +4,14 @@ import {
   composeAlternativeRequest,
   composeAvailabilityRequest,
   canonicalDocType,
-  companyDocAskSatisfied,
+  composeDocumentRequest,
   composeRenteeRequest,
+  composeShortfallRequest,
   documentAskSatisfied,
   parseRenteeRequestCard,
   parseRenteeRequestReply,
   renteeRequestState,
   type RenteeRequestCardPayload,
-  type RequestTargetCompany,
   type RequestTargetMachine,
 } from "@/lib/contract/rentee-request";
 
@@ -40,15 +40,14 @@ describe("composeRenteeRequest — one composer, four entry points (RM3-AC-17)",
     expect(composeAlternativeRequest(null)).toEqual({ scope: "company", equipmentId: null, kind: "alternative" });
   });
 
-  it("refuses an equipment-scoped ask that names no machine — the backend would 400 it", () => {
-    expect(composeRenteeRequest({ kind: "availability", equipmentId: null, scope: "equipment" })).toBeNull();
+  it("refuses an availability ask that names no machine — the backend would 400 it", () => {
+    expect(composeRenteeRequest({ kind: "availability", equipmentId: null })).toBeNull();
   });
 
   it("carries MANY document types on ONE card, deduped — never one card per row (§6.6)", () => {
     const draft = composeRenteeRequest({
       kind: "document",
       equipmentId: "eq-1",
-      scope: "equipment",
       docTypes: ["istimara", " Istimara ", "tuv", ""],
     });
     expect(draft?.docTypes).toEqual(["istimara", "tuv_cert"]);
@@ -63,10 +62,10 @@ describe("composeRenteeRequest — one composer, four entry points (RM3-AC-17)",
       .not.toHaveProperty("docTypes");
   });
 
-  it("nulls the id on a company-scoped document ask — company papers belong to the firm", () => {
-    const draft = composeRenteeRequest({ kind: "document", scope: "company", equipmentId: "eq-1", docTypes: ["cr"] });
-    expect(draft?.equipmentId).toBeNull();
-  });
+  /* The test that stood here asserted the opposite of today's rule: it nulled the id on a
+   * company-scoped document ask, because company papers belong to the firm. The product owner
+   * withdrew that ask on 2026-08-08 — a document request names a machine — so it is deleted rather
+   * than inverted, and the rule it contradicts is proved positively at the bottom of this file. */
 
   it("cannot emit the retired kind from any entry point (RM3-AC-07)", () => {
     for (const kind of RETIRED_REQUEST_KINDS) {
@@ -97,8 +96,13 @@ describe("composeRenteeRequest — one composer, four entry points (RM3-AC-17)",
     // listing carries for its safety cert); an alias that folded any onto another would have the
     // supplier upload the wrong paper. Scope decides which resolver reads the key, never a rename.
     expect(canonicalDocType("local_content")).toBe("local_content");
-    expect(canonicalDocType("saso")).toBe("saso");
     expect(canonicalDocType("istimara")).toBe("istimara");
+    // Every SASO spelling survives verbatim. A machine's `documentKeys` can carry several of them and
+    // only a machine's list ever answers an ask now, so an alias folding one onto another would have
+    // the supplier upload the wrong paper.
+    for (const t of ["saso", "saso_registration", "saso_inspection", "saso_technical_inspection"]) {
+      expect(canonicalDocType(t)).toBe(t);
+    }
   });
 
   it("collapses the two names for one photo onto one key, so the card asks once", () => {
@@ -242,153 +246,58 @@ describe("renteeRequestState — the machine is the verdict (RM3-AC-18)", () => 
   });
 });
 
-/* ────────── the company half: a paper that belongs to the firm, not to a machine ────────── */
 
-const firm = (over: Partial<RequestTargetCompany> = {}): RequestTargetCompany => ({
-  docKeys: [],
-  ...over,
-});
+/* ────────── a document request NAMES A MACHINE (product owner, 2026-08-08) ────────── */
 
-const companyAsk = (docTypes: string[]) =>
-  ask({ kind: "document", scope: "company", equipmentId: null, docTypes });
-
-describe("companyDocAskSatisfied — two storage systems behind four papers", () => {
-  it("a catalogue paper on the firm's file answers the ask", () => {
-    expect(companyDocAskSatisfied(firm({ docKeys: ["cr"] }), ["cr"])).toBe(true);
-    expect(companyDocAskSatisfied(firm({ docKeys: [] }), ["cr"])).toBe(false);
-  });
-
-  it("both sides go through the SAME alias table — the panel says `vat`, the catalogue says `vat_cert`", () => {
-    expect(companyDocAskSatisfied(firm({ docKeys: ["vat"] }), ["vat_cert"])).toBe(true);
-    expect(companyDocAskSatisfied(firm({ docKeys: ["vat_cert"] }), ["vat"])).toBe(true);
-  });
-
-  it("answered as a WHOLE — one card carries many papers, and a partial file is not an answer", () => {
-    const f = firm({ docKeys: ["cr", "vat_cert"] });
-    expect(companyDocAskSatisfied(f, ["cr", "vat_cert"])).toBe(true);
-    expect(companyDocAskSatisfied(f, ["cr", "national_address"])).toBe(false);
-  });
-
-  it("an ask naming nothing is a question about nothing", () => {
-    expect(companyDocAskSatisfied(firm({ docKeys: ["cr"] }), [])).toBe(false);
-  });
-
-  /* AC-70 — local content is a HELD CERT, and the legacy column is still populated. Resolving it
-   * against `docKeys` alone would leave the newly-requestable key permanently unanswered, which is
-   * exactly the failure `assertKnownDocTypes` refuses unknown types to prevent. */
-  it("local content resolves from the canonical `held_cert_docs.LC`", () => {
-    expect(companyDocAskSatisfied(firm({ heldCertDocs: { LC: "docs/lc.pdf" } }), ["local_content"])).toBe(true);
-  });
-
-  it("local content resolves from the LEGACY `local_content_doc_key` ALONE", () => {
-    expect(companyDocAskSatisfied(firm({ localContentDocKey: "docs/lc.pdf" }), ["local_content"])).toBe(true);
-  });
-
-  it("local content resolves from a mapped bid's `companyCertCodes` — mapBid already dual-read it", () => {
-    expect(companyDocAskSatisfied(firm({ certCodes: ["LC", "SASO"] }), ["local_content"])).toBe(true);
-    expect(companyDocAskSatisfied(firm({ certCodes: ["lc"] }), ["local_content"])).toBe(true);
-  });
-
-  it("a lowercase map key still counts — the map has more than one writer", () => {
-    expect(companyDocAskSatisfied(firm({ heldCertDocs: { lc: "docs/lc.pdf" } }), ["local_content"])).toBe(true);
-  });
-
-  it("no local-content file anywhere reads UNANSWERED, and SASO never stands in for it", () => {
-    expect(companyDocAskSatisfied(firm({ heldCertDocs: { SASO: "docs/saso.pdf" }, certCodes: ["SASO"] }), ["local_content"]))
-      .toBe(false);
-    expect(companyDocAskSatisfied(firm({ heldCertDocs: { LC: "" } }), ["local_content"])).toBe(false);
-    expect(companyDocAskSatisfied(firm({ localContentDocKey: "  " }), ["local_content"])).toBe(false);
-  });
-});
-
-describe("renteeRequestState — a company-scope document ask", () => {
-  it("reads ANSWERED off the firm's file, with no reply ever posted", () => {
-    expect(renteeRequestState(companyAsk(["local_content"]), null, null, firm({ certCodes: ["LC"] })))
-      .toBe("answered");
-  });
-
-  it("reads WAITING when the paper is not on the file — never refused", () => {
-    expect(renteeRequestState(companyAsk(["local_content"]), null, null, firm())).toBe("waiting");
-  });
-
-  it("DERIVED STATE WINS here too: a provided reply the firm's file does not corroborate reads waiting", () => {
-    expect(renteeRequestState(companyAsk(["cr"]), null, { resolution: "provided" }, firm())).toBe("waiting");
-  });
-
-  it("a refusal is still the reply's alone", () => {
-    expect(renteeRequestState(companyAsk(["cr"]), null, { resolution: "declined" }, firm())).toBe("refused");
-    expect(renteeRequestState(companyAsk(["cr"]), null, { resolution: "declined" }, firm({ docKeys: ["cr"] })))
-      .toBe("answered");
-  });
-
-  it("OMITTING the firm changes nothing — the ask falls back to the reply, exactly as before", () => {
-    // The whole point of the optional argument: `/deal-room/[id]` has no company read in hand and must
-    // keep behaving as it did rather than reading every company paper as missing.
-    expect(renteeRequestState(companyAsk(["local_content"]), null, null)).toBe("waiting");
-    expect(renteeRequestState(companyAsk(["local_content"]), null, { resolution: "provided" })).toBe("answered");
-  });
-
-  it("the shortfall `alternative` is STILL reply-only, even with the firm in hand", () => {
-    const card = ask({ kind: "alternative", scope: "company", equipmentId: null });
-    expect(renteeRequestState(card, null, null, firm({ docKeys: ["cr"], certCodes: ["LC"] }))).toBe("waiting");
-  });
-
-  it("an EQUIPMENT ask never reads a company paper as its answer", () => {
-    const card = ask({ kind: "document", equipmentId: "eq-1", docTypes: ["local_content"] });
-    expect(renteeRequestState(card, machine(), null, firm({ certCodes: ["LC"] }))).toBe("waiting");
-  });
-});
-
-describe("companyDocAskSatisfied — SASO, the same fix with an overloaded name", () => {
-  it("resolves from the canonical `held_cert_docs.SASO`", () => {
-    expect(companyDocAskSatisfied(firm({ heldCertDocs: { SASO: "docs/saso.pdf" } }), ["saso"])).toBe(true);
-  });
-
-  it("resolves from the LEGACY `saso_heavy_equip_doc_key` ALONE", () => {
-    expect(companyDocAskSatisfied(firm({ sasoHeavyEquipDocKey: "docs/saso.pdf" }), ["saso"])).toBe(true);
-  });
-
-  it("resolves from a mapped bid's `companyCertCodes`", () => {
-    expect(companyDocAskSatisfied(firm({ certCodes: ["SASO"] }), ["saso"])).toBe(true);
-  });
-
-  it("the two held certs never stand in for one another", () => {
-    expect(companyDocAskSatisfied(firm({ certCodes: ["LC"] }), ["saso"])).toBe(false);
-    expect(companyDocAskSatisfied(firm({ certCodes: ["SASO"] }), ["local_content"])).toBe(false);
-    // Both asked for, only one held — a partial file is not an answer.
-    expect(companyDocAskSatisfied(firm({ certCodes: ["SASO"] }), ["saso", "local_content"])).toBe(false);
-    expect(companyDocAskSatisfied(firm({ certCodes: ["SASO", "LC"] }), ["saso", "local_content"])).toBe(true);
-  });
-
-  it("an EQUIPMENT-level `saso` never answers the FIRM's SASO — the two are separated by scope alone", () => {
-    // `EQUIPMENT_CERT_TYPES` holds a bare `'saso'` for a machine's safety cert, and the retired
-    // `saso_registration` term already conflated the two once. The company resolver reads no machine…
-    const withSasoDoc = machine({ documentKeys: [{ type: "saso" }, { type: "saso_registration" }] });
-    expect(companyDocAskSatisfied(firm(), ["saso"])).toBe(false);
-    expect(renteeRequestState(companyAsk(["saso"]), withSasoDoc, null, firm())).toBe("waiting");
-    // …and the machine resolver reads no firm.
-    const eqAsk = ask({ kind: "document", equipmentId: "eq-1", docTypes: ["saso"] });
-    expect(renteeRequestState(eqAsk, machine(), null, firm({ certCodes: ["SASO"] }))).toBe("waiting");
-  });
-
-  it("the equipment SASO keys are never aliased onto the firm's, in either direction", () => {
-    // A company file holding the registration does not answer an ask for a machine's papers…
-    expect(companyDocAskSatisfied(firm({ certCodes: ["SASO"] }), ["saso_registration"])).toBe(false);
-    expect(companyDocAskSatisfied(firm({ certCodes: ["SASO"] }), ["saso_inspection"])).toBe(false);
-    // …and canonicalisation leaves every spelling exactly as written, so nothing can drift into another.
-    for (const t of ["saso", "saso_registration", "saso_inspection", "saso_technical_inspection"]) {
-      expect(canonicalDocType(t)).toBe(t);
+/**
+ * **The company-scope document ask is withdrawn**, and this suite is what replaces the one that
+ * asserted it. The renter can still ask about a machine's papers; he can no longer ask for the firm's,
+ * because a company paper is **read** from the panel — listed, opened, downloaded (V15 / AC-69) — and
+ * that read is untouched.
+ *
+ * The rule is enforced by the TYPE, not by a guard: `RenteeRequestDraft`'s `document` arm requires
+ * `scope: "equipment"` and a non-nullable `equipmentId`, so `kind: "document"` with a null id cannot be
+ * written down. `composeDocumentRequest` takes `equipmentId: string` for the same reason. The runtime
+ * assertions below cover the one caller that hands in untyped prose — the BFF route, which parses a
+ * JSON body straight into `composeRenteeRequest`.
+ */
+describe("a document ask cannot be composed without a machine (2026-08-08)", () => {
+  it("refuses a document ask naming no machine, however the id arrives", () => {
+    for (const equipmentId of [null, undefined, "", "   "]) {
+      expect(composeRenteeRequest({ kind: "document", equipmentId, docTypes: ["cr"] })).toBeNull();
     }
   });
-});
 
-describe("renteeRequestState — a company-scope SASO ask", () => {
-  it("reads ANSWERED off the firm's file, with no reply ever posted", () => {
-    expect(renteeRequestState(companyAsk(["saso"]), null, null, firm({ sasoHeavyEquipDocKey: "k" })))
-      .toBe("answered");
+  it("refuses it even when the types named are the firm's own papers", () => {
+    // The exact ask the company panel used to raise. It is not re-scoped, not downgraded — it is null.
+    expect(composeRenteeRequest({ kind: "document", equipmentId: null, docTypes: ["cr", "vat"] })).toBeNull();
+    expect(composeRenteeRequest({ kind: "document", equipmentId: null, docTypes: ["local_content"] })).toBeNull();
+    expect(composeRenteeRequest({ kind: "document", equipmentId: null, docTypes: ["saso"] })).toBeNull();
   });
 
-  it("reads WAITING when the registration is not on file — never refused", () => {
-    expect(renteeRequestState(companyAsk(["saso"]), null, null, firm())).toBe("waiting");
+  it("there is no `scope` input to assert one with — it is derived from the id alone", () => {
+    // A caller cannot smuggle a company scope past the derivation: the field does not exist on
+    // `RenteeAsk`, so an extra property is dropped rather than honoured.
+    const smuggled = { kind: "document", scope: "company", equipmentId: null, docTypes: ["cr"] };
+    expect(composeRenteeRequest(smuggled)).toBeNull();
+  });
+
+  it("every document ask that IS composed carries the machine and the equipment scope", () => {
+    const draft = composeDocumentRequest("eq-1", ["cr"]);
+    expect(draft).toEqual({ scope: "equipment", equipmentId: "eq-1", kind: "document", docTypes: ["cr"] });
+  });
+
+  it("the shortfall's company-scope `alternative` is UNTOUCHED — it asks FOR a machine, not about one", () => {
+    expect(composeShortfallRequest()).toEqual({ scope: "company", equipmentId: null, kind: "alternative" });
+    expect(composeAlternativeRequest(null)).toEqual({ scope: "company", equipmentId: null, kind: "alternative" });
+  });
+
+  it("a legacy company document card, posted before the reversal, falls back to the reply", () => {
+    // Nothing composable lands here any more, but a card already in a conversation still renders.
+    // There is no firm to derive from, so it says only what the supplier said — never "answered".
+    const legacy = ask({ kind: "document", scope: "company", equipmentId: null, docTypes: ["cr"] });
+    expect(renteeRequestState(legacy, null, null)).toBe("waiting");
+    expect(renteeRequestState(legacy, null, { resolution: "provided" })).toBe("answered");
+    expect(renteeRequestState(legacy, null, { resolution: "declined" })).toBe("refused");
   });
 });

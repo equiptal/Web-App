@@ -16,8 +16,17 @@
  *             local_content: { present: bid.compliance.localContent } }}
  *     ar={ar} L={L}
  *     onBack={() => setCompanyOpen(false)}
- *     onRequest={(draft) => compose(draft)}   // PanelRequestDraft — V11 owns the composer
  *   />
+ *
+ * **Read and open — never request** (product owner, 2026-08-08). This panel briefly carried the same
+ * select-all + batch «اطلب مستنداً» the equipment tab does, so a renter could ask the firm for its CR.
+ * That is withdrawn: **a document request names a machine**, and a company paper belongs to the firm.
+ * The checkboxes, the select-all bar, the send button and the `onRequest` prop are all gone, and the
+ * composer can no longer represent the ask (`RenteeRequestDraft` in `rentee-request.ts`). §6.6's "both
+ * use the same grammar" is corrected in the spec accordingly.
+ *
+ * **Nothing else changed.** All five papers are still listed, still carry verification state and
+ * expiry, and still open and download (V15 / AC-69).
  *
  * **A document list, not a profile.** No contact info, no deals count, no CR/VAT *numbers* — AC-02
  * keeps identity in the header and paperwork in these rows, and this panel is where the header's
@@ -36,16 +45,13 @@
  * details is not reversible after the fact; adding the row back later is one line.
  */
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { DocRowList } from "./DocRowList";
 import {
-  arDigits,
   attentionCount,
-  batchDocumentRequest,
   companyDocRows,
   type CompanyDocInput,
   type CompanyDocKey,
-  type PanelRequestDraft,
 } from "./machine-panel-model";
 import "./panel-proto.css";
 
@@ -59,35 +65,11 @@ export interface CompanyPanelProps {
   ar: boolean;
   L: (en: string, ar: string) => string;
   onBack: () => void;
-  onRequest?: (draft: PanelRequestDraft) => void;
 }
 
-export function CompanyPanel({ companyName, verified, docs, ar, L, onBack, onRequest }: CompanyPanelProps) {
+export function CompanyPanel({ companyName, verified, docs, ar, L, onBack }: CompanyPanelProps) {
   const rows = useMemo(() => companyDocRows({ verified, docs }), [verified, docs]);
   const attention = attentionCount(rows);
-  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set<string>());
-
-  const toggle = (key: string) =>
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  const toggleAll = (keys: string[], select: boolean) =>
-    setSelected((prev) => {
-      const next = new Set(prev);
-      for (const k of keys) {
-        if (select) next.add(k);
-        else next.delete(k);
-      }
-      return next;
-    });
-
-  // Company papers belong to the FIRM, so the draft carries a null `equipmentId` — naming a machine on
-  // a CR request would thread the answer onto the wrong subject.
-  const draft = batchDocumentRequest("company", null, rows, selected);
-  const picked = rows.filter((r) => selected.has(r.key)).length;
 
   return (
     <div className="mp mp-over" dir={ar ? "rtl" : "ltr"}>
@@ -121,33 +103,10 @@ export function CompanyPanel({ companyName, verified, docs, ar, L, onBack, onReq
               thumbUrl: null,
               downloadUrl: r.downloadUrl,
             }))}
-            selected={selected}
-            onToggle={toggle}
-            onToggleAll={toggleAll}
+            /* No `selected` / `onToggle` / `onToggleAll`: these rows cannot be requested, so they
+               render with no tick and no select-all bar. See the note at the top of this file. */
             L={L}
           />
-
-          <button
-            type="button"
-            className="mp-send"
-            disabled={!draft || !onRequest}
-            onClick={() => {
-              if (draft && onRequest) {
-                onRequest(draft);
-                setSelected(new Set<string>());
-              }
-            }}
-          >
-            {picked === 0
-              ? L("Request documents — tick what you need", "اطلب مستندات — حدّد ما تحتاجه")
-              : L(`Request ${picked} documents`, `اطلب ${arDigits(picked)} مستندات`)}
-          </button>
-          <p className="mp-note">
-            {L(
-              "One request naming everything you ticked — not one message per row.",
-              "طلب واحد يذكر كل ما حدّدته — لا رسالة لكل صف.",
-            )}
-          </p>
         </div>
       </div>
     </div>

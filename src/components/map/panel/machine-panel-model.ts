@@ -593,6 +593,11 @@ export function equipmentDocGroups(machine: FleetMachine): DocGroup[] {
  * **Company rows DO carry verification state and expiry** (§6.6, AC-40) — the deliberate asymmetry with
  * the equipment rows above. A company paper is checked and it does expire, so hiding that would strand
  * the renter with a CR that lapsed last month.
+ *
+ * **A company row is read, never requested** (product owner, 2026-08-08). It carried a `docTypes` list
+ * whose only consumer was `batchDocumentRequest`; with the company ask withdrawn that list has no
+ * reader, so it is deleted rather than left as an unused extension point. The row still states its
+ * status and still opens and downloads its paper (AC-69) — that is the whole of what it does.
  */
 export type CompanyDocStatus = "verified" | "on_file" | "missing";
 
@@ -605,7 +610,6 @@ export interface CompanyDocRow {
   /** The row's **one** presigned url — view and download both point at it (`docRowActions`). Null on a
    *  paper the firm has not filed, and then the row exposes neither control (AC-69). */
   downloadUrl: string | null;
-  docTypes: string[];
 }
 
 export type CompanyDocKey = "cr" | "vat" | "national_address" | "local_content" | "saso";
@@ -623,14 +627,15 @@ export type CompanyDocKey = "cr" | "vat" | "national_address" | "local_content" 
  *
  * **`local_content` and `saso` are HELD CERTS, not catalogue documents.** They live in
  * `supplier_profiles.held_cert_docs` (`{LC: key}` / `{SASO: key}`) with legacy `local_content_doc_key`
- * and `saso_heavy_equip_doc_key` columns still dual-read, which is why neither had a catalogue key —
- * and therefore why a renter's request naming either was refused — until V14. They are listed here
- * because a renter verifying a firm does not care which table a paper is stored in.
+ * and `saso_heavy_equip_doc_key` columns still dual-read. That dual-read is why the panel can DISPLAY
+ * and open them at all; it is not a request path — a company paper is read, never requested (product
+ * owner, 2026-08-08). They are listed here because a renter verifying a firm does not care which table
+ * a paper is stored in.
  *
  * **This `saso` is the COMPANY registration, never the equipment cert.** The word names four different
- * papers across the tree, and `canonicalDocType` above folds every `saso*` spelling to one equipment
- * type. The two never meet: this list is resolved against the firm and never against a listing, so an
- * equipment-level SASO cannot answer a company-level ask or the reverse.
+ * papers across the tree. The two never meet: this list is resolved against the firm and never against
+ * a listing, and since a document request now always names a machine, only a listing's own
+ * `documentKeys` can ever answer one.
  */
 export const COMPANY_DOC_KEYS: CompanyDocKey[] = ["cr", "vat", "national_address", "local_content", "saso"];
 
@@ -654,7 +659,6 @@ export interface CompanyDocInput {
   /** True for a paper the issuer reissues every year (a VAT certificate) — shown instead of an expiry. */
   renewsAnnually?: boolean;
   downloadUrl?: string | null;
-  docType?: string;
 }
 
 /** The company as this panel needs it. Structurally satisfiable from a `BidCard`'s `verified` +
@@ -684,7 +688,6 @@ export function companyDocRows(source: CompanyDocsSource): CompanyDocRow[] {
   return COMPANY_DOC_KEYS.map((key) => {
     const input = source.docs[key];
     const label = COMPANY_DOC_LABEL[key];
-    const docTypes = [input?.docType ?? key];
     if (!input?.present) {
       return {
         key,
@@ -692,7 +695,6 @@ export function companyDocRows(source: CompanyDocsSource): CompanyDocRow[] {
         status: "missing" as const,
         statusLine: { en: "no document yet", ar: "لا يوجد مستند بعد" },
         downloadUrl: null,
-        docTypes,
       };
     }
     const status: CompanyDocStatus = source.verified ? "verified" : "on_file";
@@ -711,7 +713,6 @@ export function companyDocRows(source: CompanyDocsSource): CompanyDocRow[] {
       status,
       statusLine: tail ? { en: `${head.en} · ${tail.en}`, ar: `${head.ar} · ${tail.ar}` } : head,
       downloadUrl: input.downloadUrl ?? null,
-      docTypes,
     };
   });
 }
@@ -730,19 +731,23 @@ export type PanelRequestDraft =
   | { kind: "alternative"; equipmentId: string | null }
   | {
       kind: "document";
-      /** Null for company papers — they belong to the firm, not to a machine. */
-      equipmentId: string | null;
-      scope: "equipment" | "company";
+      /**
+       * **Never null, and never a company scope** — a document request names a machine (product owner,
+       * 2026-08-08). This arm briefly carried `equipmentId: string | null` beside a
+       * `scope: "equipment" | "company"` so the company panel could ask the firm for its CR; that ask
+       * is withdrawn, and the type is narrowed rather than guarded so no surface can compose it again.
+       */
+      equipmentId: string;
       /** **One request naming several types** (§6.6) — never one request per row. */
       docTypes: string[];
       labels: Bilingual[];
     };
 
-/** Build the one batch document request for a set of ticked rows. Returns null when nothing is ticked,
- *  so a caller can disable its send control from the same source of truth that builds the payload. */
+/** Build the one batch document request for a set of ticked rows on ONE machine. Returns null when
+ *  nothing is ticked, so a caller can disable its send control from the same source of truth that
+ *  builds the payload. */
 export function batchDocumentRequest(
-  scope: "equipment" | "company",
-  equipmentId: string | null,
+  equipmentId: string,
   rows: { key: string; label: Bilingual; docTypes: string[] }[],
   selected: ReadonlySet<string>,
 ): PanelRequestDraft | null {
@@ -750,8 +755,7 @@ export function batchDocumentRequest(
   if (picked.length === 0) return null;
   return {
     kind: "document",
-    equipmentId: scope === "company" ? null : equipmentId,
-    scope,
+    equipmentId,
     docTypes: [...new Set(picked.flatMap((r) => r.docTypes).filter((t) => t.trim() !== ""))],
     labels: picked.map((r) => r.label),
   };

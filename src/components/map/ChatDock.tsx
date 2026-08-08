@@ -50,7 +50,6 @@ import {
   RENTEE_REQUEST_CARD_TYPE,
   RENTEE_REQUEST_REPLY_CARD_TYPE,
   type RenteeRequestCardPayload,
-  type RequestTargetCompany,
 } from "@/lib/contract/rentee-request";
 import { useLocale, useT } from "@/lib/i18n";
 import "@/components/deal-room/deal-room-proto.css";
@@ -239,23 +238,12 @@ export function ChatDock({ bid, groupKey = null, fleet, sendNonce = 0 }: ChatDoc
     [L],
   );
 
-  /**
-   * The anchor bid's FIRM, for a company-scope document ask — one that names no machine, because a
-   * company paper belongs to the firm and not to a unit.
-   *
-   * Read off the bid the dock already holds; no fetch is added. `mapBid` has already done the
-   * local-content dual-read (`held_cert_docs.LC` **or** the legacy `local_content_doc_key`) to produce
-   * `companyCertCodes`, and `compliance` states the three catalogue papers, so the ask can be answered
-   * from the file the supplier keeps rather than waiting for a reply card he will not post.
+  /*
+   * The anchor bid's FIRM used to be assembled here, so a company-scope document ask could be resolved
+   * against `compliance` + `companyCertCodes` instead of waiting for a reply card. There is no such ask
+   * any more — a document request names a machine (product owner, 2026-08-08) — so the memo, and the
+   * `company` resolver it fed on `requestCtx`, are deleted rather than left dangling.
    */
-  const firm = useMemo<RequestTargetCompany>(() => {
-    const c = bid.compliance;
-    const docKeys: string[] = [];
-    if (c.activityLicense) docKeys.push("cr");
-    if (c.taxNumber) docKeys.push("vat_cert");
-    if (c.nationalAddress) docKeys.push("national_address");
-    return { docKeys, certCodes: bid.companyCertCodes ?? [] };
-  }, [bid.compliance, bid.companyCertCodes]);
 
   const requestCtx = useMemo(
     () =>
@@ -276,11 +264,10 @@ export function ChatDock({ bid, groupKey = null, fleet, sendNonce = 0 }: ChatDoc
               };
             },
             reply: (ref: string) => repliesByRef.get(ref) ?? null,
-            company: () => firm,
             docLabel,
           }
         : undefined,
-    [active?.bidId, bid.id, fleet, fleetById, repliesByRef, firm, docLabel],
+    [active?.bidId, bid.id, fleet, fleetById, repliesByRef, docLabel],
   );
 
   /* ── the arrival notice (004a §2.1) ──────────────────────────────────────────────────────────── */
