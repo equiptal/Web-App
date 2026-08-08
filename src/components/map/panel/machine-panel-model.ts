@@ -80,7 +80,9 @@ export interface MatchCell {
 export interface MatchRequest {
   /** Raw requested equipment-cert codes (lowercase, e.g. `["aramco","tuv"]`). */
   reqEquipmentCerts?: string[] | null;
-  /** The renter's required operator licence level — one free-text field, split by `readinessInputsFor`. */
+  /** The renter's required operator licence level — one comma-joined field of request codes
+   *  (`TUV` · `SPSP` · `CERTIFIED` · `SAFETY_CERT` · `SAFETY`), translated into document kinds by
+   *  `readinessInputsFor`; a code outside that table names no paper and is dropped. */
   operatorCertReq?: string | null;
   /** The raw equipment-year requirement: a min year like 2020, or an age. */
   reqMinYear?: number | null;
@@ -187,12 +189,15 @@ const isEquipmentCertDoc = (d: OfferedUnitDoc): boolean => !isOperatorDoc(d) && 
 /**
  * An operator paper's **row code**.
  *
- * `canonicalCertCode` is the one normaliser (`bid-readiness.ts`) and it strips the `operator_` prefix,
- * which is exactly right for matching an asked-for "TÜV" against a held `operator_tuv`. But it sends
- * the three spellings of one licence to three different codes — `operating_license` stays whole while
- * `operator_license` / `operator_licence` lose their prefix and become `license` / `licence`. Left
- * alone that renders the operator's licence as three rows for one paper, so the family is folded here,
- * on top of the shared normaliser rather than instead of it.
+ * The scorer now hands over operator **document kinds** (`operator_tuv` · `operator_spsp` ·
+ * `operating_license` — the app's table, `bid-readiness.ts`), so this only has to turn a kind into the
+ * key `OPERATOR_CERT_ROW_LABEL` is written against. `canonicalCertCode` does most of it by stripping
+ * the `operator_` prefix (`operator_tuv` → `tuv`), but it sends the spellings of one licence to
+ * different codes — `operating_license` stays whole while `operator_license` / `operator_licence` lose
+ * their prefix and become `license` / `licence`. Left alone that renders the operator's licence as
+ * several rows for one paper, so the family is folded here, on top of the shared normaliser rather than
+ * instead of it. (With the ask now translated upstream, the fold is defensive: it also catches a paper
+ * the MACHINE happens to carry under one of the other spellings.)
  */
 function operatorCertCode(type: string): string {
   const c = canonicalCertCode(type);
@@ -813,10 +818,11 @@ function unionCodes(requested: string[], held: Map<string, OfferedUnitDoc[]>): s
  * openable equipment row through the other door.
  */
 function operatorStatusRows(certs: readonly { code: string; present: boolean }[]): DocRow[] {
-  // The scorer canonicalises the ASK; `operatorCertCode` folds the three licence spellings on top of it,
-  // so "operator licence" asked for under two names is ONE row. When it is, the row is present if ANY of
-  // the folded asks was satisfied — the licence is on the file or it is not, and the spelling the renter
-  // happened to type cannot make it two different papers with two different verdicts.
+  // The scorer translates the ASK into document kinds (and already dedupes them, so `CERTIFIED` and
+  // `SAFETY_CERT` arrive as one `operating_license`); `operatorCertCode` folds the licence spellings on
+  // top of that, so one paper is ONE row. When two asks do fold together, the row is present if ANY of
+  // them was satisfied — the licence is on the file or it is not, and the spelling the renter happened
+  // to type cannot make it two different papers with two different verdicts.
   const order: string[] = [];
   const present = new Map<string, boolean>();
   for (const cert of certs) {

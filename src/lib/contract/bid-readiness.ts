@@ -6,6 +6,13 @@
  * the renter's `offeredUnitsDetail`, so scoring it would hold every supplier permanently short). Scoring
  * is presence-based (a held key counts; verify status only decorates). Purely client-side — no backend
  * readiness number exists. Applies only to NATIVE app bids (those carrying `offeredUnitsDetail`).
+ *
+ * **The app is the reference implementation** (owner's ruling, 2026-08-08: *"fix the web to be like the
+ * app — always align with the app"*). The two families of certificate are matched differently and that
+ * split is the app's, not an invention here: an EQUIPMENT cert is asked for and matched by family
+ * (`canonicalCertCode`), while an OPERATOR cert is asked for by request code, translated into the
+ * document kind that code stands for (`OPERATOR_REQ_CODE_TO_DOC_KIND`), and matched against the
+ * machine's raw document type exactly. Anything the operator table does not know is dropped, not scored.
  */
 
 import type { BidCard, OfferedUnitDetail } from "./bids";
@@ -56,12 +63,71 @@ const EQ_CERT_LABELS: Record<string, { en: string; ar: string }> = {
 };
 
 /**
- * Normalize a cert code or doc-type token to a canonical equipment-cert key (tuv/aramco/spsp/saso).
+ * Requested operator-cert codes (the request item's `operatorLicenseLevel`) → **the operator document
+ * kind a machine can actually hold**.
+ *
+ * Ported verbatim from the app's `kOperatorReqCodeToDocKind` (`bid_readiness.dart`), which is the
+ * reference implementation (owner's ruling, 2026-08-08: *"fix the web to be like the app"*). SASO has
+ * no operator kind, so it is deliberately absent; the legacy `CERTIFIED` / `SAFETY_CERT` / `SAFETY`
+ * spellings all mean the operating licence.
+ *
+ * **A code that is not in this table is DROPPED, not scored** — see `requestedOperatorCertKinds`.
+ */
+export const OPERATOR_REQ_CODE_TO_DOC_KIND: Record<string, string> = {
+  TUV: "operator_tuv",
+  SPSP: "operator_spsp",
+  CERTIFIED: "operating_license",
+  SAFETY_CERT: "operating_license",
+  SAFETY: "operating_license",
+};
+
+/** Labels for the operator DOCUMENT KINDS above — the app's own wording (`docCertOperator*`). Keyed by
+ *  doc kind, never by `canonicalCertCode`: operator papers are a separate vocabulary. */
+const OPERATOR_CERT_LABELS: Record<string, { en: string; ar: string }> = {
+  operator_tuv: { en: "Operator TÜV", ar: "شهادة TUV للمشغّل" },
+  operator_spsp: { en: "Operator SPSP", ar: "شهادة SPSP للمشغّل" },
+  operating_license: { en: "Operating licence", ar: "رخصة تشغيل" },
+};
+
+/**
+ * The operator DOCUMENT KINDS a request asks for, from its raw `operatorLicenseLevel` string.
+ *
+ * **The app's rule, ported as-is** (`requestedOperatorCertKinds` in `bid_readiness.dart`): split on
+ * commas, trim, uppercase, drop blanks, map through `OPERATOR_REQ_CODE_TO_DOC_KIND`, and **drop
+ * anything the table does not know**. Deduped, in first-seen order (Dart's `Set` is insertion-ordered,
+ * so the app produces the same order).
+ *
+ * Dropping is the load-bearing half. An unmapped code (`GRADE-1`, `OPERATING_LICENSE`, free text the
+ * renter typed) names no document a machine can carry, so scoring it would hold every lessor
+ * permanently one key short — a red the supplier cannot clear by uploading anything. The app has always
+ * dropped it; the web used to keep it and score it red forever.
+ */
+export function requestedOperatorCertKinds(raw: string | null | undefined): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const token of String(raw ?? "").split(",")) {
+    const code = token.trim().toUpperCase();
+    if (!code) continue;
+    const kind = OPERATOR_REQ_CODE_TO_DOC_KIND[code];
+    if (!kind || seen.has(kind)) continue;
+    seen.add(kind);
+    out.push(kind);
+  }
+  return out;
+}
+
+/**
+ * Normalize a cert code or doc-type token to a canonical **equipment**-cert key (tuv/aramco/spsp/saso).
  *
  * **Exported because the machine panel's document rows are keyed by exactly this code.** The rows are
  * the union of the certs the request asked for and the certs the machine holds, so the two halves have
  * to fold identically — a second normaliser is how a held `operator_tuv` stops answering an asked-for
  * `TÜV` and the renter is shown a gap the scorer says is filled.
+ *
+ * ⚠️ **Equipment only.** Operator asks do NOT come through here — they go through
+ * `requestedOperatorCertKinds` and match the machine's raw document type exactly, because that is what
+ * the app does. Widening this function to serve both is how the two families start borrowing each
+ * other's verdicts.
  */
 export function canonicalCertCode(x: string): string {
   const t = x.trim().toLowerCase().replace(/[\s-]+/g, "_").replace(/^operator_/, "");
@@ -75,6 +141,12 @@ const bandOf = (percent: number): ReadinessBand => (percent >= 100 ? "green" : p
 const certLabel = (code: string): { labelEn: string; labelAr: string } => {
   const l = EQ_CERT_LABELS[code] ?? { en: code.toUpperCase(), ar: code.toUpperCase() };
   return { labelEn: l.en, labelAr: l.ar };
+};
+/** An operator doc kind's chip label. Separate from `certLabel` because the codes are document kinds
+ *  (`operator_tuv`), not equipment-cert families — `certLabel` would shout `OPERATOR_TUV` at the renter. */
+const operatorCertLabel = (kind: string): { labelEn: string; labelAr: string } => {
+  const l = OPERATOR_CERT_LABELS[kind];
+  return l ? { labelEn: l.en, labelAr: l.ar } : certLabel(kind);
 };
 
 /**
@@ -92,16 +164,19 @@ const certLabel = (code: string): { labelEn: string; labelAr: string } => {
 export function computeUnitReadiness(
   unit: OfferedUnitDetail,
   reqEquipCerts: string[],
-  reqOperatorCerts: string[],
+  reqOperatorCertKinds: string[],
   reqMinYear: number | null,
 ): UnitReadiness {
-  // Split the unit's held docs into operator-level vs equipment-level, keyed by canonical cert.
-  const eqDocByCert = new Map<string, string | null>(); // cert → presigned url
-  const opDocByCert = new Map<string, string | null>();
+  // Equipment certs fold through `canonicalCertCode`; operator-prefixed papers stay OUT of that bucket
+  // so a held `operator_tuv` can never answer an equipment TÜV ask.
+  const eqDocByCert = new Map<string, string | null>(); // canonical equipment cert → presigned url
+  // The machine's RAW document types, exactly as the wire spells them — the app's `unitDocTypes`. The
+  // operator match is `docTypes.contains(kind)`, an exact equality, so nothing is normalised here.
+  const docTypeUrl = new Map<string, string | null>();
   for (const d of unit.documentKeys) {
     const isOp = d.type.trim().toLowerCase().startsWith("operator");
-    const cert = canonicalCertCode(d.type);
-    (isOp ? opDocByCert : eqDocByCert).set(cert, d.url ?? null);
+    if (!isOp) eqDocByCert.set(canonicalCertCode(d.type), d.url ?? null);
+    docTypeUrl.set(d.type, d.url ?? null);
   }
 
   const equipmentCerts: ReadinessCert[] = reqEquipCerts.map((c) => {
@@ -109,10 +184,14 @@ export function computeUnitReadiness(
     const present = eqDocByCert.has(code);
     return { code, ...certLabel(code), present, url: present ? eqDocByCert.get(code) ?? null : null };
   });
-  const operatorCerts: ReadinessCert[] = reqOperatorCerts.map((c) => {
-    const code = canonicalCertCode(c);
-    const present = opDocByCert.has(code) || eqDocByCert.has(code); // fall back if not operator-prefixed
-    return { code, ...certLabel(code), present, url: present ? opDocByCert.get(code) ?? eqDocByCert.get(code) ?? null : null };
+  // `reqOperatorCertKinds` are already DOCUMENT KINDS (`readinessInputsFor` → `requestedOperatorCertKinds`),
+  // so this is the app's `docTypes.contains(kind)` and nothing else. It used to run the ask through
+  // `canonicalCertCode` and hunt for a doc of that name, which is why an asked-for `CERTIFIED` looked for
+  // a paper called `certified` that no machine has ever carried and read red against a lessor whose own
+  // app read green.
+  const operatorCerts: ReadinessCert[] = reqOperatorCertKinds.map((kind) => {
+    const present = docTypeUrl.has(kind);
+    return { code: kind, ...operatorCertLabel(kind), present, url: present ? docTypeUrl.get(kind) ?? null : null };
   });
 
   const front = unit.photoKeys.some((p) => /front/i.test(p.slot));
@@ -154,7 +233,11 @@ export function computeUnitReadiness(
 export interface ReadinessInputs {
   /** Canonicalised equipment-cert codes the request asked for. */
   equipCerts: string[];
-  /** Operator-cert tokens the request asked for (the raw licence-level string, split). */
+  /**
+   * Operator **document kinds** the request asked for (`operator_tuv` · `operator_spsp` ·
+   * `operating_license`) — already translated out of the renter's request codes by
+   * `requestedOperatorCertKinds`, with unmapped codes dropped. NOT raw ask tokens.
+   */
   operatorCerts: string[];
   /** The raw equipment-year requirement (a min year like 2020, or an age). */
   minYear: number | null;
@@ -163,8 +246,13 @@ export interface ReadinessInputs {
 /**
  * Derive the request-side asks from anything carrying them. Extracted verbatim out of
  * `computeBidReadiness` so RMAP T16 can score a fleet machine the bid never offered with exactly the
- * same normalisation — `normCert` folds `saso_technical_inspection` into `saso`, and the operator ask
- * is one free-text field that has to be split before it can be matched.
+ * same normalisation — `canonicalCertCode` folds `saso_technical_inspection` into `saso`, and the
+ * operator ask is one free-text field that has to be split and translated into document kinds before it
+ * can be matched.
+ *
+ * The two families normalise differently **on purpose** and this is the app's own split: an equipment
+ * cert is asked for by family and matched by family; an operator cert is asked for by request code and
+ * matched by the exact document kind that code stands for.
  */
 export function readinessInputsFor(src: {
   reqEquipmentCerts?: string[] | null;
@@ -173,10 +261,7 @@ export function readinessInputsFor(src: {
 }): ReadinessInputs {
   return {
     equipCerts: (src.reqEquipmentCerts ?? []).map(canonicalCertCode),
-    operatorCerts: String(src.operatorCertReq ?? "")
-      .split(/[,/]/)
-      .map((s) => s.trim())
-      .filter(Boolean),
+    operatorCerts: requestedOperatorCertKinds(src.operatorCertReq),
     minYear: src.reqMinYear ?? null,
   };
 }

@@ -317,7 +317,8 @@ describe("equipmentDocGroups — the groups, and each one's own attention count 
   });
 
   it("answers an asked-for licence with a held `operating_license` — it carries no `operator_` prefix", () => {
-    const g = groupBy(machine({ docs: [{ type: "operating_license" }] }), asking([], "operating_license"));
+    // `CERTIFIED` is the request code; `operating_license` is the paper it stands for (the app's table).
+    const g = groupBy(machine({ docs: [{ type: "operating_license" }] }), asking([], "CERTIFIED"));
     expect(g.operator.rows.map((r) => r.key)).toEqual(["doc:operator:operating_license"]);
     expect(g.operator.rows[0].label.en).toBe("Operator licence");
     expect(g.operator.rows[0].status).toBe("present"); // the prefix test alone would have read it missing
@@ -325,30 +326,25 @@ describe("equipmentDocGroups — the groups, and each one's own attention count 
     expect(g.documents.rows.map((r) => r.key)).toEqual(["doc:ownership"]);
   });
 
-  it("folds the three spellings of the operator's licence into ONE row", () => {
-    const g = groupBy(machine({ docs: [] }), asking([], "operating_license / operator_license / operator_licence"));
+  it("folds the three request codes for the operator's licence into ONE row", () => {
+    const g = groupBy(machine({ docs: [] }), asking([], "CERTIFIED, SAFETY_CERT, SAFETY"));
     expect(g.operator.rows.map((r) => r.key)).toEqual(["doc:operator:operating_license"]);
   });
 
-  it("keeps every operator paper the backend's vocabulary names as a row of its own", () => {
-    // web-handoff.md:16 — operator_tuv · operating_license · operator_spsp · operator_id · operator_insurance
-    const g = groupBy(
-      machine({ docs: [] }),
-      asking([], "operator_tuv, operating_license, operator_spsp, operator_id, operator_insurance"),
-    );
+  it("keeps every operator paper a request can actually ask for as a row of its own", () => {
+    // The ask vocabulary is the app's table — TUV · SPSP · CERTIFIED/SAFETY_CERT/SAFETY — and it reaches
+    // exactly three of the backend's operator papers (web-handoff.md:16). `operator_id` and
+    // `operator_insurance` are held but never requested, so they are not rows.
+    const g = groupBy(machine({ docs: [] }), asking([], "TUV, SPSP, CERTIFIED"));
     expect(g.operator.rows.map((r) => r.key)).toEqual([
       "doc:operator:tuv",
-      "doc:operator:operating_license",
       "doc:operator:spsp",
-      "doc:operator:id",
-      "doc:operator:insurance",
+      "doc:operator:operating_license",
     ]);
     expect(g.operator.rows.map((r) => r.label.en)).toEqual([
       "Operator TÜV",
-      "Operator licence",
       "Operator SPSP",
-      "Operator ID",
-      "Operator insurance",
+      "Operator licence",
     ]);
   });
 
@@ -488,7 +484,7 @@ describe("the operator's section on a job with NO operator", () => {
   });
 
   it("turns red only once the request asks for the operator's papers", () => {
-    const g = groupBy(machine({ docs: [] }), asking([], "TÜV / SPSP"));
+    const g = groupBy(machine({ docs: [] }), asking([], "TUV,SPSP"));
     expect(g.operator.rows.map((r) => [r.key, r.status])).toEqual([
       ["doc:operator:tuv", "missing"],
       ["doc:operator:spsp", "missing"],
@@ -678,21 +674,20 @@ describe("the operator's certificates say present or absent, and expose no file"
   });
 
   it("reads the SCORER's `present`, so the panel and the readiness card cannot disagree", () => {
-    // `computeUnitReadiness` falls back to the equipment bucket for a paper carrying no `operator_`
-    // prefix. Bucketing `documentKeys` a second time here is exactly the second opinion this avoids —
-    // which also means the panel inherits the scorer's own reach, including this one.
-    const g = groupBy(machine({ docs: [{ type: "operating_license" }] }), asking([], "operating_license"));
+    // The scorer translates the request code `CERTIFIED` into the kind a machine actually carries
+    // (`operating_license`) — the app's table. Bucketing `documentKeys` a second time here is exactly
+    // the second opinion this avoids, so the panel inherits that translation rather than repeating it.
+    const g = groupBy(machine({ docs: [{ type: "operating_license" }] }), asking([], "CERTIFIED"));
     expect(g.operator.rows.map((r) => [r.key, r.status])).toEqual([["doc:operator:operating_license", "present"]]);
   });
 
-  it("folds two spellings of one licence into one row, and one verdict — satisfied if EITHER was", () => {
-    // `operator_license` and `operating_license` are one paper. The scorer answers each ask token
-    // separately and its `canonicalCertCode` sends the two spellings to different keys, so only the
-    // second is matched here; folding them without OR-ing would let the spelling the renter typed decide
-    // whether his own licence counts.
+  it("raises NO row for an operator code that names no document — never a permanently red one", () => {
+    // A code outside the app's table (`GRADE-1`, free text, a paper the platform does not carry) names
+    // nothing a lessor could upload. The scorer drops it, so the renter is not shown a red row the
+    // supplier can never clear. The licence asked for alongside it still gets its row.
     const g = groupBy(
       machine({ docs: [{ type: "operating_license" }] }),
-      asking([], "operator_license / operating_license"),
+      asking([], "GRADE-1, CERTIFIED"),
     );
     expect(g.operator.rows.map((r) => [r.key, r.status])).toEqual([["doc:operator:operating_license", "present"]]);
   });

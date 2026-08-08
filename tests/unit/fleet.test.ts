@@ -157,11 +157,13 @@ describe("what gets plotted (AC-19) — coordinates only", () => {
 });
 
 describe("computeUnitReadiness — one scorer for machines with and without a bid", () => {
-  const inputs = readinessInputsFor({ reqEquipmentCerts: ["tuv", "saso_technical_inspection"], operatorCertReq: "grade-1", reqMinYear: 2020 });
+  const inputs = readinessInputsFor({ reqEquipmentCerts: ["tuv", "saso_technical_inspection"], operatorCertReq: "SPSP", reqMinYear: 2020 });
 
   it("normalises the request-side asks exactly as computeBidReadiness does", () => {
     expect(inputs.equipCerts).toEqual(["tuv", "saso"]);
-    expect(inputs.operatorCerts).toEqual(["grade-1"]);
+    // The operator ask is a request CODE translated into the document kind a machine carries — it is
+    // not passed through as a token the way the equipment families are.
+    expect(inputs.operatorCerts).toEqual(["operator_spsp"]);
     expect(inputs.minYear).toBe(2020);
   });
 
@@ -186,7 +188,7 @@ describe("computeUnitReadiness — one scorer for machines with and without a bi
         documentKeys: [
           { type: "tuv", key: "k1" },
           { type: "saso", key: "k2" },
-          { type: "operator_grade-1", key: "k3" },
+          { type: "operator_spsp", key: "k3" },
         ],
         photoKeys: [{ slot: "front", key: "a" }, { slot: "serial", key: "b" }],
       }),
@@ -205,12 +207,122 @@ describe("computeUnitReadiness — one scorer for machines with and without a bi
   });
 });
 
+/* ─────────── operator certificates — parity with the app's table ───────────
+ *
+ * Owner's ruling, 2026-08-08: *"fix the web to be like the app — always align with the app."* The app's
+ * `bid_readiness.dart` translates the renter's request CODE into the document KIND a machine actually
+ * carries, through an explicit table, and matches that kind EXACTLY against the unit's own
+ * `documentKeys[].type`:
+ *
+ *     const kOperatorReqCodeToDocKind = {
+ *       'TUV': 'operator_tuv',
+ *       'SPSP': 'operator_spsp',
+ *       'CERTIFIED': 'operating_license',
+ *       'SAFETY_CERT': 'operating_license',
+ *       'SAFETY': 'operating_license',
+ *     };
+ *
+ * **The old web behaviour, which these tests exist to keep out.** The web had no table: `canonicalCertCode`
+ * stripped an `operator_` prefix and compared strings. So an asked-for `CERTIFIED` became `certified` and
+ * hunted for a document called `certified` that no machine has ever carried, and `operating_license` — the
+ * paper the lessor had actually filed — carried no `operator_` prefix to strip and never lined up either.
+ * The renter's panel read RED on an operator certificate the lessor's own app read GREEN, on the same
+ * machine with the same papers.
+ */
+describe("operator certs — the app's `kOperatorReqCodeToDocKind`, case by case", () => {
+  const unitWith = (types: string[]) =>
+    mapFleet([
+      row({
+        documentKeys: types.map((type, i) => ({ type, key: `k${i}` })),
+        photoKeys: [{ slot: "front", key: "a" }, { slot: "serial", key: "b" }],
+      }),
+    ])[0];
+  /** Score a machine holding `held` against a request asking `ask`, with no equipment certs and no year. */
+  const score = (ask: string, held: string[]) => {
+    const inputs = readinessInputsFor({ reqEquipmentCerts: [], operatorCertReq: ask, reqMinYear: null });
+    return computeUnitReadiness(unitWith(held), inputs.equipCerts, inputs.operatorCerts, inputs.minYear);
+  };
+  const codes = (ask: string) => readinessInputsFor({ operatorCertReq: ask }).operatorCerts;
+
+  it("TUV is satisfied by a held `operator_tuv`", () => {
+    expect(codes("TUV")).toEqual(["operator_tuv"]);
+    expect(score("TUV", ["operator_tuv"]).operatorCerts.map((c) => c.present)).toEqual([true]);
+  });
+
+  it("SPSP is satisfied by a held `operator_spsp`", () => {
+    expect(codes("SPSP")).toEqual(["operator_spsp"]);
+    expect(score("SPSP", ["operator_spsp"]).operatorCerts.map((c) => c.present)).toEqual([true]);
+  });
+
+  it("CERTIFIED, SAFETY_CERT and SAFETY are all satisfied by a held `operating_license`", () => {
+    for (const ask of ["CERTIFIED", "SAFETY_CERT", "SAFETY"]) {
+      expect(codes(ask)).toEqual(["operating_license"]);
+      expect(score(ask, ["operating_license"]).operatorCerts.map((c) => c.present)).toEqual([true]);
+    }
+  });
+
+  it("THE REGRESSION — an asked-for CERTIFIED against a filed `operating_license` now reads GREEN", () => {
+    // Before the port this machine read RED on the renter's panel while the lessor's app read GREEN:
+    // the ask normalised to `certified`, a document nobody carries. Photos + the licence = everything
+    // this request scores.
+    const r = score("CERTIFIED", ["operating_license"]);
+    expect(r.operatorCerts.map((c) => [c.code, c.present])).toEqual([["operating_license", true]]);
+    expect(r.done).toBe(r.total);
+    expect(r.band).toBe("green");
+  });
+
+  it("an unmapped code produces NO cert row at all — never a permanently red one", () => {
+    // `GRADE-1` names no document a lessor could ever upload, so scoring it would hold him one key short
+    // for good. The app drops it; so does this. The machine is then complete on its photos alone.
+    expect(codes("GRADE-1")).toEqual([]);
+    const r = score("GRADE-1", []);
+    expect(r.operatorCerts).toEqual([]);
+    expect(r.total).toBe(1); // the mandatory photos, and nothing else
+    expect(r.band).toBe("green");
+  });
+
+  it("keeps the mapped codes out of a list that also carries an unmapped one", () => {
+    expect(codes("TUV, GRADE-1, SPSP")).toEqual(["operator_tuv", "operator_spsp"]);
+  });
+
+  it("splits a comma-separated list and scores every mapped code", () => {
+    const r = score("TUV,SPSP,CERTIFIED", ["operator_tuv", "operating_license"]);
+    expect(r.operatorCerts.map((c) => [c.code, c.present])).toEqual([
+      ["operator_tuv", true],
+      ["operator_spsp", false],
+      ["operating_license", true],
+    ]);
+    expect(r.total).toBe(4); // photos + three operator certs
+    expect(r.done).toBe(3);
+  });
+
+  it("uppercases and trims each code, and folds the licence's three names into ONE key", () => {
+    expect(codes(" tuv , Spsp ")).toEqual(["operator_tuv", "operator_spsp"]);
+    expect(codes("CERTIFIED,SAFETY_CERT,SAFETY")).toEqual(["operating_license"]);
+    expect(codes("")).toEqual([]);
+    expect(codes(",,")).toEqual([]);
+  });
+
+  it("still reads RED for a mapped cert the machine does not hold", () => {
+    const r = score("SPSP", ["operator_tuv"]);
+    expect(r.operatorCerts.map((c) => c.present)).toEqual([false]);
+    expect(r.band).toBe("yellow"); // photos only: 1 of 2
+  });
+
+  it("does NOT move the equipment certs — a held `operator_tuv` still cannot answer an equipment TÜV", () => {
+    const inputs = readinessInputsFor({ reqEquipmentCerts: ["tuv"], operatorCertReq: null });
+    const r = computeUnitReadiness(unitWith(["operator_tuv"]), inputs.equipCerts, inputs.operatorCerts, null);
+    expect(r.equipmentCerts.map((c) => [c.code, c.present])).toEqual([["tuv", false]]);
+    expect(r.operatorCerts).toEqual([]);
+  });
+});
+
 describe("computeBidReadiness is unchanged by the extraction (the mobile app mirrors it)", () => {
   const bid: BidCard = mapBidList({
     activeBids: [
       {
         id: "b1",
-        request: { equipmentItems: [{ numberOfUnits: 2, safetyCertifications: ["TUV"], operatorLicenseLevel: "grade-1", minimumEquipmentYear: 2020 }] },
+        request: { equipmentItems: [{ numberOfUnits: 2, safetyCertifications: ["TUV"], operatorLicenseLevel: "SPSP", minimumEquipmentYear: 2020 }] },
         offeredUnitsDetail: [
           {
             equipmentId: "eq-1",
@@ -228,7 +340,7 @@ describe("computeBidReadiness is unchanged by the extraction (the mobile app mir
     expect(r).not.toBeNull();
     expect(r!.units).toHaveLength(1);
     expect(r!.units[0].done).toBe(2); // photos + TÜV
-    expect(r!.units[0].total).toBe(3); // photos + TÜV + operator grade-1
+    expect(r!.units[0].total).toBe(3); // photos + TÜV + operator SPSP
     expect(r!.percent).toBe(67);
   });
 
