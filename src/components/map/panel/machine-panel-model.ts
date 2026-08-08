@@ -613,6 +613,10 @@ export type CompanyDocKey = "cr" | "vat" | "national_address" | "local_content" 
 /**
  * The five company papers this panel lists.
  *
+ * **SASO arrives last because it arrived last.** Appending never reorders rows a renter has already
+ * learned. `companyDocRows` maps over THIS array, so a fifth row needs nothing else — and, being a row
+ * like any other, it gets view + download when it carries a url and neither when it does not (AC-69).
+ *
  * **IBAN is deliberately absent.** Spec §6.1 and AC-41 both name it, and the product owner has since
  * decided to remove it — so the smaller, less-revealing surface wins and the spec needs editing. Adding
  * a row back is a one-line change; un-showing a supplier's bank details after the fact is not.
@@ -628,19 +632,15 @@ export type CompanyDocKey = "cr" | "vat" | "national_address" | "local_content" 
  * type. The two never meet: this list is resolved against the firm and never against a listing, so an
  * equipment-level SASO cannot answer a company-level ask or the reverse.
  */
-export const COMPANY_DOC_KEYS: CompanyDocKey[] = [
-  "cr",
-  "vat",
-  "national_address",
-  "local_content",
-  "saso",
-];
+export const COMPANY_DOC_KEYS: CompanyDocKey[] = ["cr", "vat", "national_address", "local_content", "saso"];
 
 const COMPANY_DOC_LABEL: Record<CompanyDocKey, Bilingual> = {
   cr: { en: "Commercial registration", ar: "السجل التجاري" },
   vat: { en: "VAT certificate", ar: "الشهادة الضريبية" },
   national_address: { en: "National address", ar: "العنوان الوطني" },
   local_content: { en: "Local content", ar: "المحتوى المحلي" },
+  // «تسجيل ساسو» verbatim from the backend's `TERM_LABELS` — one term, one Arabic wording, wherever
+  // the renter meets it. A second translation of the same paper would read as a second paper.
   saso: { en: "SASO registration", ar: "تسجيل ساسو" },
 };
 
