@@ -26,6 +26,7 @@ import {
   batchDocumentRequest,
   companyDocRows,
   COMPANY_DOC_KEYS,
+  distanceBandLabel,
   docDownloadBatch,
   docRowActions,
   docRowMode,
@@ -271,6 +272,33 @@ describe("heroPhotoUrl", () => {
   it("falls back to any photo, and to null when there are none", () => {
     expect(heroPhotoUrl(machine({ photos: [{ slot: "serial" }] }))).toBe("https://x/serial");
     expect(heroPhotoUrl(machine({ photos: [] }))).toBeNull();
+  });
+});
+
+/**
+ * The word after the kilometres on the detail's availability line — the prototype's own `distBand`,
+ * ported with its own thresholds rather than derived from the LIST's filter bands.
+ */
+describe("distanceBandLabel", () => {
+  it("is قريب to 30 km, متوسط to 120, and بعيد past it — the prototype's thresholds, at the boundaries", () => {
+    expect([0, 30].map((km) => distanceBandLabel(km)?.ar)).toEqual(["قريب", "قريب"]);
+    expect([30.5, 120].map((km) => distanceBandLabel(km)?.ar)).toEqual(["متوسط", "متوسط"]);
+    expect([120.5, 900].map((km) => distanceBandLabel(km)?.ar)).toEqual(["بعيد", "بعيد"]);
+  });
+
+  it("**an unknown distance gets no word** — «غير معروفة» is not «بعيدة»", () => {
+    // The same rule the list's distance bands hold. A band word on a machine with no distance would
+    // be a claim about where it is, made from the absence of any claim about where it is.
+    for (const km of [null, undefined, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(distanceBandLabel(km)).toBeNull();
+    }
+  });
+
+  it("does not follow the LIST's filter bands, which are a different question", () => {
+    // `DISTANCE_BANDS_KM` is ≤50 · ≤100 · ≤200. A machine at 50 km is inside the list's first band
+    // and is already «متوسط» here, and that is not a bug to be reconciled: one answers "hide the rest
+    // of them", the other answers "how far is this one".
+    expect(distanceBandLabel(50)?.ar).toBe("متوسط");
   });
 });
 

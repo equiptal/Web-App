@@ -61,17 +61,18 @@
 .mp-scroll { flex: 1; min-height: 0; overflow-y: auto; }
 .mp-body { padding: 14px; }
 
-/* ═══════════════════════════ hero + back (V7 §6.5.1) ═══════════════════════════ */
+/* ═══════════════════════ the viewer, its controls and its caption (V7 §6.5.1) ═══════════════════════ */
 
-/* Full-bleed: the machine is identified by sight before it is read about. */
-.mp-hero {
+/* Full-bleed: the machine is identified by sight before it is read about. `196px`, the prototype's —
+   ~~168px~~, which was ours, and which cropped a wide machine to a band. */
+.mp-viewer {
   position: relative;
   flex-shrink: 0;
-  height: 168px;
+  height: 196px;
   background: #e8eef5;
   overflow: hidden;
 }
-.mp-hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mp-viewer img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .mp-hero-empty {
   width: 100%;
   height: 100%;
@@ -83,38 +84,87 @@
   color: #6b8fa8;
   background: #f8fafc;
 }
-/* A scrim under the title only — never over the whole photo, which would dim the thing being shown. */
-.mp-hero-tx {
+/* **A CAPTION STRIP, not a scrim** (2026-08-09). ~~A scrim under the title only — never over the
+   whole photo, which would dim the thing being shown.~~ Withdrawn: the argument was right about
+   scrims and still ended in one, because a legible white title needs darkness under it wherever the
+   title sits. An opaque strip below the picture needs none — it takes 30 px of frame instead of a
+   third of the photograph, and the photograph is what the renter came to look at. The prototype's
+   own overlay, and the owner's screenshot's. */
+.mp-cap {
   position: absolute;
   inset-inline: 0;
   bottom: 0;
-  padding: 22px 14px 10px;
-  background: linear-gradient(to top, rgba(15, 34, 56, 0.78), rgba(15, 34, 56, 0));
-  color: #fff;
+  padding: 9px 14px;
+  background: rgba(255, 255, 255, 0.94);
+  border-top: 1px solid #e1e9f1;
+  color: #16304f;
+  font-size: 11.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.mp-hero-tx b { display: block; font-size: 14px; font-weight: 800; }
-.mp-hero-tx span { display: block; font-size: 10.5px; font-weight: 600; opacity: 0.88; margin-top: 2px; }
 
+/* A `34 × 34` circle carrying one chevron — ~~a rounded rect with the word «رجوع» in it~~. A control
+   pinned to the corner of a photograph is read by its shape, and the word was doing nothing the arrow
+   was not; its accessible name carries it instead, where a screen reader still gets the full sentence
+   and the photograph does not. */
 .mp-back {
   position: absolute;
-  top: 10px;
-  inset-inline-start: 10px;
+  top: 14px;
+  inset-inline-start: 14px;
   z-index: 2;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  border: 0;
-  border-radius: 10px;
-  padding: 7px 11px;
-  background: rgba(255, 255, 255, 0.94);
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #e1e9f1;
+  border-radius: 50%;
+  padding: 0;
+  background: #fff;
+  color: #1c3550;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(15, 34, 56, 0.14);
+}
+.mp-back:hover { background: #f8fafc; }
+
+/* **«تكبير» · «تحميل»** — restored 2026-08-09; the panel had neither, and the owner's screenshot
+   shows both. LABELLED pills rather than bare glyph circles, which is the prototype's own note on
+   them: a 32 px circle with an unfamiliar icon in it is a guess. */
+.mp-tools {
+  position: absolute;
+  top: 12px;
+  inset-inline-end: 12px;
+  z-index: 2;
+  display: flex;
+  gap: 7px;
+}
+.mp-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid #c8d8e8;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.97);
   color: #1c3550;
   font-family: inherit;
   font-size: 11px;
   font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(15, 34, 56, 0.18);
+  text-decoration: none;
+  box-shadow: 0 2px 10px rgba(15, 34, 56, 0.16);
 }
-.mp-back:hover { background: #fff; }
+.mp-tool.solid { border-color: #1c3550; background: #1c3550; color: #fff; }
+.mp-tool:disabled { opacity: 0.7; cursor: default; }
 
 /* ═══════════════════════════ tabs ═══════════════════════════ */
 
@@ -172,32 +222,89 @@
 
 /* ═══════════════════════════ the availability · distance · yard line ═══════════════════════════ */
 
+/* The DISTANCE is this line's headline and the chip sits on the far corner — the prototype's own
+   typography. The kilometres at 20 px is the number the renter compares between machines; it was set
+   at 11 px inside a wrapping muted sentence, which made it the hardest thing on the line to find. */
 .mp-line {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 12px 14px 0;
-  font-size: 11px;
-  font-weight: 700;
-  color: #6b8fa8;
+  gap: 10px;
+  padding: 13px 14px 12px;
 }
-/* Filled and saturated — this must read as the same fact as the machine's pin, and its colour comes
-   from `unitAvailability()` alone (bid-map.ts). Never from `yardConfirmed`. */
+.mp-line-tx {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.mp-km {
+  font-family: ui-monospace, "SFMono-Regular", monospace;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: #16304f;
+}
+.mp-band { font-size: 12px; font-weight: 700; color: #6b8fa8; }
+.mp-yard {
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: #1c3550;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* «خارج مدينة الطلب» — amber, and this is the one place on the panel amber survives the 2026-08-09
+   red ruling. It is not a document verdict: it says a delivery is a mobilisation, which is a thing to
+   ask about rather than a thing that is missing, and the §missing family would have made it read as
+   the latter. `isOutOfCity` is the contract's (bid-map.ts) — presentation only, no filtering. */
+.mp-outcity {
+  border: 1px solid rgba(212, 120, 10, 0.25);
+  border-radius: 20px;
+  padding: 2px 8px;
+  background: #fff6e8;
+  color: #8a4f08;
+  font-size: 10.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+/* **TINTED, not filled** (2026-08-09, the prototype's). ~~Filled and saturated — this must read as
+   the same fact as the machine's pin.~~ It still does: same colour, same source, and it is still the
+   only red-or-green object on this panel. What the fill bought on top of that was the loudest weight
+   on the surface for a fact that is not the line's first answer — the tint keeps the statement and
+   gives the headline back to the distance.
+   Colour comes from `unitAvailability()` alone (bid-map.ts). Never from `yardConfirmed`. */
 .mp-chip {
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  border-radius: 20px;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 999px;
   padding: 5px 11px;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 900;
+  font-size: 11.5px;
+  font-weight: 800;
+  white-space: nowrap;
 }
-.mp-chip i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, 0.9); }
-.mp-chip.confirmed { background: #16a34a; box-shadow: 0 2px 8px rgba(22, 163, 74, 0.32); }
-.mp-chip.unconfirmed { background: #d9362a; box-shadow: 0 2px 8px rgba(217, 54, 42, 0.32); }
-.mp-line-dot { color: #c8d8e8; }
+.mp-chip i { width: 8px; height: 8px; border-radius: 50%; background: currentcolor; }
+.mp-chip.confirmed {
+  background: rgba(22, 163, 74, 0.12);
+  border-color: rgba(22, 163, 74, 0.34);
+  color: #16a34a;
+}
+.mp-chip.unconfirmed {
+  background: rgba(217, 54, 42, 0.1);
+  border-color: rgba(217, 54, 42, 0.3);
+  color: #d9362a;
+}
+
+/* A titled section with a sentence under it — the panel's way of saying something the controls
+   cannot. Used once, for the unconfirmed explainer. */
+.mp-sect { padding: 14px; border-top: 1px solid #e1e9f1; }
+.mp-sect-h { font-size: 11px; font-weight: 800; letter-spacing: 0.3px; color: #6b8fa8; }
+.mp-sect-n { margin-top: 6px; font-size: 11.5px; font-weight: 600; line-height: 1.8; color: #1c3550; }
 
 /* ═══════════════════════════ the match grid (V7 §6.5.4) ═══════════════════════════ */
 
@@ -470,7 +577,7 @@
    file on a row outranks the second, which is a claim about a lessor's upload order, not about the
    renter's question — on a row holding an istimara and a customs card there is no primary paper. And
    the blue HUE was this file's `#2563EB` reaching a control the prototype paints navy; AC-33 buys the
-   blue override for `.mp-act`, one control beside a red availability chip, and nothing wider.
+   blue override for a control read against the availability chip beside it, and nothing wider.
 
    What IS documented survives untouched: the narrowing to view-only, with the per-row download glyph
    withdrawn in favour of the batch (AC-69, 2026-08-08). */
@@ -494,47 +601,56 @@
 
 /* ═══════════════════════════ actions ═══════════════════════════ */
 
-/* Blue, never navy (AC-33): beside a red availability chip, navy reads as disabled — the one control
-   the renter is meant to press looked switched off. */
-.mp-act {
-  width: 100%;
+/* **THE MACHINE'S FOOTER** — a 76 px bar over the panel's grey, two buttons side by side, the
+   prototype's own (2026-08-09).
+
+   ~~`.mp-act` — a full-width row with a `+` tile, a title and a sub-line, stacked. Blue, never navy
+   (AC-33): beside a red availability chip, navy reads as disabled.~~ **Both withdrawn.** The stacking
+   bought a tile and two lines of explanation for controls whose labels already say what they do, and
+   it left the panel's actions wherever the renter had scrolled to. AC-33's blue went with it because
+   AC-33 is a rule about a control sitting BESIDE the availability chip; down here on its own bar,
+   with the chip a scroll away, there is no adjacency to be read as switched-off — and the documents
+   tab's own footer two rules below has been navy since 2026-08-08. Two tabs of one panel now put
+   their actions in one place and one weight.
+
+   `#EDF2F7` is the prototype's `s2` beneath both bars. */
+.mp-foot {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  height: 76px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-top: 8px;
-  padding: 11px 12px;
-  border: 1.5px solid #c8d8e8;
-  border-radius: 12px;
+  gap: 8px;
+  padding: 0 18px;
+  border-top: 1px solid #e1e9f1;
+  background: #edf2f7;
+}
+.mp-foot-b {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 10px;
+  /* A border the colour of the fill, so the solid and the outline are exactly the same height. */
+  border: 1px solid #c8d8e8;
+  border-radius: 11px;
   background: #fff;
-  text-align: start;
+  color: #1c3550;
   font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
   cursor: pointer;
 }
-.mp-act .plus {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(37, 99, 235, 0.22);
-  border-radius: 8px;
-  background: rgba(37, 99, 235, 0.08);
-  color: #2563eb;
-  font-size: 13px;
-  font-weight: 900;
-}
-.mp-act .tx { flex: 1; min-width: 0; }
-.mp-act .tx b { display: block; font-size: 12px; font-weight: 700; color: #1c3550; }
-.mp-act .tx span { display: block; font-size: 9.5px; font-weight: 600; color: #6b8fa8; margin-top: 1px; }
+.mp-foot-b.solid { border-color: #1c3550; background: #1c3550; color: #fff; }
+.mp-foot-b:disabled { opacity: 0.55; cursor: not-allowed; }
 
 /* NAVY, not blue (owner, 2026-08-08, from his own prototype screenshot: «تنزيل (٢)» is the panel's dark
    navy fill). `#1C3550` is the prototype's own `navy` token — design-v3.md §2, the same fill its selected
    chips carry — read from that palette rather than sampled by eye.
 
-   This does NOT reopen AC-33, which is about `.mp-act` a few rules above: that control sits beside a red
-   availability chip where navy reads as switched off, and it stays blue. These two buttons sit under a
-   list of ticked rows with no chip near them, and the renter has just acted to light one of them. */
+   ~~This does NOT reopen AC-33, which is about `.mp-act` a few rules above.~~ There is no longer a
+   `.mp-act` to distinguish this from: the machine tab's footer above is navy too, on its own bar and
+   for the same reason — AC-33 governs a control read against the availability chip beside it, and
+   neither footer sits beside anything. */
 .mp-send {
   width: 100%;
   margin-top: 8px;

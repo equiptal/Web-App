@@ -463,6 +463,28 @@ export function heroPhotoUrl(machine: Pick<FleetMachine, "photoKeys">): string |
   return front?.url ?? machine.photoKeys.find((p) => p.url)?.url ?? null;
 }
 
+/**
+ * **«قريب · متوسط · بعيد»** — the word the detail's availability line puts after the kilometres.
+ *
+ * The prototype's own helper and its own thresholds (`distBand`, decoded line 340): ≤ 30 km near,
+ * ≤ 120 km mid, past that far. Ported rather than invented, and deliberately not derived from
+ * `DISTANCE_BANDS_KM` — those are the LIST's filter bands (≤50 · ≤100 · ≤200), a different question
+ * asked for a different reason, and folding the two together would make a filter chip and a sentence
+ * about one machine move as one.
+ *
+ * **Label only, never colour.** The prototype says so on the same line, and on this surface it is a
+ * rule: colour here means availability and nothing else (AC-18, AC-19).
+ *
+ * **A machine with no distance gets no word.** An unknown distance is not a far one — the same rule
+ * `equipmentListView`'s bands hold — so this answers `null` and the caller renders neither.
+ */
+export function distanceBandLabel(distanceKm: number | null | undefined): Bilingual | null {
+  if (typeof distanceKm !== "number" || !Number.isFinite(distanceKm)) return null;
+  if (distanceKm <= 30) return { en: "near", ar: "قريب" };
+  if (distanceKm <= 120) return { en: "mid-range", ar: "متوسط" };
+  return { en: "far", ar: "بعيد" };
+}
+
 /* ───────────────────────────── V8 — equipment documents ───────────────────────────── */
 
 /**
