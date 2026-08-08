@@ -39,6 +39,25 @@ export const AVAILABILITY_COLOUR: Record<"confirmed" | "unconfirmed", string> = 
 };
 
 /**
+ * «خارج المدينة» — the distance past which a machine is no longer a same-city job.
+ *
+ * The prototype's own threshold (`CITY_KM()`, decoded line 344) and its own reading of it
+ * (`outOfCity(u) = u.km > CITY_KM()`). It is a **presentation** rule and nothing else: it does not
+ * filter, it does not sort, it does not colour a pin, and it never contradicts the distance beside
+ * it. It says only that the yard is outside the request city's own radius, which is the fact that
+ * turns a delivery into a mobilisation the renter should be asking about.
+ *
+ * A machine with **no** distance is never out of city — an unknown distance is not a far one, the same
+ * rule `equipmentListView`'s distance bands already hold.
+ */
+export const OUT_OF_CITY_KM = 45;
+
+/** True only for a machine with a real distance greater than {@link OUT_OF_CITY_KM}. */
+export function isOutOfCity(distanceKm: number | null | undefined): boolean {
+  return typeof distanceKm === "number" && Number.isFinite(distanceKm) && distanceKm > OUT_OF_CITY_KM;
+}
+
+/**
  * The reported §7.3 precedence level, with the one tolerant default this contract allows.
  *
  * A unit with no `locationSource` is a pre-T1 payload (the backend field does not exist yet) or an

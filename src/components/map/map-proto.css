@@ -521,13 +521,22 @@
   border-radius: 14px;
   overflow: hidden;
   box-shadow: var(--eq-rest);
-  transition: border-color 0.15s ease, background 0.15s ease;
+  /* The prototype's `transition: .15s` — ALL properties, not a named pair. The card changes its
+     background, its border and its shadow together on hover and on selection, and a transition that
+     names two of the three makes the third snap while the others ease. */
+  transition: 0.15s;
   animation: dpCardIn 0.34s cubic-bezier(0.22, 0.9, 0.3, 1) both;
 }
-.bidmap .bm-eq:hover { border-color: #b9c9d8; }
+/* Hover LIFTS the card — `0 8px 20px rgba(15,34,56,.14)` (decoded 3970), which is what a row you can
+   press is supposed to do and what this card was missing entirely. It is set through `--eq-rest`
+   rather than as a `box-shadow` of its own so V6's attention cue keeps preserving it: `bmCue` puts
+   `var(--eq-rest)` first in every keyframe, so a hovered card mid-cue keeps its hover elevation
+   instead of dropping to the resting one each pulse. */
+.bidmap .bm-eq:hover { --eq-rest: 0 8px 20px rgba(15, 34, 56, 0.14); border-color: #b9c9d8; }
 /* Selection is achromatic slate, NOT blue: on a card whose only other colour is its availability chip,
    a saturated accent read as a third state. Selection is UI, so it stays neutral. */
 .bidmap .bm-eq.on { --eq-rest: 0 4px 14px rgba(15, 34, 56, 0.14); background: #f2f6fa; border-color: #1c3550; }
+.bidmap .bm-eq.on:hover { --eq-rest: 0 8px 20px rgba(15, 34, 56, 0.14); }
 .bidmap .bm-eq .bm-eq-acc {
   position: absolute;
   z-index: 2;
@@ -538,6 +547,10 @@
   /* Decoration over the stretched select button — it must never eat the click on the card's edge. */
   pointer-events: none;
   background: linear-gradient(180deg, #1c3550, #16304f);
+  /* Its OWN arrival, faster than the card's (decoded 3974). The accent appears when the renter selects
+     a card that is already on screen, so it has to animate on its own account — the card's `dpCardIn`
+     ran once, at list build, and never runs again. */
+  animation: dpCardIn 0.22s ease both;
 }
 /* The whole card selects; «التفاصيل» and «اطلب التأكيد» are real buttons ABOVE it. A stretched button
    under the content rather than a button wrapping it — a button inside a button is invalid markup, and
@@ -555,6 +568,14 @@
 .bidmap .bm-eq .bm-eq-select:focus-visible { outline: 2px solid #16304f; outline-offset: -3px; }
 .bidmap .bm-eq .bm-eq-in { position: relative; z-index: 1; display: flex; align-items: stretch; pointer-events: none; }
 
+/* The photo cell SHIMMERS until the image decodes (decoded 3988–3990), so the card never shows a bare
+   grey rectangle while a machine's photo is on the wire. The gradient is the placeholder; a decoded
+   `<img>` covers it, and a machine with no photo at all keeps it under the «لا صورة» line, which is
+   the honest reading — nothing is arriving, but nothing is broken either.
+
+   (The prototype writes `backgroundImage` and then `background` in the same style object, so its own
+   shorthand wipes the gradient it just set. The intent is unmistakable from the `dpShimmer` beside it;
+   the shorthand is dropped here rather than the gradient.) */
 .bidmap .bm-eq .bm-eq-photo {
   position: relative;
   flex-shrink: 0;
@@ -565,7 +586,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #eff4f9;
+  background-color: #eff4f9;
+  background-image: linear-gradient(90deg, #e8eff6 20%, #f4f8fc 40%, #e8eff6 60%);
+  background-size: 220% 100%;
+  animation: dpShimmer 1.25s linear infinite;
   border-inline-end: 1px solid #e1e9f1;
 }
 .bidmap .bm-eq .bm-eq-art { width: 100%; height: 100%; object-fit: cover; transition: transform 0.35s cubic-bezier(0.22, 0.9, 0.3, 1); }
@@ -1259,6 +1283,8 @@
 /* Cards arrive in sequence rather than all at once — the list reads as being built in distance order,
    not dumped. */
 @keyframes dpCardIn { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: translateY(0); } }
+/* The photo placeholder, travelling under a decoding image. */
+@keyframes dpShimmer { 0% { background-position: 120% 0; } 100% { background-position: -120% 0; } }
 /* An unanswered question is live: the unconfirmed chip's dot breathes. */
 @keyframes dpDot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.72); } }
 /* Selection on the map: the focused machine lifts off the ground, settles, and keeps a slow halo
