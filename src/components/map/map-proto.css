@@ -72,17 +72,22 @@
   box-shadow: 0 2px 8px rgba(15, 34, 56, 0.18);
 }
 
-/* ── Machine pin (design.md §4.2) ────────────────────────────────────────────────────────────────
-   132×86, anchored [66,86] by the `divIcon` itself. Every value below is static geometry; the colour,
-   the border STYLE (solid in-offer / dashed not-in-offer), the halo and each bar segment's fill are
+/* ── Machine marker (V10 — `design-v3.md` §4, value for value) ───────────────────────────────────
+   **132×124, anchored [66,124]** by the `divIcon` itself — v2's was 132×86. The machine stands ON the
+   map: a tinted ground disc carrying its availability, a contact shadow, the object above them, then
+   one label. Every value below is static geometry; the colour, the halo and the lift are
    state-dependent and stay inline in `MapCanvas.machineIcon`.
 
    `direction: rtl` is set on the pin, not inherited: Leaflet draws its own LTR canvas (AC-30, AC-98).
 
-   Deliberately ABSENT, both by decision (design.md §7): the prototype's numeric index badge (١ ٢ ٣ at
-   `bottom:-6px` — decision 3, the invented per-unit index §6.3.3 bans) and its taxonomy EMOJI in the
-   circle (decision 4 — AC-80 wants the request item's taxonomy image, then the category image, then a
-   generic icon, never a broken image). */
+   Deliberately ABSENT, all four by decision:
+     · the prototype's numeric index badge (`design.md` §7 decision 3 — the invented per-unit index
+       §6.3.3 bans, because nothing links a bid to a numbered unit);
+     · its taxonomy EMOJI in the circle (decision 4 — AC-80 wants the request item's taxonomy image,
+       then the category image, then a generic icon, never a broken image);
+     · **the readiness bar and the document count**, which v3 moved into the machine's detail — the
+       prototype says so in as many words: *"a pin on a simple map says what it is and nothing else"*;
+     · **the hollow not-in-offer variant**, gone with V10's offered-only pin set. */
 .bm-pin {
   direction: rtl;
   width: 132px;
@@ -92,10 +97,54 @@
   cursor: pointer;
   font-family: inherit;
 }
+/* The ground: 96×78, everything inside it absolutely placed against the bottom edge. */
+.bm-pin .bm-pin-stage {
+  position: relative;
+  width: 96px;
+  height: 78px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+/* A slow ring expanding across the ground disc — drawn only for the focused machine, so which marker
+   the panel is showing is never in doubt (AC-15). */
+.bm-pin .bm-pin-halo {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  animation: dpHalo 1.9s ease-out infinite;
+}
+/* The state plate the machine stands on. Colour = availability, and availability only. */
+.bm-pin .bm-pin-disc {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%) scaleY(0.32);
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+.bm-pin .bm-pin-shadow {
+  position: absolute;
+  bottom: 7px;
+  left: 50%;
+  transform: translateX(-50%) scaleY(0.26);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(15, 34, 56, 0.42), transparent);
+  filter: blur(1px);
+}
 .bm-pin .bm-pin-c {
   position: relative;
   width: 44px;
   height: 44px;
+  margin-bottom: 12px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -115,8 +164,6 @@
   background-repeat: no-repeat;
   background-size: 62%;
 }
-/* Not offered on this bid: a white circle with a dashed ring and a “+” — «you can request it». */
-.bm-pin .bm-pin-plus { font-size: 17px; font-weight: 900; line-height: 1; }
 .bm-pin .bm-pin-tick {
   position: absolute;
   top: -7px;
@@ -134,22 +181,57 @@
   border: 2px solid #fff;
   box-sizing: border-box;
 }
-/* Readiness — the SECOND, independent channel (AC-55→58): one segment per required document, filled to
-   the band's colour. Never merged with the availability colour above it; when the two disagree, that
-   disagreement is the information. */
-.bm-pin .bm-pin-bar { margin-top: 7px; width: 66px; display: flex; gap: 2px; }
-.bm-pin .bm-pin-seg { flex: 1; height: 4px; border-radius: 2px; }
+/* ONE label, ONE fact: «مؤكّد توفرها» / «لم يؤكد توفرها بعد» (§6.8). Filled with the availability
+   colour, so the marker states its own colour in words and cannot be read off the legend alone. */
 .bm-pin .bm-pin-chip {
-  margin-top: 5px;
-  background: #fff;
-  border-radius: 8px;
-  padding: 2px 8px;
-  font-size: 9px;
+  margin-top: 6px;
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 10px;
   font-weight: 800;
   white-space: nowrap;
-  color: #0f2238;
-  box-shadow: 0 2px 8px rgba(15, 34, 56, 0.18);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(15, 34, 56, 0.2);
 }
+/* Only the focused marker names itself — the map stays quiet until the renter has chosen. The tag says
+   «في هذا العرض» (AC-34); the prototype's «معروضة في اللوحة» describes the UI, not the offer. */
+.bm-pin .bm-pin-tag {
+  margin-top: 5px;
+  background: #fff;
+  border: 1px solid #e4edf5;
+  border-radius: 8px;
+  padding: 2px 8px;
+  font-size: 9.5px;
+  font-weight: 800;
+  color: #0f2238;
+  white-space: nowrap;
+  box-shadow: 0 3px 10px rgba(15, 34, 56, 0.18);
+  animation: dpTagIn 0.3s ease 0.1s both;
+}
+
+/* The distance chip riding the route (§6.8, AC-21). Non-interactive: it states the distance the card
+   already states, so it must never become a second way to select a machine. */
+.bm-distchip {
+  direction: rtl;
+  display: flex;
+  justify-content: center;
+  font-family: inherit;
+}
+.bm-distchip span {
+  background: #fff;
+  border: 1px solid #c8d8e8;
+  border-radius: 20px;
+  padding: 2px 9px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #0f2238;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(15, 34, 56, 0.16);
+}
+
+/* The dotted route back to the project — round dots travelling toward the site, so it reads as a
+   direction of travel rather than a static rule. */
+.bm-flow { animation: dpDash 2.4s linear infinite; }
 
 /* Loading the selected bid's fleet — the map says it is working rather than looking empty (§6.2). */
 .bidmap .bm-mapbusy {
@@ -338,10 +420,204 @@
 }
 .bidmap .bm-short-act:disabled { cursor: default; opacity: 0.5; }
 
-/* The panel's scrolling body — V5's equipment list, V7's detail and V9's company panel mount here.
-   It is the only part that scrolls, so the header, the pills and the alert stay in view while the
-   renter reads the machines they describe. */
-.bidmap .bm-body { flex: 1; min-height: 0; overflow-y: auto; padding: 11px 15px 15px; }
+/* The panel's scrolling body — V5's equipment list mounts here. V7's detail and V9's company panel do
+   NOT: each of them TAKES OVER the panel (§6.5 "replaces the panel with that machine", §6.1 "opens
+   over the whole panel"), so they render in place of the header, the pills, the alert and this body
+   together. It is the only part that scrolls, so the counts stay in view while the renter reads the
+   machines they describe. */
+.bidmap .bm-body { flex: 1; min-height: 0; overflow-y: auto; padding: 11px 15px 15px; background: #f8fafc; }
+/* V7's detail takes over the whole column and brings its own hero, tabs and back control. V9's company
+   panel does NOT use this: it positions itself over the panel (`.mp-over`), which is why `.bm-panel` is
+   `position: relative`. */
+.bidmap .bm-takeover { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.bidmap .bm-takeover > * { flex: 1; min-height: 0; }
+
+/* ── V5 · the equipment list (§6.4) ──────────────────────────────────────────────────────────────
+   Flat, nearest first, OFFERED machines only — the filter and the sort are `offeredMachines()`, not
+   CSS. Everything below is static geometry from `design-v3.md` §2/§3; only the availability colour and
+   the arrival delay are inline, which is this repo's `*-proto.css` convention. */
+.bidmap .bm-eqlist { display: flex; flex-direction: column; gap: 10px; list-style: none; margin: 0; padding: 0; }
+
+/* EVERY card is the same height: four rows, and no row that appears or disappears with the data
+   (RM3-AC-32). The resting shadow is a CUSTOM PROPERTY because V6's attention cue has to preserve it
+   — see `bmCue` below. */
+.bidmap .bm-eq {
+  --eq-rest: 0 1px 4px rgba(15, 34, 56, 0.05);
+  position: relative;
+  flex-shrink: 0;
+  background: #fff;
+  border: 1.5px solid #e4edf5;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: var(--eq-rest);
+  transition: border-color 0.15s ease, background 0.15s ease;
+  animation: dpCardIn 0.34s cubic-bezier(0.22, 0.9, 0.3, 1) both;
+}
+.bidmap .bm-eq:hover { border-color: #b9c9d8; }
+/* Selection is achromatic slate, NOT blue: on a card whose only other colour is its availability chip,
+   a saturated accent read as a third state. Selection is UI, so it stays neutral. */
+.bidmap .bm-eq.on { --eq-rest: 0 4px 14px rgba(15, 34, 56, 0.14); background: #f2f6fa; border-color: #1c3550; }
+.bidmap .bm-eq .bm-eq-acc {
+  position: absolute;
+  z-index: 2;
+  inset-inline-start: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  /* Decoration over the stretched select button — it must never eat the click on the card's edge. */
+  pointer-events: none;
+  background: linear-gradient(180deg, #1c3550, #16304f);
+}
+/* The whole card selects; «التفاصيل» and «اطلب التأكيد» are real buttons ABOVE it. A stretched button
+   under the content rather than a button wrapping it — a button inside a button is invalid markup, and
+   both inner controls have to stay reachable. */
+.bidmap .bm-eq .bm-eq-select {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+.bidmap .bm-eq .bm-eq-select:focus-visible { outline: 2px solid #16304f; outline-offset: -3px; }
+.bidmap .bm-eq .bm-eq-in { position: relative; z-index: 1; display: flex; align-items: stretch; pointer-events: none; }
+
+.bidmap .bm-eq .bm-eq-photo {
+  position: relative;
+  flex-shrink: 0;
+  width: 104px;
+  min-height: 112px;
+  align-self: stretch;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eff4f9;
+  border-inline-end: 1px solid #e4edf5;
+}
+.bidmap .bm-eq .bm-eq-art { width: 100%; height: 100%; object-fit: cover; transition: transform 0.35s cubic-bezier(0.22, 0.9, 0.3, 1); }
+.bidmap .bm-eq:hover .bm-eq-art { transform: scale(1.06); }
+.bidmap .bm-eq .bm-eq-nophoto { font-size: 9.5px; font-weight: 700; color: #6b8fa8; text-align: center; padding: 0 6px; }
+/* A hairline of the machine's own state down the photo's inner edge — the card's quietest signal, and
+   the same derivation as the chip and the pin (RM3-AC-19). */
+.bidmap .bm-eq .bm-eq-hair { position: absolute; inset-inline-end: 0; top: 0; bottom: 0; width: 3px; opacity: 0.85; }
+
+.bidmap .bm-eq .bm-eq-tx { flex: 1; min-width: 0; padding: 11px 13px; display: flex; flex-direction: column; gap: 7px; }
+.bidmap .bm-eq .bm-eq-r1 { display: flex; align-items: center; gap: 8px; }
+.bidmap .bm-eq .bm-eq-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.35;
+  color: #0f2238;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bidmap .bm-eq .bm-eq-details {
+  pointer-events: auto;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #fff;
+  border: 1px solid #c8d8e8;
+  color: #16304f;
+  border-radius: 20px;
+  padding: 3px 9px;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  font-family: inherit;
+}
+.bidmap .bm-eq.on .bm-eq-details { background: #1c3550; border-color: #1c3550; color: #fff; }
+
+/* Row 2 — ONE chip carrying availability AND commitment, never a chip plus a band (RM3-AC-32). The row
+   keeps its height whether or not the ask is beside it. */
+.bidmap .bm-eq .bm-eq-r2 { display: flex; align-items: center; gap: 8px; min-height: 19px; }
+.bidmap .bm-eq .bm-eq-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 10.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bidmap .bm-eq .bm-eq-chip .bm-eq-dot { flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.bidmap .bm-eq .bm-eq-chip.ok { color: #16a34a; background: rgba(22, 163, 74, 0.1); border: 1px solid rgba(22, 163, 74, 0.32); }
+.bidmap .bm-eq .bm-eq-chip.no { color: #d9362a; background: rgba(217, 54, 42, 0.1); border: 1px solid rgba(217, 54, 42, 0.3); }
+/* An unanswered question is live, not a closed verdict — so only the unconfirmed dot breathes. */
+.bidmap .bm-eq .bm-eq-chip.no .bm-eq-dot { animation: dpDot 1.7s ease-in-out infinite; }
+/* BLUE, never navy (RM3-AC-33): beside a red chip, navy reads as disabled, and this is the one control
+   the renter is supposed to press. */
+.bidmap .bm-eq .bm-eq-ask {
+  pointer-events: auto;
+  flex-shrink: 0;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid rgba(37, 99, 235, 0.4);
+  border-radius: 0;
+  padding: 0 0 1px;
+  color: #2563eb;
+  font-size: 10.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  font-family: inherit;
+}
+.bidmap .bm-eq .bm-eq-ask:disabled { cursor: default; opacity: 0.5; }
+
+.bidmap .bm-eq .bm-eq-r3 { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+.bidmap .bm-eq .bm-eq-km { font-family: ui-monospace, monospace; font-size: 17px; font-weight: 700; letter-spacing: -0.4px; color: #1c3550; }
+.bidmap .bm-eq .bm-eq-kmu { font-size: 11.5px; font-weight: 700; color: #6b8fa8; }
+
+/* Row 4 — the certificate line ALWAYS occupies its line, empty or not, so a machine with no
+   certificates is a shorter LINE and not a shorter CARD. */
+.bidmap .bm-eq .bm-eq-r4 { display: flex; align-items: center; gap: 5px; min-height: 19px; overflow: hidden; }
+.bidmap .bm-eq .bm-eq-cert {
+  flex-shrink: 0;
+  color: #8a4f08;
+  background: rgba(232, 137, 12, 0.1);
+  border: 1px solid rgba(232, 137, 12, 0.32);
+  border-radius: 7px;
+  padding: 2px 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.bidmap .bm-eq .bm-eq-nocert { font-size: 10.5px; font-weight: 700; color: #6b8fa8; opacity: 0.7; }
+
+/* RM3-AC-26 — a price and a count were given, and that is the whole statement. No card furniture. */
+.bidmap .bm-eqnone { padding: 18px 6px; text-align: center; }
+.bidmap .bm-eqnone-t { font-size: 12.5px; font-weight: 800; color: #0f2238; }
+.bidmap .bm-eqnone-s { font-size: 11px; font-weight: 600; color: #6b8fa8; margin-top: 5px; line-height: 1.8; }
+
+/* ── V6 · the landing attention cue (§6.4, RM3-AC-35) ────────────────────────────────────────────
+   **FINITE: 6 iterations × 1.5s = 9s, then it rests.** No `infinite` anywhere — a cue that loops stops
+   being a cue and becomes decoration the renter has to ignore.
+
+   **The resting shadow is preserved throughout**, which is the whole of the AC's second half: it is the
+   FIRST shadow in a two-shadow list and is identical in every keyframe, so only the ring after it grows
+   and fades. `--eq-rest` carries whichever resting shadow the card actually has (selected or not), so
+   the cue cannot flatten a selected card back to the unselected elevation mid-pulse. Nothing here
+   animates a transform, a size or a margin — the card cannot appear to shift. */
+.bidmap .bm-eq.cue {
+  animation: dpCardIn 0.34s cubic-bezier(0.22, 0.9, 0.3, 1) both, bmCue 1.5s ease-out 6 both;
+}
+@keyframes bmCue {
+  0% { box-shadow: var(--eq-rest), 0 0 0 0 rgba(37, 99, 235, 0.34); }
+  70% { box-shadow: var(--eq-rest), 0 0 0 10px rgba(37, 99, 235, 0); }
+  100% { box-shadow: var(--eq-rest), 0 0 0 0 rgba(37, 99, 235, 0); }
+}
 
 .bidmap .bm-count {
   font-size: 10.5px;
@@ -612,7 +888,8 @@
 /* T11's `[list │ map]` toggle is gone with V1: the surface is a ROUTE keyed by `bidId`, entered by
    opening a bid, so there is no view mode to switch and nothing for a toggle to switch between. */
 
-/* Prototype keyframes (design.md §5), all disabled under `prefers-reduced-motion`. */
+/* Prototype keyframes — `design.md` §5 plus `design-v3.md` §7, verbatim. All disabled under
+   `prefers-reduced-motion`. */
 @keyframes dpPulse { 0% { transform: scale(0.55); opacity: 0.9; } 70% { transform: scale(1.3); opacity: 0; } 100% { opacity: 0; } }
 @keyframes dpFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes dpPing {
@@ -620,10 +897,34 @@
   70% { box-shadow: 0 0 0 8px rgba(243, 167, 122, 0); }
   100% { box-shadow: 0 0 0 0 rgba(243, 167, 122, 0); }
 }
+/* Cards arrive in sequence rather than all at once — the list reads as being built in distance order,
+   not dumped. */
+@keyframes dpCardIn { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: translateY(0); } }
+/* An unanswered question is live: the unconfirmed chip's dot breathes. */
+@keyframes dpDot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.72); } }
+/* Selection on the map: the focused machine lifts off the ground, settles, and keeps a slow halo
+   pulsing on its ground disc. */
+@keyframes dpLift {
+  0% { transform: translateY(0); }
+  45% { transform: translateY(-13px); }
+  70% { transform: translateY(-4px); }
+  100% { transform: translateY(-7px); }
+}
+@keyframes dpHalo {
+  0% { transform: translateX(-50%) scaleY(0.32) scale(1); opacity: 0.55; }
+  70% { transform: translateX(-50%) scaleY(0.32) scale(1.75); opacity: 0; }
+  100% { transform: translateX(-50%) scaleY(0.32) scale(1.75); opacity: 0; }
+}
+@keyframes dpTagIn { from { opacity: 0; transform: translateY(-5px) scale(0.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
+/* The route from the yard to the project reads as a direction of travel, not a static rule. */
+@keyframes dpDash { to { stroke-dashoffset: -40; } }
 @media (prefers-reduced-motion: reduce) {
-  /* Pseudo-elements too — the site pin's ping is a `::after`, which `*` does not match. */
+  /* Pseudo-elements too — the site pin's ping is a `::after`, which `*` does not match. The markers and
+     the route live in Leaflet's own panes, OUTSIDE `.bidmap`'s subtree in the DOM the browser walks for
+     `divIcon` HTML, so they are named separately. */
   .bidmap *, .bidmap *::before, .bidmap *::after,
-  .bm-sitepin, .bm-sitepin *, .bm-sitepin *::before, .bm-sitepin *::after {
+  .bm-sitepin, .bm-sitepin *, .bm-sitepin *::before, .bm-sitepin *::after,
+  .bm-pin, .bm-pin *, .bm-flow {
     animation: none !important;
   }
 }

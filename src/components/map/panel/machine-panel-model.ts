@@ -371,6 +371,55 @@ function certCell(
   };
 }
 
+/**
+ * **V5** — the card's certificate chips (§6.4, AC-11): *"certificate chips (TÜV, SPSP…) or «لا شهادات
+ * على المعدّة»"*.
+ *
+ * **The certificates the MACHINE holds, not the ones the request asked for.** `computeUnitReadiness`
+ * reports `equipmentCerts` scored against the request, so on a request that asks for none it reports
+ * none — and the card would then print «لا شهادات على المعدّة» over a machine carrying a TÜV. The chip
+ * row is descriptive (it belongs to the card, not to the match grid), so it reads the machine's own
+ * `documentKeys`.
+ *
+ * It reuses `isEquipmentCertDoc` — the same allow-list the documents tab groups by — rather than a
+ * second opinion about which doc types are certificates. That list is deliberately an allow-list:
+ * `spec_sheet` / `other` / `unclassified` are real wire types, and a chip reading "SPEC_SHEET" beside
+ * TÜV would tell the renter a safety paper is on file when a spec sheet is.
+ *
+ * Deduped by canonical code and returned in the machine's own document order, so two uploads of one
+ * certificate produce one chip.
+ */
+export function certificateChips(machine: Pick<FleetMachine, "documentKeys">): Bilingual[] {
+  const seen = new Set<string>();
+  const out: Bilingual[] = [];
+  for (const d of machine.documentKeys) {
+    if (!isEquipmentCertDoc(d)) continue;
+    const code = certCode(d.type);
+    if (seen.has(code)) continue;
+    seen.add(code);
+    out.push(CERT_CHIP_LABEL[code] ?? { en: code.toUpperCase(), ar: code.toUpperCase() });
+  }
+  return out;
+}
+
+/** Collapse a raw doc type onto the chip it prints — the SASO family is one chip, not three. */
+function certCode(type: string): string {
+  const t = norm(type);
+  if (t === "tüv") return "tuv";
+  if (t.startsWith("saso")) return "saso";
+  return t;
+}
+
+/** Chip copy. Certificate names are proper nouns and stay Latin in both locales; only the two that
+ *  have an Arabic form carry one. */
+const CERT_CHIP_LABEL: Record<string, Bilingual> = {
+  tuv: { en: "TÜV", ar: "TÜV" },
+  spsp: { en: "SPSP", ar: "SPSP" },
+  saso: { en: "SASO", ar: "SASO" },
+  aramco: { en: "Aramco", ar: "أرامكو" },
+  insurance: { en: "Insurance", ar: "تأمين" },
+};
+
 /** The hero photo (§6.5.1) — the front shot when there is one, else the first photo the machine holds.
  *  Null when it holds none, which the component renders as a placeholder rather than a broken image. */
 export function heroPhotoUrl(machine: Pick<FleetMachine, "photoKeys">): string | null {

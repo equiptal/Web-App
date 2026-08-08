@@ -1,23 +1,31 @@
 "use client";
 
 /**
- * RMAP T12 + T16 — the map itself: the project-location pin, and the selected bid's supplier fleet.
+ * **V10 — the map** (spec 004 §6.8; RM3-AC-15, AC-19→22). The project pin, one marker per **offered**
+ * machine, an availability label on each, a distance chip, and a dotted route back to the project.
  *
  * There are no supplier pins and no bid pins, ever (AC-72, AC-169, §6.2): supplier company coordinates
  * are not reliable enough to plot, and a pin in roughly the wrong place invites distance judgements
- * that are wrong. **Every pin on this canvas is one machine.**
+ * that are wrong. **Every marker on this canvas is one machine.**
  *
- * Three rules the pin set enforces, all of them "draw less" rules:
- *  - **Only the selected bid's supplier's machines** (AC-75). The fleet endpoint is bid-scoped and this
+ * Four rules the marker set enforces, all of them "draw less" rules:
+ *  - **Offered machines only** (§6.8, V10). The fleet response also carries machines the supplier owns
+ *    and did not put on the table; v2 drew them as a hollow dashed "you can request it" pin and v3
+ *    removes the variant outright — they are one request, not a second thing to read off the map.
+ *  - **Only this bid's supplier's machines** (AC-75). The fleet endpoint is bid-scoped and this
  *    component is handed one list, so there is no state in which two suppliers' machines coexist.
- *  - **Claimed units are never drawn** (AC-77, §6.2). A quoted count with no registered machine has no
- *    equipment record, therefore no yard and no coordinates; the prototype's `ghostIcon` asserted a
- *    position that does not exist and is deliberately not ported. The shortfall is stated in words by
+ *  - **An `absent` unit is not drawn** (AC-22). A claimed count (`unidentified`) has no equipment
+ *    record, therefore no yard and no coordinates; the prototype's `ghostIcon` asserted a position that
+ *    does not exist and is deliberately not ported. The shortfall is stated in words by
  *    `BidMapWorkspace` instead.
  *  - **A machine with no usable coordinates is not plotted** (AC-19). `isPlottable` decides that, and it
  *    reads coordinates only — never the availability, and never `yardConfirmed`.
  *
- * Leaflet renders its own LTR canvas, so every pin's CONTENT sets `direction: rtl` explicitly rather
+ * **The colour is `unitAvailability`'s, resolved by the caller** (AC-19). The marker and the card chip
+ * are the same fact rendered twice, so the derivation happens once, in `BidMapWorkspace`, and arrives
+ * here already decided. Copy reads *unanswered*, never refused or unavailable (AC-20).
+ *
+ * Leaflet renders its own LTR canvas, so every marker's CONTENT sets `direction: rtl` explicitly rather
  * than inheriting the shell's (AC-30, AC-98), and the numerals inside a chip are wrapped `dir="ltr"`.
  *
  * SSR: `leaflet` touches `window` at import time, so this module is only ever reached through
@@ -29,7 +37,6 @@ import { MapContainer, Marker, Polyline, TileLayer, ZoomControl, useMap, useMapE
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { AVAILABILITY_COLOUR, MIN_PIN_GAP_PX, decollide, type MapPoint } from "@/lib/contract/bid-map";
-import type { ReadinessBand } from "@/lib/contract/bid-readiness";
 import { equipmentIcon } from "@/components/requests/EquipImg";
 import { useLocale, useT } from "@/lib/i18n";
 
@@ -39,10 +46,14 @@ export interface SitePoint {
 }
 
 /**
- * One machine, reduced to exactly what a pin draws. Assembled by `BidMapWorkspace` from the fleet rows
- * plus `unitAvailability` and `computeUnitReadiness` — this component derives no state of its own, so
- * the pin, the panel chip and the composition bar cannot start disagreeing (the whole point of
- * `bid-map.ts`).
+ * One offered machine, reduced to exactly what a marker draws. Assembled by `BidMapWorkspace` from the
+ * fleet rows plus `unitAvailability` — this component derives no state of its own, so the marker and
+ * the panel chip cannot start disagreeing (the whole point of `bid-map.ts`).
+ *
+ * **There is no `inBid` here.** The pin set is offered-only by construction, so "not in this offer" is
+ * not a state this type can represent — which is stronger than a branch that happens never to be taken.
+ * There is no readiness band either: v3 moved the bar and the document count into the machine's detail,
+ * because *"a pin on a simple map says what it is and nothing else"*.
  */
 export interface MachinePin extends MapPoint {
   /** `equipmentId` — the selection key and the de-collision key. */
@@ -50,18 +61,13 @@ export interface MachinePin extends MapPoint {
   lat: number;
   lng: number;
   /**
-   * **The only source of the pin's colour** (AC-18, §6.9.1), straight from `unitAvailability`. Never
+   * **The only source of the marker's colour** (AC-19, §6.8), straight from `unitAvailability`. Never
    * from the `yardConfirmed` boolean, which is true for every readiness-written entry and so would
    * paint the whole map green — `bid-map.ts` records the full reason.
    */
   availability: "confirmed" | "unconfirmed";
-  /** This bid offered this machine. False → the supplier owns it but did not put it on the table. */
-  inBid: boolean;
-  /** Readiness band for the bar's filled segments; null when there is nothing to score. */
-  band: ReadinessBand | null;
-  /** Documents held / required, for the bar's segment count and the chip's «N/M مستند». */
-  done: number;
-  total: number;
+  /** Distance to the project, for the chip riding this machine's route. Null → no chip, never a 0. */
+  distanceKm: number | null;
 }
 
 /** Saudi Arabia, roughly — the fallback view for a request with no project location (AC-21). The map
@@ -70,11 +76,6 @@ const FALLBACK_CENTRE: [number, number] = [24.0, 45.0];
 const FALLBACK_ZOOM = 5;
 const SITE_ZOOM = 11;
 
-/** §5 tokens. The readiness band is a SECOND, independent channel from availability (AC-55→58): a
- *  machine can be fully documented with no confirmed yard, and neither signal may mask the other. */
-const BAND_COLOUR: Record<ReadinessBand, string> = { green: "#16A34A", yellow: "#D4780A", red: "#D9362A" };
-const EMPTY_SEGMENT = "rgba(15,34,56,.14)";
-
 /** The site label is i18n copy plus, optionally, the request's own address string — which is user
  *  data going into `divIcon`'s HTML. Escape it rather than trusting it. */
 function esc(s: string): string {
@@ -82,7 +83,7 @@ function esc(s: string): string {
 }
 
 /** A taxonomy image URL is interpolated into a CSS `url()`, so anything that is not a plain http(s)
- *  link is refused outright — the pin then shows its icon fallback, which is the point of the chain. */
+ *  link is refused outright — the marker then shows its icon fallback, which is the point of the chain. */
 function safeImageUrl(url: string | null | undefined): string | null {
   if (!url) return null;
   if (!/^https?:\/\//i.test(url)) return null;
@@ -99,7 +100,7 @@ const digits = (n: number, ar: boolean): string =>
 function FitView({ site, points }: { site: SitePoint | null; points: MachinePin[] }) {
   const map = useMap();
   // Fit on the SET of plotted machines, not on every render: re-fitting when only the selection
-  // changed would yank the view out from under a renter who had panned to a pin.
+  // changed would yank the view out from under a renter who had panned to a marker.
   const key = points.map((p) => p.id).sort().join(",");
   useEffect(() => {
     if (points.length && site) {
@@ -122,25 +123,46 @@ function FitView({ site, points }: { site: SitePoint | null; points: MachinePin[
   return null;
 }
 
+/** The marker box, in CSS pixels — `design-v3.md` §4. Used both by the `divIcon` and by the distance
+ *  chip's clearance test, so the two cannot drift apart. */
+const PIN_W = 132;
+const PIN_H = 124;
+
+/** Route geometry, `design-v3.md` §6, verbatim: the bow is capped at 56 px, it is 16% of the chord, and
+ *  it alternates side by index so two machines in the same direction bow apart rather than laying
+ *  parallel tracks. The three segments fade toward the machine — that fade is what keeps the line off
+ *  the marker. */
+const ROUTE_BOW_MAX = 56;
+const ROUTE_BOW_RATIO = 0.16;
+const ROUTE_SEGMENTS: [number, number, number][] = [
+  [0, 0.42, 0.8],
+  [0.42, 0.76, 0.55],
+  [0.76, 1, 0.3],
+];
+const ROUTE_SAMPLES = 10;
+
 /**
- * The fleet layer: de-collided machine pins plus a leader line back to the true yard for any pin that
- * had to move.
+ * The fleet layer: de-collided machine markers, a dotted route from each back to the project, the
+ * distance chip riding that route, and a leader line back to the true yard for any marker that had to
+ * move.
  *
  * **De-collision is screen-space, not coordinate-space** (`decollide`, §6.2). Two machines parked in
- * one yard are metres apart in the data — never equal — and still land on the same 44 px circle, so the
+ * one yard are metres apart in the data — never equal — and still land on the same marker, so the
  * threshold is a projected-pixel distance. `map.project(latlng, zoom)` is used rather than
  * `latLngToContainerPoint` on purpose: absolute layer pixels are independent of the pan, so the fan is
  * a pure function of the ZOOM and the memo below is exact rather than merely cheap. Panning cannot
- * change which pins overlap; zooming can, and does — pins that touch at city zoom separate on their own
- * as the renter zooms in.
+ * change which markers overlap; zooming can, and does — markers that touch at city zoom separate on
+ * their own as the renter zooms in.
  */
 function FleetLayer({
+  site,
   points,
   selectedId,
   onSelect,
   imageUrl,
   iconName,
 }: {
+  site: SitePoint | null;
   points: MachinePin[];
   selectedId: string | null;
   onSelect: (id: string) => void;
@@ -166,10 +188,102 @@ function FleetLayer({
     [points, zoom, map],
   );
 
+  /* ── the route and its chip ──────────────────────────────────────────────────────────────────
+     Both are pure geometry over the SAME layer pixels the de-collision used, so the line ends where
+     the marker actually stands rather than where the machine is. Recomputed on zoom because layer
+     pixels are zoom-dependent; the pan does not enter it. */
+  const routes = useMemo(() => {
+    if (!site) return [];
+    const s = map.project([site.lat, site.lng], zoom);
+    // Chips already laid down this pass — a second machine in the same direction must not stack its
+    // chip on the first one's.
+    const taken: { x: number; y: number }[] = [];
+
+    return placed.map((p, i) => {
+      const b = { x: p.x, y: p.y };
+      const vx = b.x - s.x;
+      const vy = b.y - s.y;
+      const len = Math.hypot(vx, vy) || 1;
+      const bow = Math.min(ROUTE_BOW_MAX, len * ROUTE_BOW_RATIO) * (i % 2 ? -1 : 1);
+      const cx = (s.x + b.x) / 2 + (-vy / len) * bow;
+      const cy = (s.y + b.y) / 2 + (vx / len) * bow;
+      const at = (tt: number): [number, number] => {
+        const k = 1 - tt;
+        return [k * k * s.x + 2 * k * tt * cx + tt * tt * b.x, k * k * s.y + 2 * k * tt * cy + tt * tt * b.y];
+      };
+
+      const segments = ROUTE_SEGMENTS.map(([from, to, opacity]) => {
+        const pts: L.LatLng[] = [];
+        for (let n = 0; n <= ROUTE_SAMPLES; n++) {
+          const [x, y] = at(from + (to - from) * (n / ROUTE_SAMPLES));
+          pts.push(map.unproject([x, y], zoom));
+        }
+        return { pts, opacity };
+      });
+
+      // The chip rides the line, but every line ENDS inside the marker box (132×124, anchored bottom),
+      // so a fixed fraction lands on the machine whenever the line is short. Walk back from the site
+      // end until the point clears that box, then nudge perpendicular, then clear of other chips.
+      let chip: { at: L.LatLng; km: number } | null = null;
+      if (p.point.distanceKm != null) {
+        const clears = (x: number, y: number) =>
+          Math.abs(x - b.x) >= PIN_W / 2 + 20 || b.y - y >= PIN_H + 12 || y - b.y >= 26;
+        let tt = 0.62;
+        let x = s.x + vx * tt;
+        let y = s.y + vy * tt;
+        for (let n = 0; n < 9 && !clears(x, y); n++) {
+          tt = Math.max(0.18, tt - 0.07);
+          x = s.x + vx * tt;
+          y = s.y + vy * tt;
+          if (tt === 0.18) break;
+        }
+        if (!clears(x, y)) {
+          x += (-vy / len) * 30;
+          y += (vx / len) * 30;
+        }
+        for (let g = 0; g < 6 && taken.some((q) => Math.abs(q.x - x) < 58 && Math.abs(q.y - y) < 24); g++) {
+          const off = (g % 2 ? -1 : 1) * (26 + 13 * Math.floor(g / 2));
+          x = s.x + vx * tt + (-vy / len) * off;
+          y = s.y + vy * tt + (vx / len) * off;
+        }
+        taken.push({ x, y });
+        chip = { at: map.unproject([x, y], zoom), km: Math.round(p.point.distanceKm) };
+      }
+
+      return { id: p.point.id, segments, chip };
+    });
+  }, [placed, site, map, zoom]);
+
   const src = safeImageUrl(imageUrl);
 
   return (
     <>
+      {/* The routes are drawn FIRST so every marker sits above every line — a route crossing the
+          machine it belongs to would read as pointing somewhere else. */}
+      {routes.map((r) => (
+        <Fragment key={`route-${r.id}`}>
+          {r.segments.map((seg, n) => (
+            <Polyline
+              key={n}
+              positions={seg.pts}
+              // `className` carries the travelling dash; the dash pattern itself is a Leaflet path
+              // option, not CSS, so it stays here.
+              className="bm-flow"
+              pathOptions={{ color: "#6E869C", weight: 3, opacity: seg.opacity, dashArray: "1 9", lineCap: "round" }}
+              interactive={false}
+            />
+          ))}
+          {r.chip && (
+            <Marker
+              position={r.chip.at}
+              icon={distanceIcon(r.chip.km, ar, t.bidMap.km)}
+              interactive={false}
+              zIndexOffset={600}
+            />
+          )}
+        </Fragment>
+      ))}
+
       {placed.map((p) => {
         const pin = p.point;
         const at = map.unproject([p.x, p.y], zoom);
@@ -178,21 +292,20 @@ function FleetLayer({
           // A Fragment, not a wrapper element: react-leaflet children attach to the map through
           // context, and a real <div> here would be mounted inside the Leaflet pane.
           <Fragment key={pin.id}>
-            {/* The leader line is drawn only when the pin actually moved — `decollide` returns the
+            {/* The leader line is drawn only when the marker actually moved — `decollide` returns the
                 anchor equal to the position otherwise, so this is a real displacement, not a
-                zero-length hairline. It is tinted with the machine's own availability colour so the
-                line cannot suggest a different state from the pin it belongs to. */}
+                zero-length hairline. */}
             {p.displaced && (
               <Polyline
                 positions={[[pin.lat, pin.lng], [at.lat, at.lng]]}
-                pathOptions={{ color: AVAILABILITY_COLOUR[pin.availability], weight: 1.5, opacity: 0.7 }}
+                pathOptions={{ color: "#A9BCCC", weight: 1, opacity: 0.8 }}
                 interactive={false}
               />
             )}
             <Marker
               position={at}
-              icon={machineIcon(pin, selected, src, iconName, ar, t)}
-              zIndexOffset={selected ? 900 : 700}
+              icon={machineIcon(pin, selected, src, iconName, t)}
+              zIndexOffset={selected ? 900 : 760}
               riseOnHover
               eventHandlers={{ click: () => onSelect(pin.id) }}
             />
@@ -215,74 +328,73 @@ function useMapTick(): number {
   return tick;
 }
 
+/** The distance chip riding a route (§6.8). Non-interactive, and never a 0: a machine with no distance
+ *  gets no chip at all rather than a chip claiming it is at the project. */
+function distanceIcon(km: number, ar: boolean, unit: string): L.DivIcon {
+  return L.divIcon({
+    className: "",
+    iconSize: [150, 26],
+    iconAnchor: [75, 13],
+    html: `<div class="bm-distchip" dir="rtl"><span><span dir="ltr">${esc(digits(km, ar))}</span> ${esc(unit)}</span></div>`,
+  });
+}
+
 /**
- * The machine pin — `design.md` §4.2, value for value.
+ * The machine marker — `design-v3.md` §4, value for value.
  *
- * Everything static (the 132×86 box, the 44 px circle, the bar's 66 px width and 2 px gap, the chip's
- * padding and weight) lives in `map-proto.css`; only genuinely state-dependent values — the colour, the
- * border style, the halo, a segment's fill — are inline, which is this repo's `*-proto.css` convention.
+ * Everything static (the 132×124 box, the 96×78 stage, the 62 px ground disc, the 44 px object, the
+ * label's padding and weight) lives in `map-proto.css`; only genuinely state-dependent values — the
+ * availability colour, the halo, the lift — are inline, which is this repo's `*-proto.css` convention.
  *
- * **No numeric index badge.** The prototype draws one (`AR(idx+1)` at `bottom:-6px`); `design.md` §7
- * decision 3 drops it, because §6.3.3 banned exactly this invented per-unit index — nothing links a bid
- * to a numbered unit, so a renter asking "what about unit 2?" names something the supplier cannot
- * resolve.
+ * The machine stands ON the map: a tinted ground disc ringed in its availability colour, a contact
+ * shadow, then the object. **Selection is a blue ring on the disc and a lift, not a new colour** — the
+ * only two colours on this canvas are availability's.
  *
- * **No emoji.** The prototype puts the request item's taxonomy emoji in the circle; §7 decision 4 makes
- * it the request item's taxonomy IMAGE, falling back to the category image, then a generic icon, and
- * never a broken image (AC-80). A `divIcon` renders an HTML string with no React lifecycle, so the
- * `onError` swap `EquipImg` uses is not available — instead the icon glyph is always in the DOM and the
- * image is painted OVER it as a background. A URL that 404s simply never paints and the glyph shows
- * through, which is the same fallback chain with no failure mode.
+ * **No numeric index badge** (`design.md` §7 decision 3): §6.3.3 banned exactly this invented per-unit
+ * index, because nothing links a bid to a numbered unit and a renter asking "what about unit 2?" names
+ * something the supplier cannot resolve.
+ *
+ * **No emoji** (§7 decision 4): the request item's taxonomy IMAGE, falling back to the category image,
+ * then a generic icon, and never a broken image (AC-80). A `divIcon` renders an HTML string with no
+ * React lifecycle, so the `onError` swap `EquipImg` uses is not available — instead the icon glyph is
+ * always in the DOM and the image is painted OVER it as a background. A URL that 404s simply never
+ * paints and the glyph shows through, which is the same fallback chain with no failure mode.
  */
 function machineIcon(
   pin: MachinePin,
   selected: boolean,
   src: string | null,
   iconName: string,
-  ar: boolean,
   t: ReturnType<typeof useT>,
 ): L.DivIcon {
   const ring = AVAILABILITY_COLOUR[pin.availability];
-  const alt = !pin.inBid;
-  const halo = selected
-    ? "0 0 0 4px rgba(37,99,235,.35), 0 6px 16px rgba(15,34,56,.32)"
-    : "0 5px 14px rgba(15,34,56,.3)";
-  const circle = [
-    `background:${alt ? "#fff" : ring}`,
-    `border:3px ${alt ? "dashed" : "solid"} ${alt ? ring : "#fff"}`,
-    `box-shadow:${halo}`,
-  ].join(";");
+  const tint = pin.availability === "confirmed" ? "rgba(22,163,74,.34)" : "rgba(217,54,42,.32)";
 
-  const segments = Math.max(0, Math.trunc(pin.total));
-  const fill = pin.band ? BAND_COLOUR[pin.band] : EMPTY_SEGMENT;
-  let bar = "";
-  for (let i = 0; i < segments; i++) {
-    bar += `<span class="bm-pin-seg" style="background:${i < pin.done ? fill : EMPTY_SEGMENT}"></span>`;
-  }
-
-  // «يمكنك طلبها» (not offered) · «متاحة» (confirmed) · «غير مؤكّدة» — the SHORT wording, which
-  // coexists with the panel chip's longer «التوفّر مؤكّد» by decision (§7 decision 2): one fact, two
-  // lengths, because 9 px inside a 132 px marker cannot carry the explicit phrasing.
-  const state = alt ? t.bidMap.pinRequestable : pin.availability === "confirmed" ? t.bidMap.pinAvailable : t.bidMap.pinUnconfirmed;
-  const docs = `<span dir="ltr">${esc(digits(pin.done, ar))}/${esc(digits(segments, ar))}</span> ${esc(t.bidMap.pinDocs)}`;
-
-  const content = alt
-    ? `<span class="bm-pin-plus" style="color:${ring}">+</span>`
-    : `<span class="bm-pin-glyph material-icons-outlined">${esc(iconName)}</span>` +
-      (src ? `<span class="bm-pin-img" style="background-image:url('${src}')"></span>` : "");
+  // «مؤكّد توفرها» / «لم يؤكد توفرها بعد». "Not confirmed" reads as UNANSWERED — the label carries no
+  // reason, no cause and no location-source explanation (AC-20, AC-30).
+  const state = pin.availability === "confirmed" ? t.bidMap.pinAvailable : t.bidMap.pinUnconfirmed;
 
   return L.divIcon({
-    className: "", // no Leaflet default box — the pin is entirely our own markup
-    iconSize: [132, 86],
-    iconAnchor: [66, 86],
+    className: "", // no Leaflet default box — the marker is entirely our own markup
+    iconSize: [PIN_W, PIN_H],
+    iconAnchor: [PIN_W / 2, PIN_H],
     html:
       `<div class="bm-pin" dir="rtl" style="direction:rtl">` +
-      `<div class="bm-pin-c" style="${circle}">` +
-      content +
+      `<div class="bm-pin-stage">` +
+      (selected ? `<span class="bm-pin-halo" style="border:2px solid ${ring}"></span>` : "") +
+      `<span class="bm-pin-disc" style="background:${tint};border:2.5px solid ${ring}${selected ? ";box-shadow:0 0 0 3px rgba(37,99,235,.55)" : ""}"></span>` +
+      `<span class="bm-pin-shadow"></span>` +
+      `<span class="bm-pin-c" style="background:${ring};border:3px solid #fff;box-shadow:${
+        selected ? "0 12px 14px rgba(15,34,56,.34)" : "0 6px 8px rgba(15,34,56,.30)"
+      }${selected ? ";animation:dpLift .55s cubic-bezier(.34,1.4,.64,1) forwards" : ";transform:translateY(-4px)"}">` +
+      `<span class="bm-pin-glyph material-icons-outlined">${esc(iconName)}</span>` +
+      (src ? `<span class="bm-pin-img" style="background-image:url('${src}')"></span>` : "") +
       (selected ? `<span class="bm-pin-tick">✓</span>` : "") +
+      `</span>` +
       `</div>` +
-      (segments > 0 ? `<div class="bm-pin-bar">${bar}</div>` : "") +
-      `<div class="bm-pin-chip" style="border:1px ${alt ? "dashed" : "solid"} ${ring}">${esc(state)} · ${docs}</div>` +
+      `<div class="bm-pin-chip" style="background:${ring};border:1px solid ${ring}${selected ? ";transform:scale(1.06)" : ""}">${esc(state)}</div>` +
+      // Only the focused marker names itself — the map stays quiet until the renter has chosen (AC-34).
+      (selected ? `<div class="bm-pin-tag">${esc(t.bidMap.pinInOffer)}</div>` : "") +
       `</div>`,
   });
 }
@@ -298,7 +410,7 @@ export default function MapCanvas({
 }: {
   site: SitePoint | null;
   addressLabel?: string | null;
-  /** The selected bid's plottable machines. Empty in state 1, and empty for an off-platform bid. */
+  /** The bid's OFFERED, plottable machines. Empty for an off-platform bid and while the fleet loads. */
   machines?: MachinePin[];
   selectedMachineId?: string | null;
   onSelectMachine?: (id: string) => void;
@@ -343,8 +455,9 @@ export default function MapCanvas({
         {/* Opposite the bid panel, which sits on the inline-end edge — otherwise the zoom buttons land
             underneath it in Arabic, where inline-end is the physical left. */}
         <ZoomControl position={dir === "rtl" ? "topright" : "topleft"} />
-        {site && <Marker position={[site.lat, site.lng]} icon={icon} interactive={false} />}
+        {site && <Marker position={[site.lat, site.lng]} icon={icon} interactive={false} zIndexOffset={900} />}
         <FleetLayer
+          site={site}
           points={machines}
           selectedId={selectedMachineId}
           onSelect={(id) => onSelectMachine?.(id)}

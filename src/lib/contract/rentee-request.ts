@@ -51,6 +51,34 @@ export function composeShortfallRequest(): RenteeRequestDraft {
   return { scope: "company", equipmentId: null, kind: "alternative" };
 }
 
+/**
+ * The other three asks (§6.7, RM3-AC-17): «اطلب تأكيد التوفّر» from the card and the detail,
+ * «اطلب معدّة أخرى» from inside a detail, and «اطلب مستنداً» as ONE batch card over the ticked rows.
+ *
+ * **The scope is derived from the id, never passed alongside it.** The backend validates the pair
+ * against itself — `equipment` requires an `equipmentId`, `company` requires it to be null — so
+ * representing them as two free fields is representing a state the server refuses. A named machine is
+ * an `equipment` ask; no machine is a `company` one.
+ *
+ * Every ask carries the machine **as data**, not only in prose (AC-17). `ref` and `serial` stay absent:
+ * both are minted and stamped server-side, and a client-supplied one could name a different machine
+ * than the id.
+ */
+export function composeMachineRequest(
+  kind: RenteeRequestKind,
+  equipmentId: string | null,
+  docTypes?: string[],
+): RenteeRequestDraft {
+  const id = (equipmentId ?? "").trim() || null;
+  const draft: RenteeRequestDraft = { scope: id ? "equipment" : "company", equipmentId: id, kind };
+  if (kind === "document") {
+    // De-duped and emptied of blanks here rather than at the call site: the batch is assembled from
+    // row labels, and two rows can name the same wire type.
+    draft.docTypes = [...new Set((docTypes ?? []).map((s) => s.trim()).filter((s) => s !== ""))];
+  }
+  return draft;
+}
+
 /** True when a kind may still be sent. The retired list is checked FIRST on the backend, so a caller
  *  that filters here gets the same answer instead of a 400 it cannot explain. */
 export function isSendableKind(kind: string): kind is RenteeRequestKind {

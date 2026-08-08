@@ -896,14 +896,40 @@ export const en = {
     keyNotUnavailable:
       "“Not confirmed” does not mean unavailable — it means the lessor hasn't named its yard in the offer readiness yet. Ask him to confirm from the machine panel.",
     keyCountOnly: "Units added as a count only don't appear on the map — no machine is registered for them.",
-    // T16 — the machine pin. The SHORT wording, which coexists with the panel chip's longer phrasing
-    // by decision (design.md §7 decision 2): one fact, two lengths — 9px inside a 132px marker can't
-    // carry "Availability confirmed".
-    pinAvailable: "Available",
-    pinUnconfirmed: "Not confirmed",
-    pinRequestable: "You can request it",
-    pinDocs: "docs",
+    // V10 — the machine marker's availability label (§6.8). One scale, two labels, and "not confirmed"
+    // reads as UNANSWERED — never refused, never unavailable (RM3-AC-20). The "you can request it"
+    // variant is gone with the hollow marker: v3 draws offered machines only.
+    pinAvailable: "Availability confirmed",
+    pinUnconfirmed: "Not confirmed yet",
+    /** The selected marker's in-offer tag (§6.4 landing pre-selection, RM3-AC-34). */
+    pinInOffer: "In this offer",
     loadingFleet: "Loading this lessor's machines…",
+    /* ── V5 · the equipment list (§6.4) ──
+       Flat, nearest first, OFFERED machines only. No serial number and no load capacity (RM3-AC-12):
+       the serial identifies the machine to the system, and the type and size are already stated once,
+       in the count pills. */
+    // ONE chip carrying availability AND commitment (RM3-AC-32) — never a chip plus a band below it,
+    // which made cards unequal in height and split one fact across two rows. Every card in this list is
+    // in the offer, so the confirmed chip is the one that states both; the unconfirmed chip states the
+    // unanswered availability and nothing else (RM3-AC-30 — no reason, no cause).
+    eqChipConfirmed: "Availability confirmed · in this offer",
+    eqChipUnconfirmed: "Not confirmed yet",
+    // Blue, never navy (RM3-AC-33) — beside a red chip, navy reads as disabled.
+    eqAskConfirm: "Ask him to confirm",
+    eqAskConfirmWhy: "Ask the lessor to confirm this machine is available",
+    eqDetails: "Details",
+    // The certificate row always occupies its line, so a machine with no certificates is a shorter
+    // LINE and not a shorter CARD.
+    eqNoCerts: "No certificates on this machine",
+    eqDistanceUnit: "km from your project",
+    eqNoDistance: "Distance not known",
+    eqNoPhoto: "No photo",
+    eqSelect: "Show this machine on the map",
+    // RM3-AC-26 — a price and a count were given, and nothing else. No empty card furniture.
+    eqNoneRegistered: "No machine is registered in this offer",
+    eqNoneRegisteredWhy: "The lessor gave a price and a count only, so there is nothing here to place or verify.",
+    // The company panel's own back control, and the detail's.
+    backToEquipment: "Back to the machines",
     // What the map is NOT showing, in words. Silence would read as "this lessor has no machines".
     claimedNotDrawn: "{n} of the offered units aren't on the map",
     claimedNotDrawnWhy:
