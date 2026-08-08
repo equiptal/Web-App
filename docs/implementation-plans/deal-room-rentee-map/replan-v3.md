@@ -116,9 +116,15 @@ The rescope's timing was lucky: everything it deletes was either unbuilt or is a
 | **V12** | **Chat dock + price footer** — persistent dock with the unread badge, no rail; footer at the panel bottom re-hosting the existing bar | 23, 24 |
 | **V13** | **Routing + empty state** — an off-platform bid never opens this surface; a supplier with no registered machines gets an explanatory state with no empty card furniture | 25, 26 |
 
-**Explicitly absent, and asserted as such:** no distance filter (AC-28), no bid-quality score/ring
+**Explicitly absent, and asserted as such:** ~~no distance filter (AC-28),~~ no bid-quality score/ring
 (AC-29), no reason on the unconfirmed chip (AC-30). These are *negative* ACs — V5 and V10 must prove the
 view model exposes no such field, not merely that nothing renders.
+
+> **Superseded for AC-28, 2026-08-08 (owner decision).** The equipment list gets filters. AC-28 is
+> rewritten from a prohibition into the control it forbade, AC-28a→28e carry the four rules that keep it
+> safe, and the work is **V18** in [`tickets.md`](tickets.md). The v3 argument for removal is withdrawn
+> in the open, not deleted: it held for the **v2** control, which filtered competing offers on the bids
+> list, and does not carry to a list of one lessor's machines.
 
 ## Coverage
 

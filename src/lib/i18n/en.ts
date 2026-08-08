@@ -934,6 +934,20 @@ export const en = {
     // RM3-AC-26 — a price and a count were given, and nothing else. No empty card furniture.
     eqNoneRegistered: "No machine is registered in this offer",
     eqNoneRegisteredWhy: "The lessor gave a price and a count only, so there is nothing here to place or verify.",
+    // V17 — the list's filters (§6.4a). Chips select for what a machine HAS, never for what it lacks,
+    // and the count always states the whole (RM3-AC-28a→28e). Group and chip copy comes from the
+    // model, bilingual, so the list and a Dart port cannot label the same band differently.
+    eqFilterLabel: "Filter the machines in this offer",
+    eqFilterClear: "Clear filters",
+    // «3 of 8» — the numerator is what is shown, the denominator is the whole offer.
+    eqShownOfTotal: "{n} of {total}",
+    // A machine with no distance is kept by every band: unknown is not far. Said out loud, because
+    // the chips alone cannot show it.
+    eqFilterUnknownDistance: "A machine with no known distance stays visible under every band.",
+    // The filtered empty state — deliberately unlike RM3-AC-26's. That one is a statement about the
+    // lessor; this one is a statement about the chips the renter pressed.
+    eqFilterEmpty: "No machine matches what you chose",
+    eqFilterEmptyWhy: "Active filters: {filters}. This offer has {total} — clear the filters to see them all.",
     // The company panel's own back control, and the detail's.
     backToEquipment: "Back to the machines",
     // What the map is NOT showing, in words. Silence would read as "this lessor has no machines".

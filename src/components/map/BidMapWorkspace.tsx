@@ -55,7 +55,7 @@ import {
   unitCountLabel,
   unitCounts,
 } from "@/lib/contract/bid-map";
-import { landingSelectionId, offeredMachines } from "@/lib/contract/equipment-list";
+import { equipmentListView, landingSelectionId, offeredMachines } from "@/lib/contract/equipment-list";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import {
   composeDocumentRequest,
@@ -135,6 +135,13 @@ export function BidMapWorkspace({
   const [detailId, setDetailId] = useState<string | null>(null);
   /** V9 — the company panel, which takes over the same way. */
   const [companyOpen, setCompanyOpen] = useState(false);
+  /**
+   * V17 — the pressed filter chips (§6.4a). **Empty on arrival, always**: a renter who cannot see all
+   * the machines in an offer cannot tell whether the lessor sent few or a chip is hiding some. It lives
+   * HERE rather than in the list because the map filters on the same answer (RM3-AC-28d/AC-15) — one
+   * state, one derivation, so the cards and the markers cannot disagree about what the offer contains.
+   */
+  const [filterIds, setFilterIds] = useState<string[]>([]);
   /** The panel's scroller, handed to the list so a selection made on the MAP brings its card into
    *  view (AC-15). */
   const bodyRef = useRef<HTMLDivElement | null>(null);
@@ -242,6 +249,7 @@ export function BidMapWorkspace({
     setCueId(null);
     setDetailId(null);
     setCompanyOpen(false);
+    setFilterIds([]);
     landedForBid.current = null;
     onSelectMachine?.(null);
     // `onSelectMachine` is the parent's callback; re-running when only its identity changed would
@@ -293,9 +301,18 @@ export function BidMapWorkspace({
      registered machines only, and the shortfall is stated in the panel's alert instead (§6.3). */
   const listed = useMemo(() => (fleet ? offeredMachines(fleet) : []), [fleet]);
 
+  /* ── V17 · the filters (§6.4a, RM3-AC-28a→28e) ─────────────────────────────────────────────────
+     One model call answers all of it: which chips exist (only what the request asked for, and only
+     where they would split the list), which machines survive them, and the two figures the count is
+     made of. `bid` is passed as the request — a `BidCard` carries the request's asks projected onto
+     the bid, which is the same object the match grid is scored against, so a chip and a grid cell can
+     never disagree about the same certificate. */
+  const view = useMemo(() => equipmentListView(listed, bid, filterIds), [listed, bid, filterIds]);
+  const visible = view.machines;
+
   const machines: MachinePin[] = useMemo(
     () =>
-      listed
+      visible
         // AC-19/AC-22: a machine with no usable coordinates is not plotted. `isPlottable` reads
         // coordinates only — never the availability, and never `yardConfirmed`.
         .filter((m) => isPlottable(m))
@@ -308,7 +325,7 @@ export function BidMapWorkspace({
           availability: unitAvailability(m) === "confirmed" ? ("confirmed" as const) : ("unconfirmed" as const),
           distanceKm: typeof m.distanceKm === "number" && Number.isFinite(m.distanceKm) ? m.distanceKm : null,
         })),
-    [listed],
+    [visible],
   );
 
   // AC-80 decision 4: the REQUEST ITEM's taxonomy image, falling back to the category image, then a
@@ -329,6 +346,23 @@ export function BidMapWorkspace({
     },
     [selectedMachineId, onSelectMachine],
   );
+
+  /* ── V17 · a filtered-out machine cannot stay selected ─────────────────────────────────────────
+     Cards and markers move together (AC-15), so a selection pointing at a machine no chip lets
+     through would be a ring with no card and no pin — the same orphaned-selection defect the bid
+     change guards against. The whole `listed` set is checked, not `visible`, so this fires only when
+     a FILTER hid it and never while the fleet is still loading. */
+  useEffect(() => {
+    if (!selectedMachineId) return;
+    if (view.machines.some((m) => m.equipmentId === selectedMachineId)) return;
+    if (!listed.some((m) => m.equipmentId === selectedMachineId)) return;
+    setSelectedMachineId(null);
+    setCueId(null);
+    onSelectMachine?.(null);
+    // `onSelectMachine` is the parent's callback; re-running on its identity would clear a selection
+    // the renter just made.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view.machines, listed, selectedMachineId]);
 
   /* ── V6 · landing pre-selection (§6.4, RM3-AC-34/35) ────────────────────────────────────────────
      **The bid's primary machine** — `Bid.equipmentId`, which is what the supplier committed and what
@@ -450,7 +484,12 @@ export function BidMapWorkspace({
     if (fleetFailed) return { title: t.bidMap.fleetFailed, sub: t.bidMap.fleetFailedWhy };
     // Only when there ARE offered machines and none of them can be drawn. A supplier who registered
     // none at all is a different statement, and the list makes it once (RM3-AC-26).
-    if (fleet && listed.length > 0 && machines.length === 0) return { title: t.bidMap.noLocatable, sub: t.bidMap.noLocatableWhy };
+    //
+    // Measured on the UNFILTERED list on purpose: this sentence is about the lessor never sharing a
+    // yard, and a chip that happens to hide every plottable machine must not be able to say it. A
+    // filter that empties the map is stated once, beside the chips that did it (RM3-AC-28e).
+    if (fleet && listed.length > 0 && listed.filter((m) => isPlottable(m)).length === 0)
+      return { title: t.bidMap.noLocatable, sub: t.bidMap.noLocatableWhy };
     return null;
   })();
 
@@ -615,7 +654,12 @@ export function BidMapWorkspace({
             <div className="bm-body" ref={bodyRef}>
               {fleet && (
                 <EquipmentList
-                  machines={listed}
+                  view={view}
+                  filterIds={filterIds}
+                  onToggleFilter={(id) =>
+                    setFilterIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+                  }
+                  onClearFilters={() => setFilterIds([])}
                   selectedId={selectedMachineId}
                   cueId={cueId}
                   onSelect={selectMachine}

@@ -46,7 +46,7 @@ Nothing here cost implementation time except where **C** says otherwise.
 |---|---|---|
 | T11 list∣map toggle | entry is now **clicking a bid card**, not a view mode | **V1** |
 | T13 bid list panel | there is no offers list — the view is one bid | **V5** (equipment list) |
-| T14 distance filter | already dropped in v2; v3 re-states it (AC-28) | — |
+| ~~T14 distance filter~~ | ~~already dropped in v2; v3 re-states it (AC-28)~~ — **NO LONGER SUPERSEDED. Reinstated 2026-08-08 by owner decision** and rebuilt wider than T14 ever was: not a band selector over competing offers, but the equipment list's whole filter row (distance · availability · year · certificates), pure in `equipment-list.ts`, with the four rules of §6.4a. AC-28 is rewritten and AC-28a→28e added | **V17** |
 | T15 colour key | v3 states the scale in copy; no legend component | — |
 | T18–T20 panel shell / composition bar / machine chips | v2's 3-tab panel + composition bar + serial chips; v3 has count pills, a shortfall alert, and a 2-tab detail | **V2 V3 V4 V7** |
 | T21 availability & fit tab | becomes the **six-cell match grid** | **V7** |
@@ -419,9 +419,19 @@ row named "operator safety certificate" inside the machine's documents.
 integration against staging · **T41** the visual pass against `Deal Room Map.html` · **T42** spec
 alignment · **T43** regression.
 
-**Three ACs are negative and need proving, not observing:** no distance filter (28), no bid-quality
-score/ring (29), no reason on the unconfirmed chip (30). Assert the **view model exposes no such field**
-— a render that happens not to show one is not the same thing.
+**~~Three~~ Two ACs are negative and need proving, not observing:** ~~no distance filter (28),~~ no
+bid-quality score/ring (29), no reason on the unconfirmed chip (30). Assert the **view model exposes no
+such field** — a render that happens not to show one is not the same thing.
+
+**AC-28 was one of the three, and its gate inverts** (owner decision, 2026-08-08). The requirement used
+to be a test proving the view model exposes **no** distance-band field; there is now a band field, so
+that assertion is not weakened but replaced. The same standard applies to the replacement — assert the
+**model**, not a render — and the burden simply moves to the conditions: `RM3-TC-14a` in
+`tests/unit/equipment-list.test.ts` proves that a control is **absent** when the request did not ask for
+it, **absent** when it would not split the list, that the count carries the unfiltered total, that the
+marker set equals the filtered list minus what cannot be plotted, and that the filtered empty state is
+neither reachable from nor mistakable for AC-26's. A positive criterion with negative guards needs more
+proof than the negative one did, not less.
 
 ### T44 · Renumber the bare `AC-nn` citations in tests `[CT]` — **follow-up, not part of V1–V16**
 
@@ -498,11 +508,36 @@ V15's row controls (AC-69).
 - ⚠️ **Wording.** The owner wrote «اطلب من المورد إرساله»; this surface says **«المؤجّر» and never
   «المورد»**, so «اطلب من المؤجّر إرساله» ships. One word overrules it.
 
+### V18 · The equipment list gets filters `[UI][CT]`
+**AC** 28 (rewritten), 28a, 28b, 28c, 28d, 28e, 15 (spec 004 §6.4a) · **New 2026-08-08, owner decision.**
+**This un-supersedes T14** (section B) and inverts one of section E's negative gates.
+
+- **Pure, in `src/lib/contract/equipment-list.ts`**, beside `offeredMachines` — which already owns the
+  one filter+sort keeping the list and the marker set identical. Which chips exist, what each keeps and
+  both figures of the count are model decisions; `EquipmentList` paints. That is what makes rules 2, 3
+  and 4 provable in the `node` vitest env instead of by looking at a screenshot.
+- **Chips select for what a machine HAS**, never for what it lacks. A "missing TÜV" chip would turn a
+  verification surface into an accusation surface, and the ask is already the instrument for a gap.
+- **Reuse:** `computeUnitReadiness` + `readinessInputsFor` for the year and both certificate families —
+  one scorer, so a chip cannot disagree with the match grid or the document rows about the same paper.
+  `unitAvailability` for the availability chip, never `yardConfirmed`.
+- **Bands are v2's own** (الكل · ≤٥٠ · ≤١٠٠ · ≤٢٠٠ كم, `001-…-v2.md` §6.10), not reinvented. Bands that
+  hide exactly the same machines collapse to the tightest — three chips doing one thing is AC-28b's
+  failure mode wearing a different hat.
+- **Selection state lives in `BidMapWorkspace`**, not in the list: the map filters on the same answer
+  (AC-15), and the pin set is derived from the filtered list. Cleared on every bid change, and a
+  selection the filter hides is dropped, for the reason AC-177 already gives.
+- **الملحقات is built and never renders** — the fleet row carries no attachments field, so no machine can
+  be shown to have them and AC-28b drops it. One function (`recordsAttachments`) is the whole of the
+  fix when the wire grows the field.
+- **Given** a filter that leaves nothing **Then** the empty state names the active chips and offers
+  «امسح التصفية» — and AC-26's state is keyed off the offer's total so a filter can never reach it.
+
 ## Coverage
 
 All 42 `RM3-AC-*` map to V1–V13, except **AC-27**, which is backend and **already satisfied** by T1/T5.
 **Updated 2026-08-08:** the series now runs to **RM3-AC-78** — 68–70 map to V14/V15, 71–72 to V9/V11,
-73–76 to V8/V16, and **77–78 to V17**.
+73–76 to V8/V16, and **77–78 to V17**. The reversal of AC-28 adds **28a→28e**, all of them **V18**.
 
 ## Sequence
 

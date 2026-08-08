@@ -603,6 +603,88 @@
 .bidmap .bm-eqnone-t { font-size: 12.5px; font-weight: 800; color: #0f2238; }
 .bidmap .bm-eqnone-s { font-size: 11px; font-weight: 600; color: #6b8fa8; margin-top: 5px; line-height: 1.8; }
 
+/* ── V17 · the filter bar (§6.4a) ────────────────────────────────────────────────────────────────
+   It scrolls WITH the list rather than sticking above it. The count it carries describes the whole
+   offer, and a figure pinned over a moving list reads as a running total of what is on screen.
+
+   Everything here is achromatic until it is pressed: an unpressed chip is a question, and a row of
+   coloured questions beside the cards' one availability colour would read as a second state scale. */
+.bidmap .bm-eqf {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 11px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e6eef5;
+}
+.bidmap .bm-eqf-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+/* «٣ من ٨» — rule 3. Prominent enough to be read before the cards it describes, because a hidden
+   machine must never let the offer read as smaller than it is. */
+.bidmap .bm-eqf-count { font-size: 11px; font-weight: 800; color: #0f2238; letter-spacing: 0.01em; }
+.bidmap .bm-eqf-count > span { unicode-bidi: isolate; }
+/* Blue, like every other action on this surface (AC-33): clearing is what the renter came to the row
+   to do when it stopped helping, and a grey control there reads as switched off. */
+.bidmap .bm-eqf-clear {
+  background: none;
+  border: 0;
+  padding: 2px 0;
+  color: #2563eb;
+  font-size: 10.5px;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
+}
+.bidmap .bm-eqf-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 8px; }
+.bidmap .bm-eqf-label { flex-shrink: 0; font-size: 10px; font-weight: 800; color: #6b8fa8; min-width: 44px; }
+.bidmap .bm-eqf-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.bidmap .bm-eqf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #fff;
+  border: 1px solid #d7e3ec;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #33546e;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.14s, border-color 0.14s, color 0.14s;
+}
+.bidmap .bm-eqf-chip:hover { border-color: #9fb9cd; }
+/* Pressed is slate, not blue — the same reasoning the card's selection accent records: on a surface
+   whose only other colour is availability, a saturated accent reads as a third machine state. */
+.bidmap .bm-eqf-chip.on { background: #0f2238; border-color: #0f2238; color: #fff; }
+/* The chip's own count, so the renter can see what a press will cost him before he pays it. */
+.bidmap .bm-eqf-n { font-size: 9.5px; font-weight: 800; opacity: 0.62; }
+.bidmap .bm-eqf-note { flex-basis: 100%; font-size: 9.5px; font-weight: 600; color: #6b8fa8; line-height: 1.7; }
+
+/* The FILTERED empty state (RM3-AC-28e). Deliberately unlike `.bm-eqnone`: that one is centred, flat
+   and actionless because nothing can be done about a lessor who registered no machine. This one is a
+   bordered card carrying the way out, so the two cannot be mistaken for each other at a glance. */
+.bidmap .bm-eqfnone {
+  padding: 16px 14px;
+  background: #fff;
+  border: 1px solid #e6eef5;
+  border-radius: 13px;
+  text-align: start;
+}
+.bidmap .bm-eqfnone-t { font-size: 12px; font-weight: 800; color: #0f2238; }
+.bidmap .bm-eqfnone-s { font-size: 10.5px; font-weight: 600; color: #6b8fa8; margin-top: 5px; line-height: 1.8; }
+.bidmap .bm-eqfnone-act {
+  margin-top: 10px;
+  background: #2563eb;
+  border: 0;
+  color: #fff;
+  border-radius: 9px;
+  padding: 7px 12px;
+  font-size: 10.5px;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
+}
+
 /* ── V6 · the landing attention cue (§6.4, RM3-AC-35) ────────────────────────────────────────────
    **FINITE: 6 iterations × 1.5s = 9s, then it rests.** No `infinite` anywhere — a cue that loops stops
    being a cue and becomes decoration the renter has to ignore.

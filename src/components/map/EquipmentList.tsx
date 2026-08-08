@@ -27,17 +27,34 @@
  * unconfirmed machine can be asked about **without opening the detail** (AC-13). The card is therefore
  * a stretched select button UNDER the content rather than a button wrapping it: a button inside a
  * button is invalid, and the two inner controls have to stay real buttons to stay reachable.
+ *
+ * **V17 · the filter bar.** Which chips exist, what each of them keeps, and both figures of the count
+ * are `equipmentListView()`'s answers, arriving here as one `view` prop. This file only paints them —
+ * which is what lets the workspace derive the marker set from the SAME `view.machines` the cards come
+ * from (AC-15), and what makes rules 2, 3 and 4 testable without a DOM.
  */
 
-import { useEffect, useMemo, useRef, type RefObject } from "react";
+import { useEffect, useMemo, useRef, type ReactNode, type RefObject } from "react";
 import { AVAILABILITY_COLOUR, arabicIndicDigits, unitAvailability } from "@/lib/contract/bid-map";
+import type { EquipmentListView } from "@/lib/contract/equipment-list";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import { certificateChips, heroPhotoUrl } from "@/components/map/panel";
-import { useLocale, useT } from "@/lib/i18n";
+import { fmt, useLocale, useT } from "@/lib/i18n";
 
 export interface EquipmentListProps {
-  /** Already `offeredMachines(fleet)` — filtered to `inBid` and sorted nearest first. */
-  machines: FleetMachine[];
+  /**
+   * `equipmentListView(offeredMachines(fleet), bid, filterIds)` — the chips, the machines that survive
+   * them, and the two figures. Never a bare machine array: the count has to state the whole offer, and
+   * a component holding only the filtered half cannot.
+   */
+  view: EquipmentListView;
+  /** The chip ids currently pressed. Owned by the workspace, because the map filters on them too. */
+  filterIds: readonly string[];
+  /** Toggle one chip. OR within a group, AND across groups — the model does the combining. */
+  onToggleFilter: (id: string) => void;
+  /** «امسح التصفية» — one press back to the whole offer. A filter the renter cannot find his way out
+   *  of is worse than no filter. */
+  onClearFilters: () => void;
   selectedId: string | null;
   /**
    * The one card carrying V6's finite attention cue, or null once it has rested. Separate from
@@ -57,7 +74,10 @@ export interface EquipmentListProps {
 }
 
 export function EquipmentList({
-  machines,
+  view,
+  filterIds,
+  onToggleFilter,
+  onClearFilters,
   selectedId,
   cueId,
   onSelect,
@@ -69,6 +89,8 @@ export function EquipmentList({
   const { locale } = useLocale();
   const ar = locale === "ar";
   const listRef = useRef<HTMLUListElement | null>(null);
+  const machines = view.machines;
+  const num = (n: number) => (ar ? arabicIndicDigits(n) : String(n));
 
   // Bring the selected card into view when it is off-screen — which is the case when the selection was
   // made on the MAP (AC-15). Already-visible cards are left exactly where they are: scrolling a card
@@ -85,8 +107,10 @@ export function EquipmentList({
   }, [selectedId, scrollRef]);
 
   // RM3-AC-26 — a price and a count were given, and that is the whole statement. No empty card
-  // furniture: a greyed-out card outline would suggest a machine that failed to load.
-  if (machines.length === 0) {
+  // furniture: a greyed-out card outline would suggest a machine that failed to load. Keyed off
+  // `view.total`, never off what is on screen: this state is a fact about the LESSOR, and a filter
+  // that happened to hide everything must not be able to reach it (RM3-AC-28e).
+  if (view.total === 0) {
     return (
       <div className="bm-eqnone">
         <div className="bm-eqnone-t">{t.bidMap.eqNoneRegistered}</div>
@@ -95,23 +119,100 @@ export function EquipmentList({
     );
   }
 
+  // The count is the numerals themselves, so each one carries `dir="ltr"` — an Arabic-Indic figure
+  // inside an RTL run still reads left to right. The template is split rather than interpolated so
+  // the two locales keep ONE key and the word order stays the dictionary's.
+  const countParts: ReactNode[] = t.bidMap.eqShownOfTotal.split(/(\{n\}|\{total\})/).map((part, i) =>
+    part === "{n}" ? (
+      <span key={i} dir="ltr">{num(view.shown)}</span>
+    ) : part === "{total}" ? (
+      <span key={i} dir="ltr">{num(view.total)}</span>
+    ) : (
+      <span key={i}>{part}</span>
+    ),
+  );
+
   return (
-    <ul className="bm-eqlist" ref={listRef}>
-      {machines.map((m, i) => (
-        <EquipmentCard
-          key={m.equipmentId}
-          machine={m}
-          index={i}
-          selected={selectedId === m.equipmentId}
-          cue={cueId === m.equipmentId}
-          ar={ar}
-          t={t}
-          onSelect={onSelect}
-          onOpenDetail={onOpenDetail}
-          onAskAvailability={onAskAvailability}
-        />
-      ))}
-    </ul>
+    <>
+      {/* ── V17 · the filter bar ─────────────────────────────────────────────────────────────────
+          Absent entirely when the model offers no group — an empty control row is worse than none.
+          The count renders whether or not anything is filtered, because «٨ من ٨» is the sentence that
+          makes «٣ من ٨» readable later. */}
+      {(view.groups.length > 0 || view.active.length > 0) && (
+        <div className="bm-eqf" role="group" aria-label={t.bidMap.eqFilterLabel}>
+          <div className="bm-eqf-top">
+            <span className="bm-eqf-count">{countParts}</span>
+            {view.active.length > 0 && (
+              <button type="button" className="bm-eqf-clear" onClick={onClearFilters}>
+                {t.bidMap.eqFilterClear}
+              </button>
+            )}
+          </div>
+
+          {view.groups.map((g) => (
+            <div className="bm-eqf-row" key={g.kind}>
+              <span className="bm-eqf-label">{ar ? g.label.ar : g.label.en}</span>
+              <div className="bm-eqf-chips">
+                {g.options.map((o) => {
+                  const on = filterIds.includes(o.id);
+                  return (
+                    <button
+                      key={o.id}
+                      type="button"
+                      className={`bm-eqf-chip${on ? " on" : ""}`}
+                      aria-pressed={on}
+                      onClick={() => onToggleFilter(o.id)}
+                    >
+                      {ar ? o.label.ar : o.label.en}
+                      <span className="bm-eqf-n" dir="ltr">{num(o.matches)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {/* A machine whose distance is unknown is kept by every band — «غير معروفة» is not
+                  «بعيدة». The chips cannot show that, so it is said. */}
+              {g.keepsUnknownDistance && <span className="bm-eqf-note">{t.bidMap.eqFilterUnknownDistance}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* The filtered empty state NAMES what emptied it and offers the way out. Plain «لا توجد نتائج»
+          would read as "this lessor has nothing" — a claim about him rather than about the chips, and
+          the exact confusion RM3-AC-26's state exists to avoid. The two are deliberately unalike in
+          wording, in colour and in the fact that only this one carries an action. */}
+      {view.machines.length === 0 ? (
+        <div className="bm-eqfnone" role="status">
+          <div className="bm-eqfnone-t">{t.bidMap.eqFilterEmpty}</div>
+          <div className="bm-eqfnone-s">
+            {fmt(t.bidMap.eqFilterEmptyWhy, {
+              filters: view.active.map((o) => (ar ? o.label.ar : o.label.en)).join(" · "),
+              total: num(view.total),
+            })}
+          </div>
+          <button type="button" className="bm-eqfnone-act" onClick={onClearFilters}>
+            {t.bidMap.eqFilterClear}
+          </button>
+        </div>
+      ) : (
+        <ul className="bm-eqlist" ref={listRef}>
+          {machines.map((m, i) => (
+            <EquipmentCard
+              key={m.equipmentId}
+              machine={m}
+              index={i}
+              selected={selectedId === m.equipmentId}
+              cue={cueId === m.equipmentId}
+              ar={ar}
+              t={t}
+              onSelect={onSelect}
+              onOpenDetail={onOpenDetail}
+              onAskAvailability={onAskAvailability}
+            />
+          ))}
+        </ul>
+      )}
+    </>
   );
 }
 

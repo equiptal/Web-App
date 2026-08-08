@@ -57,7 +57,7 @@ dock · the price footer.
 
 | Removed | Why |
 |---|---|
-| **Distance filter** (الكل / ≤٥٠ / ≤١٠٠ / ≤٢٠٠ كم) | it filtered *competing offers*. One supplier's fleet is small and already sorted nearest-first, so filtering only hides machines from a comparison the renter is no longer making |
+| ~~**Distance filter** (الكل / ≤٥٠ / ≤١٠٠ / ≤٢٠٠ كم)~~ — **REINSTATED 2026-08-08 by owner decision; see §6.4a and AC-28** | ~~it filtered *competing offers*. One supplier's fleet is small and already sorted nearest-first, so filtering only hides machines from a comparison the renter is no longer making~~ — the argument held for the v2 control, which filtered offers on the bids list. It does not hold for a list of one lessor's machines, where the renter is narrowing to what he can accept rather than comparing anyone. The bands return unchanged; the caution that removed them survives as the four rules in §6.4a |
 | **Bid quality** — score, ring, percentage | quality ranks offers *against each other*. This surface verifies one offer, and a score here invites the supplier to farm the number instead of answering the request |
 | **A reason on the unconfirmed chip** | «التوفّر غير مؤكّد» and the request are the whole message; the cause (`bid_pin` / `bid_yard` / `listing_yard`) is not the renter's problem to interpret |
 
@@ -185,6 +185,92 @@ takes the selection accent and its map pin lifts with a halo and an "in the offe
 opens** — the renter is oriented, not navigated. The card draws attention with a slow pulse of about
 six rings over roughly nine seconds, then rests; its resting shadow is preserved throughout, so the
 card does not appear to move.
+
+### 6.4a Filtering the list
+
+**Approved by decision, 2026-08-08 (owner, twice and explicitly).** This *reverses* v3's removal of the
+distance filter — see the rewritten **AC-28** and §11's changelog entry, which withdraw the old argument
+rather than leaving it to be quietly contradicted.
+
+**A filter selects for what a machine HAS, never for what it lacks.** «لديها TÜV» narrows the list to
+the machines carrying a TÜV. The renter is deciding what he can accept, not assembling a chase-list of
+the lessor's gaps; a "missing TÜV" chip would turn a verification surface into an accusation surface,
+and the ask («اطلب المستند») is already the right instrument for a gap.
+
+**No model filter** — within one lessor's offer the models are near-identical, so a control that only
+ever offers one value is furniture. **No sort control** — the order is nearest-first, permanently.
+
+#### The controls
+
+| Control | Renders only when |
+|---|---|
+| **المسافة** — الكل · ≤ ٥٠ · ≤ ١٠٠ · ≤ ٢٠٠ كم | more than one band is represented, i.e. some band would hide a machine |
+| **التوفّر** — «مؤكّد توفرها» | the list mixes confirmed and unconfirmed |
+| **السنة** — «٢٠٢٠ أو أحدث» | the request asked for a **minimum year** (not an age) |
+| **الملحقات** | the request asked for attachments **and** a machine's file can answer — see below |
+| **الشهادات** — one chip per certificate | the request **named that certificate**, equipment or operator |
+
+The bands are **v2's own** (`001-deal-room-rentee-map-v2.md` §6.10), reused rather than reinvented.
+**«الكل» is not a chip** — it is the cleared state, and clearing is one press.
+
+**Combining: AND between controls, OR within one.** ≤ ٥٠ كم **AND** ٢٠٢٠ أو أحدث **AND** (TÜV **OR**
+SPSP). A control with nothing pressed imposes nothing; it is never an implicit "none of these".
+
+#### The four rules that make this safe on a verification surface
+
+1. **Only criteria the request asked for.** The request named no certificate ⇒ there is no certificate
+   control. This is the rule the rest of the surface already obeys — §6.5's grid greys a cell nobody
+   asked about, and §6.6 does not render a document that was not required — and breaking it here would
+   hold the lessor to a standard he was never given.
+2. **A control appears only when it would actually split the list.** Every machine confirmed ⇒ no
+   availability chip. Every machine inside ≤ ٥٠ كم ⇒ no distance row at all. A row of controls that all
+   do nothing is worse than no row: a chip that hides nothing invites the renter to believe he has
+   checked something. One consequence is load-bearing — **a single chip can never empty the list**,
+   because an option that keeps nothing never became an option. Only a combination can.
+3. **The count always states the whole — «٣ من ٨».** The denominator is the offer, never the filtered
+   figure. On a surface whose job is telling the renter what the lessor has, a hidden machine must
+   never let the offer read as smaller than it is.
+4. **The map follows the filter.** Cards and markers stay in step (**AC-15**): a filtered-out machine
+   leaves the map with its card, and a selection the filter hides is dropped. The pin set is derived
+   from the filtered list, so the two surfaces cannot disagree about what the offer contains.
+
+#### A machine with no distance
+
+**Kept by every band, never hidden.** `locationSource: 'none'` means *unknown*, not *far*; hiding it
+would silently delete a real offered machine on the strength of a fact nobody has. It is v2's own rule
+for this control, and the only reading consistent with §6.4's sort, which puts a null **last** without
+ever calling it distant. Because the chips alone cannot show this, the distance row **says so** whenever
+such a machine is in the list.
+
+**A machine with no year on file, by contrast, IS filtered out** by the year chip: the chip selects for
+a machine that *has* the year, and that machine does not demonstrably have it. This is not a new
+judgement — §6.5's grid already reads a missing year red against a year ask, so the two agree about the
+same machine.
+
+#### الملحقات — specified, and today always suppressed by rule 2
+
+The request can ask for attachments (`attachment_ids` / `custom_attachments`), so rule 1 is satisfiable.
+**The machine's side is not:** the fleet row records what the machine *is*, never what it comes with —
+neither `FleetMachine` nor `offeredUnitsDetail` carries an attachments field. No machine can therefore
+be *shown* to have them, and rule 2 drops the control before it becomes a chip.
+
+That is the correct answer rather than a gap, and it is the same one §6.5 already gives: the grid
+refuses to colour that cell because *"colouring this red would tell the renter the supplier failed a
+check the platform never ran"*. A chip would be worse — pressing it would empty the list and read as
+*"not one of his machines has what you asked for"*, a verdict on the lessor drawn entirely from our own
+missing column. The control comes alive on its own the day the wire carries the field.
+
+#### The empty state
+
+**It names what emptied the list and offers to clear it.** Plain «لا توجد نتائج» reads as *"this lessor
+has nothing"* — a claim about him rather than about the chips the renter pressed, and exactly the
+confusion **AC-26**'s state exists to avoid. The two must not be mistakable for each other:
+
+| | **AC-26** — nothing registered | **AC-28e** — emptied by a filter |
+|---|---|---|
+| Says | the lessor gave a price and a count only | which chips are active, and how many the offer holds |
+| Carries an action | no — nothing can be done about it | yes — «امسح التصفية» |
+| Reached when | the offer registers **no** machine at all | the offer holds machines and the chips hid them all |
 
 ### 6.5 Equipment detail
 
@@ -569,7 +655,12 @@ card state must be derived by re-reading the machine (§6.7).
 | RM3-AC-25 | web | **Given** an off-platform offer **When** the renter opens it **Then** this surface is **not** used — the existing submission viewer and negotiate room open instead, unchanged |
 | RM3-AC-26 | web | **Given** an offer whose supplier registered no machines **When** the list renders **Then** it states that a price and a count were given, with no empty card furniture |
 | RM3-AC-27 | app-backend | **Given** the fleet read **When** it resolves a machine **Then** `locationSource` follows the §7.2 precedence, and `yardConfirmed` is reported verbatim from **this bid's** `unitsOffered` entry — reported, never rendered |
-| RM3-AC-28 | web | **Given** the surface **When** it renders **Then** there is **no distance filter** — the fleet belongs to one supplier, so filtering it hides machines without helping a comparison the renter is no longer making |
+| RM3-AC-28 | web | **Given** the equipment list **When** the offer spans more than one distance band **Then** a distance filter renders with v2's own bands — الكل · ≤ ٥٠ · ≤ ١٠٠ · ≤ ٢٠٠ كم — and «الكل» is the cleared state rather than a chip. *(**Rewritten 2026-08-08 by owner decision.** v3 forbade this control, arguing "the fleet belongs to one supplier, so filtering it hides machines without helping a comparison the renter is no longer making". **That argument is withdrawn.** It was sound about the v2 control, which filtered competing OFFERS on the bids list; it does not carry to a list of one lessor's machines, where the renter is not comparing anyone and is narrowing to what he can accept. The rules that made the removal feel necessary are kept and generalised as AC-28a→28e rather than discarded with it — see §6.4a.)* |
+| RM3-AC-28a | web | **Given** the filter row **When** it renders **Then** it offers **only criteria the request asked for** — no certificate chip for a certificate the request did not name, no year chip without a minimum-year ask — and every chip selects for what a machine **HAS**, never for what it lacks; controls AND together and chips inside one control OR |
+| RM3-AC-28b | web | **Given** any control **When** it would keep every machine, or none **Then** it does not render at all — and therefore no single chip can empty the list |
+| RM3-AC-28c | web | **Given** a machine with no resolvable distance **When** any band is active **Then** it is **kept, never hidden** — unknown is not far — and the distance row states that it is; **given** a machine with no year on file **When** the year chip is active **Then** it **is** filtered out, agreeing with §6.5's red on that same machine |
+| RM3-AC-28d | web | **Given** any filter state **When** the count renders **Then** it states the whole — «٣ من ٨» — with the offer's own total as the denominator, never the filtered figure |
+| RM3-AC-28e | web | **Given** a filter that leaves nothing **When** the empty state renders **Then** it **names the active chips**, states the offer's total and offers «امسح التصفية» — and is not reachable by, nor mistakable for, AC-26's "no machine is registered" |
 | RM3-AC-29 | web | **Given** the surface **When** it renders **Then** there is **no bid-quality score, ring or percentage** anywhere; quality ranking belongs to surfaces that compare offers, and this one verifies a single offer |
 | RM3-AC-30 | web | **Given** an unconfirmed machine **When** its chip renders **Then** it states only that availability is not confirmed — **no reason, no cause, no location-source explanation** — with the request as the next step |
 | RM3-AC-31 | web | **Given** the counts **When** the shortfall is computed **Then** `claimed = offered − registered`, and it is never derived from the fleet total or any other count |
@@ -602,7 +693,8 @@ card state must be derived by re-reading the machine (§6.7).
 | RM3-TC-11 | AC-23, AC-24 | web | manual | chat dock persistent, no rail; footer figures match the deal-room bar for the same room |
 | RM3-TC-12 | AC-25, AC-26 | web | `tests/unit/bid-equipment-access.test.ts` | an off-platform bid never routes to this surface; a platform offer with no registered machines renders the explanatory state with no empty furniture. *(Re-pointed 2026-08-08. This named `tests/unit/link-bids.test.ts`, which only ever asserted that the mapper sets `viaSharedLink` — it never tested routing, so AC-25 had **no** coverage. Worth stating why the guard it was meant to cover was dead: the guard tested `bid.viaSharedLink`, which the route's own mapper never sets, and an off-platform id is `link-…` — a different entity whose fetch cannot succeed. A real off-platform deep link therefore landed on "this offer couldn't be loaded" rather than on its own surface.)* |
 | RM3-TC-13 | AC-27 | app-backend | `.../rentee-unit-location.test.ts` | `yardConfirmed` reads the bid entry, not the listing |
-| RM3-TC-14 | AC-28, AC-29, AC-30 | web | `tests/unit/bid-map.test.ts` | the view model exposes no distance-band state, no quality figure, and the unconfirmed chip carries no reason/cause field |
+| RM3-TC-14 | AC-29, AC-30 | web | `tests/unit/bid-map.test.ts` | the view model exposes no quality figure, and the unconfirmed chip carries no reason/cause field. *(**Re-pointed 2026-08-08.** This also required "no distance-band state". AC-28 reversed, so that clause inverts and moves to TC-14a — a negative assertion cannot survive the criterion that made it negative.)* |
+| RM3-TC-14a | AC-28, AC-28a→28e | web | `tests/unit/equipment-list.test.ts` | the view model **does** expose distance bands — exactly ≤50/≤100/≤200 — and only under the stated conditions: a control absent when the request did not ask, absent when it would not split the list, the predicate ANDing across controls and ORing within one, the count carrying the unfiltered total, a null distance kept by every band while a null year is filtered out, the marker set equal to the **filtered** list minus what cannot be plotted, and an empty state that neither reaches nor resembles AC-26's |
 | RM3-TC-15 | AC-31 | web | same | `claimed` is `offered − registered` across fixtures — including registered > offered, which must clamp to zero rather than render a negative shortfall |
 | RM3-TC-16 | AC-32, AC-33 | web | same | the card model emits one availability chip carrying commitment, no second band; the request action's token is the blue one |
 | RM3-TC-17 | AC-34, AC-35 | web | same | initial state selects the offer's confirmed machine with no detail open; the attention cue is finite (~6 cycles) and not a persistent loop |
@@ -622,7 +714,7 @@ All resolved. Kept as a record so a later change does not reopen them by acciden
 | # | Question | Decision (2026-08-08) |
 |---|---|---|
 | 1 | What happens to off-platform bids on this surface? | **Nothing — they never reach it.** They keep `SharedBidSubmissionModal` + `SharedBidNegotiateRoom` exactly as they ship (§6.11). An earlier draft designed a replacement view; that is withdrawn. |
-| 2 | Keep the distance filter? | **Removed** (AC-28). |
+| 2 | Keep the distance filter? | ~~**Removed** (AC-28).~~ → **Reinstated 2026-08-08 by owner decision**, with bands, rules and an empty state (§6.4a, AC-28 rewritten, AC-28a→28e added). |
 | 3 | Does the unconfirmed chip need a reason? | **No** (AC-30). Availability-not-confirmed plus the request is the whole message. |
 | 4 | Is `claimed = offered − registered`? | **Yes** (AC-31). The prototype's figures were demo-forced via `offerCase` and are not the rule. |
 | 5 | Bid quality on this surface? | **No** (AC-29). Quality ranks offers against each other; this surface verifies one. |
@@ -638,5 +730,6 @@ All resolved. Kept as a record so a later change does not reopen them by acciden
 | 2026-08-08 | **Alignment pass — five owner rulings, each reversing something this spec asserted.** (1) **A document request names a machine.** §6.1, §6.6, §6.7, AC-16, AC-38, AC-41's panel and TC-19 all described a company-scope document ask with select-all and a batch request; the company panel is now **read and open only**, and the payload type cannot express a `document` ask with no machine. Viewing and downloading company papers is untouched (AC-71, AC-72; 004a §8). (2) **One rule for every document row**, replacing §6.6's fixed rows: a *required* paper renders held or not — red, counted and requestable when absent — and a *not-required* one renders only when held, with no verdict and no place in the count. The fixed rows were the single place the platform's own "a cell nobody asked about cannot fail" rule broke (AC-73). (3) **The photo group is no longer four fixed slots**: `front` and plate are required, `meter` and `side` render only when uploaded, and the count is over the rows that render — AC-42 rewritten, "of 4" withdrawn as a normative count (AC-74). (4) **The operator's documents are a third group** (§6.6a) rather than one row inside the machine's papers, with the backend's five-term vocabulary written down because `operating_license` carries no `operator_` prefix (AC-75); recorded with the silent defect it fixes — rows resolved `held.find(d => d.url)?.url`, the **first file only**, so a second ownership, equipment or operator paper was dropped without a trace (AC-76). (5) **SASO is the fifth company paper** — AC-41 named four; local content and SASO are **held certs**, not catalogue documents. Also: **TC-12 re-pointed** from `link-bids.test.ts` (which only ever asserted the mapper sets `viaSharedLink`, never routing) to `bid-equipment-access.test.ts`, and TC-08 re-scoped. Six ACs and five TCs added. |
 | 2026-08-08 | **Verified against the prototype — three sections were wrong and are rewritten.** The spec had been written from the element list after rendering only two states, so §6.1, §6.5 and §6.6 described intentions rather than the design. Rendering the remaining states found: the **equipment detail** is a hero photo, two tabs and a **six-cell match grid against this request** — not the specification dump specced; the **company panel** is a batch-selectable document list that **includes IBAN**, which the spec had wrongly moved to a profile; and documents are **batch-selected**, not three buttons per row, with a deliberate asymmetry the spec had flattened — **equipment rows carry presence only, company rows carry verification and expiry**. Four later design changes folded in (AC-32→35): availability and commitment as **one chip** so cards keep equal height; the request action **blue**, since navy read as disabled beside a red chip; **landing pre-selection** of the offer's confirmed machine with no detail opening; and a **finite ~6-cycle** attention pulse that preserves its resting shadow. Twelve ACs and four TCs added. Still unopened: the document modal, and the chat dock beyond its badge. |
 | 2026-08-08 | **Made self-contained.** All references to spec 001 removed. §7 replaced a four-row "see 001 §7.12 / AC-232→234" table with the real contract read from code: the fleet route and `mapFleet` → `FleetMachine` with a field-by-field map of every card element; the full `locationSource` → availability ladder; and the request-card rules from `rentee-request.service.ts`. A spec anchored to code cannot drift with another document, and this one no longer depends on which branch's 001 the reader has. |
+| 2026-08-08 | **The equipment list gets filters — AC-28 is reversed, not quietly contradicted** (owner decision, stated twice). New **§6.4a** and **AC-28a→28e**; **AC-28 rewritten** from "there is no distance filter" to the bands that render and when. The withdrawn argument is left visible in AC-28, in the "do not reinstate" table and in open question 2, struck rather than deleted, so a reader sees a decision and not a mistake: it was sound about the **v2** control, which filtered competing OFFERS on the bids list, and does not carry to a list of one lessor's machines. **The caution survives the reversal** as four rules — only criteria the request asked for, no control that would not split the list, a count that always states the whole, and a map that follows — which is why a chip cannot be offered for a certificate nobody named, cannot appear when it would do nothing, and cannot let the offer read as smaller than it is. Bands are **v2's own** (الكل · ≤٥٠ · ≤١٠٠ · ≤٢٠٠ كم), reused rather than reinvented. Two asymmetries are decided and stated: a machine with **no distance** is kept by every band (unknown is not far) and the row says so; a machine with **no year** is filtered out, which is what §6.5's grid already says about it. **الملحقات is specified but never renders today** — the fleet row carries no attachments field, so no machine can be shown to have them and rule 2 drops the control; a chip there would be a verdict on the lessor drawn from our own missing column. `RM3-TC-14` loses its distance clause to the new `RM3-TC-14a`: a negative assertion cannot survive the criterion that made it negative. |
 | 2026-08-08 | **Realigned against decisions and audited.** Five open questions closed: off-platform is **out of scope entirely** — an earlier draft designed a replacement submission view, now withdrawn, and its answer to question 1 was itself stale; the **distance filter** and **bid quality** are removed (AC-28, AC-29); the unconfirmed chip carries **no reason** (AC-30); `claimed = offered − registered` is normative and the prototype's demo-forced figures are not (AC-31). A "do not reinstate" table records why each removal happened. **One contradiction with shipped code fixed:** the spec implied `yardConfirmed` drives pin colour, but `bid-map.ts:74` states *"Never read the `yardConfirmed` boolean for colour"* — supplier-side it is only `yardId != null`, so it is true for every readiness-written entry. Colour comes from `unitAvailability()` via `locationSource`; had this shipped, every pin would have been green (AC-19, AC-22, AC-27). Also corrected an invented test path (`off-platform.test.ts` → `link-bids.test.ts`). Verified: every field the card promises exists on `FleetMachine`/`OfferedUnitDetail`, and the fleet endpoint is already wired in the web. |
 | 2026-08-07 | Spec created from the v3 prototype and `rentee-map-v3-elements.md`. Records the shift from comparison to **verification**: one bid per view, entered from that bid's card, with the offers list, request block, item strip and edge rail all removed. Establishes the three count cases and the **orange-not-red** rule for the shortfall alert (red is reserved for availability). Fixes the equipment list as **flat, nearest-first, offered-only**, with not-offered machines reachable as a request rather than a second list. No backend change — the fleet total is the existing endpoint's row count. |
