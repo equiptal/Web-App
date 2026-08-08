@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   arrivalNotice,
   dockTabs,
@@ -164,5 +166,198 @@ describe("arrivalNotice — refresh-timed, and silent on what is being read (RM3
     const notice = arrivalNotice(tabs(), {}, { open: false, bidId: null });
     expect(notice?.reply).toBeNull();
     expect(notice?.unreadCount).toBe(1);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+   RM3-AC-47 · OPENING A TAB CREATES NO DEAL ROOM (004a §4.5, §3.2d)
+
+   The highest-consequence rule on this surface, and the one with no runtime test behind it. A
+   `DealRoom` row sets `BID_OFFER_LOCKED` and **freezes the lessor's offered count** — so a dock that
+   creates a room on mount, on open, or on a tab switch makes the shortfall ask of §6.3 permanently
+   unanswerable: the renter asks for the missing machines and the lessor is no longer able to add them,
+   because browsing his offer locked it.
+
+   `ChatDock` is a client component and this repo's vitest env is `node` with no component harness, so
+   the rule is pinned the way `bid-equipment-access.test.ts` pins the equipment route's write-freedom:
+   against the source. The claim being asserted is **structural and complete** — the room-creating call
+   exists exactly once in the file, lexically inside `send()`, and nothing that runs on its own
+   (an effect, a memo, the mount, the open toggle, a tab press) can reach it.
+   ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+
+const CHAT_DOCK = "src/components/map/ChatDock.tsx";
+const dockSrc = readFileSync(resolve(process.cwd(), CHAT_DOCK), "utf8");
+
+/** The `{…}` body of a named function declaration, by brace matching from its first `{`. */
+function functionBody(source: string, declaration: string): { start: number; end: number } {
+  const at = source.indexOf(declaration);
+  if (at < 0) throw new Error(`declaration not found: ${declaration}`);
+  const open = source.indexOf("{", at);
+  let depth = 0;
+  for (let i = open; i < source.length; i += 1) {
+    if (source[i] === "{") depth += 1;
+    else if (source[i] === "}") {
+      depth -= 1;
+      if (depth === 0) return { start: open, end: i };
+    }
+  }
+  throw new Error(`unbalanced body: ${declaration}`);
+}
+
+describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
+  it("calls the room-creating function EXACTLY ONCE in the whole component", () => {
+    // One call site is what makes every other assertion here decisive: there is no second path to
+    // audit. A second `ensureDealRoom(` anywhere in this file fails this line, wherever it was added.
+    expect(dockSrc.match(/ensureDealRoom\(/g) ?? []).toHaveLength(1);
+  });
+
+  it("puts that one call INSIDE `send()` — the room-creating act, and the only one", () => {
+    const body = functionBody(dockSrc, "async function send()");
+    const call = dockSrc.indexOf("ensureDealRoom(");
+    expect(call).toBeGreaterThan(body.start);
+    expect(call).toBeLessThan(body.end);
+  });
+
+  it("reaches no room-creating client function by any other name", () => {
+    // `ensureDealRoom` is the one wrapper over `POST /api/me/deal-rooms`. Importing the raw client
+    // call, or the accept path, would create a room this test could not see through the wrapper.
+    for (const bypass of ["startDealRoom", "acceptBid", "deal-rooms"]) {
+      expect(dockSrc).not.toContain(bypass);
+    }
+  });
+
+  it("runs NOTHING that creates a room before the send section — no effect, no memo, no mount", () => {
+    // Everything above `── sending` is what the component does on its own: the REST refresh, the
+    // focus/poll effects, the Stream connection, the tab memo, the fleet + reply memos, the notice.
+    // A function declaration is hoisted, so an effect COULD call `send()` from above it — this asserts
+    // it does not, which is what makes "only a send creates a room" true rather than merely arranged.
+    const beforeSending = dockSrc.slice(0, dockSrc.indexOf("── sending"));
+    // The call form, not the bare name — the import sits above and is not a call.
+    expect(beforeSending).not.toMatch(/ensureDealRoom\(/);
+    expect(beforeSending).not.toMatch(/\bsend\(\)/);
+  });
+
+  it("invokes `send()` from exactly two places, both of them the renter pressing send", () => {
+    const callSites = dockSrc
+      .split("\n")
+      .filter((line) => /\bvoid send\(\)/.test(line));
+    expect(callSites).toHaveLength(2);
+    // The Enter key and the send button. Neither is a lifecycle hook, and no third caller exists.
+    expect(callSites.filter((l) => /onKeyDown=/.test(l))).toHaveLength(1);
+    expect(callSites.filter((l) => /onClick=/.test(l))).toHaveLength(1);
+  });
+
+  it("switches tab by setting state and nothing else (the press an unlocked offer cannot survive)", () => {
+    // The tab handler is the likeliest place a room-creating "connect on switch" would be added.
+    expect(dockSrc).toContain("onClick={() => setActiveBidId(tab.bidId)}");
+  });
+
+  it("opens the dock by toggling state and nothing else", () => {
+    expect(dockSrc).toContain("onClick={() => setOpen((v) => !v)}");
+  });
+
+  it("renders a roomless tab as COMPOSE-ONLY — a note, never a creation", () => {
+    // `!active?.dealRoomId` is the branch that would tempt an eager create. It renders copy.
+    expect(dockSrc).toContain("{t.chatDock.composeOnly}");
+  });
+
+  it("hands the model a null room rather than one it made up", () => {
+    // The rule at the model's own boundary: a tab for a bid with no room carries `dealRoomId: null`,
+    // and `dockTabs` has no way to mint one. If it ever did, the component would inherit a room it
+    // never created and the compose-only branch would stop rendering.
+    const tabs = dockTabs(anchor({ dealRoomId: null }), [row({ bidId: "b1", dealRoomId: null })]);
+    expect(tabs.map((t) => t.dealRoomId)).toEqual([null]);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+   RM3-AC-44 · A SINGLE BID GETS NO TAB STRIP
+   ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+
+describe("no tab strip for a single bid (RM3-AC-44)", () => {
+  it("gates the strip on `tabs.length > 1`, so one tab renders no strip at all", () => {
+    // The model half is asserted above (`dockTabs` returns one tab). This is the half that lives in
+    // the component: the condition the caller actually renders under. Together they close the AC as
+    // far as a `node` env can — what stays UNPROVEN here is the PAINTED result, i.e. that the strip
+    // element is absent from the DOM and leaves no empty row behind. That needs a component harness
+    // (RM3-TC-11, manual-verify).
+    expect(dockSrc).toContain("{tabs.length > 1 && (");
+    const strip = dockSrc.indexOf('className="bm-chat-tabs"');
+    const guard = dockSrc.indexOf("{tabs.length > 1 && (");
+    expect(strip).toBeGreaterThan(-1);
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(strip); // the guard wraps the strip; it does not follow it
+  });
+
+  it("draws the strip in exactly one place, so there is no second ungated copy", () => {
+    expect(dockSrc.match(/className="bm-chat-tabs"/g) ?? []).toHaveLength(1);
+    expect(dockSrc.match(/\{tabs\.length > 1 &&/g) ?? []).toHaveLength(1);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+   RM3-AC-63 / AC-64 · THE ARRIVAL NOTICE MAY NOT IMPLY IMMEDIACY
+
+   Unread is REST on a 45-second poll, so the notice cannot know a message *just* arrived. The copy
+   must state that a reply IS there. This asserts the words themselves, in both locales, because the
+   defect is a copy edit away and no behavioural test would catch it.
+   ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+
+describe("the arrival notice states a STATE, never an event (RM3-AC-63/64)", () => {
+  const enSrc = readFileSync(resolve(process.cwd(), "src/lib/i18n/en.ts"), "utf8");
+  const arSrc = readFileSync(resolve(process.cwd(), "src/lib/i18n/ar.ts"), "utf8");
+
+  /** The `chatDock: { … }` block of a dictionary — the only copy the notice can render. */
+  const dictBlock = (source: string): string => {
+    const at = source.indexOf("chatDock: {");
+    expect(at).toBeGreaterThan(-1);
+    return source.slice(at, source.indexOf("\n  },", at));
+  };
+
+  /** One key's string value out of a dictionary block. */
+  const copy = (source: string, key: string): string => {
+    const m = new RegExp(`\\n\\s*${key}:\\s*"([^"]*)"`).exec(dictBlock(source));
+    expect(m, `chatDock.${key} not found`).not.toBeNull();
+    return (m as RegExpExecArray)[1];
+  };
+
+  /**
+   * The keys the BUBBLE renders, and only those. Scoped deliberately: `unavailable` legitimately says
+   * *"right now"* about the chat service, which is not a claim about when a message landed — a blanket
+   * sweep of the block would fail on it and the rule would get relaxed to make the test pass.
+   */
+  const NOTICE_KEYS = ["noticeTitle", "itemFallback"];
+
+  /** Immediacy vocabulary. Each of these turns a poll-timed badge into a claim about *when*. */
+  const IMMEDIACY_EN = [/\bjust\b/i, /\bnow\b/i, /\barrived\b/i, /\bnew\b/i, /\bmoments? ago\b/i];
+  const IMMEDIACY_AR = [/الآن/, /للتو/, /للتوّ/, /حالاً/, /وصل/, /جديدة?/];
+
+  it("carries no immediacy word in the English notice copy", () => {
+    for (const key of NOTICE_KEYS) {
+      const value = copy(enSrc, key);
+      for (const bad of IMMEDIACY_EN) expect(value, `chatDock.${key}`).not.toMatch(bad);
+    }
+    // And it does state the thing it IS allowed to state — that a reply exists.
+    expect(copy(enSrc, "noticeTitle")).toMatch(/repl/i);
+  });
+
+  it("carries no immediacy word in the Arabic notice copy — «الآن», «للتو», «وصل»", () => {
+    for (const key of NOTICE_KEYS) {
+      const value = copy(arSrc, key);
+      for (const bad of IMMEDIACY_AR) expect(value, `chatDock.${key}`).not.toMatch(bad);
+    }
+    expect(copy(arSrc, "noticeTitle")).toContain("ردّ");
+  });
+
+  it("never reaches for the bid list's «وصل الآن» / «Just arrived» badge", () => {
+    // `bidMap.justArrived` exists in both dictionaries. It is the one string on this surface that
+    // says exactly what AC-64 forbids, and it is one `t.bidMap.justArrived` away from the bubble.
+    expect(enSrc).toContain("justArrived");
+    expect(dockSrc).not.toContain("justArrived");
+  });
+
+  it("says nothing at all about the tab being read, whatever the copy says (RM3-AC-63)", () => {
+    const tabs = dockTabs(anchor(), [row({ bidId: "b1", unreadCount: 3 })]);
+    expect(arrivalNotice(tabs, {}, { open: true, bidId: "b1" })).toBeNull();
   });
 });
