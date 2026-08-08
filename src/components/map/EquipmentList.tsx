@@ -280,7 +280,9 @@ function EquipmentCard({
       />
 
       <div className="bm-eq-in">
-        <span className="bm-eq-photo">
+        {/* The cell shimmers while a photo decodes. `is-empty` stops it for a machine that has none:
+            nothing is arriving, and a placeholder travelling forever says otherwise. */}
+        <span className={`bm-eq-photo${photo ? "" : " is-empty"}`}>
           {photo ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={photo} alt="" className="bm-eq-art" />

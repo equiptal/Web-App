@@ -682,6 +682,10 @@
   animation: dpShimmer 1.25s linear infinite;
   border-inline-end: 1px solid #e1e9f1;
 }
+/* A machine with NO photo is not loading, so it does not shimmer. The prototype always has an image to
+   wait for and never meets this case; ours does, and a cell travelling forever under «لا صورة» claims
+   something is on its way that never will be. */
+.bidmap .bm-eq .bm-eq-photo.is-empty { background-image: none; animation: none; }
 .bidmap .bm-eq .bm-eq-art { width: 100%; height: 100%; object-fit: cover; transition: transform 0.35s cubic-bezier(0.22, 0.9, 0.3, 1); }
 .bidmap .bm-eq:hover .bm-eq-art { transform: scale(1.06); }
 .bidmap .bm-eq .bm-eq-nophoto { font-size: 9.5px; font-weight: 700; color: #6b8fa8; text-align: center; padding: 0 6px; }
@@ -836,7 +840,8 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-bottom: 11px;
+  /* No `margin-bottom`: the list container is a flex column with its own `gap: 10px` now, and a margin
+     on top of it made the rule sit nearer the chips than the cards it separates them from. */
   padding-bottom: 10px;
   border-bottom: 1px solid #e6eef5;
 }
