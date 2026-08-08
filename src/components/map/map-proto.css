@@ -46,15 +46,18 @@
   color: #16304f;
 }
 
+/* The ground under the tiles, seen while they load and in the gutters of a fit. Pale, because the
+   basemap is CARTO voyager — the green here was standing in for OSM standard's landmass, and a canvas
+   that flashes green and settles pale reads as two maps. */
 .bidmap .bm-canvas {
   position: relative;
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  background: radial-gradient(120% 90% at 50% 30%, #dde9e0 0%, #c9dacb 100%);
+  background: #f2eee9;
 }
-.bidmap .bm-leaflet { position: absolute; inset: 0; z-index: 0; background: #dde9e0; }
-.bidmap .bm-leaflet .leaflet-container { height: 100%; width: 100%; background: #dde9e0; font: inherit; }
+.bidmap .bm-leaflet { position: absolute; inset: 0; z-index: 0; background: #f2eee9; }
+.bidmap .bm-leaflet .leaflet-container { height: 100%; width: 100%; background: #f2eee9; font: inherit; }
 
 /* ── The project pin — `siteIcon()`, decoded lines 262–265 ────────────────────────────────────────
    A `divIcon`, so Leaflet's own LTR canvas is overridden per pin (AC-30, AC-98).

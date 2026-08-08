@@ -475,16 +475,41 @@ export default function MapCanvas({
       <MapContainer
         center={site ? [site.lat, site.lng] : FALLBACK_CENTRE}
         zoom={site ? SITE_ZOOM : FALLBACK_ZOOM}
+        // Leaflet's own control is off so ours can be placed clear of the panel — see below.
         zoomControl={false}
         scrollWheelZoom
+        // The prototype's view options, value for value. Half-steps rather than whole ones, because a
+        // yard 12 km out and a yard 95 km out are one zoom step apart on a whole-step map; a wheel
+        // budget of 90 px per level so a single scroll does not jump three; and a floor and ceiling so
+        // the renter can neither zoom past the country nor into a tile the basemap does not hold.
+        zoomSnap={0.5}
+        zoomDelta={0.5}
+        minZoom={5}
+        maxZoom={16}
+        wheelPxPerZoomLevel={90}
         style={{ height: "100%", width: "100%" }}
       >
+        {/* CARTO **voyager**, not OpenStreetMap standard (`baseUrl('voyager')`, decoded 3840). Not a
+            taste choice: every colour on this canvas was judged against voyager's pale ground — the
+            `#6E869C` route, the `#A9BCCC` leader line, the white chips and the white pin tag. On OSM
+            standard's saturated green-and-buff they all lose contrast, and the route in particular
+            disappears into the road network it is drawn over.
+
+            The attribution carries BOTH credits because voyager's terms require both: the data is
+            OpenStreetMap's, the rendering is CARTO's. */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          subdomains="abcd"
+          maxZoom={19}
         />
         {/* Opposite the bid panel, which sits on the inline-end edge — otherwise the zoom buttons land
-            underneath it in Arabic, where inline-end is the physical left. */}
+            underneath it in Arabic, where inline-end is the physical left.
+
+            The prototype has no zoom control at all. Kept anyway: it is the only pointer-and-keyboard
+            zoom affordance on a surface whose whole subject is distance, and dropping it would leave a
+            renter without a wheel or a trackpad with no way to change the view. `zoomControl: false`
+            is ported exactly — it is what lets this one be placed rather than Leaflet's default. */}
         <ZoomControl position={dir === "rtl" ? "topright" : "topleft"} />
         {site && <Marker position={[site.lat, site.lng]} icon={icon} interactive={false} zIndexOffset={900} />}
         <FleetLayer
