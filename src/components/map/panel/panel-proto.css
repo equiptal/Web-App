@@ -267,6 +267,12 @@
   color: #16a34a;
 }
 
+/* The bar carries a real CHECKBOX and a label on the leading edge, and «إلغاء التحديد (n)» on the
+   FAR one — the prototype's shape and the screenshot's. Two adjacent text links said nothing about
+   which of them governed the column of ticks under them; a box at the head of that column says it
+   without a word, and it is the same 22 px control the rows carry. `margin-inline-start: auto`
+   rather than `justify-content: space-between`, so the clear link still sits on the far edge when
+   the select-all half is absent. */
 .mp-selbar {
   display: flex;
   align-items: center;
@@ -276,6 +282,20 @@
   font-weight: 700;
   color: #6b8fa8;
 }
+.mp-selall {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: #1c3550;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.mp-selbar .mp-linkbtn.muted { margin-inline-start: auto; }
 .mp-linkbtn {
   border: 0;
   background: none;
@@ -310,12 +330,17 @@
    `disabled`, so this is a colour restating an inert control, never the only thing stopping a click. */
 .mp-row.dim { opacity: 0.45; }
 
+/* `22 × 22`, r6, `1.5px #C8D8E8` — the prototype's `box()`, which is ONE function drawing both the
+   row's tick and the select-all bar's. Written once here for the same reason: the bar's box sits at
+   the head of the rows' column and any difference between them reads as a different kind of control.
+   `inline-flex` because the bar's copy is a <span> inside a labelled button, and a bare span would
+   not centre its mark. */
 .mp-tick {
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   padding: 0;
-  border: 2px solid #c8d8e8;
+  border: 1.5px solid #c8d8e8;
   border-radius: 6px;
   background: #fff;
   color: #fff;
@@ -324,6 +349,9 @@
   font-weight: 900;
   line-height: 1;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .mp-tick.on { border-color: #2563eb; background: #2563eb; }
 /* The other mode's checkbox. `disabled` already refuses the click and drops it out of the tab order;

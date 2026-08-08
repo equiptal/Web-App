@@ -209,6 +209,19 @@ export function DocRowList({
   if (requestKeys.length > downloadKeys.length) byMajority.reverse();
   const selectAll = hasSelection ? (byMajority.find((s) => notAllOn(s.keys)) ?? null) : null;
 
+  // **The bar's control is a CHECKBOX again** (2026-08-09) — the prototype's and the owner's screenshot
+  // both put a real box beside the label, and this had become two text link-buttons sitting next to
+  // each other with nothing to say which one governed the column of ticks below.
+  //
+  // **The rule underneath is untouched**: still one entry, still chosen by majority at neutral and by
+  // the mode once one holds (`selectAll` above, owner's ruling 2026-08-08). What changes is that the
+  // entry now has the two states a select-all has always had. `selectAll` is the list with something
+  // left to tick, so it answers "unchecked"; when it is null every list is either empty or fully
+  // ticked, and the first non-empty one is the list this bar governs — checked, and unticking it is
+  // what the box then does. A checked box that cannot be unchecked is the dead control AC-69 forbids.
+  const governing = hasSelection ? (selectAll ?? byMajority.find((s) => s.keys.length > 0) ?? null) : null;
+  const governingOn = !!governing && !notAllOn(governing.keys);
+
   return (
     <div className="mp-grp">
       <div className="mp-grp-h">
@@ -232,16 +245,29 @@ export function DocRowList({
           ~~At NEUTRAL both links can appear~~ — withdrawn by the owner on 2026-08-08, against his own
           prototype: **select-all follows the mode and there is one link.** Which one it is at neutral is
           decided in `selectAll` above. */}
-      {hasSelection && (pickedKeys.length > 0 || selectAll) && (
+      {hasSelection && (pickedKeys.length > 0 || governing) && (
         <div className="mp-selbar">
-          {selectAll && (
-            <button type="button" className="mp-linkbtn" onClick={() => onToggleAll!(selectAll.keys, true)}>
-              {L(selectAll.label.en, selectAll.label.ar)}
+          {governing && (
+            <button
+              type="button"
+              className="mp-selall"
+              aria-pressed={governingOn}
+              onClick={() => onToggleAll!(governing.keys, !governingOn)}
+            >
+              {/* The box is the same 22 px control the rows carry, so the column reads as one column
+                  from its head down. It is decoration on an already-labelled button, never the
+                  control itself — hence `aria-hidden`, with the state on `aria-pressed` above. */}
+              <span className={`mp-tick${governingOn ? " on" : ""}`} aria-hidden="true">
+                {governingOn ? "✓" : ""}
+              </span>
+              <span>{L(governing.label.en, governing.label.ar)}</span>
             </button>
           )}
           {pickedKeys.length > 0 && (
-            // Clearing back towards neutral. It covers THIS group's ticks, which is the same scope
-            // select-all has; when this is the only group holding any, it is the whole way back.
+            // Clearing back towards neutral, on the bar's OPPOSITE edge (the screenshot's layout, and
+            // the only place it can go once select-all is a box on the leading one). It covers THIS
+            // group's ticks, which is the same scope select-all has; when this is the only group
+            // holding any, it is the whole way back.
             <button type="button" className="mp-linkbtn muted" onClick={() => onToggleAll!(pickedKeys, false)}>
               {L(`Clear selection (${pickedKeys.length})`, `إلغاء التحديد (${arDigits(pickedKeys.length)})`)}
             </button>
