@@ -9,13 +9,23 @@
    looks read in one place instead of a nested ternary.
 
    Tokens, inlined rather than shared because this surface's palette is the prototype's and
-   deliberately not the app's `--rentee`/`--success` set (map-proto.css §head, design.md §5):
-     deep #0F2238 · navy #1C3550 · muted #6B8FA8 · border #C8D8E8 · blt #E4EDF5 · surface #EFF4F9
+   deliberately not the app's `--rentee`/`--success` set (map-proto.css §head, design.md §5). Read off
+   the prototype's own `const C` in the decoded source, NOT off design-v3.md, which mis-transcribes two
+   of them:
+     deep #16304F · navy #1C3550 · muted #6B8FA8 · border #C8D8E8 · blt #E1E9F1 · surface #EFF4F9
      s2 #F8FAFC · blue #2563EB · green #16A34A · red #D9362A · amber #D4780A
 
-   RED IS AVAILABILITY. §6.3 reserves red on this surface for availability, which is why a document row
-   that needs action is AMBER and only the match grid — a match judgement the spec explicitly colours —
-   uses red. */
+   ~~deep #0F2238 · blt #E4EDF5~~ — **wrong, corrected 2026-08-09** alongside the same correction in
+   `map-proto.css`. The comment named the prototype's `deep` and `blt` and then used two colours that
+   are not them: `#0F2238` is a literal the prototype spends elsewhere (a photo backdrop, the modal
+   scrim's base) and never as the token, and `#E4EDF5` belongs to other surfaces in this app. Every site
+   that inherited them is corrected here too — panel ink, the company header's slab, row and thumbnail
+   hairlines, the tab strip's rule. `rgba(15, 34, 56, …)` survives untouched wherever it appears: that
+   is the prototype's own shadow ink, written as an rgba literal in its source and never as `deep`.
+
+   Two deliberate overrides of the prototype, both documented: `#2563EB` where the prototype's action
+   colour is its own navy (AC-33), and `#D9362A` — the palette's red — where the prototype hard-codes
+   `#C62A2A` (AC-19, AC-168, and see the missing-document rules below). */
 
 /* ═══════════════════════════ shell ═══════════════════════════ */
 
@@ -25,7 +35,7 @@
   height: 100%;
   min-height: 0;
   background: #fff;
-  color: #0f2238;
+  color: #16304f;
   font-size: 14px;
 }
 
@@ -113,7 +123,7 @@
   position: relative;
   flex: 1;
   padding: 9px 4px;
-  border: 1.5px solid #e4edf5;
+  border: 1.5px solid #e1e9f1;
   border-radius: 11px;
   background: #fff;
   color: #6b8fa8;
@@ -267,7 +277,7 @@
   align-items: center;
   gap: 10px;
   padding: 7px 10px;
-  border: 1px solid #e4edf5;
+  border: 1px solid #e1e9f1;
   border-radius: 12px;
   margin-bottom: 6px;
   background: #fff;
@@ -316,7 +326,7 @@
   flex-shrink: 0;
   width: 34px;
   height: 34px;
-  border: 1px solid #e4edf5;
+  border: 1px solid #e1e9f1;
   border-radius: 9px;
   background: #f8fafc;
   overflow: hidden;
@@ -505,7 +515,7 @@
   align-items: center;
   gap: 10px;
   padding: 14px;
-  background: #0f2238;
+  background: #16304f;
   color: #fff;
 }
 .mp-cohead .tx { flex: 1; min-width: 0; }
