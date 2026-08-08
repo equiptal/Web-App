@@ -23,6 +23,11 @@
  * bid — a supplier-keyed cache would draw bid A's offer on bid B's map. The cache is dropped when the
  * bid itself refetches, since a resubmitted bid can change which machines it names.
  *
+ * It fetches the supplier's **company papers** the same way (V15), and for the same reason: the read is
+ * bid-scoped, so it is keyed and invalidated identically. The one difference is its trigger — it waits
+ * for the company panel to open, because the urls it returns are presigned and perishable and the panel
+ * is behind a button most sessions never press.
+ *
  * **Nothing here writes until the renter asks it to.** No deal room is created by opening, selecting
  * or reading (004a §4.5) — a `DealRoom` row freezes the supplier's offered count. The three acts that
  * DO create one are all explicit and all the renter's: sending a request card (V11), sending the
@@ -37,9 +42,10 @@ import type { MachinePin } from "@/components/map/MapCanvas";
 import { PriceFooter } from "@/components/map/PriceFooter";
 import { useRenteeRequestSender } from "@/components/map/useRenteeRequestSender";
 import { EquipmentList } from "@/components/map/EquipmentList";
-import { CompanyPanel, EquipmentDetail, type CompanyDocInput, type CompanyDocKey, type PanelRequestDraft } from "@/components/map/panel";
+import { CompanyPanel, EquipmentDetail, type PanelRequestDraft } from "@/components/map/panel";
 import type { BidCard } from "@/lib/contract/bids";
-import { fetchBidFleet } from "@/lib/api/client";
+import { fetchBidCompanyDocuments, fetchBidFleet } from "@/lib/api/client";
+import { companyPanelSource, type CompanyDocsPayload } from "@/lib/contract/company-documents";
 import {
   arabicIndicDigits,
   countCase,
@@ -115,6 +121,10 @@ export function BidMapWorkspace({
   const [fleetByBid, setFleetByBid] = useState<Record<string, FleetMachine[]>>({});
   const [loadingBidId, setLoadingBidId] = useState<string | null>(null);
   const [fleetFailed, setFleetFailed] = useState(false);
+  /** bidId → that supplier's company papers, presigned (V14/V15). Keyed by BID for the fleet's exact
+   *  reason — the read is bid-scoped and gated by the bid's own access check — and dropped by the same
+   *  falling-edge invalidation, which also means a reopened panel gets freshly signed urls. */
+  const [companyDocsByBid, setCompanyDocsByBid] = useState<Record<string, CompanyDocsPayload>>({});
   /** Exactly one machine is selected at a time (AC-81) — a single id, so a second ring is not
    *  representable. Cleared on every bid change (AC-177). */
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
@@ -176,11 +186,49 @@ export function BidMapWorkspace({
     };
   }, [selectedBidId, offPlatform, fleetByBid]);
 
+  /* ── V15 · the company papers — the read that had no caller ─────────────────────────────────────
+     `docs` used to be built from `bid.compliance`: presence booleans with no url, no expiry and no
+     verification, so all five rows read "no document yet" with nothing to press and AC-69 was
+     unreachable on this panel. This is the fetch that fills it, mirroring the fleet's mechanics above
+     — keyed by `bidId`, invalidated on the same falling edge, and degrading without breaking the
+     surface when it fails.
+
+     **Lazily, on the first open per bid**, and NOT with the fleet. Two reasons, in order: the urls are
+     presigned and therefore perishable, so signing them when the renter can actually press them beats
+     signing them on arrival at a surface where the panel is behind a button most sessions never touch;
+     and the landing path stays exactly as many requests as it is today. A failed read is not latched,
+     so closing and reopening retries it.
+
+     **This is a GET and nothing else** — opening the panel creates no deal room (004a §4.5). */
+  useEffect(() => {
+    if (!companyOpen) return;
+    if (!selectedBidId || offPlatform) return;
+    if (companyDocsByBid[selectedBidId]) return; // cached — reopening must not re-request
+    let active = true;
+    fetchBidCompanyDocuments(selectedBidId)
+      .then((payload) => {
+        if (!active) return;
+        setCompanyDocsByBid((prev) => ({ ...prev, [selectedBidId]: payload }));
+      })
+      .catch(() => {
+        // Deliberately unlatched and unreported HERE. The panel falls back to `bid.compliance`, which
+        // states presence honestly and exposes no control — it must never render "no document yet",
+        // because that is a statement about the LESSOR and a failed read is a statement about us.
+      });
+    return () => {
+      active = false;
+    };
+  }, [companyOpen, selectedBidId, offPlatform, companyDocsByBid]);
+
   // Invalidate on the falling edge of a bid REFETCH (§7.5.1). A resubmitted bid can name different
-  // machines, so a cache that outlived the refetch would keep drawing the previous offer.
+  // machines, so a cache that outlived the refetch would keep drawing the previous offer. The papers
+  // go with it: a resubmission can change the firm's filings, and the presigned urls are perishable.
   const wasRefreshing = useRef(false);
   useEffect(() => {
-    if (wasRefreshing.current && !refreshing) setFleetByBid({});
+    if (wasRefreshing.current && !refreshing) {
+      setFleetByBid({});
+      setCompanyDocsByBid({});
+    }
     wasRefreshing.current = refreshing;
   }, [refreshing]);
 
@@ -356,20 +404,15 @@ export function BidMapWorkspace({
    *  dictionary — the pattern that directory already ships. */
   const L = (en: string, arText: string) => (ar ? arText : en);
 
-  /** The company's papers as V9 needs them, from what the bid already serves (§7 — no new endpoint).
-   *  `compliance` is presence only; the panel adds the verification and expiry wording from
-   *  `verified`. A key omitted here reads as "no document yet", which is the honest default. */
-  const companyDocs: Partial<Record<CompanyDocKey, CompanyDocInput>> = useMemo(() => {
-    if (!bid) return {};
-    const c = bid.compliance;
-    return {
-      cr: { present: c.activityLicense },
-      // A VAT certificate is reissued every year rather than carrying an expiry date.
-      vat: { present: c.taxNumber, renewsAnnually: true },
-      national_address: { present: c.nationalAddress },
-      local_content: { present: c.localContent },
-    };
-  }, [bid]);
+  /** The company's papers as V9 needs them (V15). The REAL read when it has answered — five rows with
+   *  presigned urls and expiry dates, which is what makes AC-69's view/download reachable at all — and
+   *  `bid.compliance` as the fallback for what presence booleans can honestly say while it has not.
+   *  The choice itself lives in `companyPanelSource`, so it is unit-testable without a component
+   *  harness; this host only supplies the two inputs. */
+  const companySource = useMemo(
+    () => companyPanelSource(selectedBidId ? companyDocsByBid[selectedBidId] ?? null : null, bid),
+    [companyDocsByBid, selectedBidId, bid],
+  );
 
   /* ── V3 · the counts ───────────────────────────────────────────────────────────────────────────
      Computed ONLY once the fleet has arrived. Three numbers, one derivation (`unitCounts`):
@@ -615,9 +658,11 @@ export function BidMapWorkspace({
             the renter to exactly the list or detail he left. */}
         {bid && companyOpen && (
           <CompanyPanel
-            companyName={bid.supplierName}
-            verified={bid.verified === true}
-            docs={companyDocs}
+            // Identity from the BID, papers from the read — `companyPanelSource` holds that split, so
+            // the panel can never name the firm differently from the header two lines above it.
+            companyName={companySource.companyName ?? bid.supplierName}
+            verified={companySource.verified}
+            docs={companySource.docs}
             ar={ar}
             L={L}
             onBack={() => setCompanyOpen(false)}

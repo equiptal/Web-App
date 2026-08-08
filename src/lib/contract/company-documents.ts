@@ -51,8 +51,11 @@ export interface CompanyDocEntry {
   /** True for a paper the issuer reissues every year. VAT alone, and it is stated here rather than in
    *  the panel so the row's second line never has to be guessed from an absent date. */
   renewsAnnually?: boolean;
-  /** The presigned url the backend signed through `batchSignItems`. **Never null on a present row** —
-   *  the backend omits a paper it has no file for, so a row that exists can always be opened. */
+  /** The presigned url the backend signed through `batchSignItems`. **Never null on a row the READ
+   *  produced** — the backend omits a paper it has no file for, so a row that came off the wire can
+   *  always be opened. It IS null on a `companyPanelSource` fallback row, which is built from the bid's
+   *  presence booleans and therefore states presence with nothing to open (`docRowActions` returns no
+   *  controls for it, so the absent url can never become a dead button — AC-69). */
   downloadUrl: string | null;
   /** The CATALOGUE key, carried so a request raised from this row names the type the backend will
    *  accept — `vat_cert`, not the panel's `vat`. */
@@ -68,10 +71,9 @@ export interface CompanyDocsPayload {
   /**
    * Keyed the panel's way, so a host spreads it straight onto `CompanyPanel`.
    *
-   * `saso` rides along here and is **not rendered yet**: `COMPANY_DOC_KEYS` in `machine-panel-model.ts`
-   * still lists four papers, and that file is another ticket's. `companyDocRows` iterates its own list
-   * and ignores anything extra, so carrying the fifth is harmless — and it means the row appears the
-   * moment that list grows, with nothing here to change.
+   * `saso` rides along here and IS rendered: `COMPANY_DOC_KEYS` in `machine-panel-model.ts` has since
+   * grown to five papers, which is what this map was already shaped for. `companyDocRows` iterates its
+   * own list and ignores anything extra, so carrying a key that list has not learned stays harmless.
    */
   docs: Partial<Record<PanelCompanyDocKey, CompanyDocEntry>>;
   /** The same rows in wire order, for a caller that wants the list rather than the map. */
@@ -191,4 +193,94 @@ export function mapCompanyDocuments(raw: unknown): CompanyDocsPayload {
     docs,
     documents,
   };
+}
+
+/* ───────────────────────── V15 — the panel's source, composed ─────────────────────────
+   The read above had **no caller**. `BidMapWorkspace` built the company panel's `docs` prop straight
+   from `bid.compliance` — presence booleans with no url, no expiry and no verification — so every row
+   rendered "no document yet" with nothing to press and `docRowActions` returned `[]` for all five.
+   This is the seam that joins the two: the read when it has answered, the bid's own presence when it
+   has not. It is pure, so the choice is testable without a component harness. */
+
+/** The presence booleans a `BidCard` already carries (`BidCard.compliance`), named as that projection
+ *  names them. Declared structurally rather than imported so this module keeps depending on nothing.
+ *
+ *  **All five papers are answerable from here** — including `saso`, which is the FIRM's registration
+ *  (`supplier_profiles.saso_heavy_equip_doc_key` / `held_cert_docs.SASO` / `certs.SASO`), the same
+ *  store `machine-panel-model.ts` names for the company SASO row. It is never a listing's safety cert. */
+export interface CompanyPresence {
+  /** Commercial registration. */
+  activityLicense: boolean;
+  /** VAT. */
+  taxNumber: boolean;
+  nationalAddress: boolean;
+  localContent: boolean;
+  saso: boolean;
+}
+
+/** What the host spreads onto `CompanyPanel`, plus where it came from. */
+export interface CompanyPanelSource {
+  companyName: string | null;
+  verified: boolean;
+  docs: Partial<Record<PanelCompanyDocKey, CompanyDocEntry>>;
+  /** `read` — the rows are the firm's real papers, presigned and openable.
+   *  `presence` — the read has not answered (not yet fetched, or it failed) and these rows state only
+   *  what the bid already told us. Exposed so a caller can tell the two apart; the panel does not need
+   *  to, because a row with no url already exposes no control. */
+  origin: "read" | "presence";
+}
+
+const PRESENCE_ROW: { key: CompanyDocumentKey; of: keyof CompanyPresence }[] = [
+  { key: "cr", of: "activityLicense" },
+  { key: "vat_cert", of: "taxNumber" },
+  { key: "national_address", of: "nationalAddress" },
+  { key: "local_content", of: "localContent" },
+  { key: "saso", of: "saso" },
+];
+
+/**
+ * The company panel's `docs`, from the read when it has answered and from the bid's presence booleans
+ * when it has not.
+ *
+ * **The read wins WHOLESALE, never row by row.** A successful read that omits `vat` means the firm has
+ * no VAT certificate on file, and "no document yet" is then the honest row. Re-filling that gap from
+ * `compliance.taxNumber` would resurrect a row saying "on file" with nothing behind it — a claim about
+ * the lessor that the one authority on the question has just contradicted.
+ *
+ * **A pending or failed read falls back rather than reporting absence.** "no document yet" is a
+ * statement about the LESSOR; a read that has not happened is a statement about us, and the two must
+ * not be spelled the same way. The fallback rows carry no url, so they state presence and expose no
+ * control — exactly the surface that shipped before this read existed, which is honest if incomplete.
+ *
+ * **Identity comes from the BID, never from the read.** The panel opens two lines under a header that
+ * already states `bid.supplierName` and `bid.verified`; a panel that named the firm differently, or
+ * showed a verified chip the header withheld, would be one surface disagreeing with itself. The read's
+ * own `companyName`/`verified` are used only when there is no bid to ask.
+ */
+export function companyPanelSource(
+  read: CompanyDocsPayload | null,
+  bid: { supplierName?: string | null; verified?: boolean; compliance?: CompanyPresence | null } | null,
+): CompanyPanelSource {
+  const companyName = s(bid?.supplierName) ?? read?.companyName ?? null;
+  const verified = bid ? bid.verified === true : read?.verified === true;
+
+  if (read) return { companyName, verified, docs: read.docs, origin: "read" };
+
+  const docs: Partial<Record<PanelCompanyDocKey, CompanyDocEntry>> = {};
+  const c = bid?.compliance;
+  if (c) {
+    for (const { key, of } of PRESENCE_ROW) {
+      if (c[of] !== true) continue; // absent here is indistinguishable from unknown — say nothing.
+      docs[PANEL_KEY[key]] = {
+        present: true,
+        expiryDate: null,
+        // The bid knows a VAT certificate exists, never when it lapses; the panel's second line says
+        // "renews annually" rather than an expiry it does not have.
+        ...(key === "vat_cert" ? { renewsAnnually: true } : {}),
+        downloadUrl: null,
+        docType: key,
+      };
+    }
+  }
+  return { companyName, verified, docs, origin: "presence" };
 }

@@ -2,6 +2,7 @@ import type { AgentDraft, RfqRequestPayload, Taxonomy } from "@/lib/contract";
 import type { RequestListItem, RequestRecord } from "@/lib/contract/requests";
 import type { BidCard } from "@/lib/contract/bids";
 import type { FleetMachine } from "@/lib/contract/fleet";
+import type { CompanyDocsPayload } from "@/lib/contract/company-documents";
 import type { DealRoomView, DealRoomDocuments, QuotationView } from "@/lib/contract/deal-room";
 import type { ComputedBid, RecommendResult, BidAskResult, BidParseResult, AwardNudgeResult, PreferencePreset, RankingPreference, RankedBid, BidEventInput, NormalizedBid, TermMatch, QuoteMatchCheck } from "@/lib/contract/agent-bids";
 import type { TransformRequestCtx } from "@/lib/contract/bid-form";
@@ -247,6 +248,22 @@ export function fetchBids(requestId: string): Promise<{ bids: BidCard[] }> {
  */
 export function fetchBidFleet(bidId: string): Promise<{ machines: FleetMachine[] }> {
   return getJson<{ machines: FleetMachine[] }>(`/api/me/bids/${encodeURIComponent(bidId)}/fleet`);
+}
+
+/**
+ * V14/V15 — the BID supplier's company papers, presigned, for the renter's company panel
+ * (RM3-AC-68 / AC-69 / AC-70). The sibling of `fetchBidFleet`: one serves the firm's machines, this
+ * one its paperwork, and both are bid-scoped because the backend derives the supplier FROM the bid.
+ *
+ * **A READ, and only a read.** Opening the company panel creates no deal room (004a §4.5) — a
+ * `DealRoom` row freezes the supplier's offered count — so this is a `GET` all the way down and must
+ * never be routed through `startDealRoom`.
+ *
+ * Cached by `bidId` by its caller, for `fetchBidFleet`'s reason: one firm can hold several bids on one
+ * request, and the papers are fetched through the bid's own access check.
+ */
+export function fetchBidCompanyDocuments(bidId: string): Promise<CompanyDocsPayload> {
+  return getJson<CompanyDocsPayload>(`/api/me/bids/${encodeURIComponent(bidId)}/company-documents`);
 }
 
 /**
