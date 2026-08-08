@@ -13,13 +13,16 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { unitAvailability } from "@/lib/contract/bid-map";
+import { isPlottable, unitAvailability } from "@/lib/contract/bid-map";
 import {
   DISTANCE_BANDS_KM,
   equipmentFilters,
   equipmentListView,
   filterMachines,
   landingSelectionId,
+  listEmptyState,
+  machineMarkers,
+  nextSelection,
   offeredMachines,
   type EquipmentFilterRequest,
 } from "@/lib/contract/equipment-list";
@@ -261,7 +264,22 @@ describe("composeMachineRequest — RM3-AC-17 / AC-07", () => {
 /* ────────────────────────── V10 · the list and the marker set agree ────────────────────────── */
 
 describe("the marker set is the list minus what cannot be drawn — RM3-AC-15 / AC-22", () => {
-  const plottable = (m: FleetMachine) => m.lat != null && m.lng != null;
+  /** **Production's own predicate**, not a local re-statement of it. What this file used to define
+   *  here — `m.lat != null && m.lng != null` — is a plausible reading of `isPlottable`, and a test
+   *  that asserts its own reading is a claim about the test. `isPlottable` rejects a HALF-resolved
+   *  point and downgrades it, which the local one would have accepted. */
+  const plottable = (m: FleetMachine) => isPlottable(m);
+
+  it("uses the same predicate the map does — and it is not the obvious one", () => {
+    // The positive control on the swap. A machine with a latitude and no longitude is NOT plottable:
+    // a point at (24.7, 0) is somewhere in the Gulf of Guinea. The local predicate this replaced
+    // would have called it drawable.
+    const half = fleet([{ id: "half", lat: 24.7, lng: null }])[0];
+    expect(half.lat != null && half.lng != null).toBe(false);
+    const halfLng = fleet([{ id: "half2", lat: null, lng: 46.7 }])[0];
+    expect(isPlottable(halfLng)).toBe(false);
+    expect(isPlottable(fleet([{ id: "whole" }])[0])).toBe(true);
+  });
 
   it("draws a marker only for a machine that is in the list", () => {
     const all = fleet([
@@ -290,6 +308,121 @@ describe("the marker set is the list minus what cannot be drawn — RM3-AC-15 / 
     ).filter(plottable);
 
     expect(drawn.map((m) => unitAvailability(m))).toEqual(["unconfirmed", "confirmed"]);
+  });
+});
+
+/* ────────────────────── V5 / V10 · the selection, as one rule (RM3-AC-15) ──────────────────────
+   AC-15 as rewritten on 2026-08-08: *"the same `selectedMachineId` reaches the map and the list …
+   exactly ONE machine id is selected on both surfaces at any moment and re-selecting the current one
+   clears it."*
+
+   The test that used to carry this number checked SET MEMBERSHIP — that the drawn machines are a
+   subset of the listed ones — which is AC-22's claim, not AC-15's, and says nothing about focus.
+   These are the focus rules themselves. The structural half — that this one value is what both
+   surfaces are handed — is in `rentee-map-surface.test.ts`, because it is a fact about the host. */
+
+describe("nextSelection — one selection rule for both surfaces (RM3-AC-15)", () => {
+  it("selects a machine that was not selected", () => {
+    expect(nextSelection(null, { kind: "press", id: "eq-1" })).toBe("eq-1");
+    expect(nextSelection("eq-2", { kind: "press", id: "eq-1" })).toBe("eq-1");
+  });
+
+  it("CLEARS on a re-press — the only way back to an unselected map", () => {
+    // The mutation this catches: a press that assigns rather than toggles. Every other test in this
+    // block still passes under it.
+    expect(nextSelection("eq-1", { kind: "press", id: "eq-1" })).toBeNull();
+  });
+
+  it("round-trips: press · re-press · press again", () => {
+    let sel: string | null = null;
+    sel = nextSelection(sel, { kind: "press", id: "eq-1" });
+    expect(sel).toBe("eq-1");
+    sel = nextSelection(sel, { kind: "press", id: "eq-1" });
+    expect(sel).toBeNull();
+    sel = nextSelection(sel, { kind: "press", id: "eq-1" });
+    expect(sel).toBe("eq-1");
+  });
+
+  it("clears on a bid change — a ring on a machine no longer on the map (AC-177)", () => {
+    expect(nextSelection("eq-1", { kind: "bid-change" })).toBeNull();
+    expect(nextSelection(null, { kind: "bid-change" })).toBeNull();
+  });
+
+  it("clears when a filter hides the selected machine — a ring with no card and no pin (AC-28e)", () => {
+    expect(nextSelection("eq-1", { kind: "hidden" })).toBeNull();
+  });
+
+  it("FOCUSES on open without toggling — «التفاصيل» on the selected card must not deselect it", () => {
+    // A detail opening on a machine the press had just cleared would leave the panel describing a
+    // machine with no accent and no lifted marker.
+    expect(nextSelection("eq-1", { kind: "open", id: "eq-1" })).toBe("eq-1");
+    expect(nextSelection("eq-2", { kind: "open", id: "eq-1" })).toBe("eq-1");
+    expect(nextSelection(null, { kind: "open", id: "eq-1" })).toBe("eq-1");
+  });
+
+  it("never returns anything but a single id or null — two rings are not representable", () => {
+    const outcomes = [
+      nextSelection("a", { kind: "press", id: "b" }),
+      nextSelection("a", { kind: "press", id: "a" }),
+      nextSelection("a", { kind: "open", id: "b" }),
+      nextSelection("a", { kind: "bid-change" }),
+      nextSelection("a", { kind: "hidden" }),
+    ];
+    for (const out of outcomes) expect(out === null || typeof out === "string").toBe(true);
+  });
+});
+
+/* ──────────────── RM3-AC-26 · the lessor's empty state, and the filter's ────────────────
+   Two states that must never be mistakable for each other. AC-26 was proven only as
+   `offeredMachines([])` returning `[]` — an array, which is not a state, and which stays green if
+   the explanatory branch is deleted outright. `listEmptyState` is the branch, as a value. */
+
+describe("listEmptyState — the two empty states, told apart (RM3-AC-26 / AC-28e)", () => {
+  const view = (over: Partial<{ total: number; machines: FleetMachine[]; emptiedByFilter: boolean }>) => ({
+    total: 0,
+    machines: [] as FleetMachine[],
+    emptiedByFilter: false,
+    ...over,
+  });
+
+  it("says `no-machines` for an offer the lessor registered nothing against", () => {
+    // The fact about the LESSOR: a price and a count were given, and that is the whole statement.
+    expect(listEmptyState(equipmentListView([], asking(), []))).toBe("no-machines");
+  });
+
+  it("says `filtered` when chips emptied a real offer", () => {
+    const crossed = offeredMachines(
+      fleet([
+        { id: "near-bare", km: 10, docs: [] },
+        { id: "far-tuv", km: 500, docs: ["tuv"] },
+        { id: "far-bare", km: 600, docs: [] },
+      ]),
+    );
+    const ask = asking({ reqEquipmentCerts: ["tuv"] });
+    const emptied = equipmentListView(crossed, ask, ["distance:50", "cert:equipment:tuv"]);
+    expect(emptied.shown).toBe(0);
+    expect(listEmptyState(emptied)).toBe("filtered");
+  });
+
+  it("says nothing at all when there are cards to draw", () => {
+    const list = offeredMachines(fleet([{ id: "a" }, { id: "b" }]));
+    expect(listEmptyState(equipmentListView(list, asking(), []))).toBeNull();
+  });
+
+  it("never reads a filter's empty list as the LESSOR's — the two are not the same answer", () => {
+    // The mutation this catches: collapsing the two branches into one. A renter told «لا توجد
+    // نتائج» over an offer that really is empty reads it as a verdict on the lessor; a renter given
+    // «امسح التصفية» over an offer with no machines is offered an escape from nothing.
+    expect(listEmptyState(view({ total: 0 }))).not.toBe(listEmptyState(view({ total: 8 })));
+    expect(listEmptyState(view({ total: 0, emptiedByFilter: true }))).toBe("no-machines");
+  });
+
+  it("agrees with `emptiedByFilter`, which is the model's own name for the same fact", () => {
+    const list = offeredMachines(fleet([{ id: "a", km: 10 }, { id: "b", km: 500 }]));
+    for (const selection of [[], ["distance:50"], ["distance:9999"]]) {
+      const v = equipmentListView(list, asking(), selection);
+      expect(listEmptyState(v) === "filtered", JSON.stringify(selection)).toBe(v.emptiedByFilter);
+    }
   });
 });
 
@@ -549,8 +682,6 @@ describe("rule 3 — the count states the WHOLE offer (RM3-AC-28d)", () => {
 });
 
 describe("rule 4 — the marker set is the FILTERED list minus what cannot be plotted (RM3-AC-15 / AC-28e)", () => {
-  const plottableUnit = (m: FleetMachine) => m.lat != null && m.lng != null;
-
   it("takes a filtered-out machine off the map with its card", () => {
     const list = offeredMachines(
       fleet([
@@ -560,12 +691,14 @@ describe("rule 4 — the marker set is the FILTERED list minus what cannot be pl
       ]),
     );
     const view = equipmentListView(list, asking(), ["distance:50"]);
-    const drawn = view.machines.filter(plottableUnit);
+    // `machineMarkers` is what the workspace actually hands the canvas — the map's real derivation,
+    // not a local predicate the test invented and then agreed with.
+    const drawn = machineMarkers(view.machines);
 
     expect(ids(view.machines)).toEqual(["near", "near-unplottable"]);
-    expect(ids(drawn)).toEqual(["near"]);
+    expect(drawn.map((m) => m.id)).toEqual(["near"]);
     // The only difference between the cards and the pins is still plottability — never the filter.
-    for (const m of drawn) expect(ids(view.machines)).toContain(m.equipmentId);
+    for (const m of drawn) expect(ids(view.machines)).toContain(m.id);
     expect(ids(view.machines)).not.toContain("far");
   });
 });
