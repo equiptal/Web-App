@@ -601,8 +601,10 @@
 
 .bidmap .bm-eq .bm-eq-tx { flex: 1; min-width: 0; padding: 11px 13px; display: flex; flex-direction: column; gap: 7px; }
 .bidmap .bm-eq .bm-eq-r1 { display: flex; align-items: center; gap: 8px; }
+/* Title and its verified mark travel together, so the mark sits against the end of the NAME rather
+   than against the far edge of the row (decoded 4004–4010). */
+.bidmap .bm-eq .bm-eq-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 5px; }
 .bidmap .bm-eq .bm-eq-title {
-  flex: 1;
   min-width: 0;
   font-size: 14px;
   font-weight: 800;
@@ -611,6 +613,23 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* The verified mark — 15 px green disc, decoded 4009. It says the PLATFORM has this machine's papers
+   on file, which is a different fact from whether it is available, and the two must not be read off
+   one another. Green here is `AVAILABILITY_COLOUR`'s over the prototype's `#12904A`, the same palette
+   override the whole surface takes. */
+.bidmap .bm-eq .bm-eq-vd {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #16a34a;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .bidmap .bm-eq .bm-eq-details {
   pointer-events: auto;
@@ -648,18 +667,39 @@
   text-overflow: ellipsis;
 }
 .bidmap .bm-eq .bm-eq-chip .bm-eq-dot { flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.bidmap .bm-eq .bm-eq-chip.ok { color: #16a34a; background: rgba(22, 163, 74, 0.1); border: 1px solid rgba(22, 163, 74, 0.32); }
+/* THE CONFIRMED CHIP IS A DIFFERENT SHAPE, on purpose (decoded 4014 vs 4015–4020). It is a small
+   squared label — `border-radius: 7px`, `padding: 2px 8px`, weight 700 — carrying a ✓ and **no dot**;
+   the unconfirmed one is a full capsule at weight 800 with a breathing dot. A settled fact and an open
+   question should not be the same object in two colours: colour alone fails anyone reading the list
+   with a red-green deficiency, and the shape difference is what makes the two states legible without
+   it. This chip was drawn as the capsule with a green dot, which lost exactly that. */
+.bidmap .bm-eq .bm-eq-chip.ok {
+  gap: 4px;
+  border-radius: 7px;
+  padding: 2px 8px;
+  font-weight: 700;
+  color: #16a34a;
+  background: rgba(22, 163, 74, 0.12);
+  border: 1px solid rgba(22, 163, 74, 0.34);
+}
 .bidmap .bm-eq .bm-eq-chip.no { color: #d9362a; background: rgba(217, 54, 42, 0.1); border: 1px solid rgba(217, 54, 42, 0.3); }
 /* An unanswered question is live, not a closed verdict — so only the unconfirmed dot breathes. */
 .bidmap .bm-eq .bm-eq-chip.no .bm-eq-dot { animation: dpDot 1.7s ease-in-out infinite; }
+/* «· خارج المدينة» (decoded 4026) — the yard is outside the request city's own radius, which is what
+   turns a delivery into a mobilisation worth asking about. Stated in the state row rather than beside
+   the distance: it qualifies the offer, not the number. Deliberately plain text, not a chip — the row
+   already carries one chip, and a second would read as a second availability state. */
+.bidmap .bm-eq .bm-eq-far { flex-shrink: 0; font-size: 10.5px; font-weight: 700; color: #8a4f08; white-space: nowrap; }
 /* BLUE, never navy (RM3-AC-33): beside a red chip, navy reads as disabled, and this is the one control
-   the renter is supposed to press. */
+   the renter is supposed to press. The underline is the prototype's `C.blueBd` alpha — **.22**, not
+   the .4 drawn here: at .4 the rule competes with the text above it and the control reads as a
+   disabled input rather than a link. */
 .bidmap .bm-eq .bm-eq-ask {
   pointer-events: auto;
   flex-shrink: 0;
   background: none;
   border: 0;
-  border-bottom: 1px solid rgba(37, 99, 235, 0.4);
+  border-bottom: 1px solid rgba(37, 99, 235, 0.22);
   border-radius: 0;
   padding: 0 0 1px;
   color: #2563eb;

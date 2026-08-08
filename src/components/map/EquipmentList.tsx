@@ -35,7 +35,7 @@
  */
 
 import { useEffect, useMemo, useRef, type ReactNode, type RefObject } from "react";
-import { AVAILABILITY_COLOUR, arabicIndicDigits, unitAvailability } from "@/lib/contract/bid-map";
+import { AVAILABILITY_COLOUR, arabicIndicDigits, isOutOfCity, unitAvailability } from "@/lib/contract/bid-map";
 import type { EquipmentListView } from "@/lib/contract/equipment-list";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import { certificateChips, heroPhotoUrl } from "@/components/map/panel";
@@ -293,22 +293,41 @@ function EquipmentCard({
         </span>
 
         <div className="bm-eq-tx">
-          {/* 1 · title — model · year. No serial, no capacity (AC-12). */}
+          {/* 1 · title — model · year, with the verified mark against the end of the NAME rather than
+              the far edge of the row. No serial, no capacity (AC-12). */}
           <div className="bm-eq-r1">
-            <span className="bm-eq-title" title={title}>{title}</span>
+            <span className="bm-eq-name">
+              <span className="bm-eq-title" title={title}>{title}</span>
+              {/* The platform holds this machine's papers — a fact about its DOCUMENTS, not about
+                  whether it is available, which is why it is a mark on the title and not a third
+                  colour in the state row. Same source as row 4's chips, stated once as a glance and
+                  once in full (the prototype drives both off one flag too). */}
+              {certs.length > 0 && (
+                <span className="bm-eq-vd" title={t.bidMap.eqVerifiedMachine} aria-label={t.bidMap.eqVerifiedMachine}>
+                  ✓
+                </span>
+              )}
+            </span>
             <button type="button" className="bm-eq-details" onClick={() => onOpenDetail(machine.equipmentId)}>
               {t.bidMap.eqDetails}
+              {/* The prototype hard-codes «‹», which is correct in Arabic and backwards in English —
+                  it is an RTL-forward chevron in an RTL-only file. Kept locale-flipped by decision
+                  (owner, 2026-08-09; `design-v3.md` §9 records it): the chevron points the way the
+                  reader travels, and a control reading "Details ‹" in English points back at the text
+                  it is meant to lead away from. */}
               <span aria-hidden="true">{ar ? "‹" : "›"}</span>
             </button>
           </div>
 
-          {/* 2 · state — ONE chip (AC-32), and the ask beside it (AC-13). The row holds its height
-              whether or not the ask is there. */}
+          {/* 2 · state — ONE chip (AC-32), the ask beside it (AC-13), and the out-of-city qualifier.
+              The row holds its height whether or not either is there. */}
           <div className="bm-eq-r2">
             <span className={`bm-eq-chip${confirmed ? " ok" : " no"}`}>
-              {/* An unanswered question is live, not a closed verdict — so the unconfirmed chip's dot
-                  breathes and the confirmed one's does not. */}
-              <span className="bm-eq-dot" aria-hidden="true" />
+              {/* Two states, two SHAPES, not one shape in two colours: the confirmed chip is a small
+                  squared label carrying a ✓, the unconfirmed one a capsule carrying a dot that
+                  breathes — an unanswered question is live, a settled fact is not. Anyone reading this
+                  list with a red-green deficiency has only the shape to go on. */}
+              {confirmed ? <span aria-hidden="true">✓</span> : <span className="bm-eq-dot" aria-hidden="true" />}
               {confirmed ? t.bidMap.eqChipConfirmed : t.bidMap.eqChipUnconfirmed}
             </span>
             {!confirmed && (
@@ -322,6 +341,10 @@ function EquipmentCard({
                 {t.bidMap.eqAskConfirm}
               </button>
             )}
+            {/* The yard is outside the request city's own radius — the fact that turns a delivery into
+                a mobilisation. It qualifies the offer, so it sits with the state and not with the
+                number it is derived from. */}
+            {isOutOfCity(machine.distanceKm) && <span className="bm-eq-far">{t.bidMap.eqOutOfCity}</span>}
           </div>
 
           {/* 3 · distance from the project. Numerals are `dir="ltr"` — an Arabic-Indic figure inside an

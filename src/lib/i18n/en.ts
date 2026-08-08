@@ -923,6 +923,12 @@ export const en = {
     eqChipConfirmed: "Availability confirmed · in this offer",
     eqChipUnconfirmed: "Not confirmed yet",
     // Blue, never navy (RM3-AC-33) — beside a red chip, navy reads as disabled.
+    // A mark on the title: the platform holds this machine's papers. A fact about its DOCUMENTS, not
+    // about whether it is available.
+    eqVerifiedMachine: "Documented machine",
+    // Qualifies the offer, not the number: the yard sits outside the request city's own radius, so
+    // delivery is a mobilisation worth asking about.
+    eqOutOfCity: "· Outside the city",
     eqAskConfirm: "Ask him to confirm",
     eqAskConfirmWhy: "Ask the lessor to confirm this machine is available",
     eqDetails: "Details",
