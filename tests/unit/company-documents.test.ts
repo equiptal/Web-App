@@ -52,7 +52,8 @@ describe("mapCompanyDocuments — the panel's source, parsed", () => {
     const src = mapCompanyDocuments(payload({ documents: [row({ documentKey: "vat_cert", key: "u", expiryDate: null })] }));
 
     expect(src.docs.vat?.docType).toBe("vat_cert");
-    expect(src.docs.vat_cert).toBeUndefined();
+    // …and NOT under the catalogue spelling, which the panel does not iterate.
+    expect((src.docs as Record<string, unknown>).vat_cert).toBeUndefined();
   });
 
   it("VAT with no date renders as `renews annually`, never as a blank expiry", () => {

@@ -126,13 +126,17 @@ export interface RenteeAsk {
  * through untouched and refused by the backend if it is unknown, because an alias that names the
  * wrong paper would have the supplier upload the wrong paper.
  *
- * **`local_content` needs no alias and never did** — it is already lower-snake, so it survives
- * normalisation verbatim. What it lacked was a catalogue ROW, added 2026-08-08 (`segment: 'company'`,
- * `sortOrder: 4`), which is what turned it from a flat 400 into a sendable ask. `saso` is still left
- * alone: the catalogue holds TWO SASO keys (`saso_registration`, `saso_inspection`) and guessing
- * between them would have the supplier upload the wrong paper. See the note on
+ * **`local_content` and `saso` need no alias and never did** — both are already lower-snake, so they
+ * survive normalisation verbatim. What they lacked was a catalogue ROW; both were added 2026-08-08 as
+ * `segment: 'company'`, which is what turned them from flat 400s into sendable asks. See the note on
  * {@link companyDocAskSatisfied} for the other half — a key that validates but cannot be answered is
  * worse than the 400 was.
+ *
+ * ⚠️ **No alias is added for any SASO spelling, and that is the point.** `saso` (the firm's
+ * registration), `saso_registration` and `saso_inspection` (a machine's papers) and the bare `saso` a
+ * listing can carry for its safety cert are FOUR different things sharing a stem. Folding any of them
+ * together would have the supplier upload the wrong paper — so each is left exactly as written, and
+ * the scope of the ask decides which resolver reads it.
  */
 const DOC_TYPE_ALIASES: Record<string, string> = {
   // The four photo slots §6.6 shows, as the wire stores them.
@@ -316,8 +320,8 @@ export interface RequestTargetCompany {
    */
   certCodes?: string[] | null;
   /**
-   * `supplier_profiles.held_cert_docs` — the canonical `{LC: "<storageKey>"}` map, for a caller reading
-   * a raw profile projection rather than a mapped bid.
+   * `supplier_profiles.held_cert_docs` — the canonical `{LC: …, SASO: …}` map, for a caller reading a
+   * raw profile projection rather than a mapped bid.
    */
   heldCertDocs?: Record<string, unknown> | null;
   /**
@@ -326,6 +330,8 @@ export interface RequestTargetCompany {
    * missing, for every firm not yet re-migrated.
    */
   localContentDocKey?: string | null;
+  /** Legacy `supplier_profiles.saso_heavy_equip_doc_key` — the SASO half of the same dual-read. */
+  sasoHeavyEquipDocKey?: string | null;
 }
 
 /**
@@ -371,40 +377,48 @@ export function documentAskSatisfied(machine: RequestTargetMachine, docTypes: st
  *
  * - `cr` · `vat_cert` · `national_address` are catalogue documents — their files sit on
  *   `supplier_profiles.*_doc_key` and they arrive here as `docKeys`.
- * - **`local_content` is a held cert.** Its file lives in `supplier_profiles.held_cert_docs.LC`, with
- *   the legacy `local_content_doc_key` column still populated alongside. Nothing ever writes a
- *   `DocumentInstance` for it, so a `local_content` ask resolved against `docKeys` alone would hang
- *   open **forever** — the exact failure `assertKnownDocTypes` refuses unknown types to prevent,
- *   arriving through the back door the moment the catalogue row was added.
+ * - **`local_content` and `saso` are held certs.** Their files live in
+ *   `supplier_profiles.held_cert_docs.LC` / `.SASO`, with the legacy `local_content_doc_key` /
+ *   `saso_heavy_equip_doc_key` columns still populated alongside. Nothing ever writes a
+ *   `DocumentInstance` for either, so an ask resolved against `docKeys` alone would hang open
+ *   **forever** — the exact failure `assertKnownDocTypes` refuses unknown types to prevent, arriving
+ *   through the back door the moment the catalogue rows were added.
  *
- * All three sources for LC are read, mirroring the backend's `resolveHeldCerts` dual-read rather than
- * dropping the legacy half: a caller may hand over a mapped bid's `certCodes` (where `mapBid` already
- * did the dual-read), the raw `heldCertDocs` map, or the legacy column alone.
+ * Every source is read, mirroring the backend's `resolveHeldCerts` dual-read rather than dropping the
+ * legacy half: a caller may hand over a mapped bid's `certCodes` (where `mapBid` already did the
+ * dual-read), the raw `heldCertDocs` map, or a legacy column alone.
  *
- * `saso` is deliberately NOT resolved from `certCodes`, for the same reason it has no alias: the
- * catalogue holds two SASO keys and this function must never claim the wrong paper arrived.
+ * ⚠️ **`saso` here is the FIRM's registration, and this function is the ONLY thing that says so.** A
+ * listing's `documentKeys[].type` can carry a bare `saso` meaning the machine's safety cert
+ * (`EQUIPMENT_CERT_TYPES`), and the retired `saso_registration` term already conflated the two once.
+ * They are separated by SCOPE and by nothing else: an equipment ask routes to
+ * {@link documentAskSatisfied} and reads a machine's list; a company ask routes here and reads a
+ * firm's certs. **No alias folds either onto the other** — `canonicalDocType` leaves every SASO
+ * spelling exactly as it found it, so an alias can never make the wrong paper look like an answer.
  */
 export function companyDocAskSatisfied(company: RequestTargetCompany, docTypes: string[]): boolean {
   const held = new Set((company.docKeys ?? []).map((k) => canonicalDocType(String(k))));
-  if (localContentOnFile(company)) held.add("local_content");
+  if (heldCertOnFile(company, "LC")) held.add("local_content");
+  if (heldCertOnFile(company, "SASO")) held.add("saso");
   const wanted = docTypes.map(canonicalDocType).filter((t) => t !== "");
   if (wanted.length === 0) return false;
   // Answered as a WHOLE, exactly like the machine half: one card carries many types.
   return wanted.every((t) => held.has(t));
 }
 
-/** The local-content dual-read, in one place. Case-insensitive on the map key for the same reason
+/** The held-cert dual-read, in one place. Case-insensitive on the map key for the same reason
  *  `resolveHeldCerts` uppercases before testing membership — the map has more than one writer, and a
  *  lowercase `lc` must not read as "no certificate". */
-function localContentOnFile(company: RequestTargetCompany): boolean {
-  if ((company.certCodes ?? []).some((c) => String(c).trim().toUpperCase() === "LC")) return true;
+function heldCertOnFile(company: RequestTargetCompany, cert: "LC" | "SASO"): boolean {
+  if ((company.certCodes ?? []).some((c) => String(c).trim().toUpperCase() === cert)) return true;
   const map = company.heldCertDocs;
   if (map && typeof map === "object" && !Array.isArray(map)) {
     for (const [k, v] of Object.entries(map)) {
-      if (k.trim().toUpperCase() === "LC" && v) return true;
+      if (k.trim().toUpperCase() === cert && v) return true;
     }
   }
-  return typeof company.localContentDocKey === "string" && company.localContentDocKey.trim() !== "";
+  const legacy = cert === "LC" ? company.localContentDocKey : company.sasoHeavyEquipDocKey;
+  return typeof legacy === "string" && legacy.trim() !== "";
 }
 
 /** A raw `photoKeys[].slot` → the catalogue's photo key, or null when it is none of the four.

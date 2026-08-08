@@ -91,8 +91,11 @@ describe("composeRenteeRequest — one composer, four entry points (RM3-AC-17)",
   });
 
   it("leaves an ambiguous name alone rather than guessing which paper it means", () => {
-    // The catalogue has no local-content key and TWO saso keys. An alias that named the wrong paper
-    // would have the supplier upload the wrong paper; a 400 at least says nothing untrue.
+    // Both `local_content` and `saso` are catalogue keys now (company segment, added 2026-08-08), and
+    // BOTH still pass through untouched — that is the point. `saso` names four different papers across
+    // the tree (the firm's registration, `saso_registration`, `saso_inspection`, and the bare `saso` a
+    // listing carries for its safety cert); an alias that folded any onto another would have the
+    // supplier upload the wrong paper. Scope decides which resolver reads the key, never a rename.
     expect(canonicalDocType("local_content")).toBe("local_content");
     expect(canonicalDocType("saso")).toBe("saso");
     expect(canonicalDocType("istimara")).toBe("istimara");
@@ -333,5 +336,59 @@ describe("renteeRequestState — a company-scope document ask", () => {
   it("an EQUIPMENT ask never reads a company paper as its answer", () => {
     const card = ask({ kind: "document", equipmentId: "eq-1", docTypes: ["local_content"] });
     expect(renteeRequestState(card, machine(), null, firm({ certCodes: ["LC"] }))).toBe("waiting");
+  });
+});
+
+describe("companyDocAskSatisfied — SASO, the same fix with an overloaded name", () => {
+  it("resolves from the canonical `held_cert_docs.SASO`", () => {
+    expect(companyDocAskSatisfied(firm({ heldCertDocs: { SASO: "docs/saso.pdf" } }), ["saso"])).toBe(true);
+  });
+
+  it("resolves from the LEGACY `saso_heavy_equip_doc_key` ALONE", () => {
+    expect(companyDocAskSatisfied(firm({ sasoHeavyEquipDocKey: "docs/saso.pdf" }), ["saso"])).toBe(true);
+  });
+
+  it("resolves from a mapped bid's `companyCertCodes`", () => {
+    expect(companyDocAskSatisfied(firm({ certCodes: ["SASO"] }), ["saso"])).toBe(true);
+  });
+
+  it("the two held certs never stand in for one another", () => {
+    expect(companyDocAskSatisfied(firm({ certCodes: ["LC"] }), ["saso"])).toBe(false);
+    expect(companyDocAskSatisfied(firm({ certCodes: ["SASO"] }), ["local_content"])).toBe(false);
+    // Both asked for, only one held — a partial file is not an answer.
+    expect(companyDocAskSatisfied(firm({ certCodes: ["SASO"] }), ["saso", "local_content"])).toBe(false);
+    expect(companyDocAskSatisfied(firm({ certCodes: ["SASO", "LC"] }), ["saso", "local_content"])).toBe(true);
+  });
+
+  it("an EQUIPMENT-level `saso` never answers the FIRM's SASO — the two are separated by scope alone", () => {
+    // `EQUIPMENT_CERT_TYPES` holds a bare `'saso'` for a machine's safety cert, and the retired
+    // `saso_registration` term already conflated the two once. The company resolver reads no machine…
+    const withSasoDoc = machine({ documentKeys: [{ type: "saso" }, { type: "saso_registration" }] });
+    expect(companyDocAskSatisfied(firm(), ["saso"])).toBe(false);
+    expect(renteeRequestState(companyAsk(["saso"]), withSasoDoc, null, firm())).toBe("waiting");
+    // …and the machine resolver reads no firm.
+    const eqAsk = ask({ kind: "document", equipmentId: "eq-1", docTypes: ["saso"] });
+    expect(renteeRequestState(eqAsk, machine(), null, firm({ certCodes: ["SASO"] }))).toBe("waiting");
+  });
+
+  it("the equipment SASO keys are never aliased onto the firm's, in either direction", () => {
+    // A company file holding the registration does not answer an ask for a machine's papers…
+    expect(companyDocAskSatisfied(firm({ certCodes: ["SASO"] }), ["saso_registration"])).toBe(false);
+    expect(companyDocAskSatisfied(firm({ certCodes: ["SASO"] }), ["saso_inspection"])).toBe(false);
+    // …and canonicalisation leaves every spelling exactly as written, so nothing can drift into another.
+    for (const t of ["saso", "saso_registration", "saso_inspection", "saso_technical_inspection"]) {
+      expect(canonicalDocType(t)).toBe(t);
+    }
+  });
+});
+
+describe("renteeRequestState — a company-scope SASO ask", () => {
+  it("reads ANSWERED off the firm's file, with no reply ever posted", () => {
+    expect(renteeRequestState(companyAsk(["saso"]), null, null, firm({ sasoHeavyEquipDocKey: "k" })))
+      .toBe("answered");
+  });
+
+  it("reads WAITING when the registration is not on file — never refused", () => {
+    expect(renteeRequestState(companyAsk(["saso"]), null, null, firm())).toBe("waiting");
   });
 });

@@ -21,19 +21,25 @@
  * **NO React, NO DOM, NO i18n** — same rule as `bid-map.ts`, for the same reason.
  */
 
-/** The four company papers, keyed as the CATALOGUE keys them (`EquipmentDocumentType.documentKey`) —
- *  which is also what a document request names, so a row and the ask raised from it are one string. */
-export type CompanyDocumentKey = "cr" | "vat_cert" | "national_address" | "local_content";
+/** The company papers, keyed as the CATALOGUE keys them (`EquipmentDocumentType.documentKey`) —
+ *  which is also what a document request names, so a row and the ask raised from it are one string.
+ *
+ *  ⚠️ **`saso` here is the FIRM's registration.** A listing's `documentKeys[].type` can also carry a
+ *  bare `saso` meaning the machine's safety cert, and the equipment papers have their own unambiguous
+ *  keys (`saso_registration`, `saso_inspection`). They are told apart by SCOPE — this module only ever
+ *  parses a company read — never by aliasing one onto the other. */
+export type CompanyDocumentKey = "cr" | "vat_cert" | "national_address" | "local_content" | "saso";
 
 /** The panel's own vocabulary. It predates the catalogue and says `vat`; the two are reconciled here
  *  once rather than at every call site. */
-export type PanelCompanyDocKey = "cr" | "vat" | "national_address" | "local_content";
+export type PanelCompanyDocKey = "cr" | "vat" | "national_address" | "local_content" | "saso";
 
 const PANEL_KEY: Record<CompanyDocumentKey, PanelCompanyDocKey> = {
   cr: "cr",
   vat_cert: "vat",
   national_address: "national_address",
   local_content: "local_content",
+  saso: "saso",
 };
 
 /** One paper as the panel needs it. Structurally `CompanyDocInput` from `machine-panel-model.ts`. */
@@ -59,6 +65,14 @@ export interface CompanyDocsPayload {
   /** The firm's verification. A paper on a verified firm's file has been checked; there is no
    *  per-document review on this platform. */
   verified: boolean;
+  /**
+   * Keyed the panel's way, so a host spreads it straight onto `CompanyPanel`.
+   *
+   * `saso` rides along here and is **not rendered yet**: `COMPANY_DOC_KEYS` in `machine-panel-model.ts`
+   * still lists four papers, and that file is another ticket's. `companyDocRows` iterates its own list
+   * and ignores anything extra, so carrying the fifth is harmless — and it means the row appears the
+   * moment that list grows, with nothing here to change.
+   */
   docs: Partial<Record<PanelCompanyDocKey, CompanyDocEntry>>;
   /** The same rows in wire order, for a caller that wants the list rather than the map. */
   documents: CompanyDocument[];
@@ -75,13 +89,23 @@ export interface CompanyDocument {
   expiryDate: string | null;
 }
 
-const CATALOGUE_KEYS: readonly CompanyDocumentKey[] = ["cr", "vat_cert", "national_address", "local_content"];
+const CATALOGUE_KEYS: readonly CompanyDocumentKey[] = [
+  "cr",
+  "vat_cert",
+  "national_address",
+  "local_content",
+  "saso",
+];
 
 const s = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
 
-/** A wire `documentKey` → one of the four, or null. Tolerates the panel's `vat` and the legacy
- *  `commercial_register` / `municipal_license` names `getDealRoomDocuments` still emits, so a payload
- *  from either projection lands on the same row instead of being silently dropped. */
+/** A wire `documentKey` → one of the company papers, or null. Tolerates the panel's `vat` and the
+ *  legacy `commercial_register` / `municipal_license` names `getDealRoomDocuments` still emits, so a
+ *  payload from either projection lands on the same row instead of being silently dropped.
+ *
+ *  **`saso_registration` and `saso_inspection` deliberately map to NOTHING.** They are the EQUIPMENT
+ *  papers; folding them onto the firm's `saso` would show a machine's certificate as the company's,
+ *  which is precisely the conflation the retired `saso_registration` term already caused once. */
 function catalogueKey(raw: unknown): CompanyDocumentKey | null {
   const k = String(raw ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
   if ((CATALOGUE_KEYS as readonly string[]).includes(k)) return k as CompanyDocumentKey;
