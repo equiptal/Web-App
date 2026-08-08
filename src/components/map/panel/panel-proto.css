@@ -316,32 +316,44 @@
 }
 .mp-h4 small { display: block; font-size: 9.5px; font-weight: 600; color: #6b8fa8; margin-top: 2px; }
 
-.mp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+/* Every number here is the prototype's, corrected 2026-08-09 — ours differed on all of them. Cell
+   `9px 10px` on a `7px` gap; the neutral cell over `#EDF2F7` inside `#E1E9F1` rather than our paler
+   grey inside the border token; the two verdict tints at `.055` / `.045` over `.28` / `.24`, which
+   are lighter fills inside firmer edges than we had. The label rises to `10.5/700` and the finding
+   falls to `11.5/800`: the pair was reading as caption-then-sentence, and it is meant to read as
+   question-then-answer, which is a smaller gap between them and more weight on the answer. */
+.mp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
 @media (max-width: 420px) { .mp-grid { grid-template-columns: 1fr; } }
 
 .mp-cell {
-  border: 1px solid #c8d8e8;
+  border: 1px solid #e1e9f1;
   border-radius: 10px;
-  padding: 9px 11px;
-  background: #f8fafc;
+  padding: 9px 10px;
+  background: #edf2f7;
+  min-width: 0;
 }
-.mp-cell .k { font-size: 9.5px; font-weight: 600; color: #6b8fa8; }
+.mp-cell .k { font-size: 10.5px; font-weight: 700; color: #6b8fa8; }
 .mp-cell .v {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 6px;
-  margin-top: 3px;
-  font-size: 12px;
-  font-weight: 700;
+  margin-top: 4px;
+  font-size: 11.5px;
+  font-weight: 800;
   line-height: 1.5;
 }
+/* **OUR ✓ / — / ! survives the port**, deliberately. The prototype puts a subject emoji beside each
+   label (📅 📎 🖼 📄 🛠 👷) and no mark at all beside the finding, so the cell states its verdict in
+   colour alone. Emoji on this surface was already overruled once; and a verdict carried only by hue
+   is unreadable to the renter who cannot separate the two tints, which is the same objection §6.3's
+   colour rules exist for. The glyph says in a character what the fill says in a colour. */
 .mp-cell .mark { flex-shrink: 0; font-size: 13px; font-weight: 900; }
 
 /* Green satisfied · grey not required · red missing. There is no fourth state. */
-.mp-cell.green { border-color: rgba(22, 163, 74, 0.25); background: rgba(22, 163, 74, 0.09); }
+.mp-cell.green { border-color: rgba(22, 163, 74, 0.28); background: rgba(22, 163, 74, 0.055); }
 .mp-cell.green .v, .mp-cell.green .mark { color: #16a34a; }
-.mp-cell.red { border-color: rgba(217, 54, 42, 0.22); background: rgba(217, 54, 42, 0.09); }
+.mp-cell.red { border-color: rgba(217, 54, 42, 0.24); background: rgba(217, 54, 42, 0.045); }
 .mp-cell.red .v, .mp-cell.red .mark { color: #d9362a; }
 .mp-cell.grey .v { color: #6b8fa8; }
 .mp-cell.grey .mark { color: #6b8fa8; }
