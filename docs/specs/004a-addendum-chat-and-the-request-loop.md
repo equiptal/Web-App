@@ -1,6 +1,11 @@
 # 004a — Addendum: the chat, and the request loop from both sides
 
-**Extends** `004-deal-room-equipment-verification.md`. Prefix `RM3-AC-*` continues from 42.
+**Extends** `004-deal-room-equipment-verification.md`. Prefix `RM3-AC-*` continues from 42, and runs to
+**76** here after the 2026-08-08 additions (§8 defines 71–72, §9 defines 73–76).
+
+⚠️ **`RM3-AC-*` is the only live prefix.** A bare `AC-nn` in a test name or comment is a spec-001 / v2
+number that collides with a live `RM3-AC-nn` meaning something else — see the boxed note above 004 §8
+before building any AC-to-test map.
 **Layers:** web (`Web-App`) · app-backend · **mobile (supplier)** — this addendum is the first part of
 the feature that needs the supplier's app.
 

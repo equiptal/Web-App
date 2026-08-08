@@ -371,11 +371,49 @@ alignment · **T43** regression.
 score/ring (29), no reason on the unconfirmed chip (30). Assert the **view model exposes no such field**
 — a render that happens not to show one is not the same thing.
 
+### T44 · Renumber the bare `AC-nn` citations in tests `[CT]` — **follow-up, not part of V1–V16**
+
+**Raised 2026-08-08 by a coverage audit.** Test names and comments across the suite cite bare `AC-nn`
+numbers inherited from spec 001 and from v2 of this feature. Those integers collide with live
+`RM3-AC-nn` numbers meaning something else, so **any AC-to-test map built by grepping `AC-nn` reports
+false coverage** — and reports it most confidently on the criteria a reader is least able to check.
+
+The sharpest example: `fleet.test.ts`'s `describe("what gets plotted (AC-19)")` is about plottability;
+**RM3-AC-19** is the pin/chip colour-agreement criterion. Nothing links them but the number.
+
+**Do not fix these ad hoc — several files are owned by work in flight.** Files carrying bare citations,
+with the numbers they cite:
+
+| File | Bare `AC-nn` cited |
+|---|---|
+| `tests/unit/deal-room-cards.test.ts` | 01–16, 18, 48 |
+| `tests/unit/bid-map.test.ts` | 03, 06, 08, 09, 10, 18, 19, 21, 31, 55–59, 65, 70, **146** |
+| `tests/unit/machine-panel.test.ts` | 36–42, 69 |
+| `tests/unit/equipment-list.test.ts` | 07, 09, 10, 11, 15, 17, 22, 26, 34 |
+| `tests/unit/rentee-request-loop.test.ts` | 07, 17, 18, 55, 58, 69 |
+| `tests/unit/chat-dock.test.ts` | 43–46, 62, 63 |
+| `tests/unit/bid-equipment-access.test.ts` | 01, 25, **203** |
+| `tests/unit/price-footer.test.ts` | 24, 65, 66, 67 |
+| `tests/unit/comparison.test.ts` | 08, 09, 12, 20, 38 |
+| `tests/unit/company-documents.test.ts` | 68, 69, 70 |
+| `tests/unit/fleet.test.ts` | 06, **19**, 59 |
+| `tests/unit/rentee-request.test.ts` | 07 |
+
+`AC-146` and `AC-203` are unambiguously spec-001 numbers — there is no `RM3-AC-146`. The rest are the
+dangerous ones, because they *look* like hits.
+
+**The fix:** prefix every citation that belongs to this feature with `RM3-`, and delete or re-anchor the
+ones that belong to 001. Until then, **§9 of spec 004 is the authority** — it names the file and the
+assertion per `RM3-AC-*` rather than trusting a string in a test name. A coverage tool must match
+`RM3-AC-` **including the prefix** and treat a bare `AC-nn` as no citation at all.
+
 ---
 
 ## Coverage
 
 All 42 `RM3-AC-*` map to V1–V13, except **AC-27**, which is backend and **already satisfied** by T1/T5.
+**Updated 2026-08-08:** the series now runs to **RM3-AC-76** — 68–70 map to V14/V15, 71–72 to V9/V11,
+and 73–76 to V8/V16.
 
 ## Sequence
 
