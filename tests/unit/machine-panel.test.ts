@@ -365,6 +365,31 @@ describe("every document family on this surface is openable (AC-69)", () => {
     expect(docRowActions(by("national_address"))).toEqual([]);
   });
 
+  it("SASO — the fifth company row, openable on exactly the same terms", () => {
+    const withUrl = companyDocRows({
+      verified: true,
+      docs: { saso: { present: true, downloadUrl: "https://x/saso.pdf" } },
+    }).find((r) => r.key === "saso")!;
+    expect(docRowActions(withUrl).map((a) => a.kind)).toEqual(["view", "download"]);
+    expect(docRowActions(withUrl)[0].href).toBe("https://x/saso.pdf");
+
+    const absent = companyDocRows({ verified: true, docs: {} }).find((r) => r.key === "saso")!;
+    expect(absent.statusLine.en).toBe("no document yet");
+    expect(docRowActions(absent)).toEqual([]);
+  });
+
+  it("EVERY company key the panel lists is covered — the list cannot grow past these assertions", () => {
+    const docs = Object.fromEntries(
+      COMPANY_DOC_KEYS.map((k) => [k, { present: true, downloadUrl: `https://x/${k}.pdf` }]),
+    );
+    for (const row of companyDocRows({ verified: true, docs })) {
+      expect(docRowActions(row).map((a) => a.kind)).toEqual(["view", "download"]);
+    }
+    for (const row of companyDocRows({ verified: true, docs: {} })) {
+      expect(docRowActions(row)).toEqual([]);
+    }
+  });
+
   it("being openable adds NO verification state to an equipment row (§6.6, §7.2)", () => {
     const groups = equipmentDocGroups(
       machine({ docs: [{ type: "istimara", verifyStatus: "verified", expiryDate: "2030-01-01" }] }),
@@ -423,8 +448,14 @@ describe("batchDocumentRequest — one request naming several types (AC-38)", ()
 /* ────────────────────────── company documents (V9) ────────────────────────── */
 
 describe("companyDocRows — verification AND expiry, unlike the equipment rows (AC-40)", () => {
-  it("carries CR, VAT, national address and local content", () => {
-    expect(COMPANY_DOC_KEYS).toEqual(["cr", "vat", "national_address", "local_content"]);
+  it("carries CR, VAT, national address, local content and SASO", () => {
+    expect(COMPANY_DOC_KEYS).toEqual(["cr", "vat", "national_address", "local_content", "saso"]);
+  });
+
+  it("labels SASO with the backend's own Arabic — one paper must not read as two", () => {
+    const saso = companyDocRows({ verified: true, docs: {} }).find((r) => r.key === "saso")!;
+    expect(saso.label.en).toBe("SASO registration");
+    expect(saso.label.ar).toBe("تسجيل ساسو");
   });
 
   it("carries NO IBAN row — the product owner removed it, so the spec (§6.1 / AC-41) is now wrong", () => {
@@ -439,7 +470,7 @@ describe("companyDocRows — verification AND expiry, unlike the equipment rows 
     const rows = companyDocRows({ verified: true, docs: {} });
     expect(rows.every((r) => r.status === "missing")).toBe(true);
     expect(rows[0].statusLine.en).toBe("no document yet");
-    expect(attentionCount(rows)).toBe(4);
+    expect(attentionCount(rows)).toBe(5);
   });
 
   it("says VERIFIED for a paper on a verified firm's file, and 'on file' otherwise", () => {
