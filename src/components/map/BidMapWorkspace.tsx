@@ -1,10 +1,16 @@
 "use client";
 
 /**
- * RMAP V1–V4 + V11/V12 — the deal-room equipment-verification surface: a **fixed-width panel with the map
+ * RMAP V1–V12 — the deal-room equipment-verification surface: a **fixed-width panel with the map
  * filling the rest** (spec 004 §5). v2's floating overlay is gone with the offers list it hosted; v3
  * scopes the view to ONE bid, so the panel is a column of that bid's own verification content and the
  * map is what is left over.
+ *
+ * **The composition owner.** It holds the panel's shell (V2), the counts (V3), the shortfall (V4) and
+ * the equipment list (V5), and it mounts V7's detail and V9's company panel as takeovers. It is also
+ * the one place a machine list is DERIVED — `offeredMachines(fleet)` — which the map then draws minus
+ * whatever has no coordinates. One derivation is what keeps a card and its marker in step (AC-15) and
+ * what makes their colours a single fact (AC-19).
  *
  * **One bid, resolved by `bidId`** (V1, RM3-AC-01). The bid arrives as a prop from the route
  * (`/bids/[bidId]/equipment`), which owns every fetch on this screen — one fetch owner means the
@@ -24,12 +30,14 @@
  * flow at `/deal-room/[id]`).
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { ChatDock } from "@/components/map/ChatDock";
 import type { MachinePin } from "@/components/map/MapCanvas";
 import { PriceFooter } from "@/components/map/PriceFooter";
 import { useRenteeRequestSender } from "@/components/map/useRenteeRequestSender";
+import { EquipmentList } from "@/components/map/EquipmentList";
+import { CompanyPanel, EquipmentDetail, type CompanyDocInput, type CompanyDocKey, type PanelRequestDraft } from "@/components/map/panel";
 import type { BidCard } from "@/lib/contract/bids";
 import { fetchBidFleet } from "@/lib/api/client";
 import {
@@ -41,12 +49,17 @@ import {
   unitCountLabel,
   unitCounts,
 } from "@/lib/contract/bid-map";
-import { computeUnitReadiness, readinessInputsFor } from "@/lib/contract/bid-readiness";
+import { landingSelectionId, offeredMachines } from "@/lib/contract/equipment-list";
 import type { FleetMachine } from "@/lib/contract/fleet";
-import { composeShortfallRequest, type RenteeRequestDraft } from "@/lib/contract/rentee-request";
+import { composeMachineRequest, composeShortfallRequest, type RenteeRequestDraft } from "@/lib/contract/rentee-request";
 import { publicTaxonomyUrl, type RequestRecord } from "@/lib/contract/requests";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import "@/components/map/map-proto.css";
+
+/** How long the landing attention cue runs before the card rests — 6 × 1.5s, the `bmCue` keyframes'
+ *  own budget plus a beat, so the class leaves the DOM after the animation has already finished
+ *  rather than cutting it short (RM3-AC-35). */
+const LANDING_CUE_MS = 9_400;
 
 // `leaflet` reaches for `window` at import time, so the canvas is client-only — the same handling
 // `MapLocationPicker`/`GoogleMapLocationPicker` need in this repo.
@@ -63,16 +76,22 @@ export interface BidMapWorkspaceProps {
   request: RequestRecord | null;
   /** Drives the fleet cache invalidation on the falling edge — see the effect below. */
   refreshing: boolean;
-  /** T16 exposes the machine selection upward for the equipment detail (V7), which does not exist yet.
-   *  Kept a callback rather than a lifted prop so nothing above has to hold state it cannot yet use. */
+  /** The machine selection, exposed upward for anything outside this panel that needs it. */
   onSelectMachine?: (equipmentId: string | null) => void;
-  /** Fired AFTER a request card is in the conversation (V11), never instead of sending it. The
-   *  surface owns the send — `useRenteeRequestSender` does create-or-fetch then post — so a caller
-   *  that wants to react (a toast, an analytics event) can, without being able to change what was
-   *  sent or whether it was. */
+  /**
+   * Fired AFTER a request card is in the conversation (V11), never instead of sending it.
+   *
+   * **All four asks** (§6.7) — the shortfall's «اطلب إضافتها», the card's and the detail's
+   * «اطلب تأكيد التوفّر», «اطلب معدّة أخرى», and the batch «اطلب مستنداً» — are now sent by this
+   * surface itself through `useRenteeRequestSender` (create-or-fetch the room, then post). The
+   * earlier `onRequest` prop, which handed a composed draft UP for someone else to post, is gone:
+   * with the send path landed there is no second implementation to route to, and a caller that
+   * could intercept an ask could also silently drop one. A caller may still REACT — a toast, an
+   * analytics event — without being able to change what was sent or whether it was.
+   */
   onRequestSent?: (draft: RenteeRequestDraft, ref: string | null) => void;
-  /** V9's company-document panel, which is not built here (a parallel ticket owns `map/panel/`). The
-   *  header's entry renders either way; without a handler it is inert rather than absent. */
+  /** Optional hook for a caller that wants to know the company panel was opened (analytics, a route
+   *  change). The panel itself opens here — V9's component is mounted below. */
   onOpenCompanyDocs?: () => void;
 }
 
@@ -94,6 +113,19 @@ export function BidMapWorkspace({
   /** Exactly one machine is selected at a time (AC-81) — a single id, so a second ring is not
    *  representable. Cleared on every bid change (AC-177). */
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
+  /** V6's attention cue, held separately from the selection: the accent is a state that persists, the
+   *  cue is an event that ends (AC-35). Null once it has rested, or as soon as the renter acts. */
+  const [cueId, setCueId] = useState<string | null>(null);
+  /** V7 — the machine whose detail has TAKEN OVER the panel, or null for the list. */
+  const [detailId, setDetailId] = useState<string | null>(null);
+  /** V9 — the company panel, which takes over the same way. */
+  const [companyOpen, setCompanyOpen] = useState(false);
+  /** The panel's scroller, handed to the list so a selection made on the MAP brings its card into
+   *  view (AC-15). */
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  /** The bid V6's landing pre-selection has already run for — see the effect below. Declared with the
+   *  state it guards, because the effect that RE-ARMS it (on a bid change) runs earlier in this file. */
+  const landedForBid = useRef<string | null>(null);
 
   /* ── V11 · the one sender behind all four requests (§6.7) ──────────────────────────────────────
      Create-or-fetch the room, then post. Handed to the shortfall alert below, and exported as a hook
@@ -149,9 +181,15 @@ export function BidMapWorkspace({
 
   // Switching the bid clears the machine selection (AC-177) — a ring left on a machine belonging to a
   // supplier no longer on the map is the defect this prevents. (The route resolves one bid, so this
-  // fires on arrival and on nothing else.)
+  // fires on arrival and on nothing else.) It also re-arms the landing pre-selection and closes both
+  // takeovers: a detail left open across a bid change would show one bid's machine over another's
+  // counts.
   useEffect(() => {
     setSelectedMachineId(null);
+    setCueId(null);
+    setDetailId(null);
+    setCompanyOpen(false);
+    landedForBid.current = null;
     onSelectMachine?.(null);
     // `onSelectMachine` is the parent's callback; re-running when only its identity changed would
     // clear a selection the renter just made.
@@ -191,44 +229,34 @@ export function BidMapWorkspace({
     return typeof raw === "string" && raw.trim() ? raw : request.id;
   })();
 
-  /* ── pins ──────────────────────────────────────────────────────────────────────────────────────
+  /* ── V5 · the list, and V10's pin set derived from it ───────────────────────────────────────────
+     `offeredMachines` is the single filter+sort: `inBid === true`, availability not `absent`, nearest
+     first (§6.4, AC-09/AC-10). The map then draws the SAME set minus what has no coordinates, so the
+     card list and the marker set cannot fall out of step (AC-15) — a machine is on the map only if it
+     is in the list, and the one difference is stated: `isPlottable`.
+
      Only this bid's supplier's machines are ever assembled here (AC-75) — the endpoint is bid-scoped,
-     so no other supplier's fleet is even in memory. Claimed units never reach this list: the fleet is
+     so no other supplier's fleet is even in memory. Claimed units never reach either: the fleet is
      registered machines only, and the shortfall is stated in the panel's alert instead (§6.3). */
-  const machines: MachinePin[] = useMemo(() => {
-    if (!fleet || !bid) return [];
-    // The request-side asks. Taken from the BID first, not from `request`: the bid already reads them
-    // off its own request item, so they are correct even where `request` is a different projection.
-    // The request item is the fallback for a payload that predates those fields.
-    // `operatorLicenseLevel` is on the wire but not on the typed `RequestItem`, so it is read
-    // defensively rather than added to a shared type this ticket has no reason to widen.
-    const itemOperatorLevel = (item as Record<string, unknown> | null)?.operatorLicenseLevel;
-    const inputs = readinessInputsFor({
-      reqEquipmentCerts: bid.reqEquipmentCerts ?? item?.safetyCertifications ?? null,
-      operatorCertReq: bid.operatorCertReq ?? (typeof itemOperatorLevel === "string" ? itemOperatorLevel : null),
-      reqMinYear: bid.reqMinYear ?? item?.maxEquipmentAge ?? null,
-    });
-    return fleet
-      // AC-19: a machine with no usable coordinates is not plotted. `isPlottable` reads coordinates
-      // only — never the availability, and never `yardConfirmed`.
-      .filter((m) => isPlottable(m))
-      .map((m) => {
-        const availability = unitAvailability(m);
-        const readiness = computeUnitReadiness(m, inputs.equipCerts, inputs.operatorCerts, inputs.minYear);
-        return {
+  const listed = useMemo(() => (fleet ? offeredMachines(fleet) : []), [fleet]);
+
+  const machines: MachinePin[] = useMemo(
+    () =>
+      listed
+        // AC-19/AC-22: a machine with no usable coordinates is not plotted. `isPlottable` reads
+        // coordinates only — never the availability, and never `yardConfirmed`.
+        .filter((m) => isPlottable(m))
+        .map((m) => ({
           id: m.equipmentId,
           lat: m.lat as number,
           lng: m.lng as number,
-          // `absent` is unreachable for a plottable machine (it has coordinates, so its level is not
-          // `unidentified`), but the pin type has no third state, so it resolves to the safe one.
-          availability: availability === "confirmed" ? ("confirmed" as const) : ("unconfirmed" as const),
-          inBid: m.inBid,
-          band: readiness.band,
-          done: readiness.done,
-          total: readiness.total,
-        };
-      });
-  }, [fleet, bid, item]);
+          // `absent` cannot reach here — `offeredMachines` already dropped it — and the marker type has
+          // no third state, so the fall-through resolves to the one that claims less.
+          availability: unitAvailability(m) === "confirmed" ? ("confirmed" as const) : ("unconfirmed" as const),
+          distanceKm: typeof m.distanceKm === "number" && Number.isFinite(m.distanceKm) ? m.distanceKm : null,
+        })),
+    [listed],
+  );
 
   // AC-80 decision 4: the REQUEST ITEM's taxonomy image, falling back to the category image, then a
   // generic icon inside the pin. The taxonomy bucket differs per env, so the URL is rebuilt against
@@ -236,12 +264,101 @@ export function BidMapWorkspace({
   const itemImageUrl = publicTaxonomyUrl(item?.subtypeImageUrl ?? item?.categoryImageUrl ?? null);
   const itemName = (ar ? item?.subtypeNameAr ?? item?.subtypeName : item?.subtypeName ?? item?.subtypeNameAr) ?? item?.subtypeName ?? null;
 
-  const selectMachine = (id: string) => {
-    // Re-clicking the selected pin deselects it — the only way back to an unselected map.
-    const next = selectedMachineId === id ? null : id;
-    setSelectedMachineId(next);
-    onSelectMachine?.(next);
-  };
+  const selectMachine = useCallback(
+    (id: string) => {
+      // Re-clicking the selected marker deselects it — the only way back to an unselected map.
+      const next = selectedMachineId === id ? null : id;
+      setSelectedMachineId(next);
+      // The renter has acted, so the landing cue has done its job and stops immediately. Waiting out
+      // the remaining seconds would pulse a card he has already moved past.
+      setCueId(null);
+      onSelectMachine?.(next);
+    },
+    [selectedMachineId, onSelectMachine],
+  );
+
+  /* ── V6 · landing pre-selection (§6.4, RM3-AC-34/35) ────────────────────────────────────────────
+     **The bid's primary machine** — `Bid.equipmentId`, which is what the supplier committed and what
+     the deal room is about — is selected as soon as the fleet answers, falling back to the first
+     confirmed machine only when it is absent from the response (`landingSelectionId`).
+
+     **No detail opens.** The renter is oriented, not navigated: `detailId` is untouched here, and the
+     only visible effects are the card accent, the lifted marker with its halo and in-offer tag, and a
+     finite attention cue. Once per bid — `landedForBid` is what stops a fleet refetch from re-selecting
+     over a choice the renter has since made, and from firing the pulse a second time. */
+  useEffect(() => {
+    if (!bid || !fleet) return;
+    if (landedForBid.current === bid.id) return;
+    landedForBid.current = bid.id;
+    const id = landingSelectionId(bid.equipment?.id, listed);
+    // Null is a real answer: nothing primary and nothing confirmed → nothing is selected, because an
+    // accent and a nine-second pulse on an arbitrary card read as a recommendation.
+    if (!id) return;
+    setSelectedMachineId(id);
+    setCueId(id);
+    onSelectMachine?.(id);
+    // `onSelectMachine` is the parent's callback; re-running on its identity would re-land.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bid, fleet, listed]);
+
+  // The cue is FINITE (AC-35). The keyframes stop themselves after six iterations; this is what takes
+  // the class back off, so the animation cannot be restarted by an unrelated re-render.
+  useEffect(() => {
+    if (!cueId) return;
+    const timer = window.setTimeout(() => setCueId(null), LANDING_CUE_MS);
+    return () => window.clearTimeout(timer);
+  }, [cueId]);
+
+  /** Every ask on this surface goes through here (V11): create-or-fetch the room, post the card, and
+   *  only then tell a listener it happened. One seam means one place that can create a room and one
+   *  place that reports a failure — `sender.error` below is the whole of that reporting. */
+  const sendDraft = useCallback(
+    (draft: RenteeRequestDraft) => {
+      void sender.send(draft).then((ok) => {
+        if (ok) onRequestSent?.(draft, sender.lastRef);
+      });
+    },
+    [sender, onRequestSent],
+  );
+
+  /* ── the four asks, as ONE handler ──────────────────────────────────────────────────────────────
+     V7/V8/V9 describe an ask in their own vocabulary (`PanelRequestDraft`); the wire wants
+     `RenteeRequestDraft`, where the scope is derived from the id rather than passed beside it. One
+     translation, here, so no component can compose a scope/id pair the backend refuses. */
+  const sendPanelRequest = useCallback(
+    (draft: PanelRequestDraft) => {
+      sendDraft(
+        draft.kind === "document"
+          ? composeMachineRequest("document", draft.equipmentId, draft.docTypes)
+          : composeMachineRequest(draft.kind, draft.equipmentId),
+      );
+    },
+    [sendDraft],
+  );
+
+  /** The detail's machine, re-read from the CURRENT list on every render (AC-18) — nothing about a
+   *  machine is held in this component's state except its id. A refetch that changes its availability
+   *  changes the chip under the renter's eyes rather than leaving a stale copy open. */
+  const detailMachine = detailId ? listed.find((m) => m.equipmentId === detailId) ?? null : null;
+
+  /** Bilingual literal for V7/V8/V9, which take copy as a prop rather than reaching for the
+   *  dictionary — the pattern that directory already ships. */
+  const L = (en: string, arText: string) => (ar ? arText : en);
+
+  /** The company's papers as V9 needs them, from what the bid already serves (§7 — no new endpoint).
+   *  `compliance` is presence only; the panel adds the verification and expiry wording from
+   *  `verified`. A key omitted here reads as "no document yet", which is the honest default. */
+  const companyDocs: Partial<Record<CompanyDocKey, CompanyDocInput>> = useMemo(() => {
+    if (!bid) return {};
+    const c = bid.compliance;
+    return {
+      cr: { present: c.activityLicense },
+      // A VAT certificate is reissued every year rather than carrying an expiry date.
+      vat: { present: c.taxNumber, renewsAnnually: true },
+      national_address: { present: c.nationalAddress },
+      local_content: { present: c.localContent },
+    };
+  }, [bid]);
 
   /* ── V3 · the counts ───────────────────────────────────────────────────────────────────────────
      Computed ONLY once the fleet has arrived. Three numbers, one derivation (`unitCounts`):
@@ -277,7 +394,9 @@ export function BidMapWorkspace({
     if (offPlatform) return { title: t.bidMap.offPlatformNoPins, sub: t.bidMap.offPlatformNoPinsWhy };
     if (loadingBidId === selectedBidId) return null;
     if (fleetFailed) return { title: t.bidMap.fleetFailed, sub: t.bidMap.fleetFailedWhy };
-    if (fleet && machines.length === 0) return { title: t.bidMap.noLocatable, sub: t.bidMap.noLocatableWhy };
+    // Only when there ARE offered machines and none of them can be drawn. A supplier who registered
+    // none at all is a different statement, and the list makes it once (RM3-AC-26).
+    if (fleet && listed.length > 0 && machines.length === 0) return { title: t.bidMap.noLocatable, sub: t.bidMap.noLocatableWhy };
     return null;
   })();
 
@@ -319,7 +438,23 @@ export function BidMapWorkspace({
           what puts it on the inline-end edge — the same edge the prototype's `left: 18px` lands on in
           Arabic — and it mirrors with the reading direction instead of trading places with the map. */}
       <aside className="bm-panel">
-        {bid ? (
+        {bid && detailMachine ? (
+          // ── V7 · the equipment detail — «replaces the panel with that machine» (§6.5, AC-36). The
+          // WHOLE panel, not the list alone: a hero photo, two tabs, the availability line and the
+          // six-cell match grid are a column, and squeezing them under the header and the count pills
+          // would leave the grid as a scrolling stub. It carries its own back control, and
+          // `EquipmentDocuments` is already wired inside it as the second tab.
+          <div className="bm-takeover">
+            <EquipmentDetail
+              machine={detailMachine}
+              request={bid}
+              ar={ar}
+              L={L}
+              onBack={() => setDetailId(null)}
+              onRequest={sendPanelRequest}
+            />
+          </div>
+        ) : bid ? (
           <>
             {/* Header: identity, not a profile. Company name · a verified chip ONLY when verified · an
                 entry to the company's documents. Contact details, deals count, IBAN, CR and VAT are
@@ -338,8 +473,10 @@ export function BidMapWorkspace({
               <button
                 type="button"
                 className="bm-docsentry"
-                onClick={() => onOpenCompanyDocs?.()}
-                disabled={!onOpenCompanyDocs}
+                onClick={() => {
+                  setCompanyOpen(true);
+                  onOpenCompanyDocs?.();
+                }}
               >
                 <span className="material-icons-outlined">folder_shared</span>
                 {t.bidMap.companyDocuments}
@@ -416,12 +553,36 @@ export function BidMapWorkspace({
               </div>
             )}
 
-            {/* The panel body. V5–V9 mount here: the equipment list, the landing pre-selection, the
-                machine detail, its documents and the company panel — all owned by the `map/panel/`
-                ticket, which is why this ticket leaves a slot rather than a placeholder component.
-                Each of those surfaces raises one of the four requests; they wire `onRequest` to
-                `sender.send` (V11) and post nothing themselves. */}
-            <div className="bm-body" />
+            {/* ── V5 · the equipment list ────────────────────────────────────────────────────────
+                The only part of the column that scrolls, so the counts and the shortfall stay in view
+                while the renter reads the machines they describe. It renders nothing until the fleet
+                has answered: an empty list before the response would read as «no machines», which is a
+                claim. The price footer (V12) closes the column below it. */}
+            <div className="bm-body" ref={bodyRef}>
+              {fleet && (
+                <EquipmentList
+                  machines={listed}
+                  selectedId={selectedMachineId}
+                  cueId={cueId}
+                  onSelect={selectMachine}
+                  onOpenDetail={(id) => {
+                    // Opening a detail also focuses that machine, so coming back out leaves the map
+                    // where the renter left it rather than on the previous selection.
+                    setSelectedMachineId(id);
+                    setCueId(null);
+                    setDetailId(id);
+                    onSelectMachine?.(id);
+                  }}
+                  // V11 landed the send path, so the card's ask posts for real instead of being
+                  // handed up and disabled. `sendDraft` is the ONE seam every ask on this surface
+                  // goes through — the shortfall, the card, the detail and both document surfaces —
+                  // so there is exactly one place that creates the room and one place that reports
+                  // a failure.
+                  onAskAvailability={(m) => sendDraft(composeMachineRequest("availability", m.equipmentId))}
+                  scrollRef={bodyRef}
+                />
+              )}
+            </div>
 
             {/* ── V12 · the price footer ─────────────────────────────────────────────────────────
                 Figures and a hand-off, NOT a re-host: §6.10's "bar" is a three-page negotiation
@@ -434,6 +595,23 @@ export function BidMapWorkspace({
           // No bid resolved yet. The route renders its own not-found/loading states, so this is only
           // the frame's resting look — never a claim about an offer.
           <div className="bm-body" />
+        )}
+
+        {/* ── V9 · the company panel ────────────────────────────────────────────────────────────
+            It opens OVER the whole panel (§6.1) rather than as a modal: a modal would black out the
+            map and the list the renter is deciding between. It positions itself (`.mp-over`), so it is
+            a sibling of whatever is underneath rather than a replacement for it — closing it returns
+            the renter to exactly the list or detail he left. */}
+        {bid && companyOpen && (
+          <CompanyPanel
+            companyName={bid.supplierName}
+            verified={bid.verified === true}
+            docs={companyDocs}
+            ar={ar}
+            L={L}
+            onBack={() => setCompanyOpen(false)}
+            onRequest={sendPanelRequest}
+          />
         )}
       </aside>
 

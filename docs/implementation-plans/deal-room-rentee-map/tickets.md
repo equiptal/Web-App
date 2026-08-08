@@ -329,8 +329,10 @@ C (U1, U2)  →  V1 V2 V3 V4  →  V5 V6 V10  →  V7 V8 V9  →  V11 V12 V13  �
 undo first     the spine       it becomes real   verification content    wiring   gates
 ```
 
-## Before V5 starts
+## Before V5 starts — **done 2026-08-08**
 
-**The v3 prototype is unread.** `design.md` and `prototype/` describe the **v2** prototype. v3's source of
-truth is `Deal Room Map.html`, which needs the same split-and-extract treatment — otherwise V5–V9 get
-built from prose while the exact geometry sits in a file nobody opened.
+**The v3 prototype has been read and extracted** into [`design-v3.md`](design-v3.md): the equipment
+card, the map marker, the project pin, the route and its distance chip, the selection treatment and
+every `@keyframes`, with their exact values and the line numbers they came from. That file — not
+`design.md`, which describes the **v2** prototype — is the layout source of truth for V5–V10. Its §9
+lists the seven places the spec's §7 decisions deliberately override what the prototype draws.

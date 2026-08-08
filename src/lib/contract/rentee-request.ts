@@ -56,6 +56,34 @@ export function composeShortfallRequest(): RenteeRequestDraft {
   return { scope: "company", equipmentId: null, kind: "alternative" };
 }
 
+/**
+ * The other three asks (§6.7, RM3-AC-17): «اطلب تأكيد التوفّر» from the card and the detail,
+ * «اطلب معدّة أخرى» from inside a detail, and «اطلب مستنداً» as ONE batch card over the ticked rows.
+ *
+ * **The scope is derived from the id, never passed alongside it.** The backend validates the pair
+ * against itself — `equipment` requires an `equipmentId`, `company` requires it to be null — so
+ * representing them as two free fields is representing a state the server refuses. A named machine is
+ * an `equipment` ask; no machine is a `company` one.
+ *
+ * Every ask carries the machine **as data**, not only in prose (AC-17). `ref` and `serial` stay absent:
+ * both are minted and stamped server-side, and a client-supplied one could name a different machine
+ * than the id.
+ */
+export function composeMachineRequest(
+  kind: RenteeRequestKind,
+  equipmentId: string | null,
+  docTypes?: string[],
+): RenteeRequestDraft {
+  const id = (equipmentId ?? "").trim() || null;
+  const draft: RenteeRequestDraft = { scope: id ? "equipment" : "company", equipmentId: id, kind };
+  if (kind === "document") {
+    // De-duped and emptied of blanks here rather than at the call site: the batch is assembled from
+    // row labels, and two rows can name the same wire type.
+    draft.docTypes = [...new Set((docTypes ?? []).map((s) => s.trim()).filter((s) => s !== ""))];
+  }
+  return draft;
+}
+
 /** True when a kind may still be sent. The retired list is checked FIRST on the backend, so a caller
  *  that filters here gets the same answer instead of a 400 it cannot explain. */
 export function isSendableKind(kind: string): kind is RenteeRequestKind {
@@ -96,8 +124,15 @@ export interface RenteeAsk {
  *
  * Deliberately narrow. Only names whose target is unambiguous are mapped; anything else is passed
  * through untouched and refused by the backend if it is unknown, because an alias that names the
- * wrong paper would have the supplier upload the wrong paper. `local_content` and `saso` are left
- * alone for that reason — the catalogue has no local-content key at all, and two SASO keys.
+ * wrong paper would have the supplier upload the wrong paper.
+ *
+ * **`local_content` needs no alias and never did** — it is already lower-snake, so it survives
+ * normalisation verbatim. What it lacked was a catalogue ROW, added 2026-08-08 (`segment: 'company'`,
+ * `sortOrder: 4`), which is what turned it from a flat 400 into a sendable ask. `saso` is still left
+ * alone: the catalogue holds TWO SASO keys (`saso_registration`, `saso_inspection`) and guessing
+ * between them would have the supplier upload the wrong paper. See the note on
+ * {@link companyDocAskSatisfied} for the other half — a key that validates but cannot be answered is
+ * worse than the 400 was.
  */
 const DOC_TYPE_ALIASES: Record<string, string> = {
   // The four photo slots §6.6 shows, as the wire stores them.
@@ -260,6 +295,40 @@ export interface RequestTargetMachine {
 }
 
 /**
+ * The FIRM, as a company-scope request's state is derived from it.
+ *
+ * A company paper belongs to the firm, not to a machine, so a `document` ask raised from the company
+ * panel carries `equipmentId: null` and there is no machine to read it off. Without this it could only
+ * ever be answered by the supplier posting a reply card — and he does not, because he acts from his own
+ * profile rather than from the conversation.
+ *
+ * Structurally satisfied by a `BidCard` (`companyCertCodes` + `compliance`) and by
+ * `CompanyDocsPayload` from `company-documents.ts` — deliberately, so the derivation reads the same
+ * rows the panel renders.
+ */
+export interface RequestTargetCompany {
+  /** Company papers on file, by CATALOGUE key (`cr` · `vat_cert` · `national_address`). Canonicalised
+   *  on the way in, so the panel's `vat` and the catalogue's `vat_cert` land on one string. */
+  docKeys?: string[] | null;
+  /**
+   * Company-level cert codes as `mapBid` resolves them (`LC`, `SASO`, …). `mapBid` already performs the
+   * dual-read described below, so a caller holding a mapped bid can pass this and nothing else.
+   */
+  certCodes?: string[] | null;
+  /**
+   * `supplier_profiles.held_cert_docs` — the canonical `{LC: "<storageKey>"}` map, for a caller reading
+   * a raw profile projection rather than a mapped bid.
+   */
+  heldCertDocs?: Record<string, unknown> | null;
+  /**
+   * Legacy `supplier_profiles.local_content_doc_key`. **Still populated, and still dual-read by the
+   * backend's `resolveHeldCerts`** — dropping it here would read a paper the supplier has filed as
+   * missing, for every firm not yet re-migrated.
+   */
+  localContentDocKey?: string | null;
+}
+
+/**
  * What a card reads as, right now.
  *
  * - `answered` — the machine satisfies the ask, or the supplier said he provided it
@@ -294,6 +363,50 @@ export function documentAskSatisfied(machine: RequestTargetMachine, docTypes: st
   return wanted.every((t) => held.has(t));
 }
 
+/**
+ * Every requested COMPANY paper present on the firm's file.
+ *
+ * The company half of {@link documentAskSatisfied}, and the reason it exists separately: the four
+ * company papers are not one storage system but **two**.
+ *
+ * - `cr` · `vat_cert` · `national_address` are catalogue documents — their files sit on
+ *   `supplier_profiles.*_doc_key` and they arrive here as `docKeys`.
+ * - **`local_content` is a held cert.** Its file lives in `supplier_profiles.held_cert_docs.LC`, with
+ *   the legacy `local_content_doc_key` column still populated alongside. Nothing ever writes a
+ *   `DocumentInstance` for it, so a `local_content` ask resolved against `docKeys` alone would hang
+ *   open **forever** — the exact failure `assertKnownDocTypes` refuses unknown types to prevent,
+ *   arriving through the back door the moment the catalogue row was added.
+ *
+ * All three sources for LC are read, mirroring the backend's `resolveHeldCerts` dual-read rather than
+ * dropping the legacy half: a caller may hand over a mapped bid's `certCodes` (where `mapBid` already
+ * did the dual-read), the raw `heldCertDocs` map, or the legacy column alone.
+ *
+ * `saso` is deliberately NOT resolved from `certCodes`, for the same reason it has no alias: the
+ * catalogue holds two SASO keys and this function must never claim the wrong paper arrived.
+ */
+export function companyDocAskSatisfied(company: RequestTargetCompany, docTypes: string[]): boolean {
+  const held = new Set((company.docKeys ?? []).map((k) => canonicalDocType(String(k))));
+  if (localContentOnFile(company)) held.add("local_content");
+  const wanted = docTypes.map(canonicalDocType).filter((t) => t !== "");
+  if (wanted.length === 0) return false;
+  // Answered as a WHOLE, exactly like the machine half: one card carries many types.
+  return wanted.every((t) => held.has(t));
+}
+
+/** The local-content dual-read, in one place. Case-insensitive on the map key for the same reason
+ *  `resolveHeldCerts` uppercases before testing membership — the map has more than one writer, and a
+ *  lowercase `lc` must not read as "no certificate". */
+function localContentOnFile(company: RequestTargetCompany): boolean {
+  if ((company.certCodes ?? []).some((c) => String(c).trim().toUpperCase() === "LC")) return true;
+  const map = company.heldCertDocs;
+  if (map && typeof map === "object" && !Array.isArray(map)) {
+    for (const [k, v] of Object.entries(map)) {
+      if (k.trim().toUpperCase() === "LC" && v) return true;
+    }
+  }
+  return typeof company.localContentDocKey === "string" && company.localContentDocKey.trim() !== "";
+}
+
 /** A raw `photoKeys[].slot` → the catalogue's photo key, or null when it is none of the four.
  *  Folded on synonyms rather than enumerated: the wire stores `serial` / `equipment` /
  *  `operating_hours`, and a differently-spelled projection of the same shot must still count. */
@@ -312,7 +425,8 @@ function photoDocKey(slot: string): string | null {
  * | kind | how it is answered |
  * |---|---|
  * | `availability` | that unit's `locationSource` becomes `unit_yard` — the supplier named the yard it leaves from |
- * | `document` | every requested type appears in `documentKeys` |
+ * | `document` (a machine) | every requested type appears in `documentKeys` |
+ * | `document` (the firm) | every requested paper is on the COMPANY's file — see {@link companyDocAskSatisfied} |
  * | `alternative` | **not derivable.** Swapping a machine leaves nothing observable that says "a different one instead", which is the whole reason the reply card exists (004a §3.2) |
  *
  * **Derived state wins where both exist** (§7.13.4 / RM3-AC-58): the reply is a *record* of what was
@@ -322,11 +436,16 @@ function photoDocKey(slot: string): string | null {
  *
  * The reply is still consulted for the two things the machine cannot say: a refusal, and an
  * `alternative`'s outcome.
+ *
+ * `company` is optional and OMITTING IT CHANGES NOTHING: a company-scope ask then falls back to the
+ * reply alone, exactly as it did before there was a company read to derive from. A caller with the
+ * firm's papers in hand passes them and the loop closes without the supplier ever posting a reply.
  */
 export function renteeRequestState(
   card: Pick<RenteeRequestCardPayload, "kind" | "equipmentId" | "docTypes">,
   machine: RequestTargetMachine | null,
   reply: Pick<RenteeRequestReplyPayload, "resolution"> | null,
+  company?: RequestTargetCompany | null,
 ): RenteeRequestState {
   const fromReply = (): RenteeRequestState => {
     if (!reply) return "waiting";
@@ -344,9 +463,19 @@ export function renteeRequestState(
     return said === "answered" ? "waiting" : said;
   };
 
-  // Nothing to derive from: the ask names no machine (the shortfall's `alternative`), or its kind has
-  // no observable answer at all. The reply is then the only thing that can speak.
-  if (card.kind === "alternative" || !card.equipmentId) return fromReply();
+  // `alternative` has no observable answer at all — at either scope. The reply is the only thing that
+  // can speak for it.
+  if (card.kind === "alternative") return fromReply();
+
+  // A COMPANY-scope ask names no machine, because a company paper belongs to the firm. It is still
+  // derivable — from the firm's file rather than a machine's — provided the caller holds it. Without
+  // the firm's papers there is nothing to read, so it falls back to the reply exactly as before.
+  if (!card.equipmentId) {
+    if (card.kind !== "document" || !company) return fromReply();
+    const docTypes = card.docTypes ?? [];
+    return derivable(docTypes.length > 0 && companyDocAskSatisfied(company, docTypes));
+  }
+
   // The machine is not in the fleet response — sold, unlisted, or simply not fetched yet. Saying
   // "waiting" would claim the supplier owes an answer we cannot check for.
   if (!machine) return reply ? fromReply() : "unknown";

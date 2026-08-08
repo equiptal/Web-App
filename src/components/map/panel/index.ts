@@ -13,6 +13,7 @@ export {
   arDigits,
   attentionCount,
   batchDocumentRequest,
+  certificateChips,
   companyDocRows,
   COMPANY_DOC_KEYS,
   equipmentDocGroups,

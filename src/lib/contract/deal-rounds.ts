@@ -17,6 +17,7 @@ import {
   type RenteeRequestCardPayload,
   type RenteeRequestReplyPayload,
   type RenteeRequestState,
+  type RequestTargetCompany,
   type RequestTargetMachine,
 } from "./rentee-request";
 
@@ -403,6 +404,12 @@ export interface ChatCardCtx {
     machine: (equipmentId: string) => (RequestTargetMachine & { label?: string | null }) | null;
     /** The supplier's answer carrying this `ref`, if he posted one. */
     reply: (ref: string) => { resolution: "provided" | "declined" | "unavailable" } | null;
+    /**
+     * The FIRM's papers, for a company-scope document ask — one that names no machine because a
+     * company paper belongs to the firm. Optional for the same reason `machine` is nullable: a caller
+     * without them shows less rather than guessing, and the card falls back to the supplier's reply.
+     */
+    company?: () => RequestTargetCompany | null;
     /** A wire document type → the renter's word for it, so a card never prints `operating_license`. */
     docLabel?: (docType: string) => string;
   };
@@ -532,11 +539,16 @@ function renteeRequestCardView(
 ): ChatCardView {
   const { L, ar } = ctx;
   const resolved = payload.equipmentId ? ctx.requestCtx?.machine(payload.equipmentId) ?? null : null;
+  // A company-scope ask names no machine — the paper belongs to the firm — so its verdict comes from
+  // the firm's file instead. Resolved only for that case: an equipment ask must never read a company
+  // paper as its answer.
+  const firm: RequestTargetCompany | null =
+    !payload.equipmentId ? ctx.requestCtx?.company?.() ?? null : null;
   // No request context at all — `/deal-room/[id]` renders this conversation with no fleet in hand.
   // The card still states the ask, the machine and the reference; it simply says nothing about
   // whether it was answered, because it has nothing to derive that from.
   const state: RenteeRequestState | null = ctx.requestCtx
-    ? renteeRequestState(payload, resolved, ctx.requestCtx.reply(payload.ref))
+    ? renteeRequestState(payload, resolved, ctx.requestCtx.reply(payload.ref), firm)
     : null;
 
   const title = ((): string => {

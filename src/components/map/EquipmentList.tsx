@@ -1,0 +1,247 @@
+"use client";
+
+/**
+ * **V5 — the equipment list**, plus **V6's card half** of the landing pre-selection
+ * (spec 004 §6.4; RM3-AC-09→13, AC-15, AC-32, AC-33, AC-34, AC-35).
+ *
+ * **Flat, nearest first, offered machines only.** The filter and the sort are not here — they are
+ * `offeredMachines()` in `lib/contract/equipment-list.ts`, because the map draws the same set and two
+ * filters kept equal by hand is exactly how a card and its marker start disagreeing (AC-15).
+ *
+ * Each card: photo · model · year · **one availability chip that also carries commitment** · distance
+ * from the project · certificate chips or an explicit «لا شهادات على المعدّة» · **التفاصيل ›** ·
+ * **اطلب التأكيد** when unconfirmed.
+ *
+ * Three rules the card's shape enforces:
+ *  - **No serial number and no load capacity** (AC-12). The serial identifies the machine to the
+ *    system, not to a renter; the type and size are already stated once, in the count pills.
+ *  - **One chip, never a chip plus a band** (AC-32) — and **four rows that always occupy their line**,
+ *    empty or not, so a machine with fewer papers is a shorter LINE and not a shorter CARD. Every card
+ *    in the list is the same height, which is what makes it scannable down a column.
+ *  - **Colour comes from `unitAvailability()` only** (AC-19) — never from the `yardConfirmed` boolean,
+ *    which supplier-side is just `yardId != null` and would turn every chip green.
+ *
+ * **The card body selects; «التفاصيل» opens.** Pressing a card focuses its marker and nothing else
+ * (AC-15) — the renter is orienting himself on the map, and a press that navigated away from the map
+ * would defeat the point. The detail is its own control, and «اطلب التأكيد» is a third, so an
+ * unconfirmed machine can be asked about **without opening the detail** (AC-13). The card is therefore
+ * a stretched select button UNDER the content rather than a button wrapping it: a button inside a
+ * button is invalid, and the two inner controls have to stay real buttons to stay reachable.
+ */
+
+import { useEffect, useMemo, useRef, type RefObject } from "react";
+import { AVAILABILITY_COLOUR, arabicIndicDigits, unitAvailability } from "@/lib/contract/bid-map";
+import type { FleetMachine } from "@/lib/contract/fleet";
+import { certificateChips, heroPhotoUrl } from "@/components/map/panel";
+import { useLocale, useT } from "@/lib/i18n";
+
+export interface EquipmentListProps {
+  /** Already `offeredMachines(fleet)` — filtered to `inBid` and sorted nearest first. */
+  machines: FleetMachine[];
+  selectedId: string | null;
+  /**
+   * The one card carrying V6's finite attention cue, or null once it has rested. Separate from
+   * `selectedId` on purpose: the accent is a state that persists, the cue is an event that ends
+   * (AC-35), and the renter can re-select the landing card later without the pulse coming back.
+   */
+  cueId: string | null;
+  onSelect: (equipmentId: string) => void;
+  onOpenDetail: (equipmentId: string) => void;
+  /** «اطلب التأكيد» — V11 owns the composer and the send; this only says which machine was asked
+   *  about. Absent → the control renders disabled rather than claiming an ask was sent. */
+  onAskAvailability?: (machine: FleetMachine) => void;
+  /** The panel's scroller, so a selection made ON THE MAP brings its card into view. Deliberately the
+   *  container's `scrollTop` rather than `scrollIntoView`, which scrolls every ancestor and moves the
+   *  whole page. */
+  scrollRef?: RefObject<HTMLElement | null>;
+}
+
+export function EquipmentList({
+  machines,
+  selectedId,
+  cueId,
+  onSelect,
+  onOpenDetail,
+  onAskAvailability,
+  scrollRef,
+}: EquipmentListProps) {
+  const t = useT();
+  const { locale } = useLocale();
+  const ar = locale === "ar";
+  const listRef = useRef<HTMLUListElement | null>(null);
+
+  // Bring the selected card into view when it is off-screen — which is the case when the selection was
+  // made on the MAP (AC-15). Already-visible cards are left exactly where they are: scrolling a card
+  // the renter just pressed is motion he did not ask for.
+  useEffect(() => {
+    if (!selectedId) return;
+    const box = scrollRef?.current;
+    const el = listRef.current?.querySelector<HTMLElement>(`[data-eq="${CSS.escape(selectedId)}"]`);
+    if (!box || !el) return;
+    const top = el.offsetTop - box.offsetTop;
+    const bottom = top + el.offsetHeight;
+    if (top >= box.scrollTop && bottom <= box.scrollTop + box.clientHeight) return;
+    box.scrollTo({ top: Math.max(0, top - 6), behavior: "smooth" });
+  }, [selectedId, scrollRef]);
+
+  // RM3-AC-26 — a price and a count were given, and that is the whole statement. No empty card
+  // furniture: a greyed-out card outline would suggest a machine that failed to load.
+  if (machines.length === 0) {
+    return (
+      <div className="bm-eqnone">
+        <div className="bm-eqnone-t">{t.bidMap.eqNoneRegistered}</div>
+        <div className="bm-eqnone-s">{t.bidMap.eqNoneRegisteredWhy}</div>
+      </div>
+    );
+  }
+
+  return (
+    <ul className="bm-eqlist" ref={listRef}>
+      {machines.map((m, i) => (
+        <EquipmentCard
+          key={m.equipmentId}
+          machine={m}
+          index={i}
+          selected={selectedId === m.equipmentId}
+          cue={cueId === m.equipmentId}
+          ar={ar}
+          t={t}
+          onSelect={onSelect}
+          onOpenDetail={onOpenDetail}
+          onAskAvailability={onAskAvailability}
+        />
+      ))}
+    </ul>
+  );
+}
+
+function EquipmentCard({
+  machine,
+  index,
+  selected,
+  cue,
+  ar,
+  t,
+  onSelect,
+  onOpenDetail,
+  onAskAvailability,
+}: {
+  machine: FleetMachine;
+  index: number;
+  selected: boolean;
+  cue: boolean;
+  ar: boolean;
+  t: ReturnType<typeof useT>;
+  onSelect: (id: string) => void;
+  onOpenDetail: (id: string) => void;
+  onAskAvailability?: (machine: FleetMachine) => void;
+}) {
+  const availability = unitAvailability(machine);
+  const confirmed = availability === "confirmed";
+  // `absent` never reaches here — `offeredMachines` drops it — but the colour map has only two keys, so
+  // the fall-through resolves to the one that claims less.
+  const colour = AVAILABILITY_COLOUR[confirmed ? "confirmed" : "unconfirmed"];
+  const photo = heroPhotoUrl(machine);
+  const certs = useMemo(() => certificateChips(machine), [machine]);
+
+  const name = [machine.manufacturer, machine.modelName].filter(Boolean).join(" ").trim();
+  const kind = (ar ? machine.subcategoryNameAr ?? machine.subcategoryName : machine.subcategoryName ?? machine.subcategoryNameAr) ?? "";
+  const title = [name || kind, machine.year != null ? (ar ? arabicIndicDigits(machine.year) : String(machine.year)) : null]
+    .filter(Boolean)
+    .join(" · ");
+
+  const km = typeof machine.distanceKm === "number" && Number.isFinite(machine.distanceKm) ? Math.round(machine.distanceKm) : null;
+
+  return (
+    <li
+      className={`bm-eq${selected ? " on" : ""}${cue ? " cue" : ""}`}
+      data-eq={machine.equipmentId}
+      // The staggered arrival is the prototype's `0.05 + index·0.07s` — the list reads as being
+      // assembled in distance order rather than dumped. Inline because it is per-card data.
+      style={{ animationDelay: `${(0.05 + index * 0.07).toFixed(2)}s` }}
+    >
+      {/* Selection is achromatic slate, not blue: on a card whose only other colour is its availability
+          chip, a saturated accent read as a third state. Selection is UI, so it stays neutral. */}
+      {selected && <span className="bm-eq-acc" aria-hidden="true" />}
+
+      <button
+        type="button"
+        className="bm-eq-select"
+        aria-label={`${t.bidMap.eqSelect} — ${title}`}
+        aria-pressed={selected}
+        onClick={() => onSelect(machine.equipmentId)}
+      />
+
+      <div className="bm-eq-in">
+        <span className="bm-eq-photo">
+          {photo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={photo} alt="" className="bm-eq-art" />
+          ) : (
+            <span className="bm-eq-nophoto">{t.bidMap.eqNoPhoto}</span>
+          )}
+          {/* A 3px hairline of the machine's own state down the photo's inner edge — the card's
+              quietest signal, and the same derivation as the chip and the pin. */}
+          <span className="bm-eq-hair" style={{ background: colour }} aria-hidden="true" />
+        </span>
+
+        <div className="bm-eq-tx">
+          {/* 1 · title — model · year. No serial, no capacity (AC-12). */}
+          <div className="bm-eq-r1">
+            <span className="bm-eq-title" title={title}>{title}</span>
+            <button type="button" className="bm-eq-details" onClick={() => onOpenDetail(machine.equipmentId)}>
+              {t.bidMap.eqDetails}
+              <span aria-hidden="true">{ar ? "‹" : "›"}</span>
+            </button>
+          </div>
+
+          {/* 2 · state — ONE chip (AC-32), and the ask beside it (AC-13). The row holds its height
+              whether or not the ask is there. */}
+          <div className="bm-eq-r2">
+            <span className={`bm-eq-chip${confirmed ? " ok" : " no"}`}>
+              {/* An unanswered question is live, not a closed verdict — so the unconfirmed chip's dot
+                  breathes and the confirmed one's does not. */}
+              <span className="bm-eq-dot" aria-hidden="true" />
+              {confirmed ? t.bidMap.eqChipConfirmed : t.bidMap.eqChipUnconfirmed}
+            </span>
+            {!confirmed && (
+              <button
+                type="button"
+                className="bm-eq-ask"
+                title={t.bidMap.eqAskConfirmWhy}
+                onClick={() => onAskAvailability?.(machine)}
+                disabled={!onAskAvailability}
+              >
+                {t.bidMap.eqAskConfirm}
+              </button>
+            )}
+          </div>
+
+          {/* 3 · distance from the project. Numerals are `dir="ltr"` — an Arabic-Indic figure inside an
+              RTL run still reads left to right. */}
+          <div className="bm-eq-r3">
+            {km != null ? (
+              <>
+                <span className="bm-eq-km" dir="ltr">{ar ? arabicIndicDigits(km) : String(km)}</span>
+                <span className="bm-eq-kmu">{t.bidMap.eqDistanceUnit}</span>
+              </>
+            ) : (
+              <span className="bm-eq-kmu">{t.bidMap.eqNoDistance}</span>
+            )}
+          </div>
+
+          {/* 4 · certificates, or the explicit absence (AC-11). Always occupies its line. */}
+          <div className="bm-eq-r4">
+            {certs.length > 0 ? (
+              certs.map((c) => (
+                <span key={c.en} className="bm-eq-cert">{ar ? c.ar : c.en}</span>
+              ))
+            ) : (
+              <span className="bm-eq-nocert">{t.bidMap.eqNoCerts}</span>
+            )}
+          </div>
+        </div>
+      </div>
+    </li>
+  );
+}
