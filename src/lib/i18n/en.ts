@@ -991,6 +991,11 @@ export const en = {
     // The notice is refresh-timed (mount · focus · post-send · the poll). It states that a reply IS
     // there — never that it just arrived, which is a recency it cannot know.
     noticeTitle: "You have a reply from the lessor",
+    // What KIND of arrival, in a word, before the renter reads whose it is. A refusal takes the
+    // bubble's warm fill — not red, which on this surface belongs to availability alone.
+    kindReply: "Reply to your ask",
+    kindRefusal: "Your ask was refused",
+    kindMessage: "New message",
   },
   /* ── V12 · the price footer (spec 004 §6.10, 004a §4a.1 + §4a.4) ──
      Figures and a hand-off. It never edits a figure and never re-implements negotiation. */

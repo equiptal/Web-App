@@ -304,6 +304,10 @@ export function ChatDock({ bid, groupKey = null, fleet, sendNonce = 0 }: ChatDoc
   );
   const noticeKey = notice ? `${notice.bidId}:${notice.reply?.ref ?? notice.unreadCount}` : null;
   const showNotice = notice && noticeKey !== dismissedNotice ? notice : null;
+  /** A refusal is an answer that closes a door — «رفض طلبك» — and it takes the bubble's warm fill.
+   *  `provided` is the only resolution that gave the renter what he asked for; the other two did not,
+   *  and reading them as an ordinary reply is how a "no" gets skimmed past. */
+  const refusal = showNotice?.reply != null && showNotice.reply.resolution !== "provided";
 
   /* ── sending ─────────────────────────────────────────────────────────────────────────────────── */
 
@@ -359,20 +363,38 @@ export function ChatDock({ bid, groupKey = null, fleet, sendNonce = 0 }: ChatDoc
         )}
       </button>
 
-      {/* The arrival bubble. Anchored to the dock, refresh-timed, and worded as a STATE ("you have a
-          reply") rather than an event ("just arrived") — there is no socket behind it (RM3-AC-64). */}
+      {/* ── The arrival bubble (004a §2.1, the prototype's `rChatPop`) ────────────────────────────
+          Anchored to the dock by a tail, refresh-timed, and worded as a STATE ("you have a reply")
+          rather than an event ("just arrived") — there is no socket behind it (RM3-AC-64).
+
+          **Filled, not outlined.** It competes with a whole map for attention, and the plain white
+          box that stood here lost. A refusal takes the warm fill, so the one arrival a renter must
+          not miss looks different before it is read — and warm rather than red, because red on this
+          surface belongs to availability alone. */}
       {showNotice && !open && (
-        <div className="bm-dock-notice" role="status">
+        <div className={`bm-dock-notice${refusal ? " is-refusal" : ""}`} role="status">
+          <span className="bm-dock-notice-tail" aria-hidden="true" />
+          <div className="bm-dock-notice-head">
+            <span className="bm-dock-notice-kind">
+              {refusal ? t.chatDock.kindRefusal : showNotice.reply ? t.chatDock.kindReply : t.chatDock.kindMessage}
+            </span>
+            <span className="bm-dock-notice-spacer" />
+            <button type="button" className="bm-dock-notice-x" onClick={() => setDismissedNotice(noticeKey)} aria-label={t.chatDock.dismiss}>
+              ✕
+            </button>
+          </div>
           <button type="button" className="bm-dock-notice-body" onClick={() => { setActiveBidId(showNotice.bidId); setOpen(true); }}>
-            <div className="bm-dock-notice-t">{t.chatDock.noticeTitle}</div>
-            <div className="bm-dock-notice-s">
-              {showNotice.reply
-                ? `↩ ${showNotice.reply.ref}${showNotice.reply.serial ? ` · ${showNotice.reply.serial}` : ""}`
-                : showNotice.label ?? t.chatDock.itemFallback}
-            </div>
-          </button>
-          <button type="button" className="bm-dock-notice-x" onClick={() => setDismissedNotice(noticeKey)} aria-label={t.chatDock.dismiss}>
-            <span className="material-icons-outlined">close</span>
+            {/* Whose arrival it is, then what state it puts the renter in. The message text itself is
+                deliberately absent: unread comes from REST, so this component does not hold the body
+                of a message it is telling him about, and inventing one would be worse than naming
+                the counterparty and handing off. */}
+            <div className="bm-dock-notice-t">{bid.supplierName}</div>
+            <div className="bm-dock-notice-x2">{showNotice.reply ? t.chatDock.noticeTitle : showNotice.label ?? t.chatDock.itemFallback}</div>
+            {showNotice.reply && (
+              <div className="bm-dock-notice-s">
+                {`↩ ${showNotice.reply.ref}${showNotice.reply.serial ? ` · ${showNotice.reply.serial}` : ""}`}
+              </div>
+            )}
           </button>
         </div>
       )}

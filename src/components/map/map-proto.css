@@ -353,7 +353,7 @@
   z-index: 12;
   /* Clears the chat dock, which now owns this corner (§6.9). The box states what the map is NOT
      showing, so it must never be the thing a floating control hides. */
-  bottom: 74px;
+  bottom: 84px;
   inset-inline-start: 18px;
   max-width: min(330px, calc(100% - 130px));
   background: rgba(255, 255, 255, 0.97);
@@ -1242,6 +1242,10 @@
 /* ── V12 · the chat dock (§6.9) ──────────────────────────────────────────────────────────────────
    Floating over the surface, on the inline-START edge — the panel owns the END edge, and a dock that
    shared it would sit on top of the price footer. There is no edge rail (RM3-AC-23). */
+/* The prototype's dock (decoded 3871–3874): a **white-ringed** navy capsule. The ring is what lifts it
+   off the tiles — this floats over a live map, not over a page, and a borderless dark pill on a dark
+   patch of basemap disappears. Asymmetric padding, `13px 20px 13px 17px`, so the glyph and the word
+   are optically balanced rather than mathematically centred. */
 .bidmap .bm-dock {
   position: absolute;
   z-index: 30;
@@ -1249,62 +1253,152 @@
   inset-inline-start: 18px;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 10px;
   background: #16304f;
-  border: 0;
+  border: 2px solid #fff;
   color: #fff;
-  border-radius: 22px;
-  padding: 10px 16px;
+  border-radius: 999px;
+  padding: 13px 20px 13px 17px;
   font: inherit;
-  font-size: 11.5px;
+  font-size: 13.5px;
   font-weight: 800;
   cursor: pointer;
-  box-shadow: 0 8px 24px rgba(15, 34, 56, 0.28);
+  box-shadow: 0 10px 28px rgba(9, 20, 34, 0.32);
 }
 .bidmap .bm-dock.is-open { background: #2563eb; }
 .bidmap .bm-dock .material-icons-outlined { font-size: 17px; }
+/* The unread badge PINGS (decoded 3878). Ours was a static 18 px peach chip with brown text — the
+   colour of a disabled control, and silent on a surface the renter is not looking at. Unread is the
+   one thing here that has to survive being ignored, so it is the availability red at 22 px and it
+   keeps a slow ring going. `dpPing`'s ring colour is the prototype's and stays warm: a red ring on a
+   red disc reads as a smear. */
 .bidmap .bm-dock-badge {
-  min-width: 18px;
-  height: 18px;
-  border-radius: 9px;
-  background: #f3a77a;
-  color: #3a1f0b;
-  font-size: 10px;
-  font-weight: 800;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #d9362a;
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 900;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 5px;
+  padding: 0 6px;
+  animation: dpPing 1.8s ease-out infinite;
 }
-/* The arrival bubble (004a §2.1) — anchored to the dock, above it, and dismissible. */
+
+/* ── The arrival bubble (004a §2.1, decoded `rChatPop` 3881–3900) ─────────────────────────────────
+   **Filled, not outlined.** This competes with a whole map for attention and an outlined white card
+   lost — which is exactly what stood here. Blue for an answer, `#B26206` for a refusal, so the one
+   arrival a renter must not miss is the one that looks different before it is read.
+
+   `--notice-fill` carries that choice: it is the only state-dependent value, and the tail has to be
+   painted in it too, so a custom property beats repeating a colour inline in two places. */
 .bidmap .bm-dock-notice {
+  --notice-fill: #1d4ed8;
   position: absolute;
   z-index: 30;
-  bottom: 62px;
+  bottom: 80px;
   inset-inline-start: 18px;
-  max-width: min(300px, calc(100% - 130px));
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  background: #fff;
-  border: 1px solid #e1e9f1;
-  border-radius: 12px;
-  padding: 9px 10px;
-  box-shadow: 0 10px 28px rgba(15, 34, 56, 0.18);
+  width: min(296px, calc(100% - 130px));
+  background: var(--notice-fill);
+  border: 2px solid #fff;
+  border-radius: 15px;
+  padding: 11px 12px;
+  text-align: start;
+  box-shadow: 0 14px 36px rgba(9, 20, 34, 0.34);
+  animation: dpFade 0.22s ease;
 }
-.bidmap .bm-dock-notice-body { flex: 1; min-width: 0; background: none; border: 0; padding: 0; font: inherit; text-align: start; cursor: pointer; }
-.bidmap .bm-dock-notice-t { font-size: 10.5px; font-weight: 800; color: #16304f; line-height: 1.5; }
-/* `↩ ref · serial` — a reference and a serial are both LTR runs inside an RTL bubble. */
-.bidmap .bm-dock-notice-s { direction: ltr; text-align: start; margin-top: 3px; font-size: 9.5px; font-weight: 700; color: #2563eb; font-family: "IBM Plex Sans", monospace; }
-.bidmap .bm-dock-notice-x { flex-shrink: 0; background: none; border: 0; padding: 0; color: #6b8fa8; cursor: pointer; line-height: 1; }
-.bidmap .bm-dock-notice-x .material-icons-outlined { font-size: 15px; }
+.bidmap .bm-dock-notice.is-refusal { --notice-fill: #b26206; }
+/* The tail. It points DOWN at the dock the bubble belongs to — an arrival notice floating free of the
+   control that opens it is a notice with no answer to "and then what?". */
+.bidmap .bm-dock-notice-tail {
+  position: absolute;
+  bottom: -8px;
+  inset-inline-start: 26px;
+  width: 14px;
+  height: 14px;
+  background: var(--notice-fill);
+  border-bottom: 2px solid #fff;
+  border-left: 2px solid #fff;
+  transform: rotate(-45deg);
+}
+.bidmap .bm-dock-notice-head { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+/* What KIND of arrival, in a word, before the renter reads whose it is. */
+.bidmap .bm-dock-notice-kind {
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 20px;
+  padding: 2px 8px;
+  align-self: flex-start;
+  flex-grow: 0;
+}
+.bidmap .bm-dock-notice-spacer { flex: 1; }
+.bidmap .bm-dock-notice-body {
+  display: block;
+  width: 100%;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.bidmap .bm-dock-notice-t {
+  font-size: 12px;
+  font-weight: 900;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Two lines and no more: the bubble states that something arrived and hands off — it is not the
+   conversation, and a bubble that grows with the message becomes one. */
+.bidmap .bm-dock-notice-x2 {
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.93);
+  line-height: 1.65;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* `↩ ref · serial` — a reference and a serial are both LTR runs inside an RTL bubble, and both are
+   identifiers, so they take the mono face the rest of the surface gives identifiers. */
+.bidmap .bm-dock-notice-s {
+  direction: ltr;
+  text-align: start;
+  margin-top: 4px;
+  font-size: 9.5px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.78);
+  font-family: ui-monospace, monospace;
+}
+.bidmap .bm-dock-notice-x {
+  flex-shrink: 0;
+  background: none;
+  border: 0;
+  padding: 0 2px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
 
 /* The conversation itself. A floating column, not a rail, and not inside the panel: a tab strip in a
    392px column would truncate every item name. */
 .bidmap .bm-chat {
   position: absolute;
   z-index: 31;
-  bottom: 62px;
+  bottom: 80px;
   inset-inline-start: 18px;
   width: min(360px, calc(100% - 60px));
   max-height: min(64%, 460px);
