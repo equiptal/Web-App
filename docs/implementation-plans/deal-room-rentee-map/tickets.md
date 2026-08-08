@@ -196,6 +196,12 @@ photo group is not four fixed slots.
   when held**, with no verdict, no colour and no place in the count. Required = asked for by this
   request (`computeUnitReadiness`) **or** platform-mandatory (`front`, `serial`/plate, proof of
   ownership).
+- **You can only ask for what is not there** (owner, later on 2026-08-08). ~~A required row is
+  selectable whether held or not~~ — withdrawn: an ask naming a paper the lessor can see on his own file
+  can only be answered *"it is already there."* **Selectable = the row is missing**, enforced in the
+  model (`DocRow.requestable`, and again inside `batchDocumentRequest`) so the checkbox and the ask
+  cannot disagree. Select-all reaches only the requestable rows, and a group with nothing missing
+  renders **no batch control at all** rather than a disabled one.
 - **Photos:** `front` and `serial`/plate are required and go red when absent; `meter` and `side` render
   only when uploaded. **The count is over the rows that render — never "of 4"** (AC-74).
 - **Presence only** — uploaded / not uploaded / on the machine's file / none yet. **Never a verification
@@ -256,7 +262,7 @@ label (*مؤكّد توفرها* / *لم يؤكد توفرها بعد*) · dista
 |---|---|
 | اطلب تأكيد التوفّر | the card (V5) and the detail (V7) |
 | اطلب معدّة أخرى | bottom of the list (dashed) and inside each detail |
-| اطلب مستنداً | per document row — **equipment (V8) only** |
+| اطلب مستنداً | per **missing** document row — **equipment (V8) only** |
 | اطلب إضافتها | the shortfall alert (V4) |
 
 - **Revised 2026-08-08.** The document row above read *"equipment (V8) and company (V9)"*. A document
@@ -352,6 +358,11 @@ half is genuinely presigned end-to-end (`getSupplierFleet` → `batchSignItems`)
 or a photo — especially on a phone.
 
 - **Both levels** — equipment documents and company documents — expose **view** and **download**.
+- **One family is exempt, by a later owner ruling (2026-08-08): the operator's certificates** (V16).
+  They expose neither control and carry no url, because nothing validates an operator document on upload
+  and an openable file reads as evidence that was checked. Nothing in this ticket enforces that — those
+  rows simply arrive with no url, and the rule below already renders neither control for such a row. One
+  mechanism, not a second flag.
 - **View is primary, download secondary.** Reversing them makes the common act the effortful one.
 - **A row with no `downloadUrl` renders neither control** — never a dead button. That is also the honest
   signal that a paper is absent, which is the one row the renter can act on.
@@ -371,16 +382,28 @@ row named "operator safety certificate" inside the machine's documents.
 - **A third group with its own rows and its own attention count.** An operator's papers are a different
   subject with a different obligation; five documents behind one row hid both what was held and what was
   owed.
-- Every row is **viewable, downloadable and requestable** on the same terms as any other (V15 / AC-69),
-  and obeys V8's required/not-required rule (AC-73).
+- ~~Every row is **viewable, downloadable and requestable** on the same terms as any other (V15 /
+  AC-69)~~ — **withdrawn by the owner, later on 2026-08-08. These rows are a STATUS, not a document
+  list:** present or not, green or red, and nothing else. No view, no download, no url. **Nothing
+  validates an operator document on upload**, so handing the renter a file to open presents an unchecked
+  upload as verified evidence, and this surface exists to answer *can I trust this?* — presence is a fact
+  the platform can stand behind, the contents are not. Requestable exactly when absent (AC-73's amended
+  rule); the group keeps its heading, its rows and its own attention count.
+- **Read `computeUnitReadiness`'s `operatorCerts` — `present`, ignoring `url` — not a second bucketing of
+  `documentKeys`.** That is also what settles the row set: the scorer maps over the certs *this request
+  asked for*, so an operator paper nobody asked about raises no row. `isOperatorDoc` still keeps a held
+  operator paper out of the equipment certs and out of the unclassified bucket, so no url can reach the
+  renter through the other door.
 - **The backend's vocabulary, verbatim:** `operating_license` · `operator_tuv` · `operator_spsp` ·
   `operator_id` · `operator_insurance`.
 - ⚠️ **`operating_license` carries no `operator_` prefix.** Identifying the family by that prefix drops
   the licence — the most important paper in the set. Do not filter by prefix.
 - **Fixes a silent defect that is not confined to this group** (AC-76): paper rows resolved their link as
   `held.find(d => d.url)?.url` — **the first file only**. A machine holding two ownership documents, two
-  equipment certificates or two operator papers rendered one link and dropped the rest with nothing on
-  screen to say so.
+  equipment certificates or ~~two operator papers~~ rendered one link and dropped the rest with nothing
+  on screen to say so. The fix stands for **ownership and equipment certificates**; the operator's rows
+  are out of its reach entirely now, since they expose no file at all. Recorded here rather than moved,
+  because this group is where the defect was found.
 
 ---
 

@@ -354,6 +354,14 @@ permission.
 **Product decision:** a renter must be able to **view and download** every document this surface names,
 at **both** levels — the machine's papers and the company's.
 
+**One exception, added by the owner on 2026-08-08 and narrowing this section: the operator's
+certificates.** They are shown as a **status** — on file or not — and expose no file (§9 / AC-75, 004
+§6.6a). The reason is the same one this section is built on, applied honestly: this surface exists to
+answer *can I trust this paperwork*, **nothing validates an operator document on upload**, and a file
+the renter can open reads as evidence that was checked. Presence is a fact the platform can stand
+behind; the contents are not. Everything else on this surface — the machine's papers, its photos, the
+firm's papers — keeps view + download.
+
 This surface exists to answer *can I trust this counterparty's paperwork*, and it is now the **only**
 place that evidence appears after bidding: `operator_certification`, `safety_certifications` and
 `operator_nationality` are in `RETIRED_DEAL_ROOM_TERM_KEYS`, stripped from the deal room at build **and**
@@ -369,7 +377,7 @@ legible; the left column is what is true now.
 | | State when audited | State now |
 |---|---|---|
 | Equipment documents — data | ✅ real. `getSupplierFleet` presigns via `batchSignItems`; ownership papers are deliberately unfiltered for the renter | ✅ unchanged |
-| Equipment documents — controls | ⚠️ download only. No view | ✅ **view + download** (V15, AC-69) |
+| Equipment documents — controls | ⚠️ download only. No view | ✅ **view + download** (V15, AC-69) — **except the operator's certificates, which expose neither** (AC-75, owner 2026-08-08) |
 | Company documents — controls | ⚠️ download only. No view | ✅ **view + download** (V15, AC-69) |
 | **Company documents — data** | ❌ **none.** `CompanyPanel` takes `docs` as a prop and no route can fill it | ✅ **served.** `GET /marketplace/bids/{bidId}/company-documents`, presigned via `batchSignItems`, gated by the **same predicate as the fleet read**, bid-scoped with no company id accepted from the client (V14) |
 
@@ -393,7 +401,7 @@ row with nothing to click.
 | ID | Layer | Criterion |
 |---|---|---|
 | RM3-AC-68 | backend | **Given** a renter who can reach a bid's request **When** he opens the company panel **Then** the bid's supplier's company documents are served **bid-scoped** — no company id accepted from the client — gated by the same predicate as the fleet read, with presigned urls, verification state and expiry |
-| RM3-AC-69 | web | **Given** any document row at either level **When** it carries a url **Then** it exposes **view** and **download**, view primary — and **When** it carries none **Then** it exposes neither, never a dead control |
+| RM3-AC-69 | web | **Given** any document row at either level **When** it carries a url **Then** it exposes **view** and **download**, view primary — and **When** it carries none **Then** it exposes neither, never a dead control. *(Unchanged by the 2026-08-08 operator ruling and worth saying why: the operator's rows carry **no url by design** (AC-75), so this criterion is satisfied by its second clause rather than exempted from. "A renter must be able to view and download every document this surface names" above is now false of one family — the operator's — and that is deliberate, not an omission.)* |
 | RM3-AC-70 | backend | **Given** local content **When** the company documents are assembled for **display** **Then** it resolves from `held_cert_docs.LC` **or** the legacy `local_content_doc_key` — so the panel can list, show and open it — because it is a held cert and not a catalogue document. The same dual-read serves SASO from `held_cert_docs.SASO` / `saso_heavy_equip_doc_key`. *(Re-scoped 2026-08-08, the day it was written. It was authored to make a company-scope document **request** resolvable: a held cert has no `DocumentInstance`, so an ask answered against catalogue keys alone would hang open forever. That ask is withdrawn — a document request names a machine, AC-71 — so the criterion now stands on display alone, which is what it was always really about. Nothing about the backend read changes.)* |
 
 ## 8 · A document request names a machine — decided 2026-08-08
@@ -467,8 +475,10 @@ row level, moved up to the group. So:
 
 **A row with no url is listed but cannot be ticked.** There is nothing to open or save behind it. AC-69
 already refuses a dead control on such a row; a tick that yields nothing when the batch runs is that
-same dead control one step later. (The **equipment** tab's rule is the opposite one and stays that way:
-there, an absent paper is exactly the row worth ticking, because ticking it asks for it.)
+same dead control one step later. (The **equipment** tab's rule is the near-opposite one and stays that
+way: there, a **missing** paper is exactly the row worth ticking, because ticking it asks for it. Stated
+as *missing*, not *url-less* — see §9: a paper can be on the file with no signed link, and the
+operator's rows carry no link at all.)
 
 ## 9 · One rule for every document row — decided 2026-08-08
 
@@ -480,8 +490,13 @@ documents — obeys one rule:
 
 | | Held | Absent |
 |---|---|---|
-| **Required** | shown · green · openable | **red, "no document yet"** · counted · requestable |
-| **Not required** | shown · openable · no verdict, no colour, not counted | **not rendered** |
+| **Required** | shown · green · openable · **not requestable** | **red, "no document yet"** · counted · requestable |
+| **Not required** | shown · openable · no verdict, no colour, not counted · not requestable | **not rendered** |
+
+**Corrected later the same day — you can only ask for what is not there.** ~~A required row is
+requestable held or not~~: the owner withdrew the "legible re-scan" argument, because an ask naming a
+paper the lessor can see on his own file can only be answered *"it is already there."* Requestable is
+therefore **exactly** the missing rows, and a group with nothing missing offers no batch control at all.
 
 **Required** = asked for by this request (the certs, as `computeUnitReadiness` derives them) **or**
 platform-mandatory regardless of the request (`front` and `serial`/plate photos, proof of ownership —
@@ -492,10 +507,10 @@ something nobody asked for, and the fixed rows were the one place that rule brok
 
 | ID | Layer | Criterion |
 |---|---|---|
-| RM3-AC-73 | web | **Given** any document row in any family **When** the tab renders **Then** a **required** paper renders whether held or not — green when held, red and counted and requestable when absent — and a **not-required** paper renders only when it is held, carrying no verdict, no colour and no place in the attention count |
+| RM3-AC-73 | web | **Given** any document row in any family **When** the tab renders **Then** a **required** paper renders whether held or not — green and **not requestable** when held, red and counted and requestable when absent — and a **not-required** paper renders only when it is held, carrying no verdict, no colour, no place in the attention count and no checkbox. **Requestable is exactly the missing rows**, and a group with none of them renders no select-all bar. *(Amended later on 2026-08-08. As first written this said only "red and counted and requestable when absent" and left the held case silent, and the implementation read the silence the other way — a required row was selectable held or not, for a legible re-scan. The owner withdrew that: you can only ask for what is not there.)* |
 | RM3-AC-74 | web | **Given** the photo group **When** it renders **Then** `front` and `serial`/plate render whether uploaded or not and go **red** when absent, `meter` and `side` render **only when uploaded**, and the group's count is over the rows that actually render — never "of 4" |
-| RM3-AC-75 | web | **Given** the equipment documents tab **When** it renders **Then** the operator's papers are a **third group** with their own rows and their own attention count, each viewable, downloadable and requestable — covering `operating_license` · `operator_tuv` · `operator_spsp` · `operator_id` · `operator_insurance`, and **not** identified by an `operator_` prefix, which `operating_license` does not carry |
-| RM3-AC-76 | web | **Given** a row whose family holds **more than one** file **When** it renders **Then** every held file is reachable — a row must never expose the first file and silently drop the rest |
+| RM3-AC-75 | web | **Given** the equipment documents tab **When** it renders **Then** the operator's papers are a **third group** with their own rows and their own attention count, each row stating **only whether that certificate is on file** — green or red, **no view, no download, no url** — and requestable exactly when it is absent; covering `operating_license` · `operator_tuv` · `operator_spsp` · `operator_id` · `operator_insurance`, and **not** identified by an `operator_` prefix, which `operating_license` does not carry. The rows are the certificates **this request asked for**, read from `computeUnitReadiness`'s `operatorCerts` (`present`, ignoring `url`); an operator paper nobody asked for raises no row. *(Rewritten later on 2026-08-08. It read "each viewable, downloadable and requestable". **Withdrawn by the owner**: nothing validates an operator document on upload, so a file the renter can open presents an unchecked upload as verified evidence, and this surface exists to answer* can I trust this? *— presence is a fact the platform can stand behind, the contents are not. Requestability narrowed with it, per AC-73.)* |
+| RM3-AC-76 | web | **Given** a row whose family holds **more than one** file **When** it renders **Then** every held file is reachable — a row must never expose the first file and silently drop the rest. *(Scoped 2026-08-08 to the families that expose files at all: ownership and equipment certificates. The operator's rows were the example this was found on and are now out of its reach entirely — they expose no file, so there is no first one to drop, AC-75.)* |
 
 ## 10 · A known and accepted divergence — proof of ownership in the readiness fraction
 
