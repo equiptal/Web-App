@@ -9,6 +9,12 @@
  * presence-only, company rows carry verification and expiry) is exactly the thing a shared component
  * makes visible: it is the `statusLine` and the `dot` the caller passes, and nothing else.
  *
+ * **Every row this component draws is openable** (004a §7, AC-69). All three document families on this
+ * surface — the machine's papers, the machine's photos, and the firm's papers — arrive here, so the
+ * view/download pair is written once, here, and cannot drift between them. §6.6's "presence only"
+ * governs **verification state**, not reachability (004a §7.2): an equipment row still carries no
+ * verify badge and no expiry, and it is still opened with one click.
+ *
  * **Usage** — the caller owns selection state and the batch send; this renders and reports ticks.
  *
  *   <DocRowList
@@ -22,7 +28,7 @@
  * Nothing here fetches, posts or navigates.
  */
 
-import { arDigits, type CompanyDocStatus, type PresenceStatus } from "./machine-panel-model";
+import { arDigits, docRowActions, type CompanyDocStatus, type PresenceStatus } from "./machine-panel-model";
 
 /** The status dot's look. `present`/`verified` green · `on_file` blue · `missing` amber. */
 export type DotState = PresenceStatus | CompanyDocStatus;
@@ -36,7 +42,10 @@ export interface DocRowView {
   dot: DotState;
   /** A photo's own image. Null renders the paper glyph instead of a broken thumbnail. */
   thumbUrl: string | null;
-  /** Presigned link. Null disables the control rather than hiding it, so every row keeps one shape. */
+  /** The row's one presigned url — **view** and **download** both point at it (AC-69, `docRowActions`).
+   *  Null renders NEITHER control: a dead button is worse than none, and the empty actions cell is the
+   *  honest signal that this paper is missing. The cell keeps its width in CSS, so a row without a file
+   *  is the same shape as one with it — the renter reads this list by its shape before its words. */
   downloadUrl: string | null;
 }
 
@@ -117,22 +126,34 @@ export function DocRowList({
               <span className={r.dot === "missing" ? "att" : undefined}>{r.status}</span>
             </span>
 
-            {r.downloadUrl ? (
-              <a
-                className="mp-dl"
-                href={r.downloadUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={L("Download", "تنزيل")}
-                aria-label={L(`Download ${r.name}`, `تنزيل ${r.name}`)}
-              >
-                ⤓
-              </a>
-            ) : (
-              // Kept in place and inert rather than removed: a row that loses its last control changes
-              // height, and the renter reads the list by its shape before he reads it by its words.
-              <span className="mp-dl off" aria-hidden="true">⤓</span>
-            )}
+            {/* V15 / AC-69 — view first, download second, and NEITHER when there is no url. The cell
+                reserves its width in CSS, so an empty one keeps the row's shape without leaving an
+                inert glyph that looks like a control the renter failed to press. */}
+            <span className="mp-acts">
+              {docRowActions(r).map((a) => {
+                const view = a.kind === "view";
+                return (
+                  <a
+                    key={a.kind}
+                    className={`mp-doc ${a.kind}${a.primary ? " primary" : ""}`}
+                    href={a.href}
+                    // A presigned url on a private bucket: a new tab is the whole viewer. No modal —
+                    // that would need MIME sniffing and a PDF strategy, which is a bigger decision
+                    // than this row. `download` rides along and is honoured only when the object was
+                    // signed with an attachment disposition.
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download={a.download}
+                    title={view ? L("View", "عرض") : L("Download", "تنزيل")}
+                    aria-label={
+                      view ? L(`View ${r.name}`, `عرض ${r.name}`) : L(`Download ${r.name}`, `تنزيل ${r.name}`)
+                    }
+                  >
+                    <span aria-hidden="true">{view ? "↗" : "⤓"}</span>
+                  </a>
+                );
+              })}
+            </span>
           </div>
         );
       })}

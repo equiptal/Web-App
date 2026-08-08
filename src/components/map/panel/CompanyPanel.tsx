@@ -27,6 +27,10 @@
  * asymmetry is deliberate (§6.6): a machine's paper is either there or it isn't, but a company's paper
  * is *checked* and it *expires* — hiding that would strand the renter with a CR that lapsed last month.
  *
+ * **Every row with a url is openable** — **view** first, download second (004a §7, AC-69). The pair is
+ * `DocRowList`'s, written once for all three document families this surface names, so the firm's papers
+ * and the machine's behave identically; only the status line differs, which is the point.
+ *
  * **Built without IBAN.** Spec §6.1 and AC-41 both list it; the product owner has since said to remove
  * it, and this is built to that decision — **the spec still needs editing**. Showing a supplier's bank
  * details is not reversible after the fact; adding the row back later is one line.
