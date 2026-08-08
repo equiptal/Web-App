@@ -911,6 +911,8 @@ export const en = {
     pinUnconfirmed: "Not confirmed yet",
     /** The selected marker's in-offer tag (§6.4 landing pre-selection, RM3-AC-34). */
     pinInOffer: "In this offer",
+    // A flag beside the distance on the map. Never a warning colour: colour here is availability's.
+    mapOutOfCity: "Outside the city",
     loadingFleet: "Loading this lessor's machines…",
     /* ── V5 · the equipment list (§6.4) ──
        Flat, nearest first, OFFERED machines only. No serial number and no load capacity (RM3-AC-12):
@@ -957,6 +959,9 @@ export const en = {
     eqFilterEmpty: "No machine matches what you chose",
     eqFilterEmptyWhy: "Active filters: {filters}. This offer has {total} — clear the filters to see them all.",
     // The company panel's own back control, and the detail's.
+    // The list-foot ask (§6.4). The prototype says «المورد»; this surface says «المؤجّر» / lessor.
+    eqAskAnother: "Ask the lessor to add another {type}",
+    eqAskAnotherSent: "Asked",
     backToEquipment: "Back to the machines",
     // What the map is NOT showing, in words. Silence would read as "this lessor has no machines".
     claimedNotDrawn: "{n} of the offered units aren't on the map",

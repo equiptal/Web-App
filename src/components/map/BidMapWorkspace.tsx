@@ -680,6 +680,36 @@ export function BidMapWorkspace({
                   scrollRef={bodyRef}
                 />
               )}
+
+              {/* The list-foot ask (§6.4, decoded 2643–2649). It closes the list with the one thing a
+                  renter who has read every machine and still wants a different one can do — and it is
+                  the ONLY control here that is not about a machine on screen, which is why it is
+                  dashed and sits after the cards rather than among them.
+
+                  Same composer as the shortfall alert's «اطلب إضافتها»: an `alternative` card with a
+                  null `equipmentId`, which the backend pairs with `scope: "company"`. The two are the
+                  same ask reached from two places — the alert is shown only when units are claimed,
+                  this is always available — so they share one acknowledgement rather than letting the
+                  renter send it twice from two controls that look unrelated. */}
+              {fleet && (
+                <button
+                  type="button"
+                  className="bm-eqask"
+                  onClick={() => {
+                    const draft = composeShortfallRequest();
+                    void sender.send(draft).then((ok) => {
+                      if (!ok) return;
+                      setShortfallSent(true);
+                      onRequestSent?.(draft, sender.lastRef);
+                    });
+                  }}
+                  disabled={sender.busy || shortfallSent}
+                >
+                  {shortfallSent
+                    ? t.bidMap.eqAskAnotherSent
+                    : fmt(t.bidMap.eqAskAnother, { type: typeWord(1) })}
+                </button>
+              )}
             </div>
 
             {/* ── V12 · the price footer ─────────────────────────────────────────────────────────

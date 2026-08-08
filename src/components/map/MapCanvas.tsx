@@ -36,7 +36,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { MapContainer, Marker, Polyline, TileLayer, ZoomControl, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { AVAILABILITY_COLOUR, MIN_PIN_GAP_PX, decollide, type MapPoint } from "@/lib/contract/bid-map";
+import { AVAILABILITY_COLOUR, MIN_PIN_GAP_PX, decollide, isOutOfCity, type MapPoint } from "@/lib/contract/bid-map";
 import { equipmentIcon } from "@/components/requests/EquipImg";
 import { useLocale, useT } from "@/lib/i18n";
 
@@ -224,7 +224,7 @@ function FleetLayer({
       // The chip rides the line, but every line ENDS inside the marker box (132×124, anchored bottom),
       // so a fixed fraction lands on the machine whenever the line is short. Walk back from the site
       // end until the point clears that box, then nudge perpendicular, then clear of other chips.
-      let chip: { at: L.LatLng; km: number } | null = null;
+      let chip: { at: L.LatLng; km: number; far: boolean } | null = null;
       if (p.point.distanceKm != null) {
         const clears = (x: number, y: number) =>
           Math.abs(x - b.x) >= PIN_W / 2 + 20 || b.y - y >= PIN_H + 12 || y - b.y >= 26;
@@ -247,7 +247,13 @@ function FleetLayer({
           y = s.y + vy * tt + (vx / len) * off;
         }
         taken.push({ x, y });
-        chip = { at: map.unproject([x, y], zoom), km: Math.round(p.point.distanceKm) };
+        chip = {
+          at: map.unproject([x, y], zoom),
+          km: Math.round(p.point.distanceKm),
+          // Read off the UNROUNDED distance, and off the same `isOutOfCity` the card's «· خارج
+          // المدينة» reads — the pill and the card line are one fact stated twice.
+          far: isOutOfCity(p.point.distanceKm),
+        };
       }
 
       return { id: p.point.id, segments, chip };
@@ -276,9 +282,11 @@ function FleetLayer({
           {r.chip && (
             <Marker
               position={r.chip.at}
-              icon={distanceIcon(r.chip.km, ar, t.bidMap.km)}
+              icon={distanceIcon(r.chip.km, r.chip.far, ar, t.bidMap.km, t.bidMap.mapOutOfCity)}
               interactive={false}
-              zIndexOffset={600}
+              // 700, the prototype's. Above the routes and the leader lines it rides, below the
+              // machines at 760 — a chip is a caption on a line, and it must never cover a marker.
+              zIndexOffset={700}
             />
           )}
         </Fragment>
@@ -328,14 +336,25 @@ function useMapTick(): number {
   return tick;
 }
 
-/** The distance chip riding a route (§6.8). Non-interactive, and never a 0: a machine with no distance
- *  gets no chip at all rather than a chip claiming it is at the project. */
-function distanceIcon(km: number, ar: boolean, unit: string): L.DivIcon {
+/**
+ * The distance chip riding a route (§6.8). Non-interactive, and never a 0: a machine with no distance
+ * gets no chip at all rather than a chip claiming it is at the project.
+ *
+ * **A second pill rides beside it when the yard is out of city** (decoded 701–705). That flag was
+ * missing here entirely, and it is the one thing the number alone cannot say: 95 km reads as a
+ * distance, «خارج المدينة» reads as a mobilisation to negotiate. Amber, never red — red on this canvas
+ * is availability's and nothing else's, and a distant yard is not an unavailable machine.
+ */
+function distanceIcon(km: number, far: boolean, ar: boolean, unit: string, farLabel: string): L.DivIcon {
   return L.divIcon({
     className: "",
     iconSize: [150, 26],
     iconAnchor: [75, 13],
-    html: `<div class="bm-distchip" dir="rtl"><span><span dir="ltr">${esc(digits(km, ar))}</span> ${esc(unit)}</span></div>`,
+    html:
+      `<div class="bm-distchip" dir="rtl">` +
+      `<span><span dir="ltr">${esc(digits(km, ar))}</span> ${esc(unit)}</span>` +
+      (far ? `<span class="bm-distfar">${esc(farLabel)}</span>` : "") +
+      `</div>`,
   });
 }
 

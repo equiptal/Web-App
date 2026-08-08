@@ -284,9 +284,10 @@
   direction: rtl;
   display: flex;
   justify-content: center;
+  gap: 4px;
   font-family: inherit;
 }
-.bm-distchip span {
+.bm-distchip > span {
   background: #fff;
   border: 1px solid #c8d8e8;
   border-radius: 20px;
@@ -296,6 +297,21 @@
   color: #16304f;
   white-space: nowrap;
   box-shadow: 0 2px 8px rgba(15, 34, 56, 0.16);
+}
+/* The out-of-city flag, riding beside the distance (decoded 704). The number alone cannot say this:
+   95 km reads as a distance, «خارج المدينة» reads as a mobilisation to negotiate. Amber and never red
+   — red on this canvas belongs to availability alone, and a distant yard is not an unavailable
+   machine. Same threshold and same helper as the card's «· خارج المدينة», so the two cannot drift. */
+.bm-distchip .bm-distfar {
+  background: #fff6e8;
+  border: 1px solid rgba(212, 120, 10, 0.25);
+  border-radius: 20px;
+  padding: 2px 9px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #8a4f08;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(15, 34, 56, 0.14);
 }
 
 /* The dotted route back to the project — round dots travelling toward the site, so it reads as a
@@ -496,7 +512,41 @@
    over the whole panel"), so they render in place of the header, the pills, the alert and this body
    together. It is the only part that scrolls, so the counts stay in view while the renter reads the
    machines they describe. */
-.bidmap .bm-body { flex: 1; min-height: 0; overflow-y: auto; padding: 11px 15px 15px; background: #f8fafc; }
+/* `padding: 14px` on `#EDF2F7`, the prototype's own (decoded 2638). The `#F8FAFC` that was here is a
+   near-white the v3 palette does not contain — `s2` is `#EDF2F7`, a cool blue-grey — and on it the
+   white cards had almost no ground to sit on, which is what a scrolling column of cards needs most. */
+.bidmap .bm-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px;
+  background: #edf2f7;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* ── The list-foot ask (decoded 2643–2649) ───────────────────────────────────────────────────────
+   «اطلب من المؤجّر إضافة … أخرى» — at the FOOT of the list, named for what it actually asks: another
+   machine of the requested type. It was missing entirely.
+
+   Dashed and white on purpose: it is not a card, and it is not one of the machines. It is the way OUT
+   of a list that has stopped answering the question — the renter has read every machine on offer and
+   still wants a different one — so it reads as an outline waiting to be filled rather than as a
+   further row to compare. */
+.bidmap .bm-eqask {
+  flex-shrink: 0;
+  width: 100%;
+  background: #fff;
+  border: 1.5px dashed #c8d8e8;
+  color: #1c3550;
+  border-radius: 12px;
+  padding: 11px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.bidmap .bm-eqask:disabled { cursor: default; opacity: 0.55; }
 /* V7's detail takes over the whole column and brings its own hero, tabs and back control. V9's company
    panel does NOT use this: it positions itself over the panel (`.mp-over`), which is why `.bm-panel` is
    `position: relative`. */
