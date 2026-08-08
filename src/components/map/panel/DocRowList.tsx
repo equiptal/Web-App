@@ -68,7 +68,9 @@ import {
   type SelectionMode,
 } from "./machine-panel-model";
 
-/** The status dot's look. `present`/`verified` green · `on_file` blue · `missing` amber. */
+/** The status dot's look. `present`/`verified` green · `on_file` blue · **`missing` red**.
+ *  ~~amber~~ — withdrawn 2026-08-09 with the rest of the amber family; `panel-proto.css` §missing
+ *  carries the reasoning and the struck argument it replaces. */
 export type DotState = PresenceStatus | CompanyDocStatus;
 
 export interface DocRowView {
@@ -212,10 +214,13 @@ export function DocRowList({
       <div className="mp-grp-h">
         <span>{groupLabel}</span>
         {attention !== null && (
+          // The prototype's own wording, both halves (2026-08-09): «يحتاج انتباه» over our «بحاجة إلى
+          // إجراء», and «مكتملة» over «لا ينقص شيء». The owner's screenshot says «١ يحتاج انتباه» too,
+          // so this is one of the places where both sources agree and we had drifted.
           <span className={`mp-att-pill${attention === 0 ? " done" : ""}`}>
             {attention === 0
-              ? L("nothing outstanding", "لا ينقص شيء")
-              : L(`${attention} need attention`, `${arDigits(attention)} بحاجة إلى إجراء`)}
+              ? L("complete", "مكتملة")
+              : L(`${attention} need attention`, `${arDigits(attention)} يحتاج انتباه`)}
           </span>
         )}
       </div>

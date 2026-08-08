@@ -134,7 +134,8 @@
   cursor: pointer;
 }
 .mp-tab.on { border-color: #2563eb; background: rgba(37, 99, 235, 0.08); color: #2563eb; }
-/* The attention badge counts ROWS NEEDING ACTION, never a total (§6.1, AC-42). */
+/* The attention badge counts ROWS NEEDING ACTION, never a total (§6.1, AC-42). RED, with the rows it
+   counts — see §missing below for why it is no longer amber. */
 .mp-tab .mp-att {
   position: absolute;
   top: -6px;
@@ -143,7 +144,7 @@
   height: 17px;
   border-radius: 9px;
   border: 2px solid #fff;
-  background: #d4780a;
+  background: #d9362a;
   color: #fff;
   font-size: 9.5px;
   font-weight: 800;
@@ -223,6 +224,24 @@
 
 /* ═══════════════════════════ document rows (V8 + V9 share this grammar) ═══════════════════════════ */
 
+/* §missing — **A MISSING DOCUMENT IS RED.** Row tint, row border, status line, the badge on its
+   thumbnail, the group's attention pill and the tab's own badge, all one family.
+   `rgba(217, 54, 42, …)` is `#D9362A`, the palette's red; the prototype writes the same rules in its
+   own raw `#C62A2A`, and the hue override is the documented one this file's head records.
+
+   ~~RED IS AVAILABILITY. §6.3 reserves red on this surface for availability, which is why a document
+   row that needs action is AMBER and only the match grid — a match judgement the spec explicitly
+   colours — uses red.~~ **Withdrawn by the owner, 2026-08-09.** Struck rather than deleted, because it
+   was a real reading of §6.3 and the next person to read that section will arrive at it again. What
+   overrules it is not a better argument but two authorities that agree: the prototype tints a missing
+   row `rgba(198,42,42,.045)` over `rgba(198,42,42,.22)` with a `#C62A2A` status line, and the owner's
+   own screenshot — which post-dates the §6.3 reading — shows the same red, down to the «١ يحتاج
+   انتباه» pill. §6.3 is about the availability CHIP, which is still the only filled red on this
+   surface; a red hairline around a row it does not own was never what it forbade.
+
+   Two reds stay out of it. The **shortfall alert** is orange by AC-06 and is a different surface. The
+   **match grid** already used red for a failed match and keeps it. */
+
 .mp-grp { margin-top: 14px; }
 .mp-grp-h {
   display: flex;
@@ -236,9 +255,9 @@
 .mp-grp-h .mp-att-pill {
   border-radius: 20px;
   padding: 2px 8px;
-  background: rgba(212, 120, 10, 0.1);
-  border: 1px solid rgba(212, 120, 10, 0.25);
-  color: #d4780a;
+  background: rgba(217, 54, 42, 0.09);
+  border: 1px solid rgba(217, 54, 42, 0.24);
+  color: #d9362a;
   font-size: 9.5px;
   font-weight: 800;
 }
@@ -283,7 +302,7 @@
   background: #fff;
 }
 .mp-row.picked { border-color: #2563eb; background: rgba(37, 99, 235, 0.08); }
-.mp-row.missing { border-color: rgba(212, 120, 10, 0.25); background: rgba(212, 120, 10, 0.06); }
+.mp-row.missing { border-color: rgba(217, 54, 42, 0.22); background: rgba(217, 54, 42, 0.045); }
 .mp-row.picked.missing { border-color: #2563eb; background: rgba(37, 99, 235, 0.08); }
 /* The OTHER mode's rows while a selection holds (owner's UI design, 2026-08-08). 45%: faint enough that
    the eye skips them, legible enough that the renter can still read what he is not allowed to tick — the
@@ -337,7 +356,8 @@
   color: #6b8fa8;
 }
 .mp-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-/* The status dot. Green present · amber needs action · blue verified is a COMPANY-only look (§6.6). */
+/* The status dot. Green present · **red** needs action (§missing) · blue on-file is a COMPANY-only
+   look (§6.6). */
 .mp-thumb .dot {
   position: absolute;
   bottom: -3px;
@@ -356,12 +376,12 @@
 }
 .mp-thumb .dot.present, .mp-thumb .dot.verified { background: #16a34a; }
 .mp-thumb .dot.on_file { background: #2563eb; }
-.mp-thumb .dot.missing { background: #d4780a; }
+.mp-thumb .dot.missing { background: #d9362a; }
 
 .mp-rowtx { flex: 1; min-width: 0; }
 .mp-rowtx b { display: block; font-size: 12px; font-weight: 700; color: #1c3550; }
 .mp-rowtx span { display: block; font-size: 9.5px; font-weight: 600; color: #6b8fa8; margin-top: 2px; }
-.mp-rowtx span.att { color: #d4780a; }
+.mp-rowtx span.att { color: #d9362a; }
 
 /* AC-69, narrowed 2026-08-08 — **view** on every document row that carries a file, and nothing else.
    The per-row download glyph is gone: downloading is the batch action now.
