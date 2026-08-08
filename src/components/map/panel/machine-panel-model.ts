@@ -485,6 +485,24 @@ export function distanceBandLabel(distanceKm: number | null | undefined): Biling
   return { en: "far", ar: "بعيد" };
 }
 
+/**
+ * The company header's initials tile — **up to two letters, from the first two words of the name**.
+ *
+ * The prototype's header carries one (`s.initials`) and ours had nothing in its place. It is not
+ * decoration: this panel opens over the machine panel, and a 40 px block of the firm's own letters is
+ * what tells the renter at a glance that the surface changed subject, before he has read the name
+ * beside it.
+ *
+ * Deliberately dumb. No transliteration, no honorific stripping, no company-suffix table — «شركة
+ * الراجحي» yields «شا» and that is correct, because whatever the tile shows must be derivable from
+ * the name printed next to it or it reads as a different firm's mark. Empty in, empty out; the
+ * component renders no tile rather than an empty box.
+ */
+export function companyInitials(name: string | null | undefined): string {
+  const words = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  return words.slice(0, 2).map((w) => [...w][0] ?? "").join("").toUpperCase();
+}
+
 /* ───────────────────────────── V8 — equipment documents ───────────────────────────── */
 
 /**

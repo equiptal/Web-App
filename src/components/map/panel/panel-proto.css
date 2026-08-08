@@ -40,18 +40,27 @@
 }
 
 /* The company panel opens OVER the whole panel (§6.1) — absolutely positioned inside the panel's own
-   stacking context, so the host only has to be `position: relative`. */
+   stacking context, so the host only has to be `position: relative`.
+
+   It arrives by SLIDING, and it casts a shadow with an edge under it — the prototype's `dpPanelIn`,
+   `6px 0 24px rgba(15, 34, 56, .10)` and `border-inline-end: 1px #E1E9F1`. ~~A 6 px rise and a fade
+   from nothing.~~ A rise says "this appeared here"; a slide from the leading edge says "this came in
+   over what you were reading, and it can go back", which is the only thing the renter needs to know
+   about a panel that covers another one. Starting at `.4` rather than `0` is part of that: it is
+   never a blank frame, it is the firm's file moving in. */
 .mp-over {
   position: absolute;
   inset: 0;
   z-index: 12;
   background: #fff;
-  animation: mpFade 0.18s ease;
+  border-inline-end: 1px solid #e1e9f1;
+  box-shadow: 6px 0 24px rgba(15, 34, 56, 0.1);
+  animation: mpPanelIn 0.18s ease;
 }
 
-@keyframes mpFade {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes mpPanelIn {
+  from { opacity: 0.4; transform: translateX(-18px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -717,37 +726,91 @@
 
 /* ═══════════════════════════ company panel header (V9 §6.1) ═══════════════════════════ */
 
-/* Its OWN dark header — the signal that this list belongs to the firm and not to the machine below it. */
+/* Its OWN dark header — the signal that this list belongs to the firm and not to the machine below it.
+   `64px` on `0 18px`, the prototype's, in place of a 14 px box that sized itself off two stacked
+   lines of text. A header the renter meets on every firm should be the same height on every firm. */
 .mp-cohead {
   flex-shrink: 0;
+  box-sizing: border-box;
+  height: 64px;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px;
+  padding: 0 18px;
   background: #16304f;
   color: #fff;
 }
-.mp-cohead .tx { flex: 1; min-width: 0; }
-.mp-cohead .tx b { display: block; font-size: 13.5px; font-weight: 800; }
-.mp-cohead .tx span { display: block; font-size: 10px; font-weight: 600; opacity: 0.72; margin-top: 2px; }
+/* The firm's letters — `40 × 40`, r11, a lift off the slab rather than a colour of its own. Absent
+   from ours entirely, and it is what makes the header read as a subject and not a title bar. */
+.mp-initials {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.13);
+  font-size: 13px;
+  font-weight: 800;
+}
+.mp-coname {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* `30 × 30` on the dark slab — the same circle the viewer's back control is, in the weight this
+   background asks for. */
 .mp-cohead .mp-back {
   position: static;
+  width: 30px;
+  height: 30px;
+  border: 0;
   box-shadow: none;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.14);
   color: #fff;
+  font-size: 14px;
 }
-.mp-cohead .mp-back:hover { background: rgba(255, 255, 255, 0.2); }
-/* Only when verified (AC-02) — an absent chip is the whole statement for an unverified firm. */
+.mp-cohead .mp-back:hover { background: rgba(255, 255, 255, 0.24); }
+/* Only when verified (AC-02) — an absent chip is the whole statement for an unverified firm.
+   **A NEAR-WHITE PILL** (2026-08-09). ~~A translucent green wash with `#7ee2a8` text.~~ Withdrawn:
+   that wash is a colour that exists nowhere else in this product, invented to survive a dark
+   background, and it made the same verification read as one thing on the machine panel's white and
+   another here. A white pill carrying the palette's own green says it identically on both.
+   `#16A34A`, our green, where the prototype writes its `#12904A` — the same documented substitution
+   the red family gets (see this file's head). */
 .mp-vchip {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  border-radius: 20px;
+  border-radius: 999px;
   padding: 4px 10px;
-  background: rgba(22, 163, 74, 0.18);
+  background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(22, 163, 74, 0.45);
-  color: #7ee2a8;
+  color: #16a34a;
   font-size: 10px;
   font-weight: 800;
 }
+
+/* ═══════════════════ the firm's rows carry a verdict, the machine's do not ═══════════════════ */
+
+/* **The green/red pair, and only here** (2026-08-09). On the equipment tab a held paper is a white
+   row on a hairline — the tab is a working list, the renter ticks his way down it, and tinting every
+   held row green would light up a column he is in the middle of using. The company panel is not a
+   working list: it is a verdict on a firm, read once, and every row is either an answer or a gap.
+   The prototype draws exactly that difference, and we had the machine's neutral grammar on both.
+
+   Scoped on `.mp-over`, which IS the company panel — one selector, no second prop threaded through
+   `DocRowList` to tell it which of its two callers it is serving. */
+.mp-over .mp-row { border-color: rgba(22, 163, 74, 0.3); background: rgba(22, 163, 74, 0.055); }
+.mp-over .mp-row .mp-rowtx b { color: #16a34a; }
+.mp-over .mp-row.missing { border-color: rgba(217, 54, 42, 0.26); background: rgba(217, 54, 42, 0.045); }
+.mp-over .mp-row.missing .mp-rowtx b { color: #d9362a; }
+/* A ticked row is still a ticked row: the selection is a thing the renter is doing NOW and it has to
+   win over a verdict that was true before he arrived. */
+.mp-over .mp-row.picked { border-color: #2563eb; background: rgba(37, 99, 235, 0.08); }

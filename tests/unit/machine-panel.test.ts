@@ -25,6 +25,7 @@ import {
   attentionCount,
   batchDocumentRequest,
   companyDocRows,
+  companyInitials,
   COMPANY_DOC_KEYS,
   distanceBandLabel,
   docDownloadBatch,
@@ -1164,6 +1165,27 @@ describe("batchDocumentRequest — one request naming several types (AC-38)", ()
 });
 
 /* ────────────────────────── company documents (V9) ────────────────────────── */
+
+describe("companyInitials — the header's tile", () => {
+  it("takes the first letter of each of the first two words, in either script", () => {
+    expect(companyInitials("Al Rajhi Equipment")).toBe("AR");
+    expect(companyInitials("شركة الراجحي للمعدّات")).toBe("شا");
+  });
+
+  it("takes what there is when there is only one word", () => {
+    expect(companyInitials("Rajhi")).toBe("R");
+  });
+
+  it("is empty for an empty or blank name, so the component can render NO tile", () => {
+    // An empty 40 px box is furniture. The panel checks the string rather than being handed a
+    // placeholder letter it would then have to explain.
+    for (const name of ["", "   ", null, undefined]) expect(companyInitials(name)).toBe("");
+  });
+
+  it("does not read past the first two words, however long the legal name is", () => {
+    expect(companyInitials("A B C D E")).toBe("AB");
+  });
+});
 
 describe("companyDocRows — verification AND expiry, unlike the equipment rows (AC-40)", () => {
   it("carries CR, VAT, national address, local content and SASO", () => {

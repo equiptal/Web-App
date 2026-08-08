@@ -74,6 +74,7 @@ import {
   arDigits,
   attentionCount,
   companyDocRows,
+  companyInitials,
   docDownloadBatch,
   docRowMode,
   docRowSelectable,
@@ -143,6 +144,7 @@ export interface CompanyPanelProps {
 export function CompanyPanel({ companyName, verified, docs, ar, L, onBack }: CompanyPanelProps) {
   const rows = useMemo(() => companyDocRows({ verified, docs }), [verified, docs]);
   const attention = attentionCount(rows);
+  const initials = companyInitials(companyName);
 
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set<string>());
 
@@ -192,15 +194,20 @@ export function CompanyPanel({ companyName, verified, docs, ar, L, onBack }: Com
 
   return (
     <div className="mp mp-over" dir={ar ? "rtl" : "ltr"}>
+      {/* **The prototype's header, at 64 px** (2026-08-09): a circular back, the firm's initials, its
+          name, and the verified chip. The subtitle «مستندات الشركة» is gone from it — the group
+          heading four lines down already says exactly that, and a header that repeats the first
+          heading under it is a line of chrome. The prototype's own note is stronger still: rating,
+          deal count and city are absent because this file exists to answer «are his papers in
+          order?», and nothing that does not serve that question belongs up here. */}
       <div className="mp-cohead">
-        <button type="button" className="mp-back" onClick={onBack}>
+        <button type="button" className="mp-back" onClick={onBack} aria-label={L("Back", "رجوع")} title={L("Back", "رجوع")}>
           <span aria-hidden="true">{ar ? "›" : "‹"}</span>
-          {L("Back", "رجوع")}
         </button>
-        <span className="tx">
-          <b>{companyName}</b>
-          <span>{L("Company documents", "مستندات الشركة")}</span>
-        </span>
+        {/* Decoration on a header whose next element is the name itself, so it is hidden rather than
+            read out twice. Absent when the name yields no letter — an empty tile is furniture. */}
+        {initials && <span className="mp-initials" aria-hidden="true">{initials}</span>}
+        <span className="mp-coname">{companyName}</span>
         {verified && (
           <span className="mp-vchip">
             <span aria-hidden="true">✓</span>
