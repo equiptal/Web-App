@@ -121,8 +121,15 @@ describe("the surface cannot reach a bid-quality score (RM3-AC-29)", () => {
     // The positive control on the rule. Deleting `bid-quality.ts` would make this AC vacuously true;
     // it is not deleted, it is live, and that is precisely why the negative needs a test.
     for (const bad of FORBIDDEN) expect(existsSync(resolve(ROOT, `${bad}.ts`)) || existsSync(resolve(ROOT, `${bad}.tsx`))).toBe(true);
+    // Named surfaces rather than a glob, so this control fails LOUDLY when one stops rendering a
+    // quality score — that is the day the negative below starts passing for the wrong reason.
+    //
+    // `bid/[token]/page.tsx` used to be on this list. `staging` split it into a server page plus
+    // `BidFormClient.tsx`, and the quality import moved with the rendering — the surface still shows a
+    // score, one file further in. Re-pointed rather than dropped: losing an entry quietly shrinks the
+    // control until it proves nothing.
     const siblings = [
-      "src/app/bid/[token]/page.tsx",
+      "src/app/bid/[token]/BidFormClient.tsx",
       "src/components/compare/BidComparisonWorkspace.tsx",
       "src/components/requests/RequestBids.tsx",
     ];
