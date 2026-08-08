@@ -289,6 +289,16 @@
   cursor: pointer;
 }
 .mp-tick.on { border-color: #2563eb; background: #2563eb; }
+/* A row nothing required carries no tick. Its width is HELD rather than collapsed, so the row still
+   lines up with the rows above and below it — an unrequired paper reads as one more document on the
+   file, not as a differently-shaped thing that got in by mistake. `display: inline-block` because the
+   spacer is a <span>, and a bare span would ignore the width the row's shape depends on. */
+.mp-tick.void {
+  display: inline-block;
+  border-color: transparent;
+  background: none;
+  cursor: default;
+}
 
 .mp-thumb {
   position: relative;
@@ -342,7 +352,12 @@
 .mp-acts {
   flex-shrink: 0;
   min-width: 66px;
+  /* A row can hold SEVERAL files, so the cell can hold several pairs — it wraps rather than pushing the
+     row's name out of the way, and is capped so the name and status line keep the majority of the row.
+     The renter identifies a row before he acts on it. */
+  max-width: 42%;
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 6px;

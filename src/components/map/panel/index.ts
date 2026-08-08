@@ -31,6 +31,7 @@ export {
   type CompanyDocStatus,
   type DocAction,
   type DocActionKind,
+  type DocFile,
   type DocGroup,
   type DocGroupKey,
   type DocRow,

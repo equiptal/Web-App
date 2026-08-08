@@ -8,14 +8,33 @@
  *
  *   <EquipmentDocuments
  *     machine={machine}                       // FleetMachine
+ *     request={bid}                           // MatchRequest — WHICH PAPERS ARE REQUIRED. A BidCard
+ *                                             // satisfies it; without it the tab cannot tell a gap
+ *                                             // from a paper nobody asked about, which is why it is
+ *                                             // required rather than optional.
  *     ar={ar} L={L}                           // component-local bilingual pattern, as
  *                                             // requests/SharedBidSubmissionModal.tsx does it
  *     onRequest={(draft) => compose(draft)}    // PanelRequestDraft — V11 owns the composer
  *   />
  *
- * **Two groups, each with its own attention count** — photos (front · plate · meter · side) and
- * documents (proof of ownership / registration · equipment safety certificate · operator safety
- * certificate). The counts count **rows needing action, never totals**.
+ * **Up to three groups, each with its own attention count** — photos · documents · **the operator's
+ * documents**, which are a section of their own and not one row buried in the equipment's papers. The
+ * counts count **rows needing action, never totals**, and a group with nothing to say does not render.
+ *
+ * **A row is red only if the request required it** (owner, 2026-08-08). A paper the lessor holds that
+ * nobody asked for still shows and still opens, with no verdict and no tick — there is nothing to
+ * chase on a document the renter is looking straight at. A paper nobody asked for and nobody holds is
+ * not a row. All of that judgement is `equipmentDocGroups`'; this component paints it.
+ *
+ * **You can only ask for what is not there** (owner, same day). A tick appears on a **missing** row and
+ * on no other, and a group with nothing missing shows no batch control at all rather than one that
+ * composes an empty ask. The rule lives in the model (`DocRow.requestable`, enforced again inside
+ * `batchDocumentRequest`), so this component never decides who may be ticked.
+ *
+ * **The operator's group is a status, not a document list** (owner, same day). Its rows say only whether
+ * each certificate is on file — no view, no download, no url — because nothing validates an operator
+ * document on upload and this surface must not present an unchecked file as evidence. Those rows simply
+ * arrive carrying no files, so the shared row grammar below needs no special case.
  *
  * **Presence only.** `documentKeys` entries carry `verifyStatus` and `expiryDate`; this tab renders
  * neither, and the model never reads them. §6.6: a machine's paper is either there or it isn't, and a
@@ -39,11 +58,20 @@
 import { useMemo, useState } from "react";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import { DocRowList } from "./DocRowList";
-import { arDigits, batchDocumentRequest, equipmentDocGroups, type PanelRequestDraft } from "./machine-panel-model";
+import {
+  arDigits,
+  batchDocumentRequest,
+  equipmentDocGroups,
+  type MatchRequest,
+  type PanelRequestDraft,
+} from "./machine-panel-model";
 import "./panel-proto.css";
 
 export interface EquipmentDocumentsProps {
   machine: FleetMachine;
+  /** The request's asks — what makes a missing paper a **gap** rather than a paper nobody wanted.
+   *  Structurally satisfied by a `BidCard`, exactly as `EquipmentDetail`'s own `request` is. */
+  request: MatchRequest;
   ar: boolean;
   L: (en: string, ar: string) => string;
   /** Hand the ask upward. This component never posts — the `rentee_request` contract (§7.3) has one
@@ -51,8 +79,8 @@ export interface EquipmentDocumentsProps {
   onRequest?: (draft: PanelRequestDraft) => void;
 }
 
-export function EquipmentDocuments({ machine, ar, L, onRequest }: EquipmentDocumentsProps) {
-  const groups = useMemo(() => equipmentDocGroups(machine), [machine]);
+export function EquipmentDocuments({ machine, request, ar, L, onRequest }: EquipmentDocumentsProps) {
+  const groups = useMemo(() => equipmentDocGroups(machine, request), [machine, request]);
   // ONE selection set across BOTH groups — the batch is the renter's whole ask, not one ask per
   // heading. He can tick the missing plate photo and the missing operator certificate and send once.
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set<string>());
@@ -74,9 +102,12 @@ export function EquipmentDocuments({ machine, ar, L, onRequest }: EquipmentDocum
       return next;
     });
 
+  // ONE filter, in the model. `batchDocumentRequest` drops a row that is not requestable, so the tick,
+  // the count on the button and the payload are the same rule read once — a second pre-filter here
+  // would be a place for them to drift apart. The count comes off the draft for the same reason.
   const allRows = useMemo(() => groups.flatMap((g) => g.rows), [groups]);
   const draft = batchDocumentRequest(machine.equipmentId, allRows, selected);
-  const pickedCount = allRows.filter((r) => selected.has(r.key)).length;
+  const pickedCount = draft?.kind === "document" ? draft.labels.length : 0;
 
   return (
     <div>
@@ -92,6 +123,8 @@ export function EquipmentDocuments({ machine, ar, L, onRequest }: EquipmentDocum
             dot: r.status,
             thumbUrl: r.thumbUrl,
             downloadUrl: r.downloadUrl,
+            files: r.files,
+            selectable: r.requestable,
           }))}
           selected={selected}
           onToggle={toggle}

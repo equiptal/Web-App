@@ -55,8 +55,15 @@ const EQ_CERT_LABELS: Record<string, { en: string; ar: string }> = {
   saso_technical_inspection: { en: "SASO technical", ar: "فحص ساسو الفني" },
 };
 
-/** Normalize a cert code or doc-type token to a canonical equipment-cert key (tuv/aramco/spsp/saso). */
-function normCert(x: string): string {
+/**
+ * Normalize a cert code or doc-type token to a canonical equipment-cert key (tuv/aramco/spsp/saso).
+ *
+ * **Exported because the machine panel's document rows are keyed by exactly this code.** The rows are
+ * the union of the certs the request asked for and the certs the machine holds, so the two halves have
+ * to fold identically — a second normaliser is how a held `operator_tuv` stops answering an asked-for
+ * `TÜV` and the renter is shown a gap the scorer says is filled.
+ */
+export function canonicalCertCode(x: string): string {
   const t = x.trim().toLowerCase().replace(/[\s-]+/g, "_").replace(/^operator_/, "");
   if (t.startsWith("aramco")) return "aramco";
   if (t.startsWith("saso")) return "saso"; // saso, saso_technical_inspection → saso family
@@ -93,17 +100,17 @@ export function computeUnitReadiness(
   const opDocByCert = new Map<string, string | null>();
   for (const d of unit.documentKeys) {
     const isOp = d.type.trim().toLowerCase().startsWith("operator");
-    const cert = normCert(d.type);
+    const cert = canonicalCertCode(d.type);
     (isOp ? opDocByCert : eqDocByCert).set(cert, d.url ?? null);
   }
 
   const equipmentCerts: ReadinessCert[] = reqEquipCerts.map((c) => {
-    const code = normCert(c);
+    const code = canonicalCertCode(c);
     const present = eqDocByCert.has(code);
     return { code, ...certLabel(code), present, url: present ? eqDocByCert.get(code) ?? null : null };
   });
   const operatorCerts: ReadinessCert[] = reqOperatorCerts.map((c) => {
-    const code = normCert(c);
+    const code = canonicalCertCode(c);
     const present = opDocByCert.has(code) || eqDocByCert.has(code); // fall back if not operator-prefixed
     return { code, ...certLabel(code), present, url: present ? opDocByCert.get(code) ?? eqDocByCert.get(code) ?? null : null };
   });
@@ -165,7 +172,7 @@ export function readinessInputsFor(src: {
   reqMinYear?: number | null;
 }): ReadinessInputs {
   return {
-    equipCerts: (src.reqEquipmentCerts ?? []).map(normCert),
+    equipCerts: (src.reqEquipmentCerts ?? []).map(canonicalCertCode),
     operatorCerts: String(src.operatorCertReq ?? "")
       .split(/[,/]/)
       .map((s) => s.trim())

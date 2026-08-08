@@ -65,10 +65,12 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest }: 
   const cells = useMemo(() => matchGrid(machine, request), [machine, request]);
   const hero = heroPhotoUrl(machine);
   const availability = unitAvailability(machine);
-  // Both groups' outstanding rows, so the tab badge agrees with the two headings inside it.
+  // Every group's outstanding rows, so the tab badge agrees with the headings inside it. The groups are
+  // request-dependent — a paper nobody asked for is not outstanding, and cannot be counted here — so
+  // the badge reads the same `request` the grid above it is scored against.
   const docAttention = useMemo(
-    () => equipmentDocGroups(machine).reduce((n, g) => n + g.attention, 0),
-    [machine],
+    () => equipmentDocGroups(machine, request).reduce((n, g) => n + g.attention, 0),
+    [machine, request],
   );
 
   const title = [machine.manufacturer, machine.modelName].filter(Boolean).join(" ").trim();
@@ -165,7 +167,7 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest }: 
               </button>
             </>
           ) : (
-            <EquipmentDocuments machine={machine} ar={ar} L={L} onRequest={onRequest} />
+            <EquipmentDocuments machine={machine} request={request} ar={ar} L={L} onRequest={onRequest} />
           )}
         </div>
       </div>

@@ -16,15 +16,23 @@
  * instead of requesting it (AC-72). The shared grammar is the ROW and the TICK; the verb underneath the
  * list is not shared, and never was.
  *
- * **`DocRowView.selectable` is how the two lists disagree about which rows may be ticked.** The company
- * panel clears it on a paper with no url — nothing to save. The equipment tab leaves it set even then,
- * because an absent paper is precisely the row it wants ticked.
+ * **`DocRowView.selectable` is the ONE place a row's tickability is decided**, and both lists reach it
+ * from the same rule — *a tick must be answerable by the batch underneath it*. The company panel's batch
+ * saves, so it clears the flag on a paper with **no url**; the equipment tab's batch asks, so it clears
+ * the flag on a paper that is **already there**. The two lists therefore tick almost opposite rows, and
+ * that is the verb differing, not the grammar. See the field's own note.
  *
- * **Every row this component draws is openable** (004a §7, AC-69). All three document families on this
- * surface — the machine's papers, the machine's photos, and the firm's papers — arrive here, so the
- * view/download pair is written once, here, and cannot drift between them. §6.6's "presence only"
- * governs **verification state**, not reachability (004a §7.2): an equipment row still carries no
- * verify badge and no expiry, and it is still opened with one click.
+ * **Every row that carries a file is openable** (004a §7, AC-69). The document families on this surface —
+ * the machine's papers, the machine's photos, and the firm's papers — arrive here, so the view/download
+ * pair is written once, here, and cannot drift between them. §6.6's "presence only" governs
+ * **verification state**, not reachability (004a §7.2): an equipment row still carries no verify badge
+ * and no expiry, and it is still opened with one click.
+ *
+ * **The operator's certificates are the deliberate exception** (owner, 2026-08-08): they are a status —
+ * on file or not — and expose no file at all, because nothing validates an operator document on upload
+ * and a file the renter can open reads as evidence that was checked. Nothing here enforces that; those
+ * rows simply arrive with no url, and a row with no url has already exposed no controls since V15. One
+ * mechanism, not a second flag.
  *
  * **Usage** — the caller owns selection state and the batch send; this renders and reports ticks.
  *
@@ -39,7 +47,7 @@
  * Nothing here fetches, posts or navigates.
  */
 
-import { arDigits, docRowActions, type CompanyDocStatus, type PresenceStatus } from "./machine-panel-model";
+import { arDigits, docRowActions, type CompanyDocStatus, type DocFile, type PresenceStatus } from "./machine-panel-model";
 
 /** The status dot's look. `present`/`verified` green · `on_file` blue · `missing` amber. */
 export type DotState = PresenceStatus | CompanyDocStatus;
@@ -53,17 +61,36 @@ export interface DocRowView {
   dot: DotState;
   /** A photo's own image. Null renders the paper glyph instead of a broken thumbnail. */
   thumbUrl: string | null;
-  /** The row's one presigned url — **view** and **download** both point at it (AC-69, `docRowActions`).
-   *  Null renders NEITHER control: a dead button is worse than none, and the empty actions cell is the
-   *  honest signal that this paper is missing. The cell keeps its width in CSS, so a row without a file
-   *  is the same shape as one with it — the renter reads this list by its shape before its words. */
+  /** The row's first presigned url — **view** and **download** both point at it (AC-69,
+   *  `docRowActions`). Null renders NEITHER control: a dead button is worse than none, and the empty
+   *  actions cell is the honest signal that this paper is missing. The cell keeps its width in CSS, so
+   *  a row without a file is the same shape as one with it — the renter reads this list by its shape
+   *  before its words. */
   downloadUrl: string | null;
-  /** May this row be ticked? **Defaults to true**, so every existing caller is unchanged.
+  /** **Every** file behind this row, when the caller has them. A machine's paper row can hold several
+   *  (an istimara AND a customs card under one ownership heading, two TÜV uploads under one certificate)
+   *  and each gets its own view/download pair — the row used to expose the first url and silently drop
+   *  the rest. Absent for the firm's papers, which carry one file and only a `downloadUrl`. */
+  files?: readonly DocFile[];
+  /**
+   * May this row be ticked? **Defaults to true**, so a caller that has no opinion is unchanged.
    *
-   *  The company panel sets it `false` on a paper with no url: its batch action *saves* files, so a tick
-   *  on a row with nothing behind it is a dead control (AC-69) — the same failure the empty actions cell
-   *  exists to avoid, moved one step later. The equipment tab leaves it alone, because there an **absent**
-   *  paper is exactly the row worth ticking: ticking it asks for it. */
+   * **One rule, stated by the caller: a tick must be answerable by the batch underneath it.** Each list
+   * reaches that from its own side, and the two are not in tension — they are the same sentence about
+   * different verbs (both owner rulings, 2026-08-08):
+   *
+   * - the **company** panel's batch *saves* files, so a row with no url cannot be ticked — there is
+   *   nothing to save, and a tick that yields nothing is the dead control AC-69 forbids, moved one step
+   *   later;
+   * - the **equipment** tab's batch *asks*, so only a **missing** row can be ticked — you can only ask
+   *   for what is not there, and an ask naming a paper the lessor can see on his own file has one
+   *   possible answer, "it is already there".
+   *
+   * The equipment side once left this set on a held-and-required row (a legible re-scan); that is
+   * withdrawn. Neither judgement is made here: this component renders the tick the caller allows, and
+   * the caller's model — `DocRow.requestable`, `companySelectableKeys` — is the single place the rule
+   * lives, so the checkbox and the batch cannot disagree.
+   */
   selectable?: boolean;
 }
 
@@ -96,12 +123,14 @@ export function DocRowList({
   onToggleAll?: (keys: string[], select: boolean) => void;
   L: (en: string, ar: string) => string;
 }) {
-  // Select-all covers only the rows that CAN be ticked, so "all" never means keys with no checkbox.
+  // Select-all covers only the rows that CAN be ticked, so "all" never means keys with no checkbox — and
+  // it never leaves the bar permanently unable to reach its all-on state.
   const keys = rows.filter((r) => r.selectable !== false).map((r) => r.key);
   // All three arrive together or not at all: a tick with no handler is a control that silently fails.
-  const selectable = !!selected && !!onToggle && !!onToggleAll;
-  const allOn = selectable && keys.length > 0 && keys.every((k) => selected!.has(k));
-  const pickedHere = selectable ? keys.filter((k) => selected!.has(k)).length : 0;
+  // This is the LIST's question (does this list tick at all?); `r.selectable` is the ROW's.
+  const hasSelection = !!selected && !!onToggle && !!onToggleAll;
+  const allOn = hasSelection && keys.length > 0 && keys.every((k) => selected!.has(k));
+  const pickedHere = hasSelection ? keys.filter((k) => selected!.has(k)).length : 0;
 
   return (
     <div className="mp-grp">
@@ -114,14 +143,12 @@ export function DocRowList({
         </span>
       </div>
 
-      {selectable && (
+      {/* No bar at all when this list does not tick, and none when it ticks but nothing here CAN be
+          ticked — never a disabled "Select all". A control whose only reachable outcome is an empty
+          batch is the dead control AC-69 forbids, moved one step later. */}
+      {hasSelection && keys.length > 0 && (
         <div className="mp-selbar">
-          <button
-            type="button"
-            className="mp-linkbtn"
-            onClick={() => onToggleAll!(keys, !allOn)}
-            disabled={keys.length === 0}
-          >
+          <button type="button" className="mp-linkbtn" onClick={() => onToggleAll!(keys, !allOn)}>
             {allOn ? L("Clear all", "إلغاء التحديد") : L("Select all", "تحديد الكل")}
           </button>
           {pickedHere > 0 && <span>{L(`${pickedHere} selected`, `${arDigits(pickedHere)} محدَّد`)}</span>}
@@ -129,11 +156,11 @@ export function DocRowList({
       )}
 
       {rows.map((r) => {
-        const tickable = selectable && r.selectable !== false;
+        const tickable = hasSelection && r.selectable !== false;
         const picked = tickable && selected!.has(r.key);
         return (
           <div key={r.key} className={`mp-row${picked ? " picked" : ""}${r.dot === "missing" ? " missing" : ""}`}>
-            {tickable && (
+            {tickable ? (
               <button
                 type="button"
                 className={`mp-tick${picked ? " on" : ""}`}
@@ -143,6 +170,14 @@ export function DocRowList({
               >
                 {picked ? "✓" : ""}
               </button>
+            ) : (
+              hasSelection && (
+                // A row this list COULD have ticked and did not: the tick's width is held rather than
+                // collapsed, so the row still lines up with the rows above it — the list is read by its
+                // shape before its words. A list that ticks nothing has no such column to hold, so it
+                // gets no spacer either.
+                <span className="mp-tick void" aria-hidden="true" />
+              )
             )}
 
             <span className="mp-thumb">
@@ -164,11 +199,20 @@ export function DocRowList({
                 reserves its width in CSS, so an empty one keeps the row's shape without leaving an
                 inert glyph that looks like a control the renter failed to press. */}
             <span className="mp-acts">
-              {docRowActions(r).map((a) => {
+              {docRowActions(r).map((a, i) => {
                 const view = a.kind === "view";
+                // A row holding several files draws several pairs of identical glyphs, so each pair is
+                // named after ITS file — and numbered too, because a lessor can file two papers of the
+                // same type and the labels would then repeat.
+                const multi = i > 1 || (r.files ?? []).filter((f) => f.url).length > 1;
+                const nth = Math.floor(i / 2) + 1;
+                const what =
+                  multi && a.file
+                    ? `${L(a.file.label.en, a.file.label.ar)} ${L(String(nth), arDigits(nth))}`
+                    : r.name;
                 return (
                   <a
-                    key={a.kind}
+                    key={`${a.kind}:${i}`}
                     className={`mp-doc ${a.kind}${a.primary ? " primary" : ""}`}
                     href={a.href}
                     // A presigned url on a private bucket: a new tab is the whole viewer. No modal —
@@ -178,10 +222,8 @@ export function DocRowList({
                     target="_blank"
                     rel="noopener noreferrer"
                     download={a.download}
-                    title={view ? L("View", "عرض") : L("Download", "تنزيل")}
-                    aria-label={
-                      view ? L(`View ${r.name}`, `عرض ${r.name}`) : L(`Download ${r.name}`, `تنزيل ${r.name}`)
-                    }
+                    title={view ? L(`View ${what}`, `عرض ${what}`) : L(`Download ${what}`, `تنزيل ${what}`)}
+                    aria-label={view ? L(`View ${what}`, `عرض ${what}`) : L(`Download ${what}`, `تنزيل ${what}`)}
                   >
                     <span aria-hidden="true">{view ? "↗" : "⤓"}</span>
                   </a>
