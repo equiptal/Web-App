@@ -608,22 +608,40 @@ export interface CompanyDocRow {
   docTypes: string[];
 }
 
-export type CompanyDocKey = "cr" | "vat" | "national_address" | "local_content";
+export type CompanyDocKey = "cr" | "vat" | "national_address" | "local_content" | "saso";
 
 /**
- * The four company papers this panel lists.
+ * The five company papers this panel lists.
  *
  * **IBAN is deliberately absent.** Spec §6.1 and AC-41 both name it, and the product owner has since
  * decided to remove it — so the smaller, less-revealing surface wins and the spec needs editing. Adding
  * a row back is a one-line change; un-showing a supplier's bank details after the fact is not.
+ *
+ * **`local_content` and `saso` are HELD CERTS, not catalogue documents.** They live in
+ * `supplier_profiles.held_cert_docs` (`{LC: key}` / `{SASO: key}`) with legacy `local_content_doc_key`
+ * and `saso_heavy_equip_doc_key` columns still dual-read, which is why neither had a catalogue key —
+ * and therefore why a renter's request naming either was refused — until V14. They are listed here
+ * because a renter verifying a firm does not care which table a paper is stored in.
+ *
+ * **This `saso` is the COMPANY registration, never the equipment cert.** The word names four different
+ * papers across the tree, and `canonicalDocType` above folds every `saso*` spelling to one equipment
+ * type. The two never meet: this list is resolved against the firm and never against a listing, so an
+ * equipment-level SASO cannot answer a company-level ask or the reverse.
  */
-export const COMPANY_DOC_KEYS: CompanyDocKey[] = ["cr", "vat", "national_address", "local_content"];
+export const COMPANY_DOC_KEYS: CompanyDocKey[] = [
+  "cr",
+  "vat",
+  "national_address",
+  "local_content",
+  "saso",
+];
 
 const COMPANY_DOC_LABEL: Record<CompanyDocKey, Bilingual> = {
   cr: { en: "Commercial registration", ar: "السجل التجاري" },
   vat: { en: "VAT certificate", ar: "الشهادة الضريبية" },
   national_address: { en: "National address", ar: "العنوان الوطني" },
   local_content: { en: "Local content", ar: "المحتوى المحلي" },
+  saso: { en: "SASO registration", ar: "تسجيل ساسو" },
 };
 
 /** One company paper as the caller holds it. Only `present` is required — everything else is rendered

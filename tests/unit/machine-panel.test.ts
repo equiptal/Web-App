@@ -423,8 +423,16 @@ describe("batchDocumentRequest — one request naming several types (AC-38)", ()
 /* ────────────────────────── company documents (V9) ────────────────────────── */
 
 describe("companyDocRows — verification AND expiry, unlike the equipment rows (AC-40)", () => {
-  it("carries CR, VAT, national address and local content", () => {
-    expect(COMPANY_DOC_KEYS).toEqual(["cr", "vat", "national_address", "local_content"]);
+  it("carries CR, VAT, national address, local content and SASO", () => {
+    expect(COMPANY_DOC_KEYS).toEqual(["cr", "vat", "national_address", "local_content", "saso"]);
+  });
+
+  // `local_content` and `saso` are HELD CERTS, not catalogue documents — the reason a renter's
+  // request naming either was refused until V14 gave them catalogue keys. A renter verifying a firm
+  // does not care which table a paper is stored in, so both belong in this list.
+  it("lists the two held certs beside the three catalogue papers", () => {
+    expect(COMPANY_DOC_KEYS).toContain("local_content");
+    expect(COMPANY_DOC_KEYS).toContain("saso");
   });
 
   it("carries NO IBAN row — the product owner removed it, so the spec (§6.1 / AC-41) is now wrong", () => {
@@ -439,7 +447,7 @@ describe("companyDocRows — verification AND expiry, unlike the equipment rows 
     const rows = companyDocRows({ verified: true, docs: {} });
     expect(rows.every((r) => r.status === "missing")).toBe(true);
     expect(rows[0].statusLine.en).toBe("no document yet");
-    expect(attentionCount(rows)).toBe(4);
+    expect(attentionCount(rows)).toBe(COMPANY_DOC_KEYS.length);
   });
 
   it("says VERIFIED for a paper on a verified firm's file, and 'on file' otherwise", () => {
