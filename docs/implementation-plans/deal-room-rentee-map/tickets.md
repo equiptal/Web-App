@@ -265,6 +265,45 @@ component. It is not embeddable.
 - **A supplier who registered no machines** gets an explicit state — a price and a count were given —
   with **no empty card furniture**.
 
+### V14 · The bid supplier's company documents — the missing read `[BE][CT]`
+**AC** 68, 70 · **Blocker for V9. Nothing serves this today.**
+
+`CompanyPanel` takes `docs` as a prop and **no caller can fill it**: there is no renter-facing route for
+another company's papers. `getMyCompany` is the supplier's own, `partner/company.ts` is the
+partner/admin surface, and neither is reachable by a renter looking at a bid. So V9 renders four rows
+that are structurally always "no document yet" — the panel does not merely lack downloads, it has no
+data at all.
+
+- `GET /marketplace/bids/{bidId}/company-documents` → the **bid's** supplier's company papers.
+- **Bid-scoped and derived, never client-named** — the same shape as T5's fleet endpoint: no company id
+  is accepted from the client, so a company the caller never transacted with is unreachable.
+- **Gate it with the identical predicate T5 uses** (`canAccessRequest` on the bid's request, `SUPERSEDED`
+  invisible). A weaker gate here would leak a firm's paperwork to anyone holding a bid id.
+- **Presign with `batchSignItems`**, exactly as `getSupplierFleet` does — the bucket is private and a bare
+  key answers `AccessDenied`.
+- Rows carry **verification state and expiry** (V9's asymmetry with V8 is deliberate: a company paper is
+  checked and does expire).
+- **Two storage systems, one response.** `cr` / `vat_cert` / `national_address` are catalogue documents;
+  **local content is a held cert** (`held_cert_docs.LC`, plus the legacy `local_content_doc_key` column
+  still dual-read by `resolveHeldCerts`). Read both, and mirror that dual-read rather than dropping the
+  legacy column.
+
+### V15 · View, not only download — every document row `[UI]`
+**AC** 69
+
+Both row models already carry `downloadUrl` (`machine-panel-model.ts:401`, `:511`), and the equipment
+half is genuinely presigned end-to-end (`getSupplierFleet` → `batchSignItems`). What is missing is the
+**verb**: a renter checking paperwork wants to *look*, and "download" is the wrong first action for a PDF
+or a photo — especially on a phone.
+
+- **Both levels** — equipment documents and company documents — expose **view** and **download**.
+- **View is primary, download secondary.** Reversing them makes the common act the effortful one.
+- **A row with no `downloadUrl` renders neither control** — never a dead button. That is also the honest
+  signal that a paper is absent, which is the one row the renter can act on.
+- §6.6's "presence only" governs **verification state**, not reachability: an equipment row still shows
+  no verify badge. Presence-only was never meant to mean unopenable, and this ticket says so explicitly
+  because the wording invites the opposite reading.
+
 ---
 
 ## E · Verification gates — re-pointed at `RM3-*`

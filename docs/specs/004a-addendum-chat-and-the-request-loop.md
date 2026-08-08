@@ -328,3 +328,42 @@ S5  render the reply           the loop is visible on both sides
 **S1 is gone** — the readiness gate was already fixed upstream, so a supplier can confirm a yard or
 upload a document during negotiation today. The remaining supplier work is presentation and wiring, not
 permission.
+
+## 7 · Every document must be openable — added 2026-08-08
+
+**Product decision:** a renter must be able to **view and download** every document this surface names,
+at **both** levels — the machine's papers and the company's.
+
+This surface exists to answer *can I trust this counterparty's paperwork*, and it is now the **only**
+place that evidence appears after bidding: `operator_certification`, `safety_certifications` and
+`operator_nationality` are in `RETIRED_DEAL_ROOM_TERM_KEYS`, stripped from the deal room at build **and**
+read, and ignored by the close gate. The cert *terms* are gone from negotiation, so the cert *documents*
+carry the whole burden. A row the renter cannot open reduces this panel to a rumour.
+
+### 7.1 What is actually built, checked rather than assumed
+
+| | State |
+|---|---|
+| Equipment documents — data | ✅ real. `getSupplierFleet` presigns via `batchSignItems`; ownership papers are deliberately unfiltered for the renter |
+| Equipment documents — controls | ⚠️ download only. No view |
+| Company documents — controls | ⚠️ download only. No view |
+| **Company documents — data** | ❌ **none.** `CompanyPanel` takes `docs` as a prop and no route can fill it |
+
+The last row is the real finding. `getMyCompany` serves a supplier's *own* company and
+`partner/company.ts` is the partner/admin surface; **neither is reachable by a renter**. So V9's four
+rows are structurally always "no document yet" — not a missing link on a present document, but a panel
+with no data behind it.
+
+### 7.2 Presence-only was never meant to mean unopenable
+
+§6.6 says equipment rows render **presence only**. That governs **verification state** — an equipment
+paper carries no verify badge, because a machine's paper is either there or it is not, and a badge
+invites judging a lessor on a technicality. It does **not** govern reachability. Stated here because the
+wording invites exactly the opposite reading, and a reasonable implementer would honour it by shipping a
+row with nothing to click.
+
+| ID | Layer | Criterion |
+|---|---|---|
+| RM3-AC-68 | backend | **Given** a renter who can reach a bid's request **When** he opens the company panel **Then** the bid's supplier's company documents are served **bid-scoped** — no company id accepted from the client — gated by the same predicate as the fleet read, with presigned urls, verification state and expiry |
+| RM3-AC-69 | web | **Given** any document row at either level **When** it carries a url **Then** it exposes **view** and **download**, view primary — and **When** it carries none **Then** it exposes neither, never a dead control |
+| RM3-AC-70 | backend | **Given** local content **When** the company documents are assembled **Then** it resolves from `held_cert_docs.LC` **or** the legacy `local_content_doc_key`, because it is a held cert and not a catalogue document |
