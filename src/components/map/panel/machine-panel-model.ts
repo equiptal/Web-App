@@ -446,7 +446,8 @@ export interface DocRow {
   statusLine: Bilingual;
   /** Thumbnail source: a photo's own image, or null for a paper (the row draws a document glyph). */
   thumbUrl: string | null;
-  /** Presigned link for the download control; null when there is nothing to download. */
+  /** The row's **one** presigned url — view and download both point at it (`docRowActions`). Null when
+   *  the machine holds no such file, and then the row exposes neither control (AC-69). */
   downloadUrl: string | null;
   /** The wire type(s) this row stands for — what a batch request names when the row is ticked. */
   docTypes: string[];
@@ -465,6 +466,50 @@ export interface DocGroup {
 /** Rows needing action. The one definition, used by both document surfaces. */
 export function attentionCount(rows: { status: PresenceStatus | CompanyDocStatus }[]): number {
   return rows.filter((r) => r.status === "missing").length;
+}
+
+/* ─────────────────── V15 — every document is openable (004a §7, RM3-AC-69) ─────────────────── */
+
+/**
+ * What a document row lets the renter do with the file behind it.
+ *
+ * **View is primary, download secondary.** A renter checking paperwork wants to *look* — "download" is
+ * the wrong first act for a PDF or a photo, especially on a phone. Reversing the two would make the
+ * common act the effortful one.
+ */
+export type DocActionKind = "view" | "download";
+
+export interface DocAction {
+  kind: DocActionKind;
+  /** The row's one presigned url. View and download point at the **same** object; only the verb
+   *  differs, because a presigned url's signature covers its query string — there is no second url to
+   *  ask S3 for an attachment disposition after the fact. */
+  href: string;
+  /** The row's primary act. Exactly one action carries it, and it is always `view`. */
+  primary: boolean;
+  /** Sets the anchor's `download` attribute. A cross-origin bucket ignores it unless the object was
+   *  signed with `Content-Disposition: attachment`, in which case the browser saves instead of
+   *  rendering — harmless either way, which is why both anchors also open in a new tab. */
+  download: boolean;
+}
+
+/**
+ * The controls one document row exposes (AC-69).
+ *
+ * **A row with no url exposes neither** — never a dead control. That absence is also the honest signal
+ * that a paper is missing, which is the one row the renter can act on: he ticks it and asks.
+ *
+ * Deliberately shape-typed rather than taking `DocRow | CompanyDocRow`, because it must serve all three
+ * families this surface names — the machine's papers, its photos, and the firm's papers — and they
+ * agree on exactly one field.
+ */
+export function docRowActions(row: { downloadUrl: string | null }): DocAction[] {
+  const href = row.downloadUrl;
+  if (!href) return [];
+  return [
+    { kind: "view", href, primary: true, download: false },
+    { kind: "download", href, primary: false, download: true },
+  ];
 }
 
 const PHOTO_LABEL: Record<PhotoSlot, Bilingual> = {
@@ -557,6 +602,8 @@ export interface CompanyDocRow {
   status: CompanyDocStatus;
   /** verified · valid until … · renews annually · **no document yet** (red). */
   statusLine: Bilingual;
+  /** The row's **one** presigned url — view and download both point at it (`docRowActions`). Null on a
+   *  paper the firm has not filed, and then the row exposes neither control (AC-69). */
   downloadUrl: string | null;
   docTypes: string[];
 }

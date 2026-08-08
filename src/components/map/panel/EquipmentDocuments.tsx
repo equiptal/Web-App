@@ -22,6 +22,11 @@
  * verification badge would invite the renter to judge a supplier on a state the platform sets. The
  * asymmetry with the company panel (V9), which *does* show verification and expiry, is deliberate.
  *
+ * **Presence only never meant unopenable** (004a §7.2, AC-69). It governs verification STATE. Both
+ * groups here — the photos and the papers — carry the same **view / download** pair as the company
+ * panel, view first, because a machine's papers are exactly what the renter came to look at. The
+ * wording of §6.6 invites the opposite reading, which is why it is written down twice.
+ *
  * **Requesting is a BATCH action** over the ticked rows — one request naming several types, never one
  * per row. §6.6: *"The renter ticks what he wants and asks once."*
  */

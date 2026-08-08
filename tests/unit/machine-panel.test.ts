@@ -17,6 +17,7 @@ import {
   batchDocumentRequest,
   companyDocRows,
   COMPANY_DOC_KEYS,
+  docRowActions,
   equipmentDocGroups,
   heroPhotoUrl,
   matchGrid,
@@ -300,6 +301,81 @@ describe("equipmentDocGroups — two groups, each with its own attention count (
     const groups = equipmentDocGroups(machine({ photos: [{ slot: "front" }] }));
     expect(groups[0].rows[0].downloadUrl).toBe("https://x/front");
     expect(groups[0].rows[1].downloadUrl).toBeNull();
+  });
+});
+
+/* ──────────── V15 — view and download on every document (004a §7, RM3-AC-69) ──────────── */
+
+describe("docRowActions — view first, download second, and neither without a url (AC-69)", () => {
+  it("a row WITH a url exposes both controls", () => {
+    const actions = docRowActions({ downloadUrl: "https://x/cr.pdf" });
+    expect(actions.map((a) => a.kind)).toEqual(["view", "download"]);
+    for (const a of actions) expect(a.href).toBe("https://x/cr.pdf");
+  });
+
+  it("view comes FIRST — the common act must not be the effortful one", () => {
+    expect(docRowActions({ downloadUrl: "https://x/cr.pdf" })[0].kind).toBe("view");
+  });
+
+  it("view is the ONLY primary", () => {
+    const actions = docRowActions({ downloadUrl: "https://x/cr.pdf" });
+    expect(actions.filter((a) => a.primary).map((a) => a.kind)).toEqual(["view"]);
+  });
+
+  it("only DOWNLOAD asks the browser to save — view renders", () => {
+    expect(docRowActions({ downloadUrl: "https://x/cr.pdf" }).map((a) => a.download)).toEqual([false, true]);
+  });
+
+  it("a row WITHOUT a url exposes NEITHER control — never a dead button", () => {
+    expect(docRowActions({ downloadUrl: null })).toEqual([]);
+  });
+
+  it("an empty-string url is an absent url, not a link to nowhere", () => {
+    expect(docRowActions({ downloadUrl: "" })).toEqual([]);
+  });
+});
+
+describe("every document family on this surface is openable (AC-69)", () => {
+  it("equipment PAPERS — a held paper gets both controls, an absent one gets none", () => {
+    const [, papers] = equipmentDocGroups(machine({ docs: [{ type: "istimara" }] }));
+    const ownership = papers.rows.find((r) => r.key === "doc:ownership")!;
+    const operator = papers.rows.find((r) => r.key === "doc:operator_cert")!;
+    expect(docRowActions(ownership).map((a) => a.kind)).toEqual(["view", "download"]);
+    expect(docRowActions(operator)).toEqual([]);
+  });
+
+  it("equipment PHOTOS — a separate group, and just as openable as a paper", () => {
+    const [photos] = equipmentDocGroups(machine({ photos: [{ slot: "front" }] }));
+    const front = photos.rows.find((r) => r.key === "photo:front")!;
+    expect(docRowActions(front).map((a) => a.kind)).toEqual(["view", "download"]);
+    expect(docRowActions(front)[0].href).toBe("https://x/front");
+    // The three slots the machine has no photo for stay unopenable rather than dead.
+    for (const row of photos.rows.filter((r) => r.key !== "photo:front")) expect(docRowActions(row)).toEqual([]);
+  });
+
+  it("COMPANY papers — same pair, and a row with no url still has nothing to press", () => {
+    const rows = companyDocRows({
+      verified: true,
+      docs: { cr: { present: true, downloadUrl: "https://x/cr.pdf" }, vat: { present: true } },
+    });
+    const by = (k: string) => rows.find((r) => r.key === k)!;
+    expect(docRowActions(by("cr")).map((a) => a.kind)).toEqual(["view", "download"]);
+    // Present but with no url, and absent entirely, come out the same way: nothing to press.
+    expect(docRowActions(by("vat"))).toEqual([]);
+    expect(docRowActions(by("national_address"))).toEqual([]);
+  });
+
+  it("being openable adds NO verification state to an equipment row (§6.6, §7.2)", () => {
+    const groups = equipmentDocGroups(
+      machine({ docs: [{ type: "istimara", verifyStatus: "verified", expiryDate: "2030-01-01" }] }),
+    );
+    for (const row of groups.flatMap((g) => g.rows)) {
+      expect(["present", "missing"]).toContain(row.status);
+      expect(["uploaded", "not uploaded", "on the machine's file", "no document yet"]).toContain(row.statusLine.en);
+      expect(Object.keys(row).sort()).toEqual(
+        ["docTypes", "downloadUrl", "key", "label", "status", "statusLine", "thumbUrl"],
+      );
+    }
   });
 });
 
