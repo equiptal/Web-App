@@ -8,14 +8,23 @@
  *
  *   <EquipmentDocuments
  *     machine={machine}                       // FleetMachine
+ *     request={bid}                           // MatchRequest — WHICH PAPERS ARE REQUIRED. A BidCard
+ *                                             // satisfies it; without it the tab cannot tell a gap
+ *                                             // from a paper nobody asked about, which is why it is
+ *                                             // required rather than optional.
  *     ar={ar} L={L}                           // component-local bilingual pattern, as
  *                                             // requests/SharedBidSubmissionModal.tsx does it
  *     onRequest={(draft) => compose(draft)}    // PanelRequestDraft — V11 owns the composer
  *   />
  *
- * **Two groups, each with its own attention count** — photos (front · plate · meter · side) and
- * documents (proof of ownership / registration · equipment safety certificate · operator safety
- * certificate). The counts count **rows needing action, never totals**.
+ * **Up to three groups, each with its own attention count** — photos · documents · **the operator's
+ * documents**, which are a section of their own and not one row buried in the equipment's papers. The
+ * counts count **rows needing action, never totals**, and a group with nothing to say does not render.
+ *
+ * **A row is red only if the request required it** (owner, 2026-08-08). A paper the lessor holds that
+ * nobody asked for still shows and still opens, with no verdict and no tick — there is nothing to
+ * chase on a document the renter is looking straight at. A paper nobody asked for and nobody holds is
+ * not a row. All of that judgement is `equipmentDocGroups`'; this component paints it.
  *
  * **Presence only.** `documentKeys` entries carry `verifyStatus` and `expiryDate`; this tab renders
  * neither, and the model never reads them. §6.6: a machine's paper is either there or it isn't, and a
@@ -34,11 +43,20 @@
 import { useMemo, useState } from "react";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import { DocRowList } from "./DocRowList";
-import { arDigits, batchDocumentRequest, equipmentDocGroups, type PanelRequestDraft } from "./machine-panel-model";
+import {
+  arDigits,
+  batchDocumentRequest,
+  equipmentDocGroups,
+  type MatchRequest,
+  type PanelRequestDraft,
+} from "./machine-panel-model";
 import "./panel-proto.css";
 
 export interface EquipmentDocumentsProps {
   machine: FleetMachine;
+  /** The request's asks — what makes a missing paper a **gap** rather than a paper nobody wanted.
+   *  Structurally satisfied by a `BidCard`, exactly as `EquipmentDetail`'s own `request` is. */
+  request: MatchRequest;
   ar: boolean;
   L: (en: string, ar: string) => string;
   /** Hand the ask upward. This component never posts — the `rentee_request` contract (§7.3) has one
@@ -46,8 +64,8 @@ export interface EquipmentDocumentsProps {
   onRequest?: (draft: PanelRequestDraft) => void;
 }
 
-export function EquipmentDocuments({ machine, ar, L, onRequest }: EquipmentDocumentsProps) {
-  const groups = useMemo(() => equipmentDocGroups(machine), [machine]);
+export function EquipmentDocuments({ machine, request, ar, L, onRequest }: EquipmentDocumentsProps) {
+  const groups = useMemo(() => equipmentDocGroups(machine, request), [machine, request]);
   // ONE selection set across BOTH groups — the batch is the renter's whole ask, not one ask per
   // heading. He can tick the missing plate photo and the missing operator certificate and send once.
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set<string>());
@@ -69,9 +87,12 @@ export function EquipmentDocuments({ machine, ar, L, onRequest }: EquipmentDocum
       return next;
     });
 
-  const allRows = useMemo(() => groups.flatMap((g) => g.rows), [groups]);
-  const draft = batchDocumentRequest("equipment", machine.equipmentId, allRows, selected);
-  const pickedCount = allRows.filter((r) => selected.has(r.key)).length;
+  // Only requestable rows can reach the composer. `DocRowList` already hides the tick on the others, so
+  // this is the belt to that braces: a selection can never carry a row the renter had no business
+  // asking for, however the set was arrived at.
+  const askableRows = useMemo(() => groups.flatMap((g) => g.rows).filter((r) => r.requestable), [groups]);
+  const draft = batchDocumentRequest("equipment", machine.equipmentId, askableRows, selected);
+  const pickedCount = askableRows.filter((r) => selected.has(r.key)).length;
 
   return (
     <div>
@@ -87,6 +108,8 @@ export function EquipmentDocuments({ machine, ar, L, onRequest }: EquipmentDocum
             dot: r.status,
             thumbUrl: r.thumbUrl,
             downloadUrl: r.downloadUrl,
+            files: r.files,
+            selectable: r.requestable,
           }))}
           selected={selected}
           onToggle={toggle}

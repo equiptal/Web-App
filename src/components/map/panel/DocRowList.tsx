@@ -28,7 +28,7 @@
  * Nothing here fetches, posts or navigates.
  */
 
-import { arDigits, docRowActions, type CompanyDocStatus, type PresenceStatus } from "./machine-panel-model";
+import { arDigits, docRowActions, type CompanyDocStatus, type DocFile, type PresenceStatus } from "./machine-panel-model";
 
 /** The status dot's look. `present`/`verified` green · `on_file` blue · `missing` amber. */
 export type DotState = PresenceStatus | CompanyDocStatus;
@@ -42,11 +42,21 @@ export interface DocRowView {
   dot: DotState;
   /** A photo's own image. Null renders the paper glyph instead of a broken thumbnail. */
   thumbUrl: string | null;
-  /** The row's one presigned url — **view** and **download** both point at it (AC-69, `docRowActions`).
-   *  Null renders NEITHER control: a dead button is worse than none, and the empty actions cell is the
-   *  honest signal that this paper is missing. The cell keeps its width in CSS, so a row without a file
-   *  is the same shape as one with it — the renter reads this list by its shape before its words. */
+  /** The row's first presigned url — **view** and **download** both point at it (AC-69,
+   *  `docRowActions`). Null renders NEITHER control: a dead button is worse than none, and the empty
+   *  actions cell is the honest signal that this paper is missing. The cell keeps its width in CSS, so
+   *  a row without a file is the same shape as one with it — the renter reads this list by its shape
+   *  before its words. */
   downloadUrl: string | null;
+  /** **Every** file behind this row, when the caller has them. A machine's paper row can hold several
+   *  (two operator certificates, a TÜV and an insurance under one heading) and each gets its own
+   *  view/download pair — the row used to expose the first url and silently drop the rest. Absent for
+   *  the firm's papers, which carry one file and only a `downloadUrl`. */
+  files?: readonly DocFile[];
+  /** May this row be ticked? Defaults to true. False on a row nothing required — the renter can read
+   *  and open it, but there is nothing to ask for, so it carries no checkbox rather than a checkbox
+   *  that composes an ask the lessor can only answer "it is already there". */
+  selectable?: boolean;
 }
 
 const DOT_GLYPH: Record<DotState, string> = {
@@ -75,7 +85,9 @@ export function DocRowList({
   onToggleAll: (keys: string[], select: boolean) => void;
   L: (en: string, ar: string) => string;
 }) {
-  const keys = rows.map((r) => r.key);
+  // Select-all reaches only the rows that can be asked for. A row nobody required has no tick, so
+  // including it here would leave "Select all" permanently unable to reach the all-on state.
+  const keys = rows.filter((r) => r.selectable !== false).map((r) => r.key);
   const allOn = keys.length > 0 && keys.every((k) => selected.has(k));
   const pickedHere = keys.filter((k) => selected.has(k)).length;
 
@@ -98,18 +110,25 @@ export function DocRowList({
       </div>
 
       {rows.map((r) => {
-        const picked = selected.has(r.key);
+        const selectable = r.selectable !== false;
+        const picked = selectable && selected.has(r.key);
         return (
           <div key={r.key} className={`mp-row${picked ? " picked" : ""}${r.dot === "missing" ? " missing" : ""}`}>
-            <button
-              type="button"
-              className={`mp-tick${picked ? " on" : ""}`}
-              aria-pressed={picked}
-              aria-label={L(`Select ${r.name}`, `تحديد ${r.name}`)}
-              onClick={() => onToggle(r.key)}
-            >
-              {picked ? "✓" : ""}
-            </button>
+            {selectable ? (
+              <button
+                type="button"
+                className={`mp-tick${picked ? " on" : ""}`}
+                aria-pressed={picked}
+                aria-label={L(`Select ${r.name}`, `تحديد ${r.name}`)}
+                onClick={() => onToggle(r.key)}
+              >
+                {picked ? "✓" : ""}
+              </button>
+            ) : (
+              // The tick's width is held rather than collapsed, so an unrequired row still lines up
+              // with the rows above it — the list is read by its shape before its words.
+              <span className="mp-tick void" aria-hidden="true" />
+            )}
 
             <span className="mp-thumb">
               {r.thumbUrl ? (
@@ -130,11 +149,20 @@ export function DocRowList({
                 reserves its width in CSS, so an empty one keeps the row's shape without leaving an
                 inert glyph that looks like a control the renter failed to press. */}
             <span className="mp-acts">
-              {docRowActions(r).map((a) => {
+              {docRowActions(r).map((a, i) => {
                 const view = a.kind === "view";
+                // A row holding several files draws several pairs of identical glyphs, so each pair is
+                // named after ITS file — and numbered too, because a lessor can file two papers of the
+                // same type and the labels would then repeat.
+                const multi = i > 1 || (r.files ?? []).filter((f) => f.url).length > 1;
+                const nth = Math.floor(i / 2) + 1;
+                const what =
+                  multi && a.file
+                    ? `${L(a.file.label.en, a.file.label.ar)} ${L(String(nth), arDigits(nth))}`
+                    : r.name;
                 return (
                   <a
-                    key={a.kind}
+                    key={`${a.kind}:${i}`}
                     className={`mp-doc ${a.kind}${a.primary ? " primary" : ""}`}
                     href={a.href}
                     // A presigned url on a private bucket: a new tab is the whole viewer. No modal —
@@ -144,10 +172,8 @@ export function DocRowList({
                     target="_blank"
                     rel="noopener noreferrer"
                     download={a.download}
-                    title={view ? L("View", "عرض") : L("Download", "تنزيل")}
-                    aria-label={
-                      view ? L(`View ${r.name}`, `عرض ${r.name}`) : L(`Download ${r.name}`, `تنزيل ${r.name}`)
-                    }
+                    title={view ? L(`View ${what}`, `عرض ${what}`) : L(`Download ${what}`, `تنزيل ${what}`)}
+                    aria-label={view ? L(`View ${what}`, `عرض ${what}`) : L(`Download ${what}`, `تنزيل ${what}`)}
                   >
                     <span aria-hidden="true">{view ? "↗" : "⤓"}</span>
                   </a>

@@ -3,8 +3,8 @@
  *
  * Every judgement the machine detail, the equipment-documents tab and the company panel render is
  * computed here, with **no React, no DOM and no i18n import**. The components below it only paint what
- * these functions return, which is why the six match cells, the two attention counts and the company
- * rows are unit-testable without a component harness (this repo's vitest env is `node`).
+ * these functions return, which is why the six match cells, the document groups' attention counts and
+ * the company rows are unit-testable without a component harness (this repo's vitest env is `node`).
  *
  * **There is exactly one readiness scorer.** `computeUnitReadiness` + `readinessInputsFor`
  * (`lib/contract/bid-readiness.ts`) already answer "does this machine hold what the request asks for?";
@@ -17,7 +17,7 @@
  * `yardId != null` supplier-side, so reading it turns every chip green). See `bid-map.ts:64`.
  */
 
-import { computeUnitReadiness, readinessInputsFor, type UnitReadiness } from "@/lib/contract/bid-readiness";
+import { canonicalCertCode, computeUnitReadiness, readinessInputsFor, type UnitReadiness } from "@/lib/contract/bid-readiness";
 import type { OfferedUnitDoc } from "@/lib/contract/bids";
 import type { FleetMachine } from "@/lib/contract/fleet";
 
@@ -90,7 +90,9 @@ export interface MatchRequest {
   customAttachments?: string[] | null;
 }
 
-/** The four photo slots the renter is shown (§6.6). */
+/** The four photo slots the renter can be shown, in the order he reads them (§6.6). Which of them
+ *  actually render is `equipmentDocGroups`' judgement: `front` and `plate` are required of every
+ *  lessor, `meter` and `side` appear only when uploaded. */
 export const PHOTO_SLOTS = ["front", "plate", "meter", "side"] as const;
 export type PhotoSlot = (typeof PHOTO_SLOTS)[number];
 
@@ -144,9 +146,21 @@ const OWNERSHIP_TYPES = new Set([
   "combined",
 ]);
 
-/** Operator-level documents. `OPERATOR_CERT_TYPES` is `operator_tuv` · `operating_license` ·
- *  `operator_spsp` · `operator_id` · `operator_insurance` — note **`operating_license` carries no
- *  `operator_` prefix**, so a prefix test alone files the operator's own licence under the equipment. */
+/**
+ * Operator-level documents.
+ *
+ * **The vocabulary, and what it is based on.** The backend's per-item `documents[].type` enum is
+ * recorded in `docs/implementation-plans/web-spec1/web-handoff.md:16`, whose operator tail is exactly
+ * `operator_tuv · operating_license · operator_spsp · operator_id · operator_insurance`; `ChatDock`'s
+ * wire-type → renter's-word table (`ChatDock.tsx:497-502`) carries those same five plus the
+ * `operator_license` spelling. The off-platform submission vocabulary in `link-bids.ts:60` /
+ * `bid-quality.ts:22` adds `operator_saso` and `operator_other` — a **different** namespace (a shared
+ * link's uploads, not a fleet machine's `documentKeys`), so those are folded in defensively rather
+ * than treated as the source of the row set.
+ *
+ * Note **`operating_license` carries no `operator_` prefix**, so a prefix test alone files the
+ * operator's own licence under the equipment. Both halves of the test are load-bearing.
+ */
 const OPERATOR_TYPES = new Set(["operating_license", "operator_license", "operator_licence"]);
 
 /** Equipment SAFETY certificates. Deliberately an allow-list: `spec_sheet` / `other` / `unclassified`
@@ -169,6 +183,22 @@ const isOperatorDoc = (d: OfferedUnitDoc): boolean => {
   return t.startsWith("operator") || OPERATOR_TYPES.has(t);
 };
 const isEquipmentCertDoc = (d: OfferedUnitDoc): boolean => !isOperatorDoc(d) && EQUIPMENT_CERT_TYPES.has(norm(d.type));
+
+/**
+ * An operator paper's **row code**.
+ *
+ * `canonicalCertCode` is the one normaliser (`bid-readiness.ts`) and it strips the `operator_` prefix,
+ * which is exactly right for matching an asked-for "TÜV" against a held `operator_tuv`. But it sends
+ * the three spellings of one licence to three different codes — `operating_license` stays whole while
+ * `operator_license` / `operator_licence` lose their prefix and become `license` / `licence`. Left
+ * alone that renders the operator's licence as three rows for one paper, so the family is folded here,
+ * on top of the shared normaliser rather than instead of it.
+ */
+function operatorCertCode(type: string): string {
+  const c = canonicalCertCode(type);
+  if (c === "license" || c === "licence" || c === "operating_licence") return "operating_license";
+  return c;
+}
 
 /** Present photo slots, deduped — the numerator of "N of 4 uploaded". */
 export function presentPhotoSlots(machine: Pick<FleetMachine, "photoKeys">): PhotoSlot[] {
@@ -294,6 +324,14 @@ function attachmentsCell(request: MatchRequest): MatchCell {
  * Green needs **all four**. `computeUnitReadiness.photosPresent` is a lower bar (front + plate are the
  * two mandatory slots), and it is not read here: this cell reports the four slots the renter is shown,
  * so a "3 of 4" that rendered green would contradict its own text on screen.
+ *
+ * ⚠️ **Left as it is, and it now disagrees with the photos GROUP one tab away.** Since 2026-08-08 the
+ * document groups require only the two slots the lessor is actually held to (`REQUIRED_PHOTO_SLOTS`,
+ * mirroring `bid_readiness.dart`), so a machine with front + plate and no meter shot reads "nothing
+ * outstanding" in the documents tab and **red, "2 of 4 uploaded"** in this cell. Changing this cell
+ * moves §6.5 / AC-36, which neither the owner's ruling nor this ticket touched — so the divergence is
+ * written down here and reported rather than resolved by guess. Whichever way it goes, both surfaces
+ * must move together.
  */
 function photosCell(machine: FleetMachine): MatchCell {
   const have = presentPhotoSlots(machine).length;
@@ -394,20 +432,12 @@ export function certificateChips(machine: Pick<FleetMachine, "documentKeys">): B
   const out: Bilingual[] = [];
   for (const d of machine.documentKeys) {
     if (!isEquipmentCertDoc(d)) continue;
-    const code = certCode(d.type);
+    const code = canonicalCertCode(d.type);
     if (seen.has(code)) continue;
     seen.add(code);
     out.push(CERT_CHIP_LABEL[code] ?? { en: code.toUpperCase(), ar: code.toUpperCase() });
   }
   return out;
-}
-
-/** Collapse a raw doc type onto the chip it prints — the SASO family is one chip, not three. */
-function certCode(type: string): string {
-  const t = norm(type);
-  if (t === "tüv") return "tuv";
-  if (t.startsWith("saso")) return "saso";
-  return t;
 }
 
 /** Chip copy. Certificate names are proper nouns and stay Latin in both locales; only the two that
@@ -435,25 +465,61 @@ export function heroPhotoUrl(machine: Pick<FleetMachine, "photoKeys">): string |
  * would invite the renter to judge a supplier on a state the platform sets, not one the supplier
  * controls. The fields exist on the wire; nothing below reads them.
  */
-export type PresenceStatus = "present" | "missing";
+/**
+ * **present** = required and held · **missing** = required and absent (the only state that can be red,
+ * counted or asked for) · **on_file** = held but nobody required it, so it is shown and openable with
+ * **no verdict attached**.
+ *
+ * There is no "absent and unrequired": that row is not rendered at all. See {@link equipmentDocGroups}.
+ */
+export type PresenceStatus = "present" | "on_file" | "missing";
+
+/**
+ * One file behind a document row.
+ *
+ * **A row can hold several.** A lessor may file two operator safety certificates, or a TÜV *and* an
+ * insurance under one heading; the row is still one row, and every file it holds is reachable. Before
+ * this existed the row exposed `held.find((d) => d.url)?.url` — the first url and no other — so the
+ * second and third papers a lessor had actually uploaded were unreachable from the renter's panel.
+ */
+export interface DocFile {
+  /** The wire type this file was uploaded as (`operator_tuv`, `istimara`, `front` …). */
+  type: string;
+  /** The renter's word for that type, so a control never reads `operating_license` at him. */
+  label: Bilingual;
+  url: string;
+}
 
 export interface DocRow {
   key: string;
   label: Bilingual;
   status: PresenceStatus;
   /** The presence sentence — "uploaded" / "not uploaded" for photos, "on the machine's file" /
-   *  "no document yet" for documents. Never a verification word. */
+   *  "no document yet" for documents, each with a "· not required" tail on an unrequired row. Never a
+   *  verification word. */
   statusLine: Bilingual;
   /** Thumbnail source: a photo's own image, or null for a paper (the row draws a document glyph). */
   thumbUrl: string | null;
-  /** The row's **one** presigned url — view and download both point at it (`docRowActions`). Null when
-   *  the machine holds no such file, and then the row exposes neither control (AC-69). */
+  /** `files[0]`, kept so the machine's papers, its photos and the firm's papers still share one shape —
+   *  {@link docRowActions} is typed across all three. **`files` is the whole truth**; this is the head
+   *  of it, and null when the row holds nothing. */
   downloadUrl: string | null;
+  /** **Every** file behind this row, in the machine's own order. */
+  files: DocFile[];
   /** The wire type(s) this row stands for — what a batch request names when the row is ticked. */
   docTypes: string[];
+  /**
+   * May the renter tick this row and ask for it?
+   *
+   * **False on a row nothing required**, because the batch ask exists to chase a paper the renter needs
+   * and a paper nobody asked for has nothing to chase — the renter is looking straight at it, and an ask
+   * naming it could only be answered "it is already on the file". True on every required row, held or
+   * not: a renter may still want a legible re-scan of a paper that is there.
+   */
+  requestable: boolean;
 }
 
-export type DocGroupKey = "photos" | "documents";
+export type DocGroupKey = "photos" | "documents" | "operator";
 
 export interface DocGroup {
   key: DocGroupKey;
@@ -491,24 +557,45 @@ export interface DocAction {
    *  signed with `Content-Disposition: attachment`, in which case the browser saves instead of
    *  rendering — harmless either way, which is why both anchors also open in a new tab. */
   download: boolean;
+  /** Which file of the row this control opens. Null on a row that carries only a bare `downloadUrl`
+   *  (the firm's papers), where there is exactly one file and nothing to disambiguate. When a row holds
+   *  several, the component titles each control with this label so two identical glyphs are not two
+   *  identical controls. */
+  file: DocFile | null;
 }
 
 /**
  * The controls one document row exposes (AC-69).
  *
- * **A row with no url exposes neither** — never a dead control. That absence is also the honest signal
+ * **A row with no file exposes none** — never a dead control. That absence is also the honest signal
  * that a paper is missing, which is the one row the renter can act on: he ticks it and asks.
+ *
+ * **A row holding several files exposes the pair for each of them.** The alternative — a row per file —
+ * was rejected: it would put the *files* in the list where the list's job is to show *slots*, so a
+ * lessor who uploaded nothing would produce no rows and the renter would see a short, clean list
+ * instead of a gap. Keeping one row per slot preserves that, keeps the attention count meaning "rows
+ * needing action", and keeps selection meaning "the type I am asking for" rather than "the copy I want
+ * a second of". The files are outputs of the row, not rows.
  *
  * Deliberately shape-typed rather than taking `DocRow | CompanyDocRow`, because it must serve all three
  * families this surface names — the machine's papers, its photos, and the firm's papers — and they
  * agree on exactly one field.
  */
-export function docRowActions(row: { downloadUrl: string | null }): DocAction[] {
+export function docRowActions(row: { downloadUrl: string | null; files?: readonly DocFile[] }): DocAction[] {
+  const files = (row.files ?? []).filter((f) => f.url);
+  if (files.length > 0) {
+    // Exactly one action carries `primary`, and it is the FIRST file's view — the invariant holds
+    // however many files the row turns out to hold.
+    return files.flatMap((file, i) => [
+      { kind: "view" as const, href: file.url, primary: i === 0, download: false, file },
+      { kind: "download" as const, href: file.url, primary: false, download: true, file },
+    ]);
+  }
   const href = row.downloadUrl;
   if (!href) return [];
   return [
-    { kind: "view", href, primary: true, download: false },
-    { kind: "download", href, primary: false, download: true },
+    { kind: "view", href, primary: true, download: false, file: null },
+    { kind: "download", href, primary: false, download: true, file: null },
   ];
 }
 
@@ -519,72 +606,318 @@ const PHOTO_LABEL: Record<PhotoSlot, Bilingual> = {
   side: { en: "Side", ar: "جانبية" },
 };
 
+/**
+ * The photo slots the lessor is actually held to.
+ *
+ * **Mirrors `bid_readiness.dart`'s `kMandatoryPhotoSlots = ['front', 'serial']`** — the *supplier's own*
+ * scorer, which is what makes the renter's panel and the lessor's readiness card agree about the same
+ * machine. The wire's `serial` is this file's `plate` (`photoSlotOf`). `meter` and `side` are mandatory
+ * nowhere, so they follow the not-required rule: shown when uploaded, and absent they are simply not a
+ * row. This repo's `computeUnitReadiness` derives `photosPresent` from the same two slots.
+ */
+const REQUIRED_PHOTO_SLOTS = new Set<PhotoSlot>(["front", "plate"]);
+
 const PRESENT_PHOTO: Bilingual = { en: "uploaded", ar: "مرفوعة" };
 const ABSENT_PHOTO: Bilingual = { en: "not uploaded", ar: "غير مرفوعة" };
+const EXTRA_PHOTO: Bilingual = { en: "uploaded · not required", ar: "مرفوعة · غير مطلوبة" };
 const PRESENT_DOC: Bilingual = { en: "on the machine's file", ar: "على ملف المعدّة" };
 const ABSENT_DOC: Bilingual = { en: "no document yet", ar: "لا يوجد مستند بعد" };
+const EXTRA_DOC: Bilingual = { en: "on the machine's file · not required", ar: "على ملف المعدّة · غير مطلوب" };
+
+/** Renter-facing words for a wire doc type — the same wording `ChatDock`'s `DOC_TYPE_LABELS` uses, so
+ *  one paper reads the same in the panel and on the request card the renter raises from it. */
+const DOC_TYPE_LABEL: Record<string, Bilingual> = {
+  istimara: { en: "Registration (Istimara)", ar: "الاستمارة" },
+  istimarah: { en: "Registration (Istimara)", ar: "الاستمارة" },
+  registration: { en: "Registration", ar: "التسجيل" },
+  customs: { en: "Customs card", ar: "البطاقة الجمركية" },
+  customs_card: { en: "Customs card", ar: "البطاقة الجمركية" },
+  sale_contract: { en: "Sale contract", ar: "عقد البيع" },
+  sales_contract: { en: "Sale contract", ar: "عقد البيع" },
+  saso_registration: { en: "SASO registration", ar: "تسجيل ساسو" },
+  tuv: { en: "TÜV certificate", ar: "شهادة TÜV" },
+  spsp: { en: "SPSP certificate", ar: "شهادة SPSP" },
+  saso: { en: "SASO certificate", ar: "شهادة ساسو" },
+  aramco: { en: "Aramco certificate", ar: "شهادة أرامكو" },
+  insurance: { en: "Insurance", ar: "التأمين" },
+  operating_license: { en: "Operator licence", ar: "رخصة المشغّل" },
+  operator_license: { en: "Operator licence", ar: "رخصة المشغّل" },
+  operator_licence: { en: "Operator licence", ar: "رخصة المشغّل" },
+  operator_tuv: { en: "Operator TÜV", ar: "شهادة TÜV للمشغّل" },
+  operator_spsp: { en: "Operator SPSP", ar: "شهادة SPSP للمشغّل" },
+  operator_saso: { en: "Operator SASO", ar: "شهادة ساسو للمشغّل" },
+  operator_id: { en: "Operator ID", ar: "هوية المشغّل" },
+  operator_insurance: { en: "Operator insurance", ar: "تأمين المشغّل" },
+};
+
+/** Humanise an unmapped wire type rather than shouting a database column at the renter — `ChatDock`'s
+ *  fallback, and locale-independent for the same reason his is: we have no Arabic for a type we have
+ *  never seen, and inventing one would be worse than the English. */
+function docTypeLabel(type: string): Bilingual {
+  const known = DOC_TYPE_LABEL[norm(type)];
+  if (known) return known;
+  const words = norm(type).replace(/_+/g, " ").trim();
+  const text = words ? words.charAt(0).toUpperCase() + words.slice(1) : type;
+  return { en: text, ar: text };
+}
+
+/** An equipment certificate's row heading, keyed by `canonicalCertCode`. */
+const EQUIPMENT_CERT_ROW_LABEL: Record<string, Bilingual> = {
+  tuv: { en: "TÜV certificate", ar: "شهادة TÜV" },
+  spsp: { en: "SPSP certificate", ar: "شهادة SPSP" },
+  saso: { en: "SASO certificate", ar: "شهادة ساسو" },
+  aramco: { en: "Aramco certificate", ar: "شهادة أرامكو" },
+  insurance: { en: "Equipment insurance", ar: "تأمين المعدّة" },
+};
+
+/** An operator paper's row heading, keyed by `operatorCertCode`. Wording follows `ChatDock`'s table so
+ *  the row and the request card raised from it name the same paper the same way. */
+const OPERATOR_CERT_ROW_LABEL: Record<string, Bilingual> = {
+  operating_license: { en: "Operator licence", ar: "رخصة المشغّل" },
+  tuv: { en: "Operator TÜV", ar: "شهادة TÜV للمشغّل" },
+  spsp: { en: "Operator SPSP", ar: "شهادة SPSP للمشغّل" },
+  saso: { en: "Operator SASO", ar: "شهادة ساسو للمشغّل" },
+  id: { en: "Operator ID", ar: "هوية المشغّل" },
+  insurance: { en: "Operator insurance", ar: "تأمين المشغّل" },
+  other: { en: "Operator document", ar: "مستند المشغّل" },
+};
 
 /**
- * The two groups of §6.6, each with its own attention count.
+ * The wire type a **not-yet-uploaded** row asks for.
  *
- * Both groups have a **fixed row set** — the four photo slots, and the three papers §6.6 names. A row
- * per uploaded file would make the list shorter the worse the supplier's file is, which is backwards:
- * the renter needs to see what is missing, and only a fixed set can show an absence.
+ * **Deliberately coarse, and this is the reversible half of a thing this repo cannot verify.** An ask
+ * is validated server-side against `EquipmentDocumentType.documentKey` and one unknown type fails the
+ * whole request (`rentee-request.ts` — `assertKnownDocTypes`, and `canonicalDocType`'s note that an
+ * unaliased name is "passed through untouched and refused by the backend if it is unknown"). The only
+ * operator/equipment names *proven* to resolve into that catalogue are the ones `DOC_TYPE_ALIASES`
+ * maps — `tuv → tuv_cert`, `spsp → spsp_cert`, `equipment_safety_certificate → safety_cert`,
+ * `operator_safety_certificate → operator_license`, `istimara`. `operator_tuv` and friends are the
+ * *upload* vocabulary (`web-handoff.md:16`); whether they are also catalogue keys cannot be checked
+ * from this repo, and guessing wrong turns the renter's most common ask into a 400 he can do nothing
+ * with.
+ *
+ * So the **rows** stay per-certificate — the renter sees exactly which paper is missing and opens
+ * exactly the one that is there — while the outgoing type names the category. Swapping in precise keys
+ * once someone confirms the catalogue is a one-line change to these two maps.
+ *
+ * ⚠️ **Known gap, unchanged by this file and reported rather than papered over.** `documentAskSatisfied`
+ * matches an ask to a held paper by exact `canonicalDocType` equality, and the operator category resolves
+ * to `operator_license` while a machine's own operator papers are typed `operator_tuv` / `operating_license`
+ * — none of which canonicalise to it. So an operator document ask reads *waiting* even after the lessor
+ * uploads. That is true of today's `operator_safety_certificate` fallback too, so nothing here regresses
+ * it; the fix is one alias (`operating_license → operator_license`) or catalogue rows per operator cert,
+ * and it belongs with whoever owns `DOC_TYPE_ALIASES`. `tuv` and `spsp` do not have this problem: both
+ * sides fold to `tuv_cert` / `spsp_cert`, which is why they are named precisely above.
  */
-export function equipmentDocGroups(machine: FleetMachine): DocGroup[] {
-  const photoBySlot = new Map<PhotoSlot, { url: string | null; slot: string }>();
-  for (const p of machine.photoKeys) {
-    const slot = photoSlotOf(p.slot);
-    if (slot && !photoBySlot.has(slot)) photoBySlot.set(slot, { url: p.url, slot: p.slot });
-  }
-  const photoRows: DocRow[] = PHOTO_SLOTS.map((slot) => {
-    const held = photoBySlot.get(slot);
-    return {
-      key: `photo:${slot}`,
-      label: PHOTO_LABEL[slot],
-      status: held ? "present" : "missing",
-      statusLine: held ? PRESENT_PHOTO : ABSENT_PHOTO,
-      thumbUrl: held?.url ?? null,
-      downloadUrl: held?.url ?? null,
-      docTypes: [held?.slot ?? slot],
-    };
-  });
+const EQUIPMENT_ASK_TYPE: Record<string, string> = { tuv: "tuv", spsp: "spsp" };
+const equipmentAskType = (code: string): string => EQUIPMENT_ASK_TYPE[code] ?? "equipment_safety_certificate";
+const operatorAskType = (): string => "operator_safety_certificate";
 
-  const docRow = (key: string, label: Bilingual, held: OfferedUnitDoc[], fallbackType: string): DocRow => ({
+const filesOf = (docs: OfferedUnitDoc[]): DocFile[] =>
+  docs.filter((d) => d.url).map((d) => ({ type: d.type, label: docTypeLabel(d.type), url: d.url as string }));
+
+/** Held docs of one family, bucketed by row code, preserving the machine's own order. */
+function heldByCode(docs: OfferedUnitDoc[], codeOf: (type: string) => string): Map<string, OfferedUnitDoc[]> {
+  const out = new Map<string, OfferedUnitDoc[]>();
+  for (const d of docs) {
+    const code = codeOf(d.type);
+    const bucket = out.get(code);
+    if (bucket) bucket.push(d);
+    else out.set(code, [d]);
+  }
+  return out;
+}
+
+/**
+ * One certificate row — for a code the request asked for, or one the machine simply holds.
+ *
+ * The required/unrequired split is the whole of the platform rule: a required code renders whether it
+ * is held or not, an unrequired one only when it is held, and only a required-and-absent row is ever
+ * red, counted or askable.
+ */
+function certRow(args: {
+  key: string;
+  label: Bilingual;
+  held: OfferedUnitDoc[];
+  required: boolean;
+  askType: string;
+}): DocRow {
+  const { key, label, held, required, askType } = args;
+  const files = filesOf(held);
+  const status: PresenceStatus = held.length === 0 ? "missing" : required ? "present" : "on_file";
+  return {
     key,
     label,
-    status: held.length > 0 ? "present" : "missing",
-    statusLine: held.length > 0 ? PRESENT_DOC : ABSENT_DOC,
+    status,
+    statusLine: status === "missing" ? ABSENT_DOC : status === "present" ? PRESENT_DOC : EXTRA_DOC,
     thumbUrl: null,
-    downloadUrl: held.find((d) => d.url)?.url ?? null,
-    docTypes: held.length > 0 ? held.map((d) => d.type) : [fallbackType],
-  });
+    downloadUrl: files[0]?.url ?? null,
+    files,
+    docTypes: held.length > 0 ? [...new Set(held.map((d) => d.type))] : [askType],
+    requestable: required,
+  };
+}
 
+/** The union of the codes the request asked for (first, in the request's order) and the codes the
+ *  machine holds (after, in the machine's order). Deduped, so an asked-for cert the machine also holds
+ *  is one row. */
+function unionCodes(requested: string[], held: Map<string, OfferedUnitDoc[]>): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const code of [...requested, ...held.keys()]) {
+    if (code === "" || seen.has(code)) continue;
+    seen.add(code);
+    out.push(code);
+  }
+  return out;
+}
+
+/**
+ * The document groups of §6.6 — **photos · documents · the operator's documents** — each with its own
+ * attention count.
+ *
+ * **The platform's one rule, applied to every family alike** (owner, 2026-08-08):
+ *
+ * | | held | absent |
+ * |---|---|---|
+ * | **required** | shown, green, openable | **red, "no document yet"**, counted, requestable |
+ * | **not required** | shown, openable, no verdict, **not counted** | **not rendered at all** |
+ *
+ * So the row set is `(what this request requires) ∪ (what this machine holds)`.
+ *
+ * **Why the row set was fixed, and what survives of that.** The earlier note read: *"a row per uploaded
+ * file would make the list shorter the worse the supplier's file is, which is backwards."* That
+ * property is still load-bearing and still holds — **every required row renders whether it is held or
+ * not**, so a lessor with an empty file produces the *longest*, reddest list, and the renter still sees
+ * what is missing. What the rule removes is the other half of the old behaviour: inventing an absence
+ * nobody asked about. A cert the renter never requested cannot fail, so it is not shown failing.
+ *
+ * This is the platform's existing rule rather than a new one, and the three surfaces it already governs
+ * are why: `matchGrid` greys an unasked cell (*"a cell nobody asked about cannot fail"*),
+ * `computeUnitReadiness` builds its cert list by mapping over the **request's** asks so an unrequested
+ * cert is not a scored key at all, and mobile's `bid_readiness.dart` does the same — *"one key per
+ * certificate this request actually asks for."*
+ *
+ * **What is required.** Two sources, both already in the codebase, neither of them invented here and
+ * neither of them fetched: the certs *this request* asked for (`readinessInputsFor` →
+ * `computeUnitReadiness`), and the papers the lessor is held to *regardless* of the request — mirroring
+ * `bid_readiness.dart`, the supplier's own scorer: `kMandatoryPhotoSlots` (front + serial/plate) and
+ * proof of ownership (`kReadinessPooKey` / `kPooDocTypes`).
+ *
+ * **Proof of ownership is required, and that is a chosen precedent.** `bid_readiness.dart` scores it as
+ * one of two mandatory documents; `bid-readiness.ts` here excludes it from its fraction. This surface
+ * follows the mobile scorer, because `ownershipCell` one tab away already reads an absent ownership
+ * paper **red** — "not on the file — you can ask for it" — and a documents tab that hid the row would
+ * leave the renter told to ask with nothing to ask with. (The web scorer's stated reason for excluding
+ * it, that the renter's projection strips ownership papers, is stale: `RENTEE_HIDDEN_DOC_TYPES` was
+ * deleted. See the note on `ownershipCell`.)
+ *
+ * **A request with no operator needs no special case.** No operator asked for ⇒ no operator certs
+ * requested ⇒ nothing in that family is required ⇒ absent operator papers render no rows, so the group
+ * is empty and is not returned at all. If the lessor happens to hold operator papers anyway they still
+ * show, openable, with no verdict — the renter can read them, and the lessor is not marked down for a
+ * check nobody ran.
+ */
+export function equipmentDocGroups(machine: FleetMachine, request: MatchRequest): DocGroup[] {
+  // The SAME derivation the match grid scores with — never a second reading of the request.
+  const asks = readinessInputsFor(request);
+  const readiness = computeUnitReadiness(machine, asks.equipCerts, asks.operatorCerts, asks.minYear);
+
+  /* ── photos ── */
+  const photoBySlot = new Map<PhotoSlot, { url: string | null; slot: string }[]>();
+  for (const p of machine.photoKeys) {
+    const slot = photoSlotOf(p.slot);
+    if (!slot) continue;
+    const bucket = photoBySlot.get(slot);
+    if (bucket) bucket.push({ url: p.url, slot: p.slot });
+    else photoBySlot.set(slot, [{ url: p.url, slot: p.slot }]);
+  }
+  const photoRows: DocRow[] = [];
+  for (const slot of PHOTO_SLOTS) {
+    const held = photoBySlot.get(slot) ?? [];
+    const required = REQUIRED_PHOTO_SLOTS.has(slot);
+    if (held.length === 0 && !required) continue; // not required and not there — no row at all
+    const files: DocFile[] = held
+      .filter((h) => h.url)
+      .map((h) => ({ type: h.slot, label: PHOTO_LABEL[slot], url: h.url as string }));
+    const status: PresenceStatus = held.length === 0 ? "missing" : required ? "present" : "on_file";
+    photoRows.push({
+      key: `photo:${slot}`,
+      label: PHOTO_LABEL[slot],
+      status,
+      statusLine: status === "missing" ? ABSENT_PHOTO : status === "present" ? PRESENT_PHOTO : EXTRA_PHOTO,
+      thumbUrl: files[0]?.url ?? null,
+      downloadUrl: files[0]?.url ?? null,
+      files,
+      docTypes: [held[0]?.slot ?? slot],
+      requestable: required,
+    });
+  }
+
+  /* ── the machine's papers ── */
+  const ownershipHeld = machine.documentKeys.filter(isOwnershipDoc);
   const paperRows: DocRow[] = [
-    docRow(
-      "doc:ownership",
-      { en: "Proof of ownership / registration", ar: "إثبات الملكية / التسجيل" },
-      machine.documentKeys.filter(isOwnershipDoc),
-      "istimara",
-    ),
-    docRow(
-      "doc:equipment_cert",
-      { en: "Equipment safety certificate", ar: "شهادة سلامة المعدّة" },
-      machine.documentKeys.filter(isEquipmentCertDoc),
-      "equipment_safety_certificate",
-    ),
-    docRow(
-      "doc:operator_cert",
-      { en: "Operator safety certificate", ar: "شهادة سلامة المشغّل" },
-      machine.documentKeys.filter(isOperatorDoc),
-      "operator_safety_certificate",
-    ),
+    certRow({
+      key: "doc:ownership",
+      label: { en: "Proof of ownership / registration", ar: "إثبات الملكية / التسجيل" },
+      held: ownershipHeld,
+      required: true, // platform-mandatory, per `bid_readiness.dart` — never request-driven
+      askType: "istimara",
+    }),
   ];
+
+  const equipHeld = heldByCode(machine.documentKeys.filter(isEquipmentCertDoc), canonicalCertCode);
+  const equipRequested = readiness.equipmentCerts.map((c) => c.code);
+  const equipRequiredSet = new Set(equipRequested);
+  for (const code of unionCodes(equipRequested, equipHeld)) {
+    paperRows.push(
+      certRow({
+        key: `doc:equipment_cert:${code}`,
+        label: EQUIPMENT_CERT_ROW_LABEL[code] ?? docTypeLabel(code),
+        held: equipHeld.get(code) ?? [],
+        required: equipRequiredSet.has(code),
+        askType: equipmentAskType(code),
+      }),
+    );
+  }
+
+  // Papers the machine holds that belong to no named family — a spec sheet, an `other`. Nothing
+  // requires them, so they can never be red or asked for; they are listed under **their own type's
+  // name** so that "every document the machine holds is visible" costs nothing in honesty. (The
+  // allow-list `isEquipmentCertDoc` exists so a spec sheet is never called a safety certificate. With
+  // one row per type that objection is answered by the label itself.)
+  const otherHeld = heldByCode(
+    machine.documentKeys.filter((d) => !isOwnershipDoc(d) && !isEquipmentCertDoc(d) && !isOperatorDoc(d)),
+    (t) => norm(t),
+  );
+  for (const [code, held] of otherHeld) {
+    paperRows.push(
+      certRow({ key: `doc:other:${code}`, label: docTypeLabel(code), held, required: false, askType: code }),
+    );
+  }
+
+  /* ── the operator's documents — their own section, their own count ── */
+  const operatorHeld = heldByCode(machine.documentKeys.filter(isOperatorDoc), operatorCertCode);
+  const operatorRequested = readiness.operatorCerts.map((c) => operatorCertCode(c.code));
+  const operatorRequiredSet = new Set(operatorRequested);
+  const operatorRows: DocRow[] = unionCodes(operatorRequested, operatorHeld).map((code) =>
+    certRow({
+      key: `doc:operator:${code}`,
+      label: OPERATOR_CERT_ROW_LABEL[code] ?? docTypeLabel(code),
+      held: operatorHeld.get(code) ?? [],
+      required: operatorRequiredSet.has(code),
+      askType: operatorAskType(),
+    }),
+  );
 
   return [
-    { key: "photos", label: { en: "Photos", ar: "الصور" }, rows: photoRows, attention: attentionCount(photoRows) },
-    { key: "documents", label: { en: "Documents", ar: "المستندات" }, rows: paperRows, attention: attentionCount(paperRows) },
-  ];
+    { key: "photos" as const, label: { en: "Photos", ar: "الصور" }, rows: photoRows },
+    { key: "documents" as const, label: { en: "Documents", ar: "المستندات" }, rows: paperRows },
+    { key: "operator" as const, label: { en: "Operator's documents", ar: "مستندات المشغّل" }, rows: operatorRows },
+  ]
+    // A group with nothing to say is not a heading with an empty body — it is absent.
+    .filter((g) => g.rows.length > 0)
+    .map((g) => ({ ...g, attention: attentionCount(g.rows) }));
 }
 
 /* ───────────────────────────── V9 — company documents ───────────────────────────── */

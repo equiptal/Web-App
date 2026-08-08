@@ -50,7 +50,9 @@ const machine = (raw: RawMachine = {}): FleetMachine =>
       documentKeys: (raw.docs ?? []).map((d, i) => ({
         type: d.type,
         key: `d${i}`,
-        url: d.url ?? `https://x/${d.type}`,
+        // `undefined` takes the default url; an explicit `null` means a paper on the file whose link
+        // the projection did not carry — a real state, and one the row model has to survive.
+        url: d.url === undefined ? `https://x/${d.type}` : d.url,
         verifyStatus: d.verifyStatus ?? null,
         expiryDate: d.expiryDate ?? null,
       })),
@@ -241,38 +243,108 @@ describe("heroPhotoUrl", () => {
 
 /* ────────────────────────── equipment documents (V8) ────────────────────────── */
 
-describe("equipmentDocGroups — two groups, each with its own attention count (AC-42)", () => {
-  it("splits photos from documents and never merges the two counts", () => {
-    const groups = equipmentDocGroups(machine({ photos: ALL_FOUR, docs: [] }));
-    expect(groups.map((g) => g.key)).toEqual(["photos", "documents"]);
-    expect(groups[0].rows).toHaveLength(4);
-    expect(groups[1].rows).toHaveLength(3);
+/* ────────────── V8 — the document groups (§6.6, AC-38, AC-39, AC-42) ──────────────
+ *
+ * The platform's one rule (owner, 2026-08-08), applied to photos, ownership, equipment certs and
+ * operator papers alike:
+ *
+ *   required + held    → shown, green, openable
+ *   required + absent  → RED, counted, requestable
+ *   not required + held→ shown, openable, NO verdict, NOT counted, NOT requestable
+ *   not required + absent → no row at all
+ *
+ * Required = front photo · plate/serial photo · proof of ownership (all three from the supplier's own
+ * scorer, `bid_readiness.dart`) + every cert THIS request asked for.
+ */
+
+/** A request that asks for nothing — the no-operator, no-cert job. */
+const NO_ASKS: MatchRequest = {};
+/** A request naming equipment certs and/or the operator licence level the renter requires. */
+const asking = (equip: string[] = [], operator = ""): MatchRequest => ({
+  reqEquipmentCerts: equip,
+  operatorCertReq: operator || null,
+});
+const groupBy = (m: FleetMachine, r: MatchRequest) =>
+  Object.fromEntries(equipmentDocGroups(m, r).map((g) => [g.key, g]));
+
+describe("equipmentDocGroups — the groups, and each one's own attention count (AC-42)", () => {
+  it("splits photos from documents from the OPERATOR's documents, and never merges the counts", () => {
+    const groups = equipmentDocGroups(
+      machine({ photos: ALL_FOUR, docs: [{ type: "istimara" }, { type: "operator_tuv" }] }),
+      asking(["tuv"], "tuv"),
+    );
+    expect(groups.map((g) => g.key)).toEqual(["photos", "documents", "operator"]);
+    // The operator is a SECTION now, not one row buried in the equipment's papers.
+    expect(groups[2].rows.map((r) => r.key)).toEqual(["doc:operator:tuv"]);
   });
 
   it("counts ROWS NEEDING ACTION, never totals", () => {
-    const groups = equipmentDocGroups(machine({ photos: [{ slot: "front" }], docs: [{ type: "tuv" }] }));
-    expect(groups[0].attention).toBe(3); // plate · meter · side outstanding, not 4
-    expect(groups[1].attention).toBe(2); // ownership · operator outstanding, not 3
+    const g = groupBy(machine({ photos: [{ slot: "front" }], docs: [{ type: "tuv" }] }), asking(["tuv"], "tuv"));
+    expect(g.photos.attention).toBe(1); // the plate shot, and nothing else — meter and side are not required
+    expect(g.documents.attention).toBe(1); // ownership; the asked-for TÜV is on the file
+    expect(g.operator.attention).toBe(1); // the asked-for operator TÜV is not
   });
 
-  it("reports zero attention when everything is on the file", () => {
+  it("reports zero attention when everything required is on the file", () => {
     const groups = equipmentDocGroups(
       machine({ photos: ALL_FOUR, docs: [{ type: "istimara" }, { type: "tuv" }, { type: "operator_tuv" }] }),
+      asking(["tuv"], "tuv"),
     );
-    expect(groups.map((g) => g.attention)).toEqual([0, 0]);
+    expect(groups.map((g) => g.attention)).toEqual([0, 0, 0]);
   });
 
-  it("files `operating_license` under the OPERATOR row — it carries no `operator_` prefix", () => {
-    const [, docs] = equipmentDocGroups(machine({ docs: [{ type: "operating_license" }] }));
-    const operator = docs.rows.find((r) => r.key === "doc:operator_cert");
-    const equip = docs.rows.find((r) => r.key === "doc:equipment_cert");
-    expect(operator?.status).toBe("present");
-    expect(equip?.status).toBe("missing");
+  it("files `operating_license` under the OPERATOR group — it carries no `operator_` prefix", () => {
+    const g = groupBy(machine({ docs: [{ type: "operating_license" }] }), NO_ASKS);
+    expect(g.operator.rows.map((r) => r.key)).toEqual(["doc:operator:operating_license"]);
+    expect(g.operator.rows[0].label.en).toBe("Operator licence");
+    // …and NOT under the equipment's papers, which hold only the ownership row here.
+    expect(g.documents.rows.map((r) => r.key)).toEqual(["doc:ownership"]);
   });
 
-  it("does not call a spec sheet an equipment safety certificate", () => {
-    const [, docs] = equipmentDocGroups(machine({ docs: [{ type: "spec_sheet" }, { type: "other" }] }));
-    expect(docs.rows.find((r) => r.key === "doc:equipment_cert")?.status).toBe("missing");
+  it("folds the three spellings of the operator's licence into ONE row", () => {
+    const g = groupBy(
+      machine({ docs: [{ type: "operating_license" }, { type: "operator_license" }, { type: "operator_licence" }] }),
+      NO_ASKS,
+    );
+    expect(g.operator.rows).toHaveLength(1);
+    expect(g.operator.rows[0].files).toHaveLength(3);
+  });
+
+  it("keeps every operator paper the backend's vocabulary names as a row of its own", () => {
+    // web-handoff.md:16 — operator_tuv · operating_license · operator_spsp · operator_id · operator_insurance
+    const g = groupBy(
+      machine({
+        docs: [
+          { type: "operator_tuv" },
+          { type: "operating_license" },
+          { type: "operator_spsp" },
+          { type: "operator_id" },
+          { type: "operator_insurance" },
+        ],
+      }),
+      NO_ASKS,
+    );
+    expect(g.operator.rows.map((r) => r.key)).toEqual([
+      "doc:operator:tuv",
+      "doc:operator:operating_license",
+      "doc:operator:spsp",
+      "doc:operator:id",
+      "doc:operator:insurance",
+    ]);
+    expect(g.operator.rows.map((r) => r.label.en)).toEqual([
+      "Operator TÜV",
+      "Operator licence",
+      "Operator SPSP",
+      "Operator ID",
+      "Operator insurance",
+    ]);
+  });
+
+  it("does not call a spec sheet an equipment safety certificate — it calls it a spec sheet", () => {
+    const g = groupBy(machine({ docs: [{ type: "spec_sheet" }, { type: "other" }] }), asking(["tuv"]));
+    const cert = g.documents.rows.find((r) => r.key === "doc:equipment_cert:tuv")!;
+    expect(cert.status).toBe("missing");
+    expect(g.documents.rows.find((r) => r.key === "doc:other:spec_sheet")?.label.en).toBe("Spec sheet");
   });
 
   it("shows PRESENCE ONLY — never a verification badge or an expiry (AC-39, §6.6)", () => {
@@ -280,8 +352,9 @@ describe("equipmentDocGroups — two groups, each with its own attention count (
     // a supplier on a state the platform sets.
     const groups = equipmentDocGroups(
       machine({ docs: [{ type: "tuv", verifyStatus: "verified", expiryDate: "2027-03-12" }] }),
+      asking(["tuv"]),
     );
-    const row = groups[1].rows.find((r) => r.key === "doc:equipment_cert");
+    const row = groups.flatMap((g) => g.rows).find((r) => r.key === "doc:equipment_cert:tuv");
     expect(row?.statusLine.en).toBe("on the machine's file");
     const text = JSON.stringify(groups);
     for (const leak of ["verified", "failed", "2027", "expiry", "valid until"]) {
@@ -290,17 +363,235 @@ describe("equipmentDocGroups — two groups, each with its own attention count (
   });
 
   it("uses the presence vocabulary the spec names, and no other", () => {
-    const groups = equipmentDocGroups(machine({ photos: [{ slot: "front" }] }));
-    const lines = groups.flatMap((g) => g.rows.map((r) => r.statusLine.en));
-    for (const line of lines) {
-      expect(["uploaded", "not uploaded", "on the machine's file", "no document yet"]).toContain(line);
+    const groups = equipmentDocGroups(machine({ photos: ALL_FOUR, docs: [{ type: "tuv" }] }), NO_ASKS);
+    for (const line of groups.flatMap((g) => g.rows.map((r) => r.statusLine.en))) {
+      expect([
+        "uploaded",
+        "not uploaded",
+        "uploaded · not required",
+        "on the machine's file",
+        "no document yet",
+        "on the machine's file · not required",
+      ]).toContain(line);
     }
   });
 
   it("gives every row a download link when it holds a file, and none when it does not", () => {
-    const groups = equipmentDocGroups(machine({ photos: [{ slot: "front" }] }));
-    expect(groups[0].rows[0].downloadUrl).toBe("https://x/front");
-    expect(groups[0].rows[1].downloadUrl).toBeNull();
+    const g = groupBy(machine({ photos: [{ slot: "front" }] }), NO_ASKS);
+    expect(g.photos.rows[0].downloadUrl).toBe("https://x/front");
+    expect(g.photos.rows[1].downloadUrl).toBeNull();
+  });
+});
+
+describe("a document nobody asked for is never shown as missing (owner, 2026-08-08)", () => {
+  it("an unrequested cert the machine does NOT hold is not a row at all", () => {
+    const g = groupBy(machine({ docs: [] }), NO_ASKS);
+    // Only proof of ownership, which is required of every lessor regardless of the request.
+    expect(g.documents.rows.map((r) => r.key)).toEqual(["doc:ownership"]);
+    expect(g.operator).toBeUndefined();
+  });
+
+  it("an unrequested cert the machine DOES hold is shown, openable, and carries no verdict", () => {
+    const g = groupBy(machine({ docs: [{ type: "tuv" }] }), NO_ASKS);
+    const row = g.documents.rows.find((r) => r.key === "doc:equipment_cert:tuv")!;
+    expect(row.status).toBe("on_file"); // not "present" — nothing was passed, because nothing was asked
+    expect(row.statusLine.en).toBe("on the machine's file · not required");
+    expect(docRowActions(row).map((a) => a.kind)).toEqual(["view", "download"]);
+  });
+
+  it("a held-but-unrequested row raises NOBODY's attention count", () => {
+    const g = groupBy(machine({ docs: [{ type: "istimara" }, { type: "tuv" }, { type: "operator_tuv" }] }), NO_ASKS);
+    expect(g.documents.attention).toBe(0);
+    expect(g.operator.attention).toBe(0);
+  });
+
+  it("a held-but-unrequested row cannot be ticked — there is nothing to chase", () => {
+    const g = groupBy(machine({ docs: [{ type: "tuv" }, { type: "operator_tuv" }] }), NO_ASKS);
+    for (const row of [...g.documents.rows, ...g.operator.rows]) {
+      expect(row.requestable).toBe(row.key === "doc:ownership");
+    }
+  });
+
+  it("a requested cert IS requestable whether it is held or not", () => {
+    const g = groupBy(machine({ docs: [{ type: "tuv" }] }), asking(["tuv", "spsp"]));
+    const held = g.documents.rows.find((r) => r.key === "doc:equipment_cert:tuv")!;
+    const gap = g.documents.rows.find((r) => r.key === "doc:equipment_cert:spsp")!;
+    expect([held.status, held.requestable]).toEqual(["present", true]);
+    expect([gap.status, gap.requestable]).toEqual(["missing", true]);
+  });
+});
+
+describe("the operator's section on a job with NO operator", () => {
+  it("does not exist when nothing was asked for and nothing is held", () => {
+    expect(groupBy(machine({ docs: [{ type: "tuv" }] }), NO_ASKS).operator).toBeUndefined();
+  });
+
+  it("never shows a missing operator paper on a job that asked for no operator", () => {
+    const rows = equipmentDocGroups(machine({ docs: [] }), NO_ASKS).flatMap((g) => g.rows);
+    expect(rows.filter((r) => r.key.startsWith("doc:operator:"))).toEqual([]);
+  });
+
+  it("STILL shows the operator papers a lessor happens to hold — with no verdict", () => {
+    const g = groupBy(machine({ docs: [{ type: "operator_tuv" }] }), NO_ASKS);
+    expect(g.operator.rows.map((r) => r.status)).toEqual(["on_file"]);
+    expect(g.operator.attention).toBe(0);
+    expect(docRowActions(g.operator.rows[0]).map((a) => a.kind)).toEqual(["view", "download"]);
+  });
+
+  it("turns red only once the request asks for the operator's papers", () => {
+    const g = groupBy(machine({ docs: [] }), asking([], "TÜV / SPSP"));
+    expect(g.operator.rows.map((r) => [r.key, r.status])).toEqual([
+      ["doc:operator:tuv", "missing"],
+      ["doc:operator:spsp", "missing"],
+    ]);
+    expect(g.operator.attention).toBe(2);
+  });
+});
+
+describe("photos follow the same rule as the papers", () => {
+  it("front and plate are required of every lessor — absent, they are red and counted", () => {
+    const g = groupBy(machine({ photos: [] }), NO_ASKS);
+    expect(g.photos.rows.map((r) => [r.key, r.status])).toEqual([
+      ["photo:front", "missing"],
+      ["photo:plate", "missing"],
+    ]);
+    expect(g.photos.attention).toBe(2);
+  });
+
+  it("meter and side are required nowhere — absent, they are NOT rows", () => {
+    const g = groupBy(machine({ photos: ALL_FOUR.filter((p) => p.slot === "front" || p.slot === "serial") }), NO_ASKS);
+    expect(g.photos.rows.map((r) => r.key)).toEqual(["photo:front", "photo:plate"]);
+    expect(g.photos.attention).toBe(0);
+  });
+
+  it("meter and side DO show when uploaded, with no verdict and no tick", () => {
+    const g = groupBy(machine({ photos: ALL_FOUR }), NO_ASKS);
+    const meter = g.photos.rows.find((r) => r.key === "photo:meter")!;
+    expect([meter.status, meter.statusLine.en, meter.requestable]).toEqual([
+      "on_file",
+      "uploaded · not required",
+      false,
+    ]);
+    expect(g.photos.attention).toBe(0);
+  });
+});
+
+describe("a row holding several files exposes EVERY one of them", () => {
+  it("two operator certificates under one heading — not just the first", () => {
+    const g = groupBy(
+      machine({
+        docs: [
+          { type: "operator_tuv", url: "https://x/op-1" },
+          { type: "operator_tuv", url: "https://x/op-2" },
+        ],
+      }),
+      asking([], "tuv"),
+    );
+    const row = g.operator.rows[0];
+    expect(row.files.map((f) => f.url)).toEqual(["https://x/op-1", "https://x/op-2"]);
+    expect(docRowActions(row).map((a) => a.href)).toEqual([
+      "https://x/op-1",
+      "https://x/op-1",
+      "https://x/op-2",
+      "https://x/op-2",
+    ]);
+    // The invariant survives the second file: exactly one primary, and it is the first file's view.
+    expect(docRowActions(row).filter((a) => a.primary)).toHaveLength(1);
+    expect(docRowActions(row).filter((a) => a.primary)[0]).toMatchObject({ kind: "view", href: "https://x/op-1" });
+  });
+
+  it("OWNERSHIP had the identical bug — an istimara AND a customs card both reach the renter", () => {
+    const g = groupBy(
+      machine({
+        docs: [
+          { type: "istimara", url: "https://x/ist" },
+          { type: "customs_card", url: "https://x/cus" },
+        ],
+      }),
+      NO_ASKS,
+    );
+    const row = g.documents.rows.find((r) => r.key === "doc:ownership")!;
+    expect(row.files.map((f) => f.url)).toEqual(["https://x/ist", "https://x/cus"]);
+    expect(docRowActions(row)).toHaveLength(4);
+  });
+
+  it("the EQUIPMENT CERTIFICATE row too — two TÜV uploads are two openable files", () => {
+    const g = groupBy(
+      machine({
+        docs: [
+          { type: "tuv", url: "https://x/tuv-a" },
+          { type: "tüv", url: "https://x/tuv-b" },
+        ],
+      }),
+      asking(["tuv"]),
+    );
+    const row = g.documents.rows.find((r) => r.key === "doc:equipment_cert:tuv")!;
+    expect(row.files.map((f) => f.url)).toEqual(["https://x/tuv-a", "https://x/tuv-b"]);
+    expect(docRowActions(row)).toHaveLength(4);
+  });
+
+  it("names each file after its own type, so two controls are never two unlabelled twins", () => {
+    const g = groupBy(
+      machine({
+        docs: [
+          { type: "istimara", url: "https://x/ist" },
+          { type: "customs_card", url: "https://x/cus" },
+        ],
+      }),
+      NO_ASKS,
+    );
+    const row = g.documents.rows.find((r) => r.key === "doc:ownership")!;
+    expect(row.files.map((f) => f.label.en)).toEqual(["Registration (Istimara)", "Customs card"]);
+    expect(row.files.map((f) => f.label.ar)).toEqual(["الاستمارة", "البطاقة الجمركية"]);
+  });
+
+  it("a file with no url is not a control — it cannot become a link to nowhere", () => {
+    const g = groupBy(
+      machine({ docs: [{ type: "istimara", url: null }, { type: "customs_card", url: "https://x/cus" }] }),
+      NO_ASKS,
+    );
+    const row = g.documents.rows.find((r) => r.key === "doc:ownership")!;
+    expect(row.status).toBe("present"); // the paper IS on the file; only its link is absent
+    expect(docRowActions(row).map((a) => a.href)).toEqual(["https://x/cus", "https://x/cus"]);
+  });
+});
+
+describe("the batch ask raised from the operator's section (AC-38)", () => {
+  it("names the machine and the operator types, and nothing the renter did not tick", () => {
+    const g = groupBy(machine({ docs: [] }), asking(["tuv"], "tuv,spsp"));
+    const rows = [...g.documents.rows, ...g.operator.rows].filter((r) => r.requestable);
+    const draft = batchDocumentRequest("equipment", "eq-1", rows, new Set(g.operator.rows.map((r) => r.key)));
+    expect(draft).toEqual({
+      kind: "document",
+      scope: "equipment",
+      equipmentId: "eq-1",
+      // Coarse BY DESIGN — see `EQUIPMENT_ASK_TYPE`: only names proven to resolve into the backend's
+      // document catalogue are sent, and the operator category is the only proven operator name.
+      docTypes: ["operator_safety_certificate"],
+      labels: [
+        { en: "Operator TÜV", ar: "شهادة TÜV للمشغّل" },
+        { en: "Operator SPSP", ar: "شهادة SPSP للمشغّل" },
+      ],
+    });
+  });
+
+  it("an equipment ask names the precise cert where the catalogue is known to accept it", () => {
+    const g = groupBy(machine({ docs: [] }), asking(["tuv", "spsp", "aramco"]));
+    const rows = g.documents.rows.filter((r) => r.key.startsWith("doc:equipment_cert:"));
+    const draft = batchDocumentRequest("equipment", "eq-1", rows, new Set(rows.map((r) => r.key)));
+    expect(draft && draft.kind === "document" && draft.docTypes).toEqual([
+      "tuv",
+      "spsp",
+      "equipment_safety_certificate",
+    ]);
+  });
+
+  it("asks for the paper, not for a second copy of one already on the file", () => {
+    const g = groupBy(machine({ docs: [{ type: "operator_tuv" }] }), NO_ASKS);
+    // Nothing in the operator group is requestable, so a batch built from it is null and the send
+    // control disables itself from the same value it would have sent.
+    const rows = g.operator.rows.filter((r) => r.requestable);
+    expect(batchDocumentRequest("equipment", "eq-1", rows, new Set(g.operator.rows.map((r) => r.key)))).toBeNull();
   });
 });
 
@@ -337,15 +628,15 @@ describe("docRowActions — view first, download second, and neither without a u
 
 describe("every document family on this surface is openable (AC-69)", () => {
   it("equipment PAPERS — a held paper gets both controls, an absent one gets none", () => {
-    const [, papers] = equipmentDocGroups(machine({ docs: [{ type: "istimara" }] }));
-    const ownership = papers.rows.find((r) => r.key === "doc:ownership")!;
-    const operator = papers.rows.find((r) => r.key === "doc:operator_cert")!;
+    const g = groupBy(machine({ docs: [{ type: "istimara" }] }), asking(["tuv"], "tuv"));
+    const ownership = g.documents.rows.find((r) => r.key === "doc:ownership")!;
+    const operator = g.operator.rows.find((r) => r.key === "doc:operator:tuv")!;
     expect(docRowActions(ownership).map((a) => a.kind)).toEqual(["view", "download"]);
     expect(docRowActions(operator)).toEqual([]);
   });
 
   it("equipment PHOTOS — a separate group, and just as openable as a paper", () => {
-    const [photos] = equipmentDocGroups(machine({ photos: [{ slot: "front" }] }));
+    const [photos] = equipmentDocGroups(machine({ photos: [{ slot: "front" }] }), NO_ASKS);
     const front = photos.rows.find((r) => r.key === "photo:front")!;
     expect(docRowActions(front).map((a) => a.kind)).toEqual(["view", "download"]);
     expect(docRowActions(front)[0].href).toBe("https://x/front");
@@ -393,12 +684,21 @@ describe("every document family on this surface is openable (AC-69)", () => {
   it("being openable adds NO verification state to an equipment row (§6.6, §7.2)", () => {
     const groups = equipmentDocGroups(
       machine({ docs: [{ type: "istimara", verifyStatus: "verified", expiryDate: "2030-01-01" }] }),
+      asking(["tuv"], "tuv"),
     );
     for (const row of groups.flatMap((g) => g.rows)) {
-      expect(["present", "missing"]).toContain(row.status);
-      expect(["uploaded", "not uploaded", "on the machine's file", "no document yet"]).toContain(row.statusLine.en);
+      expect(["present", "on_file", "missing"]).toContain(row.status);
+      expect([
+        "uploaded",
+        "not uploaded",
+        "uploaded · not required",
+        "on the machine's file",
+        "no document yet",
+        "on the machine's file · not required",
+      ]).toContain(row.statusLine.en);
+      // The row's whole shape, so a verify badge or an expiry cannot arrive by accident.
       expect(Object.keys(row).sort()).toEqual(
-        ["docTypes", "downloadUrl", "key", "label", "status", "statusLine", "thumbUrl"],
+        ["docTypes", "downloadUrl", "files", "key", "label", "requestable", "status", "statusLine", "thumbUrl"],
       );
     }
   });
