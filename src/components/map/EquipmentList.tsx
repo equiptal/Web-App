@@ -169,9 +169,15 @@ export function EquipmentList({
                   );
                 })}
               </div>
-              {/* A machine whose distance is unknown is kept by every band — «غير معروفة» is not
-                  «بعيدة». The chips cannot show that, so it is said. */}
-              {g.keepsUnknownDistance && <span className="bm-eqf-note">{t.bidMap.eqFilterUnknownDistance}</span>}
+              {/* The note that used to sit here — «machines with an unknown distance are still
+                  shown» — is gone by decision (owner, 2026-08-08): a yard is required to register a
+                  machine, so a null distance needs a yard DELETED after the fact, or one the
+                  ownership gate refuses. Rare enough that a permanent line explaining it is clutter.
+
+                  **The BEHAVIOUR it described is unchanged** — `keepsUnknownDistance` still reports
+                  it and such a machine is still kept by every band. Filtering it out would delete a
+                  real offered machine on the strength of a fact nobody has, and «غير معروفة» is not
+                  «بعيدة». Only the explanation is withdrawn, not the rule. */}
             </div>
           ))}
         </div>
