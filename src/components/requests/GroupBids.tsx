@@ -8,6 +8,7 @@ import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/cli
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
 import { BidReadinessBadge, BidEligibilityModal } from "@/components/requests/BidReadiness";
 import { computeBidReadiness } from "@/lib/contract/bid-readiness";
+import { mayOpenEquipmentSurface } from "@/lib/contract/bid-equipment-access";
 import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
 import { SharedBidNegotiateRoom } from "@/components/requests/SharedBidNegotiateRoom";
@@ -1028,8 +1029,13 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
               {/* RMAP V1 — the entry to the equipment-verification surface. A LINK, not a view flag:
                   the surface is addressable by `bidId` alone, so this caller needs to know nothing
                   about how it is built, and the next entry point (the redesigned all-bids view, the
-                  inbox, a notification) is the same href. Following it creates no deal room. */}
-              {!selectMode && (
+                  inbox, a notification) is the same href. Following it creates no deal room.
+
+                  V13/RM3-AC-25 — never offered for an off-platform bid. Such a bid already takes the
+                  `SharedLinkBidCard` branch above and never reaches this row, so today the predicate
+                  is belt to that structural brace; it is stated anyway because the branch is a
+                  rendering choice, not a rule, and the next entry point will copy this row. */}
+              {!selectMode && mayOpenEquipmentSurface(b) && (
                 <Link href={`/bids/${encodeURIComponent(b.id)}/equipment`} style={{ ...blueLink, textDecoration: "none" }}>
                   {t.bidMap.verifyEntry} ›
                 </Link>

@@ -27,6 +27,7 @@ import { useAuthGate } from "@/components/auth/AuthGate";
 import { BidMapWorkspace } from "@/components/map/BidMapWorkspace";
 import { Icon } from "@/components/ui";
 import { fetchBidDetail } from "@/lib/api/client";
+import { isOffPlatformBid, isOffPlatformBidId } from "@/lib/contract/bid-equipment-access";
 import type { BidCard } from "@/lib/contract/bids";
 import type { RequestRecord } from "@/lib/contract/requests";
 import { useT } from "@/lib/i18n";
@@ -66,6 +67,14 @@ function BidEquipmentGate({ bidId }: { bidId: string }) {
     );
   }
   if (status !== "authed") return null; // resolving session — avoid flashing the gate
+
+  // RM3-AC-25 — an off-platform bid does not open this surface, and the refusal happens BEFORE the
+  // fetch, not after it. `link-…` is a `LinkBidSubmission` id, not a `Bid` id: `GET /marketplace/
+  // bids/link-…` cannot resolve one, so fetching first would land in `bidFailed` — "this offer
+  // couldn't be loaded… it may have been withdrawn" — which claims the bid does not exist. It does
+  // exist; it simply lives somewhere else. Refusing on the id says so, and issues no request at all.
+  if (isOffPlatformBidId(bidId)) return <OffPlatformState />;
+
   return <BidEquipment bidId={bidId} />;
 }
 
@@ -134,14 +143,10 @@ function BidEquipment({ bidId }: { bidId: string }) {
   if (!bid) {
     return <div className="py-20 text-center text-[13px] font-bold text-muted">{t.bidMap.loadingBid}</div>;
   }
-  // RM3-AC-25 — an off-platform bid does not open this surface. It keeps `SharedBidSubmissionModal` +
-  // `SharedBidNegotiateRoom` exactly as they ship, both reachable from the bids list, so this states
-  // where to go rather than rendering a verification view over items that carry nothing to verify.
-  if (bid.viaSharedLink === true) {
-    return (
-      <StatePanel title={t.bidMap.offPlatformNotHere} body={t.bidMap.offPlatformNotHereWhy} back={t.bidMap.backToBids} />
-    );
-  }
+  // RM3-AC-25, second line of defence. The id check above is the one that fires today; this catches a
+  // bid that arrives flagged off-platform from a mapper that does not exist yet. Both read the same
+  // predicate, so the two can never disagree about what "off-platform" means.
+  if (isOffPlatformBid(bid)) return <OffPlatformState />;
 
   return (
     <BidMapWorkspace
@@ -153,6 +158,27 @@ function BidEquipment({ bidId }: { bidId: string }) {
       // needs a handler from here. V9's company panel still lands with the ticket that owns it, so
       // its entry stays visible and inert rather than pretending a panel opened.
     />
+  );
+}
+
+/**
+ * What an off-platform `bidId` renders (RM3-AC-25, §6.11).
+ *
+ * **A stated refusal, not a redirect** — decided because there is nothing to redirect *to*. The
+ * off-platform flow is `SharedBidSubmissionModal` / `SharedBidNegotiateRoom`, and both are modals
+ * opened from a bids list by local state (`setSubmissionBid(b)`); neither has a URL. Sending the
+ * renter to a URL that reopens his submission would mean inventing a deep-link contract for a flow
+ * §6.11 says this spec "adds nothing to" — so the surface names the offer's origin, says why there is
+ * nothing here to verify, and points at the list the viewer actually opens from. Reversible: if a
+ * deep link is ever added, this component is the single place that becomes a redirect.
+ *
+ * It renders no half-surface: no panel, no map, no counts — none of which has a referent when the
+ * offer carries items rather than registered machines.
+ */
+function OffPlatformState() {
+  const t = useT();
+  return (
+    <StatePanel title={t.bidMap.offPlatformNotHere} body={t.bidMap.offPlatformNotHereWhy} back={t.bidMap.backToBids} />
   );
 }
 
