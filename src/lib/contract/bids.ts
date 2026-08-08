@@ -552,7 +552,11 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
   };
 }
 
-function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
+/** Exported for the single-bid read (`GET /api/me/bids/:id`), which the equipment-verification surface
+ *  resolves itself: that surface is addressable by `bidId` alone (RM3-AC-01, V1), so it cannot go
+ *  through `mapBidList` — there is no request id to list by. Same parser, so one bid can never read
+ *  differently on its own route than it does in the list. */
+export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   const sup = (raw.supplier ?? {}) as Record<string, unknown>;
   const prof = (sup.supplierProfile ?? {}) as Record<string, unknown>;
   // The company-verification docs (CR/VAT/national address) can hang off several shapes depending on

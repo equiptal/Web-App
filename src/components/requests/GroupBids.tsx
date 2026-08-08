@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
-import { fetchBids, fetchRequestDetail, fetchRequestSubmissions, startDealRoom } from "@/lib/api/client";
-import { BidMapWorkspace } from "@/components/map/BidMapWorkspace";
+import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/client";
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
 import { BidReadinessBadge, BidEligibilityModal } from "@/components/requests/BidReadiness";
 import { computeBidReadiness } from "@/lib/contract/bid-readiness";
@@ -18,7 +18,7 @@ import { bidSuppliers, bidSupplierKey, bucketBidTerms, CERT_LABEL, type BidCard,
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { qualityFromSubmissionItem, type BidQuality } from "@/lib/contract/bid-quality";
 import { computeBidQuote } from "@/lib/contract/comparison";
-import { shortRef, type RequestGroup, type RequestRecord } from "@/lib/contract/requests";
+import { shortRef, type RequestGroup } from "@/lib/contract/requests";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { quotationDownloadName } from "@/lib/compare/quotation-token";
@@ -96,16 +96,13 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
 
   const [bids, setBids] = useState<GroupBid[] | null>(null);
   const [error, setError] = useState(false);
-  // ── RMAP T11/T13 · map view + freshness ────────────────────────────────────────────────────────
-  // Map state (view mode, the selected bid) is LOCAL to this component by design (spec §6.6 "Store —
-  // none"), and every fetch on this screen is owned here — the map workspace never fetches (A4).
-  const [view, setView] = useState<"list" | "map">("list");
-  // The bid the verification surface resolves. v3 scopes that surface to ONE bid, and V1 makes it
-  // addressable by `bidId`, so this is a temporary in-page entry until the route lands. Selecting
-  // creates NO deal room (a `DealRoom` row would freeze the supplier's offered count).
-  const [mapBidId] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [reqDetail, setReqDetail] = useState<RequestRecord | null>(null); // the active item's request — the project pin's only source
+  // ── RMAP · freshness ───────────────────────────────────────────────────────────────────────────
+  // The `[list │ map]` toggle and its hardcoded `mapBidId` are gone with V1: the verification surface
+  // is its own route, `/bids/[bidId]/equipment`, entered by opening ONE bid. This screen keeps the
+  // refetch freshness path, which that route reuses, and nothing about the map.
+  // Re-entrancy is a REF, not state: nothing on this screen renders a "refreshing" affordance since
+  // the map panel that hosted one moved to its own route, and a state nobody reads is a state that
+  // silently re-renders the whole bid grid on every focus event.
   const bidsRef = useRef<GroupBid[] | null>(null); // current list, for the arrival diff without re-running the fetch
   const lastFetchRef = useRef(0);
   const refreshingRef = useRef(false);
@@ -232,7 +229,6 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       if (refreshingRef.current) return;
       if (!force && Date.now() - lastFetchRef.current < STALE_MS) return;
       refreshingRef.current = true;
-      setRefreshing(true);
       try {
         const next = await fetchGroupBids();
         lastFetchRef.current = Date.now();
@@ -248,36 +244,19 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       } catch {
         // Keep what we have — a failed refresh must never empty a list the renter is reading.
       } finally {
-        setRefreshing(false);
         refreshingRef.current = false;
       }
     },
     [fetchGroupBids],
   );
 
-  // Focus refetch is confined to the map view so list view keeps today's behaviour exactly.
+  // Returning from the verification surface (or from anywhere else) refetches, under the same
+  // staleness guard. It is no longer confined to a view mode, because there is no view mode.
   useEffect(() => {
-    if (view !== "map") return;
     const onFocus = () => { void refreshBids(false); };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [view, refreshBids]);
-
-  // Opening the map is a "mount" of this surface — same staleness guard, so switching back and forth
-  // does not hammer the API.
-  useEffect(() => { if (view === "map") void refreshBids(false); }, [view, refreshBids]);
-
-  // The project pin's only source. Every item of a group shares one project location (a group is one
-  // submission fanned out), but this scopes to the ACTIVE item so it stays exact if that ever changes.
-  const siteItemId = selectedItem !== "all" ? selectedItem : group.items[0]?.id ?? null;
-  useEffect(() => {
-    if (view !== "map" || !siteItemId) return;
-    let active = true;
-    fetchRequestDetail(siteItemId)
-      .then((r) => { if (active) setReqDetail(r); })
-      .catch(() => { if (active) setReqDetail(null); });
-    return () => { active = false; };
-  }, [view, siteItemId]);
+  }, [refreshBids]);
 
   // B4: while comparing, a click anywhere outside the selection UI (toolbar / cards / action bar, all
   // tagged data-select-ui) exits selection — replaces the old Cancel button.
@@ -763,17 +742,6 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           })}
         </div>
         <div style={{ width: 1, height: 34, background: "#D7DEE8", flexShrink: 0 }} />
-        {/* RMAP T11 — list | map. Map view replaces the bid-card grid with the map workspace; the item
-            selector and the filter beside it keep scoping both views, so the map needs no strip of its
-            own (AC-22, AC-23). */}
-        <div className="bm-toggle">
-          {([["list", t.bidMap.listView, "view_agenda"], ["map", t.bidMap.view, "map"]] as const).map(([k, label, icon]) => (
-            <button key={k} type="button" className={view === k ? "on" : undefined} onClick={() => setView(k)}>
-              <span className="material-icons-outlined">{icon}</span>
-              {label}
-            </button>
-          ))}
-        </div>
         {/* item picker */}
         <div style={{ position: "relative", flexShrink: 0 }}>
           <button onClick={() => { setItemMenuOpen((o) => !o); setFilterOpen(false); }} title={L("Filter by item", "تصفية حسب البند")} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 11, border: "1.5px solid #1c3550", background: "#1c3550", color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer" }}>
@@ -870,19 +838,6 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         </div>
       </div>
 
-      {/* RMAP T12 — map view REPLACES the bid-card grid. Everything above (chips · item · filter) still
-          scopes it, and the modals below still open from it, so this is a swap of one surface, not a
-          second screen. `shown` is the same filtered list the grid renders. */}
-      {view === "map" && (
-        <BidMapWorkspace
-          bids={shown}
-          request={reqDetail}
-          selectedBidId={mapBidId}
-          refreshing={refreshing}
-        />
-      )}
-
-      {view === "list" && (<>
       <div data-select-ui style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "0 0 14px", flexWrap: "wrap" }}>
         <span style={{ fontSize: 13, fontWeight: 700, color: "#2a4f72" }}>
           {selectMode
@@ -1070,6 +1025,15 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
               {!selectMode && (
                 <button onClick={() => setEquipBid(b)} style={blueLink}>{L("Details", "التفاصيل")} ›</button>
               )}
+              {/* RMAP V1 — the entry to the equipment-verification surface. A LINK, not a view flag:
+                  the surface is addressable by `bidId` alone, so this caller needs to know nothing
+                  about how it is built, and the next entry point (the redesigned all-bids view, the
+                  inbox, a notification) is the same href. Following it creates no deal room. */}
+              {!selectMode && (
+                <Link href={`/bids/${encodeURIComponent(b.id)}/equipment`} style={{ ...blueLink, textDecoration: "none" }}>
+                  {t.bidMap.verifyEntry} ›
+                </Link>
+              )}
             </div>
 
             {/* Terms row */}
@@ -1183,7 +1147,6 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           </button>
         </div>
       )}
-      </>)}
 
       {/* Quotation language chooser — one PDF in the chosen language (no 2-in-1). */}
       {langPick && (

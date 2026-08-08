@@ -135,45 +135,64 @@ export function isPlottable(unit: Pick<OfferedUnitDetail, "lat" | "lng" | "locat
 /* ─────────────────────────────────────── counts ─────────────────────────────────────── */
 
 export interface UnitCounts {
-  /** What the supplier QUOTED — `unitsOffered.length`, already reduced to its length by `mapBid`. */
+  /** What the supplier QUOTED for this bid — `unitsOffered.length`, already reduced to its length by
+   *  `mapBid`. **Never `agreedUnits`** (RM3-AC-65/67): the pills describe the OFFER, and the price
+   *  footer is the one surface that prices on what was agreed. A mid-negotiation
+   *  `lastProposedRentalUnits` is an unapproved counter and must not rewrite what the offer says. */
   offered: number;
-  /** How many distinct machines he actually named — the deduped `offeredUnitsDetail` length. */
-  identified: number;
-  /** The gap. Claimed units with no machine behind them. Never negative. */
-  unidentified: number;
-}
-
-/** Distinct `equipmentId`s in a detail list. The backend dedupes already (padding is genuinely the same
- *  machine — `while (ids.length < count) ids.add(primary)`), but a count that silently double-counts a
- *  padded array would be a lie, so this never trusts the payload for it. */
-function distinctUnits(detail: OfferedUnitDetail[] | undefined): OfferedUnitDetail[] {
-  const seen = new Set<string>();
-  const out: OfferedUnitDetail[] = [];
-  for (const u of detail ?? []) {
-    const id = u.equipmentId;
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    out.push(u);
-  }
-  return out;
+  /** Machines this bid actually names — fleet rows with `inBid === true`, and only those (004a §4.2).
+   *  The fleet response also carries machines the supplier owns but did NOT offer, so counting every
+   *  row here would understate every shortfall to zero. */
+  registered: number;
+  /** The shortfall: `offered − registered`, **clamped at 0** (RM3-AC-31). Units quoted as a count with
+   *  no machine behind them — no location, no documents, no serial, and never drawn on the map. */
+  claimed: number;
+  /** How many QUALIFYING machines the supplier owns — the fleet response's row count (§7.1: *"the
+   *  fleet total is this response's row count"*). Qualifying, not total inventory: `getMatchedFleet`
+   *  filters by the request's subtype **and** capacity (004a §4.1), so copy built on this number must
+   *  never imply the supplier's whole fleet. */
+  owned: number;
 }
 
 /**
- * The two coverage numbers, **deliberately not reconciled** (§6.12, AC-37, AC-184).
+ * The three numbers the count pills and the shortfall alert are built from (§6.2, §6.3).
  *
- * `offered` is commercial coverage — what the supplier quoted. `identified` is verifiable substance —
- * what the renter can actually inspect. They differ whenever a supplier quotes a count above the
- * machines he registered, or (after the T2 ownership fix) names a machine he does not own. **That
- * difference is information, not an error**: it is precisely the gap the composition bar exists to
- * expose, so nothing here may clamp one to the other. No surface may present `offered` as a number of
- * machines.
+ * **`claimed` is `offered − registered` and nothing else** (RM3-AC-31). Two wrong derivations were
+ * available and both are excluded by construction: subtracting the fleet TOTAL (which counts machines
+ * that were never offered, so a supplier with a big yard would never show a shortfall), and counting
+ * `offeredUnitsDetail` (which the backend pads with the primary machine — `while (ids.length < count)
+ * ids.add(primary)` — so a padded array reads as fully backed).
+ *
+ * The counts can MOVE while the renter is looking: until the deal room exists the supplier can still
+ * add units, and `unitsOffered.length` is the offered count (004a §4.3). Nothing here caches, and no
+ * copy built on it may imply the numbers are fixed.
  */
-export function unitCounts(bid: Pick<BidCard, "unitsOffered" | "offeredUnitsDetail">): UnitCounts {
+export function unitCounts(
+  bid: Pick<BidCard, "unitsOffered">,
+  // Structurally typed rather than importing `FleetMachine`, so this file stays free of the fetch
+  // contract and its Dart port has nothing extra to carry.
+  fleet: readonly { inBid: boolean }[],
+): UnitCounts {
   // `mapBid` stores `unitsOffered` as the ARRAY'S LENGTH, not the array (`bids.ts` — the wire field is
   // `bid.units_offered: []`). So the offered count is read straight off the field.
   const offered = Math.max(0, finite(bid.unitsOffered) ?? 0);
-  const identified = distinctUnits(bid.offeredUnitsDetail).length;
-  return { offered, identified, unidentified: Math.max(0, offered - identified) };
+  const registered = fleet.reduce((n, m) => (m.inBid === true ? n + 1 : n), 0);
+  return { offered, registered, claimed: Math.max(0, offered - registered), owned: fleet.length };
+}
+
+/**
+ * Which of §6.2's three cases these counts are — the one place the branch is decided, so the pills and
+ * the alert can never disagree about which state they are rendering.
+ *
+ * `single` (offered ≤ 1) → the owned pill alone. `multi` → both pills, **no** alert (RM3-AC-04).
+ * `short` → both pills **plus** the alert. The alert renders on `short` and on nothing else, so its
+ * absence reliably means nothing is claimed (RM3-AC-05).
+ */
+export type CountCase = "single" | "multi" | "short";
+
+export function countCase(counts: Pick<UnitCounts, "offered" | "claimed">): CountCase {
+  if (counts.offered <= 1) return "single";
+  return counts.claimed > 0 ? "short" : "multi";
 }
 
 /* ────────────────────────────── per-unit indicators (§6.6) ────────────────────────────── */
@@ -348,4 +367,37 @@ function toArabicIndic(n: number): string {
  */
 export function unitCountLabel(n: number): string {
   return `${toArabicIndic(n)} وحدة`;
+}
+
+/** The bare numeral in Arabic-Indic digits — for a pill whose noun comes from the taxonomy rather than
+ *  from `unitCountLabel`'s literal «وحدة». Same formatter, without the noun. */
+export function arabicIndicDigits(n: number): string {
+  return toArabicIndic(n);
+}
+
+/**
+ * **English only.** The count pill's type word has to agree in number with the count (RM3-AC-08), and
+ * the type comes from the REQUEST's taxonomy — a plain noun phrase like `Forklift` or `Mobile crane`,
+ * with the capacity (`3 ton`) carried as a separate field. So agreement is the last word's plural.
+ *
+ * Arabic gets **no** counterpart on purpose. Its counted-noun rule needs singular/dual/plural forms of
+ * the taxonomy word, and the taxonomy stores exactly one form — deriving a broken plural from a name is
+ * not a transformation this data supports. It therefore follows the same product decision
+ * `unitCountLabel` records: **one literal form for every count**.
+ */
+export function englishTypePlural(name: string | null | undefined, n: number): string {
+  const base = (name ?? "").trim();
+  if (!base || n === 1) return base;
+  const words = base.split(/\s+/);
+  const last = words[words.length - 1];
+  // Only inflect a word that is actually a word — a name ending in a number or a symbol (`3T`) has no
+  // English plural to reach for, so it is left exactly as the taxonomy wrote it.
+  if (!/^[A-Za-z]+$/.test(last)) return base;
+  const lower = last.toLowerCase();
+  let plural: string;
+  if (/(s|x|z|ch|sh)$/.test(lower)) plural = `${last}es`;
+  else if (/[^aeiou]y$/.test(lower)) plural = `${last.slice(0, -1)}ies`;
+  else plural = `${last}s`;
+  words[words.length - 1] = plural;
+  return words.join(" ");
 }

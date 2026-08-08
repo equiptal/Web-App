@@ -12,8 +12,15 @@
      deep #0F2238 · navy #1C3550 · muted #6B8FA8 · border #C8D8E8 · blt #E4EDF5 · surface #EFF4F9
      s2 #F8FAFC · blue #2563EB · green #16A34A · red #D9362A · amber #D4780A                       */
 
+/* v3 §5 — a FIXED-WIDTH panel with the map filling the rest. v2's full-bleed canvas with a floating
+   panel went with the offers list it hosted: this surface verifies one offer, so its content is a
+   column that is read top to bottom, and a column that floats over the map hides the machines it is
+   describing. The panel is the LAST child, which is what lands it on the inline-end edge — the same
+   edge the prototype's physical `left: 18px` lands on in Arabic — in both directions. */
 .bidmap {
   position: relative;
+  display: flex;
+  align-items: stretch;
   height: min(78vh, 820px);
   min-height: 520px;
   border: 1px solid #e4edf5;
@@ -23,10 +30,10 @@
   color: #0f2238;
 }
 
-/* The map is full-bleed and the tools float over it (design.md §1) — never a two-column split. */
 .bidmap .bm-canvas {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   background: radial-gradient(120% 90% at 50% 30%, #dde9e0 0%, #c9dacb 100%);
 }
@@ -206,33 +213,136 @@
   box-shadow: 0 8px 24px rgba(15, 34, 56, 0.14);
 }
 
-/* ── Bid panel (design.md §1) ────────────────────────────────────────────────────────────────────
-   The prototype uses PHYSICAL `left: 18px` on an RTL page, i.e. the INLINE-END edge, which is also
-   what AC-30/AC-98 require in words. `inset-inline-end` reproduces the Arabic arrangement exactly and
-   mirrors it in English, where the rail and drawer (inline-start, T33/T18) mirror with it — so the two
-   never trade places. */
+/* ── V2 · the panel (§5) ─────────────────────────────────────────────────────────────────────────
+   A fixed-width column in flow, not an overlay. `flex-shrink: 0` is the "fixed width" of §5: the map
+   gives up space, never the panel, because a panel that narrows re-wraps the count pills and the
+   equipment cards at every viewport. */
 .bidmap .bm-panel {
-  position: absolute;
+  position: relative;
   z-index: 24;
-  top: 18px;
-  inset-inline-end: 18px;
+  flex: 0 0 392px;
   width: 392px;
-  max-width: calc(100% - 130px);
-  max-height: calc(100% - 36px);
+  max-width: 62%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.97);
-  backdrop-filter: blur(10px);
-  border: 1px solid #e4edf5;
-  border-radius: 18px;
-  box-shadow: 0 16px 44px rgba(15, 34, 56, 0.18);
-  animation: dpFade 0.18s ease;
+  background: #fff;
+  border-inline-start: 1px solid #e4edf5;
 }
 
-.bidmap .bm-head { flex-shrink: 0; padding: 13px 15px 11px; border-bottom: 1px solid #e4edf5; }
-.bidmap .bm-head-row { display: flex; align-items: center; gap: 8px; }
-.bidmap .bm-title { font-size: 13.5px; font-weight: 700; color: #0f2238; }
+/* Header — identity, and nothing else (RM3-AC-02). */
+.bidmap .bm-head { flex-shrink: 0; padding: 14px 15px 12px; border-bottom: 1px solid #e4edf5; }
+.bidmap .bm-head-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bidmap .bm-title {
+  font-size: 14.5px;
+  font-weight: 800;
+  color: #0f2238;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Rendered ONLY when the supplier is verified — there is no "not verified" variant, because an absent
+   chip is the honest statement and a grey one reads as a mark against him. */
+.bidmap .bm-verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 800;
+  color: #16a34a;
+  background: rgba(22, 163, 74, 0.09);
+  border: 1px solid rgba(22, 163, 74, 0.25);
+  border-radius: 20px;
+  padding: 2px 8px;
+}
+.bidmap .bm-verified .material-icons-outlined { font-size: 13px; }
+/* The one entry to the company's papers. The header states identity; verification state and expiry
+   live on the rows behind this control (§6.1, V9). */
+.bidmap .bm-docsentry {
+  margin-top: 10px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #f8fafc;
+  border: 1px solid #e4edf5;
+  border-radius: 10px;
+  padding: 8px 11px;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #1c3550;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: start;
+}
+.bidmap .bm-docsentry:disabled { cursor: default; opacity: 0.55; }
+.bidmap .bm-docsentry .material-icons-outlined { font-size: 16px; color: #6b8fa8; }
+.bidmap .bm-docsentry-chev { margin-inline-start: auto; }
+
+/* ── V3 · count pills (§6.2) ─────────────────────────────────────────────────────────────────────
+   Two independent pills so each number is readable on its own. Nothing here is a sentence, and
+   nothing here is a bar: the composition bar was v2's, and it made a supplier's shortfall a shape to
+   interpret rather than a number to read. */
+.bidmap .bm-counts { flex-shrink: 0; display: flex; flex-wrap: wrap; gap: 6px; padding: 11px 15px 0; }
+.bidmap .bm-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 20px;
+  padding: 5px 11px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+/* What he OWNS that fits this request — never his whole yard (004a §4.1). */
+.bidmap .bm-pill-owned { color: #1c3550; background: #eff4f9; border: 1px solid #e4edf5; }
+/* What THIS offer is made of. Blue, the surface's action colour, because it is the number the renter
+   is actually deciding about — and never green or red, which are availability's alone. */
+.bidmap .bm-pill-offer { color: #2563eb; background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.22); }
+
+/* ── V4 · shortfall alert (§6.3) ─────────────────────────────────────────────────────────────────
+   ORANGE (#d4780a), never red. Red on this surface means availability and nothing else; a shortfall
+   is an incomplete offer, not an unavailable machine, and one colour for two problems collapses them
+   (RM3-AC-06). */
+.bidmap .bm-short {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 11px 15px 0;
+  padding: 10px 12px;
+  background: rgba(212, 120, 10, 0.07);
+  border: 1px solid rgba(212, 120, 10, 0.28);
+  border-radius: 12px;
+}
+.bidmap .bm-short-ic { font-size: 18px; color: #d4780a; flex-shrink: 0; }
+.bidmap .bm-short-body { flex: 1; min-width: 0; }
+.bidmap .bm-short-t { font-size: 11.5px; font-weight: 800; color: #8a4f08; line-height: 1.5; }
+.bidmap .bm-short-s { font-size: 9.5px; font-weight: 600; color: #6b8fa8; margin-top: 4px; line-height: 1.7; }
+/* The ask itself is BLUE, not the alert's orange: it is an action, and an action tinted with the
+   warning it sits inside reads as part of the warning (the same reasoning as AC-33). */
+.bidmap .bm-short-act {
+  flex-shrink: 0;
+  align-self: center;
+  background: #2563eb;
+  border: 0;
+  color: #fff;
+  border-radius: 9px;
+  padding: 7px 11px;
+  font-size: 10.5px;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.bidmap .bm-short-act:disabled { cursor: default; opacity: 0.5; }
+
+/* The panel's scrolling body — V5's equipment list, V7's detail and V9's company panel mount here.
+   It is the only part that scrolls, so the header, the pills and the alert stay in view while the
+   renter reads the machines they describe. */
+.bidmap .bm-body { flex: 1; min-height: 0; overflow-y: auto; padding: 11px 15px 15px; }
+
 .bidmap .bm-count {
   font-size: 10.5px;
   font-weight: 700;
@@ -499,24 +609,8 @@
 .bidmap .bm-empty-t { font-size: 13.5px; font-weight: 800; color: #0f2238; }
 .bidmap .bm-empty-s { font-size: 11px; font-weight: 600; color: #6b8fa8; margin-top: 6px; line-height: 1.7; }
 
-/* ── T11 · view toggle ─────────────────────────────────────────────────────────────────────────── */
-.bm-toggle { display: flex; gap: 4px; flex-shrink: 0; background: #eff4f9; padding: 3px; border-radius: 11px; }
-.bm-toggle button {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: #6b8fa8;
-  border-radius: 9px;
-  padding: 7px 12px;
-  font-size: 13px;
-  font-weight: 800;
-  cursor: pointer;
-  font-family: inherit;
-}
-.bm-toggle button.on { background: #fff; border-color: #d4e0ec; color: #1c3550; box-shadow: 0 1px 3px rgba(15, 34, 56, 0.08); }
-.bm-toggle button .material-icons-outlined { font-size: 17px; }
+/* T11's `[list │ map]` toggle is gone with V1: the surface is a ROUTE keyed by `bidId`, entered by
+   opening a bid, so there is no view mode to switch and nothing for a toggle to switch between. */
 
 /* Prototype keyframes (design.md §5), all disabled under `prefers-reduced-motion`. */
 @keyframes dpPulse { 0% { transform: scale(0.55); opacity: 0.9; } 70% { transform: scale(1.3); opacity: 0; } 100% { opacity: 0; } }

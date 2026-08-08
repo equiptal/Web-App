@@ -829,9 +829,31 @@ export const en = {
    * push — `freshnessNote` states the three triggers explicitly (§7.5.1).
    */
   bidMap: {
-    // T11 — the view toggle
-    view: "Map",
-    listView: "List",
+    /* ── v3 · the equipment-verification surface (spec 004 §5, §6.1–§6.3) ──
+       The route, the panel header, the count pills and the shortfall alert. */
+    // V1 — the route, and the entry to it from a bid card
+    surfaceTitle: "Equipment in this offer",
+    verifyEntry: "Check the equipment",
+    loadingBid: "Loading this offer…",
+    bidFailed: "This offer couldn't be loaded",
+    bidFailedWhy: "It may have been withdrawn, or the link may be out of date. Open it again from your bids.",
+    backToBids: "Back to the bids",
+    signInTitle: "Sign in to check this offer's equipment",
+    signInBody: "Offers are tied to your account.",
+    signIn: "Sign in",
+    // Off-platform offers never open this surface (RM3-AC-25) — they keep their own viewer.
+    offPlatformNotHere: "This offer came in through your shared link",
+    offPlatformNotHereWhy: "It carries items, not registered machines — so there is nothing here to place or verify. Open it from your bids to read the submission and reply.",
+    // V2 — panel header. Identity only: no contact details, no deals count, no IBAN, CR or VAT.
+    verifiedCompany: "Verified company",
+    companyDocuments: "Company documents",
+    // V3 — the count pills. `type` is the REQUEST's own equipment type, and it agrees with the count.
+    // "With the lessor" means machines that FIT this request, never his whole yard.
+    countOwned: "{n} {type} with the lessor",
+    countInOffer: "{n} in this offer",
+    // V4 — the shortfall alert. It states the DIFFERENCE, not the offered total.
+    shortfall: "{n} in this offer have no registered machine — they don't appear on the map",
+    shortfallAction: "Ask him to add them",
     // Map canvas
     yourSite: "Your site",
     noSiteLocation: "This request has no project location",

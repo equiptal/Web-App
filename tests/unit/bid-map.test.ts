@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
   MIN_PIN_GAP_PX,
+  arabicIndicDigits,
+  countCase,
   decollide,
+  englishTypePlural,
   isPlottable,
   resolveUnitLocation,
   unitAvailability,
@@ -45,6 +48,10 @@ const located = (source: UnitLocationSource, p: Partial<OfferedUnitDetail> = {})
 
 const bid = (p: Partial<BidCard> = {}): BidCard =>
   ({ id: "b1", unitsOffered: 1, price: null, distanceKm: null, ...p }) as BidCard;
+
+/** One fleet row, reduced to the single field the counts read: is this machine IN this bid? The fleet
+ *  endpoint returns every qualifying machine the supplier owns, offered or not (§7.1). */
+const fleet = (inBid: boolean) => ({ inBid });
 
 const readiness = (band: UnitReadiness["band"]): UnitReadiness =>
   ({ equipmentId: "eq-1", band, done: 1, total: 1, percent: 100 }) as UnitReadiness;
@@ -124,29 +131,91 @@ describe("resolveUnitLocation — position, kept separate from commitment", () =
   });
 });
 
-describe("unitCounts — offered vs identified, deliberately unreconciled (AC-37, AC-184, TC-27)", () => {
-  it("a padded array [A,A,B] reads identified 2 / offered 3 / unidentified 1", () => {
-    const counts = unitCounts(
-      bid({
-        unitsOffered: 3,
-        offeredUnitsDetail: [unit({ equipmentId: "A" }), unit({ equipmentId: "A" }), unit({ equipmentId: "B" })],
-      }),
-    );
-    expect(counts).toEqual({ offered: 3, identified: 2, unidentified: 1 });
+describe("unitCounts — the three numbers behind the pills and the shortfall (RM3-AC-31, TC-15)", () => {
+  it("counts REGISTERED as `inBid === true` rows only — the fleet also carries machines he did not offer", () => {
+    // 4 qualifying machines in the yard, 2 of them actually in this offer, 3 units quoted.
+    const counts = unitCounts(bid({ unitsOffered: 3 }), [fleet(true), fleet(true), fleet(false), fleet(false)]);
+    // Counting all four rows would have made `claimed` 0 and hidden a real shortfall of 1 — the exact
+    // defect 004a §4.2 names.
+    expect(counts).toEqual({ offered: 3, registered: 2, claimed: 1, owned: 4 });
   });
 
-  it("reports offered 4 / identified 2 / unidentified 2 — the count and the inspectable set may disagree", () => {
-    const counts = unitCounts(bid({ unitsOffered: 4, offeredUnitsDetail: [unit({ equipmentId: "A" }), unit({ equipmentId: "B" })] }));
-    expect(counts).toEqual({ offered: 4, identified: 2, unidentified: 2 });
+  it("computes claimed as offered − registered, never from the fleet total (RM3-AC-31)", () => {
+    const counts = unitCounts(bid({ unitsOffered: 5 }), [fleet(true), fleet(false), fleet(false), fleet(false), fleet(false), fleet(false)]);
+    expect(counts.claimed).toBe(4); // 5 − 1, and NOT 5 − 6 (the fleet total) which would clamp to 0
+    expect(counts.owned).toBe(6);
   });
 
-  it("never reports a negative gap when more machines are named than were quoted", () => {
-    const counts = unitCounts(bid({ unitsOffered: 1, offeredUnitsDetail: [unit({ equipmentId: "A" }), unit({ equipmentId: "B" })] }));
-    expect(counts.unidentified).toBe(0);
+  it("clamps to zero rather than rendering a negative shortfall (RM3-AC-31)", () => {
+    // More machines registered against the bid than units quoted — possible, and not a shortfall.
+    expect(unitCounts(bid({ unitsOffered: 1 }), [fleet(true), fleet(true)]).claimed).toBe(0);
   });
 
-  it("an off-platform bid with no detail reads every quoted unit as unidentified", () => {
-    expect(unitCounts(bid({ unitsOffered: 2 }))).toEqual({ offered: 2, identified: 0, unidentified: 2 });
+  it("reads every quoted unit as claimed when the offer names no machine at all", () => {
+    expect(unitCounts(bid({ unitsOffered: 2 }), [fleet(false)])).toEqual({ offered: 2, registered: 0, claimed: 2, owned: 1 });
+  });
+
+  it("owns the OFFER's count — an agreed or mid-negotiation count never reaches it (RM3-AC-65/67)", () => {
+    // The footer prices on `agreedUnits`; the pills describe what was offered. Both are on the bid, and
+    // only one is read here.
+    const counts = unitCounts(bid({ unitsOffered: 3, agreedUnits: 2, currentRentalUnits: 1 }), [fleet(true)]);
+    expect(counts.offered).toBe(3);
+    expect(counts.claimed).toBe(2);
+  });
+
+  it("survives an empty fleet without inventing a machine", () => {
+    expect(unitCounts(bid({ unitsOffered: 1 }), [])).toEqual({ offered: 1, registered: 0, claimed: 1, owned: 0 });
+  });
+});
+
+describe("countCase — §6.2's three cases, decided once (RM3-AC-03, 04, 05)", () => {
+  it("is `single` for an offer of one unit — the owned pill alone", () => {
+    expect(countCase({ offered: 1, claimed: 0 })).toBe("single");
+    expect(countCase({ offered: 0, claimed: 0 })).toBe("single");
+  });
+
+  it("is `multi` for more than one unit with nothing claimed — two pills, NO alert", () => {
+    expect(countCase({ offered: 4, claimed: 0 })).toBe("multi");
+  });
+
+  it("is `short` only when something is claimed, so the alert's absence means nothing is claimed", () => {
+    expect(countCase({ offered: 4, claimed: 1 })).toBe("short");
+  });
+
+  it("never reports `short` for a single-unit offer, whatever the arithmetic says", () => {
+    // A one-unit offer with no registered machine is still the single case: §6.2 keys the branch on the
+    // OFFERED count, so a lone unit never gets the multi-unit comparison pill.
+    expect(countCase({ offered: 1, claimed: 1 })).toBe("single");
+  });
+});
+
+describe("englishTypePlural — the type word agrees with the count (RM3-AC-08)", () => {
+  it("leaves the singular alone for a count of one", () => {
+    expect(englishTypePlural("Forklift", 1)).toBe("Forklift");
+  });
+
+  it("inflects the head noun of a multi-word taxonomy name", () => {
+    expect(englishTypePlural("Mobile crane", 3)).toBe("Mobile cranes");
+    expect(englishTypePlural("Boom lift", 2)).toBe("Boom lifts");
+  });
+
+  it("handles the sibilant and consonant-y endings", () => {
+    expect(englishTypePlural("Bus", 2)).toBe("Buses");
+    expect(englishTypePlural("Winch", 2)).toBe("Winches");
+    expect(englishTypePlural("Lorry", 2)).toBe("Lorries");
+  });
+
+  it("leaves a name that does not end in a word exactly as the taxonomy wrote it", () => {
+    expect(englishTypePlural("Loader 3T", 4)).toBe("Loader 3T");
+    expect(englishTypePlural(null, 4)).toBe("");
+  });
+});
+
+describe("arabicIndicDigits — the pill's numeral, without `unitCountLabel`'s noun", () => {
+  it("converts per digit and never appends a word", () => {
+    expect(arabicIndicDigits(3)).toBe("٣");
+    expect(arabicIndicDigits(11)).toBe("١١");
+    expect(arabicIndicDigits(0)).toBe("٠");
   });
 });
 

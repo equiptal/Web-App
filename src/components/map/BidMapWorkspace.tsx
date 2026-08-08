@@ -1,25 +1,24 @@
 "use client";
 
 /**
- * RMAP T12 + T16 — the map workspace: a full-bleed map with the bid panel floating over it
- * (design.md §1). Not a two-column split; the panel, and later the rail (T33) and the machine panel
- * (T18), all overlay the same canvas so the map is never boxed into a corner.
+ * RMAP V1–V4 — the deal-room equipment-verification surface: a **fixed-width panel with the map
+ * filling the rest** (spec 004 §5). v2's floating overlay is gone with the offers list it hosted; v3
+ * scopes the view to ONE bid, so the panel is a column of that bid's own verification content and the
+ * map is what is left over.
  *
- * **This component does not fetch BIDS** (decision A4). Bids, the request and the freshness controls
- * all arrive as props from `GroupBids`, which owns every request on this screen — one fetch owner means
- * the refetch triggers of §7.5.1 have exactly one implementation and the list and the map can never
- * disagree about what has arrived.
+ * **One bid, resolved by `bidId`** (V1, RM3-AC-01). The bid arrives as a prop from the route
+ * (`/bids/[bidId]/equipment`), which owns every fetch on this screen — one fetch owner means the
+ * refetch triggers of §7.5.1 have exactly one implementation. There is no list of other bids here and
+ * no way to reach one.
  *
- * It DOES fetch the selected bid's fleet, because that request has no other owner and no other trigger:
- * it is lazy (nothing loads until a row is selected — a renter who never selects one never pays for
- * ~N fleet calls) and **cached by `bidId`, never by supplier**. One firm can hold several bids on one
- * request (`@@unique([requestId, bidOwnerKey, equipmentId])`), and `inBid`/`yardConfirmed` are
- * relative to ONE bid — a supplier-keyed cache would draw bid A's offer on bid B's map. The cache is
- * dropped when the bids themselves refetch, since a resubmitted bid can change which machines it names.
+ * It DOES fetch the fleet, because that request has no other owner and no other trigger, and it is
+ * **cached by `bidId`, never by supplier**. One firm can hold several bids on one request
+ * (`@@unique([requestId, bidOwnerKey, equipmentId])`), and `inBid`/`yardConfirmed` are relative to ONE
+ * bid — a supplier-keyed cache would draw bid A's offer on bid B's map. The cache is dropped when the
+ * bid itself refetches, since a resubmitted bid can change which machines it names.
  *
- * **No item strip.** A multi-item RFQ is scoped by the existing item selector in the controls cluster
- * (AC-22), and a single-item RFQ renders no strip at all (AC-23) — so there is nothing to draw here in
- * either case, and a second item control would be a second source of truth for the same choice.
+ * **Nothing here writes.** No deal room is created by opening, selecting or reading (004a §4.5) — a
+ * `DealRoom` row freezes the supplier's offered count, and this surface is a read.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -27,9 +26,18 @@ import dynamic from "next/dynamic";
 import type { MachinePin } from "@/components/map/MapCanvas";
 import type { BidCard } from "@/lib/contract/bids";
 import { fetchBidFleet } from "@/lib/api/client";
-import { isPlottable, unitAvailability, unitCountLabel, unitCounts } from "@/lib/contract/bid-map";
+import {
+  arabicIndicDigits,
+  countCase,
+  englishTypePlural,
+  isPlottable,
+  unitAvailability,
+  unitCountLabel,
+  unitCounts,
+} from "@/lib/contract/bid-map";
 import { computeUnitReadiness, readinessInputsFor } from "@/lib/contract/bid-readiness";
 import type { FleetMachine } from "@/lib/contract/fleet";
+import { composeShortfallRequest, type RenteeRequestDraft } from "@/lib/contract/rentee-request";
 import { publicTaxonomyUrl, type RequestRecord } from "@/lib/contract/requests";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import "@/components/map/map-proto.css";
@@ -42,27 +50,33 @@ const MapCanvas = dynamic(() => import("@/components/map/MapCanvas"), { ssr: fal
 export type MapBid = BidCard & { itemLabel?: string; itemLabelAr?: string };
 
 export interface BidMapWorkspaceProps {
-  /** Bids for the active item scope, already filtered by `GroupBids`. */
-  bids: MapBid[];
-  /** The active item's request record — the only source of the project pin. Null while it loads, or
-   *  when the request has no project location at all (AC-21). */
+  /** The one bid this surface resolves (V1). Null while the route is still resolving it. */
+  bid: MapBid | null;
+  /** The bid's own request — the only source of the project pin, and of the type word on the count
+   *  pills (RM3-AC-08). Null while it loads, or when the request has no project location (AC-21). */
   request: RequestRecord | null;
-  /** The bid this surface resolves. v3 scopes the view to exactly one (spec 004 §4 assumption 2); it is
-   *  lifted rather than local so an entry point can address the surface by `bidId` (V1). */
-  selectedBidId: string | null;
   /** Drives the fleet cache invalidation on the falling edge — see the effect below. */
   refreshing: boolean;
-  /** T16 exposes the machine selection upward for the machine panel (V7), which does not exist yet.
+  /** T16 exposes the machine selection upward for the equipment detail (V7), which does not exist yet.
    *  Kept a callback rather than a lifted prop so nothing above has to hold state it cannot yet use. */
   onSelectMachine?: (equipmentId: string | null) => void;
+  /** V4's action. The composed card is handed UP rather than posted here: the POST is
+   *  `/deal-rooms/{dealRoomId}/requests`, and the send is what creates the room (004a §4.5) — that
+   *  path lands with the chat dock (V11/V12). Until it does the action renders disabled, which shows
+   *  less rather than claiming an ask was sent. */
+  onRequestAlternative?: (draft: RenteeRequestDraft) => void;
+  /** V9's company-document panel, which is not built here (a parallel ticket owns `map/panel/`). The
+   *  header's entry renders either way; without a handler it is inert rather than absent. */
+  onOpenCompanyDocs?: () => void;
 }
 
 export function BidMapWorkspace({
-  bids,
+  bid,
   request,
-  selectedBidId,
   refreshing,
   onSelectMachine,
+  onRequestAlternative,
+  onOpenCompanyDocs,
 }: BidMapWorkspaceProps) {
   const t = useT();
   const { locale } = useLocale();
@@ -75,17 +89,18 @@ export function BidMapWorkspace({
    *  representable. Cleared on every bid change (AC-177). */
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
 
-  const selectedBid = useMemo(() => bids.find((b) => b.id === selectedBidId) ?? null, [bids, selectedBidId]);
+  const selectedBidId = bid?.id ?? null;
   // An off-platform submission has no listings, no yards and no coordinates — there is nothing to
-  // fetch and nothing that could be plotted (AC-197, §6.13.5). `converted` bids are NOT excluded: a
-  // converted submission is a real bid with real registered machines, and only its LABELLING stays
-  // off-platform (AC-203).
-  const offPlatform = selectedBid?.viaSharedLink === true;
+  // fetch and nothing that could be plotted (AC-197, §6.13.5). Such a bid never opens this surface at
+  // all (RM3-AC-25); this is the second line of defence, not the routing rule. `converted` bids are
+  // NOT excluded: a converted submission is a real bid with real registered machines, and only its
+  // LABELLING stays off-platform (AC-203).
+  const offPlatform = bid?.viaSharedLink === true;
 
   /* ── fetch: lazy, per bid, once ────────────────────────────────────────────────────────────────── */
   useEffect(() => {
     if (!selectedBidId || offPlatform) return;
-    if (fleetByBid[selectedBidId]) return; // cached — a re-selection must not re-request
+    if (fleetByBid[selectedBidId]) return; // cached — a re-render must not re-request
     let active = true;
     setLoadingBidId(selectedBidId);
     setFleetFailed(false);
@@ -95,8 +110,9 @@ export function BidMapWorkspace({
         setFleetByBid((prev) => ({ ...prev, [selectedBidId]: r.machines }));
       })
       .catch(() => {
-        // A failed fleet fetch must never empty the bid list the renter is reading, and must never be
-        // silent either — an empty map would read as "this lessor has no machines", which is a claim.
+        // A failed fleet fetch must never be silent: an empty map would read as "this lessor has no
+        // machines", which is a claim. It must also never produce counts — the pills would then read
+        // «٠ لدى المؤجّر», which is the same claim in a pill.
         if (active) setFleetFailed(true);
       })
       .finally(() => {
@@ -107,17 +123,17 @@ export function BidMapWorkspace({
     };
   }, [selectedBidId, offPlatform, fleetByBid]);
 
-  // Invalidate on the falling edge of a bids REFETCH (§7.5.1). A resubmitted bid can name different
-  // machines, so a cache that outlived the refetch would keep drawing the previous offer. Keyed off
-  // `refreshing` rather than off the `bids` array, whose identity changes on every parent render.
+  // Invalidate on the falling edge of a bid REFETCH (§7.5.1). A resubmitted bid can name different
+  // machines, so a cache that outlived the refetch would keep drawing the previous offer.
   const wasRefreshing = useRef(false);
   useEffect(() => {
     if (wasRefreshing.current && !refreshing) setFleetByBid({});
     wasRefreshing.current = refreshing;
   }, [refreshing]);
 
-  // Switching the bid row clears the machine selection (AC-177) — a ring left on a machine belonging
-  // to a supplier no longer on the map is the defect this prevents.
+  // Switching the bid clears the machine selection (AC-177) — a ring left on a machine belonging to a
+  // supplier no longer on the map is the defect this prevents. (The route resolves one bid, so this
+  // fires on arrival and on nothing else.)
   useEffect(() => {
     setSelectedMachineId(null);
     onSelectMachine?.(null);
@@ -140,25 +156,26 @@ export function BidMapWorkspace({
     [fleetByBid, selectedBidId, offPlatform],
   );
 
+  // The request item this bid answers — the source of the pills' type word (RM3-AC-08) and of the
+  // pin's taxonomy image.
+  const item = request?.equipmentItems?.[0] ?? null;
+
   /* ── pins ──────────────────────────────────────────────────────────────────────────────────────
-     Only the SELECTED bid's supplier's machines are ever assembled here (AC-75) — the endpoint is
-     bid-scoped, so no other supplier's fleet is even in memory. Claimed units never reach this list:
-     the fleet is registered machines only, and the shortfall is stated in the info box instead
-     (AC-77, §6.2). */
+     Only this bid's supplier's machines are ever assembled here (AC-75) — the endpoint is bid-scoped,
+     so no other supplier's fleet is even in memory. Claimed units never reach this list: the fleet is
+     registered machines only, and the shortfall is stated in the panel's alert instead (§6.3). */
   const machines: MachinePin[] = useMemo(() => {
-    if (!fleet || !selectedBid) return [];
-    // The request-side asks. Taken from the BID, not from `request`: `mapBid` already reads them off
-    // that bid's own request item, so they are correct even when the map is showing a multi-item
-    // group where `request` is only the FIRST item's record. The request item is the fallback for a
-    // payload that predates those fields.
-    const item = request?.equipmentItems?.[0] ?? null;
+    if (!fleet || !bid) return [];
+    // The request-side asks. Taken from the BID first, not from `request`: the bid already reads them
+    // off its own request item, so they are correct even where `request` is a different projection.
+    // The request item is the fallback for a payload that predates those fields.
     // `operatorLicenseLevel` is on the wire but not on the typed `RequestItem`, so it is read
     // defensively rather than added to a shared type this ticket has no reason to widen.
     const itemOperatorLevel = (item as Record<string, unknown> | null)?.operatorLicenseLevel;
     const inputs = readinessInputsFor({
-      reqEquipmentCerts: selectedBid.reqEquipmentCerts ?? item?.safetyCertifications ?? null,
-      operatorCertReq: selectedBid.operatorCertReq ?? (typeof itemOperatorLevel === "string" ? itemOperatorLevel : null),
-      reqMinYear: selectedBid.reqMinYear ?? item?.maxEquipmentAge ?? null,
+      reqEquipmentCerts: bid.reqEquipmentCerts ?? item?.safetyCertifications ?? null,
+      operatorCertReq: bid.operatorCertReq ?? (typeof itemOperatorLevel === "string" ? itemOperatorLevel : null),
+      reqMinYear: bid.reqMinYear ?? item?.maxEquipmentAge ?? null,
     });
     return fleet
       // AC-19: a machine with no usable coordinates is not plotted. `isPlottable` reads coordinates
@@ -180,38 +197,56 @@ export function BidMapWorkspace({
           total: readiness.total,
         };
       });
-  }, [fleet, selectedBid, request]);
+  }, [fleet, bid, item]);
 
   // AC-80 decision 4: the REQUEST ITEM's taxonomy image, falling back to the category image, then a
   // generic icon inside the pin. The taxonomy bucket differs per env, so the URL is rebuilt against
   // the public one exactly as the rest of the app does.
-  const item = request?.equipmentItems?.[0] ?? null;
   const itemImageUrl = publicTaxonomyUrl(item?.subtypeImageUrl ?? item?.categoryImageUrl ?? null);
-  const itemName = (ar ? item?.subtypeNameAr ?? item?.categoryNameAr : item?.subtypeName ?? item?.categoryName) ?? item?.subtypeName ?? null;
+  const itemName = (ar ? item?.subtypeNameAr ?? item?.subtypeName : item?.subtypeName ?? item?.subtypeNameAr) ?? item?.subtypeName ?? null;
 
   const selectMachine = (id: string) => {
-    // Re-clicking the selected pin deselects it — the only way back to state 2 without changing bid.
+    // Re-clicking the selected pin deselects it — the only way back to an unselected map.
     const next = selectedMachineId === id ? null : id;
     setSelectedMachineId(next);
     onSelectMachine?.(next);
   };
 
+  /* ── V3 · the counts ───────────────────────────────────────────────────────────────────────────
+     Computed ONLY once the fleet has arrived. Three numbers, one derivation (`unitCounts`):
+       · owned      — the fleet response's row count, already filtered to machines that FIT this
+                      request (004a §4.1), which is why the copy says «لدى المؤجّر» and never «lessor's
+                      fleet»;
+       · registered — `inBid === true` rows only (004a §4.2);
+       · claimed    — `offered − registered`, clamped at 0 (RM3-AC-31).
+     `offered` is the OFFER's count, never `agreedUnits` and never `lastProposedRentalUnits`: the
+     footer prices on what was agreed, these pills describe what was offered (RM3-AC-65/67). */
+  const counts = bid && fleet ? unitCounts(bid, fleet) : null;
+  const kase = counts ? countCase(counts) : null;
+
+  /** The type word, from the REQUEST's taxonomy and agreeing in number with the count (RM3-AC-08).
+   *  English inflects the subtype's head noun; Arabic keeps one literal form, the same product
+   *  decision `unitCountLabel` records — the taxonomy stores a single form per node. */
+  const typeWord = (n: number): string => {
+    const subtype = (ar ? item?.subtypeNameAr ?? item?.subtypeName : item?.subtypeName ?? item?.subtypeNameAr) ?? null;
+    const capacity = (ar ? item?.capacityNameAr ?? item?.capacityName : item?.capacityName ?? item?.capacityNameAr) ?? null;
+    const head = ar ? subtype ?? "" : englishTypePlural(subtype, n);
+    return [head, capacity].filter(Boolean).join(" ").trim();
+  };
+  /** The bare numeral, in the reader's digits. */
+  const num = (n: number): string => (ar ? arabicIndicDigits(n) : String(n));
+
   /* ── what the map is NOT showing, in words ─────────────────────────────────────────────────────
      Every one of these is a case where drawing nothing is correct and silence is not: an empty map
-     otherwise reads as "this lessor has no machines", which is a claim the data does not support. */
-  const counts = selectedBid ? unitCounts(selectedBid) : null;
+     otherwise reads as "this lessor has no machines", which is a claim the data does not support.
+     The claimed-unit case is deliberately ABSENT — §6.3 makes the shortfall alert the only place
+     claimed units exist in the UI, and a second statement of it on the canvas would be two. */
   const info: { title: string; sub: string } | null = (() => {
-    if (!selectedBid) return null;
+    if (!bid) return null;
     if (offPlatform) return { title: t.bidMap.offPlatformNoPins, sub: t.bidMap.offPlatformNoPinsWhy };
     if (loadingBidId === selectedBidId) return null;
     if (fleetFailed) return { title: t.bidMap.fleetFailed, sub: t.bidMap.fleetFailedWhy };
     if (fleet && machines.length === 0) return { title: t.bidMap.noLocatable, sub: t.bidMap.noLocatableWhy };
-    if (counts && counts.unidentified > 0) {
-      // `unitCountLabel` is the one literal Arabic form (AC-146) and carries «وحدة» itself; English
-      // has no such rule, so it prints the plain count and the noun comes from the line's own copy.
-      const n = ar ? unitCountLabel(counts.unidentified) : String(counts.unidentified);
-      return { title: fmt(t.bidMap.claimedNotDrawn, { n }), sub: t.bidMap.claimedNotDrawnWhy };
-    }
     return null;
   })();
 
@@ -246,18 +281,103 @@ export function BidMapWorkspace({
             <div className="bm-info-s">{info.sub}</div>
           </div>
         )}
-
-        {bids.length === 0 && (
-          // Zero bids → the site pin alone with an empty state (RM3-AC-26).
-          <div className="bm-empty">
-            <div className="bm-empty-t">{t.bidMap.noBids}</div>
-            <div className="bm-empty-s">{t.bidMap.freshnessNote}</div>
-          </div>
-        )}
-        {/* The panel slot. v2's offers list (`BidListPanel`) was deleted with the rescope to v3 — this
-            surface is scoped to ONE bid, so there is nothing to list. V2–V9 build the verification panel
-            here: header, counts, shortfall alert, equipment list, detail and documents. */}
       </div>
+
+      {/* ── V2 · the panel ─────────────────────────────────────────────────────────────────────────
+          Fixed width, in flow beside the map rather than floating over it (§5). Its DOM position is
+          what puts it on the inline-end edge — the same edge the prototype's `left: 18px` lands on in
+          Arabic — and it mirrors with the reading direction instead of trading places with the map. */}
+      <aside className="bm-panel">
+        {bid ? (
+          <>
+            {/* Header: identity, not a profile. Company name · a verified chip ONLY when verified · an
+                entry to the company's documents. Contact details, deals count, IBAN, CR and VAT are
+                deliberately absent — they live in the company panel (V9), and a header that lists
+                credentials invites judging the supplier before reading his machines (RM3-AC-02). */}
+            <header className="bm-head">
+              <div className="bm-head-row">
+                <span className="bm-title" title={bid.supplierName}>{bid.supplierName}</span>
+                {bid.verified && (
+                  <span className="bm-verified">
+                    <span className="material-icons-outlined">verified</span>
+                    {t.bidMap.verifiedCompany}
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                className="bm-docsentry"
+                onClick={() => onOpenCompanyDocs?.()}
+                disabled={!onOpenCompanyDocs}
+              >
+                <span className="material-icons-outlined">folder_shared</span>
+                {t.bidMap.companyDocuments}
+                {/* The chevron points the way the reader travels, so it flips with the locale rather
+                    than being mirrored by a transform that would also mirror the glyph's weight. */}
+                <span className="bm-docsentry-chev material-icons-outlined">{ar ? "chevron_left" : "chevron_right"}</span>
+              </button>
+            </header>
+
+            {/* ── V3 · the count pills ───────────────────────────────────────────────────────────
+                Pills, not a sentence: a run-on line made both numbers invisible (§6.2). Nothing
+                renders until the fleet has answered — a pill built on a failed or pending fetch would
+                claim a number the surface does not have. */}
+            {counts && (
+              <div className="bm-counts">
+                <span className="bm-pill bm-pill-owned">
+                  {fmt(t.bidMap.countOwned, { n: num(counts.owned), type: typeWord(counts.owned) })}
+                </span>
+                {/* The offer pill is the multi-unit comparison: owned ≠ offered, and both are shown
+                    because the comparison IS the point (§6.2). A single-unit offer renders the owned
+                    pill alone (RM3-AC-03). */}
+                {kase !== "single" && (
+                  <span className="bm-pill bm-pill-offer">{fmt(t.bidMap.countInOffer, { n: num(counts.offered) })}</span>
+                )}
+              </div>
+            )}
+
+            {/* ── V4 · the shortfall alert ───────────────────────────────────────────────────────
+                Renders on `short` and on nothing else, so its absence reliably means nothing is
+                claimed (RM3-AC-05). ORANGE, never red: on this surface red means availability only,
+                and a shortfall is an incomplete offer, not an unavailable machine (RM3-AC-06). It
+                states the DIFFERENCE — not the offered total — and the consequence: those units are
+                not on the map, because a claimed unit has no location, no documents and no serial. */}
+            {counts && kase === "short" && (
+              <div className="bm-short" role="status">
+                <span className="bm-short-ic material-icons-outlined">error_outline</span>
+                <div className="bm-short-body">
+                  <div className="bm-short-t">
+                    {fmt(t.bidMap.shortfall, { n: ar ? unitCountLabel(counts.claimed) : `${counts.claimed}` })}
+                  </div>
+                  <div className="bm-short-s">{t.bidMap.claimedNotDrawnWhy}</div>
+                </div>
+                <button
+                  type="button"
+                  className="bm-short-act"
+                  // The composer is the whole of this action's contract: an `alternative` card with a
+                  // NULL `equipmentId` — there is no machine to name — which the backend pairs with
+                  // `scope: "company"`. `add_to_offer` is retired and rejected server-side, and is
+                  // unreachable from here by construction (RM3-AC-07).
+                  onClick={() => onRequestAlternative?.(composeShortfallRequest())}
+                  disabled={!onRequestAlternative}
+                >
+                  {t.bidMap.shortfallAction}
+                </button>
+              </div>
+            )}
+
+            {/* The panel body. V5–V9 mount here: the equipment list, the landing pre-selection, the
+                machine detail, its documents and the company panel — all owned by the `map/panel/`
+                ticket, which is why this ticket leaves a slot rather than a placeholder component.
+                The price footer (V12) closes the column below it. */}
+            <div className="bm-body" />
+          </>
+        ) : (
+          // No bid resolved yet. The route renders its own not-found/loading states, so this is only
+          // the frame's resting look — never a claim about an offer.
+          <div className="bm-body" />
+        )}
+      </aside>
     </div>
   );
 }

@@ -248,6 +248,17 @@ export function fetchBidFleet(bidId: string): Promise<{ machines: FleetMachine[]
   return getJson<{ machines: FleetMachine[] }>(`/api/me/bids/${encodeURIComponent(bidId)}/fleet`);
 }
 
+/**
+ * Spec 004 V1 — ONE bid and the request it answers, by `bidId` alone.
+ *
+ * The equipment-verification surface is a route (`/bids/[bidId]/equipment`), so it has no request id
+ * to list by and no caller to inherit one from. This is a READ: opening the surface creates no deal
+ * room, because a `DealRoom` row would freeze the supplier's offered count.
+ */
+export function fetchBidDetail(bidId: string): Promise<{ bid: BidCard; request: RequestRecord | null }> {
+  return getJson<{ bid: BidCard; request: RequestRecord | null }>(`/api/me/bids/${encodeURIComponent(bidId)}`);
+}
+
 /** Accept a supplier's bid. */
 export function acceptBid(bidId: string): Promise<unknown> {
   return postJson(`/api/me/bids/${encodeURIComponent(bidId)}/accept`, {});
