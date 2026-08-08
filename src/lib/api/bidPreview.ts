@@ -108,31 +108,46 @@ export function buildBidMetadata({
   preview,
   slug,
   lang,
+  origin,
 }: {
   preview: BidPreview | null;
   slug: string;
   lang: "en" | "ar";
+  /**
+   * Scheme + host this page was actually requested on, e.g. `https://webstaging.moedatech.net`.
+   *
+   * REQUIRED for a correct card on any host that isn't production. `metadataBase` in the root layout
+   * is hardcoded to `https://web.moedatech.net`, so Next resolves every RELATIVE metadata URL against
+   * production — including `og:url`. A staging page therefore told WhatsApp its canonical was the prod
+   * URL; WhatsApp followed it, prod answered 200 with the generic site-wide card (it has none of this
+   * per-request work deployed), and the shared link unfurled as "Moedatech - WebApp" instead of the
+   * request. A wrong image degrades a card; a wrong canonical replaces it.
+   *
+   * Null only when the host header is missing, which shouldn't happen in a real request — the URLs
+   * then fall back to relative, i.e. the old behaviour.
+   */
+  origin: string | null;
 }): Metadata {
   const title = preview?.title || FALLBACK[lang].title;
   const description = preview?.description || FALLBACK[lang].description;
-  // metadataBase (root layout) resolves the relative path against the deployed host, so this stays
-  // correct on staging and prod without an env var here.
   const path = `/bid/${slug}${lang === "ar" ? "?lang=ar" : ""}`;
-  // The backend points at this same asset; the constant is the fallback for a failed fetch, so the
-  // branding survives a slow backend even when the copy doesn't.
-  const image = preview?.imageUrl || OG_CARD_IMAGE;
+  // Absolute, from the host actually serving this page — never resolved through metadataBase.
+  const canonical = origin ? `${origin}${path}` : path;
+  // The backend already returns an absolute, stage-correct image URL; the constant is the fallback
+  // for a failed fetch, and gets the same absolute treatment so it can't point at the wrong host.
+  const image = preview?.imageUrl || (origin ? `${origin}${OG_CARD_IMAGE}` : OG_CARD_IMAGE);
 
   return {
     // The root layout's title template appends " — Moedatech", which is where the brand comes from.
     title,
     description,
-    alternates: { canonical: path },
+    alternates: { canonical },
     openGraph: {
       type: "website",
       siteName: preview?.siteName || "Moedatech",
       title,
       description,
-      url: path,
+      url: canonical,
       locale: lang === "ar" ? "ar_SA" : "en_US",
       images: [{ url: image, alt: title }],
     },
