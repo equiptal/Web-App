@@ -83,7 +83,7 @@ describe("computeBidQuote (shared quote math — comparison ↔ quotation parity
   });
 });
 
-describe("buildItemComparison — all-in (specs#306 AC-09/10/35)", () => {
+describe("buildItemComparison — all-in (specs#306-AC-09/10/35)", () => {
   it("normalizes rate to the period × duration × units + stated mob/demob", () => {
     // 200/day · 30 days · 2 units = 12,000 + 800 mob + 800 demob = 13,600
     const { columns } = buildItemComparison([
@@ -131,7 +131,7 @@ describe("buildItemComparison — all-in (specs#306 AC-09/10/35)", () => {
   });
 });
 
-describe("buildItemComparison — +X% vs lowest (specs#306 AC-09)", () => {
+describe("buildItemComparison — +X% vs lowest (specs#306-AC-09)", () => {
   it("flags the lowest and computes the premium for the rest", () => {
     const { columns } = buildItemComparison([
       bc({ id: "a", supplierId: "1", price: 100, priceUnit: "PER_DAY", duration: 10 }), // 1000
@@ -145,7 +145,7 @@ describe("buildItemComparison — +X% vs lowest (specs#306 AC-09)", () => {
   });
 });
 
-describe("buildItemComparison — latest live round per supplier (specs#306 AC-38)", () => {
+describe("buildItemComparison — latest live round per supplier (specs#306-AC-38)", () => {
   it("keeps only the latest round and drops expired/withdrawn", () => {
     const { columns } = buildItemComparison([
       bc({ id: "r1", supplierId: "1", price: 100, priceUnit: "PER_DAY", duration: 1, round: 1 }),
@@ -157,7 +157,7 @@ describe("buildItemComparison — latest live round per supplier (specs#306 AC-3
   });
 });
 
-describe("buildItemComparison — qualification + excluded (specs#306 AC-08/16/33)", () => {
+describe("buildItemComparison — qualification + excluded (specs#306-AC-08/16/33)", () => {
   it("counts conflicts and excludes a bid that fails every requirement", () => {
     const { columns, excluded } = buildItemComparison([
       bc({ id: "ok", supplierId: "1", price: 100, priceUnit: "PER_DAY", duration: 1, terms: { equipment: [term("year", "matched")], contract: [], supplier: [] } }),
@@ -169,7 +169,7 @@ describe("buildItemComparison — qualification + excluded (specs#306 AC-08/16/3
   });
 });
 
-describe("renter-entered cost (specs#306 AC-12)", () => {
+describe("renter-entered cost (specs#306-AC-12)", () => {
   const rt = (maint: string) => ({ operatorIncluded: null, operatorNationality: null, fuelType: null, paymentMethod: null, paymentTerms: null, breakdownResponseSla: null, overtimeRate: null, maintenanceResponsibility: maint });
   it("adds the renter cost only where the responsibility lands on the renter", () => {
     // maintenance on the renter ("renter" → bidSide "me") → +500
@@ -181,7 +181,7 @@ describe("renter-entered cost (specs#306 AC-12)", () => {
   });
 });
 
-describe("sortByPreset (specs#306 AC-20 web side)", () => {
+describe("sortByPreset (specs#306-AC-20 web side)", () => {
   it("lowest sorts by all-in ascending", () => {
     const { columns } = buildItemComparison([
       bc({ id: "hi", supplierId: "1", price: 300, priceUnit: "PER_DAY", duration: 1 }),

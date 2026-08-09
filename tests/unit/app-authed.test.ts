@@ -78,7 +78,7 @@ describe("GET /api/me (authenticated)", () => {
 });
 
 describe("POST /api/profile/complete", () => {
-  it("maps a backend validation error to code:validation (specs#268 AC-02/03)", async () => {
+  it("maps a backend validation error to code:validation (specs#268-AC-02/03)", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string, _init?: RequestInit) =>
@@ -145,7 +145,7 @@ describe("self-deleted account (E12004)", () => {
 });
 
 describe("POST /api/verification/submit", () => {
-  it("forwards the company payload and returns supplierStatus (specs#268 AC-09/10/13)", async () => {
+  it("forwards the company payload and returns supplierStatus (specs#268-AC-09/10/13)", async () => {
     const fetchMock = vi.fn(async (url: string, _init?: RequestInit) =>
       String(url).includes("/users/me/company")
         ? reply(200, { success: true, data: { supplierStatus: 1 } })

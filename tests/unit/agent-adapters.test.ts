@@ -39,7 +39,7 @@ const jobPollItems = (lines: object[]) => ({
   data: { id: "j", status: "done", result: { rfq_header: {}, line_items: lines, missing_required_fields: [] } },
 });
 
-describe("agentOutputToDraft — request-wide reconciliation (specs#245 AC-25/26)", () => {
+describe("agentOutputToDraft — request-wide reconciliation (specs#245-AC-25/26)", () => {
   it("lifts a common per-item value to the request-wide setting and clears the overrides", () => {
     const d = agentOutputToDraft(
       extractAgentOutput(
@@ -67,7 +67,7 @@ describe("agentOutputToDraft — request-wide reconciliation (specs#245 AC-25/26
     expect(d.project.certificates.safety).toEqual([]); // operator cert is separate from EQUIPMENT safety
   });
 
-  it("globalizes a uniform EQUIPMENT safety cert to the request-wide default + clears per-item (specs#245 AC-50)", () => {
+  it("globalizes a uniform EQUIPMENT safety cert to the request-wide default + clears per-item (specs#245-AC-50)", () => {
     const d = agentOutputToDraft(
       extractAgentOutput(
         jobPollItems([
@@ -80,7 +80,7 @@ describe("agentOutputToDraft — request-wide reconciliation (specs#245 AC-25/26
     expect(d.items.every((i) => i.safetyCertsOverride === null)).toBe(true); // per-item cleared → inherits
   });
 
-  it("keeps EQUIPMENT safety certs per-item when items differ (specs#245 AC-50)", () => {
+  it("keeps EQUIPMENT safety certs per-item when items differ (specs#245-AC-50)", () => {
     const d = agentOutputToDraft(
       extractAgentOutput(
         jobPollItems([
@@ -134,12 +134,12 @@ describe("jobStatus", () => {
 });
 
 describe("agentOutputToDraft", () => {
-  it("uses the header detected_locations (specs#245 AC-48)", () => {
+  it("uses the header detected_locations (specs#245-AC-48)", () => {
     const draft = agentOutputToDraft(extractAgentOutput(jobPoll("done")));
     expect(draft.detectedLocations).toEqual(["Riyadh", "Jeddah"]);
   });
 
-  it("derives verdicts from match annotations (specs#245 AC-54)", () => {
+  it("derives verdicts from match annotations (specs#245-AC-54)", () => {
     const verdictOf = (line: object) => agentOutputToDraft(extractAgentOutput(jobPoll("done", line))).items[0].verdict;
     expect(verdictOf(confidentLine)).toBe("confident");
     // capacity snapped ⇒ needs a check
@@ -148,14 +148,14 @@ describe("agentOutputToDraft", () => {
     expect(verdictOf({ ...confidentLine, category_match: "new", category_id: null })).toBe("no-match");
   });
 
-  it("prefills per-item quantity + operator from the RFQ (specs#245 AC-55/57)", () => {
+  it("prefills per-item quantity + operator from the RFQ (specs#245-AC-55/57)", () => {
     const item = agentOutputToDraft(extractAgentOutput(jobPoll("done"))).items[0];
     expect(item.quantity).toBe(2);
     expect(item.operatorNeeded).toBe("yes");
   });
 });
 
-describe("toItem — FAT split (A6/specs#245 AC-24)", () => {
+describe("toItem — FAT split (A6/specs#245-AC-24)", () => {
   const opOf = (line: object) => agentOutputToDraft(extractAgentOutput(jobPoll("done", { ...confidentLine, ...line }))).items[0].operator;
 
   it("reads each FAT side independently from the split fields", () => {

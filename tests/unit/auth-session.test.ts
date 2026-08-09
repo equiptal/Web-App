@@ -19,7 +19,7 @@ vi.mock("next/headers", () => {
 
 import { GET as session } from "@/app/api/auth/session/route";
 
-describe("GET /api/auth/session (specs#235 AC-17)", () => {
+describe("GET /api/auth/session (specs#235-AC-17)", () => {
   it("returns the user from a live session without refreshing", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);

@@ -12,7 +12,7 @@ import { en } from "@/lib/i18n/en";
 import { ar } from "@/lib/i18n/ar";
 
 describe("stores mappers (web-app/004)", () => {
-  it("maps a store card and exposes only the specs#270 AC-16 fields (no rating/deals/tags)", () => {
+  it("maps a store card and exposes only the specs#270-AC-16 fields (no rating/deals/tags)", () => {
     const card = mapStoreCard({
       id: "s1",
       name: "Al Rajhi Equipment",
@@ -36,7 +36,7 @@ describe("stores mappers (web-app/004)", () => {
 
   it("treats a non-verified supplier as New (isVerified false) and tolerates missing fields", () => {
     const card = mapStoreCard({ id: "s2", name: "New Co" });
-    expect(card.isVerified).toBe(false); // → rendered as `New` (specs#270 AC-13)
+    expect(card.isVerified).toBe(false); // → rendered as `New` (specs#270-AC-13)
     expect(card.activeEquipmentCount).toBe(0);
     expect(card.logoUrl).toBeNull();
     expect(card.city).toBeNull();
@@ -77,8 +77,8 @@ describe("stores mappers (web-app/004)", () => {
     expect(withPrice.isVerified).toBe(true);
 
     const noPrice = mapEquipment({ id: "e2", price: null, verificationStatus: "PENDING_REVIEW" });
-    expect(noPrice.price).toBeNull(); // → price-on-request (specs#270 AC-20)
-    expect(noPrice.isVerified).toBe(false); // tick only when VERIFIED (specs#270 AC-20)
+    expect(noPrice.price).toBeNull(); // → price-on-request (specs#270-AC-20)
+    expect(noPrice.isVerified).toBe(false); // tick only when VERIFIED (specs#270-AC-20)
   });
 
   it("carries equipment en + ar names and make/model", () => {
