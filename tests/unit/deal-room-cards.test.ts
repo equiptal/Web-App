@@ -57,7 +57,7 @@ const shownStrings = (v: ReturnType<typeof buildChatCardView>): string[] => [
   ...(v.transition ? [v.transition.from, v.transition.to] : []),
 ];
 
-describe("DRCARD-TC-01 — rate_proposal parses, and renders from i18n not from m.text (AC-01, AC-02)", () => {
+describe("DRCARD-TC-01 — rate_proposal parses, and renders from i18n not from m.text (DRCARD-AC-01, DRCARD-AC-02)", () => {
   it("parses the rate and price unit off the payload", () => {
     const card = parseChatCard(RATE_PROPOSAL);
     expect(card?.type).toBe("rate_proposal");
@@ -89,7 +89,7 @@ describe("DRCARD-TC-01 — rate_proposal parses, and renders from i18n not from 
   });
 });
 
-describe("DRCARD-TC-02 — rate_response renders an Arabic acceptance (AC-03)", () => {
+describe("DRCARD-TC-02 — rate_response renders an Arabic acceptance (DRCARD-AC-03)", () => {
   it("parses and renders without touching the English m.text", () => {
     const card = parseChatCard({ type: "rate_response", originalMessageId: "msg_1", response: "accepted" });
     expect(card).toEqual({ type: "rate_response", response: "accepted", originalMessageId: "msg_1" });
@@ -103,7 +103,7 @@ describe("DRCARD-TC-02 — rate_response renders an Arabic acceptance (AC-03)", 
   });
 });
 
-describe("DRCARD-TC-03 — counter figures survive, term keys are localised (AC-04, AC-05)", () => {
+describe("DRCARD-TC-03 — counter figures survive, term keys are localised (DRCARD-AC-04, DRCARD-AC-05)", () => {
   it("carries BOTH oldValue and newValue — before this the counter's numbers only existed in custom", () => {
     const card = parseChatCard({ type: "counter", termKey: "PRICE", oldValue: 3000, newValue: 2600 });
     expect(card).toEqual({ type: "counter", termKey: "PRICE", oldValue: 3000, newValue: 2600 });
@@ -136,7 +136,7 @@ describe("DRCARD-TC-03 — counter figures survive, term keys are localised (AC-
   });
 });
 
-describe("DRCARD-TC-04 — the four term actions are four distinct cards (AC-06, AC-07)", () => {
+describe("DRCARD-TC-04 — the four term actions are four distinct cards (DRCARD-AC-06, DRCARD-AC-07)", () => {
   it("gives each its own kind, icon and tone", () => {
     const views = [
       { type: "term_accepted", termKey: "payment_terms", value: "net_30" },
@@ -159,7 +159,7 @@ describe("DRCARD-TC-04 — the four term actions are four distinct cards (AC-06,
   });
 });
 
-describe("DRCARD-TC-05 — unknown and absent custom both fall back to m.text (AC-08, AC-09)", () => {
+describe("DRCARD-TC-05 — unknown and absent custom both fall back to m.text (DRCARD-AC-08, DRCARD-AC-09)", () => {
   it("returns null for a type the registry does not know", () => {
     expect(parseChatCard({ type: "rentee_request", requestId: 9 })).toBeNull();
     expect(parseChatCard({ type: "something_shipped_next_year" })).toBeNull();
@@ -176,7 +176,7 @@ describe("DRCARD-TC-05 — unknown and absent custom both fall back to m.text (A
   });
 });
 
-describe("DRCARD-TC-05b — reading the card off a raw Stream message (AC-08, AC-09)", () => {
+describe("DRCARD-TC-05b — reading the card off a raw Stream message (DRCARD-AC-08, DRCARD-AC-09)", () => {
   it("finds the payload nested under `custom`, as the backend sends it", () => {
     const card = chatCardOfMessage({ id: "m1", type: "regular", text: RATE_PROPOSAL_TEXT, custom: RATE_PROPOSAL });
     expect(card?.type).toBe("rate_proposal");
@@ -189,7 +189,7 @@ describe("DRCARD-TC-05b — reading the card off a raw Stream message (AC-08, AC
     expect(chatCardOfMessage({ id: "m2", type: "rate_proposal", proposedRate: 3000 })).toBeNull();
   });
 
-  it("returns null for a plain typed message — behaviour identical to today (AC-09)", () => {
+  it("returns null for a plain typed message — behaviour identical to today (DRCARD-AC-09)", () => {
     expect(chatCardOfMessage({ id: "m3", type: "regular", text: "when can you deliver?" })).toBeNull();
     expect(chatCardOfMessage({ id: "m4", custom: { kind: "location", lat: 24.7, lng: 46.7 } })).toBeNull();
   });
@@ -214,7 +214,7 @@ describe("DRCARD-TC-05b — reading the card off a raw Stream message (AC-08, AC
   });
 });
 
-describe("DRCARD-TC-06 — malformed payloads return null and never throw (AC-10)", () => {
+describe("DRCARD-TC-06 — malformed payloads return null and never throw (DRCARD-AC-10)", () => {
   const bad: unknown[] = [
     { type: "rate_proposal" },                                    // no rate
     { type: "rate_proposal", proposedRate: "3000" },              // a numeric STRING is not a rate
@@ -253,7 +253,7 @@ describe("DRCARD-TC-06 — malformed payloads return null and never throw (AC-10
   });
 });
 
-describe("DRCARD-TC-07 — action selector (AC-11, AC-12, AC-13)", () => {
+describe("DRCARD-TC-07 — action selector (DRCARD-AC-11, DRCARD-AC-12, DRCARD-AC-13)", () => {
   const supplierProposal = parseChatCard(RATE_PROPOSAL)!;
   const myProposal = parseChatCard({ ...RATE_PROPOSAL, proposedByRole: "rentee" })!;
 
@@ -353,7 +353,7 @@ describe("DRCARD-TC-07 — action selector (AC-11, AC-12, AC-13)", () => {
   });
 });
 
-describe("DRCARD-TC-08 — mob, demob and unit counts reach the view-model (AC-14)", () => {
+describe("DRCARD-TC-08 — mob, demob and unit counts reach the view-model (DRCARD-AC-14)", () => {
   it("parses all three off the payload", () => {
     expect(parseChatCard(RATE_PROPOSAL)).toMatchObject({ mobPrice: 800, demobPrice: 650, rentalUnits: 2 });
   });
@@ -376,13 +376,13 @@ describe("DRCARD-TC-08 — mob, demob and unit counts reach the view-model (AC-1
     expect(view.rows.map((r) => r.label)).toContain("التعبئة — موب");
   });
 
-  it("marks every numeric run LTR so it survives an RTL bubble (AC-15, structural half)", () => {
+  it("marks every numeric run LTR so it survives an RTL bubble (DRCARD-AC-15, structural half)", () => {
     const view = buildChatCardView(parseChatCard(RATE_PROPOSAL)!, ctx());
     expect(view.rows.every((r) => r.ltr === true)).toBe(true);
   });
 });
 
-describe("DRCARD-TC-09 — every card kind carries the message timestamp (AC-16)", () => {
+describe("DRCARD-TC-09 — every card kind carries the message timestamp (DRCARD-AC-16)", () => {
   const all: unknown[] = [
     RATE_PROPOSAL,
     { type: "rate_response", response: "accepted" },

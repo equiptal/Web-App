@@ -138,12 +138,16 @@ describe("the pin's colour comes from unitAvailability, never from yardConfirmed
   });
 });
 
-describe("what gets plotted (AC-19) — coordinates only", () => {
+/* RMAP-AC-19 — spec 001 v2's "no resolvable location, no pin". NOT RM3-AC-19, which is the criterion
+   that a pin and its card chip take colour from the same derivation; nothing links the two but the
+   integer. The live analogue of what this asserts is RM3-AC-22, and it is proved — including the
+   `unidentified` case this file has no fixture for — in `bid-map.test.ts`. */
+describe("what gets plotted (RMAP-AC-19) — coordinates only", () => {
   it("plots a machine with both coordinates", () => {
     expect(isPlottable(mapFleet([row()])[0])).toBe(true);
   });
 
-  it("does NOT plot a half-resolved point (AC-06)", () => {
+  it("does NOT plot a half-resolved point (RMAP-AC-06)", () => {
     expect(isPlottable(mapFleet([row({ lat: 26.4, lng: null })])[0])).toBe(false);
     expect(isPlottable(mapFleet([row({ lat: null, lng: 50.1 })])[0])).toBe(false);
   });
@@ -344,7 +348,7 @@ describe("computeBidReadiness is unchanged by the extraction (the mobile app mir
     expect(r!.percent).toBe(67);
   });
 
-  it("returns null for an off-platform bid, which has no offeredUnitsDetail (AC-59)", () => {
+  it("returns null for an off-platform bid, which has no offeredUnitsDetail (RMAP-AC-59)", () => {
     expect(computeBidReadiness({ ...bid, offeredUnitsDetail: undefined })).toBeNull();
   });
 

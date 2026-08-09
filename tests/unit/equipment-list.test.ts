@@ -65,7 +65,7 @@ const ids = (ms: readonly FleetMachine[]) => ms.map((m) => m.equipmentId);
 
 /* ────────────────────────── V5 · which machines the list shows ────────────────────────── */
 
-describe("offeredMachines — RM3-AC-09 / AC-10", () => {
+describe("offeredMachines — RM3-AC-09 / RM3-AC-10", () => {
   it("keeps only machines this bid offered", () => {
     const list = offeredMachines(
       fleet([
@@ -207,7 +207,7 @@ describe("certificateChips — RM3-AC-11", () => {
 
 /* ────────────────────────── V5 / V7 · the ask, on the wire ────────────────────────── */
 
-describe("composeMachineRequest — RM3-AC-17 / AC-07", () => {
+describe("composeMachineRequest — RM3-AC-17 / RM3-AC-07", () => {
   it("scopes a named machine to `equipment`", () => {
     expect(composeMachineRequest("availability", "eq-1")).toEqual({
       scope: "equipment",
@@ -263,7 +263,7 @@ describe("composeMachineRequest — RM3-AC-17 / AC-07", () => {
 
 /* ────────────────────────── V10 · the list and the marker set agree ────────────────────────── */
 
-describe("the marker set is the list minus what cannot be drawn — RM3-AC-15 / AC-22", () => {
+describe("the marker set is the list minus what cannot be drawn — RM3-AC-15 / RM3-AC-22", () => {
   /** **Production's own predicate**, not a local re-statement of it. What this file used to define
    *  here — `m.lat != null && m.lng != null` — is a plausible reading of `isPlottable`, and a test
    *  that asserts its own reading is a claim about the test. `isPlottable` rejects a HALF-resolved
@@ -312,12 +312,12 @@ describe("the marker set is the list minus what cannot be drawn — RM3-AC-15 / 
 });
 
 /* ────────────────────── V5 / V10 · the selection, as one rule (RM3-AC-15) ──────────────────────
-   AC-15 as rewritten on 2026-08-08: *"the same `selectedMachineId` reaches the map and the list …
+   RM3-AC-15 as rewritten on 2026-08-08: *"the same `selectedMachineId` reaches the map and the list …
    exactly ONE machine id is selected on both surfaces at any moment and re-selecting the current one
    clears it."*
 
    The test that used to carry this number checked SET MEMBERSHIP — that the drawn machines are a
-   subset of the listed ones — which is AC-22's claim, not AC-15's, and says nothing about focus.
+   subset of the listed ones — which is RM3-AC-22's claim, not RM3-AC-15's, and says nothing about focus.
    These are the focus rules themselves. The structural half — that this one value is what both
    surfaces are handed — is in `rentee-map-surface.test.ts`, because it is a fact about the host. */
 
@@ -343,12 +343,12 @@ describe("nextSelection — one selection rule for both surfaces (RM3-AC-15)", (
     expect(sel).toBe("eq-1");
   });
 
-  it("clears on a bid change — a ring on a machine no longer on the map (AC-177)", () => {
+  it("clears on a bid change — a ring on a machine no longer on the map (RMAP-AC-177 — spec 001 v2, no RM3 equivalent)", () => {
     expect(nextSelection("eq-1", { kind: "bid-change" })).toBeNull();
     expect(nextSelection(null, { kind: "bid-change" })).toBeNull();
   });
 
-  it("clears when a filter hides the selected machine — a ring with no card and no pin (AC-28e)", () => {
+  it("clears when a filter hides the selected machine — a ring with no card and no pin (RM3-AC-28e)", () => {
     expect(nextSelection("eq-1", { kind: "hidden" })).toBeNull();
   });
 
@@ -373,11 +373,11 @@ describe("nextSelection — one selection rule for both surfaces (RM3-AC-15)", (
 });
 
 /* ──────────────── RM3-AC-26 · the lessor's empty state, and the filter's ────────────────
-   Two states that must never be mistakable for each other. AC-26 was proven only as
+   Two states that must never be mistakable for each other. RM3-AC-26 was proven only as
    `offeredMachines([])` returning `[]` — an array, which is not a state, and which stays green if
    the explanatory branch is deleted outright. `listEmptyState` is the branch, as a value. */
 
-describe("listEmptyState — the two empty states, told apart (RM3-AC-26 / AC-28e)", () => {
+describe("listEmptyState — the two empty states, told apart (RM3-AC-26 / RM3-AC-28e)", () => {
   const view = (over: Partial<{ total: number; machines: FleetMachine[]; emptiedByFilter: boolean }>) => ({
     total: 0,
     machines: [] as FleetMachine[],
@@ -430,7 +430,7 @@ describe("listEmptyState — the two empty states, told apart (RM3-AC-26 / AC-28
    RM3-AC-28a→28e. The four rules, each asserted on the MODEL rather than on a render: a control that
    renders is not the same claim as a control the view model offers, and it is the model the map reads.
 
-   **AC-28 was reversed by the owner on 2026-08-08** — v3 forbade a distance filter and its test
+   **RM3-AC-28 was reversed by the owner on 2026-08-08** — v3 forbade a distance filter and its test
    asserted the ABSENCE of band state. That assertion now inverts: bands exist, under stated
    conditions, and the conditions are what these tests hold. */
 
@@ -517,7 +517,7 @@ describe("rule 2 — a control appears only when it would split the list (RM3-AC
   });
 });
 
-describe("the distance bands v2 shipped, reinstated (RM3-AC-28, AC-28c)", () => {
+describe("the distance bands v2 shipped, reinstated (RM3-AC-28, RM3-AC-28c)", () => {
   it("uses ≤50 / ≤100 / ≤200 km and nothing else", () => {
     expect(DISTANCE_BANDS_KM).toEqual([50, 100, 200]);
   });
@@ -681,7 +681,7 @@ describe("rule 3 — the count states the WHOLE offer (RM3-AC-28d)", () => {
   });
 });
 
-describe("rule 4 — the marker set is the FILTERED list minus what cannot be plotted (RM3-AC-15 / AC-28e)", () => {
+describe("rule 4 — the marker set is the FILTERED list minus what cannot be plotted (RM3-AC-15 / RM3-AC-28e)", () => {
   it("takes a filtered-out machine off the map with its card", () => {
     const list = offeredMachines(
       fleet([

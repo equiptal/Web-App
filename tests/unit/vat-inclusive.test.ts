@@ -118,7 +118,7 @@ describe("end-to-end: supplier form → submission → renter viewer", () => {
   });
 });
 
-describe("vatLines — the breakdown must reconcile with the STORED total (RMAP AC-216)", () => {
+describe("vatLines — the breakdown must reconcile with the STORED total (RMAP-AC-216)", () => {
   it("derives VAT as total − subtotal, so the rows always sum to the stored figure", () => {
     // The classic rounding trap: 86.96 + 43.48 = 130.44 net, ×1.15 = 150.006 — but the supplier's
     // stored gross is the round 150 he actually typed. Recomputing the tax would print a total the

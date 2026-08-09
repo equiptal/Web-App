@@ -50,7 +50,7 @@ describe("isOffPlatformBid — id OR flag, so the route can refuse before it fet
     expect(isOffPlatformBid({ id: "bid_1", viaSharedLink: false })).toBe(false);
   });
 
-  it("admits a CONVERTED bid — a real app bid with real registered machines; only its labelling stays off-platform (AC-203)", () => {
+  it("admits a CONVERTED bid — a real app bid with real registered machines; only its labelling stays off-platform (RMAP-AC-203 — spec 001 v2, no RM3 equivalent)", () => {
     expect(mayOpenEquipmentSurface({ id: "bid_7" })).toBe(true);
   });
 });

@@ -62,7 +62,11 @@ const fleet = (inBid: boolean) => ({ inBid });
 const readiness = (band: UnitReadiness["band"]): UnitReadiness =>
   ({ equipmentId: "eq-1", band, done: 1, total: 1, percent: 100 }) as UnitReadiness;
 
-describe("unitAvailability — the single source of the map's colour (AC-18, §6.9.1)", () => {
+/* The derivation half of RM3-AC-19 — that the colour comes from `locationSource` and never from the
+   `yardConfirmed` boolean. The other half, that the card's chip and the marker read the SAME
+   derivation, is `equipment-card.test.ts`. Cited here as RMAP-AC-18 (§6.9.1) until 2026-08-08;
+   that number is a different criterion and was reading as coverage it never gave. */
+describe("unitAvailability — the single source of the map's colour (RM3-AC-19)", () => {
   it("is confirmed for unit_yard and ONLY unit_yard — the one level that means 'committed to this bid'", () => {
     expect(unitAvailability(located("unit_yard"))).toBe("confirmed");
   });
@@ -81,7 +85,7 @@ describe("unitAvailability — the single source of the map's colour (AC-18, §6
     expect(unitAvailability(registered)).toBe("unconfirmed");
   });
 
-  it("is absent ONLY for unidentified — there is no machine to colour (AC-58, §6.6)", () => {
+  it("is absent ONLY for unidentified — there is no machine to colour (RMAP-AC-58, spec 001 v2 §6.6)", () => {
     expect(unitAvailability(unit({ locationSource: "unidentified" }))).toBe("absent");
   });
 
@@ -92,7 +96,8 @@ describe("unitAvailability — the single source of the map's colour (AC-18, §6
   });
 
   it("never turns green off the yardConfirmed boolean — supplier-side it is just yardId != null", () => {
-    // AC-10 / the 2026-08-05 colour decision: the flag is reported verbatim and rendered nowhere.
+    // RMAP-AC-10 (spec 001 v2) / the 2026-08-05 colour decision: the flag is reported verbatim and
+    // rendered nowhere. RM3-AC-27 restates the reporting half for this feature's own fleet read.
     expect(unitAvailability(located("listing_yard", { yardConfirmed: true, yardId: "y-1" }))).toBe("unconfirmed");
     expect(unitAvailability(located("unit_yard", { yardConfirmed: false }))).toBe("confirmed");
   });
@@ -112,7 +117,7 @@ describe("resolveUnitLocation — position, kept separate from commitment", () =
     expect(resolveUnitLocation(located("unit_yard"))).toEqual({ lat: 24.7, lng: 46.7, distanceKm: 12.5, locationSource: "unit_yard" });
   });
 
-  it("voids a HALF-resolved point and downgrades it to none (AC-06)", () => {
+  it("voids a HALF-resolved point and downgrades it to none (RMAP-AC-06 — spec 001 v2, no RM3 equivalent)", () => {
     expect(resolveUnitLocation(unit({ locationSource: "unit_yard", lat: 24.7, lng: null }))).toEqual({
       lat: null,
       lng: null,
@@ -126,11 +131,11 @@ describe("resolveUnitLocation — position, kept separate from commitment", () =
     expect(resolveUnitLocation(unit({ locationSource: "listing_yard" })).locationSource).toBe("none");
   });
 
-  it("rejects a non-finite distance rather than passing NaN to a label (AC-21: '—', never 0)", () => {
+  it("rejects a non-finite distance rather than passing NaN to a label (RMAP-AC-21: '—', never 0)", () => {
     expect(resolveUnitLocation(located("bid_yard", { distanceKm: Number.NaN })).distanceKm).toBeNull();
   });
 
-  it("excludes unlocatable units from the pin set (AC-19)", () => {
+  it("excludes unlocatable units from the pin set (RM3-AC-22 — was cited as RMAP-AC-19)", () => {
     expect(isPlottable(located("bid_pin"))).toBe(true);
     expect(isPlottable(unit({ locationSource: "none" }))).toBe(false);
     expect(isPlottable(unit({ locationSource: "unidentified" }))).toBe(false);
@@ -195,11 +200,11 @@ describe("countCase — §6.2's three cases, decided once (RM3-AC-03, 04, 05)", 
   });
 });
 
-/* ──────────────── V4 · the shortfall alert's CONTENT and its COLOUR (RM3-AC-05 / AC-06) ────────────────
-   `countCase` above proves the TRIGGER — when the alert appears. That was the whole of AC-05's
+/* ──────────────── V4 · the shortfall alert's CONTENT and its COLOUR (RM3-AC-05 / RM3-AC-06) ────────────────
+   `countCase` above proves the TRIGGER — when the alert appears. That was the whole of RM3-AC-05's
    coverage, and it left the criterion's real claim untested: the alert states the **difference**, not
    the offered total. Swapping `counts.claimed` for `counts.offered` in the render kept every test in
-   this file green. AC-06 — orange, never red — had no test at all; it is not visual-only, because the
+   this file green. RM3-AC-06 — orange, never red — had no test at all; it is not visual-only, because the
    colours on this surface are exported constants. */
 
 describe("shortfallAlert — the alert states the DIFFERENCE, not the offer (RM3-AC-05)", () => {
@@ -311,7 +316,7 @@ describe("englishTypePlural — the type word agrees with the count (RM3-AC-08)"
   });
 });
 
-/* ── the other half of AC-08, which nothing asserted: the word comes from the REQUEST ──────────
+/* ── the other half of RM3-AC-08, which nothing asserted: the word comes from the REQUEST ──────────
    Five tests proved the pluralisation. None proved the source — re-pointing the pills at
    `machine.subcategoryName` inflected just as correctly and kept all five green. The claim is that
    the pills describe what the RENTER asked for: a supplier answering a forklift request with a
@@ -389,29 +394,32 @@ describe("arabicIndicDigits — the pill's numeral, without `unitCountLabel`'s n
   });
 });
 
-describe("unitIndicators — two independent signals (AC-55→58)", () => {
-  it("shows BOTH for a single-unit bid — neither is conditional on being multi-unit (AC-56)", () => {
+/* Spec 001 v2 §6.6's PAIR — a readiness band and a separate availability signal. v3 replaced the pair
+   on the card with one chip (RM3-AC-32), so these numbers stay anchored to 001 rather than being
+   re-pointed at a criterion that says the opposite. */
+describe("unitIndicators — two independent signals (RMAP-AC-55→58, spec 001 v2)", () => {
+  it("shows BOTH for a single-unit bid — neither is conditional on being multi-unit (RMAP-AC-56)", () => {
     expect(unitIndicators(located("unit_yard"), readiness("green"))).toEqual({ readinessBand: "green", availability: "confirmed" });
   });
 
-  it("lets the two disagree without either masking the other (AC-57)", () => {
+  it("lets the two disagree without either masking the other (RMAP-AC-57)", () => {
     // Fully documented, yard unconfirmed…
     expect(unitIndicators(located("listing_yard"), readiness("green"))).toEqual({ readinessBand: "green", availability: "unconfirmed" });
     // …and the reverse.
     expect(unitIndicators(located("unit_yard"), readiness("red"))).toEqual({ readinessBand: "red", availability: "confirmed" });
   });
 
-  it("shows NEITHER indicator for an unidentified unit (AC-58)", () => {
+  it("shows NEITHER indicator for an unidentified unit (RMAP-AC-58)", () => {
     expect(unitIndicators(unit({ locationSource: "unidentified" }), readiness("red"))).toEqual({ readinessBand: null, availability: "absent" });
   });
 
-  it("KEEPS the readiness band for a registered machine with no resolvable location (AC-58 is about unidentified only)", () => {
+  it("KEEPS the readiness band for a registered machine with no resolvable location (RMAP-AC-58 is about unidentified only)", () => {
     // Its yard was deleted, so it cannot be plotted — but it still holds photos and documents, so the
     // band is meaningful and the pair stays visible in the panel and the list.
     expect(unitIndicators(unit({ locationSource: "none" }), readiness("green"))).toEqual({ readinessBand: "green", availability: "unconfirmed" });
   });
 
-  it("reports readiness as UNAVAILABLE, never red, when there is nothing to score (AC-59)", () => {
+  it("reports readiness as UNAVAILABLE, never red, when there is nothing to score (RMAP-AC-59)", () => {
     expect(unitIndicators(located("bid_yard"), null).readinessBand).toBeNull();
     expect(unitIndicators(located("bid_yard")).readinessBand).toBeNull();
   });
@@ -482,7 +490,7 @@ describe("decollide — screen-space fan-out (§6.2)", () => {
   });
 });
 
-describe("unitCountLabel — one literal Arabic form (AC-146)", () => {
+describe("unitCountLabel — one literal Arabic form (RMAP-AC-146 — spec 001 v2, no RM3 equivalent)", () => {
   it("returns the three literal forms, with no dual and no plural", () => {
     expect(unitCountLabel(1)).toBe("١ وحدة");
     expect(unitCountLabel(2)).toBe("٢ وحدة");
@@ -549,7 +557,7 @@ describe("bids contract — per-unit location reaches the client (T8, §7.2)", (
     expect(b.offeredUnitsDetail![0].locationSource).toBeUndefined();
   });
 
-  it("adds bid-level lat/lng/locationSource without disturbing distanceKm (AC-09)", () => {
+  it("adds bid-level lat/lng/locationSource without disturbing distanceKm (RMAP-AC-09, spec 001 v2)", () => {
     const req = { request: { projectLat: 24.7, projectLng: 46.7, equipmentItems: [{ numberOfUnits: 1 }] } };
     const [pin] = mapBidList({ activeBids: [{ id: "b1", equipmentLat: 26.4, equipmentLng: 50.1, ...req }] });
     expect(pin).toMatchObject({ lat: 26.4, lng: 50.1, locationSource: "bid_pin" });
@@ -571,7 +579,9 @@ describe("bids contract — per-unit location reaches the client (T8, §7.2)", (
   });
 });
 
-describe("bidSuppliers — one firm is one counterparty (AC-70)", () => {
+/* RMAP-AC-70 (spec 001 v2). The live analogue is RM3-AC-45, and it is proved on the dock's own tabs in
+   `chat-dock.test.ts`; this asserts the mapper underneath, so it is cited as 001's, not as RM3's. */
+describe("bidSuppliers — one firm is one counterparty (RMAP-AC-70)", () => {
   it("groups two colleagues of the same company as ONE counterparty", () => {
     const [b] = mapBidList({ activeBids: [{ id: "b1", supplierCompanyId: 77, supplier: { id: 1 } }] });
     const [c] = mapBidList({ activeBids: [{ id: "b2", supplier: { id: 2, companyId: 77 } }] });
