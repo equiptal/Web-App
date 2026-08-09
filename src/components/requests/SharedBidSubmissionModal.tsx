@@ -25,11 +25,13 @@ import "@/components/requests/requests-proto.css";
  * submission's answers; if unavailable (request closed) we render from the submission alone.
  */
 
-const TERM_KEYS = ["operator", "nationality", "fatFood", "fatTransport", "fuel", "fuelType", "year", "operatorCert", "equipmentCert"] as const;
+// Mirrors the bid form's TERM_KEYS so the renter reads back exactly the terms the supplier confirmed.
+const TERM_KEYS = ["operator", "nationality", "nightShift", "fatFood", "fatTransport", "fuel", "fuelType", "year", "operatorCert", "equipmentCert"] as const;
 type TermKey = (typeof TERM_KEYS)[number];
 const TERM_LABEL: Record<TermKey, [string, string]> = {
   operator: ["Operator", "المشغّل"],
   nationality: ["Operator nationality", "جنسية المشغّل"],
+  nightShift: ["Night shift required", "العمل الليلي مطلوب"],
   fatFood: ["Food (F.A.T)", "الطعام"],
   fatTransport: ["Accommodation & transport", "السكن والمواصلات"],
   fuel: ["Fuel responsibility", "مسؤولية الوقود"],

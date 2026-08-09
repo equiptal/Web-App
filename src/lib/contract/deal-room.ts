@@ -331,6 +331,11 @@ export function computeDealTotals(
   const perDayRate = rate / dpp;
   // Shared Friday-excluded proration. With no start date it returns the raw rate rather than a
   // Friday-blind total, so the room never shows a number the app wouldn't.
+  //
+  // On a real `DealRoomView` the Friday anchor lives under `details`, NOT at the root — reading the
+  // root ALONE silently evaluates to undefined, which turns proration off and shows the raw rate on
+  // every room. The root is accepted first only for callers that pass the room flattened; the
+  // `details` fallback is what actually fires in the app.
   const startDate = room.startDate ?? room.details?.startDate ?? null;
   const perUnitRental = computeRentalTotal({ rate, priceUnit, startDate, durationDays: periods }).total;
   const rentalTotal = perUnitRental * rentalUnits;

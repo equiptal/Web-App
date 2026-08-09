@@ -172,11 +172,27 @@ describe("toItem — FAT split (A6/specs#245-AC-24)", () => {
     expect(op.fatAccommodationTransport).toBe("supplier");
   });
 
-  it("defaults each side to 'me' when nothing is stated", () => {
+  it("leaves each side UNANSWERED when nothing is stated", () => {
+    // Was "defaults each side to 'me'". That default turned the agent's silence into a definite
+    // "the renter covers it" that nobody chose — written as `fat_food = false` and shown to the
+    // supplier as the renter's settled choice. Mansour omits the field when the RFQ is silent, so
+    // absence means "not stated". App parity: `int? _fatFood` starts null, no side pre-selected.
     const op = opOf({});
+    expect(op.fatFood).toBeNull();
+    expect(op.fatAccommodationTransport).toBeNull();
+    expect(op.fatRequired ?? null).toBeNull();
+  });
+
+  it("still reads an explicit legacy 'the renter covers it'", () => {
+    const op = opOf({ operator_accommodation_by_rentee: true });
     expect(op.fatFood).toBe("me");
     expect(op.fatAccommodationTransport).toBe("me");
-    expect(op.fatRequired ?? null).toBeNull();
+  });
+
+  it("prefers a split field over the legacy one, per side", () => {
+    const op = opOf({ operator_accommodation_by_rentee: true, fat_food_by_rentee: false });
+    expect(op.fatFood).toBe("supplier"); // split field wins
+    expect(op.fatAccommodationTransport).toBe("me"); // no split field → legacy
   });
 });
 

@@ -12,6 +12,7 @@ export interface LinkBidConfirmations {
   /** Each is the supplier's Yes/No answer to a required term; undefined = not asked for this item. */
   operator?: boolean;
   nationality?: boolean;
+  nightShift?: boolean;
   fatFood?: boolean;
   fatTransport?: boolean;
   fuel?: boolean;
@@ -143,7 +144,7 @@ export interface BidFormItem {
   returnBy?: string | null;
   notes?: string | null;
   /** The required terms the supplier confirms Yes/No (value = what the request asks for, or null). */
-  requiredTerms: { operator?: string | null; nationality?: string | null; fatFood?: string | null; fatTransport?: string | null; fuel?: string | null; fuelType?: string | null; year?: string | null; operatorCert?: string | null; equipmentCert?: string | null };
+  requiredTerms: { operator?: string | null; nationality?: string | null; nightShift?: string | null; fatFood?: string | null; fatTransport?: string | null; fuel?: string | null; fuelType?: string | null; year?: string | null; operatorCert?: string | null; equipmentCert?: string | null };
 }
 /** Read-only project context shown above the items (Layout B "Project terms"). */
 export interface BidFormProjectTerms {
@@ -310,7 +311,7 @@ export function mapBidFormData(raw: unknown): BidFormData {
         deliveryBy: s(i.deliveryBy),
         returnBy: s(i.returnBy),
         notes: s(i.notes),
-        requiredTerms: { operator: s(rt.operator), nationality: s(rt.nationality), fatFood: s(rt.fatFood), fatTransport: s(rt.fatTransport), fuel: s(rt.fuel), fuelType: s(rt.fuelType), year: s(rt.year), operatorCert: s(rt.operatorCert), equipmentCert: s(rt.equipmentCert) },
+        requiredTerms: { operator: s(rt.operator), nationality: s(rt.nationality), nightShift: s(rt.nightShift), fatFood: s(rt.fatFood), fatTransport: s(rt.fatTransport), fuel: s(rt.fuel), fuelType: s(rt.fuelType), year: s(rt.year), operatorCert: s(rt.operatorCert), equipmentCert: s(rt.equipmentCert) },
       };
     }),
   };
