@@ -374,6 +374,48 @@ describe("equipmentDocGroups — the groups, and each one's own attention count 
     expect(g.operator.rows.map((r) => r.key)).toEqual(["doc:operator:operating_license"]);
   });
 
+  /**
+   * Given a machine holds `operating_licence` — the British spelling — When the panel groups its
+   * papers, Then it is an operator document and NOT an openable row under Documents.
+   *
+   * This spelling was the one hole in "operator documents are inert". It fails BOTH halves of
+   * `isOperatorDoc`: it does not start with `operator`, and it was missing from `OPERATOR_TYPES`. So it
+   * landed in the Documents group with a live `downloadUrl`, a tickable checkbox, a view control and a
+   * place in `docDownloadBatch` — the only path by which an operator paper could carry a truthy url or
+   * a selectable flag, against the owner's status-only ruling (2026-08-08).
+   */
+  it("files the BRITISH `operating_licence` under the operator, never under Documents", () => {
+    const m = machine({ photos: ALL_FOUR, docs: [{ type: "operating_licence" }] });
+
+    // It is not a Documents row at all — and in particular not an `doc:other:*` one.
+    const g = groupBy(m, asking([], "CERTIFIED"));
+    expect(g.documents.rows.map((r) => r.key)).toEqual(["doc:ownership"]);
+    expect(g.documents.rows.some((r) => r.key.startsWith("doc:other:"))).toBe(false);
+
+    // It is also inert when NOTHING asks for it: the operator group is status-only, so an unrequested
+    // operator paper is simply not a row anywhere — it must not fall back into Documents.
+    const noAsk = equipmentDocGroups(m, NO_ASKS);
+    const rows = noAsk.flatMap((gr) => gr.rows);
+    expect(rows.some((r) => r.key.includes("licence") || r.key.includes("license"))).toBe(false);
+  });
+
+  it("gives an operator paper no url, no tick and no view control — for either spelling", () => {
+    // The property the leak actually broke. Every operator-group row must be inert in both states.
+    for (const held of ["operating_licence", "operating_license"]) {
+      const g = groupBy(machine({ photos: ALL_FOUR, docs: [{ type: held }] }), asking([], "CERTIFIED"));
+      expect(g.operator.rows.map((r) => r.key)).toEqual(["doc:operator:operating_license"]);
+      for (const row of g.operator.rows) {
+        expect(row.downloadUrl).toBeNull();
+        expect(row.files).toEqual([]);
+        expect(docRowSelectable(row, "download")).toBe(false);
+        expect(docRowActions(row)).toEqual([]);
+      }
+      // …and even with every operator row force-selected, nothing reaches the download batch.
+      const allKeys = new Set(g.operator.rows.map((r) => r.key));
+      expect(docDownloadBatch(g.operator.rows, allKeys)).toEqual([]);
+    }
+  });
+
   it("keeps every operator paper a request can actually ask for as a row of its own", () => {
     // The ask vocabulary is the app's table — TUV · SPSP · CERTIFIED/SAFETY_CERT/SAFETY — and it reaches
     // exactly three of the backend's operator papers (web-handoff.md:16). `operator_id` and

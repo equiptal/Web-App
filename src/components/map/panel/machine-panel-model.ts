@@ -162,8 +162,21 @@ const OWNERSHIP_TYPES = new Set([
  *
  * Note **`operating_license` carries no `operator_` prefix**, so a prefix test alone files the
  * operator's own licence under the equipment. Both halves of the test are load-bearing.
+ *
+ * **Both spellings of `operating_licence` are listed**, and the British one is not decoration. It is
+ * the only value in this vocabulary that fails *both* halves of `isOperatorDoc` — `operating_licence`
+ * does not start with `operator`, and a set missing it does not catch it — so it fell through into the
+ * **Documents** group carrying a real `downloadUrl`, a live checkbox, a view control and a place in
+ * `docDownloadBatch`. That was the one path by which an operator paper could ever be openable or
+ * tickable, against the owner's ruling that this family is status-only and inert (2026-08-08).
+ * `operatorCertCode` below already folds the spelling, so the file always expected the value to exist.
  */
-const OPERATOR_TYPES = new Set(["operating_license", "operator_license", "operator_licence"]);
+const OPERATOR_TYPES = new Set([
+  "operating_license",
+  "operating_licence",
+  "operator_license",
+  "operator_licence",
+]);
 
 /** Equipment SAFETY certificates. Deliberately an allow-list: `spec_sheet` / `other` / `unclassified`
  *  are real wire types, and labelling one of them "equipment safety certificate" would tell the renter
