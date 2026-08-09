@@ -103,7 +103,14 @@ export interface EquipmentDocumentsProps {
 export function EquipmentDocuments({ machine, request, ar, L, onRequest }: EquipmentDocumentsProps) {
   const groups = useMemo(() => equipmentDocGroups(machine, request), [machine, request]);
   // ONE selection set across ALL groups — a batch is the renter's whole act, not one per heading. He can
-  // tick the missing plate photo and the missing operator certificate and send once.
+  // tick the missing plate photo and a missing equipment certificate — two different groups — and send once.
+  //
+  // That example used to read «the missing plate photo **and the missing operator certificate**». **The
+  // operator half is withdrawn** (owner, 2026-08-08, narrowing AC-75) and would now be false: operator
+  // rows are inert in every mode. `operatorStatusRows` gives them no url and `requestable: false`, so
+  // `docRowMode` answers `null` and they carry no checkbox to tick — they can join neither the request
+  // batch nor the download one. The cross-group point the example was making still holds; it just needs
+  // two groups that actually have checkboxes.
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set<string>());
   const allRows = useMemo(() => groups.flatMap((g) => g.rows), [groups]);
 

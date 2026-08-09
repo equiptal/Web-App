@@ -1249,9 +1249,11 @@ export type CompanyDocKey = "cr" | "vat" | "national_address" | "local_content" 
  * learned. `companyDocRows` maps over THIS array, so a fifth row needs nothing else — and, being a row
  * like any other, it gets view + download when it carries a url and neither when it does not (AC-69).
  *
- * **IBAN is deliberately absent.** Spec §6.1 and AC-41 both name it, and the product owner has since
- * decided to remove it — so the smaller, less-revealing surface wins and the spec needs editing. Adding
- * a row back is a one-line change; un-showing a supplier's bank details after the fact is not.
+ * **IBAN is deliberately absent.** Spec §6.1 and AC-41 both named it, and the product owner decided to
+ * remove it — so the smaller, less-revealing surface wins. This used to add **"and the spec needs
+ * editing"**; that half is withdrawn — the spec HAS been edited (`004:131` and `004:704` now say no
+ * IBAN), so there is no follow-up owed and no discrepancy to reconcile. The decision stands: adding a row
+ * back is a one-line change; un-showing a supplier's bank details after the fact is not.
  *
  * **`local_content` and `saso` are HELD CERTS, not catalogue documents.** They live in
  * `supplier_profiles.held_cert_docs` (`{LC: key}` / `{SASO: key}`) with legacy `local_content_doc_key`

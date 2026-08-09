@@ -62,9 +62,11 @@
  * the one link its rows support — «حدّد كل المتاح». The single-mode case fell out of the general one;
  * nothing had to be forked or special-cased for it.
  *
- * **Built without IBAN.** Spec §6.1 and AC-41 both list it; the product owner has since said to remove
- * it, and this is built to that decision — **the spec still needs editing**. Showing a supplier's bank
- * details is not reversible after the fact; adding the row back later is one line.
+ * **Built without IBAN.** Spec §6.1 and AC-41 both listed it; the product owner said to remove it, and
+ * this is built to that decision. This note used to end **"the spec still needs editing"** — that half is
+ * withdrawn and is no longer true: `004:131` and `004:704` have been edited and now say no IBAN, so code
+ * and spec agree and nothing is outstanding. The decision itself stands: showing a supplier's bank details
+ * is not reversible after the fact; adding the row back later is one line.
  */
 
 import { useCallback, useMemo, useState } from "react";
