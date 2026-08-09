@@ -13,16 +13,17 @@ import { SharedBidNegotiateRoom } from "@/components/requests/SharedBidNegotiate
 import { NEGOTIATE_ENABLED } from "@/lib/config/flags";
 import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
-import { bidSuppliers, bucketBidTerms, CERT_LABEL, type BidCard, type TermRow } from "@/lib/contract/bids";
+
+import { bidSuppliers, bucketBidTerms, type BidCard } from "@/lib/contract/bids";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { qualityFromSubmissionItem, type BidQuality } from "@/lib/contract/bid-quality";
 import { computeBidQuote } from "@/lib/contract/comparison";
-import { rentalDivisor, VAT_RATE } from "@/lib/pricing/rental";
 import { shortRef, type RequestGroup } from "@/lib/contract/requests";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { quotationDownloadName } from "@/lib/compare/quotation-token";
-import { renderQuotationSection, wrapQuotationPage, quotationLegal, type QuotationDoc, type QuotationLineItem, type QuotationCard } from "@/lib/quotation/render";
+import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/render";
+import { buildBidQuotationDoc, quotationSupplierInitials, quotationSupplierKey } from "@/lib/quotation/bid-quotation";
 
 /** A group bid = a request's bid tagged with which item (request) it belongs to. */
 type GroupBid = BidCard & { requestId: string; itemLabel: string; itemLabelAr: string; categoryId: string | null; itemImage: string | null; quality?: BidQuality | null };
@@ -281,7 +282,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
     // Multiple suppliers → multiple quotation sections in the same file.
     const bySupplier = new Map<string, GroupBid[]>();
     for (const b of chosen) {
-      const key = b.supplierId ?? b.supplierName ?? "—";
+      const key = quotationSupplierKey(b); // shared with the single-request download, so both cut the same documents
       const list = bySupplier.get(key);
       if (list) list.push(b);
       else bySupplier.set(key, [b]);
@@ -289,275 +290,51 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
     const reqCode = String(groupRef ?? group.items[0]?.displayId ?? shortRef(group.id)).replace(/[^A-Za-z0-9-]/g, "");
 
     // Render one supplier's quotation in a single language; bilingual output stacks both per supplier.
+    //
+    // Every renter-side quotation is now assembled by `buildBidQuotationDoc` — the ~270 lines that used
+    // to live here, lifted out unchanged so the single-request bid view can reach them instead of
+    // maintaining a second, thinner HTML builder of its own. This surface's only job is the mapping:
+    // which bids, which request line each was quoted against, and who the two parties are.
     const renderSection = (supBids: GroupBid[], si: number, isAr: boolean) => {
-      const L = (en: string, arr: string) => (isAr ? arr : en);
-      const sar = L("SAR", "ر.س");
-      const dateStr = new Date().toLocaleDateString(isAr ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
-      // Rentee identity (app parity) — company name primary when verified, else personal name; plus the
-      // renter's real CR/VAT/national address/phone/email from /api/me (value-or-"Verified" pill).
-      // App parity (_RenteeBlock _partyHeader): company name is primary when the renter HAS a company
-      // (gated on company presence, not verified), with the person's name demoted to a subtitle.
-      const renteeHasCompany = !!companyName.trim();
-      const rentee = {
-        name: (renteeHasCompany ? companyName.trim() : renterName) || L("Moedatech renter", "مستأجر معداتك"),
-        person: renteeHasCompany ? (renterName || null) : null,
-        city: group.city ?? group.locationLabel,
-        crNumber: renterId.crNumber,
-        vatNumber: renterId.vatNumber,
-        nationalAddress: renterId.nationalAddress,
-        phone: renterId.phone,
-        email: renterId.email,
-      };
       const sup = supBids[0];
-      const supInit = (sup.supplierName || "S").replace(/[^A-Za-z0-9]/g, "").slice(0, 3).toUpperCase() || "S";
-      const qnum = `Q-${reqCode}-${supInit}${si + 1}`;
-      const validRaw = supBids.map((b) => b.validUntil).filter(Boolean).sort()[0] ?? null;
-      const valid = validRaw ? new Date(validRaw).toLocaleDateString(isAr ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
-      const reqIds = [...new Set(supBids.map((b) => itemMap.get(b.requestId)?.displayId ?? shortRef(b.requestId)))];
-      const reqLabel = reqIds.length === 1 ? reqIds[0] : `${reqIds[0]} +${reqIds.length - 1}`;
-      const rentalBasis = itemMap.get(sup.requestId)?.rentalType ?? "";
-      const reqItem = itemMap.get(sup.requestId);
-      const fmtRefDate = (d: string | null | undefined) => (d ? new Date(d).toLocaleDateString(isAr ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—");
-      const startStr = fmtRefDate(reqItem?.startDate);
-      const endStr = fmtRefDate(reqItem?.endDate);
-      // Supplier identity rows (app parity): off-platform submissions carry real CR/VAT/address VALUES;
-      // on-platform bids carry only verification FLAGS → render the app's value-or-"Verified" pill.
-      const ld = sup.linkDocs ?? {};
-      // Party identity rows — value-or-"Verified"-pill (the shared renderer draws them). Labels + AR
-      // match the mobile quotation_document (CR=س.ت, VAT=ض.ق.م, "National Address"). Supplier rows gate
-      // the pill on PARTY-verified (a verified supplier missing a value still shows the pill).
-      const supIdRows = [
-        { label: L("National Address", "العنوان الوطني"), value: ld.national ?? sup.supplierNationalAddress, verified: sup.verified },
-        { label: L("CR #", "س.ت"), value: ld.commercial ?? sup.supplierCrNumber, verified: sup.verified },
-        { label: L("VAT #", "ض.ق.م"), value: ld.vat ?? sup.supplierVatNumber, verified: sup.verified },
-        { label: L("Phone", "الهاتف"), value: ld.contact ?? sup.supplierPhone }, // on-platform phone or off-platform contact
-        ...(sup.compliance.entityType === "company" ? [{ label: L("Email", "البريد"), value: sup.supplierEmail }] : []), // company only, per app
-      ];
-      const renteeIdRows = [
-        { label: L("National Address", "العنوان الوطني"), value: rentee.nationalAddress, verified },
-        { label: L("CR #", "س.ت"), value: rentee.crNumber, verified },
-        { label: L("VAT #", "ض.ق.م"), value: rentee.vatNumber, verified },
-        { label: L("Phone", "الهاتف"), value: rentee.phone },
-        { label: L("Email", "البريد"), value: rentee.email },
-      ];
-      // App parity (UnverifiedIndividualIdentity): unverified individual suppliers get a subtitle.
-      const supplierSub = sup.compliance.entityType === "individual" && !sup.verified
-        ? L("Individual supplier · unverified", "مُورِّد فرد · غير موثَّق") : null;
-
-      const eqLine = (b: GroupBid) => (b.equipment ? [b.equipment.make, b.equipment.model, b.equipment.year].filter(Boolean).join(" · ") : "—");
-      const labelOf = (b: GroupBid) => (ar ? b.itemLabelAr : b.itemLabel) || (itemMap.get(b.requestId)?.displayId ?? shortRef(b.requestId));
-      // App rule (014 CR #141): the bid is priced per billing period; the unit count is NOT multiplied
-      // into the price (it's shown for information only). Open-ended → ∞ qty + one-period "as operated".
-      // Divisors come from the shared pricing module (week ÷6, month ÷26) — this was the third
-      // hand-rolled copy on the web and used a 7-day week, so the quotation disagreed with the app.
-      const daysPerPeriod = (u: string | null) => rentalDivisor(u);
-      const periodLabel = (u: string | null) => { switch ((u ?? "PER_DAY").toUpperCase()) { case "PER_WEEK": return L("week", "أسبوع"); case "PER_MONTH": return L("month", "شهر"); case "PER_JOB": return L("job", "مهمة"); default: return L("day", "يوم"); } };
-
-      // Invoice line items — rate ÷ period-days × duration × units; mob/demob × units (open-ended → "as
-      // operated"). The shared renderer draws the 6-column table (# · Item · Unit · Qty · Price · Total).
-      const m2 = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); // app parity: money shows halalas
-      let sub = 0;
-      let rowNum = 0;
-      let openRate: number | null = null; // representative per-unit·period rate for open-ended framing
-      let openPlabel = "";
-      let anyCommitted = false;
-      const lineItems: QuotationLineItem[] = [];
-      for (const b of supBids) {
-        const rate = b.price ?? 0;
-        // Supplier's OFFERED units (app `_offeredUnitsForBid`: unitsOffered → requested → 1). The rental
-        // line is PER-UNIT (not × units, app parity); units only scale the per-unit mob/demob transport.
-        const units = b.unitsOffered || b.numberOfUnits || 1;
-        const dpp = daysPerPeriod(b.priceUnit);
-        const plabel = periodLabel(b.priceUnit);
-        const durDays = itemMap.get(b.requestId)?.durationDays ?? null;
-        rowNum += 1;
-        let lineSub: number, qtyCell: string, priceCell: string, totalCell: string, totalNote: string | null = null;
-        if (durDays == null) {
-          lineSub = rate; // open-ended: one-period PER-UNIT preview; billed "as operated" (app parity)
-          qtyCell = "∞";
-          priceCell = `${m2(rate)} / ${plabel}`;
-          totalCell = `${m2(rate)} / ${plabel}`;
-          totalNote = L("As operated", "حسب التشغيل");
-          if (openRate == null) { openRate = rate; openPlabel = plabel; }
-        } else if (dpp > 0) {
-          anyCommitted = true;
-          const periods = durDays / dpp;
-          const pStr = Number.isInteger(periods) ? String(periods) : periods.toFixed(2);
-          lineSub = (rate / dpp) * durDays; // per-unit over the committed duration (units shown separately)
-          qtyCell = `${pStr} ${plabel}`;
-          priceCell = `${m2(rate)} / ${plabel}`;
-          totalCell = m2(lineSub);
-        } else {
-          anyCommitted = true;
-          lineSub = rate; // PER_JOB, per-unit
-          qtyCell = "1";
-          priceCell = m2(rate);
-          totalCell = m2(lineSub);
-        }
-        const mobTotal = (b.mobPrice ?? 0) * units;
-        const demobTotal = (b.demobPrice ?? 0) * units;
-        sub += lineSub + mobTotal + demobTotal;
-        lineItems.push({ num: rowNum, label: `${L("Rental", "الإيجار")} — ${labelOf(b)}`, detail: eqLine(b) === "—" ? null : eqLine(b), unit: plabel, qty: qtyCell, price: priceCell, total: totalCell, totalNote });
-        // Always show the mobilization/demobilization legs (deal-room + app parity): a real price when the
-        // supplier charges, else "By rentee" (the rentee arranges it) or "Included" — never silently dropped.
-        const ri = itemMap.get(b.requestId);
-        const logiRow = (label: string, price: number, total: number, byRentee: boolean): QuotationLineItem =>
-          price > 0
-            ? { num: null, label, detail: labelOf(b), unit: L("Trip", "رحلة"), qty: String(units), price: m2(price), total: m2(total) }
-            : { num: null, label, detail: byRentee ? L("Arranged by the rentee", "يُرتّبه المستأجر") : L("Included", "مشمول"), unit: "—", qty: "—", price: "—", total: byRentee ? L("By rentee", "على المستأجر") : L("Included", "مشمول") };
-        lineItems.push(logiRow(L("Delivery to site", "النقل إلى الموقع"), b.mobPrice ?? 0, mobTotal, ri?.mobByRentee === true));
-        lineItems.push(logiRow(L("Return from site", "الإرجاع من الموقع"), b.demobPrice ?? 0, demobTotal, ri?.demobByRentee === true));
-      }
-      const vat = sub * VAT_RATE; // exact (not rounded) so the amount-in-words can show halalas — app parity
-      const total = sub + vat;
-      const allOpenEnded = !anyCommitted && openRate != null;
-
-      const offeredUnits = (b: GroupBid) => b.unitsOffered || b.numberOfUnits || 1;
-
-      // ---- Equipment-terms + Contract-terms cards (the renter's RFQ terms, formatted bilingually) ----
-      const tfmt = {
-        sla: (v: string | null) => { if (!v) return null; const m: Record<string, [string, string]> = { FOUR_HR: ["4 hours", "٤ ساعات"], EIGHT_HR: ["8 hours", "٨ ساعات"], TWENTY_FOUR_HR: ["24 hours", "٢٤ ساعة"], FORTY_EIGHT_HR: ["48 hours", "٤٨ ساعة"], SEVENTY_TWO_HR: ["72 hours", "٧٢ ساعة"] }; const x = m[v.toUpperCase()]; return x ? L(x[0], x[1]) : v; },
-        overtime: (v: string | null) => { if (v == null) return null; const u = v.toUpperCase(); if (u === "0" || u === "WITHOUT") return L("None", "بدون"); if (u === "1.5X") return "1.5×"; if (u === "2X") return "2×"; return v; },
-        maint: (v: string | null) => { if (!v) return null; const u = v.toLowerCase(); if (u === "supplier") return L("Supplier", "المؤجّر"); if (u === "renter" || u === "rentee") return L("Renter", "المستأجر"); return v; },
-        payTerms: (v: string | null) => { if (!v) return null; const k = v.toLowerCase().replace(/[_-]/g, ""); const m: Record<string, [string, string]> = { upfront: ["Upfront", "مقدمًا"], daily: ["Daily", "يومي"], net0: ["Net 0", "فوري"], net30: ["Net 30 days", "صافي ٣٠ يومًا"], net60: ["Net 60 days", "صافي ٦٠ يومًا"], net90: ["Net 90 days", "صافي ٩٠ يومًا"], endofjob: ["End of job", "نهاية المهمة"] }; const x = m[k]; return x ? L(x[0], x[1]) : v; },
-        fuel: (v: string | null) => { if (!v) return null; const m: Record<string, [string, string]> = { DIESEL: ["Diesel", "ديزل"], PETROL: ["Petrol", "بنزين"], ELECTRIC: ["Electric", "كهربائي"] }; const x = m[v.toUpperCase()]; return x ? L(x[0], x[1]) : v; },
-        operator: (inc: string | null, nat: string | null) => { if (inc == null) return null; if (inc.toUpperCase() !== "YES") return L("No operator", "بدون مشغّل"); return L("Includes operator", "يشمل مشغّلاً") + (nat ? ` · ${L("Nationality", "الجنسية")}: ${nat}` : ""); },
-      };
-      // App parity: the equipment-terms section prints the required/held safety certifications.
-      const eqCertsText = (b: GroupBid) => {
-        const cs = (b.heldCertCodes?.length ? b.heldCertCodes : b.equipmentCertCodes) ?? [];
-        return cs.length ? cs.map((c) => (isAr ? CERT_LABEL[c]?.ar : CERT_LABEL[c]?.en)).filter(Boolean).join(" · ") : null;
-      };
-      // Listed equipment as an app-parity chip card (app's live_quotation_document _buildEquipmentIdentity
-      // order): Type · Size · Brand · Model · Year · Fuel · Units. Type/Size are split out of the item
-      // label; Brand/Model/Year from the offered equipment. (Category name isn't in the web bid payload —
-      // only the id — so that one chip is omitted.)
-      const listed = supBids.map((b) => {
-        const eq = b.equipment;
-        const segs = labelOf(b).split(" · ").map((x) => x.trim()).filter(Boolean);
-        const size = segs.length > 1 ? segs.slice(1).join(" · ") : null;
-        const fuel = tfmt.fuel(b.requestTerms.fuelType);
-        const chips: { label: string; value: string }[] = [];
-        chips.push({ label: L("Type", "النوع"), value: segs[0] ?? labelOf(b) });
-        if (size) chips.push({ label: L("Size", "المقاس"), value: size });
-        if (eq?.make) chips.push({ label: L("Brand", "العلامة"), value: eq.make });
-        if (eq?.model) chips.push({ label: L("Model", "الطراز"), value: eq.model });
-        if (eq?.year) chips.push({ label: L("Year", "السنة"), value: String(eq.year) });
-        if (fuel) chips.push({ label: L("Fuel", "الوقود"), value: fuel });
-        chips.push({ label: L("Units offered", "الوحدات المعروضة"), value: String(offeredUnits(b)) });
-        return {
-          label: labelOf(b),
-          detail: eqLine(b),
-          units: offeredUnits(b),
-          verified: b.eqVerified,
-          certs: b.heldCertCodes.map((c) => (isAr ? CERT_LABEL[c].ar : CERT_LABEL[c].en)),
-          chips,
-        };
-      });
-
-      const cards: QuotationCard[] = [];
-      const projectRows = supBids.map((b) => ({
-        label: itemMap.get(b.requestId)?.displayId ?? shortRef(b.requestId),
-        value: `${offeredUnits(b)} × ${labelOf(b)}`,
-      }));
-      projectRows.push({ label: L("Rental basis", "أساس الإيجار"), value: rentalBasis || "—" });
-      projectRows.push({ label: L("Equipment lines", "بنود المعدات"), value: String(supBids.length) });
-      projectRows.push({ label: L("Total units", "إجمالي الوحدات"), value: String(supBids.reduce((s2, b) => s2 + offeredUnits(b), 0)) });
-      cards.push({ title: L("Project terms", "شروط المشروع"), rows: projectRows });
-
-      // App parity: the quotation shows the SUPPLIER's declared terms (not the renter's often-blank
-      // request), with a "· Agreed" tag when the term was locked in the deal room. normKey form:
-      // payment_terms→paymentterms, breakdown_response_sla→breakdownresponsesla, etc.
-      const agBadge = (b: GroupBid, nk: string) => ((b.agreedTermKeys ?? []).includes(nk) ? ` · ${L("Agreed", "متفق عليه")}` : "");
-      const declaredNat = (b: GroupBid) => b.declaredTerms?.operatorNationality ?? b.requestTerms.operatorNationality;
-      const eqCert = (b: GroupBid) => { const t = eqCertsText(b); return t ? t + agBadge(b, "safetycertifications") : null; };
-
-      if (sup.viaSharedLink) {
-        // Off-platform (shared-link form) bids carry the FULL set of submitted terms in
-        // terms.equipment / terms.contract (each a Yes/No confirmation of the renter's requirement) —
-        // their requestTerms/declaredTerms are blank. Render every term the renter asked so the
-        // quotation captures the whole bid form, not just the four the platform path renders.
-        const linkVal = (r: TermRow): string | null => {
-          if (r.state === "grey") return null; // renter didn't ask this term → omit
-          if (r.state === "conflict") return L("Not provided", "غير متوفّر"); // supplier said No
-          // Confirmed: show the requested value the supplier committed to (parsed from the row's
-          // "Renter: X · Supplier: Yes" detail), falling back to a plain "Confirmed".
-          const d = (isAr ? r.detail?.ar : r.detail?.en) ?? "";
-          const req = (isAr ? d.split(" · المؤجّر")[0].replace(/^المستأجر:\s*/, "") : d.split(" · Supplier")[0].replace(/^Renter:\s*/, "")).trim();
-          return req && req !== "—" ? req : L("Confirmed", "مؤكّد");
-        };
-        const collect = (pick: (b: GroupBid) => TermRow[] | undefined) => {
-          const seen = new Set<string>();
-          const rows: { label: string; value: string }[] = [];
-          for (const b of supBids) for (const r of pick(b) ?? []) {
-            if (seen.has(r.key)) continue;
-            const v = linkVal(r);
-            if (v) { seen.add(r.key); rows.push({ label: isAr ? r.labelAr : r.labelEn, value: v }); }
-          }
-          return rows;
-        };
-        const eqRowsL = collect((b) => b.terms?.equipment);
-        const ctRowsL = collect((b) => b.terms?.contract);
-        if (eqRowsL.length) cards.push({ title: L("Equipment terms", "شروط المعدة"), rows: eqRowsL });
-        if (ctRowsL.length) cards.push({ title: L("Contract terms", "شروط العقد"), rows: ctRowsL });
-      } else {
-        const eqRows: { label: string; value: string }[] = [];
-        const addEq = (label: string, val: string | null) => { if (val) eqRows.push({ label, value: val }); };
-        if (supBids.length === 1) {
-          addEq(L("Operator", "المشغّل"), tfmt.operator(sup.requestTerms.operatorIncluded, declaredNat(sup)));
-          addEq(L("Equipment safety certifications", "شهادات سلامة المعدة"), eqCert(sup));
-          addEq(L("Fuel type", "نوع الوقود"), tfmt.fuel(sup.requestTerms.fuelType));
-        } else {
-          for (const b of supBids) {
-            const parts = [tfmt.operator(b.requestTerms.operatorIncluded, declaredNat(b)), eqCert(b), tfmt.fuel(b.requestTerms.fuelType)].filter(Boolean).join(" · ");
-            if (parts) eqRows.push({ label: labelOf(b), value: parts });
-          }
-        }
-        if (eqRows.length) cards.push({ title: L("Equipment terms", "شروط المعدة"), rows: eqRows });
-
-        const dt = sup.declaredTerms;
-        const rt = sup.requestTerms;
-        const ctRows: { label: string; value: string }[] = [];
-        const addCt = (label: string, val: string | null) => { if (val) ctRows.push({ label, value: val }); };
-        const pay = tfmt.payTerms(dt?.paymentTerms ?? rt.paymentTerms);
-        addCt(L("Payment type", "نوع الدفع"), pay ? pay + agBadge(sup, "paymentterms") : null);
-        const sla = tfmt.sla(dt?.breakdownResponseSla ?? rt.breakdownResponseSla);
-        addCt(L("Breakdown response", "زمن الاستجابة للأعطال"), sla ? sla + agBadge(sup, "breakdownresponsesla") : null);
-        const ot = tfmt.overtime(dt?.overtimeRate ?? rt.overtimeRate);
-        addCt(L("Overtime", "العمل الإضافي"), ot ? ot + agBadge(sup, "overtimerate") : null);
-        addCt(L("Maintenance", "الصيانة"), tfmt.maint(rt.maintenanceResponsibility));
-        if (ctRows.length) cards.push({ title: L("Contract terms", "شروط العقد"), rows: ctRows });
-      }
-
-      const doc: QuotationDoc = {
+      const qnum = `Q-${reqCode}-${quotationSupplierInitials(sup.supplierName)}${si + 1}`;
+      const doc = buildBidQuotationDoc({
         lang: isAr ? "ar" : "en",
-        title: L("Equipment rental quotation", "عرض سعر تأجير معدات"),
         quotationNumber: qnum,
-        dateStr,
-        // Verified status now shows on the CR/VAT rows ("✓ Verified"), so no standalone party chip
-        // (it rendered only under the supplier — never the rentee — and read as an orphan badge).
-        supplier: { label: L("Supplier", "المؤجِّر"), name: sup.supplierName, sub: supplierSub, idRows: supIdRows, chips: [] },
-        rentee: { label: L("Rentee", "المُستأجِر"), name: rentee.name, sub: rentee.person, idRows: renteeIdRows, chips: [] },
-        meta: [
-          { label: L("Request #", "رقم الطلب"), value: groupRef ?? reqLabel },
-          { label: L("Issue date", "تاريخ الإصدار"), value: dateStr },
-          { label: L("Valid until", "صالح حتى"), value: valid },
-          { label: L("Rental start", "بدء الإيجار"), value: startStr },
-          { label: L("Rental end", "نهاية الإيجار"), value: endStr },
-          { label: L("Currency", "العملة"), value: L("SAR · Saudi Riyal", "SAR · ريال سعودي") },
-        ],
-        listed,
-        lineItems,
-        currency: sar,
-        // Open-ended bids: reframe the grand row as the per-unit·period rate ("Total / unit · day") and
-        // note the estimate, exactly like the app's live quotation. Committed durations show a real total.
-        totals: allOpenEnded
-          ? { subtotal: sub, vat, total, label: `${L("Total", "الإجمالي")} / ${L("unit", "وحدة")} · ${openPlabel}`, valueOverride: `${m2(openRate!)} ${sar}` }
-          : { subtotal: sub, vat, total },
-        cards,
-        legal: quotationLegal(L),
-        amountWordsSuffix: allOpenEnded ? L("Estimate for one day · Final amount as operated", "تقدير ليوم واحد · المبلغ النهائي حسب التشغيل") : undefined,
-      };
+        // The RFQ group code when the group has one; otherwise the builder falls back to the request
+        // codes this document covers.
+        reference: groupRef,
+        entries: supBids.map((b) => {
+          const ri = itemMap.get(b.requestId);
+          const code = ri?.displayId ?? shortRef(b.requestId);
+          return {
+            bid: b,
+            // The label follows the renter's CURRENT UI locale, not the exported document's language —
+            // long-standing behaviour of this surface, and the taxonomy names live here, not in the
+            // builder.
+            itemLabel: (ar ? b.itemLabelAr : b.itemLabel) || code,
+            requestCode: code,
+            startDate: ri?.startDate ?? null,
+            endDate: ri?.endDate ?? null,
+            durationDays: ri?.durationDays ?? null,
+            rentalType: ri?.rentalType ?? null,
+            mobByRentee: ri?.mobByRentee ?? null,
+            demobByRentee: ri?.demobByRentee ?? null,
+          };
+        }),
+        // App parity (_RenteeBlock _partyHeader): the company name is primary when the renter HAS a
+        // company (gated on company presence, not verification), with the person demoted to a subtitle.
+        rentee: {
+          companyName,
+          personName: renterName,
+          crNumber: renterId.crNumber,
+          vatNumber: renterId.vatNumber,
+          nationalAddress: renterId.nationalAddress,
+          phone: renterId.phone,
+          email: renterId.email,
+          verified,
+        },
+      });
       return renderQuotationSection(doc);
     };
 
