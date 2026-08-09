@@ -41,20 +41,34 @@ same machine). **Do not** coerce plain-string entries — they carry request *it
 - **Given** `yardConfirmed:false` on an entry that has a `yardId` **Then** `false` is returned
   verbatim, never inferred from the yard's presence.
 
-### T2 · `unitsOffered` ownership — write and read `[BE]` ⚠
-**Spec** §7.2.1 · **AC** 08b, 183, 184, 185 · **Files** `submitBid.ts:30`, `editBid.ts:28`, `bid.service.ts`, `rentee.service.ts:518-521`
+### ~~T2 · `unitsOffered` ownership — write and read `[BE]` ⚠~~
+### 🚫 T2 — **WITHDRAWN 2026-08-09. Do not build this.**
 
-Validate every `equipmentId` in `unitsOffered` against **`ownerScopeWhere(supplierId, supplierCompanyId)`**
+> **Both `unitsOffered` guards are withdrawn — this one and T37.** The equipment-ownership guard was
+> removed as **`cd47f713`** on `backend/deal-room-rentee-map`; T37's yard guard as **`ecec55be`**.
+> Do not reinstate either from this archive.
+>
+> `tickets.md` §A closed this ticket out of the plan on 2026-08-08 and recorded that *"the code is
+> committed and stays"*. **That is no longer true** — the code has since been removed, and that line is
+> struck there too. Closing the ticket while leaving the body live is exactly how T37 got rebuilt.
+>
+> The argument below is kept visible, not deleted: the removal was a **decision**, and a reader who
+> cannot see it will make the opposite one. Reopening ownership means a **new ticket against a live
+> spec** with the owner's ruling recorded — never a re-read of this file.
+
+~~**Spec** §7.2.1 · **AC** 08b, 183, 184, 185 · **Files** `submitBid.ts:30`, `editBid.ts:28`, `bid.service.ts`, `rentee.service.ts:518-521`~~
+
+~~Validate every `equipmentId` in `unitsOffered` against **`ownerScopeWhere(supplierId, supplierCompanyId)`**
 — the same scope as the primary check — on **both** endpoints, rejecting with the existing
 `EQUIPMENT_OWNERSHIP`. Read side: keep the single batched query and **drop entries at assembly time**
-when the resolved listing's owner does not match the referencing bid (no N+1, no per-bid query).
+when the resolved listing's owner does not match the referencing bid (no N+1, no per-bid query).~~
 
-- **Given** a submit or edit naming a machine the caller does not own **Then** `EQUIPMENT_OWNERSHIP`
-  and **no bid row is written**.
-- **Given** a stored bid already carrying a foreign `equipmentId` **Then** the offered count still
+- ~~**Given** a submit or edit naming a machine the caller does not own **Then** `EQUIPMENT_OWNERSHIP`
+  and **no bid row is written**.~~
+- ~~**Given** a stored bid already carrying a foreign `equipmentId` **Then** the offered count still
   reads `unitsOffered.length` while that machine contributes **no** model, year, plate, documents,
-  photos or yard.
-- **Given** a same-company colleague's machine (T7 shared fleet) **Then** it is accepted.
+  photos or yard.~~
+- ~~**Given** a same-company colleague's machine (T7 shared fleet) **Then** it is accepted.~~
 
 ### T3 · Bid-level coordinates `[BE]` ⚠
 **Spec** §7.4, §7.10 · **AC** 09 · **Files** `rentee.service.ts:663-680`
@@ -350,9 +364,17 @@ spec pass proves we built what was agreed, and the regression pass proves we bro
 **Covers** every `app-backend` TC in §9 · **Where** `apps/backend/src/tests/...`
 
 - Done in S1: `rentee.bidLocation.test.ts` (27), `rentee.offeredUnitsDetail.test.ts` (23),
-  `bid.unitsOfferedOwnership.test.ts` (10), plus the **golden file** pinning bid-level `distanceKm`.
+  ~~`bid.unitsOfferedOwnership.test.ts` (10)~~, plus the **golden file** pinning bid-level `distanceKm`.
+  **`bid.unitsOfferedOwnership.test.ts` is deleted** — it tested T2's guard, and the guard is withdrawn
+  (`cd47f713`). Withdrawn 2026-08-09.
 - Still needed: `supplier-fleet.test.ts` (T5 — AC-94/95/96, 232/233/234), `stream-cards.test.ts` (T6 —
-  AC-91→93, 104→112, 205), the T37 yard-ownership cases, and `get-request-submissions.test.ts` (T7).
+  AC-91→93, 104→112, 205), ~~the T37 yard-ownership cases,~~ and `get-request-submissions.test.ts` (T7).
+
+  > **The T37 yard-ownership cases are withdrawn, 2026-08-09** — those tests are **deleted**, along with
+  > the guard they covered (`ecec55be`). Requiring them here is how the guard came back once already:
+  > a test named as "still needed" reads as a gap, and the next reader closes it by rebuilding the
+  > production code. There is no gap. Do not write them, and do not treat their absence as missing
+  > coverage. Same for T2's cases above.
 - **`npx tsc --noEmit` is not clean at baseline** — 91 pre-existing errors in `apps/backend`, which is why
   the repo ships `.typecheck-baseline.json` + `scripts/typecheck-ratchet.mjs`. **Prove 91 → 91, none new,
   none moved**, rather than claiming a clean typecheck.
@@ -469,31 +491,52 @@ supplier actually sent.
 
 Independent of RMAP — a renter sees this today. Small enough to ship on its own.
 
-### T37 · **SECURITY** — a per-unit `yardId` is never ownership-checked `[BE]` ⚠ *blocks the S1 merge*
-**Spec** §7.2, §7.2.1 · **New** — found while implementing T1/T2
+### ~~T37 · **SECURITY** — a per-unit `yardId` is never ownership-checked `[BE]` ⚠ *blocks the S1 merge*~~
+### 🚫 T37 — **WITHDRAWN 2026-08-09. Do not build this. The code was removed, twice.**
 
-The bid's **own** `yardId` is ownership-checked on submit (`bid.service.ts:198-204`, `YARD_OWNERSHIP`) and
+> **This ticket is the one that caused the defect.** It was closed out of the plan on 2026-08-08
+> (`tickets.md` §A) while every instruction below stayed live and unstruck. A later reader followed them,
+> **rebuilt `assertOfferedUnitsOwned`'s yard branch and shipped it**, re-landing a guard the owner had
+> already withdrawn. It was removed a second time as `ecec55be` on `backend/deal-room-rentee-map`.
+>
+> **Nothing below is to be implemented.** In particular: **do not extend `assertOfferedUnitsOwned` to
+> collect `entry.yardId`.** That is the exact code that has now been deleted twice.
+>
+> Its sibling guard **T2** (`unitsOffered` equipment ownership) is withdrawn on the same footing —
+> removed as `cd47f713`. See the strike on T2 above.
+>
+> The **argument** below is preserved deliberately, because it is a real and correctly-described attack
+> and the reasoning must stay visible: withdrawing the guard was a decision, not an oversight, and a
+> reader who cannot see the decision will make the opposite one again — which is precisely what happened.
+> If the ownership question is ever reopened it must be reopened **as a new ticket, against a live spec**,
+> with the owner's ruling on the record — not by re-reading this archive.
+
+~~**Spec** §7.2, §7.2.1 · **New** — found while implementing T1/T2~~
+
+~~The bid's **own** `yardId` is ownership-checked on submit (`bid.service.ts:198-204`, `YARD_OWNERSHIP`) and
 on edit (`:533-539`), with a comment naming the attack exactly: *"a competitor's yard (its name + GPS +
-city surface on the rentee's bid card, spoofing location)."*
+city surface on the rentee's bid card, spoofing location)."*~~
 
-**`unitsOffered[].yardId` has no such check**, and T1's new read-side lookup is tenant-scoped only:
+~~**`unitsOffered[].yardId` has no such check**, and T1's new read-side lookup is tenant-scoped only:~~
 
+<!-- WITHDRAWN — retained as the record of the argument, not as an instruction. -->
 ```ts
 prisma.yard.findMany({ where: { id: { in: yardIds }, tenantId }, ... })   // rentee.service.ts:702-704
 ```
 
-So a supplier can attach a **competitor's yard** to a machine he legitimately owns, and the renter's map
+~~So a supplier can attach a **competitor's yard** to a machine he legitimately owns, and the renter's map
 will plot that machine at the competitor's yard — name, city and coordinates — and colour it **green**,
 because `unit_yard` is precisely the state that means *confirmed*. T1 turned a bid-card text leak into a
-**confirmed pin**, which is strictly worse than the hole the codebase already guards at bid level.
+**confirmed pin**, which is strictly worse than the hole the codebase already guards at bid level.~~
 
-- **Write side:** extend `assertOfferedUnitsOwned` to collect `entry.yardId` too and `count` them with
-  `ownerScopeWhere(...) + tenantId`, throwing the existing `YARD_OWNERSHIP`. Both endpoints.
-- **Read side:** select the yard's owner columns in the batched query and, at assembly time, **drop a
+- ~~**Write side:** extend `assertOfferedUnitsOwned` to collect `entry.yardId` too and `count` them with
+  `ownerScopeWhere(...) + tenantId`, throwing the existing `YARD_OWNERSHIP`. Both endpoints.~~
+  **← THIS LINE IS THE DEFECT. It has been implemented and reverted twice. Do not implement it.**
+- ~~**Read side:** select the yard's owner columns in the batched query and, at assembly time, **drop a
   foreign yard's `unit_yard` resolution and fall through to the next precedence level** (`bid_pin` →
-  `bid_yard` → `listing_yard`) — **not** to `none`. The machine is legitimate; only the claimed yard is not.
-- **Given** an entry naming a yard the bidding supplier does not own **When** the renter's payload is built
-  **Then** no yard name, city or coordinate from it appears, and that unit resolves one level lower.
+  `bid_yard` → `listing_yard`) — **not** to `none`. The machine is legitimate; only the claimed yard is not.~~
+- ~~**Given** an entry naming a yard the bidding supplier does not own **When** the renter's payload is built
+  **Then** no yard name, city or coordinate from it appears, and that unit resolves one level lower.~~
 
 ### T44 · **BUG** — a renter gets a 404 on their own trial request's fleet `[BE]` ⚠ *Moedatech-App*
 **Found while implementing T5** · **Files** `feed.service.ts:249-251`, `supplier-fleet.service.ts:98`

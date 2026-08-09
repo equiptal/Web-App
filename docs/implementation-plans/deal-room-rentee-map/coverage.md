@@ -24,7 +24,7 @@ Every live row lands in exactly one ticket, one exclusion, or one finding below.
 | Ticket | ACs |
 |---|---|
 | **T1** per-unit location | 01, 02, 03, 04, 05, 06, 07, 08, 10 |
-| **T2** `unitsOffered` ownership | 08b, 183, 184, 185 |
+| ~~**T2** `unitsOffered` ownership~~ | ~~08b, 183, 184, 185~~ — **WITHDRAWN 2026-08-09**, guard removed (`cd47f713`), `bid.unitsOfferedOwnership.test.ts` deleted. Those four rows have no ticket and need none |
 | **T3** bid coordinates + characterization | 09 |
 | **T4** ownership docs unfiltered | 101, 102 |
 | **T5** fleet endpoint | 94, 95, 96, **232, 233, 234** |
@@ -58,7 +58,7 @@ Every live row lands in exactly one ticket, one exclusion, or one finding below.
 | **T34** submission VAT sum | 216 *(defect — shipped code violated it)* |
 | **T35** absent company rows | 218 *(defect — bare em-dash in a key/value row)* |
 | **T36** the shipped 50 km refine | — *(removal; the last surviving distance filter after D-C)* |
-| **T37** per-unit `yardId` ownership | — *(security; the attack §7.2 names at bid level, unguarded per unit)* |
+| ~~**T37** per-unit `yardId` ownership~~ | ~~— *(security; the attack §7.2 names at bid level, unguarded per unit)*~~ — **WITHDRAWN 2026-08-09**, guard removed twice (latest `ecec55be`), tests deleted. **Do not extend `assertOfferedUnitsOwned` to collect `entry.yardId`** |
 | **T38–T43** verification | — *(gates, run per module: FE tests · BE tests · integration · visual · spec · regression)* |
 | **T44** trial-request fleet 404 | — *(defect found while building T5)* |
 
@@ -66,7 +66,8 @@ Every live row lands in exactly one ticket, one exclusion, or one finding below.
 
 | | Tickets |
 |---|---|
-| **Done, verified** | T1, T2, T3, T4, T5, T7, T8, T9, T10, T34, T35, T37, T44 |
+| **Done, verified** | T1, ~~T2,~~ T3, T4, T5, T7, T8, T9, T10, T34, T35, ~~T37,~~ T44 |
+| **Withdrawn 2026-08-09** | **T2** (`cd47f713`) and **T37** (`ecec55be`) — both `unitsOffered` ownership guards were **removed from the code** by the owner, T37's for the second time, and their test suites deleted. Struck above rather than deleted: a reader who cannot see the decision rebuilds the guard, which is what already happened |
 | **In flight** | T6 (backend) · T16, T17 (web) |
 | **Open** | T11–T15 *(landed, pending the T41 visual pass)* · T18–T23 · T24–T28 · T29–T33 · T36 · T38–T43 |
 

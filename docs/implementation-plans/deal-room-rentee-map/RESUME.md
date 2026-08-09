@@ -27,10 +27,16 @@ they will follow you across a branch switch.
 
 ## Done — 16 tickets
 
-**Backend, feature-complete:** T1 per-unit location · T2 `unitsOffered` ownership · T3 bid coordinates
+**Backend, feature-complete:** T1 per-unit location · ~~T2 `unitsOffered` ownership~~ · T3 bid coordinates
 + golden file · T4 ownership documents renter-visible · T5 the supplier-fleet endpoint · T6 the
 `rentee_request` card, unread and coalesced notifications · T7 `city` + `contactInfo` projected ·
-**T37** per-unit `yardId` ownership (security) · **T44** the trial-request 404.
+~~**T37** per-unit `yardId` ownership (security)~~ · **T44** the trial-request 404.
+
+> **Corrected 2026-08-09 — T2 and T37 are no longer in the code.** Both `unitsOffered` ownership guards
+> were **removed** by the owner — `cd47f713` (T2, equipment) and `ecec55be` (T37, yard) — and their test
+> suites deleted. T37's guard had already been removed once and was rebuilt by a reader following the
+> still-live ticket body in `archive-tickets-v2.md`; `ecec55be` is the second removal. **Do not reinstate
+> either.** Everything else on this line is still shipped.
 
 **Web:** T8 contract types + `supplierCompanyId` grouping · T9 `bid-map.ts` selectors · T10 their tests ·
 T11 the list/map toggle · T12 workspace + canvas · T13 bid list · T15 colour key · **T16 machine pins**

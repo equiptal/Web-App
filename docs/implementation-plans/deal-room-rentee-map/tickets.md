@@ -23,13 +23,22 @@ served by this work.
 | T8 | contract types + `supplierCompanyId` | web `43393c9` | `FleetMachine` / `OfferedUnitDetail` **is** v3's contract |
 | T9/T10 | `bid-map.ts` + tests | web `37af3ab` | partly — see **C** |
 
-**Tickets closed out of this plan 2026-08-08** — the code is committed and stays; only the tracking
+**Tickets closed out of this plan 2026-08-08** — ~~the code is committed and **stays**~~; only the tracking
 entries are removed, because none of them belongs to this feature:
+
+> **Corrected 2026-08-09 — "the code is committed and stays" is false for T2 and T37.** Both
+> `unitsOffered` ownership guards have since been **removed from the code** by the owner —
+> **`cd47f713`** (T2, equipment) and **`ecec55be`** (T37, yard) on `backend/deal-room-rentee-map`, T37's
+> for the second time. It still holds for T34, T44, T7 and T35, which are shipped and staying.
+>
+> This sentence is the reason the correction is needed at all: T37 was closed here as *committed and
+> staying* while its full ticket body stayed live in [`archive-tickets-v2.md`](archive-tickets-v2.md), a
+> reader rebuilt the guard from that body, and it shipped. Both bodies are now struck at source.
 
 | | Was | Why it left |
 |---|---|---|
-| **T2** | `unitsOffered` ownership (security) | a platform hole, not a v3 requirement. Shipped `5cc1921f` |
-| **T37** | per-unit `yardId` ownership (security) | same. Shipped `5c60a938` |
+| ~~**T2**~~ | ~~`unitsOffered` ownership (security)~~ | ~~a platform hole, not a v3 requirement. Shipped `5cc1921f`~~ — **WITHDRAWN 2026-08-09. The guard was removed (`cd47f713`) and its suite `bid.unitsOfferedOwnership.test.ts` deleted. Do not reinstate** |
+| ~~**T37**~~ | ~~per-unit `yardId` ownership (security)~~ | ~~same. Shipped `5c60a938`~~ — **WITHDRAWN 2026-08-09. Removed twice, most recently `ecec55be`. Do NOT extend `assertOfferedUnitsOwned` to collect `entry.yardId`** |
 | **T34** | the submission VAT-sum defect | an off-platform bug fix; off-platform is out of scope in v3. Shipped `36fb087` |
 | **T44** | trial-request fleet 404 | trials have no relation to this feature. Shipped `c404bedf` |
 | **T36** | the shipped 50 km refine | **withdrawn** — the "a bid 180 km away can own a machine 12 km away" argument only holds where machines are on screen. On the bids list there are only bids, and a bid's distance is the honest number for a bid |

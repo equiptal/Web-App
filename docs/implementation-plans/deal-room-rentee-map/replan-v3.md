@@ -26,11 +26,20 @@ v3 renders is already served by work that has landed.
 
 ## Disposition — all 44 tickets
 
-### Backend — 9 tickets, all landed, all still correct ✅
+### Backend — ~~9 tickets, all landed, all still correct ✅~~ → **7 landed; 2 withdrawn**
 
-`T1` per-unit location · `T2` `unitsOffered` ownership · `T3` bid coordinates + golden file · `T4`
-ownership documents · `T5` the fleet endpoint · `T6` the `rentee_request` card · `T37` per-unit `yardId`
-ownership · `T44` trial-request fleet.
+`T1` per-unit location · ~~`T2` `unitsOffered` ownership~~ · `T3` bid coordinates + golden file · `T4`
+ownership documents · `T5` the fleet endpoint · `T6` the `rentee_request` card · ~~`T37` per-unit `yardId`
+ownership~~ · `T44` trial-request fleet.
+
+> **Corrected 2026-08-09 — `T2` and `T37` are no longer landed.** Both `unitsOffered` ownership guards
+> were **removed from the code** by the owner: **`cd47f713`** (T2, equipment) and **`ecec55be`** (T37,
+> yard), the latter for the second time, along with their test suites. Neither was ever a v3 requirement
+> — §7 asks for no new validation — so nothing in V1…V18 depends on them.
+>
+> Struck rather than deleted, because deleting the line is what let this happen: T37 was closed in
+> `tickets.md` §A while its full body stayed live in `archive-tickets-v2.md`, a reader rebuilt the guard
+> from it, and it shipped. **Do not reinstate either guard from any document in this folder.**
 
 v3 §7.1 names `GET /me/bids/{bidId}/fleet` → `mapFleet` → `FleetMachine` as **the** data source, and §7.2
 names `unitAvailability`/`locationSource` as **the only derivation**. Both are exactly what T5 and T1
