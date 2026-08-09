@@ -1,6 +1,6 @@
 /**
- * **The rentee map's structural criteria** — RM3-AC-02, AC-06, AC-15, AC-26, AC-33, AC-34, AC-35,
- * AC-49.
+ * **The rentee map's structural criteria** — RM3-AC-02, RM3-AC-06, RM3-AC-15, RM3-AC-26,
+ * RM3-AC-33, RM3-AC-34, RM3-AC-35, RM3-AC-49.
  *
  * These eight are facts about the SURFACE rather than about a model: what the header is allowed to
  * list, which value reaches both drawing surfaces, which branch renders when the offer is empty, what
@@ -206,7 +206,7 @@ describe("an offer with no registered machine states so, with no card furniture 
     for (const property of ["border", "box-shadow", "background"]) {
       expect(bare, property).not.toMatch(new RegExp(`(^|;)\\s*${property}\\s*:`));
     }
-    // The positive control, and the AC-28e contrast in one: the FILTERED state deliberately does have
+    // The positive control, and the RM3-AC-28e contrast in one: the FILTERED state deliberately does have
     // furniture, so "no furniture" is a property of this rule and not of the stylesheet in general.
     const furnished = cssBlock(css, ".bidmap .bm-eqfnone {");
     expect(furnished).toMatch(/border\s*:/);
@@ -214,7 +214,7 @@ describe("an offer with no registered machine states so, with no card furniture 
   });
 });
 
-/* ═════════════════════════ RM3-AC-34 / AC-35 · the landing effect and the finite cue ═════════════════════════ */
+/* ═════════════════════════ RM3-AC-34 / RM3-AC-35 · the landing effect and the finite cue ═════════════════════════ */
 
 describe("landing orients the renter and navigates nowhere (RM3-AC-34)", () => {
   const landing = region(read(WORKSPACE), "if (landedForBid.current === bid.id) return;", "}, [bid, fleet, listed]);");
@@ -226,7 +226,7 @@ describe("landing orients the renter and navigates nowhere (RM3-AC-34)", () => {
   });
 
   it("never opens a detail — `detailId` is untouched by the whole effect", () => {
-    // "No detail opens" is the half of AC-34 nothing asserted. A `setDetailId(id)` here would take the
+    // "No detail opens" is the half of RM3-AC-34 nothing asserted. A `setDetailId(id)` here would take the
     // renter off the map he has just arrived at, before he has chosen anything.
     expect(landing).not.toMatch(/setDetailId/);
     expect(landing).not.toMatch(/setCompanyOpen/);
@@ -273,7 +273,7 @@ describe("the landing cue is finite (RM3-AC-35)", () => {
     expect(Number.isFinite(LANDING_CUE_MS)).toBe(true);
   });
 
-  /* **Manual, and labelled so.** AC-35's second clause — *"the resting shadow is preserved across the
+  /* **Manual, and labelled so.** RM3-AC-35's second clause — *"the resting shadow is preserved across the
      cue, so the card never appears to shift"* — is a rendered-appearance fact. What CAN be asserted is
      that the keyframes never animate geometry and always carry the resting shadow first; the
      perceptual claim itself stays a visual check in T41. */
@@ -288,7 +288,7 @@ describe("the landing cue is finite (RM3-AC-35)", () => {
   });
 });
 
-/* ═════════════════════════ RM3-AC-06 / AC-33 · the two colour rules, in the stylesheet ═════════════════════════ */
+/* ═════════════════════════ RM3-AC-06 / RM3-AC-33 · the two colour rules, in the stylesheet ═════════════════════════ */
 
 describe("the surface's stylesheet carries the same colour tokens the models do", () => {
   const css = read(CSS);

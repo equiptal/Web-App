@@ -5,7 +5,7 @@
  * `locationSource` **is** the reason. It names, precisely, why availability is unconfirmed: the
  * lessor pinned the bid rather than the unit (`bid_pin`), or the machine is sitting on its listing's
  * registered yard with no per-bid commitment (`listing_yard`), or its yard row was deleted (`none`).
- * And the backend must serve it — AC-19 and AC-27 both derive the chip's own COLOUR from it.
+ * And the backend must serve it — RM3-AC-19 and RM3-AC-27 both derive the chip's own COLOUR from it.
  *
  * So the field this AC forbids the chip from surfacing is the same field the AC above it requires the
  * chip to be built on. That is not a contradiction, it is the whole design: `unitAvailability` is

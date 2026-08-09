@@ -16,7 +16,7 @@ import {
 } from "@/lib/contract/rentee-request";
 
 /**
- * **V11 — the four requests, and reading them back** (spec 004 §6.7, RM3-AC-17 / AC-18 / TC-09).
+ * **V11 — the four requests, and reading them back** (spec 004 §6.7, RM3-AC-17 / RM3-AC-18 / TC-09).
  *
  * `tests/unit/rentee-request.test.ts` covers the shortfall composer alone, which is all that existed
  * when V4 landed. This suite covers the rest of the loop: the composer the other three entry points
@@ -252,7 +252,7 @@ describe("renteeRequestState — the machine is the verdict (RM3-AC-18)", () => 
 /**
  * **The company-scope document ask is withdrawn**, and this suite is what replaces the one that
  * asserted it. The renter can still ask about a machine's papers; he can no longer ask for the firm's,
- * because a company paper is **read** from the panel — listed, opened, downloaded (V15 / AC-69) — and
+ * because a company paper is **read** from the panel — listed, opened, downloaded (V15 / RM3-AC-69) — and
  * that read is untouched.
  *
  * The rule is enforced by the TYPE, not by a guard: `RenteeRequestDraft`'s `document` arm requires

@@ -40,7 +40,7 @@ import { priceFooterModel } from "@/lib/contract/price-footer";
 const ROOT = process.cwd();
 const EXT = [".ts", ".tsx", ".js", ".jsx"];
 
-/** The two modules AC-29 forbids this surface from reaching. */
+/** The two modules RM3-AC-29 forbids this surface from reaching. */
 const FORBIDDEN = ["src/lib/contract/bid-quality", "src/components/bid/QualityRing"];
 
 /** The surface's entry points: its route, and every file of its component tree. */

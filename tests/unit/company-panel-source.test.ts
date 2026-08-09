@@ -8,12 +8,12 @@ import {
 import { companyDocRows, COMPANY_DOC_KEYS, docRowActions } from "@/components/map/panel/machine-panel-model";
 
 /**
- * **V15 — the read, WIRED** (spec 004a §7; RM3-AC-68 / AC-69 / AC-70).
+ * **V15 — the read, WIRED** (spec 004a §7; RM3-AC-68 / RM3-AC-69 / RM3-AC-70).
  *
  * `company-documents.test.ts` proved the parser. It could not catch the actual defect:
  * `BidMapWorkspace` built the company panel's `docs` prop from `bid.compliance` — presence booleans,
  * no `downloadUrl`, no `expiryDate`, no verification, no `saso` row — so every row rendered
- * "no document yet", `docRowActions` returned `[]` for all five, and AC-69's view/download was
+ * "no document yet", `docRowActions` returned `[]` for all five, and RM3-AC-69's view/download was
  * unreachable on that panel while a fully-tested mapper sat behind a prop nobody fed.
  *
  * **A proven model behind an unwired prop is not coverage.** So this suite asserts the SEAM: what the
@@ -91,7 +91,7 @@ describe("companyPanelSource — what the company panel is actually fed", () => 
     }
   });
 
-  it("REGRESSION: every row the read produced opens (AC-69) — which the presence fallback cannot", () => {
+  it("REGRESSION: every row the read produced opens (RM3-AC-69) — which the presence fallback cannot", () => {
     const rows = companyDocRows({ verified: true, docs: companyPanelSource(fullRead(), bidLike()).docs });
     expect(rows).toHaveLength(COMPANY_DOC_KEYS.length);
     for (const r of rows) {

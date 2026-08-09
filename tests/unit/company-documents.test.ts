@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { mapCompanyDocuments } from "@/lib/contract/company-documents";
 
 /**
- * **V14 — the company panel's missing read** (spec 004a §7, RM3-AC-68 / AC-70).
+ * **V14 — the company panel's missing read** (spec 004a §7, RM3-AC-68 / RM3-AC-70).
  *
  * `CompanyPanel` takes its rows as a `docs` prop and nothing could fill it: `getMyCompany` serves a
  * supplier his OWN company and `partner/company.ts` is the partner surface, so V9 rendered four rows
@@ -65,7 +65,7 @@ describe("mapCompanyDocuments — the panel's source, parsed", () => {
     expect(dated.docs.vat?.expiryDate).toBe("2027-01-01");
   });
 
-  it("AC-70 — local content arrives as a first-class company paper", () => {
+  it("RM3-AC-70 — local content arrives as a first-class company paper", () => {
     // It is a HELD CERT server-side (`held_cert_docs.LC` / the legacy `local_content_doc_key`), which
     // is invisible from here on purpose: the endpoint resolved it, and the panel gets a row like any
     // other. That is what makes a `local_content` request answerable rather than merely sendable.
@@ -90,7 +90,7 @@ describe("mapCompanyDocuments — the panel's source, parsed", () => {
     expect(src.docs.local_content).toBeUndefined();
   });
 
-  it("a row with NO url is dropped — never a dead control (AC-69)", () => {
+  it("a row with NO url is dropped — never a dead control (RM3-AC-69)", () => {
     const src = mapCompanyDocuments(payload({ documents: [row({ key: null }), row({ documentKey: "vat_cert", key: "u" })] }));
     expect(src.docs.cr).toBeUndefined();
     expect(src.docs.vat).toBeDefined();

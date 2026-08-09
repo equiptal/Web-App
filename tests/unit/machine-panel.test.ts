@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 import { mapFleet, type FleetMachine } from "@/lib/contract/fleet";
 // The company panel's *decisions* are pure functions exported beside the component — which rows may be
 // ticked, what a batch covers, what each saved file is called. Imported as a namespace as well, because
-// "this module exports no request path" is itself one of the claims (AC-72).
+// "this module exports no request path" is itself one of the claims (RM3-AC-72).
 import * as companyPanelModule from "@/components/map/panel/CompanyPanel";
 import {
   companyDownloadBatch,
@@ -93,7 +93,7 @@ const cellsBy = (m: FleetMachine, r: MatchRequest): Record<MatchCellKey, { state
 
 /* ────────────────────────────── the six match cells (V7) ────────────────────────────── */
 
-describe("matchGrid — six cells, in the spec's order (AC-36)", () => {
+describe("matchGrid — six cells, in the spec's order (RM3-AC-36)", () => {
   it("returns exactly the six §6.5 cells and nothing descriptive", () => {
     const cells = matchGrid(machine({ photos: ALL_FOUR }), {});
     expect(cells.map((c) => c.key)).toEqual([
@@ -106,7 +106,7 @@ describe("matchGrid — six cells, in the spec's order (AC-36)", () => {
     ]);
   });
 
-  it("every cell states an actual finding — never a bare tick (AC-37)", () => {
+  it("every cell states an actual finding — never a bare tick (RM3-AC-37)", () => {
     for (const c of matchGrid(machine({ photos: ALL_FOUR }), { reqEquipmentCerts: ["tuv"] })) {
       expect(c.finding.en.trim().length).toBeGreaterThan(3);
       expect(c.finding.ar.trim().length).toBeGreaterThan(3);
@@ -305,7 +305,7 @@ describe("distanceBandLabel", () => {
 
 /* ────────────────────────── equipment documents (V8) ────────────────────────── */
 
-/* ────────────── V8 — the document groups (§6.6, AC-38, AC-39, AC-42) ──────────────
+/* ────────────── V8 — the document groups (§6.6, RM3-AC-38, RM3-AC-39, RM3-AC-42) ──────────────
  *
  * The platform's one rule (owner, 2026-08-08), applied to photos, ownership, equipment certs and
  * operator papers alike:
@@ -329,7 +329,7 @@ const asking = (equip: string[] = [], operator = ""): MatchRequest => ({
 const groupBy = (m: FleetMachine, r: MatchRequest) =>
   Object.fromEntries(equipmentDocGroups(m, r).map((g) => [g.key, g]));
 
-describe("equipmentDocGroups — the groups, and each one's own attention count (AC-42)", () => {
+describe("equipmentDocGroups — the groups, and each one's own attention count (RM3-AC-42)", () => {
   it("splits photos from documents from the OPERATOR's documents, and never merges the counts", () => {
     const groups = equipmentDocGroups(
       machine({ photos: ALL_FOUR, docs: [{ type: "istimara" }, { type: "operator_tuv" }] }),
@@ -398,7 +398,7 @@ describe("equipmentDocGroups — the groups, and each one's own attention count 
     expect(g.documents.rows.find((r) => r.key === "doc:other:spec_sheet")?.label.en).toBe("Spec sheet");
   });
 
-  it("shows PRESENCE ONLY — never a verification badge or an expiry (AC-39, §6.6)", () => {
+  it("shows PRESENCE ONLY — never a verification badge or an expiry (RM3-AC-39, §6.6)", () => {
     // The wire carries both fields. Nothing may render them here: a badge invites the renter to judge
     // a supplier on a state the platform sets.
     const groups = equipmentDocGroups(
@@ -630,7 +630,7 @@ describe("a row holding several files exposes EVERY one of them", () => {
   });
 });
 
-describe("the batch ask raised from the equipment's papers (AC-38)", () => {
+describe("the batch ask raised from the equipment's papers (RM3-AC-38)", () => {
   /* A test here asserted the batch ask raised FROM the operator's section — that ticking its rows
    * composed a draft naming `operator_safety_certificate`. **Deleted rather than inverted** (owner,
    * 2026-08-08): *"operator docs cannot be viewed or requested and are not part of docs."* There is no
@@ -820,11 +820,11 @@ describe("the operator's group participates in nothing", () => {
 /* ──────────── V15 — every document is VIEWABLE (004a §7, RM3-AC-69, narrowed 2026-08-08) ────────────
  *
  * The per-row **download** is withdrawn by the owner's UI design of 2026-08-08: downloading is the batch
- * action now, so a row keeps exactly one control — view — and AC-69 is narrowed to match rather than
+ * action now, so a row keeps exactly one control — view — and RM3-AC-69 is narrowed to match rather than
  * left contradicting the code. The second clause is untouched: a row with no url exposes NOTHING.
  */
 
-describe("docRowActions — view, and neither a download glyph nor a dead button (AC-69)", () => {
+describe("docRowActions — view, and neither a download glyph nor a dead button (RM3-AC-69)", () => {
   it("a row WITH a url exposes exactly one control, and it is view", () => {
     const actions = docRowActions({ downloadUrl: "https://x/cr.pdf" });
     expect(actions.map((a) => a.kind)).toEqual(["view"]);
@@ -852,7 +852,7 @@ describe("docRowActions — view, and neither a download glyph nor a dead button
   });
 });
 
-describe("every document family on this surface is openable (AC-69)", () => {
+describe("every document family on this surface is openable (RM3-AC-69)", () => {
   it("equipment PAPERS — a held paper gets view, an absent one gets nothing", () => {
     const g = groupBy(machine({ docs: [{ type: "istimara" }] }), asking(["tuv"], "tuv"));
     const ownership = g.documents.rows.find((r) => r.key === "doc:ownership")!;
@@ -1030,7 +1030,7 @@ describe("selection is a MODE, inferred from the first tick", () => {
   it("the operator's certificates tick in NEITHER mode — held or absent", () => {
     const g = groupBy(machine({ docs: [{ type: "operator_tuv" }] }), asking([], "tuv, spsp"));
     const [held, gap] = g.operator.rows;
-    expect(docRowMode(held)).toBeNull(); // present, and deliberately unopenable (AC-75)
+    expect(docRowMode(held)).toBeNull(); // present, and deliberately unopenable (RM3-AC-75)
     // ~~`docRowMode(gap)` was `"request"` — absent, so still askable~~. Withdrawn 2026-08-08: this family
     // is not asked for at all, so the absent row is `null` for the same reason the held one is.
     expect(docRowMode(gap)).toBeNull();
@@ -1117,7 +1117,7 @@ describe("attentionCount", () => {
   });
 });
 
-describe("batchDocumentRequest — one request naming several types (AC-38)", () => {
+describe("batchDocumentRequest — one request naming several types (RM3-AC-38)", () => {
   // `requestable` is not optional: the composer will not take a row that has not said whether it may be
   // asked for, which is what keeps the tick and the ask from being two rules (owner, 2026-08-08).
   const rows = [
@@ -1144,7 +1144,7 @@ describe("batchDocumentRequest — one request naming several types (AC-38)", ()
    * belong to the firm. The product owner withdrew the company-scope document request on 2026-08-08 —
    * a document request names a machine — so the `scope` parameter is gone, the id is non-nullable, and
    * the test is deleted rather than inverted. The company panel's ticks came back later the same day —
-   * for a batch **download**, not an ask (AC-72) — and are covered at the bottom of this file; nothing
+   * for a batch **download**, not an ask (RM3-AC-72) — and are covered at the bottom of this file; nothing
    * about the composer changed with them. See `CompanyPanel.tsx`. */
 
   it("never emits the retired `add_to_offer` kind", () => {
@@ -1187,7 +1187,7 @@ describe("companyInitials — the header's tile", () => {
   });
 });
 
-describe("companyDocRows — verification AND expiry, unlike the equipment rows (AC-40)", () => {
+describe("companyDocRows — verification AND expiry, unlike the equipment rows (RM3-AC-40)", () => {
   it("carries CR, VAT, national address, local content and SASO", () => {
     expect(COMPANY_DOC_KEYS).toEqual(["cr", "vat", "national_address", "local_content", "saso"]);
   });
@@ -1206,7 +1206,7 @@ describe("companyDocRows — verification AND expiry, unlike the equipment rows 
     expect(saso.label.ar).toBe("تسجيل ساسو");
   });
 
-  it("carries NO IBAN row — the product owner removed it, so the spec (§6.1 / AC-41) is now wrong", () => {
+  it("carries NO IBAN row — the product owner removed it, so the spec (§6.1 / RM3-AC-41) is now wrong", () => {
     const rows = companyDocRows({ verified: true, docs: { cr: { present: true } } });
     const text = JSON.stringify(rows).toLowerCase();
     expect(text).not.toContain("iban");
@@ -1250,7 +1250,7 @@ describe("companyDocRows — verification AND expiry, unlike the equipment rows 
   });
 });
 
-/* ───────── the company panel's selection — ticks that DOWNLOAD, never ask (AC-72) ───────── */
+/* ───────── the company panel's selection — ticks that DOWNLOAD, never ask (RM3-AC-72) ───────── */
 
 /**
  * The panel lost its ticks on 2026-08-08 with the company-scope request, and got them back the same day
@@ -1263,7 +1263,7 @@ describe("companyDocRows — verification AND expiry, unlike the equipment rows 
  * half that did not come back: `CompanyPanel` has no `onRequest` prop, and a company row still carries
  * no requestable document types for one to name.
  */
-describe("the company panel's batch — download, and only over rows with a file (AC-69, AC-72)", () => {
+describe("the company panel's batch — download, and only over rows with a file (RM3-AC-69, RM3-AC-72)", () => {
   const withUrls = (keys: CompanyDocKey[]) =>
     companyDocRows({
       verified: true,

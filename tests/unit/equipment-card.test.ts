@@ -1,23 +1,23 @@
 /**
- * **V5 · the machine card, and the marker that is the same machine** — RM3-AC-12, AC-13, AC-19,
- * AC-21, AC-32, AC-33.
+ * **V5 · the machine card, and the marker that is the same machine** — RM3-AC-12, RM3-AC-13,
+ * RM3-AC-19, RM3-AC-21, RM3-AC-32, RM3-AC-33.
  *
  * ── Why this file exists ─────────────────────────────────────────────────────────────────────────
  * Every criterion here was previously "covered" by a test that could not go red.
  *
- * **AC-19** — *the pin and the card chip take their colour from `unitAvailability`, never from
+ * **RM3-AC-19** — *the pin and the card chip take their colour from `unitAvailability`, never from
  * `yardConfirmed`* — was named by three tests, none of which touched either surface; one of them
  * called `unitAvailability()` **inside the test**, on a list the test had itself filtered, and then
  * asserted the answer. That is a claim about `unitAvailability`, which is separately and properly
  * tested; it says nothing whatever about the card or the marker. Rewriting `EquipmentList` to read
  * `machine.yardConfirmed` left all three green.
  *
- * **AC-12 / AC-32 / AC-33** are negatives about what a card may state, and a negative cannot be
+ * **RM3-AC-12 / RM3-AC-32 / RM3-AC-33** are negatives about what a card may state, and a negative cannot be
  * observed on a render this suite never mounts. They are asserted here the way `map-no-quality-score`
- * asserts AC-29: an `Object.keys` sweep over **populated** model output. A populated model is the
+ * asserts RM3-AC-29: an `Object.keys` sweep over **populated** model output. A populated model is the
  * whole point — `expect("serialNumber" in ({} as EquipmentCardModel)).toBe(false)` is vacuous at
  * runtime, because Vitest transpiles without typechecking and the type is erased before the assertion
- * runs. `price-footer.test.ts`'s AC-67 test is written that way and proves nothing.
+ * runs. `price-footer.test.ts`'s RM3-AC-67 test is written that way and proves nothing.
  *
  * ── The fixture carries the forbidden values on purpose ──────────────────────────────────────────
  * Every machine below has a real `serialNumber` and a real `measurementName` (the load capacity). The
@@ -45,7 +45,7 @@ interface RawMachine {
   inBid?: boolean;
   /** §7.3 precedence level — `unit_yard` is the only one that reads as confirmed. */
   source?: string;
-  /** The boolean AC-19 forbids either surface from reading. */
+  /** The boolean RM3-AC-19 forbids either surface from reading. */
   yardConfirmed?: boolean;
   km?: number | null;
   lat?: number | null;
@@ -53,7 +53,7 @@ interface RawMachine {
   docs?: string[];
 }
 
-/** The serial and the capacity every fixture carries, so the AC-12 sweep has something to find. */
+/** The serial and the capacity every fixture carries, so the RM3-AC-12 sweep has something to find. */
 const SERIAL = "SN-CAT-320D-88117";
 const CAPACITY = "20 ton";
 
@@ -176,7 +176,7 @@ describe("the card's chip and the machine's marker are one derivation (RM3-AC-19
   });
 });
 
-/* ── the other half of AC-19: the boolean is not reachable from either drawing surface ──────────
+/* ── the other half of RM3-AC-19: the boolean is not reachable from either drawing surface ──────────
    The model assertions above prove the two surfaces agree TODAY. This proves they cannot be made to
    disagree by the one edit that would do it — reading `yardConfirmed` at a render.
 
@@ -356,7 +356,7 @@ describe("availability and commitment are ONE chip value (RM3-AC-32)", () => {
   });
 
   it("still carries the certificates, which are a fact about DOCUMENTS and not a second chip", () => {
-    // The positive control on the rule: AC-32 forbids a second COMMITMENT signal, not row 4.
+    // The positive control on the rule: RM3-AC-32 forbids a second COMMITMENT signal, not row 4.
     expect(card.certs.map((c) => c.en)).toEqual(["TÜV", "SPSP"]);
   });
 });
@@ -391,9 +391,9 @@ describe("the request action is blue, never navy (RM3-AC-33)", () => {
   });
 });
 
-/* ══════════ RM3-AC-21 / AC-15 · one marker per plottable offered machine ══════════ */
+/* ══════════ RM3-AC-21 / RM3-AC-15 · one marker per plottable offered machine ══════════ */
 
-describe("machineMarkers — one marker per plottable offered machine (RM3-AC-21, AC-15, AC-22)", () => {
+describe("machineMarkers — one marker per plottable offered machine (RM3-AC-21, RM3-AC-15, RM3-AC-22)", () => {
   const listed = offeredMachines(
     fleet([
       { id: "near", source: "unit_yard", km: 8 },

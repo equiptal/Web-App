@@ -6,7 +6,7 @@ import { unitCounts } from "@/lib/contract/bid-map";
 import { priceFooterModel, type PriceFooterBid } from "@/lib/contract/price-footer";
 
 /**
- * **V12 — the price footer's figures** (spec 004 §6.10, 004a §4a.1 + §4a.4; RM3-AC-24, AC-65…67).
+ * **V12 — the price footer's figures** (spec 004 §6.10, 004a §4a.1 + §4a.4; RM3-AC-24, RM3-AC-65…67).
  *
  * The footer shows figures and hands off; it never edits one and never re-implements negotiation. So
  * what is asserted here is arithmetic and precedence — that the numbers come from the SAME
@@ -120,7 +120,7 @@ describe("the no-room case — the common one", () => {
 
    The first suite in this file hand-feeds `priceFooterModel` and `computeDealTotals` the same numbers
    and asserts they agree. That proves the arithmetic is deterministic — which it would be even if the
-   footer read entirely the wrong fields off the bid. AC-24's claim is about the INPUTS: that the
+   footer read entirely the wrong fields off the bid. RM3-AC-24's claim is about the INPUTS: that the
    footer reads the price basis through the same accessors `mapDealRoom` reads them through, so two
    surfaces over ONE room cannot state two different totals.
 

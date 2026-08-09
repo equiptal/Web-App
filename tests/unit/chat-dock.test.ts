@@ -11,7 +11,7 @@ import {
 import type { InboxBid } from "@/lib/contract/inbox";
 
 /**
- * **V12 — the chat dock's rules** (spec 004 §6.9, 004a §2 + §2.1; RM3-AC-43…47, AC-62…64).
+ * **V12 — the chat dock's rules** (spec 004 §6.9, 004a §2 + §2.1; RM3-AC-43…47, RM3-AC-62…64).
  *
  * The rules, not the chrome: which tabs exist, who counts as one counterparty, which tab carries
  * which badge, and when the arrival notice may appear. The rendered dock — the floating control, the
@@ -296,7 +296,7 @@ describe("no tab strip for a single bid (RM3-AC-44)", () => {
 });
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════════════
-   RM3-AC-63 / AC-64 · THE ARRIVAL NOTICE MAY NOT IMPLY IMMEDIACY
+   RM3-AC-63 / RM3-AC-64 · THE ARRIVAL NOTICE MAY NOT IMPLY IMMEDIACY
 
    Unread is REST on a 45-second poll, so the notice cannot know a message *just* arrived. The copy
    must state that a reply IS there. This asserts the words themselves, in both locales, because the
