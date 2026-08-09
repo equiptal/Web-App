@@ -18,7 +18,7 @@ function jsonReq(body: unknown) {
   });
 }
 
-describe("POST /api/auth/request-code (AC-01/02/06)", () => {
+describe("POST /api/auth/request-code (specs#235 AC-01/02/06)", () => {
   it("sends role:rentee, +966 and SMS to /auth/login", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -49,7 +49,7 @@ describe("POST /api/auth/request-code (AC-01/02/06)", () => {
   });
 });
 
-describe("POST /api/auth/verify (AC-03/04/05)", () => {
+describe("POST /api/auth/verify (specs#235 AC-03/04/05)", () => {
   it("returns the safe user with tier and sets token cookies", async () => {
     vi.stubGlobal(
       "fetch",
@@ -123,7 +123,7 @@ describe("POST /api/auth/verify (AC-03/04/05)", () => {
     expect((await res.json()).accountDeleted).toBeUndefined();
   });
 
-  it("maps a wrong code to the invalid_code error (AC-09)", async () => {
+  it("maps a wrong code to the invalid_code error (specs#235 AC-09)", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({

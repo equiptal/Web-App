@@ -14,7 +14,7 @@ function fetchOk(status: number, body: unknown) {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("app-backend authPost — error-code mapping (AC-09/10/11/15)", () => {
+describe("app-backend authPost — error-code mapping (specs#235 AC-09/10/11/15)", () => {
   it.each([
     ["E6000", "invalid_code"],
     ["E6001", "expired"],
@@ -34,7 +34,7 @@ describe("app-backend authPost — error-code mapping (AC-09/10/11/15)", () => {
     expect((err as AuthError).kind).toBe("unknown");
   });
 
-  it("fetch rejection → offline (AC-24)", async () => {
+  it("fetch rejection → offline (specs#235 AC-24)", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network")));
     await expect(authPost("/auth/login", {})).rejects.toMatchObject({ kind: "offline" });
   });
