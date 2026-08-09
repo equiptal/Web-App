@@ -240,7 +240,7 @@ function distanceGroup(listed: readonly FleetMachine[]): BuiltGroup | null {
     };
     const kept = listed.filter(keep);
     if (!splits(kept.length, total)) continue;
-    const signature = kept.map((m) => m.equipmentId).join(" ");
+    const signature = kept.map((m) => m.equipmentId).join("\0");
     if (seenSignature.has(signature)) continue; // a wider band that hides exactly the same machines
     seenSignature.add(signature);
     built.push({
