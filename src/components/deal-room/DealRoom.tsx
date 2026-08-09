@@ -209,8 +209,14 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     }
   }
 
-  // The rentee's quotation — ALWAYS RENDERED, never a stored file, at any status (app parity: the app's
-  // PDF button is commented out and `bid_quotation_page` re-renders from a fresh fetch on every open).
+  // The rentee's quotation — ALWAYS RENDERED, never a stored file, at any status (app parity:
+  // `bid_quotation_page` re-renders from a fresh `getBidDetail` on every open).
+  //
+  // ⚠ The app is NOT missing a PDF button — it has one. What it has no path to is a STORED file: its
+  // "تنزيل PDF" rasterizes the document it has just rendered (`buildRasterizedQuotationPdf`) rather than
+  // downloading one the server made. What is commented out is the SERVER-side generation, in the
+  // backend's `confirmDeal`. So "the app always renders" is about the source of the document, not about
+  // the absence of an export.
   //
   // This used to prefer `q.pdfUrl` and open the stored PDF instead of rendering. Server-side generation
   // was switched off on 2026-06-23, so only deals closed before then have a file — but

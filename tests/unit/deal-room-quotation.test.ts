@@ -234,9 +234,10 @@ describe("a deal that has a stored PDF still renders live", () => {
   });
 
   it("has no branch in the deal room that opens the stored file in preference to rendering", () => {
-    // The app's PDF button is commented out and it always renders. `POST /quotation/retry-pdf` stays
-    // (owner's call) and can still mint a file for any deal — so the renderer, not the endpoint, is
-    // what has to stop deferring to one. Source-level because there is no DOM harness here.
+    // The app never downloads a stored file — its own PDF export rasterizes the document it has just
+    // rendered. `POST /quotation/retry-pdf` stays (owner's call) and can still mint a file for any deal,
+    // so the renderer, not the endpoint, is what has to stop deferring to one. Source-level because
+    // there is no DOM harness here.
     const src = readFileSync("src/components/deal-room/DealRoom.tsx", "utf8");
     expect(src).not.toMatch(/if\s*\(\s*q\.pdfUrl\s*\)/);
     expect(src).not.toMatch(/window\.open\(\s*q\.pdfUrl/);
