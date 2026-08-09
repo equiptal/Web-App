@@ -158,6 +158,28 @@ function mapDoc(raw: Record<string, unknown>): DealRoomDocument {
  * fresh presigned download link. `pdfStatus` is `PENDING` while the PDF is still being generated
  * (the app polls until it's ready), then ready.
  */
+/** Terms the APP hides from the deal-room table (deal_room_models hidden keys) — hidden here for parity
+ *  so the web never renders rows / phantom conflicts the app suppresses. PRICE + mob/demob PRICING are
+ *  priced line items (settled on the counter Price page); the rest are handled elsewhere or retired on
+ *  the deal-room surface (certs, operator nationality, payment method, offer duration, fat, lead time).
+ *
+ *  ⚠ Applied at PARSE on BOTH payloads, exactly as the app applies it. `Quotation.agreedTerms` was
+ *  snapshotted at close and is never rewritten, so every deal closed BEFORE the retirement still carries
+ *  `operator_nationality` and `safety_certifications` in its snapshot. Filtering only the live room left
+ *  the web printing those two on the quotation while the app printed neither — one contract, two
+ *  documents. */
+const HIDDEN_DEAL_ROOM_TERM_KEYS = new Set<string>([
+  "PRICE", "mobilization_pricing", "demobilization_pricing",
+  "fulfillment_type", "required_attachments", "mobilization_lead_time",
+  "operator_nationality", "operator_certification", "safety_certifications",
+  "fat", "payment_method", "offer_duration",
+]);
+
+/** Case-insensitive membership, matching the app's `kHiddenDealRoomTermKeys.contains(k.toLowerCase())`,
+ *  so a payload that cases a key differently can't smuggle a retired term onto the paper. */
+export const isHiddenDealRoomTermKey = (key: string): boolean =>
+  HIDDEN_DEAL_ROOM_TERM_KEYS.has(key) || HIDDEN_DEAL_ROOM_TERM_KEYS.has(key.toLowerCase());
+
 /** One agreed term snapshotted on the confirmed Quotation row (backend `agreedTerms` JSON). */
 export interface QuotationTerm {
   key: string;
@@ -194,12 +216,18 @@ export function mapQuotation(raw: unknown): QuotationView {
     agreedRate: n(q.agreedRate),
     priceUnit: s(q.priceUnit),
     contractType: s(q.contractType),
-    agreedTerms: agreedTermsRaw.map((t) => ({
-      key: s(t.key) ?? "",
-      label: s(t.label) ?? s(t.key) ?? "",
-      labelAr: s(t.labelAr) ?? s(t.label) ?? "",
-      value: t.value,
-    })),
+    // Retired/hidden keys are stripped HERE, at parse, the way the app strips them
+    // (`DealRoomModel.fromJson`). The snapshot is frozen at close, so a deal closed before the
+    // retirement still carries them in its JSON — this filter is what stops one contract rendering two
+    // different documents on the two surfaces.
+    agreedTerms: agreedTermsRaw
+      .map((t) => ({
+        key: s(t.key) ?? "",
+        label: s(t.label) ?? s(t.key) ?? "",
+        labelAr: s(t.labelAr) ?? s(t.label) ?? "",
+        value: t.value,
+      }))
+      .filter((t) => !isHiddenDealRoomTermKey(t.key)),
     renteePhone: s(q.renteePhone),
     supplierPhone: s(q.supplierPhone),
     renteeEmail: s(q.renteeEmail),
@@ -273,17 +301,6 @@ export function computeDealTotals(
   return { rate, priceUnit, perDayRate, rentalUnits, mobUnitsN, demobUnitsN, mobPrice, demobPrice, mobExcluded, demobExcluded, periods, hasDuration, periodCount: periods / dpp, rentalTotal, mobTotal, demobTotal, subtotal, vat, grand };
 }
 
-/** Terms the APP hides from the deal-room table (deal_room_models hidden keys) — hidden here for parity
- *  so the web never renders rows / phantom conflicts the app suppresses. PRICE + mob/demob PRICING are
- *  priced line items (settled on the counter Price page); the rest are handled elsewhere or retired on
- *  the deal-room surface (certs, operator nationality, payment method, offer duration, fat, lead time). */
-const HIDDEN_DEAL_ROOM_TERM_KEYS = new Set<string>([
-  "PRICE", "mobilization_pricing", "demobilization_pricing",
-  "fulfillment_type", "required_attachments", "mobilization_lead_time",
-  "operator_nationality", "operator_certification", "safety_certifications",
-  "fat", "payment_method", "offer_duration",
-]);
-
 export function mapDealRoom(raw: unknown): DealRoomView {
   const d = (raw ?? {}) as Record<string, unknown>;
   const sup = (d.supplier ?? {}) as Record<string, unknown>;
@@ -304,7 +321,7 @@ export function mapDealRoom(raw: unknown): DealRoomView {
   // legacy combined `fat`, mobilization lead time, fulfillment type, required attachments). This matches
   // the app 1:1 so the web never shows extra rows or a phantom `fat`/cert conflict.
   const terms: DealTerm[] = rawTerms
-    .filter((t) => !HIDDEN_DEAL_ROOM_TERM_KEYS.has(s(t.key) ?? ""))
+    .filter((t) => !isHiddenDealRoomTermKey(s(t.key) ?? ""))
     .map((t) => ({
       key: s(t.key) ?? "",
       label: s(t.label) ?? s(t.key) ?? "",
