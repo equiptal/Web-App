@@ -785,17 +785,12 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
     wonViaSurvey: raw.wonViaSurvey === true, // survey-reported winner (app parity) — decided even if status isn't ACCEPTED
     converted: raw.converted === true, // web-app/006: materialized from an off-platform submission → labelled/counted off-platform
 
-    supplierId: sup.id != null ? String(sup.id) : null,
+    supplierId: readSupplierId(raw),
     // AC-70. `Bid.supplierCompanyId` already reaches the browser — `getBidList` spreads the bid row —
-    // it was simply never read, so two colleagues of one firm read as two counterparties. Ids can arrive
-    // as numbers, so stringify rather than `s()`. Fall back to the joined company/profile shapes, since
-    // which one carries the id depends on the projection.
-    supplierCompanyId:
-      sid(raw.supplierCompanyId ?? raw.supplier_company_id) ??
-      sid(sup.companyId ?? sup.company_id) ??
-      sid(supCompany?.id) ??
-      profSources.map((o) => sid(o.companyId ?? o.company_id)).find((x) => x != null) ??
-      null,
+    // it was simply never read, so two colleagues of one firm read as two counterparties. The scan over
+    // every shape that can carry it lives in `readSupplierCompanyId`, shared with `mapReceivedBids`:
+    // ONE counterparty key needs one derivation, or the chat dock's anchor and its rows disagree.
+    supplierCompanyId: readSupplierCompanyId(raw),
     // Company name FIRST — the supplier's own profile field, not the verification-queue company row
     // (nor the backend's `supplierDisplayName`, which resolves that row ahead of the profile). Falls
     // back to the verified firm's brand, then the backend's resolved name, then the person's name.
@@ -916,6 +911,46 @@ export interface BidSupplier {
   name: string;
   verified: boolean;
   count: number;
+}
+
+/** A nested payload object, or `{}` — so a reader can walk a shape that may not be there. */
+const obj = (v: unknown): Record<string, unknown> =>
+  v && typeof v === "object" ? (v as Record<string, unknown>) : {};
+
+/**
+ * **`Bid.supplierCompanyId`, read out of ANY projection that carries it.** (AC-70)
+ *
+ * The bid list nests the supplier (`raw.supplier.company.id`); received-bids spreads the bid row flat
+ * (`raw.supplierCompanyId`); which of the joined profile shapes carries the id depends on the
+ * projection. `bidSupplierKey` is only one key while **every** consumer resolves the company the same
+ * way — the moment one side reads four sources and another reads one, a nested company id makes the
+ * chat dock's anchor resolve a company key while its rows fall back to `supplierId`, the two never
+ * match, and every sibling bid of the same firm disappears from the tab strip. So the derivation lives
+ * here, once, and both `mapBid` and `mapReceivedBids` call it.
+ *
+ * Ids can arrive as numbers (Prisma int columns), so `sid` rather than `s`.
+ */
+export function readSupplierCompanyId(raw: Record<string, unknown>): string | null {
+  const sup = obj(raw.supplier);
+  const company = obj(sup.company);
+  // `supplier.company` IS the firm, so its own `id` is the company id — every other source names it.
+  const profiles = [obj(sup.supplierProfile), sup, obj(sup.profile), company, obj(sup.companyProfile), obj(raw.supplierProfile), obj(raw.profile)];
+  return (
+    sid(raw.supplierCompanyId ?? raw.supplier_company_id) ??
+    sid(sup.supplierCompanyId ?? sup.supplier_company_id) ??
+    sid(sup.companyId ?? sup.company_id) ??
+    sid(company.id) ??
+    profiles.map((o) => sid(o.companyId ?? o.company_id) ?? sid(o.supplierCompanyId ?? o.supplier_company_id)).find((x) => x != null) ??
+    null
+  );
+}
+
+/** The bidding MEMBER, likewise read out of either shape — nested `raw.supplier.id` on the bid list,
+ *  flat `raw.supplierId` on received-bids. The fallback below `supplierCompanyId` in `bidSupplierKey`,
+ *  so it has to agree across projections for the same reason. */
+export function readSupplierId(raw: Record<string, unknown>): string | null {
+  const sup = obj(raw.supplier);
+  return sid(sup.id) ?? sid(raw.supplierId ?? raw.supplier_id) ?? sid(sup.userId ?? sup.user_id) ?? null;
 }
 
 /**

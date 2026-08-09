@@ -8,7 +8,8 @@ import {
   inboxGroupKey,
   type DockAnchor,
 } from "@/lib/contract/chat-dock";
-import type { InboxBid } from "@/lib/contract/inbox";
+import { mapReceivedBids, type InboxBid } from "@/lib/contract/inbox";
+import { bidSupplierKey, mapBid } from "@/lib/contract/bids";
 
 /**
  * **V12 — the chat dock's rules** (spec 004 §6.9, 004a §2 + §2.1; RM3-AC-43…47, RM3-AC-62…64).
@@ -363,5 +364,85 @@ describe("the arrival notice states a STATE, never an event (RM3-AC-63/64)", () 
   it("says nothing at all about the tab being read, whatever the copy says (RM3-AC-63)", () => {
     const tabs = dockTabs(anchor(), [row({ bidId: "b1", unreadCount: 3 })]);
     expect(arrivalNotice(tabs, {}, { open: true, bidId: "b1" })).toBeNull();
+  });
+});
+
+/**
+ * **I1 — the anchor and the rows must resolve the SAME counterparty key.**
+ *
+ * The dock keys its anchor tab from a `BidCard` (`mapBid`) and its rows from `InboxBid`s
+ * (`mapReceivedBids`), then matches them with `bidSupplierKey`. Both mappers therefore have to read
+ * `Bid.supplierCompanyId` out of whatever shape the projection nests it in — and they used not to:
+ * the bid list scanned four sources, received-bids read the flat key only. On any payload that nests
+ * the company id the anchor resolved a company key while the rows fell back to `supplierId` or the
+ * name, the two never matched, `dockTabs` returned the anchor alone, and **every sibling bid of the
+ * same firm disappeared from the strip**.
+ *
+ * These go through the real mappers on raw payloads rather than through the fixtures above, because a
+ * fixture on both sides is exactly what let the two derivations drift apart unnoticed.
+ */
+describe("one counterparty key across both projections (I1, AC-70)", () => {
+  /** The bid list's shape: the supplier is nested, and the firm hangs off `supplier.company`. */
+  const rawBid = (id: string, memberId: string) => ({
+    id,
+    status: "PENDING",
+    supplier: { id: memberId, name: "Ali", company: { id: 77, name: "Al-Faris Rentals", isVerified: true } },
+    request: { id: "r1", requestGroupId: "g1" },
+  });
+
+  /** The received-bids shape: the same firm, same nesting, no flat `supplierCompanyId` at all. */
+  const rawInboxRow = (id: string, memberId: string, name: string) => ({
+    id,
+    status: "PENDING",
+    dealRoomId: `dr-${id}`,
+    unreadCount: 0,
+    supplier: { id: memberId, name: "Ali", company: { id: 77, name: "Al-Faris Rentals", isVerified: true } },
+    request: { id: "r1", requestGroupId: "g1", equipmentItems: [{ subtypeId: "t1", subtypeName: name }] },
+  });
+
+  it("resolves the same key from a nested company id on both sides", () => {
+    const card = mapBid(rawBid("b1", "u1"), false);
+    const [inbox] = mapReceivedBids([rawInboxRow("b1", "u1", "Excavator")]);
+    expect(card.supplierCompanyId).toBe("77");
+    expect(inbox.supplierCompanyId).toBe("77");
+    expect(bidSupplierKey(inbox)).toBe(bidSupplierKey(card));
+  });
+
+  it("keeps every sibling bid of the same FIRM in the strip, even when two members submitted them", () => {
+    const card = mapBid(rawBid("b1", "u1"), false);
+    const rows = mapReceivedBids([
+      rawInboxRow("b1", "u1", "Excavator"),
+      // A colleague at the same firm — a different member id, so `supplierId` alone would split them.
+      rawInboxRow("b2", "u2", "Loader"),
+    ]);
+    const tabs = dockTabs(
+      {
+        bidId: card.id,
+        supplierCompanyId: card.supplierCompanyId,
+        supplierId: card.supplierId,
+        supplierName: card.supplierName,
+        dealRoomId: card.dealRoomId,
+        label: null,
+        groupKey: "g1",
+      },
+      rows,
+    );
+    expect(tabs.map((t) => t.bidId)).toEqual(["b1", "b2"]);
+    expect(tabs.map((t) => t.label)).toEqual(["Excavator", "Loader"]);
+  });
+
+  it("still reads the FLAT key received-bids used to be the only reader of", () => {
+    const [inbox] = mapReceivedBids([{ id: "b1", supplierCompanyId: "co-9", supplierId: "u1", request: {} }]);
+    expect(inbox.supplierCompanyId).toBe("co-9");
+    expect(inbox.supplierId).toBe("u1");
+  });
+
+  it("falls back member → name when no firm is on the payload, identically on both sides", () => {
+    const card = mapBid({ id: "b1", supplier: { id: "u1", name: "Ali" }, request: { id: "r1" } }, false);
+    const [inbox] = mapReceivedBids([{ id: "b1", supplierId: "u1", supplierName: "Ali", request: {} }]);
+    expect(card.supplierCompanyId).toBeNull();
+    expect(inbox.supplierCompanyId).toBeNull();
+    expect(bidSupplierKey(inbox)).toBe(bidSupplierKey(card));
+    expect(bidSupplierKey(card)).toBe("u1");
   });
 });
