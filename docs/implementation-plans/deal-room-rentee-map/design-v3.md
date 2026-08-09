@@ -134,7 +134,12 @@ gap:10px; background:#EDF2F7`.
 Sort and filter, verbatim from 4478:
 `offered.slice().sort((a,b)=>a.km-b.km)` — **flat, nearest first, `offered` only**. The empty state
 (4474) is a centred `font-size:12px; color:#6B8FA8; line-height:1.8` line, **no card furniture**:
-«لا توجد معدّة مسجّلة في هذا العرض — قدّم المورد سعراً وعدداً فقط.»
+~~«لا توجد معدّة مسجّلة في هذا العرض — قدّم المورد سعراً وعدداً فقط.»~~
+→ **«لا توجد معدّة مسجّلة في هذا العرض — قدّم المؤجّر سعراً وعدداً فقط.»**
+
+*Corrected 2026-08-09.* Quoted verbatim from the prototype, which writes «المورد». **This surface says
+«المؤجّر»** — the repo-wide convention already recorded in §9's table and applied at `:334`; it was
+simply missed here. Geometry and the no-card-furniture rule above are unaffected.
 
 ## 4 · The map marker — `unitIcon(s,u,idx,total,selected)`, lines 454–493
 

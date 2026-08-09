@@ -368,7 +368,18 @@ no checkbox in any mode, no place in any batch, no select-all key, and no attent
 corrected). A platform that cannot vouch for the file gives the renter the fact and no controls.
 
 Everything else on this surface — the machine's papers, its photos, the
-firm's papers — keeps view + download.
+firm's papers — keeps ~~view + download~~ **view per row, and download in the batch.**
+
+> **Corrected 2026-08-09.** This line said "view + download" as though both were per-row controls, and
+> **§7.1's table two rows below already contradicts it** — "**download moved to the batch** (§8.2, owner
+> 2026-08-08)" for equipment, "**view** per row, **download in the batch**" for company. §8.2 is the
+> normative statement: **the per-row download control is withdrawn from every family**, because
+> downloading is the batch now and a per-row copy would be a second control for one act. **View is what a
+> row keeps**, so the renter can look at one paper without selecting anything.
+>
+> The contrast this sentence exists to draw is **unaffected and still exact**: the operator's rows expose
+> **no file access of any kind**, while everything else can still be **opened and, through the batch,
+> saved**.
 
 This surface exists to answer *can I trust this counterparty's paperwork*, and it is now the **only**
 place that evidence appears after bidding: `operator_certification`, `safety_certifications` and

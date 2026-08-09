@@ -204,8 +204,15 @@ halo and an in-offer tag — and **no detail opens**. The renter is oriented, no
 cert)."* Both halves of that are now wrong — the operator's papers are their own group (**V16**), and the
 photo group is not four fixed slots.
 
-- **Three groups**, each with its own attention count: **photos** · **documents** (proof of ownership,
-  equipment safety certificates) · **operator documents** (V16).
+- **Three groups**: **photos** · **documents** (proof of ownership, equipment safety certificates) ·
+  **operator documents** (V16). ~~each with its own attention count~~ — **photos and documents each
+  carry an attention count; the operator's group carries NONE.**
+
+  > **Corrected 2026-08-09.** Withdrawn later on 2026-08-08 for the operator's group alone (owner's
+  > ruling; 004 §6.6a, **AC-42**, **AC-75**). Those rows have **no tick, no ask and no file**, so a count
+  > would name an action the renter cannot take. It is **not zero — it is none at all**:
+  > `DocGroup.attention` is `null` and the tab's badge adds nothing, because a pill promises an action
+  > and there is none.
 - **One rule for every row** (spec §6.6, AC-73): a **required** paper renders whether held or not —
   green when held, **red, counted and requestable** when absent; a **not-required** paper renders **only
   when held**, with no verdict, no colour and no place in the count. Required = asked for by this
@@ -215,8 +222,23 @@ photo group is not four fixed slots.
   selectable whether held or not~~ — withdrawn: an ask naming a paper the lessor can see on his own file
   can only be answered *"it is already there."* **Selectable = the row is missing**, enforced in the
   model (`DocRow.requestable`, and again inside `batchDocumentRequest`) so the checkbox and the ask
-  cannot disagree. Select-all reaches only the requestable rows, and a group with nothing missing
+  cannot disagree. ~~Select-all reaches only the requestable rows~~, and a group with nothing missing
   renders **no batch control at all** rather than a disabled one.
+
+  > **Corrected 2026-08-09 — superseded by the two-mode rule** (owner's UI design, later on 2026-08-08;
+  > 004a §8.2, **AC-77**, **AC-78**). There is **one checkbox column with two mutually exclusive modes**,
+  > set by **the first tick**: a **held** row ticks for *download*, a **missing** row ticks for *request*,
+  > and the other kind dims to 45% and goes inert. So **select-all follows the mode** — «حدّد كل المتاح»
+  > / «حدّد كل الناقص» — with «إلغاء التحديد (n)» back to neutral. **At neutral there is only ONE
+  > select-all link**, not two: the **majority of the group's tickable rows** picks it, a tie falls to
+  > «حدّد كل المتاح» (a download acts only on the renter's own screen; a request reaches the lessor), and
+  > the majority is counted over **tickable** rows so an untickable majority cannot choose a link that
+  > selects nothing. Both footer buttons stay visible with only the supported one live, and **the active
+  > one is NAVY `#1C3550`** — the prototype's own token (design-v3 §2), not the blue it shipped as.
+  > AC-33's "blue, never navy" is **unaffected**: it rules on `.mp-act` beside the availability chip.
+  >
+  > Unchanged by all of this: *you can only ask for what is not there*, and a group with nothing missing
+  > still renders no batch control.
 - **Photos:** `front` and `serial`/plate are required and go red when absent; `meter` and `side` render
   only when uploaded. **The count is over the rows that render — never "of 4"** (AC-74).
 - **Presence only** — uploaded / not uploaded / on the machine's file / none yet. **Never a verification
@@ -225,8 +247,24 @@ photo group is not four fixed slots.
 - Select-all + a checkbox per row; **requesting is a batch action**, one card carrying several types.
   **This is the only document surface that can be requested from** (V9 no longer is — though it does tick
   again, for a batch download; 004a §8.1).
-- **Every row here stays tickable, including one with no url** — that is the paper being asked for. Do
-  not copy V9's `selectable: false` rule; it follows from V9's verb, not from the row.
+- ~~**Every row here stays tickable, including one with no url** — that is the paper being asked for. Do
+  not copy V9's `selectable: false` rule; it follows from V9's verb, not from the row.~~
+
+  > **WITHDRAWN 2026-08-09 — "every row" and "no url" are both wrong now.**
+  >
+  > - **The rule is `missing`, not `url-less`** (004a §6.6-note, **AC-73**). A paper can be **on the file
+  >   with no signed link**, and that row is **not** a gap the lessor can close — asking for it can only
+  >   be answered *"it is already there."* Ticking it is exactly the ask *you can only ask for what is
+  >   not there* forbids. A **held** row with no url is therefore tickable in **no mode at all**.
+  > - **"Every row here" is not true either.** The **operator's** rows are outside the document
+  >   machinery: **no checkbox in any mode**, no place in any batch, no select-all key (004 §6.6a,
+  >   **AC-75**). They were the other reason "no url" failed — by design they carry no url at all, which
+  >   would have made every one of them askable, including the ones already on file.
+  >
+  > What survives, and is still the point of the paragraph: the **contrast with V9 is real, and it does
+  > follow from the verb.** V9's batch **saves**, so a row with no url is untickable there — nothing to
+  > save. V8's batch **asks**, so a **missing** row is exactly the one worth ticking. Do not copy either
+  > rule across; derive it from the verb each time.
 - **Reuse:** `documentKeys` on `FleetMachine`; T4 already unfiltered ownership types.
 
 ### V9 · Company panel `[UI]`

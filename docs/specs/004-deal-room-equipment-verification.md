@@ -78,16 +78,24 @@ dock · the price footer.
 ```
 ┌──────────── panel (fixed width) ─────────────┬─────────── map (fills) ──────────┐
 │ supplier name · ✓ شركة موثّقة · مستندات الشركة › │                                  │
-│ ⟨٣ لدى المورد⟩ ⟨٥ في هذا العرض⟩                │      project pin · مشروعك        │
+│ ⟨٣ لدى المؤجّر⟩ ⟨٥ في هذا العرض⟩               │      project pin · مشروعك        │
 │ ▸ shortfall alert — اطلب إضافتها               │      machine markers             │
 │ ─────────────────────────────────────────     │      availability label          │
 │ equipment card · nearest first                │      distance chip · dotted route│
 │ equipment card                                │                                  │
 │ ─────────────────────────────────────────     │                                  │
-│ اطلب من المورد إضافة … أخرى   (dashed)         │                       ⟨المحادثة⟩ │
+│ اطلب من المؤجّر إضافة … أخرى   (dashed)        │                       ⟨المحادثة⟩ │
 │ price · عرض افتتاحي · التفاصيل                  │                                  │
 └──────────────────────────────────────────────┴──────────────────────────────────┘
 ```
+
+> **Corrected 2026-08-09 — ~~«المورد»~~ → «المؤجّر», twice in this block.** This surface says
+> **«المؤجّر» and never «المورد»** (product ruling; `coverage.md` F-8b — the shipped web app runs 79
+> «المؤجّر» to 21 «المورد», and the terms grid already reads «اختيار المؤجّر»). Recorded in place rather
+> than silently swapped, because the ruling decides **every new Arabic string on this surface** and it
+> holds even against the owner's own wording: §11 flags exactly this for «اطلب من المورد إرساله», which
+> ships as «اطلب من المؤجّر إرساله». One word overrules it. Corrected in the same pass: §6.2's example
+> pill below, and `design-v3.md:137`.
 
 ## 6. Web surface
 
@@ -113,8 +121,18 @@ chip + back). It is a **document list**, not a profile page:
   no-document-yet in red
 
 Company documents are **five** papers: **CR · VAT certificate · national address · local content ·
-SASO registration** — all read-only: listed, opened and downloaded, **one at a time or several at once**,
-never requested.
+SASO registration** — all read-only: listed, **opened one at a time and downloaded in the batch**,
+~~listed, opened and downloaded, **one at a time or several at once**~~, never requested.
+
+> **Corrected 2026-08-09 — "downloaded one at a time" is the withdrawn per-row control.** The row's own
+> **download** was withdrawn on 2026-08-08 across every family (004a §8.2): downloading is what the
+> **batch** beneath the list does, so a per-row download would be a second control for one act.
+> **View stays per row**, so the renter can open one paper without selecting anything — and it stays per
+> row deliberately: a "view all" over five presigned links is five popups, of which the browser lets one
+> through, a control that silently does one thing when five were asked for. So the two verbs split by
+> cardinality in opposite directions — **view is per row, download is the batch** — and "one at a time or
+> several at once" no longer describes either. **Never requested** is unchanged and is the load-bearing
+> half (AC-71/72).
 
 **Corrected 2026-08-08 — this section named four.** SASO registration was missing, and AC-41 was
 missing it too.
@@ -143,7 +161,7 @@ Rendered as pills so each number is readable on its own; a run-on sentence made 
 
 | Case | Condition | Renders |
 |---|---|---|
-| **single** | offered ≤ 1 | one pill — *«٣ رافعات شوكية ٣ طن لدى المورد»* |
+| **single** | offered ≤ 1 | one pill — ~~*«٣ رافعات شوكية ٣ طن لدى المورد»*~~ **«٣ رافعات شوكية ٣ طن لدى المؤجّر»** *(corrected 2026-08-09 — «المؤجّر», never «المورد»; see §5)* |
 | **multi** | offered > 1, nothing claimed | two pills — owned, and *«في هذا العرض»* |
 | **short** | offered > 1 **and** claimed > 0 | the two pills **plus** the shortfall alert |
 
@@ -434,7 +452,14 @@ AC-75), but it is why the rule is *missing* rather than *url-less* for every oth
 ### 6.6a The operator's documents — their own group
 
 **Added 2026-08-08.** §6.6 listed "operator safety certificate" as one row among the machine's papers.
-It is now a **third group with its own rows and its own attention count**.
+It is now a **third group with its own rows** and ~~its own attention count~~ **no attention count at
+all**.
+
+> **Corrected 2026-08-09.** The count was withdrawn later the same day, by the ruling recorded in the
+> subsection immediately below (**AC-42**, **AC-75**), and this opening line was left stating it. These
+> rows carry **no tick, no ask and no file**, so a count would name an action the renter cannot take.
+> It is **not zero — it is none**: `DocGroup.attention` is `null`, and the tab's badge adds nothing.
+> A pill promises an action; there is none here.
 
 #### These rows are a STATUS, not a document list — owner's ruling, later on 2026-08-08
 
@@ -783,7 +808,7 @@ All resolved. Kept as a record so a later change does not reopen them by acciden
 | 2026-08-08 | **The company panel's ticks come back — for opening, not for asking** (owner's ruling, later the same day; written up in 004a §8.1). The alignment pass below withdrew the company-scope document **request**, and the implementation withdrew the **selection UI** along with it — checkboxes, select-all, batch button. Only the ask was decided. **Select-all and a checkbox per row are restored** on the company panel, over the rows that carry a url; the batch beneath them **opens or saves** the selection and is **never** a request; a row with no url is listed but not tickable, because a tick that yields nothing when the batch runs is the dead control AC-69 forbids, moved one step later. The batch **downloads** rather than opening: a "view all" over five presigned links is five popups, of which a browser lets one through — a control that silently does one thing when five were asked for. View therefore stays **per row**. Corrected in situ: §6.1's withdrawn-selection bullet, §6.6's "corrected" note and its "the company list has nothing to tick" clause, AC-38's re-scoping note, **AC-72 rewritten**, TC-19 rewritten (third time), and **TC-25 added**. Unchanged and still load-bearing: **no request control anywhere on the company panel**, and `RenteeRequestDraft`'s `document` arm still cannot express a company ask. |
 | 2026-08-08 | **Testability pass, from a coverage audit.** Five criteria were **unassertable as written** and are rewritten to name what a test can actually observe, each carrying the old wording and why it failed. **AC-14** claimed the detail shows the machine's *"full specification"* — which §6.5 contradicts in as many words — and now enumerates the panel's six parts. **AC-15** said the marker is *"distinguished"*, undefined; it now claims that one `selectedMachineId` reaches both `MapCanvas` and `EquipmentList`. **AC-35**'s *"roughly six times over about nine seconds"* becomes exactly 6 keyframe iterations, no `infinite`, and `LANDING_CUE_MS = 9_400`, with the resting-shadow clause labelled **manual**. **AC-32**'s *"the same height"* is a rendered-layout fact no `node` test observes — it was the reason for the rule, not the rule, and is now labelled manual. **AC-24**'s *"every figure matches the deal-room bar"* could be satisfied by hand-feeding both sides; it now requires the **inputs** to come through the same accessors, naming `estimatedDurationDays` and `agreedUnits ?? unitsOffered`. Also **AC-16** re-scoped a second time: a *not-required* held row is openable but not requestable (AC-73). And a boxed note added above §8: **`RM3-AC-*` is the only live prefix** — bare `AC-nn` in tests are spec-001 / v2 numbers that collide with live criteria, so any grep-built coverage map reports false hits (`fleet.test.ts`'s AC-19 is plottability; RM3-AC-19 is colour agreement). Offending files are listed in ticket **T44**. |
 | 2026-08-08 | **Alignment pass — five owner rulings, each reversing something this spec asserted.** (1) **A document request names a machine.** §6.1, §6.6, §6.7, AC-16, AC-38, AC-41's panel and TC-19 all described a company-scope document ask with select-all and a batch request; the company panel is now **read and open only**, and the payload type cannot express a `document` ask with no machine. Viewing and downloading company papers is untouched (AC-71, AC-72; 004a §8). (2) **One rule for every document row**, replacing §6.6's fixed rows: a *required* paper renders held or not — red, counted and requestable when absent — and a *not-required* one renders only when held, with no verdict and no place in the count. The fixed rows were the single place the platform's own "a cell nobody asked about cannot fail" rule broke (AC-73). (3) **The photo group is no longer four fixed slots**: `front` and plate are required, `meter` and `side` render only when uploaded, and the count is over the rows that render — AC-42 rewritten, "of 4" withdrawn as a normative count (AC-74). (4) **The operator's documents are a third group** (§6.6a) rather than one row inside the machine's papers, with the backend's five-term vocabulary written down because `operating_license` carries no `operator_` prefix (AC-75); recorded with the silent defect it fixes — rows resolved `held.find(d => d.url)?.url`, the **first file only**, so a second ownership, equipment or operator paper was dropped without a trace (AC-76). (5) **SASO is the fifth company paper** — AC-41 named four; local content and SASO are **held certs**, not catalogue documents. Also: **TC-12 re-pointed** from `link-bids.test.ts` (which only ever asserted the mapper sets `viaSharedLink`, never routing) to `bid-equipment-access.test.ts`, and TC-08 re-scoped. Six ACs and five TCs added. |
-| 2026-08-08 | **Verified against the prototype — three sections were wrong and are rewritten.** The spec had been written from the element list after rendering only two states, so §6.1, §6.5 and §6.6 described intentions rather than the design. Rendering the remaining states found: the **equipment detail** is a hero photo, two tabs and a **six-cell match grid against this request** — not the specification dump specced; the **company panel** is a batch-selectable document list that **includes IBAN**, which the spec had wrongly moved to a profile; and documents are **batch-selected**, not three buttons per row, with a deliberate asymmetry the spec had flattened — **equipment rows carry presence only, company rows carry verification and expiry**. Four later design changes folded in (AC-32→35): availability and commitment as **one chip** so cards keep equal height; the request action **blue**, since navy read as disabled beside a red chip; **landing pre-selection** of the offer's confirmed machine with no detail opening; and a **finite ~6-cycle** attention pulse that preserves its resting shadow. Twelve ACs and four TCs added. Still unopened: the document modal, and the chat dock beyond its badge. |
+| 2026-08-08 | **Verified against the prototype — three sections were wrong and are rewritten.** The spec had been written from the element list after rendering only two states, so §6.1, §6.5 and §6.6 described intentions rather than the design. Rendering the remaining states found: the **equipment detail** is a hero photo, two tabs and a **six-cell match grid against this request** — not the specification dump specced; the **company panel** is a batch-selectable document list that ~~**includes IBAN**, which the spec had wrongly moved to a profile~~ — **⚠ REVERSED the same day and annotated 2026-08-09: IBAN is EXCLUDED (§6.1, product decision 2026-08-08). It is banking detail, not a paper a renter verifies a lessor by, and this panel exists to answer *can I trust this counterparty's documents*. It stays in the full company profile — which is what this row calls "wrongly moved", and it was not wrong. The five papers are CR · VAT certificate · national address · local content · SASO registration.** This was the one reversal in this log that carried no annotation, so a reader scanning the changelog for the IBAN decision found only the side that lost; and documents are **batch-selected**, not three buttons per row, with a deliberate asymmetry the spec had flattened — **equipment rows carry presence only, company rows carry verification and expiry**. Four later design changes folded in (AC-32→35): availability and commitment as **one chip** so cards keep equal height; the request action **blue**, since navy read as disabled beside a red chip; **landing pre-selection** of the offer's confirmed machine with no detail opening; and a **finite ~6-cycle** attention pulse that preserves its resting shadow. Twelve ACs and four TCs added. Still unopened: the document modal, and the chat dock beyond its badge. |
 | 2026-08-08 | **Made self-contained.** All references to spec 001 removed. §7 replaced a four-row "see 001 §7.12 / AC-232→234" table with the real contract read from code: the fleet route and `mapFleet` → `FleetMachine` with a field-by-field map of every card element; the full `locationSource` → availability ladder; and the request-card rules from `rentee-request.service.ts`. A spec anchored to code cannot drift with another document, and this one no longer depends on which branch's 001 the reader has. |
 | 2026-08-08 | **The equipment list gets filters — AC-28 is reversed, not quietly contradicted** (owner decision, stated twice). New **§6.4a** and **AC-28a→28e**; **AC-28 rewritten** from "there is no distance filter" to the bands that render and when. The withdrawn argument is left visible in AC-28, in the "do not reinstate" table and in open question 2, struck rather than deleted, so a reader sees a decision and not a mistake: it was sound about the **v2** control, which filtered competing OFFERS on the bids list, and does not carry to a list of one lessor's machines. **The caution survives the reversal** as four rules — only criteria the request asked for, no control that would not split the list, a count that always states the whole, and a map that follows — which is why a chip cannot be offered for a certificate nobody named, cannot appear when it would do nothing, and cannot let the offer read as smaller than it is. Bands are **v2's own** (الكل · ≤٥٠ · ≤١٠٠ · ≤٢٠٠ كم), reused rather than reinvented. Two asymmetries are decided and stated: a machine with **no distance** is kept by every band (unknown is not far) and the row says so; a machine with **no year** is filtered out, which is what §6.5's grid already says about it. **الملحقات is specified but never renders today** — the fleet row carries no attachments field, so no machine can be shown to have them and rule 2 drops the control; a chip there would be a verdict on the lessor drawn from our own missing column. `RM3-TC-14` loses its distance clause to the new `RM3-TC-14a`: a negative assertion cannot survive the criterion that made it negative. |
 | 2026-08-08 | **Realigned against decisions and audited.** Five open questions closed: off-platform is **out of scope entirely** — an earlier draft designed a replacement submission view, now withdrawn, and its answer to question 1 was itself stale; the **distance filter** and **bid quality** are removed (AC-28, AC-29); the unconfirmed chip carries **no reason** (AC-30); `claimed = offered − registered` is normative and the prototype's demo-forced figures are not (AC-31). A "do not reinstate" table records why each removal happened. **One contradiction with shipped code fixed:** the spec implied `yardConfirmed` drives pin colour, but `bid-map.ts:74` states *"Never read the `yardConfirmed` boolean for colour"* — supplier-side it is only `yardId != null`, so it is true for every readiness-written entry. Colour comes from `unitAvailability()` via `locationSource`; had this shipped, every pin would have been green (AC-19, AC-22, AC-27). Also corrected an invented test path (`off-platform.test.ts` → `link-bids.test.ts`). Verified: every field the card promises exists on `FleetMachine`/`OfferedUnitDetail`, and the fleet endpoint is already wired in the web. |
