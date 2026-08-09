@@ -7,18 +7,23 @@ import {
   isLiftingCategory,
   newManualItem,
   normalizeSafetyCert,
-  operatorCertDefault,
   splitSafetyCerts,
 } from "@/lib/contract";
 import { agentOutputToDraft } from "@/lib/api/agent-adapters";
+import { draftToCreateRequest } from "@/lib/api/app-adapters";
 import type { EquipmentItem, RfqDraft, Taxonomy } from "@/lib/contract";
 import { nodesToTree } from "@/lib/api/app-adapters";
 
 /**
- * 2026-07 certificate rule — parity with the mobile create-request flow:
- *   lifting / cranes / aerial → equipment ARAMCO + operator SPSP
- *   every other group         → equipment TÜV    + operator SPSP
+ * 2026-07 certificate rule — EQUIPMENT cert only:
+ *   lifting / cranes / aerial → ARAMCO
+ *   every other group         → TÜV
  * plus the request-wide ("settings for all items") picker fanning onto every item.
+ *
+ * The OPERATOR cert is deliberately never seeded. It used to default to SPSP on every operator-on line
+ * (mobile parity, `kDefaultOperatorCertCode`), which shipped `operatorLicenseLevel: "SPSP"` on virtually
+ * every request as a requirement no renter had asked for — and it gates supplier readiness downstream.
+ * The assertions below pin that absence, so a re-introduced seed fails loudly.
  */
 
 // Tagged taxonomy, as the live backend returns it (tag on the CATEGORY row).
@@ -83,8 +88,10 @@ describe("cert defaults", () => {
     expect(equipmentCertDefault(false)).toBe("tuv");
   });
 
-  it("seeds SPSP as the operator cert for every group (Aramco is equipment-only)", () => {
-    expect(operatorCertDefault()).toBe("spsp");
+  it("exposes no operator-cert default at all", async () => {
+    const contract = await import("@/lib/contract");
+    expect("operatorCertDefault" in contract).toBe(false);
+    expect("DEFAULT_OPERATOR_CERT" in contract).toBe(false);
   });
 });
 
@@ -101,17 +108,24 @@ describe("nodesToTree", () => {
 });
 
 describe("SET_ITEM_CATEGORY — per-item seed", () => {
-  it("seeds Aramco + SPSP when the picked category is lifting", () => {
+  it("seeds Aramco when the picked category is lifting, and no operator cert", () => {
     const s = reducer(stateWith([item("m1")]), { t: "SET_ITEM_CATEGORY", id: "m1", categoryId: "cat-lift" });
     const it0 = s.draft!.items[0];
     expect(it0.safetyCertsOverride).toEqual(["aramco"]);
-    expect(it0.operator.certificate).toEqual(["spsp"]);
+    expect(it0.operator.certificate).toEqual([]);
   });
 
-  it("seeds TÜV + SPSP for a non-lifting category", () => {
+  it("seeds TÜV for a non-lifting category, and no operator cert", () => {
     const s = reducer(stateWith([item("m1")]), { t: "SET_ITEM_CATEGORY", id: "m1", categoryId: "cat-earth" });
     expect(s.draft!.items[0].safetyCertsOverride).toEqual(["tuv"]);
-    expect(s.draft!.items[0].operator.certificate).toEqual(["spsp"]);
+    expect(s.draft!.items[0].operator.certificate).toEqual([]);
+  });
+
+  it("leaves an operator cert the renter chose intact across a category change", () => {
+    // The app's `_applyCertRule` clears and re-stamps SPSP here; we must not.
+    const chosen = item("m1", { operator: { ...newManualItem("m1").operator, certificate: ["tuv"] } });
+    const s = reducer(stateWith([chosen]), { t: "SET_ITEM_CATEGORY", id: "m1", categoryId: "cat-lift" });
+    expect(s.draft!.items[0].operator.certificate).toEqual(["tuv"]);
   });
 
   it("re-seeds on a real category change, replacing the previous cert", () => {
@@ -127,9 +141,11 @@ describe("SET_ITEM_CATEGORY — per-item seed", () => {
     expect(rePicked.draft!.items[0].safetyCertsOverride).toEqual(["aramco"]);
   });
 
-  it("does not seed an operator cert on an item with no operator", () => {
-    const s = reducer(stateWith([item("m1", { operatorNeeded: "no" })]), { t: "SET_ITEM_CATEGORY", id: "m1", categoryId: "cat-lift" });
-    expect(s.draft!.items[0].operator.certificate).toEqual([]);
+  it("does not seed an operator cert whether or not the item includes an operator", () => {
+    for (const operatorNeeded of ["yes", "no"] as const) {
+      const s = reducer(stateWith([item("m1", { operatorNeeded })]), { t: "SET_ITEM_CATEGORY", id: "m1", categoryId: "cat-lift" });
+      expect(s.draft!.items[0].operator.certificate).toEqual([]);
+    }
   });
 
   it("rescues an uncertified line even when the category is re-picked unchanged", () => {
@@ -174,7 +190,7 @@ describe("HYDRATE — resumed draft", () => {
     };
     const s = reducer({ ...initialState, taxonomy: TAXONOMY }, { t: "HYDRATE", saved });
     expect(s.draft!.items[0].safetyCertsOverride).toEqual(["aramco"]);
-    expect(s.draft!.items[0].operator.certificate).toEqual(["spsp"]);
+    expect(s.draft!.items[0].operator.certificate).toEqual([]);
   });
 
   it("does not disturb a resumed draft that already carries certs", () => {
@@ -208,13 +224,12 @@ describe("SET_CERTIFICATES — request-wide pick", () => {
     for (const i of s.draft!.items) expect(i.safetyCertsOverride).toBeNull();
   });
 
-  it("seeds SPSP on operator-on items that have no operator cert yet", () => {
+  it("seeds no operator cert on operator-on items", () => {
     const s = reducer(stateWith([item("m1", { operatorNeeded: "yes" }), item("m2", { operatorNeeded: "no" })]), {
       t: "SET_CERTIFICATES",
       patch: { safety: ["aramco"] },
     });
-    expect(s.draft!.items[0].operator.certificate).toEqual(["spsp"]);
-    expect(s.draft!.items[1].operator.certificate).toEqual([]);
+    for (const i of s.draft!.items) expect(i.operator.certificate).toEqual([]);
   });
 
   it("never overwrites an operator cert the renter already chose", () => {
@@ -248,7 +263,19 @@ describe("PROCESS_SUCCESS — agent-parsed items", () => {
     const s = reducer({ ...initialState, taxonomy: TAXONOMY }, { t: "PROCESS_SUCCESS", draft: agentDraft(items) });
     expect(s.draft!.items[0].safetyCertsOverride).toEqual(["aramco"]);
     expect(s.draft!.items[1].safetyCertsOverride).toEqual(["tuv"]);
-    expect(s.draft!.items.every((i) => i.operator.certificate[0] === "spsp")).toBe(true);
+    expect(s.draft!.items.every((i) => i.operator.certificate.length === 0)).toBe(true);
+  });
+
+  it("keeps an operator cert the agent DID extract from the RFQ text", () => {
+    // The seed is gone, but a cert the renter actually named must still survive to submit.
+    const items = [
+      item("a1", {
+        ref: { categoryId: "cat-lift", subcategoryId: null, measurementId: null },
+        operator: { ...newManualItem("a1").operator, certificate: ["spsp"] },
+      }),
+    ];
+    const s = reducer({ ...initialState, taxonomy: TAXONOMY }, { t: "PROCESS_SUCCESS", draft: agentDraft(items) });
+    expect(s.draft!.items[0].operator.certificate).toEqual(["spsp"]);
   });
 
   it("keeps a cert the agent did extract", () => {
@@ -345,10 +372,11 @@ describe("Other text is cleared when the rule replaces the cert list", () => {
 });
 
 describe("ADD_ITEM", () => {
-  it("arrives with the SPSP operator cert and no equipment cert until a category is picked", () => {
+  it("arrives with NO certs of either kind — the equipment one lands on the first category pick", () => {
     const s = reducer(stateWith([]), { t: "ADD_ITEM" });
     const added = s.draft!.items[0];
-    expect(added.operator.certificate).toEqual(["spsp"]);
+    expect(added.operatorNeeded).toBe("yes"); // operator on by default (AC-24) …
+    expect(added.operator.certificate).toEqual([]); // … but that is not a cert requirement
     expect(added.safetyCertsOverride ?? null).toBeNull();
   });
 
@@ -359,5 +387,27 @@ describe("ADD_ITEM", () => {
     // override null ⇒ the item reads the request-wide value; the UI resolves `override ?? shared`.
     expect(added.safetyCertsOverride ?? null).toBeNull();
     expect(s.draft!.project.certificates.safety).toEqual(["aramco"]);
+  });
+});
+
+describe("submitted payload — the actual regression", () => {
+  it("a renter who never touched the operator certs submits NO operatorLicenseLevel", () => {
+    // The real wizard path: add a line (operator on by default), pick a category. Previously this
+    // shipped `operatorLicenseLevel: "SPSP"` on every item.
+    const added = reducer(stateWith([]), { t: "ADD_ITEM" });
+    const s = reducer(added, { t: "SET_ITEM_CATEGORY", id: added.draft!.items[0].id, categoryId: "cat-lift" });
+    const payload = draftToCreateRequest(s.draft!, "46");
+    const line = payload.equipmentItems[0];
+    expect(line.operatorLicenseLevel).toBeUndefined();
+    // The equipment cert rule is untouched — the lifting line still asks for Aramco.
+    expect(line.safetyCertifications).toEqual(["aramco"]);
+  });
+
+  it("still submits an operator cert the renter DID pick", () => {
+    const added = reducer(stateWith([]), { t: "ADD_ITEM" });
+    const id = added.draft!.items[0].id;
+    const chosen = reducer(added, { t: "PATCH_ITEM_OPERATOR", id, patch: { certificate: ["tuv"] } });
+    const s = reducer(chosen, { t: "SET_ITEM_CATEGORY", id, categoryId: "cat-lift" });
+    expect(draftToCreateRequest(s.draft!, "46").equipmentItems[0].operatorLicenseLevel).toBe("TUV");
   });
 });

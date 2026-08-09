@@ -94,18 +94,15 @@ export type OperatorNeeded = "yes" | "no"; // AC-24
 export type OperatorCertificate = SafetyCertificate;
 
 /**
- * The operator certificate the 2026-07 cert rule seeds — SPSP for EVERY equipment group, matching the
- * app's `kDefaultOperatorCertCode` (localized_labels.dart). Aramco isn't an operator-cert option and
- * TÜV isn't the operator standard, so the branch that picks the *equipment* cert (Aramco vs TÜV) does
- * not fan into the operator cert. Seeded only when the operator is enabled and no operator cert is set
- * yet — the renter can still change it.
+ * NO operator-certificate default. The 2026-07 cert rule used to seed SPSP on every operator-on line
+ * (app parity: `kDefaultOperatorCertCode`, localized_labels.dart), which meant essentially every
+ * request left the wizard demanding an operator SPSP the renter never asked for — and that requirement
+ * is not cosmetic: it becomes the Level-3 operator term (`bids.ts`) and an operator SPSP *document*
+ * demanded of suppliers (`bid-readiness.ts`). The operator cert is now set only by the renter, or by
+ * the agent when the RFQ text actually names one (`toOperatorCert`, agent-adapters.ts).
+ *
+ * The EQUIPMENT cert rule below is a separate field and is unaffected.
  */
-export const DEFAULT_OPERATOR_CERT: OperatorCertificate = "spsp";
-
-/** @see DEFAULT_OPERATOR_CERT — kept as a function so call sites read as "the seeded default". */
-export function operatorCertDefault(): OperatorCertificate {
-  return DEFAULT_OPERATOR_CERT;
-}
 
 /**
  * Default equipment safety cert for a category, mirroring the app's cert rule (`_withCertRule`,

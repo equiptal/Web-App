@@ -17,7 +17,6 @@ import {
   computeSummary,
   defaultPreferences,
   defaultOperatorNeeded,
-  operatorCertDefault,
   equipmentCertDefault,
   isLiftingCategory,
   newManualItem,
@@ -181,22 +180,19 @@ function mapItem(d: RfqDraft, id: string, fn: (i: EquipmentItem) => EquipmentIte
  *  • equipment cert — lifting → Aramco, every other group → TÜV. Seeded only when the item has no
  *    effective cert (no per-item override AND no request-wide default), so an agent-extracted cert or a
  *    renter choice is never overwritten. Skipped while the item has no category to classify.
- *  • operator cert  — SPSP, seeded only when the operator is on and no cert is set yet.
+ *  • operator cert  — NOT seeded (see the note where the operator-cert default used to live, in
+ *    options.ts): seeding SPSP made every request demand an operator cert nobody asked for. Only the
+ *    renter's own pick or the agent's extraction sets it.
  *
  * Applied to agent-parsed items on PROCESS_SUCCESS and to a rehydrated draft on HYDRATE; the manual
  * paths seed in their own reducers.
  */
 function seedCertRule(items: EquipmentItem[], taxonomy: Taxonomy, sharedSafety: readonly SafetyCertificate[]): EquipmentItem[] {
-  return items.map((i) => {
-    let next = i;
-    if (!hasEquipmentCert(i, sharedSafety) && i.ref.categoryId) {
-      next = { ...next, safetyCertsOverride: [equipmentCertDefault(isLiftingCategory(i.ref, taxonomy))] };
-    }
-    if (next.operatorNeeded === "yes" && next.operator.certificate.length === 0) {
-      next = { ...next, operator: { ...next.operator, certificate: [operatorCertDefault()] } };
-    }
-    return next;
-  });
+  return items.map((i) =>
+    !hasEquipmentCert(i, sharedSafety) && i.ref.categoryId
+      ? { ...i, safetyCertsOverride: [equipmentCertDefault(isLiftingCategory(i.ref, taxonomy))] }
+      : i,
+  );
 }
 
 /**
@@ -320,10 +316,9 @@ export function reducer(state: RfqState, a: Action): RfqState {
       // item follows the shared setting (items with an override — e.g. from agent extraction — would
       // otherwise ignore the request-wide click).
       //
-      // App parity (`_onEquipmentDefaultsSet`): the pick also seeds the SPSP operator cert on items that
-      // include an operator. The app OVERWRITES that cert; here it is seeded only when the item has none,
-      // because the web panel sits beside the item cards (not on an earlier step), so overwriting would
-      // wipe an operator cert the renter had just chosen a few rows down.
+      // This is the EQUIPMENT cert only. The app's `_onEquipmentDefaultsSet` also stamps the SPSP
+      // operator cert here (and overwrites the renter's own pick doing it); we no longer seed an
+      // operator cert at all, so the operator side is left exactly as the renter left it.
       return withDraft(state, (d) => ({
         ...d,
         project: { ...d.project, certificates: { ...d.project.certificates, ...a.patch } },
@@ -335,10 +330,6 @@ export function reducer(state: RfqState, a: Action): RfqState {
                 // The request-wide pick replaces each item's whole cert list, so its free-text "Other"
                 // goes too — the request-wide box has its own text (`certificates.safetyOther`).
                 safetyCertsOtherText: null,
-                operator:
-                  i.operatorNeeded === "yes" && i.operator.certificate.length === 0
-                    ? { ...i.operator, certificate: [operatorCertDefault()] }
-                    : i.operator,
               }))
             : d.items,
       }));
@@ -356,18 +347,9 @@ export function reducer(state: RfqState, a: Action): RfqState {
         })),
       }));
     case "PATCH_ITEM":
-      return withDraft(state, (d) =>
-        mapItem(d, a.id, (i) => {
-          const next = { ...i, ...a.patch };
-          // App parity (`kDefaultOperatorCertCode`): enabling the operator seeds SPSP — for every
-          // equipment group, independent of the item's equipment cert — and only when none is set yet.
-          // The renter can still change it.
-          if (a.patch.operatorNeeded === "yes" && next.operator.certificate.length === 0) {
-            return { ...next, operator: { ...next.operator, certificate: [operatorCertDefault()] } };
-          }
-          return next;
-        }),
-      );
+      // Turning the operator ON no longer seeds an operator cert — "I need an operator" is not
+      // "I require an SPSP-certified operator". The chip row starts empty for the renter to fill.
+      return withDraft(state, (d) => mapItem(d, a.id, (i) => ({ ...i, ...a.patch })));
     case "PATCH_ITEM_OPERATOR":
       return withDraft(state, (d) => mapItem(d, a.id, (i) => ({ ...i, operator: { ...i.operator, ...a.patch } })));
     case "SET_ITEM_CATEGORY":
@@ -384,19 +366,17 @@ export function reducer(state: RfqState, a: Action): RfqState {
             resolved: false,
           };
           // App parity (`_onEquipmentTypePicked`: `categoryChanged || safetyCertifications.isEmpty`):
-          // (re)picking the category re-seeds the category-based equipment cert — lifting → Aramco, else
-          // TÜV — plus the SPSP operator cert when the operator is on. Fires on an actual category change
-          // OR when the line still has no cert at all, so a re-pick of the SAME category still rescues an
-          // uncertified line; a renter's own cert survives a no-op re-pick either way. A later
-          // request-wide "settings for all" pick still overrides via SET_CERTIFICATES.
+          // (re)picking the category re-seeds the category-based EQUIPMENT cert — lifting → Aramco, else
+          // TÜV. Fires on an actual category change OR when the line still has no cert at all, so a
+          // re-pick of the SAME category still rescues an uncertified line; a renter's own cert survives
+          // a no-op re-pick either way. A later request-wide "settings for all" pick still overrides via
+          // SET_CERTIFICATES. The operator cert is NOT touched — the app's `_applyCertRule` clears and
+          // re-stamps SPSP here, which is precisely how a renter's operator pick got silently reverted.
           if (categoryChanged || !hasEquipmentCert(i, d.project.certificates.safety)) {
             next.safetyCertsOverride = [equipmentCertDefault(isLiftingCategory(next.ref, state.taxonomy))];
             // The rule replaces the whole cert list, so drop any free-text "Other" cert carried over
             // from the previous equipment. App parity: `_applyCertRule` clears `_otherSafetyController`.
             next.safetyCertsOtherText = null;
-            if (next.operatorNeeded === "yes") {
-              next.operator = { ...next.operator, certificate: [operatorCertDefault()] };
-            }
           }
           return next;
         });
@@ -426,11 +406,8 @@ export function reducer(state: RfqState, a: Action): RfqState {
           if (!hasEquipmentCert(next, d.project.certificates.safety) && next.ref.categoryId) {
             next.safetyCertsOverride = [equipmentCertDefault(isLiftingCategory(next.ref, state.taxonomy))];
           }
-          // Same app-parity seed as the manual operator toggle (PATCH_ITEM): if the subcategory
-          // auto-enables the operator and no cert is set, default it to SPSP.
-          if (operatorNeeded === "yes" && next.operator.certificate.length === 0) {
-            return { ...next, operator: { ...next.operator, certificate: [operatorCertDefault()] } };
-          }
+          // A subcategory that auto-enables the operator (AC-24) enables the operator and nothing more —
+          // no operator cert is seeded alongside it.
           return next;
         }),
       );
@@ -455,15 +432,11 @@ export function reducer(state: RfqState, a: Action): RfqState {
       );
     case "ADD_ITEM":
       return withDraft({ ...state, seq: state.seq + 1 }, (d) => {
-        // App parity (`_withGlobalEquipmentDefaults`): a fresh line arrives with the operator on, so it
-        // already carries the SPSP operator cert. Its EQUIPMENT cert can't be seeded yet — there's no
-        // category to classify — and lands on the first category pick (SET_ITEM_CATEGORY).
-        const blank = newManualItem(`m${state.seq}`);
-        const seeded =
-          blank.operatorNeeded === "yes" && blank.operator.certificate.length === 0
-            ? { ...blank, operator: { ...blank.operator, certificate: [operatorCertDefault()] } }
-            : blank;
-        const items = [...d.items, seeded];
+        // A fresh line arrives with the operator on (AC-24) but with NO certs of either kind: the
+        // app's `_withGlobalEquipmentDefaults` stamps SPSP right here, which is why every request built
+        // by adding lines came out demanding it. The EQUIPMENT cert lands on the first category pick
+        // (SET_ITEM_CATEGORY) — there's no category to classify yet.
+        const items = [...d.items, newManualItem(`m${state.seq}`)];
         return { ...d, items, summary: computeSummary(items) };
       });
     case "REMOVE_ITEM":
