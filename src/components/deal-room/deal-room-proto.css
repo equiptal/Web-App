@@ -171,9 +171,15 @@
   margin: 5px 0;
   padding: 7px 11px;
   background: transparent;
-  border-color: transparent;
   /* The tone stripe survives at half width: it is the only thing distinguishing an acceptance from a
-     counter at a glance, and losing it would make the thread unreadable rather than merely quieter. */
+     counter at a glance, and losing it would make the thread unreadable rather than merely quieter.
+
+     So only the three edges that are NOT the stripe go transparent. `border-color` here is (0,3,0)
+     and beat the tone rules below at (0,2,0), which meant this rule silently erased the very stripe
+     the paragraph above promises — every negotiation card in the thread lost it, and tone survived
+     only in the icon, whose rules happen to be (0,4,0). Named edges keep the cascade honest. */
+  border-block-color: transparent;
+  border-inline-end-color: transparent;
   border-inline-start-width: 2px;
   border-radius: 8px;
   box-shadow: none;
