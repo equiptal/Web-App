@@ -25,12 +25,19 @@ import { equipmentIcon } from "@/components/requests/EquipImg";
  * can produce a card. It receives the already-extracted group-id `token`.
  */
 
-const TERM_KEYS = ["operator", "nationality", "fatFood", "fatTransport", "fuel", "fuelType", "year", "operatorCert", "equipmentCert"] as const;
+// `nightShift` sits with the other operator terms. The renter can require night-shift work in both
+// request UIs (equipment_step.dart:2882, ItemRow.tsx:354-357) and it reaches the in-app supplier via
+// `OperatorAsk` (terms_modal.dart) — but it was never carried to the off-platform bid form, so a
+// supplier bidding through the link was never told. The backend sends it ONLY when the renter
+// switched it on (null otherwise), so an untouched toggle stays hidden instead of adding a
+// "Night shift: No" row to every bid.
+const TERM_KEYS = ["operator", "nationality", "nightShift", "fatFood", "fatTransport", "fuel", "fuelType", "year", "operatorCert", "equipmentCert"] as const;
 type TermKey = (typeof TERM_KEYS)[number];
 // Term names mirror the web app's canonical labels (bids.ts negotiable terms) so renter + supplier see the same wording.
 const TERM_LABEL: Record<TermKey, [string, string]> = {
   operator: ["Operator included", "تشمل مشغّل"],
   nationality: ["Operator nationality", "جنسية المشغّل"],
+  nightShift: ["Night shift required", "العمل الليلي مطلوب"],
   fatFood: ["Operator Food", "طعام المشغّل"],
   fatTransport: ["Operator Accommodation & Transport", "سكن وتنقّل المشغّل"],
   fuel: ["Fuel responsibility", "مسؤولية الوقود"],
@@ -41,7 +48,7 @@ const TERM_LABEL: Record<TermKey, [string, string]> = {
 };
 // A Material glyph per term, so each term card reads at a glance.
 const TERM_ICON: Record<TermKey, string> = {
-  operator: "engineering", nationality: "public", fatFood: "restaurant", fatTransport: "night_shelter",
+  operator: "engineering", nationality: "public", nightShift: "bedtime", fatFood: "restaurant", fatTransport: "night_shelter",
   fuel: "local_gas_station", fuelType: "local_gas_station", year: "event", operatorCert: "workspace_premium", equipmentCert: "verified",
 };
 // App-download links for the footer CTA (off-platform suppliers → install the app to keep getting requests).

@@ -312,10 +312,21 @@ function deriveVerdict(li: RFQLineItem): { verdict: Verdict; resolved: boolean }
 function fatSide(v: boolean | null | undefined): Party | null {
   return v == null ? null : v ? "me" : "supplier";
 }
-/** Legacy FAT fallback when a split field is absent — the single operator_accommodation_by_rentee
- *  (supplier only when explicitly false; defaults to "me" otherwise, matching prior behaviour). */
-function legacyFatSide(li: RFQLineItem): Party {
-  return li.operator_accommodation_by_rentee === false ? "supplier" : "me";
+/** Legacy FAT fallback when a split field is absent — the single operator_accommodation_by_rentee.
+ *
+ *  Returns null when the agent said NOTHING about who covers F.A.T. This used to default to "me",
+ *  which turned the agent's silence into a definite "the renter covers the operator's food /
+ *  accommodation" that nobody ever chose — saved as `fat_food = false` and shown to the supplier as
+ *  the renter's choice, so they priced around a term that was never agreed. Mansour omits these
+ *  fields when the RFQ doesn't state them; absence means "not stated", not "me".
+ *
+ *  App parity: `_fatFood` / `_fatAccommodationTransport` are `int?` starting null, and the app never
+ *  pre-selects a side (equipment_step.dart:84-87). Leaving null here renders the chip empty, so the
+ *  renter can answer it — and if they don't, nothing is written. */
+function legacyFatSide(li: RFQLineItem): Party | null {
+  if (li.operator_accommodation_by_rentee === false) return "supplier";
+  if (li.operator_accommodation_by_rentee === true) return "me";
+  return null;
 }
 
 function toItem(li: RFQLineItem, idx: number): EquipmentItem {
