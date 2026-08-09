@@ -249,6 +249,20 @@
 .dlproto .quote-err { color: var(--danger, #d92d20); }
 .dlproto[dir="rtl"] .composer .send .material-icons-outlined { transform: scaleX(-1); }
 
+/* The composer and the quotation link share ONE sticky footer, so the link sits BELOW the composer
+   (app parity: quotation_button.dart is the last widget in the column, under the chat input) instead of
+   two `sticky; bottom: 0` bars fighting for the same edge and overlapping. */
+.dlproto .dl-footer { position: sticky; bottom: 0; z-index: 2; background: var(--surface1); }
+.dlproto .dl-footer .composer { position: static; }
+/* A plain text link, not a boxed card: it sits under the chat input, where a box would eat the vertical
+   space the conversation needs. Blue while the deal is a PREVIEW, green once it is FINAL — the app's two
+   accents, carrying the same distinction as the label. */
+.dlproto .quote-link-bar { border-top: 0; padding: 0 0 8px; }
+.dlproto .dl-quote.quote-link { background: none; color: var(--info); padding: 8px 10px; font-size: 13px; gap: 6px; }
+.dlproto .dl-quote.quote-link.final { color: var(--success); }
+.dlproto .dl-quote.quote-link .material-icons-outlined { font-size: 16px; }
+.dlproto[dir="rtl"] .dl-quote.quote-link .chev { transform: scaleX(-1); }
+
 .dlproto .rstate { display: grid; place-items: center; padding: 50px 0; color: var(--muted); }
 .dlproto .rempty { border: 1px dashed var(--border); background: rgba(239, 244, 249, 0.4); border-radius: var(--r-lg); padding: 36px; text-align: center; font-size: 13.5px; color: var(--muted); }
 

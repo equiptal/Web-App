@@ -7,12 +7,12 @@ import { useLocale } from "@/lib/i18n";
 import { STREAM_API_KEY, leaseStream } from "@/lib/chat/stream-connection";
 import { useHeaderBack } from "@/components/AppShell";
 import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, ApiError } from "@/lib/api/client";
-import { computeDealTotals, type DealRoomView, type DealTerm, type DealRoomDocument, type DealRoomDocuments, type QuotationView } from "@/lib/contract/deal-room";
+import { computeDealTotals, buildDealRoomQuotationDoc, quotationLinkKind, type DealRoomView, type DealTerm, type DealRoomDocument, type DealRoomDocuments, type QuotationView } from "@/lib/contract/deal-room";
 import { reconstructRounds, collapseRounds, latestRoundBy, withOpeningRound, chatCardOfMessage, buildChatCardView, respondedProposalIds, latestProposalId, type DealRound } from "@/lib/contract/deal-rounds";
 import { valText, type ResolutionsMap } from "@/components/deal-room/DealRoomTerms";
 import { ChatCard } from "@/components/deal-room/ChatCard";
 import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
-import { renderQuotationSection, wrapQuotationPage, type QuotationDoc, type QuotationLineItem, type QuotationCard } from "@/lib/quotation/render";
+import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/render";
 import "@/components/deal-room/deal-room-proto.css";
 import { computeQuoteTotals, computeRentalTotal } from "@/lib/pricing/rental";
 
@@ -98,156 +98,32 @@ const CHAT_MAX_MEDIA = 10 * 1024 * 1024; // images + documents
 const CHAT_MAX_VIDEO = 25 * 1024 * 1024; // video
 
 /**
- * Client-rendered confirmed-deal quotation (the backend server PDF is disabled — the client renders it
- * now, app parity). Values mirror the app's `extractQuotationData`: rental = agreedRate × durationFactor
- * (PER_DAY = duration days, PER_WEEK = ceil(days/7), PER_MONTH = ceil(days/30), PER_JOB = 1); estimated
- * total = (rental + mobilization + demobilization) × units; VAT 15%. Agreed values come from the confirmed
- * Quotation row (+ the deal room for mob/demob/units/fixed terms/supplier name; renter name from /api/me).
+ * The rentee's quotation, as an HTML page.
+ *
+ * A thin wrapper now: the document itself is built by `buildDealRoomQuotationDoc`, which reads the LIVE
+ * room the way the app does. It used to be built here out of a HYBRID of the frozen `Quotation` row and
+ * the room — see that function for exactly which fields moved.
+ *
+ * A PREVIEW does not auto-print. The app never prints either; and offering a print dialog for a document
+ * that is explicitly not final invites a mid-negotiation draft onto paper as if it were the deal. The
+ * FINAL keeps auto-print, because that is what the Download CTA promises.
  */
-function buildQuotationHtml(room: DealRoomView, q: QuotationView, renteeName: string, ar: boolean, L: (en: string, arr: string) => string): string {
-  const lang = ar ? "ar" : "en";
-  const sar = L("SAR", "ر.س");
-  // EXACT same math as the live price bar (computeDealTotals) — prorated ÷26/÷7, PER_JOB / no-duration =
-  // one full period, mob/demob use their own counts + honor leg exclusion, VAT 15%. Guarantees the
-  // quotation total == the number the renter saw in the room.
-  const t = computeDealTotals(room, { rate: q.agreedRate ?? room.rate, priceUnit: q.priceUnit ?? room.priceUnit });
-  const rate = t.rate;
-  const unit = t.priceUnit;
-  const units = t.rentalUnits;
-  const days = room.periods;
-  const periodLabel = unit === "PER_WEEK" ? L("week", "أسبوع") : unit === "PER_MONTH" ? L("month", "شهر") : unit === "PER_JOB" ? L("job", "مهمة") : L("day", "يوم");
-  const rentalTotal = t.rentalTotal;
-  const subtotal = t.subtotal;
-  const vat = t.vat;
-  const total = t.grand;
-  const dateStr = new Date().toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
-  const qnum = (q.quotationNumber ?? "").slice(0, 8).toUpperCase() || "—";
-  const contractType = q.contractType ?? room.contractType;
-
-  const valFmt = (v: unknown): string => {
-    if (v == null || v === "") return "—";
-    if (Array.isArray(v)) return v.length ? v.map(String).join(", ") : "—";
-    if (typeof v === "boolean") return v ? L("Yes", "نعم") : L("No", "لا");
-    const t = String(v).toLowerCase();
-    if (t === "supplier") return L("Supplier", "المؤجّر");
-    if (t === "rentee" || t === "renter") return L("Rentee", "المستأجر");
-    if (t === "true" || t === "included" || t === "yes") return L("Yes", "نعم");
-    if (t === "false" || t === "excluded" || t === "not_included" || t === "no") return L("No", "لا");
-    return String(v);
-  };
-
-  // Invoice line items (rental + delivery + return) — SAME 6-column table as the bid-card quotation.
-  const lineItems: QuotationLineItem[] = [];
-  // Rental qty/price columns mirror the live price bar's factor logic: PER_JOB → units jobs; whole
-  // period count → "N × units"; a partial (day-count) duration → effective per-day rate × days.
-  const factorInt = Number.isInteger(t.periodCount) ? t.periodCount : null;
-  const partial = unit !== "PER_JOB" && t.hasDuration && factorInt == null;
-  const rentalQty = unit === "PER_JOB"
-    ? String(units)
-    : partial
-      ? `${room.periods} ${L("days", "يوم")}${units > 1 ? ` × ${units}` : ""}`
-      : `${factorInt ?? 1}${units > 1 ? ` × ${units}` : ""}`;
-  lineItems.push({
-    num: 1, label: L("Rental", "الإيجار"), detail: room.supplier.name,
-    unit: partial ? L("day", "يوم") : periodLabel,
-    qty: rentalQty,
-    price: partial ? `${nf(Math.round(t.perDayRate))} / ${L("day", "يوم")}` : `${nf(rate)} / ${periodLabel}`,
-    total: nf(rentalTotal),
-  });
-  // Mob/demob ALWAYS shown; honor each leg's OWN unit count + exclusion (excluded → "Not included",
-  // matching the price bar which contributes 0 for an excluded leg).
-  const logiRow = (label: string, excluded: boolean, price: number, unitsN: number, lineTotal: number, byRentee: boolean): QuotationLineItem =>
-    excluded
-      ? { num: null, label, detail: L("Not included", "غير مشمول"), unit: "—", qty: "—", price: "—", total: L("Not included", "غير مشمول") }
-      : price > 0
-        ? { num: null, label, detail: room.supplier.name, unit: L("Trip", "رحلة"), qty: String(unitsN), price: nf(price), total: nf(lineTotal) }
-        : { num: null, label, detail: byRentee ? L("Arranged by the rentee", "يُرتّبه المستأجر") : L("Included", "مشمول"), unit: "—", qty: "—", price: "—", total: byRentee ? L("By rentee", "على المستأجر") : L("Included", "مشمول") };
-  lineItems.push(logiRow(L("Delivery to site", "النقل إلى الموقع"), t.mobExcluded, t.mobPrice, t.mobUnitsN, t.mobTotal, room.mobByRentee === true));
-  lineItems.push(logiRow(L("Return from site", "الإرجاع من الموقع"), t.demobExcluded, t.demobPrice, t.demobUnitsN, t.demobTotal, room.demobByRentee === true));
-
-  const cards: QuotationCard[] = [];
-  // Structured rental/equipment details (from the request item) — rows with no value are skipped
-  // (field names best-effort). Operator/safety + cost responsibilities are NOT separate cards: they
-  // flow through the Agreed/Fixed terms + the price extras below, matching the app.
-  const dd = room.details;
-  const yn = (b: boolean | null) => (b == null ? null : b ? L("Yes", "نعم") : L("No", "لا"));
-  const fmtDate = (v: string | null) => { if (!v) return null; const dt = new Date(v); return isNaN(dt.getTime()) ? v : dt.toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" }); };
-  const addRow = (rowsArr: { label: string; value: string }[], label: string, v: unknown) => {
-    if (v == null || v === "" || (Array.isArray(v) && !v.length)) return;
-    rowsArr.push({ label, value: Array.isArray(v) ? v.join(", ") : String(v) });
-  };
-  const detailRows: { label: string; value: string }[] = [];
-  addRow(detailRows, L("Equipment", "المعدة"), dd.equipmentLabel);
-  addRow(detailRows, L("Location", "الموقع"), dd.location);
-  addRow(detailRows, L("Rental type", "نوع الإيجار"), dd.rentalType);
-  addRow(detailRows, L("Contract type", "نوع العقد"), contractType);
-  addRow(detailRows, L("Start date", "تاريخ البدء"), fmtDate(dd.startDate));
-  addRow(detailRows, L("End date", "تاريخ الانتهاء"), fmtDate(dd.endDate));
-  addRow(detailRows, L("Duration", "المدة"), days != null ? `${days} ${L("days", "يوم")}` : null);
-  addRow(detailRows, L("Working hours/day", "ساعات العمل/يوم"), dd.workingHoursPerDay);
-  addRow(detailRows, L("Working days/week", "أيام العمل/أسبوع"), dd.workingDaysPerWeek);
-  addRow(detailRows, L("Fulfillment", "التنفيذ"), dd.fulfillment);
-  addRow(detailRows, L("Urgency", "الأولوية"), dd.urgency);
-  addRow(detailRows, L("Subletting", "التأجير من الباطن"), yn(dd.subletting));
-  addRow(detailRows, L("Local content", "المحتوى المحلي"), yn(dd.localContent));
-  addRow(detailRows, L("Rental extendable", "قابل للتمديد"), yn(dd.extendable));
-  addRow(detailRows, L("Additional notes", "ملاحظات إضافية"), dd.additionalNotes);
-  if (detailRows.length) cards.push({ title: L("Rental & equipment details", "تفاصيل الإيجار والمعدة"), rows: detailRows });
-
-  // Price extras (app parity): overtime rate + cost-responsibility items ("fuel → supplier"), shown in
-  // the price section. These cost keys are excluded from the term cards below to avoid duplication.
-  const COST_KEYS = new Set(["fuel", "maintenance", "overtime", "overtime_rate", "operator_food", "fat_food", "operator_transport_accommodation", "fat_accommodation_transport", "operator_transport"]);
-  const isCost = (k: string) => COST_KEYS.has(k);
-  const priceExtras: { label: string; value: string }[] = [];
-  if (dd.overtimeRate) priceExtras.push({ label: L("Overtime rate", "سعر العمل الإضافي"), value: /^\d+(\.\d+)?$/.test(dd.overtimeRate) ? `${dd.overtimeRate}x` : dd.overtimeRate });
-  const seenCost = new Set<string>();
-  for (const term of q.agreedTerms) if (isCost(term.key) && !seenCost.has(term.key)) { seenCost.add(term.key); priceExtras.push({ label: ar ? term.labelAr : term.label, value: valFmt(term.value) }); }
-  for (const term of room.terms) if (isCost(term.key) && !seenCost.has(term.key)) { seenCost.add(term.key); priceExtras.push({ label: ar ? term.labelAr : term.label, value: valFmt(term.value ?? term.platformDefault) }); }
-
-  const agreedRows = q.agreedTerms.filter((t) => t.key !== "PRICE" && !isCost(t.key)).map((t) => ({ label: ar ? t.labelAr : t.label, value: valFmt(t.value) }));
-  if (agreedRows.length) cards.push({ title: L("Agreed terms", "الشروط المتفق عليها"), rows: agreedRows });
-  const fixedRows = room.terms.filter((t) => t.state === "fixed" && !isCost(t.key)).map((t) => ({ label: ar ? t.labelAr : t.label, value: valFmt(t.value ?? t.platformDefault) }));
-  if (fixedRows.length) cards.push({ title: L("Fixed terms", "الشروط الثابتة"), rows: fixedRows });
-
-  const doc: QuotationDoc = {
-    lang,
-    title: L("Equipment rental quotation", "عرض سعر تأجير معدات"),
-    quotationNumber: qnum,
-    dateStr,
-    supplier: {
-      label: L("Supplier", "المؤجِّر"),
-      name: room.supplier.name,
-      idRows: [
-        { label: L("National Address", "العنوان الوطني"), verified: room.supplier.isVerified },
-        { label: L("CR #", "س.ت"), verified: room.supplier.isVerified },
-        { label: L("VAT #", "ض.ق.م"), verified: room.supplier.isVerified },
-        { label: L("Phone", "الهاتف"), value: q.supplierPhone },
-        { label: L("Email", "البريد"), value: q.supplierEmail },
-      ],
-      // Verified shows on the CR/VAT rows ("✓ Verified") — no standalone orphan party chip.
-      chips: [],
-    },
-    rentee: {
-      label: L("Rentee", "المُستأجِر"),
-      name: renteeName,
-      idRows: [
-        { label: L("Phone", "الهاتف"), value: q.renteePhone },
-        { label: L("Email", "البريد"), value: q.renteeEmail },
-      ],
-      chips: [],
-    },
+function buildQuotationHtml(
+  room: DealRoomView,
+  q: QuotationView | null,
+  rentee: { name: string; phone?: string | null; email?: string | null },
+  ar: boolean,
+  L: LFn,
+): string {
+  const kind = quotationLinkKind(room.status) ?? "preview";
+  const doc = buildDealRoomQuotationDoc(room, q, rentee, ar, L, {
     logoUrl: typeof window !== "undefined" ? `${window.location.origin}/moedatech-logomark.svg` : undefined,
-    meta: [], // no meta strip (app parity) — reference/contract/period live in the details card
-    priceExtras,
-    lineItems,
-    currency: sar,
-    totals: { subtotal, vat, total },
-    cards,
-    showSigned: false,
-    // Short disclaimer instead of the full legal clause list + signed block (app parity).
-    legal: [L("This quotation is generated electronically via Moedatech, valid for 7 days from the issue date. Prices exclude anything not listed above; VAT at 15% applies per Saudi tax law.", "صدر هذا العرض إلكترونيًا عبر منصة معداتك، وهو ساري المفعول لمدة ٧ أيام من تاريخ الإصدار. الأسعار لا تشمل ما لم يُذكر أعلاه، وتُطبَّق ضريبة القيمة المضافة بنسبة ١٥٪ وفقًا للنظام السعودي.")],
-  };
-  return wrapQuotationPage(renderQuotationSection(doc), { lang, title: L("Confirmed Quotation", "عرض سعر مؤكّد") });
+  });
+  return wrapQuotationPage(renderQuotationSection(doc), {
+    lang: doc.lang,
+    title: kind === "final" ? L("Final quotation", "عرض السعر النهائي") : L("Preview quotation", "معاينة عرض السعر"),
+    autoPrint: kind === "final",
+  });
 }
 
 export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) => void }) {
@@ -333,38 +209,49 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     }
   }
 
-  // The confirmed-deal quotation. The server-side PDF is disabled (app parity — the client renders it
-  // now), so we build it CLIENT-SIDE from the confirmed Quotation row's AGREED snapshot (agreedRate,
-  // agreedTerms, contractType, phones/emails) + the deal room (mob/demob, units, fixed terms, supplier
-  // name) + the renter's name (/api/me), matching the app's extractQuotationData. If a real presigned
-  // pdfUrl ever exists it's opened as-is (fallback).
-  async function downloadQuotation() {
+  // The rentee's quotation — ALWAYS RENDERED, never a stored file, at any status (app parity: the app's
+  // PDF button is commented out and `bid_quotation_page` re-renders from a fresh fetch on every open).
+  //
+  // This used to prefer `q.pdfUrl` and open the stored PDF instead of rendering. Server-side generation
+  // was switched off on 2026-06-23, so only deals closed before then have a file — but
+  // `POST /quotation/retry-pdf` accepts PENDING and can still mint one for ANY deal, and from that
+  // moment that deal's quotation stopped being live forever. The endpoint stays (owner's call); it is
+  // the RENDERER that no longer defers to it. A pre-June deal now shows the same rendered document
+  // every other deal shows, built from the room that deal closed on.
+  //
+  // The Quotation row exists only once the deal is CLOSED — `GET .../quotation` 404s before that — so
+  // the fetch is best-effort and `null` is a perfectly good answer. It supplies only the formal
+  // quotation number and the supplier's e-mail; every other value comes off the live room.
+  async function openQuotation() {
     if (quoteBusy || !room) return;
     setQuoteBusy(true);
     setQuoteErr(null);
     try {
-      const q = await fetchQuotation(id);
-      if (q.pdfUrl) {
-        window.open(q.pdfUrl, "_blank", "noopener,noreferrer");
-        return;
-      }
-      let renteeName = "";
+      const q = await fetchQuotation(id).catch(() => null);
+      // The buyer block, live from the signed-in rentee (the app fills it from the profile the same way).
+      let rentee: { name: string; phone?: string | null; email?: string | null } = { name: "" };
       try {
         const meRes = await fetch("/api/me", { cache: "no-store" });
         if (meRes.ok) {
-          const d = (await meRes.json()) as { user?: { firstName?: string | null; lastName?: string | null; companyName?: string | null } };
+          const d = (await meRes.json()) as {
+            user?: { firstName?: string | null; lastName?: string | null; companyName?: string | null; phone?: string | null; email?: string | null };
+          };
           const u = d.user ?? {};
-          renteeName = (u.companyName?.trim() || [u.firstName, u.lastName].filter(Boolean).join(" ")) ?? "";
+          rentee = {
+            name: (u.companyName?.trim() || [u.firstName, u.lastName].filter(Boolean).join(" ")) ?? "",
+            phone: u.phone ?? null,
+            email: u.email ?? null,
+          };
         }
       } catch {
-        /* name is best-effort */
+        /* the buyer block is best-effort */
       }
       const w = window.open("", "_blank");
       if (!w) {
         setQuoteErr(L("Allow pop-ups to open the quotation.", "اسمح بالنوافذ المنبثقة لفتح عرض السعر."));
         return;
       }
-      w.document.write(buildQuotationHtml(room, q, renteeName, ar, L));
+      w.document.write(buildQuotationHtml(room, q, rentee, ar, L));
       w.document.close();
     } catch (e) {
       setQuoteErr(errMsg(e, L("Couldn’t load the quotation.", "تعذّر تحميل عرض السعر.")));
@@ -647,6 +534,14 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const closed = room.status === "CLOSED";
   const abandoned = room.status === "ABANDONED";
   const awaiting = room.status === "AWAITING_SUPPLIER_CONFIRMATION";
+  // The quotation link — offered at every status except ABANDONED (app parity, quotation_button.dart).
+  // `final` only once the deal is CLOSED; everything before it is a `preview`, and the label has to say
+  // so: an agreed price the supplier hasn't confirmed yet is not a signed deal, and a rentee who reads
+  // one as if it were stops chasing the deal.
+  const quoteKind = quotationLinkKind(room.status);
+  const quoteLabel = quoteKind === "final"
+    ? L("Final quotation", "عرض السعر النهائي")
+    : L("Preview quotation", "معاينة عرض السعر");
   // Equipment title — real name + size (like the request/bid cards), not the bare "Equipment" fallback.
   const eqName = (ar ? room.details.equipmentLabelAr || room.details.equipmentLabel : room.details.equipmentLabel) || L("Equipment", "المعدّة");
   const eqSize = ar ? room.details.equipmentSizeAr || room.details.equipmentSize : room.details.equipmentSize || room.details.equipmentSizeAr;
@@ -776,7 +671,10 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
           {/* CTAs — centered below the price */}
           {closed ? (
             <div className="pb-btns">
-              <button className="pb-btn accept" disabled={quoteBusy} onClick={downloadQuotation}><span className="material-icons-outlined">download</span>{L("Download quote", "تنزيل العرض")}</button>
+              {/* The CLOSED price-bar CTA — app parity (`TurnCtaKind.download`), which the app also shows
+                  only at CLOSED. Everything before CLOSED reaches the quotation through the pinned link
+                  under the composer instead, exactly as the app arranges it. */}
+              <button className="pb-btn accept" disabled={quoteBusy} onClick={openQuotation}><span className="material-icons-outlined">download</span>{L("Download quote", "تنزيل العرض")}</button>
               <button className="pb-btn ghost" onClick={() => setReleaseOpen(true)}><span className="material-icons-outlined">refresh</span>{L("Reopen", "إعادة فتح")}</button>
             </div>
           ) : abandoned ? null : awaiting ? (
@@ -934,18 +832,18 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
         <div ref={bottomRef} />
       </div>
 
-      {/* composer */}
+      {/* Footer — the composer (or what replaces it) with the quotation link PINNED underneath. One
+          sticky container, because two `position: sticky; bottom: 0` siblings would both pin to the
+          viewport bottom and overlap. */}
+      <div className="dl-footer">
       {closed ? (
         <div className="composer ro quote-bar">
-          <button type="button" className="dl-quote" onClick={downloadQuotation} disabled={quoteBusy}>
-            <span className="material-icons-outlined">{quoteBusy ? "hourglass_top" : "download"}</span>
-            {quoteBusy ? L("Preparing quotation…", "يتم تجهيز عرض السعر…") : L("Download quotation", "تنزيل عرض السعر")}
-          </button>
+          {/* The quotation itself has moved to the pinned link below — this bar keeps only the action
+              that is specific to a closed room. Leaving both here printed the same link twice. */}
           <button type="button" className="dl-quote reopen" onClick={() => { setReleaseErr(null); setReleaseOpen(true); }} disabled={releasing}>
             <span className="material-icons-outlined">lock_open</span>
             {L("Reopen negotiation", "إعادة فتح التفاوض")}
           </button>
-          {quoteErr && <span className="ro-note quote-err">{quoteErr}</span>}
         </div>
       ) : abandoned ? (
         <div className="composer ro"><span className="ro-note">{L("Deal room has been cancelled", "تم إلغاء غرفة الصفقة")}</span></div>
@@ -977,6 +875,25 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
           {fileErr && <span className="ro-note quote-err">{fileErr}</span>}
         </div>
       )}
+
+      {/* The rentee's quotation link, PINNED below the composer — app parity (quotation_button.dart).
+          It sits outside the thread so it never scrolls away with the conversation, it is there at
+          EVERY status except ABANDONED (an abandoned room has no deal to quote), there is no
+          verification or tier gate, and its LABEL carries what the availability alone would destroy:
+          «معاينة» before the deal closes, «النهائي» after. */}
+      {quoteKind && (
+        <div className="composer ro quote-bar quote-link-bar">
+          <button type="button" className={`dl-quote quote-link ${quoteKind}`} onClick={openQuotation} disabled={quoteBusy}>
+            <span className="material-icons-outlined">
+              {quoteBusy ? "hourglass_top" : quoteKind === "final" ? "receipt_long" : "description"}
+            </span>
+            {quoteBusy ? L("Preparing quotation…", "يتم تجهيز عرض السعر…") : quoteLabel}
+            <span className="material-icons-outlined chev">chevron_right</span>
+          </button>
+          {quoteErr && <span className="ro-note quote-err">{quoteErr}</span>}
+        </div>
+      )}
+      </div>
 
       {flowMode && (
         <CounterFlow
