@@ -56,7 +56,12 @@ export function ChatCard({
    */
   const prominent = view.tone === "ask" || view.tone === "ask-reply";
   return (
-    <div className={`chatcard ${prominent ? "cc-prominent" : "cc-quiet"} cc-${view.tone}`}>
+    // **There is no `cc-prominent`.** The base `.chatcard` IS the prominent weight — the full card,
+    // the surface, the shadow — and `.cc-quiet` is the modifier that steps back from it. A
+    // `cc-prominent` class was emitted here for a while with no rule behind it in any stylesheet: it
+    // carried no meaning, only the appearance of one, and the next reader of `.cc-quiet` would go
+    // looking for its opposite and find nothing. The rendered card is byte-identical without it.
+    <div className={`chatcard${prominent ? "" : " cc-quiet"} cc-${view.tone}`}>
       <div className="cc-head">
         <span className="material-icons-outlined">{view.icon}</span>
         <span className="cc-title">{view.title}</span>
