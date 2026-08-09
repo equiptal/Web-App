@@ -123,11 +123,14 @@ export function photoSlotOf(slot: string): PhotoSlot | null {
 /**
  * Ownership / registration document types.
  *
- * **These now REACH the renter.** `rentee.service.ts` used to strip `istimara` · `customs` ·
+ * **These REACH the renter on THIS surface.** `rentee.service.ts` strips `istimara` · `customs` ·
  * `customs_card` · `sale_contract` · `sales_contract` · `saso_registration` via
- * `RENTEE_HIDDEN_DOC_TYPES`; that constant and its filter were deleted when the product owner decided
- * ownership papers are renter-visible with usable urls. So a missing one is the supplier's omission,
- * not a redaction, and `ownershipCell` reads it red.
+ * `RENTEE_HIDDEN_DOC_TYPES` — but only from the BID's projection (`offeredUnitsDetailFor`). The
+ * product owner's ruling of 2026-08-10 is that ownership papers are renter-visible **in the map's
+ * document section and nowhere else**, so `supplier-fleet.service` serves them unstripped with usable
+ * urls and the bid keeps the behaviour it ships today. Everything in this file reads a `FleetMachine`,
+ * i.e. the unstripped side. So a missing one here is the supplier's omission, not a redaction, and
+ * `ownershipCell` reads it red.
  *
  * (`bid-readiness.ts` still excludes proof-of-ownership from its readiness SCORE. That exclusion is
  * about a band that would otherwise hold every supplier short; it is not a statement that the renter
@@ -371,10 +374,10 @@ function photosCell(machine: FleetMachine): MatchCell {
  *
  * Corrected 2026-08-08. An earlier revision made this grey, reasoning that the renter's projection
  * strips ownership papers (`RENTEE_HIDDEN_DOC_TYPES`) so an absence would be the platform's redaction
- * rather than the supplier's omission. **That filter is gone** — the product owner decided ownership
- * documents are renter-visible with usable urls, and `rentee.service.ts` no longer contains the
- * constant or its filter. So an absent ownership paper is now a real gap the supplier can close, which
- * is exactly what red is for, and the documents tab can request it.
+ * rather than the supplier's omission. **That filter does not apply here.** It still guards the BID's
+ * projection, but the map's fleet rows this cell reads are served unstripped on purpose (2026-08-10 —
+ * see `OWNERSHIP_TYPES` above). So an absent ownership paper is a real gap the supplier can close,
+ * which is exactly what red is for, and the documents tab can request it.
  *
  * (`bid-readiness.ts` still excludes proof-of-ownership from its SCORE — that is a different question.
  * A band that counted a redacted paper would hold every supplier permanently short; this cell states a
@@ -1111,8 +1114,8 @@ function operatorStatusRows(certs: readonly { code: string; present: boolean }[]
  * follows the mobile scorer, because `ownershipCell` one tab away already reads an absent ownership
  * paper **red** — "not on the file — you can ask for it" — and a documents tab that hid the row would
  * leave the renter told to ask with nothing to ask with. (The web scorer's stated reason for excluding
- * it, that the renter's projection strips ownership papers, is stale: `RENTEE_HIDDEN_DOC_TYPES` was
- * deleted. See the note on `ownershipCell`.)
+ * it — that the renter's projection strips ownership papers — is true of the BID it scores and simply
+ * does not describe this surface, which reads the unstripped fleet rows. See `ownershipCell`.)
  *
  * **A request with no operator needs no special case.** No operator asked for ⇒ no operator certs
  * requested ⇒ the scorer reports none ⇒ the group is empty and is not returned at all. Operator papers

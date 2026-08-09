@@ -228,10 +228,10 @@ describe("proof of ownership — green when held, RED when absent", () => {
 
   it("reds when it does not — the paper reaches the renter now, so an absence is a real gap", () => {
     // An earlier revision made this grey, on the premise that `RENTEE_HIDDEN_DOC_TYPES` strips
-    // ownership papers before they reach this client. That filter was DELETED when ownership documents
-    // became renter-visible with usable urls, so a missing one is the supplier's omission — actionable,
-    // and requestable from the documents tab. (`bid-readiness.ts` still excludes it from the readiness
-    // SCORE; that is about a band, not about visibility.)
+    // ownership papers before they reach this client. That filter guards the BID's projection only —
+    // the map's fleet rows this panel reads carry the papers unstripped (owner's ruling 2026-08-10) —
+    // so a missing one is the supplier's omission: actionable, and requestable from the documents tab.
+    // (`bid-readiness.ts` still excludes it from the readiness SCORE; a band, not visibility.)
     const c = cellsBy(machine({ docs: [{ type: "tuv" }] }), {}).ownership;
     expect(c.state).toBe("red");
     expect(c.en).toContain("not on the file");
