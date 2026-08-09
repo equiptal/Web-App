@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { mapFleet, type FleetMachine } from "@/lib/contract/fleet";
 import { isPlottable, unitAvailability } from "@/lib/contract/bid-map";
-import { computeBidReadiness, computeUnitReadiness, readinessInputsFor } from "@/lib/contract/bid-readiness";
+import { canonicalCertCode, computeBidReadiness, computeUnitReadiness, readinessInputsFor } from "@/lib/contract/bid-readiness";
 import { mapBidList, type BidCard } from "@/lib/contract/bids";
 
 /**
@@ -415,5 +415,78 @@ describe("the fleet type is assignable where an offered unit is expected", () =>
     // Compile-time proof as much as a runtime one: these all take `Pick<OfferedUnitDetail, …>`.
     expect(unitAvailability(m)).toBe("confirmed");
     expect(isPlottable(m)).toBe(true);
+  });
+});
+
+/* ───────── SASO: the registration is OWNERSHIP, the technical inspection is the CERTIFICATE ─────────
+ *
+ * Owner's ruling, 2026-08-09: *"`saso_registration` is PROOF OF OWNERSHIP. `saso_technical_inspection`
+ * is the CERTIFICATE."*
+ *
+ * `canonicalCertCode` used to fold every `saso*` token into the `saso` family with one `startsWith`
+ * test, so a machine carrying nothing but its registration paper scored a held SASO **safety
+ * certificate** — a paper it does not have, on a surface whose whole job is to say which papers exist.
+ *
+ * SASO is no longer offerable as an ask on either client (`options.ts`), so only LEGACY requests reach
+ * here; the ask below is spelled `saso`, the way those requests store it. Bare `saso` on the HELD side
+ * remains the certificate too — no upload path emits it, but nothing else can mean it.
+ *
+ * Every assertion in this block passes only after the fix.
+ */
+describe("SASO — registration vs. certificate (owner's ruling, 2026-08-09)", () => {
+  const sasoAsk = readinessInputsFor({ reqEquipmentCerts: ["saso"] });
+  const holding = (...types: string[]): FleetMachine =>
+    mapFleet([
+      row({
+        documentKeys: types.map((type, i) => ({ type, key: `d${i}`, url: `https://x/${type}` })),
+        photoKeys: [{ slot: "front", key: "a", url: "ua" }, { slot: "serial", key: "b", url: "ub" }],
+      }),
+    ])[0];
+  const score = (m: FleetMachine) => computeUnitReadiness(m, sasoAsk.equipCerts, sasoAsk.operatorCerts, sasoAsk.minYear);
+
+  it("the ask still normalises to the one SASO family", () => {
+    expect(sasoAsk.equipCerts).toEqual(["saso"]);
+    expect(readinessInputsFor({ reqEquipmentCerts: ["saso_technical_inspection"] }).equipCerts).toEqual(["saso"]);
+  });
+
+  it("a machine holding ONLY saso_registration does NOT satisfy a requested SASO certificate", () => {
+    const r = score(holding("saso_registration"));
+    expect(r.equipmentCerts).toHaveLength(1);
+    expect(r.equipmentCerts[0].code).toBe("saso");
+    expect(r.equipmentCerts[0].present).toBe(false);
+    // …and the ownership paper is never handed over as the certificate's file to open.
+    expect(r.equipmentCerts[0].url).toBeNull();
+    expect(r.done).toBe(1); // photos only
+    expect(r.total).toBe(2); // photos + the requested SASO cert
+    expect(r.band).toBe("yellow"); // not green — the certificate is genuinely missing
+  });
+
+  it("a machine holding saso_technical_inspection DOES satisfy it", () => {
+    const r = score(holding("saso_technical_inspection"));
+    expect(r.equipmentCerts[0].present).toBe(true);
+    expect(r.equipmentCerts[0].url).toBe("https://x/saso_technical_inspection");
+    expect(r.done).toBe(2);
+    expect(r.band).toBe("green");
+  });
+
+  it("bare `saso` is read as the certificate — the legacy spelling of the same paper", () => {
+    expect(score(holding("saso")).equipmentCerts[0].present).toBe(true);
+  });
+
+  it("holding BOTH satisfies the certificate exactly ONCE — one ask, one scored key", () => {
+    const r = score(holding("saso_registration", "saso_technical_inspection"));
+    expect(r.equipmentCerts).toHaveLength(1);
+    expect(r.equipmentCerts[0].present).toBe(true);
+    expect(r.equipmentCerts[0].url).toBe("https://x/saso_technical_inspection");
+    expect(r.done).toBe(2);
+    expect(r.total).toBe(2);
+    expect(r.band).toBe("green");
+  });
+
+  it("the registration keeps a code of its own — it can never collide with the cert family", () => {
+    expect(canonicalCertCode("saso_registration")).toBe("saso_registration");
+    expect(canonicalCertCode("SASO Registration")).toBe("saso_registration");
+    expect(canonicalCertCode("saso")).toBe("saso");
+    expect(canonicalCertCode("saso_technical_inspection")).toBe("saso");
   });
 });

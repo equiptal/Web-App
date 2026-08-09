@@ -12,6 +12,7 @@
 
 import { describe, expect, it } from "vitest";
 import { mapFleet, type FleetMachine } from "@/lib/contract/fleet";
+import { computeUnitReadiness, readinessInputsFor } from "@/lib/contract/bid-readiness";
 // The company panel's *decisions* are pure functions exported beside the component — which rows may be
 // ticked, what a batch covers, what each saved file is called. Imported as a namespace as well, because
 // "this module exports no request path" is itself one of the claims (RM3-AC-72).
@@ -1386,5 +1387,68 @@ describe("the company panel's batch — download, and only over rows with a file
     // V8 takes an `onRequest` and composes a `PanelRequestDraft`; V9 has no such thing to export, and
     // this is the assertion that fails the day somebody re-adds one.
     expect(exported.filter((n) => /request|ask|compose/i.test(n))).toEqual([]);
+  });
+});
+
+/* ───────── SASO: the registration proves OWNERSHIP, it does not certify the machine ─────────
+ *
+ * Owner's ruling, 2026-08-09: *"`saso_registration` is PROOF OF OWNERSHIP. `saso_technical_inspection`
+ * is the CERTIFICATE."*
+ *
+ * The panel's own vocabulary was already right — `saso_registration` sits in `OWNERSHIP_TYPES` and is
+ * deliberately absent from the `EQUIPMENT_CERT_TYPES` allow-list, so its rows never called the
+ * registration a certificate. The SCORER did not agree: `canonicalCertCode` folded every `saso*` token
+ * into the `saso` family, so on a legacy SASO request the panel showed a **missing, requestable**
+ * certificate row while the readiness bar over it read 100% green off the very same paper. These pin
+ * both halves and, above all, that they now say the same thing.
+ *
+ * (SASO is no longer offerable as an ask on either client, so the fixtures are legacy requests.)
+ */
+describe("SASO — registration vs. certificate on the machine panel (owner's ruling, 2026-08-09)", () => {
+  const SASO_ASK = asking(["saso"]);
+  const rowsOf = (m: FleetMachine) => groupBy(m, SASO_ASK).documents.rows;
+  const find = (m: FleetMachine, key: string) => rowsOf(m).find((r) => r.key === key)!;
+
+  it("saso_registration satisfies PROOF OF OWNERSHIP — it is a real paper and it counts as one", () => {
+    const m = machine({ docs: [{ type: "saso_registration" }] });
+    const ownership = find(m, "doc:ownership");
+    expect(ownership.status).toBe("present");
+    expect(ownership.requestable).toBe(false); // nothing left to chase
+    expect(cellsBy(m, SASO_ASK).ownership.state).toBe("green");
+  });
+
+  it("…and the SASO CERTIFICATE is still missing, and still offered to be asked for", () => {
+    const m = machine({ docs: [{ type: "saso_registration" }] });
+    const cert = find(m, "doc:equipment_cert:saso");
+    expect(cert.status).toBe("missing");
+    // The load-bearing one: the path to fixing the gap must survive the gap.
+    expect(cert.requestable).toBe(true);
+    expect(cellsBy(m, SASO_ASK).equipment_cert.state).toBe("red");
+  });
+
+  it("the row and the readiness bar agree — pre-fix the row read missing while the bar read 100%", () => {
+    const m = machine({ photos: ALL_FOUR, docs: [{ type: "saso_registration" }] });
+    const inputs = readinessInputsFor(SASO_ASK);
+    const r = computeUnitReadiness(m, inputs.equipCerts, inputs.operatorCerts, inputs.minYear);
+    expect(r.equipmentCerts.map((c) => c.code)).toEqual(["saso"]);
+    expect(r.equipmentCerts[0].present).toBe(false);
+    expect(r.percent).not.toBe(100);
+    expect(find(m, "doc:equipment_cert:saso").status).toBe("missing");
+  });
+
+  it("saso_technical_inspection satisfies the CERTIFICATE and is not an ownership paper", () => {
+    const m = machine({ docs: [{ type: "saso_technical_inspection" }] });
+    expect(find(m, "doc:equipment_cert:saso").status).toBe("present");
+    expect(find(m, "doc:ownership").status).toBe("missing");
+    expect(find(m, "doc:ownership").requestable).toBe(true);
+  });
+
+  it("holding BOTH clears both — one ownership row, one certificate row, each satisfied once", () => {
+    const m = machine({ docs: [{ type: "saso_registration" }, { type: "saso_technical_inspection" }] });
+    expect(rowsOf(m).filter((r) => r.key.startsWith("doc:equipment_cert:"))).toHaveLength(1);
+    expect(find(m, "doc:ownership").status).toBe("present");
+    expect(find(m, "doc:equipment_cert:saso").status).toBe("present");
+    // The registration is not ALSO filed as a stray `doc:other:*` row.
+    expect(rowsOf(m).some((r) => r.key.startsWith("doc:other:"))).toBe(false);
   });
 });

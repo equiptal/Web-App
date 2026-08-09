@@ -128,10 +128,22 @@ export function requestedOperatorCertKinds(raw: string | null | undefined): stri
  * `requestedOperatorCertKinds` and match the machine's raw document type exactly, because that is what
  * the app does. Widening this function to serve both is how the two families start borrowing each
  * other's verdicts.
+ *
+ * ⚠️ **`saso_registration` is not a SASO certificate.** Owner's ruling, 2026-08-09:
+ * *"`saso_registration` is PROOF OF OWNERSHIP. `saso_technical_inspection` is the CERTIFICATE."*
+ * The `startsWith("saso")` test used to swallow the ownership paper into the certificate family, so a
+ * machine holding only its registration scored a held SASO safety certificate it does not have. It now
+ * keeps its own code — one no request ever asks for (`options.ts` does not offer SASO at all any more),
+ * so it matches nothing on the cert side and stays classified as ownership everywhere it already was:
+ * `eqDocTypeToCert` (bids.ts, exact-match, always correct) and `OWNERSHIP_TYPES`
+ * (machine-panel-model.ts). Bare `saso` stays the CERTIFICATE — no upload path emits it (a fresh
+ * certificate files as `saso_technical_inspection`), but it is the spelling legacy SASO *requests*
+ * carry, so it has to keep resolving to the family or those asks would silently stop being scored.
  */
 export function canonicalCertCode(x: string): string {
   const t = x.trim().toLowerCase().replace(/[\s-]+/g, "_").replace(/^operator_/, "");
   if (t.startsWith("aramco")) return "aramco";
+  if (t === "saso_registration") return "saso_registration"; // ownership paper — MUST precede the prefix test
   if (t.startsWith("saso")) return "saso"; // saso, saso_technical_inspection → saso family
   if (t === "tüv") return "tuv";
   return t;
