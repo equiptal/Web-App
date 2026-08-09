@@ -186,7 +186,13 @@ halo and an in-offer tag — and **no detail opens**. The renter is oriented, no
 4. **the match grid — the main content.** Six cells against *this request*: year & manufacturer ·
    attachments · equipment photos · proof of ownership · equipment certificate · operator certificates.
 - Each cell reads **green** (satisfied), **grey** (not required) or **red** (missing) and **states its
-  actual finding** — "3 of 4 uploaded", "on the machine's file", "not on the file".
+  actual finding** — ~~"3 of 4 uploaded"~~ **"2 of 2 uploaded"**, "on the machine's file", "not on the file".
+- **Corrected 2026-08-09 — the photo cell scores over the REQUIRED slots only** (`front` + plate), so its
+  denominator is **2**. ~~"3 of 4"~~ contradicted V8 below, which says the count is **never "of 4"**
+  (AC-74), and produced two disagreeing numbers on one screen: front + plate with no meter shot read
+  *"nothing outstanding"* in the documents tab and **red, "2 of 4"** in this cell. The owner ruled the
+  cell follows the group; `photosCell` (`machine-panel-model.ts:354`) reads `REQUIRED_PHOTO_SLOTS`.
+  Spec 004 §6.5's "survives §6.6 unchanged" note is struck there for the same reason.
 - **Given** the detail **When** it renders **Then** it answers *"does this machine fit my request"*, not
   *"what is this machine"* — no specification dump.
 
