@@ -4,6 +4,9 @@
  * rentee party. Live chat runs over GetStream (channel = streamChannelId; token via stream-token).
  */
 import { computeRentalTotal, rentalDivisor, VAT_RATE } from "@/lib/pricing/rental";
+// Type-only — the deal-room quotation BUILDER lives here (pure, testable in the node suite); the
+// rendering itself stays in the shared template module.
+import type { QuotationDoc, QuotationLineItem, QuotationCard } from "@/lib/quotation/render";
 
 export type DealRoomStatus = "OPEN" | "NEGOTIATING" | "AWAITING_SUPPLIER_CONFIRMATION" | "CLOSED" | "ABANDONED" | string;
 
@@ -166,6 +169,29 @@ function mapDoc(raw: Record<string, unknown>): DealRoomDocument {
  * fresh presigned download link. `pdfStatus` is `PENDING` while the PDF is still being generated
  * (the app polls until it's ready), then ready.
  */
+/** Terms the APP hides from EVERY deal-room term surface (`kHiddenDealRoomTermKeys`) — hidden here for
+ *  parity so the web never renders rows / phantom conflicts the app suppresses. PRICE + mob/demob
+ *  PRICING are priced line items (settled on the counter Price page); the rest are handled elsewhere or
+ *  RETIRED on the deal-room surface (certs, operator nationality, payment method, offer duration, the
+ *  legacy combined `fat`, mobilization lead time, fulfillment type, required attachments).
+ *
+ *  ⚠ Applied at PARSE on BOTH payloads, exactly as the app applies it. `Quotation.agreedTerms` was
+ *  snapshotted at close and is never rewritten, so every deal closed BEFORE the retirement still carries
+ *  `operator_nationality` and `safety_certifications` in its snapshot. Filtering only the live room left
+ *  the web printing those two on the quotation while the app printed neither — one contract, two
+ *  documents. */
+export const HIDDEN_DEAL_ROOM_TERM_KEYS = new Set<string>([
+  "PRICE", "mobilization_pricing", "demobilization_pricing",
+  "fulfillment_type", "required_attachments", "mobilization_lead_time",
+  "operator_nationality", "operator_certification", "safety_certifications",
+  "fat", "payment_method", "offer_duration",
+]);
+
+/** Case-insensitive membership, matching the app's `kHiddenDealRoomTermKeys.contains(k.toLowerCase())`,
+ *  so a payload that cases a key differently can't smuggle a retired term onto the paper. */
+export const isHiddenDealRoomTermKey = (key: string): boolean =>
+  HIDDEN_DEAL_ROOM_TERM_KEYS.has(key) || HIDDEN_DEAL_ROOM_TERM_KEYS.has(key.toLowerCase());
+
 /** One agreed term snapshotted on the confirmed Quotation row (backend `agreedTerms` JSON). */
 export interface QuotationTerm {
   key: string;
@@ -202,17 +228,44 @@ export function mapQuotation(raw: unknown): QuotationView {
     agreedRate: n(q.agreedRate),
     priceUnit: s(q.priceUnit),
     contractType: s(q.contractType),
-    agreedTerms: agreedTermsRaw.map((t) => ({
-      key: s(t.key) ?? "",
-      label: s(t.label) ?? s(t.key) ?? "",
-      labelAr: s(t.labelAr) ?? s(t.label) ?? "",
-      value: t.value,
-    })),
+    // Retired/hidden keys are stripped HERE, at parse, the way the app strips them
+    // (`DealRoomModel.fromJson`). The snapshot is frozen at close, so a deal closed before the
+    // retirement still carries them in its JSON — this filter is what stops one contract rendering two
+    // different documents on the two surfaces.
+    agreedTerms: agreedTermsRaw
+      .map((t) => ({
+        key: s(t.key) ?? "",
+        label: s(t.label) ?? s(t.key) ?? "",
+        labelAr: s(t.labelAr) ?? s(t.label) ?? "",
+        value: t.value,
+      }))
+      .filter((t) => !isHiddenDealRoomTermKey(t.key)),
     renteePhone: s(q.renteePhone),
     supplierPhone: s(q.supplierPhone),
     renteeEmail: s(q.renteeEmail),
     supplierEmail: s(q.supplierEmail),
   };
+}
+
+/**
+ * WHEN the rentee's quotation link shows, and WHICH document it is (app parity —
+ * `quotation_button.dart`, pinned below the deal room's chat composer).
+ *
+ * Available at EVERY status except ABANDONED (an abandoned room has no deal to quote); no verification
+ * and no tier gate. The two labels are the whole point of the distinction:
+ *
+ *   • CLOSED → `final`. The deal is signed.
+ *   • before → `preview`. **An agreed price is not a closed deal** — the supplier still has to confirm.
+ *     An unlabelled "quotation" mid-negotiation is how a rentee concludes the deal is done and stops
+ *     chasing it, so the label has to carry that on its own.
+ *
+ * The web used to offer the quotation only once CLOSED, on both entry points.
+ */
+export type QuotationLinkKind = "preview" | "final";
+
+export function quotationLinkKind(status: DealRoomStatus): QuotationLinkKind | null {
+  if (status === "ABANDONED") return null;
+  return status === "CLOSED" ? "final" : "preview";
 }
 
 export function mapDealRoomDocuments(raw: unknown): DealRoomDocuments {
@@ -293,17 +346,6 @@ export function computeDealTotals(
   return { rate, priceUnit, perDayRate, rentalUnits, mobUnitsN, demobUnitsN, mobPrice, demobPrice, mobExcluded, demobExcluded, periods, hasDuration, periodCount: periods / dpp, rentalTotal, mobTotal, demobTotal, subtotal, vat, grand };
 }
 
-/** Terms the APP hides from the deal-room table (deal_room_models hidden keys) — hidden here for parity
- *  so the web never renders rows / phantom conflicts the app suppresses. PRICE + mob/demob PRICING are
- *  priced line items (settled on the counter Price page); the rest are handled elsewhere or retired on
- *  the deal-room surface (certs, operator nationality, payment method, offer duration, fat, lead time). */
-const HIDDEN_DEAL_ROOM_TERM_KEYS = new Set<string>([
-  "PRICE", "mobilization_pricing", "demobilization_pricing",
-  "fulfillment_type", "required_attachments", "mobilization_lead_time",
-  "operator_nationality", "operator_certification", "safety_certifications",
-  "fat", "payment_method", "offer_duration",
-]);
-
 export function mapDealRoom(raw: unknown): DealRoomView {
   const d = (raw ?? {}) as Record<string, unknown>;
   const sup = (d.supplier ?? {}) as Record<string, unknown>;
@@ -324,7 +366,7 @@ export function mapDealRoom(raw: unknown): DealRoomView {
   // legacy combined `fat`, mobilization lead time, fulfillment type, required attachments). This matches
   // the app 1:1 so the web never shows extra rows or a phantom `fat`/cert conflict.
   const terms: DealTerm[] = rawTerms
-    .filter((t) => !HIDDEN_DEAL_ROOM_TERM_KEYS.has(s(t.key) ?? ""))
+    .filter((t) => !isHiddenDealRoomTermKey(s(t.key) ?? ""))
     .map((t) => ({
       key: s(t.key) ?? "",
       label: s(t.label) ?? s(t.key) ?? "",
@@ -435,5 +477,224 @@ export function mapDealRoom(raw: unknown): DealRoomView {
     hasDisputedTerms,
     supplierFirstEntry: d.supplierFirstEntry === true,
     details,
+  };
+}
+
+// ── The deal-room quotation document ────────────────────────────────────────────────────────────────
+
+/** Cost-responsibility terms — they render in the price section (`priceExtras`), not as term rows. */
+const COST_TERM_KEYS = new Set([
+  "fuel", "maintenance", "overtime", "overtime_rate", "operator_food", "fat_food",
+  "operator_transport_accommodation", "fat_accommodation_transport", "operator_transport",
+]);
+
+/** Four ACKNOWLEDGE terms are not facts of their own: the backend fills them straight from the request
+ *  columns the "Rental & equipment details" card already prints — `working_hours` ← workingHoursPerDay,
+ *  `working_days` ← workingDaysPerWeek, `local_content` ← localContent, and `crosshire` ← **subletting**
+ *  (`deal-room.service.ts`: "`subletting` in schema ↔ `crosshire` in canonical term-key map").
+ *  Printing them as term rows as well put each fact on the paper twice — and the subletting one twice
+ *  under two different names: "Subletting" in one card and "Crosshire" in the other, from one field.
+ *  The DETAILS card owns them. Its labels carry the unit ("Working hours/day"), it uses the rentee's own
+ *  word for the field, and the rest of the request's facts are already there. The term cards drop them. */
+const DETAILS_OWNED_TERM_KEYS = new Set(["working_hours", "working_days", "local_content", "crosshire"]);
+
+const nfQ = (v: number) => Math.round(v).toLocaleString("en-US");
+
+/**
+ * The deal-room quotation document — built LIVE off the room, the way the app builds it.
+ *
+ * The app's quotation link (`quotation_button.dart` -> `bid_quotation_page.dart`) re-fetches and
+ * re-renders on every open; no snapshot is in the path at all. The web's was a HYBRID: the rate, the
+ * price unit, the contract type and the whole terms list came off the frozen `Quotation` row while
+ * everything else came off the live room. That broke in two directions — the snapshot does not exist
+ * before the deal closes (so no preview was possible at all), and it still carries terms that have since
+ * been retired (so a pre-retirement deal printed rows the app doesn't). Everything the app reads live is
+ * now read live:
+ *
+ *   agreedRate    -> `room.rate`            (lastProposedRate ?? bid.priceAmount — what the bar shows)
+ *   priceUnit     -> `room.priceUnit`
+ *   contractType  -> `room.contractType`
+ *   agreedTerms   -> `room.terms`           (already parse-filtered; the states mirror the rule the
+ *                                            backend snapshots by at close: agreed|soft_accepted|fixed)
+ *   renteePhone   -> `/api/me`.phone        (passed in as `rentee`)
+ *   renteeEmail   -> `/api/me`.email
+ *   supplierPhone -> `room.supplier.phone`  (the deal-room payload always carries it)
+ *
+ * `q` is therefore OPTIONAL, and supplies only what has no live source anywhere: the formal quotation
+ * number (the Quotation row's id, which exists only once the deal closes) and the supplier's e-mail.
+ * Pass `null` for a preview — `GET /api/deal-rooms/{id}/quotation` 404s until the deal is closed.
+ */
+export function buildDealRoomQuotationDoc(
+  room: DealRoomView,
+  /** The confirmed Quotation row, when one exists. `null` for every pre-close preview. */
+  q: QuotationView | null,
+  /** The signed-in rentee, from `/api/me` — the live source for the buyer block. */
+  rentee: { name: string; phone?: string | null; email?: string | null },
+  ar: boolean,
+  L: (en: string, arr: string) => string,
+  opts?: { logoUrl?: string },
+): QuotationDoc {
+  const lang = ar ? "ar" : "en";
+  const sar = L("SAR", "ر.س");
+  const kind = quotationLinkKind(room.status) ?? "preview";
+
+  // EXACT same math as the live price bar — no snapshot override, so the paper always carries the
+  // number the renter is looking at in the room.
+  const t = computeDealTotals(room);
+  const rate = t.rate;
+  const unit = t.priceUnit;
+  const units = t.rentalUnits;
+  const days = room.periods;
+  const periodLabel = unit === "PER_WEEK" ? L("week", "أسبوع") : unit === "PER_MONTH" ? L("month", "شهر") : unit === "PER_JOB" ? L("job", "مهمة") : L("day", "يوم");
+  const dateStr = new Date().toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
+  // The Quotation row's id is the only formal reference this document has, and it exists only once the
+  // deal closes. A preview falls back to the request's short code — the reference the rentee already
+  // knows the room by — rather than printing a blank.
+  const qnum = (q?.quotationNumber ?? "").slice(0, 8).toUpperCase() || room.shortCode || "—";
+  const contractType = room.contractType;
+
+  const valFmt = (v: unknown): string => {
+    if (v == null || v === "") return "—";
+    if (Array.isArray(v)) return v.length ? v.map(String).join(", ") : "—";
+    if (typeof v === "boolean") return v ? L("Yes", "نعم") : L("No", "لا");
+    const x = String(v).toLowerCase();
+    if (x === "supplier") return L("Supplier", "المؤجّر");
+    if (x === "rentee" || x === "renter") return L("Rentee", "المستأجر");
+    if (x === "true" || x === "included" || x === "yes") return L("Yes", "نعم");
+    if (x === "false" || x === "excluded" || x === "not_included" || x === "no") return L("No", "لا");
+    return String(v);
+  };
+
+  // Invoice line items (rental + delivery + return) — the SAME 6-column table as the bid-card quotation.
+  const lineItems: QuotationLineItem[] = [];
+  // Rental qty/price columns mirror the live price bar's factor logic: PER_JOB -> units jobs; a whole
+  // period count -> "N × units"; a partial (day-count) duration -> effective per-day rate × days.
+  const factorInt = Number.isInteger(t.periodCount) ? t.periodCount : null;
+  const partial = unit !== "PER_JOB" && t.hasDuration && factorInt == null;
+  const rentalQty = unit === "PER_JOB"
+    ? String(units)
+    : partial
+      ? `${room.periods} ${L("days", "يوم")}${units > 1 ? ` × ${units}` : ""}`
+      : `${factorInt ?? 1}${units > 1 ? ` × ${units}` : ""}`;
+  lineItems.push({
+    num: 1, label: L("Rental", "الإيجار"), detail: room.supplier.name,
+    unit: partial ? L("day", "يوم") : periodLabel,
+    qty: rentalQty,
+    price: partial ? `${nfQ(Math.round(t.perDayRate))} / ${L("day", "يوم")}` : `${nfQ(rate)} / ${periodLabel}`,
+    total: nfQ(t.rentalTotal),
+  });
+  // Mob/demob are ALWAYS shown; each honours its OWN unit count + exclusion (excluded -> "Not included",
+  // matching the price bar, which contributes 0 for an excluded leg).
+  const logiRow = (label: string, excluded: boolean, price: number, unitsN: number, lineTotal: number, byRentee: boolean): QuotationLineItem =>
+    excluded
+      ? { num: null, label, detail: L("Not included", "غير مشمول"), unit: "—", qty: "—", price: "—", total: L("Not included", "غير مشمول") }
+      : price > 0
+        ? { num: null, label, detail: room.supplier.name, unit: L("Trip", "رحلة"), qty: String(unitsN), price: nfQ(price), total: nfQ(lineTotal) }
+        : { num: null, label, detail: byRentee ? L("Arranged by the rentee", "يُرتّبه المستأجر") : L("Included", "مشمول"), unit: "—", qty: "—", price: "—", total: byRentee ? L("By rentee", "على المستأجر") : L("Included", "مشمول") };
+  lineItems.push(logiRow(L("Delivery to site", "النقل إلى الموقع"), t.mobExcluded, t.mobPrice, t.mobUnitsN, t.mobTotal, room.mobByRentee === true));
+  lineItems.push(logiRow(L("Return from site", "الإرجاع من الموقع"), t.demobExcluded, t.demobPrice, t.demobUnitsN, t.demobTotal, room.demobByRentee === true));
+
+  const cards: QuotationCard[] = [];
+  // Structured rental/equipment details (from the request item) — rows with no value are skipped.
+  // Operator/safety + cost responsibilities are NOT separate cards: they flow through the term cards +
+  // the price extras below, matching the app.
+  const dd = room.details;
+  const yn = (b: boolean | null) => (b == null ? null : b ? L("Yes", "نعم") : L("No", "لا"));
+  const fmtDate = (v: string | null) => { if (!v) return null; const dt = new Date(v); return isNaN(dt.getTime()) ? v : dt.toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" }); };
+  const addRow = (rowsArr: { label: string; value: string }[], label: string, v: unknown) => {
+    if (v == null || v === "" || (Array.isArray(v) && !v.length)) return;
+    rowsArr.push({ label, value: Array.isArray(v) ? v.join(", ") : String(v) });
+  };
+  const detailRows: { label: string; value: string }[] = [];
+  addRow(detailRows, L("Equipment", "المعدة"), ar ? dd.equipmentLabelAr ?? dd.equipmentLabel : dd.equipmentLabel);
+  addRow(detailRows, L("Location", "الموقع"), dd.location);
+  addRow(detailRows, L("Rental type", "نوع الإيجار"), dd.rentalType);
+  addRow(detailRows, L("Contract type", "نوع العقد"), contractType);
+  addRow(detailRows, L("Start date", "تاريخ البدء"), fmtDate(dd.startDate));
+  addRow(detailRows, L("End date", "تاريخ الانتهاء"), fmtDate(dd.endDate));
+  addRow(detailRows, L("Duration", "المدة"), days != null ? `${days} ${L("days", "يوم")}` : null);
+  // These four rows are the ONLY print of their fact — the matching ACKNOWLEDGE terms
+  // (working_hours / working_days / local_content / crosshire) are dropped from the term cards below.
+  addRow(detailRows, L("Working hours/day", "ساعات العمل/يوم"), dd.workingHoursPerDay);
+  addRow(detailRows, L("Working days/week", "أيام العمل/أسبوع"), dd.workingDaysPerWeek);
+  addRow(detailRows, L("Fulfillment", "التنفيذ"), dd.fulfillment);
+  addRow(detailRows, L("Urgency", "الأولوية"), dd.urgency);
+  addRow(detailRows, L("Subletting", "التأجير من الباطن"), yn(dd.subletting));
+  addRow(detailRows, L("Local content", "المحتوى المحلي"), yn(dd.localContent));
+  addRow(detailRows, L("Rental extendable", "قابل للتمديد"), yn(dd.extendable));
+  addRow(detailRows, L("Additional notes", "ملاحظات إضافية"), dd.additionalNotes);
+  if (detailRows.length) cards.push({ title: L("Rental & equipment details", "تفاصيل الإيجار والمعدة"), rows: detailRows });
+
+  // Price extras (app parity): overtime rate + cost-responsibility terms ("fuel -> supplier"). Read from
+  // the LIVE room only — the second loop over the snapshot's copy went with the rest of the hybrid.
+  const isCost = (k: string) => COST_TERM_KEYS.has(k);
+  const priceExtras: { label: string; value: string }[] = [];
+  if (dd.overtimeRate) priceExtras.push({ label: L("Overtime rate", "سعر العمل الإضافي"), value: /^\d+(\.\d+)?$/.test(dd.overtimeRate) ? `${dd.overtimeRate}x` : dd.overtimeRate });
+  const seenCost = new Set<string>();
+  for (const term of room.terms) {
+    if (!isCost(term.key) || seenCost.has(term.key)) continue;
+    seenCost.add(term.key);
+    priceExtras.push({ label: ar ? term.labelAr : term.label, value: valFmt(term.value ?? term.platformDefault) });
+  }
+
+  // Term cards, LIVE. The states mirror the rule the backend snapshots by at close
+  // (`agreed | fixed | soft_accepted`), so a closed deal prints the rows it always did — it just reads
+  // them from the room instead of from the frozen copy.
+  const termRows = (pred: (term: DealTerm) => boolean) =>
+    room.terms
+      .filter((term) => pred(term) && !isCost(term.key) && !DETAILS_OWNED_TERM_KEYS.has(term.key))
+      .map((term) => ({ label: ar ? term.labelAr : term.label, value: valFmt(term.value ?? term.platformDefault) }));
+  const agreedRows = termRows((term) => term.state === "agreed" || term.state === "soft_accepted");
+  if (agreedRows.length) cards.push({ title: L("Agreed terms", "الشروط المتفق عليها"), rows: agreedRows });
+  const fixedRows = termRows((term) => term.state === "fixed");
+  if (fixedRows.length) cards.push({ title: L("Fixed terms", "الشروط الثابتة"), rows: fixedRows });
+
+  return {
+    lang,
+    title: L("Equipment rental quotation", "عرض سعر تأجير معدات"),
+    quotationNumber: qnum,
+    dateStr,
+    supplier: {
+      label: L("Supplier", "المؤجِّر"),
+      name: room.supplier.name,
+      idRows: [
+        { label: L("National Address", "العنوان الوطني"), verified: room.supplier.isVerified },
+        { label: L("CR #", "س.ت"), verified: room.supplier.isVerified },
+        { label: L("VAT #", "ض.ق.م"), verified: room.supplier.isVerified },
+        // Live — the deal-room payload always carries the supplier's phone; the snapshot only backstops.
+        { label: L("Phone", "الهاتف"), value: room.supplier.phone ?? q?.supplierPhone ?? null },
+        // SNAPSHOT-ONLY: nothing on the live room payload carries the supplier's e-mail, so a preview
+        // omits the row rather than inventing one.
+        { label: L("Email", "البريد"), value: q?.supplierEmail ?? null },
+      ],
+      // Verified shows on the CR/VAT rows ("✓ Verified") — no standalone orphan party chip.
+      chips: [],
+    },
+    rentee: {
+      label: L("Rentee", "المُستأجِر"),
+      name: rentee.name,
+      idRows: [
+        { label: L("Phone", "الهاتف"), value: rentee.phone ?? q?.renteePhone ?? null },
+        { label: L("Email", "البريد"), value: rentee.email ?? q?.renteeEmail ?? null },
+      ],
+      chips: [],
+    },
+    logoUrl: opts?.logoUrl,
+    meta: [], // no meta strip (app parity) — reference/contract/period live in the details card
+    priceExtras,
+    lineItems,
+    currency: sar,
+    totals: { subtotal: t.subtotal, vat: t.vat, total: t.grand },
+    cards,
+    showSigned: false,
+    // Short disclaimer instead of the full legal clause list + signed block (app parity).
+    legal: [
+      // A preview says so ON the paper, in the app's own words (`dealViewQuotationDraftHint`). The link
+      // label alone doesn't survive a print-out or a forward.
+      ...(kind === "preview"
+        ? [L("Draft — reflects the current offer, final once the supplier confirms.", "مسودة — تعكس العرض الحالي، وتُعتمد بعد تأكيد المورد.")]
+        : []),
+      L("This quotation is generated electronically via Moedatech, valid for 7 days from the issue date. Prices exclude anything not listed above; VAT at 15% applies per Saudi tax law.", "صدر هذا العرض إلكترونيًا عبر منصة معداتك، وهو ساري المفعول لمدة ٧ أيام من تاريخ الإصدار. الأسعار لا تشمل ما لم يُذكر أعلاه، وتُطبَّق ضريبة القيمة المضافة بنسبة ١٥٪ وفقًا للنظام السعودي."),
+    ],
   };
 }
