@@ -11,6 +11,7 @@ import { EquipImg, equipmentIcon } from "@/components/requests/EquipImg";
 import { groupIdFromFileName, itemCodesFromFileName, primaryCodeFromFileName } from "@/lib/compare/quotation-token";
 import "@/components/requests/requests-proto.css";
 import "@/components/compare/compare-proto.css";
+import { computeBidQuote } from "@/lib/contract/comparison";
 
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
 
@@ -144,12 +145,11 @@ export function CompareBids() {
   const allItems = okGroups.flatMap((d) => d.items);
   const bidsByItem: Record<string, BidCard[]> = Object.assign({}, ...okGroups.map((d) => d.bidsByItem));
 
-  const lineTotal = (it: RequestListItem, b: BidCard) => {
-    const dur = b.duration ?? it.durationDays ?? 1;
-    const units = it.item?.qty ?? 1; // app rule: bid price is per-unit → multiply by quantity
-    const sub = (b.price ?? 0) * dur * units + (b.mobPrice ?? 0) + (b.demobPrice ?? 0);
-    return sub + Math.round(sub * 0.15);
-  };
+  // Priced through the shared quote helper — the same one the request's own bid list and the comparison
+  // workspace use. This used to be `rate × days × units`, with NO divisor: a 4,200/week bid over 13 days
+  // came out at 54,600 instead of 7,700, so the cross-quotation basket ranked bids on invented money.
+  const lineTotal = (it: RequestListItem, b: BidCard) =>
+    computeBidQuote(b, { units: it.item?.qty ?? 1, fallbackDays: it.durationDays ?? null, startDate: it.startDate ?? null }).total;
   const offersFor = (it: RequestListItem): Offer[] => (bidsByItem[it.id] ?? []).map((b) => ({ bid: b, total: lineTotal(it, b) }));
   const selItem = allItems.find((i) => i.id === selKey) ?? allItems[0] ?? null;
 

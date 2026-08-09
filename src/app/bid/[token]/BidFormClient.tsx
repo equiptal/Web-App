@@ -5,7 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { fetchBidFormData, submitBidForm, ApiError, type BidUploadedFile } from "@/lib/api/client";
 import type { BidFormData, BidFormItem, BidPhotoKind, BidDocKind, CompanyDocKind, LinkBidConfirmations } from "@/lib/contract/link-bids";
 import { CERT_TERM_KEYS, certCodesFromValue, certConfKey, prettyCert } from "@/lib/contract/link-bids";
-import { buildSubmissionNotes, priceToStore } from "@/lib/contract/vat-inclusive";
+import { buildSubmissionNotes, priceToStore, VAT_RATE } from "@/lib/contract/vat-inclusive";
+import { computeQuoteTotals, computeRentalTotal, durationDaysBetween, rentalDivisor, rentalPeriodSubtitle } from "@/lib/pricing/rental";
 import { FileUploader, type UploaderKind } from "@/components/bid/FileUploader";
 import { QualityRing } from "@/components/bid/QualityRing";
 import { computeBidQuality } from "@/lib/contract/bid-quality";
@@ -79,6 +80,17 @@ const UNIT_LABEL: Record<string, [string, string]> = {
   PER_DAY: ["day", "يوم"], PER_WEEK: ["week", "أسبوع"], PER_MONTH: ["month", "شهر"], PER_JOB: ["job", "مهمة"],
 };
 const num = (v: string) => (v.trim() && Number.isFinite(Number(v)) ? Number(v) : 0);
+// The fixed-divisor assumption behind a weekly/monthly rate, shown next to the billable-day count so the
+// supplier can see how their rate became the period total. Mirrors the app's `rentalPeriodSubtitle`;
+// daily and per-job rates have no divisor to explain, so they get nothing.
+const periodNote = (unit: string | null | undefined, ar: boolean): string => {
+  const p = rentalPeriodSubtitle(unit);
+  if (!p) return "";
+  const d = rentalDivisor(unit);
+  return ar
+    ? ` · ${d} ${p === "weekly" ? "أيام عمل/أسبوع" : "يوم عمل/شهر"}`
+    : ` · ${d} working days/${p === "weekly" ? "week" : "month"}`;
+};
 
 // The supplier "Quote valid until" field. Enabled now that the link_bid_submissions.valid_until
 // migration (20260629000000) is on staging and the submit handler persists it end-to-end.
@@ -288,17 +300,43 @@ export default function BidFormClient({ token }: { token: string }) {
     window.scrollTo(0, 0);
   };
 
-  // Returns the NET (before-VAT) item subtotal. When the supplier priced VAT-inclusive, strip the 15%
-  // back out so the ×1.15 downstream reproduces exactly the gross they typed.
-  const itemSubtotal = (it: BidFormItem, a?: Answer) => {
-    if (!a) return 0;
-    const q = offeredQty(it, a); // price the units actually offered (partial bid)
-    const gross = (num(a.rentalRate) + num(a.deliveryPrice) + num(a.returnPrice)) * q;
-    return vatIncluded ? gross / 1.15 : gross;
+  // The request's rental window. The supplier quotes a RATE ("30,000 per month"); what they'll actually
+  // invoice is that rate prorated over the job's real length, so the form needs the period the renter
+  // set. Both dates already ride the bid-form payload — no backend change was needed to price this.
+  // Null (open-ended request, or no end date) → `computeRentalTotal` falls back to the raw rate.
+  const durationDays = durationDaysBetween(data?.projectTerms?.startDate, data?.projectTerms?.endDate);
+  const startDate = data?.projectTerms?.startDate ?? null;
+
+  /**
+   * One item's money, through the SAME module the renter's bid card, deal room and quotation price
+   * against (`@/lib/pricing/rental`) — so the number the supplier commits to here is the number the
+   * renter sees there. Before this, the form did `(rate + delivery + return) × qty` and never looked at
+   * the calendar, which is why the same off-platform bid read one way on this page and another way in
+   * the renter's comparison.
+   *
+   * Rental prorates — `(rate ÷ divisor) × billableDays`, Fridays excluded — while the two transport
+   * legs stay flat: a delivery run is a trip, not a period. VAT-inclusive entry strips the 15% off the
+   * inputs first, so proration and the ×1.15 downstream land back exactly on the gross they typed
+   * (the arithmetic is linear, so stripping before or after is identical — before is just clearer).
+   */
+  const itemPricing = (it: BidFormItem, a?: Answer) => {
+    const units = offeredQty(it, a); // price the units actually offered (partial bid)
+    const strip = (v: number) => (vatIncluded ? v / 1.15 : v);
+    const rate = strip(num(a?.rentalRate ?? ""));
+    const rental = computeRentalTotal({ rate, priceUnit: it.priceUnit, startDate, durationDays });
+    const totals = computeQuoteTotals({
+      perUnitRental: rental.total,
+      rentalUnits: units,
+      // Legs are only the supplier's when the renter said so; otherwise there is no price to add.
+      mob: { amount: (it.deliveryBy || "").toLowerCase() === "supplier" ? strip(num(a?.deliveryPrice ?? "")) : 0 },
+      demob: { amount: (it.returnBy || "").toLowerCase() === "supplier" ? strip(num(a?.returnPrice ?? "")) : 0 },
+    });
+    return { units, rental, ...totals };
   };
+
   const grand = useMemo(
-    () => (data?.items ?? []).filter((it) => !isExcluded(it)).reduce((s, it) => s + itemSubtotal(it, answers[it.requestItemId]) * 1.15, 0),
-    [data, answers, vatIncluded, skipped],
+    () => (data?.items ?? []).filter((it) => !isExcluded(it)).reduce((s, it) => s + itemPricing(it, answers[it.requestItemId]).overall.total, 0),
+    [data, answers, vatIncluded, skipped, durationDays, startDate],
   );
 
   // Company name + contact are the required identity; CR / VAT / National Address are optional and can
@@ -575,7 +613,11 @@ export default function BidFormClient({ token }: { token: string }) {
             const fullyCovered = isFullyCovered(it); // remaining ≤ 0 → nothing left to bid on
             const oq = offeredQty(it, a); // units this line offers (1..remaining)
             const unit = it.priceUnit ? (ar ? UNIT_LABEL[it.priceUnit]?.[1] : UNIT_LABEL[it.priceUnit]?.[0]) ?? it.priceUnit : L("unit", "وحدة");
-            const sub = itemSubtotal(it, a);
+            const pr = itemPricing(it, a);
+            // The table's price column is whatever basis the supplier chose (net or VAT-inclusive), so its
+            // Total column must match — `itemPricing` works in net, so scale back up when they typed gross.
+            const vatMul = vatIncluded ? 1.15 : 1;
+            const sub = pr.overall.subtotal;
             const line = (v: string) => (num(v) ? num(v) * oq : 0);
             // Supplier prices delivery/return ONLY when they handle it; if the renter does, no price row.
             const delBySup = (it.deliveryBy || "").toLowerCase() === "supplier";
@@ -691,10 +733,20 @@ export default function BidFormClient({ token }: { token: string }) {
                   <thead><tr><th>{L("Item", "البند")}</th><th className="num">{L("Unit", "الوحدة")}</th><th className="num">{L("Qty", "العدد")}</th><th className="num">{vatIncluded ? L("Price (incl. VAT)", "السعر (شامل الضريبة)") : L("Your price", "سعرك")}</th><th className="num">{L("Total", "الإجمالي")}</th></tr></thead>
                   <tbody>
                     <tr>
-                      <td><div className="it-lbl">{L("Rental", "الإيجار")}<span className="reqx"> *</span></div></td>
+                      <td>
+                        <div className="it-lbl">{L("Rental", "الإيجار")}<span className="reqx"> *</span></div>
+                        {/* How the quoted RATE becomes the period total — shown only when there's a period
+                            to prorate over. Without it the jump from "30,000" to "122,308" is unexplained. */}
+                        {!pr.rental.raw && (
+                          <div className="it-sub2">{L(
+                            `${pr.rental.billable} billable days${periodNote(it.priceUnit, false)}`,
+                            `${pr.rental.billable} يوم محتسب${periodNote(it.priceUnit, true)}`,
+                          )}</div>
+                        )}
+                      </td>
                       <td className="num">{unit}</td><td className="num">{oq}</td>
                       <td className="num"><input className={`ptbl-in${showErrors && num(a?.rentalRate ?? "") <= 0 ? " invalid" : ""}`} inputMode="numeric" value={a?.rentalRate ?? ""} onChange={(e) => setPrice(it.requestItemId, "rentalRate", e.target.value)} placeholder="0" /></td>
-                      <td className="num tot">{num(a?.rentalRate ?? "") ? nf(line(a!.rentalRate)) : "—"}</td>
+                      <td className="num tot">{num(a?.rentalRate ?? "") ? nf(pr.overall.rental * vatMul) : "—"}</td>
                     </tr>
                     {/* Delivery/Return are always shown. When the RENTER handles them, they're read-only
                         (no price input) — the supplier just sees the renter is responsible. */}
@@ -716,9 +768,19 @@ export default function BidFormClient({ token }: { token: string }) {
                     </tr>
                   </tbody>
                 </table></div>
+                {/* Why the rental total isn't just the rate — the single most surprising number on this
+                    page. Only shown once the request actually has a period (open-ended → raw rate). */}
+                {!pr.rental.raw && data.projectTerms?.startDate && (
+                  <div className="ro-hint" style={{ marginTop: -2 }}>
+                    {L(
+                      `${fmtDate(data.projectTerms.startDate)} – ${data.projectTerms.endDate ? fmtDate(data.projectTerms.endDate) : ""} · ${durationDays} days, Fridays excluded → ${pr.rental.billable} billable days. Your price per ${unit} is charged pro rata over them.`,
+                      `${fmtDate(data.projectTerms.startDate)} – ${data.projectTerms.endDate ? fmtDate(data.projectTerms.endDate) : ""} · ${durationDays} يوماً، باستثناء أيام الجمعة ← ${pr.rental.billable} يوم محتسب. يُحتسب سعرك بالتناسب عليها.`,
+                    )}
+                  </div>
+                )}
                 <div className="itot">
                   <span className="r">{vatIncluded ? L("Net (before VAT)", "الصافي (قبل الضريبة)") : L("Subtotal", "المجموع")}<b>{sub ? nf(sub) : "—"} {sar}</b></span>
-                  <span className="r">{L("VAT 15%", "ضريبة ١٥٪")}<b>{sub ? nf(sub * 0.15) : "—"} {sar}</b></span>
+                  <span className="r">{L("VAT 15%", "ضريبة ١٥٪")}<b>{sub ? nf(sub * VAT_RATE) : "—"} {sar}</b></span>
                   <span className="r t">{vatIncluded ? L("Item total (incl. VAT)", "إجمالي البند (شامل الضريبة)") : L("Item total", "إجمالي البند")}<b>{sub ? nf(sub * 1.15) : "—"} {sar}</b></span>
                 </div>
 

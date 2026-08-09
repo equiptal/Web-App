@@ -6,6 +6,7 @@ import type { BidFormData, BidFormItem, LinkBidSubmission, LinkBidItem } from "@
 import { CERT_TERM_KEYS, certCodesFromValue, certConfKey, prettyCert } from "@/lib/contract/link-bids";
 import { fetchBidFormData } from "@/lib/api/client";
 import { hasVatInclusiveNote, stripVatInclusiveNote, vatLines } from "@/lib/contract/vat-inclusive";
+import { computeRentalTotal, durationDaysBetween } from "@/lib/pricing/rental";
 import { qualityFromSubmission, qualityFromSubmissionItem } from "@/lib/contract/bid-quality";
 import { QualityRing } from "@/components/bid/QualityRing";
 import { BID_FORM_CSS } from "@/components/bid/bidFormStyles";
@@ -180,25 +181,42 @@ export function SharedBidSubmissionModal({
   const shownItems = focusedItems.length ? focusedItems : items;
   const singleItem = !!focusItemId && shownItems.length === 1 && items.length > 1;
 
+  // The request's rental window, straight off the bid-form payload this modal already fetches — the
+  // same pair the supplier's own form prorates against. Nothing here comes from the backend's stored
+  // total (see below), so an off-platform bid reads identically on the form, this viewer and the card.
+  const durationDays = durationDaysBetween(form?.projectTerms?.startDate, form?.projectTerms?.endDate);
+  const startDate = form?.projectTerms?.startDate ?? null;
+  /** Per-unit rental for one submitted line — prorated exactly as the supplier saw it when quoting. */
+  const itemRental = (a?: LinkBidItem) =>
+    computeRentalTotal({ rate: a?.rentalRate, priceUnit: a?.priceUnit, startDate, durationDays });
   const itemSubtotal = (a?: LinkBidItem) => {
     if (!a) return 0;
     const q = a.numberOfUnits || 1;
-    return ((a.rentalRate ?? 0) + (a.deliveryPrice ?? 0) + (a.returnPrice ?? 0)) * q;
+    // Rental prorates over the period; the two transport legs stay flat per unit — a trip, not a period.
+    return (itemRental(a).total + (a.deliveryPrice ?? 0) + (a.returnPrice ?? 0)) * q;
   };
+  /** True once ANY shown line was actually prorated — see the AC-216 note on `shownStoredGross`. */
+  const proratedAny = (rows: LinkBidItem[]) => rows.some((a) => !itemRental(a).raw);
   const subtotal = (submission?.items ?? []).reduce((s, a) => s + itemSubtotal(a), 0);
   // Focused on one item → total for THAT item only; otherwise the whole-submission grand total.
   const shownIds = new Set(shownItems.map((it) => it.requestItemId));
   const shownItemAnswers = (submission?.items ?? []).filter((a) => shownIds.has(a.requestItemId));
   const shownSubtotal = shownItemAnswers.reduce((s, a) => s + itemSubtotal(a), 0);
-  // RMAP AC-216 — prefer the STORED gross figure over a recomputation, so every line reconciles with
-  // what the supplier sent. `×1.15` survives only as the fallback for rows stored before `total` existed.
-  const shownStoredGross = shownItemAnswers.reduce<number | null>(
-    (s, a) => (a.total == null ? s : (s ?? 0) + a.total),
-    null,
-  );
+  // RMAP AC-216 — prefer the STORED gross figure over a recomputation, so a supplier who quoted
+  // VAT-inclusive sees their exact number back rather than a re-rounded one. `×1.15` is the fallback
+  // for rows stored before `total` existed.
+  //
+  // BUT the stored total is computed by the backend RATE-BASED — it never prorates. Once the rental has
+  // a period applied, that figure is one period's money for a multi-period job (wrong by ~4× on a
+  // two-month rental), so it is dropped and the total is recomputed. AC-216's exactness is only worth
+  // preserving while the number it protects is right; a rounding riyal is not worth a factor of four.
+  const storedGross = (rows: LinkBidItem[]) =>
+    proratedAny(rows) ? null : rows.reduce<number | null>((s, a) => (a.total == null ? s : (s ?? 0) + a.total), null);
+  const shownStoredGross = storedGross(shownItemAnswers);
+  const allItemAnswers = submission?.items ?? [];
   const grandIncl = singleItem
     ? vatLines(shownSubtotal, shownStoredGross).total
-    : vatLines(subtotal, submission?.grandTotal ?? shownStoredGross).total;
+    : vatLines(subtotal, proratedAny(allItemAnswers) ? null : (submission?.grandTotal ?? shownStoredGross)).total;
   // Per-ITEM quality when opened from a single item's card (focusItemId) — this item's terms/docs +
   // the shared company details; otherwise the whole-submission score.
   const focusedSub = focusItemId ? submission?.items.find((a) => a.requestItemId === focusItemId) : null;
@@ -350,7 +368,8 @@ export function SharedBidSubmissionModal({
                   const q = (a?.numberOfUnits ?? it.numberOfUnits) || 1;
                   const unit = it.priceUnit ? (ar ? UNIT_LABEL[it.priceUnit]?.[1] : UNIT_LABEL[it.priceUnit]?.[0]) ?? it.priceUnit : L("unit", "وحدة");
                   const rate = a?.rentalRate ?? 0, del = a?.deliveryPrice ?? 0, ret = a?.returnPrice ?? 0;
-                  const sub = (rate + del + ret) * q;
+                  const rental = itemRental(a); // the quoted rate, prorated over the request's period
+                  const sub = itemSubtotal(a);
                   const conf = a?.confirmations ?? {};
                   return (
                     <div className="sec" key={it.requestItemId || idx}>
@@ -397,10 +416,15 @@ export function SharedBidSubmissionModal({
                         <thead><tr><th>{L("Item", "البند")}</th><th className="num">{L("Unit", "الوحدة")}</th><th className="num">{L("Qty", "العدد")}</th><th className="num">{L("Price", "السعر")}</th><th className="num">{L("Total", "الإجمالي")}</th></tr></thead>
                         <tbody>
                           <tr>
-                            <td><div className="it-lbl">{L("Rental", "الإيجار")}</div></td>
+                            <td>
+                              <div className="it-lbl">{L("Rental", "الإيجار")}</div>
+                              {/* The day count the rate was prorated over — the same caption the supplier
+                                  saw on the form, so the two pages reconcile line for line. */}
+                              {!rental.raw && <div className="it-sub2">{L(`${rental.billable} billable days`, `${rental.billable} يوم محتسب`)}</div>}
+                            </td>
                             <td className="num">{unit}</td><td className="num">{q}</td>
                             <td className="num"><span className="ptbl-ro">{rate ? nf(rate) : "—"}</span></td>
-                            <td className="num tot">{rate ? nf(rate * q) : "—"}</td>
+                            <td className="num tot">{rate ? nf(rental.total * q) : "—"}</td>
                           </tr>
                           {del ? (
                             <tr>
@@ -425,7 +449,9 @@ export function SharedBidSubmissionModal({
                           breakdown whose rows do not add up to the figure the supplier actually sent.
                           Falls back to ×1.15 only for older rows that carry no stored total. */}
                       {(() => {
-                        const lines = vatLines(sub, a?.total);
+                        // Stored gross dropped once the rental was prorated — it is the backend's
+                        // rate-based figure and would no longer reconcile with the rows above it.
+                        const lines = vatLines(sub, rental.raw ? a?.total : null);
                         return (
                           <div className="itot">
                             <span className="r">{L("Subtotal", "المجموع")}<b>{sub ? nf(lines.subtotal) : "—"} {sar}</b></span>

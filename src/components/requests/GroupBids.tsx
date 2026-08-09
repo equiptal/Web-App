@@ -19,6 +19,7 @@ import { bidSuppliers, bidSupplierKey, bucketBidTerms, CERT_LABEL, type BidCard,
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { qualityFromSubmissionItem, type BidQuality } from "@/lib/contract/bid-quality";
 import { computeBidQuote } from "@/lib/contract/comparison";
+import { rentalDivisor, VAT_RATE } from "@/lib/pricing/rental";
 import { shortRef, type RequestGroup } from "@/lib/contract/requests";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { EquipImg } from "@/components/requests/EquipImg";
@@ -419,7 +420,9 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       const labelOf = (b: GroupBid) => (ar ? b.itemLabelAr : b.itemLabel) || (itemMap.get(b.requestId)?.displayId ?? shortRef(b.requestId));
       // App rule (014 CR #141): the bid is priced per billing period; the unit count is NOT multiplied
       // into the price (it's shown for information only). Open-ended → ∞ qty + one-period "as operated".
-      const daysPerPeriod = (u: string | null) => { switch ((u ?? "PER_DAY").toUpperCase()) { case "PER_WEEK": return 7; case "PER_MONTH": return 26; case "PER_JOB": return 0; default: return 1; } };
+      // Divisors come from the shared pricing module (week ÷6, month ÷26) — this was the third
+      // hand-rolled copy on the web and used a 7-day week, so the quotation disagreed with the app.
+      const daysPerPeriod = (u: string | null) => rentalDivisor(u);
       const periodLabel = (u: string | null) => { switch ((u ?? "PER_DAY").toUpperCase()) { case "PER_WEEK": return L("week", "أسبوع"); case "PER_MONTH": return L("month", "شهر"); case "PER_JOB": return L("job", "مهمة"); default: return L("day", "يوم"); } };
 
       // Invoice line items — rate ÷ period-days × duration × units; mob/demob × units (open-ended → "as
@@ -477,7 +480,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         lineItems.push(logiRow(L("Delivery to site", "النقل إلى الموقع"), b.mobPrice ?? 0, mobTotal, ri?.mobByRentee === true));
         lineItems.push(logiRow(L("Return from site", "الإرجاع من الموقع"), b.demobPrice ?? 0, demobTotal, ri?.demobByRentee === true));
       }
-      const vat = sub * 0.15; // exact (not rounded) so the amount-in-words can show halalas — app parity
+      const vat = sub * VAT_RATE; // exact (not rounded) so the amount-in-words can show halalas — app parity
       const total = sub + vat;
       const allOpenEnded = !anyCommitted && openRate != null;
 
@@ -869,12 +872,18 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       <div className="bids-snap" data-select-ui>
       {shown.map((b) => {
         if (b.viaSharedLink) {
+          // An off-platform bid carries no duration of its own (`link-bids.ts` sets `duration: null`), so
+          // the period it's priced over comes from the request it was quoted against — the same pair the
+          // on-platform branch below feeds `computeBidQuote`.
+          const gi = group.items.find((it) => it.id === b.requestId);
           return (
             <SharedLinkBidCard
               key={b.id}
               bid={b}
               ar={ar}
               L={L}
+              startDate={gi?.startDate ?? null}
+              durationDays={gi?.durationDays ?? null}
               isSel={selected.has(b.id)}
               selectMode={selectMode}
               cardFlex={cardFlex}
@@ -917,7 +926,10 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
           : (b.unitsOffered && b.unitsOffered > 0) ? b.unitsOffered
           : (b.numberOfUnits || 1);
         const u = priceOpen && perUnit ? 1 : liveUnits;
-        const cq = computeBidQuote(b, { units: u, fallbackDays: group.items.find((it) => it.id === b.requestId)?.durationDays ?? null });
+        const gi = group.items.find((it) => it.id === b.requestId);
+        // startDate is what lets the rental drop its Fridays — without it the shared maths falls back
+        // to the raw rate rather than a Friday-blind proration.
+        const cq = computeBidQuote(b, { units: u, fallbackDays: gi?.durationDays ?? null, startDate: gi?.startDate ?? null });
         const rental = cq.rentalSubtotal;
         const deliv = cq.mobTotal;
         const ret = cq.demobTotal;

@@ -72,7 +72,13 @@ export interface PriceFooterModel {
  * carry the project's duration and the two must not be allowed to diverge. Null is legitimate: no
  * duration means one full period, which is what `computeDealTotals` already does.
  */
-export function priceFooterModel(bid: PriceFooterBid, durationDays: number | null): PriceFooterModel {
+export function priceFooterModel(
+  bid: PriceFooterBid,
+  durationDays: number | null,
+  /** The request's start date — the anchor the shared rental maths counts Fridays from. Omit it and
+   *  the rental can only be shown at its raw rate (mobile §3), so pass it wherever it is known. */
+  startDate: string | null = null,
+): PriceFooterModel {
   const offeredUnits = bid.unitsOffered > 0 ? bid.unitsOffered : 1;
   const agreed = bid.agreedUnits ?? null;
   const pricedUnits = agreed ?? offeredUnits;
@@ -82,6 +88,7 @@ export function priceFooterModel(bid: PriceFooterBid, durationDays: number | nul
       rate: bid.price,
       priceUnit: bid.priceUnit,
       periods: durationDays,
+      startDate,
       // `agreedUnits` first, `unitsOffered` second — the identical precedence `mapDealRoom` applies
       // when it computes `priceUnits`, so a bid with a room prices the same on both surfaces.
       agreedUnits: agreed,

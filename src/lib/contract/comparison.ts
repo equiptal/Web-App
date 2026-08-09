@@ -9,16 +9,13 @@
  * math on it (AC-09/10/11/12/13/35). The Mansour judgement layer (pick/chat/learning) is deferred.
  */
 import type { BidCard, TermRow } from "@/lib/contract/bids";
+import { computeQuoteTotals, computeRentalTotal, rentalDivisor } from "@/lib/pricing/rental";
 
-/** Working days in one billing period for the bid's price unit (a month = 26 working days, not 30
- *  calendar days). PER_JOB → 0 (a single job, no period count). */
+/** Working days in one billing period (month = 26, week = **6** — Friday is the weekend). PER_JOB → 0.
+ *  Delegates to the shared pricing module: this used to return 7 for a week, so the same bid priced
+ *  differently here than in the mobile app. @see src/lib/pricing/rental.ts */
 export function daysPerPeriod(unit: string | null): number {
-  switch ((unit ?? "PER_DAY").toUpperCase()) {
-    case "PER_WEEK": return 7;
-    case "PER_MONTH": return 26;
-    case "PER_JOB": return 0;
-    default: return 1; // PER_DAY
-  }
+  return rentalDivisor(unit);
 }
 
 /** A cost figure that may be unknown — distinguishes a real 0 from "the bid didn't state it" (AC-10). */
@@ -108,6 +105,11 @@ export interface BidQuote {
   days: number;
   periods: number;
   perUnitRental: number;
+  /** Days actually charged (duration − Fridays) — the "(N days)" caption on the rental row. */
+  billableDays: number;
+  /** Proration landed exactly on the quoted rate. With a single unit the card drops its rental row:
+   *  the headline already shows the real total, so the row would restate it. */
+  rentalExact: boolean;
   rentalSubtotal: number;
   mobTotal: number;
   demobTotal: number;
@@ -115,7 +117,12 @@ export interface BidQuote {
   vat: number;
   total: number;
 }
-export function computeBidQuote(bid: BidCard, opts?: { fallbackDays?: number | null; units?: number }): BidQuote {
+export function computeBidQuote(
+  bid: BidCard,
+  /** `startDate` is what lets the rental exclude Fridays (mobile parity). Without it the rental falls
+   *  back to the raw rate rather than a Friday-blind proration that would overstate the total. */
+  opts?: { fallbackDays?: number | null; units?: number; startDate?: string | null },
+): BidQuote {
   const rate = num(bid.price) ?? 0;
   // Live deal-room rental count (app parity: v3_bid_card `_liveRentalUnits`) — the negotiated count wins
   // so the card price tracks the deal room; falls back to the offered/requested count. An explicit
@@ -126,23 +133,31 @@ export function computeBidQuote(bid: BidCard, opts?: { fallbackDays?: number | n
     : (bid.unitsOffered && bid.unitsOffered > 0) ? bid.unitsOffered
     : (bid.numberOfUnits || 1);
   const units = opts?.units ?? liveUnits;
-  const dpp = daysPerPeriod(bid.priceUnit);
+  const dpp = rentalDivisor(bid.priceUnit);
   const fb = num(opts?.fallbackDays);
-  // No stated duration and no request fallback → assume ONE FULL PERIOD (days = daysPerPeriod), so the
-  // rate isn't prorated down to a single day (periods = 1). PER_JOB (dpp 0) is flat anyway.
+  // No stated duration and no request fallback → ONE FULL PERIOD, which prorates to exactly the rate.
+  // Never default to a single day: on a weekly/monthly bid that reads as a near-zero total.
   const days = num(bid.duration) ?? (fb != null && fb > 0 ? fb : dpp || 1);
-  const periods = dpp === 0 ? 1 : days / dpp;
-  const perUnitRental = dpp === 0 ? rate : (rate / dpp) * days;
-  const rentalSubtotal = perUnitRental * units;
-  // Mob/demob use their OWN negotiated counts + exclusion (app parity), capped ≤ rental; default to the
-  // rental count when not negotiated (unchanged for un-negotiated bids).
-  const mobUnitsN = bid.mobExcluded ? 0 : Math.min(bid.mobUnits ?? units, units);
-  const demobUnitsN = bid.demobExcluded ? 0 : Math.min(bid.demobUnits ?? units, units);
-  const mobTotal = bid.mobExcluded ? 0 : (num(bid.mobPrice) ?? 0) * mobUnitsN;
-  const demobTotal = bid.demobExcluded ? 0 : (num(bid.demobPrice) ?? 0) * demobUnitsN;
-  const subtotalPreVat = rentalSubtotal + mobTotal + demobTotal;
-  const vat = subtotalPreVat * 0.15;
-  return { units, days, periods, perUnitRental, rentalSubtotal, mobTotal, demobTotal, subtotalPreVat, vat, total: subtotalPreVat + vat };
+  // Friday-excluded proration, shared with the deal room and the quotation.
+  const rental = computeRentalTotal({ rate, priceUnit: bid.priceUnit, startDate: opts?.startDate, durationDays: days });
+  const perUnitRental = rental.total;
+  // Periods are counted in BILLABLE days once proration ran, so the "× N periods" caption matches the
+  // money beside it; an un-prorated (raw-rate) quote is one period by definition.
+  const periods = dpp === 0 || rental.raw ? 1 : rental.billable / dpp;
+  // Mob/demob carry their OWN counts + exclusion (app parity), capped ≤ rental.
+  const t = computeQuoteTotals({
+    perUnitRental,
+    rentalUnits: units,
+    mob: { amount: num(bid.mobPrice) ?? 0, units: bid.mobUnits, excluded: bid.mobExcluded },
+    demob: { amount: num(bid.demobPrice) ?? 0, units: bid.demobUnits, excluded: bid.demobExcluded },
+  });
+  return {
+    units, days, periods, perUnitRental,
+    billableDays: rental.raw ? 0 : rental.billable,
+    rentalExact: rental.exact,
+    rentalSubtotal: t.overall.rental, mobTotal: t.overall.mob, demobTotal: t.overall.demob,
+    subtotalPreVat: t.overall.subtotal, vat: t.overall.vat, total: t.overall.total,
+  };
 }
 
 /** Cash due upfront from the bid's payment terms + stated data (deterministic, AC-09). */
@@ -373,8 +388,22 @@ export interface DisplayQuote {
   total: number;
 }
 
-/** Display figures for one bid under the chosen rate-period + prices-for basis (Week 7 / Month 26). */
-export function displayQuote(bid: BidCard, period: RatePeriod, pricesFor: PricesFor, fallbackDays?: number | null): DisplayQuote {
+/**
+ * Display figures for one bid under the chosen rate-period + prices-for basis (Week 6 / Month 26).
+ *
+ * The duration-based rental prorates through the shared module, so it excludes Fridays exactly like the
+ * bid card, the deal room and the supplier's own form. It previously did a bare `perDay × durationDays`,
+ * which charged the weekend back in and made the comparison's total disagree with the card it came from.
+ */
+export function displayQuote(
+  bid: BidCard,
+  period: RatePeriod,
+  pricesFor: PricesFor,
+  fallbackDays?: number | null,
+  /** The request's start date — what lets the rental drop its Fridays. Without it the shared maths
+   *  falls back to the raw rate rather than a Friday-blind proration that would overstate the total. */
+  startDate?: string | null,
+): DisplayQuote {
   const rate = num(bid.price) ?? 0;
   // "All units" basis = the units THIS supplier offered (unitsOffered), so every cost reflects his chosen
   // quantity (e.g. 5 units → ×5). "Per unit" = ×1. Falls back to the request's units when not stated.
@@ -383,17 +412,27 @@ export function displayQuote(bid: BidCard, period: RatePeriod, pricesFor: Prices
   const perDay = dppBid === 0 ? rate : rate / dppBid; // bid rate → per-day basis
   const ratePerPeriod = dppBid === 0 ? rate : perDay * daysPerPeriod(period); // → chosen display period
   const rentalForPeriod = ratePerPeriod * units;
-  const mobDemob = ((num(bid.mobPrice) ?? 0) + (num(bid.demobPrice) ?? 0)) * units;
   const fb = num(fallbackDays);
   const durDays = num(bid.duration) ?? (fb != null && fb > 0 ? fb : null);
-  const durationRental = durDays != null && dppBid !== 0 ? perDay * durDays * units : null;
-  // With a duration → the daily rate × duration (durationRental). With NO duration → keep the bid's own
-  // quoted rate × units (NOT the toggle-converted rentalForPeriod), so switching Day/Week/Month re-expresses
-  // only the displayed rate, never the total. Mirrors computeBidQuote's no-proration-when-unknown rule.
-  const base = durationRental ?? rate * units;
-  const subtotal = base + mobDemob;
-  const vat = subtotal * 0.15;
-  return { units, ratePerPeriod, rentalForPeriod, mobDemob, durationRental, subtotal, vat, total: subtotal + vat };
+  const rental = computeRentalTotal({ rate, priceUnit: bid.priceUnit, startDate, durationDays: durDays });
+  // Null when there was nothing to prorate over — §6 shows the duration row only then, and with NO
+  // duration the total keeps the bid's own quoted rate × units (NOT the toggle-converted
+  // `rentalForPeriod`), so switching Day/Week/Month re-expresses only the displayed rate, never the total.
+  const durationRental = rental.raw ? null : rental.total * units;
+  // Legs default to the rental count (matching the prices-for basis) but now honour exclusion — an
+  // excluded leg was still adding whatever price remained stored against it.
+  const t = computeQuoteTotals({
+    perUnitRental: rental.total,
+    rentalUnits: units,
+    mob: { amount: num(bid.mobPrice) ?? 0, excluded: bid.mobExcluded },
+    demob: { amount: num(bid.demobPrice) ?? 0, excluded: bid.demobExcluded },
+  });
+  return {
+    units, ratePerPeriod, rentalForPeriod,
+    mobDemob: t.overall.mob + t.overall.demob,
+    durationRental,
+    subtotal: t.overall.subtotal, vat: t.overall.vat, total: t.overall.total,
+  };
 }
 
 /**

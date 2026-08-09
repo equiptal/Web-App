@@ -10,15 +10,12 @@ import {
   Preferences,
   ProjectDetails,
   RfqDraft,
-  SafetyCertificate,
   Taxonomy,
   TimingHours,
   AdvancedSettings,
   computeSummary,
   defaultPreferences,
   defaultOperatorNeeded,
-  equipmentCertDefault,
-  isLiftingCategory,
   newManualItem,
   postableItems,
 } from "@/lib/contract";
@@ -174,37 +171,17 @@ function mapItem(d: RfqDraft, id: string, fn: (i: EquipmentItem) => EquipmentIte
 }
 
 /**
- * 2026-07 cert rule, seed pass. App parity: `_withGlobalEquipmentDefaults` (create_request_bloc.dart) —
- * EVERY item lands with a certificate, not just the ones whose category the renter picked by hand.
+ * The 2026-07 cert-rule seed pass USED to live here — it stamped every item that had no cert with one
+ * chosen by category (lifting → Aramco, else TÜV), mirroring `_withGlobalEquipmentDefaults`
+ * (create_request_bloc.dart). It is gone, in the app first and now here: picking nothing in step 1 must
+ * leave every line blank, for the equipment cert exactly as for the operator cert.
  *
- *  • equipment cert — lifting → Aramco, every other group → TÜV. Seeded only when the item has no
- *    effective cert (no per-item override AND no request-wide default), so an agent-extracted cert or a
- *    renter choice is never overwritten. Skipped while the item has no category to classify.
- *  • operator cert  — NOT seeded (see the note where the operator-cert default used to live, in
- *    options.ts): seeding SPSP made every request demand an operator cert nobody asked for. Only the
- *    renter's own pick or the agent's extraction sets it.
- *
- * Applied to agent-parsed items on PROCESS_SUCCESS and to a rehydrated draft on HYDRATE; the manual
- * paths seed in their own reducers.
+ * Nothing replaces it. A line with no per-item override inherits the request-wide step-1 pick
+ * (`safetyCertsOverride ?? project.certificates.safety`, read at submit), so a renter who does choose a
+ * cert once in step 1 sees it on every line in step 2 — lifting included, since no category rule
+ * intercepts it any more. A renter who chooses nothing sends no cert requirement, which is what they
+ * asked for. See the note in options.ts for why a seeded cert is not cosmetic.
  */
-function seedCertRule(items: EquipmentItem[], taxonomy: Taxonomy, sharedSafety: readonly SafetyCertificate[]): EquipmentItem[] {
-  return items.map((i) =>
-    !hasEquipmentCert(i, sharedSafety) && i.ref.categoryId
-      ? { ...i, safetyCertsOverride: [equipmentCertDefault(isLiftingCategory(i.ref, taxonomy))] }
-      : i,
-  );
-}
-
-/**
- * Whether an item already carries an EQUIPMENT cert — its own override, else the request-wide default.
- * The app checks the item's own list (it has no inheritance model); here an item with no override that
- * inherits a request-wide cert counts as covered, so a re-seed can't silently break that inheritance by
- * stamping an override.
- */
-function hasEquipmentCert(i: EquipmentItem, sharedSafety: readonly SafetyCertificate[]): boolean {
-  if ((i.safetyCertsOtherText ?? "").trim() !== "") return true;
-  return (i.safetyCertsOverride ?? sharedSafety).length > 0;
-}
 
 /** Exported for unit tests — the wizard's whole edit model lives here, so the cert rule and the
  *  request-wide fan-out are asserted against the real reducer rather than a re-implementation. */
@@ -227,10 +204,10 @@ export function reducer(state: RfqState, a: Action): RfqState {
       // account modal (same UX as the client-side localStorage nudge), never an error screen.
       return { ...state, busy: false, phase: "intake", error: null, errorDetail: null, guestLimit: true };
     case "PROCESS_SUCCESS": {
-      // Cert rule: give every agent-parsed item its category-based certificate up front. Without this,
-      // an item the agent left without `safety_certifications` reached Step 2 (and submit) with no cert
-      // at all, while the same item created by hand got Aramco/TÜV from SET_ITEM_CATEGORY.
-      const seededItems = seedCertRule(a.draft.items, state.taxonomy, a.draft.project.certificates.safety);
+      // No cert seeding. An agent-parsed item keeps whatever `safety_certifications` the RFQ text
+      // actually named and nothing more — an item the text said nothing about reaches Step 2 blank,
+      // which is now also true of one created by hand.
+      const seededItems = a.draft.items;
       return {
         ...state,
         busy: false,
@@ -365,17 +342,17 @@ export function reducer(state: RfqState, a: Action): RfqState {
             fuelType: "diesel" as const,
             resolved: false,
           };
-          // App parity (`_onEquipmentTypePicked`: `categoryChanged || safetyCertifications.isEmpty`):
-          // (re)picking the category re-seeds the category-based EQUIPMENT cert — lifting → Aramco, else
-          // TÜV. Fires on an actual category change OR when the line still has no cert at all, so a
-          // re-pick of the SAME category still rescues an uncertified line; a renter's own cert survives
-          // a no-op re-pick either way. A later request-wide "settings for all" pick still overrides via
-          // SET_CERTIFICATES. The operator cert is NOT touched — the app's `_applyCertRule` clears and
-          // re-stamps SPSP here, which is precisely how a renter's operator pick got silently reverted.
-          if (categoryChanged || !hasEquipmentCert(i, d.project.certificates.safety)) {
-            next.safetyCertsOverride = [equipmentCertDefault(isLiftingCategory(next.ref, state.taxonomy))];
-            // The rule replaces the whole cert list, so drop any free-text "Other" cert carried over
-            // from the previous equipment. App parity: `_applyCertRule` clears `_otherSafetyController`.
+          // Picking the category no longer stamps a cert. It used to seed lifting → Aramco / else TÜV
+          // (app parity `_onEquipmentTypePicked` → `_applyCertRule`), which is exactly the silent guess
+          // that has now been withdrawn: the line stays blank until the renter taps one themselves.
+          //
+          // A real category change still CLEARS the line's per-item cert, because a cert chosen for an
+          // excavator is not an answer about a crane. Clearing drops the line back to inheriting the
+          // step-1 "settings for all" pick — so a renter who chose once in step 1 keeps that choice on
+          // this line, and one who chose nothing gets nothing. It does not stamp anything. App parity:
+          // `_withCertRule` returns `const []` when no global is set, else the global.
+          if (categoryChanged) {
+            next.safetyCertsOverride = null;
             next.safetyCertsOtherText = null;
           }
           return next;
@@ -399,13 +376,12 @@ export function reducer(state: RfqState, a: Action): RfqState {
             operatorNeeded,
             resolved: false,
           };
-          // App parity (`_onEquipmentVariantPicked`, which re-seeds when the line has no cert): picking
-          // the subcategory rescues a line that still carries no equipment cert. It also refines the
-          // lifting test on an UNTAGGED taxonomy, where "Material Handling → Forklifts" only reads as
-          // lifting once the subcategory is known. A line that already has a cert is left alone.
-          if (!hasEquipmentCert(next, d.project.certificates.safety) && next.ref.categoryId) {
-            next.safetyCertsOverride = [equipmentCertDefault(isLiftingCategory(next.ref, state.taxonomy))];
-          }
+          // No cert seeding here either. This used to "rescue" an uncertified line by stamping the
+          // category default once the subcategory refined the lifting test (`_onEquipmentVariantPicked`)
+          // — but an uncertified line no longer needs rescuing; it is the renter's answer. The app's
+          // variant handler re-applies only the step-1 global, which an override-less line already
+          // inherits here.
+          //
           // A subcategory that auto-enables the operator (AC-24) enables the operator and nothing more —
           // no operator cert is seeded alongside it.
           return next;
@@ -481,20 +457,13 @@ export function reducer(state: RfqState, a: Action): RfqState {
     case "HYDRATE": {
       // Restore a saved draft on reload (web-app/002) — keep the freshly-fetched taxonomy, and raise
       // the continue/start-over prompt so the renter decides to resume or reset.
-      // Re-run the cert seed: a draft saved before the rule shipped (or one whose items the agent left
-      // uncertified) would otherwise resume — and submit — with no certificate at all.
-      const restored = { ...state, ...a.saved, taxonomy: state.taxonomy, draftPrompt: true };
-      if (!restored.draft) return restored;
-      const shared = restored.draft.project.certificates.safety;
-      return {
-        ...restored,
-        draft: { ...restored.draft, items: seedCertRule(restored.draft.items, state.taxonomy, shared) },
-        // Seed the snapshot the same way, so the defaults we just filled in aren't mistaken for renter
-        // edits at submit (same reasoning as PROCESS_SUCCESS).
-        agentOrigin: restored.agentOrigin
-          ? { ...restored.agentOrigin, items: seedCertRule(restored.agentOrigin.items, state.taxonomy, shared) }
-          : restored.agentOrigin,
-      };
+      //
+      // A cert seed used to re-run here, on the reasoning that a draft resuming with no certificate was
+      // a gap to fill. It isn't: no certificate is a valid, deliberate answer, and re-stamping one on
+      // resume would put a requirement back that the renter had left blank on purpose — the one moment
+      // they can't see it happen. The app doesn't seed on draft load either (neither `_withCertRule` nor
+      // `_withGlobalEquipmentDefaults` is reachable from `_onDraftLoaded`/`_onStashRestored`).
+      return { ...state, ...a.saved, taxonomy: state.taxonomy, draftPrompt: true };
     }
     default:
       return state;

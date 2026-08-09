@@ -7,6 +7,7 @@ import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { BAND_COLOR } from "@/components/bid/QualityRing";
 import type { BidQuality } from "@/lib/contract/bid-quality";
+import { computeQuoteTotals, computeRentalTotal } from "@/lib/pricing/rental";
 
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
 
@@ -30,6 +31,8 @@ export function SharedLinkBidCard({
   itemImage,
   categoryId,
   quality,
+  startDate = null,
+  durationDays = null,
 }: {
   bid: BidCard;
   ar: boolean;
@@ -50,6 +53,12 @@ export function SharedLinkBidCard({
   itemLabel?: string | null;
   itemImage?: string | null;
   categoryId?: string | null;
+  /** The REQUEST's rental window — an off-platform bid stores no duration of its own, so the period it
+   *  is priced over comes from the request the supplier was quoting. Both are needed: without the start
+   *  date the Fridays can't be located and the shared maths falls back to the raw rate. Omit both for an
+   *  open-ended request — the card then shows the quoted rate, exactly as it does today. */
+  startDate?: string | null;
+  durationDays?: number | null;
 }) {
   const [priceOpen, setPriceOpen] = useState(false);
   const [perUnit, setPerUnit] = useState(false);
@@ -71,14 +80,29 @@ export function SharedLinkBidCard({
   const needed = bid.numberOfUnits || offered;
   const cover = needed ? Math.min(100, Math.round((offered / needed) * 100)) : 0;
   const u = priceOpen && perUnit ? 1 : offered;
-  const rental = (bid.price ?? 0) * u;
+  // Priced through the SAME module as every other surface (`@/lib/pricing/rental`), so this card, the
+  // supplier's own form and the renter's comparison can no longer disagree about one bid. Previously
+  // this was `rate × units` with no calendar at all, while the comparison prorated — the same
+  // off-platform bid read 4,200 here and 7,700 there.
+  const rentalCalc = computeRentalTotal({ rate: bid.price, priceUnit: bid.priceUnit, startDate, durationDays });
   // Mob/demob are priced PER UNIT in the shared-link form (× qty), so the total scales with the unit
   // count shown — × offered for the "all units" view, × 1 for "per unit" (mirrors the rental line + form).
-  const deliv = bid.mobPrice ? bid.mobPrice * u : 0;
-  const ret = bid.demobPrice ? bid.demobPrice * u : 0;
-  const sub = rental + deliv + ret;
-  const vat = Math.round(sub * 0.15);
-  const grand = bid.quotedTotal && !perUnit ? bid.quotedTotal : sub + vat;
+  const totals = computeQuoteTotals({
+    perUnitRental: rentalCalc.total,
+    rentalUnits: u,
+    mob: { amount: bid.mobPrice },
+    demob: { amount: bid.demobPrice },
+  });
+  const rental = totals.overall.rental;
+  const deliv = totals.overall.mob;
+  const ret = totals.overall.demob;
+  const sub = totals.overall.subtotal;
+  const vat = Math.round(totals.overall.vat);
+  // `bid.quotedTotal` is the backend's stored figure, computed rate-based with no proration. Honour it
+  // only when we ALSO have nothing to prorate over (open-ended request) — otherwise it contradicts both
+  // the breakdown directly above it and what the supplier saw on the form, and the renter is looking at
+  // one period's money labelled as the job's total.
+  const grand = rentalCalc.raw && bid.quotedTotal && !perUnit ? bid.quotedTotal : sub + vat;
 
   const eq = bid.equipment;
   const eqLine = eq ? [eq.make, eq.model, eq.year].filter(Boolean).join(" · ") : null;
@@ -222,7 +246,12 @@ export function SharedLinkBidCard({
               </div>
             )}
             {([
-              [L(`Rental (${nf(bid.price ?? 0)}/${periodOf(bid.priceUnit)} × ${u} unit${u > 1 ? "s" : ""})`, `الإيجار (${nf(bid.price ?? 0)}/${periodOf(bid.priceUnit)} × ${u})`), rental],
+              // The day count is what turns a quoted rate into the period's money — leaving it out is what
+              // made this row look like it disagreed with the headline above it.
+              [L(
+                `Rental (${nf(bid.price ?? 0)}/${periodOf(bid.priceUnit)}${rentalCalc.raw ? "" : ` × ${rentalCalc.billable} days`} × ${u} unit${u > 1 ? "s" : ""})`,
+                `الإيجار (${nf(bid.price ?? 0)}/${periodOf(bid.priceUnit)}${rentalCalc.raw ? "" : ` × ${rentalCalc.billable} يوم`} × ${u})`,
+              ), rental],
               ...(deliv ? [[L(`Delivery to site (${nf(bid.mobPrice ?? 0)} × ${u} unit${u > 1 ? "s" : ""})`, `النقل إلى الموقع (${nf(bid.mobPrice ?? 0)} × ${u})`), deliv]] as [string, number][] : []),
               ...(ret ? [[L(`Return from site (${nf(bid.demobPrice ?? 0)} × ${u} unit${u > 1 ? "s" : ""})`, `الإرجاع من الموقع (${nf(bid.demobPrice ?? 0)} × ${u})`), ret]] as [string, number][] : []),
               [L("Subtotal before VAT", "المجموع قبل الضريبة"), sub],

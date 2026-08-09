@@ -238,7 +238,11 @@ export function RequestDetail({ id, onTitle }: { id: string; onTitle?: (t: strin
           <button className="btn sm" style={{ marginBottom: 14 }} onClick={() => setView("details")}>
             <span className="material-icons-outlined rq-arrow" style={{ transform: ar ? "none" : "scaleX(-1)" }}>chevron_right</span> {L("Back to request", "العودة للطلب")}
           </button>
-          <RequestBids requestId={r.id} />
+          <RequestBids
+            requestId={r.id}
+            startDate={typeof r.startDate === "string" ? r.startDate : null}
+            durationDays={typeof r.durationDays === "number" ? r.durationDays : null}
+          />
         </div>
       ) : (
         <>

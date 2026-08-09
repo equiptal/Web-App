@@ -39,9 +39,12 @@ export interface PriceFooterProps {
    *  two surfaces price one room identically (RM3-AC-24). Null is legitimate: no duration means one
    *  full period, which `computeDealTotals` already handles. */
   durationDays: number | null;
+  /** The request's start date — the Friday anchor for the shared rental maths. Without it the rental
+   *  falls back to the raw rate, so pass it alongside `durationDays` from the same request. */
+  startDate?: string | null;
 }
 
-export function PriceFooter({ bid, durationDays }: PriceFooterProps) {
+export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooterProps) {
   const t = useT();
   const { locale } = useLocale();
   const ar = locale === "ar";
@@ -49,7 +52,7 @@ export function PriceFooter({ bid, durationDays }: PriceFooterProps) {
   const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const model = priceFooterModel(bid, durationDays);
+  const model = priceFooterModel(bid, durationDays, startDate);
   const { totals } = model;
 
   /** Money, always LTR — an Arabic reader reads the digits left-to-right like everyone else. */

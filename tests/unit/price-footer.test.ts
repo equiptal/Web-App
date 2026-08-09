@@ -29,6 +29,11 @@ const bid = (over: Partial<PriceFooterBid> = {}): PriceFooterBid => ({
   ...over,
 });
 
+/** A Sunday, so the Friday count in every window below is easy to reason about. Real requests always
+ *  carry a start date (`equipment_requests.start_date` is NOT NULL), so fixtures must supply one — a
+ *  dateless fixture prices at the raw rate and tests nothing about proration. */
+const SUNDAY = "2026-08-09T00:00:00.000Z";
+
 describe("priceFooterModel — the same arithmetic as the deal-room bar (RM3-AC-24)", () => {
   it("produces exactly what computeDealTotals produces for the same basis", () => {
     const model = priceFooterModel(bid(), 10);
@@ -42,12 +47,14 @@ describe("priceFooterModel — the same arithmetic as the deal-room bar (RM3-AC-
   });
 
   it("breaks the total into the lines the expansion renders, VAT at 15%", () => {
-    const { totals } = priceFooterModel(bid(), 10);
-    expect(totals.rentalTotal).toBe(30000); // 1000/day × 10 days × 3 units
+    const { totals } = priceFooterModel(bid(), 10, SUNDAY);
+    // 10 days from a Sunday contains ONE Friday → 9 billable days, not 10. Friday-off applies to
+    // PER_DAY too, so this is 1000 × 9 × 3, not 1000 × 10 × 3.
+    expect(totals.rentalTotal).toBe(27000);
     expect(totals.mobTotal).toBe(1500); // mob units default to the rental count
     expect(totals.demobTotal).toBe(1200);
-    expect(totals.subtotal).toBe(32700);
-    expect(totals.vat).toBe(Math.round(32700 * 0.15));
+    expect(totals.subtotal).toBe(29700);
+    expect(totals.vat).toBe(Math.round(29700 * 0.15));
     expect(totals.grand).toBe(totals.subtotal + totals.vat);
   });
 
@@ -73,9 +80,9 @@ describe("counts vs agreed — two numbers, both correct (004a §4a.4)", () => {
   });
 
   it("prices on `agreedUnits` once a negotiation set one (RM3-AC-65)", () => {
-    const model = priceFooterModel(bid({ agreedUnits: 2, dealRoomId: "dr-1" }), 10);
+    const model = priceFooterModel(bid({ agreedUnits: 2, dealRoomId: "dr-1" }), 10, SUNDAY);
     expect(model.pricedUnits).toBe(2);
-    expect(model.totals.rentalTotal).toBe(20000);
+    expect(model.totals.rentalTotal).toBe(18000); // 1000 × 9 billable days × 2 agreed units
     // The pills keep describing the OFFER; this is only restated so the footer can explain itself.
     expect(model.offeredUnits).toBe(3);
   });
@@ -138,6 +145,9 @@ describe("the footer reads the same inputs as `mapDealRoom`, not merely the same
   const RAW = {
     id: "dr-1",
     status: "NEGOTIATING",
+    // Real rooms always carry one (the column is NOT NULL) and the rental maths anchors its Friday
+    // count to it. Without it every total below collapses to the raw rate and proves nothing.
+    startDate: SUNDAY,
     // The negotiation agreed TWO units. The lessor had offered three. The RFQ asked for seven.
     agreedUnits: 2,
     mobUnits: null,
@@ -152,6 +162,9 @@ describe("the footer reads the same inputs as `mapDealRoom`, not merely the same
       demobPrice: 400,
     },
     request: {
+      // The rental maths anchors its Friday count here. Real requests always carry one
+      // (`equipment_requests.start_date` is NOT NULL); without it every total below is the bare rate.
+      startDate: SUNDAY,
       estimatedDurationDays: 10,
       // Decoys. Both are duration-shaped, both are plausible, and reading either would change the
       // rental total by a factor of three. `mapDealRoom` reads `estimatedDurationDays` and so must
@@ -187,7 +200,7 @@ describe("the footer reads the same inputs as `mapDealRoom`, not merely the same
   });
 
   it("prices on the count `mapDealRoom` prices on — `agreedUnits`, not the offer and not the RFQ", () => {
-    const model = priceFooterModel(footerBid, RAW.request.estimatedDurationDays);
+    const model = priceFooterModel(footerBid, RAW.request.estimatedDurationDays, view.details.startDate);
     // `numberOfUnits` on the view IS `mapDealRoom`'s `priceUnits`: agreedUnits → unitsOffered.length
     // → request numberOfUnits. The footer must land on the same rung of that ladder.
     expect(view.numberOfUnits).toBe(2);
@@ -199,24 +212,24 @@ describe("the footer reads the same inputs as `mapDealRoom`, not merely the same
 
   it("falls back down the SAME ladder when nothing was agreed — to the offer, never to the RFQ", () => {
     const unagreed = mapDealRoom({ ...RAW, agreedUnits: null });
-    const model = priceFooterModel({ ...footerBid, agreedUnits: null }, RAW.request.estimatedDurationDays);
+    const model = priceFooterModel({ ...footerBid, agreedUnits: null }, RAW.request.estimatedDurationDays, view.details.startDate);
     expect(unagreed.numberOfUnits).toBe(3); // `unitsOffered.length`, not the requested 7
     expect(model.pricedUnits).toBe(unagreed.numberOfUnits);
     expect(model.pricedUnits).not.toBe(unagreed.requestedUnits);
   });
 
   it("prices over the duration `mapDealRoom` reads — `estimatedDurationDays`, past two decoys", () => {
-    const model = priceFooterModel(footerBid, RAW.request.estimatedDurationDays);
+    const model = priceFooterModel(footerBid, RAW.request.estimatedDurationDays, view.details.startDate);
     expect(view.periods).toBe(10);
     expect(model.totals.periods).toBe(view.periods);
     // The decoy is not merely unequal — it would visibly change the money, which is what makes the
     // assertion above load-bearing rather than cosmetic.
-    const onDecoy = priceFooterModel(footerBid, RAW.request.durationDays);
+    const onDecoy = priceFooterModel(footerBid, RAW.request.durationDays, view.details.startDate);
     expect(onDecoy.totals.rentalTotal).not.toBe(model.totals.rentalTotal);
   });
 
   it("produces EVERY figure the deal-room bar produces for this room, from the room's own fields", () => {
-    const model = priceFooterModel(footerBid, RAW.request.estimatedDurationDays);
+    const model = priceFooterModel(footerBid, RAW.request.estimatedDurationDays, view.details.startDate);
     // Fed from the VIEW — i.e. from what the deal room itself computed off the raw payload. If the
     // footer had reached for a different field on the bid, this is where the two would part.
     expect(model.totals).toEqual(
@@ -224,6 +237,7 @@ describe("the footer reads the same inputs as `mapDealRoom`, not merely the same
         rate: view.rate,
         priceUnit: view.priceUnit,
         periods: view.periods,
+        startDate: view.details.startDate,
         agreedUnits: view.agreedUnits,
         numberOfUnits: view.numberOfUnits,
         mobUnits: view.mobUnits,
@@ -234,9 +248,9 @@ describe("the footer reads the same inputs as `mapDealRoom`, not merely the same
         demobExcluded: view.demobExcluded,
       }),
     );
-    // 1000/day × 10 days × 2 agreed units — stated outright so a change of basis cannot hide inside a
-    // deep-equal that moved on both sides at once.
-    expect(model.totals.rentalTotal).toBe(20000);
+    // 1000/day × 9 BILLABLE days (10 less the one Friday) × 2 agreed units — stated outright so a
+    // change of basis cannot hide inside a deep-equal that moved on both sides at once.
+    expect(model.totals.rentalTotal).toBe(18000);
   });
 });
 
