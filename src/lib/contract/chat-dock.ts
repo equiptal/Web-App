@@ -110,6 +110,93 @@ export function dockUnreadTotal(tabs: DockTab[]): number {
   return tabs.reduce((sum, t) => sum + t.unreadCount, 0);
 }
 
+/* ── what a message HAS, so the dock cannot drop one silently ───────────────────────────────────── */
+
+/**
+ * One attachment, classified the way **both** chat surfaces classify it.
+ *
+ * The dock and `/deal-room/[id]` read the same Stream channel, so a message that renders in one and
+ * vanishes in the other is not a difference in chrome — it is the renter seeing an unread badge,
+ * opening the dock, and finding nothing there. Unread counts every message; the dock must therefore
+ * be able to show something for every message.
+ */
+export interface DockAttachment {
+  /** `image` gets a thumb, `audio` a player, everything else a named link. */
+  kind: "image" | "audio" | "file";
+  /** What the element opens — the full image, the audio source, the file itself. */
+  url: string | null;
+  /** Stream's small preview, when it minted one. Images only. */
+  thumbUrl: string | null;
+  /** The sender's own title for it, when there is one; the caller localises a fallback. */
+  title: string | null;
+  mimeType: string | null;
+}
+
+/** A shared point, as the app and the deal room send it (`custom.kind === "location"`). */
+export interface DockLocation {
+  lat: number;
+  lng: number;
+}
+
+/** Everything a dock bubble can carry. `empty` is the ONLY case the dock may render nothing for. */
+export interface DockMessageView {
+  text: string | null;
+  location: DockLocation | null;
+  attachments: DockAttachment[];
+  empty: boolean;
+}
+
+/** The raw Stream message shape both surfaces receive. */
+export interface DockRawMessage {
+  text?: string;
+  attachments?: {
+    type?: string;
+    image_url?: string;
+    thumb_url?: string;
+    asset_url?: string;
+    title?: string;
+    mime_type?: string;
+    fallback?: string;
+  }[];
+  custom?: Record<string, unknown>;
+}
+
+const num = (v: unknown): number | null => {
+  const x = typeof v === "string" ? Number(v) : v;
+  return typeof x === "number" && Number.isFinite(x) ? x : null;
+};
+
+/**
+ * Read one message into what the dock has to show for it.
+ *
+ * The dock used to render `if (!m.text) return null` — an attachment-only or location-only message
+ * became a silent gap that the unread count still included. The classification lives here rather
+ * than in the component so it is the SAME classification the deal room applies, and so a message
+ * kind that neither surface can show is a failing assertion rather than an invisible bubble.
+ */
+export function dockMessageView(m: DockRawMessage): DockMessageView {
+  const custom = m.custom ?? {};
+  const lat = num(custom.lat);
+  const lng = num(custom.lng);
+  const location = custom.kind === "location" && lat != null && lng != null ? { lat, lng } : null;
+
+  const attachments: DockAttachment[] = (m.attachments ?? []).map((a) => {
+    const mimeType = a.mime_type ?? null;
+    const kind: DockAttachment["kind"] =
+      a.type === "image" ? "image" : a.type === "audio" || (mimeType ?? "").startsWith("audio/") ? "audio" : "file";
+    return {
+      kind,
+      url: (kind === "image" ? a.image_url || a.thumb_url : a.asset_url) || a.asset_url || a.image_url || null,
+      thumbUrl: kind === "image" ? a.thumb_url || a.image_url || null : null,
+      title: a.title ?? a.fallback ?? null,
+      mimeType,
+    };
+  });
+
+  const text = m.text && m.text.trim() ? m.text : null;
+  return { text, location, attachments, empty: !text && !location && attachments.length === 0 };
+}
+
 /**
  * The reply detail a notice quotes — `↩ ref · serial`, taken from the ASK the supplier answered
  * rather than from his reply, because only the ask carries the machine's serial (§7.3 stamps it

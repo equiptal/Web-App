@@ -37,6 +37,7 @@ import { ensureDealRoom } from "@/lib/chat/ensure-deal-room";
 import type { BidCard } from "@/lib/contract/bids";
 import {
   arrivalNotice,
+  dockMessageView,
   dockTabs,
   dockUnreadTotal,
   type DockNotice,
@@ -63,6 +64,8 @@ type ChatMsg = {
   text?: string;
   user?: { id?: string };
   created_at?: string | Date;
+  /** Read through `dockMessageView` — the deal room renders these, so the dock must not drop them. */
+  attachments?: { type?: string; image_url?: string; thumb_url?: string; asset_url?: string; title?: string; mime_type?: string; fallback?: string }[];
   custom?: Record<string, unknown>;
 };
 
@@ -462,11 +465,48 @@ export function ChatDock({ bid, groupKey = null, fleet, sendNonce = 0 }: ChatDoc
                   });
                   return <ChatCard key={m.id} view={view} ar={ar} L={L} busy={false} onAccept={() => {}} onCounter={() => {}} />;
                 }
-                if (!m.text) return null;
+                // NOT `if (!m.text) return null`. The dock and `/deal-room/[id]` read the SAME
+                // channel, so a message the deal room shows and the dock drops is the renter seeing
+                // an unread badge, opening the dock, and finding nothing — unread counts every
+                // message. Only a message with no text, no attachment and no point is skipped.
+                const view = dockMessageView(m);
+                if (view.empty) return null;
                 const mine = myStreamId != null && m.user?.id === myStreamId;
                 return (
                   <div key={m.id} className={`msg ${mine ? "mine" : "them"}`}>
-                    {m.text}
+                    {view.location ? (
+                      <a
+                        href={`https://www.google.com/maps?q=${view.location.lat},${view.location.lng}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="msg-att-file msg-loc"
+                      >
+                        <span className="material-icons-outlined">place</span>
+                        <span className="msg-att-name">{view.text ?? L("Shared location", "موقع مشترك")}</span>
+                      </a>
+                    ) : (
+                      view.text
+                    )}
+                    {/* Enough that nothing is invisible, and no more. The element OPENS the
+                        attachment; SAVING it, and translating it, stay in `/deal-room/[id]` — the
+                        dock shows the conversation and hands off (004a §4a.2). */}
+                    {view.attachments.map((a, i) =>
+                      a.kind === "image" ? (
+                        <a key={i} href={a.url ?? undefined} target="_blank" rel="noopener noreferrer" className="msg-att-img">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={a.thumbUrl ?? a.url ?? ""} alt={a.title ?? ""} style={{ maxWidth: "100%" }} />
+                        </a>
+                      ) : a.kind === "audio" ? (
+                        <audio key={i} controls preload="none" src={a.url ?? undefined} style={{ display: "block", maxWidth: "100%", marginTop: 6 }} />
+                      ) : (
+                        <a key={i} href={a.url ?? undefined} target="_blank" rel="noopener noreferrer" className="msg-att-file">
+                          <span className="material-icons-outlined">
+                            {(a.mimeType ?? "").includes("pdf") ? "picture_as_pdf" : "insert_drive_file"}
+                          </span>
+                          <span className="msg-att-name">{a.title ?? L("Attachment", "مرفق")}</span>
+                        </a>
+                      ),
+                    )}
                   </div>
                 );
               })

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   arrivalNotice,
+  dockMessageView,
   dockTabs,
   dockUnreadTotal,
   inboxGroupKey,
@@ -444,5 +445,116 @@ describe("one counterparty key across both projections (I1, AC-70)", () => {
     expect(inbox.supplierCompanyId).toBeNull();
     expect(bidSupplierKey(inbox)).toBe(bidSupplierKey(card));
     expect(bidSupplierKey(card)).toBe("u1");
+  });
+});
+
+/**
+ * **I2 — the dock may not drop a message the deal room shows.**
+ *
+ * Both surfaces read the SAME Stream channel, and unread comes from REST and counts every message.
+ * So `if (!m.text) return null` in the dock was not a rendering shortcut: it was the renter seeing a
+ * badge, opening the dock, and finding nothing there — an attachment-only or location-only message
+ * simply did not exist on that surface, with no gap to notice and nothing to tap.
+ *
+ * The classification is asserted here rather than the chrome (this repo's vitest env is `node`), and
+ * it is the classification BOTH surfaces use, which is what stops them drifting apart again.
+ */
+describe("dockMessageView — nothing the deal room renders is invisible in the dock (I2)", () => {
+  const dealRoomSrc = readFileSync(resolve(process.cwd(), "src/components/deal-room/DealRoom.tsx"), "utf8");
+
+  it("keeps an attachment-only image message, with its thumb", () => {
+    const view = dockMessageView({
+      attachments: [{ type: "image", image_url: "https://x/full.jpg", thumb_url: "https://x/thumb.jpg" }],
+    });
+    expect(view.empty).toBe(false);
+    expect(view.text).toBeNull();
+    expect(view.attachments).toEqual([
+      { kind: "image", url: "https://x/full.jpg", thumbUrl: "https://x/thumb.jpg", title: null, mimeType: null },
+    ]);
+  });
+
+  it("keeps a location-only message, and hands back the point rather than a string", () => {
+    const view = dockMessageView({ custom: { kind: "location", lat: 24.71, lng: 46.68 } });
+    expect(view.empty).toBe(false);
+    expect(view.location).toEqual({ lat: 24.71, lng: 46.68 });
+    // The deal room falls back to "Shared location" when there is no text — so must the dock, which
+    // means the view has to say there IS a location even with nothing to label it.
+    expect(view.text).toBeNull();
+  });
+
+  it("reads a location whose coordinates arrived as strings, exactly as the deal room does", () => {
+    expect(dockMessageView({ custom: { kind: "location", lat: "24.71", lng: "46.68" } }).location).toEqual({
+      lat: 24.71,
+      lng: 46.68,
+    });
+  });
+
+  it("is not fooled by a `location` custom with no usable point", () => {
+    const view = dockMessageView({ custom: { kind: "location", lat: "not-a-number", lng: 46.68 } });
+    expect(view.location).toBeNull();
+    expect(view.empty).toBe(true); // nothing to show, and nothing pretending to be a map link
+  });
+
+  it("classifies a voice note by mime type, not only by Stream's `type`", () => {
+    const view = dockMessageView({ attachments: [{ asset_url: "https://x/vn.m4a", mime_type: "audio/mp4" }] });
+    expect(view.attachments[0].kind).toBe("audio");
+    expect(view.attachments[0].url).toBe("https://x/vn.m4a");
+  });
+
+  it("classifies everything else as a named file, keeping the sender's own title", () => {
+    const view = dockMessageView({
+      attachments: [{ type: "file", asset_url: "https://x/quote.pdf", title: "Quotation.pdf", mime_type: "application/pdf" }],
+    });
+    expect(view.attachments[0]).toMatchObject({ kind: "file", title: "Quotation.pdf", mimeType: "application/pdf" });
+  });
+
+  it("keeps an attachment that arrived with only whitespace for text", () => {
+    const view = dockMessageView({ text: "   ", attachments: [{ type: "image", image_url: "https://x/a.jpg" }] });
+    expect(view.empty).toBe(false);
+    expect(view.text).toBeNull(); // no empty bubble above the thumb
+    expect(view.attachments).toHaveLength(1);
+  });
+
+  it("keeps a plain text message unchanged", () => {
+    const view = dockMessageView({ text: "متى يمكن التسليم؟" });
+    expect(view).toEqual({ text: "متى يمكن التسليم؟", location: null, attachments: [], empty: false });
+  });
+
+  it("drops ONLY a message with no text, no attachment and no point", () => {
+    expect(dockMessageView({}).empty).toBe(true);
+    expect(dockMessageView({ text: "", attachments: [], custom: {} }).empty).toBe(true);
+  });
+
+  it("the dock renders from the view, and no longer early-returns on missing text", () => {
+    // The exact line this finding is about. Asserted on the source because the gap was invisible by
+    // construction: it rendered nothing, so no snapshot and no count could ever have caught it.
+    // Comments are stripped — the code there now explains what it is NOT doing, by name.
+    const code = dockSrc.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^[ \t]*\/\/.*$/gm, " ");
+    expect(code).not.toMatch(/if\s*\(\s*!\s*m\.text\s*\)\s*return null/);
+    expect(dockSrc).toContain("dockMessageView(m)");
+    expect(dockSrc).toContain("view.attachments.map");
+    expect(dockSrc).toContain("msg-att-img");
+    expect(dockSrc).toContain("msg-att-file");
+  });
+
+  it("covers every attachment kind the deal room has a branch for", () => {
+    // Read off the shipped surface rather than restated: if staging widens the deal room again, this
+    // is the assertion that notices the dock has not followed.
+    expect(dealRoomSrc).toContain('a.type === "image"');
+    expect(dealRoomSrc).toContain('(a.mime_type || "").startsWith("audio/")');
+    expect(dealRoomSrc).toContain('custom.kind === "location"');
+    const kinds = new Set(
+      [
+        dockMessageView({ attachments: [{ type: "image", image_url: "u" }] }),
+        dockMessageView({ attachments: [{ type: "audio", asset_url: "u" }] }),
+        dockMessageView({ attachments: [{ mime_type: "audio/mpeg", asset_url: "u" }] }),
+        dockMessageView({ attachments: [{ type: "video", asset_url: "u" }] }),
+        dockMessageView({ attachments: [{ type: "file", asset_url: "u" }] }),
+      ].map((v) => {
+        expect(v.empty).toBe(false);
+        return v.attachments[0].kind;
+      }),
+    );
+    expect([...kinds].sort()).toEqual(["audio", "file", "image"]);
   });
 });
