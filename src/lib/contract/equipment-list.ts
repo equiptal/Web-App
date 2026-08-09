@@ -127,11 +127,6 @@ export interface EquipmentFilterGroup {
   kind: EquipmentFilterKind;
   label: Bilingual;
   options: EquipmentFilterOption[];
-  /**
-   * `distance` only — true when at least one listed machine has no distance and is therefore kept by
-   * every band. The caller must SAY so; see `distanceOptions` for why it is kept rather than hidden.
-   */
-  keepsUnknownDistance?: boolean;
 }
 
 /**
@@ -199,7 +194,6 @@ interface BuiltGroup {
   kind: EquipmentFilterKind;
   label: Bilingual;
   built: BuiltOption[];
-  keepsUnknownDistance?: boolean;
 }
 
 /**
@@ -221,9 +215,13 @@ const finiteKm = (m: FleetMachine): number | null =>
  * **A machine with no distance is kept by every band, never hidden.** `locationSource: 'none'` means
  * *unknown*, not *far*: hiding it would silently delete a real offered machine on the strength of a
  * fact nobody has. It is also the rule v2 wrote for exactly this control, and it is the only reading
- * consistent with `offeredMachines`, which sorts a null LAST without ever calling it distant. Because
- * that is invisible from the chips alone, the group reports `keepsUnknownDistance` so the caller can
- * say it out loud.
+ * consistent with `offeredMachines`, which sorts a null LAST without ever calling it distant.
+ *
+ * The group used to report this as `keepsUnknownDistance` so the chip row could print a note about it.
+ * The note was withdrawn (owner, 2026-08-08 — a null distance needs a yard deleted after the fact, too
+ * rare for a permanent line), and the flag went with it: nothing read it. **The rule is unchanged** —
+ * such a machine is still kept by every band, which the tests assert directly against `filterMachines`
+ * rather than through a field whose only job was to be printed.
  *
  * The bands are cumulative and therefore often redundant — with machines at 10, 30 and 500 km all
  * three bands keep the same two — so **bands producing an identical set collapse to the tightest one**.
@@ -254,12 +252,7 @@ function distanceGroup(listed: readonly FleetMachine[]): BuiltGroup | null {
     });
   }
   if (built.length === 0) return null;
-  return {
-    kind: "distance",
-    label: GROUP_LABEL.distance,
-    built,
-    keepsUnknownDistance: listed.some((m) => finiteKm(m) == null),
-  };
+  return { kind: "distance", label: GROUP_LABEL.distance, built };
 }
 
 /** **التوفّر.** One chip, and it selects for the machine the lessor has confirmed — `unitAvailability`
@@ -450,7 +443,6 @@ export function equipmentFilters(
     kind: g.kind,
     label: g.label,
     options: g.built.map((b) => b.option),
-    ...(g.keepsUnknownDistance == null ? {} : { keepsUnknownDistance: g.keepsUnknownDistance }),
   }));
 }
 

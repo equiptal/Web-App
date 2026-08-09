@@ -886,7 +886,6 @@
 .bidmap .bm-eqf-chip.on { background: #16304f; border-color: #16304f; color: #fff; }
 /* The chip's own count, so the renter can see what a press will cost him before he pays it. */
 .bidmap .bm-eqf-n { font-size: 9.5px; font-weight: 800; opacity: 0.62; }
-.bidmap .bm-eqf-note { flex-basis: 100%; font-size: 9.5px; font-weight: 600; color: #6b8fa8; line-height: 1.7; }
 
 /* The FILTERED empty state (RM3-AC-28e). Deliberately unlike `.bm-eqnone`: that one is centred, flat
    and actionless because nothing can be done about a lessor who registered no machine. This one is a

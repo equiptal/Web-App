@@ -184,10 +184,15 @@ export function EquipmentList({
                   machine, so a null distance needs a yard DELETED after the fact, or one the
                   ownership gate refuses. Rare enough that a permanent line explaining it is clutter.
 
-                  **The BEHAVIOUR it described is unchanged** — `keepsUnknownDistance` still reports
-                  it and such a machine is still kept by every band. Filtering it out would delete a
-                  real offered machine on the strength of a fact nobody has, and «غير معروفة» is not
-                  «بعيدة». Only the explanation is withdrawn, not the rule. */}
+                  **The BEHAVIOUR it described is unchanged** — such a machine is still kept by every
+                  band. Filtering it out would delete a real offered machine on the strength of a fact
+                  nobody has, and «غير معروفة» is not «بعيدة». Only the explanation is withdrawn, not
+                  the rule.
+
+                  The `keepsUnknownDistance` flag that fed this note, and the `.bm-eqf-note` style and
+                  `eqFilterUnknownDistance` string that rendered it, are gone with it — a reporting
+                  channel with no reader. `equipment-list.test.ts` now pins the rule against
+                  `filterMachines` directly, which is where it actually lives. */}
             </div>
           ))}
         </div>

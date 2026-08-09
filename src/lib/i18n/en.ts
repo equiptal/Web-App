@@ -951,9 +951,6 @@ export const en = {
     eqFilterClear: "Clear filters",
     // «3 of 8» — the numerator is what is shown, the denominator is the whole offer.
     eqShownOfTotal: "{n} of {total}",
-    // A machine with no distance is kept by every band: unknown is not far. Said out loud, because
-    // the chips alone cannot show it.
-    eqFilterUnknownDistance: "A machine with no known distance stays visible under every band.",
     // The filtered empty state — deliberately unlike RM3-AC-26's. That one is a statement about the
     // lessor; this one is a statement about the chips the renter pressed.
     eqFilterEmpty: "No machine matches what you chose",

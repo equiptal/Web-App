@@ -557,15 +557,21 @@ describe("a machine with no distance is kept by every band, never hidden (RM3-AC
     expect(group?.options[0].matches).toBe(2);
   });
 
-  it("makes the group say so, so the renter is told rather than left to notice", () => {
+  // These two used to read the group's `keepsUnknownDistance` flag. The flag existed only to feed a
+  // chip-row note that was withdrawn (owner, 2026-08-08), and once the note went nothing read it — so
+  // it is gone, along with `.bm-eqf-note` and `eqFilterUnknownDistance`. The RULE it reported is not
+  // gone, so these now assert it where it actually lives: `filterMachines`.
+  it("is kept by EVERY band the group offers, not just the tightest — unknown is not far", () => {
     const group = equipmentFilters(list, asking()).find((g) => g.kind === "distance");
-    expect(group?.keepsUnknownDistance).toBe(true);
+    expect(group?.options.length).toBeGreaterThan(0); // the loop below must not pass vacuously
+    for (const o of group!.options) {
+      expect(ids(filterMachines(list, asking(), [o.id]))).toContain("unknown");
+    }
   });
 
-  it("does not claim an unknown distance when every machine has one", () => {
+  it("does not keep a MEASURED machine that the band excludes — the rule is about unknown only", () => {
     const measured = offeredMachines(fleet([{ id: "near", km: 10 }, { id: "far", km: 900 }]));
-    const group = equipmentFilters(measured, asking()).find((g) => g.kind === "distance");
-    expect(group?.keepsUnknownDistance).toBe(false);
+    expect(ids(filterMachines(measured, asking(), ["distance:50"]))).toEqual(["near"]);
   });
 });
 
