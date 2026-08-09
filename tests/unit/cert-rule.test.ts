@@ -3,8 +3,6 @@ import { reducer, initialState } from "@/lib/store/rfq-store";
 import {
   defaultProjectDetails,
   defaultPreferences,
-  equipmentCertDefault,
-  isLiftingCategory,
   newManualItem,
   normalizeSafetyCert,
   splitSafetyCerts,
@@ -15,15 +13,19 @@ import type { EquipmentItem, RfqDraft, Taxonomy } from "@/lib/contract";
 import { nodesToTree } from "@/lib/api/app-adapters";
 
 /**
- * 2026-07 certificate rule — EQUIPMENT cert only:
- *   lifting / cranes / aerial → ARAMCO
- *   every other group         → TÜV
- * plus the request-wide ("settings for all items") picker fanning onto every item.
+ * Certificates are the RENTER's choice, never the wizard's guess — for BOTH kinds.
  *
- * The OPERATOR cert is deliberately never seeded. It used to default to SPSP on every operator-on line
- * (mobile parity, `kDefaultOperatorCertCode`), which shipped `operatorLicenseLevel: "SPSP"` on virtually
- * every request as a requirement no renter had asked for — and it gates supplier readiness downstream.
- * The assertions below pin that absence, so a re-introduced seed fails loudly.
+ * The 2026-07 cert rule used to seed each line automatically: the equipment cert by category (lifting /
+ * cranes / aerial → ARAMCO, every other group → TÜV) and the operator cert as SPSP on every operator-on
+ * line (mobile parity: `_withCertRule` / `kDefaultOperatorCertCode`). Both are withdrawn, in the app
+ * first and mirrored here. A seeded cert is not cosmetic — it ships as a Level-3 term and as a document
+ * demanded of every supplier who bids — so guessing one narrowed the renter's own bidder pool.
+ *
+ * What remains is inheritance, not seeding: a line with no per-item override reads the request-wide
+ * step-1 pick, so one choice in step 1 reaches every line in step 2 — LIFTING INCLUDED, since no
+ * category rule intercepts it any more. Pick nothing, and the request carries no cert requirement.
+ *
+ * The assertions below pin the absence of both seeds, so a re-introduced default fails loudly.
  */
 
 // Tagged taxonomy, as the live backend returns it (tag on the CATEGORY row).
@@ -53,45 +55,22 @@ function item(id: string, patch: Partial<EquipmentItem> = {}): EquipmentItem {
   return { ...newManualItem(id), ...patch };
 }
 
-describe("isLiftingCategory", () => {
-  it("uses the taxonomy tag as the authoritative signal", () => {
-    expect(isLiftingCategory({ categoryId: "cat-lift" }, TAXONOMY)).toBe(true);
-    expect(isLiftingCategory({ categoryId: "cat-earth" }, TAXONOMY)).toBe(false);
-  });
-
-  it("does not mis-classify a tagged non-lifting category whose name reads like lifting", () => {
-    // A BMU "Basket Crane" carries a non-lifting tag; the tag wins over the name hint.
-    const tax: Taxonomy = [{ id: "bmu", name: "Basket Crane (BMU)", tag: "Access & Scaffolding", subcategories: [] }];
-    expect(isLiftingCategory({ categoryId: "bmu" }, tax)).toBe(false);
-  });
-
-  it("falls back to English name hints when no tag is present", () => {
-    // Neither the id nor the category name contains "lifting" — the subcategory hint resolves it.
-    expect(isLiftingCategory({ categoryId: "material-handling", subcategoryId: "forklifts" }, TAXONOMY)).toBe(true);
-    expect(isLiftingCategory({ categoryId: "power", subcategoryId: "generators" }, TAXONOMY)).toBe(false);
-  });
-
-  it("falls back to Arabic name hints", () => {
-    const tax: Taxonomy = [{ id: "x", name: "Unknown", nameAr: "معدات رفع", subcategories: [] }];
-    expect(isLiftingCategory({ categoryId: "x" }, tax)).toBe(true);
-  });
-
-  it("treats an unknown category as non-lifting", () => {
-    expect(isLiftingCategory({ categoryId: null }, TAXONOMY)).toBe(false);
-    expect(isLiftingCategory({ categoryId: "nope" }, TAXONOMY)).toBe(false);
-  });
-});
-
 describe("cert defaults", () => {
-  it("maps lifting to Aramco and everything else to TÜV", () => {
-    expect(equipmentCertDefault(true)).toBe("aramco");
-    expect(equipmentCertDefault(false)).toBe("tuv");
-  });
-
-  it("exposes no operator-cert default at all", async () => {
+  it("exposes NO cert default of either kind — nothing can be pre-checked", async () => {
     const contract = await import("@/lib/contract");
+    // Equipment side (the category rule: lifting → Aramco, else TÜV).
+    expect("equipmentCertDefault" in contract).toBe(false);
+    // Operator side (SPSP on every operator-on line).
     expect("operatorCertDefault" in contract).toBe(false);
     expect("DEFAULT_OPERATOR_CERT" in contract).toBe(false);
+  });
+
+  it("keeps no lifting classifier either — the app deleted its counterpart outright", async () => {
+    // `isLiftingEquipment` / `equipmentCertForLifting` / `kLiftingTagValues` are gone from
+    // `localized_labels.dart` on main. A dead predicate here would read as a live rule.
+    const contract = await import("@/lib/contract");
+    expect("isLiftingCategory" in contract).toBe(false);
+    expect("LIFTING_TAG_VALUES" in contract).toBe(false);
   });
 });
 
@@ -101,42 +80,44 @@ describe("nodesToTree", () => {
       { id: "c1", level: "CATEGORY", name: "Cranes", name_ar: null, parent_id: null, aliases: [], tag: "Lifting, Cranes & Aerial" },
       { id: "s1", level: "SUBCATEGORY", name: "Mobile Cranes", name_ar: null, parent_id: "c1", aliases: [], tag: null },
     ]);
+    // Display/grouping only now — the tag drives no cert default on either client.
     expect(tree[0].tag).toBe("Lifting, Cranes & Aerial");
     expect(tree[0].subcategories[0].tag).toBe("Lifting, Cranes & Aerial");
-    expect(isLiftingCategory({ categoryId: "c1" }, tree)).toBe(true);
   });
 });
 
-describe("SET_ITEM_CATEGORY — per-item seed", () => {
-  it("seeds Aramco when the picked category is lifting, and no operator cert", () => {
+describe("SET_ITEM_CATEGORY — picks a category, never a certificate", () => {
+  it("leaves a lifting line BLANK — no Aramco, no operator cert", () => {
     const s = reducer(stateWith([item("m1")]), { t: "SET_ITEM_CATEGORY", id: "m1", categoryId: "cat-lift" });
     const it0 = s.draft!.items[0];
-    expect(it0.safetyCertsOverride).toEqual(["aramco"]);
+    expect(it0.safetyCertsOverride ?? null).toBeNull();
     expect(it0.operator.certificate).toEqual([]);
   });
 
-  it("seeds TÜV for a non-lifting category, and no operator cert", () => {
+  it("leaves a non-lifting line blank too — no TÜV", () => {
     const s = reducer(stateWith([item("m1")]), { t: "SET_ITEM_CATEGORY", id: "m1", categoryId: "cat-earth" });
-    expect(s.draft!.items[0].safetyCertsOverride).toEqual(["tuv"]);
+    expect(s.draft!.items[0].safetyCertsOverride ?? null).toBeNull();
     expect(s.draft!.items[0].operator.certificate).toEqual([]);
   });
 
   it("leaves an operator cert the renter chose intact across a category change", () => {
-    // The app's `_applyCertRule` clears and re-stamps SPSP here; we must not.
+    // The app's `_applyCertRule` used to clear and re-stamp SPSP here; we must not.
     const chosen = item("m1", { operator: { ...newManualItem("m1").operator, certificate: ["tuv"] } });
     const s = reducer(stateWith([chosen]), { t: "SET_ITEM_CATEGORY", id: "m1", categoryId: "cat-lift" });
     expect(s.draft!.items[0].operator.certificate).toEqual(["tuv"]);
   });
 
-  it("re-seeds on a real category change, replacing the previous cert", () => {
-    const s1 = reducer(stateWith([item("m1")]), { t: "SET_ITEM_CATEGORY", id: "m1", categoryId: "cat-earth" });
-    const s2 = reducer(s1, { t: "SET_ITEM_CATEGORY", id: "m1", categoryId: "cat-lift" });
-    expect(s2.draft!.items[0].safetyCertsOverride).toEqual(["aramco"]);
+  it("a REAL category change clears the line's cert back to inheriting, without stamping one", () => {
+    // A cert chosen for an excavator is not an answer about a crane — but the replacement is blank,
+    // not a guess.
+    const s0 = stateWith([item("m1", { ref: { categoryId: "cat-earth", subcategoryId: null, measurementId: null }, safetyCertsOverride: ["tuv"] })]);
+    const s = reducer(s0, { t: "SET_ITEM_CATEGORY", id: "m1", categoryId: "cat-lift" });
+    expect(s.draft!.items[0].safetyCertsOverride).toBeNull();
   });
 
   it("leaves a renter's own cert edit alone when the category is re-picked unchanged", () => {
-    const seeded = reducer(stateWith([item("m1")]), { t: "SET_ITEM_CATEGORY", id: "m1", categoryId: "cat-earth" });
-    const edited = reducer(seeded, { t: "PATCH_ITEM", id: "m1", patch: { safetyCertsOverride: ["aramco"] } });
+    const picked = reducer(stateWith([item("m1")]), { t: "SET_ITEM_CATEGORY", id: "m1", categoryId: "cat-earth" });
+    const edited = reducer(picked, { t: "PATCH_ITEM", id: "m1", patch: { safetyCertsOverride: ["aramco"] } });
     const rePicked = reducer(edited, { t: "SET_ITEM_CATEGORY", id: "m1", categoryId: "cat-earth" });
     expect(rePicked.draft!.items[0].safetyCertsOverride).toEqual(["aramco"]);
   });
@@ -148,28 +129,27 @@ describe("SET_ITEM_CATEGORY — per-item seed", () => {
     }
   });
 
-  it("rescues an uncertified line even when the category is re-picked unchanged", () => {
-    // App parity: the re-seed fires on `categoryChanged || no cert yet`.
+  it("does not 'rescue' an uncertified line on a no-op re-pick", () => {
     const uncertified = item("m1", { ref: { categoryId: "cat-lift", subcategoryId: null, measurementId: null } });
     const s = reducer(stateWith([uncertified]), { t: "SET_ITEM_CATEGORY", id: "m1", categoryId: "cat-lift" });
-    expect(s.draft!.items[0].safetyCertsOverride).toEqual(["aramco"]);
+    expect(s.draft!.items[0].safetyCertsOverride ?? null).toBeNull();
   });
 
-  it("does not stamp an override on a line that inherits the request-wide cert", () => {
+  it("keeps a LIFTING line on the step-1 pick — the category rule no longer intercepts it", () => {
+    // The headline of this change: pick TÜV once in step 1 and a crane line shows TÜV, not Aramco.
     const picked = reducer(stateWith([item("m1")]), { t: "SET_CERTIFICATES", patch: { safety: ["tuv"] } });
     const s = reducer(picked, { t: "SET_ITEM_CATEGORY", id: "m1", categoryId: "cat-lift" });
-    // categoryChanged still re-seeds (app parity) — but a NO-OP re-pick must leave inheritance intact.
-    const noop = reducer(s, { t: "SET_ITEM_CATEGORY", id: "m1", categoryId: "cat-lift" });
-    expect(noop.draft!.items[0].safetyCertsOverride).toEqual(s.draft!.items[0].safetyCertsOverride);
+    expect(s.draft!.items[0].safetyCertsOverride).toBeNull(); // ⇒ inherits ["tuv"]
+    expect(s.draft!.project.certificates.safety).toEqual(["tuv"]);
   });
 });
 
 describe("SET_ITEM_SUBCATEGORY", () => {
-  it("seeds an uncertified line, refining lifting detection on an untagged taxonomy", () => {
-    // "Material Handling" alone doesn't read as lifting; "Forklifts" does.
+  it("never stamps a cert, even where the subcategory reveals the line is lifting", () => {
+    // "Material Handling" alone doesn't read as lifting; "Forklifts" does — and it no longer matters.
     const s0 = stateWith([item("m1", { ref: { categoryId: "material-handling", subcategoryId: null, measurementId: null } })]);
     const s = reducer(s0, { t: "SET_ITEM_SUBCATEGORY", id: "m1", subcategoryId: "forklifts" });
-    expect(s.draft!.items[0].safetyCertsOverride).toEqual(["aramco"]);
+    expect(s.draft!.items[0].safetyCertsOverride ?? null).toBeNull();
   });
 
   it("leaves a line that already has a cert alone", () => {
@@ -182,14 +162,16 @@ describe("SET_ITEM_SUBCATEGORY", () => {
 });
 
 describe("HYDRATE — resumed draft", () => {
-  it("seeds a draft saved before the cert rule shipped", () => {
+  it("resumes a blank line blank — a resumed draft is not a gap to fill", () => {
+    // The seed used to re-run here, putting a requirement back that the renter had left blank on
+    // purpose — at the one moment they can't see it happen.
     const saved = {
       phase: "wizard" as const,
       step: 2 as const,
       draft: draftWith([item("m1", { ref: { categoryId: "cat-lift", subcategoryId: null, measurementId: null } })]),
     };
     const s = reducer({ ...initialState, taxonomy: TAXONOMY }, { t: "HYDRATE", saved });
-    expect(s.draft!.items[0].safetyCertsOverride).toEqual(["aramco"]);
+    expect(s.draft!.items[0].safetyCertsOverride ?? null).toBeNull();
     expect(s.draft!.items[0].operator.certificate).toEqual([]);
   });
 
@@ -201,7 +183,7 @@ describe("HYDRATE — resumed draft", () => {
     expect(s.draft!.items[0].safetyCertsOverride).toEqual(["tuv"]);
   });
 
-  it("seeds the agent snapshot too, so resuming does not read as a renter edit", () => {
+  it("leaves the agent snapshot identical to the draft, so resuming reads as no edit", () => {
     const items = [item("m1", { ref: { categoryId: "cat-earth", subcategoryId: null, measurementId: null } })];
     const saved = {
       draft: draftWith(items),
@@ -255,14 +237,14 @@ describe("PROCESS_SUCCESS — agent-parsed items", () => {
     summary: { totalItems: items.length, needsValidation: 0, notAvailable: 0 },
   });
 
-  it("seeds the category-based cert on items the agent left without one", () => {
+  it("leaves items the agent found no cert for blank — the RFQ text named none", () => {
     const items = [
       item("a1", { ref: { categoryId: "cat-lift", subcategoryId: "sub-mc", measurementId: null } }),
       item("a2", { ref: { categoryId: "cat-earth", subcategoryId: "sub-exc", measurementId: null } }),
     ];
     const s = reducer({ ...initialState, taxonomy: TAXONOMY }, { t: "PROCESS_SUCCESS", draft: agentDraft(items) });
-    expect(s.draft!.items[0].safetyCertsOverride).toEqual(["aramco"]);
-    expect(s.draft!.items[1].safetyCertsOverride).toEqual(["tuv"]);
+    expect(s.draft!.items[0].safetyCertsOverride ?? null).toBeNull();
+    expect(s.draft!.items[1].safetyCertsOverride ?? null).toBeNull();
     expect(s.draft!.items.every((i) => i.operator.certificate.length === 0)).toBe(true);
   });
 
@@ -289,7 +271,7 @@ describe("PROCESS_SUCCESS — agent-parsed items", () => {
     expect(s.draft!.items[0].safetyCertsOverride ?? null).toBeNull();
   });
 
-  it("snapshots the seeded items as the agent origin, so the seed is not read as a renter edit", () => {
+  it("snapshots the items as the agent origin unchanged, so nothing reads as a renter edit", () => {
     const items = [item("a1", { ref: { categoryId: "cat-lift", subcategoryId: null, measurementId: null } })];
     const s = reducer({ ...initialState, taxonomy: TAXONOMY }, { t: "PROCESS_SUCCESS", draft: agentDraft(items) });
     expect(JSON.stringify(s.agentOrigin!.items)).toBe(JSON.stringify(s.draft!.items));
@@ -346,13 +328,13 @@ describe("agent items with a non-offered cert", () => {
   });
 });
 
-describe("Other text is cleared when the rule replaces the cert list", () => {
-  it("a category change drops the carried-over Other text", () => {
+describe("Other text follows the cert list it belongs to", () => {
+  it("a real category change drops the carried-over Other text along with the cert", () => {
     const s0 = stateWith([
       item("m1", { ref: { categoryId: "cat-earth", subcategoryId: null, measurementId: null }, safetyCertsOverride: ["other"], safetyCertsOtherText: "spsp" }),
     ]);
     const s = reducer(s0, { t: "SET_ITEM_CATEGORY", id: "m1", categoryId: "cat-lift" });
-    expect(s.draft!.items[0].safetyCertsOverride).toEqual(["aramco"]);
+    expect(s.draft!.items[0].safetyCertsOverride).toBeNull();
     expect(s.draft!.items[0].safetyCertsOtherText).toBeNull();
   });
 
@@ -362,7 +344,7 @@ describe("Other text is cleared when the rule replaces the cert list", () => {
     expect(s.draft!.items[0].safetyCertsOtherText).toBeNull();
   });
 
-  it("an item whose only cert is Other text counts as certified (no re-seed over it)", () => {
+  it("survives a no-op re-pick of the same category", () => {
     const s0 = stateWith([
       item("m1", { ref: { categoryId: "cat-lift", subcategoryId: null, measurementId: null }, safetyCertsOverride: ["other"], safetyCertsOtherText: "Client cert" }),
     ]);
@@ -372,7 +354,7 @@ describe("Other text is cleared when the rule replaces the cert list", () => {
 });
 
 describe("ADD_ITEM", () => {
-  it("arrives with NO certs of either kind — the equipment one lands on the first category pick", () => {
+  it("arrives with NO certs of either kind, and nothing later fills them in", () => {
     const s = reducer(stateWith([]), { t: "ADD_ITEM" });
     const added = s.draft!.items[0];
     expect(added.operatorNeeded).toBe("yes"); // operator on by default (AC-24) …
@@ -380,7 +362,7 @@ describe("ADD_ITEM", () => {
     expect(added.safetyCertsOverride ?? null).toBeNull();
   });
 
-  it("inherits the request-wide cert picked earlier (unlike the app, where a later line falls back to the rule)", () => {
+  it("inherits the request-wide cert picked earlier", () => {
     const picked = reducer(stateWith([]), { t: "SET_CERTIFICATES", patch: { safety: ["aramco"] } });
     const s = reducer(picked, { t: "ADD_ITEM" });
     const added = s.draft!.items[0];
@@ -391,16 +373,23 @@ describe("ADD_ITEM", () => {
 });
 
 describe("submitted payload — the actual regression", () => {
-  it("a renter who never touched the operator certs submits NO operatorLicenseLevel", () => {
-    // The real wizard path: add a line (operator on by default), pick a category. Previously this
-    // shipped `operatorLicenseLevel: "SPSP"` on every item.
+  it("a renter who touched NO certs submits neither an operator nor an equipment cert", () => {
+    // The real wizard path: add a line (operator on by default), pick a category. This used to ship
+    // `operatorLicenseLevel: "SPSP"` AND `safetyCertifications: ["aramco"]` on a request that asked
+    // for neither — both of them requirements suppliers are then measured against.
     const added = reducer(stateWith([]), { t: "ADD_ITEM" });
     const s = reducer(added, { t: "SET_ITEM_CATEGORY", id: added.draft!.items[0].id, categoryId: "cat-lift" });
-    const payload = draftToCreateRequest(s.draft!, "46");
-    const line = payload.equipmentItems[0];
+    const line = draftToCreateRequest(s.draft!, "46").equipmentItems[0];
     expect(line.operatorLicenseLevel).toBeUndefined();
-    // The equipment cert rule is untouched — the lifting line still asks for Aramco.
-    expect(line.safetyCertifications).toEqual(["aramco"]);
+    expect(line.safetyCertifications ?? []).toEqual([]);
+  });
+
+  it("carries a step-1 pick onto a LIFTING line — no Aramco substitution", () => {
+    const added = reducer(stateWith([]), { t: "ADD_ITEM" });
+    const id = added.draft!.items[0].id;
+    const picked = reducer(added, { t: "SET_CERTIFICATES", patch: { safety: ["tuv"] } });
+    const s = reducer(picked, { t: "SET_ITEM_CATEGORY", id, categoryId: "cat-lift" });
+    expect(draftToCreateRequest(s.draft!, "46").equipmentItems[0].safetyCertifications).toEqual(["tuv"]);
   });
 
   it("still submits an operator cert the renter DID pick", () => {

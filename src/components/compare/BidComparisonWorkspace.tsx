@@ -18,6 +18,7 @@ import { qualityFromSubmissionItem, type BidQuality } from "@/lib/contract/bid-q
 import { QualityBadge } from "@/components/bid/QualityRing";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
 import { buildItemComparison, sortByPreset, displayQuote, responsibilityTone, rowWinners, type BidColumn, type Preset, type CostResponsibility, type RatePeriod, type PricesFor } from "@/lib/contract/comparison";
+import { VAT_RATE } from "@/lib/pricing/rental";
 import { bidColumnToComputed, normalizedBidToBidCard, presetToAgent, type RecommendResult, type NormalizedBid } from "@/lib/contract/agent-bids";
 import { BID_VERIFY_ENABLED } from "@/lib/flags";
 import { bidQuoteToFormDraft, type BidFormDraft, type TransformRequestCtx } from "@/lib/contract/bid-form";
@@ -526,6 +527,9 @@ export function BidComparisonWorkspace() {
   useEffect(() => { if (awarded?.id) setAwardedIds((m) => (awarded.id in m ? m : { ...m, [awarded.id]: true })); }, [awarded?.id]);
   const activeItemObj = items.find((i) => i.id === activeItem);
   const durationDays = activeItemObj?.durationDays ?? null;
+  // Paired with durationDays for every price on this screen — the rental can only drop its Fridays when
+  // it knows which days they are; without it the shared maths falls back to the raw quoted rate.
+  const startDate = activeItemObj?.startDate ?? null;
   const units = activeItemObj?.item?.qty ?? 1;
   // itemName() joins subtype + capacity with " · " — split so the card shows the name as title, spec (e.g. "1800 cfm") in the sub.
   const itemFullName = (ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? "";
@@ -538,13 +542,13 @@ export function BidComparisonWorkspace() {
   const mobEstOnYou = (mobByRentee === true ? (renterMobEst.delivery ?? 0) : 0) + (demobByRentee === true ? (renterMobEst.return ?? 0) : 0);
   // Displayed total = the supplier's STATED costs + 15% VAT + the renter's own entered costs (responsibilities
   // on them + their delivery estimate). Always shown as a running total of what's known — never "not stated".
-  const VAT = 0.15;
+  const VAT = VAT_RATE; // the shared rate — never a second 0.15 literal that can drift
   // A cost the renter adds counts toward their total unless the supplier already covers it (AC-12).
   // (Matches the chips: you can only add a cost where bidSide !== "supplier".)
   const renterAddBid = (c: BidColumn) => c.costResponsibilities.reduce((s, x) => (x.renterCost && x.bidSide !== "supplier" ? s + x.renterCost : s), 0) + (renterMob[c.bid.id] ?? mobEstOnYou);
   // §6 toggles drive the totals: displayQuote re-expresses rate for the chosen RATE PERIOD and scales
   // every figure by PRICES-FOR. unitsOf is PER COLUMN = the units that supplier offered (1 when "Per unit").
-  const dq = (c: BidColumn) => displayQuote(c.bid, period, pricesFor, durationDays);
+  const dq = (c: BidColumn) => displayQuote(c.bid, period, pricesFor, durationDays, startDate);
   const unitsOf = (c: BidColumn) => dq(c).units; // = pricesFor === "all" ? (bid.unitsOffered || …) : 1
   // Mob/demob are PER-UNIT when the supplier handles them (× quantity, like the rate) — not one-time.
   const mobDemobUnit = (c: BidColumn) => (c.mob.stated ? c.mob.value : 0) + (c.demob.stated ? c.demob.value : 0);

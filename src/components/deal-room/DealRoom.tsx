@@ -13,6 +13,7 @@ import { ChatCard } from "@/components/deal-room/ChatCard";
 import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
 import { renderQuotationSection, wrapQuotationPage, type QuotationDoc, type QuotationLineItem, type QuotationCard } from "@/lib/quotation/render";
 import "@/components/deal-room/deal-room-proto.css";
+import { computeQuoteTotals, computeRentalTotal } from "@/lib/pricing/rental";
 
 type StreamAttachment = { type?: string; image_url?: string; thumb_url?: string; asset_url?: string; title?: string; mime_type?: string; file_size?: number; fallback?: string };
 // `custom` carries the app's round payload (type:'rate_proposal', …) + location kind; i18n carries
@@ -1277,23 +1278,31 @@ function CounterFlow({
   const demob = editable ? num(demobStr) : (room.demobPrice ?? 0);
   const rateValid = rate > 0;
 
-  // Per-type PRORATED math — monthly ÷26 / weekly ÷7 / daily, × duration(days) × units — matches the
-  // backend quotation calc + the app. Excluded legs contribute 0.
-  const FREQ_DAYS: Record<string, number> = { PER_DAY: 1, PER_WEEK: 7, PER_MONTH: 26 };
-  const basis = (room.priceUnit ?? "PER_DAY").toUpperCase();
-  const perDay = rate / (FREQ_DAYS[basis] ?? 1);
+  // The counter-offer editor recomputes locally (the rate + unit counts are being edited, so it can't
+  // read `computeDealTotals`' snapshot) — but it must recompute the SAME WAY, through the shared module.
+  // It previously carried its own divisor table with a SEVEN-day week and no Friday exclusion, so a
+  // counter-offer at an unchanged rate showed a different total from the price bar right above it.
   const rNU = editable ? rentalUnits : (room.agreedUnits ?? units);
   const mNU = Math.min(editable ? mobUnitsN : (room.mobUnits ?? rNU), rNU);
   const dNU = Math.min(editable ? demobUnitsN : (room.demobUnits ?? rNU), rNU);
   const mEx = editable ? mobExcluded : room.mobExcluded;
   const dEx = editable ? demobExcluded : room.demobExcluded;
-  // PER_JOB is a flat per-job price (no duration factor) — matches the main price bar + app. Everything
-  // else prorates ÷26/÷7 × duration(days).
-  const rentalLine = basis === "PER_JOB" ? rate * rNU : perDay * periods * rNU;
-  const mobLine = mEx ? 0 : mob * mNU;
-  const demobLine = dEx ? 0 : demob * dNU;
-  const subtotal = rentalLine + mobLine + demobLine;
-  const vat = Math.round(subtotal * 0.15);
+  // Same date the price bar prorates against. It lives on `details`, NOT at the top of the room — a
+  // `room.startDate` here type-checks under a loose signature and silently evaluates to undefined,
+  // which turns proration off and shows the raw rate.
+  const startDate = room.details?.startDate ?? null;
+  const perUnitRental = computeRentalTotal({ rate, priceUnit: room.priceUnit, startDate, durationDays: periods }).total;
+  const lines = computeQuoteTotals({
+    perUnitRental,
+    rentalUnits: rNU,
+    mob: { amount: mob, units: mNU, excluded: mEx },
+    demob: { amount: demob, units: dNU, excluded: dEx },
+  });
+  const rentalLine = lines.overall.rental;
+  const mobLine = lines.overall.mob;
+  const demobLine = lines.overall.demob;
+  const subtotal = lines.overall.subtotal;
+  const vat = Math.round(lines.overall.vat);
   const total = subtotal + vat;
 
   // العدد stepper — symmetric, capped. Rental caps at requested; mob/demob cap at the current rental.

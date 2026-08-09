@@ -10,6 +10,8 @@
  * here carries exactly one equipment line. The UI never shows a multi-item request.
  */
 
+import { durationDaysBetween } from "@/lib/pricing/rental";
+
 export type RequestStatus = "OPEN" | "ACTIVE" | "PARTIALLY_ACCEPTED" | "ACCEPTED" | "EXPIRED" | "FORCE_EXPIRED" | "HUB_CLOSED" | "CLOSED" | string;
 export type RequestType = "BROADCAST" | "DIRECT" | string;
 
@@ -239,20 +241,10 @@ export interface RequestGroup {
 const num = (v: unknown): number | null => (typeof v === "number" && !Number.isNaN(v) ? v : null);
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v : null);
 
-/**
- * Rental duration in whole days from start/end — the fallback when the backend didn't store
- * `estimatedDurationDays` (it's an optional create field the backend never derives from the dates, so
- * older/agent-created requests lack it). Matches the mobile app: `end.difference(start).inDays` with the
- * deal-room clamp `d < 1 ? 1`. Lets the comparison's duration-based "Est. rental" show for those requests.
- */
-function durationDaysBetween(start: string | null, end: string | null): number | null {
-  if (!start || !end) return null;
-  const s = new Date(start.length <= 10 ? `${start}T00:00:00Z` : start).getTime();
-  const e = new Date(end.length <= 10 ? `${end}T00:00:00Z` : end).getTime();
-  if (Number.isNaN(s) || Number.isNaN(e)) return null;
-  const d = Math.floor((e - s) / 86_400_000);
-  return d < 1 ? 1 : d;
-}
+// `durationDaysBetween` (imported above, from the pricing module) is the fallback when the backend
+// didn't store `estimatedDurationDays` — an optional create field it never derives from the dates, so
+// older/agent-created requests lack it. It lives in the pricing module rather than here because the
+// supplier bid form derives the same number from the same two dates, and the two must not drift apart.
 
 /**
  * Taxonomy images live in a constant, publicly-readable bucket (the mobile app's `S3Url._bucket`).

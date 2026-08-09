@@ -20,6 +20,7 @@ import { SharedBidNegotiateRoom } from "@/components/requests/SharedBidNegotiate
 import { NEGOTIATE_ENABLED } from "@/lib/config/flags";
 import { computeBidReadiness } from "@/lib/contract/bid-readiness";
 import { BidReadinessBadge, BidEligibilityModal } from "@/components/requests/BidReadiness";
+import { computeQuoteTotals, formatSar, headlineAmount, legDisplay, rentalPeriodSubtitle, VAT_RATE } from "@/lib/pricing/rental";
 
 /** Lifecycle pill (matches the prototype SPILL). */
 const SPILL: Record<string, { cls: string; dot: boolean; en: string; ar: string }> = {
@@ -61,7 +62,17 @@ function offerSuffix(uiState: string | null, L: (en: string, ar: string) => stri
 }
 
 
-export function RequestBids({ requestId }: { requestId: string }) {
+export function RequestBids({
+  requestId,
+  startDate = null,
+  durationDays = null,
+}: {
+  requestId: string;
+  /** The request's period. Both feed the shared rental maths: without them a bid can only be shown at
+   *  its raw rate (app parity), so they are threaded from the request rather than re-fetched here. */
+  startDate?: string | null;
+  durationDays?: number | null;
+}) {
   const { locale } = useLocale();
   const ar = locale === "ar";
   const L = (en: string, arr: string) => (ar ? arr : en);
@@ -113,7 +124,7 @@ export function RequestBids({ requestId }: { requestId: string }) {
         const units = b.numberOfUnits || 1; // bid price is per-unit → × units (app parity)
         const rental = (b.price ?? 0) * periods * units;
         const sub = rental + (b.mobPrice ?? 0) + (b.demobPrice ?? 0);
-        const vat = Math.round(sub * 0.15);
+        const vat = Math.round(sub * VAT_RATE);
         const grand = sub + vat;
         const eq = b.equipment ? [b.equipment.make, b.equipment.model, b.equipment.year].filter(Boolean).join(" · ") : "—";
         const unitsTxt = units > 1 ? ` × ${units}` : "";
@@ -256,6 +267,10 @@ export function RequestBids({ requestId }: { requestId: string }) {
               bid={b}
               ar={ar}
               L={L}
+              // Off-platform bids store no duration — they price over the REQUEST's window, the same pair
+              // `computeBidQuote` gets for the on-platform cards below.
+              startDate={startDate}
+              durationDays={durationDays}
               isSel={selected.has(b.id)}
               onToggleSelect={() => toggleSelect(b.id)}
               onViewSubmission={() => setSubmissionBid(b)}
@@ -268,14 +283,33 @@ export function RequestBids({ requestId }: { requestId: string }) {
         const sp = SPILL[b.status] ?? SPILL.PENDING;
         const accepted = b.status === "ACCEPTED";
         const disabled = b.status === "EXPIRED" || b.status === "WITHDRAWN" || b.expired;
-        // Canonical quote: rate ÷ period-days × duration (weekly ÷7, monthly ÷26), mob/demob × units, VAT 15%.
-        const q = computeBidQuote(b);
+        // Canonical quote: rate ÷ billable days (weekly ÷6, monthly ÷26, Fridays off), VAT 15%.
+        const q = computeBidQuote(b, { startDate, fallbackDays: durationDays });
         const units = q.units;
-        const periods = q.periods;
-        const rentalTotal = q.rentalSubtotal;
-        const sub = q.subtotalPreVat;
-        const vat = Math.round(q.vat);
-        const grand = Math.round(q.total);
+        const rate = b.price ?? 0;
+        // App parity (`v3_bid_card`): weekly/monthly headline the supplier's RAW quoted rate so bids
+        // compare like-for-like on what was quoted; daily headlines the prorated total for the period.
+        const headline = headlineAmount(b.priceUnit, rate, q.perUnitRental);
+        const periodSubtitle = rentalPeriodSubtitle(b.priceUnit); // "6 working days/week" etc.
+        // EVERY breakdown row is PER UNIT (app §5). Multi-unit bids get a second "Overall total" row
+        // below the grand total, and that one is NOT per-unit × units — the transport legs carry their
+        // own counts.
+        const t = computeQuoteTotals({
+          perUnitRental: q.perUnitRental,
+          rentalUnits: units,
+          mob: { amount: b.mobPrice, units: b.mobUnits, excluded: b.mobExcluded },
+          demob: { amount: b.demobPrice, units: b.demobUnits, excluded: b.demobExcluded },
+        });
+        const mobLeg = legDisplay({ amount: b.mobPrice, excluded: b.mobExcluded });
+        const demobLeg = legDisplay({ amount: b.demobPrice, excluded: b.demobExcluded });
+        // The rental row restates the headline when proration changed nothing and there's one unit —
+        // so it's dropped. Multi-unit always keeps it, to sit distinctly above "Overall total".
+        const showRentalRow = !(q.rentalExact && units === 1);
+        const legText = (leg: ReturnType<typeof legDisplay>) =>
+          leg.kind === "amount" ? formatSar(leg.amount)
+          : leg.kind === "excluded" ? L("Excluded", "مستبعد")
+          : leg.kind === "bundled" ? L("Bundled", "شامل")
+          : L("Not quoted", "لم يُحدد");
         const evt =
           b.status === "COUNTER_OFFERED" ? L("Countered", "قدّم عرضاً مقابلاً")
           : b.status === "ACCEPTED" ? L("Accepted", "مقبول")
@@ -402,17 +436,44 @@ export function RequestBids({ requestId }: { requestId: string }) {
             {/* price expandable */}
             <div className={`price-row${priceOpen ? " open" : ""}`}>
               <div className="price-collapsed" onClick={() => setOpenPrice(priceOpen ? null : b.id)}>
-                <span className="pl">{L("Rate", "السعر")}</span>
-                <span className="pr">{nf(b.price ?? 0)} {L("SAR", "ر.س")} / {periodLabel(b.priceUnit)}{units > 1 ? ` · ${L("per unit", "لكل وحدة")}` : ""}<span className="chev">expand_more</span></span>
+                <span className="pl">
+                  {units > 1 ? `${periodLabel(b.priceUnit)} · ${L("per unit", "لكل وحدة")}` : periodLabel(b.priceUnit)}
+                  {/* The fixed-divisor assumption, stated whether or not this period is exact (app parity). */}
+                  {periodSubtitle && (
+                    <span className="psub">
+                      {periodSubtitle === "weekly" ? L("6 working days/week", "٦ أيام عمل/أسبوع") : L("26 working days/month", "٢٦ يوم عمل/شهر")}
+                    </span>
+                  )}
+                </span>
+                <span className="pr">{formatSar(headline)} {L("SAR", "ر.س")}<span className="chev">expand_more</span></span>
               </div>
               {priceOpen && (
                 <div className="price-body">
-                  <div className="prow"><span className="pl2">{L("Rental", "الإيجار")} ({nf(b.price ?? 0)} × {Number.isInteger(periods) ? periods : periods.toFixed(2)}{units > 1 ? ` × ${units}` : ""})</span><span className="pv">{nf(rentalTotal)}</span></div>
-                  {b.mobPrice ? <div className="prow"><span className="pl2">{L("Delivery to site", "النقل إلى الموقع")}{b.mobLeadTime && <span className="lead">{L("delivery within", "تسليم خلال")} {b.mobLeadTime}</span>}</span><span className="pv">{nf(b.mobPrice)}</span></div> : null}
-                  {b.demobPrice ? <div className="prow"><span className="pl2">{L("Return from site", "النقل من الموقع")}{b.demobLeadTime && <span className="lead">{L("return within", "إرجاع خلال")} {b.demobLeadTime}</span>}</span><span className="pv">{nf(b.demobPrice)}</span></div> : null}
-                  <div className="prow"><span className="pl2">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="pv">{nf(sub)}</span></div>
-                  <div className="prow"><span className="pl2">{L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)")}</span><span className="pv">{nf(vat)}</span></div>
-                  <div className="grandcard"><span className="gl">{L("Estimated total", "الإجمالي التقديري")}</span><span className="gv">{nf(grand)} {L("SAR", "ر.س")}</span></div>
+                  {showRentalRow && (
+                    <div className="prow">
+                      <span className="pl2">
+                        {q.billableDays > 0
+                          ? `${L("Rental", "الإيجار")} · ${q.billableDays} ${L("days", "يوم")}`
+                          : L("Rental", "الإيجار")}
+                      </span>
+                      <span className="pv">{formatSar(t.perUnit.rental)}</span>
+                    </div>
+                  )}
+                  <div className="prow"><span className="pl2">{L("Delivery to site", "النقل إلى الموقع")}{b.mobLeadTime && <span className="lead">{L("delivery within", "تسليم خلال")} {b.mobLeadTime}</span>}</span><span className="pv">{legText(mobLeg)}</span></div>
+                  <div className="prow"><span className="pl2">{L("Return from site", "النقل من الموقع")}{b.demobLeadTime && <span className="lead">{L("return within", "إرجاع خلال")} {b.demobLeadTime}</span>}</span><span className="pv">{legText(demobLeg)}</span></div>
+                  <div className="prow"><span className="pl2">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="pv">{formatSar(t.perUnit.subtotal)}</span></div>
+                  <div className="prow"><span className="pl2">{L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)")}</span><span className="pv">{formatSar(t.perUnit.vat)}</span></div>
+                  <div className="grandcard">
+                    <span className="gl">{L("Grand total · incl. VAT", "الإجمالي · شامل الضريبة")}</span>
+                    <span className="gv">{formatSar(t.perUnit.total)} {L("SAR", "ر.س")}</span>
+                  </div>
+                  {units > 1 && (
+                    // All-units math — NOT per-unit × units, since the transport legs have their own counts.
+                    <div className="grandcard overall">
+                      <span className="gl">{L("Overall total", "الإجمالي الكلي")}<span className="lead">{L("Units", "الوحدات")}: {units}</span></span>
+                      <span className="gv">{formatSar(t.overall.total)} {L("SAR", "ر.س")}</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

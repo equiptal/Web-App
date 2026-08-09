@@ -3,6 +3,7 @@
  * Source: app backend `GET /api/deal-rooms/{id}` (deal-room.service.getDealRoom). The renter is the
  * rentee party. Live chat runs over GetStream (channel = streamChannelId; token via stream-token).
  */
+import { computeRentalTotal, rentalDivisor, VAT_RATE } from "@/lib/pricing/rental";
 
 export type DealRoomStatus = "OPEN" | "NEGOTIATING" | "AWAITING_SUPPLIER_CONFIRMATION" | "CLOSED" | "ABANDONED" | string;
 
@@ -216,9 +217,9 @@ export function mapDealRoomDocuments(raw: unknown): DealRoomDocuments {
   };
 }
 
-/** Deal-room proration constants — monthly ÷26 (working days), weekly ÷7, daily ÷1 (app parity:
- *  deal_room_pricing.dart kFreqDays). Deliberately diverges from the marketplace whole-period rule. */
-const DEAL_FREQ_DAYS: Record<string, number> = { PER_DAY: 1, PER_WEEK: 7, PER_MONTH: 26 };
+// Proration now comes from the shared pricing module (monthly ÷26, weekly ÷6, Fridays excluded) so the
+// deal room, the comparison and the quotation cannot drift apart. The local ÷7 table this replaced was
+// one of three copies on the web, and the only one mobile never agreed with.
 
 export interface DealTotals {
   rate: number; priceUnit: string; perDayRate: number;
@@ -246,14 +247,20 @@ export function computeDealTotals(
   const pick = <T,>(o: T | null | undefined, fb: T): T => (o == null ? fb : o);
   const rate = override?.rate ?? room.rate ?? 0;
   const priceUnit = (override?.priceUnit ?? room.priceUnit ?? "PER_DAY").toUpperCase();
-  const dpp = DEAL_FREQ_DAYS[priceUnit] || 1;
+  const dpp = rentalDivisor(priceUnit) || 1;
   const hasDuration = room.periods != null && room.periods > 0;
   const periods = hasDuration ? (room.periods as number) : dpp; // duration in DAYS; no duration = one full period
   const rentalUnits = pick(override?.rentalUnits, room.agreedUnits ?? room.numberOfUnits ?? 1);
   const mobUnitsN = Math.min(pick(override?.mobUnits, room.mobUnits ?? rentalUnits), rentalUnits);
   const demobUnitsN = Math.min(pick(override?.demobUnits, room.demobUnits ?? rentalUnits), rentalUnits);
   const perDayRate = rate / dpp;
-  const rentalTotal = priceUnit === "PER_JOB" ? rate * rentalUnits : perDayRate * periods * rentalUnits;
+  // Shared Friday-excluded proration. With no start date it returns the raw rate rather than a
+  // Friday-blind total, so the room never shows a number the app wouldn't.
+  // The Friday anchor lives under `details`, NOT at the root of the room — a `room.startDate` here
+  // silently evaluates to undefined, which turns proration off and shows the raw rate on every room.
+  const startDate = room.details?.startDate ?? null;
+  const perUnitRental = computeRentalTotal({ rate, priceUnit, startDate, durationDays: periods }).total;
+  const rentalTotal = perUnitRental * rentalUnits;
   const mobPrice = pick(override?.mobPrice, room.mobPrice ?? 0);
   const demobPrice = pick(override?.demobPrice, room.demobPrice ?? 0);
   const mobExcluded = override?.mobExcluded ?? room.mobExcluded === true;
@@ -261,7 +268,7 @@ export function computeDealTotals(
   const mobTotal = mobExcluded ? 0 : mobPrice * mobUnitsN;
   const demobTotal = demobExcluded ? 0 : demobPrice * demobUnitsN;
   const subtotal = rentalTotal + mobTotal + demobTotal;
-  const vat = Math.round(subtotal * 0.15);
+  const vat = Math.round(subtotal * VAT_RATE);
   const grand = subtotal + vat;
   return { rate, priceUnit, perDayRate, rentalUnits, mobUnitsN, demobUnitsN, mobPrice, demobPrice, mobExcluded, demobExcluded, periods, hasDuration, periodCount: periods / dpp, rentalTotal, mobTotal, demobTotal, subtotal, vat, grand };
 }

@@ -94,24 +94,26 @@ export type OperatorNeeded = "yes" | "no"; // AC-24
 export type OperatorCertificate = SafetyCertificate;
 
 /**
- * NO operator-certificate default. The 2026-07 cert rule used to seed SPSP on every operator-on line
- * (app parity: `kDefaultOperatorCertCode`, localized_labels.dart), which meant essentially every
- * request left the wizard demanding an operator SPSP the renter never asked for — and that requirement
- * is not cosmetic: it becomes the Level-3 operator term (`bids.ts`) and an operator SPSP *document*
- * demanded of suppliers (`bid-readiness.ts`). The operator cert is now set only by the renter, or by
- * the agent when the RFQ text actually names one (`toOperatorCert`, agent-adapters.ts).
+ * NO certificate defaults — neither operator nor equipment. Both halves of the 2026-07 cert rule have
+ * now been withdrawn, in the app first (`da23c045`, main) and mirrored here.
  *
- * The EQUIPMENT cert rule below is a separate field and is unaffected.
+ *  • operator cert — used to seed SPSP on every operator-on line (`kDefaultOperatorCertCode`,
+ *    localized_labels.dart), so essentially every request left the wizard demanding an operator SPSP
+ *    the renter never asked for.
+ *  • equipment cert — used to seed Aramco for lifting equipment and TÜV for everything else
+ *    (`_withCertRule` / `_withGlobalEquipmentDefaults`, create_request_bloc.dart), so every line landed
+ *    pre-checked with a cert chosen by category rather than by the renter.
+ *
+ * Neither requirement is cosmetic: a seeded cert becomes a Level-3 term (`bids.ts`) and a *document*
+ * demanded of every supplier who bids (`bid-readiness.ts`). A guess made on the renter's behalf
+ * narrows their own bidder pool.
+ *
+ * Both certs are now set ONLY by the renter — either per line in step 2, or once in step 1's
+ * "settings for all items", which every line inherits (see `SET_CERTIFICATES`, rfq-store.tsx) — or by
+ * the agent when the RFQ text actually names one (`toOperatorCert`/`toSafetyCerts`, agent-adapters.ts).
+ * Picking nothing leaves the request with no cert requirement at all, which is the correct default: the
+ * renter asked for none.
  */
-
-/**
- * Default equipment safety cert for a category, mirroring the app's cert rule (`_withCertRule`,
- * create_request_bloc.dart): Aramco for lifting equipment, TÜV for every other category. Applied when
- * an item's equipment type is (re)picked; the renter can still override it per item.
- */
-export function equipmentCertDefault(isLifting: boolean): SafetyCertificate {
-  return isLifting ? "aramco" : "tuv";
-}
 
 export type Accommodation = "me" | "supplier"; // AC-24
 

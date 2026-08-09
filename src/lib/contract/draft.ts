@@ -50,7 +50,10 @@ export interface AdvancedSettings {
 }
 
 export interface Certificates {
-  safety: SafetyCertificate[]; // AC-50; a pick sets each item's operator certificate (AC-24)
+  /** AC-50 — the request-wide EQUIPMENT cert ("settings for all items"). Every line with no per-item
+   *  override inherits it, lifting included. It does NOT touch the operator certificate: a pick here
+   *  used to stamp one on each item too (AC-24), which is part of the withdrawn cert rule. */
+  safety: SafetyCertificate[];
   /** web-app/002: free-text name when "other" is selected in `safety` (optional). */
   safetyOther: string;
   other: OtherCertificate[]; // AC-50
@@ -278,7 +281,12 @@ export function defaultPreferences(): Preferences {
 }
 
 export function defaultOperatorDetails(): OperatorDetails {
-  return { nightShift: false, nationality: null, nationalityCustom: null, certificate: [], certificateOther: null, fatFood: "me", fatAccommodationTransport: "me" };
+  // F.A.T starts UNSPECIFIED (null), not "me". Seeding "me" made every manually added item submit a
+  // definite "the renter covers food / accommodation & transport" that the renter never chose — the
+  // supplier then prices against a term nobody agreed, and a dispute surfaces after the bid is taken.
+  // The app models this as a real third state (`int? _fatFood`, re-tapping a pill clears it) and
+  // agent-parsed items here already arrive null; this brings manual items in line with both.
+  return { nightShift: false, nationality: null, nationalityCustom: null, certificate: [], certificateOther: null, fatFood: null, fatAccommodationTransport: null };
 }
 
 /** Build a blank item (used when the renter adds a missed item — AC-22). */
