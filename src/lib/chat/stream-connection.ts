@@ -83,6 +83,83 @@ export function releaseStream(): void {
   void pending?.then((c) => c.disconnectUser()).catch(() => {});
 }
 
+/** What {@link StreamLease.connect} rejects with when the lease was released mid-flight. Not a
+ *  failure to report: the caller asked for a connection and then went away, which is ordinary. */
+export const STREAM_LEASE_RELEASED = "stream: lease released";
+
+/**
+ * One caller's reference on the shared client, given back **exactly once** — including when the
+ * caller goes away while the connect is still in flight.
+ *
+ * ── The defect this exists to prevent ────────────────────────────────────────────────────────────
+ * A React effect cannot take the reference synchronously: the token has to be fetched first. The
+ * obvious shape is therefore
+ *
+ * ```ts
+ * let held = false;
+ * const client = await acquireStream(id, token);
+ * held = true;                                  // ← after the await
+ * return () => { if (held) releaseStream(); };  // ← runs synchronously at unmount
+ * ```
+ *
+ * and it is wrong. Cleanup runs **synchronously at unmount**, so leaving the room while the token
+ * fetch or `connectUser` is still pending — slow network, a fast back-tap, StrictMode's double
+ * effect in dev — reads `held === false`, releases nothing, and the reference is taken a moment
+ * later with nobody left to give it back.
+ *
+ * The consequence is worse than the leak. With `refCount` stuck above zero, `connecting` is never
+ * cleared, so **every later visit gets the cached client and never calls `connectUser` again with a
+ * freshly fetched token**. Once the cached token expires the thread simply goes quiet, and there is
+ * no error path for it.
+ *
+ * A lease inverts the ordering: the *intent to release* is recorded synchronously, and whichever of
+ * the two runs last honours it. Create it before the first await, release it in cleanup or a
+ * `finally`, and no interleaving can leak.
+ */
+export interface StreamLease {
+  /** Connect (or join an existing connection) under this lease. Rejects with
+   *  {@link STREAM_LEASE_RELEASED} if the lease was released before or during the attempt — in the
+   *  latter case the reference it took has already been given back. */
+  connect(userId: string, token: string): Promise<StreamChat>;
+  /** Give back whatever this lease holds — now, or the moment an in-flight {@link connect} lands.
+   *  Idempotent, and safe to call before `connect` was ever reached. */
+  release(): void;
+  /** Whether {@link release} has been called. */
+  readonly released: boolean;
+}
+
+/** Open a lease. Call this **synchronously**, before any await, so cleanup always has it to release. */
+export function leaseStream(): StreamLease {
+  let released = false;
+  let held = false;
+  return {
+    get released() {
+      return released;
+    },
+    async connect(userId: string, token: string): Promise<StreamChat> {
+      if (released) throw new Error(STREAM_LEASE_RELEASED);
+      const client = await acquireStream(userId, token);
+      // THE case the old shape got wrong: `release()` ran while this was in flight. The reference is
+      // real now and the only code that could have given it back has already run — so give it back
+      // here rather than pinning `refCount` above zero for the rest of the session.
+      if (released) {
+        releaseStream();
+        throw new Error(STREAM_LEASE_RELEASED);
+      }
+      held = true;
+      return client;
+    },
+    release(): void {
+      if (released) return;
+      released = true;
+      // Nothing taken yet — `connect` will give back whatever it ends up taking.
+      if (!held) return;
+      held = false;
+      releaseStream();
+    },
+  };
+}
+
 /** Watch one deal room's channel on the shared client. */
 export async function watchDealRoom(client: StreamChat, dealRoomId: string): Promise<Channel> {
   const channel = client.channel("messaging", dealRoomChannelId(dealRoomId));

@@ -32,7 +32,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Channel } from "stream-chat";
 import { ChatCard } from "@/components/deal-room/ChatCard";
 import { fetchReceivedBids, fetchStreamToken } from "@/lib/api/client";
-import { STREAM_API_KEY, acquireStream, releaseStream, watchDealRoom } from "@/lib/chat/stream-connection";
+import { STREAM_API_KEY, leaseStream, watchDealRoom } from "@/lib/chat/stream-connection";
 import { ensureDealRoom } from "@/lib/chat/ensure-deal-room";
 import type { BidCard } from "@/lib/contract/bids";
 import {
@@ -169,7 +169,10 @@ export function ChatDock({ bid, groupKey = null, fleet, sendNonce = 0 }: ChatDoc
       return;
     }
     let cancelled = false;
-    let held = false;
+    // Opened SYNCHRONOUSLY, before the token fetch — see `leaseStream`. A `held` flag set after the
+    // await reads false in a cleanup that runs at unmount, and the reference taken a moment later
+    // would never come back.
+    const lease = leaseStream();
     let channel: Channel | null = null;
     const onNew = () => {
       if (channel) setMessages([...channel.state.messages] as ChatMsg[]);
@@ -178,8 +181,7 @@ export function ChatDock({ bid, groupKey = null, fleet, sendNonce = 0 }: ChatDoc
       try {
         const tok = await fetchStreamToken(tokenRoomId);
         if (cancelled || !tok.token || !tok.userId) return;
-        const client = await acquireStream(tok.userId, tok.token);
-        held = true;
+        const client = await lease.connect(tok.userId, tok.token);
         if (cancelled) return;
         setMyStreamId(tok.userId);
         channel = await watchDealRoom(client, activeRoomId);
@@ -196,7 +198,7 @@ export function ChatDock({ bid, groupKey = null, fleet, sendNonce = 0 }: ChatDoc
       channel?.off("message.new", onNew);
       channelRef.current = null;
       // Release, never disconnect: the deal-room route may still hold the same client.
-      if (held) releaseStream();
+      lease.release();
     };
   }, [open, activeRoomId, tokenRoomId]);
 
@@ -325,10 +327,16 @@ export function ChatDock({ bid, groupKey = null, fleet, sendNonce = 0 }: ChatDoc
         // message is not lost between creating the room and having a channel to put it in.
         const tok = await fetchStreamToken(roomId);
         if (tok.token && tok.userId) {
-          const client = await acquireStream(tok.userId, tok.token);
-          const channel = await watchDealRoom(client, roomId);
-          await channel.sendMessage({ text: body });
-          releaseStream();
+          // `finally`, not a trailing release: a throw out of `watchDealRoom` or `sendMessage` is
+          // swallowed by the outer catch below, and without this the reference would leak there too.
+          const lease = leaseStream();
+          try {
+            const client = await lease.connect(tok.userId, tok.token);
+            const channel = await watchDealRoom(client, roomId);
+            await channel.sendMessage({ text: body });
+          } finally {
+            lease.release();
+          }
         }
       } else {
         if (!channelRef.current) return;

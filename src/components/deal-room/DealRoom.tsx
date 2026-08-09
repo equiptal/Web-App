@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
-import { STREAM_API_KEY, acquireStream, releaseStream } from "@/lib/chat/stream-connection";
+import { STREAM_API_KEY, leaseStream } from "@/lib/chat/stream-connection";
 import { useHeaderBack } from "@/components/AppShell";
 import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, ApiError } from "@/lib/api/client";
 import { computeDealTotals, type DealRoomView, type DealTerm, type DealRoomDocument, type DealRoomDocuments, type QuotationView } from "@/lib/contract/deal-room";
@@ -406,14 +406,18 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   // other's channels. Now the last release disconnects, and this component's cleanup is a release.
   useEffect(() => {
     if (!STREAM_API_KEY) return;
-    let held = false;
+    // The lease is opened SYNCHRONOUSLY, before the token fetch. Cleanup runs synchronously at
+    // unmount, so a flag set *after* the await would still read false there and the reference taken
+    // a moment later would never be given back — pinning `refCount` above zero and leaving every
+    // later visit on a cached client that is never re-authenticated. The lease records the release
+    // instead, and whichever of the two runs last honours it.
+    const lease = leaseStream();
     let cancelled = false;
     (async () => {
       try {
         const tok = await fetchStreamToken(id);
         if (cancelled || !tok.token || !tok.userId || !tok.channelId) return;
-        const client = await acquireStream(tok.userId, tok.token);
-        held = true;
+        const client = await lease.connect(tok.userId, tok.token);
         if (cancelled) return;
         setMyStreamId(tok.userId);
         const ch = client.channel("messaging", tok.channelId);
@@ -438,8 +442,9 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
       cancelled = true;
       channelRef.current = null;
       if (roomRefetchTimer.current) clearTimeout(roomRefetchTimer.current);
-      // Release, never disconnect: another surface may still be reading the same client.
-      if (held) releaseStream();
+      // Release, never disconnect: another surface may still be reading the same client. Releasing
+      // the LEASE (rather than a `held` flag) is what makes an unmount-during-connect safe.
+      lease.release();
     };
     // loadRoom just re-reads fetchDealRoom(id) (id stable) — don't re-open the chat connection for it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
