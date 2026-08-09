@@ -319,6 +319,56 @@ describe("operator certs — the app's `kOperatorReqCodeToDocKind`, case by case
     expect(r.equipmentCerts.map((c) => [c.code, c.present])).toEqual([["tuv", false]]);
     expect(r.operatorCerts).toEqual([]);
   });
+
+  /**
+   * **The HELD side, which `bids.ts` copies off the wire verbatim.**
+   *
+   * Given a machine holds an operator paper, When the wire spells its `type` in any case or with
+   * stray spacing, Then the paper scores in the operator bucket — and never falls between the two.
+   *
+   * The regression this pins: the `isOp` router lowercased its copy before testing `startsWith
+   * ("operator")`, so `OPERATOR_TUV` was pushed OUT of the equipment bucket; but `docTypeUrl` was
+   * keyed by the raw string, so the operator bucket's exact-equality lookup for `operator_tuv` missed
+   * it too. **The paper scored in NEITHER** — the machine read red on `GroupBids`, `RequestBids`,
+   * `BidComparisonWorkspace` and `BidReadiness` for a certificate it holds.
+   */
+  describe("a held paper is folded the same way the ask is, so the two meet", () => {
+    const spellings = ["OPERATOR_TUV", " operator_tuv", "operator_tuv ", "Operator_TUV", "operator-tuv", "Operator TUV"];
+
+    it.each(spellings)("a held %j answers an asked-for TUV", (held) => {
+      const r = score("TUV", [held]);
+      expect(r.operatorCerts.map((c) => [c.code, c.present])).toEqual([["operator_tuv", true]]);
+      expect(r.done).toBe(r.total);
+      expect(r.band).toBe("green");
+    });
+
+    it("the licence and SPSP spellings fold too", () => {
+      expect(score("CERTIFIED", ["OPERATING_LICENSE"]).operatorCerts.map((c) => c.present)).toEqual([true]);
+      expect(score("CERTIFIED", [" Operating License "]).operatorCerts.map((c) => c.present)).toEqual([true]);
+      expect(score("SPSP", ["Operator-SPSP"]).operatorCerts.map((c) => c.present)).toEqual([true]);
+    });
+
+    it("scores in exactly ONE bucket — an odd-cased operator paper is still not an equipment cert", () => {
+      // The other half of the bug: whichever way `isOp` goes, the paper must land somewhere. It must
+      // NOT land in both, or a held `OPERATOR_TUV` would start answering an equipment TÜV ask.
+      const inputs = readinessInputsFor({ reqEquipmentCerts: ["tuv"], operatorCertReq: "TUV" });
+      const r = computeUnitReadiness(unitWith(["OPERATOR_TUV"]), inputs.equipCerts, inputs.operatorCerts, null);
+      expect(r.equipmentCerts.map((c) => [c.code, c.present])).toEqual([["tuv", false]]);
+      expect(r.operatorCerts.map((c) => [c.code, c.present])).toEqual([["operator_tuv", true]]);
+    });
+
+    it("an oddly-cased EQUIPMENT cert still answers its own ask", () => {
+      // `heldDocType` runs ahead of `canonicalCertCode`, which already normalised; folding twice must
+      // not move the equipment side at all.
+      const inputs = readinessInputsFor({ reqEquipmentCerts: ["tuv"], operatorCertReq: null });
+      const r = computeUnitReadiness(unitWith([" TUV "]), inputs.equipCerts, inputs.operatorCerts, null);
+      expect(r.equipmentCerts.map((c) => [c.code, c.present])).toEqual([["tuv", true]]);
+    });
+
+    it("a paper the machine does not hold is still absent, however it is spelled", () => {
+      expect(score("SPSP", ["OPERATOR_TUV"]).operatorCerts.map((c) => c.present)).toEqual([false]);
+    });
+  });
 });
 
 describe("computeBidReadiness is unchanged by the extraction (the mobile app mirrors it)", () => {

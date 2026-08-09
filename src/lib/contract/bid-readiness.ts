@@ -137,6 +137,28 @@ export function canonicalCertCode(x: string): string {
   return t;
 }
 
+/**
+ * Fold a **held** document type — the raw `documents[].type` string `bids.ts` copies off the wire
+ * verbatim — to the one spelling both branches of the scorer test against.
+ *
+ * Trim, lowercase, and collapse spaces and hyphens to `_`. That is deliberately the same fold as
+ * `machine-panel-model.ts`'s `norm`, and it produces exactly the vocabulary
+ * `OPERATOR_REQ_CODE_TO_DOC_KIND` emits on the ask side (`operator_tuv` · `operator_spsp` ·
+ * `operating_license`), so a held paper and the ask for it meet as the same string.
+ *
+ * **Why it has to be one fold and not two.** The equipment bucket keyed on `canonicalCertCode` (which
+ * normalises) while the operator bucket keyed on the raw type (which does not), and the `isOp` test
+ * that routes between them ran on a lowercased copy of a string neither map was keyed by. A held
+ * `OPERATOR_TUV`, or `" operator_tuv"` with a leading space, was therefore pushed out of the equipment
+ * bucket by `isOp` **and** missed by the operator bucket's exact-equality lookup — the paper scored in
+ * neither, and read red on every readiness surface for a machine that holds it.
+ *
+ * ⚠️ **Held vocabulary only.** This never touches `OPERATOR_REQ_CODE_TO_DOC_KIND`: the request-code →
+ * doc-kind translation is a verbatim port of `bid_readiness.dart` and stays exactly as the app writes
+ * it. This normalises how the MACHINE's papers are spelled, not what the request asks for.
+ */
+const heldDocType = (s: string): string => s.trim().toLowerCase().replace(/[\s-]+/g, "_");
+
 const bandOf = (percent: number): ReadinessBand => (percent >= 100 ? "green" : percent >= 50 ? "yellow" : "red");
 const certLabel = (code: string): { labelEn: string; labelAr: string } => {
   const l = EQ_CERT_LABELS[code] ?? { en: code.toUpperCase(), ar: code.toUpperCase() };
@@ -170,13 +192,16 @@ export function computeUnitReadiness(
   // Equipment certs fold through `canonicalCertCode`; operator-prefixed papers stay OUT of that bucket
   // so a held `operator_tuv` can never answer an equipment TÜV ask.
   const eqDocByCert = new Map<string, string | null>(); // canonical equipment cert → presigned url
-  // The machine's RAW document types, exactly as the wire spells them — the app's `unitDocTypes`. The
-  // operator match is `docTypes.contains(kind)`, an exact equality, so nothing is normalised here.
+  // The machine's document types, folded through `heldDocType` — the SAME fold that decides `isOp`, so
+  // the two branches partition the papers instead of each disowning the same one. The operator match
+  // below is still `docTypes.contains(kind)`, an exact equality; what changed is that both sides of
+  // that equality are now spelled the one way.
   const docTypeUrl = new Map<string, string | null>();
   for (const d of unit.documentKeys) {
-    const isOp = d.type.trim().toLowerCase().startsWith("operator");
-    if (!isOp) eqDocByCert.set(canonicalCertCode(d.type), d.url ?? null);
-    docTypeUrl.set(d.type, d.url ?? null);
+    const type = heldDocType(d.type);
+    const isOp = type.startsWith("operator");
+    if (!isOp) eqDocByCert.set(canonicalCertCode(type), d.url ?? null);
+    docTypeUrl.set(type, d.url ?? null);
   }
 
   const equipmentCerts: ReadinessCert[] = reqEquipCerts.map((c) => {
