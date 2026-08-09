@@ -3,8 +3,13 @@
 **Prefix:** `RM3-AC-*` / `RM3-TC-*` · **Layer:** web (`Web-App`) unless marked
 **Self-contained.** Everything this surface depends on is stated here and anchored to code, not to
 another spec.
-**Source of truth for layout:** prototype `Deal Room Map.html` · element list
-`docs/rentee-map-v3-elements.md`
+**Source of truth for layout:** prototype `Deal Room Map.html` (geometry extracted in
+`docs/implementation-plans/deal-room-rentee-map/design-v3.md`) · element list
+`docs/rentee-map-v3-elements.md` — **for layout and intent only. On behaviour, THIS spec and `004a`
+win.** The element list was written 2026-08-07, before the 7–9 August rulings, and went on stating rules
+that were later withdrawn (the company document ask · per-row download · a held row being requestable ·
+"every row, the same three actions", which sweeps in the operator's inert rows). Each is now struck in
+place there, dated, with what replaced it — corrected 2026-08-09, see §11.
 
 ---
 
