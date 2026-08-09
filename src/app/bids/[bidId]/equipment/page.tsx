@@ -37,7 +37,10 @@ export default function BidEquipmentPage({ params }: { params: Promise<{ bidId: 
   const { bidId } = use(params);
   const t = useT();
   return (
-    <AppShell title={t.bidMap.surfaceTitle}>
+    // `fullBleed` — the map fills the shell below the header. Without it the surface renders inside
+    // the standard `max-w-[1440px]` page gutter, which drew it as a card floating in the middle of a
+    // desktop viewport with the map squeezed into what was left.
+    <AppShell fullBleed title={t.bidMap.surfaceTitle}>
       <BidEquipmentGate bidId={decodeURIComponent(bidId)} />
     </AppShell>
   );

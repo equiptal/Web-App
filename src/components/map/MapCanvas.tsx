@@ -506,6 +506,14 @@ export default function MapCanvas({
         minZoom={5}
         maxZoom={16}
         wheelPxPerZoomLevel={90}
+        // `inertiaDeceleration` is the one view option in §7b that is NOT already Leaflet's default.
+        // Leaflet ships **3400** px/s² (`leaflet-src.js:13724` — its own doc comment above it says
+        // 3000 and is wrong), so an unset map stopped a flick about a fifth harder than the
+        // prototype, which coasts a pan across the country instead of parking it under the finger.
+        // The rest of §7b's list — `inertia`, `doubleClickZoom`, `keyboard`, `worldCopyJump:false`,
+        // `attributionControl` — was checked against that same source and does match, so those are
+        // left unstated rather than restated.
+        inertiaDeceleration={2800}
         style={{ height: "100%", width: "100%" }}
       >
         {/* CARTO **voyager**, not OpenStreetMap standard (`baseUrl('voyager')`, decoded 3840). Not a

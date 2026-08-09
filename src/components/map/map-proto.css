@@ -33,14 +33,18 @@
    column that is read top to bottom, and a column that floats over the map hides the machines it is
    describing. The panel is the LAST child, which is what lands it on the inline-end edge — the same
    edge the prototype's physical `left: 18px` lands on in Arabic — in both directions. */
+/* FULL-BLEED, not a card. The surface fills the shell below the header — the host route passes
+   `fullBleed` to `AppShell`, so there is no page gutter and no max-width to sit inside. It was
+   briefly `height: min(78vh, 820px)` with a 1px border and an 18px radius, which drew the whole
+   verification surface as a floating card with a wide margin on a desktop viewport. No spec asked
+   for that: §5's box is diagram furniture, not a border. A map you are reading distances off wants
+   the pixels. */
 .bidmap {
   position: relative;
   display: flex;
   align-items: stretch;
-  height: min(78vh, 820px);
+  flex: 1;
   min-height: 520px;
-  border: 1px solid #e1e9f1;
-  border-radius: 18px;
   overflow: hidden;
   font-size: 14px;
   color: #16304f;
