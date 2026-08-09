@@ -133,6 +133,54 @@ describe("draftToCreateRequest — ALIGNMENT rules", () => {
     expect(c.operatorLicenseLevel).toBeUndefined();
   });
 
+  it("F.A.T untouched → nothing sent, not an invented 'renter covers it'", () => {
+    // defaultOperatorDetails() used to seed "me" on both sides, so every manual item asserted that the
+    // RENTER covers food + accommodation/transport. The supplier priced against a term nobody agreed.
+    const a = draftToCreateRequest(makeDraft({ items: [makeItem({ operatorNeeded: "yes" })] }), "46").equipmentItems[0];
+    expect(a.fatFood).toBeUndefined();
+    expect(a.fatAccommodationTransport).toBeUndefined();
+    // The deprecated rollup must stay off too — deriving `false` here would assert "renter covers F.A.T".
+    expect(a.fatRequired).toBeUndefined();
+  });
+
+  it("F.A.T answered → sides sent, and fatRequired DERIVED from them (app parity)", () => {
+    const at = (fatFood: "me" | "supplier" | null, fatAccommodationTransport: "me" | "supplier" | null) =>
+      draftToCreateRequest(
+        makeDraft({ items: [makeItem({ operatorNeeded: "yes", operator: { ...defaultOperatorDetails(), fatFood, fatAccommodationTransport } })] }),
+        "46",
+      ).equipmentItems[0];
+
+    // supplier covers food, renter covers accommodation → both sides sent, rollup true ("at least one")
+    const split = at("supplier", "me");
+    expect(split.fatFood).toBe(true);
+    expect(split.fatAccommodationTransport).toBe(false);
+    expect(split.fatRequired).toBe(true);
+
+    // renter covers both → an explicit answer, so it IS sent; rollup false
+    const renter = at("me", "me");
+    expect(renter.fatFood).toBe(false);
+    expect(renter.fatAccommodationTransport).toBe(false);
+    expect(renter.fatRequired).toBe(false);
+
+    // only one side answered → the other stays unspecified, never back-filled from the rollup
+    const partial = at(null, "supplier");
+    expect(partial.fatFood).toBeUndefined();
+    expect(partial.fatAccommodationTransport).toBe(true);
+    expect(partial.fatRequired).toBe(true);
+  });
+
+  it("the agent's fat_required can no longer bypass the two sides", () => {
+    // This produced `fat_required = true` with BOTH split columns null — impossible under the split
+    // model, and it reads as "F.A.T included" on the admin surfaces while the bid form shows nothing.
+    const a = draftToCreateRequest(
+      makeDraft({ items: [makeItem({ operatorNeeded: "yes", operator: { ...defaultOperatorDetails(), fatRequired: true } })] }),
+      "46",
+    ).equipmentItems[0];
+    expect(a.fatRequired).toBeUndefined();
+    expect(a.fatFood).toBeUndefined();
+    expect(a.fatAccommodationTransport).toBeUndefined();
+  });
+
   it("operator cert 'other' free-text → appended to operatorLicenseLevel (commas→spaces)", () => {
     const a = draftToCreateRequest(
       makeDraft({ items: [makeItem({ operatorNeeded: "yes", operator: { ...defaultOperatorDetails(), certificate: ["tuv", "other"], certificateOther: "Crane Op Level 3, IPAF" } })] }),

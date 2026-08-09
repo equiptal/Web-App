@@ -17,10 +17,16 @@ const bc = (p: Partial<BidCard>): BidCard => ({
 });
 const term = (key: string, state: TermRow["state"]): TermRow => ({ key, labelEn: key, labelAr: key, state });
 
+/** A Sunday, so each window's Friday count is easy to follow. Real requests always carry a start date
+ *  (`equipment_requests.start_date` is NOT NULL); a quote built without one prices at the bare rate. */
+const SUNDAY = "2026-08-09T00:00:00.000Z";
+
 describe("daysPerPeriod", () => {
-  it("maps the price unit to days (PER_JOB → 0)", () => {
+  it("maps the price unit to BILLABLE days (week = 6, PER_JOB → 0)", () => {
     expect(daysPerPeriod("PER_DAY")).toBe(1);
-    expect(daysPerPeriod("PER_WEEK")).toBe(7);
+    // 6, not 7: Friday is the weekend, so a working week is six days (mobile parity — this returned 7
+    // until the pricing module landed, which is why the app and the web disagreed on every weekly bid).
+    expect(daysPerPeriod("PER_WEEK")).toBe(6);
     expect(daysPerPeriod("PER_MONTH")).toBe(26); // 26 working days per month, not 30 calendar
     expect(daysPerPeriod("PER_JOB")).toBe(0);
     expect(daysPerPeriod(null)).toBe(1);
@@ -31,10 +37,36 @@ describe("computeBidQuote (shared quote math — comparison ↔ quotation parity
   // `unitsOffered` is set alongside `numberOfUnits` in these cases on purpose: the supplier's OFFERED
   // count is what the quote scales by (see the precedence test below), and the shared `bc()` fixture
   // defaults it to 1. Leaving it out silently priced every case at one unit.
-  it("weekly rate ÷7 × duration × units", () => {
-    const q = computeBidQuote(bc({ price: 700, priceUnit: "PER_WEEK", duration: 14, numberOfUnits: 2, unitsOffered: 2 }));
-    expect(q.perUnitRental).toBe(1400); // 700 / 7 × 14
+  it("weekly rate ÷6 × BILLABLE days × units", () => {
+    // 14 days from a Sunday contains 2 Fridays → 12 billable days, so 700 ÷ 6 × 12.
+    const q = computeBidQuote(bc({ price: 700, priceUnit: "PER_WEEK", duration: 14, numberOfUnits: 2, unitsOffered: 2 }), { startDate: SUNDAY });
+    expect(q.perUnitRental).toBe(1400);
     expect(q.rentalSubtotal).toBe(2800); // × 2 units
+  });
+
+  it("exposes the billable-day count and the exact-period flag the card renders from", () => {
+    // 14 days from a Sunday → 12 billable. The card captions the rental row "· 12 days".
+    const q = computeBidQuote(bc({ price: 700, priceUnit: "PER_WEEK", duration: 14, unitsOffered: 1 }), { startDate: SUNDAY });
+    expect(q.billableDays).toBe(12);
+    expect(q.rentalExact).toBe(false);
+  });
+
+  it("flags an exact period, which is what lets a single-unit card drop its rental row", () => {
+    // 7 days from a Sunday → 6 billable → ÷6 × 6 lands exactly on the quoted rate, so the row would
+    // only restate the headline.
+    const q = computeBidQuote(bc({ price: 700, priceUnit: "PER_WEEK", duration: 7, unitsOffered: 1 }), { startDate: SUNDAY });
+    expect(q.perUnitRental).toBe(700);
+    expect(q.rentalExact).toBe(true);
+  });
+
+  it("reports no billable days when the rental never prorated, so no day caption is shown", () => {
+    const q = computeBidQuote(bc({ price: 700, priceUnit: "PER_WEEK", duration: 14, unitsOffered: 1 }));
+    expect(q.billableDays).toBe(0); // no startDate → bare rate → nothing to caption
+  });
+
+  it("without a startDate the rental is the bare rate — Fridays can't be located (mobile §3)", () => {
+    const q = computeBidQuote(bc({ price: 700, priceUnit: "PER_WEEK", duration: 14, numberOfUnits: 1, unitsOffered: 1 }));
+    expect(q.perUnitRental).toBe(700);
   });
 
   it("monthly rate uses 26 working days", () => {
@@ -49,13 +81,16 @@ describe("computeBidQuote (shared quote math — comparison ↔ quotation parity
   });
 
   it("mobilization/demobilization are per-unit (× units); VAT is 15% of the pre-VAT subtotal", () => {
-    const q = computeBidQuote(bc({ price: 100, priceUnit: "PER_DAY", duration: 10, numberOfUnits: 2, unitsOffered: 2, mobPrice: 800, demobPrice: 800 }));
-    expect(q.rentalSubtotal).toBe(2000); // 100 × 10 × 2
-    expect(q.mobTotal).toBe(1600); // 800 × 2
+    const q = computeBidQuote(
+      bc({ price: 100, priceUnit: "PER_DAY", duration: 10, numberOfUnits: 2, unitsOffered: 2, mobPrice: 800, demobPrice: 800 }),
+      { startDate: SUNDAY },
+    );
+    expect(q.rentalSubtotal).toBe(1800); // 100 × 9 billable days (10 less one Friday) × 2
+    expect(q.mobTotal).toBe(1600); // 800 × 2 — transport doesn't prorate
     expect(q.demobTotal).toBe(1600);
-    expect(q.subtotalPreVat).toBe(5200);
-    expect(q.vat).toBeCloseTo(780); // 15%
-    expect(q.total).toBeCloseTo(5980);
+    expect(q.subtotalPreVat).toBe(5000);
+    expect(q.vat).toBeCloseTo(750); // 15%
+    expect(q.total).toBeCloseTo(5750);
   });
 
   // The guard that was missing. When the live-unit price landed (6a5890e) the resolution order changed
@@ -76,10 +111,10 @@ describe("computeBidQuote (shared quote math — comparison ↔ quotation parity
   });
 
   it("a units override and a duration fallback are honored", () => {
-    const q = computeBidQuote(bc({ price: 100, priceUnit: "PER_DAY", duration: null, numberOfUnits: 5 }), { units: 1, fallbackDays: 7 });
+    const q = computeBidQuote(bc({ price: 100, priceUnit: "PER_DAY", duration: null, numberOfUnits: 5 }), { units: 1, fallbackDays: 7, startDate: SUNDAY });
     expect(q.units).toBe(1); // override beats numberOfUnits
     expect(q.days).toBe(7); // fallback used when the bid states no duration
-    expect(q.rentalSubtotal).toBe(700); // 100 × 7 × 1
+    expect(q.rentalSubtotal).toBe(600); // 100 × 6 billable days (7 less one Friday) × 1
   });
 });
 
@@ -94,9 +129,9 @@ describe("buildItemComparison — all-in (AC-09/10/35)", () => {
   });
 
   it("normalizes a per-week rate to per-day before totaling", () => {
-    // 700/week ÷ 7 × 14 days × 1 = 1,400
+    // 700/week ÷ 6 billable days × 14 days × 1 (no startDate here, so no Fridays are dropped)
     const { columns } = buildItemComparison([bc({ id: "a", supplierId: "1", price: 700, priceUnit: "PER_WEEK", duration: 14 })]);
-    expect(columns[0].rental.value).toBe(1400);
+    expect(columns[0].rental.value).toBeCloseTo((700 / 6) * 14, 6);
   });
 
   it("PER_JOB is rate × units (no period)", () => {
@@ -195,10 +230,11 @@ describe("sortByPreset (AC-20 web side)", () => {
 
 describe("displayQuote (RATE PERIOD + PRICES FOR toggles)", () => {
   // "All units" multiplies by the units THIS supplier OFFERED (unitsOffered), not the request's needed count.
-  it("re-expresses a day-rate into week (×7) and month (×26) for all units", () => {
+  it("re-expresses a day-rate into week (×6 billable days) and month (×26) for all units", () => {
     const b = bc({ price: 445, priceUnit: "PER_DAY", numberOfUnits: 3, unitsOffered: 3 });
     expect(displayQuote(b, "PER_DAY", "all").ratePerPeriod).toBe(445);
-    expect(displayQuote(b, "PER_WEEK", "all").ratePerPeriod).toBe(445 * 7);
+    // A week bills 6 days, not 7 — the toggle must quote what a week actually costs to rent.
+    expect(displayQuote(b, "PER_WEEK", "all").ratePerPeriod).toBe(445 * 6);
     expect(displayQuote(b, "PER_MONTH", "all").ratePerPeriod).toBe(445 * 26);
     expect(displayQuote(b, "PER_DAY", "all").rentalForPeriod).toBe(445 * 3); // × units offered
   });
@@ -212,13 +248,26 @@ describe("displayQuote (RATE PERIOD + PRICES FOR toggles)", () => {
     const five = bc({ price: 445, priceUnit: "PER_DAY", numberOfUnits: 3, unitsOffered: 5, mobPrice: 100, demobPrice: 50 });
     expect(displayQuote(five, "PER_DAY", "all").rentalForPeriod).toBe(445 * 5);
     expect(displayQuote(five, "PER_DAY", "all").mobDemob).toBe(150 * 5);
-    expect(displayQuote(five, "PER_DAY", "all", 10).durationRental).toBe(445 * 10 * 5);
+    // 10 days from a Sunday bills 9 — the Friday comes out, exactly as it does on the bid card.
+    expect(displayQuote(five, "PER_DAY", "all", 10, SUNDAY).durationRental).toBe(445 * 9 * 5);
   });
-  it("duration-based rental shows only when a duration is known (else null)", () => {
+  it("duration-based rental shows only when there is a period to prorate (else null)", () => {
     const noDur = bc({ price: 445, priceUnit: "PER_DAY", numberOfUnits: 1, unitsOffered: 1 });
     expect(displayQuote(noDur, "PER_DAY", "all").durationRental).toBeNull();
-    const withDur = displayQuote(bc({ price: 445, priceUnit: "PER_DAY", numberOfUnits: 2, unitsOffered: 2 }), "PER_DAY", "all", 10);
-    expect(withDur.durationRental).toBe(445 * 10 * 2);
+    const withDur = displayQuote(bc({ price: 445, priceUnit: "PER_DAY", numberOfUnits: 2, unitsOffered: 2 }), "PER_DAY", "all", 10, SUNDAY);
+    expect(withDur.durationRental).toBe(445 * 9 * 2);
+  });
+  it("a duration with NO start date prorates nothing — the row hides rather than charging Fridays", () => {
+    // Mobile §3: without the start date the Fridays can't be located, so the shared maths returns the
+    // bare rate. Unreachable on real data (`start_date` is NOT NULL) — pinned so a caller that forgets
+    // to thread the date fails loudly here instead of quietly overstating the total by ~17%.
+    const q = displayQuote(bc({ price: 445, priceUnit: "PER_DAY", numberOfUnits: 2, unitsOffered: 2 }), "PER_DAY", "all", 10);
+    expect(q.durationRental).toBeNull();
+    expect(q.subtotal).toBe(445 * 2); // the quoted rate × units, never rate × 10 days
+  });
+  it("an excluded leg contributes nothing, however much price is still stored on it", () => {
+    const b = bc({ price: 445, priceUnit: "PER_DAY", numberOfUnits: 1, unitsOffered: 1, mobPrice: 100, demobPrice: 50, mobExcluded: true });
+    expect(displayQuote(b, "PER_DAY", "all").mobDemob).toBe(50);
   });
   it("PER_JOB is a flat rate — no period conversion", () => {
     const q = displayQuote(bc({ price: 5000, priceUnit: "PER_JOB", numberOfUnits: 2, unitsOffered: 2 }), "PER_WEEK", "all");

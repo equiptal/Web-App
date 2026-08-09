@@ -395,6 +395,14 @@
 .rproto .grandcard { border: 1.5px solid rgba(247, 144, 9, 0.4); background: var(--action-dim); border-radius: var(--r-md); padding: 11px 13px; margin-top: 10px; display: flex; align-items: center; }
 .rproto .grandcard .gl { font-size: 13px; font-weight: 800; color: var(--navy); }
 .rproto .grandcard .gv { margin-inline-start: auto; font-family: "IBM Plex Sans", monospace; font-size: 16px; font-weight: 800; color: var(--action); }
+/* The fixed-divisor assumption under the collapsed rate label ("6 working days/week"). Own line, so
+   it reads as a caption rather than part of the label. */
+.rproto .price-collapsed .pl { display: flex; flex-direction: column; gap: 2px; }
+.rproto .price-collapsed .psub { font-size: 10.5px; font-weight: 500; color: var(--muted); }
+/* All-units row, shown only for multi-unit bids. It sits in its own box beneath the per-unit grand
+   total; the app is the only place the NUMBER goes amber rather than just the currency glyph. */
+.rproto .grandcard.overall { margin-top: 8px; }
+.rproto .grandcard.overall .gl .lead { display: block; font-size: 10.5px; font-weight: 600; color: var(--muted); margin: 0; }
 .rproto .lc-chips { display: flex; gap: 7px; padding: 8px 14px 4px; flex-wrap: wrap; }
 .rproto .lc-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--navy-mid); background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-full); padding: 4px 10px; }
 .rproto .lc-chip .material-icons-outlined { font-size: 13px; color: var(--muted); }

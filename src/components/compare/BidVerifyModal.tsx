@@ -8,6 +8,7 @@ import {
   BID_TERM_LABEL, bidFormDraftToNormalized, draftVatMode,
 } from "@/lib/contract/bid-form";
 import { BID_FORM_CSS } from "@/components/bid/bidFormStyles";
+import { VAT_RATE } from "@/lib/pricing/rental";
 
 /**
  * Renter-verify screen for an uploaded quote (Option A). Renders the quote transformed into OUR bid-form
@@ -230,7 +231,7 @@ export function BidVerifyModal({
                   </table>
                   <div className="itot">
                     <span className="r">{vatMode === "incl" ? L("Net (before VAT)", "الصافي (قبل الضريبة)") : L("Subtotal", "المجموع")}<b>{net ? nf(net) : "—"} {sar}</b></span>
-                    <span className="r">{L("VAT 15%", "ضريبة ١٥٪")}<b>{net ? nf(net * 0.15) : "—"} {sar}</b></span>
+                    <span className="r">{L("VAT 15%", "ضريبة ١٥٪")}<b>{net ? nf(net * VAT_RATE) : "—"} {sar}</b></span>
                     <span className="r t">{L("Item total", "إجمالي البند")}<b>{net ? nf(itemTotal) : "—"} {sar}</b></span>
                   </div>
                 </div>

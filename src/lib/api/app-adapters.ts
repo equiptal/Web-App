@@ -14,8 +14,9 @@ export function nodesToTree(nodes: TaxonomyNode[]): Taxonomy {
     id: c.id,
     name: c.name,
     nameAr: c.name_ar, // carry Arabic display names (was dropped) so the UI can render them by locale
-    // Carry the canonical group tag — it's what `isLiftingCategory` reads to decide the 2026-07 cert
-    // rule (lifting → Aramco). Tags live on CATEGORY rows, so a subcategory inherits its parent's.
+    // Carry the canonical group tag — the taxonomy's own grouping signal, returned verbatim by the
+    // endpoint. It drives no cert default any more (the lifting → Aramco rule is withdrawn, in the app
+    // first). Tags live on CATEGORY rows, so a subcategory inherits its parent's.
     tag: c.tag,
     subcategories: subs
       .filter((s) => s.parent_id === c.id)
@@ -264,14 +265,20 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
         fatFood: operatorIncluded && i.operator.fatFood ? i.operator.fatFood === "supplier" : undefined,
         fatAccommodationTransport:
           operatorIncluded && i.operator.fatAccommodationTransport ? i.operator.fatAccommodationTransport === "supplier" : undefined,
-        // `fatRequired` = whether FAT applies at all. Prefer the agent's explicit signal (i.operator.fatRequired,
-        // from Mansour's fat_required); fall back to deriving it from the two sides for back-compat.
-        fatRequired: operatorIncluded
-          ? i.operator.fatRequired ??
-            (i.operator.fatFood || i.operator.fatAccommodationTransport
-              ? i.operator.fatFood === "supplier" || i.operator.fatAccommodationTransport === "supplier"
-              : undefined)
-          : undefined,
+        // `fatRequired` is the DEPRECATED rollup, kept only for consumers that haven't moved to the two
+        // columns above. It is now purely DERIVED from them (app parity: `_operatorOn && (_fatFood == 1
+        // || _fatAccommodationTransport == 1)`) — never taken from the agent's `fat_required` directly.
+        //
+        // Sending it independently is what produced rows with `fat_required = true` and BOTH split
+        // columns null: an impossible state under the split model, which reads as "F.A.T included" on
+        // the admin surfaces while the bid form (which reads the split columns) can show nothing at all.
+        //
+        // Omitted entirely while neither side is specified — deriving `false` there would assert "the
+        // renter covers F.A.T", inventing the very answer the null default exists to avoid.
+        fatRequired:
+          operatorIncluded && (i.operator.fatFood != null || i.operator.fatAccommodationTransport != null)
+            ? i.operator.fatFood === "supplier" || i.operator.fatAccommodationTransport === "supplier"
+            : undefined,
         // §4.2 per-item operator sub-fields (only meaningful when an operator is included):
         nightShiftRequired: operatorIncluded ? i.operator.nightShift : undefined, // AC-24
         operatorNationality: operatorIncluded ? i.operator.nationality ?? undefined : undefined, // AC-24
