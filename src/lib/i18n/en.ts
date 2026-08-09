@@ -964,7 +964,12 @@ export const en = {
     eqAskAnotherSent: "Asked",
     backToEquipment: "Back to the machines",
     // What the map is NOT showing, in words. Silence would read as "this lessor has no machines".
-    claimedNotDrawn: "{n} of the offered units aren't on the map",
+    //
+    // This is the SUBTITLE of the V4 shortfall alert (`BidMapWorkspace.tsx`, `.bm-short-s`); the
+    // headline above it is `shortfall`, not a string of its own. There used to be a `claimedNotDrawn`
+    // headline here too — "{n} of the offered units aren't on the map" — which nothing rendered,
+    // because `shortfall` already says that and says WHY ("no registered machine"). Two headlines for
+    // one slot is how the alert ends up stating the same fact twice; the unused one is gone.
     claimedNotDrawnWhy:
       "They were added as a count only — no machine is registered for them, so they have no location, documents or serial to show.",
     noLocatable: "None of this lessor's machines can be placed",
