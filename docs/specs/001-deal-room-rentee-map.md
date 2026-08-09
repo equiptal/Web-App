@@ -1,9 +1,29 @@
 # Deal Room Rentee Map — per-item supplier bid map
 
+> ## ⛔ SUPERSEDED — 2026-08-09. Do not build from this document.
+>
+> **Replaced by [`004-deal-room-equipment-verification.md`](004-deal-room-equipment-verification.md)**
+> (plus its addenda [`004a`](004a-addendum-chat-and-the-request-loop.md) and
+> [`001a`](001a-equipment-panel-addendum.md)), which is **self-contained** and anchored to code.
+> The disposition of every RMAP ticket against 004 is in
+> [`../implementation-plans/deal-room-rentee-map/replan-v3.md`](../implementation-plans/deal-room-rentee-map/replan-v3.md);
+> the live ticket set is [`tickets.md`](../implementation-plans/deal-room-rentee-map/tickets.md).
+>
+> This file is **kept, not deleted**, because it is the record of how the surface got here — v2 answered
+> *"which offer?"*, v3 answers *"is this offer real?"*, and the arguments for the removals are only
+> legible here. But it is **not a contract any more**, and two of its rules are actively wrong:
+>
+> | Still written as live here | The truth since |
+> |---|---|
+> | **`scope: 'company'` document requests** — the wire contract at `:1545-1555`, AC-117 at `:1850`, TC-77 at `:2069` | **Withdrawn.** *A document request names a machine.* The company panel is read/open/download only, with **no request control of any kind** (004 §6.1, 004a §8, AC-71/72). `RenteeRequestDraft`'s `document` arm cannot express it. `scope: 'company'` survives for **exactly one** ask — the shortfall's «اطلب إضافتها» |
+> | **Distance as a bid sort**, and the surrounding distance rules at `:56, :209-210`, AC-24 at `:1751`, open question 5 at `:2135` | v3 has **no offers list to sort** — the equipment list is a plain nearest-first sort of one lessor's machines (004 §6.4). Separately, the *filter* those lines record as dropped was **reinstated 2026-08-08 by owner decision** (004 §6.4a, AC-28 rewritten, AC-28a→28e) |
+>
+> Acceptance IDs here (`RMAP-AC-*`) are **dead**. The only live prefix is `RM3-AC-*` in 004.
+
 | | |
 |---|---|
 | **Key** | RMAP |
-| **Status** | Draft |
+| **Status** | ~~Draft~~ → **Superseded by 004** (2026-08-09) |
 | **Author** | yfa245 |
 | **Created** | 2026-08-03 |
 | **Layers** | web · app-backend |

@@ -1,5 +1,22 @@
 # Tickets — Deal Room Rentee Map (RMAP)
 
+> ## ⛔ SUPERSEDED — 2026-08-09. **ARCHIVE. Do not implement anything in this file.**
+>
+> This is the **v2** ticket set (T1…T44), written against spec 001. It is kept only so the *detail* behind
+> each v2 ticket stays legible — [`tickets.md`](tickets.md) references it and does not restate it.
+> **The live ticket set is [`tickets.md`](tickets.md) (V1…V18); the disposition of every T-ticket below
+> is [`replan-v3.md`](replan-v3.md).** The spec is
+> [`../../specs/004-deal-room-equipment-verification.md`](../../specs/004-deal-room-equipment-verification.md),
+> not 001.
+>
+> **This file has already caused one production defect.** A ticket here was closed while its text stayed
+> live, and a guard the owner had *withdrawn* was read back out of this archive, rebuilt and shipped. If a
+> ticket below is not listed in `tickets.md` §A or §B, **it does not exist** — check `replan-v3.md`
+> before writing a line of code against anything here. Withdrawn tickets are struck **in place** and
+> never deleted, so that the withdrawal itself is visible.
+>
+> `AC-nn` numbers below are **001/v2 ids and are dead**; they collide with live `RM3-AC-*` numbers.
+
 Scope tags: **`[BE]`** `Moedatech-App/apps/backend` · **`[AG]`** `Moedatech-App/apps/backend-agents` ·
 **`[CT]`** web contract/selectors · **`[BFF]`** `src/app/api/*` · **`[UI]`** web components ·
 **`[T]`** tests. `⚠ Backend (Moedatech-App)` marks work that cannot ship from this repo.

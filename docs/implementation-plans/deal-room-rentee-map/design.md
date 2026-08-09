@@ -1,5 +1,21 @@
 # Design reference (D1) — extracted from `deal-room-rentee-map-v2.html`
 
+> ## ⛔ SUPERSEDED for this surface — 2026-08-09.
+>
+> This extracts the **v2** prototype (`deal-room-rentee-map-v2.html`) for a spec — 001 — that
+> [`004-deal-room-equipment-verification.md`](../../specs/004-deal-room-equipment-verification.md)
+> replaced. v3 names a **different** prototype: `Deal Room Map.html`, extracted in
+> **[`design-v3.md`](design-v3.md)**, with the element list in
+> [`../../rentee-map-v3-elements.md`](../../rentee-map-v3-elements.md).
+>
+> **Read `design-v3.md` for geometry. Read this only where v3 re-hosts a v2 component unchanged** — the
+> shipped `DealRoom` price bar, `MapCanvas`/`decollide`, and the RTL shell note in §1, all of which
+> carried over. Everything describing the v2 *composition* — bid list panel, colour key, edge rail,
+> composition bar, the three-tab drawer — describes UI that v3 deleted or was never built (`replan-v3.md`).
+>
+> §7's six conflict rulings still stand and are carried forward by `replan-v3.md` §"Two things to
+> confirm"; §6's do-not-copy table has one row now false — see the strike at `:199`.
+
 The prototype is a 1.1 MB single file with React and Leaflet bundled inline; nobody will read it while
 coding. This is its **structure, layout and component anatomy**, extracted verbatim, so S3–S6 can be
 built against exact values. Where the spec and the prototype disagree, see **§Conflicts** at the end —

@@ -1,5 +1,17 @@
 # Implementation plan — Deal Room Rentee Map (RMAP)
 
+> ## ⛔ SUPERSEDED — 2026-08-09. This is not the build list any more.
+>
+> It plans against **spec 001**, which is itself superseded by
+> [`../../specs/004-deal-room-equipment-verification.md`](../../specs/004-deal-room-equipment-verification.md).
+> **The live plan is [`replan-v3.md`](replan-v3.md) (disposition) + [`tickets.md`](tickets.md) (the V1…V18 set).**
+>
+> Kept for the reasoning in **§Decisions (D-A…D-C)** and **§Open items (O-1, O-2)**, which are still the
+> record of why those calls were made. Two of its statements are now false in the open:
+>
+> - **D-C — "the distance filter is dropped entirely"** (`:166-172`) is **reversed**. See the strike there.
+> - Sequencing and slice names (S1…S6) do not map onto the V-tickets; read `replan-v3.md` for the mapping.
+
 **Not a spec.** `docs/specs/001-deal-room-rentee-map.md` is the contract. This is the ordered build
 list, the sequencing, and the open items. It never restates an AC — it references one.
 

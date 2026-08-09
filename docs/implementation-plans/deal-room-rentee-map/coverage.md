@@ -1,5 +1,21 @@
 # AC coverage audit (D2) — RMAP
 
+> ## ⛔ SUPERSEDED — 2026-08-09. This audit covers a dead AC set.
+>
+> It audits **spec 001**'s `RMAP-AC-*` rows. 001 is replaced by
+> [`../../specs/004-deal-room-equipment-verification.md`](../../specs/004-deal-room-equipment-verification.md),
+> whose criteria carry the **`RM3-AC-*`** prefix — *the only live prefix*. A bare `AC-nn` below is a
+> 001/v2 number and **collides** with a live RM3 criterion of the same number (004 §11, 2026-08-08:
+> `fleet.test.ts`'s AC-19 is plottability; RM3-AC-19 is colour agreement). Do not grep this file into a
+> coverage map.
+>
+> **Live coverage lives in [`replan-v3.md`](replan-v3.md) §Coverage and [`tickets.md`](tickets.md).**
+>
+> Kept for findings **F-1…F-8**, which are still the record of real defects and their reasoning — F-8a
+> (the VAT sum), F-8b (the «المؤجّر» ruling) and F-8c (the em-dash rows) all shipped as fixes. But the
+> **ticket status tables below are stale**: see the strikes at `:11`, `:45` and `:53` — T2 and T37 are no
+> longer landed code.
+
 Spec revision audited: `001-deal-room-rentee-map.md`, 2026-08-06 (**208 live AC rows**, 33 struck).
 Every live row lands in exactly one ticket, one exclusion, or one finding below.
 

@@ -1,5 +1,17 @@
 # Where this stopped — 2026-08-06
 
+> ## ⛔ SUPERSEDED — 2026-08-09. A snapshot of 2026-08-06, not the current state.
+>
+> Work continued past this pause and the surface was **rescoped**: spec 001 was replaced by
+> [`../../specs/004-deal-room-equipment-verification.md`](../../specs/004-deal-room-equipment-verification.md),
+> and the T-ticket set by the V-tickets. **For where things actually stand, read
+> [`tickets.md`](tickets.md); for why each T-ticket lives or dies, [`replan-v3.md`](replan-v3.md).**
+>
+> Kept because its **"Two things not to undo by accident"** (`:53-60`) are still load-bearing and are
+> stated nowhere else. Its **"Done"** list is not: two of the tickets it reports as done have since been
+> **withdrawn from the code** — see the strike at `:18-21`. Counts, branch commit numbers and the "Next,
+> in order" list are all out of date.
+
 Paused deliberately at a clean tree so branches can be switched. **Nothing is pushed. No PR exists.**
 
 ## Branches

@@ -1,9 +1,28 @@
 # Deal Room Rentee Map — per-item supplier bid map
 
+> ## ⛔ SUPERSEDED — 2026-08-09. Do not build from this document.
+>
+> This is the **v2 revision** of `001-deal-room-rentee-map.md`. Both are replaced by
+> **[`004-deal-room-equipment-verification.md`](004-deal-room-equipment-verification.md)** and its
+> addenda ([`004a`](004a-addendum-chat-and-the-request-loop.md),
+> [`001a`](001a-equipment-panel-addendum.md)). Ticket-by-ticket disposition:
+> [`replan-v3.md`](../implementation-plans/deal-room-rentee-map/replan-v3.md); live tickets:
+> [`tickets.md`](../implementation-plans/deal-room-rentee-map/tickets.md).
+>
+> **Kept, not deleted** — it holds the reasoning behind the v2→v3 rescope. It is **not a contract**, and
+> it still states two rules that were later reversed:
+>
+> | Still written as live here | The truth since |
+> |---|---|
+> | **`scope: 'company'` document requests** (`:1553`, `:1566`, AC-110 `:1816`, AC-117 `:1823`) | **Withdrawn.** *A document request names a machine.* The company panel is read/open/download only, with **no request control of any kind** (004 §6.1, 004a §8, AC-71/72). `scope: 'company'` survives for **exactly one** ask — the shortfall's «اطلب إضافتها» |
+> | **§6.10 the distance filter** (`:747`) and distance as a **bid** sort | v3 has no offers list to sort. The *filter* was **reinstated 2026-08-08 by owner decision**, but as the equipment list's filter row over one lessor's machines — 004 §6.4a, AC-28 rewritten, AC-28a→28e, ticket **V17/V18** |
+>
+> `RMAP-AC-*` ids are **dead**. The only live prefix is `RM3-AC-*` in 004.
+
 | | |
 |---|---|
 | **Key** | RMAP |
-| **Status** | Draft |
+| **Status** | ~~Draft~~ → **Superseded by 004** (2026-08-09) |
 | **Author** | yfa245 |
 | **Created** | 2026-08-03 |
 | **Layers** | web · app-backend |
