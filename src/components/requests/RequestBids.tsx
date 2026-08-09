@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n";
-import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/client";
+import { fetchBids, fetchRequestDetail, fetchRequestSubmissions, startDealRoom } from "@/lib/api/client";
 import { bucketBidTerms, type BidCard } from "@/lib/contract/bids";
 import { computeBidQuote } from "@/lib/contract/comparison";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
@@ -20,7 +20,11 @@ import { SharedBidNegotiateRoom } from "@/components/requests/SharedBidNegotiate
 import { NEGOTIATE_ENABLED } from "@/lib/config/flags";
 import { computeBidReadiness } from "@/lib/contract/bid-readiness";
 import { BidReadinessBadge, BidEligibilityModal } from "@/components/requests/BidReadiness";
-import { computeQuoteTotals, formatSar, headlineAmount, legDisplay, rentalPeriodSubtitle, VAT_RATE } from "@/lib/pricing/rental";
+import { computeQuoteTotals, durationDaysBetween, formatSar, headlineAmount, legDisplay, rentalPeriodSubtitle } from "@/lib/pricing/rental";
+import { shortRef, type RequestRecord } from "@/lib/contract/requests";
+import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/render";
+import { buildBidQuotationDoc, quotationSupplierInitials, quotationSupplierKey } from "@/lib/quotation/bid-quotation";
+import { quotationDownloadName } from "@/lib/compare/quotation-token";
 
 /** Lifecycle pill (matches the prototype SPILL). */
 const SPILL: Record<string, { cls: string; dot: boolean; en: string; ar: string }> = {
@@ -31,7 +35,6 @@ const SPILL: Record<string, { cls: string; dot: boolean; en: string; ar: string 
   EXPIRED: { cls: "sp-expired", dot: false, en: "Expired", ar: "منتهٍ" },
   WITHDRAWN: { cls: "sp-withdrawn", dot: false, en: "Withdrawn", ar: "مسحوب" },
 };
-const nf = (n: number) => Math.round(n).toLocaleString("en-US");
 
 /** Footer CTA label per bid lifecycle — exact app 6-state mapping (AC-21). */
 function pillLabel(status: string, L: (en: string, ar: string) => string): string {
@@ -110,66 +113,134 @@ export function RequestBids({
       return next;
     });
 
-  // Quotation PDF (matches the app's bid_pdf_builder: supplier + equipment + pricing breakdown).
-  // Rendered via the browser's print-to-PDF so Arabic/RTL render correctly without font embedding.
-  function downloadQuotation() {
+  /**
+   * The renter's own identity for the quotation's Rentee block (app parity: CR / VAT / national address
+   * / phone / email, each shown as a value or the green "Verified" pill). Read here rather than passed
+   * in, so this surface stays a drop-in on any request page.
+   */
+  const [renterName, setRenterName] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [renterId, setRenterId] = useState<{ phone: string | null; email: string | null; crNumber: string | null; vatNumber: string | null; nationalAddress: string | null }>({ phone: null, email: null, crNumber: null, vatNumber: null, nationalAddress: null });
+  useEffect(() => {
+    let active = true;
+    fetch("/api/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { user?: { firstName?: string; lastName?: string; companyName?: string | null; phone?: string | null; email?: string | null; crNumber?: string | null; vatNumber?: string | null; nationalAddress?: string | null } } | null) => {
+        if (active && d?.user) {
+          setRenterName([d.user.firstName, d.user.lastName].filter(Boolean).join(" "));
+          setCompanyName(d.user.companyName ?? "");
+          setRenterId({ phone: d.user.phone ?? null, email: d.user.email ?? null, crNumber: d.user.crNumber ?? null, vatNumber: d.user.vatNumber ?? null, nationalAddress: d.user.nationalAddress ?? null });
+        }
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  // The request record behind these bids — its display code, rental window and transport assignment all
+  // print on the quotation. Fetched ON DEMAND and cached: nothing in the bid LIST needs it, so a renter
+  // who never downloads never pays for the call.
+  const reqRef = useRef<RequestRecord | null>(null);
+  async function loadRequestRecord(): Promise<RequestRecord | null> {
+    if (reqRef.current) return reqRef.current;
+    try {
+      reqRef.current = await fetchRequestDetail(requestId);
+    } catch {
+      // Best-effort: the quotation still renders from what the bid itself carries.
+    }
+    return reqRef.current;
+  }
+
+  /**
+   * Download the formal quotation for the selected bids.
+   *
+   * This used to be a second, completely separate inline HTML builder — no parties block, no terms
+   * cards, no legal clauses, no quotation reference, and mobilisation/demobilisation added to the total
+   * even when the parties had EXCLUDED those legs, with each leg priced at the rental unit count rather
+   * than its own. It is gone: this now goes through `buildBidQuotationDoc`, the same document the
+   * grouped bid view issues, so the same deal downloaded from either place is the same document.
+   */
+  async function downloadQuotation() {
     // Include off-platform (shared-link) submissions, not just on-platform bids.
     const chosen = merged.filter((b) => selected.has(b.id));
     if (!chosen.length) return;
-    const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
-    const sar = L("SAR", "ر.س");
-    const sections = chosen
-      .map((b) => {
-        const periods = b.duration ?? 1;
-        const units = b.numberOfUnits || 1; // bid price is per-unit → × units (app parity)
-        const rental = (b.price ?? 0) * periods * units;
-        const sub = rental + (b.mobPrice ?? 0) + (b.demobPrice ?? 0);
-        const vat = Math.round(sub * VAT_RATE);
-        const grand = sub + vat;
-        const eq = b.equipment ? [b.equipment.make, b.equipment.model, b.equipment.year].filter(Boolean).join(" · ") : "—";
-        const unitsTxt = units > 1 ? ` × ${units}` : "";
-        const row = (l: string, v: string) => `<tr><td>${esc(l)}</td><td class="v">${esc(v)}</td></tr>`;
-        return `<section class="q">
-          <div class="qh"><b>${esc(b.supplierName)}</b>${b.verified ? `<span class="vf">✓ ${esc(L("Verified", "موثّق"))}</span>` : ""}</div>
-          <div class="eq">${esc(L("Equipment", "المعدات"))}: ${esc(eq)}</div>
-          <table>
-            ${row(`${L("Rental", "الإيجار")} (${nf(b.price ?? 0)} × ${periods}${unitsTxt})`, `${nf(rental)} ${sar}`)}
-            ${b.mobPrice ? row(L("Mobilization", "النقل"), `${nf(b.mobPrice)} ${sar}`) : ""}
-            ${b.demobPrice ? row(L("Return", "الإرجاع"), `${nf(b.demobPrice)} ${sar}`) : ""}
-            ${row(L("Subtotal before VAT", "المجموع قبل الضريبة"), `${nf(sub)} ${sar}`)}
-            ${row(L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"), `${nf(vat)} ${sar}`)}
-            <tr class="tot"><td>${esc(L("Estimated total", "الإجمالي التقديري"))}</td><td class="v">${nf(grand)} ${sar}</td></tr>
-          </table>
-        </section>`;
-      })
+
+    const req = await loadRequestRecord();
+    const code = (typeof req?.displayId === "string" && req.displayId) || shortRef(requestId);
+    const item = req?.equipmentItems?.[0] ?? null;
+    // The request's window: the props the parent threads win, with the record as the fallback for a
+    // surface that didn't pass them. A null duration is meaningful — it means open-ended, and the
+    // builder prices it "as operated" rather than inventing a period.
+    const reqStart = startDate ?? req?.startDate ?? null;
+    const durDays = durationDays ?? durationDaysBetween(req?.startDate, req?.endDate);
+    const itemName = [
+      (ar ? item?.subtypeNameAr : item?.subtypeName) ?? (ar ? item?.categoryNameAr : item?.categoryName),
+      ar ? item?.capacityNameAr : item?.capacityName,
+    ].filter(Boolean).join(" · ");
+
+    // One quotation per supplier, cut by the SAME key the grouped download uses.
+    const bySupplier = new Map<string, BidCard[]>();
+    for (const b of chosen) {
+      const key = quotationSupplierKey(b);
+      const list = bySupplier.get(key);
+      if (list) list.push(b);
+      else bySupplier.set(key, [b]);
+    }
+    const reqCode = code.replace(/[^A-Za-z0-9-]/g, "");
+
+    const sections = [...bySupplier.values()]
+      .map((supBids, si) =>
+        renderQuotationSection(
+          buildBidQuotationDoc({
+            lang: ar ? "ar" : "en",
+            quotationNumber: `Q-${reqCode}-${quotationSupplierInitials(supBids[0].supplierName)}${si + 1}`,
+            reference: code,
+            entries: supBids.map((b) => ({
+              bid: b,
+              // An off-platform submission names the line itself; an app bid takes the request's own
+              // equipment name, falling back to the request code so the row is never blank.
+              itemLabel: linkLabels.get(b.id) || itemName || code,
+              requestCode: code,
+              startDate: reqStart,
+              endDate: req?.endDate ?? null,
+              durationDays: durDays,
+              rentalType: req?.rentalType ?? null,
+              mobByRentee: item?.mobilizationByRentee ?? null,
+              demobByRentee: item?.demobilizationByRentee ?? null,
+            })),
+            rentee: {
+              companyName,
+              personName: renterName,
+              crNumber: renterId.crNumber,
+              vatNumber: renterId.vatNumber,
+              nationalAddress: renterId.nationalAddress,
+              phone: renterId.phone,
+              email: renterId.email,
+              verified: tier === "verified",
+            },
+          }),
+        ),
+      )
       .join("");
-    const html = `<!doctype html><html dir="${ar ? "rtl" : "ltr"}" lang="${ar ? "ar" : "en"}"><head><meta charset="utf-8"><title>${L("Quotation", "عرض السعر")}</title>
-      <style>
-        *{box-sizing:border-box} body{font-family:${ar ? '"Tajawal",' : ""}-apple-system,"Segoe UI",Roboto,sans-serif;color:#1C3550;margin:32px}
-        .brand{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #1C3550;padding-bottom:12px;margin-bottom:18px}
-        .brand .logo{font-size:18px;font-weight:900;letter-spacing:-.3px} .brand .logo i{font-style:normal;color:#F79009}
-        .brand .meta{font-size:11.5px;color:#6B8FA8;text-align:${ar ? "left" : "right"}}
-        h1{font-size:22px;margin:0 0 4px} .sub{color:#6B8FA8;font-size:13px;margin:0 0 22px}
-        .foot{margin-top:24px;border-top:1px solid #E4EDF5;padding-top:12px;font-size:11px;color:#9BB3C8}
-        .q{border:1px solid #D4E0EC;border-radius:12px;padding:16px;margin-bottom:14px;page-break-inside:avoid}
-        .qh{display:flex;align-items:center;gap:10px;font-size:16px;margin-bottom:6px}
-        .qh .vf{font-size:12px;font-weight:800;color:#1DAF58;background:#E7F7EE;border-radius:99px;padding:2px 9px}
-        .eq{font-size:13px;color:#2A4F72;font-weight:600;margin-bottom:10px}
-        table{width:100%;border-collapse:collapse;font-size:13.5px}
-        td{padding:7px 0;border-bottom:1px solid #E4EDF5} td.v{text-align:${ar ? "left" : "right"};font-weight:700}
-        tr.tot td{border-top:2px solid #D4E0EC;border-bottom:0;font-weight:800;padding-top:10px} tr.tot td.v{color:#F79009}
-      </style></head><body>
-      <div class="brand"><span class="logo">MOEDA<i>TECH</i></span><span class="meta">${esc(L("Quotation", "عرض السعر"))}<br>${esc(new Date().toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "long", year: "numeric" }))}</span></div>
-      <h1>${L("Quotation", "عرض السعر")}</h1>
-      <p class="sub">${esc(L("Bids on request", "عروض على الطلب"))} ${esc(requestId)} · ${chosen.length} ${L("bids", "عروض")}</p>
-      ${sections}
-      <div class="foot">${esc(L("Prices exclude any items not listed. VAT 15% included. Generated by Moedatech.", "الأسعار لا تشمل أي بنود غير مدرجة. تشمل ضريبة القيمة المضافة ١٥٪. صادر عن معداتك."))}</div>
-      <script>window.onload=function(){window.print()}</script>
-    </body></html>`;
+
+    const dlName = quotationDownloadName(code, [code]);
+    const html = wrapQuotationPage(sections, { lang: ar ? "ar" : "en", title: dlName });
+    // Robust open: a popup-blocked `window.open` returns null and used to fail silently (a dead click).
+    // Fall back to downloading the self-printing HTML file so the quotation is never a no-op.
     const w = window.open("", "_blank");
-    if (!w) return;
-    w.document.write(html);
-    w.document.close();
+    if (w) {
+      w.document.write(html);
+      w.document.close();
+      return;
+    }
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${dlName.replace(/[^\w.-]+/g, "_")}.html`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
   }
 
   useEffect(() => {
@@ -507,7 +578,7 @@ export function RequestBids({
         <div className="qbar">
           <span className="qn">{selected.size} {L("selected", "محدّد")}</span>
           <span className="qclear" onClick={() => setSelected(new Set())}>{L("Clear", "مسح")}</span>
-          <button className="qdl" onClick={() => (tier === "verified" ? downloadQuotation() : setQuoteGate(true))}>
+          <button className="qdl" onClick={() => (tier === "verified" ? void downloadQuotation() : setQuoteGate(true))}>
             <span className="material-icons-outlined">download</span> {L("Download quotation", "تنزيل عرض السعر")}
           </button>
         </div>
@@ -558,7 +629,7 @@ export function RequestBids({
           L={L}
           onClose={() => setQuoteGate(false)}
           onVerify={() => { setQuoteGate(false); router.push("/verify"); }}
-          onContinue={() => { setQuoteGate(false); downloadQuotation(); }}
+          onContinue={() => { setQuoteGate(false); void downloadQuotation(); }}
         />
       )}
     </div>
