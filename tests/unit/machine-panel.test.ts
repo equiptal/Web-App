@@ -130,16 +130,31 @@ describe("year & manufacturer", () => {
     expect(c.en).toContain("Caterpillar");
   });
 
+  // The conflict clause is the APP's, `bidReadinessYearConflict` — "Below the required year {min}" /
+  // «أقدم من الحد الأدنى المطلوب {min}» (app_en.arb:5295 · app_ar.arb:3613). It replaced this
+  // surface's own "you asked for 2020 or newer" on 2026-08-10.
   it("reds when the machine is older than the asked-for year, and says what was asked", () => {
     const c = cellsBy(machine({ year: 2016 }), { reqMinYear: 2020 }).year_make;
     expect(c.state).toBe("red");
-    expect(c.en).toContain("2020 or newer");
+    expect(c.en).toContain("below the required year 2020");
+    expect(c.ar).toContain("أقدم من الحد الأدنى المطلوب");
   });
 
   it("reds when a year was asked for and the machine's file carries none", () => {
     const c = cellsBy(machine({ year: null }), { reqMinYear: 2020 }).year_make;
     expect(c.state).toBe("red");
-    expect(c.en).toContain("not on the file");
+    // `bidReadinessDocMissing` (app_en.arb:5436 · app_ar.arb:3642) — the app's one phrase for an
+    // absence, and the ask is still named beside it.
+    expect(c.en).toContain("not on the unit's file");
+    expect(c.en).toContain("below the required year 2020");
+  });
+
+  // The app's satisfied cell is `'${year} · $make'` and stops there (`bid_readiness_sheets.dart:1128`)
+  // — there is no "· meets 2020 or newer" in it, and the ✓ is what says the check passed.
+  it("states the bare fact when the year is met — no clause of approval", () => {
+    const c = cellsBy(machine({ year: 2022 }), { reqMinYear: 2020 }).year_make;
+    expect(c.state).toBe("green");
+    expect(c.en).toBe("2022 · Caterpillar");
   });
 
   it("does not treat an AGE requirement as a year — `computeUnitReadiness` already ruled on that", () => {
@@ -150,10 +165,14 @@ describe("year & manufacturer", () => {
 });
 
 describe("attachments — grey by decision, never red", () => {
-  it("greys with 'none asked for' when the request asked for none", () => {
+  // The phrase is the app's `bidReadinessNoAttachmentsRequired` (app_en.arb:5304 · app_ar.arb:3614) —
+  // the ONLY thing the app's attachments cell ever prints. The colour still differs: the app bands it
+  // green, this grid keeps grey, deliberately (see `MatchCellState`).
+  it("greys with the app's «No attachments required» when the request asked for none", () => {
     const c = cellsBy(machine(), {}).attachments;
     expect(c.state).toBe("grey");
-    expect(c.en).toContain("none asked for");
+    expect(c.en).toBe("no attachments required");
+    expect(c.ar).toBe("لا توجد ملحقات مطلوبة");
   });
 
   it("stays grey when the request DID ask, because a fleet row carries no attachment record", () => {
@@ -177,11 +196,11 @@ describe("equipment photos — the fraction, over the slots the lessor is actual
   it("greens on the two REQUIRED slots, whether or not the optional two were uploaded", () => {
     const both = cellsBy(machine({ photos: [{ slot: "front" }, { slot: "serial" }] }), {}).photos;
     expect(both.state).toBe("green");
-    expect(both.en).toBe("2 of 2 uploaded");
+    expect(both.en).toBe("2 of 2 on file");
     // All four reads the same: the optional shots are not a higher score, they are simply optional.
     const all = cellsBy(machine({ photos: ALL_FOUR }), {}).photos;
     expect(all.state).toBe("green");
-    expect(all.en).toBe("2 of 2 uploaded");
+    expect(all.en).toBe("2 of 2 on file");
   });
 
   it("does not fail a machine for a shot nobody requires", () => {
@@ -193,13 +212,17 @@ describe("equipment photos — the fraction, over the slots the lessor is actual
   it("reds when a REQUIRED shot is missing, and says which fraction is short", () => {
     const c = cellsBy(machine({ photos: [{ slot: "front" }, { slot: "equipment" }] }), {}).photos;
     expect(c.state).toBe("red");
-    expect(c.en).toBe("1 of 2 uploaded");
+    expect(c.en).toBe("1 of 2 on file");
   });
 
   it("reds at none, and reports zero rather than omitting the cell", () => {
     const c = cellsBy(machine({ photos: [] }), {}).photos;
     expect(c.state).toBe("red");
-    expect(c.en).toBe("0 of 2 uploaded");
+    // «{onFile} of {total} on file» / «{onFile} من {total} في الملف» — the app's own count phrasing,
+    // `bidReadinessDocsOnFile` (app_en.arb:5444 · app_ar.arb:3644). "uploaded" / «مرفوعة» had no
+    // counterpart anywhere in the app's readiness vocabulary.
+    expect(c.en).toBe("0 of 2 on file");
+    expect(c.ar).toBe("٠ من ٢ في الملف");
   });
 
   it("folds the wire's slot vocabulary onto the four the renter is shown", () => {
@@ -223,7 +246,9 @@ describe("proof of ownership — green when held, RED when absent", () => {
   it("greens when the machine's file carries one", () => {
     const c = cellsBy(machine({ docs: [{ type: "istimara" }] }), {}).ownership;
     expect(c.state).toBe("green");
-    expect(c.en).toBe("on the machine's file");
+    // `bidReadinessDocOnFile` (app_en.arb:8719 · app_ar.arb:6236) — the app's noun is the UNIT's file.
+    expect(c.en).toBe("on the unit's file");
+    expect(c.ar).toBe("موجودة في ملف الوحدة");
   });
 
   it("reds when it does not — the paper reaches the renter now, so an absence is a real gap", () => {
@@ -234,19 +259,28 @@ describe("proof of ownership — green when held, RED when absent", () => {
     // (`bid-readiness.ts` still excludes it from the readiness SCORE; a band, not visibility.)
     const c = cellsBy(machine({ docs: [{ type: "tuv" }] }), {}).ownership;
     expect(c.state).toBe("red");
-    expect(c.en).toContain("not on the file");
+    // `bidReadinessDocMissing`, plus the one clause the app has no equivalent for — the renter can ask
+    // for it from here, and the app's read-only mirror cannot.
+    expect(c.en).toBe("not on the unit's file — you can ask for it");
+    expect(c.ar).toBe("غير موجودة في ملف الوحدة — يمكنك طلبها");
   });
 });
 
 describe("certificates — grey when unasked, red when asked and missing", () => {
   it("greys the equipment cert when the request asked for none", () => {
-    expect(cellsBy(machine(), {}).equipment_cert.state).toBe("grey");
+    const c = cellsBy(machine(), {}).equipment_cert;
+    expect(c.state).toBe("grey");
+    // `bidReadinessNoneRequested` (app_en.arb:5312 · app_ar.arb:3616) — the app's phrase for a category
+    // nobody asked about. (The app bands it green; this grid keeps grey — see `MatchCellState`.)
+    expect(c.en).toBe("none requested");
+    expect(c.ar).toBe("لم يُطلب شيء");
   });
 
   it("greens when every asked-for equipment cert is on the file", () => {
     const c = cellsBy(machine({ docs: [{ type: "tuv" }, { type: "spsp" }] }), { reqEquipmentCerts: ["tuv", "spsp"] }).equipment_cert;
     expect(c.state).toBe("green");
-    expect(c.en).toContain("on the machine's file");
+    expect(c.en).toContain("on the unit's file");
+    expect(c.ar).toContain("موجودة في ملف الوحدة");
   });
 
   it("reds and names ONLY the missing one", () => {
@@ -254,7 +288,7 @@ describe("certificates — grey when unasked, red when asked and missing", () =>
     expect(c.state).toBe("red");
     expect(c.en).toContain("SPSP");
     expect(c.en).not.toContain("TÜV");
-    expect(c.en).toContain("not on the file");
+    expect(c.en).toContain("not on the unit's file");
   });
 
   it("greys operator certs when the request declared no operator licence level", () => {
@@ -449,23 +483,31 @@ describe("equipmentDocGroups — the groups, and each one's own attention count 
       asking(["tuv"]),
     );
     const row = groups.flatMap((g) => g.rows).find((r) => r.key === "doc:equipment_cert:tuv");
-    expect(row?.statusLine.en).toBe("on the machine's file");
+    expect(row?.statusLine.en).toBe("on the unit's file");
     const text = JSON.stringify(groups);
     for (const leak of ["verified", "failed", "2027", "expiry", "valid until"]) {
       expect(text.toLowerCase()).not.toContain(leak.toLowerCase());
     }
   });
 
-  it("uses the presence vocabulary the spec names, and no other", () => {
+  // The vocabulary is the APP's, and it is TWO phrases for every family — `bidReadinessDocOnFile` and
+  // `bidReadinessDocMissing`, which is all `_rowShell` (`bid_readiness_sheets.dart:2681-2684`) ever
+  // says, for a photo row and a certificate row alike. The "· not required" tail is the one thing here
+  // the app has no word for: it renders no unrequired row at all.
+  it("uses the app's presence vocabulary, and no other", () => {
     const groups = equipmentDocGroups(machine({ photos: ALL_FOUR, docs: [{ type: "tuv" }] }), NO_ASKS);
     for (const line of groups.flatMap((g) => g.rows.map((r) => r.statusLine.en))) {
       expect([
-        "uploaded",
-        "not uploaded",
-        "uploaded · not required",
-        "on the machine's file",
-        "no document yet",
-        "on the machine's file · not required",
+        "on the unit's file",
+        "not on the unit's file",
+        "on the unit's file · not required",
+      ]).toContain(line);
+    }
+    for (const line of groups.flatMap((g) => g.rows.map((r) => r.statusLine.ar))) {
+      expect([
+        "موجودة في ملف الوحدة",
+        "غير موجودة في ملف الوحدة",
+        "موجودة في ملف الوحدة · غير مطلوبة",
       ]).toContain(line);
     }
   });
@@ -489,7 +531,7 @@ describe("a document nobody asked for is never shown as missing (owner, 2026-08-
     const g = groupBy(machine({ docs: [{ type: "tuv" }] }), NO_ASKS);
     const row = g.documents.rows.find((r) => r.key === "doc:equipment_cert:tuv")!;
     expect(row.status).toBe("on_file"); // not "present" — nothing was passed, because nothing was asked
-    expect(row.statusLine.en).toBe("on the machine's file · not required");
+    expect(row.statusLine.en).toBe("on the unit's file · not required");
     expect(docRowActions(row).map((a) => a.kind)).toEqual(["view"]);
     // Not requestable, and yet tickable — for the OTHER batch. Being on the file is what makes it
     // downloadable, which is the 2026-08-08 mode split seen from the not-required row.
@@ -606,7 +648,9 @@ describe("photos follow the same rule as the papers", () => {
     const meter = g.photos.rows.find((r) => r.key === "photo:meter")!;
     expect([meter.status, meter.statusLine.en, meter.requestable]).toEqual([
       "on_file",
-      "uploaded · not required",
+      // A photo row is not worded differently from a paper row — the app files both through one
+      // `_rowShell`, which says only `bidReadinessDocOnFile` / `bidReadinessDocMissing`.
+      "on the unit's file · not required",
       false,
     ]);
     expect(g.photos.attention).toBe(0);
@@ -715,8 +759,8 @@ describe("the operator's certificates say present or absent, and expose no file"
   it("states presence, green or red, and makes no attention claim at all", () => {
     const g = held();
     expect(g.rows.map((r) => [r.key, r.status, r.statusLine.en])).toEqual([
-      ["doc:operator:tuv", "present", "on the machine's file"],
-      ["doc:operator:spsp", "missing", "no document yet"],
+      ["doc:operator:tuv", "present", "on the unit's file"],
+      ["doc:operator:spsp", "missing", "not on the unit's file"],
     ]);
     // ~~`attention` was 1 here~~ — withdrawn 2026-08-08 with the group's requestability. The count reads
     // "N rows need action from you", and there is no action on this group; `null` is the component's
@@ -960,12 +1004,9 @@ describe("every document family on this surface is openable (RM3-AC-69)", () => 
     for (const row of groups.flatMap((g) => g.rows)) {
       expect(["present", "on_file", "missing"]).toContain(row.status);
       expect([
-        "uploaded",
-        "not uploaded",
-        "uploaded · not required",
-        "on the machine's file",
-        "no document yet",
-        "on the machine's file · not required",
+        "on the unit's file",
+        "not on the unit's file",
+        "on the unit's file · not required",
       ]).toContain(row.statusLine.en);
       // The row's whole shape, so a verify badge or an expiry cannot arrive by accident.
       expect(Object.keys(row).sort()).toEqual(

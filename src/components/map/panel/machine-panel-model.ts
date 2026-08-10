@@ -42,11 +42,48 @@ const norm = (s: string): string => s.trim().toLowerCase().replace(/[\s-]+/g, "_
 /* ───────────────────────────── V7 — the six match cells ───────────────────────────── */
 
 /**
+ * **The renter's words are the APP's words** (owner, 2026-08-10, on a screenshot of this grid: *"for
+ * this fields ui and wordings use the bid readiness shown to the renter in the app … check with app
+ * even for wordings and language"*), under the standing rule that the Flutter app is the reference for
+ * shared logic and wording and the web is what changes when they disagree.
+ *
+ * The reference surface is the renter's own readiness in the app — `rentee_readiness_section.dart` →
+ * `EligibilityGrid` (`bid_readiness_sheets.dart:1107-1218`), whose cells are scored by
+ * `bid_readiness.dart`. Its whole vocabulary for "does this machine hold the paper?" is two strings,
+ * and they are the two below. **Every finding on this surface that answers that question is one of
+ * them**, quoted from the app's own ARB rather than paraphrased, so a renter who reads a machine in
+ * the app and then on the map is told the same thing in the same words.
+ *
+ * Note the noun: the app says **the unit's file** / «ملف الوحدة» everywhere — never "the machine's
+ * file" / «ملف المعدّة», which is what this file used to say. Same paper, one name.
+ */
+/** `bidReadinessDocOnFile` — app_en.arb:8719 · app_ar.arb:6236. Lower-cased in EN only, because a
+ *  finding here is a clause in a sentence («TÜV — on the unit's file») and the app's is a standalone
+ *  cell value. The Arabic is verbatim. */
+const ON_FILE: Bilingual = { en: "on the unit's file", ar: "موجودة في ملف الوحدة" };
+/** `bidReadinessDocMissing` — app_en.arb:5436 · app_ar.arb:3642. Same lower-casing rule as
+ *  {@link ON_FILE}. The app uses this one string for BOTH the photos cell and the proof-of-ownership
+ *  cell, feminine agreement and all, so both are quoted from it here too. */
+const NOT_ON_FILE: Bilingual = { en: "not on the unit's file", ar: "غير موجودة في ملف الوحدة" };
+/** `bidReadinessNoneRequested` — app_en.arb:5312 · app_ar.arb:3616. The app's word for **case 5**,
+ *  "nothing was asked for in this category at all". */
+const NONE_REQUESTED: Bilingual = { en: "none requested", ar: "لم يُطلب شيء" };
+
+/**
  * **green** = the request asked and the machine satisfies it · **grey** = the request did not ask ·
  * **red** = the request asked and the machine does not satisfy it.
  *
  * There is no fourth state and there is no amber: a cell either answers the renter's question or says
  * it was never asked.
+ *
+ * **The app has no grey, and that difference was NOT reconciled here** (2026-08-10, when the wording
+ * was brought onto the app's). `EligibilityGrid` bands an unasked cell **green**: the year cell is
+ * `yearConflict ? red : green` with no third arm (`bid_readiness_sheets.dart:1123`), the attachments
+ * cell is hard-coded `ReadinessBand.green` (:1137), and an empty cert cell prints «None requested» in
+ * `AppColors.success` (:1331). This surface keeps grey in all three, because grey is *this* grid's
+ * whole contract — «a cell nobody asked about cannot fail» — and turning three unasked cells green
+ * would tell the renter three checks passed that were never run. The instruction was to align the
+ * words, not the rules; the divergence is written down instead.
  */
 export type MatchCellState = "green" | "grey" | "red";
 
@@ -245,8 +282,12 @@ export function matchGrid(machine: FleetMachine, request: MatchRequest): MatchCe
     attachmentsCell(request),
     photosCell(machine),
     ownershipCell(machine),
-    certCell("equipment_cert", { en: "Equipment certificate", ar: "شهادة المعدّة" }, readiness.equipmentCerts),
-    certCell("operator_cert", { en: "Operator certificates", ar: "شهادات المشغّل" }, readiness.operatorCerts),
+    // Labels quoted from the app's own grid: `bidReadinessCellEquipCerts` (app_en.arb:5283 ·
+    // app_ar.arb:3610) and `bidReadinessCellOperatorCerts` (app_en.arb:5287 · app_ar.arb:3611).
+    // Both are PLURAL and both say "certifications" — this file said "Equipment certificate" /
+    // «شهادة المعدّة», singular, for a cell that routinely lists two.
+    certCell("equipment_cert", { en: "Equipment certifications", ar: "شهادات المعدّة" }, readiness.equipmentCerts),
+    certCell("operator_cert", { en: "Operator certifications", ar: "شهادات المشغّل" }, readiness.operatorCerts),
   ];
 }
 
@@ -256,6 +297,20 @@ export function matchGrid(machine: FleetMachine, request: MatchRequest): MatchCe
  * `computeUnitReadiness` has already decided whether the raw `reqMinYear` reads as a year at all (it
  * can also be an age), and exposes the answer as `reqMinYear` — non-null only when it does. Re-deriving
  * that here is exactly the second scorer this file refuses to be.
+ *
+ * **Wording, against the app** (`EligibilityGrid`, `bid_readiness_sheets.dart:1119-1129`). The app's
+ * cell is two branches and no more:
+ *
+ * - **conflict** → `bidReadinessYearConflict` — *"Below the required year {min}"* / «أقدم من الحد
+ *   الأدنى المطلوب {min}» (app_en.arb:5295 · app_ar.arb:3613). That is the phrase used here, and it
+ *   replaces this file's *"you asked for 2020 or newer"*.
+ * - **otherwise** → `'${year ?? '—'} · $make'` — the bare fact, **with no clause of approval**. So the
+ *   satisfied cell now reads «2020 · Case» and stops there; *"· meets 2020 or newer"* is gone, because
+ *   the app never says it and the ✓ already does.
+ *
+ * **The app has no equivalent for the grey case** — it has no grey year cell at all (see the rule note
+ * on {@link matchGrid}'s states), so *"· no year asked for"* / «· لم تطلب سنة» stays this surface's own
+ * phrase. It is not dropped: without it the grey cell and the green cell would print identical text.
  */
 function yearMakeCell(machine: FleetMachine, readiness: UnitReadiness): MatchCell {
   const label: Bilingual = { en: "Year & manufacturer", ar: "سنة الصنع والصانع" };
@@ -274,7 +329,7 @@ function yearMakeCell(machine: FleetMachine, readiness: UnitReadiness): MatchCel
       state: "grey",
       finding: shown
         ? { en: `${shown}${makeSuffix.en} · no year asked for`, ar: `${arDigits(shown)}${makeSuffix.ar} · لم تطلب سنة` }
-        : { en: "not on the file · no year asked for", ar: "غير مذكورة على الملف · لم تطلب سنة" },
+        : { en: `${NOT_ON_FILE.en} · no year asked for`, ar: `${NOT_ON_FILE.ar} · لم تطلب سنة` },
     };
   }
   if (year == null) {
@@ -283,8 +338,8 @@ function yearMakeCell(machine: FleetMachine, readiness: UnitReadiness): MatchCel
       label,
       state: "red",
       finding: {
-        en: `year not on the file · you asked for ${req} or newer`,
-        ar: `سنة الصنع غير مذكورة على الملف · طلبت ${arDigits(req)} أو أحدث`,
+        en: `${NOT_ON_FILE.en} · below the required year ${req}`,
+        ar: `${NOT_ON_FILE.ar} · أقدم من الحد الأدنى المطلوب ${arDigits(req)}`,
       },
     };
   }
@@ -294,18 +349,19 @@ function yearMakeCell(machine: FleetMachine, readiness: UnitReadiness): MatchCel
       label,
       state: "red",
       finding: {
-        en: `${year}${makeSuffix.en} · you asked for ${req} or newer`,
-        ar: `${arDigits(year)}${makeSuffix.ar} · طلبت ${arDigits(req)} أو أحدث`,
+        en: `${year}${makeSuffix.en} · below the required year ${req}`,
+        ar: `${arDigits(year)}${makeSuffix.ar} · أقدم من الحد الأدنى المطلوب ${arDigits(req)}`,
       },
     };
   }
+  // The app's satisfied cell verbatim: `'${year} · $make'`, and nothing after it.
   return {
     key: "year_make",
     label,
     state: "green",
     finding: {
-      en: `${year}${makeSuffix.en} · meets ${req} or newer`,
-      ar: `${arDigits(year)}${makeSuffix.ar} · تفي بـ${arDigits(req)} أو أحدث`,
+      en: `${year}${makeSuffix.en}`,
+      ar: `${arDigits(year)}${makeSuffix.ar}`,
     },
   };
 }
@@ -318,6 +374,14 @@ function yearMakeCell(machine: FleetMachine, readiness: UnitReadiness): MatchCel
  * (`bids.ts:532`). Colouring this red would tell the renter the supplier failed a check the platform
  * never ran — it would show *more* than we know. When the request asked for attachments the cell says
  * so and says the file cannot answer; when it did not, it reads as not required.
+ *
+ * **Wording, against the app.** The app's attachments cell is a constant: label `bidReadinessCell-`
+ * `Attachments` (app_en.arb:5279 · app_ar.arb:3609 — already this file's label, unchanged) and the
+ * single value `bidReadinessNoAttachmentsRequired`, *"No attachments required"* / «لا توجد ملحقات
+ * مطلوبة» (app_en.arb:5304 · app_ar.arb:3614), which it prints **whatever the request asked for** —
+ * `bid_readiness_sheets.dart:1138` never reads the request at all. So the nothing-asked case is quoted
+ * from it, and the asked-for case is a state the app never renders and has no phrase for; it keeps this
+ * surface's own sentence, moved onto the app's noun («ملف الوحدة»).
  */
 function attachmentsCell(request: MatchRequest): MatchCell {
   const label: Bilingual = { en: "Attachments", ar: "الملحقات" };
@@ -325,15 +389,20 @@ function attachmentsCell(request: MatchRequest): MatchCell {
     (x) => String(x ?? "").trim() !== "",
   ).length;
   if (asked === 0) {
-    return { key: "attachments", label, state: "grey", finding: { en: "none asked for", ar: "لم تطلب ملحقات" } };
+    return {
+      key: "attachments",
+      label,
+      state: "grey",
+      finding: { en: "no attachments required", ar: "لا توجد ملحقات مطلوبة" },
+    };
   }
   return {
     key: "attachments",
     label,
     state: "grey",
     finding: {
-      en: `${asked} asked for · not recorded on the machine's file`,
-      ar: `طلبت ${arDigits(asked)} · غير مسجّلة على ملف المعدّة`,
+      en: `${asked} asked for · not recorded on the unit's file`,
+      ar: `طلبت ${arDigits(asked)} · غير مسجّلة في ملف الوحدة`,
     },
   };
 }
@@ -353,6 +422,19 @@ function attachmentsCell(request: MatchRequest): MatchCell {
  *
  * The fraction is therefore over the **required** slots, not over `PHOTO_SLOTS`. A renter who wants to
  * know whether the optional shots exist reads the group, where they appear when they are uploaded.
+ *
+ * **Wording, against the app.** The label is `bidReadinessGapPhotos` — *"Unit photos"* / «صور الوحدة»
+ * (app_en.arb:8739 · app_ar.arb:6241), which is what the app calls this cell
+ * (`bid_readiness_sheets.dart:1178`) and its photo group alike; this file said "Equipment photos" /
+ * «صور المعدّة».
+ *
+ * The **fraction has no equivalent in the app's grid cell** — there it is a bare
+ * `bidReadinessDocOnFile` / `bidReadinessDocMissing`, which would throw away the count the owner is
+ * looking at. So the count is kept and phrased in the app's own words for a count of filed papers:
+ * `bidReadinessDocsOnFile`, *"{onFile} of {total} on file"* / «{onFile} من {total} في الملف»
+ * (app_en.arb:5444 · app_ar.arb:3644 — the readiness docs sheet's summary line). Nothing is invented
+ * and nothing is lost; "uploaded" / «مرفوعة» was the one word here with no counterpart anywhere in the
+ * app's readiness vocabulary.
  */
 function photosCell(machine: FleetMachine): MatchCell {
   const present = new Set<PhotoSlot>(presentPhotoSlots(machine));
@@ -360,11 +442,11 @@ function photosCell(machine: FleetMachine): MatchCell {
   const total = REQUIRED_PHOTO_SLOTS.size;
   return {
     key: "photos",
-    label: { en: "Equipment photos", ar: "صور المعدّة" },
+    label: { en: "Unit photos", ar: "صور الوحدة" },
     state: have === total ? "green" : "red",
     finding: {
-      en: `${have} of ${total} uploaded`,
-      ar: `${arDigits(have)} من ${arDigits(total)} مرفوعة`,
+      en: `${have} of ${total} on file`,
+      ar: `${arDigits(have)} من ${arDigits(total)} في الملف`,
     },
   };
 }
@@ -382,23 +464,52 @@ function photosCell(machine: FleetMachine): MatchCell {
  * (`bid-readiness.ts` still excludes proof-of-ownership from its SCORE — that is a different question.
  * A band that counted a redacted paper would hold every supplier permanently short; this cell states a
  * fact about one machine and can be acted on.)
+ *
+ * **Wording, against the app.** The label is `ocrOwnershipProof` — *"Proof of Ownership"* / «إثبات
+ * الملكية» (app_en.arb:6936 · app_ar.arb:4874), which is the app's heading for this cell
+ * (`bid_readiness_sheets.dart:1194`) and for the ownership row in its documents sheet (`_rowLabel`,
+ * :2832). Title case is the app's, kept rather than tidied.
+ *
+ * The two findings are the app's supplier-side pair, `bidReadinessDocOnFile` / `bidReadinessDocMissing`
+ * — **not** the rentee-side `renteeReadinessOwnershipHidden` («Not shown here» / «لا تُعرض هنا»), and
+ * that is the same distinction the red-when-absent rule above rests on. The app hides this cell's
+ * verdict because the BID's projection redacts ownership papers; this surface reads the unstripped
+ * fleet row, so it can and does state the fact.
+ *
+ * *"— you can ask for it"* / «— يمكنك طلبها» has **no app equivalent** (the renter cannot ask from the
+ * app's read-only mirror) and is kept: it names the one act this panel offers that the app's does not.
+ * The «phrase — action» shape is the app's own, from `docUploadView`: *"On the unit's file — tap to
+ * view"* / «موجودة في ملف الوحدة — اضغط للعرض» (app_en.arb:8727 · app_ar.arb:6238).
  */
 function ownershipCell(machine: FleetMachine): MatchCell {
   const held = machine.documentKeys.filter(isOwnershipDoc);
   return {
     key: "ownership",
-    label: { en: "Proof of ownership", ar: "إثبات الملكية" },
+    label: { en: "Proof of Ownership", ar: "إثبات الملكية" },
     state: held.length > 0 ? "green" : "red",
     finding:
       held.length > 0
-        ? { en: "on the machine's file", ar: "على ملف المعدّة" }
-        : { en: "not on the file — you can ask for it", ar: "غير موجود على الملف — يمكنك طلبه" },
+        ? ON_FILE
+        : { en: `${NOT_ON_FILE.en} — you can ask for it`, ar: `${NOT_ON_FILE.ar} — يمكنك طلبها` },
   };
 }
 
 /**
  * A cert cell — equipment or operator. Grey when the request asked for none: an unrequested cert is
  * not a gap, and colouring it would invent an acceptance criterion the renter never set.
+ *
+ * **Wording, against the app.** The app's cert cell (`_certCell`, `bid_readiness_sheets.dart:1286-`
+ * `:1356`) is chips, not a sentence, so there is nothing to quote for the *"NAME — verdict"* shape this
+ * surface renders; what is quoted is the verdict, {@link ON_FILE} / {@link NOT_ON_FILE}, which is the
+ * app's own vocabulary for exactly the judgement a chip's ✓/✗ carries. The **empty** case does have a
+ * phrase, and it is `bidReadinessNoneRequested` ({@link NONE_REQUESTED}) — the app prints it when the
+ * request asked for no cert in this family, which is this cell's grey.
+ *
+ * The certificate NAMES come from the scorer (`bid-readiness.ts`'s `EQ_CERT_LABELS` /
+ * `OPERATOR_CERT_LABELS`) and are deliberately **not** touched here: they are shared with
+ * `requests/BidReadiness.tsx`, so they are a second surface's copy, not this one's. They do differ from
+ * the app's `readinessCertLabel` (which reads «TUV Certificate» / «شهادة TUV» where this reads «TÜV»),
+ * and that is reported rather than changed from inside the map.
  */
 function certCell(
   key: Extract<MatchCellKey, "equipment_cert" | "operator_cert">,
@@ -406,7 +517,7 @@ function certCell(
   certs: { labelEn: string; labelAr: string; present: boolean }[],
 ): MatchCell {
   if (certs.length === 0) {
-    return { key, label, state: "grey", finding: { en: "none asked for", ar: "لم تطلب شهادات" } };
+    return { key, label, state: "grey", finding: NONE_REQUESTED };
   }
   const missing = certs.filter((c) => !c.present);
   if (missing.length === 0) {
@@ -415,8 +526,8 @@ function certCell(
       label,
       state: "green",
       finding: {
-        en: `${certs.map((c) => c.labelEn).join(" · ")} — on the machine's file`,
-        ar: `${certs.map((c) => c.labelAr).join(" · ")} — على ملف المعدّة`,
+        en: `${certs.map((c) => c.labelEn).join(" · ")} — ${ON_FILE.en}`,
+        ar: `${certs.map((c) => c.labelAr).join(" · ")} — ${ON_FILE.ar}`,
       },
     };
   }
@@ -425,8 +536,8 @@ function certCell(
     label,
     state: "red",
     finding: {
-      en: `${missing.map((c) => c.labelEn).join(" · ")} — not on the file`,
-      ar: `${missing.map((c) => c.labelAr).join(" · ")} — غير موجودة على الملف`,
+      en: `${missing.map((c) => c.labelEn).join(" · ")} — ${NOT_ON_FILE.en}`,
+      ar: `${missing.map((c) => c.labelAr).join(" · ")} — ${NOT_ON_FILE.ar}`,
     },
   };
 }
@@ -560,9 +671,9 @@ export interface DocRow {
   key: string;
   label: Bilingual;
   status: PresenceStatus;
-  /** The presence sentence — "uploaded" / "not uploaded" for photos, "on the machine's file" /
-   *  "no document yet" for documents, each with a "· not required" tail on an unrequired row. Never a
-   *  verification word. */
+  /** The presence sentence — "on the unit's file" / "not on the unit's file", the app's own two
+   *  phrases, for photos and papers alike (see the constants below), with a "· not required" tail on an
+   *  unrequired row. Never a verification word. */
   statusLine: Bilingual;
   /** Thumbnail source: a photo's own image, or null for a paper (the row draws a document glyph). */
   thumbUrl: string | null;
@@ -841,12 +952,28 @@ const PHOTO_LABEL: Record<PhotoSlot, Bilingual> = {
  */
 const REQUIRED_PHOTO_SLOTS = new Set<PhotoSlot>(["front", "plate"]);
 
-const PRESENT_PHOTO: Bilingual = { en: "uploaded", ar: "مرفوعة" };
-const ABSENT_PHOTO: Bilingual = { en: "not uploaded", ar: "غير مرفوعة" };
-const EXTRA_PHOTO: Bilingual = { en: "uploaded · not required", ar: "مرفوعة · غير مطلوبة" };
-const PRESENT_DOC: Bilingual = { en: "on the machine's file", ar: "على ملف المعدّة" };
-const ABSENT_DOC: Bilingual = { en: "no document yet", ar: "لا يوجد مستند بعد" };
-const EXTRA_DOC: Bilingual = { en: "on the machine's file · not required", ar: "على ملف المعدّة · غير مطلوب" };
+/**
+ * The rows' status lines — **the app's two phrases, and a tail it has no word for**.
+ *
+ * The app files photos and papers through **one** row widget (`_rowShell`,
+ * `bid_readiness_sheets.dart:2646`), and it says exactly one of two things: `bidReadinessDocOnFile` or
+ * `bidReadinessDocMissing` ({@link ON_FILE} / {@link NOT_ON_FILE}, quoted at their definitions). A
+ * photo row is not worded differently from a certificate row there — `_photoRow` (:2494) hands the same
+ * shell the same booleans — so the four constants below collapse onto two phrases, deliberately. This
+ * file's «uploaded» / «not uploaded» / «no document yet» were three more ways to say them.
+ *
+ * **The «· not required» tail has no app equivalent.** The app renders *only* scored rows — one per
+ * mandatory photo slot and one per certificate this request asked for — so a held-but-unrequired paper
+ * is a row it never draws and therefore never had to word. This surface does draw it (see
+ * {@link equipmentDocGroups}: held-and-unrequired is shown with no verdict), so the tail is kept as
+ * this surface's own. Its Arabic is now feminine in both, agreeing with «موجودة» in front of it.
+ */
+const PRESENT_PHOTO: Bilingual = ON_FILE;
+const ABSENT_PHOTO: Bilingual = NOT_ON_FILE;
+const EXTRA_PHOTO: Bilingual = { en: `${ON_FILE.en} · not required`, ar: `${ON_FILE.ar} · غير مطلوبة` };
+const PRESENT_DOC: Bilingual = ON_FILE;
+const ABSENT_DOC: Bilingual = NOT_ON_FILE;
+const EXTRA_DOC: Bilingual = EXTRA_PHOTO;
 
 /** Renter-facing words for a wire doc type — the same wording `ChatDock`'s `DOC_TYPE_LABELS` uses, so
  *  one paper reads the same in the panel and on the request card the renter raises from it. */
@@ -1231,13 +1358,20 @@ export function equipmentDocGroups(machine: FleetMachine, request: MatchRequest)
   const operatorRows: DocRow[] = operatorStatusRows(readiness.operatorCerts);
 
   return [
-    // The two equipment headings name the MACHINE, per the prototype: a renter reading two stacked
-    // groups then knows both belong to the machine in front of him, not to the supplier or the bid.
-    // The operator's group is deliberately not renamed — its papers are the operator's, not the
-    // machine's, and that distinction is the whole point of it being a third group (RM3-AC-75).
-    { key: "photos" as const, label: { en: "Equipment photos", ar: "صور المعدّة" }, rows: photoRows },
+    // The two equipment headings name the MACHINE (the app's «الوحدة» / «المعدّة» for the same thing):
+    // a renter reading two stacked groups knows both belong to the machine in front of him, not to the
+    // supplier or the bid. The operator's group stays a group of its own — its papers are the
+    // operator's, not the machine's, and that distinction is the whole point of a third group
+    // (RM3-AC-75).
+    // Headings quoted from the app's own documents sheet (`bid_readiness_sheets.dart:2290-2311`):
+    // `bidReadinessGapPhotos` (app_en.arb:8739 · app_ar.arb:6241), `bidReadinessDocsEquipmentGroup`
+    // (app_en.arb:5415 · app_ar.arb:3638 — already word-for-word what this file had) and
+    // `bidReadinessDocsOperatorGroup` (app_en.arb:5419 · app_ar.arb:3639). The operator's group is
+    // still a group of its own — the point of RM3-AC-75 — it just carries the app's spelling of the
+    // name now.
+    { key: "photos" as const, label: { en: "Unit photos", ar: "صور الوحدة" }, rows: photoRows },
     { key: "documents" as const, label: { en: "Equipment documents", ar: "مستندات المعدّة" }, rows: paperRows },
-    { key: "operator" as const, label: { en: "Operator's documents", ar: "مستندات المشغّل" }, rows: operatorRows },
+    { key: "operator" as const, label: { en: "Operator documents", ar: "مستندات المشغّل" }, rows: operatorRows },
   ]
     // A group with nothing to say is not a heading with an empty body — it is absent.
     .filter((g) => g.rows.length > 0)
