@@ -324,18 +324,29 @@ describe("the surface's stylesheet carries the same colour tokens the models do"
 describe("the chat dock's tab strip touches no map state (RM3-AC-49)", () => {
   const dock = strip(read(DOCK));
 
-  it("is mounted with four props, none of which can write to the surface", () => {
+  it("is mounted with five props, none of which can write to the surface", () => {
     const mounted = region(read(WORKSPACE), "<ChatDock", "/>");
     const props = [...mounted.matchAll(/^\s*(\w+)=/gm)].map((m) => m[1]);
-    expect(props.sort()).toEqual(["bid", "fleet", "groupKey", "sendNonce"]);
-    // A setter handed down here is the one edit that would make a tab press move the map.
+    // `onOutstandingAsks` joined the list with "one ask, one card" (owner, 2026-08-10): the channel
+    // is the only record of the request cards and this component is the only reader of it, so the
+    // outstanding asks have to travel UP from here. It is enumerated rather than allowed by a
+    // pattern, so a SIXTH prop still fails this line whatever it is called.
+    expect(props.sort()).toEqual(["bid", "fleet", "groupKey", "onOutstandingAsks", "sendNonce"]);
+    // A setter handed down here is the one edit that would make a tab press move the map. The one
+    // setter that IS handed down writes a set of ask identities and nothing the map can read.
     expect(mounted).not.toMatch(/setSelected|setDetail|setFilter|setCue|onSelectMachine|setCompanyOpen/);
+    expect(mounted).toMatch(/onOutstandingAsks=\{setOutstandingAsks\}/);
   });
 
-  it("declares no prop it could use to reach back — the component's own contract", () => {
+  it("declares exactly one callback, and it reports rather than reaches back", () => {
     const contract = region(read(DOCK), "export interface ChatDockProps {", "}");
     expect(contract).toMatch(/bid: BidCard/); // the positive control: the region is the real interface
-    expect(contract).not.toMatch(/=>/); // no callback of any kind
+    // ONE callback, and its whole vocabulary is a set of opaque strings. It carries no id the
+    // surface could select on, no machine, and no setter of the dock's own — so the dock can tell
+    // the surface which questions are outstanding and still not move anything (RM3-AC-49).
+    const callbacks = [...contract.matchAll(/^\s*(\w+)\??:.*=>/gm)].map((m) => m[1]);
+    expect(callbacks).toEqual(["onOutstandingAsks"]);
+    expect(contract).toMatch(/onOutstandingAsks\?: \(identities: ReadonlySet<string>\) => void;/);
     expect(contract).not.toMatch(/select|detail|filter|marker|map|cue/i);
   });
 

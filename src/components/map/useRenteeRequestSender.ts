@@ -22,14 +22,23 @@
  */
 
 import { useCallback, useRef, useState } from "react";
-import { sendRenteeRequest } from "@/lib/api/client";
+import { ApiError, sendRenteeRequest } from "@/lib/api/client";
 import { ensureDealRoom } from "@/lib/chat/ensure-deal-room";
 import type { BidCard } from "@/lib/contract/bids";
-import { composeRenteeRequest, type RenteeAsk } from "@/lib/contract/rentee-request";
+import { askIdentity, composeRenteeRequest, type RenteeAsk } from "@/lib/contract/rentee-request";
+
+/**
+ * The backend's half of "one ask, one card" — `DEAL_ROOM_REQUEST_ALREADY_PENDING`, a 409 carrying the
+ * `ref` already outstanding (owner's rule, 2026-08-10). The BFF forwards the backend's own code
+ * untranslated, so this is the one string that identifies it.
+ */
+const ALREADY_PENDING_CODE = "E13012";
 
 /** Why a send did not land. `invalid` is a card the backend would refuse — a retired kind, a document
- *  ask naming no type, an equipment ask naming no machine — and it never reaches the network. */
-export type RenteeRequestSendError = "invalid" | "failed";
+ *  ask naming no type, an equipment ask naming no machine — and it never reaches the network.
+ *  `already_pending` is the rule, not a fault: the renter has asked this exact question and the lessor
+ *  has not answered. */
+export type RenteeRequestSendError = "invalid" | "failed" | "already_pending";
 
 export interface RenteeRequestSender {
   /** Compose → create-or-fetch the room → post. Resolves true when the card is in the conversation. */
@@ -38,6 +47,15 @@ export interface RenteeRequestSender {
   error: RenteeRequestSendError | null;
   /** The backend-minted reference of the last card sent — the `RQ-7F3A` both sides can quote. */
   lastRef: string | null;
+  /**
+   * The identity of the last ask the backend refused as already outstanding, or null.
+   *
+   * The client is the primary guard and this 409 is the backstop, so reaching it means the client
+   * did not know — a stale tab, a dock that was never opened, a double-tap that beat the first
+   * response home. Reporting the identity is what lets the surface learn the thing it was missing
+   * and disable the control, instead of leaving a live button that will refuse again.
+   */
+  alreadyPendingAsk: string | null;
   /** Increments on every successful send. The chat dock takes it as its **post-send** refresh
    *  trigger, which is one of the four moments the arrival notice may appear (004a §2.1). */
   nonce: number;
@@ -49,6 +67,7 @@ export function useRenteeRequestSender(bid: Pick<BidCard, "id" | "dealRoomId"> |
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<RenteeRequestSendError | null>(null);
   const [lastRef, setLastRef] = useState<string | null>(null);
+  const [alreadyPendingAsk, setAlreadyPendingAsk] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
   const [created, setCreated] = useState<string | null>(null);
   // Guards a double-click from creating a room, failing, and creating a second one on the retry.
@@ -76,7 +95,18 @@ export function useRenteeRequestSender(bid: Pick<BidCard, "id" | "dealRoomId"> |
         setLastRef(result.ref || null);
         setNonce((n) => n + 1);
         return true;
-      } catch {
+      } catch (err) {
+        // ── one ask, one card, from the other side ──────────────────────────────────────────────
+        // The backend refuses a repeat of an unanswered ask with 409 E13012. It is not a failure and
+        // must not read as one: «لم يصل الطلب» would tell the renter to try again, which is exactly
+        // what the rule exists to stop. It is reported as the rule, and the identity is published so
+        // the control that produced it can disable itself the way it would have had the conversation
+        // been read.
+        if (err instanceof ApiError && err.backendCode === ALREADY_PENDING_CODE) {
+          setError("already_pending");
+          setAlreadyPendingAsk(askIdentity(draft));
+          return false;
+        }
         setError("failed");
         return false;
       } finally {
@@ -87,5 +117,5 @@ export function useRenteeRequestSender(bid: Pick<BidCard, "id" | "dealRoomId"> |
     [bid, created],
   );
 
-  return { send, busy, error, lastRef, nonce, dealRoomId };
+  return { send, busy, error, lastRef, alreadyPendingAsk, nonce, dealRoomId };
 }

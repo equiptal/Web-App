@@ -50,6 +50,7 @@ import type { InboxBid } from "@/lib/contract/inbox";
 import {
   RENTEE_REQUEST_CARD_TYPE,
   RENTEE_REQUEST_REPLY_CARD_TYPE,
+  outstandingAskIdentities,
   type RenteeRequestCardPayload,
 } from "@/lib/contract/rentee-request";
 import { useLocale, useT } from "@/lib/i18n";
@@ -83,9 +84,25 @@ export interface ChatDockProps {
   /** Bumped by the surface after it sends a request card, so the dock refreshes on **post-send** —
    *  one of the four refresh points of 004a §2.1. */
   sendNonce?: number;
+  /**
+   * Every ask in this conversation the lessor has not answered, by identity — the renter-facing half
+   * of the owner's "one ask, one card" rule (2026-08-10). The surface's ask controls disable
+   * themselves from it, so a repeat is a control that says why rather than a live button that 409s.
+   *
+   * **The channel is the only record of these cards**, and this component is the only thing on the
+   * surface that reads it, which is why the report starts here and travels up rather than the other
+   * way round.
+   *
+   * **A report, not a handle** (RM3-AC-49). It hands out opaque strings and receives nothing: there
+   * is no selection, no detail, no filter and no marker on the far end of it, so a tab press still
+   * moves nothing. It fires for the ANCHOR bid's own conversation only — a sibling tab describes a
+   * different room — and only when there is a conversation to read, so a closed dock says nothing
+   * rather than saying that nothing is outstanding.
+   */
+  onOutstandingAsks?: (identities: ReadonlySet<string>) => void;
 }
 
-export function ChatDock({ bid, groupKey = null, fleet, sendNonce = 0 }: ChatDockProps) {
+export function ChatDock({ bid, groupKey = null, fleet, sendNonce = 0, onOutstandingAsks }: ChatDockProps) {
   const t = useT();
   const { locale } = useLocale();
   const ar = locale === "ar";
@@ -229,6 +246,44 @@ export function ChatDock({ bid, groupKey = null, fleet, sendNonce = 0 }: ChatDoc
     }
     return map;
   }, [messages]);
+
+  /* ── one ask, one card (owner, 2026-08-10) ─────────────────────────────────────────────────────
+     The identities of every ask the lessor has not answered, threaded by `ref` in ONE pass so a
+     reply counts whether it arrives before or after its own ask — a channel read is not guaranteed
+     to be ordered, and a partially-loaded page must not resurrect an answered question.
+
+     Deliberately NOT the same reading as `requestCtx` above. That one derives a card's STATE from
+     the machine, because the lessor usually acts from his fleet page rather than from the card; this
+     one asks only "has he replied to this ref", which is exactly what the backend's own guard asks.
+     Reading derived state here would let a machine that satisfies an ask silently re-enable a
+     control — and the surface already withdraws the control in that case (a confirmed machine has no
+     «اطلب التأكيد», a held document is not a requestable row), so there is nothing to gain and one
+     more way for the two halves of the guard to disagree. */
+  const outstandingAsks = useMemo(
+    () =>
+      outstandingAskIdentities(
+        messages.map((m) => {
+          const card = chatCardOfMessage(m);
+          if (card?.type === RENTEE_REQUEST_CARD_TYPE) return { ask: card.card };
+          if (card?.type === RENTEE_REQUEST_REPLY_CARD_TYPE) return { reply: card.reply };
+          // Ordinary chat and the negotiation vocabulary travel this list too, and neither may block
+          // a request control.
+          return {};
+        }),
+      ),
+    [messages],
+  );
+
+  useEffect(() => {
+    if (!onOutstandingAsks) return;
+    // Silence, never an empty set, when this component has nothing to say: the anchor bid's own
+    // conversation is the only one whose asks belong to this surface's controls, and a dock that is
+    // shut holds no messages at all. Reporting an empty set from either state would tell the surface
+    // that nothing is outstanding — a claim about the lessor made out of our own ignorance, and one
+    // that would re-enable a control the renter had just used.
+    if (active?.bidId !== bid.id || messages.length === 0) return;
+    onOutstandingAsks(outstandingAsks);
+  }, [onOutstandingAsks, outstandingAsks, active?.bidId, bid.id, messages.length]);
 
   const docLabel = useCallback(
     (docType: string) => {

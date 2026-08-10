@@ -72,6 +72,16 @@ export interface EquipmentListProps {
   /** «اطلب التأكيد» — V11 owns the composer and the send; this only says which machine was asked
    *  about. Absent → the control renders disabled rather than claiming an ask was sent. */
   onAskAvailability?: (machine: FleetMachine) => void;
+  /**
+   * Whether this machine's availability ask is already with the lessor and unanswered — the owner's
+   * "one ask, one card" rule (2026-08-10), asked of the workspace because only it can see the
+   * conversation. The control then states that it was asked instead of offering to ask again.
+   *
+   * A predicate rather than a set of ids, for the same reason `onAskAvailability` is a callback: the
+   * question "is this ask outstanding" is composed by V11 out of the same draft it would have sent,
+   * and a list that assembled its own key would be the rule spelled a second time.
+   */
+  askPending?: (machine: FleetMachine) => boolean;
   /** The panel's scroller, so a selection made ON THE MAP brings its card into view. Deliberately the
    *  container's `scrollTop` rather than `scrollIntoView`, which scrolls every ancestor and moves the
    *  whole page. */
@@ -88,6 +98,7 @@ export function EquipmentList({
   onSelect,
   onOpenDetail,
   onAskAvailability,
+  askPending,
   scrollRef,
 }: EquipmentListProps) {
   const t = useT();
@@ -229,6 +240,7 @@ export function EquipmentList({
               onSelect={onSelect}
               onOpenDetail={onOpenDetail}
               onAskAvailability={onAskAvailability}
+              askPending={askPending}
             />
           ))}
         </ul>
@@ -247,6 +259,7 @@ function EquipmentCard({
   onSelect,
   onOpenDetail,
   onAskAvailability,
+  askPending,
 }: {
   machine: FleetMachine;
   index: number;
@@ -257,6 +270,7 @@ function EquipmentCard({
   onSelect: (id: string) => void;
   onOpenDetail: (id: string) => void;
   onAskAvailability?: (machine: FleetMachine) => void;
+  askPending?: (machine: FleetMachine) => boolean;
 }) {
   // Everything this card states — and everything it is allowed to know — is one model call. The chip
   // is `availabilityView`'s, which is the SAME call `machineMarkers` makes for this machine's pin
@@ -265,6 +279,9 @@ function EquipmentCard({
   const card = useMemo(() => equipmentCardModel(machine), [machine]);
   const { chip, certs, photo, askAvailability } = card;
   const confirmed = chip.availability === "confirmed";
+  /** Asked, and not yet answered. The workspace decides it — only it can see the conversation — and
+   *  the card paints the answer, the same division the chip above already follows. */
+  const pending = askPending?.(machine) ?? false;
   const colour = chip.colour;
   const title = ar ? card.title.ar : card.title.en;
   const km = card.km;
@@ -351,11 +368,18 @@ function EquipmentCard({
                 type="button"
                 className="bm-eq-ask"
                 style={{ color: askAvailability.colour }}
-                title={t.bidMap.eqAskConfirmWhy}
+                // ── One ask, one card (owner, 2026-08-10) ────────────────────────────────────────
+                // The control STAYS on the card once the ask is out, disabled and relabelled. It is
+                // not removed: a control that vanished would read as «there is nothing to ask»,
+                // when the truth is that the question was asked and is waiting — and it is not left
+                // live either, because a second press would flood the lessor's conversation with a
+                // duplicate card (or, since the backend's own guard landed, meet a 409 the renter
+                // can do nothing with).
+                title={pending ? t.bidMap.askPendingWhy : t.bidMap.eqAskConfirmWhy}
                 onClick={() => onAskAvailability?.(machine)}
-                disabled={!onAskAvailability}
+                disabled={!onAskAvailability || pending}
               >
-                {t.bidMap.eqAskConfirm}
+                {pending ? t.bidMap.eqAskPending : t.bidMap.eqAskConfirm}
               </button>
             )}
             {/* The yard is outside the request city's own radius — the fact that turns a delivery into

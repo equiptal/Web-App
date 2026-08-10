@@ -65,9 +65,11 @@ import {
 } from "@/lib/contract/equipment-list";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import {
+  askIdentity,
   composeDocumentRequest,
   composeMachineRequest,
   composeShortfallRequest,
+  isAskOutstanding,
   type RenteeRequestDraft,
 } from "@/lib/contract/rentee-request";
 import { publicTaxonomyUrl, type RequestRecord } from "@/lib/contract/requests";
@@ -160,10 +162,53 @@ export function BidMapWorkspace({
      so the surfaces that mount inside `bm-body` (V5's list, V7's detail, V8/V9's document rows) wire
      one prop instead of each repeating the room-creating sequence. */
   const sender = useRenteeRequestSender(bid);
-  /** Local acknowledgement for the shortfall control only — an ask the renter just made should not
-   *  look unasked. It is NOT the card's state: the card in the conversation derives its own on every
-   *  render (RM3-AC-18), and this button knows nothing about it. */
-  const [shortfallSent, setShortfallSent] = useState(false);
+  /**
+   * ── One ask, one card (owner, 2026-08-10) ─────────────────────────────────────────────────────
+   * The identities of every ask the lessor has not answered yet. A control whose draft is in here is
+   * disabled and says why, because a renter who can repeat an open question floods the lessor's
+   * conversation — verified on staging before the guard existed, where the identical availability ask
+   * returned 201 three times and posted three cards.
+   *
+   * It is fed from two places, and the difference between them matters:
+   *
+   *  · **the conversation**, reported up by the dock, which is the RECORD — there is no table of these
+   *    cards, so the channel is the only place an ask from a previous session survives. It arrives as
+   *    a whole set and REPLACES what is here, because it is the complete answer for that room and a
+   *    merge would keep resurrecting asks the lessor has since answered;
+   *
+   *  · **this session's own sends**, added one at a time. The dock holds no messages until it is
+   *    opened, and most renters never open it, so without this an ask sent from the panel would leave
+   *    its control live for the rest of the session. A refusal from the backend's own guard (409) adds
+   *    one the same way — that is the case where the client was the one that did not know.
+   *
+   * It replaces the `shortfallSent` flag that used to acknowledge the shortfall ask alone: that was
+   * this rule written for one of the four controls, and could not know about an ask made yesterday.
+   *
+   * It is NOT the card's state. A card in the conversation derives its own verdict from the machine on
+   * every render (RM3-AC-18); this only answers "has the renter already asked this exact question".
+   */
+  const [outstandingAsks, setOutstandingAsks] = useState<ReadonlySet<string>>(() => new Set());
+
+  /** One ask learned the hard way — sent, or refused as already pending. Merged rather than replacing:
+   *  a single identity is not a statement about the whole conversation. */
+  const noteOutstanding = useCallback((identity: string) => {
+    setOutstandingAsks((prev) => (prev.has(identity) ? prev : new Set(prev).add(identity)));
+  }, []);
+
+  // The backstop closing the loop: when the backend refuses a repeat the client did not catch — a
+  // stale tab, a dock never opened, a double-tap that beat the first response home — the surface
+  // learns the identity it was missing and the control disables itself.
+  useEffect(() => {
+    if (sender.alreadyPendingAsk) noteOutstanding(sender.alreadyPendingAsk);
+  }, [sender.alreadyPendingAsk, noteOutstanding]);
+
+  /** Whether this exact question is already with the lessor. Null drafts — an ask the composer refuses
+   *  — are never outstanding: they are disabled for their own reason, and claiming otherwise would
+   *  explain an unsendable control with the wrong sentence. */
+  const askPending = useCallback(
+    (draft: RenteeRequestDraft | null): boolean => draft != null && isAskOutstanding(draft, outstandingAsks),
+    [outstandingAsks],
+  );
 
   const selectedBidId = bid?.id ?? null;
   // An off-platform submission has no listings, no yards and no coordinates — there is nothing to
@@ -402,10 +447,15 @@ export function BidMapWorkspace({
       // is the one authority on that, so nothing is sent and no error is invented.
       if (!draft) return;
       void sender.send(draft).then((ok) => {
-        if (ok) onRequestSent?.(draft, sender.lastRef);
+        if (!ok) return;
+        // The card is in the conversation, so this question is now with the lessor and the control
+        // that sent it must stop offering to send it again. Recorded here rather than by each
+        // control, so all four are acknowledged by the one act that put a card in the room.
+        noteOutstanding(askIdentity(draft));
+        onRequestSent?.(draft, sender.lastRef);
       });
     },
-    [sender, onRequestSent],
+    [sender, onRequestSent, noteOutstanding],
   );
 
   /* ── the asks, as ONE handler ───────────────────────────────────────────────────────────────────
@@ -415,15 +465,27 @@ export function BidMapWorkspace({
 
      V9's company panel no longer arrives here at all: a document request names a machine, so the
      firm's papers are read and opened rather than asked for (product owner, 2026-08-08). */
+  const panelDraftToWire = useCallback(
+    (draft: PanelRequestDraft): RenteeRequestDraft | null =>
+      draft.kind === "document"
+        ? composeDocumentRequest(draft.equipmentId, draft.docTypes)
+        : composeMachineRequest(draft.kind, draft.equipmentId),
+    [],
+  );
+
   const sendPanelRequest = useCallback(
-    (draft: PanelRequestDraft) => {
-      sendDraft(
-        draft.kind === "document"
-          ? composeDocumentRequest(draft.equipmentId, draft.docTypes)
-          : composeMachineRequest(draft.kind, draft.equipmentId),
-      );
-    },
-    [sendDraft],
+    (draft: PanelRequestDraft) => sendDraft(panelDraftToWire(draft)),
+    [sendDraft, panelDraftToWire],
+  );
+
+  /** The same translation read for the other verb. A panel control asks whether its ask is already out
+   *  through the SAME composer that would have sent it — including `canonicalDocType`, so a row the
+   *  surface spells `TUV` and a card carrying `tuv_cert` are recognised as one paper. Two spellings of
+   *  the translation is how a control ends up disabled for an ask that was never sent, or live for one
+   *  that was. */
+  const panelAskPending = useCallback(
+    (draft: PanelRequestDraft) => askPending(panelDraftToWire(draft)),
+    [askPending, panelDraftToWire],
   );
 
   /** The detail's machine, re-read from the CURRENT list on every render (AC-18) — nothing about a
@@ -459,6 +521,12 @@ export function BidMapWorkspace({
   /** V4's alert, or null. It carries the DIFFERENCE and not the offered total (RM3-AC-05), and its
    *  own orange (RM3-AC-06) — both decided in the model, so neither is re-derived at the render. */
   const shortfall = counts ? shortfallAlert(counts) : null;
+
+  /** The alert's «اطلب إضافتها» and the list-foot's «اطلب معدّة أخرى» are the SAME ask reached from two
+   *  places — an `alternative` naming no machine — so one outstanding card silences both. That was
+   *  already true of the `shortfallSent` flag this replaces; what is new is that it is also true of an
+   *  ask made in an earlier session, which a flag could never know about. */
+  const shortfallPending = askPending(composeShortfallRequest());
 
   /** The type word, from the REQUEST's taxonomy — `item` is `request.equipmentItems[0]` and a fleet
    *  row cannot satisfy `RequestTypeSource` — and agreeing in number with the count (RM3-AC-08). */
@@ -642,6 +710,7 @@ export function BidMapWorkspace({
               L={L}
               onBack={() => setDetailId(null)}
               onRequest={sendPanelRequest}
+              askPending={panelAskPending}
             />
           </div>
         ) : bid ? (
@@ -710,6 +779,11 @@ export function BidMapWorkspace({
                     {fmt(t.bidMap.shortfall, { n: ar ? unitCountLabel(shortfall.claimed) : `${shortfall.claimed}` })}
                   </div>
                   <div className="bm-short-s">{t.bidMap.claimedNotDrawnWhy}</div>
+                  {/* The reason the control beside this is inert, IN WORDS. A disabled button whose
+                      label merely changed to «تم الطلب» leaves the renter guessing whether the ask
+                      failed or the surface is broken; the rule is that his question is already with
+                      the lessor, and that is a sentence, not a state on a button. */}
+                  {shortfallPending && <div className="bm-short-s">{t.bidMap.askPendingWhy}</div>}
                 </div>
                 <button
                   type="button"
@@ -722,17 +796,15 @@ export function BidMapWorkspace({
                   // Sending is ALSO what creates the deal room when the bid has none (004a §4.5) —
                   // which is why this is the one control on the panel that writes, and why opening
                   // the surface still does not.
-                  onClick={() => {
-                    const draft = composeShortfallRequest();
-                    void sender.send(draft).then((ok) => {
-                      if (!ok) return;
-                      setShortfallSent(true);
-                      onRequestSent?.(draft, sender.lastRef);
-                    });
-                  }}
-                  disabled={sender.busy || shortfallSent}
+                  //
+                  // Routed through the ONE send seam like every other ask, so the acknowledgement
+                  // that used to be this control's own `shortfallSent` flag is now the thing all
+                  // four asks share: a card in the room means the question is out.
+                  onClick={() => sendDraft(composeShortfallRequest())}
+                  disabled={sender.busy || shortfallPending}
+                  title={shortfallPending ? t.bidMap.askPendingWhy : undefined}
                 >
-                  {sender.busy ? t.bidMap.shortfallSending : shortfallSent ? t.bidMap.shortfallSent : t.bidMap.shortfallAction}
+                  {sender.busy ? t.bidMap.shortfallSending : shortfallPending ? t.bidMap.shortfallSent : t.bidMap.shortfallAction}
                 </button>
               </div>
             )}
@@ -741,7 +813,14 @@ export function BidMapWorkspace({
                 question reached the lessor when it did not. */}
             {sender.error && (
               <div className="bm-sendfail" role="alert">
-                {sender.error === "invalid" ? t.bidMap.requestInvalid : t.bidMap.requestFailed}
+                {/* The 409 is the RULE arriving from the other side, not a fault, so it says the rule.
+                    Reading it as «لم يصل الطلب» would tell the renter to try again — which is the one
+                    thing "one ask, one card" exists to stop, and the try would refuse again. */}
+                {sender.error === "invalid"
+                  ? t.bidMap.requestInvalid
+                  : sender.error === "already_pending"
+                    ? t.bidMap.requestAlreadyPending
+                    : t.bidMap.requestFailed}
               </div>
             )}
 
@@ -778,6 +857,9 @@ export function BidMapWorkspace({
                   // so there is exactly one place that creates the room and one place that reports
                   // a failure.
                   onAskAvailability={(m) => sendDraft(composeMachineRequest("availability", m.equipmentId))}
+                  // …and the same composer read for the other verb: a card whose «اطلب التأكيد» is
+                  // already out shows it as asked instead of offering to ask again (owner, 2026-08-10).
+                  askPending={(m) => askPending(composeMachineRequest("availability", m.equipmentId))}
                   scrollRef={bodyRef}
                 />
               )}
@@ -796,17 +878,11 @@ export function BidMapWorkspace({
                 <button
                   type="button"
                   className="bm-eqask"
-                  onClick={() => {
-                    const draft = composeShortfallRequest();
-                    void sender.send(draft).then((ok) => {
-                      if (!ok) return;
-                      setShortfallSent(true);
-                      onRequestSent?.(draft, sender.lastRef);
-                    });
-                  }}
-                  disabled={sender.busy || shortfallSent}
+                  onClick={() => sendDraft(composeShortfallRequest())}
+                  disabled={sender.busy || shortfallPending}
+                  title={shortfallPending ? t.bidMap.askPendingWhy : undefined}
                 >
-                  {shortfallSent
+                  {shortfallPending
                     ? t.bidMap.eqAskAnotherSent
                     : fmt(t.bidMap.eqAskAnother, { type: typeWord(1) })}
                 </button>
@@ -858,6 +934,11 @@ export function BidMapWorkspace({
           // about the answer.
           fleet={fleet}
           sendNonce={sender.nonce}
+          // The conversation is the only record of these cards, and the dock is the only thing here
+          // that reads it — so the outstanding asks travel UP from it. A set of opaque strings and
+          // nothing else: it names no machine, moves no selection and opens no detail, so a tab press
+          // still changes the conversation and nothing more (RM3-AC-49).
+          onOutstandingAsks={setOutstandingAsks}
         />
       )}
     </div>

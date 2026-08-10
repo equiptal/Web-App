@@ -98,9 +98,19 @@ export interface EquipmentDocumentsProps {
   /** Hand the ask upward. This component never posts — the `rentee_request` contract (§7.3) has one
    *  caller, so `ref` minting and serial stamping can never be duplicated here. */
   onRequest?: (draft: PanelRequestDraft) => void;
+  /**
+   * Whether the batch currently ticked is a question already with the lessor and unanswered — the
+   * owner's "one ask, one card" rule (2026-08-10). Asked of the host for the same reason `onRequest`
+   * is handed upward: the conversation that records these cards is V12's, and this tab cannot see it.
+   *
+   * It is asked about the **built draft**, never about the ticks, so the guard sees exactly the
+   * `docTypes` that would be sent — the same set, canonicalised the same way, whatever order the rows
+   * were ticked in.
+   */
+  askPending?: (draft: PanelRequestDraft) => boolean;
 }
 
-export function EquipmentDocuments({ machine, request, ar, L, onRequest }: EquipmentDocumentsProps) {
+export function EquipmentDocuments({ machine, request, ar, L, onRequest, askPending }: EquipmentDocumentsProps) {
   const groups = useMemo(() => equipmentDocGroups(machine, request), [machine, request]);
   // ONE selection set across ALL groups — a batch is the renter's whole act, not one per heading. He can
   // tick the missing plate photo and a missing equipment certificate — two different groups — and send once.
@@ -166,7 +176,13 @@ export function EquipmentDocuments({ machine, request, ar, L, onRequest }: Equip
   const { state: batch, running, run } = useDownloadBatch(labelOf, onDone);
 
   const canDownload = mode === "download" && targets.length > 0 && !running;
-  const canRequest = mode === "request" && !!draft && !!onRequest;
+  /* ── One ask, one card (owner, 2026-08-10) ──────────────────────────────────────────────────────
+     A batch is a question about a SET of papers, so re-ticking the same rows — in any order, from
+     either group — is the same question asked twice and the send is withheld. Ticking a different
+     set is a different question and goes through: having asked for the istimara does not bar asking
+     for the TÜV as well. All of that judgement is the identity's, upstream; this only asks. */
+  const pending = draft != null && (askPending?.(draft) ?? false);
+  const canRequest = mode === "request" && !!draft && !!onRequest && !pending;
 
   return (
     <div>
@@ -209,6 +225,7 @@ export function EquipmentDocuments({ machine, request, ar, L, onRequest }: Equip
           type="button"
           className="mp-send wide"
           disabled={!canRequest}
+          title={pending ? L("You've already asked this, and the supplier hasn't answered yet.", "سبق أن طلبت هذا، ولم يردّ المؤجّر بعد.") : undefined}
           onClick={() => {
             if (draft && onRequest) {
               onRequest(draft);
@@ -216,11 +233,26 @@ export function EquipmentDocuments({ machine, request, ar, L, onRequest }: Equip
             }
           }}
         >
-          {canRequest
-            ? L(`Ask the supplier to send it (${requestCount})`, `اطلب من المؤجّر إرساله (${arDigits(requestCount)})`)
-            : L("Ask the supplier to send it", "اطلب من المؤجّر إرساله")}
+          {pending
+            ? L("Asked — awaiting his reply", "طُلب — بانتظار ردّه")
+            : canRequest
+              ? L(`Ask the supplier to send it (${requestCount})`, `اطلب من المؤجّر إرساله (${arDigits(requestCount)})`)
+              : L("Ask the supplier to send it", "اطلب من المؤجّر إرساله")}
         </button>
       </div>
+
+      {/* The reason the button above is inert, IN WORDS — the ticks are still on screen and still
+          look sendable, so a control that merely greyed out would read as a broken page rather than
+          as a rule. It says what to do about it too: the answer arrives in the conversation, not
+          here. Written inline through `L` like every other sentence in this directory. */}
+      {pending && (
+        <p className="mp-note" dir={ar ? "rtl" : "ltr"} role="status">
+          {L(
+            "You've already asked for exactly these documents and the supplier hasn't answered yet — his reply will arrive in the chat. Tick a different document to ask for that one.",
+            "سبق أن طلبت هذه المستندات بعينها ولم يردّ المؤجّر بعد — سيصلك ردّه في المحادثة. حدّد مستنداً آخر لطلبه.",
+          )}
+        </p>
+      )}
 
       {batch.phase === "done" && (
         <p className="mp-note" dir={ar ? "rtl" : "ltr"} role="status">

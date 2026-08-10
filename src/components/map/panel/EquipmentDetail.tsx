@@ -63,9 +63,16 @@ export interface EquipmentDetailProps {
   /** Back to the equipment list. */
   onBack: () => void;
   onRequest?: (draft: PanelRequestDraft) => void;
+  /**
+   * Whether this exact ask is already with the lessor and unanswered — the owner's "one ask, one
+   * card" rule (2026-08-10). Asked of the host, because the conversation that records these cards is
+   * V12's and this panel cannot see it; answered against the same composer the ask would have been
+   * sent through, so the panel never invents a second spelling of what "the same question" means.
+   */
+  askPending?: (draft: PanelRequestDraft) => boolean;
 }
 
-export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest }: EquipmentDetailProps) {
+export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, askPending }: EquipmentDetailProps) {
   const [tab, setTab] = useState<"machine" | "documents">("machine");
 
   const cells = useMemo(() => matchGrid(machine, request), [machine, request]);
@@ -92,6 +99,26 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest }: 
   const band = distanceBandLabel(km);
   const outOfCity = isOutOfCity(km);
   const heroName = title || kind || L("Equipment", "المعدّة");
+
+  /* ── One ask, one card (owner, 2026-08-10) ──────────────────────────────────────────────────────
+     The two asks this footer raises, composed ONCE and used for both verbs: the object that would be
+     sent is the object the guard is asked about, so the control cannot be disabled for an ask it
+     would not have made, or stay live for one it already did.
+
+     The copy is written inline through `L`, not pulled from the dictionary, because that is how this
+     whole directory takes its words (see the file header) — a panel that reached for `useT` for one
+     sentence would be the only one that did. */
+  const availabilityAsk: PanelRequestDraft = { kind: "availability", equipmentId: machine.equipmentId };
+  const alternativeAsk: PanelRequestDraft = { kind: "alternative", equipmentId: machine.equipmentId };
+  const availabilityPending = askPending?.(availabilityAsk) ?? false;
+  const alternativePending = askPending?.(alternativeAsk) ?? false;
+  /** The disabled control says what it is waiting for rather than going quietly inert. «المؤجّر» is
+   *  this surface's word for the other party — never the prototype's «المورد». */
+  const pendingLabel = L("Asked — awaiting his reply", "طُلب — بانتظار ردّه");
+  const pendingWhy = L(
+    "You've already asked this, and the supplier hasn't answered yet.",
+    "سبق أن طلبت هذا، ولم يردّ المؤجّر بعد.",
+  );
 
   // «تحميل» saves the photo through the same batch runner the document lists use, for the same reason
   // it exists: `<a download>` on a cross-origin presigned url is ignored by the browser and navigates
@@ -238,7 +265,7 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest }: 
           </>
         ) : (
           <div className="mp-body">
-            <EquipmentDocuments machine={machine} request={request} ar={ar} L={L} onRequest={onRequest} />
+            <EquipmentDocuments machine={machine} request={request} ar={ar} L={L} onRequest={onRequest} askPending={askPending} />
           </div>
         )}
       </div>
@@ -259,12 +286,24 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest }: 
       {tab === "machine" && (
         <div className="mp-foot">
           {availability !== "confirmed" && (
-            <button type="button" className="mp-foot-b solid" onClick={() => onRequest?.({ kind: "availability", equipmentId: machine.equipmentId })} disabled={!onRequest}>
-              {L("Ask him to confirm availability", "اطلب تأكيد التوفّر")}
+            <button
+              type="button"
+              className="mp-foot-b solid"
+              onClick={() => onRequest?.(availabilityAsk)}
+              disabled={!onRequest || availabilityPending}
+              title={availabilityPending ? pendingWhy : undefined}
+            >
+              {availabilityPending ? pendingLabel : L("Ask him to confirm availability", "اطلب تأكيد التوفّر")}
             </button>
           )}
-          <button type="button" className="mp-foot-b" onClick={() => onRequest?.({ kind: "alternative", equipmentId: machine.equipmentId })} disabled={!onRequest}>
-            {L("Ask for a different machine", "اطلب معدّة أخرى")}
+          <button
+            type="button"
+            className="mp-foot-b"
+            onClick={() => onRequest?.(alternativeAsk)}
+            disabled={!onRequest || alternativePending}
+            title={alternativePending ? pendingWhy : undefined}
+          >
+            {alternativePending ? pendingLabel : L("Ask for a different machine", "اطلب معدّة أخرى")}
           </button>
         </div>
       )}

@@ -860,6 +860,12 @@ export const en = {
     shortfallSent: "Asked",
     requestFailed: "The request didn't reach the supplier. Try again.",
     requestInvalid: "This request can't be sent as it is.",
+    // One ask, one card (owner, 2026-08-10). Both of these say the same thing in two places: the
+    // reason a control is disabled, and the reason a send came back refused. Neither may read as a
+    // failure — "try again" is precisely what the rule exists to stop, and the question is already
+    // with the supplier.
+    askPendingWhy: "You've already asked this, and the supplier hasn't answered yet.",
+    requestAlreadyPending: "You've already asked this. It's with the supplier — you'll see his answer in the chat.",
     // Map canvas
     // The prototype's copy verbatim: «مشروعك». "Your site" names a place on a map; the pin names the
     // PROJECT, which is the thing every distance on this surface is measured from.
@@ -933,6 +939,10 @@ export const en = {
     eqOutOfCity: "· Outside the city",
     eqAskConfirm: "Ask him to confirm",
     eqAskConfirmWhy: "Ask the supplier to confirm this machine is available",
+    // The same control once the ask is out. It keeps its place in the row rather than disappearing:
+    // a control that vanished would read as "there is nothing to ask", when the truth is that the
+    // question has been asked and is waiting.
+    eqAskPending: "Asked — awaiting reply",
     eqDetails: "Details",
     // The certificate row always occupies its line, so a machine with no certificates is a shorter
     // LINE and not a shorter CARD.

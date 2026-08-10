@@ -482,3 +482,63 @@ export function renteeRequestState(
   const docTypes = card.docTypes ?? [];
   return derivable(docTypes.length > 0 && documentAskSatisfied(machine, docTypes));
 }
+
+/* ── one ask, one card ─────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * What makes two asks "the same question" — the client's copy of the backend's rule
+ * (`rentee-request.service.askIdentity`). **Change one, change the other**: they are two halves of a
+ * single guard, and a client that keys them differently either blocks a legitimate ask or lets a
+ * repeat through to a 409 the renter cannot act on.
+ *
+ * Kind, scope, machine, and — for a document ask — the SET of types, order-independent. Ticking
+ * {istimara, tuv} and {tuv, istimara} is one question asked twice. A DIFFERENT set is a different
+ * question: having asked for the istimara does not bar asking for the TÜV.
+ */
+export function askIdentity(a: {
+  kind: string;
+  scope: string;
+  equipmentId: string | null;
+  docTypes?: readonly string[] | null;
+}): string {
+  const types = [...(a.docTypes ?? [])].sort().join("+");
+  return `${a.kind}|${a.scope}|${a.equipmentId ?? ""}|${types}`;
+}
+
+/**
+ * The identities of every ask in a conversation the supplier has **not answered**.
+ *
+ * Owner's rule, 2026-08-10: one ask, one card. A renter must not be able to repeat an open request
+ * and flood the supplier's conversation, so the control that would send it is disabled while its
+ * identity is in this set. The backend refuses the same thing with 409
+ * `DEAL_ROOM_REQUEST_ALREADY_PENDING`; this exists so the renter sees a disabled control with a
+ * reason instead of pressing a live-looking button and getting an error.
+ *
+ * An ask is answered when a reply carries its `ref`. Note what this deliberately does NOT consult:
+ * derived state. When the supplier satisfies an ask from elsewhere — confirms the yard on his
+ * readiness card, uploads the paper from the machine's page — no reply is posted, so the ask still
+ * counts as outstanding here. That costs nothing, because the surface already withdraws the control
+ * in exactly that case: a confirmed machine offers no availability ask, and a held document is not a
+ * requestable row. The set only ever suppresses a control the renter could otherwise press twice.
+ *
+ * Ordering-independent: a reply is honoured whether it arrives before or after its ask in the array,
+ * so a partially-loaded or re-ordered page cannot resurrect an answered ask.
+ */
+export function outstandingAskIdentities(
+  cards: readonly { ask?: RenteeRequestCardPayload | null; reply?: RenteeRequestReplyPayload | null }[],
+): ReadonlySet<string> {
+  const answered = new Set<string>();
+  const byRef = new Map<string, RenteeRequestCardPayload>();
+  for (const c of cards) {
+    if (c.reply?.inReplyTo) answered.add(c.reply.inReplyTo);
+    if (c.ask?.ref) byRef.set(c.ask.ref, c.ask);
+  }
+  const out = new Set<string>();
+  for (const [ref, ask] of byRef) if (!answered.has(ref)) out.add(askIdentity(ask));
+  return out;
+}
+
+/** Whether this draft repeats an ask the supplier has not answered yet. */
+export function isAskOutstanding(draft: RenteeRequestDraft, outstanding: ReadonlySet<string>): boolean {
+  return outstanding.has(askIdentity(draft));
+}
