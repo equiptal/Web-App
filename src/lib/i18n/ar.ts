@@ -967,8 +967,10 @@ export const ar: Dictionary = {
     openingOffer: "عرض افتتاحي",
     fromDealRoom: "من غرفة الصفقة",
     details: "التفاصيل",
-    negotiate: "تفاوض",
-    continueNegotiation: "تابع في غرفة الصفقة",
+    // مدخلا التذييل، مسمّيان بالنيّة لا بالوجهة (قرار المالك، ٢٠٢٦-٠٨-١١) — كلاهما ما زال يفتح
+    // `/deal-room/[id]`؛ لوحة المحادثة لا تُقرّ سعراً (004a §4a.2).
+    counterPrice: "اعرض سعراً مقابلاً",
+    confirmPrice: "أكّد هذا السعر",
     // الموضع الوحيد الذي يُوفَّق فيه بين العدد المعروض والعدد المتفق عليه (RM3-AC-66).
     unitsDiffer: "السعر محسوب على {agreed} وحدة متفق عليها — والعرض مكوّن من {offered}.",
     rentalLine: "الإيجار — {rate} / {unit} × {n} × {periods}",

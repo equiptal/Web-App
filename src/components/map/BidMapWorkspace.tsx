@@ -42,7 +42,7 @@ import type { MachinePin } from "@/components/map/MapCanvas";
 import { PriceFooter } from "@/components/map/PriceFooter";
 import { useRenteeRequestSender } from "@/components/map/useRenteeRequestSender";
 import { EquipmentList } from "@/components/map/EquipmentList";
-import { CompanyPanel, EquipmentDetail, type PanelRequestDraft } from "@/components/map/panel";
+import { CompanyPanel, EquipmentDetail, matchGrid, type PanelRequestDraft } from "@/components/map/panel";
 import type { BidCard } from "@/lib/contract/bids";
 import { fetchBidCompanyDocuments, fetchBidFleet } from "@/lib/api/client";
 import { companyPanelSource, type CompanyDocsPayload } from "@/lib/contract/company-documents";
@@ -605,6 +605,25 @@ export function BidMapWorkspace({
    *  own orange (RM3-AC-06) — both decided in the model, so neither is re-derived at the render. */
   const shortfall = counts ? shortfallAlert(counts) : null;
 
+  /**
+   * Does anything in this offer contradict the request? Only the footer's WORD depends on it —
+   * «Confirm this price» when nothing does, «Counter this price» when something might.
+   *
+   * Derived here because this is where the fleet and the bid already are (the file header's rule: one
+   * place derives the machine list). Three things have to hold, and each is a real "no":
+   *  - the fleet has ARRIVED. Unknown is not matched; while it loads the footer says «Counter», which
+   *    is the safe word to be wrong with.
+   *  - no machine carries a RED match cell. Grey is not a failure — `matchGrid` greys what the request
+   *    never asked about, and a cell nobody asked about cannot fail.
+   *  - no SHORTFALL. A unit offered as a bare count has no machine to match, so an offer carrying one
+   *    cannot be said to match in full however green its registered machines are.
+   */
+  const allMatched = useMemo(() => {
+    if (!bid || !fleet || listed.length === 0) return false;
+    if (shortfall) return false;
+    return listed.every((m) => matchGrid(m, bid).every((cell) => cell.state !== "red"));
+  }, [bid, fleet, listed, shortfall]);
+
   /** The alert's «اطلب إضافتها» and the list-foot's «اطلب معدّة أخرى» are the SAME ask reached from two
    *  places — an `alternative` naming no machine — so one outstanding card silences both. That was
    *  already true of the `shortfallSent` flag this replaces; what is new is that it is also true of an
@@ -989,7 +1008,7 @@ export function BidMapWorkspace({
                 wizard bound to `DealRoom.tsx`'s local state (004a §4a.1). التفاصيل expands this in
                 place, taking vertical space from the list above rather than overlaying it — the
                 panel is a fixed-width column, so there is nowhere to overlay to. */}
-            <PriceFooter bid={bid} durationDays={requestDurationDays} />
+            <PriceFooter bid={bid} durationDays={requestDurationDays} allMatched={allMatched} />
           </>
         ) : (
           // No bid resolved yet. The route renders its own not-found/loading states, so this is only

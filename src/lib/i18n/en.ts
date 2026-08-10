@@ -1048,8 +1048,15 @@ export const en = {
     openingOffer: "Opening offer",
     fromDealRoom: "From the deal room",
     details: "Details",
-    negotiate: "Negotiate",
-    continueNegotiation: "Continue in the deal room",
+    // The footer's two ways in, named by INTENT rather than by destination (owner, 2026-08-11).
+    // ~~"Negotiate" / "Continue in the deal room"~~ — both described the room the renter arrives in,
+    // which he has not seen yet and cannot want; these describe what he is about to do with the price
+    // in front of him. Both still land in `/deal-room/[id]`: the dock never settles a rate (004a
+    // §4a.2), so there is still exactly one place a price can be accepted.
+    counterPrice: "Counter this price",
+    // Shown INSTEAD, and only when nothing in the offer contradicts the request — no red cell on any
+    // machine's match grid, and no unit offered as a count with no machine behind it.
+    confirmPrice: "Confirm this price",
     // The one place the offered and the agreed count are reconciled (RM3-AC-66).
     unitsDiffer: "Priced on {agreed} agreed units — the offer was made of {offered}.",
     rentalLine: "Rental — {rate} / {unit} × {n} × {periods}",

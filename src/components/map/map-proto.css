@@ -1450,6 +1450,14 @@
   white-space: nowrap;
 }
 .bidmap .bm-foot-cta:disabled { opacity: 0.55; cursor: default; }
+/* «Confirm this price» — GREEN, and only when nothing in the offer contradicts the request. Blue is
+   this surface's request action (AC-33): every ask the renter can make wears it, and confirming is
+   not an ask. Green is `AVAILABILITY_COLOUR.confirmed`, the same green a confirmed machine wears, so
+   the button is the same fact about the whole offer that the chips are about each machine.
+
+   It still opens `/deal-room/[id]` — nothing is settled by pressing it here (004a §4a.2). The colour
+   says the offer holds up, not that the deal is done. */
+.bidmap .bm-foot-cta.is-confirm { background: #16a34a; }
 /* The one place the offered count and the agreed count are reconciled (RM3-AC-66). Neutral, because
    a renegotiated count is not a problem — it is simply two correct numbers needing one sentence. */
 .bidmap .bm-foot-units {
