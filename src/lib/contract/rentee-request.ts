@@ -542,3 +542,67 @@ export function outstandingAskIdentities(
 export function isAskOutstanding(draft: RenteeRequestDraft, outstanding: ReadonlySet<string>): boolean {
   return outstanding.has(askIdentity(draft));
 }
+
+/* ── V12 · compose → review → send (RM3-AC-17, owner 2026-08-10) ───────────────────────────────── */
+
+/**
+ * The staged ask — composed, shown to the renter as a card in the conversation, and **not yet sent**.
+ *
+ * RM3-AC-17 asks for a review card before sending, and until now there was none: pressing «اطلب تأكيد
+ * التوفّر» posted immediately, which also meant it created the deal room immediately. A room is a
+ * write that freezes the supplier's offered count (004a §4.5), so the difference between composing and
+ * confirming is not cosmetic — it is the difference between a renter who looked and a renter who
+ * committed.
+ *
+ * One draft at a time. Composing a second replaces the first: two review cards stacked in a
+ * conversation is two things to confirm and no way to tell which button belongs to which.
+ */
+export interface RenteeDraftState {
+  pending: RenteeRequestDraft | null;
+}
+
+export type RenteeDraftAction =
+  /** A control was pressed. `draft` is whatever its composer produced — **null included**, because a
+   *  control disabled for its own reason must not stage anything. */
+  | { type: "compose"; draft: RenteeRequestDraft | null; outstanding?: ReadonlySet<string> }
+  /** «إلغاء» — the draft is discarded and NOTHING is sent. */
+  | { type: "cancel" }
+  /** «أرسل الطلب» — the one action that writes. */
+  | { type: "confirm" };
+
+export interface RenteeDraftStep {
+  state: RenteeDraftState;
+  /**
+   * The ask to POST — non-null on a `confirm` that had something staged, and on nothing else.
+   *
+   * This is the whole of "sends exactly once": the confirm clears `pending` in the same step that
+   * yields the payload, so a second confirm — a double-tap, a re-render, a stale handler — finds
+   * nothing staged and yields null. There is no in-flight flag to get out of step with.
+   */
+  send: RenteeRequestDraft | null;
+}
+
+/**
+ * The draft lifecycle, as a pure step. The surface holds `pending` in state and does what `send` says.
+ *
+ * Written here rather than inline in the component because it is the rule, not the plumbing: composing
+ * must never write, cancelling must never write, and confirming must write exactly once. All three are
+ * assertions about a transition, and a transition can be proved.
+ */
+export function renteeDraftStep(state: RenteeDraftState, action: RenteeDraftAction): RenteeDraftStep {
+  switch (action.type) {
+    case "compose": {
+      // An ask the composer refused is not a draft. Staging one would put a card in the conversation
+      // whose «أرسل الطلب» could only ever produce a 400.
+      if (!action.draft) return { state, send: null };
+      // One ask, one card — enforced at the SEAM as well as on each control. A control can be stale
+      // (the dock reported an outstanding ask a moment ago); this cannot.
+      if (action.outstanding && isAskOutstanding(action.draft, action.outstanding)) return { state, send: null };
+      return { state: { pending: action.draft }, send: null };
+    }
+    case "cancel":
+      return { state: { pending: null }, send: null };
+    case "confirm":
+      return { state: { pending: null }, send: state.pending };
+  }
+}

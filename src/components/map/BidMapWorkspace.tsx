@@ -70,6 +70,7 @@ import {
   composeMachineRequest,
   composeShortfallRequest,
   isAskOutstanding,
+  renteeDraftStep,
   type RenteeRequestDraft,
 } from "@/lib/contract/rentee-request";
 import { publicTaxonomyUrl, type RequestRecord } from "@/lib/contract/requests";
@@ -150,6 +151,23 @@ export function BidMapWorkspace({
    * state, one derivation, so the cards and the markers cannot disagree about what the offer contains.
    */
   const [filterIds, setFilterIds] = useState<string[]>([]);
+  /** V12 — the ask the renter has COMPOSED and not yet sent (RM3-AC-17). The dock renders it as a
+   *  draft card; the lifecycle that moves it is `composeDraft`/`cancelDraft`/`confirmDraft` below. */
+  const [pendingDraft, setPendingDraft] = useState<RenteeRequestDraft | null>(null);
+  /**
+   * The staged ask as the TRANSITION reads it, mirrored beside the state that renders it.
+   *
+   * A `setState` updater is not guaranteed to have run by the time the handler returns, so a confirm
+   * that read the next state out of one would send nothing — and two presses landing in one batch
+   * would both read the same staged ask and send it twice. The ref is what makes "exactly once" true
+   * of the second press as well as the first, which is the whole reason `renteeDraftStep` yields the
+   * payload and the next state together.
+   */
+  const pendingRef = useRef<RenteeRequestDraft | null>(null);
+  const stage = useCallback((next: RenteeRequestDraft | null) => {
+    pendingRef.current = next;
+    setPendingDraft(next);
+  }, []);
   /** The panel's scroller, handed to the list so a selection made on the MAP brings its card into
    *  view (AC-15). */
   const bodyRef = useRef<HTMLDivElement | null>(null);
@@ -301,6 +319,9 @@ export function BidMapWorkspace({
     setDetailId(null);
     setCompanyOpen(false);
     setFilterIds([]);
+    // An ask composed against one bid's machines has no meaning in another's conversation, and it was
+    // never sent — so it is dropped rather than carried across.
+    stage(null);
     landedForBid.current = null;
     onSelectMachine?.(null);
     // `onSelectMachine` is the parent's callback; re-running when only its identity changed would
@@ -438,25 +459,54 @@ export function BidMapWorkspace({
     return () => window.clearTimeout(timer);
   }, [cueId]);
 
-  /** Every ask on this surface goes through here (V11): create-or-fetch the room, post the card, and
-   *  only then tell a listener it happened. One seam means one place that can create a room and one
-   *  place that reports a failure — `sender.error` below is the whole of that reporting. */
-  const sendDraft = useCallback(
+  /* ── V12 · compose → review → send (RM3-AC-17, owner 2026-08-10) ───────────────────────────────
+     Every ask on this surface goes through this ONE seam, and what it does changed on 2026-08-10:
+     pressing an ask control used to POST immediately, which meant it also created the deal room
+     immediately. There was no review step at all, and RM3-AC-17 asks for one.
+
+     Now a press STAGES the ask. The dock puts it in the conversation as a draft card, and only
+     «أرسل الطلب» writes — so a renter who composed and thought better of it has created nothing, and
+     the supplier's offered count is not frozen by a question that was never asked (004a §4.5).
+
+     The transition itself is `renteeDraftStep`, a pure model: composing never sends, cancelling never
+     sends, and a confirm yields the payload exactly once because it clears the staged ask in the same
+     step that hands it over. The state it moves is declared with the panel's other state above. */
+  const composeDraft = useCallback(
     (draft: RenteeRequestDraft | null) => {
       // Null is an ask the backend would refuse — an availability ask naming no machine. The composer
-      // is the one authority on that, so nothing is sent and no error is invented.
-      if (!draft) return;
-      void sender.send(draft).then((ok) => {
-        if (!ok) return;
-        // The card is in the conversation, so this question is now with the lessor and the control
-        // that sent it must stop offering to send it again. Recorded here rather than by each
-        // control, so all four are acknowledged by the one act that put a card in the room.
-        noteOutstanding(askIdentity(draft));
-        onRequestSent?.(draft, sender.lastRef);
-      });
+      // is the one authority on that, so nothing is staged and no error is invented. `outstanding` is
+      // the one-ask guard held at the seam as well as on each control: a control can be stale, this
+      // cannot.
+      const step = renteeDraftStep({ pending: pendingRef.current }, { type: "compose", draft, outstanding: outstandingAsks });
+      stage(step.state.pending);
     },
-    [sender, onRequestSent, noteOutstanding],
+    [outstandingAsks, stage],
   );
+
+  /** «إلغاء». Nothing was written, so there is nothing to undo — that is the point of the review step. */
+  const cancelDraft = useCallback(() => {
+    stage(renteeDraftStep({ pending: pendingRef.current }, { type: "cancel" }).state.pending);
+  }, [stage]);
+
+  /** «أرسل الطلب» — the one act on this surface that writes: create-or-fetch the room, post the card,
+   *  and only then tell a listener it happened. One seam means one place that can create a room and
+   *  one place that reports a failure — `sender.error` below is the whole of that reporting. */
+  const confirmDraft = useCallback(() => {
+    const step = renteeDraftStep({ pending: pendingRef.current }, { type: "confirm" });
+    stage(step.state.pending);
+    const draft = step.send;
+    if (!draft) return;
+    void sender.send(draft).then((ok) => {
+      // NOT restored on failure. The panel states a failed send in words (`sender.error` below), and
+      // putting the card back would leave a live «أرسل الطلب» beside a 409 that will refuse it again.
+      if (!ok) return;
+      // The card is in the conversation, so this question is now with the lessor and the control
+      // that sent it must stop offering to send it again. Recorded here rather than by each
+      // control, so all four are acknowledged by the one act that put a card in the room.
+      noteOutstanding(askIdentity(draft));
+      onRequestSent?.(draft, sender.lastRef);
+    });
+  }, [sender, onRequestSent, noteOutstanding, stage]);
 
   /* ── the asks, as ONE handler ───────────────────────────────────────────────────────────────────
      V7/V8 describe an ask in their own vocabulary (`PanelRequestDraft`); the wire wants
@@ -474,8 +524,8 @@ export function BidMapWorkspace({
   );
 
   const sendPanelRequest = useCallback(
-    (draft: PanelRequestDraft) => sendDraft(panelDraftToWire(draft)),
-    [sendDraft, panelDraftToWire],
+    (draft: PanelRequestDraft) => composeDraft(panelDraftToWire(draft)),
+    [composeDraft, panelDraftToWire],
   );
 
   /** The same translation read for the other verb. A panel control asks whether its ask is already out
@@ -492,6 +542,39 @@ export function BidMapWorkspace({
    *  machine is held in this component's state except its id. A refetch that changes its availability
    *  changes the chip under the renter's eyes rather than leaving a stale copy open. */
   const detailMachine = detailId ? listed.find((m) => m.equipmentId === detailId) ?? null : null;
+
+  /* ── A request card is a way INTO the machine it names (owner, 2026-08-10) ─────────────────────
+     His reason, in his words: the supplier reading the ask has to "quickly go to equipment and add its
+     doc or confirm it". So pressing the card selects that machine and opens its detail — the same two
+     acts the list's own card performs, deliberately, so arriving from the chat leaves the surface in
+     exactly the state arriving from the list does.
+
+     A machine hidden by a FILTER is still opened, and the filters are cleared to do it: the renter
+     pressed a specific machine by name, and honouring a chip he set for the list by silently doing
+     nothing would be the worst of both. */
+  const canOpenMachineFromChat = useCallback(
+    // `listed`, not the fleet: the detail resolves from the offered set, so a machine the offer does
+    // not name has nothing to open and its card must not claim otherwise.
+    (equipmentId: string) => listed.some((m) => m.equipmentId === equipmentId),
+    [listed],
+  );
+
+  const openMachineFromChat = useCallback(
+    (equipmentId: string) => {
+      if (!canOpenMachineFromChat(equipmentId)) return;
+      setFilterIds((prev) => (prev.length > 0 ? [] : prev));
+      // `open`, never `press`: opening the detail of the ALREADY selected machine must not toggle the
+      // selection off underneath the panel it is about to fill — the list's own rule.
+      setSelectedMachineId((cur) => nextSelection(cur, { kind: "open", id: equipmentId }));
+      setCueId(null);
+      // The company panel opens OVER the whole panel, so a detail opened underneath it would be
+      // invisible and the press would read as broken.
+      setCompanyOpen(false);
+      setDetailId(equipmentId);
+      onSelectMachine?.(equipmentId);
+    },
+    [canOpenMachineFromChat, onSelectMachine],
+  );
 
   /** Bilingual literal for V7/V8/V9, which take copy as a prop rather than reaching for the
    *  dictionary — the pattern that directory already ships. */
@@ -803,14 +886,15 @@ export function BidMapWorkspace({
                   // `scope: "company"`. `add_to_offer` is retired and rejected server-side, and is
                   // unreachable from here by construction (RM3-AC-07).
                   //
-                  // Sending is ALSO what creates the deal room when the bid has none (004a §4.5) —
-                  // which is why this is the one control on the panel that writes, and why opening
-                  // the surface still does not.
+                  // This control COMPOSES; it does not send. The draft card lands in the chat and
+                  // «أرسل الطلب» is what writes — which is also what creates the deal room when the
+                  // bid has none (004a §4.5), so opening the surface and pressing this both still
+                  // leave the supplier's offered count unfrozen.
                   //
-                  // Routed through the ONE send seam like every other ask, so the acknowledgement
-                  // that used to be this control's own `shortfallSent` flag is now the thing all
-                  // four asks share: a card in the room means the question is out.
-                  onClick={() => sendDraft(composeShortfallRequest())}
+                  // Routed through the ONE seam like every other ask, so the acknowledgement that
+                  // used to be this control's own `shortfallSent` flag is now the thing all four
+                  // asks share: a card in the room means the question is out.
+                  onClick={() => composeDraft(composeShortfallRequest())}
                   disabled={sender.busy || shortfallPending}
                   title={shortfallPending ? t.bidMap.askPendingWhy : undefined}
                 >
@@ -861,12 +945,11 @@ export function BidMapWorkspace({
                     setDetailId(id);
                     onSelectMachine?.(id);
                   }}
-                  // V11 landed the send path, so the card's ask posts for real instead of being
-                  // handed up and disabled. `sendDraft` is the ONE seam every ask on this surface
-                  // goes through — the shortfall, the card, the detail and both document surfaces —
-                  // so there is exactly one place that creates the room and one place that reports
-                  // a failure.
-                  onAskAvailability={(m) => sendDraft(composeMachineRequest("availability", m.equipmentId))}
+                  // V11 landed the send path; V12 put a review card in front of it. `composeDraft` is
+                  // the ONE seam every ask on this surface goes through — the shortfall, the card,
+                  // the detail and both document surfaces — so there is exactly one place that stages
+                  // an ask, one that creates the room, and one that reports a failure.
+                  onAskAvailability={(m) => composeDraft(composeMachineRequest("availability", m.equipmentId))}
                   // …and the same composer read for the other verb: a card whose «اطلب التأكيد» is
                   // already out shows it as asked instead of offering to ask again (owner, 2026-08-10).
                   askPending={(m) => askPending(composeMachineRequest("availability", m.equipmentId))}
@@ -888,7 +971,7 @@ export function BidMapWorkspace({
                 <button
                   type="button"
                   className="bm-eqask"
-                  onClick={() => sendDraft(composeShortfallRequest())}
+                  onClick={() => composeDraft(composeShortfallRequest())}
                   disabled={sender.busy || shortfallPending}
                   title={shortfallPending ? t.bidMap.askPendingWhy : undefined}
                 >
@@ -949,6 +1032,19 @@ export function BidMapWorkspace({
           // nothing else: it names no machine, moves no selection and opens no detail, so a tab press
           // still changes the conversation and nothing more (RM3-AC-49).
           onOutstandingAsks={setOutstandingAsks}
+          // ── The review step (RM3-AC-17) ──
+          // The ask the renter has composed, shown as a draft card IN the conversation and sent only
+          // on «أرسل الطلب». The dock renders it and reports the two presses; the write stays here,
+          // where the one send seam is.
+          draft={pendingDraft}
+          onConfirmDraft={confirmDraft}
+          onCancelDraft={cancelDraft}
+          draftBusy={sender.busy}
+          // A card names a machine, and pressing it opens that machine — the owner's reason for the
+          // card. The predicate travels with the handler because only this component knows which of
+          // the fleet's machines the offer actually names, and therefore which have a detail.
+          onOpenMachine={openMachineFromChat}
+          canOpenMachine={canOpenMachineFromChat}
         />
       )}
     </div>

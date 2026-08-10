@@ -426,16 +426,24 @@ function periodOf(unit: string, L: LFn): string {
   }
 }
 
+/**
+ * A message's time, as every card in a conversation prints it (AC-16).
+ *
+ * Exported because the renter's request card is drawn by `RequestCard` rather than by `ChatCard`
+ * (V12) and still has to carry one. Two formatters would be two clock faces in one thread.
+ */
+export function chatCardTime(at: string | Date | null | undefined, ar: boolean): string {
+  if (!at) return "";
+  const d = at instanceof Date ? at : new Date(at);
+  return Number.isNaN(d.getTime())
+    ? ""
+    : d.toLocaleTimeString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+
 /** Typed card + room context → the view-model the card component renders. */
 export function buildChatCardView(card: ChatCard, ctx: ChatCardCtx): ChatCardView {
   const { ar, L, terms } = ctx;
-  const at = (() => {
-    if (!ctx.at) return "";
-    const d = ctx.at instanceof Date ? ctx.at : new Date(ctx.at);
-    return Number.isNaN(d.getTime())
-      ? ""
-      : d.toLocaleTimeString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { hour: "2-digit", minute: "2-digit" });
-  })();
+  const at = chatCardTime(ctx.at, ar);
   const base = { at, transition: null, actions: false, outcome: null, outcomeTone: "accepted", outcomeIcon: null } as const;
   const label = (k: string) => chatCardTermLabel(k, terms, ar);
   const val = (v: unknown, k: string) => chatCardValue(v, k, terms, ar, L);

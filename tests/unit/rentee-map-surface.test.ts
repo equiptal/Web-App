@@ -138,12 +138,13 @@ describe("one selected id reaches the map and the list alike (RM3-AC-15)", () =>
   });
 
   it("routes every change to that value through the one reducer", () => {
-    // Five movers — press, open, land, bid change, filtered-out — and every one of them is the
-    // reducer's answer. A `setSelectedMachineId` with no matching `nextSelection` is the rule written
-    // a second time, which is how the two surfaces start disagreeing.
+    // SIX movers — press, open, land, bid change, filtered-out, and (2026-08-10) a request card in
+    // the chat pressed to open the machine it names — and every one of them is the reducer's answer.
+    // A `setSelectedMachineId` with no matching `nextSelection` is the rule written a second time,
+    // which is how the two surfaces start disagreeing.
     const calls = workspace.match(/nextSelection\(/g) ?? [];
     const sets = [...workspace.matchAll(/setSelectedMachineId\(([^\n]*)/g)].map((m) => m[1].trim());
-    expect(calls).toHaveLength(5);
+    expect(calls).toHaveLength(6);
     expect(sets).toHaveLength(calls.length);
     // …and none of them is handed a raw id, which is the shape a bypass would take.
     for (const arg of sets) expect(arg, arg).not.toMatch(/^(id|m\.equipmentId|equipmentId|null)\s*\)/);
@@ -324,30 +325,84 @@ describe("the surface's stylesheet carries the same colour tokens the models do"
 describe("the chat dock's tab strip touches no map state (RM3-AC-49)", () => {
   const dock = strip(read(DOCK));
 
-  it("is mounted with five props, none of which can write to the surface", () => {
+  it("is mounted with the enumerated props, and hands down no setter of the surface's own", () => {
     const mounted = region(read(WORKSPACE), "<ChatDock", "/>");
     const props = [...mounted.matchAll(/^\s*(\w+)=/gm)].map((m) => m[1]);
     // `onOutstandingAsks` joined the list with "one ask, one card" (owner, 2026-08-10): the channel
     // is the only record of the request cards and this component is the only reader of it, so the
-    // outstanding asks have to travel UP from here. It is enumerated rather than allowed by a
-    // pattern, so a SIXTH prop still fails this line whatever it is called.
-    expect(props.sort()).toEqual(["bid", "fleet", "groupKey", "onOutstandingAsks", "sendNonce"]);
-    // A setter handed down here is the one edit that would make a tab press move the map. The one
-    // setter that IS handed down writes a set of ask identities and nothing the map can read.
-    expect(mounted).not.toMatch(/setSelected|setDetail|setFilter|setCue|onSelectMachine|setCompanyOpen/);
+    // outstanding asks have to travel UP from here.
+    //
+    // The six that follow it landed with the request card the same owner asked for on 2026-08-10 —
+    // the review step («أرسل الطلب» / «إلغاء») and the press that opens the machine a card names.
+    // Still ENUMERATED rather than allowed by a pattern, so a further prop fails this line whatever
+    // it is called.
+    expect(props.sort()).toEqual([
+      "bid",
+      "canOpenMachine",
+      "draft",
+      "draftBusy",
+      "fleet",
+      "groupKey",
+      "onCancelDraft",
+      "onConfirmDraft",
+      "onOpenMachine",
+      "onOutstandingAsks",
+      "sendNonce",
+    ]);
+    // A raw setter handed down here is the one edit that would make a TAB PRESS move the map. What
+    // is handed down instead is a set-writer and two named intentions of the surface's own, each of
+    // which decides for itself what it does — see the next test for what still cannot move.
+    expect(mounted).not.toMatch(/setSelected|setDetail|setFilter|setCue|onSelectMachine=|setCompanyOpen/);
     expect(mounted).toMatch(/onOutstandingAsks=\{setOutstandingAsks\}/);
+    expect(mounted).toMatch(/onOpenMachine=\{openMachineFromChat\}/);
   });
 
-  it("declares exactly one callback, and it reports rather than reaches back", () => {
+  it("moves the surface only from the request card — never from the tab strip", () => {
+    /* ── The rule, restated (owner, 2026-08-10) ──────────────────────────────────────────────────
+       RM3-AC-49 is about the TAB STRIP: switching conversation must not move the map, the selection
+       or the panel. It was previously enforced by the dock declaring exactly one callback and having
+       no vocabulary for a machine at all — which also made the request card inert, and the owner
+       asked for the opposite: pressing a card must take the reader to the machine it names.
+
+       So the prohibition moves to where it belongs. The tab button's handler is proved to write the
+       ACTIVE TAB and nothing else, and the machine-opening callback is proved to be reachable only
+       from the card. */
+    const tab = region(read(DOCK), 'role="tab"', "</button>");
+    expect(tab).toMatch(/aria-selected=\{tab\.bidId === activeBidId\}/); // positive control
+    const tabWrites = [...tab.matchAll(/on[A-Z]\w*=\{[^}]*\}/g)].map((m) => m[0]);
+    expect(tabWrites).toEqual(["onClick={() => setActiveBidId(tab.bidId)}"]);
+
+    // `onOpenMachine` is handed to `RequestCard` and to nothing else — not to the tab, not to the
+    // composer, not to a message bubble. Two mounts carry it (the sent card and the draft), and the
+    // counts are asserted against each other so a third consumer anywhere in the file fails the line.
+    expect(dock.match(/<RequestCard/g)).toHaveLength(2);
+    expect(dock.match(/onOpenMachine=\{onOpenMachine\}/g)).toHaveLength(2);
+    // Eight mentions in all: the prop declaration, the destructure, the resolver that decides whether
+    // a press is offered at all, its dependency, and the two `prop={prop}` pairs above. Anything more
+    // is a second consumer, which is what this line exists to catch.
+    expect(dock.match(/onOpenMachine/g)).toHaveLength(8);
+  });
+
+  it("declares callbacks that REPORT or ACT, and none that hands out map state", () => {
     const contract = region(read(DOCK), "export interface ChatDockProps {", "}");
     expect(contract).toMatch(/bid: BidCard/); // the positive control: the region is the real interface
-    // ONE callback, and its whole vocabulary is a set of opaque strings. It carries no id the
-    // surface could select on, no machine, and no setter of the dock's own — so the dock can tell
-    // the surface which questions are outstanding and still not move anything (RM3-AC-49).
     const callbacks = [...contract.matchAll(/^\s*(\w+)\??:.*=>/gm)].map((m) => m[1]);
-    expect(callbacks).toEqual(["onOutstandingAsks"]);
+    expect(callbacks.sort()).toEqual([
+      "canOpenMachine",
+      "onCancelDraft",
+      "onConfirmDraft",
+      "onOpenMachine",
+      "onOutstandingAsks",
+    ]);
+    // The outstanding-ask report's whole vocabulary is still a set of opaque strings: it carries no
+    // id the surface could select on and no machine.
     expect(contract).toMatch(/onOutstandingAsks\?: \(identities: ReadonlySet<string>\) => void;/);
-    expect(contract).not.toMatch(/select|detail|filter|marker|map|cue/i);
+    // The two machine callbacks speak `equipmentId` and NOTHING else. No selection, no detail id, no
+    // filter, no marker and no cue crosses this boundary — the surface decides what an open means.
+    expect(contract).toMatch(/onOpenMachine\?: \(equipmentId: string\) => void;/);
+    expect(contract).toMatch(/canOpenMachine\?: \(equipmentId: string\) => boolean;/);
+    // `region` has already stripped the prose, so this sweeps the DECLARATIONS alone.
+    expect(contract).not.toMatch(/selectedMachineId|detailId|filterIds|cueId|companyOpen|marker/i);
   });
 
   it("holds no selection, filter, detail or marker state of its own", () => {
@@ -369,5 +424,47 @@ describe("the chat dock's tab strip touches no map state (RM3-AC-49)", () => {
     const onTab = [...dock.matchAll(/onClick=\{\(\) => \{?([^}]*)/g)].map((m) => m[1]).join(" ");
     expect(onTab.length).toBeGreaterThan(0);
     expect(onTab).not.toMatch(/setSelectedMachineId|setDetailId|setFilterIds|setCueId/);
+  });
+});
+
+/* ═════════════ RM3-AC-17 · a review card stands between an ask and the write ═════════════ */
+
+describe("no ask control on this surface writes — they compose (owner, 2026-08-10)", () => {
+  const workspace = strip(read(WORKSPACE));
+
+  it("posts from exactly ONE place, and that place is the confirm", () => {
+    /* Before 2026-08-10 every ask control called the seam and the seam posted, so pressing «اطلب
+       تأكيد التوفّر» created the deal room — a write that freezes the supplier's offered count
+       (004a §4.5) — before the renter had seen what he was sending. RM3-AC-17 asks for a review card
+       and there was none.
+
+       One `sender.send(` in the file is the whole of that rule. A second one is an ask control that
+       posts directly, which is exactly the shape the regression takes. */
+    expect(workspace.match(/sender\.send\(/g)).toHaveLength(1);
+    expect(region(read(WORKSPACE), "const confirmDraft = useCallback", "}, [sender,")).toMatch(/sender\.send\(draft\)/);
+  });
+
+  it("routes all four asks through the one composing seam", () => {
+    // The shortfall alert, the list-foot ask, the card's «اطلب تأكيد التوفّر» and the panel's own
+    // (`sendPanelRequest`, which the detail and both document surfaces share).
+    expect(workspace.match(/composeDraft\(/g)?.length).toBeGreaterThanOrEqual(4);
+    // …and none of them reaches past it. `renteeDraftStep` is the only thing that moves the staged
+    // ask, so "composing never sends" is a property of the transition rather than of four handlers.
+    const staged = [...workspace.matchAll(/setPendingDraft\(([^\n]*)/g)].map((m) => m[1].trim());
+    expect(staged).toHaveLength(1); // the single `stage` writer
+    expect(workspace.match(/renteeDraftStep\(/g)).toHaveLength(3); // compose · cancel · confirm
+  });
+
+  it("hands the staged ask to the dock, so the review card lives IN the conversation", () => {
+    const mounted = region(read(WORKSPACE), "<ChatDock", "/>");
+    expect(mounted).toMatch(/draft=\{pendingDraft\}/);
+    expect(mounted).toMatch(/onConfirmDraft=\{confirmDraft\}/);
+    expect(mounted).toMatch(/onCancelDraft=\{cancelDraft\}/);
+  });
+
+  it("creates no deal room on compose — the room is still the send's (004a §4.5)", () => {
+    // `ensureDealRoom` is reachable from the sender alone. If this file learned to call it, an ask
+    // control would be creating a room again, review card or not.
+    expect(workspace).not.toContain("ensureDealRoom");
   });
 });

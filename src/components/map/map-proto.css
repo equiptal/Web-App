@@ -1645,6 +1645,131 @@
 /* The send glyph points the way the message travels, so it mirrors with the script. */
 .bidmap[dir="rtl"] .bm-chat-send .material-icons-outlined, [dir="rtl"] .bidmap .bm-chat-send .material-icons-outlined { transform: scaleX(-1); }
 
+/* ── The renter's request card, sent and draft (`rRequestCard`, prototype 05:92) ──────────────────
+   Its own object, not a `.chatcard` variant: the identity strip, the chips and the dashed status row
+   have no counterpart in the negotiation vocabulary, and expressing them as overrides of that card
+   would tie two unrelated things together. Geometry is the prototype's — r14, a 1.5px frame, a 34px
+   tile at r9, `9px 11px` on the strip and `10px 11px` on the body. */
+.bidmap .bm-rq {
+  background: #fff;
+  border: 1.5px solid #e4edf5;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+/* The DRAFT is the same card, in blue and lifted — the prototype's only two differences besides the
+   buttons. It has to read as "not yet in the conversation" at a glance, from the frame alone. */
+.bidmap .bm-rq.is-draft { border-color: #2563eb; box-shadow: 0 6px 18px rgba(37, 99, 235, 0.16); }
+/* The identity strip — tinted, with a bottom border, and the WHOLE of the press target when the card
+   names a machine the surface can open. */
+.bidmap .bm-rq-id {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 11px;
+  background: #f8fafc;
+  border: 0;
+  border-bottom: 1px solid #e4edf5;
+  font: inherit;
+  text-align: start;
+}
+/* Pressable, and it says so before it is pressed — the affordance the owner asked for. A card with no
+   machine (`scope: "company"`) never gets this class and stays a plain strip. */
+.bidmap .bm-rq-id.is-open { cursor: pointer; }
+.bidmap .bm-rq-id.is-open:hover, .bidmap .bm-rq-id.is-open:focus-visible { background: rgba(37, 99, 235, 0.08); }
+.bidmap .bm-rq-id.is-open:hover .bm-rq-go, .bidmap .bm-rq-id.is-open:focus-visible .bm-rq-go { color: #2563eb; }
+.bidmap .bm-rq-tile {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f2c94c, #e19a2e);
+  color: #fff;
+}
+/* The firm, not a machine — the prototype's second gradient, so the two scopes are told apart before
+   the title is read. */
+.bidmap .bm-rq-tile.is-co { background: linear-gradient(135deg, #1e4a7a, #2563eb); }
+.bidmap .bm-rq-tile img { width: 100%; height: 100%; object-fit: cover; }
+.bidmap .bm-rq-tile .material-icons-outlined { font-size: 18px; }
+.bidmap .bm-rq-who { flex: 1; min-width: 0; display: block; }
+.bidmap .bm-rq-t {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #0f2238;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bidmap .bm-rq-serial, .bidmap .bm-rq-ref {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  color: #6b8fa8;
+  text-align: start;
+}
+.bidmap .bm-rq-serial { display: block; margin-top: 1px; font-size: 9.5px; }
+.bidmap .bm-rq-ref { flex-shrink: 0; font-size: 9px; font-weight: 800; }
+.bidmap .bm-rq-go { flex-shrink: 0; font-size: 16px; color: #c8d8e8; }
+.bidmap[dir="rtl"] .bm-rq-go, [dir="rtl"] .bidmap .bm-rq-go { transform: scaleX(-1); }
+.bidmap .bm-rq-body { padding: 10px 11px; }
+.bidmap .bm-rq-kind { font-size: 10px; font-weight: 800; color: #2563eb; margin-bottom: 5px; }
+.bidmap .bm-rq-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 7px; }
+.bidmap .bm-rq-chip {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #1c3550;
+  background: #f8fafc;
+  border: 1px solid #e4edf5;
+  border-radius: 7px;
+  padding: 3px 8px;
+}
+.bidmap .bm-rq-ask { font-size: 11.5px; font-weight: 600; color: #1c3550; line-height: 1.7; margin: 0 0 7px; }
+/* The live status row. Dashed divider above it, because the verdict is not part of the ask — it is
+   what the ask reads as RIGHT NOW, and it changes under a card that never moves. */
+.bidmap .bm-rq-state {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-top: 8px;
+  border-top: 1px dashed #e4edf5;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #6b8fa8;
+}
+.bidmap .bm-rq-dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; background: currentcolor; }
+.bidmap .bm-rq-state.is-answered { color: #16a34a; }
+/* Amber, not red: red on this surface means "not available" on a machine, and a supplier's «no» to a
+   question is not that (the same rule the arrival bubble's warm fill follows). */
+.bidmap .bm-rq-state.is-refused { color: #d4780a; }
+.bidmap .bm-rq-state.is-draft { color: #2563eb; }
+/* Every card in a conversation carries its time (AC-16), including this one. Quiet and at the
+   trailing edge — the card's subject is the ask, not the minute it was made in. */
+.bidmap .bm-rq-at { margin-top: 7px; text-align: end; font-size: 9px; font-weight: 700; color: #6b8fa8; }
+.bidmap .bm-rq-acts { display: flex; gap: 8px; padding: 0 11px 11px; }
+.bidmap .bm-rq-btn {
+  border-radius: 10px;
+  padding: 9px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.bidmap .bm-rq-btn:disabled { opacity: 0.55; cursor: default; }
+.bidmap .bm-rq-btn.ghost { flex: 1; background: #fff; border: 1.5px solid #c8d8e8; color: #1c3550; }
+/* `flex: 2` — the prototype's own weighting. The send is the action; the cancel is the way out. */
+.bidmap .bm-rq-btn.go { flex: 2; background: #2563eb; border: 0; color: #fff; }
+/* A sent card is the renter's own message, so it sits at the outgoing edge and takes the bubble's
+   width rule — the prototype gives it `align-self: flex-end` at 86%. */
+.bidmap .bm-chat-body .bm-rq { align-self: flex-end; width: 86%; max-width: 86%; }
+/* The draft sits between the stream and the composer, pinned, exactly where `rPendingCard` puts it —
+   it must not scroll away with the conversation it is about to join. */
+.bidmap .bm-chat-draft { flex-shrink: 0; padding: 10px 12px; border-top: 1px solid #eff4f9; }
+
 /* Prototype keyframes — `design.md` §5 plus `design-v3.md` §7, verbatim. All disabled under
    `prefers-reduced-motion`. */
 /* `dpPulse` is deliberately NOT here. It exists in the prototype's stylesheet, but on this surface it

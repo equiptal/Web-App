@@ -1018,6 +1018,14 @@ export const en = {
     // The composer's send control. The prototype labels it «إرسال» in words; ours draws a glyph, so
     // the word has to reach a screen reader some other way or the button announces as "button".
     send: "Send",
+    // ── The review card (RM3-AC-17) ──
+    // An ask is COMPOSED into the conversation and sent only when this is pressed. Cancelling writes
+    // nothing at all — not a message, and not the deal room, which the send is what creates.
+    draftCancel: "Cancel",
+    draftSend: "Send the request",
+    // The card's press target. The card names a machine, and the reason it is pressable is that the
+    // supplier reading it has to reach that machine to add a document or confirm its yard.
+    openMachine: "Open this machine",
   },
   /* ── V12 · the price footer (spec 004 §6.10, 004a §4a.1 + §4a.4) ──
      Figures and a hand-off. It never edits a figure and never re-implements negotiation. */

@@ -19,9 +19,17 @@
  *    creates the room and then connects. A `DealRoom` row freezes the supplier's offered count.
  * 2. **Switching tabs does not move the map** (RM3-AC-49). This component owns no selection and no
  *    map state, which is what makes that true rather than something to remember.
- * 3. **Every custom card renders as a card** (RM3-AC-48) — the negotiation vocabulary plus
- *    `rentee_request` and `rentee_request_reply`, all through the same `parseChatCard` +
- *    `buildChatCardView` + `ChatCard` the deal room uses. Never a bare grey pill.
+ * 3. **Every custom card renders as a card** (RM3-AC-48) — the negotiation vocabulary and
+ *    `rentee_request_reply` through the same `parseChatCard` + `buildChatCardView` + `ChatCard` the
+ *    deal room uses, and the renter's own **`rentee_request` through `RequestCard`**, which is the
+ *    prototype's `rRequestCard`: an identity strip naming the machine, the ask, and a live status row.
+ *    Never a bare grey pill, and never a row-list where the prototype drew a card.
+ *
+ * ── Compose → review → send (RM3-AC-17, owner 2026-08-10) ────────────────────────────────────────
+ * An ask raised on the surface arrives here as a **draft card** and is not sent until «أرسل الطلب» is
+ * pressed. Composing writes nothing — no message, and no deal room, which is the write that freezes
+ * the supplier's offered count (004a §4.5). The room is still created by the SEND, one layer up in
+ * `useRenteeRequestSender`; this component only shows the card and reports the two presses.
  *
  * Unread is REST (`GET /api/me/received-bids` rows carry `bidId` + `unreadCount`), so the arrival
  * notice is refresh-timed and its copy says *"you have a reply"*, never *"just arrived"*
@@ -31,6 +39,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Channel } from "stream-chat";
 import { ChatCard } from "@/components/deal-room/ChatCard";
+import { RequestCard } from "@/components/map/RequestCard";
+import { heroPhotoUrl } from "@/components/map/panel/machine-panel-model";
 import { fetchReceivedBids, fetchStreamToken } from "@/lib/api/client";
 import { STREAM_API_KEY, leaseStream, watchDealRoom } from "@/lib/chat/stream-connection";
 import { ensureDealRoom } from "@/lib/chat/ensure-deal-room";
@@ -44,7 +54,7 @@ import {
   type DockReplyDigest,
   type DockTab,
 } from "@/lib/contract/chat-dock";
-import { buildChatCardView, chatCardOfMessage } from "@/lib/contract/deal-rounds";
+import { buildChatCardView, chatCardOfMessage, chatCardTime } from "@/lib/contract/deal-rounds";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import type { InboxBid } from "@/lib/contract/inbox";
 import {
@@ -52,7 +62,9 @@ import {
   RENTEE_REQUEST_REPLY_CARD_TYPE,
   outstandingAskIdentities,
   type RenteeRequestCardPayload,
+  type RenteeRequestDraft,
 } from "@/lib/contract/rentee-request";
+import { draftSubject, postedSubject, requestCardView, type RequestCardCtx } from "@/lib/contract/request-card";
 import { useLocale, useT } from "@/lib/i18n";
 import "@/components/deal-room/deal-room-proto.css";
 
@@ -100,9 +112,46 @@ export interface ChatDockProps {
    * rather than saying that nothing is outstanding.
    */
   onOutstandingAsks?: (identities: ReadonlySet<string>) => void;
+  /**
+   * The ask the renter has composed but not sent (RM3-AC-17). Rendered as a DRAFT card pinned between
+   * the stream and the composer — the prototype's `rPendingCard` position — and it opens the dock, so
+   * an ask raised from the panel is reviewed where it will live rather than in a dialog of its own.
+   *
+   * It belongs to the ANCHOR bid: an ask is composed from this surface, and this surface resolves one
+   * bid. A draft is therefore only ever shown on the anchor tab.
+   */
+  draft?: RenteeRequestDraft | null;
+  /** «أرسل الطلب». The ONLY thing here that writes — it creates the room if the bid has none. */
+  onConfirmDraft?: () => void;
+  /** «إلغاء» — discards the draft. Nothing was written, so there is nothing to undo. */
+  onCancelDraft?: () => void;
+  /** A send is in flight; both draft buttons go inert so the confirm cannot fire twice. */
+  draftBusy?: boolean;
+  /**
+   * Open the machine a request card names (the owner's reason for the card, 2026-08-10: a supplier
+   * reading an ask should land on the machine he has to act on). Omitted makes every card inert, which
+   * is why {@link canOpenMachine} exists beside it rather than the card guessing.
+   */
+  onOpenMachine?: (equipmentId: string) => void;
+  /** Whether the surface can actually open this machine. The dock knows the FLEET; the surface knows
+   *  which of those machines have a detail to open, and a card that looked pressable and did nothing
+   *  would be worse than one that never claimed to be. */
+  canOpenMachine?: (equipmentId: string) => boolean;
 }
 
-export function ChatDock({ bid, groupKey = null, fleet, sendNonce = 0, onOutstandingAsks }: ChatDockProps) {
+export function ChatDock({
+  bid,
+  groupKey = null,
+  fleet,
+  sendNonce = 0,
+  onOutstandingAsks,
+  draft = null,
+  onConfirmDraft,
+  onCancelDraft,
+  draftBusy = false,
+  onOpenMachine,
+  canOpenMachine,
+}: ChatDockProps) {
   const t = useT();
   const { locale } = useLocale();
   const ar = locale === "ar";
@@ -226,6 +275,18 @@ export function ChatDock({ bid, groupKey = null, fleet, sendNonce = 0, onOutstan
     if (open) bottomRef.current?.scrollIntoView({ block: "end" });
   }, [messages, open]);
 
+  /* A composed ask OPENS the dock and lands on the anchor tab — the prototype's `composeRequest` sets
+     `activePanel='chat'; drawerOpen=true` for the same reason. The renter pressed «اطلب…» somewhere in
+     the panel; if the card he now has to confirm were behind a closed dock, the press would look like
+     it did nothing. Deliberately keyed on the draft's ARRIVAL only: it must not re-open a dock the
+     renter closed while the draft is still staged. */
+  useEffect(() => {
+    if (!draft) return;
+    setOpen(true);
+    setActiveBidId(bid.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft]);
+
   /* ── the request loop's context (V11) ────────────────────────────────────────────────────────── */
 
   /** The fleet, by machine — re-read on EVERY render, because nothing about a request's state is
@@ -302,32 +363,53 @@ export function ChatDock({ bid, groupKey = null, fleet, sendNonce = 0, onOutstan
    * The anchor bid's FIRM used to be assembled here, so a company-scope document ask could be resolved
    * against `compliance` + `companyCertCodes` instead of waiting for a reply card. There is no such ask
    * any more — a document request names a machine (product owner, 2026-08-08) — so the memo, and the
-   * `company` resolver it fed on `requestCtx`, are deleted rather than left dangling.
+   * `company` resolver it fed, are deleted rather than left dangling.
    */
 
-  const requestCtx = useMemo(
-    () =>
-      // Supplied only for the tab whose fleet this surface actually holds. Elsewhere it is omitted,
-      // and the card renders with no verdict line at all.
-      active?.bidId === bid.id && fleet
-        ? {
-            machine: (equipmentId: string) => {
-              const m = fleetById.get(equipmentId);
-              if (!m) return null;
-              return {
-                locationSource: m.locationSource ?? null,
-                documentKeys: m.documentKeys,
-                // Photos are their own list, and a document ask can name one — see
-                // `documentAskSatisfied`.
-                photoKeys: m.photoKeys,
-                label: [m.manufacturer, m.modelName].filter(Boolean).join(" ") || m.serialNumber,
-              };
-            },
-            reply: (ref: string) => repliesByRef.get(ref) ?? null,
-            docLabel,
-          }
-        : undefined,
-    [active?.bidId, bid.id, fleet, fleetById, repliesByRef, docLabel],
+  /**
+   * Everything a request card needs, assembled from the fleet this dock already receives.
+   *
+   * **The machine is resolved by `equipmentId`, never parsed out of the message text** — the payload's
+   * `serial` is display-only (§7.3 stamps it) and is the fallback the view falls back TO, not the
+   * source. `photoUrl` comes through the same `heroPhotoUrl` the machine detail uses, so the tile on
+   * the card is the picture the renter sees when he presses it.
+   *
+   * `fleetKnown` is false on a SIBLING tab: that is a different room about a different item, and its
+   * fleet is not fetched here. The cards there state the ask and say nothing about the answer.
+   */
+  const cardCtx: RequestCardCtx = useMemo(
+    () => ({
+      L,
+      fleetKnown: active?.bidId === bid.id && fleet != null,
+      machine: (equipmentId: string) => {
+        const m = fleetById.get(equipmentId);
+        if (!m) return null;
+        return {
+          locationSource: m.locationSource ?? null,
+          documentKeys: m.documentKeys,
+          // Photos are their own list, and a document ask can name one — see `documentAskSatisfied`.
+          photoKeys: m.photoKeys,
+          // `model · spec`, the prototype's own title, composed the way `EquipmentDetail` composes it
+          // — same two fields, same separator — so the card and the panel name one machine one way.
+          label:
+            [
+              [m.manufacturer, m.modelName].filter(Boolean).join(" "),
+              (ar ? m.subcategoryNameAr : m.subcategoryName) || m.subcategoryName,
+            ]
+              .map((s) => (s ?? "").trim())
+              .filter(Boolean)
+              .join(" · ") || null,
+          serial: m.serialNumber,
+          photoUrl: heroPhotoUrl(m),
+        };
+      },
+      reply: (ref: string) => repliesByRef.get(ref) ?? null,
+      docLabel,
+      // No handler means no press, whatever the fleet holds — the card must not offer an affordance
+      // this host cannot honour.
+      canOpen: onOpenMachine ? canOpenMachine ?? ((id: string) => fleetById.has(id)) : () => false,
+    }),
+    [L, ar, active?.bidId, bid.id, fleet, fleetById, repliesByRef, docLabel, onOpenMachine, canOpenMachine],
   );
 
   /* ── the arrival notice (004a §2.1) ──────────────────────────────────────────────────────────── */
@@ -507,16 +589,31 @@ export function ChatDock({ bid, groupKey = null, fleet, sendNonce = 0, onOutstan
             ) : (
               messages.map((m) => {
                 const card = chatCardOfMessage(m);
+                // The renter's own ask keeps its CARD form — he and the supplier look at the same
+                // object, and it is the one thing in the thread with an identity strip and a live
+                // verdict on it. The prototype renders it with the same function it renders the draft
+                // with, which is why one component serves both.
+                if (card?.type === RENTEE_REQUEST_CARD_TYPE) {
+                  return (
+                    <RequestCard
+                      key={m.id}
+                      view={requestCardView(postedSubject(card.card), cardCtx)}
+                      onOpenMachine={onOpenMachine}
+                      openLabel={t.chatDock.openMachine}
+                      // The SAME formatter `ChatCard` prints — one clock face in one thread (AC-16).
+                      at={chatCardTime(m.created_at, ar)}
+                    />
+                  );
+                }
                 if (card) {
-                  // EVERY custom type renders as a card — the negotiation vocabulary and the request
-                  // loop alike. Never a bare grey pill (RM3-AC-48).
+                  // EVERY other custom type renders as a card — the negotiation vocabulary and the
+                  // supplier's reply alike. Never a bare grey pill (RM3-AC-48).
                   const view = buildChatCardView(card, {
                     ar, L, terms: [], at: m.created_at, responded: false, superseded: false,
                     // The dock never negotiates: it shows the conversation and hands off to
                     // `/deal-room/[id]` (004a §4a.2). `live: false` is what removes accept/counter
                     // from a rate card here, so there is exactly one place a rate can be accepted.
                     live: false,
-                    requestCtx,
                   });
                   return <ChatCard key={m.id} view={view} ar={ar} L={L} busy={false} onAccept={() => {}} onCounter={() => {}} />;
                 }
@@ -568,6 +665,29 @@ export function ChatDock({ bid, groupKey = null, fleet, sendNonce = 0, onOutstan
             )}
             <div ref={bottomRef} />
           </div>
+
+          {/* ── The review card (RM3-AC-17) ─────────────────────────────────────────────────────
+              Pinned between the stream and the composer, where `rPendingCard` puts it — it must not
+              scroll away with the conversation it is about to join. Shown on the ANCHOR tab only: the
+              ask was composed from this surface, and this surface resolves one bid.
+
+              Nothing has been written at this point. «إلغاء» leaves no trace, and «أرسل الطلب» is
+              what creates the room and posts the card. */}
+          {draft && activeBidId === bid.id && (
+            <div className="bm-chat-draft">
+              <RequestCard
+                view={requestCardView(draftSubject(draft), cardCtx, { draft: true })}
+                draft
+                busy={draftBusy}
+                onCancel={onCancelDraft}
+                onConfirm={onConfirmDraft}
+                onOpenMachine={onOpenMachine}
+                openLabel={t.chatDock.openMachine}
+                cancelLabel={t.chatDock.draftCancel}
+                confirmLabel={t.chatDock.draftSend}
+              />
+            </div>
+          )}
 
           <div className="bm-chat-compose">
             <input
