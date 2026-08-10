@@ -949,7 +949,65 @@
   padding-bottom: 10px;
   border-bottom: 1px solid #e6eef5;
 }
-.bidmap .bm-eqf-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bidmap .bm-eqf-top { display: flex; align-items: center; gap: 8px; }
+/* The count takes the slack so the clear link and the filter control sit together on the far edge,
+   rather than the three spreading across 392px with nothing between them. */
+.bidmap .bm-eqf-count { flex: 1; min-width: 0; }
+/* ── The filter control (owner, 2026-08-11) ──────────────────────────────────────────────────────
+   The groups used to lie flat above every list: two labelled rows of chips the renter reads past to
+   reach the machines. One icon says filtering exists and how much is on; the panel says the rest when
+   asked. Sized like the surface's other small controls — 28px, r9 — not a pill, because it toggles a
+   panel rather than naming a destination. */
+.bidmap .bm-eqf-btn {
+  flex-shrink: 0;
+  position: relative;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e1e9f1;
+  border-radius: 9px;
+  background: #fff;
+  color: #6b8fa8;
+  cursor: pointer;
+  font-family: inherit;
+}
+.bidmap .bm-eqf-btn .material-icons-outlined { font-size: 16px; }
+.bidmap .bm-eqf-btn:hover { border-color: #c8d8e8; color: #16304f; }
+/* OPEN is navy, matching the surface's one selection colour — the panel below it is a state, and
+   `#2563EB` here is the request action (AC-33), not "this is showing". */
+.bidmap .bm-eqf-btn.on { background: #16304f; border-color: #16304f; color: #fff; }
+/* The count of ACTIVE filters, so a collapsed panel still says the list is not the whole offer. */
+.bidmap .bm-eqf-btn-n {
+  position: absolute;
+  top: -5px;
+  inset-inline-end: -5px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #2563eb;
+  border: 2px solid #fff;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+/* The panel itself — inset on the surface's own grey so it reads as a layer over the list rather than
+   as two more rows of the list. */
+.bidmap .bm-eqf-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #e1e9f1;
+  border-radius: 12px;
+  background: #f8fafc;
+}
 /* «٣ من ٨» — rule 3. Prominent enough to be read before the cards it describes, because a hidden
    machine must never let the offer read as smaller than it is. */
 .bidmap .bm-eqf-count { font-size: 11px; font-weight: 800; color: #16304f; letter-spacing: 0.01em; }

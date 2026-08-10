@@ -46,7 +46,7 @@
  * from (AC-15), and what makes rules 2, 3 and 4 testable without a DOM.
  */
 
-import { useEffect, useMemo, useRef, type ReactNode, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { arabicIndicDigits } from "@/lib/contract/bid-map";
 import { listEmptyState, type EquipmentListView } from "@/lib/contract/equipment-list";
 import type { FleetMachine } from "@/lib/contract/fleet";
@@ -117,6 +117,17 @@ export function EquipmentList({
   const machines = view.machines;
   const num = (n: number) => (ar ? arabicIndicDigits(n) : String(n));
 
+  /** The filter groups are behind a control now, so the bar is one line until asked. Escape closes
+   *  it — a panel that only its own button can dismiss is a panel the renter has to aim at twice. */
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filterRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!filtersOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setFiltersOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [filtersOpen]);
+
   // Bring the selected card into view when it is off-screen — which is the case when the selection was
   // made on the MAP (AC-15). Already-visible cards are left exactly where they are: scrolling a card
   // the renter just pressed is motion he did not ask for.
@@ -169,7 +180,7 @@ export function EquipmentList({
           The count renders whether or not anything is filtered, because «٨ من ٨» is the sentence that
           makes «٣ من ٨» readable later. */}
       {(view.groups.length > 0 || view.active.length > 0) && (
-        <div className="bm-eqf" role="group" aria-label={t.bidMap.eqFilterLabel}>
+        <div className="bm-eqf" role="group" aria-label={t.bidMap.eqFilterLabel} ref={filterRef}>
           <div className="bm-eqf-top">
             <span className="bm-eqf-count">{countParts}</span>
             {view.active.length > 0 && (
@@ -177,8 +188,35 @@ export function EquipmentList({
                 {t.bidMap.eqFilterClear}
               </button>
             )}
+            {/* The groups live BEHIND this control (owner, 2026-08-11). Laid out flat, they were two
+                labelled rows of chips above every list — furniture the renter reads past on the way
+                to the machines, on a panel whose whole width is 392px. One icon states that filtering
+                exists and how much of it is on; the panel states the rest, when asked. */}
+            {view.groups.length > 0 && (
+              <button
+                type="button"
+                className={`bm-eqf-btn${filtersOpen ? " on" : ""}`}
+                aria-expanded={filtersOpen}
+                aria-label={t.bidMap.eqFilterLabel}
+                title={t.bidMap.eqFilterLabel}
+                onClick={() => setFiltersOpen((v) => !v)}
+              >
+                <span className="material-icons-outlined">tune</span>
+                {/* The count of ACTIVE filters, not of groups — the number that tells the renter the
+                    list in front of them is not the whole offer. */}
+                {view.active.length > 0 && (
+                  <span className="bm-eqf-btn-n" dir="ltr">{num(view.active.length)}</span>
+                )}
+              </button>
+            )}
           </div>
 
+          {/* An expanding panel, not a floating popover: the column is 392px, and a popover in it
+              either clips against the panel edge or covers the machines the filter is about to
+              change. Opening pushes the list down, which is honest — the renter can see the chips and
+              the result of pressing them at the same time. */}
+          {filtersOpen && (
+          <div className="bm-eqf-panel">
           {view.groups.map((g) => (
             <div className="bm-eqf-row" key={g.kind}>
               <span className="bm-eqf-label">{ar ? g.label.ar : g.label.en}</span>
@@ -215,6 +253,8 @@ export function EquipmentList({
                   `filterMachines` directly, which is where it actually lives. */}
             </div>
           ))}
+          </div>
+          )}
         </div>
       )}
 
