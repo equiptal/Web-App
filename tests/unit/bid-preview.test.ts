@@ -57,9 +57,14 @@ describe("buildBidMetadata", () => {
     expect(m.title).toBe(EN.title);
     expect(m.openGraph?.title).toBe(EN.title);
     expect(m.openGraph?.description).toBe(EN.description);
-    // The backend's image, honoured as sent — it resolves to the same asset the emailed card uses, so
-    // a supplier meeting this link twice sees one picture.
-    expect((m.openGraph as { images?: { url: string }[] }).images?.[0].url).toBe(preview.imageUrl);
+    // The image is DRAWN for this request, not a fixed brand asset: it is the only place the request's
+    // details can reach a client that builds the card itself (WhatsApp, Telegram, Slack, iMessage).
+    const image = (m.openGraph as { images?: { url: string; width?: number; height?: number }[] }).images?.[0];
+    expect(image?.url).toBe(`${STAGING}/bid/excavator-riyadh-11111111-2222-3333-4444-555555555555/og`);
+    // Declared, not left to be discovered — WhatsApp drops an image of unstated size, and a card with
+    // no image collapses to a bare link.
+    expect(image?.width).toBe(1200);
+    expect(image?.height).toBe(630);
     // The shared URL, not the extracted token — clients relabel the card if the canonical disagrees.
     expect(m.openGraph?.url).toBe(`${STAGING}/bid/excavator-riyadh-11111111-2222-3333-4444-555555555555`);
     expect(m.alternates?.canonical).toBe(`${STAGING}/bid/excavator-riyadh-11111111-2222-3333-4444-555555555555`);
@@ -78,9 +83,11 @@ describe("buildBidMetadata", () => {
 
     expect(m.title).toBe("Bid request");
     expect(m.description).toBe("Submit a bid on an equipment request — no account needed.");
-    // Branding survives an unreachable backend — and the fallback image is made absolute from the
-    // request host too, so it can never point at prod from a staging page.
-    expect((m.openGraph as { images?: { url: string }[] }).images?.[0].url).toBe(`${STAGING}/og-bid.png`);
+    // The image route is still named: it renders its own branded fallback when the preview is missing,
+    // so a slow backend costs the card its detail, not its picture.
+    expect((m.openGraph as { images?: { url: string }[] }).images?.[0].url).toBe(
+      `${STAGING}/bid/11111111-2222-3333-4444-555555555555/og`,
+    );
   });
 
   it("Given a staging host, When building metadata, Then no URL points at production", () => {
