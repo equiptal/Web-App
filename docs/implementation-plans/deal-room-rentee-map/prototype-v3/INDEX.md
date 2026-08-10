@@ -69,9 +69,9 @@ against the file until 2026-08-10:
 | `pChat` · `rChatPop` | 3174 · 3881 | `ChatDock.tsx` | **done** — stream, bubbles, wordings, and §7a's notice exact (kind pill · 12px/900 name · 2-line clamp · ltr ref line). **Behaviour is 004a §2.1, not a port**: refresh-timed with no socket (RM3-AC-64), and the notice hides while the panel is open |
 | `rDocPanel` | 2910 | `EquipmentDocuments.tsx` | **done, rows** — `.mp-row` exact (gap 10 · 7px 10px · r12 · mb 6). Thumbnail is a **documented departure**: 46×40 landscape, not its 34×34 square, because a square crops a certificate until it stops identifying the file (2026-08-09) |
 | `rEquipDetail` | 4190 | `EquipmentDetail.tsx` | section inset done; body outstanding |
-| `eqDocsTab` | 4334 | `EquipmentDocuments.tsx` | outstanding |
+| `eqDocsTab` | 4334 | `EquipmentDocuments.tsx` | outstanding — **do not start without checking `git status`**: this file and `EquipmentDetail.tsx` were under active edit by a second session on 2026-08-10 |
 | `rDocSelectBar` | 2812 | `.mp-selbar` | **not a port.** Its two adjacent text links became a real checkbox + label, because two links said nothing about which governed the column of ticks beneath them. Its `#F8FAFC` bar, `8px 2px 9px` and 11px do not map onto that shape — do not transplant them |
-| `rRequestCard` · `rReplyCard` | — | `ChatCard.tsx` | outstanding — the request loop's cards |
+| `rRequestCard` · `rReplyCard` | 3142 · 3053 | `ChatCard.tsx` | **not a port.** RM3-AC-48 routes EVERY custom type — the negotiation vocabulary, `rentee_request`, `rentee_request_reply` — through the deal room's one `ChatCard`, never a bespoke card and never a bare pill. Its `.dlproto .chatcard` values are shared with `/deal-room/[id]`, so the prototype's `14px` r / `9px 11px` / 11.5px card cannot be transplanted without moving a surface this spec does not own |
 | `rChatTabs` · `rChatPop` | — | `ChatDock.tsx` | outstanding, incl. §6.8.5: a message arriving with a panel open gives the POPUP, not the bubble |
 | `eqReadinessRow` | 431 | — | outstanding |
 | `rUnitPhotos` | 2398 | — | **not a port.** Its four 74×58 slots were replaced by a 196 px viewer (spec 004 §6, "A VIEWER, not a hero", 2026-08-09). Do not restore them. |
