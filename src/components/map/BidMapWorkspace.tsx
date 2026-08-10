@@ -35,7 +35,7 @@
  * flow at `/deal-room/[id]`).
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import dynamic from "next/dynamic";
 import { ChatDock } from "@/components/map/ChatDock";
 import type { MachinePin } from "@/components/map/MapCanvas";
@@ -77,6 +77,10 @@ import "@/components/map/map-proto.css";
 // `leaflet` reaches for `window` at import time, so the canvas is client-only — the same handling
 // `MapLocationPicker`/`GoogleMapLocationPicker` need in this repo.
 const MapCanvas = dynamic(() => import("@/components/map/MapCanvas"), { ssr: false });
+
+/** §5's fixed panel width, and the FLOOR the resize handle enforces. T41 judges every wrapping check
+ *  on this surface at exactly 392 px, so the panel may be widened but never narrowed past it. */
+const PANEL_MIN_W = 392;
 
 /** A bid this surface can resolve. v3 scopes the view to exactly ONE of these (spec 004 §4). */
 export type MapBid = BidCard & { itemLabel?: string; itemLabelAr?: string };
@@ -503,10 +507,71 @@ export function BidMapWorkspace({
     return null;
   })();
 
+  // ── The panel's width, and why it is draggable at all ─────────────────────────────────────────
+  // §5 makes the panel a FIXED 392 px and says why: "the map gives up space, never the panel, because
+  // a panel that narrows re-wraps the count pills and the equipment cards at every viewport." That
+  // still holds — 392 is the floor here, and the default, so nothing re-wraps unless the renter asks
+  // for it. What the renter can do is give the panel MORE, which the rule never forbade: a long firm
+  // name, an Arabic manufacturer + model at 35 characters, a document list read beside the map.
+  //
+  // The ceiling is the same 62% the stylesheet already capped it at, so a drag can never leave the map
+  // narrower than the panel it is being compared against.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [panelW, setPanelW] = useState<number | null>(null);
+  const dragRef = useRef<{ x: number; w: number } | null>(null);
+
+  const clampW = useCallback((w: number) => {
+    const host = rootRef.current?.clientWidth ?? 0;
+    const max = host > 0 ? Math.round(host * 0.62) : PANEL_MIN_W;
+    return Math.max(PANEL_MIN_W, Math.min(w, Math.max(PANEL_MIN_W, max)));
+  }, []);
+
+  const onResizeDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const from = (e.currentTarget.parentElement as HTMLElement | null)?.getBoundingClientRect().width ?? PANEL_MIN_W;
+      dragRef.current = { x: e.clientX, w: from };
+      e.currentTarget.setPointerCapture(e.pointerId);
+    },
+    [],
+  );
+
+  const onResizeMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const d = dragRef.current;
+      if (!d) return;
+      // The panel is on the INLINE-START edge, so which way widens it flips with the locale: dragging
+      // away from that edge is rightwards in English and leftwards in Arabic.
+      const dx = (e.clientX - d.x) * (ar ? -1 : 1);
+      setPanelW(clampW(d.w + dx));
+    },
+    [ar, clampW],
+  );
+
+  const onResizeUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    dragRef.current = null;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+  }, []);
+
+  // Keyboard: a drag handle nobody can reach without a pointer is not an affordance, it is a mouse
+  // feature. Arrows nudge by 24 px, Home restores the 392 px the surface is specified at.
+  const onResizeKey = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      const grow = ar ? "ArrowLeft" : "ArrowRight";
+      const shrink = ar ? "ArrowRight" : "ArrowLeft";
+      const cur = (e.currentTarget.parentElement as HTMLElement | null)?.getBoundingClientRect().width ?? PANEL_MIN_W;
+      if (e.key === grow) setPanelW(clampW(cur + 24));
+      else if (e.key === shrink) setPanelW(clampW(cur - 24));
+      else if (e.key === "Home") setPanelW(null);
+      else return;
+      e.preventDefault();
+    },
+    [ar, clampW],
+  );
+
   return (
     // No `dir` here: the shell's direction is the locale's, and every offset in `map-proto.css` is a
-    // logical property, so the panel lands on the inline-end edge in both (AC-30, AC-98).
-    <div className="bidmap">
+    // logical property, so the panel lands on the inline-start edge in both (AC-30, AC-98).
+    <div className="bidmap" ref={rootRef} style={panelW == null ? undefined : ({ "--bm-panel-w": `${panelW}px` } as CSSProperties)}>
       <div className="bm-canvas">
         <MapCanvas
           site={site}
@@ -541,6 +606,28 @@ export function BidMapWorkspace({
           what puts it on the inline-end edge — the same edge the prototype's `left: 18px` lands on in
           Arabic — and it mirrors with the reading direction instead of trading places with the map. */}
       <aside className="bm-panel">
+        {/* The grip lives on the panel's map-facing edge and is invisible until the pointer is on it —
+            the surface already carries a lot of furniture and a permanent handle would be one more
+            thing to read. `role="separator"` with the width on `aria-valuenow` is what makes it a
+            control rather than a div that happens to respond to drags. */}
+        <div
+          className="bm-resize"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={t.bidMap.resizePanel}
+          aria-valuemin={PANEL_MIN_W}
+          aria-valuenow={Math.round(panelW ?? PANEL_MIN_W)}
+          tabIndex={0}
+          onPointerDown={onResizeDown}
+          onPointerMove={onResizeMove}
+          onPointerUp={onResizeUp}
+          onPointerCancel={onResizeUp}
+          onKeyDown={onResizeKey}
+          onDoubleClick={() => setPanelW(null)}
+          title={t.bidMap.resizePanel}
+        >
+          <span className="bm-resize-grip" aria-hidden="true" />
+        </div>
         {bid && detailMachine ? (
           // ── V7 · the equipment detail — «replaces the panel with that machine» (§6.5, AC-36). The
           // WHOLE panel, not the list alone: a hero photo, two tabs, the availability line and the

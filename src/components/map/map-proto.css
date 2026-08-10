@@ -437,8 +437,11 @@
      to change which edge it paints on is a large diff for a visual outcome. The cost is that keyboard
      order still follows the DOM — map, then panel. */
   order: -1;
-  flex: 0 0 392px;
-  width: 392px;
+  /* 392px is §5's width AND the floor; `--bm-panel-w` is set only once the renter drags the grip, so
+     an untouched surface is exactly what T41 judges. The 62% cap is unchanged and the drag clamps to
+     it, so widening the panel can never leave the map narrower than the panel. */
+  flex: 0 0 var(--bm-panel-w, 392px);
+  width: var(--bm-panel-w, 392px);
   max-width: 62%;
   display: flex;
   flex-direction: column;
@@ -446,6 +449,42 @@
   background: #fff;
   /* The divider is on whichever edge FACES THE MAP, which is now the trailing one. */
   border-inline-end: 1px solid #e1e9f1;
+}
+
+/* ── The resize grip ─────────────────────────────────────────────────────────────────────────────
+   On the panel's map-facing edge, and INVISIBLE until the pointer is on it. This surface already
+   carries a lot of furniture — a rail of pins, floating notices, a chat dock — and a permanent handle
+   would be one more thing to read for a control most renters will never want.
+
+   The hit area is 10px and straddles the border; the visible grip is 3px. A 3px target is a target
+   only for people who already know it is there. */
+.bidmap .bm-resize {
+  position: absolute;
+  z-index: 26;
+  top: 0;
+  bottom: 0;
+  inset-inline-end: -5px;
+  width: 10px;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none; /* or the pointer drag becomes a scroll on a touchpad/tablet */
+}
+.bidmap .bm-resize-grip {
+  width: 3px;
+  height: 46px;
+  border-radius: 999px;
+  background: #c8d8e8;
+  opacity: 0;
+  transition: opacity 0.14s ease, background 0.14s ease;
+}
+.bidmap .bm-resize:hover .bm-resize-grip,
+.bidmap .bm-resize:focus-visible .bm-resize-grip { opacity: 1; }
+.bidmap .bm-resize:focus-visible { outline: 2px solid #16304f; outline-offset: -2px; }
+.bidmap .bm-resize:active .bm-resize-grip { opacity: 1; background: #2563eb; }
+@media (prefers-reduced-motion: reduce) {
+  .bidmap .bm-resize-grip { transition: none; }
 }
 
 /* Header — identity, and nothing else (RM3-AC-02). */

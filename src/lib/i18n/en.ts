@@ -970,6 +970,9 @@ export const en = {
     claimedNotDrawnWhy:
       "They were added as a count only — no machine is registered for them, so they have no location, documents or serial to show.",
     noLocatable: "None of this supplier's machines can be placed",
+    // The resize grip's accessible name. Says what dragging does and what returns it, because the
+    // control is invisible until hovered and a screen reader never sees the cursor change.
+    resizePanel: "Drag to widen the panel — double-click, or Home, to restore",
     noLocatableWhy:
       "He hasn't shared a yard for any machine that fits this request, so nothing can be drawn. Ask him to confirm a yard.",
     offPlatformNoPins: "An off-platform offer has no pin",
