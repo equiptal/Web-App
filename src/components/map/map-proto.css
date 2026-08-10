@@ -451,7 +451,11 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #fff;
+  /* `#EDF2F7`, not white — the panel's GROUND, which the header alone stands apart from. The cards,
+     the pills and the shortfall each carry their own fill; making the column white behind them left
+     the pills and the shortfall floating on one shade and the list on another. The takeovers
+     (`.mp`, `.mp-over`) set their own white and are unaffected. */
+  background: #edf2f7;
   /* The divider is on whichever edge FACES THE MAP, which is now the trailing one. */
   border-inline-end: 1px solid #e1e9f1;
 }
@@ -593,6 +597,11 @@
    Two independent pills so each number is readable on its own. Nothing here is a sentence, and
    nothing here is a bar: the composition bar was v2's, and it made a supplier's shortfall a shape to
    interpret rather than a number to read. */
+/* ONE GROUND BELOW THE HEADER (owner, 2026-08-11, against the prototype's own panel). The header is
+   the only banded thing; the pills, the shortfall, the filter and the list all stand on the same
+   `#EDF2F7`. Ours put the pills and the shortfall on the panel's white and only the list on the grey,
+   so the column read as two stacked regions with a seam between them — and the filter bar drew a rule
+   across it, which made three. The white here belongs to the CARDS, not to the ground they sit on. */
 .bidmap .bm-counts { flex-shrink: 0; display: flex; flex-wrap: wrap; gap: 6px; padding: 11px 15px 0; }
 /* BOTH PILLS ARE THE SAME WHITE PILL (decoded 3763–3766), and the difference between them is the word
    they carry, not their colour.
@@ -972,9 +981,11 @@
   flex-direction: column;
   gap: 8px;
   /* No `margin-bottom`: the list container is a flex column with its own `gap: 10px` now, and a margin
-     on top of it made the rule sit nearer the chips than the cards it separates them from. */
+     on top of it made the rule sit nearer the chips than the cards it separates them from.
+     ~~`border-bottom: 1px solid #e6eef5`~~ — withdrawn 2026-08-11: the prototype bands the HEADER and
+     nothing else, and a rule here cut the one ground into two. The gap below already separates the
+     bar from the first card; a line as well was saying it twice. */
   padding-bottom: 10px;
-  border-bottom: 1px solid #e6eef5;
 }
 .bidmap .bm-eqf-top { display: flex; align-items: center; gap: 8px; }
 /* The count takes the slack so the clear link and the filter control sit together on the far edge,
