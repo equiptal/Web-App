@@ -971,6 +971,7 @@ export const ar: Dictionary = {
     // `/deal-room/[id]`؛ لوحة المحادثة لا تُقرّ سعراً (004a §4a.2).
     counterPrice: "اعرض سعراً مقابلاً",
     confirmPrice: "أكّد هذا السعر",
+    acceptInRoom: "افتح غرفة الصفقة للقبول — الشروط وآخر جولة تُحسم هناك",
     // الموضع الوحيد الذي يُوفَّق فيه بين العدد المعروض والعدد المتفق عليه (RM3-AC-66).
     unitsDiffer: "السعر محسوب على {agreed} وحدة متفق عليها — والعرض مكوّن من {offered}.",
     rentalLine: "الإيجار — {rate} / {unit} × {n} × {periods}",

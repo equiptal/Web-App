@@ -42,22 +42,9 @@ export interface PriceFooterProps {
   /** The request's start date — the Friday anchor for the shared rental maths. Without it the rental
    *  falls back to the raw rate, so pass it alongside `durationDays` from the same request. */
   startDate?: string | null;
-  /**
-   * Whether NOTHING in the offer contradicts the request — no red cell on any offered machine's match
-   * grid, and no unit offered as a bare count. It only changes the CTA's word: «Confirm this price»
-   * instead of «Counter this price». Both land in the same room and neither settles anything here.
-   *
-   * Derived by the workspace, not here: it owns the fleet and the request, and this component is
-   * given a bid and two request fields on purpose. A footer that fetched a fleet to label a button
-   * would be a second derivation of the machine list, which is the thing AC-15 exists to prevent.
-   *
-   * Undefined while the fleet is still loading — which reads as "not yet known to match", so the
-   * button says «Counter» rather than flickering from Confirm to Counter as data lands.
-   */
-  allMatched?: boolean;
 }
 
-export function PriceFooter({ bid, durationDays, startDate = null, allMatched = false }: PriceFooterProps) {
+export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooterProps) {
   const t = useT();
   const { locale } = useLocale();
   const ar = locale === "ar";
@@ -114,18 +101,28 @@ export function PriceFooter({ bid, durationDays, startDate = null, allMatched = 
           {t.priceFooter.details}
           <span className="material-icons-outlined">{expanded ? "expand_more" : "expand_less"}</span>
         </button>
-        {/* ONE control, two words. Both open `/deal-room/[id]` — the price is settled there and
-            nowhere else (004a §4a.2) — but the word says what the renter is going in to DO, which is
-            the thing he knows and the room is not. `hasRoom` no longer changes the label: "continue"
-            described a room he may never have opened, and the choice between confirming and
-            countering does not depend on whether one exists. */}
+        {/* TWO controls, always both — the deal room's own pair (`DealRoom.tsx:676`): Negotiate is
+            always available, Accept is always VISIBLE and gated. One-or-the-other hid the act the
+            renter was looking for and made the surface decide for him.
+
+            Both open `/deal-room/[id]`; the price is settled there and nowhere else (004a §4a.2). */}
+        <button type="button" className="bm-foot-cta" onClick={() => void negotiate()} disabled={busy}>
+          {t.priceFooter.counterPrice}
+        </button>
+        {/* Gated by the DEAL ROOM's rule, not by one of ours: `termsMatched && priceMatches &&
+            unitsMatch`. With no room there are no counter-rounds and no terms, and that rule reduces
+            to true — an untouched opening offer is acceptable, which is what the deal room does with
+            one. Once a room EXISTS the rule needs its terms and its last two rounds, which this
+            surface does not fetch, so the control says so rather than guessing: a button that claimed
+            "acceptable" off a figure it cannot check is the one failure this pair must not have. */}
         <button
           type="button"
-          className={`bm-foot-cta${allMatched ? " is-confirm" : ""}`}
+          className="bm-foot-cta is-confirm"
           onClick={() => void negotiate()}
-          disabled={busy}
+          disabled={busy || model.hasRoom}
+          title={model.hasRoom ? t.priceFooter.acceptInRoom : undefined}
         >
-          {allMatched ? t.priceFooter.confirmPrice : t.priceFooter.counterPrice}
+          {t.priceFooter.confirmPrice}
         </button>
       </div>
 

@@ -1057,6 +1057,9 @@ export const en = {
     // Shown INSTEAD, and only when nothing in the offer contradicts the request — no red cell on any
     // machine's match grid, and no unit offered as a count with no machine behind it.
     confirmPrice: "Confirm this price",
+    // Why Accept is unavailable HERE once a room exists: the rule that gates it needs the room's
+    // terms and its last two rounds, and this surface does not fetch them.
+    acceptInRoom: "Open the deal room to accept — the terms and the latest round are settled there",
     // The one place the offered and the agreed count are reconciled (RM3-AC-66).
     unitsDiffer: "Priced on {agreed} agreed units — the offer was made of {offered}.",
     rentalLine: "Rental — {rate} / {unit} × {n} × {periods}",
