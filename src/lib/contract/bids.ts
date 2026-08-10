@@ -144,6 +144,41 @@ function offeredUnitLocationSource(v: unknown): UnitLocationSource | undefined {
  * extra fields. `fleet.ts` extends this rather than re-deriving it, so a bid's units and its supplier's
  * fleet can never be parsed into two subtly different objects.
  */
+/**
+ * The link a document or photo row can actually be opened with.
+ *
+ * **The backend never populates `url`.** `toSignedStructured` (backend `s3.service`) returns
+ * `{...entry, key: <presigned URL>}` — it OVERWRITES `key` with the signed link and leaves `url`
+ * exactly as the stored row had it, which is absent. Every rentee-facing payload goes through it:
+ * `batchSignItems` on the fleet read (`getSupplierFleet`), `toSignedStructured` on the bid read.
+ *
+ * Verified against staging, 2026-08-10 — a seeded istimara came back as
+ * `{type:"istimara", key:"https://…X-Amz-Signature=…", url:null}`, and fetching that key returned
+ * 200 with the real PDF.
+ *
+ * The app has always resolved this ("a presigned `url` when present, else the (now presigned) `key`"
+ * — `rentee_readiness_section.dart`). The web did not, and read `url` alone in every consumer:
+ * `heroPhotoUrl`, `equipmentDocGroups`, the photo groups, `docRowActions`. With `url` permanently
+ * null that meant **no view control on any row, no thumbnails, no hero photo, and a download batch
+ * that could never be armed** — a held paper with no url is selectable in neither mode by design
+ * (`selectionModeOf`). RM3-AC-69/74/76/77/78 all failed on real data.
+ *
+ * Resolved here, in the one mapper the bid card and the map panel share, so no consumer needs to
+ * know. `key` is left untouched — it is still the row's identity for dedupe.
+ *
+ * An explicit `url` passes through VERBATIM — it is the backend's own answer for this row, and this
+ * function is not the place to second-guess its shape. The absolute-link test applies only to the
+ * `key` FALLBACK, where we are inferring rather than being told: a bare S3 key is deliberately not
+ * turned into a URL, because the app has a bucket-aware `S3Url.from` for that and the web has no
+ * equivalent, so inventing an origin would render a control that looks live and 404s. Null is the
+ * honest answer there — the row renders with no view action, which is what an unopenable paper
+ * should do.
+ */
+function openableUrl(url: string | null, key: string): string | null {
+  if (url) return url;
+  return /^https?:\/\//i.test(key) ? key : null;
+}
+
 export function mapOfferedUnit(raw: unknown): OfferedUnitDetail {
   const str = (v: unknown): string | null => (v == null || v === "" ? null : String(v));
   const num = (v: unknown): number | null => (typeof v === "number" ? v : v != null && v !== "" && !isNaN(Number(v)) ? Number(v) : null);
@@ -162,8 +197,8 @@ export function mapOfferedUnit(raw: unknown): OfferedUnitDetail {
     subcategoryNameAr: str(o.subcategoryNameAr ?? o.subcategory_name_ar),
     measurementName: str(o.measurementName ?? o.measurement_name),
     measurementNameAr: str(o.measurementNameAr ?? o.measurement_name_ar),
-    documentKeys: docs.map((d) => { const x = (d ?? {}) as Record<string, unknown>; return { type: String(x.type ?? x.code ?? ""), key: String(x.key ?? ""), url: str(x.url), verifyStatus: str(x.verifyStatus ?? x.verify_status), expiryDate: str(x.expiryDate ?? x.expiry_date) }; }),
-    photoKeys: photos.map((p) => { const x = (p ?? {}) as Record<string, unknown>; return { slot: String(x.slot ?? x.type ?? ""), key: String(x.key ?? ""), url: str(x.url) }; }),
+    documentKeys: docs.map((d) => { const x = (d ?? {}) as Record<string, unknown>; const key = String(x.key ?? ""); return { type: String(x.type ?? x.code ?? ""), key, url: openableUrl(str(x.url), key), verifyStatus: str(x.verifyStatus ?? x.verify_status), expiryDate: str(x.expiryDate ?? x.expiry_date) }; }),
+    photoKeys: photos.map((p) => { const x = (p ?? {}) as Record<string, unknown>; const key = String(x.key ?? ""); return { slot: String(x.slot ?? x.type ?? ""), key, url: openableUrl(str(x.url), key) }; }),
     // §7.2 per-unit location, camel/snake tolerant like every other field here. The backend flattens
     // the yard onto the unit; a nested `yard: {…}` is accepted too so an older/other projection of the
     // same data still parses. `yardConfirmed` stays undefined when absent — `false` would assert the

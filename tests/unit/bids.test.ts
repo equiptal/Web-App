@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mapBidList, bidSuppliers, type BidCard } from "@/lib/contract/bids";
+import { mapBidList, bidSuppliers, mapOfferedUnit, type BidCard } from "@/lib/contract/bids";
 
 describe("mapBidList — unitsOffered (supplier's chosen quantity)", () => {
   const req = { request: { equipmentItems: [{ numberOfUnits: 10 }] } };
@@ -119,5 +119,55 @@ describe("bidSuppliers", () => {
     expect(s[0].key).toBe("A");
     expect(s[0].verified).toBe(true);
     expect(s[0].count).toBe(2);
+  });
+});
+
+/**
+ * The backend signs a document by OVERWRITING `key` — `toSignedStructured` returns
+ * `{...entry, key: <presigned URL>}` and never fills `url`. Every consumer on this side reads
+ * `url`, so before this was resolved a real document rendered with no view control, no thumbnail,
+ * and could not be put in the download batch.
+ *
+ * The payloads below are the shape staging actually returned on 2026-08-10 with seeded documents.
+ */
+describe("mapOfferedUnit — the openable link (backend signs into `key`, not `url`)", () => {
+  const SIGNED =
+    "https://moedatech-staging-eu.s3.eu-central-1.amazonaws.com/default/equipment/documents/1786381128000-istimara-seed.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Signature=fa6f";
+
+  it("resolves a document's url from the presigned key when url is null", () => {
+    const u = mapOfferedUnit({ equipmentId: "eq-1", documentKeys: [{ type: "istimara", key: SIGNED, url: null }] });
+    expect(u.documentKeys[0].url).toBe(SIGNED);
+    // `key` stays as-is — it is still the row's identity for dedupe.
+    expect(u.documentKeys[0].key).toBe(SIGNED);
+  });
+
+  it("resolves a photo's url the same way", () => {
+    const u = mapOfferedUnit({ equipmentId: "eq-1", photoKeys: [{ slot: "front", key: SIGNED, url: null }] });
+    expect(u.photoKeys[0].url).toBe(SIGNED);
+  });
+
+  it("passes an explicit url through verbatim — it is the backend's own answer", () => {
+    const u = mapOfferedUnit({ equipmentId: "eq-1", documentKeys: [{ type: "tuv", key: SIGNED, url: "https://cdn/explicit.pdf" }] });
+    expect(u.documentKeys[0].url).toBe("https://cdn/explicit.pdf");
+  });
+
+  it("does not second-guess an explicit url's shape — the http test is for the key fallback only", () => {
+    // `fleet.test.ts` has always asserted a bare "u1" passes through. Applying the absolute-link
+    // test to the explicit url too silently nulled it, which is how this was caught.
+    const u = mapOfferedUnit({ equipmentId: "eq-1", documentKeys: [{ type: "tuv", key: "k1", url: "u1" }] });
+    expect(u.documentKeys[0].url).toBe("u1");
+  });
+
+  it("does NOT invent a url from a bare S3 key", () => {
+    // No bucket origin is known here, so a fabricated link would look live and 404. Null keeps the
+    // row rendering without a view action, which is what an unopenable paper should do.
+    const u = mapOfferedUnit({ equipmentId: "eq-1", documentKeys: [{ type: "istimara", key: "default/equipment/documents/x.pdf", url: null }] });
+    expect(u.documentKeys[0].url).toBeNull();
+    expect(u.documentKeys[0].key).toBe("default/equipment/documents/x.pdf");
+  });
+
+  it("leaves a row with neither url nor key unopenable", () => {
+    const u = mapOfferedUnit({ equipmentId: "eq-1", documentKeys: [{ type: "istimara" }] });
+    expect(u.documentKeys[0].url).toBeNull();
   });
 });
