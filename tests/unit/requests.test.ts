@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   parseAddress, groupRequests, mapRequestListItem, publicTaxonomyUrl, cappedFilled,
   isCancellable, cancellableItems, statusCounts, statusSummary, representativeStatus, cancelBlockedReason,
-  REQUEST_STATUS, type RequestListItem, type RequestRecord,
+  REQUEST_STATUS, mapRequestDetail, type RequestListItem, type RequestRecord,
 } from "@/lib/contract/requests";
 
 /* ------------------------------- cappedFilled (fulfillment math) ------------------------------- */
@@ -265,5 +265,44 @@ describe("mapRequestListItem", () => {
   it("maps a null group id to null", () => {
     const rec = { id: "r1", status: "OPEN", type: "BROADCAST", equipmentItems: [] } as unknown as RequestRecord;
     expect(mapRequestListItem(rec).requestGroupId).toBeNull();
+  });
+});
+
+/**
+ * `projectLat`/`projectLng` are Prisma `Decimal` columns and serialise as STRINGS. The live staging
+ * payload is `{"projectLat":"24.7135983"}`. `RequestRecord` declares them `number | null`, and the
+ * map's project pin guards with `typeof lat !== "number"` — so an uncoerced cast made every request
+ * render "This request has no project location" while its distances read fine.
+ */
+describe("mapRequestDetail — project coordinates arrive as Decimal strings", () => {
+  it("coerces the string pair the backend actually sends", () => {
+    const r = mapRequestDetail({ id: "r1", projectLat: "24.7135983", projectLng: "46.6753" });
+    expect(r.projectLat).toBe(24.7135983);
+    expect(r.projectLng).toBe(46.6753);
+  });
+
+  it("leaves a real number alone", () => {
+    const r = mapRequestDetail({ id: "r1", projectLat: 24.5, projectLng: 46.5 });
+    expect(r.projectLat).toBe(24.5);
+    expect(r.projectLng).toBe(46.5);
+  });
+
+  it("null stays null — a request may legitimately have no pin", () => {
+    const r = mapRequestDetail({ id: "r1", projectLat: null, projectLng: null });
+    expect(r.projectLat).toBeNull();
+    expect(r.projectLng).toBeNull();
+  });
+
+  it("an empty or unparseable value is null, never 0 or NaN", () => {
+    // `Number("")` is 0, which would drop the pin in the Gulf of Guinea.
+    const r = mapRequestDetail({ id: "r1", projectLat: "", projectLng: "not-a-number" });
+    expect(r.projectLat).toBeNull();
+    expect(r.projectLng).toBeNull();
+  });
+
+  it("keeps every other field untouched", () => {
+    const r = mapRequestDetail({ id: "r1", projectAddressLabel: "Al Wuroud District, Riyadh", equipmentItems: [{ id: "i1" }] }) as unknown as Record<string, unknown>;
+    expect(r.projectAddressLabel).toBe("Al Wuroud District, Riyadh");
+    expect(r.equipmentItems).toEqual([{ id: "i1" }]);
   });
 });
