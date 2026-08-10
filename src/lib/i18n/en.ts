@@ -862,8 +862,14 @@ export const en = {
     // literal form at every count (the decision `unitCountLabel` records) and English's does not — a
     // literal "units" here would print "1 units" on the reachable one-unit shortfall. The count reads
     // against the «{n} in this offer» pill directly above it, which is where the noun already is.
-    shortfall: "{n} in this offer have no registered machine — they don't appear on the map",
-    shortfallAction: "Ask him to add them",
+    // ONE LINE beside the button, at the panel's 392px (owner, 2026-08-11). ~~"{n} in this offer have
+    // no registered machine — they don't appear on the map"~~ wrapped to three. The dash clause went
+    // with it: "no registered machine" already says it is not on a map, and the alert sits above the
+    // list it is absent from.
+    shortfall: "{n} in this offer with no registered machine",
+    // "it", not "them" — the count reads «1 unit» far more often than not, and a plural button beside
+    // a singular line is the kind of mismatch a reader trips on before they can say why.
+    shortfallAction: "Ask him to add it",
     // V11 — the send. Sending is also what creates the deal room, so the control acknowledges that a
     // question left, and a failure says so rather than letting the renter assume it arrived.
     shortfallSending: "Sending…",
