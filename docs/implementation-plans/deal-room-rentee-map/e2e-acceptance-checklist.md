@@ -213,6 +213,8 @@ Also: `operating_license` appears in the group despite carrying no `operator_` p
 ## 7 · Selecting and requesting
 
 ### RM3-AC-77 — one checkbox column, two mutually exclusive modes [CORE]
+*This AC won the footer.* AC-38 used to forbid a disabled ask button outright; that clause is superseded — the prototype the owner pointed at on 2026-08-10 agrees with this AC, not with AC-38 (see AC-38). Where the two ever disagree about the footer, this one is the contract.
+
 *How to test:*
 1. Nothing ticked → **both** footer buttons visible and **both disabled** (~70% opacity, `not-allowed` cursor).
 2. Tick a **held** row → «تنزيل» lights with a count; the request button stays disabled; **missing** rows dim to ~45% and go inert (click the checkbox, try tabbing to it — out of the tab order).
@@ -228,8 +230,14 @@ Also: `operating_license` appears in the group despite carrying no `operator_` p
 4. Press it — only that mode's rows tick, and the button's count equals the rows ticked.
 5. **«إلغاء التحديد (n)»** returns to neutral with both buttons disabled.
 
-### RM3-AC-38 — the full control set [CORE]
-*How to test:* Every row has a thumbnail with a status dot, a name and a status line. On an all-held machine there is **no request select-all and no batch request control at all** — not even a disabled one whose only outcome is an empty ask. On an all-missing machine, no download select-all.
+### RM3-AC-38 — the full control set [CORE] [SUPERSEDED]
+*Superseded:* the clause **"no batch request control at all — not even a disabled one"** is overturned, because it contradicts AC-77 and the prototype agrees with AC-77.
+
+**The evidence** — two prototype screenshots the owner pointed at on 2026-08-10, saying the prototype is what's correct here. Neutral state: **both** footer buttons render and **both** are greyed. Download mode (one photo ticked): «تنزيل (١)» goes solid navy, the ask button stays greyed, the missing row dims. So the button the current selection cannot feed is **visible and disabled**, never absent — which is AC-77 exactly.
+
+**Therefore AC-77 governs the footer**, and a permanently-rendered disabled ask button is correct rather than a defect. AC-38's other clauses are untouched — the row anatomy (thumbnail + status dot, name, status line), the per-row **view**, the single checkbox column, and the per-mode select-all all stand.
+
+*How to test:* Every row has a thumbnail with a status dot, a name and a status line. On an all-held machine there is **no request select-all** (AC-78 leaves only «حدّد كل المتاح») while the ask **button** still renders, disabled. On an all-missing machine, no download select-all — and «تنزيل» still renders, disabled.
 
 ### RM3-AC-16 — requestable is exactly "missing" [CORE]
 *How to test:* Tick everything reachable in request mode and open the preview. `docTypes` contains **only** missing papers — no held paper, no operator certificate. Constructing a request naming a held paper must be impossible.
@@ -243,7 +251,7 @@ Also: `operating_license` appears in the group despite carrying no `operator_` p
 - **view** opens each held paper;
 - held papers carry a checkbox; a paper with no file is listed but not selectable;
 - one select-all **«حدّد كل المتاح»** plus **«إلغاء التحديد (n)»**;
-- **exactly one** footer button, and it downloads — **no «اطلب…» button, not even disabled**;
+- **exactly one** footer button, and it downloads — **no «اطلب…» button, not even disabled**. (This is the **company** panel, which raises no ask at all; it is untouched by AC-38's overturned clause, which is about the machine's documents tab, where both buttons do render.)
 - ticking 3 saves **3 files to disk** (not 3 tabs) and reports how many landed.
 
 *Superseded:* v2's **RMAP-AC-110** and **RMAP-AC-117** specified a `scope: 'company'` document request. **Withdrawn** — company documents are view/download only. The only surviving company-scope ask is the shortfall's «اطلب إضافتها».
