@@ -211,7 +211,7 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest }: 
                 <div className="mp-sect-h">{L("Availability", "التوفّر")}</div>
                 <p className="mp-sect-n">
                   {L(
-                    "The lessor has not named this machine's yard yet — an open question, not a refusal.",
+                    "The supplier has not named this machine's yard yet — an open question, not a refusal.",
                     "لم يحدّد المؤجّر ساحة هذه المعدّة بعد — سؤال معلّق، وليس رفضاً.",
                   )}
                 </p>

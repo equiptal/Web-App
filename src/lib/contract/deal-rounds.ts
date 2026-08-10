@@ -511,7 +511,7 @@ export function buildChatCardView(card: ChatCard, ctx: ChatCardCtx): ChatCardVie
       return {
         ...base,
         kind: card.type, icon: "reply", tone: "ask-reply",
-        title: L("The lessor answered", "ردّ المؤجّر"),
+        title: L("The supplier answered", "ردّ المؤجّر"),
         rows: [
           { label: L("Reference", "المرجع"), value: card.reply.inReplyTo, ltr: true },
           { label: L("Answer", "الردّ"), value: RESOLUTION_WORD[card.reply.resolution](L) },

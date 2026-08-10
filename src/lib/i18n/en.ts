@@ -848,8 +848,8 @@ export const en = {
     verifiedCompany: "Verified company",
     companyDocuments: "Company documents",
     // V3 — the count pills. `type` is the REQUEST's own equipment type, and it agrees with the count.
-    // "With the lessor" means machines that FIT this request, never his whole yard.
-    countOwned: "{n} {type} with the lessor",
+    // "With the supplier" means machines that FIT this request, never his whole yard.
+    countOwned: "{n} {type} with the supplier",
     countInOffer: "{n} in this offer",
     // V4 — the shortfall alert. It states the DIFFERENCE, not the offered total.
     shortfall: "{n} in this offer have no registered machine — they don't appear on the map",
@@ -858,7 +858,7 @@ export const en = {
     // question left, and a failure says so rather than letting the renter assume it arrived.
     shortfallSending: "Sending…",
     shortfallSent: "Asked",
-    requestFailed: "The request didn't reach the lessor. Try again.",
+    requestFailed: "The request didn't reach the supplier. Try again.",
     requestInvalid: "This request can't be sent as it is.",
     // Map canvas
     // The prototype's copy verbatim: «مشروعك». "Your site" names a place on a map; the pin names the
@@ -875,7 +875,7 @@ export const en = {
     unitsConfirmed: "{c} confirmed · {a} not confirmed",
     // T13 — the bid list panel
     title: "Offers received",
-    pickSupplier: "Pick a lessor from the list to see their machines",
+    pickSupplier: "Pick a supplier from the list to see their machines",
     sortPrice: "Lowest price",
     sortNearest: "Nearest",
     sortNearestOff: "Nearest — needs a project location",
@@ -899,10 +899,10 @@ export const en = {
     // T15 — the colour key, hosted inside the panel
     keyToggle: "What do the colours mean?",
     keyHeading: "Every pin on the map is one machine",
-    keyConfirmed: "Confirmed — the lessor confirmed its yard in the offer readiness",
+    keyConfirmed: "Confirmed — the supplier confirmed its yard in the offer readiness",
     keyUnconfirmed: "Not confirmed — he hasn't confirmed it yet",
     keyNotUnavailable:
-      "“Not confirmed” does not mean unavailable — it means the lessor hasn't named its yard in the offer readiness yet. Ask him to confirm from the machine panel.",
+      "“Not confirmed” does not mean unavailable — it means the supplier hasn't named its yard in the offer readiness yet. Ask him to confirm from the machine panel.",
     keyCountOnly: "Units added as a count only don't appear on the map — no machine is registered for them.",
     // V10 — the machine marker's availability label (§6.8). One scale, two labels, and "not confirmed"
     // reads as UNANSWERED — never refused, never unavailable (RM3-AC-20). The "you can request it"
@@ -913,7 +913,7 @@ export const en = {
     pinInOffer: "In this offer",
     // A flag beside the distance on the map. Never a warning colour: colour here is availability's.
     mapOutOfCity: "Outside the city",
-    loadingFleet: "Loading this lessor's machines…",
+    loadingFleet: "Loading this supplier's machines…",
     /* ── V5 · the equipment list (§6.4) ──
        Flat, nearest first, OFFERED machines only. No serial number and no load capacity (RM3-AC-12):
        the serial identifies the machine to the system, and the type and size are already stated once,
@@ -932,7 +932,7 @@ export const en = {
     // delivery is a mobilisation worth asking about.
     eqOutOfCity: "· Outside the city",
     eqAskConfirm: "Ask him to confirm",
-    eqAskConfirmWhy: "Ask the lessor to confirm this machine is available",
+    eqAskConfirmWhy: "Ask the supplier to confirm this machine is available",
     eqDetails: "Details",
     // The certificate row always occupies its line, so a machine with no certificates is a shorter
     // LINE and not a shorter CARD.
@@ -943,7 +943,7 @@ export const en = {
     eqSelect: "Show this machine on the map",
     // RM3-AC-26 — a price and a count were given, and nothing else. No empty card furniture.
     eqNoneRegistered: "No machine is registered in this offer",
-    eqNoneRegisteredWhy: "The lessor gave a price and a count only, so there is nothing here to place or verify.",
+    eqNoneRegisteredWhy: "The supplier gave a price and a count only, so there is nothing here to place or verify.",
     // V17 — the list's filters (§6.4a). Chips select for what a machine HAS, never for what it lacks,
     // and the count always states the whole (RM3-AC-28a→28e). Group and chip copy comes from the
     // model, bilingual, so the list and a Dart port cannot label the same band differently.
@@ -952,15 +952,15 @@ export const en = {
     // «3 of 8» — the numerator is what is shown, the denominator is the whole offer.
     eqShownOfTotal: "{n} of {total}",
     // The filtered empty state — deliberately unlike RM3-AC-26's. That one is a statement about the
-    // lessor; this one is a statement about the chips the renter pressed.
+    // supplier; this one is a statement about the chips the renter pressed.
     eqFilterEmpty: "No machine matches what you chose",
     eqFilterEmptyWhy: "Active filters: {filters}. This offer has {total} — clear the filters to see them all.",
     // The company panel's own back control, and the detail's.
-    // The list-foot ask (§6.4). The prototype says «المورد»; this surface says «المؤجّر» / lessor.
-    eqAskAnother: "Ask the lessor to add another {type}",
+    // The list-foot ask (§6.4). The prototype says «المورد»; this surface says «المؤجّر» / supplier.
+    eqAskAnother: "Ask the supplier to add another {type}",
     eqAskAnotherSent: "Asked",
     backToEquipment: "Back to the machines",
-    // What the map is NOT showing, in words. Silence would read as "this lessor has no machines".
+    // What the map is NOT showing, in words. Silence would read as "this supplier has no machines".
     //
     // This is the SUBTITLE of the V4 shortfall alert (`BidMapWorkspace.tsx`, `.bm-short-s`); the
     // headline above it is `shortfall`, not a string of its own. There used to be a `claimedNotDrawn`
@@ -969,7 +969,7 @@ export const en = {
     // one slot is how the alert ends up stating the same fact twice; the unused one is gone.
     claimedNotDrawnWhy:
       "They were added as a count only — no machine is registered for them, so they have no location, documents or serial to show.",
-    noLocatable: "None of this lessor's machines can be placed",
+    noLocatable: "None of this supplier's machines can be placed",
     noLocatableWhy:
       "He hasn't shared a yard for any machine that fits this request, so nothing can be drawn. Ask him to confirm a yard.",
     offPlatformNoPins: "An off-platform offer has no pin",
@@ -986,13 +986,13 @@ export const en = {
     dismiss: "Dismiss",
     itemFallback: "This item",
     // A tab whose bid has no room is compose-only — the room is created by SENDING, never by opening.
-    composeOnly: "No messages yet. Your first message starts the conversation with the lessor.",
+    composeOnly: "No messages yet. Your first message starts the conversation with the supplier.",
     empty: "No messages yet.",
     unavailable: "Chat isn't available right now.",
     placeholder: "Write a message…",
     // The notice is refresh-timed (mount · focus · post-send · the poll). It states that a reply IS
     // there — never that it just arrived, which is a recency it cannot know.
-    noticeTitle: "You have a reply from the lessor",
+    noticeTitle: "You have a reply from the supplier",
     // What KIND of arrival, in a word, before the renter reads whose it is. A refusal takes the
     // bubble's warm fill — not red, which on this surface belongs to availability alone.
     kindReply: "Reply to your ask",

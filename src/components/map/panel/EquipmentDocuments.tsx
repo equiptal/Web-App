@@ -217,8 +217,8 @@ export function EquipmentDocuments({ machine, request, ar, L, onRequest }: Equip
           }}
         >
           {canRequest
-            ? L(`Ask the lessor to send it (${requestCount})`, `اطلب من المؤجّر إرساله (${arDigits(requestCount)})`)
-            : L("Ask the lessor to send it", "اطلب من المؤجّر إرساله")}
+            ? L(`Ask the supplier to send it (${requestCount})`, `اطلب من المؤجّر إرساله (${arDigits(requestCount)})`)
+            : L("Ask the supplier to send it", "اطلب من المؤجّر إرساله")}
         </button>
       </div>
 
