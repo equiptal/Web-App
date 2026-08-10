@@ -213,11 +213,32 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
     expect(dockSrc.match(/ensureDealRoom\(/g) ?? []).toHaveLength(1);
   });
 
-  it("puts that one call INSIDE `send()` — the room-creating act, and the only one", () => {
-    const body = functionBody(dockSrc, "async function send()");
+  it("puts that one call INSIDE `deliver()` — the one seam every send goes through", () => {
+    /* This used to name `send()`, and the RULE has not changed — the seam has. The composer grew an
+       attach control and a voice note (owner, 2026-08-11) and all three senders post the same way,
+       so the create-connect-post steps moved into the one function they share rather than being
+       copied twice. The assertion is stronger for it: no longer "the text sender creates the room",
+       but "exactly one function can, and it is not a sender". */
+    const body = functionBody(dockSrc, "async function deliver(");
     const call = dockSrc.indexOf("ensureDealRoom(");
     expect(call).toBeGreaterThan(body.start);
     expect(call).toBeLessThan(body.end);
+  });
+
+  it("routes the typed message, the attachment AND the voice note through that one seam", () => {
+    // The shape this AC's regression takes now that the composer can send more than text: an upload
+    // that posts on its own has to create the room on its own, and a `DealRoom` row freezes the
+    // lessor's offered count. Each sender is proved to reach `deliver`, and the call count is proved
+    // to be exactly those three — a fourth caller anywhere in the file fails this line.
+    const SENDERS = ["async function send()", "async function sendFiles(", "async function sendVoiceNote("];
+    for (const sender of SENDERS) {
+      const body = functionBody(dockSrc, sender);
+      expect(dockSrc.slice(body.start, body.end), sender).toContain("deliver(");
+      // …and none of them holds a channel itself. `channelRef` is read inside `deliver` alone, so
+      // there is no path that posts into a room without first passing the create-if-missing branch.
+      expect(dockSrc.slice(body.start, body.end), sender).not.toContain("channelRef");
+    }
+    expect(dockSrc.match(/\bdeliver\(/g) ?? []).toHaveLength(SENDERS.length + 1); // + the declaration
   });
 
   it("reaches no room-creating client function by any other name", () => {
@@ -558,3 +579,120 @@ describe("dockMessageView — nothing the deal room renders is invisible in the 
     expect([...kinds].sort()).toEqual(["audio", "file", "image"]);
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+   THE COMPOSER (owner, 2026-08-11)
+
+   «just add things already exist in the existing chat like upload and voice note, the composer».
+
+   Two claims, and they are the only two. **Reuse**: the attach control and the voice note are the
+   DEAL ROOM's — one gate, one upload, one message shape, in `lib/chat/chat-attachments` — so a file
+   sent from the map is the same object as one sent in the deal room, and the dock declares no rules
+   of its own to drift from them. **Inert while in flight**: every control in the row, the attach and
+   the mic included, goes dead while a send is on the wire — on a roomless bid the first press is
+   creating a `DealRoom`, and a second press during it would race that create.
+
+   Source-asserted for the same reason everything above is: `ChatDock` is a client component and this
+   repo's vitest env is `node` with no component harness. The BEHAVIOUR of the shared path itself is
+   exercised for real in `chat-attachments.test.ts`.
+   ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+
+describe("the dock's composer sends what the deal room sends, the way the deal room sends it", () => {
+  const composerSrc = dockSrc.slice(
+    dockSrc.indexOf('<div className="bm-chat-compose">'),
+    dockSrc.indexOf("</section>"),
+  );
+  const dealRoomSrc = readFileSync(resolve(process.cwd(), "src/components/deal-room/DealRoom.tsx"), "utf8");
+  const cssSrc = readFileSync(resolve(process.cwd(), "src/components/map/map-proto.css"), "utf8");
+
+  it("carries an attach control, a recorder, an input and a send — the positive control", () => {
+    // Without these the disabled sweep below would pass over an empty row.
+    expect(composerSrc.length).toBeGreaterThan(400);
+    expect(composerSrc).toContain('type="file"');
+    expect(composerSrc).toContain("accept={CHAT_ACCEPT}");
+    expect(composerSrc).toContain("<VoiceRecorder");
+    expect(composerSrc).toContain('className="bm-chat-input"');
+    expect(composerSrc).toContain('className="bm-chat-send"');
+  });
+
+  it("takes BOTH capabilities from the deal room rather than restating them", () => {
+    // The recorder is the deal room's component, mounted unchanged; the gate, the caps, the accept
+    // list and the wire shape are the shared module's. Both surfaces import the same one.
+    expect(dockSrc).toContain('from "@/components/deal-room/VoiceRecorder"');
+    expect(dockSrc).toContain('from "@/lib/chat/chat-attachments"');
+    expect(dealRoomSrc).toContain('from "@/lib/chat/chat-attachments"');
+    // …and neither surface keeps a private copy of the rules. A local extension list or a local cap
+    // is exactly how the two would start disagreeing about what a chat attachment is.
+    for (const src of [dockSrc, dealRoomSrc]) {
+      expect(src).not.toMatch(/const CHAT_(IMAGE|DOC|VIDEO)_EXT\s*=/);
+      expect(src).not.toMatch(/const CHAT_MAX_(MEDIA|VIDEO)\s*=/);
+      expect(src).not.toMatch(/\.sendImage\(|\.sendFile\(/);
+    }
+  });
+
+  it("disables EVERY control in the row while a send is in flight", () => {
+    // Four controls, four gates, and each one names both flight states: `busy` (the seam, which
+    // spans the room create) and `uploading` (the file on the wire). A control that named neither
+    // would still be pressable during the create it is racing.
+    const gates = [...composerSrc.matchAll(/disabled=\{([^}]*)\}/g)].map((m) => m[1]);
+    expect(gates).toHaveLength(4); // attach · recorder · input · send
+    for (const gate of gates) {
+      expect(gate, gate).toMatch(/\bbusy\b/);
+      expect(gate, gate).toMatch(/\buploading\b/);
+    }
+    // …and the send button is additionally gated on there being something to send.
+    expect(gates.filter((g) => /text\.trim\(\)/.test(g))).toHaveLength(1);
+  });
+
+  it("hands the recorder the SHARED cap, and its errors to the composer's own error row", () => {
+    expect(composerSrc).toContain("maxBytes={CHAT_MAX_MEDIA}");
+    expect(composerSrc).toContain("onError={setFileErr}");
+    // The recorder takes the row while it runs — a timer, a cancel and a send cannot share this
+    // width with an input.
+    expect(composerSrc).toMatch(/\{!voiceRecording && \(/);
+    expect(dockSrc).toContain("onRecordingChange={setVoiceRecording}");
+  });
+
+  it("keeps a media message rendering as MEDIA — the card paths are unchanged", () => {
+    // The dock renders `rentee_request` through `RequestCard` and every other custom type through
+    // `ChatCard`. An attachment carries no `custom.type`, so it has to fall through BOTH of those to
+    // the bubble — otherwise the file the composer just gained would be invisible where it lands.
+    const stream = dockSrc.slice(
+      dockSrc.indexOf("messages.map((m) => {"),
+      dockSrc.indexOf("<div ref={bottomRef} />"),
+    );
+    expect(stream.length).toBeGreaterThan(500); // positive control on the slice
+    expect(stream).toContain("if (card?.type === RENTEE_REQUEST_CARD_TYPE)");
+    expect(stream).toContain("if (card) {");
+    expect(stream).toContain("dockMessageView(m)");
+    expect(stream).toContain("view.attachments.map");
+    // …and the media branch is LAST. A card path added below it would swallow the attachment.
+    expect(stream.indexOf("dockMessageView(m)")).toBeGreaterThan(stream.indexOf("if (card) {"));
+  });
+
+  it("draws the prototype's composer geometry (05-chat-and-requests.js:42–45)", () => {
+    // 40px round send; input r20 · `10px 14px` · 12.5px on `#F8FAFC` inside `#C8D8E8`. Ours ran a
+    // size under all of it (32px · r18 · `8px 12px` · 11.5px · white on `#E1E9F1`).
+    const send = cssBlockOf(cssSrc, ".bidmap .bm-chat-send {");
+    expect(send).toMatch(/width:\s*40px/);
+    expect(send).toMatch(/height:\s*40px/);
+    const input = cssBlockOf(cssSrc, ".bidmap .bm-chat-input {");
+    expect(input).toMatch(/border-radius:\s*20px/);
+    expect(input).toMatch(/padding:\s*10px 14px/);
+    expect(input).toMatch(/font-size:\s*12\.5px/);
+    expect(input.toLowerCase()).toContain("#f8fafc");
+    expect(input.toLowerCase()).toContain("#c8d8e8");
+    // The recorder renders `.ib`, and the deal room styles that under `.composer` — a selector that
+    // does not reach this surface. Without a rule here the two new controls would be unstyled
+    // buttons, which is the one way "reuse the component" quietly fails to look reused.
+    expect(cssSrc).toContain(".bidmap .bm-chat-compose .ib {");
+  });
+});
+
+/** One CSS rule's declaration block, by exact selector. */
+function cssBlockOf(css: string, selector: string): string {
+  const at = css.indexOf(selector);
+  if (at < 0) throw new Error(`selector missing: ${selector}`);
+  const open = css.indexOf("{", at);
+  return css.slice(open + 1, css.indexOf("}", open));
+}

@@ -1636,14 +1636,63 @@
   border-end-start-radius: 4px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
-.bidmap .bm-chat-compose { flex-shrink: 0; display: flex; align-items: center; gap: 7px; padding: 9px 10px; border-top: 1px solid #e1e9f1; }
-.bidmap .bm-chat-input { flex: 1; min-width: 0; border: 1px solid #e1e9f1; border-radius: 18px; padding: 8px 12px; font: inherit; font-size: 11.5px; color: #16304f; background: #fff; }
-.bidmap .bm-chat-input:disabled { background: #f7fafc; }
-.bidmap .bm-chat-send { flex-shrink: 0; background: #2563eb; border: 0; color: #fff; border-radius: 50%; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+/* ── The composer (`05-chat-and-requests.js:42–45`) ───────────────────────────────────────────────
+   The prototype's own numbers, which ours ran a size under across the board: a 32px send, r18,
+   `8px 12px`, 11.5px ink and a WHITE field inside `#E1E9F1`. At that size the row read as a search
+   box bolted under a conversation rather than as the place you write in it — and the pale field on
+   white had no edge of its own at all. r20 · `10px 14px` · 12.5px on `#F8FAFC` inside `#C8D8E8`, and
+   a 40px send, are what the prototype draws. */
+.bidmap .bm-chat-compose { flex-shrink: 0; display: flex; align-items: center; gap: 6px; padding: 10px 12px 11px; border-top: 1px solid #e1e9f1; }
+.bidmap .bm-chat-input { flex: 1; min-width: 0; border: 1px solid #c8d8e8; border-radius: 20px; padding: 10px 14px; font: inherit; font-size: 12.5px; color: #16304f; background: #f8fafc; }
+.bidmap .bm-chat-input:disabled { opacity: 0.65; }
+.bidmap .bm-chat-send { flex-shrink: 0; background: #2563eb; border: 0; color: #fff; border-radius: 50%; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .bidmap .bm-chat-send:disabled { opacity: 0.5; cursor: default; }
-.bidmap .bm-chat-send .material-icons-outlined { font-size: 17px; }
+.bidmap .bm-chat-send .material-icons-outlined { font-size: 18px; }
 /* The send glyph points the way the message travels, so it mirrors with the script. */
 .bidmap[dir="rtl"] .bm-chat-send .material-icons-outlined, [dir="rtl"] .bidmap .bm-chat-send .material-icons-outlined { transform: scaleX(-1); }
+/* ── Attach + mic (owner, 2026-08-11) ─────────────────────────────────────────────────────────────
+   `.ib` is the class `VoiceRecorder` already renders — the deal room styles it under `.composer`, a
+   selector that does not reach here, so the component is mounted UNCHANGED and dressed for this
+   surface instead. 34px rather than the prototype's 38: the prototype draws one attach control and
+   an inert glyph beside it, where this row carries an attach AND a working recorder in a dock that
+   is `min(360px, 100% - 60px)` wide — at 38 the input lost the width it needs to show a phrase. */
+.bidmap .bm-chat-compose .ib {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid #c8d8e8;
+  border-radius: 50%;
+  background: #fff;
+  color: #6b8fa8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.bidmap .bm-chat-compose .ib:disabled { opacity: 0.5; cursor: default; }
+.bidmap .bm-chat-compose .ib .material-icons-outlined { font-size: 17px; }
+/* The recorder's own send, while it holds the row. Same fill as the composer's, so "send" is one
+   colour on this surface whatever is being sent. */
+.bidmap .bm-chat-compose .ib.send { background: #2563eb; border-color: #2563eb; color: #fff; }
+.bidmap[dir="rtl"] .bm-chat-compose .ib.send .material-icons-outlined, [dir="rtl"] .bidmap .bm-chat-compose .ib.send .material-icons-outlined { transform: scaleX(-1); }
+/* The recorder's running row — `VoiceRecorder` sizes itself inline; this only keeps its text from
+   overflowing a card this narrow. */
+.bidmap .bm-chat-compose .vn-rec { min-width: 0; }
+.bidmap .bm-chat-compose .vn-rec > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A refused or failed attachment. Its own row ABOVE the composer, not inside it: a message squeezed
+   into a 340px flex row would take the width the input needs, and it is not part of the
+   conversation, so it must not go in the stream and scroll away. */
+.bidmap .bm-chat-err {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border-top: 1px solid #f2d9d6;
+  background: rgba(217, 54, 42, 0.07);
+  color: #a32a20;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+}
 
 /* ── The renter's request card, sent and draft (`rRequestCard`, prototype 05:92) ──────────────────
    Its own object, not a `.chatcard` variant: the identity strip, the chips and the dashed status row

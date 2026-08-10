@@ -12,11 +12,23 @@ import { reconstructRounds, collapseRounds, latestRoundBy, withOpeningRound, cha
 import { valText, type ResolutionsMap } from "@/components/deal-room/DealRoomTerms";
 import { ChatCard } from "@/components/deal-room/ChatCard";
 import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
+import {
+  CHAT_ACCEPT,
+  CHAT_MAX_MEDIA,
+  chatFileRejection,
+  chatSendFailure,
+  classifyChatFile,
+  sendChatAttachment,
+  sendChatVoiceNote,
+  type ChatAttachment,
+} from "@/lib/chat/chat-attachments";
 import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/render";
 import "@/components/deal-room/deal-room-proto.css";
 import { computeQuoteTotals, computeRentalTotal } from "@/lib/pricing/rental";
 
-type StreamAttachment = { type?: string; image_url?: string; thumb_url?: string; asset_url?: string; title?: string; mime_type?: string; file_size?: number; fallback?: string };
+// The attachment shape is the SHARED one — this surface and the map's chat dock read the same
+// channel, so a second declaration here is a second thing to keep in step.
+type StreamAttachment = ChatAttachment;
 // `custom` carries the app's round payload (type:'rate_proposal', …) + location kind; i18n carries
 // Stream's message translations. Both are read defensively (reconstructRounds / the translate toggle).
 type ChatMsg = { id: string; text?: string; user?: { id?: string }; created_at?: string | Date; attachments?: StreamAttachment[]; custom?: Record<string, unknown>; i18n?: Record<string, unknown> };
@@ -82,20 +94,6 @@ async function saveAttachment(url: string, filename: string): Promise<void> {
     window.open(url, "_blank", "noopener,noreferrer");
   }
 }
-
-// Deal-room chat attachments — matched EXACTLY to the mobile app (chat_input_bar.dart): images +
-// documents ≤ 10 MB, video ≤ 25 MB, and ONE attachment per message. The web used to allow any file,
-// any size, multiple at once — these bring it in line.
-const CHAT_IMAGE_EXT = ["jpg", "jpeg", "png", "webp", "heic"];
-const CHAT_DOC_EXT = ["pdf", "doc", "docx", "xls", "xlsx", "csv", "txt", "ppt", "pptx"];
-const CHAT_VIDEO_EXT = ["mp4", "mov", "m4v", "webm", "3gp"];
-const CHAT_ACCEPT = [
-  "image/jpeg", "image/png", "image/webp", "image/heic", ".jpg", ".jpeg", ".png", ".webp", ".heic",
-  ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt", ".ppt", ".pptx",
-  "video/mp4", "video/quicktime", "video/webm", ".mp4", ".mov", ".m4v", ".webm", ".3gp",
-].join(",");
-const CHAT_MAX_MEDIA = 10 * 1024 * 1024; // images + documents
-const CHAT_MAX_VIDEO = 25 * 1024 * 1024; // video
 
 /**
  * The rentee's quotation, as an HTML page.
@@ -359,37 +357,24 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     }
   }
 
-  /** Upload + send ONE attachment via GetStream, gated to the app's allowed types + size caps. */
+  /** Upload + send ONE attachment via GetStream. The gate, the caps and the message shape are the
+   *  SHARED ones (`lib/chat/chat-attachments`) — the map's chat dock sends through the same pair, so
+   *  a file is the same object whichever surface it left from. */
   async function sendFiles(files: FileList | null) {
     const ch = channelRef.current;
-    if (!ch || !files || !files.length) return;
-    setFileErr(null);
     // App parity: one attachment per message — take the first only.
-    const file = files[0];
-    const ext = (file.name.split(".").pop() ?? "").toLowerCase();
-    const isImg = file.type.startsWith("image/") || CHAT_IMAGE_EXT.includes(ext);
-    const isVideo = file.type.startsWith("video/") || CHAT_VIDEO_EXT.includes(ext);
-    const isDoc = CHAT_DOC_EXT.includes(ext);
-    if (!isImg && !isVideo && !isDoc) {
-      setFileErr(L("That file type isn't supported.", "نوع الملف غير مدعوم."));
-      return;
-    }
-    const cap = isVideo ? CHAT_MAX_VIDEO : CHAT_MAX_MEDIA;
-    if (file.size > cap) {
-      setFileErr(L(`File is too large (max ${Math.round(cap / (1024 * 1024))} MB).`, `الملف كبير جدًا (الحد ${Math.round(cap / (1024 * 1024))} ميغابايت).`));
-      return;
-    }
+    const file = files?.[0];
+    if (!ch || !file) return;
+    setFileErr(null);
+    const verdict = classifyChatFile(file);
+    // A refusal never reached the wire, so no spinner is owed for it.
+    if (!verdict.ok) { setFileErr(chatFileRejection(verdict, L)); return; }
     setUploading(true);
     try {
-      const res = isImg ? await ch.sendImage(file) : await ch.sendFile(file);
-      const attachment: StreamAttachment = isImg
-        ? { type: "image", image_url: res.file, fallback: file.name }
-        : { type: "file", asset_url: res.file, title: file.name, mime_type: file.type, file_size: file.size };
-      const body = text.trim();
-      await ch.sendMessage({ text: body || undefined, attachments: [attachment] });
+      await sendChatAttachment(ch, file, verdict.kind, text);
       setText("");
     } catch {
-      setFileErr(L("Upload failed — please try again.", "فشل الرفع — حاول مجددًا."));
+      setFileErr(chatSendFailure("attachment", L));
     } finally {
       setUploading(false);
     }
@@ -402,10 +387,9 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     setFileErr(null);
     setUploading(true);
     try {
-      const res = await ch.sendFile(file);
-      await ch.sendMessage({ attachments: [{ type: "audio", asset_url: res.file, title: file.name, mime_type: file.type, file_size: file.size }] });
+      await sendChatVoiceNote(ch, file);
     } catch {
-      setFileErr(L("Couldn't send the voice note.", "تعذّر إرسال الملاحظة الصوتية."));
+      setFileErr(chatSendFailure("voice", L));
     } finally {
       setUploading(false);
     }

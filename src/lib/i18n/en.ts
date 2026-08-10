@@ -1018,6 +1018,11 @@ export const en = {
     // The composer's send control. The prototype labels it «إرسال» in words; ours draws a glyph, so
     // the word has to reach a screen reader some other way or the button announces as "button".
     send: "Send",
+    // The attach control (owner, 2026-08-11: «just add things already exist in the existing chat
+    // like upload and voice note»). A glyph again, so the word reaches a screen reader from here.
+    // What it is ALLOWED to attach, and what it says when it refuses, is the shared gate's — only
+    // the label is this surface's, because this surface's strings are keyed here.
+    attach: "Attach a file",
     // ── The review card (RM3-AC-17) ──
     // An ask is COMPOSED into the conversation and sent only when this is pressed. Cancelling writes
     // nothing at all — not a message, and not the deal room, which the send is what creates.

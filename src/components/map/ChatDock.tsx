@@ -31,6 +31,13 @@
  * the supplier's offered count (004a §4.5). The room is still created by the SEND, one layer up in
  * `useRenteeRequestSender`; this component only shows the card and reports the two presses.
  *
+ * ── The composer (owner, 2026-08-11) ────────────────────────────────────────────────────────────
+ * «just add things already exist in the existing chat like upload and voice note, the composer».
+ * Both are the DEAL ROOM's, lifted rather than rebuilt: `lib/chat/chat-attachments` owns the gate,
+ * the caps and the message shape for both surfaces, and `deal-room/VoiceRecorder` is mounted here
+ * unchanged. They post through `deliver` — the same room-creating seam a typed message uses — so an
+ * upload cannot become a second way to create a `DealRoom` row.
+ *
  * Unread is REST (`GET /api/me/received-bids` rows carry `bidId` + `unreadCount`), so the arrival
  * notice is refresh-timed and its copy says *"you have a reply"*, never *"just arrived"*
  * (RM3-AC-64).
@@ -39,9 +46,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Channel } from "stream-chat";
 import { ChatCard } from "@/components/deal-room/ChatCard";
+import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
 import { RequestCard } from "@/components/map/RequestCard";
 import { heroPhotoUrl } from "@/components/map/panel/machine-panel-model";
 import { fetchReceivedBids, fetchStreamToken } from "@/lib/api/client";
+import {
+  CHAT_ACCEPT,
+  CHAT_MAX_MEDIA,
+  chatFileRejection,
+  chatSendFailure,
+  classifyChatFile,
+  sendChatAttachment,
+  sendChatVoiceNote,
+} from "@/lib/chat/chat-attachments";
 import { STREAM_API_KEY, leaseStream, watchDealRoom } from "@/lib/chat/stream-connection";
 import { ensureDealRoom } from "@/lib/chat/ensure-deal-room";
 import type { BidCard } from "@/lib/contract/bids";
@@ -166,6 +183,13 @@ export function ChatDock({
   const [myStreamId, setMyStreamId] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  /** An upload is on the wire. Separate from `busy` only so the attach control can show it. */
+  const [uploading, setUploading] = useState(false);
+  /** A refused or failed attachment, stated above the composer rather than inside it — this row is
+   *  ~340px wide and an error squeezed into it would push the input to nothing. */
+  const [fileErr, setFileErr] = useState<string | null>(null);
+  /** Mic active → the composer hands its whole row to the recorder (deal-room parity). */
+  const [voiceRecording, setVoiceRecording] = useState(false);
   const [dismissedNotice, setDismissedNotice] = useState<string | null>(null);
   /** Ticks on mount · focus · post-send · poll — the four refresh points, and the ONLY moments the
    *  arrival notice is recomputed. That is what makes the notice refresh-timed rather than live. */
@@ -173,6 +197,7 @@ export function ChatDock({
 
   const channelRef = useRef<Channel | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   /* ── the tabs (REST) ─────────────────────────────────────────────────────────────────────────── */
 
@@ -453,42 +478,93 @@ export function ChatDock({
 
   /* ── sending ─────────────────────────────────────────────────────────────────────────────────── */
 
-  /** The first message on a bid with no room is a **room-creating act** (004a §4.5): create, connect,
-   *  then post. Opening the tab did none of that. */
-  async function send() {
-    const body = text.trim();
-    if (!body || !active || busy) return;
+  /**
+   * **The one seam every send goes through** — the typed message, an attachment and a voice note
+   * alike.
+   *
+   * The first message on a bid with no room is a **room-creating act** (004a §4.5): create, connect,
+   * then post. Opening the tab did none of that. An upload that posted on its own would need the
+   * same three steps, and a second copy of them is a second place that can create a `DealRoom` row —
+   * the write that freezes the lessor's offered count. So the composer's three controls hand this
+   * function what to post and know nothing about rooms.
+   *
+   * Answers whether the post LANDED, because each caller clears something different afterwards (the
+   * typed line, the caption, nothing at all) and none of them may clear it on a failure.
+   */
+  async function deliver(post: (channel: Channel) => Promise<void>): Promise<boolean> {
+    if (!active || busy) return false;
     setBusy(true);
     try {
       if (!active.dealRoomId) {
         const roomId = await ensureDealRoom(active.bidId, null);
         setFreshRooms((prev) => ({ ...prev, [active.bidId]: roomId }));
-        // The effect above reconnects on the new room id; the text is kept so the renter's first
-        // message is not lost between creating the room and having a channel to put it in.
+        // The effect above reconnects on the new room id; what the renter composed is kept until the
+        // post lands, so it is not lost between creating the room and having a channel to put it in.
         const tok = await fetchStreamToken(roomId);
-        if (tok.token && tok.userId) {
-          // `finally`, not a trailing release: a throw out of `watchDealRoom` or `sendMessage` is
-          // swallowed by the outer catch below, and without this the reference would leak there too.
-          const lease = leaseStream();
-          try {
-            const client = await lease.connect(tok.userId, tok.token);
-            const channel = await watchDealRoom(client, roomId);
-            await channel.sendMessage({ text: body });
-          } finally {
-            lease.release();
-          }
+        // No token is a failure, not a silent success: the room exists but nothing was posted, and
+        // reporting otherwise would clear the renter's message into a room it never reached.
+        if (!tok.token || !tok.userId) return false;
+        // `finally`, not a trailing release: a throw out of `watchDealRoom` or the post is swallowed
+        // by the outer catch below, and without this the reference would leak there too.
+        const lease = leaseStream();
+        try {
+          const client = await lease.connect(tok.userId, tok.token);
+          const channel = await watchDealRoom(client, roomId);
+          await post(channel);
+        } finally {
+          lease.release();
         }
       } else {
-        if (!channelRef.current) return;
-        await channelRef.current.sendMessage({ text: body });
+        if (!channelRef.current) return false;
+        await post(channelRef.current);
       }
-      setText("");
       refresh();
+      return true;
     } catch {
-      /* keep the text — a failed send must not swallow what the renter typed */
+      /* keep what the renter composed — a failed send must not swallow it */
+      return false;
     } finally {
       setBusy(false);
     }
+  }
+
+  /** The typed message. */
+  async function send() {
+    const body = text.trim();
+    if (!body) return;
+    if (await deliver(async (channel) => { await channel.sendMessage({ text: body }); })) setText("");
+  }
+
+  /**
+   * ONE attachment, through the deal room's own gate and upload (`lib/chat/chat-attachments`).
+   *
+   * A refusal — wrong type, over the cap — never touches the channel, so it costs no spinner and
+   * cannot create a room. What survives the gate goes down {@link deliver} like any other message,
+   * which is what makes a file sent from the map indistinguishable from one sent in the deal room.
+   */
+  async function sendFiles(files: FileList | null) {
+    // App parity: one attachment per message — take the first only.
+    const file = files?.[0];
+    if (!file || uploading) return;
+    setFileErr(null);
+    const verdict = classifyChatFile(file);
+    if (!verdict.ok) { setFileErr(chatFileRejection(verdict, L)); return; }
+    setUploading(true);
+    // The composer's line rides along as the caption, exactly as it does in the deal room.
+    const caption = text;
+    const sent = await deliver((channel) => sendChatAttachment(channel, file, verdict.kind, caption));
+    setUploading(false);
+    if (sent) setText("");
+    else setFileErr(chatSendFailure("attachment", L));
+  }
+
+  /** A recorded voice note, down the same seam. `VoiceRecorder` has already applied the cap. */
+  async function sendVoiceNote(file: File) {
+    setFileErr(null);
+    setUploading(true);
+    const sent = await deliver((channel) => sendChatVoiceNote(channel, file));
+    setUploading(false);
+    if (!sent) setFileErr(chatSendFailure("voice", L));
   }
 
   /* ── render ──────────────────────────────────────────────────────────────────────────────────── */
@@ -689,26 +765,75 @@ export function ChatDock({
             </div>
           )}
 
+          {/* A refusal or a failed upload, in its own row. It is about the composer, not about the
+              conversation, so it must not enter the stream and scroll away. */}
+          {fileErr && <div className="bm-chat-err" role="status">{fileErr}</div>}
+
+          {/* ── The composer (owner, 2026-08-11) ────────────────────────────────────────────────
+              «just add things already exist in the existing chat like upload and voice note, the
+              composer». So: the deal room's OWN attach control and its OWN `VoiceRecorder`, sending
+              through the seam above — not a second upload path, and nothing the product does not
+              already have. Geometry is the prototype's (05:42–45); see `map-proto.css`.
+
+              Every control goes inert while a send is in flight, the attach and the mic included: a
+              second press during the room-creating first message would race the create. */}
           <div className="bm-chat-compose">
-            <input
-              className="bm-chat-input"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
-              placeholder={t.chatDock.placeholder}
-              disabled={busy || !active}
+            {/* The recorder takes the WHOLE row while it is running (deal-room parity) — at this
+                width a timer, a cancel and a send cannot share the row with an input. */}
+            {!voiceRecording && (
+              <>
+                <button
+                  type="button"
+                  className="ib"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={busy || uploading || !active}
+                  aria-label={t.chatDock.attach}
+                  title={t.chatDock.attach}
+                >
+                  <span className="material-icons-outlined">{uploading ? "hourglass_top" : "attach_file"}</span>
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={CHAT_ACCEPT}
+                  hidden
+                  // Cleared on the way out so choosing the SAME file twice still fires `change`.
+                  onChange={(e) => { void sendFiles(e.target.files); e.target.value = ""; }}
+                />
+              </>
+            )}
+            <VoiceRecorder
+              disabled={busy || uploading || !active}
+              ar={ar}
+              L={L}
+              maxBytes={CHAT_MAX_MEDIA}
+              onRecordingChange={setVoiceRecording}
+              onRecorded={(f) => void sendVoiceNote(f)}
+              onError={setFileErr}
             />
-            <button
-              type="button"
-              className="bm-chat-send"
-              onClick={() => void send()}
-              disabled={busy || !text.trim() || !active}
-              aria-label={t.chatDock.send}
-              title={t.chatDock.send}
-            >
-              {/* The glyph is mirrored in CSS with the script, not swapped for another icon. */}
-              <span className="material-icons-outlined">send</span>
-            </button>
+            {!voiceRecording && (
+              <>
+                <input
+                  className="bm-chat-input"
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
+                  placeholder={t.chatDock.placeholder}
+                  disabled={busy || uploading || !active}
+                />
+                <button
+                  type="button"
+                  className="bm-chat-send"
+                  onClick={() => void send()}
+                  disabled={busy || uploading || !text.trim() || !active}
+                  aria-label={t.chatDock.send}
+                  title={t.chatDock.send}
+                >
+                  {/* The glyph is mirrored in CSS with the script, not swapped for another icon. */}
+                  <span className="material-icons-outlined">send</span>
+                </button>
+              </>
+            )}
           </div>
         </section>
       )}
