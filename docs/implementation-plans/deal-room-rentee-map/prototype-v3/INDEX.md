@@ -70,11 +70,20 @@ against the file until 2026-08-10:
 | `rDocPanel` | 2910 | `EquipmentDocuments.tsx` | **done, rows** — `.mp-row` exact (gap 10 · 7px 10px · r12 · mb 6). Thumbnail is a **documented departure**: 46×40 landscape, not its 34×34 square, because a square crops a certificate until it stops identifying the file (2026-08-09) |
 | `rEquipDetail` | 4190 | `EquipmentDetail.tsx` | section inset done; body outstanding |
 | `eqDocsTab` | 4334 | `EquipmentDocuments.tsx` | outstanding |
-| `rDocSelectBar` | 2812 | the batch footer | outstanding |
+| `rDocSelectBar` | 2812 | `.mp-selbar` | **not a port.** Its two adjacent text links became a real checkbox + label, because two links said nothing about which governed the column of ticks beneath them. Its `#F8FAFC` bar, `8px 2px 9px` and 11px do not map onto that shape — do not transplant them |
 | `rRequestCard` · `rReplyCard` | — | `ChatCard.tsx` | outstanding — the request loop's cards |
 | `rChatTabs` · `rChatPop` | — | `ChatDock.tsx` | outstanding, incl. §6.8.5: a message arriving with a panel open gives the POPUP, not the bubble |
 | `eqReadinessRow` | 431 | — | outstanding |
 | `rUnitPhotos` | 2398 | — | **not a port.** Its four 74×58 slots were replaced by a 196 px viewer (spec 004 §6, "A VIEWER, not a hero", 2026-08-09). Do not restore them. |
+
+**What the audit actually found.** The map canvas is a faithful port and now matches: marker, project
+pin, route, distance chip, basemap, cards, list, count pills, chat stream and bubbles, the arrival
+notice, the interaction language. **The panel's interior is mostly not a port at all** — spec 004 §6
+reshaped it, and four of its surfaces (`rEquipDetail`, `rUnitPhotos`, `rDocSelectBar`, and the doc
+thumbnail) are departures with dated rationales in the code. So the remaining rows below are more
+likely to be "redesigned, correctly" than "drifted". Confirm which before changing a value; the
+expensive mistake on this surface has always been transplanting a prototype value onto a shape that
+was deliberately changed.
 
 **Ask "port or redesign?" before comparing any value.** `EquipmentDetail` is the worked example: it is
 a spec-004 design (viewer · two tabs · a six-cell match grid the prototype has **none** of · 76 px
