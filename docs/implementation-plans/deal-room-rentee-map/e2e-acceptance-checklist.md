@@ -73,7 +73,7 @@ Both take colour from `unitAvailability(unit)` (via `locationSource`), **never**
 ## 3 · Counts and the shortfall
 
 ### RM3-AC-03 — single-unit offer shows one pill [CORE]
-*How to test:* `unitsOffered` of 1 → exactly one pill (**«٣ رافعات شوكية ٣ طن لدى المؤجّر»**). No «في هذا العرض» pill, no shortfall alert.
+*How to test:* `unitsOffered` of 1 → exactly one pill (**«٣ رافعات شوكية ٣ طن لدى المورد»**). No «في هذا العرض» pill, no shortfall alert.
 
 ### RM3-AC-04 — multi-unit, fully backed, two pills and no alert [CORE]
 *How to test:* 3 offered / 3 registered → two pills, **no** orange alert. Its absence must reliably mean nothing is claimed.
@@ -218,7 +218,7 @@ Also: `operating_license` appears in the group despite carrying no `operator_` p
 *How to test:*
 1. Nothing ticked → **both** footer buttons visible and **both disabled** (~70% opacity, `not-allowed` cursor).
 2. Tick a **held** row → «تنزيل» lights with a count; the request button stays disabled; **missing** rows dim to ~45% and go inert (click the checkbox, try tabbing to it — out of the tab order).
-3. Back to neutral, tick a **missing** row first → **«اطلب من المؤجّر إرساله»** lights; held rows go inert.
+3. Back to neutral, tick a **missing** row first → **«اطلب من المورد إرساله»** lights; held rows go inert.
 4. Clear the last tick → neutral, every row tickable again.
 5. A held row **with no url** is tickable in neither mode; a held row is requestable in none.
 
@@ -430,8 +430,12 @@ Owner ruling 2026-08-10. `RENTEE_HIDDEN_DOC_TYPES` is **back** in `rentee.servic
 
 *How to test:* Ownership papers list and open on the verification surface's documents tab. On the **bids list / bid card / comparison** surfaces they are **not** exposed. In devtools, `GET /me/bids/{bidId}/fleet` carries them with urls; the bid's own payload does not.
 
-### The wording ruling — «المؤجّر», never «المورد» [CORE]
-*How to test:* Sweep the surface in Arabic — header, pills, alert, list, detail, documents, both footer buttons, chat dock, price footer. Any **«المورد»** in a string belonging to this surface is a fail. This holds even for the request button, which ships as **«اطلب من المؤجّر إرساله»**.
+### The wording ruling — «المورد», the prototype's word [CORE] [REVERSED 2026-08-10]
+This surface previously said **«المؤجّر»** everywhere, deliberately and against the prototype. The owner reversed that on 2026-08-10: *"also use supplier always"*, alongside the prototype screenshots that spell the request button **«اطلب من المورد إرساله»**. So the prototype's word wins and the earlier ruling is void.
+
+*How to test:* Sweep the surface in Arabic — header, pills, alert, list, detail, documents, both footer buttons, chat dock, price footer. Any **«المؤجّر»** in a string belonging to this surface is now the failure, the exact inverse of what this line used to say. The English is unaffected: it already said "supplier" throughout.
+
+**Scope, so this is not over-applied:** the reversal covers THIS surface. Two strings elsewhere in `ar.ts` still say «المؤجّر» — a comment at :322 and `shareTeaserBody` at :392, which belongs to the share-link feature — and were deliberately left alone, because rewriting another feature's copy was not what was asked. If the word should change app-wide, that is a separate sweep.
 
 ### The active documents-footer button is navy `#1C3550` [EDGE]
 *How to test:* The live footer button fills navy. The card-level **«اطلب التأكيد»** stays blue `#2563EB` — different controls, not to be unified. Does not reopen AC-33.

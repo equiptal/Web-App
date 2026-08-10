@@ -233,7 +233,7 @@ export function BidMapWorkspace({
       .catch(() => {
         // A failed fleet fetch must never be silent: an empty map would read as "this lessor has no
         // machines", which is a claim. It must also never produce counts — the pills would then read
-        // «٠ لدى المؤجّر», which is the same claim in a pill.
+        // «٠ لدى المورد», which is the same claim in a pill.
         if (active) setFleetFailed(true);
       })
       .finally(() => {
@@ -510,7 +510,7 @@ export function BidMapWorkspace({
   /* ── V3 · the counts ───────────────────────────────────────────────────────────────────────────
      Computed ONLY once the fleet has arrived. Three numbers, one derivation (`unitCounts`):
        · owned      — the fleet response's row count, already filtered to machines that FIT this
-                      request (004a §4.1), which is why the copy says «لدى المؤجّر» and never «lessor's
+                      request (004a §4.1), which is why the copy says «لدى المورد» and never «lessor's
                       fleet»;
        · registered — `inBid === true` rows only (004a §4.2);
        · claimed    — `offered − registered`, clamped at 0 (RM3-AC-31).

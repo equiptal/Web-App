@@ -195,7 +195,7 @@ export function DocRowList({
   //
   // **A tie falls to «حدّد كل المتاح».** "More than half" leaves 50/50 undecided, and download is the
   // side with no outward consequence — it arms «تنزيل», whose worst outcome is files the renter could
-  // already open landing on his own disk, against «اطلب من المؤجّر إرساله», whose worst outcome reaches
+  // already open landing on his own disk, against «اطلب من المورد إرساله», whose worst outcome reaches
   // the lessor. It also matches the company panel, whose single kind of row has only ever offered «حدّد
   // كل المتاح».
   //

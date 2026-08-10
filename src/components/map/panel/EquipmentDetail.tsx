@@ -112,12 +112,13 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
   const alternativeAsk: PanelRequestDraft = { kind: "alternative", equipmentId: machine.equipmentId };
   const availabilityPending = askPending?.(availabilityAsk) ?? false;
   const alternativePending = askPending?.(alternativeAsk) ?? false;
-  /** The disabled control says what it is waiting for rather than going quietly inert. «المؤجّر» is
-   *  this surface's word for the other party — never the prototype's «المورد». */
+  /** The disabled control says what it is waiting for rather than going quietly inert. «المورد» is
+   *  this surface's word for the other party, matching the prototype — the owner's ruling of
+   *  2026-08-10, which reversed an earlier one that had this surface saying «المؤجّر». */
   const pendingLabel = L("Asked — awaiting his reply", "طُلب — بانتظار ردّه");
   const pendingWhy = L(
     "You've already asked this, and the supplier hasn't answered yet.",
-    "سبق أن طلبت هذا، ولم يردّ المؤجّر بعد.",
+    "سبق أن طلبت هذا، ولم يردّ المورد بعد.",
   );
 
   // «تحميل» saves the photo through the same batch runner the document lists use, for the same reason
@@ -231,7 +232,7 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
 
             {/* A CONFIRMED machine needs no explanation — the chip is the whole statement. The
                 unanswered one does: red reads as rejection, and this sentence is the only thing on
-                the panel that says it is not (AC-20). «المؤجّر», not the prototype's «المورد» —
+                the panel that says it is not (AC-20). «المورد», not the prototype's «المورد» —
                 this surface's word for the other party, as the equipment list already has it. */}
             {availability === "unconfirmed" && (
               <div className="mp-sect">
@@ -239,7 +240,7 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
                 <p className="mp-sect-n">
                   {L(
                     "The supplier has not named this machine's yard yet — an open question, not a refusal.",
-                    "لم يحدّد المؤجّر ساحة هذه المعدّة بعد — سؤال معلّق، وليس رفضاً.",
+                    "لم يحدّد المورد ساحة هذه المعدّة بعد — سؤال معلّق، وليس رفضاً.",
                   )}
                 </p>
               </div>

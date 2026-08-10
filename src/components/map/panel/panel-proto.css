@@ -539,7 +539,15 @@
   font-size: 14px;
   color: #6b8fa8;
 }
-.mp-thumb.missing { border: 1px dashed #c8d8e8; background: #f8fafc; }
+/* A missing paper's tile is WARM, not neutral grey — the prototype's red tile (owner, 2026-08-10).
+   `missing` is only ever set on a row the request actually asked for: `requestable` is `status ===
+   "missing"`, and an unrequested paper the machine does not hold renders no row at all (AC-73/74).
+   So the tile can carry the alarm colour without ever accusing a supplier of lacking something
+   nobody wanted. Same `#D9362A` as the dot inside it and the row's own tint, at tile weights, so the
+   three read as one state rather than three reds. The dash stays: the frame is still an empty slot,
+   and a solid fill would read as a document that failed to load rather than one never uploaded. */
+.mp-thumb.missing { border: 1px dashed rgba(217, 54, 42, 0.32); background: rgba(217, 54, 42, 0.06); }
+.mp-thumb.missing > [aria-hidden="true"]:not(.dot) { color: #d9362a; }
 .mp-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 /* The status badge sits INSIDE the tile (2026-08-09), tucked into its bottom leading corner, rather
    than hanging off the corner on a white ring. Outside, it needed that ring to survive whatever it

@@ -1231,8 +1231,12 @@ export function equipmentDocGroups(machine: FleetMachine, request: MatchRequest)
   const operatorRows: DocRow[] = operatorStatusRows(readiness.operatorCerts);
 
   return [
-    { key: "photos" as const, label: { en: "Photos", ar: "الصور" }, rows: photoRows },
-    { key: "documents" as const, label: { en: "Documents", ar: "المستندات" }, rows: paperRows },
+    // The two equipment headings name the MACHINE, per the prototype: a renter reading two stacked
+    // groups then knows both belong to the machine in front of him, not to the supplier or the bid.
+    // The operator's group is deliberately not renamed — its papers are the operator's, not the
+    // machine's, and that distinction is the whole point of it being a third group (RM3-AC-75).
+    { key: "photos" as const, label: { en: "Equipment photos", ar: "صور المعدّة" }, rows: photoRows },
+    { key: "documents" as const, label: { en: "Equipment documents", ar: "مستندات المعدّة" }, rows: paperRows },
     { key: "operator" as const, label: { en: "Operator's documents", ar: "مستندات المشغّل" }, rows: operatorRows },
   ]
     // A group with nothing to say is not a heading with an empty body — it is absent.

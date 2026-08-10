@@ -34,7 +34,7 @@
  * not that rule but what a tick is *for*: a **held** row is tickable too, and ticking it means
  * *download*. The mode is set by the first tick and read back out of the ticked set (`selectionModeOf`);
  * the other kind dims to 45% and goes inert, so a selection can never be half an ask and half a save.
- * **Both footer buttons stay visible** — «تنزيل» and «اطلب من المؤجّر إرساله» — with only the one the
+ * **Both footer buttons stay visible** — «تنزيل» and «اطلب من المورد إرساله» — with only the one the
  * selection supports live, carrying its count; the other keeps its shape and is disabled. Clearing the
  * last tick returns to neutral and re-enables everything, which is free here because the mode is
  * derived rather than stored. Every judgement is the model's; this component paints it.
@@ -225,7 +225,7 @@ export function EquipmentDocuments({ machine, request, ar, L, onRequest, askPend
           type="button"
           className="mp-send wide"
           disabled={!canRequest}
-          title={pending ? L("You've already asked this, and the supplier hasn't answered yet.", "سبق أن طلبت هذا، ولم يردّ المؤجّر بعد.") : undefined}
+          title={pending ? L("You've already asked this, and the supplier hasn't answered yet.", "سبق أن طلبت هذا، ولم يردّ المورد بعد.") : undefined}
           onClick={() => {
             if (draft && onRequest) {
               onRequest(draft);
@@ -236,8 +236,8 @@ export function EquipmentDocuments({ machine, request, ar, L, onRequest, askPend
           {pending
             ? L("Asked — awaiting his reply", "طُلب — بانتظار ردّه")
             : canRequest
-              ? L(`Ask the supplier to send it (${requestCount})`, `اطلب من المؤجّر إرساله (${arDigits(requestCount)})`)
-              : L("Ask the supplier to send it", "اطلب من المؤجّر إرساله")}
+              ? L(`Ask the supplier to send it (${requestCount})`, `اطلب من المورد إرساله (${arDigits(requestCount)})`)
+              : L("Ask the supplier to send it", "اطلب من المورد إرساله")}
         </button>
       </div>
 
@@ -249,7 +249,7 @@ export function EquipmentDocuments({ machine, request, ar, L, onRequest, askPend
         <p className="mp-note" dir={ar ? "rtl" : "ltr"} role="status">
           {L(
             "You've already asked for exactly these documents and the supplier hasn't answered yet — his reply will arrive in the chat. Tick a different document to ask for that one.",
-            "سبق أن طلبت هذه المستندات بعينها ولم يردّ المؤجّر بعد — سيصلك ردّه في المحادثة. حدّد مستنداً آخر لطلبه.",
+            "سبق أن طلبت هذه المستندات بعينها ولم يردّ المورد بعد — سيصلك ردّه في المحادثة. حدّد مستنداً آخر لطلبه.",
           )}
         </p>
       )}
