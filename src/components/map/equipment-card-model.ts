@@ -21,7 +21,8 @@
 import { arabicIndicDigits, availabilityView, isOutOfCity, REQUEST_ACTION_COLOUR } from "@/lib/contract/bid-map";
 import type { Bilingual } from "@/lib/contract/equipment-list";
 import type { FleetMachine } from "@/lib/contract/fleet";
-import { certificateChips, heroPhotoUrl } from "@/components/map/panel/machine-panel-model";
+import { computeUnitReadiness, readinessInputsFor } from "@/lib/contract/bid-readiness";
+import { heroPhotoUrl, type MatchRequest } from "@/components/map/panel/machine-panel-model";
 
 /**
  * **The card's ONE state chip** (RM3-AC-32).
@@ -52,6 +53,20 @@ export interface EquipmentCardAsk {
 }
 
 /**
+ * One requested certificate, and whether this machine has it.
+ *
+ * `held` is the whole state: green when the machine carries it, red when it does not. There is no
+ * third value, because there is no third case — the list only ever contains certificates the request
+ * named, so every entry is either satisfied or outstanding.
+ */
+export interface EquipmentCardCert {
+  /** The canonical code (`tuv`, `spsp`, …) — the key, and the React list key. */
+  code: string;
+  label: Bilingual;
+  held: boolean;
+}
+
+/**
  * Everything one card states, and **nothing else**.
  *
  * What is deliberately absent, and why:
@@ -75,9 +90,24 @@ export interface EquipmentCardModel {
   /** The yard is outside the request city's own radius — the fact that turns a delivery into a
    *  mobilisation. A qualifier on the offer, not a colour and not a filter. */
   outOfCity: boolean;
-  /** The safety certificates the machine actually holds (AC-11). Empty ⇒ the card states the absence
-   *  explicitly rather than leaving the line blank. */
-  certs: Bilingual[];
+  /**
+   * The certificates **this request asked for**, each said to be held or not (owner, 2026-08-11).
+   *
+   * ~~The certificates the machine actually holds.~~ Withdrawn. The card used to list whatever was on
+   * the machine's file, which put an Insurance chip on a machine while the TÜV the renter asked for
+   * was missing and said nowhere — the card answered a question nobody had asked and stayed silent on
+   * the one that mattered.
+   *
+   * So: **only requested certificates appear**, held ones green and missing ones red. A certificate
+   * the machine holds but the request never named is not shown here at all — the owner's words, *"not
+   * requested docs, the renter will not be interested to see it here"*. It is still on the documents
+   * tab, where the renter goes to see everything the machine carries; this line is the answer to *his
+   * request*, not an inventory.
+   *
+   * Empty ⇒ the request asked for no certificates, and the card says so rather than leaving the line
+   * blank. That is a different sentence from "the machine has none" and the copy has to follow.
+   */
+  certs: EquipmentCardCert[];
   /** Non-null **iff** {@link EquipmentCardChip.availability} is `unconfirmed` (AC-13). */
   askAvailability: EquipmentCardAsk | null;
 }
@@ -90,7 +120,15 @@ export interface EquipmentCardModel {
  * **`yardConfirmed` is not read here and is not readable from here**: it is true for every
  * readiness-written entry, so reading it would turn every chip green and every pin with it.
  */
-export function equipmentCardModel(machine: FleetMachine): EquipmentCardModel {
+export function equipmentCardModel(
+  machine: FleetMachine,
+  /**
+   * The request this machine is being read against — the source of WHICH certificates the card names.
+   * Optional so a caller with no request in hand (a preview, a test) still renders a card; without it
+   * the certificate line is empty, which reads as "nothing asked for" rather than inventing a list.
+   */
+  request?: MatchRequest,
+): EquipmentCardModel {
   const chip = availabilityView(machine);
   const name = [machine.manufacturer, machine.modelName].filter(Boolean).join(" ").trim();
 
@@ -115,7 +153,15 @@ export function equipmentCardModel(machine: FleetMachine): EquipmentCardModel {
         ? Math.round(machine.distanceKm)
         : null,
     outOfCity: isOutOfCity(machine.distanceKm),
-    certs: certificateChips(machine),
+    // Scored by the SAME function the match grid and the readiness band use, fed the same request —
+    // so a certificate cannot read green on the card and red one screen deeper. `computeUnitReadiness`
+    // returns exactly one entry per REQUESTED cert with its `present` flag, which is precisely the
+    // list this line wants; nothing here re-derives what is asked for or what is held.
+    certs: request
+      ? computeUnitReadiness(machine, readinessInputsFor(request).equipCerts, [], null).equipmentCerts.map(
+          (c) => ({ code: c.code, label: { en: c.labelEn, ar: c.labelAr }, held: c.present }),
+        )
+      : [],
     askAvailability: chip.availability === "confirmed" ? null : { colour: REQUEST_ACTION_COLOUR },
   };
 }

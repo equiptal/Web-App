@@ -82,7 +82,12 @@ const fleet = (rows: RawMachine[]): FleetMachine[] =>
     })),
   );
 
-const one = (r: RawMachine) => equipmentCardModel(fleet([r])[0]);
+/** The request a card is read against. Certificates on the card are the REQUESTED ones (owner,
+ *  2026-08-11), so every fixture that expects chips has to say what was asked for. */
+const asking = (certs: string[]) => ({ reqEquipmentCerts: certs }) as never;
+
+const one = (r: RawMachine, req: string[] = ["tuv", "spsp"]) =>
+  equipmentCardModel(fleet([r])[0], asking(req));
 
 /** Every key at every depth of a model's output — arrays walked, so a key on a chip is caught as
  *  readily as one on the root. Borrowed from `map-no-quality-score.test.ts`, deliberately. */
@@ -245,7 +250,7 @@ describe("neither drawing surface can reach the yardConfirmed boolean (RM3-AC-19
 /* ══════════════════════ RM3-AC-12 · no serial number and no load capacity ══════════════════════ */
 
 describe("the card states neither the serial number nor the load capacity (RM3-AC-12)", () => {
-  const card = one({ id: "eq", docs: ["tuv"] });
+  const card = one({ id: "eq", docs: ["tuv"] }, ["tuv"]);
 
   it("is built from a machine that HAS both — the positive control on the sweep", () => {
     const machine = fleet([{ id: "eq" }])[0];
@@ -357,7 +362,40 @@ describe("availability and commitment are ONE chip value (RM3-AC-32)", () => {
 
   it("still carries the certificates, which are a fact about DOCUMENTS and not a second chip", () => {
     // The positive control on the rule: RM3-AC-32 forbids a second COMMITMENT signal, not row 4.
-    expect(card.certs.map((c) => c.en)).toEqual(["TÜV", "SPSP"]);
+    expect(card.certs.map((c) => c.label.en)).toEqual(["TÜV", "SPSP"]);
+  });
+});
+
+/* ═════════ the certificate line answers the REQUEST, not the machine (owner, 2026-08-11) ═════════ */
+
+describe("row 4 lists the certificates the REQUEST asked for, held or not", () => {
+  it("names a requested certificate the machine has, as held", () => {
+    const card = one({ id: "eq", docs: ["tuv"] }, ["tuv"]);
+    expect(card.certs).toEqual([{ code: "tuv", label: { en: "TÜV", ar: "TÜV" }, held: true }]);
+  });
+
+  it("names a requested certificate the machine LACKS, as missing", () => {
+    // The case the old card was silent about: the renter asked for a TÜV, the machine has none, and
+    // the line said nothing at all because it only listed what was on the file.
+    const card = one({ id: "eq", docs: [] }, ["tuv"]);
+    expect(card.certs).toEqual([{ code: "tuv", label: { en: "TÜV", ar: "TÜV" }, held: false }]);
+  });
+
+  it("does NOT name a certificate the machine holds that nobody asked for", () => {
+    // The owner's words: "not requested docs, the renter will not be interested to see it here."
+    // It is still on the documents tab — this line is the answer to his request, not an inventory.
+    const card = one({ id: "eq", docs: ["insurance", "tuv"] }, ["tuv"]);
+    expect(card.certs.map((c) => c.code)).toEqual(["tuv"]);
+  });
+
+  it("is empty when the request asked for no certificates at all", () => {
+    // Which the card states as "none requested" — a different sentence from "the machine has none",
+    // and the only one this line is entitled to make.
+    expect(one({ id: "eq", docs: ["tuv", "spsp"] }, []).certs).toEqual([]);
+  });
+
+  it("is empty when no request is supplied, rather than falling back to the machine's own papers", () => {
+    expect(equipmentCardModel(fleet([{ id: "eq", docs: ["tuv"] }])[0]).certs).toEqual([]);
   });
 });
 

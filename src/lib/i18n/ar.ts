@@ -889,7 +889,7 @@ export const ar: Dictionary = {
     // السؤال أُرسل وينتظر ردّاً.
     eqAskPending: "طُلب — بانتظار ردّه",
     eqDetails: "التفاصيل",
-    eqNoCerts: "لا شهادات على المعدّة",
+    eqNoCerts: "لم تُطلب شهادات",
     eqDistanceUnit: "كم من مشروعك",
     eqNoDistance: "المسافة غير معروفة",
     eqNoPhoto: "لا صورة",

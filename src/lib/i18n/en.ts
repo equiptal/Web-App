@@ -962,7 +962,9 @@ export const en = {
     eqDetails: "Details",
     // The certificate row always occupies its line, so a machine with no certificates is a shorter
     // LINE and not a shorter CARD.
-    eqNoCerts: "No certificates on this machine",
+    // The line now answers the REQUEST, so its empty case is "you asked for none" — not "the machine
+    // has none", which is a claim about the machine this card no longer makes (owner, 2026-08-11).
+    eqNoCerts: "No certificates requested",
     eqDistanceUnit: "km from your project",
     eqNoDistance: "Distance not known",
     eqNoPhoto: "No photo",

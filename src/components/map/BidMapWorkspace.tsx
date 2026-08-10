@@ -935,6 +935,7 @@ export function BidMapWorkspace({
               {fleet && (
                 <EquipmentList
                   view={view}
+                  request={bid}
                   filterIds={filterIds}
                   onToggleFilter={(id) =>
                     setFilterIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))

@@ -51,6 +51,7 @@ import { arabicIndicDigits } from "@/lib/contract/bid-map";
 import { listEmptyState, type EquipmentListView } from "@/lib/contract/equipment-list";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import { equipmentCardModel } from "@/components/map/equipment-card-model";
+import type { MatchRequest } from "@/components/map/panel/machine-panel-model";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 
 export interface EquipmentListProps {
@@ -60,6 +61,12 @@ export interface EquipmentListProps {
    * a component holding only the filtered half cannot.
    */
   view: EquipmentListView;
+  /**
+   * The request every card is read against — the source of WHICH certificates a card names (owner,
+   * 2026-08-11). It is the request, not the machine, that decides: a card lists what was ASKED FOR,
+   * marked held or missing, and never a certificate the machine happens to carry that nobody wanted.
+   */
+  request?: MatchRequest;
   /** The chip ids currently pressed. Owned by the workspace, because the map filters on them too. */
   filterIds: readonly string[];
   /** Toggle one chip. OR within a group, AND across groups — the model does the combining. */
@@ -100,6 +107,7 @@ export interface EquipmentListProps {
 
 export function EquipmentList({
   view,
+  request,
   filterIds,
   onToggleFilter,
   onClearFilters,
@@ -307,6 +315,7 @@ function EquipmentCard({
   onOpenDetail,
   onAskAvailability,
   askPending,
+  request,
 }: {
   machine: FleetMachine;
   index: number;
@@ -319,12 +328,16 @@ function EquipmentCard({
   onOpenDetail: (id: string) => void;
   onAskAvailability?: (machine: FleetMachine) => void;
   askPending?: (machine: FleetMachine) => boolean;
+  /** The request this machine is read against — the source of WHICH certificates the card names
+   *  (owner, 2026-08-11). Absent → no certificate chips, which reads as "nothing was asked for"
+   *  rather than as an inventory of what the machine happens to carry. */
+  request?: MatchRequest;
 }) {
   // Everything this card states — and everything it is allowed to know — is one model call. The chip
   // is `availabilityView`'s, which is the SAME call `machineMarkers` makes for this machine's pin
   // (AC-19), and the model carries no serial, no capacity and no second band for the card to reach
   // for even by accident (AC-12, AC-32).
-  const card = useMemo(() => equipmentCardModel(machine), [machine]);
+  const card = useMemo(() => equipmentCardModel(machine, request), [machine, request]);
   const { chip, certs, photo, askAvailability } = card;
   const confirmed = chip.availability === "confirmed";
   /** Asked, and not yet answered. The workspace decides it — only it can see the conversation — and
@@ -459,11 +472,19 @@ function EquipmentCard({
             )}
           </div>
 
-          {/* 4 · certificates, or the explicit absence (AC-11). Always occupies its line. */}
+          {/* 4 · the REQUESTED certificates, held or not (owner, 2026-08-11). Always occupies its
+              line. A certificate the machine holds but nobody asked for is not here — it is on the
+              documents tab, where the renter goes to see everything the machine carries. */}
           <div className="bm-eq-r4">
             {certs.length > 0 ? (
+              // The mark is not decoration. At this size the two fills are close enough that colour
+              // would be the only carrier, and a renter who cannot separate them reads a missing
+              // certificate as a present one — the exact misreading this line exists to prevent.
               certs.map((c) => (
-                <span key={c.en} className="bm-eq-cert">{ar ? c.ar : c.en}</span>
+                <span key={c.code} className={`bm-eq-cert ${c.held ? "held" : "missing"}`}>
+                  <span aria-hidden="true">{c.held ? "✓" : "!"}</span>
+                  {ar ? c.label.ar : c.label.en}
+                </span>
               ))
             ) : (
               <span className="bm-eq-nocert">{t.bidMap.eqNoCerts}</span>
