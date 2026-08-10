@@ -1499,6 +1499,41 @@
    chrome around it; on white the bubbles had nothing to sit on and the stream ran into the composer. */
 .bidmap .bm-chat-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 16px; background: #edf3fa; }
 .bidmap .bm-chat-note { margin: auto 0; text-align: center; font-size: 10.5px; font-weight: 600; color: #6b8fa8; line-height: 1.8; padding: 14px 6px; }
+/* ── The bubbles, from `chatMsg` (prototype 3028–3030) ────────────────────────────────────────────
+   Scoped INSIDE `.bidmap` on purpose. The markup reuses `.dlproto .msg`, which `/deal-room/[id]`
+   also renders — that surface has its own spec and its own prototype (70% · 10px 14px · r14 ·
+   13.5px/1.45 · a saturated fill with white text), and none of it may move for this one. Four
+   classes here beats its three, so these win without touching it.
+   Incoming carries a BORDER and no shadow; outgoing carries a SHADOW and no border, on pale
+   `#D9EEFF` with the same dark ink — not a brand fill with white text.
+
+   THE TAIL. The prototype writes PHYSICAL corners on an RTL-only page: incoming is
+   `13px 13px 13px 4px` while sitting at the inline-start (visual RIGHT in Arabic), so its 4px notch
+   is bottom-LEFT — the edge AWAY from it — and outgoing mirrors that. Expressed logically below so
+   English mirrors rather than repeats it. If the far-edge notch turns out to be a slip in the
+   prototype rather than intent, the fix is to swap these two longhands and nothing else. */
+.bidmap .bm-chat .msg {
+  max-width: 80%;
+  margin: 0; /* the rhythm is the stream's `gap: 8px`, not per-bubble margin */
+  padding: 9px 12px;
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+.bidmap .bm-chat .msg.them {
+  background: #fff;
+  border: 1px solid #e1e9f1;
+  color: #16304f;
+  border-radius: 13px;
+  border-end-end-radius: 4px;
+}
+.bidmap .bm-chat .msg.mine {
+  background: #d9eeff;
+  border: 0;
+  color: #16304f;
+  border-radius: 13px;
+  border-end-start-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
 .bidmap .bm-chat-compose { flex-shrink: 0; display: flex; align-items: center; gap: 7px; padding: 9px 10px; border-top: 1px solid #e1e9f1; }
 .bidmap .bm-chat-input { flex: 1; min-width: 0; border: 1px solid #e1e9f1; border-radius: 18px; padding: 8px 12px; font: inherit; font-size: 11.5px; color: #16304f; background: #fff; }
 .bidmap .bm-chat-input:disabled { background: #f7fafc; }
