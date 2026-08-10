@@ -188,9 +188,19 @@ label**.
 
 **H4 · The shortfall alert's colour, next to the availability red.**
 *Do:* D7, with an unconfirmed machine visible in the list below it.
-*Pass:* the alert reads as *attention*, the chip below it reads as *unavailable* — the amber and the red
-are not competing for the same meaning.
+*Pass:* the alert reads as *attention*, the chip below it reads as *unavailable* — the orange and the red
+are not competing for the same meaning. The alert's orange is the **same** warm family as the
+certificate chip on the cards below it (both are the prototype's `orange`, not `amber`).
 *Ref:* RM3-AC-06 (the token itself is asserted in `bid-map.test.ts`; this is the reading, not the value).
+
+**H4a · The shortfall alert is one line and a small outlined button.**
+*Do:* D7.
+*Pass:* one sentence on the tint, and a **white** button with a blue hairline and blue text beside it —
+no warning glyph, no heading over a grey paragraph, no filled button. Aligned to the prototype
+2026-08-11 (`app-decoded.js` 3775–3784).
+*Fail:* the alert is a three-part notice, or the button is a solid blue block.
+⚠ A **second** grey line appears under the sentence once the ask has been sent, and that one is ours
+on purpose (it says why the button is inert). It is not a regression to this item.
 
 **H5 · ⚠ The type word agrees in number, in Arabic.**
 *Do:* find an offer with **one** unit, **two** units, and **more than ten**. Read the pill's sentence

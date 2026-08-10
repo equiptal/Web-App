@@ -12,7 +12,12 @@
    at decoded line 6–11** — not off `design-v3.md`, whose §1 table is right but whose offsets are not:
 
      deep #16304F · navy #1C3550 · muted #6B8FA8 · border #C8D8E8 · blt #E1E9F1
-     surface #EFF4F9 · s2 #EDF2F7 · green #16A34A · red #D9362A · amber #D4780A
+     surface #EFF4F9 · s2 #EDF2F7 · green #16A34A · red #D9362A
+     orange #E8890C (orangeLt rgba(232,137,12,.10) · orangeBd rgba(232,137,12,.32)) · amber #D4780A
+
+   The palette carries TWO warm tokens and they are not interchangeable. Everything warm on this
+   surface — the shortfall alert and the certificate chip — is the prototype's `orange`; `amber` is
+   listed because it exists at decoded line 12, not because this surface paints anything in it.
 
    Two of these were MIS-TRANSCRIBED here until 2026-08-08 and everything inherited the error:
      · `deep` was written `#0F2238`. That colour does exist in the prototype — as the site label's ink
@@ -615,34 +620,56 @@
 .bidmap .bm-pill-l { font-size: 10.5px; font-weight: 700; color: #6b8fa8; }
 
 /* ── V4 · shortfall alert (§6.3) ─────────────────────────────────────────────────────────────────
-   ORANGE (#d4780a), never red. Red on this surface means availability and nothing else; a shortfall
-   is an incomplete offer, not an unavailable machine, and one colour for two problems collapses them
-   (RM3-AC-06). */
+   ORANGE, never red. Red on this surface means availability and nothing else; a shortfall is an
+   incomplete offer, not an unavailable machine, and one colour for two problems collapses them
+   (RM3-AC-06).
+
+   The family is the prototype's `orange` (#E8890C · `orangeLt` · `orangeBd`, decoded 9), which is
+   what its own alert is drawn in (decoded 3778) and what the card's certificate chip below already
+   wears. It was `amber` (#D4780A) here until 2026-08-11 — a real token on the same palette line, but
+   the wrong one of the two, so the alert and the chip were two warm families for one meaning.
+
+   ONE LINE OF TEXT AND A BUTTON (decoded 3775–3784). What was here — a warning glyph, a bold heading
+   and a grey paragraph under it — drew a three-part notice for a sentence-long fact, and the
+   paragraph («no location, documents or serial to show») spent three lines explaining a consequence
+   the sentence already states. A shortfall is read in passing, above the list it is about; the alert
+   is sized for that, not for being studied. */
 .bidmap .bm-short {
   flex-shrink: 0;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 9px;
   margin: 11px 15px 0;
-  padding: 10px 12px;
-  background: rgba(212, 120, 10, 0.07);
-  border: 1px solid rgba(212, 120, 10, 0.28);
-  border-radius: 12px;
+  padding: 8px 10px;
+  background: rgba(232, 137, 12, 0.1);
+  border: 1px solid rgba(232, 137, 12, 0.32);
+  border-radius: 10px;
 }
-.bidmap .bm-short-ic { font-size: 18px; color: #d4780a; flex-shrink: 0; }
+/* The wrapper is `flex: 1` rather than the text itself, because the pending sentence below is OURS
+   and can join it — see `.bm-short-s`. With nothing pending it collapses to exactly the prototype's
+   single flexed span. */
 .bidmap .bm-short-body { flex: 1; min-width: 0; }
-.bidmap .bm-short-t { font-size: 11.5px; font-weight: 800; color: #8a4f08; line-height: 1.5; }
+.bidmap .bm-short-t { font-size: 11px; font-weight: 700; color: #8a4f08; line-height: 1.65; }
+/* NOT in the prototype, and deliberately kept: the one thing this line says is why the button beside
+   it is inert, and a disabled control whose label merely changed to «تم الطلب» leaves the renter
+   guessing whether the ask failed. It renders only while an ask is outstanding, so the resting alert
+   is the prototype's one line. */
 .bidmap .bm-short-s { font-size: 9.5px; font-weight: 600; color: #6b8fa8; margin-top: 4px; line-height: 1.7; }
-/* The ask itself is BLUE, not the alert's orange: it is an action, and an action tinted with the
-   warning it sits inside reads as part of the warning (the same reasoning as AC-33). */
+/* WHITE and outlined, as the prototype draws it (decoded 3783) — a filled button inside a tinted
+   alert makes the alert itself look pressed, and this is a small ask, not the surface's primary act.
+
+   The ink and the hairline are the ask BLUE, not the prototype's navy `C.blue`/`C.blueBd`: RM3-AC-33
+   fixes one colour for every ask on this surface, and beside a red availability chip navy reads as
+   disabled. Blue, not the alert's orange, for the reason the old comment here gave and which still
+   holds — an action tinted with the warning it sits inside reads as part of the warning. The border
+   is the same .22 alpha the prototype uses, taken on the blue, exactly as `.bm-eq-ask` already does. */
 .bidmap .bm-short-act {
   flex-shrink: 0;
-  align-self: center;
-  background: #2563eb;
-  border: 0;
-  color: #fff;
-  border-radius: 9px;
-  padding: 7px 11px;
+  background: #fff;
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  color: #2563eb;
+  border-radius: 8px;
+  padding: 6px 10px;
   font-size: 10.5px;
   font-weight: 800;
   cursor: pointer;

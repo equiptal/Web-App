@@ -861,17 +861,20 @@ export function BidMapWorkspace({
                 claimed (RM3-AC-05). ORANGE, never red: on this surface red means availability only,
                 and a shortfall is an incomplete offer, not an unavailable machine (RM3-AC-06). It
                 states the DIFFERENCE — not the offered total — and the consequence: those units are
-                not on the map, because a claimed unit has no location, no documents and no serial. */}
+                not on the map.
+
+                ONE SENTENCE AND A BUTTON, as the prototype draws it (decoded 3775–3784). The glyph,
+                the bold heading and the grey paragraph that were here until 2026-08-11 made a
+                three-part notice out of a fact that fits on one line, and the paragraph only
+                unpacked the consequence the sentence already carries. */}
             {shortfall && (
               <div className="bm-short" role="status">
-                <span className="bm-short-ic material-icons-outlined">error_outline</span>
                 <div className="bm-short-body">
                   <div className="bm-short-t">
                     {/* `shortfall.claimed` — the DIFFERENCE. `counts.offered` is the sentence's one
                         plausible wrong number and is not reachable from this model at all. */}
                     {fmt(t.bidMap.shortfall, { n: ar ? unitCountLabel(shortfall.claimed) : `${shortfall.claimed}` })}
                   </div>
-                  <div className="bm-short-s">{t.bidMap.claimedNotDrawnWhy}</div>
                   {/* The reason the control beside this is inert, IN WORDS. A disabled button whose
                       label merely changed to «تم الطلب» leaves the renter guessing whether the ask
                       failed or the surface is broken; the rule is that his question is already with

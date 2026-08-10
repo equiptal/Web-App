@@ -307,8 +307,15 @@ describe("the surface's stylesheet carries the same colour tokens the models do"
     // And the availability red is not in the alert at all, in either notation.
     expect(hex(alert)).not.toContain("d9362a");
     expect(alert).not.toContain("rgba(217, 54, 42");
-    // The icon and the heading are the same warm family, never the red.
-    expect(hex(cssBlock(css, ".bidmap .bm-short-ic {"))).toContain(hex(SHORTFALL_COLOUR));
+    // The sentence's ink is the same warm family, never the red. This assertion used to read
+    // `.bm-short-ic` — the alert's warning glyph, which the v3 alignment removed on 2026-08-11 along
+    // with the heading and the body paragraph (the prototype's alert is one line and a button). The
+    // criterion is unchanged; only the element wearing the colour is, so the assertion followed it to
+    // the line of text. `#8a4f08` is the prototype's own ink for this sentence (decoded 3779) — a
+    // darkened orange, and the check that matters is that it is warm and is not the availability red.
+    const line = hex(cssBlock(css, ".bidmap .bm-short-t {"));
+    expect(line).toContain("#8a4f08");
+    expect(line).not.toContain("d9362a");
   });
 
   it("paints the card's ask blue, never navy (RM3-AC-33)", () => {

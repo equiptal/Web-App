@@ -855,7 +855,13 @@ export const en = {
     // is also the word the rest of this surface already uses for the same fact («لا توجد معدّة مسجّلة»).
     countOwned: "{n} {type} registered",
     countInOffer: "{n} in this offer",
-    // V4 — the shortfall alert. It states the DIFFERENCE, not the offered total.
+    // V4 — the shortfall alert. It states the DIFFERENCE, not the offered total, and it is the WHOLE
+    // alert: one sentence beside one button, the same shape the Arabic and the prototype have.
+    //
+    // It carries no noun where the Arabic carries «وحدة», because Arabic's counted noun keeps one
+    // literal form at every count (the decision `unitCountLabel` records) and English's does not — a
+    // literal "units" here would print "1 units" on the reachable one-unit shortfall. The count reads
+    // against the «{n} in this offer» pill directly above it, which is where the noun already is.
     shortfall: "{n} in this offer have no registered machine — they don't appear on the map",
     shortfallAction: "Ask him to add them",
     // V11 — the send. Sending is also what creates the deal room, so the control acknowledges that a
@@ -976,13 +982,12 @@ export const en = {
     backToEquipment: "Back to the machines",
     // What the map is NOT showing, in words. Silence would read as "this supplier has no machines".
     //
-    // This is the SUBTITLE of the V4 shortfall alert (`BidMapWorkspace.tsx`, `.bm-short-s`); the
-    // headline above it is `shortfall`, not a string of its own. There used to be a `claimedNotDrawn`
-    // headline here too — "{n} of the offered units aren't on the map" — which nothing rendered,
-    // because `shortfall` already says that and says WHY ("no registered machine"). Two headlines for
-    // one slot is how the alert ends up stating the same fact twice; the unused one is gone.
-    claimedNotDrawnWhy:
-      "They were added as a count only — no machine is registered for them, so they have no location, documents or serial to show.",
+    // The V4 shortfall alert has no subtitle key any more (2026-08-11, aligning to the v3 prototype,
+    // whose alert is one line of text and a button): `shortfall` is the whole alert. The paragraph
+    // that lived here — "They were added as a count only — no machine is registered for them, so they
+    // have no location, documents or serial to show." — spent three grey lines unpacking a
+    // consequence "no registered machine — they don't appear on the map" already carries. An earlier
+    // `claimedNotDrawn` headline went the same way and for the same reason: one slot, one sentence.
     noLocatable: "None of this supplier's machines can be placed",
     // The resize grip's accessible name. Says what dragging does and what returns it, because the
     // control is invisible until hovered and a screen reader never sees the cursor change.
