@@ -263,7 +263,8 @@ export interface BidCard {
   demobUnits?: number | null;
   mobExcluded?: boolean;
   demobExcluded?: boolean;
-  /** The request's equipment-year requirement (raw maxEquipmentAge — a min year like 2020, or an age). */
+  /** The request's equipment-year requirement, raw (`requestedMinYear`: `minimumEquipmentYear`, else the
+   *  deprecated `maxEquipmentAge` alias) — a min year like 2020, or, on legacy data, an age. */
   reqMinYear: number | null;
   equipment: { id: string | null; make: string | null; model: string | null; year: number | null; imageUrl: string | null } | null;
   /** Whether the offered equipment is verified (for the comparison's compliance block). */
@@ -319,6 +320,14 @@ export interface BidCard {
   /** Raw requested equipment-cert codes from the request item (lowercase, e.g. ["aramco","tuv"]) — kept
    *  alongside `requiredCerts` (CertCode[]) so readiness can count certs the CertCode enum can't name. */
   reqEquipmentCerts?: string[];
+  /** The attachments the REQUEST item asked for — admin-defined ids (`attachment_ids`) and the renter's
+   *  free-text additions (`custom_attachments`). Request-side asks projected onto the bid, exactly like
+   *  `reqMinYear` / `reqEquipmentCerts`: the map panel hands the bid straight through as its
+   *  `MatchRequest`, and without these the attachments cell read «لم تطلب ملحقات» on a request that had
+   *  asked (RM3-AC-37). They say what was ASKED FOR only — no fleet row records what a machine comes
+   *  with, so nothing here can fail a supplier (see `attachmentsCell`). */
+  attachmentIds?: string[];
+  customAttachments?: string[];
   /** LEVEL 3 (Operator): a declared deal-room term, NOT a held-doc pill. Rentee's required operator
    *  license level (request operatorLicenseLevel) + the supplier's declared position (t3Declarations). */
   operatorCertReq?: string | null;
@@ -426,6 +435,10 @@ const s = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v 
  *  rejects booleans and objects, which would otherwise stringify into a plausible-looking key. */
 const sid = (v: unknown): string | null =>
   typeof v === "number" && Number.isFinite(v) ? String(v) : typeof v === "string" && v.trim() ? v : null;
+/** A wire array → trimmed non-empty strings. Anything that isn't an array reads as "nothing", never as
+ *  a one-element list, so a null/`{}` payload can't be mistaken for an ask. */
+const strList = (v: unknown): string[] =>
+  (Array.isArray(v) ? v : []).map((x) => String(x ?? "").trim()).filter(Boolean);
 /** First present number across several candidate keys (camelCase + snake_case payloads). */
 const pickNum = (o: Record<string, unknown>, ...keys: string[]): number | null => {
   for (const k of keys) { const x = n(o[k]); if (x != null) return x; }
@@ -441,6 +454,27 @@ function haversineKm(aLat: number | null, aLng: number | null, bLat: number | nu
 }
 /** Normalize a term key for fuzzy matching across the request, deal-room, and Terms-modal vocabularies. */
 const normKey = (k: string) => k.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/**
+ * The request item's equipment-year ask — **one reader, because two of them drifted.**
+ *
+ * The live wire carries `minimumEquipmentYear`. `maxEquipmentAge` is a DEPRECATED ALIAS the backend
+ * keeps only so old app builds keep posting (`validators/request.schema.ts`, which coalesces
+ * `minimumEquipmentYear ?? maxEquipmentAge`); today's payloads do not send it at all. The fallback is
+ * therefore not removable — it is the only thing that reads a request submitted by an old build — but
+ * it must never be read ALONE.
+ *
+ * It was, until 2026-08-10: `mapBid` set `reqMinYear` from the alias only, so every live bid carried
+ * `reqMinYear: null` while the Terms modal 400 lines up read the real field and disagreed. A renter who
+ * asked for 2020 got «لم تطلب سنة» in the match grid and no السنة filter at all (RM3-AC-28a/28c/37).
+ * Both callers now go through here, so the next rename lands in one place.
+ *
+ * The value is returned RAW — a min year (2020) or, on legacy data, an age. Deciding which it reads as
+ * is `computeUnitReadiness`'s job and stays there; this only reads the wire.
+ */
+function requestedMinYear(item: Record<string, unknown>): number | null {
+  return n(item.minimumEquipmentYear) ?? n(item.maxEquipmentAge);
+}
 
 /**
  * Per-term request-vs-offer comparison for the Terms modal (013 AC-04/05, spec 128) — a faithful
@@ -466,9 +500,9 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
   const certs: TermState = requiredCerts.length === 0 ? "grey" : requiredCerts.every((c) => heldSet.has(c)) ? "matched" : "conflict";
 
   // The column holds a MINIMUM MANUFACTURE YEAR (e.g. 2018), not an age — match by comparing years
-  // directly (terms-journey doc). Read `minimumEquipmentYear` (the renamed/exposed field); fall back to
-  // the legacy `maxEquipmentAge` key only for old payloads. Conflict = bid older than the minimum year.
-  const minYear = n(reqItem.minimumEquipmentYear) ?? n(reqItem.maxEquipmentAge);
+  // directly (terms-journey doc). Conflict = bid older than the minimum year. Field precedence lives in
+  // `requestedMinYear`, shared with `mapBid`'s `reqMinYear`.
+  const minYear = requestedMinYear(reqItem);
   const bidYear = n(eq.year) ?? 0;
   const year: TermState = minYear == null || bidYear === 0 ? "grey" : unverified ? "grey" : bidYear < minYear ? "conflict" : "matched";
 
@@ -856,7 +890,7 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
     demobUnits: n(raw.demobUnits ?? raw.demob_units),
     mobExcluded: raw.mobExcluded === true || raw.mob_excluded === true,
     demobExcluded: raw.demobExcluded === true || raw.demob_excluded === true,
-    reqMinYear: n(rqItem.maxEquipmentAge),
+    reqMinYear: requestedMinYear(rqItem),
     equipment: eq
       ? { id: s(eq.id) ?? s(eq.equipmentId), make: s(eq.manufacturer) ?? s(eq.make), model: s(eq.model), year: n(eq.year), imageUrl: s(eq.imageUrl) ?? s(eq.primaryPhotoUrl) }
       : null,
@@ -892,6 +926,10 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
     lng: bidHasPoint ? bidLng : null,
     locationSource: bidHasPoint ? bidLocationSource : "none",
     reqEquipmentCerts: (Array.isArray(rqItem.safetyCertifications) ? (rqItem.safetyCertifications as unknown[]) : []).map((x) => String(x).trim().toLowerCase()).filter(Boolean),
+    // Attachments the request asked for. Snake-case accepted alongside camel for the same reason the
+    // unit overlay above does it — the bid-list and bid-detail projections don't always agree on case.
+    attachmentIds: strList(rqItem.attachmentIds ?? rqItem.attachment_ids),
+    customAttachments: strList(rqItem.customAttachments ?? rqItem.custom_attachments),
     operatorCertReq,
     operatorCertDeclared,
     mobLeadTime: negMobLead ?? s(raw.mobLeadTime),

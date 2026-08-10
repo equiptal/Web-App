@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { mapBidList, bidSuppliers, mapOfferedUnit, type BidCard } from "@/lib/contract/bids";
+import { matchGrid } from "@/components/map/panel/machine-panel-model";
+import { equipmentFilters } from "@/lib/contract/equipment-list";
+import { mapFleet } from "@/lib/contract/fleet";
 
 describe("mapBidList — unitsOffered (supplier's chosen quantity)", () => {
   const req = { request: { equipmentItems: [{ numberOfUnits: 10 }] } };
@@ -169,5 +172,109 @@ describe("mapOfferedUnit — the openable link (backend signs into `key`, not `u
   it("leaves a row with neither url nor key unopenable", () => {
     const u = mapOfferedUnit({ equipmentId: "eq-1", documentKeys: [{ type: "istimara" }] });
     expect(u.documentKeys[0].url).toBeNull();
+  });
+});
+
+/**
+ * **The request's asks, projected onto the bid — read off the wire the backend actually sends.**
+ *
+ * Both defects these cover were invisible to a suite that hand-built the asks onto a `MatchRequest`
+ * literal: the panel model was right, the MAPPER never produced the fields, and nothing crossed the
+ * seam. So every case here starts at a raw bid in the shape staging returned on 2026-08-10 and ends at
+ * the surface that consumes it.
+ *
+ * The item shapes are live: `minimumEquipmentYear: 2020` on request `c4d18b6f`, `2021` on `f0438260`,
+ * `attachmentIds: ["6ef091c4-…"]` on `90dfe350` — and NOT ONE of them carries `maxEquipmentAge`.
+ */
+describe("mapBidList — the request's year ask (RM3-AC-28a / 28c / 37)", () => {
+  const bidWith = (item: Record<string, unknown>) => mapBidList({ activeBids: [{ id: "b1", request: { equipmentItems: [item] } }] })[0];
+
+  it("reads `minimumEquipmentYear` — the field the live backend sends", () => {
+    expect(bidWith({ minimumEquipmentYear: 2020 }).reqMinYear).toBe(2020);
+    expect(bidWith({ minimumEquipmentYear: 2021 }).reqMinYear).toBe(2021);
+  });
+
+  it("still reads the deprecated `maxEquipmentAge` alias, for requests old app builds posted", () => {
+    expect(bidWith({ maxEquipmentAge: 2018 }).reqMinYear).toBe(2018);
+  });
+
+  it("prefers the live field when a payload carries both", () => {
+    expect(bidWith({ minimumEquipmentYear: 2020, maxEquipmentAge: 2015 }).reqMinYear).toBe(2020);
+  });
+
+  it("stays null when the request asked for no year", () => {
+    expect(bidWith({ minimumEquipmentYear: null }).reqMinYear).toBeNull();
+    expect(bidWith({}).reqMinYear).toBeNull();
+  });
+
+  it("the Terms modal and the card agree — one reader, one answer", () => {
+    // They disagreed for real: the modal read the live field, the card read the dead alias.
+    const bid = bidWith({ minimumEquipmentYear: 2020 });
+    const year = bid.terms.equipment.find((t) => t.key === "year");
+    expect(bid.reqMinYear).toBe(2020);
+    expect(year).toBeTruthy();
+  });
+
+  it("carries far enough for the match grid to state the ask, not deny it (RM3-AC-37)", () => {
+    const bid = bidWith({ minimumEquipmentYear: 2020 });
+    const machine = mapFleet([{ equipmentId: "eq-1", manufacturer: "BOMAG", year: 2026, inBid: true }])[0];
+    const cell = matchGrid(machine, bid).find((c) => c.key === "year_make")!;
+    expect(cell.state).toBe("green");
+    expect(cell.finding.en).toContain("meets 2020 or newer");
+    expect(cell.finding.ar).not.toContain("لم تطلب سنة"); // the falsehood the dead alias produced
+  });
+
+  it("carries far enough for the السنة control to exist at all (RM3-AC-28a)", () => {
+    // Rule 2 needs the ask to actually split the offer, so two machines — one meeting it, one not.
+    const bid = bidWith({ minimumEquipmentYear: 2020 });
+    const fleet = mapFleet([
+      { equipmentId: "new", year: 2026, inBid: true },
+      { equipmentId: "old", year: 2005, inBid: true },
+    ]);
+    expect(equipmentFilters(fleet, bid).map((g) => g.kind)).toContain("year");
+  });
+});
+
+describe("mapBidList — the request's attachments ask (RM3-AC-37)", () => {
+  const bidWith = (item: Record<string, unknown>) => mapBidList({ activeBids: [{ id: "b1", request: { equipmentItems: [item] } }] })[0];
+
+  it("carries the item's attachment ids and the renter's free-text ones", () => {
+    const bid = bidWith({ attachmentIds: ["6ef091c4-fc08-4073-93fd-0ee5af27bcf5"], customAttachments: ["ripper"] });
+    expect(bid.attachmentIds).toEqual(["6ef091c4-fc08-4073-93fd-0ee5af27bcf5"]);
+    expect(bid.customAttachments).toEqual(["ripper"]);
+  });
+
+  it("accepts the snake_case spelling too, and drops blanks", () => {
+    const bid = bidWith({ attachment_ids: ["a1", "   "], custom_attachments: [""] });
+    expect(bid.attachmentIds).toEqual(["a1"]);
+    expect(bid.customAttachments).toEqual([]);
+  });
+
+  it("reads a missing/non-array field as nothing asked for, never as one blank ask", () => {
+    expect(bidWith({}).attachmentIds).toEqual([]);
+    expect(bidWith({ attachmentIds: null, customAttachments: {} }).customAttachments).toEqual([]);
+  });
+
+  it("makes the attachments cell say what was asked instead of «لم تطلب ملحقات»", () => {
+    const bid = bidWith({ attachmentIds: ["6ef091c4-fc08-4073-93fd-0ee5af27bcf5"] });
+    const machine = mapFleet([{ equipmentId: "eq-1", year: 2020, inBid: true }])[0];
+    const cell = matchGrid(machine, bid).find((c) => c.key === "attachments")!;
+    expect(cell.finding.en).toBe("1 asked for · not recorded on the machine's file");
+    // STILL GREY, and that is the decision `attachmentsCell` documents: no fleet row records the
+    // attachments a machine comes with, so red here would accuse the supplier of failing a check the
+    // platform never ran. Plumbing the ask must not turn this cell into an accusation.
+    expect(cell.state).toBe("grey");
+  });
+
+  it("does NOT switch on the الملحقات filter — it now exits at rule 2, not on a zero ask (§6.4a)", () => {
+    // The control was suppressed for the wrong reason while `asked` was permanently 0. With the ask
+    // real, `splits()` is what drops it: no machine's file can be shown to have the attachments, so a
+    // chip would empty the list and read as a claim about the lessor drawn from our own missing column.
+    const bid = bidWith({ attachmentIds: ["a1"], customAttachments: ["ripper"] });
+    const fleet = mapFleet([
+      { equipmentId: "eq-1", year: 2026, inBid: true },
+      { equipmentId: "eq-2", year: 2005, inBid: true },
+    ]);
+    expect(equipmentFilters(fleet, bid).map((g) => g.kind)).not.toContain("attachments");
   });
 });

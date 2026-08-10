@@ -321,8 +321,10 @@ function yearGroup(listed: readonly FleetMachine[], scored: ReadonlyMap<string, 
 /**
  * **الملحقات** — specified, built, and **suppressed by rule 2 on every offer that exists today.**
  *
- * The request can ask for attachments (`attachment_ids` / `custom_attachments`), so rule 1 is
- * satisfiable. The machine's side is not: `FleetMachine` extends `OfferedUnitDetail`, and neither
+ * The request can ask for attachments (`attachment_ids` / `custom_attachments`) — and since 2026-08-10
+ * the bid actually CARRIES that ask (`BidCard.attachmentIds`), so rule 1 is now genuinely satisfiable
+ * rather than only in principle; live requests reach here with `asked > 0`. The machine's side is still
+ * not satisfiable: `FleetMachine` extends `OfferedUnitDetail`, and neither
  * carries an attachments field — the fleet row records what the machine IS, never what it comes with.
  * So no machine can be shown to have them, `matches` is 0, and `splits()` drops the group before it
  * ever reaches a chip.
