@@ -61,18 +61,30 @@ project pin, the route and chip, the animations, the chat dock, the basemap, the
 list-foot ask. The panel's interior is **not** in it. These are built and were never value-checked
 against the file until 2026-08-10:
 
-| Prototype | Line | Ours |
-|---|---|---|
-| `rVerifiedChip` | 4045 | `.bm-verified` · `.mp-vchip` — **audited** |
-| `coDocsBody` | 4062 | `DocRowList.tsx` — **audited** (rows only) |
-| `rCompanyPanel` | 4127 | `CompanyPanel.tsx` — **audited** |
-| `rEquipDetail` | 4190 | `EquipmentDetail.tsx` — section inset audited; body outstanding |
-| `rDocPanel` | 2910 | `EquipmentDocuments.tsx` — outstanding |
-| `eqDocsTab` | 4334 | `EquipmentDocuments.tsx` — outstanding |
-| `rDocSelectBar` | 2812 | the batch footer — outstanding |
-| `pChat` | 3174 | `ChatDock.tsx` — outstanding |
-| `rUnitPhotos` | 2398 | the detail's photo strip — outstanding |
-| `eqReadinessRow` | 431 | — outstanding |
+| Prototype | Line | Ours | State |
+|---|---|---|---|
+| `rVerifiedChip` | 4045 | `.bm-verified` · `.mp-vchip` | **done** — was two geometries for one chip |
+| `coDocsBody` | 4062 | `DocRowList.tsx` | **done, rows only** — alphas already exact |
+| `rCompanyPanel` | 4127 | `CompanyPanel.tsx` | **done** — container + 64px header exact |
+| `pChat` | 3174 | `ChatDock.tsx` | **partly** — stream ground/padding/gap, bubbles and wordings done. **BEHAVIOUR NOT AUDITED** |
+| `rEquipDetail` | 4190 | `EquipmentDetail.tsx` | section inset done; body outstanding |
+| `rDocPanel` | 2910 | `EquipmentDocuments.tsx` | outstanding |
+| `eqDocsTab` | 4334 | `EquipmentDocuments.tsx` | outstanding |
+| `rDocSelectBar` | 2812 | the batch footer | outstanding |
+| `rRequestCard` · `rReplyCard` | — | `ChatCard.tsx` | outstanding — the request loop's cards |
+| `rChatTabs` · `rChatPop` | — | `ChatDock.tsx` | outstanding, incl. §6.8.5: a message arriving with a panel open gives the POPUP, not the bubble |
+| `eqReadinessRow` | 431 | — | outstanding |
+| `rUnitPhotos` | 2398 | — | **not a port.** Its four 74×58 slots were replaced by a 196 px viewer (spec 004 §6, "A VIEWER, not a hero", 2026-08-09). Do not restore them. |
+
+**Ask "port or redesign?" before comparing any value.** `EquipmentDetail` is the worked example: it is
+a spec-004 design (viewer · two tabs · a six-cell match grid the prototype has **none** of · 76 px
+footer) answering *"does this machine fit my request"* where the prototype answers *"what is this
+machine"*. Making it match the prototype would DELETE the match grid.
+
+The split that survives that question: **structure and content follow the spec; spacing, radii, sizes,
+colours, durations and easing follow the prototype** (owner, 2026-08-10). A redesigned surface still
+owes the prototype its visual values — which is exactly how `pChat` reached us with no stream tint,
+`10px 12px` padding and no gap.
 
 **Where the spec overrides the file, the spec wins.** Two are settled and must not be "fixed" back:
 the absent chip for an unverified firm (RM3-AC-02), and `#16A34A`/`#D9362A` for the prototype's
