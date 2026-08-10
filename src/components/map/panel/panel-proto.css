@@ -508,7 +508,12 @@
   align-items: center;
   justify-content: center;
 }
-.mp-tick.on { border-color: #2563eb; background: #2563eb; }
+/* NAVY when ticked, not the action blue — the prototype's `box()` fills with `C.blue`, which §1's
+   palette settles as `#16304F`. The block above already cited `box()` for the 22px, the r6 and the
+   1.5px border and then diverged on the one value that is visible only once the renter acts. It also
+   left a picked row wearing navy (`.mp-row.picked`) and its own tick wearing blue — two colours for
+   one selection. `#2563EB` on this surface is the request ACTION (AC-33), not a selection. */
+.mp-tick.on { border-color: #16304f; background: #16304f; }
 /* The other mode's checkbox. `disabled` already refuses the click and drops it out of the tab order;
    this only makes the cursor say so before the renter tries. */
 .mp-tick:disabled { cursor: not-allowed; }
@@ -836,4 +841,7 @@
 .mp-over .mp-row.missing .mp-rowtx b { color: #d9362a; }
 /* A ticked row is still a ticked row: the selection is a thing the renter is doing NOW and it has to
    win over a verdict that was true before he arrived. */
-.mp-over .mp-row.picked { border-color: #2563eb; background: rgba(37, 99, 235, 0.08); }
+/* The firm's rows pick the same way the machine's do — the prototype's `coDocsBody` calls the SAME
+   `box()` and its own comment says "same selection model as the machine's documents". So the same
+   navy, not the action blue this carried while `.mp-row.picked` had already moved to it. */
+.mp-over .mp-row.picked { border-color: #16304f; background: rgba(22, 48, 79, 0.08); }
