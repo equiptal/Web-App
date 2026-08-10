@@ -488,8 +488,51 @@
 }
 
 /* Header — identity, and nothing else (RM3-AC-02). */
-.bidmap .bm-head { flex-shrink: 0; padding: 14px 15px 12px; border-bottom: 1px solid #e1e9f1; }
-.bidmap .bm-head-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* **ONE header geometry across all three panels** — equipment, company, chat — which is the
+   prototype's own comment at `rEquipPanel` (2616): 64 px tall, 18 px gutters. The company panel's
+   `.mp-cohead` already carried both; this one was `14px 15px 12px` and auto-height, so the two headers
+   of one panel stack disagreed by 3 px of gutter and however tall the name wrapped to.
+
+   The gradient and the sheen are the prototype's too. The sheen sweeps ONCE on open (`dpSheen`, one of
+   the five keyframes §7 recorded as missing from the extract) — the panel reads as handed over rather
+   than swapped. `overflow: hidden` is what keeps the 42% band inside the header. */
+.bidmap .bm-head { flex-shrink: 0; padding: 0 0 12px; border-bottom: 1px solid #e1e9f1; }
+/* The 64 px band is the IDENTITY ROW, not the whole header. RM3-AC-02 keeps the documents entry in
+   the header — a test asserts it by reading that region — and a fixed 64 px with `overflow: hidden`
+   around both would have clipped the entry rather than merely crowding it. */
+.bidmap .bm-head-id {
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  height: 64px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 18px;
+  background: linear-gradient(180deg, #fbfdff, #f2f7fc);
+}
+.bidmap .bm-head-id::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 42%;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent);
+  animation: dpSheen 1.5s ease-out 0.1s 1 both;
+}
+@keyframes dpSheen {
+  0% { transform: translateX(-120%); }
+  55%, 100% { transform: translateX(220%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bidmap .bm-head-id::after { animation: none; opacity: 0; }
+}
+.bidmap .bm-head-row { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
+/* The documents entry, on the header's 18px gutters so the identity block reads as one thing even
+   though the fixed-height header cannot contain it. */
+.bidmap .bm-docsentry-row { flex-shrink: 0; padding: 11px 18px 0; }
 .bidmap .bm-title {
   font-size: 14.5px;
   font-weight: 800;

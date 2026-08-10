@@ -849,7 +849,11 @@ export const en = {
     companyDocuments: "Company documents",
     // V3 — the count pills. `type` is the REQUEST's own equipment type, and it agrees with the count.
     // "With the supplier" means machines that FIT this request, never his whole yard.
-    countOwned: "{n} {type} with the supplier",
+    // «registered», not the prototype's «لدى المورد» / "with the supplier" (owner, 2026-08-10). The
+    // count is of machines on the supplier's FILE that fit this request — "with the supplier" reads as
+    // physical possession, which is a different claim and one this number cannot make. "Registered"
+    // is also the word the rest of this surface already uses for the same fact («لا توجد معدّة مسجّلة»).
+    countOwned: "{n} {type} registered",
     countInOffer: "{n} in this offer",
     // V4 — the shortfall alert. It states the DIFFERENCE, not the offered total.
     shortfall: "{n} in this offer have no registered machine — they don't appear on the map",

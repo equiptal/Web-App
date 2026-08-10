@@ -720,6 +720,9 @@ export function BidMapWorkspace({
                 deliberately absent — they live in the company panel (V9), and a header that lists
                 credentials invites judging the supplier before reading his machines (RM3-AC-02). */}
             <header className="bm-head">
+              {/* The prototype's 64px identity band — one geometry across the equipment, company and
+                  chat panels (`rEquipPanel` 2616), with the gradient and the single sheen on open. */}
+              <div className="bm-head-id">
               <div className="bm-head-row">
                 <span className="bm-title" title={bid.supplierName}>{bid.supplierName}</span>
                 {bid.verified && (
@@ -729,6 +732,12 @@ export function BidMapWorkspace({
                   </span>
                 )}
               </div>
+              </div>
+              {/* Inside the header, which RM3-AC-02 requires and a test asserts by reading this very
+                  region. The prototype's fixed 64 px belongs to the IDENTITY ROW above, not to the
+                  whole header — putting it on the header would have clipped this entry under its
+                  `overflow: hidden`. */}
+              <div className="bm-docsentry-row">
               <button
                 type="button"
                 className="bm-docsentry"
@@ -743,6 +752,7 @@ export function BidMapWorkspace({
                     than being mirrored by a transform that would also mirror the glyph's weight. */}
                 <span className="bm-docsentry-chev material-icons-outlined">{ar ? "chevron_left" : "chevron_right"}</span>
               </button>
+              </div>
             </header>
 
             {/* ── V3 · the count pills ───────────────────────────────────────────────────────────
