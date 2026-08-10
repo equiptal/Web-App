@@ -447,18 +447,22 @@
 }
 /* Rendered ONLY when the supplier is verified — there is no "not verified" variant, because an absent
    chip is the honest statement and a grey one reads as a mark against him. */
+/* One chip, one geometry — `rVerifiedChip` (prototype 4045) is a single definition whose only
+   placement-dependent values are its three colours. The dark twin is `.mp-vchip`; the two must stay
+   dimensionally identical or the same fact reads as two things. Alphas are the prototype's (.10 fill,
+   .30 border); the hue is our `#16A34A`, the documented substitution for its `#12904A`. */
 .bidmap .bm-verified {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   flex-shrink: 0;
   font-size: 10px;
   font-weight: 800;
   color: #16a34a;
-  background: rgba(22, 163, 74, 0.09);
-  border: 1px solid rgba(22, 163, 74, 0.25);
-  border-radius: 20px;
-  padding: 2px 8px;
+  background: rgba(22, 163, 74, 0.1);
+  border: 1px solid rgba(22, 163, 74, 0.3);
+  border-radius: 999px;
+  padding: 2px 9px;
 }
 .bidmap .bm-verified .material-icons-outlined { font-size: 13px; }
 /* The one entry to the company's papers. The header states identity; verification state and expiry
