@@ -723,35 +723,35 @@ export function BidMapWorkspace({
               {/* The prototype's 64px identity band — one geometry across the equipment, company and
                   chat panels (`rEquipPanel` 2616), with the gradient and the single sheen on open. */}
               <div className="bm-head-id">
-              <div className="bm-head-row">
-                <span className="bm-title" title={bid.supplierName}>{bid.supplierName}</span>
-                {bid.verified && (
-                  <span className="bm-verified">
-                    <span className="material-icons-outlined">verified</span>
-                    {t.bidMap.verifiedCompany}
+                {/* ONE row, the prototype's (2626): the name and its tick take `flex: 1`, and the way
+                    into the company file is an explicit control on the TRAILING edge — its own comment
+                    says "not the name itself". It was a full-width button on a second row here, which
+                    made the identity block two storeys tall and the entry look like a menu item. */}
+                <div className="bm-head-row">
+                  <span className="bm-head-name">
+                    <span className="bm-title" title={bid.supplierName}>{bid.supplierName}</span>
+                    {bid.verified && (
+                      <span className="bm-verified">
+                        <span className="material-icons-outlined">verified</span>
+                        {t.bidMap.verifiedCompany}
+                      </span>
+                    )}
                   </span>
-                )}
-              </div>
-              </div>
-              {/* Inside the header, which RM3-AC-02 requires and a test asserts by reading this very
-                  region. The prototype's fixed 64 px belongs to the IDENTITY ROW above, not to the
-                  whole header — putting it on the header would have clipped this entry under its
-                  `overflow: hidden`. */}
-              <div className="bm-docsentry-row">
-              <button
-                type="button"
-                className="bm-docsentry"
-                onClick={() => {
-                  setCompanyOpen(true);
-                  onOpenCompanyDocs?.();
-                }}
-              >
-                <span className="material-icons-outlined">folder_shared</span>
-                {t.bidMap.companyDocuments}
-                {/* The chevron points the way the reader travels, so it flips with the locale rather
-                    than being mirrored by a transform that would also mirror the glyph's weight. */}
-                <span className="bm-docsentry-chev material-icons-outlined">{ar ? "chevron_left" : "chevron_right"}</span>
-              </button>
+                  <button
+                    type="button"
+                    className="bm-docsentry"
+                    onClick={() => {
+                      setCompanyOpen(true);
+                      onOpenCompanyDocs?.();
+                    }}
+                  >
+                    {t.bidMap.companyDocuments}
+                    {/* A bare chevron, as the prototype draws it — no folder glyph. It points the way
+                        the reader travels, so it flips with the locale rather than being mirrored by a
+                        transform that would also mirror its weight. */}
+                    <span className="bm-docsentry-chev" aria-hidden="true">{ar ? "‹" : "›"}</span>
+                  </button>
+                </div>
               </div>
             </header>
 
