@@ -1452,3 +1452,35 @@ describe("SASO — registration vs. certificate on the machine panel (owner's ru
     expect(rowsOf(m).some((r) => r.key.startsWith("doc:other:"))).toBe(false);
   });
 });
+
+/**
+ * A requested certificate outside the five mapped codes used to fall through to `docTypeLabel`,
+ * which is locale-independent by design and returns humanised English for BOTH locales. Correct for
+ * an arbitrary wire type; wrong for a certificate, because the code arrived through the request's
+ * own `reqEquipmentCerts` and is therefore known to BE one. An Arabic panel rendered a row headed
+ * "Certified".
+ */
+describe("an unmapped equipment certificate still gets an Arabic heading", () => {
+  const rowFor = (cert: string, machine = { documentKeys: [], photoKeys: [] }) =>
+    equipmentDocGroups(machine as never, { reqEquipmentCerts: [cert] } as never)
+      .flatMap((g) => g.rows as { key: string; label: { en: string; ar: string } }[])
+      .find((r) => r.key.startsWith("doc:equipment_cert:"));
+
+  it("translates the category and leaves the NAME alone", () => {
+    const row = rowFor("certified");
+    expect(row?.label.en).toBe("CERTIFIED certificate");
+    // The Arabic must not be the English string. The name stays Latin — as TÜV and SPSP already do,
+    // because a certificate's name is a proper noun.
+    expect(row?.label.ar).not.toBe(row?.label.en);
+    expect(row?.label.ar).toContain("CERTIFIED");
+  });
+
+  it("upper-cases the name so it reads as a name beside TÜV, not as a stray word", () => {
+    expect(rowFor("safety_cert")?.label.en).toBe("SAFETY CERT certificate");
+  });
+
+  it("leaves the five mapped codes exactly as they were", () => {
+    expect(rowFor("tuv")?.label.en).toBe("TÜV certificate");
+    expect(rowFor("insurance")?.label.en).toBe("Equipment insurance");
+  });
+});

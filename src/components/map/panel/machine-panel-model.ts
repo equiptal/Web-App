@@ -894,6 +894,31 @@ const EQUIPMENT_CERT_ROW_LABEL: Record<string, Bilingual> = {
   insurance: { en: "Equipment insurance", ar: "تأمين المعدّة" },
 };
 
+/**
+ * An equipment certificate's row heading, including a code this table has never seen.
+ *
+ * `docTypeLabel` used to be the fallback here, and it is the wrong one. It is locale-independent BY
+ * DESIGN — it has no Arabic for a type nobody mapped, so it returns humanised English for both
+ * locales. That is right for an arbitrary wire type. It is wrong for a certificate, because we know
+ * one thing about this code that `docTypeLabel` does not: **it is a certificate**, since it reached
+ * here through the request's own `reqEquipmentCerts`. The result was an Arabic panel rendering a row
+ * headed "Certified" — English inside an Arabic column — for any request naming a cert outside the
+ * five above.
+ *
+ * So the CATEGORY is translated and the NAME is left alone. That is not a compromise, it is what the
+ * mapped entries already do: TÜV and SPSP stay Latin in Arabic, and only SASO and Aramco carry an
+ * Arabic form at all, because a certificate's name is a proper noun. An unmapped code is therefore
+ * shown exactly as the platform spells it, under a word the reader can actually read.
+ */
+function equipmentCertRowLabel(code: string): Bilingual {
+  const known = EQUIPMENT_CERT_ROW_LABEL[code];
+  if (known) return known;
+  // Upper-cased because every certificate this platform names is an acronym; a lower-case
+  // `certified` sitting beside TÜV and SPSP reads as a bug rather than as a name.
+  const name = norm(code).replace(/_+/g, " ").trim().toUpperCase() || code;
+  return { en: `${name} certificate`, ar: `شهادة ${name}` };
+}
+
 /** An operator paper's row heading, keyed by `operatorCertCode`. Wording follows `ChatDock`'s table so
  *  the row and the request card raised from it name the same paper the same way. */
 const OPERATOR_CERT_ROW_LABEL: Record<string, Bilingual> = {
@@ -1179,7 +1204,7 @@ export function equipmentDocGroups(machine: FleetMachine, request: MatchRequest)
     paperRows.push(
       certRow({
         key: `doc:equipment_cert:${code}`,
-        label: EQUIPMENT_CERT_ROW_LABEL[code] ?? docTypeLabel(code),
+        label: equipmentCertRowLabel(code),
         held: equipHeld.get(code) ?? [],
         required: equipRequiredSet.has(code),
         askType: equipmentAskType(code),
