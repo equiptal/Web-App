@@ -66,9 +66,9 @@ against the file until 2026-08-10:
 | `rVerifiedChip` | 4045 | `.bm-verified` · `.mp-vchip` | **done** — was two geometries for one chip |
 | `coDocsBody` | 4062 | `DocRowList.tsx` | **done, rows only** — alphas already exact |
 | `rCompanyPanel` | 4127 | `CompanyPanel.tsx` | **done** — container + 64px header exact |
-| `pChat` | 3174 | `ChatDock.tsx` | **partly** — stream ground/padding/gap, bubbles and wordings done. **BEHAVIOUR NOT AUDITED** |
+| `pChat` · `rChatPop` | 3174 · 3881 | `ChatDock.tsx` | **done** — stream, bubbles, wordings, and §7a's notice exact (kind pill · 12px/900 name · 2-line clamp · ltr ref line). **Behaviour is 004a §2.1, not a port**: refresh-timed with no socket (RM3-AC-64), and the notice hides while the panel is open |
+| `rDocPanel` | 2910 | `EquipmentDocuments.tsx` | **done, rows** — `.mp-row` exact (gap 10 · 7px 10px · r12 · mb 6). Thumbnail is a **documented departure**: 46×40 landscape, not its 34×34 square, because a square crops a certificate until it stops identifying the file (2026-08-09) |
 | `rEquipDetail` | 4190 | `EquipmentDetail.tsx` | section inset done; body outstanding |
-| `rDocPanel` | 2910 | `EquipmentDocuments.tsx` | outstanding |
 | `eqDocsTab` | 4334 | `EquipmentDocuments.tsx` | outstanding |
 | `rDocSelectBar` | 2812 | the batch footer | outstanding |
 | `rRequestCard` · `rReplyCard` | — | `ChatCard.tsx` | outstanding — the request loop's cards |
