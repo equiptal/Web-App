@@ -357,7 +357,8 @@
   position: absolute;
   z-index: 12;
   top: 18px;
-  inset-inline-start: 18px;
+  /* Trailing edge — the panel now holds the leading one (see `.bm-panel`). */
+  inset-inline-end: 18px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -388,7 +389,8 @@
   /* Clears the chat dock, which now owns this corner (§6.9). The box states what the map is NOT
      showing, so it must never be the thing a floating control hides. */
   bottom: 84px;
-  inset-inline-start: 18px;
+  /* Trailing edge — the panel now holds the leading one (see `.bm-panel`). */
+  inset-inline-end: 18px;
   max-width: min(330px, calc(100% - 130px));
   background: rgba(255, 255, 255, 0.97);
   border: 1px solid #e1e9f1;
@@ -404,7 +406,8 @@
   position: absolute;
   z-index: 10;
   top: 18px;
-  inset-inline-start: 18px;
+  /* Trailing edge — the panel now holds the leading one (see `.bm-panel`). */
+  inset-inline-end: 18px;
   max-width: 300px;
   background: rgba(255, 255, 255, 0.97);
   border: 1px solid #e1e9f1;
@@ -423,6 +426,17 @@
 .bidmap .bm-panel {
   position: relative;
   z-index: 24;
+  /* INLINE-START, by product decision (owner, 2026-08-10): the panel leads — left in English, right in
+     Arabic — because it is what the renter reads first, and the reading edge is where "first" lives.
+     This DEPARTS from the prototype, which puts it on the inline-end edge (visual left in its RTL-only
+     document); `design-v3.md` §9 is the register of such departures and carries this one. Anything
+     positioned relative to the panel moves with it: the zoom control to the opposite corner
+     (`MapCanvas`), and the canvas's floating furniture to `inset-inline-end` so it does not sit against
+     the panel.
+     `order` rather than reordering the markup: the panel is a 200-line `<aside>` and moving it in JSX
+     to change which edge it paints on is a large diff for a visual outcome. The cost is that keyboard
+     order still follows the DOM — map, then panel. */
+  order: -1;
   flex: 0 0 392px;
   width: 392px;
   max-width: 62%;
@@ -430,7 +444,8 @@
   flex-direction: column;
   overflow: hidden;
   background: #fff;
-  border-inline-start: 1px solid #e1e9f1;
+  /* The divider is on whichever edge FACES THE MAP, which is now the trailing one. */
+  border-inline-end: 1px solid #e1e9f1;
 }
 
 /* Header — identity, and nothing else (RM3-AC-02). */
@@ -1302,7 +1317,8 @@
   position: absolute;
   z-index: 30;
   bottom: 18px;
-  inset-inline-start: 18px;
+  /* Trailing edge — the panel now holds the leading one (see `.bm-panel`). */
+  inset-inline-end: 18px;
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -1351,7 +1367,8 @@
   position: absolute;
   z-index: 30;
   bottom: 80px;
-  inset-inline-start: 18px;
+  /* Trailing edge — the panel now holds the leading one (see `.bm-panel`). */
+  inset-inline-end: 18px;
   width: min(296px, calc(100% - 130px));
   background: var(--notice-fill);
   border: 2px solid #fff;
@@ -1367,7 +1384,10 @@
 .bidmap .bm-dock-notice-tail {
   position: absolute;
   bottom: -8px;
-  inset-inline-start: 26px;
+  /* 26px in from the SAME edge the dock is anchored to (`inset-inline-end: 18px`), so the tail keeps
+     landing on the control. Anchored to the leading edge it pointed at empty canvas once the dock
+     moved. The two offsets are a pair: change one and this one follows. */
+  inset-inline-end: 26px;
   width: 14px;
   height: 14px;
   background: var(--notice-fill);
@@ -1451,7 +1471,8 @@
   position: absolute;
   z-index: 31;
   bottom: 80px;
-  inset-inline-start: 18px;
+  /* Trailing edge — the panel now holds the leading one (see `.bm-panel`). */
+  inset-inline-end: 18px;
   width: min(360px, calc(100% - 60px));
   max-height: min(64%, 460px);
   display: flex;

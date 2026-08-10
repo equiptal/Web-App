@@ -371,6 +371,7 @@ animates, so only the ring after it grows and fades — the card cannot appear t
 | «المورد» | **«المؤجّر»** | repo-wide convention |
 | hollow/dashed not-in-offer marker | nothing | V10 — offered machines only |
 | «‹» hard-coded on the card's التفاصيل control | a chevron that **flips with the locale** (`‹` / `›`) | Ours, by decision (owner, 2026-08-09). The prototype is an RTL-only document, so its chevron is RTL-forward by default; in an English locale «Details ‹» points back at the text it is meant to lead away from. |
+| the panel on the **inline-END** edge — visual left in the RTL document | the panel on the **inline-START** edge: **left in English, right in Arabic** | Ours, by decision (owner, 2026-08-10). The panel is what the renter reads first, and the reading edge is where "first" lives. Everything positioned relative to it moved with it, because *opposite the panel* is the rule and the side is only its consequence: the zoom control to top-right in English / top-left in Arabic (T41 M11 restates this), and the canvas's floating furniture — `.bm-mapbusy`, `.bm-info`, `.bm-nosite`, `.bm-dock`, `.bm-dock-notice`, `.bm-chat` — to `inset-inline-end`, with `.bm-dock-notice-tail` following its dock so it still lands on the control. |
 
 ### ⚠ The struck-through row above, and what it cost
 

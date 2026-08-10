@@ -530,14 +530,15 @@ export default function MapCanvas({
           subdomains="abcd"
           maxZoom={19}
         />
-        {/* Opposite the bid panel, which sits on the inline-end edge — otherwise the zoom buttons land
-            underneath it in Arabic, where inline-end is the physical left.
+        {/* Opposite the bid panel, which sits on the inline-START edge (owner, 2026-08-10) — so the
+            buttons are top-right in English and top-left in Arabic. Being opposite is the rule, not the
+            side: T41 M11's second clause is "never underneath the panel", and the panel is what moved.
 
             The prototype has no zoom control at all. Kept anyway: it is the only pointer-and-keyboard
             zoom affordance on a surface whose whole subject is distance, and dropping it would leave a
             renter without a wheel or a trackpad with no way to change the view. `zoomControl: false`
             is ported exactly — it is what lets this one be placed rather than Leaflet's default. */}
-        <ZoomControl position={dir === "rtl" ? "topright" : "topleft"} />
+        <ZoomControl position={dir === "rtl" ? "topleft" : "topright"} />
         {site && <Marker position={[site.lat, site.lng]} icon={icon} interactive={false} zIndexOffset={900} />}
         <FleetLayer
           site={site}

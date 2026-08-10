@@ -161,7 +161,11 @@ and the ✓ tick do **not** travel with it.
 sits under it without covering the point.
 
 **M11 · ⇄ The zoom control's side.**
-*Pass:* top-right in Arabic, top-left in English, and never underneath the panel.
+*Pass:* top-**left** in Arabic, top-**right** in English, and never underneath the panel.
+⚠ **Reversed 2026-08-10**, and this line used to read the other way round. The panel moved to the
+inline-START edge by owner decision (`design-v3.md` §9), so the corner that is *opposite the panel* —
+which is the actual rule; the second clause here is the whole point — is now the other one. Judge it by
+whether the buttons clear the panel, not by the words left and right.
 
 ## H · The panel header, the counts and the shortfall
 
