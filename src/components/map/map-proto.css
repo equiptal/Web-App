@@ -962,6 +962,27 @@
   font-size: 10.5px;
   font-weight: 700;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+/* Held vs missing (owner, 2026-08-11). The amber above survives only as the shared shape — every chip
+   this card renders is one the REQUEST named, so it is always one of these two.
+
+   `#12904A` / `#D9362A` are the surface's own availability green and red (`AVAILABILITY_COLOUR`), not
+   a third pair invented for this line: on a card whose chip above is already one of those two, a
+   near-miss shade would read as a different KIND of state rather than the same one applied to a
+   certificate. Chip weights — a tenth of the ink for the fill, a third for the border — so the
+   certificate line never competes with the availability chip that governs the card. */
+.bidmap .bm-eq .bm-eq-cert.held {
+  color: #0d6c38;
+  background: rgba(18, 144, 74, 0.1);
+  border-color: rgba(18, 144, 74, 0.32);
+}
+.bidmap .bm-eq .bm-eq-cert.missing {
+  color: #a82c22;
+  background: rgba(217, 54, 42, 0.1);
+  border-color: rgba(217, 54, 42, 0.32);
 }
 .bidmap .bm-eq .bm-eq-nocert { font-size: 10.5px; font-weight: 700; color: #6b8fa8; opacity: 0.7; }
 
@@ -1421,11 +1442,16 @@
    overlay to — the panel is a fixed-width column, not a page. */
 .bidmap .bm-foot {
   flex-shrink: 0;
-  border-top: 1px solid #e1e9f1;
-  background: #fff;
+  /* DARK, the prototype's `#0F2238` — the one slab on this surface. Everything above is white cards
+     on grey, and the bar that prices them must not read as one more card. */
+  background: #0f2238;
   padding: 10px 15px 12px;
 }
-.bidmap .bm-foot-bar { display: flex; align-items: center; gap: 10px; }
+/* Two buttons plus the expander plus the price do not fit 392px on one line — that is what pushed
+   «/ day» under «Details» and wrapped «Opening offer». The figures take their own row above the
+   controls, which is also the prototype's stacking. */
+.bidmap .bm-foot-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bidmap .bm-foot-figs { flex: 1 0 100%; }
 .bidmap .bm-foot-figs { flex: 1; min-width: 0; }
 .bidmap .bm-foot-rate { display: flex; align-items: baseline; gap: 5px; }
 .bidmap .bm-foot-amt { font-size: 17px; font-weight: 800; color: #16304f; font-family: "IBM Plex Sans", monospace; }
@@ -1975,3 +2001,28 @@
   .bidmap .dpRow:hover, .bidmap .dpCell:hover { transform: none; }
   .bidmap .bm-eq:hover .bm-eq-art { transform: none; }
 }
+
+/* ── The dark footer's own ink (owner, 2026-08-11) ───────────────────────────────────────────────
+   The bar is `#0F2238` now, so every colour inside it that was chosen against white has to be
+   restated — a `#16304F` figure on a `#0F2238` slab is invisible, and `#6B8FA8` on it is nearly so. */
+.bidmap .bm-foot-amt { color: #fff; }
+.bidmap .bm-foot-unit,
+.bidmap .bm-foot-src { color: rgba(255, 255, 255, 0.72); }
+.bidmap .bm-foot-det { color: rgba(255, 255, 255, 0.86); }
+.bidmap .bm-foot-units { color: rgba(255, 255, 255, 0.8); }
+/* «Counter this price» — an outlined control on the slab, not a filled blue one: the filled blue was
+   sized against white and on navy it reads as the primary act, which Accept is. */
+.bidmap .bm-foot-cta {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #fff;
+}
+/* Accept — the prototype's green, filled, and the one thing on the bar that carries a fill. */
+.bidmap .bm-foot-cta.is-confirm {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
+}
+.bidmap .bm-foot-cta.is-confirm:disabled { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.2); }
+.bidmap .bm-foot-break { border-top-color: rgba(255, 255, 255, 0.14); }
+.bidmap .bm-foot-break, .bidmap .bm-foot-break * { color: rgba(255, 255, 255, 0.86); }

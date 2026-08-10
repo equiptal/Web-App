@@ -1059,10 +1059,10 @@ export const en = {
     // which he has not seen yet and cannot want; these describe what he is about to do with the price
     // in front of him. Both still land in `/deal-room/[id]`: the dock never settles a rate (004a
     // §4a.2), so there is still exactly one place a price can be accepted.
-    counterPrice: "Counter this price",
+    counterPrice: "Counter",
     // Shown INSTEAD, and only when nothing in the offer contradicts the request — no red cell on any
     // machine's match grid, and no unit offered as a count with no machine behind it.
-    confirmPrice: "Confirm this price",
+    confirmPrice: "Accept",
     // Why Accept is unavailable HERE once a room exists: the rule that gates it needs the room's
     // terms and its last two rounds, and this surface does not fetch them.
     acceptInRoom: "Open the deal room to accept — the terms and the latest round are settled there",
