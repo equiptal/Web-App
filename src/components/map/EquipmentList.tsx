@@ -26,11 +26,18 @@
  * This file receives an `EquipmentCardModel` and paints it; what a card is allowed to KNOW is swept
  * with `Object.keys` over that model instead.
  *
- * **The card body selects; «التفاصيل» opens.** Pressing a card focuses its marker and nothing else
- * (AC-15) — the renter is orienting himself on the map, and a press that navigated away from the map
- * would defeat the point. The detail is its own control, and «اطلب التأكيد» is a third, so an
- * unconfirmed machine can be asked about **without opening the detail** (AC-13). The card is therefore
- * a stretched select button UNDER the content rather than a button wrapping it: a button inside a
+ * **The whole card OPENS the machine** (owner, 2026-08-11). ~~The card body selects; «التفاصيل»
+ * opens.~~ Withdrawn: the largest target on the card did the least, and a renter who had already
+ * pressed the machine had to find a 10 px pill to get what they had asked for. «التفاصيل» stays as
+ * the visible affordance — it names what the press does — but it is no longer the only way in.
+ *
+ * **Both ACs still hold, which is why this was the owner's to change.** AC-15 asks that ONE selection
+ * value reach the map and the list; opening routes through `nextSelection(…, "open")`, so it still
+ * does — and "open" never toggles the selection off, so opening the already-selected card cannot
+ * clear the panel it is filling. AC-13 asks that an unconfirmed machine be askable **without** opening
+ * the detail; «اطلب التأكيد» is a real button ABOVE the stretched layer, so it still is.
+ *
+ * The card remains a stretched button UNDER the content rather than one wrapping it: a button inside a
  * button is invalid, and the two inner controls have to stay real buttons to stay reachable.
  *
  * **V17 · the filter bar.** Which chips exist, what each of them keeps, and both figures of the count
@@ -67,7 +74,10 @@ export interface EquipmentListProps {
    * (AC-35), and the renter can re-select the landing card later without the pulse coming back.
    */
   cueId: string | null;
-  onSelect: (equipmentId: string) => void;
+  /** Opening IS the card's action now (owner, 2026-08-11) — the whole card opens the machine, and
+   *  `nextSelection(…, "open")` focuses it on the way in. There is deliberately no select-only
+   *  handler: a second route to the same state that no control calls is a trap for the next reader.
+   *  The map's own pins still select without opening; that path does not come through here. */
   onOpenDetail: (equipmentId: string) => void;
   /** «اطلب التأكيد» — V11 owns the composer and the send; this only says which machine was asked
    *  about. Absent → the control renders disabled rather than claiming an ask was sent. */
@@ -95,7 +105,6 @@ export function EquipmentList({
   onClearFilters,
   selectedId,
   cueId,
-  onSelect,
   onOpenDetail,
   onAskAvailability,
   askPending,
@@ -237,7 +246,6 @@ export function EquipmentList({
               cue={cueId === m.equipmentId}
               ar={ar}
               t={t}
-              onSelect={onSelect}
               onOpenDetail={onOpenDetail}
               onAskAvailability={onAskAvailability}
               askPending={askPending}
@@ -256,7 +264,6 @@ function EquipmentCard({
   cue,
   ar,
   t,
-  onSelect,
   onOpenDetail,
   onAskAvailability,
   askPending,
@@ -267,7 +274,8 @@ function EquipmentCard({
   cue: boolean;
   ar: boolean;
   t: ReturnType<typeof useT>;
-  onSelect: (id: string) => void;
+  /** No `onSelect`: the card OPENS now, and opening selects on its way in. A select-only handler
+   *  here would be a second way to change the same state that nothing calls. */
   onOpenDetail: (id: string) => void;
   onAskAvailability?: (machine: FleetMachine) => void;
   askPending?: (machine: FleetMachine) => boolean;
@@ -298,12 +306,22 @@ function EquipmentCard({
           chip, a saturated accent read as a third state. Selection is UI, so it stays neutral. */}
       {selected && <span className="bm-eq-acc" aria-hidden="true" />}
 
+      {/* The WHOLE CARD opens the machine (owner, 2026-08-11), not just the «Details» control beside
+          it. A card that only highlighted a pin made the one obvious target on it do the least, and
+          left the renter hunting a 10px pill for the thing they had already asked for by clicking.
+          `onOpenDetail` focuses the machine on its way in — `nextSelection(…, "open")`, which never
+          toggles the selection off — so opening still leaves the map where the card points.
+          Not `aria-pressed`: this no longer toggles a state, it navigates. */}
       <button
         type="button"
         className="bm-eq-select"
-        aria-label={`${t.bidMap.eqSelect} — ${title}`}
-        aria-pressed={selected}
-        onClick={() => onSelect(machine.equipmentId)}
+        aria-label={`${t.bidMap.eqDetails} — ${title}`}
+        /* `aria-current`, not `aria-pressed`. AC-15 still needs the selected id to reach the card as
+           a state a reader can perceive, but this control no longer TOGGLES anything — it navigates,
+           and `aria-pressed` on a non-toggle announces a button that can be un-pressed. "The current
+           machine in this list" is what the accent means and what this now says. */
+        aria-current={selected || undefined}
+        onClick={() => onOpenDetail(machine.equipmentId)}
       />
 
       <div className="bm-eq-in">

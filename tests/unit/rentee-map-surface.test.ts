@@ -154,7 +154,11 @@ describe("one selected id reaches the map and the list alike (RM3-AC-15)", () =>
   it("turns that id into the card's pressed state in the list", () => {
     const list = strip(read(LIST));
     expect(list).toMatch(/selected=\{selectedId === m\.equipmentId\}/);
-    expect(list).toMatch(/aria-pressed=\{selected\}/);
+    // `aria-current`, not the `aria-pressed` this asserted until 2026-08-11. The card OPENS the
+    // machine now (owner) instead of toggling a selection, and `aria-pressed` on a control that
+    // cannot be un-pressed announces a state that does not exist. AC-15's claim is unchanged — the
+    // selected id still reaches the card as something a reader can perceive.
+    expect(list).toMatch(/aria-current=\{selected \|\| undefined\}/);
   });
 
   it("turns the same id into the marker's selected state on the canvas", () => {

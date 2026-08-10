@@ -934,7 +934,6 @@ export function BidMapWorkspace({
                   onClearFilters={() => setFilterIds([])}
                   selectedId={selectedMachineId}
                   cueId={cueId}
-                  onSelect={selectMachine}
                   onOpenDetail={(id) => {
                     // Opening a detail also focuses that machine, so coming back out leaves the map
                     // where the renter left it rather than on the previous selection. `open`, never
