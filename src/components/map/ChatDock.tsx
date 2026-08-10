@@ -175,6 +175,16 @@ export function ChatDock({
   const L = useCallback((en: string, arr: string) => (ar ? arr : en), [ar]);
 
   const [open, setOpen] = useState(false);
+  /**
+   * WHERE the conversation sits (`rDrawer`'s `chatPlace`, prototype 1573). `fill` is the prototype's
+   * default and its stated intent — the conversation *replaces* the map rather than floating over it,
+   * flush and square beside the panel, so only ever one thing occupies that space. `mirror` is the
+   * original placement, a column on the opposite edge with the map still visible between the two.
+   *
+   * A view preference and nothing more: it moves no selection, fetches nothing, and changes no
+   * message. That is why it lives here rather than in the surface's state.
+   */
+  const [place, setPlace] = useState<"fill" | "mirror">("fill");
   const [rows, setRows] = useState<InboxBid[]>([]);
   const [activeBidId, setActiveBidId] = useState(bid.id);
   /** Rooms this dock created by sending, before the feed has caught up with them. */
@@ -573,19 +583,19 @@ export function ChatDock({
 
   return (
     <>
-      {/* The dock control. Persistent, floating, and the only global action on the surface. */}
-      <button
-        type="button"
-        className={`bm-dock${open ? " is-open" : ""}`}
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-      >
-        <span className="material-icons-outlined">forum</span>
-        <span className="bm-dock-label">{t.chatDock.title}</span>
-        {unreadTotal > 0 && (
-          <span className="bm-dock-badge" dir="ltr">{unreadTotal > 99 ? "99+" : unreadTotal}</span>
-        )}
-      </button>
+      {/* The dock control — the only global action on the surface, and gone while the conversation is
+          open: `rChatDock` returns null in that state and says why, *"while the conversation is open
+          it IS the affordance — a button under it would be a second one."* The drawer's own ✕ closes
+          it, so there is one control for one state rather than two that both claim to toggle. */}
+      {!open && (
+        <button type="button" className="bm-dock" onClick={() => setOpen(true)} aria-expanded={false}>
+          <span className="material-icons-outlined">forum</span>
+          <span className="bm-dock-label">{t.chatDock.title}</span>
+          {unreadTotal > 0 && (
+            <span className="bm-dock-badge" dir="ltr">{unreadTotal > 99 ? "99+" : unreadTotal}</span>
+          )}
+        </button>
+      )}
 
       {/* ── The arrival bubble (004a §2.1, the prototype's `rChatPop`) ────────────────────────────
           Anchored to the dock by a tail, refresh-timed, and worded as a STATE ("you have a reply")
@@ -624,9 +634,22 @@ export function ChatDock({
       )}
 
       {open && (
-        <section className="bm-chat dlproto" aria-label={t.chatDock.title}>
+        <section className={`bm-chat dlproto is-${place}`} aria-label={t.chatDock.title}>
           <header className="bm-chat-head">
             <span className="bm-chat-who">{bid.supplierName}</span>
+            {/* ONE control decides the placement (prototype 1590). Not a resize handle — there are two
+                placements, not a continuum, and each is a whole layout rather than a width. */}
+            <button
+              type="button"
+              className="bm-chat-place"
+              onClick={() => setPlace((p) => (p === "fill" ? "mirror" : "fill"))}
+              aria-label={place === "fill" ? t.chatDock.placeMirror : t.chatDock.placeFill}
+              title={place === "fill" ? t.chatDock.placeMirror : t.chatDock.placeFill}
+            >
+              <span className="material-icons-outlined">
+                {place === "fill" ? "vertical_split" : "open_in_full"}
+              </span>
+            </button>
             <button type="button" className="bm-chat-x" onClick={() => setOpen(false)} aria-label={t.chatDock.close}>
               <span className="material-icons-outlined">close</span>
             </button>

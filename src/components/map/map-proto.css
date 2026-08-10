@@ -1676,24 +1676,47 @@
   cursor: pointer;
 }
 
-/* The conversation itself. A floating column, not a rail, and not inside the panel: a tab strip in a
-   392px column would truncate every item name. */
+/* ── The conversation (`rDrawer`, prototype 1554–1580) ────────────────────────────────────────────
+   NOT a floating card. The prototype says so in as many words: *"The conversation REPLACES the map
+   rather than floating over it: it fills the canvas beside the panel, flush and square-edged like the
+   map it stands in for, so only ever one thing occupies that space."* A 360px bubble in the corner
+   was the thing that read as a widget bolted onto a map instead of the other half of the surface.
+
+   Two placements, and ONE control switches them (`chatPlace`) — see `.bm-chat-place`:
+     · FILL (the default) — `top:0; bottom:0; left:436px; right:0`, square, no border, no shadow.
+       It starts where the panel ends, so it is sized from `--bm-panel-w` and follows the grip.
+     · MIRROR — the prototype's original: a 436px column on the map's opposite edge, so the panel and
+       the conversation read as a pair and the map stays visible between them.
+   Neither changes the MAP's box — both are absolute over it — so Leaflet needs no `invalidateSize`. */
 .bidmap .bm-chat {
   position: absolute;
   z-index: 31;
-  bottom: 80px;
-  /* Trailing edge — the panel now holds the leading one (see `.bm-panel`). */
-  inset-inline-end: 18px;
-  width: min(360px, calc(100% - 60px));
-  max-height: min(64%, 460px);
+  inset-block: 0;
   display: flex;
   flex-direction: column;
   background: #fff;
-  border: 1px solid #e1e9f1;
-  border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 16px 40px rgba(15, 34, 56, 0.24);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
+/* Fill: from the panel's edge to the far side. `--bm-panel-w` is the same variable `.bm-panel` sizes
+   itself from, so dragging the grip moves this seam with it and the two never overlap. */
+.bidmap .bm-chat.is-fill {
+  inset-inline-start: var(--bm-panel-w, 392px);
+  inset-inline-end: 0;
+}
+/* Mirror: the prototype's 436px, and its `calc(100% - 470px)` ceiling so the map is never squeezed to
+   nothing between the two columns. */
+.bidmap .bm-chat.is-mirror {
+  inset-inline-end: 0;
+  width: 436px;
+  max-width: calc(100% - 470px);
+  border-inline-start: 1px solid #e1e9f1;
+  box-shadow: -6px 0 24px rgba(15, 34, 56, 0.1);
+}
+/* The shadow falls AWAY from the map, so it turns with the script. */
+.bidmap[dir="rtl"] .bm-chat.is-mirror, [dir="rtl"] .bidmap .bm-chat.is-mirror { box-shadow: 6px 0 24px rgba(15, 34, 56, 0.1); }
 /* The dock carries `.dlproto` so `ChatCard` renders EXACTLY as it does in the deal room — same
    markup, same tones, one stylesheet (RM3-AC-48). That class also carries the deal-room PAGE's own
    geometry (`max-width: 1120px`, `margin: 0 auto`, `min-height: calc(100vh - 140px)`), which is meant
@@ -1701,12 +1724,56 @@
    rather than by splitting the stylesheet: the variables and the card rules are what we want, and
    they are defined on the same selector as the layout. */
 .bidmap .bm-chat.dlproto { max-width: none; margin: 0; min-height: 0; }
-.bidmap .bm-chat-head { flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #e1e9f1; }
-.bidmap .bm-chat-who { flex: 1; min-width: 0; font-size: 12px; font-weight: 800; color: #16304f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bidmap .bm-chat-x { background: none; border: 0; padding: 0; color: #6b8fa8; cursor: pointer; line-height: 1; }
-.bidmap .bm-chat-x .material-icons-outlined { font-size: 18px; }
+/* The drawer's own head band — 64px, `0 18px`, the panel's height and gutters, so the two columns
+   start on one line. Docked drops the icon tile and the subtitle the floating drawer carries: the
+   panel beside it already names the supplier, and a second identity block here repeated it. */
+.bidmap .bm-chat-head {
+  flex-shrink: 0;
+  height: 64px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 0 18px;
+  border-bottom: 1px solid #e1e9f1;
+  background: #fff;
+}
+.bidmap .bm-chat-who { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 800; color: #16304f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The placement control — the prototype's one square button, 30px at r9. It changes WHERE the
+   conversation sits and nothing about the conversation, which is why it is a quiet outline rather
+   than an action. */
+.bidmap .bm-chat-place {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: #fff;
+  border: 1px solid #c8d8e8;
+  color: #1c3550;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+.bidmap .bm-chat-place .material-icons-outlined { font-size: 16px; }
+.bidmap .bm-chat-x {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid #c8d8e8;
+  color: #6b8fa8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+.bidmap .bm-chat-x .material-icons-outlined { font-size: 16px; }
 /* Rendered ONLY when this counterparty holds more than one bid in the RFQ group (RM3-AC-44). */
-.bidmap .bm-chat-tabs { flex-shrink: 0; display: flex; gap: 5px; padding: 8px 10px; overflow-x: auto; border-bottom: 1px solid #eff4f9; }
+.bidmap .bm-chat-tabs { flex-shrink: 0; display: flex; gap: 6px; padding: 8px 18px; overflow-x: auto; background: #fff; border-bottom: 1px solid #eff4f9; }
 .bidmap .bm-chat-tab {
   flex-shrink: 0;
   display: inline-flex;
@@ -1772,7 +1839,19 @@
    box bolted under a conversation rather than as the place you write in it — and the pale field on
    white had no edge of its own at all. r20 · `10px 14px` · 12.5px on `#F8FAFC` inside `#C8D8E8`, and
    a 40px send, are what the prototype draws. */
-.bidmap .bm-chat-compose { flex-shrink: 0; display: flex; align-items: center; gap: 6px; padding: 10px 12px 11px; border-top: 1px solid #e1e9f1; }
+.bidmap .bm-chat-compose {
+  flex-shrink: 0;
+  /* 76px and `0 18px` — `pChat`'s own words: *"same footer geometry as the panels"*. It is the price
+     bar's height, so the two columns end on one line the way they start on one. */
+  min-height: 76px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 18px;
+  background: #fff;
+  border-top: 1px solid #e1e9f1;
+}
 .bidmap .bm-chat-input { flex: 1; min-width: 0; border: 1px solid #c8d8e8; border-radius: 20px; padding: 10px 14px; font: inherit; font-size: 12.5px; color: #16304f; background: #f8fafc; }
 .bidmap .bm-chat-input:disabled { opacity: 0.65; }
 .bidmap .bm-chat-send { flex-shrink: 0; background: #2563eb; border: 0; color: #fff; border-radius: 50%; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
@@ -1783,13 +1862,14 @@
 /* ── Attach + mic (owner, 2026-08-11) ─────────────────────────────────────────────────────────────
    `.ib` is the class `VoiceRecorder` already renders — the deal room styles it under `.composer`, a
    selector that does not reach here, so the component is mounted UNCHANGED and dressed for this
-   surface instead. 34px rather than the prototype's 38: the prototype draws one attach control and
-   an inert glyph beside it, where this row carries an attach AND a working recorder in a dock that
-   is `min(360px, 100% - 60px)` wide — at 38 the input lost the width it needs to show a phrase. */
+   surface instead. The prototype's 38px, restored: these were held at 34 only because the dock was
+   `min(360px, 100% - 60px)` wide and two round controls at 38 left the input no room for a phrase.
+   The drawer is now the width of the canvas beside the panel, so the constraint that shrank them is
+   gone and the prototype's own size stands. */
 .bidmap .bm-chat-compose .ib {
   flex: 0 0 auto;
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   padding: 0;
   border: 1px solid #c8d8e8;
   border-radius: 50%;
@@ -1815,7 +1895,7 @@
    conversation, so it must not go in the stream and scroll away. */
 .bidmap .bm-chat-err {
   flex-shrink: 0;
-  padding: 7px 12px;
+  padding: 7px 18px;
   border-top: 1px solid #f2d9d6;
   background: rgba(217, 54, 42, 0.07);
   color: #a32a20;
@@ -1944,10 +2024,15 @@
 .bidmap .bm-rq-btn.go { flex: 2; background: #2563eb; border: 0; color: #fff; }
 /* A sent card is the renter's own message, so it sits at the outgoing edge and takes the bubble's
    width rule — the prototype gives it `align-self: flex-end` at 86%. */
-.bidmap .bm-chat-body .bm-rq { align-self: flex-end; width: 86%; max-width: 86%; }
+/* The card is a bubble with a lot in it, so it takes more of the stream than a line of text does —
+   but it is still one side's message and must not run the full width now that the drawer fills the
+   canvas. 86% of the prototype's 436px column is the ceiling it was drawn at. */
+.bidmap .bm-chat-body .bm-rq { align-self: flex-end; width: 86%; max-width: min(86%, 376px); }
 /* The draft sits between the stream and the composer, pinned, exactly where `rPendingCard` puts it —
    it must not scroll away with the conversation it is about to join. */
-.bidmap .bm-chat-draft { flex-shrink: 0; padding: 10px 12px; border-top: 1px solid #eff4f9; }
+.bidmap .bm-chat-draft { flex-shrink: 0; padding: 12px 18px; border-top: 1px solid #eff4f9; }
+/* The card itself keeps the stream's ceiling — pinned, but still one message's width. */
+.bidmap .bm-chat-draft .bm-rq { width: 100%; max-width: 376px; }
 
 /* Prototype keyframes — `design.md` §5 plus `design-v3.md` §7, verbatim. All disabled under
    `prefers-reduced-motion`. */

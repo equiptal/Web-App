@@ -189,6 +189,9 @@ describe("arrivalNotice — refresh-timed, and silent on what is being read (RM3
 
 const CHAT_DOCK = "src/components/map/ChatDock.tsx";
 const dockSrc = readFileSync(resolve(process.cwd(), CHAT_DOCK), "utf8");
+/** The surface's stylesheet. Read once here rather than per-describe: the geometry assertions below
+ *  and the composer's further down are reading the same file for the same reason. */
+const cssSrc = readFileSync(resolve(process.cwd(), "src/components/map/map-proto.css"), "utf8");
 
 /** The `{…}` body of a named function declaration, by brace matching from its first `{`. */
 function functionBody(source: string, declaration: string): { start: number; end: number } {
@@ -275,8 +278,53 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
     expect(dockSrc).toContain("onClick={() => setActiveBidId(tab.bidId)}");
   });
 
-  it("opens the dock by toggling state and nothing else", () => {
-    expect(dockSrc).toContain("onClick={() => setOpen((v) => !v)}");
+  it("opens the dock by setting state and nothing else", () => {
+    expect(dockSrc).toContain("onClick={() => setOpen(true)}");
+  });
+
+  it("hides the dock button while the conversation is open (`rChatDock`, prototype 3863)", () => {
+    // *"While the conversation is open it IS the affordance — a button under it would be a second
+    // one."* The prototype returns null; ours must not render the FAB under its own drawer, where it
+    // would be a second control claiming to toggle one state.
+    expect(dockSrc).toMatch(/\{!open && \(\s*<button type="button" className="bm-dock"/);
+    // …and the drawer's ✕ is then the only way back, so it must still exist.
+    expect(dockSrc).toContain('className="bm-chat-x" onClick={() => setOpen(false)}');
+  });
+
+  it("docks the conversation beside the panel rather than floating it (`rDrawer`, prototype 1573–1580)", () => {
+    // The prototype's stated intent: the conversation REPLACES the map — flush, square, full height,
+    // starting where the panel ends. A radius, a shadow or a `bottom:` offset here is the floating
+    // widget this deliberately stopped being.
+    const chat = cssBlockOf(cssSrc, ".bidmap .bm-chat {");
+    expect(chat).toMatch(/inset-block:\s*0/);
+    expect(chat).toMatch(/border-radius:\s*0/);
+    expect(chat).toMatch(/box-shadow:\s*none/);
+    expect(chat).not.toMatch(/max-height/);
+    // FILL is sized from the SAME variable the panel is, so the resize grip moves the seam with it
+    // and the two columns can never overlap.
+    const fill = cssBlockOf(cssSrc, ".bidmap .bm-chat.is-fill {");
+    expect(fill).toContain("var(--bm-panel-w, 392px)");
+    expect(fill).toMatch(/inset-inline-end:\s*0/);
+    // MIRROR keeps the prototype's 436px and its `calc(100% - 470px)` ceiling — the guard that stops
+    // two columns squeezing the map to nothing between them.
+    const mirror = cssBlockOf(cssSrc, ".bidmap .bm-chat.is-mirror {");
+    expect(mirror).toMatch(/width:\s*436px/);
+    expect(mirror).toContain("calc(100% - 470px)");
+  });
+
+  it("moves the conversation with ONE control, and that control moves nothing else", () => {
+    // A view preference: it may not touch the selection, the map, the active tab or the channel.
+    expect(dockSrc).toContain('onClick={() => setPlace((p) => (p === "fill" ? "mirror" : "fill"))}');
+    const place = dockSrc.slice(
+      dockSrc.indexOf('className="bm-chat-place"'),
+      dockSrc.indexOf('className="bm-chat-x"'),
+    );
+    expect(place.length).toBeGreaterThan(120); // positive control on the slice
+    for (const forbidden of ["setActiveBidId", "setOpen", "refresh(", "ensureDealRoom", "onOpenMachine"]) {
+      expect(place).not.toContain(forbidden);
+    }
+    // Both labels name the state the press moves TO — a toggle labelled with its current state lies.
+    expect(dockSrc).toContain("place === \"fill\" ? t.chatDock.placeMirror : t.chatDock.placeFill");
   });
 
   it("renders a roomless tab as COMPOSE-ONLY — a note, never a creation", () => {
@@ -603,7 +651,6 @@ describe("the dock's composer sends what the deal room sends, the way the deal r
     dockSrc.indexOf("</section>"),
   );
   const dealRoomSrc = readFileSync(resolve(process.cwd(), "src/components/deal-room/DealRoom.tsx"), "utf8");
-  const cssSrc = readFileSync(resolve(process.cwd(), "src/components/map/map-proto.css"), "utf8");
 
   it("carries an attach control, a recorder, an input and a send — the positive control", () => {
     // Without these the disabled sweep below would pass over an empty row.

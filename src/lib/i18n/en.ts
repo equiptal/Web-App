@@ -1036,6 +1036,10 @@ export const en = {
     // What it is ALLOWED to attach, and what it says when it refuses, is the shared gate's — only
     // the label is this surface's, because this surface's strings are keyed here.
     attach: "Attach a file",
+    // The placement control. Both labels name the STATE the press moves to, not the one it is in — a
+    // toggle labelled with its current state is the oldest way to make a button lie.
+    placeFill: "Fill the map area",
+    placeMirror: "Show beside the map",
     // ── The review card (RM3-AC-17) ──
     // An ask is COMPOSED into the conversation and sent only when this is pressed. Cancelling writes
     // nothing at all — not a message, and not the deal room, which the send is what creates.

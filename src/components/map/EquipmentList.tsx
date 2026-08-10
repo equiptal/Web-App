@@ -290,6 +290,11 @@ export function EquipmentList({
               key={m.equipmentId}
               machine={m}
               index={i}
+              // The request reaches the CARD, which is what decides which certificates it names.
+              // Threaded but not forwarded, `equipmentCardModel(machine, undefined)` names none —
+              // and since the fallback is deliberately "no chips" rather than the machine's papers,
+              // the omission was silent on the surface and visible only as an unused prop.
+              request={request}
               selected={selectedId === m.equipmentId}
               cue={cueId === m.equipmentId}
               ar={ar}
