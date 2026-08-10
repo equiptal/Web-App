@@ -65,6 +65,21 @@
  * (2026-08-08): saving is the batch's job now, and view is what a row keeps so the renter can look at
  * one paper without selecting anything.
  *
+ * **And pressing a row now puts that paper in the panel's VIEWER** (owner, 2026-08-11; the prototype's
+ * `eqDocsTab`, *"Every row opens in the viewer above"*). This tab does not own the frame — `V7` does —
+ * so the press is handed up through `onView` exactly as the ask is handed up through `onRequest`, and
+ * the row that is currently framed comes back down as `viewingKey`. What this component adds on the way
+ * is the one thing V7 cannot know: whether the row is a **photo** or a **paper**, which it reads off the
+ * group the row came from rather than by sniffing a url. The two are framed differently — a photograph
+ * fills its frame, a certificate is a sheet laid on white — and guessing that from a presigned link is
+ * exactly the MIME sniffing this directory has refused twice.
+ *
+ * **The tab's own FOOTER** (the prototype's `eqDocsTab`, 4399/4408). The tab is a column with
+ * `min-height: 100%`, its groups on the prototype's `13px 14px 4px`, and the two batch buttons in a
+ * sticky 76 px bar at the foot of it — not a row of buttons that scrolls away under the last document.
+ * V7's own footer already steps aside on this tab for exactly that reason, and until now it stepped
+ * aside for nothing: the actions were wherever the renter had scrolled to.
+ *
  * **Both batches act on the ticked rows** — one request naming several types, never one per row (§6.6:
  * *"The renter ticks what he wants and asks once"*), and one download run over every file behind the
  * held rows he ticked.
@@ -88,6 +103,29 @@ import {
 } from "./machine-panel-model";
 import "./panel-proto.css";
 
+/**
+ * What the panel's viewer is being asked to show (owner, 2026-08-11).
+ *
+ * It is a **resolved subject**, not a row key: the frame above cannot reach into this tab's model, and a
+ * key would make it. Four fields and no more — what to draw, what to call it, and which of the two ways
+ * to draw it.
+ */
+export interface DocViewSubject {
+  /** The row this came from, handed straight back down as `viewingKey` so the list can mark it. */
+  key: string;
+  /** Already localised — the frame's caption says it verbatim and does no lookup of its own. */
+  name: string;
+  /** The row's primary file (`docRowActions(row)[0]`), resolved by `DocRowList`. */
+  url: string;
+  /**
+   * **A photograph fills the frame; a paper is a sheet laid on white.** Read off the GROUP the row
+   * belongs to, never guessed from the url — the prototype makes the same split (`eqViewer`: a photo
+   * renders `contain` over its dark backdrop, a document `contain` over white with the caption's height
+   * cleared beneath it) and gets it from `eqDocKind` for the same reason.
+   */
+  kind: "photo" | "paper";
+}
+
 export interface EquipmentDocumentsProps {
   machine: FleetMachine;
   /** The request's asks — what makes a missing paper a **gap** rather than a paper nobody wanted.
@@ -108,9 +146,24 @@ export interface EquipmentDocumentsProps {
    * were ticked in.
    */
   askPending?: (draft: PanelRequestDraft) => boolean;
+  /** Put this document in the panel's viewer. Handed upward for the same reason `onRequest` is: the
+   *  frame is V7's, and this tab can no more draw in it than it can post a request. Omit it and rows
+   *  stop pressing — they keep their `↗`, and nothing else about the tab changes. */
+  onView?: (subject: DocViewSubject) => void;
+  /** Which row the frame is showing right now, so the list can mark it. V7's state, read back down. */
+  viewingKey?: string | null;
 }
 
-export function EquipmentDocuments({ machine, request, ar, L, onRequest, askPending }: EquipmentDocumentsProps) {
+export function EquipmentDocuments({
+  machine,
+  request,
+  ar,
+  L,
+  onRequest,
+  askPending,
+  onView,
+  viewingKey,
+}: EquipmentDocumentsProps) {
   const groups = useMemo(() => equipmentDocGroups(machine, request), [machine, request]);
   // ONE selection set across ALL groups — a batch is the renter's whole act, not one per heading. He can
   // tick the missing plate photo and a missing equipment certificate — two different groups — and send once.
@@ -185,7 +238,7 @@ export function EquipmentDocuments({ machine, request, ar, L, onRequest, askPend
   const canRequest = mode === "request" && !!draft && !!onRequest && !pending;
 
   return (
-    <div>
+    <div className="mp-docs">
       {groups.map((g) => (
         <DocRowList
           key={g.key}
@@ -205,14 +258,63 @@ export function EquipmentDocuments({ machine, request, ar, L, onRequest, askPend
           selected={selected}
           onToggle={toggle}
           onToggleAll={toggleAll}
+          // The group is what decides `kind`, which is the whole reason this closure is built per group
+          // rather than passed straight through. Anything the operator's group might send is moot — its
+          // rows carry no file, so `DocRowList` never offers the press on one.
+          onView={
+            onView
+              ? (row, href) => onView({ key: row.key, name: row.name, url: href, kind: g.key === "photos" ? "photo" : "paper" })
+              : undefined
+          }
+          viewingKey={viewingKey}
           L={L}
         />
       ))}
 
+      {/* **The notes come BEFORE the bar now.** They are sentences about the list — what a tick means,
+          why the send is withheld, what the last run saved — and the bar they used to sit under is
+          sticky, so leaving them there would have put the explanation permanently below the control it
+          explains, at the bottom of a scroll. */}
+      <div className="mp-docs-notes">
+        {/* The reason the send is inert, IN WORDS — the ticks are still on screen and still look
+            sendable, so a control that merely greyed out would read as a broken page rather than as a
+            rule. It says what to do about it too: the answer arrives in the conversation, not here.
+            Written inline through `L` like every other sentence in this directory. */}
+        {pending && (
+          <p className="mp-note" dir={ar ? "rtl" : "ltr"} role="status">
+            {L(
+              "You've already asked for exactly these documents and the supplier hasn't answered yet — his reply will arrive in the chat. Tick a different document to ask for that one.",
+              "سبق أن طلبت هذه المستندات بعينها ولم يردّ المورد بعد — سيصلك ردّه في المحادثة. حدّد مستنداً آخر لطلبه.",
+            )}
+          </p>
+        )}
+
+        {batch.phase === "done" && (
+          <p className="mp-note" dir={ar ? "rtl" : "ltr"} role="status">
+            {batch.failed === 0
+              ? L(`Saved ${batch.saved} documents.`, `تم حفظ ${arDigits(batch.saved)} مستندات.`)
+              : L(
+                  `Saved ${batch.saved} of ${batch.saved + batch.failed}. Open the rest from their own rows.`,
+                  `تم حفظ ${arDigits(batch.saved)} من ${arDigits(batch.saved + batch.failed)}. افتح البقية من صفوفها.`,
+                )}
+          </p>
+        )}
+
+        <p className="mp-note" dir={ar ? "rtl" : "ltr"}>
+          {L(
+            "Tick what is on the file to download it, or what is missing to ask for it — one selection, never both. Press a row to read it in the viewer above.",
+            "حدّد ما هو على الملف لتنزيله، أو ما ينقص لطلبه — تحديد واحد، لا الاثنان معاً. اضغط الصف لقراءته في العارض أعلاه.",
+          )}
+        </p>
+      </div>
+
       {/* BOTH buttons stay visible, and only the one the selection supports is live (owner's UI design,
           2026-08-08). Hiding the other would make the panel change shape under the renter's first tick
           and hide the fact that the same column can do two things; the disabled one keeps its shape and
-          says what the other kind of tick would have got him. */}
+          says what the other kind of tick would have got him.
+
+          The bar is the prototype's own (4408): 76 px, `0 18px`, `margin-top: auto` so it sits at the
+          foot of a short list, and `position: sticky` so it is still there at the foot of a long one. */}
       <div className="mp-sendrow">
         <button type="button" className="mp-send" disabled={!canDownload} onClick={() => run(targets)}>
           {running
@@ -240,37 +342,6 @@ export function EquipmentDocuments({ machine, request, ar, L, onRequest, askPend
               : L("Ask the supplier to send it", "اطلب من المورد إرساله")}
         </button>
       </div>
-
-      {/* The reason the button above is inert, IN WORDS — the ticks are still on screen and still
-          look sendable, so a control that merely greyed out would read as a broken page rather than
-          as a rule. It says what to do about it too: the answer arrives in the conversation, not
-          here. Written inline through `L` like every other sentence in this directory. */}
-      {pending && (
-        <p className="mp-note" dir={ar ? "rtl" : "ltr"} role="status">
-          {L(
-            "You've already asked for exactly these documents and the supplier hasn't answered yet — his reply will arrive in the chat. Tick a different document to ask for that one.",
-            "سبق أن طلبت هذه المستندات بعينها ولم يردّ المورد بعد — سيصلك ردّه في المحادثة. حدّد مستنداً آخر لطلبه.",
-          )}
-        </p>
-      )}
-
-      {batch.phase === "done" && (
-        <p className="mp-note" dir={ar ? "rtl" : "ltr"} role="status">
-          {batch.failed === 0
-            ? L(`Saved ${batch.saved} documents.`, `تم حفظ ${arDigits(batch.saved)} مستندات.`)
-            : L(
-                `Saved ${batch.saved} of ${batch.saved + batch.failed}. Open the rest from their own rows.`,
-                `تم حفظ ${arDigits(batch.saved)} من ${arDigits(batch.saved + batch.failed)}. افتح البقية من صفوفها.`,
-              )}
-        </p>
-      )}
-
-      <p className="mp-note" dir={ar ? "rtl" : "ltr"}>
-        {L(
-          "Tick what is on the file to download it, or what is missing to ask for it — one selection, never both.",
-          "حدّد ما هو على الملف لتنزيله، أو ما ينقص لطلبه — تحديد واحد، لا الاثنان معاً.",
-        )}
-      </p>
     </div>
   );
 }

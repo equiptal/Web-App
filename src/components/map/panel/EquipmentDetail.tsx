@@ -18,8 +18,11 @@
  *   />
  *
  * Five parts, in this order:
- *  1. a **196 px viewer** — the machine's photo, a circular back control, «تكبير» / «تحميل», and a
- *     caption strip naming what is in the frame; the machine is identified by sight first
+ *  1. a **196 px viewer** — the machine's photo, a circular back control, «تكبير» / «تحميل» as icons,
+ *     and a caption strip naming what is in the frame; the machine is identified by sight first.
+ *     **It is a viewer, and it now has a second subject**: press a row on the documents tab and that
+ *     paper is what the frame holds (owner, 2026-08-11 — the prototype's `eqViewer`, *"one frame, two
+ *     subjects"*). The frame's state lives HERE because the frame does; the tab reports the press.
  *  2. **two underline tabs** — the machine · its documents
  *  3. one line: distance · band — yard, with the availability chip on the opposite corner (and the
  *     unconfirmed explainer under it, which is the only thing that stops red reading as a refusal)
@@ -39,7 +42,7 @@ import { useCallback, useMemo, useState } from "react";
 import { isOutOfCity, unitAvailability } from "@/lib/contract/bid-map";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import { useDownloadBatch } from "./doc-download";
-import { EquipmentDocuments } from "./EquipmentDocuments";
+import { EquipmentDocuments, type DocViewSubject } from "./EquipmentDocuments";
 import {
   arDigits,
   distanceBandLabel,
@@ -53,6 +56,42 @@ import {
 import "./panel-proto.css";
 
 const MARK: Record<"green" | "grey" | "red", string> = { green: "✓", grey: "—", red: "!" };
+
+/**
+ * The viewer's three tools, as line art (owner, 2026-08-11 — see `.mp-tools` in `panel-proto.css` for
+ * why they stopped being words). Each path list is the prototype's own, off `eqViewer`'s `ico()`
+ * (`app-decoded.js` 4280–4300) at its `15px` / `2.2` stroke, so the glyphs are the ones the design was
+ * drawn with rather than a second set chosen by us. `aria-hidden`: every one of them sits inside a
+ * control that carries the whole sentence on its `aria-label`.
+ */
+const GLYPH = {
+  enlarge: ["M4 10V4h6", "M20 14v6h-6", "M4 4l7 7", "M20 20l-7-7"],
+  download: ["M12 3v12", "M7 11l5 5 5-5", "M4 20h16"],
+  // Not the prototype's — it has no way back to the photograph because its back arrow leaves the
+  // machine altogether. Ours does not, so the frame needs a door out of the document it is holding.
+  close: ["M6 6l12 12", "M18 6L6 18"],
+} as const;
+
+function Ico({ paths }: { paths: readonly string[] }) {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {paths.map((d) => (
+        <path key={d} d={d} />
+      ))}
+    </svg>
+  );
+}
 
 export interface EquipmentDetailProps {
   machine: FleetMachine;
@@ -74,6 +113,29 @@ export interface EquipmentDetailProps {
 
 export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, askPending }: EquipmentDetailProps) {
   const [tab, setTab] = useState<"machine" | "documents">("machine");
+
+  /* ── The frame's second subject (owner, 2026-08-11) ─────────────────────────────────────────────
+     What the viewer is holding instead of the machine's photograph, or null for the photograph. It
+     lives here rather than in the documents tab because the FRAME is here; the tab reports a press
+     and reads back which row is framed, exactly as it hands an ask up and reads back whether it is
+     pending.
+
+     `framedFailed` is the url of a file the browser would not render as an image. There is no MIME to
+     read — these are presigned links on a private bucket, and this directory has twice refused to
+     sniff one — so the honest test is to try. A PDF, a DWG or a corrupt scan fires `onError` once and
+     the frame says so in words with a way out, rather than showing the broken-image glyph and letting
+     the renter conclude the supplier uploaded nothing. */
+  const [framedDoc, setFramedDoc] = useState<DocViewSubject | null>(null);
+  const [framedFailed, setFramedFailed] = useState<string | null>(null);
+  /* A different machine is a different set of papers, so a document from the last one cannot stay in
+     the frame. Adjusted during render off a key we keep ourselves — the host is not obliged to remount
+     this component per machine, and an effect would paint the wrong paper for one frame first. */
+  const [framedFor, setFramedFor] = useState(machine.equipmentId);
+  if (framedFor !== machine.equipmentId) {
+    setFramedFor(machine.equipmentId);
+    setFramedDoc(null);
+    setFramedFailed(null);
+  }
 
   const cells = useMemo(() => matchGrid(machine, request), [machine, request]);
   const hero = heroPhotoUrl(machine);
@@ -127,49 +189,108 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
   const photoLabel = useCallback((t: DocDownloadTarget) => L(t.label.en, t.label.ar), [L]);
   const { running: savingPhoto, run: savePhoto } = useDownloadBatch(photoLabel);
 
+  /* **ONE subject, resolved once**, and every one of the frame's parts reads it: the image, the two
+     tools and the caption. The document when there is one, the machine's photograph otherwise, and
+     nothing at all when the machine has no photograph either — which is the state that gives the tools
+     nothing to act on and is why they render off this rather than off `hero`. */
+  const framed: DocViewSubject | null = framedDoc ?? (hero ? { key: "hero", name: heroName, url: hero, kind: "photo" } : null);
+  const framedBroken = framed != null && framedFailed === framed.url;
+
   return (
     <div className="mp" dir={ar ? "rtl" : "ltr"}>
-      {/* **A VIEWER, not a hero** (2026-08-09): `196px`, a circular back control, tool pills on the
-          opposite corner, and a caption STRIP rather than a gradient scrim. The scrim dimmed the
+      {/* **A VIEWER, not a hero** (2026-08-09): `196px`, a circular back control, its tools on the
+          opposite corner (pills then, icons since 2026-08-11), and a caption STRIP rather than a
+          gradient scrim. The scrim dimmed the
           photograph in order to write over it the two facts the panel repeats underneath anyway; a
           white strip under the image leaves the image alone and still names what is being looked at.
           The prototype's own frame, and the owner's screenshot's. */}
-      <div className="mp-viewer">
-        {hero ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={hero} alt={heroName} />
-        ) : (
+      {/* `.doc` is the prototype's taller frame for a paper (268 px over its `#EEF3F9`) — a certificate
+          at 196 px is a picture of a certificate. The `photo` / `paper` half decides how the file sits
+          in it, and comes off the ROW'S GROUP rather than off its url; see `DocViewSubject.kind`. */}
+      <div className={`mp-viewer${framedDoc ? ` doc ${framedDoc.kind}` : ""}`}>
+        {framed == null ? (
           <div className="mp-hero-empty">{L("No photo on this machine's file", "لا توجد صورة على ملف هذه المعدّة")}</div>
+        ) : framedBroken ? (
+          // Not an image, and there is no way to have known that in advance. It says so, and hands over
+          // the one control that always works on a presigned url: a tab.
+          <div className="mp-hero-empty">
+            <span>{L("This file can't be shown here.", "لا يمكن عرض هذا الملف هنا.")}</span>
+            <a href={framed.url} target="_blank" rel="noopener noreferrer">
+              {L("Open it in a new tab", "افتحه في تبويب جديد")}
+            </a>
+          </div>
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={framed.url} alt={framed.name} onError={() => setFramedFailed(framed.url)} />
         )}
         <button type="button" className="mp-back" onClick={onBack} aria-label={L("Back to the equipment", "العودة إلى المعدّات")} title={L("Back to the equipment", "العودة إلى المعدّات")}>
           <span aria-hidden="true">{ar ? "›" : "‹"}</span>
         </button>
 
-        {/* Both pills, because the owner's screenshot shows both. «تكبير» opens the photograph at its
-            own size in a new tab — the same "a tab is the whole viewer" decision `DocRowList` records
-            for presigned urls, and for the same reason: a modal here would need a MIME strategy this
-            row does not get to decide. Neither renders when there is no photo to act on. */}
-        {hero && (
+        {/* **ICONS, not words** (owner, 2026-08-11). ~~LABELLED pills rather than bare glyph circles,
+            which is the prototype's own note on them: a 32 px circle with an unfamiliar icon in it is a
+            guess.~~ Withdrawn by the owner against the prototype and against its comment. The objection
+            it raised is answered instead of ignored: every one of these carries `aria-label` AND
+            `title`, so the name is on the control for a screen reader and one hover away for everyone
+            else — an icon-only control with neither announces as "button", which is the actual defect
+            the pill was protecting against.
+
+            «تكبير» opens the file at its own size in a new tab — the same "a tab is the whole viewer"
+            decision `DocRowList` records for presigned urls, and for the same reason: a modal would
+            need the MIME strategy nothing on this surface is allowed to guess at. Both act on whatever
+            the frame is HOLDING, so on a document they save and enlarge that document and not the
+            machine's photograph behind it. */}
+        {framed && (
           <div className="mp-tools">
-            <a className="mp-tool solid" href={hero} target="_blank" rel="noopener noreferrer" title={L("Enlarge", "تكبير")}>
-              {L("Enlarge", "تكبير")}
+            {/* Only while a document is in the frame: the way back to the machine's photograph. The
+                prototype needs none — its back arrow clears the document and leaves the machine in one
+                press — but ours goes back to the list, so without this the frame keeps the last paper
+                the renter opened until he leaves the machine entirely. */}
+            {framedDoc && (
+              <button
+                type="button"
+                className="mp-tool"
+                aria-label={L("Back to the machine's photo", "العودة إلى صورة المعدّة")}
+                title={L("Back to the machine's photo", "العودة إلى صورة المعدّة")}
+                onClick={() => {
+                  setFramedDoc(null);
+                  setFramedFailed(null);
+                }}
+              >
+                <Ico paths={GLYPH.close} />
+              </button>
+            )}
+            <a
+              className="mp-tool solid"
+              href={framed.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={L("Enlarge", "تكبير")}
+              title={L("Enlarge", "تكبير")}
+            >
+              <Ico paths={GLYPH.enlarge} />
             </a>
             <button
               type="button"
               className="mp-tool"
               disabled={savingPhoto}
-              onClick={() => savePhoto([{ key: "photo", label: { en: heroName, ar: heroName }, url: hero }])}
+              aria-label={savingPhoto ? L("Saving…", "يُحفظ…") : L("Download", "تحميل")}
+              title={savingPhoto ? L("Saving…", "يُحفظ…") : L("Download", "تحميل")}
+              onClick={() => savePhoto([{ key: framed.key, label: { en: framed.name, ar: framed.name }, url: framed.url }])}
             >
-              {savingPhoto ? L("Saving…", "يُحفظ…") : L("Download", "تحميل")}
+              <Ico paths={GLYPH.download} />
             </button>
           </div>
         )}
 
-        {/* The strip names what the viewer is showing. In the prototype that is whichever document the
-            renter clicked into the frame; here the frame holds the machine's photograph and nothing
-            else — our document rows open in their own tab (AC-69) rather than in this frame — so it
-            names the machine. Same surface, same job: say what is on screen. */}
-        <div className="mp-cap">{caption ? `${heroName} · ${caption}` : heroName}</div>
+        {/* The strip names what the viewer is showing — the machine when it holds the photograph, and
+            the document's own name when it holds one. ~~Here the frame holds the machine's photograph
+            and nothing else, because our document rows open in their own tab (AC-69) rather than in
+            this frame.~~ No longer true as of 2026-08-11: a row press frames the paper, which is the
+            prototype's *"one frame, two subjects"*, and it makes this strip the only thing on screen
+            that says which of the two the renter is looking at. AC-69's tab is untouched — it is now
+            the `↗` beside the row, and the way to reach a PDF or a second file. */}
+        <div className="mp-cap">{framedDoc ? framedDoc.name : caption ? `${heroName} · ${caption}` : heroName}</div>
       </div>
 
       <div className="mp-tabs" role="tablist">
@@ -265,9 +386,23 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
             </div>
           </>
         ) : (
-          <div className="mp-body">
-            <EquipmentDocuments machine={machine} request={request} ar={ar} L={L} onRequest={onRequest} askPending={askPending} />
-          </div>
+          /* No `.mp-body` around it, unlike the machine tab and unlike the company panel: this tab is a
+             COLUMN with its own sticky action bar at the foot of it (the prototype's `eqDocsTab`), so it
+             owns its insets — a padded box around it would have inset the bar too and left it floating
+             14 px off both edges. */
+          <EquipmentDocuments
+            machine={machine}
+            request={request}
+            ar={ar}
+            L={L}
+            onRequest={onRequest}
+            askPending={askPending}
+            onView={(subject) => {
+              setFramedDoc(subject);
+              setFramedFailed(null);
+            }}
+            viewingKey={framedDoc?.key ?? null}
+          />
         )}
       </div>
 

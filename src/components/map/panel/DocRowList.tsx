@@ -36,6 +36,24 @@
  * governs **verification state**, not reachability (004a §7.2): an equipment row still carries no verify
  * badge and no expiry, and it is still opened with one click.
  *
+ * **Pressing the ROW opens it in the panel's viewer** (owner, 2026-08-11) — the prototype's own
+ * behaviour, whose `eqDocsTab` comment reads *"Every row opens in the viewer above"* (`app-decoded.js`
+ * 4332, 4366). Until now a row did exactly one thing, select, and looking at a paper meant finding the
+ * small `↗` at its trailing edge.
+ *
+ * **The press and the tick are independent by CONSTRUCTION, not by a guard.** The prototype hangs the
+ * click on the row `<div>` and then has to `stopPropagation()` out of the checkbox and the download
+ * control inside it; here the openable region is its **own** `<button>` holding the name, the status
+ * line and the thumbnail, with the checkbox and the `↗` links as its SIBLINGS. Nothing bubbles from one
+ * to the other, so pressing the row cannot tick it and ticking it cannot open anything — there is no
+ * ordering, no propagation and no handler to get wrong.
+ *
+ * **The `↗` links stay** (AC-69). They are not the same act: the press puts the paper in the frame at
+ * the top of the panel, the link opens the file itself in a tab — which is the only thing that works
+ * for a PDF, and the only way to reach the SECOND and third files of a row that holds several. The
+ * press opens `docRowActions(row)[0]`, the same file the first `↗` points at, so the two can never
+ * disagree about which paper the row stands for.
+ *
  * **The operator's certificates are the deliberate exception** (owner, 2026-08-08): they are a status —
  * on file or not — and expose no file at all, because nothing validates an operator document on upload
  * and a file the renter can open reads as evidence that was checked. Narrowed the same day to **no
@@ -142,6 +160,8 @@ export function DocRowList({
   selected,
   onToggle,
   onToggleAll,
+  onView,
+  viewingKey,
   L,
 }: {
   groupLabel: string;
@@ -164,6 +184,20 @@ export function DocRowList({
   onToggle?: (key: string) => void;
   /** Select-all / clear-all over THIS group's keys. */
   onToggleAll?: (keys: string[], select: boolean) => void;
+  /**
+   * Show this row in the panel's viewer (owner, 2026-08-11). **Optional, and a list that omits it keeps
+   * exactly today's behaviour** — the row's body renders as a plain block and only the `↗` opens
+   * anything. The company panel is the caller with nothing to hand a row up TO: its list opens over the
+   * whole panel (`.mp-over`) and has no frame of its own, so it passes nothing and its rows do not press.
+   *
+   * The `href` is resolved here rather than by the caller, from `docRowActions(row)[0]` — the row's
+   * primary file. That keeps "which paper is this row?" a single answer shared with the glyphs beside
+   * it, instead of a rule each caller re-derives from `downloadUrl` / `files`.
+   */
+  onView?: (row: DocRowView, href: string) => void;
+  /** The key of the row currently IN the viewer, so the list can say which one the frame is showing.
+   *  Only one row can be, and a key that matches nothing here simply marks nothing. */
+  viewingKey?: string | null;
   L: (en: string, ar: string) => string;
 }) {
   // All three arrive together or not at all: a tick with no handler is a control that silently fails.
@@ -282,10 +316,42 @@ export function DocRowList({
         // and refuses the click, `aria-disabled` says so to a screen reader. A row that only *looks*
         // dead while still accepting a click is worse than one that looks alive.
         const dimmed = hasSelection && !tickable && r.mode !== null;
+        // ONE resolution of "the file behind this row", read by the press and by the glyphs below, so
+        // the paper the renter opens by pressing cannot be a different paper from the first `↗`.
+        const actions = docRowActions(r);
+        const openable = !!onView && actions.length > 0;
+        const framed = viewingKey === r.key && actions.length > 0;
+
+        /* The name, the status line and the thumbnail — the part of the row that IS the document, and
+           therefore the part that opens it. The checkbox and the `↗` links stay outside it: a control
+           inside a control is a click the renter cannot aim. */
+        const body = (
+          <>
+            {/* **Text before thumbnail** (2026-08-09). The prototype and the owner's screenshot both
+                read tick · text · thumbnail from the leading edge, and we had the thumbnail second.
+                On eight rows that is not a detail: the names no longer start at one shared inset, so
+                the column the renter actually scans is the one that zig-zags. */}
+            <span className="mp-rowtx">
+              <b>{r.name}</b>
+              <span className={r.dot === "missing" ? "att" : undefined}>{r.status}</span>
+            </span>
+
+            <span className={`mp-thumb${r.dot === "missing" ? " missing" : ""}`}>
+              {r.thumbUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={r.thumbUrl} alt={r.name} />
+              ) : (
+                <span aria-hidden="true">{r.dot === "missing" ? "—" : "📄"}</span>
+              )}
+              <span className={`dot ${r.dot}`} aria-hidden="true">{DOT_GLYPH[r.dot]}</span>
+            </span>
+          </>
+        );
+
         return (
           <div
             key={r.key}
-            className={`mp-row${picked ? " picked" : ""}${r.dot === "missing" ? " missing" : ""}${dimmed ? " dim" : ""}`}
+            className={`mp-row${picked ? " picked" : ""}${framed ? " open" : ""}${r.dot === "missing" ? " missing" : ""}${dimmed ? " dim" : ""}`}
           >
             {tickable || dimmed ? (
               <button
@@ -309,24 +375,27 @@ export function DocRowList({
               )
             )}
 
-            {/* **Text before thumbnail** (2026-08-09). The prototype and the owner's screenshot both
-                read tick · text · thumbnail from the leading edge, and we had the thumbnail second.
-                On eight rows that is not a detail: the names no longer start at one shared inset, so
-                the column the renter actually scans is the one that zig-zags. */}
-            <span className="mp-rowtx">
-              <b>{r.name}</b>
-              <span className={r.dot === "missing" ? "att" : undefined}>{r.status}</span>
-            </span>
-
-            <span className={`mp-thumb${r.dot === "missing" ? " missing" : ""}`}>
-              {r.thumbUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={r.thumbUrl} alt={r.name} />
-              ) : (
-                <span aria-hidden="true">{r.dot === "missing" ? "—" : "📄"}</span>
-              )}
-              <span className={`dot ${r.dot}`} aria-hidden="true">{DOT_GLYPH[r.dot]}</span>
-            </span>
+            {openable ? (
+              <button
+                type="button"
+                className="mp-rowopen"
+                // The accessible name says the ACT and then repeats the status line, because a button's
+                // own name is all a screen reader reads in focus mode and the sentence under the title
+                // is the row's whole verdict. Naming it "View x" alone would have hidden that.
+                aria-label={L(`Show ${r.name} in the viewer — ${r.status}`, `اعرض ${r.name} في العارض — ${r.status}`)}
+                title={L(`Show ${r.name} in the viewer`, `اعرض ${r.name} في العارض`)}
+                // Which row the frame above is showing, stated rather than only tinted: the `.open`
+                // outline is a colour, and a colour is not a statement a screen reader can read.
+                aria-current={framed ? "true" : undefined}
+                onClick={() => onView!(r, actions[0].href)}
+              >
+                {body}
+              </button>
+            ) : (
+              // A row with no file to frame, or a list with no frame to put it in. Same element, same
+              // width, no control — the row keeps its shape, which is how this list is read.
+              <span className="mp-rowopen">{body}</span>
+            )}
 
             {/* AC-69, narrowed 2026-08-08 — **view only**, and none at all when there is no url. The
                 per-row download glyph is gone: downloading is what the batch beneath the list does, and
@@ -334,7 +403,7 @@ export function DocRowList({
                 its width in CSS, so an empty one keeps the row's shape without leaving an inert glyph
                 that looks like a control the renter failed to press. */}
             <span className="mp-acts">
-              {docRowActions(r).map((a, i) => {
+              {actions.map((a, i) => {
                 // A row holding several files draws several identical glyphs, so each is named after ITS
                 // file — and numbered too, because a lessor can file two papers of the same type and the
                 // labels would then repeat.
@@ -344,7 +413,12 @@ export function DocRowList({
                   multi && a.file
                     ? `${L(a.file.label.en, a.file.label.ar)} ${L(String(nth), arDigits(nth))}`
                     : r.name;
-                const title = L(`View ${what}`, `عرض ${what}`);
+                // ~~«عرض x»~~ — **«افتح x في تبويب جديد»** since 2026-08-11, because the row itself now
+                // says «اعرض … في العارض» and two controls on one row cannot both be called "view".
+                // The distinction is real and worth the longer name: this one leaves the panel for the
+                // file, which is the only thing that works for a PDF and the only way to the SECOND
+                // paper of a row that holds two.
+                const title = L(`Open ${what} in a new tab`, `افتح ${what} في تبويب جديد`);
                 return (
                   <a
                     key={`${a.kind}:${i}`}

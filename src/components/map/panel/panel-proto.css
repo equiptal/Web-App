@@ -82,17 +82,44 @@
   overflow: hidden;
 }
 .mp-viewer img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* **ONE FRAME, TWO SUBJECTS** — the prototype's `eqViewer` (4288–4293), reached on 2026-08-11 when the
+   owner made a document row press open its paper here. Its three states, with its own numbers:
+
+   - the machine's photograph — `196px`, `cover`. It fills the frame because a crop of a machine is
+     still a machine, and the panel is 392 px wide.
+   - **a document — `268px` over `#EEF3F9`, `contain`.** A certificate at 196 px is a picture of a
+     certificate: the extra 72 px is the difference between seeing that a paper is there and reading
+     what it says. `contain` for the same reason — a cropped certificate loses precisely the corner the
+     stamp is in. `34px` of bottom padding is the caption strip's height, kept clear so the sheet is
+     never partly under it.
+   - **a photo opened from a ROW — `268px`, `contain`, over `#0F2238`.** Same frame, and the dark
+     backdrop is the prototype's: a photograph shown whole rather than cropped has letterboxing beside
+     it, and light bars around a photograph read as part of the photograph. */
+.mp-viewer.doc { height: 268px; background: #eef3f9; }
+.mp-viewer.doc img { object-fit: contain; }
+.mp-viewer.doc.photo img { background: #0f2238; }
+.mp-viewer.doc.paper img { background: #fff; padding: 10px 10px 34px; }
+
+/* Two states share this: a machine with no photograph on its file, and a file the browser would not
+   render as an image. The second one carries a link out, which is why this is a column now — the
+   sentence and the way out stack rather than running together on one line. */
 .mp-hero-empty {
   width: 100%;
   height: 100%;
   display: flex;
+  flex-direction: column;
+  gap: 8px;
   align-items: center;
   justify-content: center;
+  padding: 0 18px;
+  text-align: center;
   font-size: 12px;
   font-weight: 700;
   color: #6b8fa8;
   background: #f8fafc;
 }
+.mp-hero-empty a { color: #2563eb; text-decoration: underline; }
 /* **A CAPTION STRIP, not a scrim** (2026-08-09). ~~A scrim under the title only — never over the
    whole photo, which would dim the thing being shown.~~ Withdrawn: the argument was right about
    scrims and still ended in one, because a legible white title needs darkness under it wherever the
@@ -143,8 +170,20 @@
 .mp-back:hover { background: #f8fafc; }
 
 /* **«تكبير» · «تحميل»** — restored 2026-08-09; the panel had neither, and the owner's screenshot
-   shows both. LABELLED pills rather than bare glyph circles, which is the prototype's own note on
-   them: a 32 px circle with an unfamiliar icon in it is a guess. */
+   shows both.
+
+   **ICON CIRCLES, 2026-08-11 (owner).** ~~LABELLED pills rather than bare glyph circles, which is the
+   prototype's own note on them: a 32 px circle with an unfamiliar icon in it is a guess.~~ Struck, not
+   deleted: the objection was real, and it is now ANSWERED rather than dropped. Every tool carries
+   `aria-label` AND `title` with the same words the pill used to print, so the name is on the control
+   for a screen reader and one hover away from anyone else; what an icon-only control must never be is
+   nameless, and none of these is. What the pills cost was the top corner of the photograph — labelled
+   at `0 11px` they are most of the frame's width at the panel's real 392 px, laid over the one thing
+   on this surface the renter came to look at. `32 × 32` keeps the prototype's height, radius, fill,
+   border and shadow and spends none of that width, and the glyphs are `eqViewer`'s own paths.
+
+   The frame carries three while it holds a document — back-to-the-photograph, enlarge, download — and
+   two while it holds the machine's photograph. */
 .mp-tools {
   position: absolute;
   top: 12px;
@@ -157,8 +196,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 32px;
   height: 32px;
-  padding: 0 11px;
+  padding: 0;
   border: 1px solid #c8d8e8;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.97);
@@ -390,24 +430,36 @@
    Two reds stay out of it. The **shortfall alert** is orange by AC-06 and is a different surface. The
    **match grid** already used red for a failed match and keeps it. */
 
+/* The heading and its pill are `eqDocsTab`'s `grp()` (4356–4361), value for value: `12px/800` in the
+   palette's DEEP — not the navy this was, and not 11 px. A group heading is the only thing between two
+   lists of near-identical rows, and at 11 px in the row's own navy it was reading as one more row.
+   Its pill: `999px`, `2px 9px`, `10px/800`, `nowrap` — a rounder, slightly larger capsule than the
+   `20px / 2px 8px / 9.5px` it carried. Only the two hues are ours, and both are the documented
+   substitutions this file's head records (`#D9362A` for its `#C62A2A`, `#16A34A` for its `#12904A`). */
 .mp-grp { margin-top: 14px; }
 .mp-grp-h {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 7px;
-  font-size: 11px;
+  margin-bottom: 9px;
+  font-size: 12px;
   font-weight: 800;
-  color: #1c3550;
+  color: #16304f;
 }
+/* `flex: 1` on the title, so the pill sits on the group's FAR edge rather than trailing the words —
+   the prototype's `grp()` and its company twin (4112) both do it. It is what puts every group's
+   attention claim in one column, which is the column the renter scans before he reads a heading. */
+.mp-grp-h > span:first-child { flex: 1; min-width: 0; }
 .mp-grp-h .mp-att-pill {
-  border-radius: 20px;
-  padding: 2px 8px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 2px 9px;
   background: rgba(217, 54, 42, 0.09);
   border: 1px solid rgba(217, 54, 42, 0.24);
   color: #d9362a;
-  font-size: 9.5px;
+  font-size: 10px;
   font-weight: 800;
+  white-space: nowrap;
 }
 .mp-grp-h .mp-att-pill.done {
   background: rgba(22, 163, 74, 0.09);
@@ -479,6 +531,41 @@
 .mp-row.picked { border-color: #16304f; background: rgba(22, 48, 79, 0.08); }
 .mp-row.missing { border-color: rgba(217, 54, 42, 0.22); background: rgba(217, 54, 42, 0.045); }
 .mp-row.picked.missing { border-color: #16304f; background: rgba(22, 48, 79, 0.08); }
+
+/* **The row that is IN THE FRAME** (owner, 2026-08-11). The prototype marks it with the navy border
+   and a `rgba(15,34,56,.045)` fill — but the prototype has no other state to confuse it with, because
+   there selection is the checkbox and nothing else. Here navy-plus-fill is already `.picked`, and
+   `.picked` is settled (owner, 2026-08-10: a selection is navy, `#2563EB` is the ACTION).
+
+   So the framed row takes the same navy and states it a different way: the hairline DOUBLED by an
+   inset ring, and no fill of its own. Emphasis rather than a second colour — which keeps the surface's
+   two-colour rule intact and, more to the point, lets a row be framed and ticked at once and still say
+   both. A third hue would have made "I am reading this" and "I am about to download this" two things
+   the renter has to learn apart. The statement is also made in words: `aria-current` on the button. */
+.mp-row.open { border-color: #16304f; box-shadow: inset 0 0 0 1px #16304f; }
+
+/* The pressable body of a row: its name, its status line and its thumbnail, in ONE control (owner,
+   2026-08-11). It is a `<button>` when there is a file to frame and a `<span>` when there is not, and
+   the rule is shared so the two are the same shape — a row nobody can open must not be a differently
+   sized row. `gap: 10px` is `.mp-row`'s own, restated here because the wrapper now owns the space
+   between the text and the tile; the row's geometry is unchanged by the wrapping.
+   The tick and the `↗` are its SIBLINGS, never its children — that is what makes pressing the row and
+   ticking it independent, with no propagation to stop. */
+.mp-rowopen {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+span.mp-rowopen { cursor: default; }
 /* The OTHER mode's rows while a selection holds (owner's UI design, 2026-08-08). 45%: faint enough that
    the eye skips them, legible enough that the renter can still read what he is not allowed to tick — the
    row has not gone away, it is out of scope for THIS selection. The tick inside it is genuinely
@@ -722,20 +809,55 @@
   cursor: not-allowed;
 }
 
+/* ═══════════════════ the documents tab is a column with a bar at its foot ═══════════════════ */
+
+/* `eqDocsTab` (4399) is a `flex` column at `min-height: 100%` whose last child is a 76 px bar pinned
+   to the bottom of the scrollport. Ours was a list in a padded box with two buttons after it, so on a
+   machine with eight papers the tab's actions were wherever the renter had stopped scrolling — and
+   V7's own footer has been stepping aside for this tab since 2026-08-09 on the stated grounds that
+   *"the documents tab has its own footer"*, which until now it did not.
+   The insets are the prototype's too: groups on `13px 14px 4px` in place of `.mp-body`'s flat 14 px,
+   which is why this tab is the one surface `EquipmentDetail` does not wrap in it. */
+.mp-docs {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+.mp-docs .mp-grp { margin-top: 0; padding: 13px 14px 4px; }
+.mp-docs-notes { padding: 6px 14px 12px; }
+.mp-docs-notes .mp-note:first-child { margin-top: 0; }
+
 /* BOTH footer buttons, side by side and both always present (owner's UI design, 2026-08-08). The ask
    carries the longer label, so it takes the larger share rather than wrapping to two lines beside a
-   one-word «تنزيل». Flex is direction-agnostic, so the pair reads download-then-ask in both locales. */
+   one-word «تنزيل». Flex is direction-agnostic, so the pair reads download-then-ask in both locales.
+
+   `margin-top: auto` puts the bar at the foot of a short list and `position: sticky` keeps it at the
+   foot of a long one — the prototype's own pair (4408). `rgba(255,255,255,.97)` is its fill, and it is
+   nearly-opaque rather than opaque on purpose: the row scrolling under the bar stays faintly visible,
+   so the bar reads as sitting over the list rather than as the end of it. `#EDF2F7` — the machine
+   tab's footer — is deliberately NOT used here; that bar closes a page, this one floats over one. */
 .mp-sendrow {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin-top: auto;
+  box-sizing: border-box;
+  height: 76px;
   display: flex;
-  align-items: stretch;
+  align-items: center;
   gap: 8px;
-  margin-top: 8px;
+  padding: 0 18px;
+  border-top: 1px solid #e1e9f1;
+  background: rgba(255, 255, 255, 0.97);
 }
+/* `12px`, `foot()`'s own size (4397) — the shared `.mp-send` is 11.5 px because the company panel's
+   single full-width button reads at that; a pair of buttons splitting 392 px does not. */
 .mp-sendrow .mp-send {
   margin-top: 0;
   flex: 1 1 0;
   min-width: 0;
   padding-inline: 10px;
+  font-size: 12px;
 }
 .mp-sendrow .mp-send.wide { flex: 1.9 1 0; }
 
