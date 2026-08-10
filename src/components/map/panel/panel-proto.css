@@ -469,9 +469,16 @@
   margin-bottom: 6px;
   background: #fff;
 }
-.mp-row.picked { border-color: #2563eb; background: rgba(37, 99, 235, 0.08); }
+/* A PICKED row wears the prototype's navy `#16304F`, not the action blue (owner, 2026-08-10). The
+   same move `.mp-doc` already made on 2026-08-09 and for the same reason: `#2563EB` is this surface's
+   ACTION colour — it is what «اطلب التأكيد» is painted in, and AC-33 requires it there precisely
+   because that control must read as pressable beside a red chip. A selected row is not an action; it
+   is a state. Sharing the action's colour made a ticked row look like something still to be pressed.
+   `picked.missing` repeats the rule rather than inheriting it, because the missing tint below would
+   otherwise win on specificity and a selected missing row would lose its outline entirely. */
+.mp-row.picked { border-color: #16304f; background: rgba(22, 48, 79, 0.08); }
 .mp-row.missing { border-color: rgba(217, 54, 42, 0.22); background: rgba(217, 54, 42, 0.045); }
-.mp-row.picked.missing { border-color: #2563eb; background: rgba(37, 99, 235, 0.08); }
+.mp-row.picked.missing { border-color: #16304f; background: rgba(22, 48, 79, 0.08); }
 /* The OTHER mode's rows while a selection holds (owner's UI design, 2026-08-08). 45%: faint enough that
    the eye skips them, legible enough that the renter can still read what he is not allowed to tick — the
    row has not gone away, it is out of scope for THIS selection. The tick inside it is genuinely
