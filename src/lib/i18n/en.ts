@@ -1001,6 +1001,9 @@ export const en = {
     kindReply: "Reply to your ask",
     kindRefusal: "Your ask was refused",
     kindMessage: "New message",
+    // The composer's send control. The prototype labels it «إرسال» in words; ours draws a glyph, so
+    // the word has to reach a screen reader some other way or the button announces as "button".
+    send: "Send",
   },
   /* ── V12 · the price footer (spec 004 §6.10, 004a §4a.1 + §4a.4) ──
      Figures and a hand-off. It never edits a figure and never re-implements negotiation. */

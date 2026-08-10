@@ -523,7 +523,14 @@ export function ChatDock({ bid, groupKey = null, fleet, sendNonce = 0 }: ChatDoc
               placeholder={t.chatDock.placeholder}
               disabled={busy || !active}
             />
-            <button type="button" className="bm-chat-send" onClick={() => void send()} disabled={busy || !text.trim() || !active}>
+            <button
+              type="button"
+              className="bm-chat-send"
+              onClick={() => void send()}
+              disabled={busy || !text.trim() || !active}
+              aria-label={t.chatDock.send}
+              title={t.chatDock.send}
+            >
               {/* The glyph is mirrored in CSS with the script, not swapped for another icon. */}
               <span className="material-icons-outlined">send</span>
             </button>
