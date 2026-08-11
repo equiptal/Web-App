@@ -6,13 +6,18 @@ import {
   renteeDraftStep,
   type RenteeRequestCardPayload,
   type RenteeRequestDraft,
+  type RenteeRequestReplyPayload,
 } from "@/lib/contract/rentee-request";
 import {
+  askAnsweredBy,
   draftSubject,
   postedSubject,
+  replyAnswerLine,
+  replyCardView,
   requestCardView,
   type RequestCardCtx,
   type RequestCardMachine,
+  type RequestThreadCard,
 } from "@/lib/contract/request-card";
 
 /**
@@ -238,7 +243,8 @@ describe("the status row is re-read from the machine, never stored (RM3-AC-18)",
       availability,
       ctx({ machine: () => machine(), reply: () => ({ resolution: "declined" }) }),
     );
-    expect(view.status).toEqual({ tone: "refused", label: "اعتذر المورد" });
+    // «المورّد» — the one word for the counterparty, the same one the reply card uses.
+    expect(view.status).toEqual({ tone: "refused", label: "اعتذر المورّد" });
   });
 
   it("says nothing at all when this surface holds no fleet to read it off", () => {
@@ -290,5 +296,154 @@ describe("the draft card states what it is, and never what the supplier owes", (
     // A document ask states itself through its chips; a sentence above them would say it twice.
     expect(view.docChips).toEqual(["«istimara»", "«tuv_cert»"]);
     expect(view.askText).toBeNull();
+  });
+});
+
+/* ═══════════════════════ 5 · the supplier's reply, in the ask's own card ═══════════════════════ */
+
+/**
+ * **V12a — the answer arrives in the format of the card it answers** (owner, 2026-08-11: *"the
+ * supplier response must arrive in the same format of the sent card but with supplier answer"*).
+ *
+ * The reply payload carries only `inReplyTo` and a resolution, so everything the header shows has to
+ * be resolved from the thread. Three properties are asserted, and they are the three that were wrong:
+ *
+ * 1. **The header is the REQUEST's header**, built by the request's own function — not a second
+ *    rendering that can drift from it.
+ * 2. **The answer answers the question that was asked.** "Done" said nothing; each kind × resolution
+ *    now reads as an answer to that kind, and only `declined` ever reads as a refusal.
+ * 3. **An unresolved reply says less, never more.** No ask in the window → no card, and the caller
+ *    keeps the bare form rather than naming equipment nobody read.
+ */
+
+const EN = (en: string, _ar: string) => en;
+const AR = (_en: string, ar: string) => ar;
+
+const reply = (over: Partial<RenteeRequestReplyPayload> = {}): RenteeRequestReplyPayload => ({
+  type: "rentee_request_reply",
+  inReplyTo: "RQ-7F3A",
+  equipmentId: "eq-1",
+  resolution: "provided",
+  ...over,
+});
+
+/** A thread as the dock projects it: asks, replies, and the ordinary chat between them. */
+const thread = (...cards: RequestThreadCard[]): RequestThreadCard[] => cards;
+
+describe("a reply resolves the ask it answers, out of the thread, by reference", () => {
+  it("finds the ask whatever order the window loaded in — a channel read is not ordered", () => {
+    const ask = posted();
+    expect(askAnsweredBy(thread({ reply: reply() }, {}, { ask }), reply())).toBe(ask);
+    expect(askAnsweredBy(thread({ ask }, {}, { reply: reply() }), reply())).toBe(ask);
+  });
+
+  it("does not answer with SOME other ask — the reference has to match", () => {
+    expect(askAnsweredBy(thread({ ask: posted({ ref: "RQ-0001" }) }), reply({ inReplyTo: "RQ-7F3A" }))).toBeNull();
+    // Ordinary chat and the negotiation vocabulary ride this list as empty entries.
+    expect(askAnsweredBy(thread({}, {}, {}), reply())).toBeNull();
+  });
+});
+
+describe("the reply card IS the request card, with the answer where the waiting state was", () => {
+  const ask = posted();
+  const c = ctx({ machine: () => machine() });
+
+  it("carries the same tile, title, serial, reference and ask line as the card it answers", () => {
+    const sent = requestCardView(postedSubject(ask), c);
+    const answered = replyCardView(thread({ ask }, { reply: reply() }), reply(), c)!;
+    // Everything BUT the status row is the request's own view — one function decides both, so the
+    // pair cannot drift into naming one machine two ways.
+    expect({ ...answered, status: null }).toEqual({ ...sent, status: null });
+    expect(answered.title).toBe("CAT 320D · حفّار ٢٠ طن");
+    expect(answered.ref).toBe("RQ-7F3A");
+    expect(answered.kindLabel).toBe("طلب تأكيد التوفّر");
+  });
+
+  it("states the answer, not the wait", () => {
+    const answered = replyCardView(thread({ ask }, { reply: reply() }), reply(), c)!;
+    expect(answered.status).toEqual({ tone: "answered", label: "أكّد توفّر هذه المعدّة" });
+    // The mutation this guards: the request's own reading leaking onto the reply.
+    expect(answered.status?.label).not.toBe("بانتظار ردّه");
+  });
+
+  it("still states the answer on a surface holding no fleet — a reply needs none", () => {
+    // The REQUEST goes quiet without a fleet (a verdict it cannot derive). The reply does not: what
+    // the supplier said is a thing he said, not a thing read off a machine.
+    const answered = replyCardView(thread({ ask }, { reply: reply() }), reply(), ctx({ fleetKnown: false }))!;
+    expect(answered.status).toEqual({ tone: "answered", label: "أكّد توفّر هذه المعدّة" });
+  });
+
+  it("falls back to the bare form — null — when the ask is not in the loaded window", () => {
+    // An older page, a partial read. Naming an equipment on nothing but a matching reference would
+    // put a machine's name under a supplier's answer as a guess.
+    expect(replyCardView(thread({ reply: reply() }), reply(), c)).toBeNull();
+    expect(replyCardView(thread(), reply(), c)).toBeNull();
+  });
+});
+
+describe("the answer is worded as an answer to the question that was asked", () => {
+  type Subject = Parameters<typeof replyAnswerLine>[0];
+  const line = (
+    kind: Subject["kind"],
+    resolution: RenteeRequestReplyPayload["resolution"],
+    over: Partial<Subject> = {},
+    l = EN,
+  ) => replyAnswerLine({ kind, resolution, ...over }, l);
+
+  it("an availability ask: confirmed, declined, or not available — never «Done»", () => {
+    expect(line("availability", "provided").label).toBe("He confirmed this equipment is available");
+    expect(line("availability", "declined").label).toBe("He declined to confirm availability");
+    expect(line("availability", "unavailable").label).toBe("He answered: this equipment is not available");
+    expect(line("availability", "provided", {}, AR).label).toBe("أكّد توفّر هذه المعدّة");
+  });
+
+  it("a document ask: the papers were added — and singular when one was asked for", () => {
+    expect(line("document", "provided", { docCount: 1 }).label).toBe(
+      "He added the document to this equipment's file",
+    );
+    expect(line("document", "provided", { docCount: 3 }).label).toBe(
+      "He added the documents to this equipment's file",
+    );
+    expect(line("document", "declined", { docCount: 1 }).label).toBe("He declined to provide the document");
+    // `unavailable` on a document ask is about the EQUIPMENT — he never said the papers were missing.
+    expect(line("document", "unavailable", { docCount: 2 }).label).toBe(
+      "He answered: this equipment is not available",
+    );
+  });
+
+  it("an alternative ask reads in the request's own type word, and is never a swap", () => {
+    const w = { typeWord: "حفّار زاحف ٣٠ طن" };
+    expect(line("alternative", "provided", w, AR).label).toBe("أضاف حفّار زاحف ٣٠ طن أخرى");
+    expect(line("alternative", "declined", w, AR).label).toBe("اعتذر عن إضافة حفّار زاحف ٣٠ طن أخرى");
+    expect(line("alternative", "unavailable", w, AR).label).toBe("ردّ: لا تتوفّر لديه حفّار زاحف ٣٠ طن أخرى");
+    // No type word — «معدّة», and "equipment" in English.
+    expect(line("alternative", "provided").label).toBe("He added other equipment");
+    expect(line("alternative", "unavailable").label).toBe("He answered: he has no other equipment available");
+  });
+
+  it("says only what the resolution says when the ask could not be resolved", () => {
+    expect(line(null, "provided").label).toBe("He provided what was asked");
+    expect(line(null, "declined").label).toBe("He declined");
+    expect(line(null, "unavailable").label).toBe("He answered: not available");
+    // «المورّد», never «المؤجّر».
+    expect(line(null, "declined", {}, AR).label).toBe("اعتذر المورّد");
+  });
+
+  it("NEVER implies a refusal that was not made — only `declined` is a refusal", () => {
+    for (const k of ["availability", "document", "alternative", null] as const) {
+      expect(line(k, "provided").tone).toBe("answered");
+      // "I can't" is not "I won't": `unavailable` takes the amber tone but says nothing about
+      // willingness, and its words never contain a declining.
+      expect(line(k, "unavailable").tone).toBe("refused");
+      expect(line(k, "unavailable").label.toLowerCase()).not.toContain("declin");
+      expect(line(k, "declined").label.toLowerCase()).toContain("declin");
+    }
+  });
+
+  it("says «equipment», never «machine» — one word for the thing across the surface", () => {
+    const all = (["availability", "document", "alternative", null] as const).flatMap((k) =>
+      (["provided", "declined", "unavailable"] as const).map((r) => line(k, r, { docCount: 2 }).label),
+    );
+    for (const label of all) expect(label.toLowerCase()).not.toContain("machine");
   });
 });

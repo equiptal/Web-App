@@ -441,8 +441,13 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
        to come off the Stream author, exactly as the plain bubbles below it already take theirs. */
     const stream = dockSrc.slice(dockSrc.indexOf("messages.map((m) => {"), dockSrc.indexOf("<div ref={bottomRef} />"));
     expect(stream).toContain("const mine = myStreamId != null && m.user?.id === myStreamId;");
-    // Both card wrappers are driven by that one reading, and NEITHER states a side literally.
-    expect(stream.match(/bm-chat-card \$\{mine \? "is-mine" : "is-them"\}/g) ?? []).toHaveLength(2);
+    /* All THREE card wrappers are driven by that one reading, and none states a side literally.
+       The third arrived with the owner's next ruling the same day — *"the supplier response must
+       arrive in the same format of the sent card but with supplier answer"* — which renders a reply
+       through `RequestCard` when the ask it answers is in the window, and leaves the bare `ChatCard`
+       wrapper for when it is not. Both of those are the supplier's message and take his side the
+       same way. */
+    expect(stream.match(/bm-chat-card \$\{mine \? "is-mine" : "is-them"\}/g) ?? []).toHaveLength(3);
     expect(stream).not.toContain('className="bm-chat-card is-mine"');
     expect(stream).not.toContain('className="bm-chat-card is-them"');
   });

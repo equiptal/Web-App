@@ -30,6 +30,7 @@ import {
   type RenteeRequestCardPayload,
   type RenteeRequestDraft,
   type RenteeRequestKind,
+  type RenteeRequestReplyPayload,
   type RenteeRequestResolution,
   type RenteeRequestScope,
   type RequestTargetMachine,
@@ -231,7 +232,8 @@ export function requestCardView(
               `هل لديك ${another} أخرى تضيفها وتطابق طلبي؟`,
             )
           : L(
-              "Do you have another machine to add that meets my request?",
+              // "equipment", never "machine" — one word for the thing across the whole surface.
+              "Do you have other equipment to add that meets my request?",
               "هل لديك معدّة أخرى تضيفها وتطابق طلبي؟",
             );
       case "document":
@@ -257,7 +259,7 @@ export function requestCardView(
       case "answered":
         return { tone: "answered", label: L("Answered — his file now shows it", "تم الردّ — ظهر على ملفه") };
       case "refused":
-        return { tone: "refused", label: L("He declined", "اعتذر المورد") };
+        return { tone: "refused", label: L("He declined", "اعتذر المورّد") };
       case "unavailable":
         return { tone: "refused", label: L("He answered: not available", "ردّ: غير متوفّرة") };
       case "unknown":
@@ -295,5 +297,179 @@ export function requestCardView(
     docChips,
     askText,
     status,
+  };
+}
+
+/* ═════════ V12a · the supplier's ANSWER, in the card of the ask it answers (owner, 2026-08-11) ═════
+ *
+ * The ruling: *"the supplier response must arrive in the same format of the sent card but with
+ * supplier answer"*.
+ *
+ * Until now a reply rendered through the generic `buildChatCardView` — a "The supplier answered"
+ * title, a `Reference` row, an `Answer: Done` row. It said nothing about WHAT was asked or WHICH
+ * equipment, so a renter scrolling the thread saw his own card followed by an unrelated receipt and
+ * had to carry the reference in his head to pair them.
+ *
+ * The reply payload carries only `inReplyTo` and a resolution (§7.3) — no equipment, no kind — so the
+ * header cannot be built from it. It is **resolved from the thread**: the ask carrying that `ref` is
+ * found among the loaded messages and its OWN view is built by `requestCardView` above, so the two
+ * cards cannot drift — one function decides the tile, the title, the reference and the ask line for
+ * both. Only the status row differs, and that is the whole point: where the request says «بانتظار
+ * ردّه», the reply says what he answered.
+ *
+ * **An unresolved reply says less; it never guesses.** When the ask is not in the loaded window — an
+ * older page, a partial channel read — `replyCardView` returns null and the caller keeps today's bare
+ * form. Naming an equipment we have not read would put a machine's name under a supplier's answer on
+ * nothing but a matching reference.
+ */
+
+/** The thread as these functions read it: the asks and the answers, in load order. Deliberately the
+ *  same shape `outstandingAskIdentities` takes — one projection of a message list serves both. */
+export interface RequestThreadCard {
+  ask?: RenteeRequestCardPayload | null;
+  reply?: RenteeRequestReplyPayload | null;
+}
+
+/**
+ * The ask a reply answers, or null when the thread in hand does not hold it.
+ *
+ * Pure and order-independent: a channel read is not guaranteed to be ordered, so the ask is looked up
+ * across the whole window rather than searched backwards from the reply.
+ */
+export function askAnsweredBy(
+  thread: readonly RequestThreadCard[],
+  reply: Pick<RenteeRequestReplyPayload, "inReplyTo">,
+): RenteeRequestCardPayload | null {
+  const want = reply.inReplyTo.trim();
+  if (!want) return null;
+  for (const c of thread) {
+    if (c.ask && c.ask.ref.trim() === want) return c.ask;
+  }
+  return null;
+}
+
+/** What the supplier's answer is worded FROM: the ask's own kind, and the resolution he sent. */
+export interface ReplyAnswerSubject {
+  /** Null when the ask could not be resolved — the wording then says only what the resolution says. */
+  kind: RenteeRequestKind | null;
+  resolution: RenteeRequestResolution;
+  /** How many documents were asked for, so a one-paper ask does not read as several. */
+  docCount?: number;
+  /** The request's type word, as {@link RequestCardCtx.typeWord} carries it. */
+  typeWord?: string | null;
+}
+
+/**
+ * The answer as a line the renter can read without re-reading the question — "Done" is not an answer
+ * (owner, 2026-08-11). Each resolution is worded in the terms of the ask it answers: an `availability`
+ * ask answered `provided` is a confirmation, a `document` ask answered `provided` is papers added, and
+ * `unavailable` is always about the equipment rather than about the papers.
+ *
+ * The one wording rule that outranks the rest is the card's existing one: **never imply a refusal that
+ * was not made.** `declined` is the only resolution that says he refused, and it is the only wording
+ * here that says so; `unavailable` reports a fact about the equipment, not an unwillingness.
+ *
+ * Exported so the bare fallback in `buildChatCardView` says the same words with the kind removed —
+ * one table, two renderings, no drift.
+ */
+export function replyAnswerLine(
+  subject: ReplyAnswerSubject,
+  L: LFn,
+): { tone: RequestCardTone; label: string } {
+  const { resolution } = subject;
+  const another = subject.typeWord?.trim() || null;
+  const many = (subject.docCount ?? 0) > 1;
+  const tone: RequestCardTone = resolution === "provided" ? "answered" : "refused";
+
+  const label = ((): string => {
+    if (subject.kind === "availability") {
+      switch (resolution) {
+        case "provided":
+          return L("He confirmed this equipment is available", "أكّد توفّر هذه المعدّة");
+        case "declined":
+          return L("He declined to confirm availability", "اعتذر عن تأكيد التوفّر");
+        case "unavailable":
+          return L("He answered: this equipment is not available", "ردّ: هذه المعدّة غير متوفّرة");
+      }
+    }
+    if (subject.kind === "document") {
+      switch (resolution) {
+        case "provided":
+          return many
+            ? L("He added the documents to this equipment's file", "أضاف المستندات إلى ملف هذه المعدّة")
+            : L("He added the document to this equipment's file", "أضاف المستند إلى ملف هذه المعدّة");
+        case "declined":
+          return many
+            ? L("He declined to provide the documents", "اعتذر عن تقديم المستندات")
+            : L("He declined to provide the document", "اعتذر عن تقديم المستند");
+        case "unavailable":
+          // A document ask answered `unavailable` is not a statement about the PAPERS — he answered
+          // about the equipment, and "the documents are unavailable" would invent an answer he did
+          // not give.
+          return L("He answered: this equipment is not available", "ردّ: هذه المعدّة غير متوفّرة");
+      }
+    }
+    if (subject.kind === "alternative") {
+      switch (resolution) {
+        case "provided":
+          return another
+            ? L(`He added another ${another}`, `أضاف ${another} أخرى`)
+            : L("He added other equipment", "أضاف معدّة أخرى");
+        case "declined":
+          return another
+            ? L(`He declined to add another ${another}`, `اعتذر عن إضافة ${another} أخرى`)
+            : L("He declined to add other equipment", "اعتذر عن إضافة معدّة أخرى");
+        case "unavailable":
+          // This ask is FOR equipment that is not on his list yet, so "not available" reads as "he
+          // has none to add" — a fact about his fleet, not a refusal.
+          return another
+            ? L(`He answered: he has no other ${another} available`, `ردّ: لا تتوفّر لديه ${another} أخرى`)
+            : L("He answered: he has no other equipment available", "ردّ: لا تتوفّر لديه معدّة أخرى");
+      }
+    }
+    // The ask is not in hand. Say what the resolution says and NOTHING about equipment or papers.
+    switch (resolution) {
+      case "provided":
+        return L("He provided what was asked", "قدّم ما طُلب");
+      case "declined":
+        return L("He declined", "اعتذر المورّد");
+      case "unavailable":
+        return L("He answered: not available", "ردّ: غير متوفّرة");
+    }
+  })();
+
+  return { tone, label };
+}
+
+/**
+ * The thread + a reply → **the ask's own card, with the answer where its waiting state was**.
+ *
+ * Null when the ask is not in the loaded window — see the section header: the caller falls back to the
+ * bare form rather than this function inventing a header.
+ *
+ * The status is NOT re-derived from the fleet here, and that is deliberate. Rule 2 above re-reads the
+ * machine because a REQUEST asks what is true right now; a reply is a thing the supplier said at a
+ * moment, and it keeps saying it whether or not his file has moved since. The request card sitting
+ * above it is the one that tracks the fleet — which is also why the pair is worth showing.
+ */
+export function replyCardView(
+  thread: readonly RequestThreadCard[],
+  reply: RenteeRequestReplyPayload,
+  ctx: RequestCardCtx,
+): RequestCardView | null {
+  const ask = askAnsweredBy(thread, reply);
+  if (!ask) return null;
+  const view = requestCardView(postedSubject(ask), ctx);
+  return {
+    ...view,
+    status: replyAnswerLine(
+      {
+        kind: ask.kind,
+        resolution: reply.resolution,
+        docCount: ask.docTypes?.length ?? 0,
+        typeWord: ctx.typeWord ?? null,
+      },
+      ctx.L,
+    ),
   };
 }

@@ -19,6 +19,7 @@ import {
   type RenteeRequestState,
   type RequestTargetMachine,
 } from "./rentee-request";
+import { replyAnswerLine } from "./request-card";
 
 export type RoundRole = "supplier" | "rentee";
 
@@ -516,26 +517,34 @@ export function buildChatCardView(card: ChatCard, ctx: ChatCardCtx): ChatCardVie
     case RENTEE_REQUEST_CARD_TYPE:
       return renteeRequestCardView(card.card, ctx, base);
     case RENTEE_REQUEST_REPLY_CARD_TYPE:
+      /* ── The BARE reply — the fallback, not the shape a reply is meant to take (owner, 2026-08-11)
+         The ruling is that *"the supplier response must arrive in the same format of the sent card
+         but with supplier answer"*, and `replyCardView` does exactly that wherever the ask it answers
+         is in hand: the ask's own card, with the answer where its waiting state was.
+
+         This branch is what is left when it is NOT in hand — an older page, a partial channel read,
+         or a surface that renders the conversation through `ChatCard` alone (`/deal-room/[id]`).
+         It states the reference and the answer and names NO equipment, because resolving one from a
+         matching reference alone would put a machine's name under a supplier's answer on a guess.
+
+         The answer's words come from `replyAnswerLine` with the kind removed — one table for both
+         renderings, so the bare form can never say something the full card would contradict. "Done"
+         is gone from both: it was not an answer to anything. */
       return {
         ...base,
         kind: card.type, icon: "reply", tone: "ask-reply",
-        title: L("The supplier answered", "ردّ المؤجّر"),
+        // «المورّد», never «المؤجّر» — one word for the counterparty across the surface.
+        title: L("The supplier answered", "ردّ المورّد"),
         rows: [
           { label: L("Reference", "المرجع"), value: card.reply.inReplyTo, ltr: true },
-          { label: L("Answer", "الردّ"), value: RESOLUTION_WORD[card.reply.resolution](L) },
+          {
+            label: L("Answer", "الردّ"),
+            value: replyAnswerLine({ kind: null, resolution: card.reply.resolution }, L).label,
+          },
         ],
       };
   }
 }
-
-/** The supplier's three possible answers, in the renter's words. `unavailable` is deliberately not
- *  folded into `declined`: "I won't" and "I can't" are different answers, and only one of them is
- *  worth asking again later. */
-const RESOLUTION_WORD: Record<"provided" | "declined" | "unavailable", (L: LFn) => string> = {
-  provided: (L) => L("Done", "تم"),
-  declined: (L) => L("Declined", "اعتذر"),
-  unavailable: (L) => L("Not available", "غير متوفّرة"),
-};
 
 /** The ask itself — «اطلب تأكيد التوفّر» / «اطلب مستنداً» / «اطلب معدّة أخرى», as it reads in the
  *  conversation, with its verdict re-derived from the machine on every render (RM3-AC-18). */
@@ -586,7 +595,9 @@ function renteeRequestCardView(
       case "answered":
         return { text: L("Answered — his file now shows it", "تم الردّ — ظهر على ملفه"), tone: "accepted", icon: "task_alt" };
       case "refused":
-        return { text: L("He declined", "اعتذر المؤجّر"), tone: "refused", icon: "do_not_disturb_on" };
+        // «المورّد», never «المؤجّر» — the request loop names the counterparty one way, and the reply
+        // card beside this one says the same word.
+        return { text: L("He declined", "اعتذر المورّد"), tone: "refused", icon: "do_not_disturb_on" };
       case "unavailable":
         return { text: L("He answered: not available", "ردّ: غير متوفّرة"), tone: "refused", icon: "do_not_disturb_on" };
       case "unknown":

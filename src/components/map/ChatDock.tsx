@@ -87,7 +87,14 @@ import {
   type RenteeRequestCardPayload,
   type RenteeRequestDraft,
 } from "@/lib/contract/rentee-request";
-import { draftSubject, postedSubject, requestCardView, type RequestCardCtx } from "@/lib/contract/request-card";
+import {
+  draftSubject,
+  postedSubject,
+  replyCardView,
+  requestCardView,
+  type RequestCardCtx,
+  type RequestThreadCard,
+} from "@/lib/contract/request-card";
 import { useLocale, useT } from "@/lib/i18n";
 import "@/components/deal-room/deal-room-proto.css";
 
@@ -396,20 +403,22 @@ export function ChatDock({
      control — and the surface already withdraws the control in that case (a confirmed machine has no
      «اطلب التأكيد», a held document is not a requestable row), so there is nothing to gain and one
      more way for the two halves of the guard to disagree. */
-  const outstandingAsks = useMemo(
+  /* The request loop's own cards, out of the message list and in load order — the ONE projection two
+     readings share: the outstanding-ask guard below, and the reply card's search for the ask it
+     answers (`replyCardView`). Ordinary chat and the negotiation vocabulary travel this list too as
+     empty entries, and neither may block a control or be mistaken for an ask. */
+  const threadCards: RequestThreadCard[] = useMemo(
     () =>
-      outstandingAskIdentities(
-        messages.map((m) => {
-          const card = chatCardOfMessage(m);
-          if (card?.type === RENTEE_REQUEST_CARD_TYPE) return { ask: card.card };
-          if (card?.type === RENTEE_REQUEST_REPLY_CARD_TYPE) return { reply: card.reply };
-          // Ordinary chat and the negotiation vocabulary travel this list too, and neither may block
-          // a request control.
-          return {};
-        }),
-      ),
+      messages.map((m) => {
+        const card = chatCardOfMessage(m);
+        if (card?.type === RENTEE_REQUEST_CARD_TYPE) return { ask: card.card };
+        if (card?.type === RENTEE_REQUEST_REPLY_CARD_TYPE) return { reply: card.reply };
+        return {};
+      }),
     [messages],
   );
+
+  const outstandingAsks = useMemo(() => outstandingAskIdentities(threadCards), [threadCards]);
 
   useEffect(() => {
     if (!onOutstandingAsks) return;
@@ -821,9 +830,38 @@ export function ChatDock({
                     </div>
                   );
                 }
+                /* ── The ANSWER, in the card of the ask it answers (owner, 2026-08-11) ────────────
+                   *"the supplier response must arrive in the same format of the sent card but with
+                   supplier answer."*
+
+                   The reply payload carries only `inReplyTo` and a resolution, so the header is
+                   resolved from the thread: `replyCardView` finds the ask carrying that reference
+                   among the loaded messages and builds ITS view with the very function the request
+                   card is built with — same tile, same title, same reference, same ask line — then
+                   replaces the waiting state with what he answered. A renter scrolling now sees a
+                   matched pair rather than a card followed by a receipt.
+
+                   Null means the ask is not in the loaded window, and the render falls through to
+                   the bare `ChatCard` form below rather than naming an equipment nobody read. */
+                if (card?.type === RENTEE_REQUEST_REPLY_CARD_TYPE) {
+                  const answered = replyCardView(threadCards, card.reply, cardCtx);
+                  if (answered) {
+                    return (
+                      <div key={m.id} className={`bm-chat-card ${mine ? "is-mine" : "is-them"}`}>
+                        <RequestCard
+                          view={answered}
+                          onOpenMachine={onOpenMachine}
+                          openLabel={t.chatDock.openMachine}
+                          at={chatCardTime(m.created_at, ar)}
+                        />
+                      </div>
+                    );
+                  }
+                }
                 if (card) {
                   // EVERY other custom type renders as a card — the negotiation vocabulary and the
-                  // supplier's reply alike. Never a bare grey pill (RM3-AC-48).
+                  // supplier's reply that could not be paired with its ask alike. Never a bare grey
+                  // pill (RM3-AC-48).
                   const view = buildChatCardView(card, {
                     ar, L, terms: [], at: m.created_at, responded: false, superseded: false,
                     // The dock never negotiates: it shows the conversation and hands off to

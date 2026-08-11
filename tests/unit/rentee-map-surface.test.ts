@@ -611,15 +611,19 @@ describe("the chat dock's tab strip touches no map state (RM3-AC-49)", () => {
     const tabWrites = [...tab.matchAll(/on[A-Z]\w*=\{[^}]*\}/g)].map((m) => m[0]);
     expect(tabWrites).toEqual(["onClick={() => setActiveBidId(tab.bidId)}"]);
 
-    // `onOpenMachine` is handed to `RequestCard` and to nothing else — not to the tab, not to the
-    // composer, not to a message bubble. Two mounts carry it (the sent card and the draft), and the
-    // counts are asserted against each other so a third consumer anywhere in the file fails the line.
-    expect(dock.match(/<RequestCard/g)).toHaveLength(2);
-    expect(dock.match(/onOpenMachine=\{onOpenMachine\}/g)).toHaveLength(2);
-    // Eight mentions in all: the prop declaration, the destructure, the resolver that decides whether
-    // a press is offered at all, its dependency, and the two `prop={prop}` pairs above. Anything more
-    // is a second consumer, which is what this line exists to catch.
-    expect(dock.match(/onOpenMachine/g)).toHaveLength(8);
+    /* `onOpenMachine` is handed to `RequestCard` and to nothing else — not to the tab, not to the
+       composer, not to a message bubble. THREE mounts carry it now: the sent card, the draft, and
+       the supplier's reply, which renders in the ask's own card since the owner's ruling of
+       2026-08-11 (*"the supplier response must arrive in the same format of the sent card but with
+       supplier answer"*) and is pressable for the same reason the ask is — it names the same
+       equipment. The counts are asserted against each other so a fourth consumer anywhere in the
+       file fails the line. */
+    expect(dock.match(/<RequestCard/g)).toHaveLength(3);
+    expect(dock.match(/onOpenMachine=\{onOpenMachine\}/g)).toHaveLength(3);
+    // Ten mentions in all: the prop declaration, the destructure, the resolver that decides whether
+    // a press is offered at all, its dependency, and the three `prop={prop}` pairs above. Anything
+    // more is a second consumer, which is what this line exists to catch.
+    expect(dock.match(/onOpenMachine/g)).toHaveLength(10);
   });
 
   it("declares callbacks that REPORT or ACT, and none that hands out map state", () => {
