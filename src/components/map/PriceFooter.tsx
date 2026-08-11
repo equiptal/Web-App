@@ -84,7 +84,35 @@ export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooter
       default: return plural ? t.priceFooter.days : t.priceFooter.day;
     }
   };
-  const periodCount = Math.round(totals.periodCount);
+  /** The fixed divisor behind a weekly/monthly rate, in the bid card's words. */
+  const divisorText = ((): string | null => {
+    switch ((totals.priceUnit || "PER_DAY").toUpperCase()) {
+      case "PER_WEEK": return t.priceFooter.divisorWeek;
+      case "PER_MONTH": return t.priceFooter.divisorMonth;
+      default: return null;
+    }
+  })();
+  /**
+   * The rental line's basis, as the bid card states it: the raw quoted rate over its own period, the
+   * BILLABLE days it is charged across, and the unit count. It used to read "{rate} × N {periods}" off
+   * the calendar duration — which counts the Fridays `rentalTotal` excludes, so the arithmetic on offer
+   * never quite reached the figure beside it.
+   */
+  const rentalBasis =
+    totals.rentalRaw
+      ? fmt(t.priceFooter.rentalBasisFlat, {
+          rate: money(totals.rate),
+          unit: periodWord(false),
+          n: num(totals.rentalUnits),
+          units: totals.rentalUnits === 1 ? t.priceFooter.unitOne : t.priceFooter.unitMany,
+        })
+      : fmt(t.priceFooter.rentalBasis, {
+          rate: money(totals.rate),
+          unit: periodWord(false),
+          days: num(totals.billableDays),
+          n: num(totals.rentalUnits),
+          units: totals.rentalUnits === 1 ? t.priceFooter.unitOne : t.priceFooter.unitMany,
+        }) + (divisorText ? ` · ${divisorText}` : "");
 
   /**
    * Hand off to the deal room **with the act attached**.
@@ -112,13 +140,7 @@ export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooter
         <div className="bm-foot-break">
           <Line
             label={t.priceFooter.rental}
-            sub={fmt(t.priceFooter.rentalBasis, {
-              rate: money(totals.rate),
-              periods: num(periodCount),
-              unit: periodWord(periodCount !== 1),
-              n: num(totals.rentalUnits),
-              units: totals.rentalUnits === 1 ? t.priceFooter.unitOne : t.priceFooter.unitMany,
-            })}
+            sub={rentalBasis}
             value={money(totals.rentalTotal)}
             currency={t.priceFooter.currency}
           />

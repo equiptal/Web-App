@@ -1101,9 +1101,17 @@ export const en = {
     // The one place the offered and the agreed count are reconciled (RM3-AC-66).
     unitsDiffer: "Priced on {agreed} agreed units — the offer was made of {offered}.",
     rental: "Rental",
-    // The basis, restated under the label the way the app restates it: rate, then how many periods,
-    // then how many units — so the rental total is arithmetic the reader can check, not a claim.
-    rentalBasis: "{rate} × {periods} {unit} × {n} {units} in your request",
+    // The basis, restated under the label the way the BID CARD restates it: the raw quoted rate over its
+    // own period, the days it is actually charged across, then how many units — so the rental total is
+    // arithmetic the reader can check, not a claim. Billable days, never the calendar span: the total
+    // excludes the Fridays, and a basis line that counted them stated a sum its own figure contradicted.
+    rentalBasis: "{rate}/{unit} × {days} billable days × {n} {units} in your request",
+    // Nothing to prorate — open-ended, per-job, or no start date. One full period, as quoted.
+    rentalBasisFlat: "{rate}/{unit} × {n} {units} in your request",
+    // The fixed divisor behind a weekly/monthly rate — what turns the quoted rate into the day count
+    // beside it. Printed whether or not this particular period comes out exact (app parity).
+    divisorWeek: "6 working days/week",
+    divisorMonth: "26 working days/month",
     // The legs keep their internal names as KEYS (mob/demob is what the backend and the deal room
     // call them) but wear the app's plain words, which is what a renter reading a price expects.
     mobilisation: "Delivery",

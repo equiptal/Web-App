@@ -58,6 +58,27 @@ describe("priceFooterModel — the same arithmetic as the deal-room bar (RM3-AC-
     expect(totals.grand).toBe(totals.subtotal + totals.vat);
   });
 
+  it("carries the billable-day count the basis line has to state", () => {
+    // The basis line under "Rental" reads "{rate}/{unit} × {days} billable days × {n} units", and the
+    // days it names must be the days `rentalTotal` was built from. It used to name the calendar span —
+    // an arithmetic that never reached the figure beside it, off by exactly the Fridays.
+    const { totals } = priceFooterModel(bid(), 10, SUNDAY);
+    expect(totals.billableDays).toBe(9);
+    expect(totals.rentalRaw).toBe(false);
+    expect(totals.rate * totals.billableDays * totals.rentalUnits).toBe(totals.rentalTotal);
+    // Period count follows the billable days too — 9 days of a daily rate is 9 periods, not 10.
+    expect(totals.periodCount).toBe(9);
+  });
+
+  it("names no day count when nothing prorated — there is no arithmetic to show", () => {
+    // No start date: the Fridays can't be located, so the rental falls back to one full period at the
+    // quoted rate. A "× N billable days" line here would be inventing a window.
+    const { totals } = priceFooterModel(bid({ priceUnit: "PER_MONTH" }), 10);
+    expect(totals.rentalRaw).toBe(true);
+    expect(totals.billableDays).toBe(0);
+    expect(totals.rentalTotal).toBe(totals.rate * totals.rentalUnits);
+  });
+
   it("honours an excluded leg — an excluded leg is zero, not absent", () => {
     const { totals } = priceFooterModel(bid({ mobExcluded: true }), 10);
     expect(totals.mobTotal).toBe(0);

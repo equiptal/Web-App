@@ -101,10 +101,10 @@ describe("excluded transport legs never print as a charge", () => {
     const bid = bc({ mobExcluded: true });
     const doc = build([groupEntry(bid)]);
 
-    // rental 1200/day × 10 days (per unit, app parity) = 12,000; demob 400 × 3 units = 1,200. No mob.
-    expect(doc.totals.subtotal).toBe(13_200);
-    expect(doc.totals.vat).toBeCloseTo(1_980, 6);
-    expect(doc.totals.total).toBeCloseTo(15_180, 6);
+    // rental 1200/day × 9 BILLABLE days (10 − one Friday) × 3 units = 32,400; demob 400 × 3 = 1,200. No mob.
+    expect(doc.totals.subtotal).toBe(33_600);
+    expect(doc.totals.vat).toBeCloseTo(5_040, 6);
+    expect(doc.totals.total).toBeCloseTo(38_640, 6);
 
     // The old request-view builder charged the excluded 500 anyway — this is the defect, pinned.
     expect(legacyRequestViewTotal(bid)).toBe(4_500); // 1200×1×3 + 500 + 400, mob included
@@ -115,7 +115,7 @@ describe("excluded transport legs never print as a charge", () => {
     const both = build([groupEntry(bc({ mobExcluded: true, demobExcluded: true }))]);
     expect(legRow(both, "Delivery to site").total).toBe("Excluded");
     expect(legRow(both, "Return from site").total).toBe("Excluded");
-    expect(both.totals.subtotal).toBe(12_000); // rental only
+    expect(both.totals.subtotal).toBe(32_400); // rental only — 1200 × 9 billable days × 3 units
 
     const demobOnly = build([groupEntry(bc({ demobExcluded: true }))]);
     expect(legRow(demobOnly, "Delivery to site").total).toBe("1,500.00"); // 500 × 3 units, still charged
@@ -143,8 +143,8 @@ describe("per-leg unit counts are honoured", () => {
 
     expect(mob.qty).toBe("1");
     expect(mob.total).toBe("500.00"); // 500 × 1, NOT 500 × 3
-    // rental 12,000 + mob 500 + demob 400×3
-    expect(doc.totals.subtotal).toBe(13_700);
+    // rental 32,400 + mob 500 + demob 400×3
+    expect(doc.totals.subtotal).toBe(34_100);
   });
 
   it("caps a leg count at the rental count — you can't mobilise more than you rent", () => {
@@ -158,7 +158,7 @@ describe("per-leg unit counts are honoured", () => {
     expect(legRow(doc, "Delivery to site").qty).toBe("3");
     expect(legRow(doc, "Delivery to site").total).toBe("1,500.00");
     expect(legRow(doc, "Return from site").total).toBe("1,200.00");
-    expect(doc.totals.subtotal).toBe(14_700); // 12,000 + 1,500 + 1,200
+    expect(doc.totals.subtotal).toBe(35_100); // 32,400 + 1,500 + 1,200
   });
 
   it("an unpriced leg still prints its reason rather than vanishing", () => {
@@ -246,20 +246,58 @@ describe("the document carries the content the request view used to omit", () =>
   });
 });
 
-describe("the grouped view's document is unchanged where nothing was negotiated", () => {
-  // Every assertion here is the behaviour BEFORE unification. An un-negotiated bid carries no exclusion
-  // and no per-leg counts, so the shared leg maths is arithmetically identical to the old `price × units`
-  // — which is why moving the grouped download onto it does not move the document renters already get.
-  it("prices a multi-item supplier group exactly as before", () => {
+describe("the leg maths leaves an un-negotiated bid's legs where they were", () => {
+  // An un-negotiated bid carries no exclusion and no per-leg counts, so the shared leg maths is
+  // arithmetically identical to the old `price × units` — moving the grouped download onto it does not
+  // move the transport charges. The RENTAL did move, and deliberately: see the describe below.
+  it("prices a multi-item supplier group across both bids", () => {
     const doc = build([
       groupEntry(bc({ id: "b1", price: 1000, priceUnit: "PER_DAY", mobPrice: 300, demobPrice: 200, unitsOffered: 2, numberOfUnits: 2 })),
       groupEntry(bc({ id: "b2", price: 5000, priceUnit: "PER_WEEK", mobPrice: 0, demobPrice: 0, unitsOffered: 1, numberOfUnits: 1 }), { requestCode: "REQ-00043", itemLabel: "Loader · 5 ton" }),
     ]);
-    // b1: 1000 × 10 days = 10,000 + (300 + 200) × 2 = 1,000 → 11,000
-    // b2: 5000 ÷ 6 × 10 days = 8,333.33… , legs 0
-    expect(doc.totals.subtotal).toBeCloseTo(11_000 + (5000 / 6) * 10, 6);
+    // b1: 1000 × 9 billable days × 2 units = 18,000 + (300 + 200) × 2 = 1,000 → 19,000
+    // b2: 5000 ÷ 6 × 9 billable days × 1 unit = 7,500, legs 0
+    expect(doc.totals.subtotal).toBeCloseTo(19_000 + (5000 / 6) * 9, 6);
     expect(doc.lineItems.filter((l) => l.num != null)).toHaveLength(2); // one numbered rental row per bid
     expect(doc.lineItems).toHaveLength(6); // + two leg rows each
+  });
+
+  it("prints the rental exactly as the bid card does — raw rate, billable days, divisor", () => {
+    const doc = build([groupEntry(bc({ price: 30_000, priceUnit: "PER_MONTH", mobPrice: 0, demobPrice: 0, unitsOffered: 2, numberOfUnits: 2 }))]);
+    const rental = doc.lineItems[0];
+
+    // PRICE column: the supplier's RAW quoted rate over its own period — never a derived per-day figure.
+    expect(rental.price).toBe("30,000.00 / month");
+    expect(rental.unit).toBe("month");
+    // QTY column: the days actually charged (10 − one Friday), times the units.
+    expect(rental.qty).toBe("9 days × 2");
+    // The divisor that turns the rate into those days, stated whether or not the period comes out exact.
+    expect(rental.totalNote).toBe("26 working days/month");
+    // TOTAL: (30,000 ÷ 26) × 9 × 2 — Fridays out, and every unit's rent in.
+    expect(rental.total).toBe("20,769.23");
+    expect(doc.totals.subtotal).toBeCloseTo((30_000 / 26) * 9 * 2, 6);
+  });
+
+  it("charges every unit's rent, not one unit's beside all-units transport", () => {
+    // The defect this replaced: the rental row priced ONE machine while the legs beside it were already
+    // multiplied by the unit count, so the grand total was neither per-unit nor the whole deal.
+    const one = build([groupEntry(bc({ price: 1000, priceUnit: "PER_DAY", mobPrice: 0, demobPrice: 0, unitsOffered: 1, numberOfUnits: 1 }))]);
+    const three = build([groupEntry(bc({ price: 1000, priceUnit: "PER_DAY", mobPrice: 0, demobPrice: 0, unitsOffered: 3, numberOfUnits: 3 }))]);
+    expect(three.totals.subtotal).toBe(one.totals.subtotal * 3);
+  });
+
+  it("charges a PER_JOB bid its flat price once per unit", () => {
+    const doc = build([groupEntry(bc({ price: 7_700, priceUnit: "PER_JOB", mobPrice: 0, demobPrice: 0, unitsOffered: 2, numberOfUnits: 2 }))]);
+    expect(doc.lineItems[0].qty).toBe("2");
+    expect(doc.lineItems[0].totalNote).toBeNull(); // no divisor — a flat price has no period to explain
+    expect(doc.totals.subtotal).toBe(15_400);
+  });
+
+  it("falls back to one full period, never a Friday-blind proration, with no start date", () => {
+    // No start date ⇒ the Fridays cannot be located ⇒ the bare quoted rate (mobile §3), NOT rate × days.
+    const doc = build([groupEntry(bc({ price: 5_000, priceUnit: "PER_WEEK", mobPrice: 0, demobPrice: 0, unitsOffered: 1, numberOfUnits: 1 }), { startDate: null })]);
+    expect(doc.lineItems[0].qty).toBe("1 week");
+    expect(doc.totals.subtotal).toBe(5_000);
   });
 
   it("still reframes an open-ended bid as a per-period rate", () => {

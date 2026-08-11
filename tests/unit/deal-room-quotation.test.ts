@@ -153,6 +153,30 @@ describe("the document reads the live room, not the frozen snapshot", () => {
     expect(doc.lineItems[0].price).not.toContain("month");
   });
 
+  it("prints the rental exactly as the bid card does — raw rate, billable days, divisor", () => {
+    // 2,800/day × 2 units over 1 Sep – 11 Sep. Ten days, one of them a Friday, so nine are charged.
+    const doc = buildDealRoomQuotationDoc(room(), null, RENTEE, false, L);
+    const rental = doc.lineItems[0];
+
+    expect(rental.price).toBe("2,800 / day");
+    expect(rental.unit).toBe("day");
+    // The QUANTITY the renter is shown is the days the rate is charged across — not the calendar span,
+    // which counts a Friday the total below it excludes.
+    expect(rental.qty).toBe("9 days × 2");
+    expect(rental.total).toBe("50,400"); // 2,800 × 9 × 2
+    expect(rental.totalNote).toBeNull(); // daily rate — no divisor to explain
+  });
+
+  it("states the divisor behind a weekly or monthly rate, as the card does", () => {
+    const monthly = buildDealRoomQuotationDoc(
+      room({ lastProposedPriceUnit: "PER_MONTH", lastProposedRate: 30_000 }), null, RENTEE, false, L,
+    );
+    expect(monthly.lineItems[0].price).toBe("30,000 / month");
+    expect(monthly.lineItems[0].qty).toBe("9 days × 2");
+    expect(monthly.lineItems[0].totalNote).toBe("26 working days/month");
+    expect(monthly.lineItems[0].total).toBe(String(Math.round((30_000 / 26) * 9 * 2).toLocaleString("en-US")));
+  });
+
   it("takes the contract type from the room", () => {
     const doc = buildDealRoomQuotationDoc(room({ status: "CLOSED" }), staleSnapshot(), RENTEE, false, L);
     const details = doc.cards.find((c) => c.title === "Rental & equipment details");

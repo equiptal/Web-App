@@ -162,6 +162,21 @@ export function rentalPeriodSubtitle(unit: string | null | undefined): "weekly" 
   return null;
 }
 
+/**
+ * That subtitle as the words the bid card prints — "6 working days/week" / "26 working days/month".
+ *
+ * Takes the caller's `L` rather than reading a bundle because every surface that prints it (the bid
+ * card, the deal room's price bar and counter sheet, both quotation documents) carries its copy inline
+ * the same way. One function so the divisor a reader is told about can never disagree with the divisor
+ * `RENTAL_DIVISOR` actually applied. Null for daily and per-job — there is no divisor to explain.
+ */
+export function divisorNote(unit: string | null | undefined, L: (en: string, ar: string) => string): string | null {
+  const p = rentalPeriodSubtitle(unit);
+  if (p === "weekly") return L("6 working days/week", "٦ أيام عمل/أسبوع");
+  if (p === "monthly") return L("26 working days/month", "٢٦ يوم عمل/شهر");
+  return null;
+}
+
 /** How one transport leg reads when it has no number to show (priority order, mobile §7). */
 export type LegDisplay = { kind: "amount"; amount: number } | { kind: "excluded" | "bundled" | "not_quoted" };
 

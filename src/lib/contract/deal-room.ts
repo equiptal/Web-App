@@ -3,7 +3,7 @@
  * Source: app backend `GET /api/deal-rooms/{id}` (deal-room.service.getDealRoom). The renter is the
  * rentee party. Live chat runs over GetStream (channel = streamChannelId; token via stream-token).
  */
-import { computeRentalTotal, rentalDivisor, VAT_RATE } from "@/lib/pricing/rental";
+import { computeRentalTotal, divisorNote, rentalDivisor, VAT_RATE } from "@/lib/pricing/rental";
 // Type-only — the deal-room quotation BUILDER lives here (pure, testable in the node suite); the
 // rendering itself stays in the shared template module.
 import type { QuotationDoc, QuotationLineItem, QuotationCard } from "@/lib/quotation/render";
@@ -301,6 +301,16 @@ export interface DealTotals {
   rentalUnits: number; mobUnitsN: number; demobUnitsN: number;
   mobPrice: number; demobPrice: number; mobExcluded: boolean; demobExcluded: boolean;
   periods: number; hasDuration: boolean; periodCount: number;
+  /**
+   * Days actually charged — the duration minus its Fridays. This, NOT `periods`, is the number every
+   * surface must show beside the rate: `rentalTotal` is `(rate ÷ divisor) × billableDays × units`, so a
+   * label built from the raw duration states an arithmetic the total does not follow. 0 when the rental
+   * did not prorate (see `rentalRaw`).
+   */
+  billableDays: number;
+  /** True when `rentalTotal` is the bare quoted rate — no duration, no start date, PER_JOB, or a
+   *  collapsed window. Nothing prorated, so no day count is shown. */
+  rentalRaw: boolean;
   rentalTotal: number; mobTotal: number; demobTotal: number;
   subtotal: number; vat: number; grand: number;
 }
@@ -351,7 +361,8 @@ export function computeDealTotals(
   // every room. The root is accepted first only for callers that pass the room flattened; the
   // `details` fallback is what actually fires in the app.
   const startDate = room.startDate ?? room.details?.startDate ?? null;
-  const perUnitRental = computeRentalTotal({ rate, priceUnit, startDate, durationDays: periods }).total;
+  const rental = computeRentalTotal({ rate, priceUnit, startDate, durationDays: periods });
+  const perUnitRental = rental.total;
   const rentalTotal = perUnitRental * rentalUnits;
   const mobPrice = pick(override?.mobPrice, room.mobPrice ?? 0);
   const demobPrice = pick(override?.demobPrice, room.demobPrice ?? 0);
@@ -362,7 +373,10 @@ export function computeDealTotals(
   const subtotal = rentalTotal + mobTotal + demobTotal;
   const vat = Math.round(subtotal * VAT_RATE);
   const grand = subtotal + vat;
-  return { rate, priceUnit, perDayRate, rentalUnits, mobUnitsN, demobUnitsN, mobPrice, demobPrice, mobExcluded, demobExcluded, periods, hasDuration, periodCount: periods / dpp, rentalTotal, mobTotal, demobTotal, subtotal, vat, grand };
+  // Period count is derived from the BILLABLE days, not the calendar duration: a 61-day monthly job
+  // charges ~53 days, which is 2.04 months of rent, not the 2.35 the calendar suggests. The old raw
+  // figure disagreed with `rentalTotal` by exactly the Fridays.
+  return { rate, priceUnit, perDayRate, rentalUnits, mobUnitsN, demobUnitsN, mobPrice, demobPrice, mobExcluded, demobExcluded, periods, hasDuration, periodCount: (rental.raw ? periods : rental.billable) / dpp, billableDays: rental.raw ? 0 : rental.billable, rentalRaw: rental.raw, rentalTotal, mobTotal, demobTotal, subtotal, vat, grand };
 }
 
 export function mapDealRoom(raw: unknown): DealRoomView {
@@ -590,20 +604,22 @@ export function buildDealRoomQuotationDoc(
 
   // Invoice line items (rental + delivery + return) — the SAME 6-column table as the bid-card quotation.
   const lineItems: QuotationLineItem[] = [];
-  // Rental qty/price columns mirror the live price bar's factor logic: PER_JOB -> units jobs; a whole
-  // period count -> "N × units"; a partial (day-count) duration -> effective per-day rate × days.
-  const factorInt = Number.isInteger(t.periodCount) ? t.periodCount : null;
-  const partial = unit !== "PER_JOB" && t.hasDuration && factorInt == null;
-  const rentalQty = unit === "PER_JOB"
-    ? String(units)
-    : partial
-      ? `${room.periods} ${L("days", "يوم")}${units > 1 ? ` × ${units}` : ""}`
-      : `${factorInt ?? 1}${units > 1 ? ` × ${units}` : ""}`;
+  // Rental qty/price columns read exactly as the bid card does: the PRICE column always carries the
+  // supplier's raw quoted rate over its own period, and the QTY column carries the BILLABLE days the
+  // rate is prorated across — never the calendar duration, which charges the Fridays the total does
+  // not. Nothing prorated (PER_JOB, open-ended, no start date) shows a plain period count instead.
+  const rentalQty = unit === "PER_JOB" || t.rentalRaw
+    ? `${units}`
+    : `${t.billableDays} ${L("days", "يوم")}${units > 1 ? ` × ${units}` : ""}`;
   lineItems.push({
     num: 1, label: L("Rental", "الإيجار"), detail: room.supplier.name,
-    unit: partial ? L("day", "يوم") : periodLabel,
+    unit: periodLabel,
     qty: rentalQty,
-    price: partial ? `${nfQ(Math.round(t.perDayRate))} / ${L("day", "يوم")}` : `${nfQ(rate)} / ${periodLabel}`,
+    price: `${nfQ(rate)} / ${periodLabel}`,
+    // The fixed-divisor assumption behind a weekly/monthly rate, stated whether or not this particular
+    // period comes out exact (app parity: `rentalPeriodSubtitle`) — it is what turns the rate into the
+    // day count beside it.
+    totalNote: divisorNote(unit, L),
     total: nfQ(t.rentalTotal),
   });
   // Mob/demob are ALWAYS shown; each honours its OWN unit count + exclusion (excluded -> "Not included",
