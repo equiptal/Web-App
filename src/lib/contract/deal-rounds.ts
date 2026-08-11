@@ -16,10 +16,11 @@ import {
   renteeRequestState,
   type RenteeRequestCardPayload,
   type RenteeRequestReplyPayload,
+  type RenteeRequestResolution,
   type RenteeRequestState,
   type RequestTargetMachine,
 } from "./rentee-request";
-import { replyAnswerLine } from "./request-card";
+import { replyAnswerLine, type RequestThreadCard } from "./request-card";
 
 export type RoundRole = "supplier" | "rentee";
 
@@ -242,6 +243,56 @@ export function chatCardOfMessage(raw: unknown): ChatCard | null {
 }
 
 /**
+ * **The request loop's own cards, out of a message list and in load order** — the ONE projection every
+ * reading of a conversation's asks shares.
+ *
+ * Three of them, and they must agree or the surface contradicts itself:
+ *   · `outstandingAskIdentities` — which questions are still with the lessor, which gates the map's
+ *     ask controls (owner's "one ask, one card", 2026-08-10);
+ *   · `replyCardView` — the search for the ask a reply answers, so the answer arrives in the card of
+ *     the question (owner, 2026-08-11);
+ *   · the render itself, on BOTH surfaces.
+ *
+ * It lived inline in `ChatDock.tsx` until `/deal-room/[id]` had to render the same pair of cards
+ * (owner, 2026-08-11: *"i want it like request card"*). Lifted here rather than copied there: this
+ * module already owns `chatCardOfMessage`, and two copies of "which messages are asks" is two answers
+ * to a question the two surfaces ask about ONE channel.
+ *
+ * **Ordinary chat and the negotiation vocabulary travel the list as empty entries**, deliberately.
+ * Dropping them would compact the list; keeping them one-to-one with the messages means an index into
+ * either list means the same thing, and neither an empty entry nor a rate proposal can be mistaken
+ * for an ask or block a control.
+ *
+ * Order-independent by construction — a channel read is not guaranteed to be ordered, so a reply that
+ * arrives before its own ask is still paired with it by `ref`.
+ */
+export function requestThreadCards(messages: readonly unknown[]): RequestThreadCard[] {
+  return messages.map((m) => {
+    const card = chatCardOfMessage(m);
+    if (card?.type === RENTEE_REQUEST_CARD_TYPE) return { ask: card.card };
+    if (card?.type === RENTEE_REQUEST_REPLY_CARD_TYPE) return { reply: card.reply };
+    return {};
+  });
+}
+
+/**
+ * `ref` → the supplier's answer, read out of the conversation itself.
+ *
+ * The other half of what a `RequestCardCtx` needs, and the other thing both surfaces were deriving
+ * separately. There is no status column behind a request (§7.3): the channel IS the record, so this
+ * is the only place an answer can come from.
+ */
+export function requestRepliesByRef(
+  thread: readonly RequestThreadCard[],
+): Map<string, { resolution: RenteeRequestResolution }> {
+  const map = new Map<string, { resolution: RenteeRequestResolution }>();
+  for (const c of thread) {
+    if (c.reply) map.set(c.reply.inReplyTo, { resolution: c.reply.resolution });
+  }
+  return map;
+}
+
+/**
  * Term label fallback, mirroring the backend's `term-matching.ts` TERM_LABELS.
  *
  * A card's `termKey` normally resolves against the room's own terms — but `mapDealRoom` strips
@@ -394,9 +445,14 @@ export interface ChatCardCtx {
   /**
    * V11 — what the request loop needs to state a card's verdict.
    *
-   * **Optional on purpose.** `/deal-room/[id]` renders the same conversation with no fleet in hand,
-   * and a request card there still states the ask, the machine and the reference; it simply cannot
-   * say whether the machine has since satisfied it. Showing less beats guessing.
+   * **Optional on purpose.** A card built without it still states the ask, the machine and the
+   * reference; it simply cannot say whether the machine has since satisfied it. Showing less beats
+   * guessing.
+   *
+   * This used to be how `/deal-room/[id]` rendered the request loop — through `ChatCard`, with no
+   * fleet in hand. That route now fetches the bid's fleet and draws the full `RequestCard` (owner,
+   * 2026-08-11: *"i want it like request card"*), so what reaches this branch there is the FALLBACK:
+   * a reply whose ask is not in the loaded window, and any card drawn before the fleet lands.
    */
   requestCtx?: {
     /** The machine as the fleet response holds it **right now** — re-read on every render, because
@@ -522,8 +578,10 @@ export function buildChatCardView(card: ChatCard, ctx: ChatCardCtx): ChatCardVie
          but with supplier answer"*, and `replyCardView` does exactly that wherever the ask it answers
          is in hand: the ask's own card, with the answer where its waiting state was.
 
-         This branch is what is left when it is NOT in hand — an older page, a partial channel read,
-         or a surface that renders the conversation through `ChatCard` alone (`/deal-room/[id]`).
+         This branch is what is left when it is NOT in hand — an older page, a partial channel read.
+         Both surfaces that render this conversation now try `replyCardView` first and fall through to
+         here (`/deal-room/[id]` since the ruling of 2026-08-11), so this is the one shape a reply
+         takes when nothing better is honest.
          It states the reference and the answer and names NO equipment, because resolving one from a
          matching reference alone would put a machine's name under a supplier's answer on a guess.
 
@@ -555,9 +613,9 @@ function renteeRequestCardView(
 ): ChatCardView {
   const { L, ar } = ctx;
   const resolved = payload.equipmentId ? ctx.requestCtx?.machine(payload.equipmentId) ?? null : null;
-  // No request context at all — `/deal-room/[id]` renders this conversation with no fleet in hand.
-  // The card still states the ask, the machine and the reference; it simply says nothing about
-  // whether it was answered, because it has nothing to derive that from.
+  // No request context at all — a surface with no fleet behind this conversation. The card still
+  // states the ask, the machine and the reference; it simply says nothing about whether it was
+  // answered, because it has nothing to derive that from.
   const state: RenteeRequestState | null = ctx.requestCtx
     ? renteeRequestState(payload, resolved, ctx.requestCtx.reply(payload.ref))
     : null;

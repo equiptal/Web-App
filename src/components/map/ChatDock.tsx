@@ -48,7 +48,7 @@ import type { Channel } from "stream-chat";
 import { ChatCard } from "@/components/deal-room/ChatCard";
 import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
 import { RequestCard } from "@/components/map/RequestCard";
-import { heroPhotoUrl } from "@/components/map/panel/machine-panel-model";
+import { fleetMachineResolver } from "@/components/map/request-card-ctx";
 import { fetchReceivedBids, fetchStreamToken } from "@/lib/api/client";
 import {
   CHAT_ACCEPT,
@@ -77,7 +77,13 @@ import {
   type DockReplyDigest,
   type DockTab,
 } from "@/lib/contract/chat-dock";
-import { buildChatCardView, chatCardOfMessage, chatCardTime } from "@/lib/contract/deal-rounds";
+import {
+  buildChatCardView,
+  chatCardOfMessage,
+  chatCardTime,
+  requestRepliesByRef,
+  requestThreadCards,
+} from "@/lib/contract/deal-rounds";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import type { InboxBid } from "@/lib/contract/inbox";
 import {
@@ -92,6 +98,7 @@ import {
   postedSubject,
   replyCardView,
   requestCardView,
+  requestDocLabel,
   type RequestCardCtx,
   type RequestThreadCard,
 } from "@/lib/contract/request-card";
@@ -374,22 +381,14 @@ export function ChatDock({
 
   /** The fleet, by machine — re-read on EVERY render, because nothing about a request's state is
    *  stored (RM3-AC-18). Only the anchor tab has one; a sibling tab's cards state the ask and say
-   *  nothing about the answer, which is honest rather than wrong. */
-  const fleetById = useMemo(() => {
-    const map = new Map<string, FleetMachine>();
-    for (const m of fleet ?? []) map.set(m.equipmentId, m);
-    return map;
-  }, [fleet]);
-
-  /** `ref` → the supplier's answer, read out of the conversation itself. */
-  const repliesByRef = useMemo(() => {
-    const map = new Map<string, { resolution: "provided" | "declined" | "unavailable" }>();
-    for (const m of messages) {
-      const card = chatCardOfMessage(m);
-      if (card?.type === RENTEE_REQUEST_REPLY_CARD_TYPE) map.set(card.reply.inReplyTo, { resolution: card.reply.resolution });
-    }
-    return map;
-  }, [messages]);
+   *  nothing about the answer, which is honest rather than wrong.
+   *
+   *  The projection itself is `fleetMachineResolver`, shared with `/deal-room/[id]` since the owner
+   *  put the same cards there (2026-08-11) — one answer to what a machine is called and looks like. */
+  const machineOf = useMemo(() => fleetMachineResolver(fleet, ar), [fleet, ar]);
+  /** Whether the fleet even HOLDS this machine — the `canOpen` fallback, which asks a different
+   *  question from "what is it called" and must not resolve a whole projection to answer it. */
+  const fleetHas = useCallback((id: string) => machineOf(id) != null, [machineOf]);
 
   /* ── one ask, one card (owner, 2026-08-10) ─────────────────────────────────────────────────────
      The identities of every ask the lessor has not answered, threaded by `ref` in ONE pass so a
@@ -407,16 +406,11 @@ export function ChatDock({
      readings share: the outstanding-ask guard below, and the reply card's search for the ask it
      answers (`replyCardView`). Ordinary chat and the negotiation vocabulary travel this list too as
      empty entries, and neither may block a control or be mistaken for an ask. */
-  const threadCards: RequestThreadCard[] = useMemo(
-    () =>
-      messages.map((m) => {
-        const card = chatCardOfMessage(m);
-        if (card?.type === RENTEE_REQUEST_CARD_TYPE) return { ask: card.card };
-        if (card?.type === RENTEE_REQUEST_REPLY_CARD_TYPE) return { reply: card.reply };
-        return {};
-      }),
-    [messages],
-  );
+  const threadCards: RequestThreadCard[] = useMemo(() => requestThreadCards(messages), [messages]);
+
+  /** `ref` → the supplier's answer, off the SAME projection — so the reply a card consults and the
+   *  reply the card renders can never be two different readings of one channel. */
+  const repliesByRef = useMemo(() => requestRepliesByRef(threadCards), [threadCards]);
 
   const outstandingAsks = useMemo(() => outstandingAskIdentities(threadCards), [threadCards]);
 
@@ -431,18 +425,10 @@ export function ChatDock({
     onOutstandingAsks(outstandingAsks);
   }, [onOutstandingAsks, outstandingAsks, loadedRoomId, anchorRoomId, messages.length]);
 
-  const docLabel = useCallback(
-    (docType: string) => {
-      const key = docType.trim().toLowerCase().replace(/[\s-]+/g, "_");
-      const known = DOC_TYPE_LABELS[key];
-      if (known) return L(known[0], known[1]);
-      // Never the raw key: `operating_license` humanises to "Operating license" rather than shouting
-      // a database column at the renter.
-      const words = key.replace(/_+/g, " ").trim();
-      return words ? words.charAt(0).toUpperCase() + words.slice(1) : docType;
-    },
-    [L],
-  );
+  /** The document vocabulary. ONE table, in `request-card.ts`, since `/deal-room/[id]` renders the
+   *  same chips off the same channel (owner, 2026-08-11) — never the raw key, and never two words
+   *  for one paper on two surfaces. */
+  const docLabel = useCallback((docType: string) => requestDocLabel(docType, L), [L]);
 
   /*
    * The anchor bid's FIRM used to be assembled here, so a company-scope document ask could be resolved
@@ -466,38 +452,17 @@ export function ChatDock({
     () => ({
       L,
       fleetKnown: active?.bidId === bid.id && fleet != null,
-      machine: (equipmentId: string) => {
-        const m = fleetById.get(equipmentId);
-        if (!m) return null;
-        return {
-          locationSource: m.locationSource ?? null,
-          documentKeys: m.documentKeys,
-          // Photos are their own list, and a document ask can name one — see `documentAskSatisfied`.
-          photoKeys: m.photoKeys,
-          // `model · spec`, the prototype's own title, composed the way `EquipmentDetail` composes it
-          // — same two fields, same separator — so the card and the panel name one machine one way.
-          label:
-            [
-              [m.manufacturer, m.modelName].filter(Boolean).join(" "),
-              (ar ? m.subcategoryNameAr : m.subcategoryName) || m.subcategoryName,
-            ]
-              .map((s) => (s ?? "").trim())
-              .filter(Boolean)
-              .join(" · ") || null,
-          serial: m.serialNumber,
-          photoUrl: heroPhotoUrl(m),
-        };
-      },
+      machine: machineOf,
       reply: (ref: string) => repliesByRef.get(ref) ?? null,
       docLabel,
       // No handler means no press, whatever the fleet holds — the card must not offer an affordance
       // this host cannot honour.
-      canOpen: onOpenMachine ? canOpenMachine ?? ((id: string) => fleetById.has(id)) : () => false,
+      canOpen: onOpenMachine ? canOpenMachine ?? fleetHas : () => false,
       // The REQUEST's type, and only on the anchor tab: a sibling tab is a different item, and a card
       // there naming this item's type would name the wrong machine in words.
       typeWord: active?.bidId === bid.id ? typeWord : null,
     }),
-    [L, ar, active?.bidId, bid.id, fleet, fleetById, repliesByRef, docLabel, onOpenMachine, canOpenMachine, typeWord],
+    [L, active?.bidId, bid.id, fleet, machineOf, fleetHas, repliesByRef, docLabel, onOpenMachine, canOpenMachine, typeWord],
   );
 
   /* ── the arrival notice (004a §2.1) ──────────────────────────────────────────────────────────── */
@@ -1051,32 +1016,3 @@ export function ChatDock({
     </>
   );
 }
-
-/** Wire document types → the renter's words. Only the types the four requests can name; anything else
- *  is humanised from its key rather than guessed at, because a wrong label on a document request is a
- *  request for the wrong paper. */
-const DOC_TYPE_LABELS: Record<string, [string, string]> = {
-  istimara: ["Registration (Istimara)", "الاستمارة"],
-  istimarah: ["Registration (Istimara)", "الاستمارة"],
-  registration: ["Registration", "التسجيل"],
-  customs: ["Customs card", "البطاقة الجمركية"],
-  customs_card: ["Customs card", "البطاقة الجمركية"],
-  sale_contract: ["Sale contract", "عقد البيع"],
-  sales_contract: ["Sale contract", "عقد البيع"],
-  saso_registration: ["SASO registration", "تسجيل ساسو"],
-  tuv: ["TÜV certificate", "شهادة TÜV"],
-  spsp: ["SPSP certificate", "شهادة SPSP"],
-  saso: ["SASO certificate", "شهادة ساسو"],
-  aramco: ["Aramco certificate", "شهادة أرامكو"],
-  insurance: ["Insurance", "التأمين"],
-  operating_license: ["Operator licence", "رخصة المشغّل"],
-  operator_license: ["Operator licence", "رخصة المشغّل"],
-  operator_tuv: ["Operator TÜV", "شهادة TÜV للمشغّل"],
-  operator_spsp: ["Operator SPSP", "شهادة SPSP للمشغّل"],
-  operator_id: ["Operator ID", "هوية المشغّل"],
-  operator_insurance: ["Operator insurance", "تأمين المشغّل"],
-  cr: ["Commercial registration", "السجل التجاري"],
-  vat: ["VAT certificate", "الشهادة الضريبية"],
-  national_address: ["National address", "العنوان الوطني"],
-  local_content: ["Local content", "المحتوى المحلي"],
-};

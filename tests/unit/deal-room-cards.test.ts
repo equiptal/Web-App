@@ -467,8 +467,14 @@ describe("DRCARD — the request loop parses through the same reader (RM3-AC-48)
     expect(view.rows.map((r) => r.value)).toContain("SER-9");
   });
 
-  it("states NO verdict without a request context — the deal-room route holds no fleet", () => {
-    // Showing less beats guessing: `/deal-room/[id]` can say what was asked, not whether it landed.
+  it("states NO verdict without a request context — showing less beats guessing", () => {
+    /* This used to be titled "the deal-room route holds no fleet", and that is no longer why it
+       matters. `/deal-room/[id]` fetches the bid's fleet and draws the full `RequestCard` since the
+       owner's ruling of 2026-08-11 (*"i want it like request card"*), so this generic form is now the
+       FALLBACK on both surfaces: what renders before a non-blocking fleet read lands, and what
+       renders forever if it fails. The rule under it is unchanged and is exactly what made that fetch
+       safe to make non-blocking — a card with no fleet behind it says what was asked and never
+       whether it landed. */
     expect(buildChatCardView(parseChatCard(RENTEE_REQUEST)!, ctx()).outcome).toBeNull();
   });
 

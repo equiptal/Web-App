@@ -25,6 +25,10 @@
 
 import { equipmentIcon } from "@/components/requests/EquipImg";
 import type { RequestCardView } from "@/lib/contract/request-card";
+/* The card's own chrome travels WITH it. These rules were `.bidmap`-scoped in `map-proto.css` until
+   the owner put the same card in `/deal-room/[id]` (2026-08-11) — a surface that is not `.bidmap`,
+   where the shared markup therefore painted as unstyled text. See `request-card.css`. */
+import "@/components/map/request-card.css";
 
 export interface RequestCardProps {
   view: RequestCardView;

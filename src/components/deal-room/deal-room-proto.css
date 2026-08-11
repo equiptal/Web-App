@@ -217,6 +217,23 @@
    tinted with either. A refusal is amber, never red: red on this feature means availability only. */
 .dlproto .cc-out-waiting { color: var(--muted); }
 .dlproto .cc-out-refused { color: var(--warning); }
+/* ── V12b · the request card, sided by its AUTHOR (owner, 2026-08-11) ─────────────────────────────
+   Two rulings meet on this wrapper. *"i want it like request card"* put the map's `rRequestCard` in
+   this thread — the card's own chrome travels with the component now (`map/request-card.css`), so
+   nothing of its appearance is restated here. And *"make these cards appear like messages sent by the
+   other side or by me whether the request or the response"* is what this wrapper is: a request and a
+   reply are things a PARTY said, so each hugs its author's edge, while the negotiation vocabulary
+   stays centred as `.chatcard` centres itself — an event in the room belongs to neither chair.
+
+   THE SIDE AND THE WIDTH ARE BOTH ON THE WRAPPER. A card carrying a width of its own inside a sided
+   wrapper is a second opinion about one geometry, and the disagreement is what leaves a card floating
+   in from the edge. `align-self` on a child of this wrapper is inert, which is exactly why the
+   fallback `.chatcard` inside it is re-stated rather than left to centre itself. */
+.dlproto .thread .dl-rq-card { width: min(340px, 92%); margin: 8px 0; }
+.dlproto .thread .dl-rq-card.is-mine { align-self: flex-end; }
+.dlproto .thread .dl-rq-card.is-them { align-self: flex-start; }
+.dlproto .thread .dl-rq-card .bm-rq,
+.dlproto .thread .dl-rq-card .chatcard { width: 100%; max-width: none; margin: 0; }
 .dlproto .msg { max-width: 70%; margin: 5px 0; padding: 10px 14px; border-radius: 14px; font-size: 13.5px; line-height: 1.45; }
 .dlproto .msg .meta { font-size: 10.5px; font-weight: 700; margin-top: 5px; opacity: 0.7; }
 .dlproto .msg.them { align-self: flex-start; background: var(--surface1); border: 1px solid var(--border); border-start-start-radius: 5px; color: var(--navy); }

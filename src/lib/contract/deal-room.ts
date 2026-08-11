@@ -41,6 +41,20 @@ export interface DealTerm {
 
 export interface DealRoomView {
   id: string;
+  /**
+   * **The BID this room settles** (owner, 2026-08-11: *"i want it like request card"*).
+   *
+   * `DealRoom.bidId` is `@unique` — one bid = one item = one room = one Stream channel — so the room
+   * resolves exactly one bid, and every bid-scoped read the room needs is addressed by it. The one
+   * that made this field necessary is `GET /marketplace/bids/{bidId}/fleet`: the request cards in
+   * this conversation name a machine by `equipmentId` and nothing on the wire carries its NAME, so
+   * without the fleet the deal room could only render the generic key/value form the ruling replaced.
+   *
+   * Null when the payload does not carry it. Never fabricated from the room id — a wrong bid id would
+   * fetch ANOTHER supplier's fleet and put his machines' names on this conversation's cards, which is
+   * worse in every direction than the fleet-less fallback.
+   */
+  bidId: string | null;
   status: DealRoomStatus;
   contractType: string | null;
   streamChannelId: string | null;
@@ -447,6 +461,10 @@ export function mapDealRoom(raw: unknown): DealRoomView {
 
   return {
     id: String(d.id ?? ""),
+    // `getDealRoom` includes the bid rather than selecting it, so the room's own `bidId` column comes
+    // back alongside the nested `bid.id`. Both are read — the column first, because it is the FK the
+    // `@unique` is on — so a projection that trims the nested object still yields the id.
+    bidId: s(d.bidId) ?? s(bid.id) ?? null,
     status,
     contractType: s(d.contractType),
     streamChannelId: s(d.streamChannelId),

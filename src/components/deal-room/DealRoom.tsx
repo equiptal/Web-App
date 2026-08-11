@@ -1,16 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState, Fragment } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
 import { STREAM_API_KEY, leaseStream } from "@/lib/chat/stream-connection";
 import { useHeaderBack } from "@/components/AppShell";
-import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, ApiError } from "@/lib/api/client";
+import { fetchBidFleet, fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, ApiError } from "@/lib/api/client";
 import { computeDealTotals, buildDealRoomQuotationDoc, quotationLinkKind, type DealRoomView, type DealTerm, type DealRoomDocument, type DealRoomDocuments, type QuotationView } from "@/lib/contract/deal-room";
-import { reconstructRounds, collapseRounds, latestRoundBy, withOpeningRound, chatCardOfMessage, buildChatCardView, respondedProposalIds, latestProposalId, type DealRound } from "@/lib/contract/deal-rounds";
+import { reconstructRounds, collapseRounds, latestRoundBy, withOpeningRound, chatCardOfMessage, chatCardTime, buildChatCardView, requestRepliesByRef, requestThreadCards, respondedProposalIds, latestProposalId, type DealRound } from "@/lib/contract/deal-rounds";
+import type { FleetMachine } from "@/lib/contract/fleet";
+import { RENTEE_REQUEST_CARD_TYPE, RENTEE_REQUEST_REPLY_CARD_TYPE } from "@/lib/contract/rentee-request";
+import { postedSubject, replyCardView, requestCardView, requestDocLabel, type RequestCardCtx } from "@/lib/contract/request-card";
 import { valText, type ResolutionsMap } from "@/components/deal-room/DealRoomTerms";
 import { ChatCard } from "@/components/deal-room/ChatCard";
+import { RequestCard } from "@/components/map/RequestCard";
+import { fleetMachineResolver } from "@/components/map/request-card-ctx";
 import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
 import {
   CHAT_ACCEPT,
@@ -109,7 +114,11 @@ export function DealRoom({ id, onTitle, initialFlow }: {
 }) {
   const { locale } = useLocale();
   const ar = locale === "ar";
-  const L = (en: string, arr: string) => (ar ? arr : en);
+  /* `useCallback`, as the map's dock declares the same helper. Identical semantics — it is still
+     "pick the string for this script" — but a STABLE reference, which the request-card context below
+     lists as a dependency. Re-created every render it would rebuild that context on every render,
+     which is the one thing a memo exists not to do. */
+  const L = useCallback((en: string, arr: string) => (ar ? arr : en), [ar]);
   const router = useRouter();
   // In-app Back arrow in the AppShell header → the Inbox (the deal-room list). A deal room is a
   // drill-down, so this gives an explicit way up instead of relying on the browser back button.
@@ -142,6 +151,31 @@ export function DealRoom({ id, onTitle, initialFlow }: {
   // App parity: term accept/counter are collected LOCALLY here and submitted once (batched) on
   // Counter/Accept — nothing is PATCHed per click.
   const [resolutions, setResolutions] = useState<ResolutionsMap>({});
+
+  /**
+   * ── V12b · the bid's fleet, so a request card can be a CARD here too (owner, 2026-08-11) ────────
+   * The ruling: *"i want it like request card"*. The map's chat dock renders the renter's ask — and
+   * the supplier's answer — as the prototype's `rRequestCard`: an identity strip naming the machine,
+   * the ask, and a live status row. This route rendered the SAME two messages off the SAME channel as
+   * a title and a list of key/value rows, because the one thing it lacked was the machine's NAME:
+   * `RenteeRequestCardPayload` carries `equipmentId` and a display-only `serial` (§7.3) and no label,
+   * so the name can only come from the fleet.
+   *
+   * So the fleet is fetched here, by the SAME client function the map uses (`fetchBidFleet`, keyed by
+   * bid because `inBid`/`yardConfirmed` are only meaningful relative to one bid). Three properties
+   * this state exists to guarantee, in order of how badly each would hurt:
+   *
+   * 1. **The conversation never waits for it.** `null` is the initial value and the thread renders
+   *    immediately; the cards fill in when it lands. A chat that blocks on a fleet read is a chat
+   *    broken by an endpoint that has nothing to do with talking.
+   * 2. **A failure changes nothing.** The catch leaves this `null`, which is exactly the state this
+   *    route was in before today — `fleetKnown: false`, the generic `ChatCard`, the ask stated and no
+   *    verdict claimed. Latching a failure flag would only give the surface something to say about it,
+   *    and there is nothing here to say it in.
+   * 3. **It is a READ.** Opening a deal room that already exists creates nothing, and this must not
+   *    become a second write path — `GET` all the way down.
+   */
+  const [fleet, setFleet] = useState<FleetMachine[] | null>(null);
 
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [myStreamId, setMyStreamId] = useState<string | null>(null);
@@ -269,6 +303,30 @@ export function DealRoom({ id, onTitle, initialFlow }: {
   useEffect(() => {
     if (room && onTitle) onTitle(room.supplier.name);
   }, [room, onTitle]);
+
+  /* ── The fleet behind the request cards — once per room, and never in the way ────────────────────
+     Fired off the moment the room answers with a bid id, in its own effect: it is not on the chat's
+     path, not on the room's, and nothing renders behind it. `room.bidId` is the whole dependency, so
+     the 15s room poll above cannot re-request it — a bid id does not change under a deal room
+     (`DealRoom.bidId` is `@unique`).
+
+     The catch is EMPTY on purpose. Every plausible failure here — the endpoint refusing a caller it
+     does not serve, a network drop, a bid whose supplier has since delisted — leaves `fleet` null,
+     and null is precisely the state this route shipped in until today: the ask still states what was
+     asked and simply claims no verdict (`fleetKnown: false`). There is nothing for the renter to do
+     about a fleet read, so there is nothing to tell him about one; the conversation is what he came
+     for and it is untouched. */
+  useEffect(() => {
+    const bidId = room?.bidId;
+    if (!bidId) return;
+    let active = true;
+    fetchBidFleet(bidId)
+      .then((r) => { if (active) setFleet(r.machines); })
+      .catch(() => { /* the cards fall back to the fleet-less form — see the state's comment */ });
+    return () => {
+      active = false;
+    };
+  }, [room?.bidId]);
 
 
   // Live chat (GetStream).
@@ -485,6 +543,52 @@ export function DealRoom({ id, onTitle, initialFlow }: {
       setTranslating(null);
     }
   }
+
+  /* ── V12b · the request loop's context, exactly as the map's dock assembles it ───────────────────
+     Owner, 2026-08-11: *"i want it like request card"*. Everything below is SHARED with `ChatDock`
+     rather than restated: `requestThreadCards` is the one projection of a message list into asks and
+     answers, `requestRepliesByRef` the one reading of what was answered, `fleetMachineResolver` the
+     one answer to what a machine is called and looks like, and `requestDocLabel` the one word for a
+     paper. Two surfaces, one channel, one set of cards — a second copy of any of these is how the
+     renter's screen and the supplier's start describing the same ask differently.
+
+     These are hooks, so they sit ABOVE the two early returns below: a room that has not loaded yet
+     still has to run them, and a conversation with no cards in it costs three empty derivations. */
+  const threadCards = useMemo(() => requestThreadCards(messages as unknown[]), [messages]);
+  const repliesByRef = useMemo(() => requestRepliesByRef(threadCards), [threadCards]);
+  const machineOf = useMemo(() => fleetMachineResolver(fleet, ar), [fleet, ar]);
+
+  const cardCtx: RequestCardCtx = useMemo(
+    () => ({
+      L,
+      /* The rule this route documented and now finally satisfies (see `RequestCardCtx.fleetKnown`):
+         **the status row is omitted when the fleet is genuinely unknown, never guessed.** Until the
+         fetch lands — and forever, if it fails — this is false and the card states the ask without a
+         verdict, which is what `/deal-room/[id]` has always done. Once the fleet is in hand the
+         verdict is derived on every render (RM3-AC-18) from the machine as the fleet holds it NOW.
+
+         A machine MISSING from a fleet we do hold is a different answer again: `machineOf` returns
+         null, `renteeRequestState` reads `unknown`, and the card says the equipment is not in his
+         current list — a statement the fleet supports, rather than one made out of our ignorance. */
+      fleetKnown: fleet != null,
+      machine: machineOf,
+      reply: (ref: string) => repliesByRef.get(ref) ?? null,
+      docLabel: (docType: string) => requestDocLabel(docType, L),
+      /* **Nothing here is pressable, and the card must say so before it is pressed.** The card's whole
+         reason to exist is that pressing it lands the reader on the machine (owner, 2026-08-10) — but
+         that detail is the MAP's panel, and this route has no equipment surface to open. A chevron
+         that did nothing would be worse than one that never claimed to be there. */
+      canOpen: () => false,
+      /* The REQUEST's type word — "Crawler Excavator 30 ton" — which only an `alternative` card reads.
+         Null here by the rule `RequestCardCtx.typeWord` already states for this surface: the deal
+         room holds the accepted BID's equipment, not the request's taxonomy, and `details.equipmentLabel`
+         falls back to the bid's make+model. Naming one machine where the card means a TYPE would make
+         the ask read as a swap for that unit, which is the exact misreading the type word was added
+         to remove. The card names no type instead. */
+      typeWord: null,
+    }),
+    [L, fleet, machineOf, repliesByRef],
+  );
 
   if (error) return <div className="dlproto"><div className="rempty">{L("Couldn’t open this deal room.", "تعذّر فتح غرفة الصفقة.")}</div></div>;
   if (!room) return <div className="dlproto"><div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 28 }}>progress_activity</span></div></div>;
@@ -737,6 +841,54 @@ export function DealRoom({ id, onTitle, initialFlow }: {
             // `system_bot`, so the early return used to swallow them into one grey pill, showing English
             // `text` in an Arabic chat and dropping a counter-offer's figures entirely.
             const card = chatCardOfMessage(m);
+            /* ── WHOSE message this is, and why the CARDS ask it too (owner, 2026-08-11) ───────────
+               *"make these cards appear like messages sent by the other side or by me whether the
+               request or the response."*
+
+               The side is read from the Stream AUTHOR, never from the card's TYPE — the renter and
+               the supplier read the SAME channel from opposite chairs, and "an ask is mine, a reply
+               is theirs" is true from one of them and inverted from the other. Authorship is the one
+               reading that is correct from both, and it is the reading the plain bubbles below have
+               always used. The dock sides its cards off this same fact; this route centred every one
+               of them, so a renter's own request read as narration the room had emitted. */
+            const cardMine = myStreamId != null && m.user?.id === myStreamId;
+            /* ── The renter's ASK, as the card he sent (owner, 2026-08-11: "i want it like request
+               card") ──────────────────────────────────────────────────────────────────────────────
+               The identity strip, the ask, the reference and — now that this route holds the fleet —
+               the live verdict, built by the very function the map's dock builds it with. Both sides
+               of the conversation are looking at one object; it must not be one object on one surface
+               and a list of rows on the other. */
+            if (card?.type === RENTEE_REQUEST_CARD_TYPE) {
+              return (
+                <div key={m.id} className={`dl-rq-card ${cardMine ? "is-mine" : "is-them"}`}>
+                  <RequestCard
+                    view={requestCardView(postedSubject(card.card), cardCtx)}
+                    // The SAME clock face every other card in this thread carries (AC-16).
+                    at={chatCardTime(m.created_at, ar)}
+                  />
+                </div>
+              );
+            }
+            /* ── The supplier's ANSWER, in the card of the ask it answers ──────────────────────────
+               *"the supplier response must arrive in the same format of the sent card but with
+               supplier answer."* The reply payload carries only `inReplyTo` and a resolution (§7.3),
+               so the header is resolved FROM the thread: `replyCardView` finds the ask carrying that
+               reference among the loaded messages and builds its view with `requestCardView`, then
+               replaces the waiting state with what he answered.
+
+               Null means the ask is not in the loaded window — an older page, a partial channel read
+               — and the render falls through to the bare `ChatCard` below rather than naming an
+               equipment nobody read. */
+            if (card?.type === RENTEE_REQUEST_REPLY_CARD_TYPE) {
+              const answered = replyCardView(threadCards, card.reply, cardCtx);
+              if (answered) {
+                return (
+                  <div key={m.id} className={`dl-rq-card ${cardMine ? "is-mine" : "is-them"}`}>
+                    <RequestCard view={answered} at={chatCardTime(m.created_at, ar)} />
+                  </div>
+                );
+              }
+            }
             if (card) {
               const view = buildChatCardView(card, {
                 ar, L, terms: room.terms, at: m.created_at,
@@ -744,9 +896,8 @@ export function DealRoom({ id, onTitle, initialFlow }: {
                 superseded: card.type === "rate_proposal" && lastProposalId !== null && lastProposalId !== m.id,
                 live,
               });
-              return (
+              const chatCard = (
                 <ChatCard
-                  key={m.id}
                   view={view}
                   ar={ar}
                   L={L}
@@ -757,6 +908,16 @@ export function DealRoom({ id, onTitle, initialFlow }: {
                   translating={translating === m.id}
                   translation={translations[m.id]}
                 />
+              );
+              /* An unpaired ANSWER is still a message somebody wrote, so it takes his side the way
+                 the full card above does — the bare form is a smaller card, not a different kind of
+                 event. The negotiation vocabulary is NOT sided: a rate, a counter, an acceptance is
+                 an event in the room rather than either party's remark, and `.chatcard` centres
+                 itself for exactly that reason (a wrapper here would turn its `align-self` inert). */
+              return card.type === RENTEE_REQUEST_REPLY_CARD_TYPE ? (
+                <div key={m.id} className={`dl-rq-card ${cardMine ? "is-mine" : "is-them"}`}>{chatCard}</div>
+              ) : (
+                <Fragment key={m.id}>{chatCard}</Fragment>
               );
             }
             // deal-room/negotiation — system narration (posted by the backend's `system_bot`) renders as a

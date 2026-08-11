@@ -111,9 +111,16 @@ export interface RequestCardCtx {
    *
    * **False omits the status row entirely.** A sibling tab is a different room about a different item
    * and its fleet is not fetched here; deriving anyway would print «هذه المعدّة ليست ضمن قائمته
-   * الحالية» — a claim about the SUPPLIER made out of our own ignorance. `/deal-room/[id]` renders the
-   * same conversation with no fleet at all and shows the ask without a verdict for exactly this
-   * reason (see `buildChatCardView`'s `requestCtx`); this is that rule, per card.
+   * الحالية» — a claim about the SUPPLIER made out of our own ignorance.
+   *
+   * `/deal-room/[id]` was the other surface this described: it rendered the same conversation with no
+   * fleet at all. It now fetches one (owner, 2026-08-11 — *"i want it like request card"*), so it
+   * passes `fleetKnown: fleet != null` and the false state there means **the read has not landed, or
+   * failed**. The rule is unchanged and is the reason the fetch could be made non-blocking at all:
+   * a card with no fleet behind it says less rather than guessing, on any surface and for any reason.
+   *
+   * Distinct from `machine()` answering null, which is a fleet we DO hold that lacks this machine —
+   * that is a verdict (`unknown`), and one the fleet supports.
    */
   fleetKnown?: boolean;
   /**
@@ -298,6 +305,61 @@ export function requestCardView(
     askText,
     status,
   };
+}
+
+/* ═════════ The document vocabulary — ONE table, every surface (owner, 2026-08-11) ═════════════════
+ *
+ * A document chip must never read `operating_license`, and it must never read one thing in the map's
+ * chat dock and another in `/deal-room/[id]` — the two surfaces render the SAME channel, so a second
+ * table is a second answer to "what paper is this?" about one card.
+ *
+ * It lived in `ChatDock.tsx` until the deal room grew the same cards (the owner's ruling of
+ * 2026-08-11 — *"i want it like request card"*). Lifted here rather than copied there: this module
+ * already owns every other word on the card, and `docLabel` is the one hole the surface had to fill.
+ */
+
+/** Wire document types → the renter's words. Only the types the requests can name; anything else is
+ *  humanised from its key rather than guessed at, because a wrong label on a document request is a
+ *  request for the wrong paper. */
+const DOC_TYPE_LABELS: Record<string, [string, string]> = {
+  istimara: ["Registration (Istimara)", "الاستمارة"],
+  istimarah: ["Registration (Istimara)", "الاستمارة"],
+  registration: ["Registration", "التسجيل"],
+  customs: ["Customs card", "البطاقة الجمركية"],
+  customs_card: ["Customs card", "البطاقة الجمركية"],
+  sale_contract: ["Sale contract", "عقد البيع"],
+  sales_contract: ["Sale contract", "عقد البيع"],
+  saso_registration: ["SASO registration", "تسجيل ساسو"],
+  tuv: ["TÜV certificate", "شهادة TÜV"],
+  spsp: ["SPSP certificate", "شهادة SPSP"],
+  saso: ["SASO certificate", "شهادة ساسو"],
+  aramco: ["Aramco certificate", "شهادة أرامكو"],
+  insurance: ["Insurance", "التأمين"],
+  operating_license: ["Operator licence", "رخصة المشغّل"],
+  operator_license: ["Operator licence", "رخصة المشغّل"],
+  operator_tuv: ["Operator TÜV", "شهادة TÜV للمشغّل"],
+  operator_spsp: ["Operator SPSP", "شهادة SPSP للمشغّل"],
+  operator_id: ["Operator ID", "هوية المشغّل"],
+  operator_insurance: ["Operator insurance", "تأمين المشغّل"],
+  cr: ["Commercial registration", "السجل التجاري"],
+  vat: ["VAT certificate", "الشهادة الضريبية"],
+  national_address: ["National address", "العنوان الوطني"],
+  local_content: ["Local content", "المحتوى المحلي"],
+};
+
+/**
+ * A wire document type → the word the reader knows it by, in his script.
+ *
+ * An UNKNOWN type is humanised from its key rather than printed raw or dropped: a request for a paper
+ * this table has not learned yet is still a real request, and `operating_license` shouted at the
+ * renter is a database column rather than a document.
+ */
+export function requestDocLabel(docType: string, L: LFn): string {
+  const key = docType.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  const known = DOC_TYPE_LABELS[key];
+  if (known) return L(known[0], known[1]);
+  const words = key.replace(/_+/g, " ").trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : docType;
 }
 
 /* ═════════ V12a · the supplier's ANSWER, in the card of the ask it answers (owner, 2026-08-11) ═════
