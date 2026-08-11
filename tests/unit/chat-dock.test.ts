@@ -5,6 +5,7 @@ import {
   arrivalNotice,
   dockMayReportAsks,
   dockMessageView,
+  dockNoticeQuote,
   dockTabs,
   dockTabsWithKnownRooms,
   dockUnreadTotal,
@@ -182,6 +183,54 @@ describe("arrivalNotice — refresh-timed, and silent on what is being read (RM3
 });
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════════════
+   THE BUBBLE QUOTES WHAT WAS SAID (owner, 2026-08-11)
+
+   *"It never shows what was actually said."* The bubble carried «رسالة جديدة», the supplier's name
+   and the item's type — three things the renter already knew. The words were available the whole
+   time: `dockWatchRoomId` keeps the anchor bid's channel connected while the dock is shut, so the
+   messages the notice is announcing are in hand.
+
+   What this pins is the one judgement that can go wrong quietly: WHOSE line gets quoted.
+   ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+
+describe("dockNoticeQuote — the arrival's own words, and only the arrival's", () => {
+  const mine = { id: "m1", user: { id: "me" }, text: "هل المعدّة متاحة؟" };
+  const theirs = { id: "t1", user: { id: "them" }, text: "وصلنا طلبك، سنرد قريباً." };
+
+  it("quotes the last INCOMING message", () => {
+    expect(dockNoticeQuote([mine, theirs], "me")).toEqual({ text: "وصلنا طلبك، سنرد قريباً.", attachment: false });
+  });
+
+  it("never quotes my own line back at me, however recent it is", () => {
+    // The renter answering the supplier must not turn his own reply into "the supplier said".
+    expect(dockNoticeQuote([theirs, mine], "me")).toEqual({ text: "وصلنا طلبك، سنرد قريباً.", attachment: false });
+  });
+
+  it("stops at the last incoming message rather than hunting backwards for words", () => {
+    // A file with no caption is the arrival. Walking past it to an older remark would put a sentence
+    // from an hour ago in quotes under a notice about something that landed now.
+    const file = { id: "t2", user: { id: "them" }, attachments: [{ type: "file", asset_url: "https://x/q.pdf" }] };
+    expect(dockNoticeQuote([theirs, file], "me")).toEqual({ text: null, attachment: true });
+  });
+
+  it("reports a shared point as something said without words", () => {
+    const point = { id: "t3", user: { id: "them" }, custom: { kind: "location", lat: 24.7, lng: 46.6 } };
+    expect(dockNoticeQuote([point], "me")).toEqual({ text: null, attachment: true });
+  });
+
+  it("says nothing at all when it cannot tell whose message is whose", () => {
+    // No connection yet, so no author to compare against. Silence — the caller falls back to copy
+    // that claims nothing, which beats attributing the renter's own line to the supplier.
+    expect(dockNoticeQuote([theirs], null)).toBeNull();
+  });
+
+  it("says nothing when the conversation holds nothing from the other side", () => {
+    expect(dockNoticeQuote([mine], "me")).toBeNull();
+    expect(dockNoticeQuote([], "me")).toBeNull();
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
    RM3-AC-47 · OPENING A TAB CREATES NO DEAL ROOM (004a §4.5, §3.2d)
 
    The highest-consequence rule on this surface, and the one with no runtime test behind it. A
@@ -344,16 +393,27 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
     expect(dockSrc).toContain("{t.chatDock.composeOnly}");
   });
 
-  it("wears the prototype's chat chrome — a blue identity band and shadowed bubbles", () => {
-    /* Owner, 2026-08-11: *"Chat is still different UI and size."* Three of `pChat`'s own values that
-       this surface had drifted from, and each one is a thing he can see:
-         · the header is the BLUE identity band (05:17–24), not a white toolbar;
+  it("wears a WHITE identity band and shadowed bubbles", () => {
+    /* Owner, 2026-08-11 — two rulings, a day apart, and the second supersedes the first on the band
+       alone. *"Chat is still different UI and size"* brought `pChat`'s values to this surface; then,
+       looking at the result: *"the dock header is blue — make it white."* Blue on this surface means
+       an action, and a 64px slab of it said something that is not an action: who you are talking to.
+
+       So the head is WHITE with dark ink and a hairline divider, and everything else that ruling
+       brought stays — each of these is a thing he can see:
          · the stream's ground is `#E9EEF3`, the prototype's tint;
          · BOTH bubbles carry `0 1px 2px rgba(0,0,0,.08)` and neither carries an outline (05:29,
            05:143) — the border on incoming made every one of the supplier's remarks a boxed notice. */
     const head = cssBlockOf(cssSrc, ".bidmap .bm-chat-head {");
-    expect(head.toLowerCase()).toContain("#2563eb");
+    expect(head.toLowerCase()).toMatch(/background:\s*#fff\b/);
+    expect(head.toLowerCase()).not.toContain("#2563eb");
+    // A hairline the eye can find: a translucent-white rule, which is what it carried against blue,
+    // is no divider at all on white.
+    expect(head).toMatch(/border-bottom:\s*1px solid #e1e9f1/);
     expect(head).toMatch(/height:\s*64px/); // still on the panel's own line
+    // The name has to be legible on it — white ink on a white band was the way this would break.
+    expect(cssSrc).toContain(".bidmap .bm-chat-who");
+    expect(/\.bidmap \.bm-chat-who \{[^}]*color: #0f2238/.test(cssSrc)).toBe(true);
     // The avatar the band is built around — the prototype's 42px circle of initials.
     expect(cssBlockOf(cssSrc, ".bidmap .bm-chat-av {")).toMatch(/width:\s*42px/);
     expect(cssBlockOf(cssSrc, ".bidmap .bm-chat-body {").toLowerCase()).toContain("#e9eef3");
@@ -361,9 +421,30 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
     expect(them).toContain("box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08)");
     expect(them).toMatch(/border:\s*0/);
     // A card is a message, so it takes a side and the prototype's 86% (05:140–141) rather than
-    // stretching the column and reading as a banner.
-    expect(cssBlockOf(cssSrc, ".bidmap .bm-chat-card {")).toMatch(/width:\s*86%/);
+    // stretching the column and reading as a banner — and it is CAPPED on the same wrapper, so a
+    // drawer that fills the canvas cannot leave the card floating in the middle of it.
+    const card = cssBlockOf(cssSrc, ".bidmap .bm-chat-card {");
+    expect(card).toMatch(/width:\s*86%/);
+    expect(card).toContain("max-width: min(86%, 376px)");
     expect(cssSrc).toContain(".bidmap .bm-chat-card.is-mine { align-self: flex-end; }");
+    expect(cssSrc).toContain(".bidmap .bm-chat-card.is-them { align-self: flex-start; }");
+  });
+
+  it("sides every card by its AUTHOR, so one channel reads right from both chairs", () => {
+    /* Owner, 2026-08-11: *"not floating cards in the middle, same on the supplier view make these
+       cards appear like messages sent by the other side or by me whether the request or the
+       response."*
+
+       The dock and `/deal-room/[id]` read the SAME channel, and the renter and the supplier read it
+       from opposite ends. `is-mine` for an ask and `is-them` for a reply is therefore not a rule —
+       it is the renter's chair hardcoded, and it inverts the moment the reader changes. The side has
+       to come off the Stream author, exactly as the plain bubbles below it already take theirs. */
+    const stream = dockSrc.slice(dockSrc.indexOf("messages.map((m) => {"), dockSrc.indexOf("<div ref={bottomRef} />"));
+    expect(stream).toContain("const mine = myStreamId != null && m.user?.id === myStreamId;");
+    // Both card wrappers are driven by that one reading, and NEITHER states a side literally.
+    expect(stream.match(/bm-chat-card \$\{mine \? "is-mine" : "is-them"\}/g) ?? []).toHaveLength(2);
+    expect(stream).not.toContain('className="bm-chat-card is-mine"');
+    expect(stream).not.toContain('className="bm-chat-card is-them"');
   });
 
   it("gives an attachment a way to be KEPT, through the deal room's own save", () => {

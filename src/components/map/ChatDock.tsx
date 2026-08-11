@@ -68,6 +68,7 @@ import {
   arrivalNotice,
   dockMayReportAsks,
   dockMessageView,
+  dockNoticeQuote,
   dockTabs,
   dockTabsWithKnownRooms,
   dockUnreadTotal,
@@ -524,10 +525,35 @@ export function ChatDock({
   );
   const noticeKey = notice ? `${notice.bidId}:${notice.reply?.ref ?? notice.unreadCount}` : null;
   const showNotice = notice && noticeKey !== dismissedNotice ? notice : null;
-  /** A refusal is an answer that closes a door — «رفض طلبك» — and it takes the bubble's warm fill.
+  /** A refusal is an answer that closes a door — «رفض طلبك» — and it takes the bubble's warm tone.
    *  `provided` is the only resolution that gave the renter what he asked for; the other two did not,
    *  and reading them as an ordinary reply is how a "no" gets skimmed past. */
   const refusal = showNotice?.reply != null && showNotice.reply.resolution !== "provided";
+
+  /**
+   * **What was actually said** (owner, 2026-08-11: the bubble *"never shows what was actually
+   * said"*).
+   *
+   * Quoted from the conversation this dock is already watching — `dockWatchRoomId` keeps the ANCHOR
+   * bid's channel connected while the dock is shut, which is the only reason the words are in hand
+   * at all. Gated on the notice being about that same conversation, and on the messages having been
+   * loaded from it: a SIBLING tab is a different room whose messages this component does not hold,
+   * and quoting the anchor's last line under a sibling's name would attribute one supplier's words
+   * to another's conversation.
+   *
+   * Nothing here changes the notice's TIMING. `arrivalNotice` above is still refresh-gated; this
+   * only decides which words the bubble it already decided to show carries.
+   */
+  const noticeQuote =
+    showNotice && showNotice.bidId === bid.id && loadedRoomId != null && loadedRoomId === anchorRoomId
+      ? dockNoticeQuote(messages, myStreamId)
+      : null;
+  /** The bubble's middle line. The message itself when there are words; the kind of arrival when
+   *  there are none (a file, a point, a card) — never an invented sentence. */
+  const noticeBody =
+    noticeQuote?.text?.trim() ||
+    (noticeQuote?.attachment ? t.chatDock.noticeAttachment : null) ||
+    (showNotice?.reply ? t.chatDock.noticeTitle : showNotice?.label ?? t.chatDock.itemFallback);
 
   /* ── sending ─────────────────────────────────────────────────────────────────────────────────── */
 
@@ -654,14 +680,24 @@ export function ChatDock({
           Anchored to the dock by a tail, refresh-timed, and worded as a STATE ("you have a reply")
           rather than an event ("just arrived") — there is no socket behind it (RM3-AC-64).
 
-          **Filled, not outlined.** It competes with a whole map for attention, and the plain white
-          box that stood here lost. A refusal takes the warm fill, so the one arrival a renter must
-          not miss looks different before it is read — and warm rather than red, because red on this
-          surface belongs to availability alone. */}
+          **A white card that QUOTES the message** (owner, 2026-08-11). It was a solid blue slab
+          reading «رسالة جديدة» over the supplier's name over the item's type: three things the
+          renter already knew, and not one word of what was actually said. Now it reads as a message
+          does — who it is from, a chip saying it answers his request, the words themselves, and the
+          reference underneath — on white, because a card that quotes someone has to look like paper
+          rather than like a banner.
+
+          The refusal distinction SURVIVES the change of fill: it moves from the card's ground to the
+          chip and the rail down the leading edge, so the one arrival a renter must not miss still
+          looks different before it is read — and warm rather than red, because red on this surface
+          belongs to availability alone. */}
       {showNotice && !open && (
         <div className={`bm-dock-notice${refusal ? " is-refusal" : ""}`} role="status">
           <span className="bm-dock-notice-tail" aria-hidden="true" />
           <div className="bm-dock-notice-head">
+            {/* Who is speaking, then in a chip what this is — an answer to HIS request, which is
+                what makes the quote below worth reading before the dock is even opened. */}
+            <span className="bm-dock-notice-t">{bid.supplierName}</span>
             <span className="bm-dock-notice-kind">
               {refusal ? t.chatDock.kindRefusal : showNotice.reply ? t.chatDock.kindReply : t.chatDock.kindMessage}
             </span>
@@ -671,12 +707,9 @@ export function ChatDock({
             </button>
           </div>
           <button type="button" className="bm-dock-notice-body" onClick={() => { setActiveBidId(showNotice.bidId); setOpen(true); }}>
-            {/* Whose arrival it is, then what state it puts the renter in. The message text itself is
-                deliberately absent: unread comes from REST, so this component does not hold the body
-                of a message it is telling him about, and inventing one would be worse than naming
-                the counterparty and handing off. */}
-            <div className="bm-dock-notice-t">{bid.supplierName}</div>
-            <div className="bm-dock-notice-x2">{showNotice.reply ? t.chatDock.noticeTitle : showNotice.label ?? t.chatDock.itemFallback}</div>
+            {/* The message. Clamped to three lines by the stylesheet — the bubble quotes the arrival
+                and hands off; a bubble that grows with the message becomes the conversation. */}
+            <div className="bm-dock-notice-x2">{noticeBody}</div>
             {showNotice.reply && (
               <div className="bm-dock-notice-s">
                 {`↩ ${showNotice.reply.ref}${showNotice.reply.serial ? ` · ${showNotice.reply.serial}` : ""}`}
@@ -689,10 +722,11 @@ export function ChatDock({
       {open && (
         <section className={`bm-chat dlproto is-${place}`} aria-label={t.chatDock.title}>
           {/* ── The identity band (`pChat`, prototype 05:17–24) ────────────────────────────────
-              BLUE, with the counterparty's initials in a circle and his name in white — not the
-              white bar with dark text this carried, which read as a toolbar over a conversation
-              rather than as the head of one. The owner's «Chat is still different UI» is largely
-              this band.
+              WHITE, with the counterparty's initials in a circle and his name in dark ink (owner,
+              2026-08-11: *"the dock header is blue — make it white"*). It was `pChat`'s blue band
+              for a day; on this surface blue means an ACTION, and 64px of it was spent saying
+              something that is not one — who you are talking to — while fighting the pale bubbles
+              and the blue kind-line of the cards in the same column. See `map-proto.css`.
 
               What the prototype draws here and this does NOT: the presence dot, the two simulator
               buttons and the call control. All three were excluded by name, so the band carries the
@@ -755,6 +789,17 @@ export function ChatDock({
             ) : (
               messages.map((m) => {
                 const card = chatCardOfMessage(m);
+                /* ── WHOSE message this is, and why it is asked of the channel ──────────────────
+                   Owner, 2026-08-11: *"not floating cards in the middle, same on the supplier view
+                   make these cards appear like messages sent by the other side or by me whether the
+                   request or the response."*
+
+                   So the side is read from the Stream AUTHOR, exactly as the plain bubbles below
+                   read it, and never from the card's TYPE. Type worked only because this surface
+                   happens to be the renter's: "an ask is mine, a reply is theirs" is true from his
+                   chair and inverted from the supplier's, and the two of them read the SAME channel.
+                   Authorship is the one reading that is correct from both. */
+                const mine = myStreamId != null && m.user?.id === myStreamId;
                 // The renter's own ask keeps its CARD form — he and the supplier look at the same
                 // object, and it is the one thing in the thread with an identity strip and a live
                 // verdict on it. The prototype renders it with the same function it renders the draft
@@ -762,10 +807,10 @@ export function ChatDock({
                 if (card?.type === RENTEE_REQUEST_CARD_TYPE) {
                   return (
                     // A card is a MESSAGE in the stream, so it takes a side and a width like one
-                    // (`chatMsg`, prototype 05:141): the renter's own ask sits on his side at 86%.
-                    // Stretched across the full column it read as a banner the conversation was
-                    // wrapped around rather than as something he said.
-                    <div key={m.id} className="bm-chat-card is-mine">
+                    // (`chatMsg`, prototype 05:141) — the author's side, hugging his edge. Stretched
+                    // across the full column it read as a banner the conversation was wrapped around
+                    // rather than as something either party said.
+                    <div key={m.id} className={`bm-chat-card ${mine ? "is-mine" : "is-them"}`}>
                       <RequestCard
                         view={requestCardView(postedSubject(card.card), cardCtx)}
                         onOpenMachine={onOpenMachine}
@@ -787,13 +832,19 @@ export function ChatDock({
                     live: false,
                   });
                   const chatCard = <ChatCard view={view} ar={ar} L={L} busy={false} onAccept={() => {}} onCounter={() => {}} />;
-                  // The supplier's ANSWER is a message of his, so it takes his side at 86% the way
-                  // the ask takes the renter's (prototype 05:140). The negotiation vocabulary is not
-                  // sided: those cards are events in the room rather than either party's remark.
+                  // An ANSWER is a message of whoever wrote it, so it takes his side the way the ask
+                  // takes its author's (prototype 05:140) — his own answer hugs his edge on his
+                  // screen and the other edge on the asker's, off the one reading both share. The
+                  // negotiation vocabulary is not sided: those cards are events in the room rather
+                  // than either party's remark.
                   return card.type === RENTEE_REQUEST_REPLY_CARD_TYPE ? (
-                    <div key={m.id} className="bm-chat-card is-them">{chatCard}</div>
+                    <div key={m.id} className={`bm-chat-card ${mine ? "is-mine" : "is-them"}`}>{chatCard}</div>
                   ) : (
-                    <div key={m.id}>{chatCard}</div>
+                    // An EVENT in the room — a rate, a counter, an acceptance. It belongs to the
+                    // conversation rather than to either party, so it is centred rather than sided.
+                    // The class exists because `ChatCard` centres itself with `align-self`, which a
+                    // wrapper turns inert: without it the "not sided" card silently took a side.
+                    <div key={m.id} className="bm-chat-event">{chatCard}</div>
                   );
                 }
                 // NOT `if (!m.text) return null`. The dock and `/deal-room/[id]` read the SAME
@@ -802,7 +853,6 @@ export function ChatDock({
                 // message. Only a message with no text, no attachment and no point is skipped.
                 const view = dockMessageView(m);
                 if (view.empty) return null;
-                const mine = myStreamId != null && m.user?.id === myStreamId;
                 return (
                   <div key={m.id} className={`msg ${mine ? "mine" : "them"}`}>
                     {view.location ? (

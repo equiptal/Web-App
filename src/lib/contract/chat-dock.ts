@@ -270,6 +270,56 @@ export function dockMessageView(m: DockRawMessage): DockMessageView {
   return { text, location, attachments, empty: !text && !location && attachments.length === 0 };
 }
 
+/* ── what the bubble QUOTES (owner, 2026-08-11) ──────────────────────────────────────────────────
+ *
+ * *"The bubble never shows what was actually said."* It read «رسالة جديدة» + the supplier's name +
+ * the item's type — three things the renter already knew — and the one thing he opened the dock to
+ * find out, the words themselves, were not on it.
+ *
+ * The dock CAN say them, and could all along: since `dockWatchRoomId` the anchor bid's channel is
+ * watched open or shut, so the messages the bubble is announcing are already in hand. Unread is
+ * still REST and the notice is still refresh-timed — quoting a message the dock is holding claims
+ * no recency the badge does not already claim.
+ *
+ * **The LAST INCOMING message, and only it.** Walking further back to find something with words in
+ * it would quote a remark the supplier made an hour ago as though it were the arrival, so a card- or
+ * attachment-only message answers `{ text: null }` and the caller falls back to naming the kind of
+ * arrival rather than putting the wrong sentence in quotes.
+ */
+export interface DockNoticeMessage extends DockRawMessage {
+  user?: { id?: string };
+}
+
+/** What the bubble has to show for the arrival. `text` null with `attachment` true is a file or a
+ *  point — something was said, just not in words. */
+export interface DockNoticeQuote {
+  text: string | null;
+  attachment: boolean;
+}
+
+/**
+ * The words the arrival bubble quotes, out of the conversation the dock is already watching.
+ *
+ * **Null when it cannot tell whose message is whose** (`myUserId == null`, i.e. the connection has
+ * not resolved yet): quoting the renter's own last line back at him as the supplier's arrival is
+ * worse than the generic copy the caller falls back to. Null too when this side of the conversation
+ * has said nothing at all — there is no arrival to quote.
+ */
+export function dockNoticeQuote(
+  messages: readonly DockNoticeMessage[],
+  myUserId: string | null,
+): DockNoticeQuote | null {
+  if (!myUserId) return null;
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const m = messages[i];
+    // Mine are skipped, never quoted: a bubble about an arrival must not read back what I sent.
+    if (m.user?.id === myUserId) continue;
+    const view = dockMessageView(m);
+    return { text: view.text, attachment: view.attachments.length > 0 || view.location != null };
+  }
+  return null;
+}
+
 /**
  * The reply detail a notice quotes — `↩ ref · serial`, taken from the ASK the supplier answered
  * rather than from his reply, because only the ask carries the machine's serial (§7.3 stamps it

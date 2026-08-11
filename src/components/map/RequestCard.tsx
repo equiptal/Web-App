@@ -23,6 +23,7 @@
  * file holds no copy and no derivation.
  */
 
+import { equipmentIcon } from "@/components/requests/EquipImg";
 import type { RequestCardView } from "@/lib/contract/request-card";
 
 export interface RequestCardProps {
@@ -61,15 +62,31 @@ export function RequestCard({
   openLabel,
   at,
 }: RequestCardProps) {
+  /* ── The EQUIPMENT's picture, not a glyph tile (owner, 2026-08-11) ───────────────────────────────
+     The card showed the same gold `precision_manufacturing` tile on every machine — a robot arm on an
+     excavator — because the fallback named one glyph for the whole taxonomy. It now walks the same
+     chain the rest of the feature walks (`EquipImg`, and `MapCanvas` for the pins): the unit's own
+     photo when its file has one, else the icon `equipmentIcon` derives from what the machine IS.
+
+     The name it derives from is the card's own title — `model · spec`, whose spec half is the
+     subcategory the fleet row carries — so the icon is keyed to the same words the reader sees. The
+     fleet payload carries no taxonomy IMAGE url (`OfferedUnitDetail` has photos and nothing else),
+     which is why the chain ends at the icon here rather than at a second picture.
+
+     `scope: "company"` is untouched: that card names a firm, not a machine, and its glyph is the
+     building it has always been. */
   const strip = (
     <>
-      <span className={`bm-rq-tile${view.scope === "company" ? " is-co" : ""}`} aria-hidden="true">
+      <span
+        className={`bm-rq-tile${view.scope === "company" ? " is-co" : ""}${view.photoUrl ? " has-photo" : ""}`}
+        aria-hidden="true"
+      >
         {view.photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={view.photoUrl} alt="" />
         ) : (
           <span className="material-icons-outlined">
-            {view.scope === "company" ? "apartment" : "precision_manufacturing"}
+            {view.scope === "company" ? "apartment" : equipmentIcon(view.title)}
           </span>
         )}
       </span>
