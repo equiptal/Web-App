@@ -315,16 +315,26 @@ describe("the filter is a panel over the column, dismissed by an X", () => {
 
 /* ═════════ the card's controls are the CARD's, not floating on it (owner, 2026-08-11) ═════════ */
 
-describe("the two card controls sit in one cluster, and both keep their rules", () => {
+describe("the card's controls each keep a row, and both keep their rules", () => {
   const list = strip(read(LIST));
   const css = read(CSS);
 
-  it("puts both controls in one cluster on the distance row — the positive control", () => {
-    const row = region(read(LIST), '<div className="bm-eq-r3">', '<div className="bm-eq-r4">');
-    expect(row).toMatch(/bm-eq-acts/);
-    expect(row).toMatch(/bm-eq-ask/);
-    expect(row).toMatch(/bm-eq-details/);
-    // …and neither is left behind on the rows they came from, which is what "floating" was.
+  // ── Superseded (owner, 2026-08-11) ───────────────────────────────────────────────────────────
+  // ~~"puts both controls in one cluster on the distance row"~~. The owner withdrew the cluster on
+  // seeing it: *"for the asked make it beside not confirmed"*, *"the details button make it as
+  // before"*. Row 3 is `nowrap`, so on a card whose ask was already out the pair clipped the
+  // distance mid-word — and the distance is the fact this list is sorted on.
+  it("puts the ask beside the availability chip, and «التفاصيل» alone on the distance row", () => {
+    const r2 = region(read(LIST), '<div className="bm-eq-r2">', '<div className="bm-eq-r3">');
+    const r3 = region(read(LIST), '<div className="bm-eq-r3">', '<div className="bm-eq-r4">');
+    // The ask answers the chip, so it shares the chip's row…
+    expect(r2).toMatch(/bm-eq-chip/);
+    expect(r2).toMatch(/bm-eq-ask/);
+    // …and is not left behind on the row it came from.
+    expect(r3).not.toMatch(/bm-eq-ask/);
+    // Details keeps the trailing edge, alone, so it lands in one place on every card in the column.
+    expect(r3).toMatch(/bm-eq-acts/);
+    expect(r3).toMatch(/bm-eq-details/);
     const r1 = region(read(LIST), '<div className="bm-eq-r1">', "</div>");
     expect(r1).not.toMatch(/bm-eq-details/);
   });

@@ -1109,11 +1109,14 @@
    borderless blue word with a hairline under it, dropped between a red chip and a brown qualifier, so
    the state row carried three unlike objects and the eye could not tell which of them was pressable.
 
-   Both now sit in `.bm-eq-acts` on row 3, sharing ONE height, ONE radius and ONE baseline, anchored to
-   the row's trailing edge and flush with the text column's own padding. Two controls in a strip read
-   as the card's controls; two scattered over two rows read as things resting on it. They cost no
-   height — row 3 was already a full line holding one short figure — so the card is still exactly four
-   rows and every card in the column is still the same height.
+   «التفاصيل» sits in `.bm-eq-acts`, alone, at row 3's trailing edge, flush with the text column's own
+   padding. The ask joined it there briefly and the owner withdrew that on sight (2026-08-11: *"for the
+   asked make it beside not confirmed"* / *"the details button make it as before"*) — row 3 is `nowrap`,
+   so on an asked card the pair clipped the distance mid-word, and the distance is the fact this list is
+   sorted on. The ask now sits beside the availability chip on row 2, where it reads as the answer to
+   it. Details alone also lands in the same place on every card, asked or not, which is what makes the
+   column scannable down its trailing edge. Neither costs height — row 2 and row 3 were both already
+   full lines — so the card is still exactly four rows and every card is still the same height.
 
    **Both keep the grounds their rules give them.** The ask is still the blue of RM3-AC-33 (never navy:
    beside a red chip navy reads as disabled) and is still a real button above the stretched open layer,

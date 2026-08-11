@@ -518,22 +518,60 @@ function EquipmentCard({
                 a mobilisation. It qualifies the offer, so it sits with the state and not with the
                 number it is derived from. */}
             {card.outOfCity && <span className="bm-eq-far">{t.bidMap.eqOutOfCity}</span>}
+
+            {/* ── The ask sits BESIDE the state, not with the controls (owner, 2026-08-11) ─────────
+                ~~Both controls clustered on row 3's trailing edge.~~ Withdrawn by the owner on
+                seeing it: *"for the asked make it beside not confirmed"*, and *"the details button
+                make it as before"*.
+
+                It was not only a preference. Row 3 is `nowrap`, so on a card that had been asked the
+                ask and «التفاصيل» together took enough of the row to clip the distance — the screenshot
+                shows «7.5 km from your |», the label cut mid-word. The distance is the reason this
+                list is sorted the way it is; a control must not eat it.
+
+                And it reads better here on its merits: «تم الطلب» is the ANSWER to «لم يؤكد توفرها
+                بعد» — the chip states the question, the pill states that it has been put. Two facts
+                about the same thing, on one line. «التفاصيل» goes back to being alone at row 3's
+                trailing edge, which is where it sits on a confirmed card, so every card in the column
+                now has its Details in the same place whether or not an ask is out.
+
+                AC-13 is untouched: the ask is still a real button on the card, above the stretched
+                open layer, so an unconfirmed machine is still askable without opening the detail.
+                AC-33 too — it is still `askAvailability.colour`. Only the row moved. */}
+            {askAvailability && (
+              <button
+                type="button"
+                className="bm-eq-ask"
+                style={{ color: askAvailability.colour }}
+                // ── One ask, one card (owner, 2026-08-10) ──────────────────────────────────────
+                // The control STAYS on the card once the ask is out, disabled and relabelled. It is
+                // not removed: a control that vanished would read as «there is nothing to ask»,
+                // when the truth is that the question was asked and is waiting — and it is not left
+                // live either, because a second press would flood the lessor's conversation with a
+                // duplicate card (or, since the backend's own guard landed, meet a 409 the renter
+                // can do nothing with).
+                title={pending ? t.bidMap.askPendingWhy : t.bidMap.eqAskConfirmWhy}
+                onClick={() => onAskAvailability?.(machine)}
+                disabled={!onAskAvailability || pending}
+              >
+                {/* «تم الطلب» / «Asked» — the list-foot ask's own sent label, borrowed rather than
+                    duplicated (owner, 2026-08-11: *"use shorter wordings, even on the equipment
+                    card"*). The earlier draft read «Asked — awaiting reply», a sentence inside a
+                    22px control beside a second control; the same fact fits in one word, and the
+                    REASON the button is inert is already on its `title` in full. */}
+                {pending ? t.bidMap.eqAskAnotherSent : t.bidMap.eqAskConfirm}
+              </button>
+            )}
           </div>
 
-          {/* 3 · distance from the project, and **the card's two controls, as one cluster** (owner,
-              2026-08-11). Numerals are `dir="ltr"` — an Arabic-Indic figure inside an RTL run still
-              reads left to right.
+          {/* 3 · distance from the project, and «التفاصيل» alone at the row's trailing edge. Numerals
+              are `dir="ltr"` — an Arabic-Indic figure inside an RTL run still reads left to right.
 
-              The cluster is anchored to the row's trailing edge and both controls share one height,
-              one radius and one baseline, which is the whole of "settle the layout": two controls in
-              one strip read as the card's controls, two scattered across two rows read as furniture
-              dropped on top of it. It costs NO extra height — the distance line was already a full
-              row carrying one short figure, and the controls fill the slack it was wasting. Every
-              card is still exactly four rows tall (AC-32's second half).
-
-              **AC-13 survives the move unchanged**: «اطلب التأكيد» is still a real button on the
-              card, above the stretched open layer, so an unconfirmed machine is still askable without
-              opening the detail. So does AC-33 — the ask is still `askAvailability.colour`, blue. */}
+              The ask used to share this row. It moved up beside the availability chip (see row 2):
+              the row is `nowrap`, and two controls on it clipped the distance on any card that had
+              been asked. Details alone also means it lands in the same place on every card in the
+              column, asked or not, which is what makes a list scannable down its trailing edge.
+              Every card is still exactly four rows tall (AC-32's second half). */}
           <div className="bm-eq-r3">
             <span className="bm-eq-dist">
               {km != null ? (
@@ -550,34 +588,6 @@ function EquipmentCard({
             </span>
 
             <span className="bm-eq-acts">
-              {/* The ask exists on an unconfirmed card and does not exist on a confirmed one (AC-13) —
-                  `askAvailability` is the model's answer, not a condition re-derived here. Its colour
-                  is the model's too: blue, never navy (AC-33), because beside a red chip navy reads as
-                  disabled and this is the one control the renter is supposed to press. */}
-              {askAvailability && (
-                <button
-                  type="button"
-                  className="bm-eq-ask"
-                  style={{ color: askAvailability.colour }}
-                  // ── One ask, one card (owner, 2026-08-10) ──────────────────────────────────────
-                  // The control STAYS on the card once the ask is out, disabled and relabelled. It is
-                  // not removed: a control that vanished would read as «there is nothing to ask»,
-                  // when the truth is that the question was asked and is waiting — and it is not left
-                  // live either, because a second press would flood the lessor's conversation with a
-                  // duplicate card (or, since the backend's own guard landed, meet a 409 the renter
-                  // can do nothing with).
-                  title={pending ? t.bidMap.askPendingWhy : t.bidMap.eqAskConfirmWhy}
-                  onClick={() => onAskAvailability?.(machine)}
-                  disabled={!onAskAvailability || pending}
-                >
-                  {/* «تم الطلب» / «Asked» — the list-foot ask's own sent label, borrowed rather than
-                      duplicated (owner, 2026-08-11: *"use shorter wordings, even on the equipment
-                      card"*). The earlier draft read «Asked — awaiting reply», a sentence inside a
-                      22px control beside a second control; the same fact fits in one word, and the
-                      REASON the button is inert is already on its `title` in full. */}
-                  {pending ? t.bidMap.eqAskAnotherSent : t.bidMap.eqAskConfirm}
-                </button>
-              )}
               <button type="button" className="bm-eq-details" onClick={() => onOpenDetail(machine.equipmentId)}>
                 {t.bidMap.eqDetails}
                 {/* The prototype hard-codes «‹», which is correct in Arabic and backwards in English —
