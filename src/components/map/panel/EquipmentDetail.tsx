@@ -227,7 +227,7 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
           in it, and comes off the ROW'S GROUP rather than off its url; see `DocViewSubject.kind`. */}
       <div className={`mp-viewer${framedDoc ? ` doc ${framedDoc.kind}` : ""}`}>
         {framed == null ? (
-          <div className="mp-hero-empty">{L("No photo on this machine's file", "لا توجد صورة على ملف هذه المعدّة")}</div>
+          <div className="mp-hero-empty">{L("No photo on this equipment's file", "لا توجد صورة على ملف هذه المعدّة")}</div>
         ) : framedBroken ? (
           /* **The paper renders HERE, not in a message about the paper** (owner, UAT of 2026-08-11 —
              *"the document does not render at the top"*, over a screenshot of this very state). What he
@@ -397,7 +397,7 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
             <div className="mp-body">
               <div className="mp-h4">
                 {L("Against your request", "مقابل طلبك")}
-                <small>{L("What this machine answers, and what it does not.", "ما تفي به هذه المعدّة، وما لا تفي به.")}</small>
+                <small>{L("What this equipment answers, and what it does not.", "ما تفي به هذه المعدّة، وما لا تفي به.")}</small>
               </div>
               {/* **A CELL OPENS ITS EVIDENCE** (owner, UAT of 2026-08-11: *"clicking on any document
                   field here, like '2 of 2 unit photos', will take them to the document"*). The cell is a
@@ -434,7 +434,7 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
                   // The accessible name says the ACT and names the paper, because the cell's own two
                   // lines are a label and a finding — neither of them says that pressing shows a file.
                   const say = framedHere
-                    ? L("Back to the machine's photo", "العودة إلى صورة المعدّة")
+                    ? L("Back to the equipment's photo", "العودة إلى صورة المعدّة")
                     : L(`Show ${evName} in the viewer`, `اعرض ${evName} في العارض`);
                   return (
                     <button
@@ -505,7 +505,7 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
             disabled={!onRequest || alternativePending}
             title={alternativePending ? pendingWhy : undefined}
           >
-            {alternativePending ? pendingLabel : L("Ask for a different machine", "اطلب معدّة أخرى")}
+            {alternativePending ? pendingLabel : L("Ask for different equipment", "اطلب معدّة أخرى")}
           </button>
         </div>
       )}

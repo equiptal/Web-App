@@ -843,7 +843,7 @@ export const en = {
     signIn: "Sign in",
     // Off-platform offers never open this surface (RM3-AC-25) — they keep their own viewer.
     offPlatformNotHere: "This offer came in through your shared link",
-    offPlatformNotHereWhy: "It carries items, not registered machines — so there is nothing here to place or verify. Open it from your bids to read the submission and reply.",
+    offPlatformNotHereWhy: "It carries items, not registered equipment — so there is nothing here to place or verify. Open it from your bids to read the submission and reply.",
     // V2 — panel header. Identity only: no contact details, no deals count, no IBAN, CR or VAT.
     verifiedCompany: "Verified company",
     companyDocuments: "Company documents",
@@ -866,7 +866,7 @@ export const en = {
     // no registered machine — they don't appear on the map"~~ wrapped to three. The dash clause went
     // with it: "no registered machine" already says it is not on a map, and the alert sits above the
     // list it is absent from.
-    shortfall: "{n} in this offer with no registered machine",
+    shortfall: "{n} in this offer with no registered equipment",
     // "it", not "them" — the count reads «1 unit» far more often than not, and a plural button beside
     // a singular line is the kind of mismatch a reader trips on before they can say why.
     shortfallAction: "Ask him to add it",
@@ -897,7 +897,7 @@ export const en = {
     unitsConfirmed: "{c} confirmed · {a} not confirmed",
     // T13 — the bid list panel
     title: "Offers received",
-    pickSupplier: "Pick a supplier from the list to see their machines",
+    pickSupplier: "Pick a supplier from the list to see their equipment",
     sortPrice: "Lowest price",
     sortNearest: "Nearest",
     sortNearestOff: "Nearest — needs a project location",
@@ -920,12 +920,12 @@ export const en = {
     freshnessNote: "Offers update when you open this page, come back to it, or press refresh.",
     // T15 — the colour key, hosted inside the panel
     keyToggle: "What do the colours mean?",
-    keyHeading: "Every pin on the map is one machine",
+    keyHeading: "Every pin on the map is one piece of equipment",
     keyConfirmed: "Confirmed — the supplier confirmed its yard in the offer readiness",
     keyUnconfirmed: "Not confirmed — he hasn't confirmed it yet",
     keyNotUnavailable:
-      "“Not confirmed” does not mean unavailable — it means the supplier hasn't named its yard in the offer readiness yet. Ask him to confirm from the machine panel.",
-    keyCountOnly: "Units added as a count only don't appear on the map — no machine is registered for them.",
+      "“Not confirmed” does not mean unavailable — it means the supplier hasn't named its yard in the offer readiness yet. Ask him to confirm from the equipment panel.",
+    keyCountOnly: "Units added as a count only don't appear on the map — no equipment is registered for them.",
     // V10 — the machine marker's availability label (§6.8). One scale, two labels, and "not confirmed"
     // reads as UNANSWERED — never refused, never unavailable (RM3-AC-20). The "you can request it"
     // variant is gone with the hollow marker: v3 draws offered machines only.
@@ -935,7 +935,7 @@ export const en = {
     pinInOffer: "In this offer",
     // A flag beside the distance on the map. Never a warning colour: colour here is availability's.
     mapOutOfCity: "Outside the city",
-    loadingFleet: "Loading this supplier's machines…",
+    loadingFleet: "Loading this supplier's equipment…",
     /* ── V5 · the equipment list (§6.4) ──
        Flat, nearest first, OFFERED machines only. No serial number and no load capacity (RM3-AC-12):
        the serial identifies the machine to the system, and the type and size are already stated once,
@@ -947,14 +947,19 @@ export const en = {
     eqChipConfirmed: "Availability confirmed · in this offer",
     eqChipUnconfirmed: "Not confirmed yet",
     // Blue, never navy (RM3-AC-33) — beside a red chip, navy reads as disabled.
-    // A mark on the title: the platform holds this machine's papers. A fact about its DOCUMENTS, not
-    // about whether it is available.
-    eqVerifiedMachine: "Documented machine",
+    // A mark on the title: the platform CHECKED this equipment's papers (`verificationStatus ===
+    // "VERIFIED"`). A fact about the platform's verdict, not about whether it is available.
+    // ~~"Documented machine".~~ Two changes, one ruling (owner, 2026-08-11 — "make sure it is read
+    // the equipment status is it verified really or not"): the mark used to fire on "the request
+    // named a certificate", and "documented" was the honest word for that weaker claim. Now that it
+    // states verification, the copy has to as well — a renter reading "documented" beside a tick
+    // cannot tell whether anyone checked. ("equipment", never "machine", in English copy.)
+    eqVerifiedMachine: "Verified equipment",
     // Qualifies the offer, not the number: the yard sits outside the request city's own radius, so
     // delivery is a mobilisation worth asking about.
     eqOutOfCity: "· Outside the city",
     eqAskConfirm: "Ask him to confirm",
-    eqAskConfirmWhy: "Ask the supplier to confirm this machine is available",
+    eqAskConfirmWhy: "Ask the supplier to confirm this equipment is available",
     eqDetails: "Details",
     // The certificate row always occupies its line, so a machine with no certificates is a shorter
     // LINE and not a shorter CARD.
@@ -964,26 +969,26 @@ export const en = {
     eqDistanceUnit: "km from your project",
     eqNoDistance: "Distance not known",
     eqNoPhoto: "No photo",
-    eqSelect: "Show this machine on the map",
+    eqSelect: "Show this equipment on the map",
     // RM3-AC-26 — a price and a count were given, and nothing else. No empty card furniture.
-    eqNoneRegistered: "No machine is registered in this offer",
+    eqNoneRegistered: "No equipment is registered in this offer",
     eqNoneRegisteredWhy: "The supplier gave a price and a count only, so there is nothing here to place or verify.",
     // V17 — the list's filters (§6.4a). Chips select for what a machine HAS, never for what it lacks,
     // and the count always states the whole (RM3-AC-28a→28e). Group and chip copy comes from the
     // model, bilingual, so the list and a Dart port cannot label the same band differently.
-    eqFilterLabel: "Filter the machines in this offer",
+    eqFilterLabel: "Filter the equipment in this offer",
     eqFilterClear: "Clear filters",
     // «3 of 8» — the numerator is what is shown, the denominator is the whole offer.
     eqShownOfTotal: "{n} of {total}",
     // The filtered empty state — deliberately unlike RM3-AC-26's. That one is a statement about the
     // supplier; this one is a statement about the chips the renter pressed.
-    eqFilterEmpty: "No machine matches what you chose",
+    eqFilterEmpty: "No equipment matches what you chose",
     eqFilterEmptyWhy: "Active filters: {filters}. This offer has {total} — clear the filters to see them all.",
     // The company panel's own back control, and the detail's.
     // The list-foot ask (§6.4). The prototype says «المورد»; this surface says «المؤجّر» / supplier.
     eqAskAnother: "Ask the supplier to add another {type}",
     eqAskAnotherSent: "Asked",
-    backToEquipment: "Back to the machines",
+    backToEquipment: "Back to the equipment",
     // What the map is NOT showing, in words. Silence would read as "this supplier has no machines".
     //
     // The V4 shortfall alert has no subtitle key any more (2026-08-11, aligning to the v3 prototype,
@@ -992,15 +997,15 @@ export const en = {
     // have no location, documents or serial to show." — spent three grey lines unpacking a
     // consequence "no registered machine — they don't appear on the map" already carries. An earlier
     // `claimedNotDrawn` headline went the same way and for the same reason: one slot, one sentence.
-    noLocatable: "None of this supplier's machines can be placed",
+    noLocatable: "None of this supplier's equipment can be placed",
     // The resize grip's accessible name. Says what dragging does and what returns it, because the
     // control is invisible until hovered and a screen reader never sees the cursor change.
     resizePanel: "Drag to widen the panel — double-click, or Home, to restore",
     noLocatableWhy:
-      "He hasn't shared a yard for any machine that fits this request, so nothing can be drawn. Ask him to confirm a yard.",
+      "He hasn't shared a yard for any equipment that fits this request, so nothing can be drawn. Ask him to confirm a yard.",
     offPlatformNoPins: "An off-platform offer has no pin",
-    offPlatformNoPinsWhy: "It was submitted through your shared link, so it carries no registered machine and no location.",
-    fleetFailed: "The machines couldn't be loaded",
+    offPlatformNoPinsWhy: "It was submitted through your shared link, so it carries no registered equipment and no location.",
+    fleetFailed: "The equipment couldn't be loaded",
     fleetFailedWhy: "This isn't a statement about the offer. Press refresh to try again.",
     keyOffPlatform: "Off-platform offers carry no location, so they get no pin.",
   },
@@ -1019,11 +1024,15 @@ export const en = {
     // The notice is refresh-timed (mount · focus · post-send · the poll). It states that a reply IS
     // there — never that it just arrived, which is a recency it cannot know.
     noticeTitle: "You have a reply from the supplier",
-    // What KIND of arrival, in a word, before the renter reads whose it is. A refusal takes the
-    // bubble's warm fill — not red, which on this surface belongs to availability alone.
+    // What KIND of arrival, in a chip beside the sender's name. A refusal takes the bubble's warm
+    // tone — not red, which on this surface belongs to availability alone.
     kindReply: "Reply to your ask",
     kindRefusal: "Your ask was refused",
     kindMessage: "New message",
+    // The bubble QUOTES the message itself (owner, 2026-08-11). This is what it says when there are
+    // no words to quote — a file or a shared point — so it still reports what came rather than
+    // inventing a sentence the supplier never wrote.
+    noticeAttachment: "Sent you an attachment",
     // The composer's send control. The prototype labels it «إرسال» in words; ours draws a glyph, so
     // the word has to reach a screen reader some other way or the button announces as "button".
     send: "Send",
@@ -1047,39 +1056,57 @@ export const en = {
     draftSend: "Send the request",
     // The card's press target. The card names a machine, and the reason it is pressable is that the
     // supplier reading it has to reach that machine to add a document or confirm its yard.
-    openMachine: "Open this machine",
+    openMachine: "Open this equipment",
   },
   /* ── V12 · the price footer (spec 004 §6.10, 004a §4a.1 + §4a.4) ──
      Figures and a hand-off. It never edits a figure and never re-implements negotiation. */
   priceFooter: {
     perPeriod: "SAR / {unit}",
+    // Every figure in the breakdown carries the currency, exactly as the app's bid footer prints it.
+    currency: "SAR",
     day: "day",
     week: "week",
     month: "month",
     job: "job",
+    // Plurals — for the rental basis line ONLY ("… × 14 days × 1 unit"), which counts periods and
+    // units out loud. The singular keys above still label the rate itself ("SAR / day").
+    days: "days",
+    weeks: "weeks",
+    months: "months",
+    jobs: "jobs",
+    unitOne: "unit",
+    unitMany: "units",
     openingOffer: "Opening offer",
     fromDealRoom: "From the deal room",
-    details: "Details",
+    // A text link that says what pressing it DOES, both ways round — the app's footer names the next
+    // state rather than the section (owner, 2026-08-11, from the app screenshot). The old single
+    // "Details" + chevron left the reader to decode the arrow.
+    showDetails: "Show details",
+    hideDetails: "Hide details",
     // The footer's two ways in, named by INTENT rather than by destination (owner, 2026-08-11).
     // ~~"Negotiate" / "Continue in the deal room"~~ — both described the room the renter arrives in,
     // which he has not seen yet and cannot want; these describe what he is about to do with the price
-    // in front of him. Both still land in `/deal-room/[id]`: the dock never settles a rate (004a
-    // §4a.2), so there is still exactly one place a price can be accepted.
-    counterPrice: "Counter",
-    // Shown INSTEAD, and only when nothing in the offer contradicts the request — no red cell on any
-    // machine's match grid, and no unit offered as a count with no machine behind it.
-    confirmPrice: "Accept",
-    // Why Accept is unavailable HERE once a room exists: the rule that gates it needs the room's
-    // terms and its last two rounds, and this surface does not fetch them.
-    acceptInRoom: "Open the deal room to accept — the terms and the latest round are settled there",
+    // in front of him. "Counter this price" is the owner's own wording (2026-08-11); the Arabic pair
+    // «اطلب سعراً أقل» / «اعتمد» is the app's, verbatim.
+    //
+    // Both now land in `/deal-room/[id]?act=…`, which opens the room's OWN three-step flow on
+    // arrival. The price is still settled in exactly one place (004a §4a.2) — this only removes the
+    // second press that used to stand between the renter and the sheet he had already asked for.
+    counterPrice: "Counter this price",
+    confirmPrice: "Approve",
     // The one place the offered and the agreed count are reconciled (RM3-AC-66).
     unitsDiffer: "Priced on {agreed} agreed units — the offer was made of {offered}.",
-    rentalLine: "Rental — {rate} / {unit} × {n} × {periods}",
-    mobilisation: "Mobilisation",
-    demobilisation: "Demobilisation",
+    rental: "Rental",
+    // The basis, restated under the label the way the app restates it: rate, then how many periods,
+    // then how many units — so the rental total is arithmetic the reader can check, not a claim.
+    rentalBasis: "{rate} × {periods} {unit} × {n} {units} in your request",
+    // The legs keep their internal names as KEYS (mob/demob is what the backend and the deal room
+    // call them) but wear the app's plain words, which is what a renter reading a price expects.
+    mobilisation: "Delivery",
+    demobilisation: "Return",
     excluded: "Not charged",
-    subtotal: "Subtotal",
-    vat: "VAT 15%",
+    subtotal: "Subtotal before VAT",
+    vat: "VAT (15%)",
     total: "Total",
     noDuration: "This request has no duration, so the figures cover one full period.",
   },

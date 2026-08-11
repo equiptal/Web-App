@@ -187,7 +187,7 @@ export function requestCardView(
     machine?.label?.trim() ||
     machine?.serial ||
     subject.serial ||
-    (subject.scope === "company" ? L("The company", "الشركة") : L("The machine", "المعدّة"));
+    (subject.scope === "company" ? L("The company", "الشركة") : L("The equipment", "المعدّة"));
 
   /* ── `alternative` asks for an ADDITION, and names the REQUEST's type (owner, 2026-08-11) ───────
      «طلب معدّة أخرى» / "Request for another machine" described a SWAP — a different unit instead of
@@ -208,7 +208,7 @@ export function requestCardView(
         // why they now read alike. Only the type word separates them from "another machine".
         return another
           ? L(`Request to add another ${another}`, `طلب إضافة ${another} أخرى`)
-          : L("Request to add another machine", "طلب إضافة معدّة أخرى");
+          : L("Request to add other equipment", "طلب إضافة معدّة أخرى");
     }
   })();
 
@@ -221,7 +221,7 @@ export function requestCardView(
   const askText = ((): string | null => {
     switch (subject.kind) {
       case "availability":
-        return L("Can you confirm this machine is available?", "هل يمكنك تأكيد توفّر هذه المعدّة؟");
+        return L("Can you confirm this equipment is available?", "هل يمكنك تأكيد توفّر هذه المعدّة؟");
       case "alternative":
         // An ADDITION, not a swap. "matching these specifications" read as *instead of this one* —
         // and it is asked from beside a machine, which made the misreading the obvious one.
@@ -263,7 +263,7 @@ export function requestCardView(
       case "unknown":
         return {
           tone: "unknown",
-          label: L("This machine isn't in his current list", "هذه المعدّة ليست ضمن قائمته الحالية"),
+          label: L("This equipment isn't in his current list", "هذه المعدّة ليست ضمن قائمته الحالية"),
         };
       default:
         // NEVER "he refused" — an unanswered ask is unanswered (RM3-AC-20's rule, on the card). And

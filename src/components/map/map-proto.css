@@ -169,12 +169,33 @@
    large free-standing object*, which is what this file drew until 2026-08-08 (owner's ruling). */
 .bm-pin {
   direction: rtl;
+  /* The RESTING width. `MapCanvas.pinBox()` overrides it inline once the zoom scale takes the machine
+     past it, together with the `divIcon`'s own box — the two are one number and must not drift. */
   width: 132px;
   display: flex;
   flex-direction: column;
   align-items: center;
   cursor: pointer;
   font-family: inherit;
+  /* The containing block for `.bm-pinfo`, and nothing else. Every other absolutely-placed part of this
+     marker is positioned against `.bm-pin-stage` or `.bm-pin-art`, both of which are already
+     `position: relative`, so this changes where exactly one element lands. */
+  position: relative;
+}
+/* ── The zoom LENS (owner, 2026-08-11: *"the equipment must scale up as I zoom in"*) ─────────────────
+   A wrapper around the stage carrying `scale(pinScale(zoom))`, set inline because it is the one value
+   on this marker that changes continuously with the view.
+
+   Why a wrapper and not the stage itself: `.bm-pin.is-on .bm-pin-stage` already owns a transform — the
+   1.14 of the selection emphasis — and a second one on the same element would have replaced it, so a
+   selected machine would have stopped being bigger than its neighbours the moment the renter zoomed
+   in. Nested, the two multiply, which is what that 14% has always meant.
+
+   `transform-origin: bottom center` for the same reason the selected scale has it: the machine grows
+   UPWARD out of the ground it stands on, and the point the marker marks does not move. */
+.bm-pin .bm-pin-lens {
+  transform-origin: bottom center;
+  display: flex;
 }
 /* The ground: 96×78, everything inside it absolutely placed against the bottom edge. */
 .bm-pin .bm-pin-stage {
@@ -366,6 +387,138 @@
   white-space: nowrap;
   box-shadow: 0 3px 10px rgba(15, 34, 56, 0.18);
   animation: dpTagIn 0.3s ease 0.1s both;
+}
+
+/* ── The hover details box (owner, 2026-08-11: *"hovering an equipment must show its details"*) ──────
+   A white card beside the machine carrying what the FLEET LIST CARD carries — its title and year, its
+   one availability chip, its distance to one decimal, its requested certificates — all of them off the
+   same `EquipmentCardModel` the column renders, so the two cannot start disagreeing.
+   `MapCanvas.hoverBoxHtml()` records the derivation rules and what the box deliberately does not say.
+
+   **Why the reveal is CSS and not React.** A `divIcon` is an HTML string with no lifecycle, so a
+   hover-driven box in React would have meant a hovered-id state on the canvas — the one thing that
+   file's header says it does not have — and a rebuild of every marker's icon on every mouse-over. The
+   box ships inside the pin, hidden, and `:hover` reveals it. `riseOnHover` on the marker already lifts
+   the hovered pin above its neighbours, so it is never drawn under another machine.
+
+   `visibility` alongside `opacity`, not `display`: a `display: none` box cannot transition, and an
+   `opacity: 0` box left `visible` would still take the pointer — which on this marker means eating the
+   press that OPENS the machine. `pointer-events: none` says the same thing a second way, deliberately:
+   the box is a preview, never a target, and the marker under it must stay pressable through it.
+
+   The inline-start offset is set inline per marker: the machine grows with the zoom, so a fixed gap
+   would put the box on top of the machine at exactly the zoom it grew for. */
+.bm-pin .bm-pinfo {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 236px;
+  box-sizing: border-box;
+  text-align: start;
+  background: #fff;
+  border-radius: 14px;
+  padding: 10px 12px;
+  box-shadow: 0 10px 28px rgba(15, 34, 56, 0.22), 0 2px 6px rgba(15, 34, 56, 0.1);
+  font-family: inherit;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.13s ease, visibility 0.13s ease;
+  /* Above the marker's own parts, and above the neighbours `riseOnHover` has just raised this pin over. */
+  z-index: 5;
+}
+.bm-pin:hover .bm-pinfo {
+  opacity: 1;
+  visibility: visible;
+}
+/* Row 1 — model · year, the card's own title string. Two lines at most: a machine whose make and model
+   run long is clamped rather than allowed to grow the box down over the map. */
+.bm-pin .bm-pinfo-t {
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+  color: #16304f;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.bm-pin .bm-pinfo-r {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+/* The card's ONE state chip (RM3-AC-32), drawn as ink and a keyline. The colour is set INLINE from
+   `card.chip.colour` — the model stays the only authority on it, exactly as the card's own chip and
+   this marker's label do — so there is deliberately no `background` and no `color` here to override
+   it, and no green or red anywhere in this rule for a sweep to find. */
+.bm-pin .bm-pinfo-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid;
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-size: 10.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+/* «خارج المدينة» — a qualifier on the offer, in the same warm ink the card gives it. Never red: red on
+   this canvas is availability's, and a distant yard is not an unavailable machine. */
+.bm-pin .bm-pinfo-far {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #8a4f08;
+  white-space: nowrap;
+}
+.bm-pin .bm-pinfo-km {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #6b8fa8;
+}
+/* The numeral itself, which carries `dir="ltr"` in the markup — an Arabic-Indic figure inside an RTL
+   run still reads left to right. Same face and same weight the card's distance wears. */
+.bm-pin .bm-pinfo-km [dir="ltr"] {
+  font-family: ui-monospace, monospace;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  color: #1c3550;
+}
+.bm-pin .bm-pinfo-c {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 7px;
+}
+/* Held vs missing, the card's own two treatments. The ✓/! mark carries as much of the distinction as
+   the fill does: at 10 px the two grounds are close enough that colour alone would decide it, and a
+   renter who cannot separate them would read a missing certificate as a present one. */
+.bm-pin .bm-pinfo-cert {
+  border-radius: 7px;
+  padding: 1px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.bm-pin .bm-pinfo-cert.held {
+  color: #0d6c38;
+  background: rgba(18, 144, 74, 0.1);
+  border: 1px solid rgba(18, 144, 74, 0.32);
+}
+.bm-pin .bm-pinfo-cert.missing {
+  color: #a82c22;
+  background: rgba(217, 54, 42, 0.1);
+  border: 1px solid rgba(217, 54, 42, 0.32);
+}
+.bm-pin .bm-pinfo-none {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #6b8fa8;
+  opacity: 0.7;
 }
 
 /* The distance chip riding the route (§6.8, AC-21). Non-interactive: it states the distance the card
@@ -1673,83 +1826,120 @@
 /* ── V12 · the price footer (§6.10) ──────────────────────────────────────────────────────────────
    It closes the panel column: `flex-shrink: 0` beside `.bm-body`'s `flex: 1`, so التفاصيل expanding
    takes vertical space FROM the equipment list rather than overlaying it. There is nowhere to
-   overlay to — the panel is a fixed-width column, not a page. */
+   overlay to — the panel is a fixed-width column, not a page.
+
+   Rebuilt against the APP's bid footer (owner's screenshot, 2026-08-11), which this had drifted from
+   in every dimension that matters: the app leads with the rate at hero size, states the breakdown
+   above it, and offers the two acts as a white pill beside a quiet dark one. Everything below is
+   dark-native — the ink is chosen against `#0F2238` at the point of use, so there is no second
+   "…and now restate every colour for the dark slab" block further down the file to keep in sync. */
 .bidmap .bm-foot {
   flex-shrink: 0;
   /* DARK, the prototype's `#0F2238` — the one slab on this surface. Everything above is white cards
      on grey, and the bar that prices them must not read as one more card. */
   background: #0f2238;
-  padding: 10px 15px 12px;
+  padding: 12px 15px 14px;
+  color: #fff;
 }
-/* Two buttons plus the expander plus the price do not fit 392px on one line — that is what pushed
-   «/ day» under «Details» and wrapped «Opening offer». The figures take their own row above the
-   controls, which is also the prototype's stacking. */
-.bidmap .bm-foot-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.bidmap .bm-foot-figs { flex: 1 0 100%; }
-.bidmap .bm-foot-figs { flex: 1; min-width: 0; }
-.bidmap .bm-foot-rate { display: flex; align-items: baseline; gap: 5px; }
-.bidmap .bm-foot-amt { font-size: 17px; font-weight: 800; color: #16304f; font-family: "IBM Plex Sans", monospace; }
-.bidmap .bm-foot-unit { font-size: 10.5px; font-weight: 700; color: #6b8fa8; }
-/* The SOURCE of the figure, never the state of the conversation. */
-.bidmap .bm-foot-src { display: block; margin-top: 2px; font-size: 9.5px; font-weight: 700; color: #6b8fa8; }
-.bidmap .bm-foot-det {
+
+/* ── the breakdown, above the rate ──────────────────────────────────────────────────────────────
+   Above, not below: the reader who opened it is checking arithmetic, and the total it builds to
+   should finish next to the rate it explains rather than trailing off the bottom of the column. */
+.bidmap .bm-foot-break { padding-bottom: 11px; }
+.bidmap .bm-foot-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 3.5px 0; }
+.bidmap .bm-foot-k { font-size: 11.5px; font-weight: 700; color: #fff; min-width: 0; }
+/* The basis rides inside the label — beside the thing it is the basis of, in the app's grey. */
+.bidmap .bm-foot-sub { margin-inline-start: 7px; font-size: 9.5px; font-weight: 600; color: rgba(255, 255, 255, 0.45); }
+.bidmap .bm-foot-v {
   flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.94);
+  font-family: "IBM Plex Sans", monospace;
+  white-space: nowrap;
+}
+/* «ر.س» rides with every figure, as the app prints it — quieter than the digits, because the reader
+   is comparing amounts and the currency is the same on all six lines. */
+.bidmap .bm-foot-cur { margin-inline-start: 4px; font-size: 9.5px; font-weight: 700; color: rgba(255, 255, 255, 0.5); }
+/* الإجمالي — the line the other five add up to, so it is the only one given weight and a rule. */
+.bidmap .bm-foot-row.is-total { margin-top: 5px; padding-top: 9px; border-top: 1px solid rgba(255, 255, 255, 0.14); }
+.bidmap .bm-foot-row.is-total .bm-foot-k { font-size: 12.5px; font-weight: 800; }
+.bidmap .bm-foot-row.is-total .bm-foot-v { font-size: 17px; font-weight: 800; }
+.bidmap .bm-foot-row.is-muted .bm-foot-v { color: rgba(255, 255, 255, 0.55); font-weight: 600; }
+.bidmap .bm-foot-note { margin-top: 7px; font-size: 9.5px; font-weight: 600; color: rgba(255, 255, 255, 0.5); line-height: 1.7; }
+
+/* ── the rate + the two acts ────────────────────────────────────────────────────────────────────
+   The rule only appears once the breakdown is open: with the footer at rest there is nothing above
+   the bar to separate it from. `wrap` because 392px is a hard ceiling — the two acts stay whole and
+   drop below the rate rather than shrinking their labels to fit. */
+.bidmap .bm-foot-bar { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.bidmap .bm-foot.is-open .bm-foot-bar { padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.14); }
+.bidmap .bm-foot-figs { flex: 1; min-width: 0; }
+.bidmap .bm-foot-rate { display: flex; align-items: baseline; gap: 6px; }
+/* Hero size — the one number on this surface a renter is actually deciding about. */
+.bidmap .bm-foot-amt { font-size: 25px; font-weight: 800; line-height: 1.1; letter-spacing: -0.5px; color: #fff; font-family: "IBM Plex Sans", monospace; }
+.bidmap .bm-foot-unit { font-size: 11px; font-weight: 700; color: rgba(255, 255, 255, 0.62); }
+.bidmap .bm-foot-meta { display: flex; align-items: baseline; gap: 8px; margin-top: 3px; flex-wrap: wrap; }
+/* The SOURCE of the figure, never the state of the conversation. */
+.bidmap .bm-foot-src { font-size: 10px; font-weight: 600; color: rgba(255, 255, 255, 0.55); }
+/* A text LINK, not a button with a chevron: it names the state it moves to («إخفاء التفاصيل»), and an
+   underline is how a reader is told a word is pressable without giving it a control's weight — which
+   this must not have next to the two acts. */
+.bidmap .bm-foot-det {
   background: none;
   border: 0;
-  padding: 4px 2px;
+  padding: 0;
   font: inherit;
-  font-size: 10.5px;
-  font-weight: 800;
-  color: #2563eb;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.88);
+  text-decoration: underline;
+  text-underline-offset: 3px;
   cursor: pointer;
 }
-.bidmap .bm-foot-det .material-icons-outlined { font-size: 16px; }
+/* «اطلب سعراً أقل» — the WHITE pill, and the loudest thing on the slab. The renter reached this
+   footer to argue about a price; the app makes countering the obvious act and approving the quiet
+   one, and inverting that here would be this surface disagreeing with the app about what a bid is
+   for. Neither button settles anything (004a §4a.2) — both open the room's own sheets. */
 .bidmap .bm-foot-cta {
   flex-shrink: 0;
-  background: #2563eb;
-  border: 0;
-  color: #fff;
-  border-radius: 10px;
-  padding: 9px 13px;
+  background: #fff;
+  border: 1px solid #fff;
+  color: #0f2238;
+  border-radius: 999px;
+  /* Sized so the ENGLISH pair — «Counter this price» beside «Approve», the longer of the two — still
+     shares one line with the hero rate inside the panel's 392px. Arabic has room to spare. */
+  padding: 10px 15px;
   font: inherit;
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 800;
   cursor: pointer;
   white-space: nowrap;
 }
+/* «اعتمد» — present, pressable, and deliberately quieter. It is no longer disabled when a room
+   exists: the room's own `canAccept` decides on arrival, so a control that used to grey out on a
+   rule it could not evaluate now simply asks the room. */
+.bidmap .bm-foot-cta.is-confirm {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.94);
+  font-weight: 700;
+  padding: 10px 16px;
+}
 .bidmap .bm-foot-cta:disabled { opacity: 0.55; cursor: default; }
-/* «Confirm this price» — GREEN, and only when nothing in the offer contradicts the request. Blue is
-   this surface's request action (AC-33): every ask the renter can make wears it, and confirming is
-   not an ask. Green is `AVAILABILITY_COLOUR.confirmed`, the same green a confirmed machine wears, so
-   the button is the same fact about the whole offer that the chips are about each machine.
-
-   It still opens `/deal-room/[id]` — nothing is settled by pressing it here (004a §4a.2). The colour
-   says the offer holds up, not that the deal is done. */
-.bidmap .bm-foot-cta.is-confirm { background: #16a34a; }
 /* The one place the offered count and the agreed count are reconciled (RM3-AC-66). Neutral, because
    a renegotiated count is not a problem — it is simply two correct numbers needing one sentence. */
 .bidmap .bm-foot-units {
-  margin-top: 8px;
+  margin-top: 10px;
   padding: 7px 10px;
   border-radius: 9px;
-  background: #eff4f9;
-  border: 1px solid #e1e9f1;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   font-size: 10px;
   font-weight: 700;
-  color: #1c3550;
+  color: rgba(255, 255, 255, 0.8);
   line-height: 1.6;
 }
-.bidmap .bm-foot-break { margin-top: 10px; border-top: 1px dashed #e1e9f1; padding-top: 9px; }
-.bidmap .bm-foot-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 3px 0; }
-.bidmap .bm-foot-k { font-size: 10.5px; font-weight: 700; color: #6b8fa8; min-width: 0; }
-.bidmap .bm-foot-v { font-size: 11.5px; font-weight: 800; color: #1c3550; font-family: "IBM Plex Sans", monospace; }
-.bidmap .bm-foot-row.is-strong .bm-foot-k, .bidmap .bm-foot-row.is-strong .bm-foot-v { color: #16304f; font-weight: 800; }
-.bidmap .bm-foot-row.is-strong { border-top: 1px solid #eff4f9; margin-top: 3px; padding-top: 6px; }
-.bidmap .bm-foot-row.is-muted .bm-foot-v { color: #6b8fa8; }
-.bidmap .bm-foot-note { margin-top: 7px; font-size: 9.5px; font-weight: 600; color: #6b8fa8; line-height: 1.7; }
 
 /* ── V12 · the chat dock (§6.9) ──────────────────────────────────────────────────────────────────
    Floating over the surface, on the inline-START edge — the panel owns the END edge, and a dock that
@@ -1801,58 +1991,69 @@
 }
 
 /* ── The arrival bubble (004a §2.1, decoded `rChatPop` 3881–3900) ─────────────────────────────────
-   **Filled, not outlined.** This competes with a whole map for attention and an outlined white card
-   lost — which is exactly what stood here. Blue for an answer, `#B26206` for a refusal, so the one
-   arrival a renter must not miss is the one that looks different before it is read.
+   **A white card that QUOTES the message** (owner, 2026-08-11). It was a solid blue slab carrying
+   «رسالة جديدة» over the supplier's name over the item's type — three things the renter already knew,
+   and not one word of what was actually said. The words are the point of it, and a card that quotes
+   someone has to look like paper: white, a soft shadow, and a pointer down at the control that opens
+   the conversation.
 
-   `--notice-fill` carries that choice: it is the only state-dependent value, and the tail has to be
-   painted in it too, so a custom property beats repeating a colour inline in two places. */
+   THE REFUSAL DISTINCTION SURVIVES THE CHANGE OF FILL. It used to be carried by the whole ground; it
+   is now carried by `--notice-tone` — the chip's ink and tint, plus a rail down the LEADING edge — so
+   the one arrival a renter must not miss still looks different before it is read. Warm, never red:
+   red on this surface belongs to availability alone. */
 .bidmap .bm-dock-notice {
-  --notice-fill: #1d4ed8;
+  --notice-tone: #1d4ed8;
+  --notice-tint: rgba(37, 99, 235, 0.1);
   position: absolute;
   z-index: 30;
   bottom: 80px;
   /* Trailing edge — the panel now holds the leading one (see `.bm-panel`). */
   inset-inline-end: 18px;
-  width: min(296px, calc(100% - 130px));
-  background: var(--notice-fill);
-  border: 2px solid #fff;
-  border-radius: 15px;
-  padding: 11px 12px;
+  width: min(320px, calc(100% - 130px));
+  background: #fff;
+  border: 1px solid #e4edf5;
+  border-radius: 16px;
+  padding: 10px 12px;
   text-align: start;
-  box-shadow: 0 14px 36px rgba(9, 20, 34, 0.34);
+  box-shadow: 0 14px 34px rgba(9, 20, 34, 0.18);
   animation: dpFade 0.22s ease;
 }
-.bidmap .bm-dock-notice.is-refusal { --notice-fill: #b26206; }
+/* The rail is on the leading edge, so it turns with the script rather than sitting on the left of an
+   Arabic card. A tinted chip alone is READ; this is seen. */
+.bidmap .bm-dock-notice.is-refusal {
+  --notice-tone: #b26206;
+  --notice-tint: rgba(178, 98, 6, 0.12);
+  border-inline-start: 3px solid var(--notice-tone);
+}
 /* The tail. It points DOWN at the dock the bubble belongs to — an arrival notice floating free of the
-   control that opens it is a notice with no answer to "and then what?". */
+   control that opens it is a notice with no answer to "and then what?". White now, carrying the
+   card's own hairline on its two lower edges, so the card and its pointer are one piece of paper. */
 .bidmap .bm-dock-notice-tail {
   position: absolute;
-  bottom: -8px;
+  bottom: -7px;
   /* 26px in from the SAME edge the dock is anchored to (`inset-inline-end: 18px`), so the tail keeps
      landing on the control. Anchored to the leading edge it pointed at empty canvas once the dock
      moved. The two offsets are a pair: change one and this one follows. */
   inset-inline-end: 26px;
-  width: 14px;
-  height: 14px;
-  background: var(--notice-fill);
-  border-bottom: 2px solid #fff;
-  border-left: 2px solid #fff;
+  width: 13px;
+  height: 13px;
+  background: #fff;
+  border-bottom: 1px solid #e4edf5;
+  border-left: 1px solid #e4edf5;
   transform: rotate(-45deg);
 }
-.bidmap .bm-dock-notice-head { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
-/* What KIND of arrival, in a word, before the renter reads whose it is. */
+.bidmap .bm-dock-notice-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+/* What KIND of arrival, in a chip BESIDE the name — «رد على طلبك». That it answers something he asked
+   for is what makes the quote below worth reading before the dock is opened at all. */
 .bidmap .bm-dock-notice-kind {
-  flex: 1;
-  min-width: 0;
-  font-size: 10px;
+  flex-shrink: 0;
+  font-size: 9.5px;
   font-weight: 800;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.22);
+  color: var(--notice-tone);
+  background: var(--notice-tint);
   border-radius: 20px;
   padding: 2px 8px;
-  align-self: flex-start;
-  flex-grow: 0;
+  white-space: nowrap;
 }
 .bidmap .bm-dock-notice-spacer { flex: 1; }
 .bidmap .bm-dock-notice-body {
@@ -1865,25 +2066,28 @@
   text-align: start;
   cursor: pointer;
 }
+/* WHOSE message it is — first, on one line with the chip beside it, the way a message names its
+   sender before it says anything. It is the only thing here allowed to shrink: the chip states a
+   fixed phrase and the ✕ is a target. */
 .bidmap .bm-dock-notice-t {
+  min-width: 0;
   font-size: 12px;
   font-weight: 900;
-  color: #fff;
+  color: #0f2238;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* Two lines and no more: the bubble states that something arrived and hands off — it is not the
-   conversation, and a bubble that grows with the message becomes one. */
+/* THE MESSAGE ITSELF. Three lines and no more: the bubble quotes the arrival and hands off — it is
+   not the conversation, and a bubble that grows with the message becomes one. */
 .bidmap .bm-dock-notice-x2 {
-  margin-top: 3px;
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.93);
-  line-height: 1.65;
+  color: #1c3550;
+  line-height: 1.7;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -1892,10 +2096,10 @@
 .bidmap .bm-dock-notice-s {
   direction: ltr;
   text-align: start;
-  margin-top: 4px;
+  margin-top: 5px;
   font-size: 9.5px;
   font-weight: 800;
-  color: rgba(255, 255, 255, 0.78);
+  color: #6b8fa8;
   font-family: ui-monospace, monospace;
 }
 .bidmap .bm-dock-notice-x {
@@ -1903,7 +2107,7 @@
   background: none;
   border: 0;
   padding: 0 2px;
-  color: rgba(255, 255, 255, 0.85);
+  color: #94a9bd;
   font-size: 12px;
   font-weight: 900;
   line-height: 1;
@@ -1964,13 +2168,18 @@
 /* The drawer's own head band — 64px, `0 18px`, the panel's height and gutters, so the two columns
    start on one line. Docked drops the icon tile and the subtitle the floating drawer carries: the
    panel beside it already names the supplier, and a second identity block here repeated it. */
-/* BLUE, with the counterparty's initials beside his name — `pChat`'s own band (05:17–24), which this
-   had as a white bar with dark ink. That bar read as a toolbar sitting on top of a conversation
-   rather than as the head of one, and it is most of what the owner meant by «Chat is still different
-   UI» (2026-08-11).
-   Still 64px and `0 18px`, so it starts on the same line as the panel's own identity band beside it.
-   The prototype's presence dot, its two simulator buttons and its call control are deliberately
-   absent — all three were excluded by name. */
+/* WHITE, with the counterparty's initials beside his name in dark ink (owner, 2026-08-11: *"the dock
+   header is blue — make it white"*). The blue band was `pChat`'s, and on a surface where blue means
+   an action it painted a whole 64px slab in the loudest colour available to say something that is not
+   an action at all: who you are talking to. It also fought the conversation under it — the renter's
+   own bubbles are `#D9EEFF` and the cards carry a blue kind-line, and all of it was competing with a
+   saturated band at the top of the same column.
+
+   Kept: 64px and `0 18px`, so the head starts on the same line as the panel's identity band beside
+   it, and the avatar's own colour, which says "a party to the deal" rather than decorating. The
+   divider is now a HAIRLINE in the surface's own border tone — on white, a translucent-white rule is
+   no rule at all. The prototype's presence dot, its two simulator buttons and its call control stay
+   absent; all three were excluded by name. */
 .bidmap .bm-chat-head {
   flex-shrink: 0;
   height: 64px;
@@ -1979,18 +2188,20 @@
   align-items: center;
   gap: 11px;
   padding: 0 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
-  background: #2563eb;
+  border-bottom: 1px solid #e1e9f1;
+  background: #fff;
 }
 /* The prototype's 42px circle: the firm's initials, in the green it uses to say "this is a party to
-   the deal" rather than a decoration. `dir="ltr"` is not set — Arabic initials read right to left. */
+   the deal" rather than a decoration. `dir="ltr"` is not set — Arabic initials read right to left.
+   The white ring it wore against blue is gone: a white ring on a white band is a gap around the
+   disc. */
 .bidmap .bm-chat-av {
   flex-shrink: 0;
   width: 42px;
   height: 42px;
   border-radius: 50%;
   background: #16a34a;
-  border: 2px solid rgba(255, 255, 255, 0.5);
+  border: 0;
   color: #fff;
   font-size: 13px;
   font-weight: 900;
@@ -1999,23 +2210,24 @@
   justify-content: center;
   overflow: hidden;
 }
-.bidmap .bm-chat-who { flex: 1; min-width: 0; display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: 900; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bidmap .bm-chat-who { flex: 1; min-width: 0; display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: 900; color: #0f2238; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The tick the prototype writes as a bare '✓' after the name. A glyph rather than the panel's full
    «شركة موثّقة» chip: the panel two columns away already carries that chip, and repeating it here
-   would state the same credential twice on one screen. */
-.bidmap .bm-chat-tick { flex-shrink: 0; font-size: 15px; color: rgba(255, 255, 255, 0.92); }
+   would state the same credential twice on one screen. Green, matching the avatar — it is the same
+   claim about the same firm, and on white it needs a colour of its own to read as one. */
+.bidmap .bm-chat-tick { flex-shrink: 0; font-size: 15px; color: #16a34a; }
 /* The placement control — the prototype's one square button, 30px at r9. It changes WHERE the
    conversation sits and nothing about the conversation, which is why it is a quiet outline rather
-   than an action. Translucent white since the band went blue (`pChat` draws its own two controls
-   that way): a white-filled button on blue reads as the loudest thing in the header. */
+   than an action. Outlined in the surface's own border tone now that the band is white: the
+   translucent-white pair it wore against blue would be invisible here. */
 .bidmap .bm-chat-place {
   flex-shrink: 0;
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  background: rgba(255, 255, 255, 0.14);
-  border: 1.5px solid rgba(255, 255, 255, 0.3);
-  color: #fff;
+  background: #fff;
+  border: 1.5px solid #c8d8e8;
+  color: #6b8fa8;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2028,9 +2240,9 @@
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.14);
-  border: 1.5px solid rgba(255, 255, 255, 0.3);
-  color: #fff;
+  background: #fff;
+  border: 1.5px solid #c8d8e8;
+  color: #6b8fa8;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2111,12 +2323,29 @@
 .bidmap .bm-chat .msg .msg-att-dl { color: #2563eb; }
 .bidmap .bm-chat .msg.mine .msg-att-dl { color: #1d4ed8; }
 /* ── A card is a message, so it takes a side (`chatMsg`, prototype 05:140–141) ────────────────────
-   The renter's own ask on his side, the supplier's answer on his, both at the prototype's 86%. Left
-   to stretch the full column they read as banners the conversation was wrapped around rather than as
-   things either party said. */
-.bidmap .bm-chat-card { max-width: 86%; width: 86%; }
+   The AUTHOR's own card on his side, the other party's on theirs, at the prototype's 86% — and the
+   component decides which by reading the Stream author rather than the card's type, so the same
+   channel sides correctly for the renter and for the supplier (owner, 2026-08-11: *"make these cards
+   appear like messages sent by the other side or by me"*).
+
+   THE WIDTH IS ON THIS WRAPPER, and it is a ceiling as well as a share. It used to be 86% of the
+   column with the card itself a 376px block INSIDE it, which — now that the drawer fills the canvas
+   rather than being a 436px panel — parked every card 14% in from the edge with white on both sides:
+   the floating-in-the-middle the owner reported. Sided, capped, and the card fills its wrapper. */
+.bidmap .bm-chat-card { max-width: min(86%, 376px); width: 86%; }
 .bidmap .bm-chat-card.is-mine { align-self: flex-end; }
 .bidmap .bm-chat-card.is-them { align-self: flex-start; }
+/* The card fills the wrapper that took the side. A width of its own here is a second opinion about
+   the same geometry, and the disagreement is what left it floating. Both cards this stream sides are
+   named: the renter loop's own `.bm-rq`, and the deal room's `.chatcard`, whose `min(340px, 92%)` is
+   right on a full-width route and leaves a gap at the edge of a sided bubble here. */
+.bidmap .bm-chat-card .bm-rq,
+.bidmap .bm-chat-card .chatcard { width: 100%; max-width: none; margin: 0; }
+/* The negotiation vocabulary is NOT sided — a rate, a counter, an acceptance is an event in the room
+   rather than either party's remark, and the deal room centres it. `ChatCard` does that with
+   `align-self`, which the wrapper this dock puts around it turns inert, so the wrapper carries it. */
+.bidmap .bm-chat-event { align-self: center; width: min(86%, 376px); }
+.bidmap .bm-chat-event .chatcard { width: 100%; margin: 0; }
 /* ── The composer (`05-chat-and-requests.js:42–45`) ───────────────────────────────────────────────
    The prototype's own numbers, which ours ran a size under across the board: a 32px send, r18,
    `8px 12px`, 11.5px ink and a WHITE field inside `#E1E9F1`. At that size the row read as a search
@@ -2222,23 +2451,33 @@
 .bidmap .bm-rq-id.is-open { cursor: pointer; }
 .bidmap .bm-rq-id.is-open:hover, .bidmap .bm-rq-id.is-open:focus-visible { background: rgba(37, 99, 235, 0.08); }
 .bidmap .bm-rq-id.is-open:hover .bm-rq-go, .bidmap .bm-rq-id.is-open:focus-visible .bm-rq-go { color: #2563eb; }
+/* The EQUIPMENT's picture (owner, 2026-08-11: the card should show the equipment, *"not a generic
+   glyph tile"*). The gold gradient was drawn for a glyph on it, and every machine got the same one;
+   the tile now holds the unit's own photo, and the icon it falls back to is derived from what the
+   machine IS (`equipmentIcon`, the chain `EquipImg` and the map's own pins use). So the tile is a
+   quiet frame in the surface's border tone, and the picture is the thing in it — a photo edge to
+   edge, or the taxonomy's glyph in the navy the rest of the identity strip is written in. */
 .bidmap .bm-rq-tile {
   flex-shrink: 0;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   border-radius: 9px;
   overflow: hidden;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #f2c94c, #e19a2e);
-  color: #fff;
+  background: #f1f6fb;
+  border: 1px solid #e4edf5;
+  box-sizing: border-box;
+  color: #1e4a7a;
 }
+/* A real photograph fills the frame — no border under it, and nothing of the tile showing through. */
+.bidmap .bm-rq-tile.has-photo { background: #e9eef3; border-color: transparent; }
 /* The firm, not a machine — the prototype's second gradient, so the two scopes are told apart before
-   the title is read. */
-.bidmap .bm-rq-tile.is-co { background: linear-gradient(135deg, #1e4a7a, #2563eb); }
+   the title is read. A company card names no equipment, so there is no picture to show instead. */
+.bidmap .bm-rq-tile.is-co { background: linear-gradient(135deg, #1e4a7a, #2563eb); border-color: transparent; color: #fff; }
 .bidmap .bm-rq-tile img { width: 100%; height: 100%; object-fit: cover; }
-.bidmap .bm-rq-tile .material-icons-outlined { font-size: 18px; }
+.bidmap .bm-rq-tile .material-icons-outlined { font-size: 22px; }
 .bidmap .bm-rq-who { flex: 1; min-width: 0; display: block; }
 .bidmap .bm-rq-t {
   display: block;
@@ -2306,12 +2545,11 @@
 .bidmap .bm-rq-btn.ghost { flex: 1; background: #fff; border: 1.5px solid #c8d8e8; color: #1c3550; }
 /* `flex: 2` — the prototype's own weighting. The send is the action; the cancel is the way out. */
 .bidmap .bm-rq-btn.go { flex: 2; background: #2563eb; border: 0; color: #fff; }
-/* A sent card is the renter's own message, so it sits at the outgoing edge and takes the bubble's
-   width rule — the prototype gives it `align-self: flex-end` at 86%. */
-/* The card is a bubble with a lot in it, so it takes more of the stream than a line of text does —
-   but it is still one side's message and must not run the full width now that the drawer fills the
-   canvas. 86% of the prototype's 436px column is the ceiling it was drawn at. */
-.bidmap .bm-chat-body .bm-rq { align-self: flex-end; width: 86%; max-width: min(86%, 376px); }
+/* A card LOOSE in the stream — one that reached the body without the sided wrapper above. It keeps
+   the same ceiling, and nothing else: the `align-self: flex-end` that used to live here pinned every
+   card to the outgoing edge whoever wrote it, which is precisely the reading the author-sided
+   wrapper replaced (owner, 2026-08-11). Side is the wrapper's business now, in one place. */
+.bidmap .bm-chat-body > .bm-rq { width: 100%; max-width: min(86%, 376px); }
 /* The draft sits between the stream and the composer, pinned, exactly where `rPendingCard` puts it —
    it must not scroll away with the conversation it is about to join. */
 .bidmap .bm-chat-draft { flex-shrink: 0; padding: 12px 18px; border-top: 1px solid #eff4f9; }
@@ -2371,27 +2609,8 @@
   .bidmap .bm-eq:hover .bm-eq-art { transform: none; }
 }
 
-/* ── The dark footer's own ink (owner, 2026-08-11) ───────────────────────────────────────────────
-   The bar is `#0F2238` now, so every colour inside it that was chosen against white has to be
-   restated — a `#16304F` figure on a `#0F2238` slab is invisible, and `#6B8FA8` on it is nearly so. */
-.bidmap .bm-foot-amt { color: #fff; }
-.bidmap .bm-foot-unit,
-.bidmap .bm-foot-src { color: rgba(255, 255, 255, 0.72); }
-.bidmap .bm-foot-det { color: rgba(255, 255, 255, 0.86); }
-.bidmap .bm-foot-units { color: rgba(255, 255, 255, 0.8); }
-/* «Counter this price» — an outlined control on the slab, not a filled blue one: the filled blue was
-   sized against white and on navy it reads as the primary act, which Accept is. */
-.bidmap .bm-foot-cta {
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  color: #fff;
-}
-/* Accept — the prototype's green, filled, and the one thing on the bar that carries a fill. */
-.bidmap .bm-foot-cta.is-confirm {
-  background: #16a34a;
-  border-color: #16a34a;
-  color: #fff;
-}
-.bidmap .bm-foot-cta.is-confirm:disabled { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.2); }
-.bidmap .bm-foot-break { border-top-color: rgba(255, 255, 255, 0.14); }
-.bidmap .bm-foot-break, .bidmap .bm-foot-break * { color: rgba(255, 255, 255, 0.86); }
+/* ── The dark footer's own ink — DELETED, and deliberately not replaced (owner, 2026-08-11) ──────
+   This block existed to restate, against `#0F2238`, every colour the footer had first chosen against
+   white. The footer's rules are dark-native now (see §6.10 above), so a second copy of its palette
+   down here could only drift out of step with the first — and, sitting later in the file at equal
+   specificity, it would silently win. Every declaration it carried now lives at the point of use. */

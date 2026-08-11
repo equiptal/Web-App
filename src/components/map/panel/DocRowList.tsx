@@ -405,12 +405,12 @@ export function DocRowList({
                 // lie a screen-reader user cannot see past.
                 aria-label={
                   framed
-                    ? L("Back to the machine's photo", "العودة إلى صورة المعدّة")
+                    ? L("Back to the equipment's photo", "العودة إلى صورة المعدّة")
                     : L(`Show ${r.name} in the viewer — ${r.status}`, `اعرض ${r.name} في العارض — ${r.status}`)
                 }
                 title={
                   framed
-                    ? L("Back to the machine's photo", "العودة إلى صورة المعدّة")
+                    ? L("Back to the equipment's photo", "العودة إلى صورة المعدّة")
                     : L(`Show ${r.name} in the viewer`, `اعرض ${r.name} في العارض`)
                 }
                 // Which row the frame above is showing, stated rather than only tinted: the `.open`

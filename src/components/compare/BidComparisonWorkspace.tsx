@@ -1266,7 +1266,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                 {(() => {
                   const whatif = [
                     { label: L("Lowest all-in?", "الأقل إجمالاً؟"), message: "rank by lowest all-in cost", icon: "savings" },
-                    { label: L("Newest machine?", "أحدث معدّة؟"), message: "rank by newest machine", icon: "new_releases" },
+                    { label: L("Newest equipment?", "أحدث معدّة؟"), message: "rank by newest machine", icon: "new_releases" },
                     { label: L("Fuel included only?", "الوقود مشمول فقط؟"), message: "only the bids where fuel is included", icon: "local_gas_station" },
                     { label: L("Closest to site?", "الأقرب للموقع؟"), message: "rank by closest distance to site", icon: "place" },
                     { label: L("Most trusted?", "الأكثر ثقة؟"), message: "rank by most trusted supplier", icon: "verified_user" },
@@ -1326,7 +1326,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         <div className="flex h-[40px] min-w-[220px] flex-1 items-center gap-2 rounded-full border ps-3.5 pe-1.5" style={{ background: "#fff", borderColor: C.border }}>
                           <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>auto_awesome</span>
                           <input value={freeText} onChange={(e) => setFreeText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") applyFreeText(); }}
-                            placeholder={L("Ask AI — e.g. closest machine, newest with operator…", "اسأل الذكاء — مثلاً أقرب معدّة، الأحدث مع مشغّل…")}
+                            placeholder={L("Ask AI — e.g. closest equipment, newest with operator…", "اسأل الذكاء — مثلاً أقرب معدّة، الأحدث مع مشغّل…")}
                             className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold outline-none" style={{ color: C.navy }} />
                           <button onClick={applyFreeText} className="inline-flex flex-none items-center gap-1 rounded-full px-3 py-1.5 text-[12.5px] font-extrabold text-white" style={{ background: C.action }}>
                             <span className="material-icons-outlined" style={{ fontSize: 15, transform: ar ? "scaleX(-1)" : undefined }}>send</span>{L("Re-rank", "إعادة")}

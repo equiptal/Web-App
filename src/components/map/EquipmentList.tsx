@@ -412,7 +412,7 @@ function EquipmentCard({
   // (AC-19), and the model carries no serial, no capacity and no second band for the card to reach
   // for even by accident (AC-12, AC-32).
   const card = useMemo(() => equipmentCardModel(machine, request), [machine, request]);
-  const { chip, certs, photo, askAvailability } = card;
+  const { chip, certs, photo, askAvailability, verified } = card;
   const confirmed = chip.availability === "confirmed";
   /** Asked, and not yet answered. The workspace decides it — only it can see the conversation — and
    *  the card paints the answer, the same division the chip above already follows. */
@@ -478,11 +478,21 @@ function EquipmentCard({
           <div className="bm-eq-r1">
             <span className="bm-eq-name">
               <span className="bm-eq-title" title={title}>{title}</span>
-              {/* The platform holds this machine's papers — a fact about its DOCUMENTS, not about
-                  whether it is available, which is why it is a mark on the title and not a third
-                  colour in the state row. Same source as row 4's chips, stated once as a glance and
-                  once in full (the prototype drives both off one flag too). */}
-              {certs.length > 0 && (
+              {/* The PLATFORM verified this machine — a fact about its papers, not about whether it
+                  is available, which is why it is a mark on the title and not a third colour in the
+                  state row.
+
+                  ~~`certs.length > 0`.~~ Withdrawn (owner, 2026-08-11: *"for equipment verification
+                  ticked make sure it is read the equipment status is it verified really or not"*).
+                  `certs` holds one entry per certificate the REQUEST named, held or not — so that
+                  condition was a fact about the request, the same for every card in the list, and it
+                  ticked machines an admin had rejected while leaving genuinely verified ones bare.
+                  `card.verified` is `verificationStatus === "VERIFIED"` and nothing else; the model's
+                  field comment carries the full ruling and the staging numbers.
+
+                  Row 4's chips are NOT the same source and never were — they answer the request, this
+                  answers the platform's file. */}
+              {verified && (
                 <span className="bm-eq-vd" title={t.bidMap.eqVerifiedMachine} aria-label={t.bidMap.eqVerifiedMachine}>
                   ✓
                 </span>

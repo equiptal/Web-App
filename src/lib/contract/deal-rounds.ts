@@ -561,7 +561,7 @@ function renteeRequestCardView(
         // The shortfall ask names no machine — it asks FOR one. Saying "instead of" would describe a
         // swap the renter never proposed.
         return payload.equipmentId
-          ? L("You asked for a different machine", "طلبت معدّة أخرى")
+          ? L("You asked for different equipment", "طلبت معدّة أخرى")
           : L("You asked him to add the missing units", "طلبت منه إضافة الوحدات الناقصة");
     }
   })();
@@ -570,7 +570,7 @@ function renteeRequestCardView(
   // The machine, named the way the renter sees it — the label from the fleet row when we hold it,
   // else the serial the backend stamped. A card that named only an id would be unreadable.
   const machineName = resolved?.label ?? payload.serial;
-  if (machineName) rows.push({ label: L("Machine", "المعدّة"), value: machineName, ltr: !resolved?.label });
+  if (machineName) rows.push({ label: L("Equipment", "المعدّة"), value: machineName, ltr: !resolved?.label });
   if (payload.docTypes?.length) {
     const naming = ctx.requestCtx?.docLabel;
     rows.push({
@@ -593,7 +593,7 @@ function renteeRequestCardView(
         // Not in the fleet response — we cannot check, so we neither claim he owes an answer nor
         // strike the card through as history (`.cc-out-history` does exactly that to a superseded
         // offer, and this ask is not superseded; it is uncheckable).
-        return { text: L("This machine isn't in his current list", "هذه المعدّة ليست ضمن قائمته الحالية"), tone: "waiting", icon: "help_outline" };
+        return { text: L("This equipment isn't in his current list", "هذه المعدّة ليست ضمن قائمته الحالية"), tone: "waiting", icon: "help_outline" };
       default:
         // NEVER "he refused". An unanswered ask is unanswered.
         return { text: L("Waiting for his answer", "بانتظار ردّه"), tone: "waiting", icon: "schedule" };
