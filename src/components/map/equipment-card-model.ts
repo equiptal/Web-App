@@ -22,6 +22,7 @@ import { arabicIndicDigits, availabilityView, isOutOfCity, REQUEST_ACTION_COLOUR
 import type { Bilingual } from "@/lib/contract/equipment-list";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import { computeUnitReadiness, readinessInputsFor } from "@/lib/contract/bid-readiness";
+import { isEquipmentVerified } from "@/lib/contract/equipment-verification";
 import { heroPhotoUrl, type MatchRequest } from "@/components/map/panel/machine-panel-model";
 
 /**
@@ -120,6 +121,35 @@ export interface EquipmentCardModel {
    * blank. That is a different sentence from "the machine has none" and the copy has to follow.
    */
   certs: EquipmentCardCert[];
+  /**
+   * **The platform verified THIS MACHINE's papers** — the green ✓ against the end of the title.
+   *
+   * ~~The card ticks when the request named any certificate.~~ Withdrawn (owner, 2026-08-11: *"for
+   * equipment verification ticked make sure it is read the equipment status is it verified really or
+   * not"*). The mark was rendered on `certs.length > 0`, and `certs` is one entry per **requested**
+   * certificate whether the machine holds it or not (`computeUnitReadiness` builds it straight off
+   * `reqEquipCerts.map`) — so the condition said nothing about the machine at all. It said *"this
+   * request asked for at least one certificate"*, which is a property of the REQUEST and therefore
+   * identical for every card in the list. On a request naming a TÜV, every machine in the supplier's
+   * fleet wore the platform's trust mark; on a request naming none, not one did — including machines
+   * the platform really had verified. Exactly the "one boolean, true for every row, painting
+   * everything green" this surface was bitten by before (`yardConfirmed`, RM3-AC-19), reached by a
+   * different road.
+   *
+   * It is now `isEquipmentVerified(machine.verificationStatus)` — `=== "VERIFIED"`, the app's
+   * `equipment_verification.dart` and nothing else. Deliberately NOT the backend's `ACCEPTED_STATUSES`
+   * fold (`VERIFIED` ∪ `ACCEPTED`, `repositories/equipment-where.ts`), which answers *"may renters see
+   * this listing at all"* and would tick 271 of staging's 1104 map-eligible machines that nobody
+   * verified.
+   *
+   * **Not a third commitment state** (RM3-AC-32). Availability is *did the supplier commit this
+   * machine to this bid*; this is *did the platform check its papers*. Different subjects, different
+   * owners — which is why the mark sits on the title while the chip sits on its own row, and why this
+   * field is a bare boolean carrying no colour for the AC-32 palette sweep to find.
+   *
+   * False when the status is absent: an unknown draws no tick, never an assumed one.
+   */
+  verified: boolean;
   /** Non-null **iff** {@link EquipmentCardChip.availability} is `unconfirmed` (AC-13). */
   askAvailability: EquipmentCardAsk | null;
 }
@@ -177,6 +207,9 @@ export function equipmentCardModel(
           (c) => ({ code: c.code, label: { en: c.labelEn, ar: c.labelAr }, held: c.present }),
         )
       : [],
+    // The MACHINE's own verification, through the one helper that defines the word — never
+    // `certs.length`, never a document count, never "has any approved doc". See the field's comment.
+    verified: isEquipmentVerified(machine.verificationStatus),
     askAvailability: chip.availability === "confirmed" ? null : { colour: REQUEST_ACTION_COLOUR },
   };
 }

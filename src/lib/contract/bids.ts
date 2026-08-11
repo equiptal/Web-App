@@ -126,6 +126,21 @@ export interface OfferedUnitDetail {
    *  distance uses — so a unit's distance is directly comparable to its bid's. */
   distanceKm?: number | null;
   locationSource?: UnitLocationSource;
+  /**
+   * The LISTING's admin verification state, verbatim from the backend
+   * (`equipment_listings.verification_status` — `VERIFIED` · `ACCEPTED` · `PENDING_REVIEW` ·
+   * `UNVERIFIED` · `REJECTED`). **Never read this raw** — put it through `isEquipmentVerified`
+   * (`contract/equipment-verification.ts`), which is the app's definition and the only one any
+   * surface is allowed to use.
+   *
+   * ⚠️ Not `documentKeys[].verifyStatus`, which is ONE PAPER's review state. A machine can hold an
+   * approved istimara and still be an `UNVERIFIED` listing; the two names are one character apart.
+   *
+   * OPTIONAL, like the §7.2 location block above and for the same reason: the mobile app parses this
+   * same payload and older projections do not carry it, so absent must stay a legitimate answer.
+   * Absent reads as NOT verified — see the helper's header on why an unknown draws no tick.
+   */
+  verificationStatus?: string | null;
 }
 
 const OFFERED_UNIT_LOCATION_SOURCES: UnitLocationSource[] = ["unit_yard", "bid_pin", "bid_yard", "listing_yard", "unidentified", "none"];
@@ -211,6 +226,12 @@ export function mapOfferedUnit(raw: unknown): OfferedUnitDetail {
     lng: num(o.lng ?? o.longitude ?? yard.longitude ?? yard.lng),
     distanceKm: num(o.distanceKm ?? o.distance_km),
     locationSource: offeredUnitLocationSource(o.locationSource ?? o.location_source),
+    // Verbatim and UNTOUCHED — no upper-casing, no trimming, no mapping to a boolean. The comparison
+    // that decides the tick belongs to `isEquipmentVerified` alone, and a parser that "helpfully"
+    // normalised `verified` → `VERIFIED` here would be a second definition of the word living in the
+    // one place nobody would look for it. `verifyStatus` (the DOCUMENT field, parsed above on each
+    // `documentKeys` entry) is deliberately not consulted as a fallback: it answers another question.
+    verificationStatus: str(o.verificationStatus ?? o.verification_status),
   };
 }
 
