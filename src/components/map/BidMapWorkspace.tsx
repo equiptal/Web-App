@@ -42,6 +42,9 @@ import type { MachinePin } from "@/components/map/MapCanvas";
 import { PriceFooter } from "@/components/map/PriceFooter";
 import { useRenteeRequestSender } from "@/components/map/useRenteeRequestSender";
 import { EquipmentList } from "@/components/map/EquipmentList";
+// The list's own card model, built here ONCE and handed to both readers — the cards in the column and
+// the hover box on each marker. Two calls would be two answers waiting to differ (RM3-AC-19).
+import { equipmentCardModel } from "@/components/map/equipment-card-model";
 import { CompanyPanel, EquipmentDetail, type PanelRequestDraft } from "@/components/map/panel";
 import type { BidCard } from "@/lib/contract/bids";
 import { fetchBidCompanyDocuments, fetchBidFleet } from "@/lib/api/client";
@@ -386,8 +389,22 @@ export function BidMapWorkspace({
      cannot be drawn (AC-15, AC-21, AC-22). The derivation lives in the model beside the list's own,
      so each marker's availability is the SAME `availabilityView` call the card's chip is built on
      (AC-19): one fact, two renderings, no possible disagreement. `isPlottable` reads coordinates
-     only — never the availability, never the filter and never `yardConfirmed`. */
-  const machines: MachinePin[] = useMemo(() => machineMarkers(visible), [visible]);
+     only — never the availability, never the filter and never `yardConfirmed`.
+
+     **Each marker carries the list card's own model as well** (owner, 2026-08-11: *"hovering an
+     equipment on the map must show its details"*). The map's hover box states the card, so it is
+     handed the card — the very object `EquipmentList` renders, from the very same
+     `equipmentCardModel(machine, bid)` call, built once here for both readers. Deriving it a second
+     time inside the canvas would put a fifth spelling of the availability, the distance and the
+     certificate line on the surface, which is the failure RM3-AC-19 and the one-decimal ruling are
+     both about. `bid` is the request a card is read against, exactly as it is for `<EquipmentList>`. */
+  const machines: MachinePin[] = useMemo(() => {
+    const cards = new Map(visible.map((m) => [m.equipmentId, equipmentCardModel(m, bid ?? undefined)] as const));
+    // Spread onto `machineMarkers`' answer rather than mapping `visible` ourselves: the marker SET is
+    // the model's decision (offered · plottable · filtered), and this must stay a passthrough that
+    // cannot add a pin the list does not have.
+    return machineMarkers(visible).map((marker) => ({ ...marker, card: cards.get(marker.id) }));
+  }, [visible, bid]);
 
   // AC-80 decision 4: the REQUEST ITEM's taxonomy image, falling back to the category image, then a
   // generic icon inside the pin. The taxonomy bucket differs per env, so the URL is rebuilt against

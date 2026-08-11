@@ -38,6 +38,9 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { AVAILABILITY_COLOUR, MIN_PIN_GAP_PX, decollide, distanceDigits, isOutOfCity, type MapPoint } from "@/lib/contract/bid-map";
 import { equipmentIcon } from "@/components/requests/EquipImg";
+// Type-only: the canvas RENDERS this model and never builds one. The import is erased at compile time,
+// which is the shape the dependency should have — the map has no business knowing how a card is made.
+import type { EquipmentCardModel } from "@/components/map/equipment-card-model";
 import { useLocale, useT } from "@/lib/i18n";
 
 export interface SitePoint {
@@ -68,6 +71,23 @@ export interface MachinePin extends MapPoint {
   availability: "confirmed" | "unconfirmed";
   /** Distance to the project, for the chip riding this machine's route. Null → no chip, never a 0. */
   distanceKm: number | null;
+  /**
+   * **The fleet list card's own model for this machine** — the details box that opens on hover, and
+   * nothing else (owner, 2026-08-11: *"hovering an equipment must show its details beside it"*).
+   *
+   * It is the CARD's model, `equipmentCardModel(machine, bid)`, built once by `BidMapWorkspace` and
+   * handed down — never re-derived here. That is the whole design of the field: a hover box that
+   * assembled its own title, its own chip, its own distance and its own certificate line would be a
+   * fifth spelling of facts RM3-AC-19, RM3-AC-32 and the one-decimal ruling exist to keep single, and
+   * it would be the spelling nobody looks at when the card is changed. The box states the card; if
+   * they ever disagree it is because one of them stopped rendering the model, which is a visible bug
+   * rather than a silent drift.
+   *
+   * Optional because a caller with no fleet in hand (a preview, a test) still gets markers — it simply
+   * gets no hover box, which is the honest degradation: the machine is still pressable and its card
+   * and its panel still carry every one of these facts.
+   */
+  card?: EquipmentCardModel;
 }
 
 /** Saudi Arabia, roughly — the fallback view for a request with no project location (AC-21). The map
@@ -125,10 +145,111 @@ function FitView({ site, points }: { site: SitePoint | null; points: MachinePin[
   return null;
 }
 
-/** The marker box, in CSS pixels — `design-v3.md` §4. Used both by the `divIcon` and by the distance
- *  chip's clearance test, so the two cannot drift apart. */
+/** The marker box AT REST, in CSS pixels — `design-v3.md` §4. Used by the `divIcon`, by the distance
+ *  chip's clearance test and by the de-collision gap, so the three cannot drift apart. */
 const PIN_W = 132;
 const PIN_H = 124;
+
+/**
+ * The stage — the ground disc, the contact shadow and the machine object — exactly as
+ * `map-proto.css` draws it (`.bm-pin-stage`, 96 × 78). Restated here because the zoom scale below is
+ * applied TO the stage and the box has to be recomputed from it; the two values are bound by a comment
+ * in each file rather than by a variable, for the same reason `PIN_W`/`PIN_H` already are — a `divIcon`
+ * is an HTML string handed to Leaflet, so there is no layout to measure at the moment the box is
+ * declared.
+ */
+const PIN_STAGE_W = 96;
+const PIN_STAGE_H = 78;
+
+/**
+ * How wide the availability label actually draws — **the number the old 74 px gap ignored**.
+ *
+ * `.bm-pin-chip` is `white-space: nowrap` at 10 px / 800 with 10 px of padding a side, and the widest
+ * string either locale puts in it is «Availability not confirmed yet» / «لم يؤكد توفرها بعد». It
+ * therefore OVERFLOWS the 132 px box by design (it always has), which is why the marker's drawn width
+ * is not `PIN_W` and why two markers separated by the box's width still overlapped where it counts.
+ *
+ * It is a constant rather than a measurement because a `divIcon` has no layout to measure at the
+ * moment its geometry is decided, and because a per-marker measurement would make the fan depend on
+ * which machine happened to be unconfirmed — the arrangement has to stay deterministic (`decollide`).
+ */
+const PIN_LABEL_W = 156;
+
+/**
+ * ── The machine grows as the renter zooms in (owner, 2026-08-11) ────────────────────────────────────
+ * *"The equipment must scale up as I zoom, so a close view reads as a real machine and not the same
+ * small sprite."*
+ *
+ * The curve, and why each end of it is where it is:
+ *  - **No growth at or below `SITE_ZOOM`.** At city zoom the map's subject is *where the yards are*, and
+ *    every marker on it is competing for the same tiles; a bigger sprite there buys nothing and costs
+ *    the separation the fan has to pay for (see `pinGapPx`). `FitView` also lands exactly on
+ *    `SITE_ZOOM`, so the view the renter arrives at is the marker at its documented 132 × 124.
+ *  - **Linear in zoom LEVELS, not in scale.** A level is a doubling of the ground scale, so a machine
+ *    drawn "to scale" would be 256× at the tile ceiling — nonsense on a canvas whose markers are
+ *    symbols. 0.1 per level is a step the eye reads as growth across one wheel notch (0.05 at the
+ *    surface's `zoomSnap: 0.5`) without ever being an animation.
+ *  - **1.8 at the ceiling, and capped there.** `SITE_ZOOM` 11 → `maxZoom` 19 is eight levels, so the
+ *    linear term reaches the cap exactly at the deepest tile CARTO serves: the marker grows all the way
+ *    in and stops growing at the same moment the basemap does. 1.8 puts the 94 px object at 169 px —
+ *    large enough to read as a machine, and small enough that four of them still fit a phone viewport.
+ */
+// `SITE_ZOOM` itself, not a copy of its value: the "no growth at city zoom" clause is a statement
+// about the zoom `FitView` lands on, so if that ever moves the curve has to move with it.
+const PIN_SCALE_FROM = SITE_ZOOM;
+const PIN_SCALE_PER_LEVEL = 0.1;
+const PIN_SCALE_MAX = 1.8;
+
+function pinScale(zoom: number): number {
+  return Math.min(PIN_SCALE_MAX, Math.max(1, 1 + (zoom - PIN_SCALE_FROM) * PIN_SCALE_PER_LEVEL));
+}
+
+/**
+ * The marker's box at a given scale — the `divIcon`'s own size, and the thing everything else measures.
+ *
+ * Only the STAGE scales, so only the stage's contribution grows: the label strip under it keeps its
+ * 46 px whatever the zoom, because the words in it are the same size at every zoom (a caption that grew
+ * with the map would be a second, competing scale). The width follows the stage but never shrinks below
+ * `PIN_W`, which is the box the label was always given room in.
+ *
+ * The box grows rather than letting the art overflow a fixed 132 × 124, because the box IS the hit
+ * area: a machine drawn 169 px wide whose outer 20 px a side could not be pressed — or hovered, which
+ * is now how the details box opens — would be a marker that lies about its own target.
+ */
+function pinBox(scale: number): { w: number; h: number } {
+  return {
+    w: Math.round(Math.max(PIN_W, PIN_STAGE_W * scale)),
+    h: Math.round(PIN_H + PIN_STAGE_H * (scale - 1)),
+  };
+}
+
+/**
+ * **The de-collision gap, measured off what is actually DRAWN** (§6.2; owner, 2026-08-11).
+ *
+ * `MIN_PIN_GAP_PX` is 74 and the marker is 132 × 124 with a ~156 px label hanging off its bottom edge,
+ * so the fan was separating markers by rather less than half their own size — which is why two machines
+ * in one yard drew one legible machine and one behind it, with their labels stacked into an unreadable
+ * pile. The owner's screenshot is that state at maximum zoom; it was the same state at city zoom.
+ *
+ * **The diagonal, and that is not belt-and-braces — it is the exact sufficient condition.** `decollide`
+ * separates by EUCLIDEAN distance, and a Euclidean distance is not an axis clearance: two boxes offset
+ * by (105, 105) are 148 px apart and still overlap in both axes. But if `dist ≥ hypot(W, H)` then
+ * `|dx| ≥ W` **or** `|dy| ≥ H` — otherwise `dist < hypot(W, H)`, a contradiction — and either one puts
+ * the boxes apart. So the diagonal is the smallest scalar that can be handed to a radial threshold and
+ * still guarantee the labels clear, whichever way the fan happens to point.
+ *
+ * The width term takes the LABEL over the box: the label is what overlaps first, being the widest thing
+ * the marker draws and the one thing two neighbours both draw at the same height.
+ *
+ * The cost is honest and is paid deliberately: markers fan further from their yards than they used to,
+ * and every displaced one draws the leader line back to the true point that `decollide` already
+ * returns. A marker 100 px from its yard with a line saying so is a smaller lie than two markers on top
+ * of each other, neither of which can be read at all.
+ */
+function pinGapPx(scale: number): number {
+  const box = pinBox(scale);
+  return Math.max(MIN_PIN_GAP_PX, Math.hypot(Math.max(box.w, PIN_LABEL_W), box.h));
+}
 
 /** Route geometry, `design-v3.md` §6, verbatim: the bow is capped at 56 px, it is 16% of the chord, and
  *  it alternates side by index so two machines in the same direction bow apart rather than laying
@@ -182,15 +303,24 @@ function FleetLayer({
   useMapTick();
 
   const zoom = map.getZoom();
+  /* How big every marker is being drawn at this zoom, decided once and used three times: the fan's
+     threshold, the distance chip's clearance test, and the `divIcon` itself. Deriving it separately in
+     any of the three is how a marker starts overlapping a chip that was measured against a smaller
+     machine. */
+  const scale = pinScale(zoom);
+  const box = pinBox(scale);
   const placed = useMemo(
     () =>
       decollide<MachinePin>(
         points,
         (lat, lng) => map.project([lat, lng], zoom),
-        MIN_PIN_GAP_PX,
+        // The gap the markers are actually DRAWN at, not the 74 px floor — see `pinGapPx`. It rises
+        // with the zoom scale, so the machines that just grew do not grow into each other.
+        pinGapPx(scale),
       ),
-    // `points`/`zoom` are the only inputs; `map` is stable for the life of the container.
-    [points, zoom, map],
+    // `points`/`zoom` are the only real inputs (`scale` is a pure function of `zoom`); `map` is stable
+    // for the life of the container.
+    [points, zoom, scale, map],
   );
 
   /* ── the route and its chip ──────────────────────────────────────────────────────────────────
@@ -226,13 +356,17 @@ function FleetLayer({
         return { pts, opacity };
       });
 
-      // The chip rides the line, but every line ENDS inside the marker box (132×124, anchored bottom),
-      // so a fixed fraction lands on the machine whenever the line is short. Walk back from the site
-      // end until the point clears that box, then nudge perpendicular, then clear of other chips.
+      // The chip rides the line, but every line ENDS inside the marker box (anchored bottom), so a
+      // fixed fraction lands on the machine whenever the line is short. Walk back from the site end
+      // until the point clears that box, then nudge perpendicular, then clear of other chips.
+      //
+      // Measured against the box AT THIS ZOOM, not against the resting 132×124: the machine grows as
+      // the renter zooms in, and a clearance test frozen at the small size would park the chip on top
+      // of the machine it is captioning at exactly the zoom he went in to read it.
       let chip: { at: L.LatLng; km: number; far: boolean } | null = null;
       if (p.point.distanceKm != null) {
         const clears = (x: number, y: number) =>
-          Math.abs(x - b.x) >= PIN_W / 2 + 20 || b.y - y >= PIN_H + 12 || y - b.y >= 26;
+          Math.abs(x - b.x) >= box.w / 2 + 20 || b.y - y >= box.h + 12 || y - b.y >= 26;
         let tt = 0.62;
         let x = s.x + vx * tt;
         let y = s.y + vy * tt;
@@ -265,7 +399,7 @@ function FleetLayer({
 
       return { id: p.point.id, segments, chip };
     });
-  }, [placed, site, map, zoom]);
+  }, [placed, site, map, zoom, box.w, box.h]);
 
   const src = safeImageUrl(imageUrl);
 
@@ -319,7 +453,7 @@ function FleetLayer({
             )}
             <Marker
               position={at}
-              icon={machineIcon(pin, selected, src, iconName, t)}
+              icon={machineIcon(pin, selected, src, iconName, t, ar, scale)}
               zIndexOffset={selected ? 900 : 760}
               riseOnHover
               eventHandlers={{ click: () => onOpen(pin.id) }}
@@ -363,6 +497,99 @@ function distanceIcon(km: number, far: boolean, ar: boolean, unit: string, farLa
       (far ? `<span class="bm-distfar">${esc(farLabel)}</span>` : "") +
       `</div>`,
   });
+}
+
+/**
+ * **The details box that opens beside a marker on hover** (owner, 2026-08-11: *"hovering an equipment
+ * on the map must show its details, the same ones the card shows"*).
+ *
+ * ── It is the CARD, rendered a second time — not a second description of the machine ──────────────
+ * Every value in it comes off `pin.card`, the `EquipmentCardModel` `BidMapWorkspace` built with the
+ * SAME `equipmentCardModel(machine, bid)` call the fleet list makes. Nothing is re-derived here: not
+ * the availability (RM3-AC-19 — one derivation, four surfaces), not the distance (the one-decimal
+ * ruling of 2026-08-11, formatted by the shared `distanceDigits` and never rounded again on the way
+ * out), not the out-of-city qualifier, not which certificates are named. The box cannot start
+ * disagreeing with the card, because there is no second answer for it to hold.
+ *
+ * ── Why it is CSS `:hover` on the marker's own markup, and not React state ────────────────────────
+ * A `divIcon` is an HTML string with no React lifecycle, so the alternative was a hovered-id state on
+ * this component plus a second `Marker` to carry the box. That would have given the canvas a piece of
+ * state of its own — the one thing this file's header says it does not have — and would have rebuilt
+ * every marker's icon on every mouse-over. The box therefore ships INSIDE the pin it belongs to,
+ * hidden, and `.bm-pin:hover .bm-pinfo` reveals it. Leaflet's `riseOnHover` (already on the marker)
+ * lifts the hovered pin above its neighbours, so the box is never drawn under another machine.
+ *
+ * ── The three constraints it is built under ──────────────────────────────────────────────────────
+ *  1 · **It is not a click.** Pressing a marker still opens that machine's panel (owner, 2026-08-11)
+ *      and that behaviour is untouched — this is a preview on the way to it, never a replacement.
+ *  2 · **It is not the only path to any of it.** There is no hover on touch, so a hover-only fact
+ *      would be a fact half the renters could not reach. Every line here is already on the card in
+ *      the list beside the map and again in the machine's own panel; the box saves a press, and
+ *      carries nothing that would be lost without it. It is `aria-hidden` and `pointer-events: none`
+ *      for the same reason: duplicated content a reader is walked through twice is noise, and a box
+ *      that could swallow the press meant for the marker under it would break rule 1.
+ *  3 · **RTL is set from the LOCALE, not from the pin.** `.bm-pin` is hard-coded `dir="rtl"` because
+ *      its one label is a chip whose direction cannot matter; four rows of text can, and English
+ *      right-aligned under an Arabic container is the exact bug AC-30/AC-98 are about.
+ *
+ * ── What the screenshot asked for and this box does NOT carry, with the ruling that forbids each ──
+ *  · **The plate / serial number.** RM3-AC-12: *no serial number and no load capacity on the card* —
+ *    the serial identifies the machine to the SYSTEM, not to a renter. It is not on the card model at
+ *    all, and `equipment-card.test.ts` sweeps that model's keys AND its values for one. A box built
+ *    from the card cannot state what the card is forbidden to know, and re-deriving it here from the
+ *    fleet row would be re-introducing, one surface over, exactly what the AC removed.
+ *  · **«unit 1 of 2».** `design.md` §7 decision 3 / §6.3.3 ban the invented per-unit index outright:
+ *    nothing links a bid to a numbered unit, so a renter asking *"what about unit 2?"* names something
+ *    the supplier cannot resolve. The marker itself has carried that ban since v3.
+ *  · **The supplier's company name.** Every marker on this canvas is the same supplier's (AC-75) and
+ *    his name is already the panel header's first line; repeating it on each of a dozen markers states
+ *    the one fact that cannot vary between them.
+ *  · **The yard's name and city.** Not on the card model — it is the machine DETAIL's line
+ *    (`EquipmentDetail`), which is one press away, and this surface's contract is that the box and the
+ *    card are one model. Adding it would mean putting it on the card too, and the card is fixed at
+ *    four rows by RM3-AC-32.
+ */
+function hoverBoxHtml(card: EquipmentCardModel, ar: boolean, scale: number, t: ReturnType<typeof useT>): string {
+  // Clear of the machine's own silhouette at THIS zoom. The art grows out of the resting box, so a
+  // fixed offset would have the box sitting on the machine at exactly the zoom it grew for.
+  const clear = Math.round(Math.max(10, (PIN_STAGE_W * scale) / 2 - PIN_W / 2 + 12));
+  const title = ar ? card.title.ar : card.title.en;
+  const confirmed = card.chip.availability === "confirmed";
+
+  return (
+    `<div class="bm-pinfo" aria-hidden="true" dir="${ar ? "rtl" : "ltr"}" style="inset-inline-start:calc(100% + ${clear}px)">` +
+    `<div class="bm-pinfo-t">${esc(title)}</div>` +
+    // The card's ONE state chip (RM3-AC-32), in the card's own words and the model's own colour. Drawn
+    // as ink and a keyline rather than as a fill: on a white box a solid availability panel would be
+    // the loudest thing on the canvas, and the marker's own label already states this fact filled.
+    `<div class="bm-pinfo-r">` +
+    `<span class="bm-pinfo-chip" style="color:${card.chip.colour};border-color:${card.chip.colour}">` +
+    // Two states, two SHAPES as well as two colours — the card's rule, for the same reader.
+    `<span>${confirmed ? "✓" : "•"}</span>${esc(confirmed ? t.bidMap.eqChipConfirmed : t.bidMap.eqChipUnconfirmed)}` +
+    `</span>` +
+    (card.outOfCity ? `<span class="bm-pinfo-far">${esc(t.bidMap.eqOutOfCity)}</span>` : "") +
+    `</div>` +
+    // One decimal, always, through the one formatter (owner, 2026-08-11). An unknown distance is a
+    // sentence and never a 0.
+    `<div class="bm-pinfo-r bm-pinfo-km">` +
+    (card.km != null
+      ? `<span dir="ltr">${esc(distanceDigits(card.km, ar))}</span> ${esc(t.bidMap.eqDistanceUnit)}`
+      : esc(t.bidMap.eqNoDistance)) +
+    `</div>` +
+    // The certificates the REQUEST asked for, held or missing — the card's row 4, verbatim. The mark
+    // is not decoration: at this size the two fills are close enough that colour alone would decide it.
+    `<div class="bm-pinfo-c">` +
+    (card.certs.length > 0
+      ? card.certs
+          .map(
+            (c) =>
+              `<span class="bm-pinfo-cert ${c.held ? "held" : "missing"}">${c.held ? "✓" : "!"} ${esc(ar ? c.label.ar : c.label.en)}</span>`,
+          )
+          .join("")
+      : `<span class="bm-pinfo-none">${esc(t.bidMap.eqNoCerts)}</span>`) +
+    `</div>` +
+    `</div>`
+  );
 }
 
 /**
@@ -425,7 +652,13 @@ function machineIcon(
   src: string | null,
   iconName: string,
   t: ReturnType<typeof useT>,
+  /** The reader's script — for the hover box's four rows of text, and for its distance. The pin's own
+   *  markup stays `dir="rtl"`; see `hoverBoxHtml` constraint 3. */
+  ar: boolean,
+  /** `pinScale(zoom)` — how big the machine is drawn at the zoom this render is at. */
+  scale: number,
 ): L.DivIcon {
+  const box = pinBox(scale);
   const ring = AVAILABILITY_COLOUR[pin.availability];
   const tint = pin.availability === "confirmed" ? "rgba(22,163,74,.34)" : "rgba(217,54,42,.32)";
 
@@ -441,15 +674,26 @@ function machineIcon(
 
   return L.divIcon({
     className: "", // no Leaflet default box — the marker is entirely our own markup
-    iconSize: [PIN_W, PIN_H],
-    iconAnchor: [PIN_W / 2, PIN_H],
+    // The box GROWS with the machine, and the anchor grows with the box — see `pinBox`. `padding-top`
+    // takes up the difference so the drawing keeps its exact place relative to the anchor: the content
+    // is laid out from the top of the box, so a taller box would otherwise lift the ground disc off the
+    // point it marks, which is the one thing the whole scaling design promised not to do.
+    iconSize: [box.w, box.h],
+    iconAnchor: [box.w / 2, box.h],
     html:
       // `is-on` carries the whole of the selected EMPHASIS — the scale, the glow, the label's
       // keyline. It is a class rather than more inline style because none of those values is
       // state-DEPENDENT in the way the colours are: they are one fixed treatment, switched on, and
       // the stylesheet is where a fixed treatment belongs (and where it can be swept for the
       // availability colours it must not contain).
-      `<div class="bm-pin${selected ? " is-on" : ""}" dir="rtl" style="direction:rtl">` +
+      `<div class="bm-pin${selected ? " is-on" : ""}" dir="rtl" style="direction:rtl;width:${box.w}px;padding-top:${box.h - PIN_H}px">` +
+      // The zoom LENS. A wrapper rather than a scale on the stage itself, because `.bm-pin.is-on
+      // .bm-pin-stage` already owns that transform for the selection emphasis and a second one would
+      // have replaced it — a selected machine would have stopped being bigger the moment it was zoomed
+      // to. Nested, the two multiply, which is what "the selected one is 14% bigger than its
+      // neighbours" has always meant. `transform-origin: bottom center` is in the stylesheet, for the
+      // same reason the selected scale's is: the machine grows UPWARD out of the ground it stands on.
+      `<div class="bm-pin-lens" style="transform:scale(${scale})">` +
       `<div class="bm-pin-stage">` +
       // A second, STATIC ring outside the breathing halo. The halo pulses to draw the eye and is
       // therefore absent for more than half of every cycle; this one never leaves, so the marker is
@@ -467,6 +711,11 @@ function machineIcon(
       // containing block and drag the tick along with the lift.
       (selected ? `<span class="bm-pin-tick">✓</span>` : "") +
       `</div>` +
+      `</div>` +
+      // The hover preview, shipped hidden inside the pin and revealed by `.bm-pin:hover` — see
+      // `hoverBoxHtml`. A machine with no card model (a preview, a test) simply has no box, which is
+      // why this is a conditional and not an empty shell.
+      (pin.card ? hoverBoxHtml(pin.card, ar, scale, t) : "") +
       // The label's own selected treatment — the scale and the white keyline — moved to `.bm-pin.is-on
       // .bm-pin-chip`. An inline `transform` here could not be combined with the shadow the emphasis
       // also wants, and would have overridden the stylesheet rather than joining it.
@@ -549,7 +798,14 @@ export default function MapCanvas({
         zoomSnap={0.5}
         zoomDelta={0.5}
         minZoom={5}
-        maxZoom={16}
+        // **19, the tile ceiling** (owner, 2026-08-11: *"I must be able to zoom in further"*). This was
+        // 16 while the `TileLayer` below has always declared 19 — so the basemap served three levels of
+        // detail the map refused to show, and a renter trying to see which corner of a yard a machine
+        // is parked in hit a wall the tiles did not. 19 is CARTO voyager's own maximum: past it Leaflet
+        // would upscale a level-19 raster and the map would go soft with no new information in it.
+        // `minZoom`, `zoomSnap`, `zoomDelta`, `wheelPxPerZoomLevel` and `inertiaDeceleration` are the
+        // prototype's and are untouched — the comment above records what each of them is for.
+        maxZoom={19}
         wheelPxPerZoomLevel={90}
         // `inertiaDeceleration` is the one view option in §7b that is NOT already Leaflet's default.
         // Leaflet ships **3400** px/s² (`leaflet-src.js:13724` — its own doc comment above it says

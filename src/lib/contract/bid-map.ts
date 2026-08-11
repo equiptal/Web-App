@@ -345,7 +345,24 @@ export function unitIndicators(
 
 /* ──────────────────────────── pin de-collision in screen space ──────────────────────────── */
 
-/** The minimum on-screen gap between two machine pins, in CSS pixels (§6.2). */
+/**
+ * The minimum on-screen gap between two machine pins, in CSS pixels (§6.2) — and, since 2026-08-11, a
+ * **FLOOR rather than the answer**.
+ *
+ * 74 was never the marker's size: the `divIcon` box is 132 × 124 and the availability label hangs off
+ * its bottom edge, so two pins exactly 74 px apart drew two machines whose labels sat on top of each
+ * other — the defect the owner reported at close zoom (*"the labels stack and I cannot read either"*),
+ * and one that was equally present at city zoom where nobody had looked for it.
+ *
+ * The real separation is therefore computed by the DRAWING surface, which is the only place that knows
+ * how big the marker is being drawn — `MapCanvas.pinGapPx()`, off the marker box, the label strip and
+ * the zoom scale. This constant stays as the floor that surface clamps against and as the default for
+ * a caller with no drawn size in hand (and for the unit tests, which assert the fan geometry rather
+ * than the marker's dimensions).
+ *
+ * It is deliberately NOT raised here to the drawn size. `decollide` is portable, DOM-free and gets a
+ * Dart port; the pixel dimensions of a web `divIcon` are not a fact this file can hold.
+ */
 export const MIN_PIN_GAP_PX = 74;
 
 export interface MapPoint {
