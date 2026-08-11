@@ -86,8 +86,10 @@ const posted = (
 const answer = (
   inReplyTo: string,
   resolution: RenteeRequestResolution = "provided",
+  /** Only a `partial` ever names any (owner ruling, 2026-08-11, §8). */
+  deliveredTypes: string[] | null = null,
 ): { reply: RenteeRequestReplyPayload } => ({
-  reply: { type: RENTEE_REQUEST_REPLY_CARD_TYPE, inReplyTo, equipmentId: null, resolution },
+  reply: { type: RENTEE_REQUEST_REPLY_CARD_TYPE, inReplyTo, equipmentId: null, resolution, deliveredTypes },
 });
 
 /** `composeX` returns null for an ask the backend would refuse; every draft below is a valid one, so

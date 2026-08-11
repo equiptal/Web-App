@@ -27,6 +27,7 @@
 
 import {
   renteeRequestState,
+  stillMissingDocTypes,
   type RenteeRequestCardPayload,
   type RenteeRequestDraft,
   type RenteeRequestKind,
@@ -102,9 +103,18 @@ export interface RequestCardCtx {
   /** The fleet, by `equipmentId`, read on EVERY render. Null when this machine is not in the response
    *  — sold, unlisted, or a sibling tab whose fleet this surface does not hold. */
   machine: (equipmentId: string) => RequestCardMachine | null;
-  /** The supplier's answer carrying this `ref`, if he posted one. A draft has no `ref` and is never
-   *  asked. */
-  reply: (ref: string) => { resolution: RenteeRequestResolution } | null;
+  /**
+   * The supplier's answer carrying this `ref`, if he posted one. A draft has no `ref` and is never
+   * asked.
+   *
+   * `deliveredTypes` rides along because a `partial` is not fully described by its resolution: the
+   * line the renter reads names the papers that landed (owner ruling, 2026-08-11, §8). Optional, so
+   * a caller that only holds resolutions still type-checks and simply words the unnamed form.
+   */
+  reply: (ref: string) => {
+    resolution: RenteeRequestResolution;
+    deliveredTypes?: readonly string[] | null;
+  } | null;
   /** A wire document type → the renter's word for it, so a chip never reads `operating_license`. */
   docLabel?: (docType: string) => string;
   /**
@@ -142,9 +152,17 @@ export interface RequestCardCtx {
   typeWord?: string | null;
 }
 
-/** How the status row reads. `draft` is the one tone that is not a statement about the supplier — it
- *  is a statement about the renter, who has not pressed send yet. */
-export type RequestCardTone = "answered" | "refused" | "waiting" | "unknown" | "draft";
+/**
+ * How the status row reads. `draft` is the one tone that is not a statement about the supplier — it
+ * is a statement about the renter, who has not pressed send yet.
+ *
+ * **`partial` is AMBER** (owner ruling, 2026-08-11, §8: *"Amber. Not 'provided', not 'declined'."*).
+ * It has its own tone rather than borrowing `refused` — which is already amber on this surface — for
+ * two reasons: a supplier who sent the wrong paper has not refused anything, and a tone that two
+ * different verdicts share is a tone that cannot be restyled for one of them later. It must never
+ * take the green of `answered`.
+ */
+export type RequestCardTone = "answered" | "refused" | "partial" | "waiting" | "unknown" | "draft";
 
 export interface RequestCardView {
   scope: RenteeRequestScope;
@@ -286,9 +304,11 @@ export function requestCardView(
     ? null
     : answer.resolution === "provided"
       ? "answered"
-      : answer.resolution === "declined"
-        ? "refused"
-        : "unavailable";
+      : answer.resolution === "partial"
+        ? "partial"
+        : answer.resolution === "declined"
+          ? "refused"
+          : "unavailable";
 
   const status = ((): { tone: RequestCardTone; label: string } | null => {
     if (answer && (state === null || state === saidState)) {
@@ -298,6 +318,14 @@ export function requestCardView(
           resolution: answer.resolution,
           docCount: subject.docTypes?.length ?? 0,
           typeWord: ctx.typeWord ?? null,
+          /* The `partial` half (owner, 2026-08-11, §8). Both lists are handed over so the line can
+             name what arrived AND what is still owed: the ask's own types are right here on the
+             subject, so the folded card — unlike the bare fallback — can always state the second
+             clause. `docLabel` is passed too, so the sentence names a paper the same way the chips
+             two lines above it do. */
+          deliveredTypes: answer.deliveredTypes ?? null,
+          askedTypes: subject.docTypes,
+          docLabel: naming,
         },
         L,
       );
@@ -311,6 +339,18 @@ export function requestCardView(
         return { tone: "refused", label: L("He declined", "اعتذر المورّد") };
       case "unavailable":
         return { tone: "refused", label: L("He answered: not available", "ردّ: غير متوفّرة") };
+      /* Reachable only when the derivation and the answer disagree — `state === "partial"` while
+         `saidState` is something else, which cannot happen — or when there is no answer object to
+         word from. Kept explicit rather than folded into the default so a partial can never fall
+         through to «بانتظار ردّه» and erase the news. */
+      case "partial":
+        return {
+          tone: "partial",
+          label: L(
+            "He sent something else — what was asked for is still not on file",
+            "أرسل شيئًا آخر — ما طُلب لا يزال غير مرفوع",
+          ),
+        };
       case "unknown":
         return {
           tone: "unknown",
@@ -377,6 +417,25 @@ const DOC_TYPE_LABELS: Record<string, [string, string]> = {
   saso: ["SASO certificate", "شهادة ساسو"],
   aramco: ["Aramco certificate", "شهادة أرامكو"],
   insurance: ["Insurance", "التأمين"],
+  /* ── The CATALOGUE's spellings of papers already named above ────────────────────────────────────
+     One paper, two vocabularies: a machine stores `tuv` / `insurance` / `customs`
+     (`validators/equipment.schema.ts`) while the catalogue row an ASK is validated against is
+     `tuv_cert` / `equipment_insurance` / `custom_card` (`EquipmentDocumentType.documentKey`). Both
+     spellings reach this table from real data — the ask carries the catalogue's, the reply's
+     `deliveredTypes` carries the listing's — so a table holding only one of them humanises the other
+     into `Tuv cert`, and the owner's sentence becomes *"sent Insurance — the Tuv cert is still not on
+     file"*. Added as labels rather than folded through `canonicalDocType`, because that function's
+     canonical form is the catalogue's and half of these keys are not it. */
+  tuv_cert: ["TÜV certificate", "شهادة TÜV"],
+  tuv_certificate: ["TÜV certificate", "شهادة TÜV"],
+  spsp_cert: ["SPSP certificate", "شهادة SPSP"],
+  spsp_certificate: ["SPSP certificate", "شهادة SPSP"],
+  saso_inspection: ["SASO certificate", "شهادة ساسو"],
+  safety_cert: ["Safety certificate", "شهادة السلامة"],
+  equipment_insurance: ["Insurance", "التأمين"],
+  custom_card: ["Customs card", "البطاقة الجمركية"],
+  vat_cert: ["VAT certificate", "الشهادة الضريبية"],
+  ownership_letter: ["Proof of ownership", "إثبات الملكية"],
   operating_license: ["Operator licence", "رخصة المشغّل"],
   operator_license: ["Operator licence", "رخصة المشغّل"],
   operator_tuv: ["Operator TÜV", "شهادة TÜV للمشغّل"],
@@ -465,6 +524,44 @@ export interface ReplyAnswerSubject {
   docCount?: number;
   /** The request's type word, as {@link RequestCardCtx.typeWord} carries it. */
   typeWord?: string | null;
+  /**
+   * **What actually landed** — the reply's own `deliveredTypes` (owner ruling, 2026-08-11, §8).
+   *
+   * Read only by `partial`. Null/absent is a real case — an older client names nothing — and the
+   * wording falls back to saying that something else was sent without naming it.
+   */
+  deliveredTypes?: readonly string[] | null;
+  /**
+   * **What was asked for** — the ask's own `docTypes`, so what is STILL missing can be derived
+   * (`stillMissingDocTypes`) rather than read off a wire field that would go stale.
+   *
+   * Null on the bare fallback form, where the ask is not in the loaded window at all: the line then
+   * says something else arrived and says nothing about which paper is still owed, because naming one
+   * would be a guess about a question nobody read.
+   */
+  askedTypes?: readonly string[] | null;
+  /**
+   * A wire document type → the renter's word for it. Handed in rather than reached for, so this
+   * module keeps its "takes its words through an `L`" rule and a surface with its own naming (the
+   * dock's `docLabel`) cannot end up disagreeing with the chips right above the line.
+   */
+  docLabel?: (docType: string) => string;
+}
+
+/**
+ * A list of paper names → one readable run, in the reader's script.
+ *
+ * Prose, not chips: this sentence is read as a sentence — *"sent Insurance and the customs card"* —
+ * and a `·`-joined run there reads as a stray list dropped into the middle of it. Arabic joins with
+ * a prefixed «و» on the last item, which is how the language conjoins rather than by borrowing the
+ * English comma-and.
+ */
+function namedList(items: readonly string[], L: LFn): string {
+  if (items.length === 0) return "";
+  if (items.length === 1) return items[0];
+  const head = items.slice(0, -1);
+  const last = items[items.length - 1];
+  return L(`${head.join(", ")} and ${last}`, `${head.join("، ")} و${last}`);
 }
 
 /**
@@ -487,7 +584,87 @@ export function replyAnswerLine(
   const { resolution } = subject;
   const another = subject.typeWord?.trim() || null;
   const many = (subject.docCount ?? 0) > 1;
-  const tone: RequestCardTone = resolution === "provided" ? "answered" : "refused";
+  const tone: RequestCardTone =
+    resolution === "provided" ? "answered" : resolution === "partial" ? "partial" : "refused";
+
+  /* ═══ `partial` — "sent Insurance — the TÜV certificate is still not on file" ═════════════════════
+     Owner ruling, 2026-08-11, §8:
+
+       *"Sending something other than what was asked is still an answer. He can upload a missing
+       document the renter didn't ask for. The renter is told exactly that: sent Insurance — the TUV
+       certificate is still not on file. Amber. Not 'provided', not 'declined'."*
+
+     Two clauses, and the sentence is built to keep BOTH or degrade one at a time, because on real
+     data either half can be unknown:
+
+       · what LANDED comes off the reply (`deliveredTypes`), and an older client sends none;
+       · what is STILL MISSING is DERIVED here from the ask's own types (`stillMissingDocTypes`),
+         never read off the wire — a stored "still missing" would go on saying so after the supplier
+         had filed the paper, and this whole loop re-derives on every render for exactly that reason
+         (RM3-AC-18). It is also unknowable on the bare fallback form, where the ask is not in the
+         loaded window at all.
+
+     Handled before the kind switch because it is answered the same way whatever the ask's kind was:
+     it is a statement about PAPERS, and the sentence names them. The non-document kinds fall through
+     to their own wordings below, where "he sent a paper" would be nonsense.
+
+     It is worded so it can NEVER read as a refusal and never as an answer — the one rule that
+     outranks the rest on this card. "Sent X" is a thing he did; "still not on file" is a fact about
+     the machine, stated the way `documentAskSatisfied` states it, not an accusation. */
+  if (resolution === "partial") {
+    const naming = subject.docLabel ?? ((t: string) => t);
+    const sent = (subject.deliveredTypes ?? []).map(naming).filter((t) => t.trim() !== "");
+    const missing = stillMissingDocTypes(subject.askedTypes, subject.deliveredTypes)
+      .map(naming)
+      .filter((t) => t.trim() !== "");
+
+    /* The delivered papers are named BARE — *"Sent Insurance"*, the owner's own phrasing: they are a
+       list of things that arrived, and an article in front of each would read as a receipt. The
+       still-missing ones each take "the", because that clause is a sentence about them and the
+       ruling words it that way. Arabic needs neither: every label in `DOC_TYPE_LABELS` already
+       carries its own «الـ». */
+    const sentClause = L(`Sent ${namedList(sent, L)}`, `أرسل ${namedList(sent, L)}`);
+    // "the TÜV certificate IS still not on file" / "…ARE still not on file" — the verb agrees, so a
+    // two-paper shortfall does not read as a typo. Arabic «لا تزال … غير مرفوعة» carries both.
+    const missingClause = L(
+      `${namedList(missing.map((m) => `the ${m}`), L)} ${missing.length > 1 ? "are" : "is"} still not on file`,
+      `لا تزال ${namedList(missing, L)} غير مرفوعة`,
+    );
+
+    if (sent.length > 0 && missing.length > 0) {
+      return { tone, label: `${sentClause} — ${missingClause}` };
+    }
+    // He named what he sent, but we cannot say what is still owed — the ask is not in this window.
+    // The first clause is the news; the second degrades to the honest generality rather than naming
+    // a paper nobody read.
+    if (sent.length > 0) {
+      return {
+        tone,
+        label: L(
+          `${sentClause} — but not everything that was asked for`,
+          `${sentClause} — لكن ليس كل ما طُلب`,
+        ),
+      };
+    }
+    // Nothing named at all: an older client, or an ask this window does not hold. Still worth
+    // saying — the alternative is the silence this ruling replaced.
+    if (missing.length > 0) {
+      return {
+        tone,
+        label: L(
+          `He sent something else — ${missingClause}`,
+          `أرسل شيئًا آخر — ${missingClause}`,
+        ),
+      };
+    }
+    return {
+      tone,
+      label: L(
+        "He sent something else — what was asked for is still not on file",
+        "أرسل شيئًا آخر — ما طُلب لا يزال غير مرفوع",
+      ),
+    };
+  }
 
   const label = ((): string => {
     if (subject.kind === "availability") {

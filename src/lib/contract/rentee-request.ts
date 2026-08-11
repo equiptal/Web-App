@@ -278,9 +278,26 @@ export function composeAlternativeRequest(equipmentId: string | null): RenteeReq
 export const RENTEE_REQUEST_CARD_TYPE = "rentee_request";
 export const RENTEE_REQUEST_REPLY_CARD_TYPE = "rentee_request_reply";
 
-/** The supplier's answer. A refusal changes no state anywhere, so without this a "no" is invisible
- *  (004a §3.2). */
-export type RenteeRequestResolution = "provided" | "declined" | "unavailable";
+/**
+ * The supplier's answer. A refusal changes no state anywhere, so without this a "no" is invisible
+ * (004a §3.2).
+ *
+ * ── `partial` — the third answer (owner ruling, 2026-08-11, §8) ────────────────────────────────────
+ * > *"Sending something other than what was asked is still an answer. He can upload a missing document
+ * > the renter didn't ask for. The renter is told exactly that: **sent Insurance — the TUV certificate
+ * > is still not on file**. Amber. Not 'provided', not 'declined'."*
+ *
+ * Before this, an upload that did not satisfy the ask posted nothing at all and the renter was told
+ * nothing had happened. Neither existing value could carry it: `provided` claims the ask is satisfied,
+ * which the machine would immediately contradict (RM3-AC-58 downgrades exactly that to «بانتظار ردّه»,
+ * so the news would vanish); `declined` is a refusal he never made.
+ *
+ * **It is not an answer.** The ask reads as still open underneath it — see {@link renteeRequestState},
+ * where `partial` is its own verdict rather than a flavour of `answered`, and the backend's
+ * `ASK_CLOSING_RESOLUTIONS`, which excludes it so a partial answer cannot stop the real one from ever
+ * being sent.
+ */
+export type RenteeRequestResolution = "provided" | "declined" | "unavailable" | "partial";
 
 /** The `custom` a posted ask carries, verbatim from `RenteeRequestCard` on the backend. */
 export interface RenteeRequestCardPayload {
@@ -301,6 +318,23 @@ export interface RenteeRequestReplyPayload {
   inReplyTo: string;
   equipmentId: string | null;
   resolution: RenteeRequestResolution;
+  /**
+   * **Which document types actually landed** (owner ruling, 2026-08-11, §8).
+   *
+   * Only a `partial` carries them, and they are what let the renter's line NAME the news — *"sent
+   * Insurance — the TÜV certificate is still not on file"* — instead of reading an enum aloud.
+   *
+   * **Null is a real case and must stay renderable.** The clients ship independently, so a `partial`
+   * posted by a build that predates the field arrives naming nothing; the card then says that
+   * something else was sent without naming it, which is still more than the silence this ruling
+   * replaced. Nothing here may require the field.
+   *
+   * What is still MISSING is deliberately not on the wire: it is the ask's own `docTypes` minus this,
+   * re-derived on every render by {@link stillMissingDocTypes}. Storing it would freeze, at answer
+   * time, a fact that goes stale the moment the supplier files the paper — the same reason no request
+   * carries a status column (§7.3).
+   */
+  deliveredTypes: string[] | null;
 }
 
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v : null);
@@ -332,6 +366,15 @@ export function parseRenteeRequestCard(custom: unknown): RenteeRequestCardPayloa
   };
 }
 
+/** A list-of-strings field off a `custom`, cleaned — or null when it names nothing. Null rather than
+ *  `[]` so "he named no papers" is ONE case for the wording to handle, whether the field was absent,
+ *  empty, or full of blanks. */
+function strList(v: unknown): string[] | null {
+  if (!Array.isArray(v)) return null;
+  const out = v.map((t) => String(t).trim()).filter((t) => t !== "");
+  return out.length > 0 ? out : null;
+}
+
 /** A `custom` object → a supplier's answer, or null. */
 export function parseRenteeRequestReply(custom: unknown): RenteeRequestReplyPayload | null {
   if (!custom || typeof custom !== "object" || Array.isArray(custom)) return null;
@@ -340,8 +383,60 @@ export function parseRenteeRequestReply(custom: unknown): RenteeRequestReplyPayl
   const inReplyTo = str(c.inReplyTo);
   const resolution = str(c.resolution);
   if (!inReplyTo) return null;
-  if (resolution !== "provided" && resolution !== "declined" && resolution !== "unavailable") return null;
-  return { type: RENTEE_REQUEST_REPLY_CARD_TYPE, inReplyTo, equipmentId: str(c.equipmentId), resolution };
+  if (
+    resolution !== "provided" &&
+    resolution !== "declined" &&
+    resolution !== "unavailable" &&
+    resolution !== "partial"
+  ) {
+    return null;
+  }
+  return {
+    type: RENTEE_REQUEST_REPLY_CARD_TYPE,
+    inReplyTo,
+    equipmentId: str(c.equipmentId),
+    resolution,
+    /* `providedDocTypes` is the MOBILE client's name for the same field. Both clients were built
+       against this ruling in parallel on 2026-08-11 and picked different words; the backend stamps
+       `deliveredTypes` on every card it writes, so this fallback only matters for a card an older or
+       divergent client posted directly. Reading both is a two-token tolerance; reading one and being
+       wrong is the renter being told a `partial` arrived without being told WHICH paper — which is
+       most of what the ruling was for. Delete it once the two sides agree on one word. */
+    deliveredTypes: strList(c.deliveredTypes) ?? strList(c.providedDocTypes),
+  };
+}
+
+/**
+ * **What is still not on file** — the second half of *"sent Insurance — the TÜV certificate is still
+ * not on file"* (owner ruling, 2026-08-11, §8).
+ *
+ * Derived, never read off the reply: the ask's own types minus what landed. That is deliberate and it
+ * is the same rule the whole request loop runs on (RM3-AC-18) — a "still missing" stored at answer
+ * time would keep saying so after the supplier had filed the paper, and the card re-renders from the
+ * data on every pass precisely so it cannot.
+ *
+ * **Both sides fold through {@link canonicalDocType}**, because the ask names a paper in the
+ * catalogue's vocabulary and the reply names it in the listing's — `tuv_cert` against `tuv` is one
+ * TÜV, and comparing them raw would report a paper as missing while it sat on the machine. It is the
+ * same fold `documentAskSatisfied` applies for the same reason.
+ *
+ * Returns the types **as the ASK wrote them**, so the label the renter reads is drawn from his own
+ * question rather than from the supplier's spelling of it.
+ */
+export function stillMissingDocTypes(
+  askedTypes: readonly string[] | null | undefined,
+  deliveredTypes: readonly string[] | null | undefined,
+): string[] {
+  const landed = new Set((deliveredTypes ?? []).map(canonicalDocType).filter((t) => t !== ""));
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const asked of askedTypes ?? []) {
+    const key = canonicalDocType(asked);
+    if (!key || landed.has(key) || seen.has(key)) continue;
+    seen.add(key);
+    out.push(asked);
+  }
+  return out;
 }
 
 /**
@@ -382,11 +477,20 @@ export interface RequestTargetMachine {
  * - `answered` — the machine satisfies the ask, or the supplier said he provided it
  * - `refused` — he declined
  * - `unavailable` — he answered that it is not available
+ * - `partial` — **he sent something, but not what was asked for** (owner ruling, 2026-08-11, §8). Its
+ *   own verdict rather than a shade of `answered` or of `refused`, because it is neither: the ask is
+ *   still open underneath it and the renter is still owed the paper. Amber on every surface.
  * - `waiting` — nothing yet. **Never "refused"**: an unanswered ask is unanswered (AC-20's rule,
  *   applied to the card rather than the chip)
  * - `unknown` — the machine this ask names is not in the fleet response, so nothing can be said
  */
-export type RenteeRequestState = "answered" | "refused" | "unavailable" | "waiting" | "unknown";
+export type RenteeRequestState =
+  | "answered"
+  | "refused"
+  | "unavailable"
+  | "partial"
+  | "waiting"
+  | "unknown";
 
 /**
  * Every requested type present on the machine's file.
@@ -452,6 +556,7 @@ export function renteeRequestState(
   const fromReply = (): RenteeRequestState => {
     if (!reply) return "waiting";
     if (reply.resolution === "provided") return "answered";
+    if (reply.resolution === "partial") return "partial";
     return reply.resolution === "declined" ? "refused" : "unavailable";
   };
 
@@ -459,6 +564,14 @@ export function renteeRequestState(
   // derivable kind — the reply stays visible in the thread as the record of what was said, but it
   // never overrides the file (RM3-AC-58). A refusal is not downgraded: nothing in the file can state
   // one, so it is the reply's alone to carry.
+  //
+  // **`partial` is not downgraded either, and it is not promoted** (owner ruling, 2026-08-11, §8).
+  // Not downgraded, because unlike a `provided` it claims nothing the file contradicts — it says he
+  // sent something OTHER than what was asked, which is exactly what an unsatisfied ask looks like
+  // from the outside, and the whole point is that the renter hears it instead of silence. Not
+  // promoted, because the ask is genuinely still open: `satisfied` is checked FIRST above, so the
+  // moment the file does carry every named type the card reads `answered` and the stale partial
+  // stops speaking, which is the derived-state-wins rule doing its job rather than an exception to it.
   const derivable = (satisfied: boolean): RenteeRequestState => {
     if (satisfied) return "answered";
     const said = fromReply();

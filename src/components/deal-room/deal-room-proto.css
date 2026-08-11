@@ -217,6 +217,12 @@
    tinted with either. A refusal is amber, never red: red on this feature means availability only. */
 .dlproto .cc-out-waiting { color: var(--muted); }
 .dlproto .cc-out-refused { color: var(--warning); }
+/* `partial` — "Amber. Not 'provided', not 'declined'." (owner ruling, 2026-08-11, §8). He sent
+   something other than what was asked: it must never take `--success` (that would read as answered)
+   and it is given its own deeper amber rather than sharing `--warning` with the refusal, so the two
+   are distinguishable and neither is restyled by a change meant for the other. The same pairing the
+   map's card draws (`map/request-card.css` `.bm-rq-state.is-partial`) — one channel, one colour. */
+.dlproto .cc-out-partial { color: #b45309; }
 /* ── V12b · the request card, sided by its AUTHOR (owner, 2026-08-11) ─────────────────────────────
    Two rulings meet on this wrapper. *"i want it like request card"* put the map's `rRequestCard` in
    this thread — the card's own chrome travels with the component now (`map/request-card.css`), so

@@ -1012,7 +1012,7 @@ describe("an ask sent, the page reloaded — the control stays blocked", () => {
     // response, whatever it is": a refusal releases the control exactly as an acceptance does.
     const answered = outstandingAskIdentities([
       { ask: posted },
-      { reply: { type: "rentee_request_reply", inReplyTo: "RQ-7F3A", equipmentId: "eq-1", resolution: "declined" } },
+      { reply: { type: "rentee_request_reply", inReplyTo: "RQ-7F3A", equipmentId: "eq-1", resolution: "declined", deliveredTypes: null } },
     ]);
     expect(isAskOutstanding(ask, answered)).toBe(false);
   });

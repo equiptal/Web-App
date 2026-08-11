@@ -162,6 +162,11 @@
 /* Amber, not red: red on this surface means "not available" on a machine, and a supplier's «no» to a
    question is not that (the same rule the arrival bubble's warm fill follows). */
 .bm-rq-state.is-refused { color: #d4780a; }
+/* `partial` — "Amber. Not 'provided', not 'declined'." (owner ruling, 2026-08-11, §8). He sent
+   something other than what was asked for: never the green of an answer, and never the tone of a
+   refusal he did not make. Its own amber rather than `is-refused`'s — one step deeper — so the two
+   verdicts can be told apart at a glance and either can be restyled without moving the other. */
+.bm-rq-state.is-partial { color: #b45309; }
 .bm-rq-state.is-draft { color: #2563eb; }
 /* Every card in a conversation carries its time (AC-16), including this one. Quiet and at the
    trailing edge — the card's subject is the ask, not the minute it was made in. */

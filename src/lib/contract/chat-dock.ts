@@ -328,7 +328,10 @@ export function dockNoticeQuote(
 export interface DockReplyDigest {
   ref: string;
   serial: string | null;
-  resolution: "provided" | "declined" | "unavailable";
+  /** `partial` — he sent something OTHER than what was asked (owner ruling, 2026-08-11, §8). It is
+   *  an answer, so it raises the bubble like any other; it is not a refusal, so it must not take the
+   *  bubble's refusal tone — see `ChatDock`'s `refusal`. */
+  resolution: "provided" | "declined" | "unavailable" | "partial";
 }
 
 /** The bubble on the dock (004a §2.1). */

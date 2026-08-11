@@ -4,6 +4,7 @@ import {
   composeDocumentRequest,
   composeShortfallRequest,
   renteeDraftStep,
+  stillMissingDocTypes,
   type RenteeRequestCardPayload,
   type RenteeRequestDraft,
   type RenteeRequestReplyPayload,
@@ -18,6 +19,7 @@ import {
   replyAnswerLine,
   replyFoldsIntoAsk,
   requestCardView,
+  requestDocLabel,
   type RequestCardCtx,
   type RequestCardMachine,
   type RequestThreadCard,
@@ -344,7 +346,13 @@ const reply = (over: Partial<RenteeRequestReplyPayload> = {}): RenteeRequestRepl
   inReplyTo: "RQ-7F3A",
   equipmentId: "eq-1",
   resolution: "provided",
+  // `partial` is the only resolution that ever names papers (owner ruling, 2026-08-11, §8); every
+  // other answer names none, and so does a client too old to send them.
+  deliveredTypes: null,
   ...over,
+  // `Partial<>` lets an override set the field to `undefined`, which the payload type does not
+  // allow — normalised so a fixture can spell "he named nothing" either way.
+  ...(over.deliveredTypes === undefined ? { deliveredTypes: null } : {}),
 });
 
 /** A thread as the dock projects it: asks, replies, and the ordinary chat between them. */
@@ -567,5 +575,171 @@ describe("the answer is worded as an answer to the question that was asked", () 
       (["provided", "declined", "unavailable"] as const).map((r) => line(k, r, { docCount: 2 }).label),
     );
     for (const label of all) expect(label.toLowerCase()).not.toContain("machine");
+  });
+});
+
+/* ═════════ `partial` — the third answer, in amber (owner ruling, 2026-08-11, §8) ═════════════════
+ *
+ * > *"Sending something other than what was asked is still an answer. He can upload a missing
+ * > document the renter didn't ask for. The renter is told exactly that: sent Insurance — the TUV
+ * > certificate is still not on file. Amber. Not 'provided', not 'declined'."*
+ *
+ * The renter reads this card, so this file is where the ruling's sentence is pinned — both clauses,
+ * both scripts, and the tone that must never be the green of an answer or the tone of a refusal he
+ * did not make.
+ */
+describe("`partial` — he sent something other than what was asked", () => {
+  const docLabel = (t: string) => requestDocLabel(t, EN);
+  const docLabelAr = (t: string) => requestDocLabel(t, AR);
+
+  it("names what arrived and what is still owed — the owner's own sentence, in English", () => {
+    expect(
+      replyAnswerLine(
+        {
+          kind: "document",
+          resolution: "partial",
+          deliveredTypes: ["insurance"],
+          askedTypes: ["tuv_cert"],
+          docLabel,
+        },
+        EN,
+      ),
+    ).toEqual({
+      tone: "partial",
+      label: "Sent Insurance — the TÜV certificate is still not on file",
+    });
+  });
+
+  it("says the same sentence in Arabic, and calls the counterparty nothing it should not", () => {
+    const { tone, label } = replyAnswerLine(
+      {
+        kind: "document",
+        resolution: "partial",
+        deliveredTypes: ["insurance"],
+        askedTypes: ["tuv_cert"],
+        docLabel: docLabelAr,
+      },
+      AR,
+    );
+    expect(tone).toBe("partial");
+    expect(label).toBe("أرسل التأمين — لا تزال شهادة TÜV غير مرفوعة");
+    // «المؤجّر» is the word this feature does not use.
+    expect(label).not.toContain("المؤجّر");
+  });
+
+  it("handles SEVERAL delivered and SEVERAL still-missing papers, with the verb agreeing", () => {
+    expect(
+      replyAnswerLine(
+        {
+          kind: "document",
+          resolution: "partial",
+          deliveredTypes: ["insurance", "customs"],
+          askedTypes: ["tuv_cert", "spsp_cert"],
+          docLabel,
+        },
+        EN,
+      ).label,
+    ).toBe(
+      "Sent Insurance and Customs card — the TÜV certificate and the SPSP certificate are still not on file",
+    );
+
+    expect(
+      replyAnswerLine(
+        {
+          kind: "document",
+          resolution: "partial",
+          deliveredTypes: ["insurance", "customs"],
+          askedTypes: ["tuv_cert", "spsp_cert"],
+          docLabel: docLabelAr,
+        },
+        AR,
+      ).label,
+    ).toBe("أرسل التأمين والبطاقة الجمركية — لا تزال شهادة TÜV وشهادة SPSP غير مرفوعة");
+  });
+
+  it("counts a paper delivered under the OTHER vocabulary as delivered — `tuv` answers `tuv_cert`", () => {
+    // The listing stores `tuv`; the ask names the catalogue's `tuv_cert`. One TÜV. Comparing them
+    // raw would report a paper as still missing while it sat on the machine — the failure
+    // `documentAskSatisfied` folds through the same table to avoid.
+    expect(stillMissingDocTypes(["tuv_cert", "istimara"], ["tuv"])).toEqual(["istimara"]);
+    expect(stillMissingDocTypes(["tuv_cert"], ["tuv"])).toEqual([]);
+  });
+
+  it("degrades one clause at a time and NEVER falls silent", () => {
+    // He named what he sent, but the ask is not in this window — the bare fallback form.
+    expect(
+      replyAnswerLine({ kind: null, resolution: "partial", deliveredTypes: ["insurance"], docLabel }, EN).label,
+    ).toBe("Sent Insurance — but not everything that was asked for");
+
+    // An older client named nothing at all. Still said, because the alternative is the silence this
+    // ruling replaced.
+    expect(replyAnswerLine({ kind: null, resolution: "partial" }, EN).label).toBe(
+      "He sent something else — what was asked for is still not on file",
+    );
+    expect(replyAnswerLine({ kind: null, resolution: "partial" }, AR).label).toBe(
+      "أرسل شيئًا آخر — ما طُلب لا يزال غير مرفوع",
+    );
+  });
+
+  it("is never worded as an answer and never as a refusal — the one rule that outranks the rest", () => {
+    const labels = (["document", "availability", "alternative", null] as const).map(
+      (kind) =>
+        replyAnswerLine(
+          { kind, resolution: "partial", deliveredTypes: ["insurance"], askedTypes: ["tuv_cert"], docLabel },
+          EN,
+        ).label,
+    );
+    for (const label of labels) {
+      // He refused nothing.
+      expect(label.toLowerCase()).not.toContain("declin");
+      // And he did not answer: the ask is still open underneath.
+      expect(label.toLowerCase()).not.toContain("added the document");
+      expect(label.toLowerCase()).not.toContain("machine");
+    }
+    // Its tone is neither of the other two, on every kind.
+    for (const kind of ["document", "availability", "alternative", null] as const) {
+      expect(replyAnswerLine({ kind, resolution: "partial" }, EN).tone).toBe("partial");
+    }
+  });
+
+  it("folds onto its ask exactly like any other answer, and the ask still reads as open", () => {
+    const ask = posted({ kind: "document", docTypes: ["tuv_cert"] });
+    const partial = reply({ resolution: "partial", deliveredTypes: ["insurance"] });
+
+    // Rule 1 of V12c: the reply's own card is suppressed and the ASK's card carries the answer.
+    const answered = answeredAskRefs(thread({ ask }, {}, { reply: partial }));
+    expect([...answered]).toEqual(["RQ-7F3A"]);
+    expect(replyFoldsIntoAsk(answered, partial)).toBe(true);
+    // …and it is the card the arrival cue points at, like any other answer.
+    expect(latestAnsweredRef(thread({ ask }, { reply: partial }))).toBe("RQ-7F3A");
+
+    const view = requestCardView(
+      postedSubject(ask),
+      ctx({
+        L: EN,
+        // The machine still does NOT hold the TÜV — which is exactly the state a partial describes.
+        machine: () => machine({ documentKeys: [{ type: "insurance" }] }),
+        reply: () => ({ resolution: "partial", deliveredTypes: ["insurance"] }),
+        docLabel,
+      }),
+    );
+    expect(view.status).toEqual({
+      tone: "partial",
+      label: "Sent Insurance — the TÜV certificate is still not on file",
+    });
+  });
+
+  it("stops speaking the moment the file really does carry every paper — derived state still wins", () => {
+    // RM3-AC-58 unchanged: a stale `partial` must not out-shout a machine that now satisfies the ask.
+    const view = requestCardView(
+      postedSubject(posted({ kind: "document", docTypes: ["tuv_cert"] })),
+      ctx({
+        L: EN,
+        machine: () => machine({ documentKeys: [{ type: "insurance" }, { type: "tuv" }] }),
+        reply: () => ({ resolution: "partial", deliveredTypes: ["insurance"] }),
+        docLabel,
+      }),
+    );
+    expect(view.status).toEqual({ tone: "answered", label: "Answered — his file now shows it" });
   });
 });

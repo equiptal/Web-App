@@ -2,7 +2,12 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { mapDealRoom } from "@/lib/contract/deal-room";
-import { requestRepliesByRef, requestThreadCards } from "@/lib/contract/deal-rounds";
+import {
+  buildChatCardView,
+  chatCardOfMessage,
+  requestRepliesByRef,
+  requestThreadCards,
+} from "@/lib/contract/deal-rounds";
 import { mapFleet } from "@/lib/contract/fleet";
 import {
   answeredAskRefs,
@@ -130,7 +135,9 @@ describe("requestThreadCards — ONE projection of a conversation into asks and 
     const byRef = requestRepliesByRef(
       requestThreadCards([msg(reply({ resolution: "declined" }))]),
     );
-    expect(byRef.get("RQ-7F3A")).toEqual({ resolution: "declined" });
+    // `deliveredTypes` rides WITH the resolution (owner ruling, 2026-08-11, §8) — null on every
+    // answer but a `partial` that named papers.
+    expect(byRef.get("RQ-7F3A")).toEqual({ resolution: "declined", deliveredTypes: null });
     expect(byRef.get("RQ-NOPE")).toBeUndefined();
   });
 });
@@ -411,5 +418,99 @@ describe("the dock and the deal room share the derivations rather than copying t
     }
     // The dock's private copy of the document vocabulary is gone.
     expect(CHAT_DOCK).not.toContain("DOC_TYPE_LABELS");
+  });
+});
+
+/* ═════════ `partial` folds and paints like any other answer (owner ruling, 2026-08-11, §8) ════════
+ *
+ * > *"…the renter is told exactly that: sent Insurance — the TUV certificate is still not on file.
+ * > Amber. Not 'provided', not 'declined'."*
+ *
+ * BOTH surfaces render this one channel, so a `partial` that folded on one and not the other would
+ * put two cards about one answer on the map and one in the deal room. The V12c fold is asserted here
+ * for the new resolution, and the amber is read off the two stylesheets that draw it.
+ */
+describe("`partial` — one card, amber, on both surfaces", () => {
+  const docLabel = (t: string) => requestDocLabel(t, L);
+  const asked = ask({ kind: "document", docTypes: ["tuv_cert"] });
+  const partial = reply({ resolution: "partial", deliveredTypes: ["insurance"] });
+
+  it("survives the shared projection and the reply index, carrying its papers", () => {
+    const thread = requestThreadCards([msg(asked), msg(partial)]);
+    expect(requestRepliesByRef(thread).get("RQ-7F3A")).toEqual({
+      resolution: "partial",
+      deliveredTypes: ["insurance"],
+    });
+  });
+
+  it("folds onto its ask exactly as `provided` does — one card, and it is the request's", () => {
+    const thread = requestThreadCards([msg(asked), msg(partial)]);
+    const answered = answeredAskRefs(thread);
+    expect(replyFoldsIntoAsk(answered, partial)).toBe(true);
+    // …and the arrival cue points at it, because it IS news.
+    expect(latestAnsweredRef(thread)).toBe("RQ-7F3A");
+  });
+
+  it("names both clauses on the surviving card, and the ask still reads as unsatisfied underneath", () => {
+    const thread = requestThreadCards([msg(asked), msg(partial)]);
+    const replies = requestRepliesByRef(thread);
+    // The machine holds what he SENT and not what was ASKED — the state a partial describes.
+    const fleet = fleetRow({ documentKeys: [{ type: "insurance" }], locationSource: "listing_yard" });
+
+    const view = requestCardView(postedSubject(asked), {
+      L,
+      machine: fleetMachineResolver(fleet, false),
+      reply: (ref) => replies.get(ref) ?? null,
+      docLabel,
+      fleetKnown: true,
+    });
+
+    expect(view.status).toEqual({
+      tone: "partial",
+      label: "Sent Insurance — the TÜV certificate is still not on file",
+    });
+    // Never the green of an answer, never the words of a refusal.
+    expect(view.status?.tone).not.toBe("answered");
+    expect(view.status?.label.toLowerCase()).not.toContain("declin");
+  });
+
+  it("the bare fallback — a reply whose ask is NOT in the window — still names what arrived", () => {
+    // Rule 3 of V12c: nothing to fold into, so it renders on its own. It can still say the first
+    // clause (it is on the reply) and must not invent the second (the question was never read).
+    const thread = requestThreadCards([msg(partial)]);
+    expect(replyFoldsIntoAsk(answeredAskRefs(thread), partial)).toBe(false);
+
+    const card = chatCardOfMessage(msg(partial))!;
+    const view = buildChatCardView(card, {
+      ar: false, L, terms: [], at: null, responded: false, superseded: false, live: false,
+      requestCtx: { machine: () => null, reply: () => null, docLabel },
+    });
+    const answerRow = view.rows.find((r) => r.label === "Answer");
+    expect(answerRow?.value).toBe("Sent Insurance — but not everything that was asked for");
+  });
+
+  it("paints amber on both stylesheets, and never the success colour", () => {
+    // One channel, one colour. The map's card and the deal room's smaller form must not disagree
+    // about what a partial looks like.
+    expect(RQ_CSS).toContain(".bm-rq-state.is-partial");
+    expect(DL_CSS).toContain(".cc-out-partial");
+    // Neither borrows the green of an answer.
+    const partialRules = [
+      RQ_CSS.slice(RQ_CSS.indexOf(".bm-rq-state.is-partial")).split("\n")[0],
+      DL_CSS.slice(DL_CSS.indexOf(".dlproto .cc-out-partial")).split("\n")[0],
+    ];
+    for (const rule of partialRules) {
+      expect(rule).not.toContain("--success");
+      expect(rule).not.toContain("#16a34a");
+    }
+  });
+
+  it("does not read as a refusal on the dock's arrival bubble", () => {
+    // The bubble's warm «رفض طلبك» tone was written as `resolution !== "provided"`, which would have
+    // swept the new resolution into it and told the renter the supplier refused him when he had just
+    // sent him a document. It is now an allow-list of the two resolutions that really refuse.
+    expect(CHAT_DOCK).toContain('resolution === "declined"');
+    expect(CHAT_DOCK).toContain('resolution === "unavailable"');
+    expect(CHAT_DOCK).not.toContain('reply.resolution !== "provided"');
   });
 });

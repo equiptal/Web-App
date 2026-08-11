@@ -535,10 +535,20 @@ export function ChatDock({
   );
   const noticeKey = notice ? `${notice.bidId}:${notice.reply?.ref ?? notice.unreadCount}` : null;
   const showNotice = notice && noticeKey !== dismissedNotice ? notice : null;
-  /** A refusal is an answer that closes a door — «رفض طلبك» — and it takes the bubble's warm tone.
-   *  `provided` is the only resolution that gave the renter what he asked for; the other two did not,
-   *  and reading them as an ordinary reply is how a "no" gets skimmed past. */
-  const refusal = showNotice?.reply != null && showNotice.reply.resolution !== "provided";
+  /**
+   * A refusal is an answer that closes a door — «رفض طلبك» — and it takes the bubble's warm tone.
+   * `declined` and `unavailable` are the two that close it, and reading them as an ordinary reply is
+   * how a "no" gets skimmed past.
+   *
+   * **`partial` is deliberately NOT one of them** (owner ruling, 2026-08-11, §8: *"Not 'provided',
+   * not 'declined'"*). Written as an allow-list of the two refusals rather than as `!== "provided"`,
+   * which is what it was: that form silently swept the new resolution into «رفض طلبك» and told the
+   * renter the supplier had refused him when the supplier had just sent him a document. The bubble
+   * still RAISES for a partial — it is an answer and it is news — it simply is not a refusal.
+   */
+  const refusal =
+    showNotice?.reply != null &&
+    (showNotice.reply.resolution === "declined" || showNotice.reply.resolution === "unavailable");
 
   /**
    * **What was actually said** (owner, 2026-08-11: the bubble *"never shows what was actually

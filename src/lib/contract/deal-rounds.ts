@@ -284,12 +284,29 @@ export function requestThreadCards(messages: readonly unknown[]): RequestThreadC
  */
 export function requestRepliesByRef(
   thread: readonly RequestThreadCard[],
-): Map<string, { resolution: RenteeRequestResolution }> {
-  const map = new Map<string, { resolution: RenteeRequestResolution }>();
+): Map<string, ReplyStanding> {
+  const map = new Map<string, ReplyStanding>();
   for (const c of thread) {
-    if (c.reply) map.set(c.reply.inReplyTo, { resolution: c.reply.resolution });
+    // `deliveredTypes` travels WITH the resolution, because a `partial` is not fully described by
+    // its name: the line the renter reads names the papers that landed (owner ruling, 2026-08-11,
+    // §8). Plain assignment leaves the LAST reply for a `ref` standing, which is what "the answer
+    // that stands" means — a supplier who sent the wrong paper and has since sent the right one is
+    // read as having sent the right one.
+    if (c.reply) {
+      map.set(c.reply.inReplyTo, {
+        resolution: c.reply.resolution,
+        deliveredTypes: c.reply.deliveredTypes,
+      });
+    }
   }
   return map;
+}
+
+/** The answer that stands on one `ref`, as every surface reads it. */
+export interface ReplyStanding {
+  resolution: RenteeRequestResolution;
+  /** Null when he named no papers — an older client, or any resolution but `partial`. */
+  deliveredTypes: string[] | null;
 }
 
 /**
@@ -424,7 +441,9 @@ export interface ChatCardView {
   /** How the outcome reads — an acceptance is good news, a superseded offer is just history, an
    *  unanswered ask is neither (and must never read as a refusal — RM3-AC-20's rule, applied to the
    *  card). */
-  outcomeTone: "accepted" | "history" | "waiting" | "refused";
+  /** `partial` is the supplier's third answer (owner ruling, 2026-08-11, §8) and carries its own
+   *  amber — never the green of `accepted`, never the red-warm of `refused`. */
+  outcomeTone: "accepted" | "history" | "waiting" | "refused" | "partial";
   /** Material icon for the outcome line, when the tone's default is not specific enough. */
   outcomeIcon: string | null;
 }
@@ -458,8 +477,12 @@ export interface ChatCardCtx {
     /** The machine as the fleet response holds it **right now** — re-read on every render, because
      *  nothing about a request's state is stored (RM3-AC-18). Null when it is not in the response. */
     machine: (equipmentId: string) => (RequestTargetMachine & { label?: string | null }) | null;
-    /** The supplier's answer carrying this `ref`, if he posted one. */
-    reply: (ref: string) => { resolution: "provided" | "declined" | "unavailable" } | null;
+    /** The supplier's answer carrying this `ref`, if he posted one. `deliveredTypes` rides along for
+     *  `partial`, whose line names the papers that landed (owner ruling, 2026-08-11, §8). */
+    reply: (ref: string) => {
+      resolution: RenteeRequestResolution;
+      deliveredTypes?: readonly string[] | null;
+    } | null;
     /*
      * A `company: () => RequestTargetCompany | null` resolver lived here, for a company-scope document
      * ask. That ask is withdrawn (product owner, 2026-08-08): a document request names a machine, and a
@@ -597,7 +620,21 @@ export function buildChatCardView(card: ChatCard, ctx: ChatCardCtx): ChatCardVie
           { label: L("Reference", "المرجع"), value: card.reply.inReplyTo, ltr: true },
           {
             label: L("Answer", "الردّ"),
-            value: replyAnswerLine({ kind: null, resolution: card.reply.resolution }, L).label,
+            value: replyAnswerLine(
+              {
+                kind: null,
+                resolution: card.reply.resolution,
+                /* A `partial` still NAMES what arrived here (owner ruling, 2026-08-11, §8) — that
+                   half comes off the reply itself and needs no ask. What is still missing does need
+                   one, and there is none in this window by definition, so `askedTypes` stays absent
+                   and the line degrades to *"…— but not everything that was asked for"*. Naming a
+                   paper as missing off an unread question would be the same guess this branch
+                   already refuses to make about the equipment. */
+                deliveredTypes: card.reply.deliveredTypes,
+                docLabel: ctx.requestCtx?.docLabel,
+              },
+              L,
+            ).label,
           },
         ],
       };
@@ -658,6 +695,29 @@ function renteeRequestCardView(
         return { text: L("He declined", "اعتذر المورّد"), tone: "refused", icon: "do_not_disturb_on" };
       case "unavailable":
         return { text: L("He answered: not available", "ردّ: غير متوفّرة"), tone: "refused", icon: "do_not_disturb_on" };
+      /* ── `partial` — amber, and named (owner ruling, 2026-08-11, §8) ──────────────────────────
+         This is the SMALLER of the two renderings of an ask — the one drawn where no fleet is in
+         hand — so it words the same sentence `replyAnswerLine` words on the full card, from the same
+         table, with the same two lists. Two wordings of one answer is precisely what V12c withdrew a
+         whole card to stop.
+
+         Its own tone, never `accepted` and never `refused`: he did not answer, and he did not
+         refuse. The glyph says "part of it", not a cross. */
+      case "partial":
+        return {
+          text: replyAnswerLine(
+            {
+              kind: payload.kind,
+              resolution: "partial",
+              deliveredTypes: ctx.requestCtx?.reply(payload.ref)?.deliveredTypes ?? null,
+              askedTypes: payload.docTypes,
+              docLabel: ctx.requestCtx?.docLabel,
+            },
+            L,
+          ).label,
+          tone: "partial",
+          icon: "incomplete_circle",
+        };
       case "unknown":
         // Not in the fleet response — we cannot check, so we neither claim he owes an answer nor
         // strike the card through as history (`.cc-out-history` does exactly that to a superseded

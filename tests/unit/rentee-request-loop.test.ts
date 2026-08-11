@@ -11,6 +11,7 @@ import {
   parseRenteeRequestCard,
   parseRenteeRequestReply,
   renteeRequestState,
+  stillMissingDocTypes,
   type RenteeRequestCardPayload,
   type RequestTargetMachine,
 } from "@/lib/contract/rentee-request";
@@ -299,5 +300,119 @@ describe("a document ask cannot be composed without a machine (2026-08-08)", () 
     expect(renteeRequestState(legacy, null, null)).toBe("waiting");
     expect(renteeRequestState(legacy, null, { resolution: "provided" })).toBe("answered");
     expect(renteeRequestState(legacy, null, { resolution: "declined" })).toBe("refused");
+  });
+});
+
+/* ─────────── `partial` — the third answer, read back (owner ruling, 2026-08-11, §8) ─────────── */
+
+/**
+ * > *"Sending something other than what was asked is still an answer. He can upload a missing
+ * > document the renter didn't ask for. The renter is told exactly that: sent Insurance — the TUV
+ * > certificate is still not on file. Amber. Not 'provided', not 'declined'."*
+ *
+ * The derivation half. The wording is pinned in `request-card.test.ts`; what is pinned HERE is that
+ * `partial` parses, that it is its own verdict rather than a shade of `answered`, and — the part the
+ * whole ruling rests on — that **the ask still reads as open underneath it**.
+ */
+describe("`partial` — an answer that does not answer the ask", () => {
+  it("parses, and carries the papers that landed", () => {
+    const parsed = parseRenteeRequestReply({
+      type: "rentee_request_reply",
+      inReplyTo: "RQ-01",
+      resolution: "partial",
+      deliveredTypes: ["insurance"],
+    });
+    expect(parsed?.resolution).toBe("partial");
+    expect(parsed?.deliveredTypes).toEqual(["insurance"]);
+  });
+
+  it("parses from a client too old to name any — absent, empty and blank are ONE case", () => {
+    // The clients ship independently. A `partial` that names nothing must still render, or the
+    // renter is back to the silence this ruling replaced.
+    for (const over of [{}, { deliveredTypes: [] }, { deliveredTypes: ["  "] }, { deliveredTypes: "no" }]) {
+      const parsed = parseRenteeRequestReply({
+        type: "rentee_request_reply",
+        inReplyTo: "RQ-01",
+        resolution: "partial",
+        ...over,
+      });
+      expect(parsed?.resolution).toBe("partial");
+      expect(parsed?.deliveredTypes).toBeNull();
+    }
+  });
+
+  it("reads the mobile client's `providedDocTypes` under the same field, while the two names reconcile", () => {
+    expect(
+      parseRenteeRequestReply({
+        type: "rentee_request_reply",
+        inReplyTo: "RQ-01",
+        resolution: "partial",
+        providedDocTypes: ["insurance"],
+      })?.deliveredTypes,
+    ).toEqual(["insurance"]);
+  });
+
+  it("is its OWN verdict — never `answered`, never `refused`", () => {
+    const card = ask({ kind: "document", docTypes: ["tuv"] });
+    // The file holds the insurance he sent and NOT the TÜV that was asked for, which is exactly the
+    // state a partial describes.
+    const state = renteeRequestState(card, machine({ documentKeys: [{ type: "insurance" }] }), {
+      resolution: "partial",
+    });
+    expect(state).toBe("partial");
+  });
+
+  it("leaves the ask OPEN — the machine still decides, and it still says no", () => {
+    // The rule the backend enforces as `ASK_CLOSING_RESOLUTIONS` and the renter's card must agree
+    // with: a partial answer does not satisfy the question. If this read `answered`, the renter would
+    // stop expecting the paper he is still owed.
+    const card = ask({ kind: "document", docTypes: ["tuv"] });
+    expect(documentAskSatisfied(machine({ documentKeys: [{ type: "insurance" }] }), ["tuv"])).toBe(false);
+    expect(renteeRequestState(card, machine({ documentKeys: [{ type: "insurance" }] }), { resolution: "partial" }))
+      .not.toBe("answered");
+  });
+
+  it("stops speaking the moment the file really does satisfy the ask — derived state still wins", () => {
+    // The stale partial is not promoted and is not preserved: `satisfied` is checked first, so the
+    // card reads `answered` the moment the TÜV lands. RM3-AC-58, unchanged by the ruling.
+    const card = ask({ kind: "document", docTypes: ["tuv"] });
+    expect(
+      renteeRequestState(card, machine({ documentKeys: [{ type: "insurance" }, { type: "tuv" }] }), {
+        resolution: "partial",
+      }),
+    ).toBe("answered");
+  });
+
+  it("is NOT downgraded to waiting the way an uncorroborated `provided` is", () => {
+    // A `provided` the file contradicts is a claim, so it is downgraded and the renter reads
+    // «بانتظار ردّه». A `partial` claims nothing the file contradicts — it says he sent something
+    // ELSE — so downgrading it would delete the news, which is the whole thing the ruling added.
+    const card = ask({ kind: "document", docTypes: ["tuv"] });
+    const file = machine({ documentKeys: [{ type: "insurance" }] });
+    expect(renteeRequestState(card, file, { resolution: "provided" })).toBe("waiting");
+    expect(renteeRequestState(card, file, { resolution: "partial" })).toBe("partial");
+  });
+
+  it("answers an `alternative` too, where nothing is derivable at all", () => {
+    expect(renteeRequestState(ask({ kind: "alternative" }), machine(), { resolution: "partial" })).toBe("partial");
+  });
+});
+
+describe("stillMissingDocTypes — what is owed, re-derived rather than stored", () => {
+  it("subtracts what landed from what was asked, in the ASK's own spelling", () => {
+    expect(stillMissingDocTypes(["tuv_cert", "istimara"], ["insurance"])).toEqual(["tuv_cert", "istimara"]);
+    expect(stillMissingDocTypes(["tuv_cert", "istimara"], ["istimara"])).toEqual(["tuv_cert"]);
+  });
+
+  it("folds the two vocabularies, so a paper on file is never reported as missing", () => {
+    // The listing stores `tuv`; the catalogue — and therefore the ask — says `tuv_cert`. One TÜV.
+    expect(stillMissingDocTypes(["tuv_cert"], ["tuv"])).toEqual([]);
+    expect(stillMissingDocTypes(["customs_card"], ["custom_card"])).toEqual([]);
+  });
+
+  it("is total on the absent cases — an older client, an ask nobody read", () => {
+    expect(stillMissingDocTypes(null, ["insurance"])).toEqual([]);
+    expect(stillMissingDocTypes(["tuv_cert"], null)).toEqual(["tuv_cert"]);
+    expect(stillMissingDocTypes(undefined, undefined)).toEqual([]);
   });
 });
