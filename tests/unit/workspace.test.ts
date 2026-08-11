@@ -9,10 +9,11 @@ import {
   selectedGroup,
   selectedItem,
   sourceCounts,
+  termsDial,
   type WorkspaceBid,
 } from "@/lib/contract/workspace";
 import type { RequestGroup, RequestListItem, RequestStatus } from "@/lib/contract/requests";
-import type { BidCard } from "@/lib/contract/bids";
+import type { BidCard, TermRow, TermState } from "@/lib/contract/bids";
 
 function item(id: string, status: RequestStatus = "OPEN", qty = 1, imageUrl: string | null = null): RequestListItem {
   return {
@@ -152,6 +153,47 @@ describe("selectedGroup / selectedItem", () => {
   it("returns null for a selection pointing nowhere", () => {
     expect(selectedGroup(groups, EMPTY_SELECTION)).toBeNull();
     expect(selectedItem(groups, EMPTY_SELECTION)).toBeNull();
+  });
+});
+
+describe("termsDial", () => {
+  const row = (key: string, state: TermState): TermRow => ({ key, labelEn: key, labelAr: key, state });
+  // Only the two fields the dial reads; the rest of a BidCard is irrelevant here.
+  const withTerms = (rows: TermRow[], negotiable: TermRow[] = []): BidCard =>
+    ({ terms: { equipment: rows, contract: [], supplier: [] }, negotiableTerms: negotiable }) as unknown as BidCard;
+
+  it("splits an app bid into met, against and unanswered", () => {
+    const bid = withTerms([
+      row("operator", "matched"),
+      row("payment_terms", "conflict"),
+      row("overtime_rate", "negotiating"),
+    ]);
+    expect(termsDial(bid, "app")).toEqual({ met: 1, against: 1, unanswered: 1, total: 3 });
+  });
+
+  it("counts an agreed term as met, since it is settled", () => {
+    expect(termsDial(withTerms([row("operator", "agreed")]), "app").met).toBe(1);
+  });
+
+  it("leaves an off-platform bid nothing unanswered — a form answer is final", () => {
+    // 'grey' is unanswered and is dropped for off-platform; the two answers are all that remain.
+    const bid = withTerms([
+      row("safety_certifications", "matched"),
+      row("fuel_responsibility", "conflict"),
+      row("payment_terms", "grey"),
+    ]);
+    expect(termsDial(bid, "offline")).toEqual({ met: 1, against: 1, unanswered: 0, total: 2 });
+  });
+
+  it("counts every answered term off-platform, not only the app's six", () => {
+    const bid = withTerms([row("delivery_window", "matched"), row("insurance_cover", "matched")]);
+    // Neither key is one of the app's negotiable six, so the app reading sees nothing at all.
+    expect(termsDial(bid, "offline").total).toBe(2);
+    expect(termsDial(bid, "app").total).toBe(0);
+  });
+
+  it("reports an empty dial rather than a full one when there are no terms", () => {
+    expect(termsDial(withTerms([]), "app")).toEqual({ met: 0, against: 0, unanswered: 0, total: 0 });
   });
 });
 

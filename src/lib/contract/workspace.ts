@@ -9,7 +9,7 @@
  * **NO React, NO DOM, NO i18n.**
  */
 
-import type { BidCard } from "./bids";
+import { bucketBidTerms, type BidCard } from "./bids";
 import type { RequestGroup, RequestListItem } from "./requests";
 
 /** Where a bid came from. The filter above the tabs switches between these. */
@@ -114,6 +114,37 @@ export function selectedGroup(groups: RequestGroup[], sel: WorkspaceSelection): 
 /** The bids the source filter admits, in the order they were loaded. */
 export function filterBySource(bids: WorkspaceBid[], filter: SourceFilter): WorkspaceBid[] {
   return filter === "all" ? bids : bids.filter((b) => b.source === filter);
+}
+
+/** The dial beside `Terms` on a bid card: how much of the terms this supplier answered. */
+export interface TermsDial {
+  /** Answered the way the request asked, or since agreed. */
+  met: number;
+  /** Answered, but against what was asked. */
+  against: number;
+  /** Not answered — the renter is still waiting on it. */
+  unanswered: number;
+  total: number;
+}
+
+/**
+ * Read the dial off a bid's terms.
+ *
+ * The two sources are counted differently, and deliberately — this mirrors what the shipped cards
+ * already do rather than inventing a third rule. An **app** bid is measured against the six
+ * negotiable terms the app itself tracks, where an unanswered one is a real gap the renter can chase.
+ * An **off-platform** bid has no negotiation, so it is measured against every required term the
+ * supplier actually answered on the form — which is why nothing there lands in `unanswered`.
+ *
+ * This is a measure of how completely the supplier answered, and never of how good the offer is;
+ * bid quality is `QualityRing`, a different thing on a different scale.
+ */
+export function termsDial(bid: BidCard, source: BidSource): TermsDial {
+  const { counts } = bucketBidTerms(bid.terms, bid.negotiableTerms, source === "offline" ? { all: true } : undefined);
+  const met = counts.matched;
+  const against = counts.conflict;
+  const unanswered = counts.pending;
+  return { met, against, unanswered, total: met + against + unanswered };
 }
 
 /** How many bids each filter position would show — the counts beside the filter. */
