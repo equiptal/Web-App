@@ -1093,7 +1093,11 @@ export const en = {
     // arrival. The price is still settled in exactly one place (004a §4a.2) — this only removes the
     // second press that used to stand between the renter and the sheet he had already asked for.
     counterPrice: "Counter this price",
-    confirmPrice: "Approve",
+    // "Accept", not "Approve" (owner, 2026-08-11). The Arabic keeps the app's «اعتمد», but in
+    // English this button and the deal room's own are one act reached from two surfaces, and the
+    // room says Accept. A renter who pressed "Approve" and landed on a sheet headed "Accept" would
+    // have had to work out that they are the same thing.
+    confirmPrice: "Accept",
     // The one place the offered and the agreed count are reconciled (RM3-AC-66).
     unitsDiffer: "Priced on {agreed} agreed units — the offer was made of {offered}.",
     rental: "Rental",
