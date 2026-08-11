@@ -441,15 +441,53 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
        to come off the Stream author, exactly as the plain bubbles below it already take theirs. */
     const stream = dockSrc.slice(dockSrc.indexOf("messages.map((m) => {"), dockSrc.indexOf("<div ref={bottomRef} />"));
     expect(stream).toContain("const mine = myStreamId != null && m.user?.id === myStreamId;");
-    /* All THREE card wrappers are driven by that one reading, and none states a side literally.
-       The third arrived with the owner's next ruling the same day — *"the supplier response must
-       arrive in the same format of the sent card but with supplier answer"* — which renders a reply
-       through `RequestCard` when the ask it answers is in the window, and leaves the bare `ChatCard`
-       wrapper for when it is not. Both of those are the supplier's message and take his side the
-       same way. */
-    expect(stream.match(/bm-chat-card \$\{mine \? "is-mine" : "is-them"\}/g) ?? []).toHaveLength(3);
+    /* BOTH card wrappers are driven by that one reading, and neither states a side literally: the
+       renter's request card, and the bare form an unfoldable reply keeps.
+
+       There were THREE until the owner's evening ruling of the same day (V12c) — *"make it one card
+       for request and show his answer"* — which withdrew the second full card a reply used to draw
+       through `RequestCard` (`replyCardView`). Its wrapper went with it. What did NOT change is this
+       rule: a card takes its author's side, so the surviving card sits on the renter's edge here and
+       on the other edge from the supplier's chair, with nothing hardcoded either way. */
+    expect(stream.match(/bm-chat-card \$\{mine \? "is-mine" : "is-them"\}/g) ?? []).toHaveLength(2);
     expect(stream).not.toContain('className="bm-chat-card is-mine"');
     expect(stream).not.toContain('className="bm-chat-card is-them"');
+  });
+
+  it("draws ONE card per request, and keeps the unfoldable answer rendering", () => {
+    /* Owner, 2026-08-11 (evening, superseding that morning's ruling): *"why the cards each one on
+       different side… make it one card for request and show his answer"*.
+
+       The two cards were the ask and a second full card built for the reply — on opposite edges,
+       because each takes its own author's side, and both stating the answer in different words. The
+       request's card carries the answer now (through `cardCtx.reply`, worded by `replyAnswerLine`),
+       and the reply's card is suppressed. */
+    const stream = dockSrc.slice(dockSrc.indexOf("messages.map((m) => {"), dockSrc.indexOf("<div ref={bottomRef} />"));
+    // Not imported and not called — the withdrawn function is named only in the comment that records
+    // why it is gone.
+    expect(dockSrc).not.toMatch(/^\s*replyCardView,$/m);
+    expect(dockSrc).not.toContain("replyCardView(");
+    expect(stream).toContain("replyFoldsIntoAsk(answeredRefs, card.reply)");
+    /* …and ONLY when the fold has somewhere to go. A reply whose ask is not in the loaded window has
+       nothing carrying its answer, so it must fall through to the bare `ChatCard` form below rather
+       than disappearing — the fold is a suppression, never a deletion. */
+    expect(stream.indexOf("replyFoldsIntoAsk")).toBeLessThan(stream.indexOf("if (card) {"));
+    expect(stream).toContain("if (card) {");
+  });
+
+  it("cues the card the answer folded into — finite, and not on every poll", () => {
+    // *"light plumbing or something to show the answer when opening the chat"*. The answer lands in
+    // the card of the QUESTION, which may be far above the newest message.
+    expect(dockSrc).toContain("cue={cuedRef != null && cuedRef === card.card.ref}");
+    // Keyed on a stable string, so a `message.new` or a refresh that leaves the same last answer in
+    // place restarts nothing…
+    expect(dockSrc).toContain("latestAnsweredRef(threadCards)");
+    expect(dockSrc).toMatch(/\}, \[open, cueRef\]\);/);
+    // …and `open` is a term of the rule because this dock stays mounted while SHUT (it watches the
+    // anchor's room), so a cue started then would burn itself behind a closed drawer.
+    expect(dockSrc).toMatch(/setTimeout\(\(\) => setCuedRef\(null\), ANSWER_CUE_MS\)/);
+    // It takes its own class back off. Nothing here loops.
+    expect(dockSrc).toContain("clearTimeout(timer)");
   });
 
   it("gives an attachment a way to be KEPT, through the deal room's own save", () => {

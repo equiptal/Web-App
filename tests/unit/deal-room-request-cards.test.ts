@@ -4,7 +4,15 @@ import { resolve } from "node:path";
 import { mapDealRoom } from "@/lib/contract/deal-room";
 import { requestRepliesByRef, requestThreadCards } from "@/lib/contract/deal-rounds";
 import { mapFleet } from "@/lib/contract/fleet";
-import { postedSubject, replyCardView, requestCardView, requestDocLabel } from "@/lib/contract/request-card";
+import {
+  answeredAskRefs,
+  askAnsweredBy,
+  latestAnsweredRef,
+  postedSubject,
+  replyFoldsIntoAsk,
+  requestCardView,
+  requestDocLabel,
+} from "@/lib/contract/request-card";
 import type { RenteeRequestCardPayload, RenteeRequestReplyPayload } from "@/lib/contract/rentee-request";
 import { fleetMachineResolver, fleetRequestMachine } from "@/components/map/request-card-ctx";
 
@@ -114,8 +122,8 @@ describe("requestThreadCards — ONE projection of a conversation into asks and 
       msg(reply()),
       msg(ask()),
     ]);
-    // `replyCardView` searches the whole window rather than scanning backwards from the reply.
-    expect(replyCardView(backwards, reply(), { L, machine: () => null, reply: () => null })).not.toBeNull();
+    // The pairing searches the whole window rather than scanning backwards from the reply.
+    expect(askAnsweredBy(backwards, reply())?.ref).toBe("RQ-7F3A");
   });
 
   it("indexes the answers by reference off that same projection", () => {
@@ -187,22 +195,45 @@ describe("the status row, and the three things this route can honestly say", () 
     expect(view.status?.label).toContain("isn't in his current list");
   });
 
-  it("renders the supplier's answer in the card of the ask it answers", () => {
-    const thread = requestThreadCards([
-      msg(ask()),
-      msg(reply({ resolution: "declined" })),
-    ]);
-    const view = replyCardView(thread, reply({ resolution: "declined" }), ctx({ fleetKnown: true }))!;
-    // Same tile, same title, same reference as the ask above it — only the status row differs.
+  /* ── V12c · ONE card per request on this surface too (owner, 2026-08-11, evening) ────────────────
+     *"make it one card for request and show his answer"*, superseding this morning's *"the supplier
+     response must arrive in the same format of the sent card"*. The deal room and the map's dock read
+     the same channel from the two chairs, so they must fold it identically — which is why the fold is
+     a contract-layer function and is asserted here as well as in `request-card.test.ts`. */
+
+  it("puts the supplier's answer in the card of the ask, and gives it no card of its own", () => {
+    const thread = requestThreadCards([msg(ask()), msg(reply({ resolution: "declined" }))]);
+    const answered = answeredAskRefs(thread);
+    // The reply's own card is suppressed — the ask above is already saying this.
+    expect(replyFoldsIntoAsk(answered, reply({ resolution: "declined" }))).toBe(true);
+
+    const view = requestCardView(
+      postedSubject(ask()),
+      ctx({
+        fleetKnown: true,
+        // A yard the ask was never satisfied by, so the file has not overtaken what he said — that
+        // precedence rule is RM3-AC-58's, and it has its own tests in `request-card.test.ts`.
+        machine: fleetMachineResolver(fleetRow({ locationSource: "listing_yard" }), false),
+        reply: () => ({ resolution: "declined" }),
+      }),
+    );
     expect(view.title).toBe("Cat 320D · Crawler excavator");
     expect(view.ref).toBe("RQ-7F3A");
     expect(view.status?.tone).toBe("refused");
+    // The SPECIFIC wording, not the generic «He declined» the ask card used to derive on its own.
     expect(view.status?.label).toBe("He declined to confirm availability");
   });
 
   it("falls back to the bare form when the ask is not in the loaded window", () => {
-    // An older page, a partial read. Naming an equipment nobody read would be a guess.
-    expect(replyCardView([], reply(), ctx({ fleetKnown: true }))).toBeNull();
+    // An older page, a partial read. Naming an equipment nobody read would be a guess — and deleting
+    // the answer along with its card would be worse, so it is NOT folded.
+    expect(replyFoldsIntoAsk(answeredAskRefs(requestThreadCards([msg(reply())])), reply())).toBe(false);
+    expect(replyFoldsIntoAsk(answeredAskRefs([]), reply())).toBe(false);
+  });
+
+  it("cues the card the newest answer landed in, and nothing when none has", () => {
+    expect(latestAnsweredRef(requestThreadCards([msg(ask()), msg(reply())]))).toBe("RQ-7F3A");
+    expect(latestAnsweredRef(requestThreadCards([msg(ask())]))).toBeNull();
   });
 });
 
@@ -278,10 +309,22 @@ describe("the deal room's fleet fetch — once, non-blocking, and harmless when 
 });
 
 describe("both card types render through RequestCard, sided by their author", () => {
-  it("renders the ask and the resolved reply as the full card", () => {
+  it("renders the request as the full card, and folds the answer into it", () => {
     expect(DEAL_ROOM).toContain("requestCardView(postedSubject(card.card), cardCtx)");
-    expect(DEAL_ROOM).toContain("replyCardView(threadCards, card.reply, cardCtx)");
     expect(DEAL_ROOM).toMatch(/<RequestCard[\s\S]{0,200}view=\{requestCardView/);
+    /* V12c (owner, 2026-08-11, evening): the reply's SECOND full card is gone — `replyCardView` was
+       what built it and is withdrawn — and the reply is suppressed only where its ask is on screen
+       carrying the answer. The bare fallback below is untouched. */
+    expect(DEAL_ROOM).not.toContain("replyCardView");
+    expect(DEAL_ROOM).toContain("replyFoldsIntoAsk(answeredRefs, card.reply)");
+  });
+
+  it("carries the finite arrival cue on the card the answer folded into", () => {
+    // Owner, 2026-08-11: *"light plumbing or something to show the answer when opening the chat"*.
+    expect(DEAL_ROOM).toContain("cue={cuedRef != null && cuedRef === card.card.ref}");
+    // Keyed on a STABLE ref, so the room's 15s poll cannot restart it; and it takes itself off.
+    expect(DEAL_ROOM).toContain("latestAnsweredRef(threadCards)");
+    expect(DEAL_ROOM).toMatch(/setTimeout\(\(\) => setCuedRef\(null\), ANSWER_CUE_MS\)/);
   });
 
   it("reads the side off the Stream AUTHOR, never off the card's type", () => {
@@ -312,6 +355,21 @@ describe("the card's chrome reaches a surface that is not the map", () => {
     // The positive control above proves the file holds the real rules; this is the point of moving
     // it. Comments are stripped first — the header EXPLAINS the move in the words the rule forbids.
     expect(RQ_CSS.replace(/\/\*[\s\S]*?\*\//g, " ")).not.toContain(".bidmap");
+  });
+
+  it("draws the answer's arrival cue as a FINITE ring, and stills it for reduced motion", () => {
+    // V6's rule, on a smaller cue: it ENDS. A ring that loops is decoration the renter learns to
+    // ignore — and this one sits on a card he keeps re-reading.
+    expect(RQ_CSS).toContain(".bm-rq.is-cued { animation: bmRqAnswer 1.6s ease-out 3 both; }");
+    expect(RQ_CSS).not.toMatch(/animation:[^;]*infinite/);
+    // Nothing animated but the shadow — a card mid-cue cannot appear to move or reflow the thread.
+    const keyframes = RQ_CSS.match(/@keyframes bmRqAnswer \{[\s\S]*?\n\}/)![0];
+    expect(keyframes).toMatch(/box-shadow/);
+    expect(keyframes).not.toMatch(/transform|width|margin|border/);
+    const reduced = RQ_CSS.slice(RQ_CSS.indexOf("@media (prefers-reduced-motion: reduce)"));
+    expect(reduced).toContain("animation: none");
+    // …and still FINDABLE without motion: a still ring, on the surface's own timer.
+    expect(reduced).toContain("0 0 0 3px rgba(37, 99, 235, 0.24)");
   });
 
   it("mirrors the chevron under RTL without depending on the map's root", () => {

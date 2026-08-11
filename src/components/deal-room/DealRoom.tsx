@@ -11,7 +11,7 @@ import { computeDealTotals, buildDealRoomQuotationDoc, quotationLinkKind, type D
 import { reconstructRounds, collapseRounds, latestRoundBy, withOpeningRound, chatCardOfMessage, chatCardTime, buildChatCardView, requestRepliesByRef, requestThreadCards, respondedProposalIds, latestProposalId, type DealRound } from "@/lib/contract/deal-rounds";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import { RENTEE_REQUEST_CARD_TYPE, RENTEE_REQUEST_REPLY_CARD_TYPE } from "@/lib/contract/rentee-request";
-import { postedSubject, replyCardView, requestCardView, requestDocLabel, type RequestCardCtx } from "@/lib/contract/request-card";
+import { ANSWER_CUE_MS, answeredAskRefs, latestAnsweredRef, postedSubject, replyFoldsIntoAsk, requestCardView, requestDocLabel, type RequestCardCtx } from "@/lib/contract/request-card";
 import { valText, type ResolutionsMap } from "@/components/deal-room/DealRoomTerms";
 import { ChatCard } from "@/components/deal-room/ChatCard";
 import { RequestCard } from "@/components/map/RequestCard";
@@ -558,6 +558,30 @@ export function DealRoom({ id, onTitle, initialFlow }: {
   const repliesByRef = useMemo(() => requestRepliesByRef(threadCards), [threadCards]);
   const machineOf = useMemo(() => fleetMachineResolver(fleet, ar), [fleet, ar]);
 
+  /* ── V12c · ONE card per request, and the light cue on it (owner, 2026-08-11) ───────────────────
+     *"make it one card for request and show his answer, but light plumbing or something to show the
+     answer when opening the chat"*. Both halves are decided in the contract layer and are therefore
+     the SAME fold the map's dock performs — the supplier reads this conversation from the other chair
+     and must not see a different number of cards in it.
+
+     `answeredRefs` suppresses the reply whose ask is on screen carrying the answer; `cueRef` names the
+     card that answer landed in. The cue is finite (`ANSWER_CUE_MS`) and cannot re-fire on the room's
+     15s poll: `latestAnsweredRef` returns the same string for the same conversation, so the effect
+     does not re-run. It DOES fire on arriving at the route, which is this surface's "opening the
+     chat". */
+  const answeredRefs = useMemo(() => answeredAskRefs(threadCards), [threadCards]);
+  const cueRef = useMemo(() => latestAnsweredRef(threadCards), [threadCards]);
+  const [cuedRef, setCuedRef] = useState<string | null>(null);
+  useEffect(() => {
+    if (!cueRef) {
+      setCuedRef(null);
+      return;
+    }
+    setCuedRef(cueRef);
+    const timer = window.setTimeout(() => setCuedRef(null), ANSWER_CUE_MS);
+    return () => window.clearTimeout(timer);
+  }, [cueRef]);
+
   const cardCtx: RequestCardCtx = useMemo(
     () => ({
       L,
@@ -865,29 +889,27 @@ export function DealRoom({ id, onTitle, initialFlow }: {
                     view={requestCardView(postedSubject(card.card), cardCtx)}
                     // The SAME clock face every other card in this thread carries (AC-16).
                     at={chatCardTime(m.created_at, ar)}
+                    // The answer folds into THIS card (V12c), wherever in the thread the question was
+                    // asked — so this is the card that points at itself when the answer is new.
+                    cue={cuedRef != null && cuedRef === card.card.ref}
                   />
                 </div>
               );
             }
-            /* ── The supplier's ANSWER, in the card of the ask it answers ──────────────────────────
-               *"the supplier response must arrive in the same format of the sent card but with
-               supplier answer."* The reply payload carries only `inReplyTo` and a resolution (§7.3),
-               so the header is resolved FROM the thread: `replyCardView` finds the ask carrying that
-               reference among the loaded messages and builds its view with `requestCardView`, then
-               replaces the waiting state with what he answered.
+            /* ── The supplier's ANSWER has no card of its own (owner, 2026-08-11) ──────────────────
+               *"make it one card for request and show his answer"* — which SUPERSEDES this morning's
+               *"the supplier response must arrive in the same format of the sent card"*. That ruling
+               drew the ask's card a second time under the reply (`replyCardView`, now withdrawn), and
+               because each card takes its own author's side the pair sat on opposite edges of the
+               column both stating the answer in different words. The ask's card carries it now, in the
+               reply's own kind-specific wording.
 
-               Null means the ask is not in the loaded window — an older page, a partial channel read
-               — and the render falls through to the bare `ChatCard` below rather than naming an
+               The fallback survives and is why this suppresses rather than deletes: a reply whose ask
+               is NOT in the loaded window — an older page, a partial channel read — falls through to
+               the bare `ChatCard` below, which states the reference and the answer and names no
                equipment nobody read. */
-            if (card?.type === RENTEE_REQUEST_REPLY_CARD_TYPE) {
-              const answered = replyCardView(threadCards, card.reply, cardCtx);
-              if (answered) {
-                return (
-                  <div key={m.id} className={`dl-rq-card ${cardMine ? "is-mine" : "is-them"}`}>
-                    <RequestCard view={answered} at={chatCardTime(m.created_at, ar)} />
-                  </div>
-                );
-              }
+            if (card?.type === RENTEE_REQUEST_REPLY_CARD_TYPE && replyFoldsIntoAsk(answeredRefs, card.reply)) {
+              return null;
             }
             if (card) {
               const view = buildChatCardView(card, {

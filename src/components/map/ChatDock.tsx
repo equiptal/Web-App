@@ -94,9 +94,12 @@ import {
   type RenteeRequestDraft,
 } from "@/lib/contract/rentee-request";
 import {
+  ANSWER_CUE_MS,
+  answeredAskRefs,
   draftSubject,
+  latestAnsweredRef,
   postedSubject,
-  replyCardView,
+  replyFoldsIntoAsk,
   requestCardView,
   requestDocLabel,
   type RequestCardCtx,
@@ -411,6 +414,39 @@ export function ChatDock({
   /** `ref` → the supplier's answer, off the SAME projection — so the reply a card consults and the
    *  reply the card renders can never be two different readings of one channel. */
   const repliesByRef = useMemo(() => requestRepliesByRef(threadCards), [threadCards]);
+
+  /* ── V12c · ONE card per request (owner, 2026-08-11) ────────────────────────────────────────────
+     *"make it one card for request and show his answer"*. The refs whose ask AND answer are both in
+     this window: the ask card carries the answer (through `cardCtx.reply` below), and the reply's own
+     card is suppressed in the stream. Decided in the contract layer so `/deal-room/[id]` folds the
+     same channel the same way — see the V12c section of `request-card.ts`. */
+  const answeredRefs = useMemo(() => answeredAskRefs(threadCards), [threadCards]);
+
+  /* ── …and the light cue that points at it ───────────────────────────────────────────────────────
+     *"light plumbing or something to show the answer when opening the chat"*. Folding the answer into
+     the question's card puts it wherever the question was asked, which may be well above the newest
+     message.
+
+     `latestAnsweredRef` is a stable STRING, and that is what keeps this from firing twice: a poll or a
+     `message.new` that leaves the same last answer in place recomputes the same value, the effect does
+     not re-run, and no timer restarts. It fires on a NEW answer, and on the dock being opened — the
+     moment the owner named — because that is when the thread is read. `open` is a term of the rule for
+     the same reason: this dock stays mounted while shut (it watches the anchor's room), so a cue
+     started then would burn its five seconds behind a closed drawer. */
+  const cueRef = useMemo(() => latestAnsweredRef(threadCards), [threadCards]);
+  const [cuedRef, setCuedRef] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open || !cueRef) {
+      // Also the tab switch: a sibling conversation's answer is not this one's.
+      setCuedRef(null);
+      return;
+    }
+    setCuedRef(cueRef);
+    // FINITE (the keyframes stop themselves after three iterations). This is what takes the class back
+    // off, so an unrelated re-render cannot restart the animation.
+    const timer = window.setTimeout(() => setCuedRef(null), ANSWER_CUE_MS);
+    return () => window.clearTimeout(timer);
+  }, [open, cueRef]);
 
   const outstandingAsks = useMemo(() => outstandingAskIdentities(threadCards), [threadCards]);
 
@@ -791,37 +827,32 @@ export function ChatDock({
                         openLabel={t.chatDock.openMachine}
                         // The SAME formatter `ChatCard` prints — one clock face in one thread (AC-16).
                         at={chatCardTime(m.created_at, ar)}
+                        // The answer landed HERE rather than at the foot of the thread, so this is the
+                        // card that has to announce itself (V12c). Finite, and off by itself.
+                        cue={cuedRef != null && cuedRef === card.card.ref}
                       />
                     </div>
                   );
                 }
-                /* ── The ANSWER, in the card of the ask it answers (owner, 2026-08-11) ────────────
-                   *"the supplier response must arrive in the same format of the sent card but with
-                   supplier answer."*
+                /* ── The ANSWER has no card of its own (owner, 2026-08-11) ───────────────────────
+                   *"why the cards each one on different side… make it one card for request and show
+                   his answer."*
 
-                   The reply payload carries only `inReplyTo` and a resolution, so the header is
-                   resolved from the thread: `replyCardView` finds the ask carrying that reference
-                   among the loaded messages and builds ITS view with the very function the request
-                   card is built with — same tile, same title, same reference, same ask line — then
-                   replaces the waiting state with what he answered. A renter scrolling now sees a
-                   matched pair rather than a card followed by a receipt.
+                   This morning's ruling — *"the supplier response must arrive in the same format of
+                   the sent card"* — is WITHDRAWN and its second card with it. It was built by
+                   `replyCardView`, which rendered the ask's view again under the reply; because each
+                   card is sided by its own author (which is still right), the two landed on opposite
+                   edges of the column, both saying the answer, in different words. The renter's ask
+                   card now carries it, in the reply's own kind-specific wording — see the V12c
+                   sections of `request-card.ts`.
 
-                   Null means the ask is not in the loaded window, and the render falls through to
-                   the bare `ChatCard` form below rather than naming an equipment nobody read. */
-                if (card?.type === RENTEE_REQUEST_REPLY_CARD_TYPE) {
-                  const answered = replyCardView(threadCards, card.reply, cardCtx);
-                  if (answered) {
-                    return (
-                      <div key={m.id} className={`bm-chat-card ${mine ? "is-mine" : "is-them"}`}>
-                        <RequestCard
-                          view={answered}
-                          onOpenMachine={onOpenMachine}
-                          openLabel={t.chatDock.openMachine}
-                          at={chatCardTime(m.created_at, ar)}
-                        />
-                      </div>
-                    );
-                  }
+                   The FALLBACK is untouched and is why this is a suppression rather than a deletion:
+                   an answer whose question is NOT in the loaded window — an older page, a partial
+                   channel read — has nothing to fold into, so it falls through to the bare `ChatCard`
+                   form below, which states the reference and the answer and names no equipment
+                   nobody read. Suppressing it there would delete the answer from the conversation. */
+                if (card?.type === RENTEE_REQUEST_REPLY_CARD_TYPE && replyFoldsIntoAsk(answeredRefs, card.reply)) {
+                  return null;
                 }
                 if (card) {
                   // EVERY other custom type renders as a card — the negotiation vocabulary and the

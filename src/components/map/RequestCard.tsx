@@ -52,6 +52,20 @@ export interface RequestCardProps {
    * will not have been sent at.
    */
   at?: string | null;
+  /**
+   * **The answer's arrival cue** (owner, 2026-08-11: *"light plumbing or something to show the answer
+   * when opening the chat"*).
+   *
+   * V12c folds the supplier's answer into the card of the ask it answers, which means it lands where
+   * the QUESTION is — possibly far above the newest message — rather than at the foot of the thread.
+   * This is what points at it: a finite ring that ends by itself (`ANSWER_CUE_MS`, and the keyframes
+   * stop themselves), and that does not animate at all under `prefers-reduced-motion`.
+   *
+   * A prop rather than a thing this component works out, for the same reason `EquipmentList` takes
+   * `cue`: whether an answer is newly on screen is a fact about the surface's reading of the thread,
+   * not about the view-model, and a card that started its own timer would restart it on every render.
+   */
+  cue?: boolean;
 }
 
 export function RequestCard({
@@ -65,6 +79,7 @@ export function RequestCard({
   confirmLabel,
   openLabel,
   at,
+  cue = false,
 }: RequestCardProps) {
   /* ── The EQUIPMENT's picture, not a glyph tile (owner, 2026-08-11) ───────────────────────────────
      The card showed the same gold `precision_manufacturing` tile on every machine — a robot arm on an
@@ -107,7 +122,7 @@ export function RequestCard({
   );
 
   return (
-    <article className={`bm-rq${draft ? " is-draft" : ""}`}>
+    <article className={`bm-rq${draft ? " is-draft" : ""}${cue ? " is-cued" : ""}`}>
       {view.openable && view.equipmentId && onOpenMachine ? (
         <button
           type="button"

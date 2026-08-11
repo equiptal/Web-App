@@ -9,11 +9,14 @@ import {
   type RenteeRequestReplyPayload,
 } from "@/lib/contract/rentee-request";
 import {
+  ANSWER_CUE_MS,
+  answeredAskRefs,
   askAnsweredBy,
   draftSubject,
+  latestAnsweredRef,
   postedSubject,
   replyAnswerLine,
-  replyCardView,
+  replyFoldsIntoAsk,
   requestCardView,
   type RequestCardCtx,
   type RequestCardMachine,
@@ -243,8 +246,13 @@ describe("the status row is re-read from the machine, never stored (RM3-AC-18)",
       availability,
       ctx({ machine: () => machine(), reply: () => ({ resolution: "declined" }) }),
     );
-    // «المورّد» — the one word for the counterparty, the same one the reply card uses.
-    expect(view.status).toEqual({ tone: "refused", label: "اعتذر المورّد" });
+    expect(view.status?.tone).toBe("refused");
+    /* The WORDS changed with the owner's evening ruling (V12c, 2026-08-11): this card used to read
+       «اعتذر المورّد» because the answer had a card of its own to say the specific thing in. There is
+       one card now, so it says the specific thing — «اعتذر عن تأكيد التوفّر» — and «اعتذر المورّد»
+       survives only where the ask cannot be resolved. The counterparty is «المورّد» either way, never
+       «المؤجّر». See section 5. */
+    expect(view.status?.label).toBe("اعتذر عن تأكيد التوفّر");
   });
 
   it("says nothing at all when this surface holds no fleet to read it off", () => {
@@ -299,21 +307,33 @@ describe("the draft card states what it is, and never what the supplier owes", (
   });
 });
 
-/* ═══════════════════════ 5 · the supplier's reply, in the ask's own card ═══════════════════════ */
+/* ═══════════════════════ 5 · ONE card per request, carrying the answer ═════════════════════════ */
 
 /**
- * **V12a — the answer arrives in the format of the card it answers** (owner, 2026-08-11: *"the
- * supplier response must arrive in the same format of the sent card but with supplier answer"*).
+ * **V12c — one card per request, and it is the ask's** (owner, 2026-08-11, evening).
  *
- * The reply payload carries only `inReplyTo` and a resolution, so everything the header shows has to
- * be resolved from the thread. Three properties are asserted, and they are the three that were wrong:
+ * *"why the cards each one on different side… make it one card for request and show his answer, but
+ * light plumbing or something to show the answer when opening the chat"*.
  *
- * 1. **The header is the REQUEST's header**, built by the request's own function — not a second
- *    rendering that can drift from it.
- * 2. **The answer answers the question that was asked.** "Done" said nothing; each kind × resolution
- *    now reads as an answer to that kind, and only `declined` ever reads as a refusal.
- * 3. **An unresolved reply says less, never more.** No ask in the window → no card, and the caller
- *    keeps the bare form rather than naming equipment nobody read.
+ * This **supersedes V12a of the same morning** — *"the supplier response must arrive in the same
+ * format of the sent card but with supplier answer"* — which was implemented by rendering the ask's
+ * card a second time under the reply (`replyCardView`, withdrawn). Each card is sided by its own
+ * author, correctly, so the pair landed on OPPOSITE edges of the column, both stating the answer and
+ * in different words: the ask's derived status said *"He answered: not available"* while the reply's
+ * said *"He answered: he has no other Crawler Excavator 30 ton available"*.
+ *
+ * Four properties are asserted, and they are the four the ruling turns on:
+ *
+ * 1. **The fold.** Ask + answer both in the window → the reply's own card is suppressed and the ask's
+ *    card carries the answer.
+ * 2. **The wording is the SPECIFIC one.** The surviving card must not fall back to the generic
+ *    resolution reading — that is the sentence the owner was made to read twice.
+ * 3. **The fallback survives.** A reply whose ask is not in the window is not folded and not deleted.
+ * 4. **The cue is finite and stable** — one card, and the same value across a poll, so it cannot
+ *    re-fire on every render.
+ *
+ * The answer's own vocabulary (`replyAnswerLine`) is unchanged by the ruling and is still asserted
+ * below: one table words the folded card AND the unfoldable reply's bare form.
  */
 
 const EN = (en: string, _ar: string) => en;
@@ -344,40 +364,142 @@ describe("a reply resolves the ask it answers, out of the thread, by reference",
   });
 });
 
-describe("the reply card IS the request card, with the answer where the waiting state was", () => {
+describe("the fold — a request and its answer are ONE card, and it is the request's", () => {
   const ask = posted();
-  const c = ctx({ machine: () => machine() });
 
-  it("carries the same tile, title, serial, reference and ask line as the card it answers", () => {
-    const sent = requestCardView(postedSubject(ask), c);
-    const answered = replyCardView(thread({ ask }, { reply: reply() }), reply(), c)!;
-    // Everything BUT the status row is the request's own view — one function decides both, so the
-    // pair cannot drift into naming one machine two ways.
-    expect({ ...answered, status: null }).toEqual({ ...sent, status: null });
-    expect(answered.title).toBe("CAT 320D · حفّار ٢٠ طن");
-    expect(answered.ref).toBe("RQ-7F3A");
-    expect(answered.kindLabel).toBe("طلب تأكيد التوفّر");
+  it("folds a reply whose ask is in the window, whichever order the window loaded in", () => {
+    for (const t of [thread({ ask }, {}, { reply: reply() }), thread({ reply: reply() }, {}, { ask })]) {
+      const answered = answeredAskRefs(t);
+      expect([...answered]).toEqual(["RQ-7F3A"]);
+      // The reply's own card is suppressed: the ask above it is already saying this.
+      expect(replyFoldsIntoAsk(answered, reply())).toBe(true);
+    }
   });
 
-  it("states the answer, not the wait", () => {
-    const answered = replyCardView(thread({ ask }, { reply: reply() }), reply(), c)!;
-    expect(answered.status).toEqual({ tone: "answered", label: "أكّد توفّر هذه المعدّة" });
-    // The mutation this guards: the request's own reading leaking onto the reply.
-    expect(answered.status?.label).not.toBe("بانتظار ردّه");
+  it("does NOT fold a reply whose ask is missing — the answer would vanish with it", () => {
+    // An older page, a partial channel read. The surface keeps rendering it in the bare form, which
+    // names no equipment because nothing read one.
+    expect(replyFoldsIntoAsk(answeredAskRefs(thread({ reply: reply() })), reply())).toBe(false);
+    expect(replyFoldsIntoAsk(answeredAskRefs(thread()), reply())).toBe(false);
+    // Nor an ask that is merely NEAR one: the reference has to match.
+    const other = thread({ ask: posted({ ref: "RQ-0001" }) }, { reply: reply({ inReplyTo: "RQ-7F3A" }) });
+    expect(replyFoldsIntoAsk(answeredAskRefs(other), reply())).toBe(false);
   });
 
-  it("still states the answer on a surface holding no fleet — a reply needs none", () => {
-    // The REQUEST goes quiet without a fleet (a verdict it cannot derive). The reply does not: what
-    // the supplier said is a thing he said, not a thing read off a machine.
-    const answered = replyCardView(thread({ ask }, { reply: reply() }), reply(), ctx({ fleetKnown: false }))!;
-    expect(answered.status).toEqual({ tone: "answered", label: "أكّد توفّر هذه المعدّة" });
+  it("folds nothing on an unanswered ask — there is one card there already", () => {
+    expect([...answeredAskRefs(thread({ ask }, {}, {}))]).toEqual([]);
+  });
+});
+
+describe("the surviving card says what he answered, in the words of the question", () => {
+  /** The window's own answers, as both surfaces hand them to the card (`requestRepliesByRef`). */
+  const answering = (resolution: RenteeRequestReplyPayload["resolution"], over: Partial<RequestCardCtx> = {}) =>
+    ctx({ machine: () => machine(), reply: () => ({ resolution }), ...over });
+
+  it("takes the reply's KIND-SPECIFIC wording, never the generic resolution reading", () => {
+    /* THE defect, in the owner's screenshot: his ask card read *"He answered: not available"* while
+       the supplier's card beside it read *"He answered: he has no other Crawler Excavator 30 ton
+       available"*. One card survives now, and it has to be the second sentence. */
+    const view = requestCardView(
+      postedSubject(posted({ kind: "alternative" })),
+      answering("unavailable", { L: EN, typeWord: "Crawler Excavator 30 ton" }),
+    );
+    expect(view.status).toEqual({
+      tone: "refused",
+      label: "He answered: he has no other Crawler Excavator 30 ton available",
+    });
+    expect(view.status?.label).not.toBe("He answered: not available");
   });
 
-  it("falls back to the bare form — null — when the ask is not in the loaded window", () => {
-    // An older page, a partial read. Naming an equipment on nothing but a matching reference would
-    // put a machine's name under a supplier's answer as a guess.
-    expect(replyCardView(thread({ reply: reply() }), reply(), c)).toBeNull();
-    expect(replyCardView(thread(), reply(), c)).toBeNull();
+  it("confirms, declines and adds papers in the ask's own terms", () => {
+    // Corroborated by the file — `unit_yard` is what an availability ask is derived from, and an
+    // uncorroborated `provided` is a different rule entirely (RM3-AC-58, below).
+    const availability = requestCardView(
+      postedSubject(posted()),
+      answering("provided", { L: EN, machine: () => machine({ locationSource: "unit_yard" }) }),
+    );
+    expect(availability.status).toEqual({ tone: "answered", label: "He confirmed this equipment is available" });
+    // …and never the wait it replaced.
+    expect(availability.status?.label).not.toBe("Waiting for his answer");
+
+    const declined = requestCardView(postedSubject(posted()), answering("declined", { L: EN }));
+    expect(declined.status).toEqual({ tone: "refused", label: "He declined to confirm availability" });
+    // The generic line — the one the ask card used to derive — says less than this one.
+    expect(declined.status?.label).not.toBe("He declined");
+  });
+
+  it("states the answer even where no fleet is known — an answer is not read off a machine", () => {
+    /* `/deal-room/[id]` before its fleet lands, and forever if the read fails. The VERDICT stays
+       withheld there (it cannot be derived), but what the supplier SAID still stands — the withdrawn
+       reply card stated it on a fleet-less surface for exactly this reason, and folding it into the
+       ask must not lose it. */
+    const view = requestCardView(
+      postedSubject(posted()),
+      answering("provided", { fleetKnown: false, machine: () => null }),
+    );
+    expect(view.status).toEqual({ tone: "answered", label: "أكّد توفّر هذه المعدّة" });
+    // Unanswered, that same surface still says nothing at all.
+    expect(requestCardView(postedSubject(posted()), ctx({ fleetKnown: false })).status).toBeNull();
+  });
+
+  it("never lets his words overrule the file — RM3-AC-58 survives the fold", () => {
+    /* A `provided` the machine does not corroborate is downgraded to waiting: the reply stays in the
+       thread as the record of what was said, but it does not move the verdict. Folding the answer into
+       the card must not smuggle "he added it" past that rule — so his wording is printed only where it
+       AGREES with what the card derived. */
+    const uncorroborated = requestCardView(
+      postedSubject(posted()),
+      answering("provided", { L: EN, machine: () => machine({ locationSource: "listing_yard" }) }),
+    );
+    expect(uncorroborated.status).toEqual({ tone: "waiting", label: "Waiting for his answer" });
+
+    // The mirror: he said no, and his file has since shown it anyway. The file is what the renter can
+    // act on, so the card reports it rather than repeating a refusal the machine has overtaken.
+    const overtaken = requestCardView(
+      postedSubject(posted()),
+      answering("declined", { L: EN, machine: () => machine({ locationSource: "unit_yard" }) }),
+    );
+    expect(overtaken.status).toEqual({ tone: "answered", label: "Answered — his file now shows it" });
+  });
+
+  it("leaves an UNANSWERED ask exactly as it read before", () => {
+    // The fold only speaks where there IS an answer. Nothing about the waiting card moved, and the
+    // draft's own reading (section 4) is untouched.
+    const waiting = requestCardView(postedSubject(posted()), ctx({ machine: () => machine() }));
+    expect(waiting.status).toEqual({ tone: "waiting", label: "بانتظار ردّه" });
+  });
+});
+
+describe("the arrival cue — finite, one card, and it does not re-fire", () => {
+  it("points at the LAST answered ask in the window, never at a set of them", () => {
+    const t = thread(
+      { ask: posted({ ref: "RQ-0001" }) },
+      { reply: reply({ inReplyTo: "RQ-0001" }) },
+      { ask: posted({ ref: "RQ-7F3A" }) },
+      { reply: reply({ inReplyTo: "RQ-7F3A" }) },
+    );
+    expect(latestAnsweredRef(t)).toBe("RQ-7F3A");
+  });
+
+  it("returns the SAME string for the same conversation — what keeps a poll from re-firing it", () => {
+    // The surfaces key their timer on this value. A refresh that returns the same messages must
+    // produce the same reference, or the ring would restart every 15 seconds.
+    const t = thread({ ask: posted() }, { reply: reply() });
+    expect(latestAnsweredRef(t)).toBe(latestAnsweredRef([...t]));
+  });
+
+  it("points at nothing when nothing in the window is answered", () => {
+    expect(latestAnsweredRef(thread({ ask: posted() }))).toBeNull();
+    // An answer whose ask is not loaded renders on its OWN card, so there is nothing to point at.
+    expect(latestAnsweredRef(thread({ reply: reply() }))).toBeNull();
+    expect(latestAnsweredRef(thread())).toBeNull();
+  });
+
+  it("ENDS — a cue that loops is decoration", () => {
+    expect(ANSWER_CUE_MS).toBeGreaterThan(0);
+    expect(Number.isFinite(ANSWER_CUE_MS)).toBe(true);
+    // Shorter than V6's landing cue: this one sits on a card the renter keeps re-reading.
+    expect(ANSWER_CUE_MS).toBeLessThan(9_400);
   });
 });
 

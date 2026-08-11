@@ -612,18 +612,21 @@ describe("the chat dock's tab strip touches no map state (RM3-AC-49)", () => {
     expect(tabWrites).toEqual(["onClick={() => setActiveBidId(tab.bidId)}"]);
 
     /* `onOpenMachine` is handed to `RequestCard` and to nothing else — not to the tab, not to the
-       composer, not to a message bubble. THREE mounts carry it now: the sent card, the draft, and
-       the supplier's reply, which renders in the ask's own card since the owner's ruling of
-       2026-08-11 (*"the supplier response must arrive in the same format of the sent card but with
-       supplier answer"*) and is pressable for the same reason the ask is — it names the same
-       equipment. The counts are asserted against each other so a fourth consumer anywhere in the
-       file fails the line. */
-    expect(dock.match(/<RequestCard/g)).toHaveLength(3);
-    expect(dock.match(/onOpenMachine=\{onOpenMachine\}/g)).toHaveLength(3);
-    // Ten mentions in all: the prop declaration, the destructure, the resolver that decides whether
-    // a press is offered at all, its dependency, and the three `prop={prop}` pairs above. Anything
+       composer, not to a message bubble. TWO mounts carry it: the sent card and the draft.
+
+       There were three between the two rulings of 2026-08-11: the morning's *"the supplier response
+       must arrive in the same format of the sent card but with supplier answer"* gave a reply a full
+       card of its own, pressable for the same reason the ask is. The evening's ruling withdrew that
+       card — *"make it one card for request and show his answer"* — so the answer is now a status row
+       on the ask's card and there is one fewer thing to press. The rule this line guards did not
+       change: the counts are asserted against each other, so a third consumer anywhere in the file
+       fails it. */
+    expect(dock.match(/<RequestCard/g)).toHaveLength(2);
+    expect(dock.match(/onOpenMachine=\{onOpenMachine\}/g)).toHaveLength(2);
+    // Eight mentions in all: the prop declaration, the destructure, the resolver that decides whether
+    // a press is offered at all, its dependency, and the two `prop={prop}` pairs above. Anything
     // more is a second consumer, which is what this line exists to catch.
-    expect(dock.match(/onOpenMachine/g)).toHaveLength(10);
+    expect(dock.match(/onOpenMachine/g)).toHaveLength(8);
   });
 
   it("declares callbacks that REPORT or ACT, and none that hands out map state", () => {

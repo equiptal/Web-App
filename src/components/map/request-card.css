@@ -30,6 +30,35 @@
 /* The DRAFT is the same card, in blue and lifted — the prototype's only two differences besides the
    buttons. It has to read as "not yet in the conversation" at a glance, from the frame alone. */
 .bm-rq.is-draft { border-color: #2563eb; box-shadow: 0 6px 18px rgba(37, 99, 235, 0.16); }
+
+/* ── V12c · the answer's arrival cue (owner, 2026-08-11) ─────────────────────────────────────────
+   *"light plumbing or something to show the answer when opening the chat"*.
+
+   One card per request now, so the supplier's answer appears in the card of the QUESTION — which sits
+   wherever the question was asked, not at the foot of the thread. Without a cue, opening the chat to
+   read an answer means hunting for it.
+
+   Built to V6's rule (`bmCue`, map-proto.css) and deliberately quieter: **FINITE — 3 iterations ×
+   1.6s, then it rests.** No `infinite` anywhere. The resting shadow is the FIRST of two in every
+   keyframe and is identical throughout, so only the ring after it grows and fades; nothing animates a
+   transform, a size, a border or a margin, so a card mid-cue cannot appear to move or reflow the
+   thread around it. Blue, like every other attention cue on this surface — the ANSWER's own tone
+   (green, amber) is the status row's job and stays where the reader will re-read it. */
+.bm-rq.is-cued { animation: bmRqAnswer 1.6s ease-out 3 both; }
+@keyframes bmRqAnswer {
+  0% { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 0 0 rgba(37, 99, 235, 0.3); }
+  70% { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 0 9px rgba(37, 99, 235, 0); }
+  100% { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 0 0 rgba(37, 99, 235, 0); }
+}
+/* A renter who has asked for no motion still has to be able to FIND the answer, so the cue becomes a
+   still ring rather than nothing at all — it appears and leaves with the class, on the surface's own
+   timer, and never pulses. */
+@media (prefers-reduced-motion: reduce) {
+  .bm-rq.is-cued {
+    animation: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 0 3px rgba(37, 99, 235, 0.24);
+  }
+}
 /* The identity strip — tinted, with a bottom border, and the WHOLE of the press target when the card
    names a machine the surface can open. */
 .bm-rq-id {

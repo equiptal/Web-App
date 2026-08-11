@@ -33,6 +33,7 @@ import {
   type RenteeRequestReplyPayload,
   type RenteeRequestResolution,
   type RenteeRequestScope,
+  type RenteeRequestState,
   type RequestTargetMachine,
 } from "./rentee-request";
 
@@ -250,16 +251,57 @@ export function requestCardView(
 
   // Rule 2 — the verdict, re-derived. A draft has no `ref`, so it has no reply to consult and the
   // machine is the whole of its answer.
+  const answer = subject.ref ? ctx.reply(subject.ref) : null;
   const state =
     ctx.fleetKnown === false
       ? null
       : renteeRequestState(
           { kind: subject.kind, equipmentId: subject.equipmentId, docTypes: subject.docTypes },
           machine,
-          subject.ref ? ctx.reply(subject.ref) : null,
+          answer,
         );
 
+  /* ── V12c · this card SAYS what he answered, in the ask's own words (owner, 2026-08-11) ──────────
+     One card per request now (see the V12c section below), so this status row is the only place the
+     supplier's answer can appear — and the generic derivation was the WEAKER of the two wordings the
+     renter was seeing. His thread showed the ask card saying «ردّ: غير متوفّرة» *"He answered: not
+     available"* beside a reply card saying *"He answered: he has no other Crawler Excavator 30 ton
+     available"*. The second sentence is an answer to the question that was asked; the first is a
+     resolution enum read aloud. The card that survives must carry the second.
+
+     `replyAnswerLine` is that wording, and it is the SAME table the bare fallback form uses — so the
+     folded card and an unfoldable reply can never word one resolution two ways.
+
+     **It speaks only when the answer is what this card is reporting**, which is the rule that keeps
+     RM3-AC-58 intact in both directions:
+       · `state === saidState` — the derivation and the supplier agree, so his own words are simply the
+         specific form of the same verdict;
+       · `state === null` — this surface holds no fleet (`fleetKnown: false`) and derives nothing. What
+         he SAID still stands: an answer is a thing he said, not a thing read off a machine, which is
+         why the withdrawn reply card stated it here too;
+       · otherwise the derivation wins and his words are not printed — a `provided` the file does not
+         corroborate is downgraded to «بانتظار ردّه» (RM3-AC-58) and must not read as "he added it",
+         and a refusal his file has since overtaken must not out-shout «ظهر على ملفه». */
+  const saidState: RenteeRequestState | null = !answer
+    ? null
+    : answer.resolution === "provided"
+      ? "answered"
+      : answer.resolution === "declined"
+        ? "refused"
+        : "unavailable";
+
   const status = ((): { tone: RequestCardTone; label: string } | null => {
+    if (answer && (state === null || state === saidState)) {
+      return replyAnswerLine(
+        {
+          kind: subject.kind,
+          resolution: answer.resolution,
+          docCount: subject.docTypes?.length ?? 0,
+          typeWord: ctx.typeWord ?? null,
+        },
+        L,
+      );
+    }
     switch (state) {
       case null:
         return null;
@@ -363,6 +405,10 @@ export function requestDocLabel(docType: string, L: LFn): string {
 }
 
 /* ═════════ V12a · the supplier's ANSWER, in the card of the ask it answers (owner, 2026-08-11) ═════
+ *
+ * **SUPERSEDED the same evening by V12c below — `replyCardView` is withdrawn.** The reasoning is kept
+ * because half of it still runs the fallback (a reply whose ask is not in the window), and because the
+ * ruling it implemented is the reason the ANSWER is worded the way it is; only the second card is gone.
  *
  * The ruling: *"the supplier response must arrive in the same format of the sent card but with
  * supplier answer"*.
@@ -503,35 +549,114 @@ export function replyAnswerLine(
   return { tone, label };
 }
 
-/**
- * The thread + a reply → **the ask's own card, with the answer where its waiting state was**.
+/* ═════════ V12c · ONE card per request, carrying the answer (owner, 2026-08-11) ═══════════════════
  *
- * Null when the ask is not in the loaded window — see the section header: the caller falls back to the
- * bare form rather than this function inventing a header.
+ * **This supersedes V12a above, and withdraws `replyCardView` with it.**
  *
- * The status is NOT re-derived from the fleet here, and that is deliberate. Rule 2 above re-reads the
- * machine because a REQUEST asks what is true right now; a reply is a thing the supplier said at a
- * moment, and it keeps saying it whether or not his file has moved since. The request card sitting
- * above it is the one that tracks the fleet — which is also why the pair is worth showing.
+ * V12a satisfied *"the supplier response must arrive in the same format of the sent card"* by building
+ * the ask's card a SECOND time under the reply. Both cards were sided by their own author — which is
+ * still the right rule for a side — so the renter's thread ended up with two cards per request on
+ * OPPOSITE edges of the column, each stating the answer in different words: his own ask card (his
+ * side) derived «ردّ: غير متوفّرة» *"He answered: not available"*, and the supplier's reply card (the
+ * other side) said *"He answered: he has no other Crawler Excavator 30 ton available"*. One question,
+ * two objects, two sentences, and the reader has to work out that they are the same event.
+ *
+ * The owner, on seeing it: *"why the cards each one on different side… make it one card for request
+ * and show his answer, but light plumbing or something to show the answer when opening the chat"*.
+ *
+ * So, three rules, and this section is where the first two are decided for BOTH surfaces at once —
+ * the map's `ChatDock` and `/deal-room/[id]` render the same channel and must fold it identically:
+ *
+ * 1. **A request and its answer, both in the loaded window → the REQUEST's card, alone.** The reply's
+ *    own card is suppressed by the surface, through {@link replyFoldsIntoAsk}.
+ * 2. **The surviving card carries the SPECIFIC wording**, because a generic one is what the pair made
+ *    the renter read twice. `requestCardView` above words its status with `replyAnswerLine` whenever
+ *    the answer is what it is reporting — see the V12c comment inside it.
+ * 3. **A reply with no ask in the window still renders**, on its own, through the bare
+ *    `buildChatCardView` form. It has nothing to fold into, and suppressing it would delete the answer
+ *    from the conversation entirely. That fallback is V12a's own second half and is untouched.
+ *
+ * Nothing here decides a SIDE. The surviving card is the renter's own ask and sits on its author's
+ * edge exactly as it did — from the supplier's chair the same card is his counterparty's, and it moves
+ * to the other edge without a line of this module changing.
+ *
+ * Pure and order-independent, like everything else here: a channel read is not guaranteed to be
+ * ordered, so a reply that loaded before its own ask folds into it just the same.
  */
-export function replyCardView(
-  thread: readonly RequestThreadCard[],
-  reply: RenteeRequestReplyPayload,
-  ctx: RequestCardCtx,
-): RequestCardView | null {
-  const ask = askAnsweredBy(thread, reply);
-  if (!ask) return null;
-  const view = requestCardView(postedSubject(ask), ctx);
-  return {
-    ...view,
-    status: replyAnswerLine(
-      {
-        kind: ask.kind,
-        resolution: reply.resolution,
-        docCount: ask.docTypes?.length ?? 0,
-        typeWord: ctx.typeWord ?? null,
-      },
-      ctx.L,
-    ),
-  };
+
+/**
+ * **The references this window can fold** — an ask AND an answer to it, both loaded.
+ *
+ * The one reading behind both halves of rule 1: the surface asks it once per thread, the ask card
+ * finds its own answer through `ctx.reply(ref)` (the same window, indexed by `requestRepliesByRef`),
+ * and the reply card asks whether it is in this set. A membership test rather than a per-reply search
+ * so a long thread costs one pass, and so the two halves cannot answer differently.
+ *
+ * References are compared TRIMMED, the same way {@link askAnsweredBy} pairs them — one definition of
+ * "these two messages are about the same request", or a card could be folded by one rule and rendered
+ * by the other, and the answer would appear twice or not at all.
+ */
+export function answeredAskRefs(thread: readonly RequestThreadCard[]): Set<string> {
+  const asked = new Set<string>();
+  const replied = new Set<string>();
+  for (const c of thread) {
+    const ask = c.ask?.ref.trim();
+    if (ask) asked.add(ask);
+    const to = c.reply?.inReplyTo.trim();
+    if (to) replied.add(to);
+  }
+  const out = new Set<string>();
+  for (const ref of replied) if (asked.has(ref)) out.add(ref);
+  return out;
+}
+
+/**
+ * **Is this reply's own card suppressed?** — true when the ask it answers is in the window and is
+ * already carrying the answer (rule 1).
+ *
+ * False is the FALLBACK (rule 3) and the caller must keep rendering it: an older page or a partial
+ * channel read leaves an answer whose question is not on screen, and that answer is the only record of
+ * what the supplier said.
+ */
+export function replyFoldsIntoAsk(
+  answered: ReadonlySet<string>,
+  reply: Pick<RenteeRequestReplyPayload, "inReplyTo">,
+): boolean {
+  return answered.has(reply.inReplyTo.trim());
+}
+
+/**
+ * **How long the answer's arrival cue runs before the card rests.**
+ *
+ * The owner's *"light plumbing or something to show the answer when opening the chat"* — folding the
+ * answer into a card that was already in the thread means it lands where the QUESTION is, which may be
+ * far above the last message, so something has to point at it.
+ *
+ * Modelled on V6's landing cue (`LANDING_CUE_MS`, `bmCue`) and deliberately SHORTER: 3 × 1.6s, plus a
+ * beat so the class leaves the DOM after the animation has already stopped rather than cutting it. The
+ * rule that matters is the same one — **it is finite and it ends.** A ring that loops is not a cue,
+ * it is decoration the renter learns to ignore, and this one sits on a card he will keep re-reading.
+ */
+export const ANSWER_CUE_MS = 5_000;
+
+/**
+ * **Which card the cue points at** — the reference of the LAST answered ask in load order, or null
+ * when nothing in this window is answered.
+ *
+ * One card, never a set: two rings at once is a page announcing itself rather than an arrival. The
+ * newest answer is the one the renter has not read, and on a thread whose answers he has all read it
+ * is simply the last thing that happened in the conversation.
+ *
+ * Pure, and a stable STRING — which is what keeps the cue from re-firing. A surface keys its timer on
+ * this value, so a poll that returns the same conversation returns the same reference and starts
+ * nothing; only a new answer, or a fresh reading of the thread (opening the chat), changes it.
+ */
+export function latestAnsweredRef(thread: readonly RequestThreadCard[]): string | null {
+  const answered = answeredAskRefs(thread);
+  let last: string | null = null;
+  for (const c of thread) {
+    const to = c.reply?.inReplyTo.trim();
+    if (to && answered.has(to)) last = to;
+  }
+  return last;
 }
