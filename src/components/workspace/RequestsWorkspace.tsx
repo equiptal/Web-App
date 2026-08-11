@@ -23,6 +23,7 @@ import {
 import { RequestRail } from "@/components/workspace/RequestRail";
 import { RequestStrip } from "@/components/workspace/RequestStrip";
 import { BidCards } from "@/components/workspace/BidCards";
+import { CompareMatrix } from "@/components/workspace/CompareMatrix";
 
 type Tab = "cards" | "compare";
 
@@ -253,16 +254,12 @@ export function RequestsWorkspace() {
               onSelect={pickBid}
             />
           ) : (
-            /* Phase 3 fills this. The count is real already, so the shell is not pretending. */
-            <div className="grid min-h-[220px] place-items-center px-4 py-12 text-center">
-              <div>
-                <Icon name="table_chart" size={30} className="text-muted" />
-                <p className="mt-2 text-[13px] font-semibold text-muted">{t.workspace.tabPending}</p>
-                <p className="mt-1 text-[12px] font-semibold text-muted/70">
-                  {shown.length} · {t.workspace.tabCompare}
-                </p>
-              </div>
-            </div>
+            <CompareMatrix
+              bids={shown}
+              selectedId={resolved.bidId}
+              durationDays={item?.durationDays ?? null}
+              onSelect={pickBid}
+            />
           )}
         </div>
       </div>

@@ -1185,6 +1185,38 @@ export const en = {
     inviteToApp: "Invite to Moedatech",
     viewQuote: "View quote",
     notBuiltYet: "Not available yet.",
+    // ── The comparison matrix ──
+    // "Pick one" focuses the row — it drives the strip above. It never awards; that is the deal room.
+    supplierPickOne: "Supplier · pick one",
+    removeColumn: "Take off the comparison",
+    recommended: "Recommended",
+    awaitingReply: "Awaiting reply",
+    inNegotiation: "In negotiation",
+    perCycle: "Per cycle",
+    colRate: "Rental",
+    // The three totals. The third is named after the request's own duration.
+    firstCycle: "First cycle",
+    everyCycleAfter: "Every cycle after",
+    overDays: "{n} days",
+    // Their popovers. Each lists the lines the figure was added from, in that order.
+    howFirstCycle: "How first cycle is built",
+    howEveryCycle: "How every cycle after is built",
+    howHorizon: "How {n} days is built",
+    transportOnce: "Delivery + return",
+    paidOnce: "paid once, cycle 1",
+    vatNote: "All figures in SAR. VAT applied at 15% on the taxable lines above.",
+    // The terms split: what the request asked for, against what suppliers volunteered.
+    termsYouSet: "Terms you set",
+    theyOffered: "They offered on their own",
+    termOperator: "Operator",
+    termFuel: "Fuel",
+    termPayment: "Payment",
+    termSla: "Maintenance SLA",
+    termOvertime: "Overtime",
+    termNationality: "Nationality",
+    // A term the supplier never answered. Said out loud, because a blank cell reads as "nothing to pay".
+    didntSay: "Didn't say",
+    rankWithAi: "Rank with AI",
   },
   survey: {
     navTitle: "Surveys",

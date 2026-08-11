@@ -9,7 +9,7 @@
  * **NO React, NO DOM, NO i18n.**
  */
 
-import { bucketBidTerms, type BidCard } from "./bids";
+import { bucketBidTerms, type BidCard, type TermRow } from "./bids";
 import type { RequestGroup, RequestListItem } from "./requests";
 
 /** Where a bid came from. The filter above the tabs switches between these. */
@@ -145,6 +145,32 @@ export function termsDial(bid: BidCard, source: BidSource): TermsDial {
   const against = counts.conflict;
   const unanswered = counts.pending;
   return { met, against, unanswered, total: met + against + unanswered };
+}
+
+/**
+ * The bid ids holding the lowest figure in a column. Ties all win — two suppliers charging the same
+ * to deliver are equally the cheapest, and picking one of them by list order would invent a
+ * difference the quotes do not contain. A bid with nothing stated cannot win.
+ */
+export function cheapest(bids: WorkspaceBid[], value: (b: WorkspaceBid) => number | null): Set<string> {
+  const stated = bids.filter((b) => {
+    const v = value(b);
+    return v != null && Number.isFinite(v);
+  });
+  if (stated.length < 2) return new Set(); // nothing to be cheaper *than*
+  const low = Math.min(...stated.map((b) => value(b) as number));
+  return new Set(stated.filter((b) => value(b) === low).map((b) => b.card.id));
+}
+
+/** The first term row matching any of these keys, looked for wherever the card keeps its terms. */
+export function findTerm(bid: BidCard, keys: string[]): TermRow | null {
+  const wanted = new Set(keys);
+  const pools = [bid.negotiableTerms ?? [], bid.terms.contract, bid.terms.equipment, bid.terms.supplier];
+  for (const pool of pools) {
+    const hit = pool.find((r) => wanted.has(r.key));
+    if (hit) return hit;
+  }
+  return null;
 }
 
 /** How many bids each filter position would show — the counts beside the filter. */
