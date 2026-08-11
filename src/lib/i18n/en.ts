@@ -1122,6 +1122,51 @@ export const en = {
     total: "Total",
     noDuration: "This request has no duration, so the figures cover one full period.",
   },
+  /* ── The requests workspace (docs/implementation-plans/requests-workspace/plan.md) ──
+     One page for every request, its items and its bids. Phase 1 is the shell: the rail, the strip
+     that names what is selected, and the two tabs. */
+  workspace: {
+    title: "My Requests",
+    // The rail's first tile. It is an action, not a request, so it says what it makes.
+    newRequest: "New",
+    closed: "Closed",
+    // The units a request asked for, on the rail tile. Rendered only when it is more than one.
+    unitsBadge: "×{n}",
+    railScrollNext: "More requests",
+    railScrollPrev: "Earlier requests",
+    // The dark strip, left half — the request itself.
+    bidsCount: "{n} bids",
+    oneBid: "1 bid",
+    openRequest: "Open the request",
+    // The dark strip, right half — the item, and what the selected supplier offers against it.
+    offers: "{supplier} offers",
+    noBidSelected: "No bid selected",
+    noBidsYet: "No bids on this item yet",
+    reviewEquipment: "Review equipment",
+    viewDocuments: "View documents",
+    // The two tabs and the export beside them.
+    tabCards: "Cards",
+    tabCompare: "Compare",
+    download: "Download",
+    // The source filter. "Via app" is a bid placed through Moedatech; "Offline" is one that arrived
+    // through the share link or was typed in by the renter.
+    source: "Source",
+    sourceAll: "All",
+    sourceApp: "Via app",
+    sourceOffline: "Offline",
+    // Empty states.
+    emptyTitle: "No requests yet",
+    emptyBody: "Create your first request to start getting supplier bids — you'll set up your account when you submit.",
+    emptyCta: "Create request",
+    signedOutTitle: "Sign in to see your requests",
+    signedOutBody: "Your requests, the bids on them, and every comparison live here once you're signed in.",
+    signedOutCta: "Sign in",
+    loading: "Loading your requests…",
+    loadFailed: "Your requests could not be loaded. Check your connection and try again.",
+    retry: "Try again",
+    // Phase 1 ships the shell; the two panes arrive with phases 2 and 3.
+    tabPending: "This view is still being built.",
+  },
   survey: {
     navTitle: "Surveys",
     badgeAria: "You have a survey waiting",
