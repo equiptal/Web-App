@@ -190,7 +190,11 @@ describe("the identity strip is resolved from equipmentId (RM3-AC-17/18)", () =>
     expect(looked).toBe(false);
     // The shortfall ask asks FOR a machine — there is none to open, so the card must not offer.
     expect(view.openable).toBe(false);
-    expect(view.kindLabel).toBe("طلب إضافة الوحدات الناقصة");
+    // Both `alternative` cards now read as an ADDITION and in the same words (owner, 2026-08-11) —
+    // «طلب إضافة الوحدات الناقصة» named a shortfall the renter never sees on the list-foot control
+    // that raises the identical ask. With no request type in hand it names no type rather than the
+    // wrong one.
+    expect(view.kindLabel).toBe("طلب إضافة معدّة أخرى");
   });
 
   it("keeps a company card inert even if one arrives carrying a machine id", () => {

@@ -1422,7 +1422,24 @@
 
 /* ── V11 · a failed ask, stated ──────────────────────────────────────────────────────────────────
    A question the renter believes he asked, and did not, is the worst outcome on this surface — so a
-   send that fails says so in the panel rather than only in a console. */
+   send that fails says so in the panel rather than only in a console.
+
+   `.bm-sendnote` is its opposite number, and it exists because the two were sharing one red box. The
+   409 «سبق أن طلبت هذا» is "one ask, one card" arriving from the backend — the guard WORKING — and
+   red made the rule read as a fault the renter had caused (owner, 2026-08-11). Red on this surface
+   belongs to availability alone. Quiet blue, beside a control that has already gone inert. */
+.bidmap .bm-sendnote {
+  flex-shrink: 0;
+  margin: 9px 15px 0;
+  padding: 8px 11px;
+  border-radius: 10px;
+  background: rgba(37, 99, 235, 0.06);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  color: #1c3550;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.6;
+}
 .bidmap .bm-sendfail {
   flex-shrink: 0;
   margin: 9px 15px 0;
@@ -1706,11 +1723,14 @@
   inset-inline-start: var(--bm-panel-w, 392px);
   inset-inline-end: 0;
 }
-/* Mirror: the prototype's 436px, and its `calc(100% - 470px)` ceiling so the map is never squeezed to
-   nothing between the two columns. */
+/* Mirror: `rDrawer`'s own resting width — **420px** (`04-machine-panel.js:20`, `w = drawerMax ?
+   'min(760px, calc(100% - 40px))' : '420px'`), which is the pair the placement control switches
+   between: 420 here, and the fill above as the expanded state. It was 436 for no reason but a
+   rounding of the prototype's number. The `calc(100% - 470px)` ceiling stays, so the map is never
+   squeezed to nothing between the two columns. */
 .bidmap .bm-chat.is-mirror {
   inset-inline-end: 0;
-  width: 436px;
+  width: 420px;
   max-width: calc(100% - 470px);
   border-inline-start: 1px solid #e1e9f1;
   box-shadow: -6px 0 24px rgba(15, 34, 56, 0.1);
@@ -1727,6 +1747,13 @@
 /* The drawer's own head band — 64px, `0 18px`, the panel's height and gutters, so the two columns
    start on one line. Docked drops the icon tile and the subtitle the floating drawer carries: the
    panel beside it already names the supplier, and a second identity block here repeated it. */
+/* BLUE, with the counterparty's initials beside his name — `pChat`'s own band (05:17–24), which this
+   had as a white bar with dark ink. That bar read as a toolbar sitting on top of a conversation
+   rather than as the head of one, and it is most of what the owner meant by «Chat is still different
+   UI» (2026-08-11).
+   Still 64px and `0 18px`, so it starts on the same line as the panel's own identity band beside it.
+   The prototype's presence dot, its two simulator buttons and its call control are deliberately
+   absent — all three were excluded by name. */
 .bidmap .bm-chat-head {
   flex-shrink: 0;
   height: 64px;
@@ -1735,21 +1762,43 @@
   align-items: center;
   gap: 11px;
   padding: 0 18px;
-  border-bottom: 1px solid #e1e9f1;
-  background: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  background: #2563eb;
 }
-.bidmap .bm-chat-who { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 800; color: #16304f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The prototype's 42px circle: the firm's initials, in the green it uses to say "this is a party to
+   the deal" rather than a decoration. `dir="ltr"` is not set — Arabic initials read right to left. */
+.bidmap .bm-chat-av {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #16a34a;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.bidmap .bm-chat-who { flex: 1; min-width: 0; display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: 900; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The tick the prototype writes as a bare '✓' after the name. A glyph rather than the panel's full
+   «شركة موثّقة» chip: the panel two columns away already carries that chip, and repeating it here
+   would state the same credential twice on one screen. */
+.bidmap .bm-chat-tick { flex-shrink: 0; font-size: 15px; color: rgba(255, 255, 255, 0.92); }
 /* The placement control — the prototype's one square button, 30px at r9. It changes WHERE the
    conversation sits and nothing about the conversation, which is why it is a quiet outline rather
-   than an action. */
+   than an action. Translucent white since the band went blue (`pChat` draws its own two controls
+   that way): a white-filled button on blue reads as the loudest thing in the header. */
 .bidmap .bm-chat-place {
   flex-shrink: 0;
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  background: #fff;
-  border: 1px solid #c8d8e8;
-  color: #1c3550;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1762,9 +1811,9 @@
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: #fff;
-  border: 1px solid #c8d8e8;
-  color: #6b8fa8;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1793,10 +1842,11 @@
 .bidmap .bm-chat-tab.is-on { background: rgba(37, 99, 235, 0.1); border-color: rgba(37, 99, 235, 0.3); color: #2563eb; }
 .bidmap .bm-chat-tab-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bidmap .bm-chat-tab-n { flex-shrink: 0; min-width: 15px; height: 15px; border-radius: 8px; background: #f3a77a; color: #3a1f0b; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; }
-/* The stream's own values, from `pChat` (prototype 3184): `padding: 16px`, `gap: 8px`, and a TINTED
-   ground — `#EDF3FA`, not the panel's white. The tint is what separates the conversation from the
-   chrome around it; on white the bubbles had nothing to sit on and the stream ran into the composer. */
-.bidmap .bm-chat-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 16px; background: #edf3fa; }
+/* The stream's own values, from `pChat` (prototype 05:28): `padding: 16px`, `gap: 8px`, and a TINTED
+   ground — the prototype's own `#E9EEF3`, not the panel's white and not the blue-leaning `#EDF3FA`
+   this carried. The tint is what separates the conversation from the chrome around it; on white the
+   bubbles had nothing to sit on and the stream ran into the composer. */
+.bidmap .bm-chat-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 16px; background: #e9eef3; }
 .bidmap .bm-chat-note { margin: auto 0; text-align: center; font-size: 10.5px; font-weight: 600; color: #6b8fa8; line-height: 1.8; padding: 14px 6px; }
 /* ── The bubbles, from `chatMsg` (prototype 3028–3030) ────────────────────────────────────────────
    Scoped INSIDE `.bidmap` on purpose. The markup reuses `.dlproto .msg`, which `/deal-room/[id]`
@@ -1818,12 +1868,17 @@
   font-size: 12.5px;
   line-height: 1.7;
 }
+/* Incoming carries the SAME shadow as outgoing and no border — `chatMsg` gives both bubbles
+   `0 1px 2px rgba(0,0,0,.08)` and neither an outline (prototype 05:29, 05:143). The border this had
+   made every incoming bubble read as a boxed notice while the renter's own floated; the owner's
+   «different UI» covers it (2026-08-11). */
 .bidmap .bm-chat .msg.them {
   background: #fff;
-  border: 1px solid #e1e9f1;
+  border: 0;
   color: #16304f;
   border-radius: 13px;
   border-end-end-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 .bidmap .bm-chat .msg.mine {
   background: #d9eeff;
@@ -1833,6 +1888,18 @@
   border-end-start-radius: 4px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
+/* «حفظ» beside an attachment. The deal room's rule paints it white for `.msg.mine`, which is right
+   on ITS saturated outgoing fill and invisible on this surface's pale `#D9EEFF`. Same ink as the
+   bubble's own, both sides. */
+.bidmap .bm-chat .msg .msg-att-dl { color: #2563eb; }
+.bidmap .bm-chat .msg.mine .msg-att-dl { color: #1d4ed8; }
+/* ── A card is a message, so it takes a side (`chatMsg`, prototype 05:140–141) ────────────────────
+   The renter's own ask on his side, the supplier's answer on his, both at the prototype's 86%. Left
+   to stretch the full column they read as banners the conversation was wrapped around rather than as
+   things either party said. */
+.bidmap .bm-chat-card { max-width: 86%; width: 86%; }
+.bidmap .bm-chat-card.is-mine { align-self: flex-end; }
+.bidmap .bm-chat-card.is-them { align-self: flex-start; }
 /* ── The composer (`05-chat-and-requests.js:42–45`) ───────────────────────────────────────────────
    The prototype's own numbers, which ours ran a size under across the board: a 32px send, r18,
    `8px 12px`, 11.5px ink and a WHITE field inside `#E1E9F1`. At that size the row read as a search

@@ -43,7 +43,7 @@
  * (RM3-AC-64).
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Channel } from "stream-chat";
 import { ChatCard } from "@/components/deal-room/ChatCard";
 import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
@@ -53,9 +53,11 @@ import { fetchReceivedBids, fetchStreamToken } from "@/lib/api/client";
 import {
   CHAT_ACCEPT,
   CHAT_MAX_MEDIA,
+  chatAttachmentFilename,
   chatFileRejection,
   chatSendFailure,
   classifyChatFile,
+  saveChatAttachment,
   sendChatAttachment,
   sendChatVoiceNote,
 } from "@/lib/chat/chat-attachments";
@@ -64,9 +66,12 @@ import { ensureDealRoom } from "@/lib/chat/ensure-deal-room";
 import type { BidCard } from "@/lib/contract/bids";
 import {
   arrivalNotice,
+  dockMayReportAsks,
   dockMessageView,
   dockTabs,
+  dockTabsWithKnownRooms,
   dockUnreadTotal,
+  dockWatchRoomId,
   type DockNotice,
   type DockReplyDigest,
   type DockTab,
@@ -106,6 +111,25 @@ export interface ChatDockProps {
    *  contain the anchor bid (paging), so the tab strip degrades to "no siblings" rather than to a
    *  wrong group. */
   groupKey?: string | null;
+  /**
+   * The anchor bid's room **as the surface knows it**, including one the surface's own ask-send just
+   * created (owner's UAT, 2026-08-11).
+   *
+   * Sending a request card is a room-creating act, and until now it was one the dock could not see:
+   * the room existed, the card was in it, and the dock waited for `GET /received-bids` to mention it
+   * — a wait that never ends at all when the anchor bid is off that feed's first page. The renter
+   * sent an ask and the conversation stayed on «لا رسائل بعد».
+   *
+   * Only ever ADDS a room. It cannot take one away, so a feed that already knows the room wins and a
+   * stale prop cannot disconnect a live tab.
+   */
+  dealRoomId?: string | null;
+  /**
+   * What the REQUEST asked for — "Crawler Excavator 30 ton" — singular and localised by the surface.
+   * The `alternative` cards say it, so the card in the conversation names the same thing the control
+   * that raised it named (owner, 2026-08-11).
+   */
+  typeWord?: string | null;
   /** The anchor bid's fleet, for deriving each request card's state on every render (RM3-AC-18).
    *  Null until it arrives; a sibling tab has none, and its cards then state the ask without claiming
    *  an answer either way. */
@@ -159,6 +183,8 @@ export interface ChatDockProps {
 export function ChatDock({
   bid,
   groupKey = null,
+  dealRoomId = null,
+  typeWord = null,
   fleet,
   sendNonce = 0,
   onOutstandingAsks,
@@ -190,6 +216,9 @@ export function ChatDock({
   /** Rooms this dock created by sending, before the feed has caught up with them. */
   const [freshRooms, setFreshRooms] = useState<Record<string, string>>({});
   const [messages, setMessages] = useState<ChatMsg[]>([]);
+  /** WHICH room {@link messages} were loaded from. The outstanding-ask report is gated on it, so a
+   *  set read from a sibling tab can never be reported as the anchor's. */
+  const [loadedRoomId, setLoadedRoomId] = useState<string | null>(null);
   const [myStreamId, setMyStreamId] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -248,10 +277,12 @@ export function ChatDock({
       },
       rows,
     );
-    // A room this dock just created is real even though the feed still says null — otherwise the tab
-    // would fall back to compose-only for up to one poll and try to create a second room.
-    return base.map((tab) => (tab.dealRoomId ? tab : { ...tab, dealRoomId: freshRooms[tab.bidId] ?? null }));
-  }, [bid, groupKey, rows, freshRooms]);
+    // A room this dock just created — or one the SURFACE created by sending a request card — is real
+    // even though the feed still says null. Otherwise the tab falls back to compose-only for up to
+    // one poll, tries to create a second room, and (when the anchor bid is off the feed's first
+    // page) never recovers at all. The rule is `dockTabsWithKnownRooms`.
+    return dockTabsWithKnownRooms(base, { fresh: freshRooms, anchorBidId: bid.id, surfaceRoomId: dealRoomId });
+  }, [bid, groupKey, rows, freshRooms, dealRoomId]);
 
   const active = tabs.find((tb) => tb.bidId === activeBidId) ?? tabs[0] ?? null;
   const unreadTotal = dockUnreadTotal(tabs);
@@ -265,10 +296,18 @@ export function ChatDock({
   // otherwise tear this connection down the moment the renter came back from negotiating.
   const tokenRoomId = active?.dealRoomId ?? tabs.find((tb) => tb.dealRoomId)?.dealRoomId ?? null;
   const activeRoomId = active?.dealRoomId ?? null;
+  /** The room belonging to the bid this surface resolves — the one whose asks gate its controls. */
+  const anchorRoomId = tabs.find((tb) => tb.bidId === bid.id)?.dealRoomId ?? null;
+  /* **Watched open or shut** (owner's UAT, 2026-08-11). See `dockWatchRoomId`: the channel is the
+     only record of a request card, so a dock that read it only while open forgot every ask the
+     renter had made the moment he reloaded. Shut, it reads the ANCHOR's room — the conversation the
+     surface's ask controls answer to — rather than whichever tab was last selected. */
+  const watchRoomId = dockWatchRoomId({ activeRoomId, anchorRoomId, open });
 
   useEffect(() => {
-    if (!STREAM_API_KEY || !open || !activeRoomId || !tokenRoomId) {
+    if (!STREAM_API_KEY || !watchRoomId || !tokenRoomId) {
       setMessages([]);
+      setLoadedRoomId(null);
       channelRef.current = null;
       return;
     }
@@ -288,10 +327,11 @@ export function ChatDock({
         const client = await lease.connect(tok.userId, tok.token);
         if (cancelled) return;
         setMyStreamId(tok.userId);
-        channel = await watchDealRoom(client, activeRoomId);
+        channel = await watchDealRoom(client, watchRoomId);
         if (cancelled) return;
         channelRef.current = channel;
         setMessages([...channel.state.messages] as ChatMsg[]);
+        setLoadedRoomId(watchRoomId);
         channel.on("message.new", onNew);
       } catch {
         /* chat unavailable — the tab still composes, and the rest of the surface is unaffected */
@@ -304,7 +344,7 @@ export function ChatDock({
       // Release, never disconnect: the deal-room route may still hold the same client.
       lease.release();
     };
-  }, [open, activeRoomId, tokenRoomId]);
+  }, [watchRoomId, tokenRoomId]);
 
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ block: "end" });
@@ -372,14 +412,14 @@ export function ChatDock({
 
   useEffect(() => {
     if (!onOutstandingAsks) return;
-    // Silence, never an empty set, when this component has nothing to say: the anchor bid's own
-    // conversation is the only one whose asks belong to this surface's controls, and a dock that is
-    // shut holds no messages at all. Reporting an empty set from either state would tell the surface
-    // that nothing is outstanding — a claim about the lessor made out of our own ignorance, and one
-    // that would re-enable a control the renter had just used.
-    if (active?.bidId !== bid.id || messages.length === 0) return;
+    // Silence, never an empty set, when this component has nothing to say: reporting an empty set
+    // out of our own ignorance would tell the surface that nothing is outstanding and re-enable a
+    // control the renter had just used. The rule is `dockMayReportAsks`, and what it deliberately
+    // does NOT ask is whether the dock is open — that question is what made a reload forget every
+    // ask (owner's UAT, 2026-08-11).
+    if (!dockMayReportAsks({ loadedRoomId, anchorRoomId, messageCount: messages.length })) return;
     onOutstandingAsks(outstandingAsks);
-  }, [onOutstandingAsks, outstandingAsks, active?.bidId, bid.id, messages.length]);
+  }, [onOutstandingAsks, outstandingAsks, loadedRoomId, anchorRoomId, messages.length]);
 
   const docLabel = useCallback(
     (docType: string) => {
@@ -443,8 +483,11 @@ export function ChatDock({
       // No handler means no press, whatever the fleet holds — the card must not offer an affordance
       // this host cannot honour.
       canOpen: onOpenMachine ? canOpenMachine ?? ((id: string) => fleetById.has(id)) : () => false,
+      // The REQUEST's type, and only on the anchor tab: a sibling tab is a different item, and a card
+      // there naming this item's type would name the wrong machine in words.
+      typeWord: active?.bidId === bid.id ? typeWord : null,
     }),
-    [L, ar, active?.bidId, bid.id, fleet, fleetById, repliesByRef, docLabel, onOpenMachine, canOpenMachine],
+    [L, ar, active?.bidId, bid.id, fleet, fleetById, repliesByRef, docLabel, onOpenMachine, canOpenMachine, typeWord],
   );
 
   /* ── the arrival notice (004a §2.1) ──────────────────────────────────────────────────────────── */
@@ -581,6 +624,16 @@ export function ChatDock({
 
   const tabLabel = (tab: DockTab) => tab.label ?? t.chatDock.itemFallback;
 
+  /** The header avatar's letters (`pChat`'s `initials`). Two words at most — a firm name runs long in
+   *  both scripts, and three letters in a 42px circle is a smudge. */
+  const initials =
+    bid.supplierName
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => [...w][0] ?? "")
+      .join("") || "—";
+
   return (
     <>
       {/* The dock control — the only global action on the surface, and gone while the conversation is
@@ -635,8 +688,22 @@ export function ChatDock({
 
       {open && (
         <section className={`bm-chat dlproto is-${place}`} aria-label={t.chatDock.title}>
+          {/* ── The identity band (`pChat`, prototype 05:17–24) ────────────────────────────────
+              BLUE, with the counterparty's initials in a circle and his name in white — not the
+              white bar with dark text this carried, which read as a toolbar over a conversation
+              rather than as the head of one. The owner's «Chat is still different UI» is largely
+              this band.
+
+              What the prototype draws here and this does NOT: the presence dot, the two simulator
+              buttons and the call control. All three were excluded by name, so the band carries the
+              identity and the two controls that are real — where the conversation sits, and closing
+              it. */}
           <header className="bm-chat-head">
-            <span className="bm-chat-who">{bid.supplierName}</span>
+            <span className="bm-chat-av" aria-hidden="true">{initials}</span>
+            <span className="bm-chat-who">
+              {bid.supplierName}
+              {bid.verified && <span className="bm-chat-tick material-icons-outlined">verified</span>}
+            </span>
             {/* ONE control decides the placement (prototype 1590). Not a resize handle — there are two
                 placements, not a continuum, and each is a whole layout rather than a width. */}
             <button
@@ -694,14 +761,19 @@ export function ChatDock({
                 // with, which is why one component serves both.
                 if (card?.type === RENTEE_REQUEST_CARD_TYPE) {
                   return (
-                    <RequestCard
-                      key={m.id}
-                      view={requestCardView(postedSubject(card.card), cardCtx)}
-                      onOpenMachine={onOpenMachine}
-                      openLabel={t.chatDock.openMachine}
-                      // The SAME formatter `ChatCard` prints — one clock face in one thread (AC-16).
-                      at={chatCardTime(m.created_at, ar)}
-                    />
+                    // A card is a MESSAGE in the stream, so it takes a side and a width like one
+                    // (`chatMsg`, prototype 05:141): the renter's own ask sits on his side at 86%.
+                    // Stretched across the full column it read as a banner the conversation was
+                    // wrapped around rather than as something he said.
+                    <div key={m.id} className="bm-chat-card is-mine">
+                      <RequestCard
+                        view={requestCardView(postedSubject(card.card), cardCtx)}
+                        onOpenMachine={onOpenMachine}
+                        openLabel={t.chatDock.openMachine}
+                        // The SAME formatter `ChatCard` prints — one clock face in one thread (AC-16).
+                        at={chatCardTime(m.created_at, ar)}
+                      />
+                    </div>
                   );
                 }
                 if (card) {
@@ -714,7 +786,15 @@ export function ChatDock({
                     // from a rate card here, so there is exactly one place a rate can be accepted.
                     live: false,
                   });
-                  return <ChatCard key={m.id} view={view} ar={ar} L={L} busy={false} onAccept={() => {}} onCounter={() => {}} />;
+                  const chatCard = <ChatCard view={view} ar={ar} L={L} busy={false} onAccept={() => {}} onCounter={() => {}} />;
+                  // The supplier's ANSWER is a message of his, so it takes his side at 86% the way
+                  // the ask takes the renter's (prototype 05:140). The negotiation vocabulary is not
+                  // sided: those cards are events in the room rather than either party's remark.
+                  return card.type === RENTEE_REQUEST_REPLY_CARD_TYPE ? (
+                    <div key={m.id} className="bm-chat-card is-them">{chatCard}</div>
+                  ) : (
+                    <div key={m.id}>{chatCard}</div>
+                  );
                 }
                 // NOT `if (!m.text) return null`. The dock and `/deal-room/[id]` read the SAME
                 // channel, so a message the deal room shows and the dock drops is the renter seeing
@@ -738,26 +818,46 @@ export function ChatDock({
                     ) : (
                       view.text
                     )}
-                    {/* Enough that nothing is invisible, and no more. The element OPENS the
-                        attachment; SAVING it, and translating it, stay in `/deal-room/[id]` — the
-                        dock shows the conversation and hands off (004a §4a.2). */}
-                    {view.attachments.map((a, i) =>
-                      a.kind === "image" ? (
-                        <a key={i} href={a.url ?? undefined} target="_blank" rel="noopener noreferrer" className="msg-att-img">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={a.thumbUrl ?? a.url ?? ""} alt={a.title ?? ""} style={{ maxWidth: "100%" }} />
-                        </a>
-                      ) : a.kind === "audio" ? (
-                        <audio key={i} controls preload="none" src={a.url ?? undefined} style={{ display: "block", maxWidth: "100%", marginTop: 6 }} />
-                      ) : (
-                        <a key={i} href={a.url ?? undefined} target="_blank" rel="noopener noreferrer" className="msg-att-file">
-                          <span className="material-icons-outlined">
-                            {(a.mimeType ?? "").includes("pdf") ? "picture_as_pdf" : "insert_drive_file"}
-                          </span>
-                          <span className="msg-att-name">{a.title ?? L("Attachment", "مرفق")}</span>
-                        </a>
-                      ),
-                    )}
+                    {/* The element OPENS the attachment; «حفظ» beside it KEEPS it — opening a paper
+                        in a browser tab is not having a copy of it, which is the owner's point
+                        (2026-08-11: documents in this chat need a download, *"same as existing
+                        behaviour of existing deal room"*).
+
+                        Deliberately the deal room's own `saveChatAttachment` and its own `.msg-att-dl`
+                        markup, not a second implementation: both surfaces show the same files off the
+                        same channel, so a file saved from the map must land on disk under the same
+                        name it lands under from the deal room. Translating still stays in
+                        `/deal-room/[id]` — the dock shows the conversation and hands off (004a
+                        §4a.2). */}
+                    {view.attachments.map((a, i) => (
+                      <Fragment key={i}>
+                        {a.kind === "image" ? (
+                          <a href={a.url ?? undefined} target="_blank" rel="noopener noreferrer" className="msg-att-img">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={a.thumbUrl ?? a.url ?? ""} alt={a.title ?? ""} style={{ maxWidth: "100%" }} />
+                          </a>
+                        ) : a.kind === "audio" ? (
+                          <audio controls preload="none" src={a.url ?? undefined} style={{ display: "block", maxWidth: "100%", marginTop: 6 }} />
+                        ) : (
+                          <a href={a.url ?? undefined} target="_blank" rel="noopener noreferrer" className="msg-att-file">
+                            <span className="material-icons-outlined">
+                              {(a.mimeType ?? "").includes("pdf") ? "picture_as_pdf" : "insert_drive_file"}
+                            </span>
+                            <span className="msg-att-name">{a.title ?? L("Attachment", "مرفق")}</span>
+                          </a>
+                        )}
+                        {a.url && (
+                          <button
+                            type="button"
+                            className="msg-att-dl"
+                            onClick={() => void saveChatAttachment(a.url as string, chatAttachmentFilename({ title: a.title, url: a.url }))}
+                          >
+                            <span className="material-icons-outlined">download</span>
+                            {t.chatDock.save}
+                          </button>
+                        )}
+                      </Fragment>
+                    ))}
                   </div>
                 );
               })

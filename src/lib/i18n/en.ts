@@ -1036,6 +1036,10 @@ export const en = {
     // What it is ALLOWED to attach, and what it says when it refuses, is the shared gate's — only
     // the label is this surface's, because this surface's strings are keyed here.
     attach: "Attach a file",
+    // Beside an attachment, never instead of it: the bubble OPENS the file, this KEEPS it. Same word
+    // and the same control the deal room already carries (owner, 2026-08-11) — a paper the supplier
+    // sends in the chat has to be savable from wherever the renter is reading the conversation.
+    save: "Save",
     // The placement control. Both labels name the STATE the press moves to, not the one it is in — a
     // toggle labelled with its current state is the oldest way to make a button lie.
     placeFill: "Fill the map area",

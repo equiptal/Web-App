@@ -15,9 +15,11 @@ import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
 import {
   CHAT_ACCEPT,
   CHAT_MAX_MEDIA,
+  chatAttachmentFilename,
   chatFileRejection,
   chatSendFailure,
   classifyChatFile,
+  saveChatAttachment,
   sendChatAttachment,
   sendChatVoiceNote,
   type ChatAttachment,
@@ -55,44 +57,11 @@ const nf = (n: number) => Math.round(n).toLocaleString("en-US");
 type LFn = (en: string, arr: string) => string;
 
 /** A chat attachment's filename. `attName` produces a LOCALISED label for the bubble ("مرفق"), which is
- *  the wrong thing to write to disk — prefer the real title, then the name off the URL. */
+ *  the wrong thing to write to disk — prefer the real title, then the name off the URL. The rule and
+ *  the save itself moved to `lib/chat/chat-attachments` when the map's dock grew the same control:
+ *  one channel, one answer to what a file is called (owner, 2026-08-11). */
 function attFilename(a: StreamAttachment): string {
-  const title = (a.title ?? "").trim();
-  if (title) return title;
-  const path = (a.asset_url || a.image_url || a.thumb_url || "").split(/[?#]/)[0];
-  const last = decodeURIComponent(path.split("/").pop() ?? "");
-  return last || "attachment";
-}
-
-/**
- * SAVE a chat attachment to the device, as opposed to opening it.
- *
- * The bubble's anchor navigates to the file, which for a PDF or an image means the browser renders it in
- * a tab — you can read it, but there's no in-page way to keep a copy. This fetches the bytes and hands
- * the browser a blob with a filename, the same idiom the export/quotation downloads use.
- *
- * `download` on a plain anchor would NOT do: the attachment lives on Stream's CDN, and browsers ignore
- * the attribute cross-origin.
- *
- * Falls back to opening the URL if the fetch is refused (a CDN that sends no CORS headers). That's the
- * behaviour the anchor already gives, so the button can never be worse than not having it.
- */
-async function saveAttachment(url: string, filename: string): Promise<void> {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const blob = await res.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = objectUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(objectUrl);
-  } catch {
-    window.open(url, "_blank", "noopener,noreferrer");
-  }
+  return chatAttachmentFilename({ title: a.title, url: a.asset_url || a.image_url || a.thumb_url });
 }
 
 /**
@@ -801,7 +770,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
                         </a>
                       )}
                       {src && (
-                        <button type="button" className="msg-att-dl" onClick={() => void saveAttachment(src, attFilename(a))}>
+                        <button type="button" className="msg-att-dl" onClick={() => void saveChatAttachment(src, attFilename(a))}>
                           <span className="material-icons-outlined">download</span>
                           {L("Save", "حفظ")}
                         </button>

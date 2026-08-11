@@ -911,20 +911,28 @@ export function BidMapWorkspace({
               </div>
             )}
 
-            {/* A failed ask is stated, never swallowed: the renter must not be left believing a
-                question reached the lessor when it did not. */}
-            {sender.error && (
+            {/* ── A failed ask is stated; the RULE is not a failure (owner, 2026-08-11) ──────────
+                Two different things went through one red `role="alert"` box, and the owner saw the
+                wrong one on staging. The 409 `already_pending` is the guard WORKING — his own "one
+                ask, one card" arriving from the other side — and a red banner made the rule read as a
+                defect he had caused. His ruling: the control adopts the blocked state and says the
+                question is already with the supplier, **never a failure banner**.
+
+                The control has already adopted it by the time this renders: `alreadyPendingAsk` is
+                merged into `outstandingAsks` above, which is the same set a control read out of the
+                conversation would have used, so the button beside this row is already inert and
+                already says why. This row is only the sentence — quiet, and a `status` rather than an
+                `alert`, because nothing here has gone wrong and nothing here says try again.
+
+                A genuine failure keeps the red box and keeps `role="alert"`: the renter must not be
+                left believing a question reached the supplier when it did not. */}
+            {sender.error === "already_pending" ? (
+              <div className="bm-sendnote" role="status">{t.bidMap.requestAlreadyPending}</div>
+            ) : sender.error ? (
               <div className="bm-sendfail" role="alert">
-                {/* The 409 is the RULE arriving from the other side, not a fault, so it says the rule.
-                    Reading it as «لم يصل الطلب» would tell the renter to try again — which is the one
-                    thing "one ask, one card" exists to stop, and the try would refuse again. */}
-                {sender.error === "invalid"
-                  ? t.bidMap.requestInvalid
-                  : sender.error === "already_pending"
-                    ? t.bidMap.requestAlreadyPending
-                    : t.bidMap.requestFailed}
+                {sender.error === "invalid" ? t.bidMap.requestInvalid : t.bidMap.requestFailed}
               </div>
-            )}
+            ) : null}
 
             {/* ── V5 · the equipment list ────────────────────────────────────────────────────────
                 The only part of the column that scrolls, so the counts and the shortfall stay in view
@@ -1030,6 +1038,15 @@ export function BidMapWorkspace({
         <ChatDock
           bid={bid}
           groupKey={requestGroupKey}
+          // The room as the SENDER knows it — the bid's own, or the one the first ask created. The
+          // dock otherwise waits for `GET /received-bids` to mention a room that already exists, and
+          // waits forever when the anchor bid is off that feed's page: the renter sends an ask and
+          // the conversation he was just shown the card in still reads «لا رسائل بعد» (owner's UAT,
+          // 2026-08-11).
+          dealRoomId={sender.dealRoomId}
+          // What the REQUEST asked for, so an `alternative` card in the conversation names the same
+          // thing the control that raised it named (owner, 2026-08-11). Singular — one more machine.
+          typeWord={item ? typeWord(1) : null}
           // Only the anchor bid's fleet exists on this surface, and that is what a request card's
           // state is derived from (RM3-AC-18). A sibling tab's cards state the ask and claim nothing
           // about the answer.

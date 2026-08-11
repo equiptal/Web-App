@@ -122,6 +122,53 @@ export async function sendChatAttachment(
 }
 
 /**
+ * What a saved attachment is called on disk.
+ *
+ * NOT the bubble's label: a surface localises that to «مرفق», and writing an Arabic word with no
+ * extension to disk loses the file's type. The sender's own title first, then the name off the url.
+ */
+export function chatAttachmentFilename(a: { title?: string | null; url?: string | null }): string {
+  const title = (a.title ?? "").trim();
+  if (title) return title;
+  const path = (a.url ?? "").split(/[?#]/)[0];
+  const last = decodeURIComponent(path.split("/").pop() ?? "");
+  return last || "attachment";
+}
+
+/**
+ * SAVE an attachment to the device, as opposed to opening it.
+ *
+ * A bubble's anchor NAVIGATES to the file, which for a PDF or an image means the browser renders it
+ * in a tab — you can read it, but there is no in-page way to keep a copy. This fetches the bytes and
+ * hands the browser a blob with a filename, the same idiom the export/quotation downloads use.
+ *
+ * `download` on a plain anchor would NOT do: the attachment lives on Stream's CDN, and browsers
+ * ignore the attribute cross-origin. Falls back to opening the url when the fetch is refused (a CDN
+ * that sends no CORS headers) — the behaviour the anchor already gives, so the control can never be
+ * worse than not having it.
+ *
+ * It lives HERE, beside the gate and the upload, because both chat surfaces show the same files off
+ * the same channel: a second copy is a second answer to what a file is called and how it is kept.
+ */
+export async function saveChatAttachment(url: string, filename: string): Promise<void> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(objectUrl);
+  } catch {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+}
+
+/**
  * Post a recorded voice note (app parity: mic → voice bubble).
  *
  * `type: "audio"` is what both surfaces switch on to render an `<audio>` player instead of a file

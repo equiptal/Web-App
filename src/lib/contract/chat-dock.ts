@@ -110,6 +110,79 @@ export function dockUnreadTotal(tabs: DockTab[]): number {
   return tabs.reduce((sum, t) => sum + t.unreadCount, 0);
 }
 
+/**
+ * The rooms {@link dockTabs} could not know about, folded in.
+ *
+ * `dockTabs` reads the received-bids feed, and a room created a moment ago is not on it yet. Two
+ * sources fill that gap, and the second one is the owner's UAT of 2026-08-11:
+ *
+ *  · **`fresh`** — rooms this dock created by sending a message;
+ *  · **`surfaceRoomId`** — the ANCHOR bid's room as the surface knows it, which includes the one the
+ *    ask-send created. Sending a request card creates the room, and until this existed the dock had
+ *    no way to hear about it: the card was posted into a conversation the dock was still calling
+ *    compose-only, so it rendered «لا رسائل بعد» and the renter's ask was nowhere. On a bid that the
+ *    feed's first page does not contain, that wait never ends at all.
+ *
+ * **Only ever ADDS.** A tab that already has a room keeps it, so a stale value cannot disconnect a
+ * live conversation, and the feed — which is the authority — always wins.
+ */
+export function dockTabsWithKnownRooms(
+  tabs: DockTab[],
+  known: { fresh?: Record<string, string>; anchorBidId: string; surfaceRoomId?: string | null },
+): DockTab[] {
+  return tabs.map((tab) => {
+    if (tab.dealRoomId) return tab;
+    const extra =
+      known.fresh?.[tab.bidId] ?? (tab.bidId === known.anchorBidId ? known.surfaceRoomId ?? null : null);
+    return extra ? { ...tab, dealRoomId: extra } : tab;
+  });
+}
+
+/* ── which conversation the dock reads (owner's UAT, 2026-08-11) ─────────────────────────────────
+ *
+ * **`open` is not a term of this, and that is the whole fix.**
+ *
+ * The channel is the ONLY record of a request card — there is no table and no status column (§7.3) —
+ * so the surface's ask controls are gated on what the dock reads out of it. Until now the dock
+ * connected only while it was open, which made that record exist only while the renter was looking
+ * at it: he sent an ask, reloaded the page, and every control came back live because the set that
+ * blocks them is rebuilt from messages the dock no longer held. Pressing one then reached the
+ * backend's own guard and came back 409 — proof the ask had been sent and only the UI had forgotten.
+ *
+ * So the anchor bid's room is watched from mount whether the dock is open or shut. His ruling:
+ * *"remain blocked and will never open it again for the renter if asked once, and only change when
+ * the supplier replied."* A closed dock is not a reason to forget.
+ */
+export function dockWatchRoomId(input: {
+  /** The tab the renter is reading — only meaningful while the dock is open. */
+  activeRoomId: string | null;
+  /** The room belonging to the bid this surface resolves. Its asks are what the controls are gated
+   *  on, so it is what a closed dock reads. */
+  anchorRoomId: string | null;
+  open: boolean;
+}): string | null {
+  return input.open ? input.activeRoomId : input.anchorRoomId;
+}
+
+/**
+ * Whether the dock may report the outstanding asks it has read.
+ *
+ * Silence, never an empty set, when it cannot say: an empty set is a claim that the supplier owes
+ * nothing, and made out of our own ignorance it re-enables a control the renter has already used.
+ * Two conditions, and only two — the messages in hand came from the ANCHOR bid's own room, and there
+ * are some. Neither of them is "the dock is open".
+ */
+export function dockMayReportAsks(input: {
+  /** The room the messages currently held were loaded from. */
+  loadedRoomId: string | null;
+  anchorRoomId: string | null;
+  messageCount: number;
+}): boolean {
+  return (
+    input.loadedRoomId != null && input.loadedRoomId === input.anchorRoomId && input.messageCount > 0
+  );
+}
+
 /* ── what a message HAS, so the dock cannot drop one silently ───────────────────────────────────── */
 
 /**

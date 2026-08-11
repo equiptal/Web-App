@@ -3,12 +3,22 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   arrivalNotice,
+  dockMayReportAsks,
   dockMessageView,
   dockTabs,
+  dockTabsWithKnownRooms,
   dockUnreadTotal,
+  dockWatchRoomId,
   inboxGroupKey,
   type DockAnchor,
 } from "@/lib/contract/chat-dock";
+import {
+  askIdentity,
+  composeAvailabilityRequest,
+  isAskOutstanding,
+  outstandingAskIdentities,
+  type RenteeRequestCardPayload,
+} from "@/lib/contract/rentee-request";
 import { mapReceivedBids, type InboxBid } from "@/lib/contract/inbox";
 import { bidSupplierKey, mapBid } from "@/lib/contract/bids";
 
@@ -305,10 +315,12 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
     const fill = cssBlockOf(cssSrc, ".bidmap .bm-chat.is-fill {");
     expect(fill).toContain("var(--bm-panel-w, 392px)");
     expect(fill).toMatch(/inset-inline-end:\s*0/);
-    // MIRROR keeps the prototype's 436px and its `calc(100% - 470px)` ceiling — the guard that stops
-    // two columns squeezing the map to nothing between them.
+    // MIRROR is `rDrawer`'s own resting width — 420px (`04-machine-panel.js:20`), the value the
+    // placement control switches away from and back to. 436 was a rounding of it and nothing more
+    // (owner, 2026-08-11: *"chat is still different UI and size"*). The `calc(100% - 470px)` ceiling
+    // stays — it is the guard that stops two columns squeezing the map to nothing between them.
     const mirror = cssBlockOf(cssSrc, ".bidmap .bm-chat.is-mirror {");
-    expect(mirror).toMatch(/width:\s*436px/);
+    expect(mirror).toMatch(/width:\s*420px/);
     expect(mirror).toContain("calc(100% - 470px)");
   });
 
@@ -330,6 +342,39 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
   it("renders a roomless tab as COMPOSE-ONLY — a note, never a creation", () => {
     // `!active?.dealRoomId` is the branch that would tempt an eager create. It renders copy.
     expect(dockSrc).toContain("{t.chatDock.composeOnly}");
+  });
+
+  it("wears the prototype's chat chrome — a blue identity band and shadowed bubbles", () => {
+    /* Owner, 2026-08-11: *"Chat is still different UI and size."* Three of `pChat`'s own values that
+       this surface had drifted from, and each one is a thing he can see:
+         · the header is the BLUE identity band (05:17–24), not a white toolbar;
+         · the stream's ground is `#E9EEF3`, the prototype's tint;
+         · BOTH bubbles carry `0 1px 2px rgba(0,0,0,.08)` and neither carries an outline (05:29,
+           05:143) — the border on incoming made every one of the supplier's remarks a boxed notice. */
+    const head = cssBlockOf(cssSrc, ".bidmap .bm-chat-head {");
+    expect(head.toLowerCase()).toContain("#2563eb");
+    expect(head).toMatch(/height:\s*64px/); // still on the panel's own line
+    // The avatar the band is built around — the prototype's 42px circle of initials.
+    expect(cssBlockOf(cssSrc, ".bidmap .bm-chat-av {")).toMatch(/width:\s*42px/);
+    expect(cssBlockOf(cssSrc, ".bidmap .bm-chat-body {").toLowerCase()).toContain("#e9eef3");
+    const them = cssBlockOf(cssSrc, ".bidmap .bm-chat .msg.them {");
+    expect(them).toContain("box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08)");
+    expect(them).toMatch(/border:\s*0/);
+    // A card is a message, so it takes a side and the prototype's 86% (05:140–141) rather than
+    // stretching the column and reading as a banner.
+    expect(cssBlockOf(cssSrc, ".bidmap .bm-chat-card {")).toMatch(/width:\s*86%/);
+    expect(cssSrc).toContain(".bidmap .bm-chat-card.is-mine { align-self: flex-end; }");
+  });
+
+  it("gives an attachment a way to be KEPT, through the deal room's own save", () => {
+    // Owner, 2026-08-11: documents in this chat need a download, *"same as existing behaviour of
+    // existing deal room"*. One path, not two — the shared module owns both the save and the name
+    // the file lands under, so the dock cannot save a file under a different name than the deal
+    // room does.
+    expect(dockSrc).toContain("saveChatAttachment(");
+    expect(dockSrc).toContain("chatAttachmentFilename(");
+    expect(dockSrc).toContain('className="msg-att-dl"');
+    expect(dockSrc).not.toMatch(/async function save|createObjectURL/); // no second implementation
   });
 
   it("hands the model a null room rather than one it made up", () => {
@@ -733,6 +778,119 @@ describe("the dock's composer sends what the deal room sends, the way the deal r
     // does not reach this surface. Without a rule here the two new controls would be unstyled
     // buttons, which is the one way "reuse the component" quietly fails to look reused.
     expect(cssSrc).toContain(".bidmap .bm-chat-compose .ib {");
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────────────────────────
+ * A SENT ASK SURVIVES A RELOAD (owner's UAT, 2026-08-11)
+ *
+ * The defect, in his words: he composed an ask, confirmed it, and *"the card never showed in the
+ * thread"*; on refresh the control was back to «اطلب تأكيد التوفّر» as though nothing had been sent,
+ * and pressing it returned the backend's 409 — which proved the ask HAD been sent and only the UI
+ * had forgotten. His ruling: *"remain blocked and will never open it again for the renter if asked
+ * once, and only change when the supplier replied."*
+ *
+ * Both halves of the cause are asserted here, because either one alone reproduces it:
+ *
+ *  1. the dock read the channel only while it was OPEN, so the set that blocks the controls was
+ *     rebuilt from messages a reloaded page did not hold — `dockWatchRoomId`;
+ *  2. the room the ask-send created was invisible to the dock until `GET /received-bids` mentioned
+ *     it, so the card had no stream to land in — the `dealRoomId` the surface passes down, exercised
+ *     through `dockTabs` here.
+ *
+ * The set itself is `outstandingAskIdentities`, which already had its own tests; what is new is that
+ * it is reachable at all on a page nobody has opened the dock on.
+ * ────────────────────────────────────────────────────────────────────────────────────────────────*/
+describe("an ask sent, the page reloaded — the control stays blocked", () => {
+  const ask = composeAvailabilityRequest("eq-1")!;
+  /** The card as it comes back off the channel, exactly as the backend stamps it (§7.3). */
+  const posted: RenteeRequestCardPayload = {
+    type: "rentee_request",
+    ref: "RQ-7F3A",
+    scope: "equipment",
+    equipmentId: "eq-1",
+    serial: "BM-991",
+    kind: "availability",
+    docTypes: null,
+  };
+
+  it("the closed dock still watches the anchor's room — `open` is not a term of the rule", () => {
+    // THE regression. Before the fix this was `open ? activeRoomId : null`, so a page the renter had
+    // not opened the dock on read no conversation at all and reported nothing.
+    expect(dockWatchRoomId({ open: false, activeRoomId: null, anchorRoomId: "dr-1" })).toBe("dr-1");
+    // Open, it follows the tab being read — a sibling tab is a different room.
+    expect(dockWatchRoomId({ open: true, activeRoomId: "dr-2", anchorRoomId: "dr-1" })).toBe("dr-2");
+    // No room, nothing to watch. A bid with no deal room has no conversation to forget.
+    expect(dockWatchRoomId({ open: false, activeRoomId: null, anchorRoomId: null })).toBeNull();
+  });
+
+  it("reports the anchor's asks with the dock shut, and never an empty set out of ignorance", () => {
+    const anchorRoomId = "dr-1";
+    // Shut, with the anchor's messages in hand: it may speak.
+    expect(dockMayReportAsks({ loadedRoomId: anchorRoomId, anchorRoomId, messageCount: 3 })).toBe(true);
+    // Nothing loaded yet — silence, not "nothing is outstanding".
+    expect(dockMayReportAsks({ loadedRoomId: null, anchorRoomId, messageCount: 0 })).toBe(false);
+    // A SIBLING tab's conversation says nothing about this surface's controls.
+    expect(dockMayReportAsks({ loadedRoomId: "dr-2", anchorRoomId, messageCount: 9 })).toBe(false);
+  });
+
+  it("the room the ask-send created gives the anchor tab a stream to render the card in", () => {
+    // The feed has not caught up: its row for this bid still carries `dealRoomId: null`.
+    const tabs = dockTabs(anchor({ dealRoomId: null }), [row({ bidId: "b1", dealRoomId: null })]);
+    expect(tabs[0].dealRoomId).toBeNull();
+    // The room the SENDER holds is folded in. Without it the tab stays compose-only, the dock
+    // renders «لا رسائل بعد», and the card the renter just confirmed is nowhere.
+    const merged = dockTabsWithKnownRooms(tabs, { anchorBidId: "b1", surfaceRoomId: "dr-1" });
+    expect(merged[0].dealRoomId).toBe("dr-1");
+  });
+
+  it("never overrides the feed, and never lends the anchor's room to a sibling tab", () => {
+    // The feed is the authority: a room it already knows wins, so a stale prop cannot disconnect a
+    // live conversation.
+    const known = dockTabs(anchor({ dealRoomId: null }), [row({ bidId: "b1", dealRoomId: "dr-feed" })]);
+    expect(dockTabsWithKnownRooms(known, { anchorBidId: "b1", surfaceRoomId: "dr-stale" })[0].dealRoomId).toBe("dr-feed");
+    // A sibling bid is a different room; the surface's id belongs to the anchor alone.
+    const two = dockTabs(anchor({ dealRoomId: null }), [
+      row({ bidId: "b1", dealRoomId: null }),
+      row({ bidId: "b2", dealRoomId: null, equipmentType: { id: "t2", name: "Loader" } }),
+    ]);
+    const merged = dockTabsWithKnownRooms(two, { anchorBidId: "b1", surfaceRoomId: "dr-1" });
+    expect(merged.find((tb) => tb.bidId === "b1")?.dealRoomId).toBe("dr-1");
+    expect(merged.find((tb) => tb.bidId === "b2")?.dealRoomId).toBeNull();
+    // The dock's own fresh rooms still take precedence for the tab that created them.
+    const fresh = dockTabsWithKnownRooms(two, { fresh: { b2: "dr-2" }, anchorBidId: "b1", surfaceRoomId: "dr-1" });
+    expect(fresh.find((tb) => tb.bidId === "b2")?.dealRoomId).toBe("dr-2");
+  });
+
+  it("blocks the control after the reload, and unblocks it only on the supplier's reply", () => {
+    // ── the send ──────────────────────────────────────────────────────────────────────────────
+    // This session's own acknowledgement: the surface notes the identity it just put in the room.
+    const thisSession = new Set([askIdentity(ask)]);
+    expect(isAskOutstanding(ask, thisSession)).toBe(true);
+
+    // ── the reload ────────────────────────────────────────────────────────────────────────────
+    // Everything in memory is gone. The surface starts with an empty set — which is exactly the
+    // state that produced the 409 — and the ONLY thing that can put the ask back is the channel.
+    const afterReload = new Set<string>();
+    expect(isAskOutstanding(ask, afterReload)).toBe(false);
+
+    // The dock mounts SHUT, watches the anchor's room, and reads the card back out of it.
+    const roomId = dockWatchRoomId({ open: false, activeRoomId: null, anchorRoomId: "dr-1" });
+    expect(roomId).toBe("dr-1");
+    const messages = [{ ask: posted }];
+    expect(dockMayReportAsks({ loadedRoomId: roomId, anchorRoomId: "dr-1", messageCount: messages.length })).toBe(true);
+    const reported = outstandingAskIdentities(messages);
+    // Still blocked, on a page nobody opened the dock on.
+    expect(isAskOutstanding(ask, reported)).toBe(true);
+
+    // ── the supplier answers ──────────────────────────────────────────────────────────────────
+    // "only change when the supplier replied — whether it becomes confirmed or with supplier
+    // response, whatever it is": a refusal releases the control exactly as an acceptance does.
+    const answered = outstandingAskIdentities([
+      { ask: posted },
+      { reply: { type: "rentee_request_reply", inReplyTo: "RQ-7F3A", equipmentId: "eq-1", resolution: "declined" } },
+    ]);
+    expect(isAskOutstanding(ask, answered)).toBe(false);
   });
 });
 

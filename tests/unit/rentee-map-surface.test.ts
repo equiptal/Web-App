@@ -345,11 +345,19 @@ describe("the chat dock's tab strip touches no map state (RM3-AC-49)", () => {
     //
     // The six that follow it landed with the request card the same owner asked for on 2026-08-10 —
     // the review step («أرسل الطلب» / «إلغاء») and the press that opens the machine a card names.
+    //
+    // `dealRoomId` and `typeWord` joined on 2026-08-11, and neither is a handle on this surface:
+    // one is the room the ask-send created (without it the dock waits on a feed for a room that
+    // already exists, and the card the renter just confirmed lands in no stream he can see), the
+    // other is the REQUEST's type word, which the `alternative` cards say. Both travel DOWN and
+    // carry no callback back.
+    //
     // Still ENUMERATED rather than allowed by a pattern, so a further prop fails this line whatever
     // it is called.
     expect(props.sort()).toEqual([
       "bid",
       "canOpenMachine",
+      "dealRoomId",
       "draft",
       "draftBusy",
       "fleet",
@@ -359,6 +367,7 @@ describe("the chat dock's tab strip touches no map state (RM3-AC-49)", () => {
       "onOpenMachine",
       "onOutstandingAsks",
       "sendNonce",
+      "typeWord",
     ]);
     // A raw setter handed down here is the one edit that would make a TAB PRESS move the map. What
     // is handed down instead is a set-writer and two named intentions of the surface's own, each of
@@ -477,5 +486,39 @@ describe("no ask control on this surface writes — they compose (owner, 2026-08
     // `ensureDealRoom` is reachable from the sender alone. If this file learned to call it, an ask
     // control would be creating a room again, review card or not.
     expect(workspace).not.toContain("ensureDealRoom");
+  });
+
+  it("states the 409 as the rule, never as a failure (owner, 2026-08-11)", () => {
+    /* ── The defect this pins ────────────────────────────────────────────────────────────────────
+       The backend's `DEAL_ROOM_REQUEST_ALREADY_PENDING` went through the same red `role="alert"`
+       box as a send that never left, and the owner met it on staging: a scarlet banner telling him
+       his own "one ask, one card" rule had gone wrong. His ruling — the control adopts the blocked
+       state and says the question is already with the supplier, NEVER a failure banner.
+
+       So the two must not share a box, and `already_pending` must reach neither `.bm-sendfail` nor
+       an alert role. The region is the whole of the reporting, anchored on both classes. */
+    const reporting = region(read(WORKSPACE), "sender.error === \"already_pending\"", "bm-body");
+    // Positive control: the region really is the branch, and it really does state the rule.
+    expect(reporting).toContain("t.bidMap.requestAlreadyPending");
+    expect(reporting).toContain("bm-sendnote");
+    // The rule's own row is a STATUS. An `alert` interrupts a screen reader to announce a fault.
+    expect(reporting).toMatch(/bm-sendnote" role="status"/);
+    // …and it is not the red box. `.bm-sendfail` still exists — for a send that genuinely failed —
+    // but nothing on the already-pending path may reach it.
+    const beforeFail = reporting.slice(0, reporting.indexOf("bm-sendfail"));
+    expect(beforeFail).not.toContain("requestFailed");
+    expect(beforeFail).not.toContain("role=\"alert\"");
+    // The blocked state is what actually answers the renter, and it is fed from the same 409: the
+    // identity the backend refused is merged into the set every ask control reads.
+    expect(workspace).toMatch(/sender\.alreadyPendingAsk\)\s*noteOutstanding\(sender\.alreadyPendingAsk\)/);
+  });
+
+  it("hands the dock the room the ask-send created, so the card has a stream to land in", () => {
+    /* Owner's UAT, 2026-08-11: *"the card never showed in the thread"*. Sending an ask CREATES the
+       deal room, and the dock could only learn of it from `GET /received-bids` — a wait that never
+       ends when the anchor bid is off that feed's page. The sender already held the id; nothing
+       carried it across. */
+    const mounted = region(read(WORKSPACE), "<ChatDock", "/>");
+    expect(mounted).toMatch(/dealRoomId=\{sender\.dealRoomId\}/);
   });
 });

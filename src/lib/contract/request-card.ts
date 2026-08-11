@@ -122,6 +122,15 @@ export interface RequestCardCtx {
    * that looked pressable and did nothing would be worse than one that never claimed to be.
    */
   canOpen?: (equipmentId: string) => boolean;
+  /**
+   * What the REQUEST asked for — "Crawler Excavator 30 ton" — already composed and localised by the
+   * surface from the request's own taxonomy, singular.
+   *
+   * Only an `alternative` reads it, and it is what makes that card say the same thing the list-foot
+   * control says (owner, 2026-08-11). Null on a surface holding no request — a sibling tab, the deal
+   * room — where the card names no type rather than naming the wrong one.
+   */
+  typeWord?: string | null;
 }
 
 /** How the status row reads. `draft` is the one tone that is not a statement about the supplier — it
@@ -180,6 +189,14 @@ export function requestCardView(
     subject.serial ||
     (subject.scope === "company" ? L("The company", "الشركة") : L("The machine", "المعدّة"));
 
+  /* ── `alternative` asks for an ADDITION, and names the REQUEST's type (owner, 2026-08-11) ───────
+     «طلب معدّة أخرى» / "Request for another machine" described a SWAP — a different unit instead of
+     this one — which is not what either control raises. Both ask the supplier to ADD one more machine
+     that meets the request, so both now read the way the list-foot control reads: *"ask to add
+     another Crawler Excavator 30 ton"*. The type word comes from the request's own taxonomy through
+     `ctx.typeWord`, never from the machine the ask was raised beside — the ask is not about it. */
+  const another = ctx.typeWord?.trim() || null;
+
   const kindLabel = ((): string => {
     switch (subject.kind) {
       case "availability":
@@ -187,11 +204,11 @@ export function requestCardView(
       case "document":
         return L("Document request", "طلب مستند");
       case "alternative":
-        // The shortfall ask names no machine — it asks FOR one. «طلب معدّة أخرى» would describe a swap
-        // the renter never proposed.
-        return subject.equipmentId
-          ? L("Request for another machine", "طلب معدّة أخرى")
-          : L("Request to add the missing units", "طلب إضافة الوحدات الناقصة");
+        // The shortfall ask names no machine — it asks FOR one — and neither does this one, which is
+        // why they now read alike. Only the type word separates them from "another machine".
+        return another
+          ? L(`Request to add another ${another}`, `طلب إضافة ${another} أخرى`)
+          : L("Request to add another machine", "طلب إضافة معدّة أخرى");
     }
   })();
 
@@ -206,12 +223,17 @@ export function requestCardView(
       case "availability":
         return L("Can you confirm this machine is available?", "هل يمكنك تأكيد توفّر هذه المعدّة؟");
       case "alternative":
-        return subject.equipmentId
+        // An ADDITION, not a swap. "matching these specifications" read as *instead of this one* —
+        // and it is asked from beside a machine, which made the misreading the obvious one.
+        return another
           ? L(
-              "Do you have another machine matching these specifications?",
-              "هل لديك معدّة أخرى مطابقة لمواصفات الطلب؟",
+              `Do you have another ${another} to add that meets my request?`,
+              `هل لديك ${another} أخرى تضيفها وتطابق طلبي؟`,
             )
-          : L("Can you add the missing units to the offer?", "هل يمكنك إضافة الوحدات الناقصة إلى العرض؟");
+          : L(
+              "Do you have another machine to add that meets my request?",
+              "هل لديك معدّة أخرى تضيفها وتطابق طلبي؟",
+            );
       case "document":
         return null;
     }
@@ -260,9 +282,13 @@ export function requestCardView(
     title,
     serial: machine?.serial ?? subject.serial,
     photoUrl: machine?.photoUrl ?? null,
-    // A company card is never pressable, and a machine the surface cannot open is not either.
+    /* Never pressable: a `company` card (it names no machine at all), an `alternative` (owner,
+       2026-08-11 — it asks for a machine that does not exist yet, so the unit it happens to carry is
+       the one it is NOT about, and opening that would land the reader on the wrong machine), and a
+       machine this surface cannot open. */
     openable:
       subject.scope !== "company" &&
+      subject.kind !== "alternative" &&
       subject.equipmentId != null &&
       (ctx.canOpen ? ctx.canOpen(subject.equipmentId) : machine != null),
     kindLabel,
