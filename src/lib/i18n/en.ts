@@ -1171,6 +1171,20 @@ export const en = {
     retry: "Try again",
     // Phase 1 ships the shell; the two panes arrive with phases 2 and 3.
     tabPending: "This view is still being built.",
+    // ── The bid card ──
+    // The card's source line, said in full. The header chip above is the short form.
+    sourceAppLong: "Via Moedatech app",
+    sourceOfflineLong: "Offline · added by you",
+    notOnApp: "Not on the app",
+    openChat: "Open the conversation",
+    // "{period}" is the rental period the bid quoted in — Monthly rental, Weekly rental, and so on.
+    rentalPer: "Rental / {period}",
+    grandTotal: "Grand total",
+    allUnits: "All {n} units",
+    // Off-platform pair. The invite has no action behind it yet and says so when pressed.
+    inviteToApp: "Invite to Moedatech",
+    viewQuote: "View quote",
+    notBuiltYet: "Not available yet.",
   },
   survey: {
     navTitle: "Surveys",

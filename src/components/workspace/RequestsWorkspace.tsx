@@ -5,9 +5,9 @@ import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import { SignInPrompt } from "@/components/common/SignInPrompt";
-import { fetchAllMyRequests, fetchBids, fetchRequestSubmissions } from "@/lib/api/client";
+import { fetchAllMyRequests, fetchBids, fetchReceivedBids, fetchRequestSubmissions } from "@/lib/api/client";
 import { groupRequests, type RequestGroup } from "@/lib/contract/requests";
-import { submissionToBidCard } from "@/lib/contract/link-bids";
+import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import {
   EMPTY_SELECTION,
   filterBySource,
@@ -22,6 +22,7 @@ import {
 } from "@/lib/contract/workspace";
 import { RequestRail } from "@/components/workspace/RequestRail";
 import { RequestStrip } from "@/components/workspace/RequestStrip";
+import { BidCards } from "@/components/workspace/BidCards";
 
 type Tab = "cards" | "compare";
 
@@ -44,6 +45,11 @@ export function RequestsWorkspace() {
   const [groups, setGroups] = useState<RequestGroup[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [bids, setBids] = useState<WorkspaceBid[]>([]);
+  // The submission behind each off-platform card, kept so its viewer has the original to show.
+  const [submissionsByBid, setSubmissionsByBid] = useState<Record<string, LinkBidSubmission>>({});
+  // Unread chat per bid. `fetchDealRoomUnread` is one global total for the Inbox badge; the per-bid
+  // number lives on received-bids, which reads it out of Stream's own per-channel counts.
+  const [unreadByBid, setUnreadByBid] = useState<Record<string, number>>({});
   const [wanted, setWanted] = useState<WorkspaceSelection>(EMPTY_SELECTION);
   const [tab, setTab] = useState<Tab>("cards");
   const [source, setSource] = useState<SourceFilter>("all");
@@ -77,31 +83,46 @@ export function RequestsWorkspace() {
   useEffect(() => {
     if (status !== "authed" || !itemId) {
       setBids([]);
+      setSubmissionsByBid({});
       return;
     }
     let live = true;
     setBids([]);
+    setSubmissionsByBid({});
     Promise.all([
       fetchBids(itemId).catch(() => ({ bids: [] })),
       fetchRequestSubmissions(itemId).catch(() => ({ submissions: [] as Awaited<ReturnType<typeof fetchRequestSubmissions>>["submissions"] })),
     ]).then(([app, link]) => {
       if (!live) return;
-      setBids([
-        ...app.bids.map((card): WorkspaceBid => ({ card, source: "app" })),
-        // One card per item of a submission — an off-platform supplier can answer several lines of
-        // the same RFQ in one go, and each line is its own offer to compare.
-        ...link.submissions.flatMap((sub) =>
-          (sub.items.length ? sub.items : [undefined]).map((it): WorkspaceBid => ({ card: submissionToBidCard(sub, it), source: "offline" })),
-        ),
-      ]);
+      // One card per item of a submission — an off-platform supplier can answer several lines of the
+      // same RFQ in one go, and each line is its own offer to compare.
+      const offline = link.submissions.flatMap((sub) =>
+        (sub.items.length ? sub.items : [undefined]).map((it) => ({ bid: { card: submissionToBidCard(sub, it), source: "offline" } as WorkspaceBid, sub })),
+      );
+      setBids([...app.bids.map((card): WorkspaceBid => ({ card, source: "app" })), ...offline.map((o) => o.bid)]);
+      setSubmissionsByBid(Object.fromEntries(offline.map((o) => [o.bid.card.id, o.sub])));
     });
     return () => {
       live = false;
     };
   }, [status, itemId]);
 
+  // Unread is per bid across every request, so it is fetched once for the session rather than per
+  // item — switching item does not change anyone's unread count.
+  useEffect(() => {
+    if (status !== "authed") return;
+    let live = true;
+    fetchReceivedBids()
+      .then((r) => live && setUnreadByBid(Object.fromEntries(r.bids.map((b) => [b.bidId, b.unreadCount]))))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [status]);
+
   const pickGroup = useCallback((groupId: string) => setWanted({ groupId, itemId: null, bidId: null }), []);
   const pickItem = useCallback((id: string) => setWanted((w) => ({ groupId: w.groupId, itemId: id, bidId: null })), []);
+  const pickBid = useCallback((bidId: string) => setWanted((w) => ({ groupId: w.groupId, itemId: w.itemId, bidId })), []);
 
   const tiles = useMemo(() => railTiles(groups ?? []), [groups]);
   const shown = useMemo(() => filterBySource(bids, source), [bids, source]);
@@ -223,16 +244,26 @@ export function RequestsWorkspace() {
             ))}
           </div>
 
-          {/* Phases 2 and 3 fill these. The count is real already, so the shell is not pretending. */}
-          <div className="grid min-h-[220px] place-items-center px-4 py-12 text-center">
-            <div>
-              <Icon name={tab === "cards" ? "view_agenda" : "table_chart"} size={30} className="text-muted" />
-              <p className="mt-2 text-[13px] font-semibold text-muted">{t.workspace.tabPending}</p>
-              <p className="mt-1 text-[12px] font-semibold text-muted/70">
-                {shown.length} · {tab === "cards" ? t.workspace.tabCards : t.workspace.tabCompare}
-              </p>
+          {tab === "cards" ? (
+            <BidCards
+              bids={shown}
+              selectedId={resolved.bidId}
+              unreadByBid={unreadByBid}
+              submissionsByBid={submissionsByBid}
+              onSelect={pickBid}
+            />
+          ) : (
+            /* Phase 3 fills this. The count is real already, so the shell is not pretending. */
+            <div className="grid min-h-[220px] place-items-center px-4 py-12 text-center">
+              <div>
+                <Icon name="table_chart" size={30} className="text-muted" />
+                <p className="mt-2 text-[13px] font-semibold text-muted">{t.workspace.tabPending}</p>
+                <p className="mt-1 text-[12px] font-semibold text-muted/70">
+                  {shown.length} · {t.workspace.tabCompare}
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
