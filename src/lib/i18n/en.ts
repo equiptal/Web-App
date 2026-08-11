@@ -955,10 +955,6 @@ export const en = {
     eqOutOfCity: "· Outside the city",
     eqAskConfirm: "Ask him to confirm",
     eqAskConfirmWhy: "Ask the supplier to confirm this machine is available",
-    // The same control once the ask is out. It keeps its place in the row rather than disappearing:
-    // a control that vanished would read as "there is nothing to ask", when the truth is that the
-    // question has been asked and is waiting.
-    eqAskPending: "Asked — awaiting reply",
     eqDetails: "Details",
     // The certificate row always occupies its line, so a machine with no certificates is a shorter
     // LINE and not a shorter CARD.

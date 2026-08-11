@@ -562,7 +562,7 @@ function EquipmentCard({
                 >
                   {/* «تم الطلب» / «Asked» — the list-foot ask's own sent label, borrowed rather than
                       duplicated (owner, 2026-08-11: *"use shorter wordings, even on the equipment
-                      card"*). `eqAskPending` reads «Asked — awaiting reply», which is a sentence in a
+                      card"*). The earlier draft read «Asked — awaiting reply», a sentence inside a
                       22px control beside a second control; the same fact fits in one word, and the
                       REASON the button is inert is already on its `title` in full. */}
                   {pending ? t.bidMap.eqAskAnotherSent : t.bidMap.eqAskConfirm}

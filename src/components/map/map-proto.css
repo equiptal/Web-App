@@ -1408,10 +1408,12 @@
   cursor: pointer;
   font-family: inherit;
 }
+/* Navy, not action blue: an active sort states how the list is ordered. That is
+   a state, not something to act on — AC-33 keeps #2563EB for asks. */
 .bidmap .bm-sort.on {
   background: #fff;
-  border-color: rgba(37, 99, 235, 0.22);
-  color: #2563eb;
+  border-color: rgba(22, 48, 79, 0.22);
+  color: #16304f;
   box-shadow: 0 1px 3px rgba(15, 34, 56, 0.08);
 }
 /* No project location → the nearest sort is DISABLED, not silently meaningless (AC-21). */
@@ -1449,10 +1451,13 @@
   transition: 0.15s;
 }
 .bidmap .bm-row.cheap { border-color: rgba(22, 163, 74, 0.25); }
+/* Same rule as .bm-sort.on — the selected row is showing on the map, which is a
+   state. The accent bar and the map pin already carry the meaning; navy keeps
+   the row from reading as a button (AC-33, AC-74). */
 .bidmap .bm-row.on {
-  background: rgba(37, 99, 235, 0.08);
-  border-color: #2563eb;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.18);
+  background: rgba(22, 48, 79, 0.07);
+  border-color: #16304f;
+  box-shadow: 0 4px 14px rgba(22, 48, 79, 0.18);
 }
 /* Selection is single and replacing, so the others must visibly recede (AC-74). */
 .bidmap .bm-row.dim { opacity: 0.55; }
