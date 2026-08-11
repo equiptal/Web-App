@@ -1338,7 +1338,12 @@ function CounterFlow({
   // `room.startDate` here type-checks under a loose signature and silently evaluates to undefined,
   // which turns proration off and shows the raw rate.
   const startDate = room.details?.startDate ?? null;
-  const rentalCalc = computeRentalTotal({ rate, priceUnit: room.priceUnit, startDate, durationDays: periods });
+  // `periods` arrives as one full period when the room has no duration, so it must NOT be handed to the
+  // module as a window — that would strike out Fridays nobody booked and undercut the rate the renter
+  // typed. Open deals price at the bare rate, exactly as the app's open-deal branch does.
+  const rentalCalc = hasDuration
+    ? computeRentalTotal({ rate, priceUnit: room.priceUnit, startDate, durationDays: periods })
+    : { total: rate, billable: 0, raw: true, exact: true };
   const perUnitRental = rentalCalc.total;
   // The paper states the days the rate is actually charged across, not the calendar duration — the same
   // number the bid card puts on its rental row, and the one `perUnitRental` above was built from.

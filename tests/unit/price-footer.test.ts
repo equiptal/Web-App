@@ -70,6 +70,20 @@ describe("priceFooterModel — the same arithmetic as the deal-room bar (RM3-AC-
     expect(totals.periodCount).toBe(9);
   });
 
+  it("prices an open deal at the bare rate, even with a start date to count Fridays from", () => {
+    // App parity (`rentalLineTotal`, open mode): `durationDays == null` → `rate × units`, full stop.
+    // This used to substitute one full period (26 days for a monthly rate) and hand THAT to the shared
+    // module, which then struck out the Fridays of a window nobody had booked — 30,000/month over two
+    // units came back 53,077 where the app said 60,000. A request with no end date has nothing to
+    // prorate over; the rate is the period.
+    const { totals } = priceFooterModel(bid({ priceUnit: "PER_MONTH", price: 30_000 }), null, SUNDAY);
+    expect(totals.hasDuration).toBe(false);
+    expect(totals.rentalRaw).toBe(true);
+    expect(totals.billableDays).toBe(0);
+    expect(totals.rentalTotal).toBe(30_000 * totals.rentalUnits);
+    expect(totals.periodCount).toBe(1); // one full period, not 22⁄26 of one
+  });
+
   it("names no day count when nothing prorated — there is no arithmetic to show", () => {
     // No start date: the Fridays can't be located, so the rental falls back to one full period at the
     // quoted rate. A "× N billable days" line here would be inventing a window.
