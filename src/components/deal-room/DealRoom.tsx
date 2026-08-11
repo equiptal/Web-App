@@ -93,7 +93,20 @@ function buildQuotationHtml(
   });
 }
 
-export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) => void }) {
+export function DealRoom({ id, onTitle, initialFlow }: {
+  id: string;
+  onTitle?: (t: string) => void;
+  /**
+   * Open one of the two flows on arrival — the deep link behind `/deal-room/[id]?act=counter|accept`
+   * (owner, 2026-08-11).
+   *
+   * The rentee-map price footer's buttons are *these* buttons pressed from a surface that cannot host
+   * the flow (004a §4a.2); without this they landed the renter on the room and asked him to press
+   * Negotiate again for the thing he had already asked for. It seeds `openFlow` and nothing else — no
+   * part of the flow is reachable, or duplicated, through this prop.
+   */
+  initialFlow?: "counter" | "accept";
+}) {
   const { locale } = useLocale();
   const ar = locale === "ar";
   const L = (en: string, arr: string) => (ar ? arr : en);
@@ -370,6 +383,31 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     setFlowMode(mode);
   }
 
+  // ── The `?act=` deep link (owner, 2026-08-11) ───────────────────────────────────────────────────
+  // Seeded ONCE per visit, through `openFlow` itself, so the flow keeps every guard it already had —
+  // including the one this file states twice over: nothing opens before the room is here or while a
+  // submit is in flight.
+  const seededFlow = useRef(false);
+  // Written during the render below, read here. The verdict belongs to that render — `canAccept`
+  // compares the room's terms against the last two negotiation rounds and is derived long past the
+  // early returns, far past where a hook may be declared. A ref is the only way the two can meet, and
+  // it is a pure mirror of what this render's own buttons carry, so a discarded render costs nothing.
+  const flowGate = useRef<{ counter: boolean; accept: boolean }>({ counter: false, accept: false });
+  useEffect(() => {
+    if (seededFlow.current || !initialFlow || !room || busy) return;
+    // Accept waits for the chat, Counter does not. `canAccept`'s price/units halves are reconstructed
+    // from the message stream; judged before it lands they degrade to "nothing to compare", so an
+    // outstanding supplier counter would be invisible and the gate would read open when it is shut.
+    // Counter's own condition is `room.myTurn` — a field of the room — so it needs nothing else.
+    // Where the chat never connects at all the accept link simply never fires, leaving the renter on
+    // the room: the same place a blocked accept leaves him, under the same strip.
+    if (initialFlow === "accept" && !chatReady && STREAM_API_KEY) return;
+    seededFlow.current = true; // whatever the verdict — closing the sheet must not reopen it
+    if (flowGate.current[initialFlow]) openFlow(initialFlow);
+    // `openFlow` is redeclared every render; the one-shot ref above is what actually bounds this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFlow, room, busy, chatReady]);
+
   // Collect a term resolution locally (no server call — app parity). Submitted on Counter/Accept.
   const setResolution = (key: string, action: "accept" | "counter", value?: unknown) =>
     setResolutions((r) => ({ ...r, [key]: { action, value } }));
@@ -543,6 +581,10 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     : L("Match the supplier's latest price and quantities before you can accept", "طابق أحدث سعر وكميات المورد قبل القبول");
   // Turn cue (app `negotiateFresh` vs `negotiate`): the supplier countered last vs the renter's opening move.
   const supplierCountered = room.myTurn && room.lastCounterBy === "supplier";
+  // What the two buttons below would allow right now, handed to the `?act=` deep link. Read off the
+  // SAME expressions the buttons are gated by, on the same render, so a deep link can never open a
+  // sheet the renter could not have opened himself with a press.
+  flowGate.current = { counter: showAct, accept: showAct && canAccept };
 
   return (
     <div className="dlproto" dir={ar ? "rtl" : "ltr"}>

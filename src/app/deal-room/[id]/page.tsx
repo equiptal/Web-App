@@ -1,6 +1,7 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { Suspense, use, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { useLocale } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
@@ -15,14 +16,32 @@ export default function DealRoomPage({ params }: { params: Promise<{ id: string 
   const [title, setTitle] = useState("");
   return (
     <AppShell title={title || (locale === "ar" ? "غرفة الصفقة" : "Deal Room")}>
-      <DealRoomGate id={id} onTitle={setTitle} />
+      {/* Suspense boundary: the gate reads `useSearchParams`, which needs one. */}
+      <Suspense fallback={null}>
+        <DealRoomGate id={id} onTitle={setTitle} />
+      </Suspense>
     </AppShell>
   );
+}
+
+/**
+ * `?act=counter` / `?act=accept` — **the act the renter already chose**, arriving with him.
+ *
+ * The rentee map's price footer (004a §4a.1) can show a bid's figures but cannot host the three-step
+ * flow that settles them (004a §4a.2), so its two buttons navigate here. Carrying the act in the URL
+ * is what stops that hand-off from costing a second press on a room the renter never asked to read.
+ *
+ * Anything else in `act` is simply not a mode — `DealRoom` opens nothing and the room behaves as it
+ * always has, which is the right answer for a hand-edited or stale URL.
+ */
+function initialFlowOf(act: string | null): "counter" | "accept" | undefined {
+  return act === "counter" || act === "accept" ? act : undefined;
 }
 
 /** Public web has no route gate, but a deal room needs a session — so a signed-out visitor gets the
  *  auth modal opened in place (per the design), with a sign-in prompt behind it. */
 function DealRoomGate({ id, onTitle }: { id: string; onTitle: (t: string) => void }) {
+  const initialFlow = initialFlowOf(useSearchParams().get("act"));
   const { status } = useSession();
   const { openAuth } = useAuthGate();
   const { locale } = useLocale();
@@ -45,5 +64,5 @@ function DealRoomGate({ id, onTitle }: { id: string; onTitle: (t: string) => voi
     );
   }
   if (status !== "authed") return null; // resolving session — avoid flashing the gate
-  return <DealRoom id={id} onTitle={onTitle} />;
+  return <DealRoom id={id} onTitle={onTitle} initialFlow={initialFlow} />;
 }
