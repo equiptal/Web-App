@@ -20,10 +20,12 @@
  * Five parts, in this order:
  *  1. a **196 px viewer** — the machine's photo, a circular back control, «تكبير» / «تحميل» as icons,
  *     and a caption strip naming what is in the frame; the machine is identified by sight first.
- *     **It is a viewer, and it now has a second subject**: press a row on the documents tab and that
- *     paper is what the frame holds (owner, 2026-08-11 — the prototype's `eqViewer`, *"one frame, two
- *     subjects"*). The frame's state lives HERE because the frame does; the tab reports the press.
- *  2. **two underline tabs** — the machine · its documents
+ *     **It is a viewer, and it now has a second subject**: press a row on the documents tab — or a
+ *     GREEN match cell, which opens the same paper (UAT of 2026-08-11) — and that paper is what the
+ *     frame holds (owner, 2026-08-11 — the prototype's `eqViewer`, *"one frame, two subjects"*). The
+ *     frame's state lives HERE because the frame does; the two tabs report the press. Pressing what is
+ *     already framed is the way back to the photograph — the frame carries no X (owner, same UAT).
+ *  2. **two underline tabs** — «Equipment» · its documents
  *  3. one line: distance · band — yard, with the availability chip on the opposite corner (and the
  *     unconfirmed explainer under it, which is the only thing that stops red reading as a refusal)
  *  4. **the match grid** — six cells scoring this machine against *this request*
@@ -39,7 +41,7 @@
  */
 
 import { useCallback, useMemo, useState } from "react";
-import { isOutOfCity, unitAvailability } from "@/lib/contract/bid-map";
+import { distanceDigits, isOutOfCity, unitAvailability } from "@/lib/contract/bid-map";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import { useDownloadBatch } from "./doc-download";
 import { EquipmentDocuments, type DocViewSubject } from "./EquipmentDocuments";
@@ -67,9 +69,13 @@ const MARK: Record<"green" | "grey" | "red", string> = { green: "✓", grey: "�
 const GLYPH = {
   enlarge: ["M4 10V4h6", "M20 14v6h-6", "M4 4l7 7", "M20 20l-7-7"],
   download: ["M12 3v12", "M7 11l5 5 5-5", "M4 20h16"],
-  // Not the prototype's — it has no way back to the photograph because its back arrow leaves the
-  // machine altogether. Ours does not, so the frame needs a door out of the document it is holding.
-  close: ["M6 6l12 12", "M18 6L6 18"],
+  /* ~~`close` — not the prototype's; it has no way back to the photograph because its back arrow leaves
+     the machine altogether. Ours does not, so the frame needs a door out of the document it is
+     holding.~~ **Removed by the owner's UAT of 2026-08-11** — *"the X button must be removed"*, and the
+     prototype agrees with him. The door it argued for is real and is still there; it is the row itself.
+     Pressing the framed row (or the framed match cell) a second time returns the frame to the machine's
+     photograph, so the way out is the control the renter used to come in, rather than a third glyph
+     stacked on the corner of the photograph he is trying to look at. */
 } as const;
 
 function Ico({ paths }: { paths: readonly string[] }) {
@@ -137,6 +143,17 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
     setFramedFailed(null);
   }
 
+  /* **ONE way in and out of the frame** (owner, 2026-08-11, after the X was removed). Pressing what is
+     already framed puts the machine's photograph back — the control that opened a paper is the control
+     that closes it, on the documents tab's rows and on the match grid's cells alike, so neither surface
+     needs a close button of its own and there is no state where a paper is stuck in the frame.
+     Identified by the ROW's key rather than by the url, so the two subjects a `DocViewSubject` can name
+     are told apart even when one machine files the same paper twice. */
+  const frame = useCallback((subject: DocViewSubject) => {
+    setFramedDoc((cur) => (cur?.key === subject.key ? null : subject));
+    setFramedFailed(null);
+  }, []);
+
   const cells = useMemo(() => matchGrid(machine, request), [machine, request]);
   const hero = heroPhotoUrl(machine);
   const availability = unitAvailability(machine);
@@ -144,11 +161,12 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
   // request-dependent — a paper nobody asked for is not outstanding, and cannot be counted here — so
   // the badge reads the same `request` the grid above it is scored against.
   //
-  // **A group whose `attention` is `null` adds nothing** — it is not zero, it is a group that makes no
-  // such claim (the operator's, owner 2026-08-08). The badge counts what the renter can act on, and there
-  // is nothing to act on there; counting it would send him to a tab and then to rows with no controls.
+  // ~~A group whose `attention` is `null` adds nothing — it is not zero, it is a group that makes no such
+  // claim (the operator's, owner 2026-08-08).~~ That group left the tab in the UAT of 2026-08-11, and
+  // with it the only `null` this sum ever had to survive. Every row this badge counts is now a row the
+  // renter can tick, ask for or open.
   const docAttention = useMemo(
-    () => equipmentDocGroups(machine, request).reduce((n, g) => n + (g.attention ?? 0), 0),
+    () => equipmentDocGroups(machine, request).reduce((n, g) => n + g.attention, 0),
     [machine, request],
   );
 
@@ -211,14 +229,27 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
         {framed == null ? (
           <div className="mp-hero-empty">{L("No photo on this machine's file", "لا توجد صورة على ملف هذه المعدّة")}</div>
         ) : framedBroken ? (
-          // Not an image, and there is no way to have known that in advance. It says so, and hands over
-          // the one control that always works on a presigned url: a tab.
-          <div className="mp-hero-empty">
-            <span>{L("This file can't be shown here.", "لا يمكن عرض هذا الملف هنا.")}</span>
-            <a href={framed.url} target="_blank" rel="noopener noreferrer">
-              {L("Open it in a new tab", "افتحه في تبويب جديد")}
-            </a>
-          </div>
+          /* **The paper renders HERE, not in a message about the paper** (owner, UAT of 2026-08-11 —
+             *"the document does not render at the top"*, over a screenshot of this very state). What he
+             pressed was a PDF, and `<img>` cannot draw one, so the frame said so and offered a tab.
+
+             `<object>` can draw one: every browser this app supports renders a PDF inline with its own
+             viewer, and an `<object>` picks the viewer off the RESPONSE's content type rather than off a
+             guess we made about the url — which is the MIME sniffing this directory has twice refused to
+             do. It is the second attempt rather than the first because `<img>` is the right element for
+             a photograph and most of what is framed here is one.
+
+             **And the message is not lost — it is the fallback.** An `<object>` renders its children
+             when it cannot display its data, so a DWG or a corrupt scan still lands on the same sentence
+             and the same way out it landed on before, with no detection code of ours in between. */
+          <object className="mp-frame-doc" data={framed.url} aria-label={framed.name}>
+            <div className="mp-hero-empty">
+              <span>{L("This file can't be shown here.", "لا يمكن عرض هذا الملف هنا.")}</span>
+              <a href={framed.url} target="_blank" rel="noopener noreferrer">
+                {L("Open it in a new tab", "افتحه في تبويب جديد")}
+              </a>
+            </div>
+          </object>
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={framed.url} alt={framed.name} onError={() => setFramedFailed(framed.url)} />
@@ -242,24 +273,10 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
             machine's photograph behind it. */}
         {framed && (
           <div className="mp-tools">
-            {/* Only while a document is in the frame: the way back to the machine's photograph. The
-                prototype needs none — its back arrow clears the document and leaves the machine in one
-                press — but ours goes back to the list, so without this the frame keeps the last paper
-                the renter opened until he leaves the machine entirely. */}
-            {framedDoc && (
-              <button
-                type="button"
-                className="mp-tool"
-                aria-label={L("Back to the machine's photo", "العودة إلى صورة المعدّة")}
-                title={L("Back to the machine's photo", "العودة إلى صورة المعدّة")}
-                onClick={() => {
-                  setFramedDoc(null);
-                  setFramedFailed(null);
-                }}
-              >
-                <Ico paths={GLYPH.close} />
-              </button>
-            )}
+            {/* ~~Only while a document is in the frame: the way back to the machine's photograph.~~
+                **Removed on the owner's word** (UAT of 2026-08-11): the frame carries no X. The state it
+                existed for cannot arise — pressing the framed row or cell again is the way back (see
+                `frame` above) — so what is gone is the third glyph, not the exit. */}
             <a
               className="mp-tool solid"
               href={framed.url}
@@ -295,7 +312,13 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
 
       <div className="mp-tabs" role="tablist">
         <button type="button" role="tab" aria-selected={tab === "machine"} className={`mp-tab${tab === "machine" ? " on" : ""}`} onClick={() => setTab("machine")}>
-          {L("The machine", "المعدّة")}
+          {/* ~~«The machine»~~ — **«Equipment»** (owner, UAT of 2026-08-11: *"for the machine tab call it
+              Equipment"*). It is the word the rest of this surface already uses for the same object: the
+              panel it sits in is headed «المعدّات في هذا العرض», the list behind the back arrow is the
+              equipment list, and «الطلب» names an equipment item. One noun, everywhere the renter
+              travels. The Arabic already said «المعدّة» and is unchanged — «المعدّة» *is* "the
+              equipment"; the two locales had drifted apart, not the Arabic away from the ruling. */}
+          {L("Equipment", "المعدّة")}
         </button>
         <button type="button" role="tab" aria-selected={tab === "documents"} className={`mp-tab${tab === "documents" ? " on" : ""}`} onClick={() => setTab("documents")}>
           {/* «المستندات», the prototype's and the screenshot's word — not «مستنداتها». The possessive
@@ -330,7 +353,11 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
               <span className="mp-line-tx">
                 {km != null && (
                   <>
-                    <span className="mp-km" dir="ltr">{ar ? arDigits(Math.round(km)) : Math.round(km)}</span>
+                    {/* ONE DECIMAL, never a whole kilometre (owner, 2026-08-11) — and through the
+                        SAME `distanceDigits` the card and the marker's chip use, so the three cannot
+                        state one machine's distance three ways. `arDigits` truncates, which is right
+                        for the document count above and would have turned 7.5 km into «٧» here. */}
+                    <span className="mp-km" dir="ltr">{distanceDigits(km, ar)}</span>
                     <span className="mp-band">{band ? L(`km · ${band.en}`, `كم · ${band.ar}`) : L("km", "كم")}</span>
                   </>
                 )}
@@ -372,16 +399,58 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
                 {L("Against your request", "مقابل طلبك")}
                 <small>{L("What this machine answers, and what it does not.", "ما تفي به هذه المعدّة، وما لا تفي به.")}</small>
               </div>
+              {/* **A CELL OPENS ITS EVIDENCE** (owner, UAT of 2026-08-11: *"clicking on any document
+                  field here, like '2 of 2 unit photos', will take them to the document"*). The cell is a
+                  `<button>` when the model resolved a file behind it and a plain `<div>` when it did not
+                  — a cell with nothing to show must not press, which is the same rule the document rows
+                  hold to and the reason `MatchCell.evidence` is null on every red and grey cell.
+
+                  It puts the paper in the frame at the top of THIS panel rather than opening a tab: the
+                  viewer is already there, already sized for a sheet, and the renter reading a grid of
+                  findings should not have to leave the findings to check one. Pressing the framed cell
+                  again brings the machine's photograph back (`frame`). The subject it hands over is the
+                  documents tab's own row, so the frame marks that row too if he crosses over. */}
               <div className="mp-grid">
-                {cells.map((c) => (
-                  <div key={c.key} className={`mp-cell ${c.state}`}>
-                    <div className="k">{L(c.label.en, c.label.ar)}</div>
-                    <div className="v">
-                      <span>{L(c.finding.en, c.finding.ar)}</span>
-                      <span className="mark" aria-hidden="true">{MARK[c.state]}</span>
-                    </div>
-                  </div>
-                ))}
+                {cells.map((c) => {
+                  const ev = c.evidence;
+                  const framedHere = ev != null && framedDoc?.key === ev.key;
+                  const body = (
+                    <>
+                      <div className="k">{L(c.label.en, c.label.ar)}</div>
+                      <div className="v">
+                        <span>{L(c.finding.en, c.finding.ar)}</span>
+                        <span className="mark" aria-hidden="true">{MARK[c.state]}</span>
+                      </div>
+                    </>
+                  );
+                  if (!ev) {
+                    return (
+                      <div key={c.key} className={`mp-cell ${c.state}`}>
+                        {body}
+                      </div>
+                    );
+                  }
+                  const evName = L(ev.label.en, ev.label.ar);
+                  // The accessible name says the ACT and names the paper, because the cell's own two
+                  // lines are a label and a finding — neither of them says that pressing shows a file.
+                  const say = framedHere
+                    ? L("Back to the machine's photo", "العودة إلى صورة المعدّة")
+                    : L(`Show ${evName} in the viewer`, `اعرض ${evName} في العارض`);
+                  return (
+                    <button
+                      key={c.key}
+                      type="button"
+                      className={`mp-cell ${c.state} press${framedHere ? " open" : ""}`}
+                      aria-label={say}
+                      title={say}
+                      // Stated, not only outlined: a colour is not something a screen reader can read.
+                      aria-current={framedHere ? "true" : undefined}
+                      onClick={() => frame({ key: ev.key, name: evName, url: ev.url, kind: ev.kind })}
+                    >
+                      {body}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </>
@@ -397,10 +466,7 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
             L={L}
             onRequest={onRequest}
             askPending={askPending}
-            onView={(subject) => {
-              setFramedDoc(subject);
-              setFramedFailed(null);
-            }}
+            onView={frame}
             viewingKey={framedDoc?.key ?? null}
           />
         )}

@@ -101,9 +101,28 @@
 .mp-viewer.doc.photo img { background: #0f2238; }
 .mp-viewer.doc.paper img { background: #fff; padding: 10px 10px 34px; }
 
-/* Two states share this: a machine with no photograph on its file, and a file the browser would not
-   render as an image. The second one carries a link out, which is why this is a column now — the
-   sentence and the way out stack rather than running together on one line. */
+/* **The file the `<img>` could not draw, drawn** (owner, UAT of 2026-08-11 — *"the document does not
+   render at the top"*). An `<object>` fills the frame exactly as the image it replaces does, so a PDF
+   lands at the same size, in the same place, under the same caption. `border: 0` because the agent
+   stylesheet gives an `<object>` none but a stray one is one hairline from being read as a second frame
+   inside the frame. Its own `padding` is left to `.mp-viewer.doc.paper`'s rule below, which already
+   clears the caption strip for a sheet. */
+.mp-frame-doc {
+  width: 100%;
+  height: 100%;
+  /* `border-box` is not the page default here, and without it the 34 px kept clear for the caption
+     would push the object's own height past the frame and put the foot of the sheet under it. */
+  box-sizing: border-box;
+  padding-bottom: 34px;
+  border: 0;
+  display: block;
+  background: #fff;
+}
+
+/* Two states share this: a machine with no photograph on its file, and a file NEITHER an image nor an
+   `<object>` could render — the second reaches it as the object's own fallback content, so the sentence
+   and its way out are what the browser paints when it has nothing else to paint. It is a column for
+   that reason: the sentence and the way out stack rather than running together on one line. */
 .mp-hero-empty {
   width: 100%;
   height: 100%;
@@ -409,6 +428,31 @@
 .mp-cell.red .v, .mp-cell.red .mark { color: #d9362a; }
 .mp-cell.grey .v { color: #6b8fa8; }
 .mp-cell.grey .mark { color: #6b8fa8; }
+
+/* **A GREEN CELL IS A CONTROL** (owner, UAT of 2026-08-11: *"clicking on any document field here, like
+   '2 of 2 unit photos', will take them to the document"*). It is a `<button>` only when the model found
+   a file behind it, so this resets the agent stylesheet's button and changes nothing else: same border,
+   same fill, same two lines, same grid cell. A pressable cell must not look like a different kind of
+   cell — the grid's job is to be read down in one pass, and a control among findings that redrew itself
+   would break that before it helped anybody. What says it presses is the cursor and, when it is holding
+   the frame, the outline below. */
+button.mp-cell {
+  width: 100%;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+/* **THE FRAMED CELL WEARS WHAT THE FRAMED ROW WEARS** — `#16304F`, stated as a doubled hairline with no
+   fill of its own (`.mp-row.open`, and the note there for why emphasis rather than a second colour).
+   Selection on this surface is navy wherever it happens: a ticked row, a ticked box, a framed row, a
+   framed cell (owner, 2026-08-11 — *"use consistent styling on any selection of a row, whether here or
+   any other surface"*). `#2563EB` remains the ACTION colour and never a state.
+   The border-color override has to beat `.mp-cell.green`, which is why it is written with the state
+   class beside it rather than relying on source order. */
+.mp-cell.press.open,
+.mp-cell.green.press.open { border-color: #16304f; box-shadow: inset 0 0 0 1px #16304f; }
 
 /* ═══════════════════════════ document rows (V8 + V9 share this grammar) ═══════════════════════════ */
 

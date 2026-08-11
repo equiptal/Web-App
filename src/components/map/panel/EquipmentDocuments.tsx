@@ -17,10 +17,12 @@
  *     onRequest={(draft) => compose(draft)}    // PanelRequestDraft — V11 owns the composer
  *   />
  *
- * **Up to three groups** — photos · documents · **the operator's documents**, which are a section of
- * their own and not one row buried in the equipment's papers. The first two carry an attention count of
- * **rows needing action, never totals**; the operator's carries none (see below). A group with nothing to
- * say does not render.
+ * **Two groups** — photos · documents. ~~and **the operator's documents**, which are a section of their
+ * own and not one row buried in the equipment's papers.~~ **The operator's group is gone** (owner, UAT of
+ * 2026-08-11: *"operator will not be viewed in the document section at all — only in the equipment
+ * field, as its cert exists or not"*), and with it the one group here that could be neither ticked,
+ * asked for nor opened. Both surviving groups carry an attention count of **rows needing action, never
+ * totals**. A group with nothing to say does not render.
  *
  * **A row is red only if the request required it** (owner, 2026-08-08). A paper the lessor holds that
  * nobody asked for still shows and still opens, with no verdict and no tick — there is nothing to
@@ -39,14 +41,15 @@
  * last tick returns to neutral and re-enables everything, which is free here because the mode is
  * derived rather than stored. Every judgement is the model's; this component paints it.
  *
- * **The operator's group is a status, not a document list** (owner, same day, narrowed later the same
+ * ~~**The operator's group is a status, not a document list** (owner, 2026-08-08, narrowed later the same
  * day). Its rows say only whether each certificate is on file — *"they are just a view of what the
- * supplier has"* — and it **participates in nothing else on this tab**: no checkbox in either mode, no
- * place in either batch, no select-all key, and no attention count of its own or in the tab badge above.
- * Nothing validates an operator document on upload, so presence is the only claim the platform can stand
- * behind and there is nothing here for the renter to act on. Those rows simply arrive with no files and
- * `requestable: false`, so the shared row grammar below needs no special case — `docRowMode` answers
- * `null` and every mechanism on this page already ignores a `null`-mode row.
+ * supplier has"* — and it participates in nothing else on this tab.~~ **Withdrawn upward, not sideways**
+ * (owner, UAT of 2026-08-11): a group that participates in nothing does not belong on a tab whose every
+ * other row can be ticked, asked for and opened, so the statement moved to the match grid — where the
+ * operator cell already said the same thing, scored from the same `computeUnitReadiness().operatorCerts`
+ * — and the group is not built at all. The reason it had no controls is unchanged and is why the
+ * statement is all that survives: nothing validates an operator document on upload, so presence is the
+ * only claim the platform can stand behind.
  *
  * **Presence only.** `documentKeys` entries carry `verifyStatus` and `expiryDate`; this tab renders
  * neither, and the model never reads them. §6.6: a machine's paper is either there or it isn't, and a
@@ -168,12 +171,10 @@ export function EquipmentDocuments({
   // ONE selection set across ALL groups — a batch is the renter's whole act, not one per heading. He can
   // tick the missing plate photo and a missing equipment certificate — two different groups — and send once.
   //
-  // That example used to read «the missing plate photo **and the missing operator certificate**». **The
-  // operator half is withdrawn** (owner, 2026-08-08, narrowing AC-75) and would now be false: operator
-  // rows are inert in every mode. `operatorStatusRows` gives them no url and `requestable: false`, so
-  // `docRowMode` answers `null` and they carry no checkbox to tick — they can join neither the request
-  // batch nor the download one. The cross-group point the example was making still holds; it just needs
-  // two groups that actually have checkboxes.
+  // That example used to read «the missing plate photo **and the missing operator certificate**», which
+  // stopped being true when the operator's rows went inert (owner, 2026-08-08) and stopped naming
+  // anything at all when the group left this tab (UAT of 2026-08-11). Rewritten against the two groups
+  // that remain; the cross-group point it makes is unchanged.
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set<string>());
   const allRows = useMemo(() => groups.flatMap((g) => g.rows), [groups]);
 
@@ -259,8 +260,8 @@ export function EquipmentDocuments({
           onToggle={toggle}
           onToggleAll={toggleAll}
           // The group is what decides `kind`, which is the whole reason this closure is built per group
-          // rather than passed straight through. Anything the operator's group might send is moot — its
-          // rows carry no file, so `DocRowList` never offers the press on one.
+          // rather than passed straight through — a photograph fills the frame, a paper is a sheet laid
+          // on white, and neither can be told from a presigned url.
           onView={
             onView
               ? (row, href) => onView({ key: row.key, name: row.name, url: href, kind: g.key === "photos" ? "photo" : "paper" })

@@ -220,11 +220,13 @@ describe("mapBidList — the request's year ask (RM3-AC-28a / 28c / 37)", () => 
     const machine = mapFleet([{ equipmentId: "eq-1", manufacturer: "BOMAG", year: 2026, inBid: true }])[0];
     const cell = matchGrid(machine, bid).find((c) => c.key === "year_make")!;
     expect(cell.state).toBe("green");
-    // The ✓ IS the statement now — the app's satisfied year cell is `'${year} · $make'` and carries no
-    // "· meets 2020 or newer" clause (`bid_readiness_sheets.dart:1128`). What this test guards is
-    // unchanged: the ask reached the grid, so the cell is green and does NOT deny the ask.
-    expect(cell.finding.en).toBe("2026 · BOMAG");
-    expect(cell.finding.ar).not.toContain("لم تطلب سنة"); // the falsehood the dead alias produced
+    // The ✓ IS the statement — the app's satisfied year cell is `'${year} · $make'` and carries no
+    // "· meets 2020 or newer" clause (`bid_readiness_sheets.dart:1128`). The verdict tail is the grid's
+    // shared shape 1 since the owner's UAT of 2026-08-11 (`machine-panel-model.ts`), not a clause of
+    // approval. What this test guards is unchanged: the ask reached the grid, so the cell is green and
+    // does NOT deny the ask.
+    expect(cell.finding.en).toBe("2026 · BOMAG — on the unit's file");
+    expect(cell.finding.ar).not.toContain("لم يُطلب"); // the falsehood the dead alias produced
   });
 
   it("carries far enough for the السنة control to exist at all (RM3-AC-28a)", () => {
@@ -258,11 +260,13 @@ describe("mapBidList — the request's attachments ask (RM3-AC-37)", () => {
     expect(bidWith({ attachmentIds: null, customAttachments: {} }).customAttachments).toEqual([]);
   });
 
-  it("makes the attachments cell say what was asked instead of «لا توجد ملحقات مطلوبة»", () => {
+  it("makes the attachments cell say what was asked instead of «لم يُطلب شيء»", () => {
     const bid = bidWith({ attachmentIds: ["6ef091c4-fc08-4073-93fd-0ee5af27bcf5"] });
     const machine = mapFleet([{ equipmentId: "eq-1", year: 2020, inBid: true }])[0];
     const cell = matchGrid(machine, bid).find((c) => c.key === "attachments")!;
-    expect(cell.finding.en).toBe("1 asked for · not recorded on the unit's file");
+    // ~~«1 asked for · …»~~ — one of the three spellings of the ask the owner read side by side on
+    // 2026-08-11; the grid says «requested» everywhere now.
+    expect(cell.finding.en).toBe("1 requested — not recorded on the unit's file");
     // STILL GREY, and that is the decision `attachmentsCell` documents: no fleet row records the
     // attachments a machine comes with, so red here would accuse the supplier of failing a check the
     // platform never ran. Plumbing the ask must not turn this cell into an accusation.

@@ -192,21 +192,24 @@ Then sweep: no red row may exist for anything the request never asked for and th
 ### RM3-AC-39 — equipment rows show presence only [CORE]
 *How to test:* No «موثّق» badge, no seal, no expiry date anywhere on the equipment tab. (These *do* appear on the company panel — deliberate asymmetry.)
 
-### RM3-AC-69 — view where there is a url, nothing where there isn't [CORE]
-*How to test:* A held paper's **view** opens the file in a new tab, with **no per-row download glyph** beside it. A missing paper exposes no button — not even a greyed one that swallows clicks.
+### RM3-AC-69 — view where there is a url, nothing where there isn't [CORE] [SUPERSEDED]
+*Superseded:* on the **machine's documents tab** the per-row `↗` is withdrawn — the owner's UAT of 2026-08-11 (*"no per-row arrow"*), which is also what the prototype draws. The row itself replaced it: pressing a row puts its paper in the viewer at the top of the panel. The arrow survives in the two places that ruling does not reach — a row holding **several** files keeps one per extra file (its first is what the press frames, see AC-76), and the **company panel**, whose rows do not press because that list has no viewer of its own.
 
-### RM3-AC-76 — every held file is reachable [EDGE]
-*How to test:* A machine holding two ownership papers (istimara + customs) must let you open **both**, separately named. Fail if only one link exists with nothing saying a second file is there.
+*How to test:* On the machine's documents tab a held paper's row **presses**, and the paper appears in the frame above; a row holding one file carries **no arrow**, and no per-row download glyph. On **مستندات الشركة** each held paper still opens in a new tab from its own control. A missing paper exposes no button anywhere — not even a greyed one that swallows clicks.
 
-### RM3-AC-75 — the operator's certificates are a status only [CORE]
-*How to test:* Each operator row carries a green/red dot **and nothing else**. Confirm:
-- no **view** control on any row, held or absent;
-- no checkbox on any row — **including a red one**;
-- **«حدّد كل الناقص»** selects no operator row;
-- tick every other missing row and open the review — **no operator type appears in the ask**;
-- the heading carries no count pill.
+### RM3-AC-76 — every held file is reachable [EDGE] [SUPERSEDED]
+*Superseded:* *"open both"* is now two different controls, by the same UAT — one frame can hold one subject, so the row's first file is reached by pressing the row and the rest keep their arrows.
 
-Also: `operating_license` appears in the group despite carrying no `operator_` prefix, and a request asking nothing of the operator raises **no operator group at all**.
+*How to test:* A machine holding two ownership papers (istimara + customs) must let you reach **both**: press the row for the first, and the arrow beside it for the second, separately named. Fail if the second file has no control at all.
+
+### RM3-AC-75 — the operator's certificates are a status only [CORE] [SUPERSEDED]
+*Superseded:* the **group is gone from the documents tab**. The owner's UAT of 2026-08-11: *"operator will not be viewed in the document section at all — only in the equipment field, as its cert exists or not."*
+
+The 2026-08-08 ruling this AC records had already emptied the group of every act — no view, no ask, no tick, no count — because nothing validates an operator document on upload and presence is the only claim the platform can stand behind. What the UAT settles is **where that one claim belongs**: on the match grid's **شهادات المشغّل** cell, which was already scoring the same certificates from the same readiness inputs, rather than as a third heading in a tab whose every other row can be opened, ticked and asked for. The AC's own clauses are not contradicted so much as left with nothing to check — there is no operator row to carry a dot, refuse a tick, or omit a pill.
+
+*How to test:* On **مستندات المعدّة** confirm there is **no operator group and no operator row**, whatever the request asked of the operator (TÜV · SPSP · CERTIFIED) and whatever the machine holds (`operator_tuv`, `operating_license`, and the British `operating_licence`). Then confirm the statement survives where it moved: **شهادات المشغّل** reads «مفقود: …» when an asked-for operator certificate is absent and «… — موجودة في ملف الوحدة» when it is on the file — and, unlike the other green cells, **it does not press**, because an operator paper still exposes no file.
+
+Also, still: a held operator paper must not fall back into **مستندات المعدّة** as an openable, tickable row. With no group of its own to catch it, that is the only place left for it to land.
 
 ---
 

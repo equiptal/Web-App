@@ -68,6 +68,64 @@ const NOT_ON_FILE: Bilingual = { en: "not on the unit's file", ar: "غير مو�
 /** `bidReadinessNoneRequested` — app_en.arb:5312 · app_ar.arb:3616. The app's word for **case 5**,
  *  "nothing was asked for in this category at all". */
 const NONE_REQUESTED: Bilingual = { en: "none requested", ar: "لم يُطلب شيء" };
+/**
+ * The same statement about ONE thing rather than a whole category — the shape below calls it *case 3*.
+ * The app has no phrase for it (it renders no unasked row at all), so it is this surface's own; what it
+ * is *not* is a sixth way to say "nobody asked", which is exactly what the owner found on 2026-08-11.
+ */
+const NOT_REQUESTED: Bilingual = { en: "not requested", ar: "لم يُطلب" };
+
+/* ── ONE SENTENCE SHAPE PER CASE (owner, UAT of 2026-08-11) ───────────────────────────────────────
+   *"some use 'no year asked for' while some 'none requested' or '1 asked for' — use consistent
+   wording."* Every phrase below was already the app's; what differed was the **grammar** each cell
+   wrapped them in, so six cells answered one question six ways. The words stay, the shapes collapse to
+   four, and every cell on this surface builds its finding out of these three helpers and nothing else:
+
+   | case | | shape |
+   |---|---|---|
+   | 1 | asked, and the unit's file answers it (**green**) | `{thing} — on the unit's file` |
+   | 2 | asked, and it does not (**red**) | `Missing {thing}` |
+   | 3 | not asked, and the file still has something to say (**grey**) | `{thing} — not requested` |
+   | 4 | nothing asked in this category at all (**grey**) | `none requested` |
+
+   **Red leads with the absence and names the thing** — the owner's own example, *"for TÜV or any field
+   that doesn't match your request and is red, show wording like 'Missing TUV' instead of the current
+   sentence."* It replaces «TÜV — غير موجودة في ملف الوحدة», which buried the one word the renter is
+   scanning for behind the name of the paper. `{thing}` is dropped when the cell's LABEL already names
+   exactly one thing (proof of ownership), because "Proof of Ownership / Missing Proof of Ownership" is
+   a cell that reads like a bug; the documents tab's rows drop it for the same reason and so say the
+   same word about the same absence, which is the other half of the ruling.
+
+   **Case 2 may carry a tail — `Missing {thing} — {what the file has instead}` — and exactly one cell
+   uses it**: the year, where the unit *does* hold a value and the value is the point. Everywhere else
+   the tail would restate the absence the head just named.
+
+   **Arabic leads with «مفقود:» and a colon.** Leading with the absence is the ruling; the colon is what
+   makes it possible without gender agreement, since one shape has to serve «شهادة» (f.), «إثبات» (m.)
+   and a bare year alike. */
+const MISSING: Bilingual = { en: "Missing", ar: "مفقود" };
+
+/** Case 1 — the file answers the ask. */
+const heldOf = (thing: Bilingual): Bilingual => ({
+  en: `${thing.en} — ${ON_FILE.en}`,
+  ar: `${thing.ar} — ${ON_FILE.ar}`,
+});
+/** Case 3 — nobody asked, and the file still has something to state. */
+const unaskedOf = (thing: Bilingual): Bilingual => ({
+  en: `${thing.en} — ${NOT_REQUESTED.en}`,
+  ar: `${thing.ar} — ${NOT_REQUESTED.ar}`,
+});
+/** Case 2 — the absence first, then the thing, then (the year cell only) what the file holds instead.
+ *  `thing == null` is the cell whose label is already the thing's name. */
+const missingOf = (thing: Bilingual | null, instead?: Bilingual): Bilingual => ({
+  en: `${MISSING.en}${thing ? ` ${thing.en}` : ""}${instead ? ` — ${instead.en}` : ""}`,
+  ar: `${MISSING.ar}${thing ? `: ${thing.ar}` : ""}${instead ? ` — ${instead.ar}` : ""}`,
+});
+/** Several names in one finding — the certificates and the photo slots both list what they mean. */
+const joinNames = (names: Bilingual[]): Bilingual => ({
+  en: names.map((n) => n.en).join(" · "),
+  ar: names.map((n) => n.ar).join(" · "),
+});
 
 /**
  * **green** = the request asked and the machine satisfies it · **grey** = the request did not ask ·
@@ -100,11 +158,46 @@ export interface MatchCell {
   label: Bilingual;
   state: MatchCellState;
   /**
-   * The cell's **actual finding** — "3 of 4 uploaded", "on the machine's file", "not on the file"
-   * (§6.5). Never a bare tick: a tick tells the renter a check passed without telling him what was
-   * checked, which is the whole thing this surface exists to stop.
+   * The cell's **actual finding** — "2 of 2 — on the unit's file", "Missing TÜV" (§6.5). Never a bare
+   * tick: a tick tells the renter a check passed without telling him what was checked, which is the
+   * whole thing this surface exists to stop. Built by the four shapes above and nothing else.
    */
   finding: Bilingual;
+  /**
+   * **The file this cell is reading, so the cell can open it** (owner, UAT of 2026-08-11: *"clicking on
+   * any document field here, like '2 of 2 unit photos', will take them to the document"*).
+   *
+   * **Null except on a GREEN cell**, and that is the whole rule: green is the state that says *the
+   * unit's file answers your request*, so it is the only state with a file to show. A red cell's
+   * finding names what is **absent** — there is nothing to open, and opening some other paper of the
+   * same family would be evidence for a sentence the cell did not write. A grey cell was never scored.
+   * A cell with nothing to show must not be pressable, so this is `null` and the component draws a
+   * plain block rather than a dead control.
+   *
+   * It is **the documents tab's own row**, resolved by {@link equipmentDocGroups} — same key, same
+   * label, same url. That is deliberate: the frame at the top of the panel then marks the row the
+   * renter would have pressed on the other tab, and the two tabs cannot disagree about which paper a
+   * finding stands for.
+   */
+  evidence: DocViewTarget | null;
+}
+
+/**
+ * A document the panel's **viewer** can be asked to hold — the frame's subject, resolved to four
+ * fields (`EquipmentDocuments`' `DocViewSubject` is this with its label already localised).
+ *
+ * It lives here rather than beside the component because both surfaces that raise one — a document row
+ * and now a match cell — resolve it out of this model, and a shape defined in a component would make
+ * the model import a component to name its own return type.
+ */
+export interface DocViewTarget {
+  /** The documents-tab row this file belongs to, so the frame and that row agree on what is open. */
+  key: string;
+  label: Bilingual;
+  url: string;
+  /** **A photograph fills the frame; a paper is a sheet laid on white.** Read off the GROUP the row
+   *  came from, never sniffed from the url. */
+  kind: "photo" | "paper";
 }
 
 /**
@@ -209,7 +302,9 @@ const OWNERSHIP_TYPES = new Set([
  * **Documents** group carrying a real `downloadUrl`, a live checkbox, a view control and a place in
  * `docDownloadBatch`. That was the one path by which an operator paper could ever be openable or
  * tickable, against the owner's ruling that this family is status-only and inert (2026-08-08).
- * `operatorCertCode` below already folds the spelling, so the file always expected the value to exist.
+ * ~~`operatorCertCode` below already folds the spelling, so the file always expected the value to exist.~~
+ * That helper went with the operator group (UAT of 2026-08-11); this test is what still catches the
+ * British spelling, and it is now the ONLY thing that does.
  */
 const OPERATOR_TYPES = new Set([
   "operating_license",
@@ -239,24 +334,13 @@ const isOperatorDoc = (d: OfferedUnitDoc): boolean => {
 };
 const isEquipmentCertDoc = (d: OfferedUnitDoc): boolean => !isOperatorDoc(d) && EQUIPMENT_CERT_TYPES.has(norm(d.type));
 
-/**
- * An operator paper's **row code**.
- *
- * The scorer now hands over operator **document kinds** (`operator_tuv` · `operator_spsp` ·
- * `operating_license` — the app's table, `bid-readiness.ts`), so this only has to turn a kind into the
- * key `OPERATOR_CERT_ROW_LABEL` is written against. `canonicalCertCode` does most of it by stripping
- * the `operator_` prefix (`operator_tuv` → `tuv`), but it sends the spellings of one licence to
- * different codes — `operating_license` stays whole while `operator_license` / `operator_licence` lose
- * their prefix and become `license` / `licence`. Left alone that renders the operator's licence as
- * several rows for one paper, so the family is folded here, on top of the shared normaliser rather than
- * instead of it. (With the ask now translated upstream, the fold is defensive: it also catches a paper
- * the MACHINE happens to carry under one of the other spellings.)
- */
-function operatorCertCode(type: string): string {
-  const c = canonicalCertCode(type);
-  if (c === "license" || c === "licence" || c === "operating_licence") return "operating_license";
-  return c;
-}
+/* ~~`operatorCertCode` — an operator paper's row CODE~~, which folded the four spellings of one licence
+   into a single row key. **Deleted with the operator group** (owner, UAT of 2026-08-11): with no rows
+   to key, nothing on this surface turns an operator document kind into a row code, and a helper kept
+   "in case" is a second answer waiting to disagree with the scorer's. The fold itself is not lost —
+   `bid-readiness.ts` already dedupes the request's operator asks upstream, which is where the several
+   spellings came from, and `isOperatorDoc` (above) still recognises every one of them so an operator
+   paper cannot fall through into the equipment's documents. */
 
 /** Present photo slots, deduped — the numerator of "N of 4 uploaded". */
 export function presentPhotoSlots(machine: Pick<FleetMachine, "photoKeys">): PhotoSlot[] {
@@ -277,7 +361,7 @@ export function presentPhotoSlots(machine: Pick<FleetMachine, "photoKeys">): Pho
 export function matchGrid(machine: FleetMachine, request: MatchRequest): MatchCell[] {
   const asks = readinessInputsFor(request);
   const readiness = computeUnitReadiness(machine, asks.equipCerts, asks.operatorCerts, asks.minYear);
-  return [
+  const cells: Omit<MatchCell, "evidence">[] = [
     yearMakeCell(machine, readiness),
     attachmentsCell(request),
     photosCell(machine),
@@ -287,8 +371,60 @@ export function matchGrid(machine: FleetMachine, request: MatchRequest): MatchCe
     // Both are PLURAL and both say "certifications" — this file said "Equipment certificate" /
     // «شهادة المعدّة», singular, for a cell that routinely lists two.
     certCell("equipment_cert", { en: "Equipment certifications", ar: "شهادات المعدّة" }, readiness.equipmentCerts),
+    // **The operator's ONLY appearance on this panel since the UAT of 2026-08-11** — *"operator will not
+    // be viewed in the document section at all — only in the equipment field, as its cert exists or
+    // not."* The documents tab's operator group is gone (see {@link equipmentDocGroups}); this cell is
+    // what survives of it, and it says exactly what the owner asked it to say.
     certCell("operator_cert", { en: "Operator certifications", ar: "شهادات المشغّل" }, readiness.operatorCerts),
   ];
+  const evidenceOf = matchCellEvidence(machine, request, readiness.equipmentCerts.map((c) => c.code));
+  return cells.map((c) => ({ ...c, evidence: evidenceOf(c) }));
+}
+
+/**
+ * **The file behind a green cell** (owner, UAT of 2026-08-11) — see {@link MatchCell.evidence} for the
+ * green-only rule and why a red cell has nothing to open.
+ *
+ * Resolved out of {@link equipmentDocGroups} rather than off `machine` directly: the rows are already
+ * the answer to "which paper does this finding stand for", they already carry the renter's word for it,
+ * and reading them here means the key handed to the viewer is the key the documents tab marks. Building
+ * the groups a second time costs one more `computeUnitReadiness`; both callers memoise on
+ * `(machine, request)`, and a second opinion about which paper a cell means would cost the renter a
+ * frame holding the wrong one.
+ */
+function matchCellEvidence(
+  machine: FleetMachine,
+  request: MatchRequest,
+  requestedCertCodes: string[],
+): (cell: Omit<MatchCell, "evidence">) => DocViewTarget | null {
+  const rows = new Map<string, { row: DocRow; kind: DocViewTarget["kind"] }>();
+  for (const group of equipmentDocGroups(machine, request)) {
+    for (const row of group.rows) rows.set(row.key, { row, kind: group.key === "photos" ? "photo" : "paper" });
+  }
+  /** The first of these rows that actually holds a file, in the order the renter reads them. */
+  const first = (keys: string[]): DocViewTarget | null => {
+    for (const key of keys) {
+      const hit = rows.get(key);
+      const url = hit?.row.files.find((f) => f.url)?.url;
+      if (hit && url) return { key, label: hit.row.label, url, kind: hit.kind };
+    }
+    return null;
+  };
+  return (cell) => {
+    if (cell.state !== "green") return null;
+    switch (cell.key) {
+      case "photos":
+        return first([...REQUIRED_PHOTO_SLOTS].map((s) => `photo:${s}`));
+      case "ownership":
+        return first(["doc:ownership"]);
+      case "equipment_cert":
+        return first(requestedCertCodes.map((code) => `doc:equipment_cert:${code}`));
+      // The year and the attachments are not documents at all, and the operator's certificates expose
+      // no file by ruling (RM3-AC-75) — three cells with nothing to open, and none of them press.
+      default:
+        return null;
+    }
+  };
 }
 
 /**
@@ -309,61 +445,39 @@ export function matchGrid(machine: FleetMachine, request: MatchRequest): MatchCe
  *   the app never says it and the ✓ already does.
  *
  * **The app has no equivalent for the grey case** — it has no grey year cell at all (see the rule note
- * on {@link matchGrid}'s states), so *"· no year asked for"* / «· لم تطلب سنة» stays this surface's own
- * phrase. It is not dropped: without it the grey cell and the green cell would print identical text.
+ * on {@link matchGrid}'s states), so the *"nobody asked"* clause stays this surface's own. It is not
+ * dropped: without it the grey cell and the green cell would print identical text.
+ *
+ * **Reshaped by the UAT of 2026-08-11**, which is what the two struck sentences above cost. The app's
+ * *"below the required year {min}"* was the one finding on the grid that stated a **mismatch** instead
+ * of an absence, and *"· no year asked for"* was one of the three spellings of "nobody asked" the owner
+ * read side by side. Both are now the shared shapes: red is `Missing {min} or newer — {what the file
+ * holds}` — the only cell that uses case 2's tail, because it is the only one where the file holds a
+ * value that fails rather than nothing at all — and grey is case 3's `{year} · {make} — not requested`.
+ * The requirement the app's phrase carried is not lost; it is what red now names as missing.
  */
-function yearMakeCell(machine: FleetMachine, readiness: UnitReadiness): MatchCell {
+function yearMakeCell(machine: FleetMachine, readiness: UnitReadiness): Omit<MatchCell, "evidence"> {
   const label: Bilingual = { en: "Year & manufacturer", ar: "سنة الصنع والصانع" };
   const make = machine.manufacturer?.trim() || null;
   const year = machine.year;
   const req = readiness.reqMinYear;
   const makeSuffix: Bilingual = make ? { en: ` · ${make}`, ar: ` · ${make}` } : { en: "", ar: "" };
+  // What the unit's own file says, or the app's phrase for a file that says nothing.
+  const onFile: Bilingual | null =
+    year != null ? { en: `${year}${makeSuffix.en}`, ar: `${arDigits(year)}${makeSuffix.ar}` } : null;
 
   if (req == null) {
     // No year was asked for, so nothing here can fail. The finding still states what the machine is,
-    // because a grey cell that says only "not required" wastes the row.
-    const shown = year != null ? `${year}` : null;
-    return {
-      key: "year_make",
-      label,
-      state: "grey",
-      finding: shown
-        ? { en: `${shown}${makeSuffix.en} · no year asked for`, ar: `${arDigits(shown)}${makeSuffix.ar} · لم تطلب سنة` }
-        : { en: `${NOT_ON_FILE.en} · no year asked for`, ar: `${NOT_ON_FILE.ar} · لم تطلب سنة` },
-    };
+    // because a grey cell that says only "not requested" wastes the row.
+    return { key: "year_make", label, state: "grey", finding: unaskedOf(onFile ?? NOT_ON_FILE) };
   }
-  if (year == null) {
-    return {
-      key: "year_make",
-      label,
-      state: "red",
-      finding: {
-        en: `${NOT_ON_FILE.en} · below the required year ${req}`,
-        ar: `${NOT_ON_FILE.ar} · أقدم من الحد الأدنى المطلوب ${arDigits(req)}`,
-      },
-    };
+  if (onFile == null || readiness.yearConflict) {
+    // Two ways to fail one ask — no year on the file, or a year that is too old — and one sentence for
+    // both: what the request wanted, then what the file actually holds.
+    const wanted: Bilingual = { en: `${req} or newer`, ar: `${arDigits(req)} أو أحدث` };
+    return { key: "year_make", label, state: "red", finding: missingOf(wanted, onFile ?? NOT_ON_FILE) };
   }
-  if (readiness.yearConflict) {
-    return {
-      key: "year_make",
-      label,
-      state: "red",
-      finding: {
-        en: `${year}${makeSuffix.en} · below the required year ${req}`,
-        ar: `${arDigits(year)}${makeSuffix.ar} · أقدم من الحد الأدنى المطلوب ${arDigits(req)}`,
-      },
-    };
-  }
-  // The app's satisfied cell verbatim: `'${year} · $make'`, and nothing after it.
-  return {
-    key: "year_make",
-    label,
-    state: "green",
-    finding: {
-      en: `${year}${makeSuffix.en}`,
-      ar: `${arDigits(year)}${makeSuffix.ar}`,
-    },
-  };
+  return { key: "year_make", label, state: "green", finding: heldOf(onFile) };
 }
 
 /**
@@ -382,27 +496,32 @@ function yearMakeCell(machine: FleetMachine, readiness: UnitReadiness): MatchCel
  * `bid_readiness_sheets.dart:1138` never reads the request at all. So the nothing-asked case is quoted
  * from it, and the asked-for case is a state the app never renders and has no phrase for; it keeps this
  * surface's own sentence, moved onto the app's noun («ملف الوحدة»).
+ *
+ * **Both halves were reworded by the UAT of 2026-08-11**, and this cell is where the owner's complaint
+ * is easiest to see: it said *"no attachments required"* in one state and *"1 asked for"* in the other,
+ * two vocabularies inside a single cell, and neither matched «لم يُطلب شيء» one cell over. The
+ * nothing-asked case is now case 4's shared phrase, and the asked-for case is case 1's shape carrying
+ * the only verdict this cell can give — the platform records no attachment, so it says so in the app's
+ * own noun rather than pretending to have checked.
+ *
+ * **Still grey in both, and the owner confirmed that on the same screenshot** — *"1 asked but in grey,
+ * which is correct."* Grey never says "Missing": a cell the platform did not score cannot report a gap.
  */
-function attachmentsCell(request: MatchRequest): MatchCell {
+function attachmentsCell(request: MatchRequest): Omit<MatchCell, "evidence"> {
   const label: Bilingual = { en: "Attachments", ar: "الملحقات" };
   const asked = [...(request.attachmentIds ?? []), ...(request.customAttachments ?? [])].filter(
     (x) => String(x ?? "").trim() !== "",
   ).length;
   if (asked === 0) {
-    return {
-      key: "attachments",
-      label,
-      state: "grey",
-      finding: { en: "no attachments required", ar: "لا توجد ملحقات مطلوبة" },
-    };
+    return { key: "attachments", label, state: "grey", finding: NONE_REQUESTED };
   }
   return {
     key: "attachments",
     label,
     state: "grey",
     finding: {
-      en: `${asked} asked for · not recorded on the unit's file`,
-      ar: `طلبت ${arDigits(asked)} · غير مسجّلة في ملف الوحدة`,
+      en: `${asked} requested — not recorded on the unit's file`,
+      ar: `${arDigits(asked)} مطلوبة — غير مسجّلة في ملف الوحدة`,
     },
   };
 }
@@ -435,19 +554,28 @@ function attachmentsCell(request: MatchRequest): MatchCell {
  * (app_en.arb:5444 · app_ar.arb:3644 — the readiness docs sheet's summary line). Nothing is invented
  * and nothing is lost; "uploaded" / «مرفوعة» was the one word here with no counterpart anywhere in the
  * app's readiness vocabulary.
+ *
+ * **The fraction survives on the GREEN cell only** (UAT of 2026-08-11). Red used to read *"1 of 2 on
+ * file"* — a count, in a state whose job is to name what is absent, and the renter then had to work out
+ * *which* shot the missing one was by opening the other tab. It now names the slot: `Missing Plate /
+ * serial`, the same grammar the certificates cell answers with, out of the same `PHOTO_LABEL` the
+ * documents tab heads that row with. The count is what green states, and it is why green is the cell
+ * the owner pointed at when he asked for a cell to open its evidence — *"2 of 2 unit photos"*.
  */
-function photosCell(machine: FleetMachine): MatchCell {
+function photosCell(machine: FleetMachine): Omit<MatchCell, "evidence"> {
   const present = new Set<PhotoSlot>(presentPhotoSlots(machine));
-  const have = [...REQUIRED_PHOTO_SLOTS].filter((s) => present.has(s)).length;
-  const total = REQUIRED_PHOTO_SLOTS.size;
+  const label: Bilingual = { en: "Unit photos", ar: "صور الوحدة" };
+  const required = [...REQUIRED_PHOTO_SLOTS];
+  const absent = required.filter((s) => !present.has(s));
+  if (absent.length > 0) {
+    return { key: "photos", label, state: "red", finding: missingOf(joinNames(absent.map((s) => PHOTO_LABEL[s]))) };
+  }
+  const total = required.length;
   return {
     key: "photos",
-    label: { en: "Unit photos", ar: "صور الوحدة" },
-    state: have === total ? "green" : "red",
-    finding: {
-      en: `${have} of ${total} on file`,
-      ar: `${arDigits(have)} من ${arDigits(total)} في الملف`,
-    },
+    label,
+    state: "green",
+    finding: heldOf({ en: `${total} of ${total}`, ar: `${arDigits(total)} من ${arDigits(total)}` }),
   };
 }
 
@@ -476,21 +604,24 @@ function photosCell(machine: FleetMachine): MatchCell {
  * verdict because the BID's projection redacts ownership papers; this surface reads the unstripped
  * fleet row, so it can and does state the fact.
  *
- * *"— you can ask for it"* / «— يمكنك طلبها» has **no app equivalent** (the renter cannot ask from the
- * app's read-only mirror) and is kept: it names the one act this panel offers that the app's does not.
- * The «phrase — action» shape is the app's own, from `docUploadView`: *"On the unit's file — tap to
- * view"* / «موجودة في ملف الوحدة — اضغط للعرض» (app_en.arb:8727 · app_ar.arb:6238).
+ * ~~*"— you can ask for it"* / «— يمكنك طلبها» has **no app equivalent** (the renter cannot ask from the
+ * app's read-only mirror) and is kept: it names the one act this panel offers that the app's does not.~~
+ * **Withdrawn by the UAT of 2026-08-11.** No other red cell offers an action in its finding, and the
+ * shared red shape has no room for one — a six-cell grid where one cell alone ends in an instruction is
+ * the unevenness the owner was reading. The act is not lost: the documents tab is where it is performed,
+ * and its row for this paper is one press away.
+ *
+ * **This is the one cell whose `{thing}` is dropped**, in both states — its label *is* the paper's name,
+ * so `Missing Proof of Ownership` under a heading reading "Proof of Ownership" would print it twice. It
+ * therefore says exactly what the documents tab's row says about the same absence: «مفقود».
  */
-function ownershipCell(machine: FleetMachine): MatchCell {
+function ownershipCell(machine: FleetMachine): Omit<MatchCell, "evidence"> {
   const held = machine.documentKeys.filter(isOwnershipDoc);
   return {
     key: "ownership",
     label: { en: "Proof of Ownership", ar: "إثبات الملكية" },
     state: held.length > 0 ? "green" : "red",
-    finding:
-      held.length > 0
-        ? ON_FILE
-        : { en: `${NOT_ON_FILE.en} — you can ask for it`, ar: `${NOT_ON_FILE.ar} — يمكنك طلبها` },
+    finding: held.length > 0 ? ON_FILE : missingOf(null),
   };
 }
 
@@ -515,31 +646,19 @@ function certCell(
   key: Extract<MatchCellKey, "equipment_cert" | "operator_cert">,
   label: Bilingual,
   certs: { labelEn: string; labelAr: string; present: boolean }[],
-): MatchCell {
+): Omit<MatchCell, "evidence"> {
+  const names = (of: typeof certs): Bilingual => joinNames(of.map((c) => ({ en: c.labelEn, ar: c.labelAr })));
   if (certs.length === 0) {
     return { key, label, state: "grey", finding: NONE_REQUESTED };
   }
   const missing = certs.filter((c) => !c.present);
   if (missing.length === 0) {
-    return {
-      key,
-      label,
-      state: "green",
-      finding: {
-        en: `${certs.map((c) => c.labelEn).join(" · ")} — ${ON_FILE.en}`,
-        ar: `${certs.map((c) => c.labelAr).join(" · ")} — ${ON_FILE.ar}`,
-      },
-    };
+    return { key, label, state: "green", finding: heldOf(names(certs)) };
   }
-  return {
-    key,
-    label,
-    state: "red",
-    finding: {
-      en: `${missing.map((c) => c.labelEn).join(" · ")} — ${NOT_ON_FILE.en}`,
-      ar: `${missing.map((c) => c.labelAr).join(" · ")} — ${NOT_ON_FILE.ar}`,
-    },
-  };
+  // **The owner's own example of the red shape** (UAT of 2026-08-11): «TÜV — غير موجودة في ملف الوحدة»
+  // becomes «مفقود: TÜV». Only the missing ones are named, exactly as before — a cell that also listed
+  // the certificates the file *does* hold would bury the gap it exists to report.
+  return { key, label, state: "red", finding: missingOf(names(missing)) };
 }
 
 /**
@@ -656,8 +775,8 @@ export type PresenceStatus = "present" | "on_file" | "missing";
  * no other — so the second and third papers a lessor had actually uploaded were unreachable from the
  * renter's panel.
  *
- * (The operator's rows are not one of these. They carry no files at all — see
- * {@link operatorStatusRows} — so the multi-file treatment never reaches them.)
+ * (~~The operator's rows are not one of these. They carry no files at all.~~ There are no operator rows
+ * on this tab at all since the UAT of 2026-08-11 — see {@link equipmentDocGroups}.)
  */
 export interface DocFile {
   /** The wire type this file was uploaded as (`operator_tuv`, `istimara`, `front` …). */
@@ -704,18 +823,18 @@ export interface DocRow {
    * of {@link docRowMode}, which is what the checkbox column reads; the rule above is unchanged by that
    * and a held paper is still never requestable.
    *
-   * **One family is `false` in BOTH states — the operator's certificates** (owner, 2026-08-08, narrowing
-   * AC-75). *"Operator docs cannot be viewed or requested and are not part of docs — they are just a view
-   * of what the supplier has."* An absent operator certificate is therefore **not** a gap the renter may
-   * put in an ask, which is the one place the sentence above bends: *you can only ask for what is not
-   * there* still holds, but this family is outside the asking machinery altogether. See
-   * {@link operatorStatusRows} for why — nothing validates an operator document on upload, so presence is
-   * the only claim the platform can stand behind, and a status is all this group states.
+   * ~~One family is `false` in BOTH states — the operator's certificates~~ (owner, 2026-08-08, narrowing
+   * AC-75). **There is no such family here any more**: the operator's rows left this tab altogether in
+   * the UAT of 2026-08-11 (see {@link equipmentDocGroups}), so the exception the sentence above bent for
+   * has nothing to describe. Every row on this tab is now a paper of the machine's, and the rule reads
+   * without a footnote: `status === "missing"` and nothing else.
    */
   requestable: boolean;
 }
 
-export type DocGroupKey = "photos" | "documents" | "operator";
+/** ~~`| "operator"`~~ — the operator's group left this tab in the UAT of 2026-08-11; see
+ *  {@link equipmentDocGroups}. Two groups, and both are the machine's. */
+export type DocGroupKey = "photos" | "documents";
 
 export interface DocGroup {
   key: DocGroupKey;
@@ -724,17 +843,12 @@ export interface DocGroup {
   /**
    * **Rows needing action, never a total** (§6.1, AC-42). Zero means nothing is outstanding.
    *
-   * **`null` means this group makes no attention claim at all**, and exactly one does: the operator's
-   * (owner, 2026-08-08). The count's whole sentence is *"N rows here need action from you"* — and there
-   * is no action on that group: no tick, no ask, no file. A number would have to lie in one direction or
-   * the other, and both lies are worse than silence: counting the absent certificates promises an act the
-   * renter cannot perform, while reporting zero prints «لا ينقص شيء» in green over rows that are red.
-   * The group keeps its heading and its green/red rows, which is what the owner asked it to keep.
-   *
-   * It is `null` rather than `0` so every reader has to decide what to do with it —
-   * {@link DocRowList} renders no pill, and the tab badge adds nothing.
+   * ~~`null` means this group makes no attention claim at all, and exactly one does: the operator's.~~
+   * That group is gone (owner, UAT of 2026-08-11), and with it the only case this was ever `null` for —
+   * so it is a plain number again, every group counts, and no reader has to carry a branch for a state
+   * nothing can produce. `DocRowList` and the tab badge lost their `null` arms with it.
    */
-  attention: number | null;
+  attention: number;
 }
 
 /** Rows needing action. The one definition, used by both document surfaces. */
@@ -839,10 +953,10 @@ export type SelectionMode = "download" | "request";
  *   paper but not its link. Nothing can be saved and nothing can be asked, so it is untickable in
  *   **every** mode, exactly as it is today.
  *
- * **The operator's certificates are `null` in both states** (owner, 2026-08-08, narrowing AC-75). They
- * carry no url, so the held ones were already here; the absent ones join them now that they are not
- * `requestable` either. That is the whole of "no checkbox, ever" — it falls out of the two fields the
- * row carries rather than needing a third one this function could forget to read.
+ * ~~**The operator's certificates are `null` in both states** (owner, 2026-08-08, narrowing AC-75).~~
+ * They no longer reach this function: the group that built them left the tab in the UAT of 2026-08-11.
+ * The mechanism it demonstrated is untouched and still the reason a third flag was never added — a row
+ * with no url and nothing to ask for is untickable in every mode, out of the two fields it carries.
  */
 export function docRowMode(row: {
   downloadUrl: string | null;
@@ -962,17 +1076,25 @@ const REQUIRED_PHOTO_SLOTS = new Set<PhotoSlot>(["front", "plate"]);
  * shell the same booleans — so the four constants below collapse onto two phrases, deliberately. This
  * file's «uploaded» / «not uploaded» / «no document yet» were three more ways to say them.
  *
- * **The «· not required» tail has no app equivalent.** The app renders *only* scored rows — one per
+ * **The «· not requested» tail has no app equivalent.** The app renders *only* scored rows — one per
  * mandatory photo slot and one per certificate this request asked for — so a held-but-unrequired paper
  * is a row it never draws and therefore never had to word. This surface does draw it (see
  * {@link equipmentDocGroups}: held-and-unrequired is shown with no verdict), so the tail is kept as
- * this surface's own. Its Arabic is now feminine in both, agreeing with «موجودة» in front of it.
+ * this surface's own — in the grid's own word for it ({@link NOT_REQUESTED}), because «غير مطلوبة» here
+ * and «لم يُطلب» one tab away were two ways to say the one thing.
+ *
+ * **An ABSENT row says «مفقود», the match grid's word** (owner, UAT of 2026-08-11): *"same wording as
+ * the equipment tab for a missing document."* The two tabs describe the same absence, and until now the
+ * grid was about to lead with «مفقود» while a row still read «غير موجودة في ملف الوحدة». The row drops
+ * the paper's NAME from the phrase for the same reason the ownership cell does — the row's own title is
+ * the name, six pixels above the status line — so a row reads «شهادة TÜV / مفقود» and the cell it
+ * answers reads «مفقود: TÜV». One word, one absence, both tabs.
  */
 const PRESENT_PHOTO: Bilingual = ON_FILE;
-const ABSENT_PHOTO: Bilingual = NOT_ON_FILE;
-const EXTRA_PHOTO: Bilingual = { en: `${ON_FILE.en} · not required`, ar: `${ON_FILE.ar} · غير مطلوبة` };
+const ABSENT_PHOTO: Bilingual = MISSING;
+const EXTRA_PHOTO: Bilingual = { en: `${ON_FILE.en} · ${NOT_REQUESTED.en}`, ar: `${ON_FILE.ar} · ${NOT_REQUESTED.ar}` };
 const PRESENT_DOC: Bilingual = ON_FILE;
-const ABSENT_DOC: Bilingual = NOT_ON_FILE;
+const ABSENT_DOC: Bilingual = MISSING;
 const EXTRA_DOC: Bilingual = EXTRA_PHOTO;
 
 /** Renter-facing words for a wire doc type — the same wording `ChatDock`'s `DOC_TYPE_LABELS` uses, so
@@ -1046,17 +1168,11 @@ function equipmentCertRowLabel(code: string): Bilingual {
   return { en: `${name} certificate`, ar: `شهادة ${name}` };
 }
 
-/** An operator paper's row heading, keyed by `operatorCertCode`. Wording follows `ChatDock`'s table so
- *  the row and the request card raised from it name the same paper the same way. */
-const OPERATOR_CERT_ROW_LABEL: Record<string, Bilingual> = {
-  operating_license: { en: "Operator licence", ar: "رخصة المشغّل" },
-  tuv: { en: "Operator TÜV", ar: "شهادة TÜV للمشغّل" },
-  spsp: { en: "Operator SPSP", ar: "شهادة SPSP للمشغّل" },
-  saso: { en: "Operator SASO", ar: "شهادة ساسو للمشغّل" },
-  id: { en: "Operator ID", ar: "هوية المشغّل" },
-  insurance: { en: "Operator insurance", ar: "تأمين المشغّل" },
-  other: { en: "Operator document", ar: "مستند المشغّل" },
-};
+/* ~~`OPERATOR_CERT_ROW_LABEL` — an operator paper's row heading~~. **Deleted with the operator group**
+   (owner, UAT of 2026-08-11). The renter's words for those papers survive where they are still read:
+   `DOC_TYPE_LABEL` above names them on a chat request card, and the match grid's operator cell takes
+   its certificate names from the scorer (`bid-readiness.ts`'s `OPERATOR_CERT_LABELS`) exactly as the
+   equipment cell does. */
 
 /**
  * The wire type a **not-yet-uploaded** row asks for.
@@ -1079,9 +1195,10 @@ const OPERATOR_CERT_ROW_LABEL: Record<string, Bilingual> = {
  * ~~⚠️ **Known gap** — `documentAskSatisfied` matches an ask to a held paper by exact `canonicalDocType`
  * equality, and the operator category resolves to `operator_license` while a machine's own operator papers
  * are typed `operator_tuv` / `operating_license`, none of which canonicalise to it, so an operator document
- * ask reads *waiting* even after the lessor uploads.~~ **Out of this file's reach since 2026-08-08**: the
- * operator's certificates are a status and are never asked for from here (see {@link operatorStatusRows}),
- * so this surface emits no operator ask for that mismatch to strand. The gap is kept written down rather
+ * ask reads *waiting* even after the lessor uploads.~~ **Out of this file's reach since 2026-08-08** and
+ * further out of it since the UAT of 2026-08-11, which removed the operator's rows from this tab
+ * entirely (see {@link equipmentDocGroups}), so this surface emits no operator ask for that mismatch to
+ * strand. The gap is kept written down rather
  * than deleted because it is real for whoever *does* raise one — the fix is one alias
  * (`operating_license → operator_license`) or catalogue rows per operator cert, and it belongs with
  * whoever owns `DOC_TYPE_ALIASES`. `tuv` and `spsp` never had the problem: both sides fold to
@@ -1150,78 +1267,27 @@ function unionCodes(requested: string[], held: Map<string, OfferedUnitDoc[]>): s
   return out;
 }
 
-/**
- * The operator's certificates as **a status, and only a status** (owner's ruling, 2026-08-08).
- *
- * These rows briefly rendered like the equipment's papers: a row per certificate with a view/download
- * pair for every file the lessor had filed. **The owner withdrew that.** They are shown the way the
- * bid-readiness card already shows them — *present or not, green or red, and nothing else.* No view, no
- * download, no file access.
- *
- * **And no ask either** — the ruling, narrowed the same day, in the owner's words: *"operator docs cannot
- * be viewed or requested and are not part of docs — they are just a view of what the supplier has."* The
- * rows had kept a checkbox on the missing ones and composed into the batch ask; that is withdrawn. This
- * group is **outside the document machinery**: no tick in any mode, no place in any batch, and no
- * attention count (see {@link DocGroup.attention}). It states what the lessor holds and stops there.
- *
- * **The reason is the same for both halves.** Nothing validates an operator document on upload. Handing
- * the renter a file to open presents an unchecked upload as if it were verified evidence, and this
- * surface exists to answer *can I trust this?* — so it must not imply a check that never happened.
- * **Presence is a fact the platform can stand behind; the contents are not.** A surface that cannot
- * vouch for the file is not a surface to act on, so the renter is given the fact and no controls.
- *
- * So the rows carry no `files`, no `downloadUrl` and `requestable: false`, which is what makes
- * `docRowActions` return nothing and `docRowMode` return `null` for them in **both** states — one
- * mechanism, not a third flag the component could forget to read. `docTypes` is empty for the same
- * reason: nothing composes an ask out of these rows, so there is no type to name.
- *
- * **Read from the scorer, never re-derived.** `computeUnitReadiness().operatorCerts` already carries
- * exactly this shape (`{code, labelEn, labelAr, present, url}`); this reads **`present` and ignores
- * `url`** rather than bucketing `documentKeys` a second time. That also settles the row set: the scorer
- * maps over the certs **this request asked for**, so an operator paper nobody asked about is not a row —
- * which is the required/not-required rule this file already obeys everywhere else, arrived at from the
- * other side. (It could not be otherwise now: with no verdict, no count and no file behind it, an
- * unrequested row would be a line of text with nothing to say and nothing to do.)
- *
- * A machine's own held operator papers are still recognised — `isOperatorDoc` keeps them out of the
- * equipment certs and out of the unclassified bucket, so a held `operator_tuv` cannot reappear as an
- * openable equipment row through the other door.
- */
-function operatorStatusRows(certs: readonly { code: string; present: boolean }[]): DocRow[] {
-  // The scorer translates the ASK into document kinds (and already dedupes them, so `CERTIFIED` and
-  // `SAFETY_CERT` arrive as one `operating_license`); `operatorCertCode` folds the licence spellings on
-  // top of that, so one paper is ONE row. When two asks do fold together, the row is present if ANY of
-  // them was satisfied — the licence is on the file or it is not, and the spelling the renter happened
-  // to type cannot make it two different papers with two different verdicts.
-  const order: string[] = [];
-  const present = new Map<string, boolean>();
-  for (const cert of certs) {
-    const code = operatorCertCode(cert.code);
-    if (code === "") continue;
-    if (!present.has(code)) order.push(code);
-    present.set(code, (present.get(code) ?? false) || cert.present);
-  }
-  const rows: DocRow[] = [];
-  for (const code of order) {
-    const cert = { present: present.get(code) as boolean };
-    rows.push({
-      key: `doc:operator:${code}`,
-      label: OPERATOR_CERT_ROW_LABEL[code] ?? docTypeLabel(code),
-      status: cert.present ? "present" : "missing",
-      statusLine: cert.present ? PRESENT_DOC : ABSENT_DOC,
-      thumbUrl: null,
-      // No url, ever — see above. Not "none happened to be signed": none is offered.
-      downloadUrl: null,
-      files: [],
-      // Names no ask, because there is no ask. `batchDocumentRequest` would drop the row on
-      // `requestable` alone; leaving a type here would be a payload waiting for a caller.
-      docTypes: [],
-      // Never requestable, held or absent (owner, 2026-08-08) — this family is not asked for at all.
-      requestable: false,
-    });
-  }
-  return rows;
-}
+/* ── ~~The operator's certificates as a status, and only a status~~ (owner, 2026-08-08) ─────────────
+   **The GROUP is gone** (owner, UAT of 2026-08-11): *"operator will not be viewed in the document
+   section at all — only in the equipment field, as its cert exists or not."*
+
+   `operatorStatusRows` lived here and built it. The 2026-08-08 ruling had already emptied the group of
+   every act — no view, no download, no tick, no ask, no attention count — on the grounds that nothing
+   validates an operator document on upload, so presence is the only claim the platform can stand
+   behind. What the UAT settled is where that one claim belongs: on the match grid, where `certCell`
+   already scores `readiness.operatorCerts` and says whether the certificate is there, and not as a
+   third heading in a tab whose every other row can be opened, ticked and asked for. A group of rows
+   that cannot be acted on, under two groups of rows that can, reads as a list the renter has failed to
+   work out how to use.
+
+   Nothing replaces it here, because nothing needs to: `matchGrid`'s operator cell is the whole of the
+   surviving statement, and it was always scored from the same `computeUnitReadiness().operatorCerts`
+   these rows read. RM3-AC-75 is superseded and the checklist records it.
+
+   **A machine's own held operator papers are still recognised** — `isOperatorDoc` keeps them out of the
+   equipment certs and out of the unclassified bucket, so a held `operator_tuv` cannot reappear as an
+   openable equipment row through the other door now that no group of its own exists to catch it. That
+   is the one part of this ruling with a test behind it that must never go green by accident. */
 
 /**
  * The document groups of §6.6 — **photos · documents · the operator's documents** — each with its own
@@ -1237,10 +1303,14 @@ function operatorStatusRows(certs: readonly { code: string; present: boolean }[]
  * So the row set is `(what this request requires) ∪ (what this machine holds)`, and the requestable
  * column collapses to one sentence (owner, same day): **you can only ask for what is not there.**
  *
- * **The operator's group is the one exception, and it is a different kind of row** — a status, not a
- * document list: present or absent, no file access, **no tick, no ask and no attention count**. The table
- * above does not govern it at all; it is a statement of what the lessor holds, and the renter acts on
- * none of it. See {@link operatorStatusRows}.
+ * ~~**The operator's group is the one exception, and it is a different kind of row** — a status, not a
+ * document list: present or absent, no file access, no tick, no ask and no attention count.~~
+ * **The exception is gone because the group is** (owner, UAT of 2026-08-11): *"operator will not be
+ * viewed in the document section at all — only in the equipment field, as its cert exists or not."* The
+ * table above now governs **everything** this function returns, which is the point — a tab where one
+ * group answered to none of the rules the other two announced was a tab the renter had to be told about.
+ * The operator's one surviving statement is `matchGrid`'s operator cell. RM3-AC-75 is superseded; the
+ * e2e checklist records what it changed to.
  *
  * **Why the row set was fixed, and what survives of that.** The earlier note read: *"a row per uploaded
  * file would make the list shorter the worse the supplier's file is, which is backwards."* That
@@ -1269,11 +1339,11 @@ function operatorStatusRows(certs: readonly { code: string; present: boolean }[]
  * it — that the renter's projection strips ownership papers — is true of the BID it scores and simply
  * does not describe this surface, which reads the unstripped fleet rows. See `ownershipCell`.)
  *
- * **A request with no operator needs no special case.** No operator asked for ⇒ no operator certs
- * requested ⇒ the scorer reports none ⇒ the group is empty and is not returned at all. Operator papers
- * the lessor happens to hold do not summon a row of their own: with the operator group reduced to a
- * status the renter never asked for, there is nothing such a row could say. The lessor is still not
- * marked down for a check nobody ran — an absent row is not a red one.
+ * ~~**A request with no operator needs no special case.**~~ **No request does, now**: with the group
+ * gone, an operator paper is never a row here whatever the request asked and whatever the lessor holds.
+ * The other half of that note still holds and is still enforced — a held `operator_tuv` does not fall
+ * back into **Equipment documents**, because `isOperatorDoc` keeps it out of both the certificate
+ * bucket and the unclassified one.
  */
 export function equipmentDocGroups(machine: FleetMachine, request: MatchRequest): DocGroup[] {
   // The SAME derivation the match grid scores with — never a second reading of the request.
@@ -1354,31 +1424,21 @@ export function equipmentDocGroups(machine: FleetMachine, request: MatchRequest)
     );
   }
 
-  /* ── the operator's documents — a STATUS, not a document list ── */
-  const operatorRows: DocRow[] = operatorStatusRows(readiness.operatorCerts);
+  /* ── ~~the operator's documents~~ — the group left this tab on 2026-08-11; see the block above ── */
 
   return [
-    // The two equipment headings name the MACHINE (the app's «الوحدة» / «المعدّة» for the same thing):
-    // a renter reading two stacked groups knows both belong to the machine in front of him, not to the
-    // supplier or the bid. The operator's group stays a group of its own — its papers are the
-    // operator's, not the machine's, and that distinction is the whole point of a third group
-    // (RM3-AC-75).
+    // Both headings name the MACHINE (the app's «الوحدة» / «المعدّة» for the same thing): a renter
+    // reading two stacked groups knows both belong to the machine in front of him, not to the supplier
+    // or the bid — and since the operator's group left, that is true of everything on this tab.
     // Headings quoted from the app's own documents sheet (`bid_readiness_sheets.dart:2290-2311`):
-    // `bidReadinessGapPhotos` (app_en.arb:8739 · app_ar.arb:6241), `bidReadinessDocsEquipmentGroup`
-    // (app_en.arb:5415 · app_ar.arb:3638 — already word-for-word what this file had) and
-    // `bidReadinessDocsOperatorGroup` (app_en.arb:5419 · app_ar.arb:3639). The operator's group is
-    // still a group of its own — the point of RM3-AC-75 — it just carries the app's spelling of the
-    // name now.
+    // `bidReadinessGapPhotos` (app_en.arb:8739 · app_ar.arb:6241) and `bidReadinessDocsEquipmentGroup`
+    // (app_en.arb:5415 · app_ar.arb:3638 — already word-for-word what this file had).
     { key: "photos" as const, label: { en: "Unit photos", ar: "صور الوحدة" }, rows: photoRows },
     { key: "documents" as const, label: { en: "Equipment documents", ar: "مستندات المعدّة" }, rows: paperRows },
-    { key: "operator" as const, label: { en: "Operator documents", ar: "مستندات المشغّل" }, rows: operatorRows },
   ]
     // A group with nothing to say is not a heading with an empty body — it is absent.
     .filter((g) => g.rows.length > 0)
-    // **The operator's group makes no attention claim** (owner, 2026-08-08). Its rows are red or green
-    // and that is the whole statement; a count would promise an act that no longer exists on them. See
-    // `DocGroup.attention` for why `null` rather than `0`.
-    .map((g) => ({ ...g, attention: g.key === "operator" ? null : attentionCount(g.rows) }));
+    .map((g) => ({ ...g, attention: attentionCount(g.rows) }));
 }
 
 /* ───────────────────────────── V9 — company documents ───────────────────────────── */

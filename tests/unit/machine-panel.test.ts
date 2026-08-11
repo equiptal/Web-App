@@ -8,9 +8,16 @@
  * Fixtures go through `mapFleet` rather than being hand-built `FleetMachine` literals: the parser is
  * the only thing that ever produces one in production, so a test that skipped it could pass on a shape
  * the wire cannot make.
+ *
+ * **One section at the foot reads SOURCE rather than calling a function** — the four findings of the
+ * owner's UAT of 2026-08-11 that are rendering rules (the tab's name, the frame's removed X, the cell
+ * that presses, the row's removed arrow). They have no model to interrogate, and each is the other half
+ * of a model rule asserted above; the technique is `availability-chip.test.ts`'s.
  */
 
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { mapFleet, type FleetMachine } from "@/lib/contract/fleet";
 import { computeUnitReadiness, readinessInputsFor } from "@/lib/contract/bid-readiness";
 // The company panel's *decisions* are pure functions exported beside the component — which rows may be
@@ -40,8 +47,8 @@ import {
   presentPhotoSlots,
   selectionModeOf,
   type CompanyDocKey,
-  type DocGroup,
   type DocRow,
+  type MatchCell,
   type MatchCellKey,
   type MatchCellState,
   type MatchRequest,
@@ -116,11 +123,117 @@ describe("matchGrid — six cells, in the spec's order (RM3-AC-36)", () => {
   });
 });
 
+/* ─── ONE SENTENCE SHAPE PER CASE (owner, UAT of 2026-08-11) ───────────────────────────────────────
+ *
+ * *"Some use 'no year asked for' while some 'none requested' or '1 asked for' — use consistent
+ * wording."* Every phrase was already the app's; the SHAPE each cell wrapped them in was not shared, so
+ * six cells answered one question six ways. Four shapes now, and every cell builds its finding out of
+ * them:
+ *
+ *   1 · asked + held (green)      `{thing} — on the unit's file`
+ *   2 · asked + missing (red)     `Missing {thing}`   (+ ` — {what the file holds}`, the year only)
+ *   3 · not asked, but a fact     `{thing} — not requested`
+ *   4 · nothing asked at all      `none requested`
+ *
+ * The block below is the shape's own test — it walks the whole grid over several machines and requests
+ * and refuses any finding that is not one of the four. It is what catches a seventh phrasing arriving
+ * in a cell somebody edited in isolation, which is exactly how the six grew apart.
+ */
+describe("every finding on the grid is one of four shapes", () => {
+  const SHAPES = [
+    /^.+ — on the unit's file$/, // 1
+    /^Missing(?: .+)?$/, //         2
+    /^.+ — not requested$/, //      3
+    /^none requested$/, //          4
+    // The `{thing}` is dropped when the cell's LABEL already names it — proof of ownership, in both
+    // states (`Missing` alone is already shape 2's optional half).
+    /^on the unit's file$/,
+    // The attachments cell is shape 1 carrying the one verdict it can give: the platform records no
+    // attachment, so it says so rather than pretending to have checked. See `attachmentsCell`.
+    /^\d+ requested — not recorded on the unit's file$/,
+  ];
+  const AR_SHAPES = [
+    /^.+ — موجودة في ملف الوحدة$/,
+    /^مفقود(?:: .+)?$/,
+    /^.+ — لم يُطلب$/,
+    /^لم يُطلب شيء$/,
+    /^موجودة في ملف الوحدة$/,
+    /^[٠-٩]+ مطلوبة — غير مسجّلة في ملف الوحدة$/,
+  ];
+  const machines = [
+    machine({ photos: ALL_FOUR, docs: [{ type: "istimara" }, { type: "tuv" }, { type: "operator_tuv" }] }),
+    machine({ photos: [{ slot: "front" }], docs: [] }),
+    machine({ photos: [], docs: [], year: null, manufacturer: null }),
+  ];
+  const requests: MatchRequest[] = [
+    {},
+    { reqMinYear: 2020, reqEquipmentCerts: ["tuv", "spsp"], operatorCertReq: "tuv", attachmentIds: ["a1"] },
+    { reqMinYear: 2020, reqEquipmentCerts: ["tuv"], operatorCertReq: "tuv" },
+  ];
+
+  it("matches one of the four in English, on every cell of every combination", () => {
+    for (const m of machines) {
+      for (const r of requests) {
+        for (const c of matchGrid(m, r)) {
+          expect(SHAPES.some((s) => s.test(c.finding.en))).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("matches one of the four in Arabic too — the shape is not an English-only tidy-up", () => {
+    for (const m of machines) {
+      for (const r of requests) {
+        for (const c of matchGrid(m, r)) {
+          expect(AR_SHAPES.some((s) => s.test(c.finding.ar))).toBe(true);
+        }
+      }
+    }
+  });
+
+  /** The symptom in the owner's own words: three ways to say "nobody asked", on one screen. */
+  it("says «nobody asked» exactly one way across the whole grid", () => {
+    const findings = matchGrid(machine({ photos: ALL_FOUR, docs: [{ type: "istimara" }] }), {}).map((c) => c.finding);
+    for (const gone of ["no year asked for", "no attachments required", "asked for", "not required"]) {
+      expect(findings.filter((f) => f.en.includes(gone))).toEqual([]);
+    }
+    // What survives is «not requested» for a cell with a fact, «none requested» for a whole category.
+    expect(findings.filter((f) => /not requested$/.test(f.en)).length).toBeGreaterThan(0);
+    expect(findings.filter((f) => f.en === "none requested").length).toBeGreaterThan(0);
+  });
+
+  /** *"For TÜV or any field that doesn't match your request and is red, show wording like 'Missing
+   *  TUV' instead of the current sentence."* — applied to EVERY red cell, not only the certificates. */
+  it("leads every red cell with «Missing», whichever cell it is", () => {
+    const m = machine({ photos: [], docs: [], year: 2016 });
+    const red = matchGrid(m, { reqMinYear: 2020, reqEquipmentCerts: ["tuv"], operatorCertReq: "spsp" }).filter(
+      (c) => c.state === "red",
+    );
+    // The year, the photos, the ownership, both cert cells — five reds, and not one of them says «not
+    // on the unit's file» first.
+    expect(red.map((c) => c.key)).toEqual(["year_make", "photos", "ownership", "equipment_cert", "operator_cert"]);
+    for (const c of red) {
+      expect(c.finding.en.startsWith("Missing")).toBe(true);
+      expect(c.finding.ar.startsWith("مفقود")).toBe(true);
+    }
+  });
+});
+
 describe("year & manufacturer", () => {
   it("greys when the request asked for no year — a cell nobody asked about cannot fail", () => {
     const c = cellsBy(machine({ year: 2011 }), {}).year_make;
     expect(c.state).toBe("grey");
-    expect(c.en).toContain("no year asked for");
+    // ~~"no year asked for"~~ — one of the three spellings of "nobody asked" the owner read side by
+    // side on 2026-08-11. Shape 3, which is now the only way this grid says it about one thing.
+    expect(c.en).toBe("2011 · Caterpillar — not requested");
+    expect(c.ar).toBe("٢٠١١ · Caterpillar — لم يُطلب");
+  });
+
+  it("still states what the file holds when nobody asked — a grey cell must not waste the row", () => {
+    const c = cellsBy(machine({ year: null, manufacturer: null }), {}).year_make;
+    expect(c.state).toBe("grey");
+    // Nothing on the file and nothing asked: the app's absence phrase as the subject, shape 3's tail.
+    expect(c.en).toBe("not on the unit's file — not requested");
   });
 
   it("greens when the machine meets the asked-for year, and names the year and the maker", () => {
@@ -130,31 +243,35 @@ describe("year & manufacturer", () => {
     expect(c.en).toContain("Caterpillar");
   });
 
-  // The conflict clause is the APP's, `bidReadinessYearConflict` — "Below the required year {min}" /
-  // «أقدم من الحد الأدنى المطلوب {min}» (app_en.arb:5295 · app_ar.arb:3613). It replaced this
-  // surface's own "you asked for 2020 or newer" on 2026-08-10.
-  it("reds when the machine is older than the asked-for year, and says what was asked", () => {
+  // ~~The conflict clause is the APP's, `bidReadinessYearConflict` — "Below the required year {min}" /
+  // «أقدم من الحد الأدنى المطلوب {min}» (app_en.arb:5295 · app_ar.arb:3613).~~ Superseded by the UAT of
+  // 2026-08-11: it was the one finding on the grid that stated a MISMATCH rather than an absence, so it
+  // could not lead with «Missing» like every other red. The required year is not lost — it is what red
+  // now names as missing, and the unit's own year follows it as shape 2's tail.
+  it("reds when the machine is older than the asked-for year, and says what was asked AND what it is", () => {
     const c = cellsBy(machine({ year: 2016 }), { reqMinYear: 2020 }).year_make;
     expect(c.state).toBe("red");
-    expect(c.en).toContain("below the required year 2020");
-    expect(c.ar).toContain("أقدم من الحد الأدنى المطلوب");
+    expect(c.en).toBe("Missing 2020 or newer — 2016 · Caterpillar");
+    expect(c.ar).toBe("مفقود: ٢٠٢٠ أو أحدث — ٢٠١٦ · Caterpillar");
   });
 
   it("reds when a year was asked for and the machine's file carries none", () => {
     const c = cellsBy(machine({ year: null }), { reqMinYear: 2020 }).year_make;
     expect(c.state).toBe("red");
-    // `bidReadinessDocMissing` (app_en.arb:5436 · app_ar.arb:3642) — the app's one phrase for an
-    // absence, and the ask is still named beside it.
-    expect(c.en).toContain("not on the unit's file");
-    expect(c.en).toContain("below the required year 2020");
+    // Same head, and the tail is `bidReadinessDocMissing` (app_en.arb:5436 · app_ar.arb:3642) — the
+    // app's one phrase for a file that holds nothing.
+    expect(c.en).toBe("Missing 2020 or newer — not on the unit's file");
   });
 
   // The app's satisfied cell is `'${year} · $make'` and stops there (`bid_readiness_sheets.dart:1128`)
-  // — there is no "· meets 2020 or newer" in it, and the ✓ is what says the check passed.
+  // — there is no "· meets 2020 or newer" in it, and the ✓ is what says the check passed. The verdict
+  // clause the UAT added is not a clause of approval: it is shape 1's tail, which every green cell on
+  // the grid now carries, and it says where the fact came from rather than that it passed.
   it("states the bare fact when the year is met — no clause of approval", () => {
     const c = cellsBy(machine({ year: 2022 }), { reqMinYear: 2020 }).year_make;
     expect(c.state).toBe("green");
-    expect(c.en).toBe("2022 · Caterpillar");
+    expect(c.en).toBe("2022 · Caterpillar — on the unit's file");
+    expect(c.en).not.toContain("meets");
   });
 
   it("does not treat an AGE requirement as a year — `computeUnitReadiness` already ruled on that", () => {
@@ -165,27 +282,34 @@ describe("year & manufacturer", () => {
 });
 
 describe("attachments — grey by decision, never red", () => {
-  // The phrase is the app's `bidReadinessNoAttachmentsRequired` (app_en.arb:5304 · app_ar.arb:3614) —
-  // the ONLY thing the app's attachments cell ever prints. The colour still differs: the app bands it
-  // green, this grid keeps grey, deliberately (see `MatchCellState`).
-  it("greys with the app's «No attachments required» when the request asked for none", () => {
+  // ~~The phrase is the app's `bidReadinessNoAttachmentsRequired` (app_en.arb:5304 · app_ar.arb:3614) —
+  // the ONLY thing the app's attachments cell ever prints.~~ Replaced by the grid's shared shape 4 on
+  // 2026-08-11: it is the app's phrase too (`bidReadinessNoneRequested`), and this cell saying
+  // "no attachments required" while the cert cell beside it said "none requested" is half of what the
+  // owner was reading. The colour still differs from the app's: it bands this green, this grid keeps
+  // grey, deliberately (see `MatchCellState`).
+  it("greys with the grid's one «nothing was asked» phrase when the request asked for none", () => {
     const c = cellsBy(machine(), {}).attachments;
     expect(c.state).toBe("grey");
-    expect(c.en).toBe("no attachments required");
-    expect(c.ar).toBe("لا توجد ملحقات مطلوبة");
+    expect(c.en).toBe("none requested");
+    expect(c.ar).toBe("لم يُطلب شيء");
   });
 
   it("stays grey when the request DID ask, because a fleet row carries no attachment record", () => {
     // Red here would mark every machine on the platform as failing a check that was never run —
-    // `FleetMachine` has no attachments field, and `bids.ts` hard-codes the same term grey.
+    // `FleetMachine` has no attachments field, and `bids.ts` hard-codes the same term grey. The owner
+    // confirmed the colour on the same screenshot: *"1 asked but in grey, which is correct."*
     const c = cellsBy(machine(), { attachmentIds: ["a1", "a2"], customAttachments: ["ripper"] }).attachments;
     expect(c.state).toBe("grey");
-    expect(c.en).toContain("3 asked for");
+    expect(c.en).toBe("3 requested — not recorded on the unit's file");
+    expect(c.ar).toBe("٣ مطلوبة — غير مسجّلة في ملف الوحدة");
+    // Grey never says «Missing»: a cell the platform did not score cannot report a gap.
+    expect(c.en).not.toContain("Missing");
   });
 
   it("ignores blank attachment entries when counting", () => {
     const c = cellsBy(machine(), { attachmentIds: ["a1", "  "], customAttachments: [""] }).attachments;
-    expect(c.en).toContain("1 asked for");
+    expect(c.en).toContain("1 requested");
   });
 });
 
@@ -196,11 +320,14 @@ describe("equipment photos — the fraction, over the slots the lessor is actual
   it("greens on the two REQUIRED slots, whether or not the optional two were uploaded", () => {
     const both = cellsBy(machine({ photos: [{ slot: "front" }, { slot: "serial" }] }), {}).photos;
     expect(both.state).toBe("green");
-    expect(both.en).toBe("2 of 2 on file");
+    // The count, in shape 1 — the cell the owner pointed at when he asked for a cell to open its
+    // evidence: *"clicking on any document field here, like '2 of 2 unit photos'"*.
+    expect(both.en).toBe("2 of 2 — on the unit's file");
+    expect(both.ar).toBe("٢ من ٢ — موجودة في ملف الوحدة");
     // All four reads the same: the optional shots are not a higher score, they are simply optional.
     const all = cellsBy(machine({ photos: ALL_FOUR }), {}).photos;
     expect(all.state).toBe("green");
-    expect(all.en).toBe("2 of 2 on file");
+    expect(all.en).toBe("2 of 2 — on the unit's file");
   });
 
   it("does not fail a machine for a shot nobody requires", () => {
@@ -209,20 +336,22 @@ describe("equipment photos — the fraction, over the slots the lessor is actual
     expect(c.state).toBe("green");
   });
 
-  it("reds when a REQUIRED shot is missing, and says which fraction is short", () => {
+  // ~~"says which fraction is short"~~ — it names the SHOT now (owner, UAT of 2026-08-11). A count in
+  // a red cell left the renter to work out which of the two shots was the missing one by opening the
+  // other tab; the slot's own name is the answer, and it is the same `PHOTO_LABEL` that heads the row
+  // over there. The fraction is what green states.
+  it("reds when a REQUIRED shot is missing, and NAMES the shot", () => {
     const c = cellsBy(machine({ photos: [{ slot: "front" }, { slot: "equipment" }] }), {}).photos;
     expect(c.state).toBe("red");
-    expect(c.en).toBe("1 of 2 on file");
+    expect(c.en).toBe("Missing Plate / serial");
+    expect(c.ar).toBe("مفقود: اللوحة والرقم التسلسلي");
   });
 
-  it("reds at none, and reports zero rather than omitting the cell", () => {
+  it("reds at none, and names both rather than omitting the cell", () => {
     const c = cellsBy(machine({ photos: [] }), {}).photos;
     expect(c.state).toBe("red");
-    // «{onFile} of {total} on file» / «{onFile} من {total} في الملف» — the app's own count phrasing,
-    // `bidReadinessDocsOnFile` (app_en.arb:5444 · app_ar.arb:3644). "uploaded" / «مرفوعة» had no
-    // counterpart anywhere in the app's readiness vocabulary.
-    expect(c.en).toBe("0 of 2 on file");
-    expect(c.ar).toBe("٠ من ٢ في الملف");
+    expect(c.en).toBe("Missing Front · Plate / serial");
+    expect(c.ar).toBe("مفقود: أمامية · اللوحة والرقم التسلسلي");
   });
 
   it("folds the wire's slot vocabulary onto the four the renter is shown", () => {
@@ -259,10 +388,16 @@ describe("proof of ownership — green when held, RED when absent", () => {
     // (`bid-readiness.ts` still excludes it from the readiness SCORE; a band, not visibility.)
     const c = cellsBy(machine({ docs: [{ type: "tuv" }] }), {}).ownership;
     expect(c.state).toBe("red");
-    // `bidReadinessDocMissing`, plus the one clause the app has no equivalent for — the renter can ask
-    // for it from here, and the app's read-only mirror cannot.
-    expect(c.en).toBe("not on the unit's file — you can ask for it");
-    expect(c.ar).toBe("غير موجودة في ملف الوحدة — يمكنك طلبها");
+    // ~~`bidReadinessDocMissing`, plus the one clause the app has no equivalent for — the renter can ask
+    // for it from here.~~ Both withdrawn by the UAT of 2026-08-11: the absence leads, and no other red
+    // cell ends in an instruction. The act is still one press away, on the documents tab.
+    //
+    // **The `{thing}` is dropped here and only here** — the cell's label IS the paper's name, so
+    // «Missing Proof of Ownership» under a heading reading "Proof of Ownership" prints it twice. It
+    // therefore says exactly what the documents tab's row says about the same absence.
+    expect(c.en).toBe("Missing");
+    expect(c.ar).toBe("مفقود");
+    expect(c.en).not.toContain("you can ask");
   });
 });
 
@@ -286,9 +421,12 @@ describe("certificates — grey when unasked, red when asked and missing", () =>
   it("reds and names ONLY the missing one", () => {
     const c = cellsBy(machine({ docs: [{ type: "tuv" }] }), { reqEquipmentCerts: ["tuv", "spsp"] }).equipment_cert;
     expect(c.state).toBe("red");
-    expect(c.en).toContain("SPSP");
+    // The owner's own example of the red shape (UAT of 2026-08-11): «TÜV — غير موجودة في ملف الوحدة»
+    // became «مفقود: TÜV». A cell that also listed the certificate the file DOES hold would bury the gap
+    // it exists to report, which is why only the missing one is named — that half is unchanged.
+    expect(c.en).toBe("Missing SPSP");
+    expect(c.ar).toBe("مفقود: SPSP");
     expect(c.en).not.toContain("TÜV");
-    expect(c.en).toContain("not on the unit's file");
   });
 
   it("greys operator certs when the request declared no operator licence level", () => {
@@ -298,6 +436,86 @@ describe("certificates — grey when unasked, red when asked and missing", () =>
   it("reds operator certs the request asked for and the machine does not hold", () => {
     const c = cellsBy(machine({ docs: [{ type: "tuv" }] }), { operatorCertReq: "spsp" }).operator_cert;
     expect(c.state).toBe("red");
+  });
+});
+
+/* ─── a cell opens its evidence (owner, UAT of 2026-08-11) ────────────────────────────────────────
+ *
+ * *"Clicking on any document field here, like '2 of 2 unit photos', will take them to the document."*
+ * The model resolves WHICH document, out of the documents tab's own rows; `EquipmentDetail` puts it in
+ * the frame. The rule that matters is the negative one — **only a green cell carries evidence** — since
+ * that is what keeps a red cell from opening some other paper of the same family as if it were the one
+ * the finding named, and what keeps a cell with nothing to show from being a dead control.
+ */
+describe("only a green cell opens its evidence", () => {
+  const cellsOf = (m: FleetMachine, r: MatchRequest) =>
+    Object.fromEntries(matchGrid(m, r).map((c) => [c.key, c])) as Record<MatchCellKey, MatchCell>;
+
+  it("hands the photos cell the front shot, as a PHOTO", () => {
+    const c = cellsOf(machine({ photos: [{ slot: "front" }, { slot: "serial" }] }), {}).photos;
+    expect(c.state).toBe("green");
+    expect(c.evidence).toEqual({
+      key: "photo:front",
+      label: { en: "Front", ar: "أمامية" },
+      url: "https://x/front",
+      kind: "photo",
+    });
+  });
+
+  it("hands the ownership and certificate cells their paper, as a PAPER", () => {
+    const cells = cellsOf(machine({ docs: [{ type: "istimara" }, { type: "tuv" }] }), { reqEquipmentCerts: ["tuv"] });
+    expect(cells.ownership.evidence).toMatchObject({ key: "doc:ownership", url: "https://x/istimara", kind: "paper" });
+    expect(cells.equipment_cert.evidence).toMatchObject({ key: "doc:equipment_cert:tuv", kind: "paper" });
+  });
+
+  /** The frame marks the row the renter would have pressed on the other tab, so the two surfaces cannot
+   *  disagree about which paper a finding stands for. That is one key, resolved once. */
+  it("names the DOCUMENTS TAB's own row, key for key", () => {
+    const m = machine({ photos: [{ slot: "front" }, { slot: "serial" }], docs: [{ type: "istimara" }] });
+    const rowKeys = equipmentDocGroups(m, {}).flatMap((g) => g.rows.map((r) => r.key));
+    for (const c of matchGrid(m, {})) {
+      if (c.evidence) expect(rowKeys).toContain(c.evidence.key);
+    }
+  });
+
+  it("gives a RED cell none — a finding about an absence has nothing to open", () => {
+    // Front is on the file and the plate shot is not, so this cell is red WITH a real photo behind it:
+    // the case where opening "the first file of the family" would show evidence for a sentence the cell
+    // did not write.
+    const c = cellsOf(machine({ photos: [{ slot: "front" }] }), {}).photos;
+    expect(c.state).toBe("red");
+    expect(c.evidence).toBeNull();
+    // Same for a half-held certificate cell: TÜV is on the file, the finding is about the SPSP.
+    const cert = cellsOf(machine({ docs: [{ type: "tuv" }] }), { reqEquipmentCerts: ["tuv", "spsp"] }).equipment_cert;
+    expect(cert.state).toBe("red");
+    expect(cert.evidence).toBeNull();
+  });
+
+  it("gives a GREY cell none — nothing was scored, so nothing was read", () => {
+    // The machine holds a TÜV; the request asked for no certificate at all.
+    const cells = cellsOf(machine({ docs: [{ type: "tuv" }], year: 2011 }), {});
+    expect(cells.equipment_cert.state).toBe("grey");
+    expect(cells.equipment_cert.evidence).toBeNull();
+    expect(cells.year_make.evidence).toBeNull();
+    expect(cells.attachments.evidence).toBeNull();
+  });
+
+  it("gives a green cell none when the projection carried the paper but not its link", () => {
+    // A real state (`url: null`) and the one that would produce a control opening nothing.
+    const c = cellsOf(machine({ docs: [{ type: "istimara", url: null }] }), {}).ownership;
+    expect(c.state).toBe("green");
+    expect(c.evidence).toBeNull();
+  });
+
+  it("never points at a file the documents tab does not offer", () => {
+    // An operator paper is the family with no file by ruling; it must not reach the frame through a
+    // cell either. Nothing on this grid may resolve to a url no row on the other tab exposes.
+    const m = machine({ photos: ALL_FOUR, docs: [{ type: "istimara" }, { type: "operator_tuv" }] });
+    const request = asking(["tuv"], "tuv");
+    const rowUrls = equipmentDocGroups(m, request).flatMap((g) => g.rows.flatMap((r) => r.files.map((f) => f.url)));
+    for (const c of matchGrid(m, request)) {
+      if (c.evidence) expect(rowUrls).toContain(c.evidence.url);
+    }
   });
 });
 
@@ -342,8 +560,8 @@ describe("distanceBandLabel", () => {
 
 /* ────────────── V8 — the document groups (§6.6, RM3-AC-38, RM3-AC-39, RM3-AC-42) ──────────────
  *
- * The platform's one rule (owner, 2026-08-08), applied to photos, ownership, equipment certs and
- * operator papers alike:
+ * The platform's one rule (owner, 2026-08-08), applied to photos, ownership and equipment certs alike —
+ * and since the owner's UAT of 2026-08-11 there is nothing else on this tab for it to be applied to:
  *
  *   required + held    → shown, green, openable
  *   required + absent  → RED, counted, requestable
@@ -352,6 +570,11 @@ describe("distanceBandLabel", () => {
  *
  * Required = front photo · plate/serial photo · proof of ownership (all three from the supplier's own
  * scorer, `bid_readiness.dart`) + every cert THIS request asked for.
+ *
+ * **The operator's group is gone** — *"operator will not be viewed in the document section at all —
+ * only in the equipment field, as its cert exists or not."* It kept its own describe blocks here for
+ * every act it refused to take part in; they are now one block asserting that no operator row reaches
+ * this tab by any door, plus the match-grid cell that carries the surviving statement.
  */
 
 /** A request that asks for nothing — the no-operator, no-cert job. */
@@ -365,23 +588,23 @@ const groupBy = (m: FleetMachine, r: MatchRequest) =>
   Object.fromEntries(equipmentDocGroups(m, r).map((g) => [g.key, g]));
 
 describe("equipmentDocGroups — the groups, and each one's own attention count (RM3-AC-42)", () => {
-  it("splits photos from documents from the OPERATOR's documents, and never merges the counts", () => {
+  it("splits photos from documents, and never merges the counts", () => {
     const groups = equipmentDocGroups(
       machine({ photos: ALL_FOUR, docs: [{ type: "istimara" }, { type: "operator_tuv" }] }),
       asking(["tuv"], "tuv"),
     );
-    expect(groups.map((g) => g.key)).toEqual(["photos", "documents", "operator"]);
-    // The operator is a SECTION now, not one row buried in the equipment's papers.
-    expect(groups[2].rows.map((r) => r.key)).toEqual(["doc:operator:tuv"]);
+    // TWO groups, both the machine's. The third — the operator's — left on 2026-08-11, and the
+    // `operator_tuv` this machine holds raises no row in either of the two that remain.
+    expect(groups.map((g) => g.key)).toEqual(["photos", "documents"]);
   });
 
   it("counts ROWS NEEDING ACTION, never totals", () => {
     const g = groupBy(machine({ photos: [{ slot: "front" }], docs: [{ type: "tuv" }] }), asking(["tuv"], "spsp"));
     expect(g.photos.attention).toBe(1); // the plate shot, and nothing else — meter and side are not required
     expect(g.documents.attention).toBe(1); // ownership; the asked-for TÜV is on the file
-    // The operator's group makes NO claim (owner, 2026-08-08) — its missing SPSP is red on the row and
-    // counted nowhere, because the count promises an action and this group offers none.
-    expect(g.operator.attention).toBeNull();
+    // The asked-for operator SPSP is missing and is counted NOWHERE here — it is the match grid's
+    // operator cell that reports it, which is the whole of the 2026-08-11 ruling.
+    expect(groupBy(machine({ photos: [{ slot: "front" }], docs: [{ type: "tuv" }] }), asking(["tuv"], "spsp")).operator).toBeUndefined();
   });
 
   it("reports zero attention when everything required is on the file", () => {
@@ -389,83 +612,9 @@ describe("equipmentDocGroups — the groups, and each one's own attention count 
       machine({ photos: ALL_FOUR, docs: [{ type: "istimara" }, { type: "tuv" }, { type: "operator_tuv" }] }),
       asking(["tuv"], "tuv"),
     );
-    // The operator's group is `null` even here, where every certificate it names IS on the file — the
-    // group never makes a claim, rather than making one that happens to be zero.
-    expect(groups.map((g) => g.attention)).toEqual([0, 0, null]);
-  });
-
-  it("answers an asked-for licence with a held `operating_license` — it carries no `operator_` prefix", () => {
-    // `CERTIFIED` is the request code; `operating_license` is the paper it stands for (the app's table).
-    const g = groupBy(machine({ docs: [{ type: "operating_license" }] }), asking([], "CERTIFIED"));
-    expect(g.operator.rows.map((r) => r.key)).toEqual(["doc:operator:operating_license"]);
-    expect(g.operator.rows[0].label.en).toBe("Operator licence");
-    expect(g.operator.rows[0].status).toBe("present"); // the prefix test alone would have read it missing
-    // …and it is NOT also a row under the equipment's papers, which hold only the ownership row here.
-    expect(g.documents.rows.map((r) => r.key)).toEqual(["doc:ownership"]);
-  });
-
-  it("folds the three request codes for the operator's licence into ONE row", () => {
-    const g = groupBy(machine({ docs: [] }), asking([], "CERTIFIED, SAFETY_CERT, SAFETY"));
-    expect(g.operator.rows.map((r) => r.key)).toEqual(["doc:operator:operating_license"]);
-  });
-
-  /**
-   * Given a machine holds `operating_licence` — the British spelling — When the panel groups its
-   * papers, Then it is an operator document and NOT an openable row under Documents.
-   *
-   * This spelling was the one hole in "operator documents are inert". It fails BOTH halves of
-   * `isOperatorDoc`: it does not start with `operator`, and it was missing from `OPERATOR_TYPES`. So it
-   * landed in the Documents group with a live `downloadUrl`, a tickable checkbox, a view control and a
-   * place in `docDownloadBatch` — the only path by which an operator paper could carry a truthy url or
-   * a selectable flag, against the owner's status-only ruling (2026-08-08).
-   */
-  it("files the BRITISH `operating_licence` under the operator, never under Documents", () => {
-    const m = machine({ photos: ALL_FOUR, docs: [{ type: "operating_licence" }] });
-
-    // It is not a Documents row at all — and in particular not an `doc:other:*` one.
-    const g = groupBy(m, asking([], "CERTIFIED"));
-    expect(g.documents.rows.map((r) => r.key)).toEqual(["doc:ownership"]);
-    expect(g.documents.rows.some((r) => r.key.startsWith("doc:other:"))).toBe(false);
-
-    // It is also inert when NOTHING asks for it: the operator group is status-only, so an unrequested
-    // operator paper is simply not a row anywhere — it must not fall back into Documents.
-    const noAsk = equipmentDocGroups(m, NO_ASKS);
-    const rows = noAsk.flatMap((gr) => gr.rows);
-    expect(rows.some((r) => r.key.includes("licence") || r.key.includes("license"))).toBe(false);
-  });
-
-  it("gives an operator paper no url, no tick and no view control — for either spelling", () => {
-    // The property the leak actually broke. Every operator-group row must be inert in both states.
-    for (const held of ["operating_licence", "operating_license"]) {
-      const g = groupBy(machine({ photos: ALL_FOUR, docs: [{ type: held }] }), asking([], "CERTIFIED"));
-      expect(g.operator.rows.map((r) => r.key)).toEqual(["doc:operator:operating_license"]);
-      for (const row of g.operator.rows) {
-        expect(row.downloadUrl).toBeNull();
-        expect(row.files).toEqual([]);
-        expect(docRowSelectable(row, "download")).toBe(false);
-        expect(docRowActions(row)).toEqual([]);
-      }
-      // …and even with every operator row force-selected, nothing reaches the download batch.
-      const allKeys = new Set(g.operator.rows.map((r) => r.key));
-      expect(docDownloadBatch(g.operator.rows, allKeys)).toEqual([]);
-    }
-  });
-
-  it("keeps every operator paper a request can actually ask for as a row of its own", () => {
-    // The ask vocabulary is the app's table — TUV · SPSP · CERTIFIED/SAFETY_CERT/SAFETY — and it reaches
-    // exactly three of the backend's operator papers (web-handoff.md:16). `operator_id` and
-    // `operator_insurance` are held but never requested, so they are not rows.
-    const g = groupBy(machine({ docs: [] }), asking([], "TUV, SPSP, CERTIFIED"));
-    expect(g.operator.rows.map((r) => r.key)).toEqual([
-      "doc:operator:tuv",
-      "doc:operator:spsp",
-      "doc:operator:operating_license",
-    ]);
-    expect(g.operator.rows.map((r) => r.label.en)).toEqual([
-      "Operator TÜV",
-      "Operator SPSP",
-      "Operator licence",
-    ]);
+    // Two counts, both numbers. ~~`[0, 0, null]`~~ — the `null` was the operator's group saying "I make
+    // no attention claim", and there is no group left that can say it.
+    expect(groups.map((g) => g.attention)).toEqual([0, 0]);
   });
 
   it("does not call a spec sheet an equipment safety certificate — it calls it a spec sheet", () => {
@@ -490,26 +639,43 @@ describe("equipmentDocGroups — the groups, and each one's own attention count 
     }
   });
 
-  // The vocabulary is the APP's, and it is TWO phrases for every family — `bidReadinessDocOnFile` and
-  // `bidReadinessDocMissing`, which is all `_rowShell` (`bid_readiness_sheets.dart:2681-2684`) ever
-  // says, for a photo row and a certificate row alike. The "· not required" tail is the one thing here
-  // the app has no word for: it renders no unrequired row at all.
-  it("uses the app's presence vocabulary, and no other", () => {
+  // The vocabulary is the APP's for what is HELD — `bidReadinessDocOnFile`, which is what `_rowShell`
+  // (`bid_readiness_sheets.dart:2681-2684`) says for a photo row and a certificate row alike. What is
+  // ABSENT says «مفقود», the match grid's word for the same absence (owner, UAT of 2026-08-11: *"same
+  // wording as the equipment tab for a missing document"*), where it used to say the app's
+  // `bidReadinessDocMissing`. The "· not requested" tail is the one thing here the app has no word for:
+  // it renders no unrequested row at all.
+  it("uses ONE vocabulary, and it is the match grid's", () => {
     const groups = equipmentDocGroups(machine({ photos: ALL_FOUR, docs: [{ type: "tuv" }] }), NO_ASKS);
     for (const line of groups.flatMap((g) => g.rows.map((r) => r.statusLine.en))) {
-      expect([
-        "on the unit's file",
-        "not on the unit's file",
-        "on the unit's file · not required",
-      ]).toContain(line);
+      expect(["on the unit's file", "Missing", "on the unit's file · not requested"]).toContain(line);
     }
     for (const line of groups.flatMap((g) => g.rows.map((r) => r.statusLine.ar))) {
-      expect([
-        "موجودة في ملف الوحدة",
-        "غير موجودة في ملف الوحدة",
-        "موجودة في ملف الوحدة · غير مطلوبة",
-      ]).toContain(line);
+      expect(["موجودة في ملف الوحدة", "مفقود", "موجودة في ملف الوحدة · لم يُطلب"]).toContain(line);
     }
+  });
+
+  /**
+   * Given the request asked for a TÜV and the machine's file carries none, When the renter reads the
+   * documents tab and then the equipment tab, Then both describe the absence with the same word.
+   *
+   * The owner's UAT of 2026-08-11: *"same wording as the equipment tab for a missing document."* The
+   * two are not the same STRING — the row's own title already names the paper six pixels above its
+   * status line, and the cell has no title of its own to lean on — so the row says «مفقود» and the cell
+   * says «مفقود: TÜV». What must never differ again is the word.
+   */
+  it("says the same word about one absence on both tabs", () => {
+    const m = machine({ photos: ALL_FOUR, docs: [] });
+    const row = equipmentDocGroups(m, asking(["tuv"]))
+      .flatMap((g) => g.rows)
+      .find((r) => r.key === "doc:equipment_cert:tuv")!;
+    const cell = cellsBy(m, asking(["tuv"])).equipment_cert;
+    expect(row.statusLine.en).toBe("Missing");
+    expect(cell.en).toBe("Missing TÜV");
+    expect(cell.en.startsWith(row.statusLine.en)).toBe(true);
+    expect(row.statusLine.ar).toBe("مفقود");
+    expect(cell.ar).toBe("مفقود: TÜV");
+    expect(cell.ar.startsWith(row.statusLine.ar)).toBe(true);
   });
 
   it("gives every row a download link when it holds a file, and none when it does not", () => {
@@ -531,7 +697,7 @@ describe("a document nobody asked for is never shown as missing (owner, 2026-08-
     const g = groupBy(machine({ docs: [{ type: "tuv" }] }), NO_ASKS);
     const row = g.documents.rows.find((r) => r.key === "doc:equipment_cert:tuv")!;
     expect(row.status).toBe("on_file"); // not "present" — nothing was passed, because nothing was asked
-    expect(row.statusLine.en).toBe("on the unit's file · not required");
+    expect(row.statusLine.en).toBe("on the unit's file · not requested");
     expect(docRowActions(row).map((a) => a.kind)).toEqual(["view"]);
     // Not requestable, and yet tickable — for the OTHER batch. Being on the file is what makes it
     // downloadable, which is the 2026-08-08 mode split seen from the not-required row.
@@ -541,7 +707,8 @@ describe("a document nobody asked for is never shown as missing (owner, 2026-08-
   it("a held-but-unrequested row raises NOBODY's attention count", () => {
     const g = groupBy(machine({ docs: [{ type: "istimara" }, { type: "tuv" }, { type: "operator_tuv" }] }), NO_ASKS);
     expect(g.documents.attention).toBe(0);
-    // Nothing was asked of the operator, so he has no section to raise a count in.
+    // The held `operator_tuv` raises no count either, because it raises no row: there is no operator
+    // group to hold it and `isOperatorDoc` keeps it out of the equipment's papers.
     expect(g.operator).toBeUndefined();
   });
 
@@ -575,19 +742,18 @@ describe("a document already on the file is never requestable", () => {
   });
 
   /* A test here asserted that the operator's certificates follow this rule too — a missing one being
-   * `requestable: true`. **Deleted, not inverted** (owner, 2026-08-08): that family is outside the rule
-   * rather than a case of it, and the assertion that replaces it lives with the rest of the group's
-   * inertness below ("the operator's group participates in nothing"). Inverting it here would have left
-   * the operator inside a describe block about what may be asked for. */
+   * `requestable: true`. **Deleted, not inverted** (owner, 2026-08-08): that family was outside the rule
+   * rather than a case of it. Since the UAT of 2026-08-11 it is not on this tab at all, and what
+   * replaces both is "the operator's documents leave this tab entirely" below. */
 
-  it("makes requestable and missing the SAME set, in every group that can be asked of", () => {
+  it("makes requestable and missing the SAME set, in EVERY group", () => {
     const g = equipmentDocGroups(
       machine({ photos: [{ slot: "front" }], docs: [{ type: "istimara" }, { type: "operator_tuv" }] }),
       asking(["tuv"], "tuv, spsp"),
     );
-    // The operator's group is excluded BY NAME rather than by a filter that happens to skip it, so the
-    // exception stays visible: it is not asked for at all, in either state.
-    for (const group of g.filter((x) => x.key !== "operator")) {
+    // ~~`g.filter((x) => x.key !== "operator")`~~ — no group is excluded any more, which is the shape of
+    // the ruling: one rule, and nothing on this tab standing outside it.
+    for (const group of g) {
       for (const row of group.rows) expect(row.requestable).toBe(row.status === "missing");
     }
   });
@@ -599,31 +765,87 @@ describe("a document already on the file is never requestable", () => {
   });
 });
 
-describe("the operator's section on a job with NO operator", () => {
-  it("does not exist when nothing was asked for and nothing is held", () => {
-    expect(groupBy(machine({ docs: [{ type: "tuv" }] }), NO_ASKS).operator).toBeUndefined();
+/* ── the operator's documents leave this tab entirely (owner, UAT of 2026-08-11) ────────────────────
+ *
+ * *"Operator will not be viewed in the document section at all — only in the equipment field, as its
+ * cert exists or not."* This supersedes the part of RM3-AC-75 that described an operator GROUP of
+ * status-only rows; the checklist records what it changed to.
+ *
+ * Six describe blocks used to assert what that group refused to do — no url, no tick, no ask, no count,
+ * no place in either batch. They are one block now, and it asserts something stronger and shorter: no
+ * operator row exists on this tab **by any door**, whatever the request asks and whatever the lessor
+ * holds. The two facts worth keeping from the deleted blocks are kept — the British spelling of the
+ * licence, and the machine's own held operator papers — because both are ways an operator paper could
+ * come back as an openable, tickable equipment row now that no group of its own would catch it. */
+describe("the operator's documents leave this tab entirely", () => {
+  /** Every request shape that used to raise an operator group, and every spelling the wire uses. */
+  const asks = ["TUV", "SPSP", "CERTIFIED", "SAFETY_CERT", "SAFETY", "TUV, SPSP, CERTIFIED"];
+  const holds = ["operator_tuv", "operator_spsp", "operating_license", "operating_licence", "operator_licence"];
+
+  it("raises no operator group, whatever the request asks of him", () => {
+    for (const operator of asks) {
+      expect(groupBy(machine({ photos: ALL_FOUR, docs: [] }), asking([], operator)).operator).toBeUndefined();
+    }
   });
 
-  it("never shows a missing operator paper on a job that asked for no operator", () => {
-    const rows = equipmentDocGroups(machine({ docs: [] }), NO_ASKS).flatMap((g) => g.rows);
-    expect(rows.filter((r) => r.key.startsWith("doc:operator:"))).toEqual([]);
+  it("raises no operator ROW anywhere — not in photos, not in documents", () => {
+    for (const operator of asks) {
+      for (const held of holds) {
+        const rows = equipmentDocGroups(machine({ photos: ALL_FOUR, docs: [{ type: held }] }), asking(["tuv"], operator))
+          .flatMap((g) => g.rows);
+        expect(rows.filter((r) => r.key.startsWith("doc:operator:"))).toEqual([]);
+      }
+    }
   });
 
-  it("raises no row for an operator paper the lessor happens to hold, either", () => {
-    // The group is a STATUS of what THIS request asked of the operator. With nothing asked there is
-    // nothing to state — and a row carrying no verdict, no count and (per ruling 1) no file would be a
-    // line of text with nothing to say.
-    expect(groupBy(machine({ docs: [{ type: "operator_tuv" }] }), NO_ASKS).operator).toBeUndefined();
+  /**
+   * Given a machine holds an operator paper — including `operating_licence`, the British spelling —
+   * When the panel groups its papers, Then it is not an openable row under **Documents**.
+   *
+   * This is the assertion that must never go green by accident. `operating_licence` fails BOTH halves of
+   * `isOperatorDoc` unless the set lists it — it does not start with `operator` — and with the operator
+   * group gone there is no longer a second home for it to land in instead: it either falls into
+   * Documents with a live url, a tickable checkbox and a place in `docDownloadBatch`, or it is nowhere.
+   */
+  it("never falls back into Documents — no url, no tick, no batch", () => {
+    for (const held of holds) {
+      const m = machine({ photos: ALL_FOUR, docs: [{ type: held }] });
+      for (const request of [NO_ASKS, asking([], "CERTIFIED"), asking(["tuv"], "TUV")]) {
+        const groups = equipmentDocGroups(m, request);
+        const rows = groups.flatMap((g) => g.rows);
+        // Not a row of any kind, and in particular not a `doc:other:*` one.
+        expect(rows.some((r) => r.key.includes("licence") || r.key.includes("license"))).toBe(false);
+        expect(rows.some((r) => r.key.startsWith("doc:other:"))).toBe(false);
+        // …and its url reaches nothing: not a row's `files`, not the download batch, not the ask.
+        expect(JSON.stringify(groups)).not.toContain(`https://x/${held}`);
+        const everything = new Set(rows.map((r) => r.key));
+        expect(docDownloadBatch(rows, everything).map((t) => t.url)).not.toContain(`https://x/${held}`);
+        expect(JSON.stringify(batchDocumentRequest("eq-1", rows, everything) ?? {})).not.toContain("operator");
+      }
+    }
   });
 
-  it("turns red only once the request asks for the operator's papers", () => {
-    const g = groupBy(machine({ docs: [] }), asking([], "TUV,SPSP"));
-    expect(g.operator.rows.map((r) => [r.key, r.status])).toEqual([
-      ["doc:operator:tuv", "missing"],
-      ["doc:operator:spsp", "missing"],
-    ]);
-    // Red on the rows, and no count — the group states a fact and offers no act (owner, 2026-08-08).
-    expect(g.operator.attention).toBeNull();
+  /**
+   * Given the request asks for an operator certificate the machine does not hold, When the renter reads
+   * the panel, Then the **match grid** says so — that is where the statement moved, and the ruling is
+   * only half kept if it vanished from the documents tab and nowhere reported it.
+   */
+  it("still says whether the operator's certificate exists — in the equipment field", () => {
+    const gap = cellsBy(machine({ docs: [] }), asking([], "TUV")).operator_cert;
+    expect(gap.state).toBe("red");
+    expect(gap.en).toContain("Missing");
+    const held = cellsBy(machine({ docs: [{ type: "operator_tuv" }] }), asking([], "TUV")).operator_cert;
+    expect(held.state).toBe("green");
+    expect(held.en).toContain("on the unit's file");
+  });
+
+  /** …and it opens nothing. The cell presses only when there is a file to show, and an operator paper
+   *  is never one: nothing validates it on upload (RM3-AC-75's surviving half). */
+  it("gives the operator cell no evidence to open, held or not", () => {
+    for (const m of [machine({ docs: [] }), machine({ docs: [{ type: "operator_tuv" }] })]) {
+      const cell = matchGrid(m, asking([], "TUV")).find((c) => c.key === "operator_cert")!;
+      expect(cell.evidence).toBeNull();
+    }
   });
 });
 
@@ -649,8 +871,10 @@ describe("photos follow the same rule as the papers", () => {
     expect([meter.status, meter.statusLine.en, meter.requestable]).toEqual([
       "on_file",
       // A photo row is not worded differently from a paper row — the app files both through one
-      // `_rowShell`, which says only `bidReadinessDocOnFile` / `bidReadinessDocMissing`.
-      "on the unit's file · not required",
+      // `_rowShell`, which says only `bidReadinessDocOnFile`. ~~«· not required»~~ — the tail moved onto
+      // the grid's «not requested» in the UAT of 2026-08-11, so one tab cannot say "required" where the
+      // other says "requested" about the same paper.
+      "on the unit's file · not requested",
       false,
     ]);
     expect(g.photos.attention).toBe(0);
@@ -751,156 +975,55 @@ describe("the batch ask raised from the equipment's papers (RM3-AC-38)", () => {
   });
 });
 
-/* ───── ruling 1 — the operator's documents are a STATUS, not a document list (owner, 2026-08-08) ───── */
-
-describe("the operator's certificates say present or absent, and expose no file", () => {
-  const held = () => groupBy(machine({ docs: [{ type: "operator_tuv" }] }), asking([], "tuv, spsp")).operator;
-
-  it("states presence, green or red, and makes no attention claim at all", () => {
-    const g = held();
-    expect(g.rows.map((r) => [r.key, r.status, r.statusLine.en])).toEqual([
-      ["doc:operator:tuv", "present", "on the unit's file"],
-      ["doc:operator:spsp", "missing", "not on the unit's file"],
-    ]);
-    // ~~`attention` was 1 here~~ — withdrawn 2026-08-08 with the group's requestability. The count reads
-    // "N rows need action from you", and there is no action on this group; `null` is the component's
-    // instruction to render no pill, which is not the same as a green «لا ينقص شيء» over a red row.
-    expect(g.attention).toBeNull();
-  });
-
-  it("exposes NO url — not on the held row, and not on the missing one", () => {
-    // Nothing validates an operator document on upload, so a file the renter can open would present an
-    // unchecked upload as verified evidence. Presence is a fact the platform can stand behind.
-    for (const row of held().rows) {
-      expect(row.downloadUrl).toBeNull();
-      expect(row.files).toEqual([]);
-      expect(row.thumbUrl).toBeNull();
-    }
-  });
-
-  it("offers NO view and NO download control — the withdrawn behaviour cannot come back by accident", () => {
-    for (const row of held().rows) expect(docRowActions(row)).toEqual([]);
-  });
-
-  it("carries no url even when the lessor filed several copies", () => {
-    const g = groupBy(
-      machine({
-        docs: [
-          { type: "operator_tuv", url: "https://x/op-1" },
-          { type: "operator_tuv", url: "https://x/op-2" },
-        ],
-      }),
-      asking([], "tuv"),
-    );
-    expect(g.operator.rows[0].status).toBe("present");
-    expect(JSON.stringify(g.operator)).not.toContain("https://x/op-");
-  });
-
+/* ───── ~~ruling 1 — the operator's documents are a STATUS, not a document list~~ (owner, 2026-08-08),
+ * ~~narrowed the same day to a group that participates in nothing~~ ─────────────────────────────────
+ *
+ * Two describe blocks stood here — one asserting what the operator's rows SAID, one asserting the long
+ * list of things they refused to do. **Both are answered by the group's absence** (owner, UAT of
+ * 2026-08-11), and by the block above, which walks every request code and every wire spelling and finds
+ * no operator row on this tab at all: a row that does not exist cannot be ticked, asked for, opened,
+ * counted or batched, and the assertion is stronger for being about existence rather than about six
+ * mechanisms declining one row.
+ *
+ * What did NOT come from the group's own rendering is kept, and it is the part that outlives it — the
+ * scorer's translation of a request CODE into the paper a lessor actually files. It is now read where
+ * the operator's one surviving statement is made: the match grid. */
+describe("what the operator's cell inherits from the scorer", () => {
   it("reads the SCORER's `present`, so the panel and the readiness card cannot disagree", () => {
     // The scorer translates the request code `CERTIFIED` into the kind a machine actually carries
     // (`operating_license`) — the app's table. Bucketing `documentKeys` a second time here is exactly
     // the second opinion this avoids, so the panel inherits that translation rather than repeating it.
-    const g = groupBy(machine({ docs: [{ type: "operating_license" }] }), asking([], "CERTIFIED"));
-    expect(g.operator.rows.map((r) => [r.key, r.status])).toEqual([["doc:operator:operating_license", "present"]]);
+    // A prefix test alone would read a held `operating_license` as missing and print red over a machine
+    // whose licence is on the file.
+    const c = cellsBy(machine({ docs: [{ type: "operating_license" }] }), asking([], "CERTIFIED")).operator_cert;
+    expect(c.state).toBe("green");
+    expect(c.en).toContain("on the unit's file");
   });
 
-  it("raises NO row for an operator code that names no document — never a permanently red one", () => {
+  it("scores NO code that names no document — never a permanently red cell", () => {
     // A code outside the app's table (`GRADE-1`, free text, a paper the platform does not carry) names
-    // nothing a lessor could upload. The scorer drops it, so the renter is not shown a red row the
-    // supplier can never clear. The licence asked for alongside it still gets its row.
-    const g = groupBy(
-      machine({ docs: [{ type: "operating_license" }] }),
-      asking([], "GRADE-1, CERTIFIED"),
-    );
-    expect(g.operator.rows.map((r) => [r.key, r.status])).toEqual([["doc:operator:operating_license", "present"]]);
+    // nothing a lessor could upload. The scorer drops it, so the renter is not shown a gap the supplier
+    // can never close. The licence asked for alongside it is still scored.
+    const c = cellsBy(machine({ docs: [{ type: "operating_license" }] }), asking([], "GRADE-1, CERTIFIED")).operator_cert;
+    expect(c.state).toBe("green");
   });
 
-  it("keeps a held operator paper out of the equipment's papers — no url through the other door", () => {
-    const g = groupBy(machine({ docs: [{ type: "operator_tuv" }] }), asking([], "tuv"));
-    expect(g.documents.rows.map((r) => r.key)).toEqual(["doc:ownership"]);
-    expect(JSON.stringify(g.documents)).not.toContain("operator_tuv");
+  it("folds the three spellings of the licence into one finding, not three", () => {
+    const c = cellsBy(machine({ docs: [] }), asking([], "CERTIFIED, SAFETY_CERT, SAFETY")).operator_cert;
+    expect(c.state).toBe("red");
+    // One name after «Missing», not the same paper listed three times.
+    expect(c.en.split(" · ")).toHaveLength(1);
   });
-});
 
-/* ─── the same ruling, narrowed the same day: the group is a STATUS and NOTHING ELSE (owner) ───
- *
- * *"Operator docs cannot be viewed or requested and are not part of docs — they are just a view of what
- * the supplier has."* The rows had kept a checkbox while missing and composed into the batch ask. That is
- * withdrawn, and what these assert is the negative that follows: **a group that renders must participate
- * in nothing.** Not "is usually skipped" — unreachable from every mechanism on the tab, however the
- * selection was arrived at.
- */
-describe("the operator's group participates in nothing", () => {
-  /** Two operator certs asked for, one held; alongside a machine with a real mix of tickable rows, so a
-   *  selection built over EVERYTHING has both modes available to it. */
-  const mixedWithOperator = () =>
-    equipmentDocGroups(
+  it("the tab's attention badge counts the two groups that remain, and nothing else", () => {
+    const groups = equipmentDocGroups(
       machine({ photos: [{ slot: "front" }], docs: [{ type: "istimara" }, { type: "operator_tuv" }] }),
       asking(["tuv"], "tuv, spsp"),
     );
-  const operatorKeys = (groups: DocGroup[]) =>
-    groups.flatMap((g) => g.rows).filter((r) => r.key.startsWith("doc:operator:")).map((r) => r.key);
-
-  it("no operator row is requestable, in either state", () => {
-    const rows = mixedWithOperator().find((g) => g.key === "operator")!.rows;
-    expect(rows.map((r) => [r.status, r.requestable])).toEqual([
-      ["present", false],
-      ["missing", false],
-    ]);
-  });
-
-  it("no operator row is selectable, in any mode — neutral, download or request", () => {
-    const groups = mixedWithOperator();
-    const rows = groups.flatMap((g) => g.rows);
-    for (const mode of [null, "download", "request"] as const) {
-      const selectable = rows.filter((r) => docRowSelectable(r, mode)).map((r) => r.key);
-      expect(selectable.filter((k) => k.startsWith("doc:operator:"))).toEqual([]);
-    }
-  });
-
-  it("neither select-all key list can reach one", () => {
-    const rows = mixedWithOperator().flatMap((g) => g.rows);
-    // The two lists the select-all link is built from — `DocRowList` filters on exactly this.
-    const available = rows.filter((r) => docRowMode(r) === "download").map((r) => r.key);
-    const missing = rows.filter((r) => docRowMode(r) === "request").map((r) => r.key);
-    expect([...available, ...missing].filter((k) => k.startsWith("doc:operator:"))).toEqual([]);
-    // And a select-all run cannot pull one in as a side effect: the operator's own keys select nothing.
-    expect(operatorKeys(mixedWithOperator())).not.toEqual([]);
-  });
-
-  it("the batch composer names none of them, even with every row on the tab ticked", () => {
-    const groups = mixedWithOperator();
-    const rows = groups.flatMap((g) => g.rows);
-    const draft = batchDocumentRequest("eq-1", rows, new Set(rows.map((r) => r.key)));
-    // The plate photo and the asked-for TÜV are missing and go in; the two operator rows do not, and the
-    // withdrawn `operator_safety_certificate` cannot appear from any row.
-    expect(draft && draft.kind === "document" && draft.docTypes).toEqual(["plate", "tuv"]);
-    expect(JSON.stringify(draft)).not.toContain("operator");
-  });
-
-  it("ticking ONLY the operator's rows composes nothing at all — no ask and no download", () => {
-    const groups = mixedWithOperator();
-    const rows = groups.flatMap((g) => g.rows);
-    const ticked = new Set(operatorKeys(groups));
-    expect(batchDocumentRequest("eq-1", rows, ticked)).toBeNull();
-    expect(docDownloadBatch(rows, ticked)).toEqual([]);
-    // It cannot even put the tab into a mode, so it can never dim the rows that DO act.
-    expect(selectionModeOf(rows, ticked)).toBeNull();
-  });
-
-  it("carries no doc type to ask with — there is no payload waiting for a caller", () => {
-    for (const row of mixedWithOperator().find((g) => g.key === "operator")!.rows) {
-      expect(row.docTypes).toEqual([]);
-    }
-  });
-
-  it("adds nothing to the tab's attention badge, which sums the groups", () => {
-    const groups = mixedWithOperator();
-    // `EquipmentDetail` sums `g.attention ?? 0`. The plate photo and the missing TÜV are the whole badge;
-    // the missing operator SPSP is red on its row and counted nowhere.
-    expect(groups.reduce((n, g) => n + (g.attention ?? 0), 0)).toBe(2);
-    expect(groups.find((g) => g.key === "operator")!.attention).toBeNull();
-    expect(groups.filter((g) => g.attention === null).map((g) => g.key)).toEqual(["operator"]);
+    // `EquipmentDetail` sums `g.attention`. The plate photo and the missing TÜV are the whole badge; the
+    // missing operator SPSP is the grid's to report and is counted nowhere here.
+    expect(groups.reduce((n, g) => n + g.attention, 0)).toBe(2);
+    expect(groups.every((g) => typeof g.attention === "number")).toBe(true);
   });
 });
 
@@ -946,8 +1069,9 @@ describe("every document family on this surface is openable (RM3-AC-69)", () => 
     const cert = g.documents.rows.find((r) => r.key === "doc:equipment_cert:tuv")!;
     expect(docRowActions(ownership).map((a) => a.kind)).toEqual(["view"]);
     expect(docRowActions(cert)).toEqual([]);
-    // The operator's rows are the deliberate exception — never openable, held or not (ruling 1).
-    expect(g.operator.rows.flatMap((r) => docRowActions(r))).toEqual([]);
+    // ~~The operator's rows are the deliberate exception — never openable, held or not.~~ There is no
+    // exception left to state: every row on this tab is one of the machine's own papers or photos.
+    expect(g.operator).toBeUndefined();
   });
 
   it("equipment PHOTOS — a separate group, and just as openable as a paper", () => {
@@ -1005,8 +1129,8 @@ describe("every document family on this surface is openable (RM3-AC-69)", () => 
       expect(["present", "on_file", "missing"]).toContain(row.status);
       expect([
         "on the unit's file",
-        "not on the unit's file",
-        "on the unit's file · not required",
+        "Missing",
+        "on the unit's file · not requested",
       ]).toContain(row.statusLine.en);
       // The row's whole shape, so a verify badge or an expiry cannot arrive by accident.
       expect(Object.keys(row).sort()).toEqual(
@@ -1111,17 +1235,11 @@ describe("selection is a MODE, inferred from the first tick", () => {
     }
   });
 
-  it("the operator's certificates tick in NEITHER mode — held or absent", () => {
-    const g = groupBy(machine({ docs: [{ type: "operator_tuv" }] }), asking([], "tuv, spsp"));
-    const [held, gap] = g.operator.rows;
-    expect(docRowMode(held)).toBeNull(); // present, and deliberately unopenable (RM3-AC-75)
-    // ~~`docRowMode(gap)` was `"request"` — absent, so still askable~~. Withdrawn 2026-08-08: this family
-    // is not asked for at all, so the absent row is `null` for the same reason the held one is.
-    expect(docRowMode(gap)).toBeNull();
-    for (const mode of [null, "download", "request"] as const) {
-      for (const row of g.operator.rows) expect(docRowSelectable(row, mode)).toBe(false);
-    }
-  });
+  /* ~~"the operator's certificates tick in NEITHER mode — held or absent"~~ — the rows those two
+   * assertions were made about are not built any more (owner, UAT of 2026-08-11), and a test of
+   * `docRowMode` over a hand-made operator row would be a test of a fixture. The `null` mode itself is
+   * still exercised, one test above, by the row that actually produces it now: a held paper whose link
+   * the projection did not carry. */
 
   it("select-all is per mode: each list holds only the rows that mode can act on", () => {
     const rows = mixed();
@@ -1523,5 +1641,124 @@ describe("an unmapped equipment certificate still gets an Arabic heading", () =>
   it("leaves the five mapped codes exactly as they were", () => {
     expect(rowFor("tuv")?.label.en).toBe("TÜV certificate");
     expect(rowFor("insurance")?.label.en).toBe("Equipment insurance");
+  });
+});
+
+/* ══════════════ the UAT of 2026-08-11, where it is a RENDERING rule ══════════════
+ *
+ * Four of the owner's findings are not decisions the model can hold — they are about what the panel
+ * draws. This file has no component harness (see its head), so they are asserted the way
+ * `availability-chip.test.ts` asserts its own negatives: against the source, with the commentary
+ * stripped, because these files explain at length using the very words the rules withdraw.
+ *
+ * They are here rather than in a file of their own because each one is the other half of a model rule
+ * above — the frame the evidence goes into, the row the «مفقود» is printed on.
+ */
+const src = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
+const stripComments = (source: string): string =>
+  source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
+
+describe("the equipment tab is called Equipment, in both locales", () => {
+  it("names the tab with the word the rest of the surface uses", () => {
+    const code = stripComments(src("src/components/map/panel/EquipmentDetail.tsx"));
+    expect(code).toContain('L("Equipment", "المعدّة")');
+    // ~~«The machine»~~ — the owner's *"for the machine tab call it Equipment"*.
+    expect(code).not.toContain('"The machine"');
+  });
+});
+
+describe("the frame carries no X, and renders the document (owner, UAT of 2026-08-11)", () => {
+  const detail = () => stripComments(src("src/components/map/panel/EquipmentDetail.tsx"));
+
+  it("has no close control and no glyph to draw one with", () => {
+    const code = detail();
+    // The path pair that drew it, and the label it carried. Neither may come back quietly.
+    expect(code).not.toContain("M6 6l12 12");
+    expect(code).not.toContain("GLYPH.close");
+  });
+
+  it("still has a way back to the machine's photograph — the press that opened the paper", () => {
+    // Removing the X without this would strand the last paper the renter opened in the frame until he
+    // left the machine entirely. The toggle is the replacement, and it is what makes the X removable.
+    expect(detail()).toContain("cur?.key === subject.key ? null : subject");
+  });
+
+  it("draws a file the <img> could not, rather than a message about it", () => {
+    const code = detail();
+    expect(code).toContain("<object");
+    expect(code).toContain("mp-frame-doc");
+    // The message survives as the object's FALLBACK — the browser paints it only when it has nothing
+    // else to paint, so a DWG still lands somewhere honest.
+    expect(code).toContain("Open it in a new tab");
+  });
+
+  it("gives the frame a size for a document", () => {
+    // The `<object>` is a new element in an old frame; if the stylesheet did not carry it, a PDF would
+    // render at its intrinsic size inside a 268 px box.
+    expect(src("src/components/map/panel/panel-proto.css")).toContain(".mp-frame-doc {");
+  });
+});
+
+describe("a match cell that opens its evidence is a control, and only then", () => {
+  const detail = () => stripComments(src("src/components/map/panel/EquipmentDetail.tsx"));
+
+  it("renders a button when there is evidence and a plain block when there is not", () => {
+    const code = detail();
+    expect(code).toContain("`mp-cell ${c.state} press");
+    // The negative arm: `!ev` draws the same two lines with no control around them.
+    expect(code).toContain("if (!ev)");
+  });
+
+  it("says which cell the frame is holding in words, not only in colour", () => {
+    expect(detail()).toContain('aria-current={framedHere ? "true" : undefined}');
+  });
+});
+
+describe("no per-row arrow where the row itself opens the paper", () => {
+  const list = () => stripComments(src("src/components/map/panel/DocRowList.tsx"));
+
+  it("drops the arrow for the file the press already frames", () => {
+    expect(list()).toContain("if (openable && i === 0) return null;");
+  });
+
+  it("keeps the actions cell only where a row still has an arrow to draw", () => {
+    const code = list();
+    // Otherwise every row on the equipment tab would hold 34 px of empty gutter for a control none of
+    // them has — and the question has to be asked of the LIST, or the column would zig-zag.
+    expect(code).toContain("const arrowsShown = rows.some(");
+    expect(code).toContain("{arrowsShown && (");
+  });
+
+  it("leaves a list with no viewer — the company panel — every one of its arrows", () => {
+    // `onView` is what says "this list has a frame to press into". Without it the arrow is the only way
+    // to read a paper, and AC-69 requires one.
+    expect(list()).toContain("docRowActions(r).length > (onView ? 1 : 0)");
+  });
+});
+
+describe("one selection colour on this surface (owner, UAT of 2026-08-11)", () => {
+  /** Every rule in the panel's stylesheet whose selector is about being selected, picked or framed. */
+  const selectionRules = () => {
+    const css = src("src/components/map/panel/panel-proto.css").replace(/\/\*[\s\S]*?\*\//g, " ");
+    return [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)]
+      .map((m) => ({ selector: m[1].trim(), body: m[2] }))
+      .filter((r) => /\.(picked|open)\b|\.mp-tick\.on\b/.test(r.selector));
+  };
+
+  it("paints every selected, picked or framed thing the same navy", () => {
+    const rules = selectionRules();
+    // The fixture must actually cover the family — a ticked row, a ticked box, a framed row, a framed
+    // cell — or "they all agree" is trivially true of an empty list.
+    expect(rules.length).toBeGreaterThanOrEqual(5);
+    for (const rule of rules) {
+      expect(rule.body.toLowerCase()).toContain("#16304f");
+      // `#2563EB` is this surface's ACTION colour (AC-33), never a state. A selection wearing it reads
+      // as something still to be pressed.
+      expect(rule.body.toLowerCase()).not.toContain("#2563eb");
+    }
+  });
+
+  it("covers the match cell, which is the newest thing that can be selected", () => {
+    expect(selectionRules().some((r) => r.selector.includes(".mp-cell"))).toBe(true);
   });
 });

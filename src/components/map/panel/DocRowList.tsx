@@ -48,19 +48,31 @@
  * to the other, so pressing the row cannot tick it and ticking it cannot open anything — there is no
  * ordering, no propagation and no handler to get wrong.
  *
- * **The `↗` links stay** (AC-69). They are not the same act: the press puts the paper in the frame at
+ * ~~**The `↗` links stay** (AC-69). They are not the same act: the press puts the paper in the frame at
  * the top of the panel, the link opens the file itself in a tab — which is the only thing that works
- * for a PDF, and the only way to reach the SECOND and third files of a row that holds several. The
- * press opens `docRowActions(row)[0]`, the same file the first `↗` points at, so the two can never
- * disagree about which paper the row stands for.
+ * for a PDF, and the only way to reach the SECOND and third files of a row that holds several.~~
  *
- * **The operator's certificates are the deliberate exception** (owner, 2026-08-08): they are a status —
- * on file or not — and expose no file at all, because nothing validates an operator document on upload
- * and a file the renter can open reads as evidence that was checked. Narrowed the same day to **no
- * checkbox and no ask either**: the group is outside the document machinery, not a quieter part of it.
- * Nothing here enforces any of that; those rows simply arrive with no url and `requestable: false`, so
- * their `mode` is `null` — and a `null`-mode row has drawn the held spacer, no tick and no controls since
- * V15/V16. One mechanism, not a second flag.
+ * **The row's own arrow is gone** (owner, UAT of 2026-08-11: *"no per-row arrow"* — the prototype has
+ * none, and ours drew one on every row). Half the argument above expired on the same day: the frame
+ * renders a PDF now (`EquipmentDetail`'s `<object>` fallback), so the tab is no longer the only thing
+ * that works on one. The other half is real and is what survives — a row holding SEVERAL files can put
+ * only its first in the frame, so **the extra files keep their arrows and the first does not**. On the
+ * lists the owner was reading, where every row holds one file, that is no arrow at all.
+ *
+ * **A list with no frame to press into keeps every arrow** (`onView` omitted — the company panel). Its
+ * rows do not press, so the arrow is the only way to a paper there, and removing it would leave a
+ * document surface with no way to read a document. The ruling was about a row that already opens.
+ *
+ * The press opens `docRowActions(row)[0]`, so the frame and the arrows partition one list of files
+ * between them and cannot disagree about which paper the row stands for.
+ *
+ * ~~**The operator's certificates are the deliberate exception** (owner, 2026-08-08): they are a status —
+ * on file or not — and expose no file at all… no checkbox and no ask either.~~ **They are not rendered
+ * by anything any more** — the group left the equipment tab in the owner's UAT of 2026-08-11 and the
+ * operator's one surviving statement is a match-grid cell. The mechanism the exception rode on is not a
+ * special case and never was, so nothing here changes: a row arriving with no url and `requestable:
+ * false` still has `mode === null`, and a `null`-mode row still draws the held spacer, no tick and no
+ * controls. A held paper whose link the projection did not carry is one, and it is why the branch stays.
  *
  * **Usage** — the caller owns selection state and the batch send; this renders and reports ticks.
  *
@@ -165,11 +177,11 @@ export function DocRowList({
   L,
 }: {
   groupLabel: string;
-  /** Rows needing action — **never a total** (§6.1, AC-42). **`null` renders no pill at all**, for a
-   *  group that makes no attention claim: the operator's certificates, which the renter cannot tick, ask
-   *  for or open, so neither a count nor a green "nothing outstanding" would be true of them
-   *  (`DocGroup.attention`). The heading itself stays. */
-  attention: number | null;
+  /** Rows needing action — **never a total** (§6.1, AC-42). ~~`null` renders no pill at all, for a group
+   *  that makes no attention claim: the operator's certificates.~~ That group left the equipment tab in
+   *  the UAT of 2026-08-11 and was the only caller that ever passed `null`, so every group carries a
+   *  count again and the pill is unconditional. */
+  attention: number;
   /**
    * **The mode arrives already applied**, in each row's `selectable` — there is deliberately no `mode`
    * prop. One selection spans every group on the equipment tab, so the mode is the caller's to compute
@@ -203,6 +215,13 @@ export function DocRowList({
   // All three arrive together or not at all: a tick with no handler is a control that silently fails.
   // This is the LIST's question (does this list tick at all?); `r.selectable` is the ROW's.
   const hasSelection = !!selected && !!onToggle && !!onToggleAll;
+
+  /* Does ANY row here still draw an arrow? The actions cell reserves a fixed width so every row in a
+     list is the same shape, and with the per-row arrow withdrawn (see the file header) a list of
+     single-file rows would otherwise hold 34 px of empty gutter beside every row for a control none of
+     them has. It is a question about the LIST, not the row, for exactly that reason: the moment one row
+     holds two files, every row keeps the gutter and the column stays straight. */
+  const arrowsShown = rows.some((r) => docRowActions(r).length > (onView ? 1 : 0));
 
   // Select-all is per MODE, so it can never be the control that mixes the selection. Each list covers
   // only the rows that can be ticked right now, which means the one belonging to the other mode is
@@ -260,16 +279,14 @@ export function DocRowList({
     <div className="mp-grp">
       <div className="mp-grp-h">
         <span>{groupLabel}</span>
-        {attention !== null && (
-          // The prototype's own wording, both halves (2026-08-09): «يحتاج انتباه» over our «بحاجة إلى
-          // إجراء», and «مكتملة» over «لا ينقص شيء». The owner's screenshot says «١ يحتاج انتباه» too,
-          // so this is one of the places where both sources agree and we had drifted.
-          <span className={`mp-att-pill${attention === 0 ? " done" : ""}`}>
-            {attention === 0
-              ? L("complete", "مكتملة")
-              : L(`${attention} need attention`, `${arDigits(attention)} يحتاج انتباه`)}
-          </span>
-        )}
+        {/* The prototype's own wording, both halves (2026-08-09): «يحتاج انتباه» over our «بحاجة إلى
+            إجراء», and «مكتملة» over «لا ينقص شيء». The owner's screenshot says «١ يحتاج انتباه» too,
+            so this is one of the places where both sources agree and we had drifted. */}
+        <span className={`mp-att-pill${attention === 0 ? " done" : ""}`}>
+          {attention === 0
+            ? L("complete", "مكتملة")
+            : L(`${attention} need attention`, `${arDigits(attention)} يحتاج انتباه`)}
+        </span>
       </div>
 
       {/* No bar at all when this list does not tick, and none when it ticks but nothing here CAN be
@@ -382,8 +399,20 @@ export function DocRowList({
                 // The accessible name says the ACT and then repeats the status line, because a button's
                 // own name is all a screen reader reads in focus mode and the sentence under the title
                 // is the row's whole verdict. Naming it "View x" alone would have hidden that.
-                aria-label={L(`Show ${r.name} in the viewer — ${r.status}`, `اعرض ${r.name} في العارض — ${r.status}`)}
-                title={L(`Show ${r.name} in the viewer`, `اعرض ${r.name} في العارض`)}
+                //
+                // **The framed row's name is the way OUT**, because pressing it again is (owner's UAT of
+                // 2026-08-11 removed the frame's X). A control that says "show this" and hides it is a
+                // lie a screen-reader user cannot see past.
+                aria-label={
+                  framed
+                    ? L("Back to the machine's photo", "العودة إلى صورة المعدّة")
+                    : L(`Show ${r.name} in the viewer — ${r.status}`, `اعرض ${r.name} في العارض — ${r.status}`)
+                }
+                title={
+                  framed
+                    ? L("Back to the machine's photo", "العودة إلى صورة المعدّة")
+                    : L(`Show ${r.name} in the viewer`, `اعرض ${r.name} في العارض`)
+                }
                 // Which row the frame above is showing, stated rather than only tinted: the `.open`
                 // outline is a colour, and a colour is not a statement a screen reader can read.
                 aria-current={framed ? "true" : undefined}
@@ -401,48 +430,56 @@ export function DocRowList({
                 per-row download glyph is gone: downloading is what the batch beneath the list does, and
                 two controls for one act is one the renter has to learn is redundant. The cell reserves
                 its width in CSS, so an empty one keeps the row's shape without leaving an inert glyph
-                that looks like a control the renter failed to press. */}
-            <span className="mp-acts">
-              {actions.map((a, i) => {
-                // A row holding several files draws several identical glyphs, so each is named after ITS
-                // file — and numbered too, because a lessor can file two papers of the same type and the
-                // labels would then repeat.
-                const multi = (r.files ?? []).filter((f) => f.url).length > 1;
-                const nth = i + 1;
-                const what =
-                  multi && a.file
-                    ? `${L(a.file.label.en, a.file.label.ar)} ${L(String(nth), arDigits(nth))}`
-                    : r.name;
-                // ~~«عرض x»~~ — **«افتح x في تبويب جديد»** since 2026-08-11, because the row itself now
-                // says «اعرض … في العارض» and two controls on one row cannot both be called "view".
-                // The distinction is real and worth the longer name: this one leaves the panel for the
-                // file, which is the only thing that works for a PDF and the only way to the SECOND
-                // paper of a row that holds two.
-                const title = L(`Open ${what} in a new tab`, `افتح ${what} في تبويب جديد`);
-                return (
-                  <a
-                    key={`${a.kind}:${i}`}
-                    // ~~`a.primary` used to add `.primary`, a solid blue fill.~~ Withdrawn 2026-08-09
-                    // against the prototype, which draws one outline on every row (`panel-proto.css`
-                    // §.mp-doc). `DocAction.primary` itself is untouched — it is the model's statement
-                    // that the first file's view is the row's act, and the batch and the tests read it.
-                    // It simply no longer buys a different LOOK, because on a row holding two papers
-                    // there is no primary paper to look at.
-                    className={`mp-doc ${a.kind}`}
-                    href={a.href}
-                    // A presigned url on a private bucket: a new tab is the whole viewer. No modal —
-                    // that would need MIME sniffing and a PDF strategy, which is a bigger decision
-                    // than this row.
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={title}
-                    aria-label={title}
-                  >
-                    <span aria-hidden="true">↗</span>
-                  </a>
-                );
-              })}
-            </span>
+                that looks like a control the renter failed to press.
+                Narrowed again by the UAT of 2026-08-11 — the whole cell is absent from a list where no
+                row has a second file to reach, and the row's FIRST file is reached by pressing the row
+                (see the file header). */}
+            {arrowsShown && (
+              <span className="mp-acts">
+                {actions.map((a, i) => {
+                  // The first file is what the press frames, so on a list that presses it is not also an
+                  // arrow. `i` still numbers every file, so the second paper of a two-paper row is «… ٢»
+                  // whether or not the first one drew a control.
+                  if (openable && i === 0) return null;
+                  // A row holding several files draws several identical glyphs, so each is named after ITS
+                  // file — and numbered too, because a lessor can file two papers of the same type and the
+                  // labels would then repeat.
+                  const multi = (r.files ?? []).filter((f) => f.url).length > 1;
+                  const nth = i + 1;
+                  const what =
+                    multi && a.file
+                      ? `${L(a.file.label.en, a.file.label.ar)} ${L(String(nth), arDigits(nth))}`
+                      : r.name;
+                  // ~~«عرض x»~~ — **«افتح x في تبويب جديد»** since 2026-08-11, because the row itself now
+                  // says «اعرض … في العارض» and two controls on one row cannot both be called "view".
+                  // The distinction is real and worth the longer name: this one leaves the panel for the
+                  // file — on the equipment tab, for a SECOND paper the one frame cannot also hold.
+                  const title = L(`Open ${what} in a new tab`, `افتح ${what} في تبويب جديد`);
+                  return (
+                    <a
+                      key={`${a.kind}:${i}`}
+                      // ~~`a.primary` used to add `.primary`, a solid blue fill.~~ Withdrawn 2026-08-09
+                      // against the prototype, which draws one outline on every row (`panel-proto.css`
+                      // §.mp-doc). `DocAction.primary` itself is untouched — it is the model's statement
+                      // that the first file's view is the row's act, and the batch and the tests read it.
+                      // It simply no longer buys a different LOOK, because on a row holding two papers
+                      // there is no primary paper to look at.
+                      className={`mp-doc ${a.kind}`}
+                      href={a.href}
+                      // A presigned url on a private bucket: a new tab is the whole viewer. No modal —
+                      // that would need MIME sniffing and a PDF strategy, which is a bigger decision
+                      // than this row.
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={title}
+                      aria-label={title}
+                    >
+                      <span aria-hidden="true">↗</span>
+                    </a>
+                  );
+                })}
+              </span>
+            )}
           </div>
         );
       })}
