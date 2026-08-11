@@ -666,6 +666,24 @@ export function BidComparisonWorkspace() {
   // (offeredUnitsDetail) when available — a cert counts as held only if it's present on EVERY offered
   // unit (partial = "K/M"). Native app bids only; off-platform bids have no unit data (rd null) → the
   // rows fall back to the bid-level codes. Memoized once per column.
+  //
+  // ── Proof of ownership is NOT in this fraction, and that is deliberate ────────────────────────────
+  // The owner's ruling of 2026-08-12 — *"for the percentage use existing bid readiness in the app as
+  // source of truth"* — points the web at the app's numbers, and the app has TWO: `total`/`done`
+  // (`2 + certs`, ownership counted) for the supplier who holds the papers, and `renteeTotal`/
+  // `renteeDone` (`1 + certs`, ownership never counted) for the renter. This workspace is the renter's
+  // surface and reads `bid.offeredUnitsDetail`, which the backend has already stripped of ownership
+  // papers (`RENTEE_HIDDEN_DOC_TYPES`, `rentee.service.ts`) — istimara, customs, sale_contract and
+  // saso_registration arrive absent and url-less, deliberately: they are supplier-private everywhere
+  // except the map's document section (owner, 2026-08-10).
+  //
+  // So counting ownership here would not be strictness, it would be a permanent shortfall on evidence
+  // this screen is not allowed to display — every supplier held below 100% on a paper the renter can
+  // never open and the supplier can never clear in the renter's eyes. That is why `computeBidReadiness`
+  // exposes no `scoreOwnership` option at all: a bid-backed reading has nothing to score. The map's
+  // panel reads unstripped FLEET rows and therefore does count it (`FLEET_READINESS_OPTS` in
+  // `machine-panel-model.ts`); the difference between the two screens is a difference in the DATA each
+  // one holds, not two opinions about readiness. See `bid-readiness.ts`'s header.
   const rdByBid = new Map(cols.map((c) => [c.bid.id, computeBidReadiness(c.bid)]));
   const unitCert = (bidId: string, certCode: string, kind: "equipment" | "operator") => {
     const rd = rdByBid.get(bidId);
@@ -1398,7 +1416,10 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                             </div>
                             {/* bid-readiness — equipment eligibility badge (native bids only); an
                                 off-platform bid declares no per-unit eligibility, so the same slot shows
-                                its bid-quality % instead, opening the full submission on click. */}
+                                its bid-quality % instead, opening the full submission on click.
+                                Bid-backed, so the badge's % excludes proof of ownership — the renter's
+                                `offeredUnitsDetail` is stripped of it and scoring it would hold every
+                                supplier permanently short. Full reasoning at `rdByBid` above. */}
                             {(() => {
                               const rd = computeBidReadiness(c.bid);
                               if (rd) return <div className="mt-1.5"><BidReadinessBadge r={rd} L={L} onClick={() => setEligBid(c.bid)} /></div>;
@@ -2134,7 +2155,9 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
           </div>
         </div>
       )}
-      {/* bid-readiness — read-only eligibility view for a native bid's offered units */}
+      {/* bid-readiness — read-only eligibility view for a native bid's offered units. Bid-backed, so
+          proof of ownership is not one of the scored keys here (the renter's projection strips it);
+          the fleet-backed map panel does score it. Full reasoning at `rdByBid` above. */}
       {eligBid && (() => { const rd = computeBidReadiness(eligBid); return rd ? <BidEligibilityModal r={rd} supplierName={eligBid.supplierName} ar={ar} L={L} onClose={() => setEligBid(null)} /> : null; })()}
       {/* off-platform — read-only viewer of the shared-link submission behind the quality badge */}
       {subBid && (() => {

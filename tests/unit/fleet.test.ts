@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { mapFleet, type FleetMachine } from "@/lib/contract/fleet";
 import { isPlottable, unitAvailability } from "@/lib/contract/bid-map";
 import { canonicalCertCode, computeBidReadiness, computeUnitReadiness, readinessInputsFor } from "@/lib/contract/bid-readiness";
@@ -406,6 +408,176 @@ describe("computeBidReadiness is unchanged by the extraction (the mobile app mir
     const inputs = readinessInputsFor(bid);
     const direct = computeUnitReadiness(bid.offeredUnitsDetail![0], inputs.equipCerts, inputs.operatorCerts, bid.reqMinYear);
     expect(direct).toEqual(computeBidReadiness(bid)!.units[0]);
+  });
+});
+
+/* ───────── proof of ownership — scored by CALLER, never by constant (owner, 2026-08-12) ─────────
+ *
+ * Owner's ruling, 2026-08-12: *"for the percentage use existing bid readiness in the app as source of
+ * truth."* That withdraws the "accepted divergence" recorded against **004a §10** — the web scored
+ * `total = 1 + certs` unconditionally while the app scores `2 + certs`, so one machine with one set of
+ * papers read **50% to the supplier and 100% to the renter**.
+ *
+ * The fix is NOT a flipped constant, because the exclusion's stated reason is true of exactly one of
+ * the two input families this scorer serves:
+ *
+ *   · **fleet-backed** — `GET /marketplace/bids/{bidId}/fleet`, served UNSTRIPPED by
+ *     `supplier-fleet.service.ts` (owner, 2026-08-10). The ownership paper is there. It is scored.
+ *   · **bid-backed** — `bid.offeredUnitsDetail`, stripped of `RENTEE_HIDDEN_DOC_TYPES` by
+ *     `rentee.service.ts`. The paper can never arrive, so scoring it would hold every supplier
+ *     permanently short on evidence the renter is not allowed to see. It stays out.
+ *
+ * The app models both halves already — `total`/`done` vs `renteeTotal`/`renteeDone` — and these tests
+ * pin the web to the same two numbers, chosen by an explicit argument with the SAFE default.
+ */
+describe("proof of ownership in the fraction — the 2026-08-12 ruling", () => {
+  /** A fleet row holding `types`, with both mandatory photos so the only variable is the paperwork. */
+  const holding = (...types: string[]): FleetMachine =>
+    mapFleet([
+      row({
+        documentKeys: types.map((type, i) => ({ type, key: `d${i}`, url: `https://x/${type}` })),
+        photoKeys: [{ slot: "front", key: "a", url: "ua" }, { slot: "serial", key: "b", url: "ub" }],
+      }),
+    ])[0];
+  const tuvAsk = readinessInputsFor({ reqEquipmentCerts: ["tuv"] });
+  /** The FLEET reading — unstripped rows, so ownership counts (`FLEET_READINESS_OPTS`). */
+  const fleetScore = (m: FleetMachine) =>
+    computeUnitReadiness(m, tuvAsk.equipCerts, tuvAsk.operatorCerts, tuvAsk.minYear, { scoreOwnership: true });
+  /** The default reading — the app's rentee subset, which every unopted caller keeps. */
+  const defaultScore = (m: FleetMachine) =>
+    computeUnitReadiness(m, tuvAsk.equipCerts, tuvAsk.operatorCerts, tuvAsk.minYear);
+
+  it("the FLEET path scores ownership and reaches 100% with the paper held (the app's `2 + certs`)", () => {
+    const r = fleetScore(holding("tuv", "istimara"));
+    expect(r.ownershipScored).toBe(true);
+    expect(r.ownershipPresent).toBe(true);
+    expect(r.total).toBe(3); // photos + ownership + the requested TÜV — `bid_readiness.dart`'s `total`
+    expect(r.done).toBe(3);
+    expect(r.percent).toBe(100);
+    expect(r.band).toBe("green");
+  });
+
+  it("a machine missing ONLY its ownership paper is short by exactly one on the fleet path", () => {
+    const held = fleetScore(holding("tuv", "istimara"));
+    const missing = fleetScore(holding("tuv"));
+    expect(missing.ownershipPresent).toBe(false);
+    expect(missing.total).toBe(held.total); // the DENOMINATOR does not move — the key is always asked
+    expect(missing.done).toBe(held.done - 1); // …exactly one key short, and no more
+    expect(missing.percent).toBe(67);
+    expect(missing.band).toBe("yellow"); // no longer the green 100% of 004a §10
+  });
+
+  it("the BID path is unchanged — ownership is not a key, and the renter's numbers do not move", () => {
+    const bid: BidCard = mapBidList({
+      activeBids: [
+        {
+          id: "b1",
+          request: { equipmentItems: [{ numberOfUnits: 1, safetyCertifications: ["TUV"] }] },
+          offeredUnitsDetail: [
+            {
+              equipmentId: "eq-1",
+              // The wire can never carry these on a bid (`RENTEE_HIDDEN_DOC_TYPES` strips them); one is
+              // planted anyway to prove the BID path would not score it even if the strip regressed.
+              documentKeys: [{ type: "tuv", key: "k1" }, { type: "istimara", key: "k2" }],
+              photoKeys: [{ slot: "front", key: "a" }, { slot: "serial", key: "b" }],
+            },
+          ],
+        },
+      ],
+    })[0];
+    const r = computeBidReadiness(bid)!;
+    expect(r.units[0].ownershipScored).toBe(false);
+    expect(r.units[0].total).toBe(2); // photos + TÜV — the app's `renteeTotal`, `1 + certs`
+    expect(r.units[0].done).toBe(2);
+    expect(r.percent).toBe(100);
+    // …and the paper's PRESENCE is still reported, so a surface can say "no ownership on file" without
+    // reading it out of the fraction.
+    expect(r.units[0].ownershipPresent).toBe(true);
+  });
+
+  it("defaults to NOT scoring it — an unopted caller keeps the exact fraction it had", () => {
+    const m = holding("tuv", "istimara");
+    const d = defaultScore(m);
+    expect(d.ownershipScored).toBe(false);
+    expect(d.total).toBe(2); // photos + TÜV, ownership excluded — the pre-ruling behaviour, preserved
+    expect(d.done).toBe(2);
+    // Explicit `false` and omitted are the same reading, so a caller can state the safe choice.
+    expect(computeUnitReadiness(m, tuvAsk.equipCerts, tuvAsk.operatorCerts, tuvAsk.minYear, { scoreOwnership: false })).toEqual(d);
+  });
+
+  it("counts ownership exactly as the app's `kPooDocTypes` does — ANY ONE of the four resolves it", () => {
+    // Verbatim from `bid_readiness.dart:11`; the app's `hasPoo` is `docTypes.any(kPooDocTypes.contains)`,
+    // so a machine needs one of these, not all of them.
+    for (const paper of ["istimara", "customs", "sale_contract", "saso_registration"]) {
+      const r = fleetScore(holding("tuv", paper));
+      expect(r.ownershipPresent, paper).toBe(true);
+      expect(r.percent, paper).toBe(100);
+    }
+    // Held vocabulary is folded the way every other branch of this scorer folds it, so a spelling
+    // difference in whitespace or case cannot silently cost the supplier a key.
+    expect(fleetScore(holding("tuv", " Istimara ")).ownershipPresent).toBe(true);
+    // A paper that is not one of the four is not ownership — a spec sheet must not close this key.
+    expect(fleetScore(holding("tuv", "spec_sheet")).ownershipPresent).toBe(false);
+  });
+
+  it("does not let the ownership paper answer a CERTIFICATE ask as well (one paper, one key)", () => {
+    // `saso_registration` is ownership (owner, 2026-08-09) and is now scored as such — which must not
+    // reopen the fold that once let it satisfy a requested SASO certificate.
+    const sasoAsk = readinessInputsFor({ reqEquipmentCerts: ["saso"] });
+    const r = computeUnitReadiness(holding("saso_registration"), sasoAsk.equipCerts, sasoAsk.operatorCerts, null, {
+      scoreOwnership: true,
+    });
+    expect(r.ownershipPresent).toBe(true);
+    expect(r.equipmentCerts[0].present).toBe(false); // still NOT the certificate
+    expect(r.total).toBe(3); // photos + ownership + the requested SASO cert
+    expect(r.done).toBe(2); // photos + ownership; the certificate is genuinely missing
+  });
+});
+
+/**
+ * **Which call sites opt in** — the half of the 2026-08-12 ruling no pure-function test can observe.
+ *
+ * The scorer's default is safe, so a fleet-backed caller that forgets the option produces the renter's
+ * smaller fraction over unstripped rows and silently reopens 004a §10 — the failure this ticket exists
+ * to close, and it is invisible to a unit test of the scorer itself. Asserted against the source,
+ * matching whole CALL EXPRESSIONS rather than the bare word `scoreOwnership`, because every one of
+ * these files explains the rule in prose using exactly that word.
+ */
+describe("the ownership option is wired at the call sites, not just offered", () => {
+  const read = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
+
+  it("both FLEET-backed scorer calls in the machine panel pass `FLEET_READINESS_OPTS`", () => {
+    const src = read("src/components/map/panel/machine-panel-model.ts");
+    // `matchGrid` and `equipmentDocGroups` — one shared constant so the two cannot answer differently.
+    expect(src.match(/computeUnitReadiness\([^)]*FLEET_READINESS_OPTS\)/g)).toHaveLength(2);
+    expect(src).toMatch(/const FLEET_READINESS_OPTS = \{ scoreOwnership: true \} as const;/);
+    // Positive control: those two ARE every scorer call in the file — none is left on the default.
+    // Matched on `(machine,`, the first argument, so the prose reference to `computeUnitReadiness()`
+    // in the documents-tab block is not counted as a third call site.
+    expect(src.match(/computeUnitReadiness\(machine,/g)).toHaveLength(2);
+  });
+
+  it("the equipment card and the filter groups — also fleet rows — pass it too", () => {
+    expect(read("src/components/map/equipment-card-model.ts")).toMatch(
+      /computeUnitReadiness\(machine,[\s\S]{0,140}?\{ scoreOwnership: true \}\)/,
+    );
+    expect(read("src/lib/contract/equipment-list.ts")).toMatch(
+      /computeUnitReadiness\(m,[\s\S]{0,120}?\{ scoreOwnership: true \}\)/,
+    );
+  });
+
+  it("the BID-backed comparison workspace scores no ownership and cannot reach the option", () => {
+    const src = read("src/components/compare/BidComparisonWorkspace.tsx");
+    expect(src.match(/computeBidReadiness\(/g)).toHaveLength(3); // positive control — the file still scores
+    // `computeBidReadiness` is the whole of its access to readiness: it never reaches the per-unit
+    // scorer, so it has nowhere to pass an option even by accident.
+    expect(src).not.toContain("computeUnitReadiness");
+  });
+
+  it("`computeBidReadiness` itself never forwards one — the renter's projection has nothing to score", () => {
+    expect(read("src/lib/contract/bid-readiness.ts")).toMatch(
+      /computeUnitReadiness\(u, reqEquipCerts, reqOperatorCerts, bid\.reqMinYear\)/,
+    );
   });
 });
 

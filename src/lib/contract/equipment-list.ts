@@ -424,8 +424,21 @@ function buildGroups(listed: readonly FleetMachine[], request: EquipmentFilterRe
   const asks = readinessInputsFor(req);
   // One scoring pass, shared by the year and the certificate groups and by every predicate they hand
   // back — so a machine is never scored twice and can never be scored two ways.
+  //
+  // `scoreOwnership: true` because `listed` is `FleetMachine[]` — rows from
+  // `GET /marketplace/bids/{bidId}/fleet`, which `supplier-fleet.service.ts` serves UNSTRIPPED, so the
+  // ownership paper is really there to score (owner's ruling, 2026-08-12: *"for the percentage use
+  // existing bid readiness in the app as source of truth"*). No filter chip reads `done`/`total`/
+  // `percent` today — the groups below read `equipmentCerts`, `operatorCerts` and `reqMinYear` — so
+  // this moves no count on this screen. It is passed because the FLEET family answers this question one
+  // way at every call site (`machine-panel-model.FLEET_READINESS_OPTS`, `equipmentCardModel`), and a
+  // scorer call that quietly holds the renter's stripped-data subset over unstripped rows is the exact
+  // shape of the divergence the ruling closed — waiting for the first reader of `.percent`.
   const scored = new Map<string, UnitReadiness>(
-    listed.map((m) => [m.equipmentId, computeUnitReadiness(m, asks.equipCerts, asks.operatorCerts, asks.minYear)]),
+    listed.map((m) => [
+      m.equipmentId,
+      computeUnitReadiness(m, asks.equipCerts, asks.operatorCerts, asks.minYear, { scoreOwnership: true }),
+    ]),
   );
   return [
     distanceGroup(listed),

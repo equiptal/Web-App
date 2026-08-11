@@ -1,11 +1,45 @@
 /**
- * Bid readiness — RENTEE-SUBSET, read-only (ported from the app's bid_readiness.dart).
+ * Bid readiness — read-only (ported from the app's bid_readiness.dart).
  *
  * Per offered unit, answers "does this unit hold what the request asks for?" — mandatory photos +
- * the requested equipment / operator certs. Proof-of-ownership is EXCLUDED (the backend strips it from
- * the renter's `offeredUnitsDetail`, so scoring it would hold every supplier permanently short). Scoring
- * is presence-based (a held key counts; verify status only decorates). Purely client-side — no backend
- * readiness number exists. Applies only to NATIVE app bids (those carrying `offeredUnitsDetail`).
+ * the requested equipment / operator certs, and — on the surfaces that can actually see it — proof of
+ * ownership. Scoring is presence-based (a held key counts; verify status only decorates). Purely
+ * client-side — no backend readiness number exists. Applies only to NATIVE app bids (those carrying
+ * `offeredUnitsDetail`) and to the fleet rows the map reads.
+ *
+ * ## Proof of ownership — scored or not, by CALLER, never by constant
+ *
+ * **Owner's ruling, 2026-08-12:** *"for the percentage use existing bid readiness in the app as source
+ * of truth."* That withdraws the blanket exclusion this file used to state and the "accepted divergence"
+ * recorded against 004a §10 — a machine holding every certificate but no ownership paper must not read
+ * 100% to the renter while the supplier's own app reads 50% for the same machine and the same papers.
+ *
+ * **The old reasoning is SCOPED, not withdrawn.** It read: *"the backend strips it from the renter's
+ * `offeredUnitsDetail`, so scoring it would hold every supplier permanently short."* That is still true,
+ * and still load-bearing — but it describes exactly ONE of the two input families this scorer serves:
+ *
+ * - **Bid-backed input** (`computeBidReadiness`, reading `bid.offeredUnitsDetail`) — `rentee.service.ts`
+ *   strips `RENTEE_HIDDEN_DOC_TYPES` (istimara · customs · customs_card · sale_contract ·
+ *   sales_contract · saso_registration) out of the renter's projection. The paper is not merely absent
+ *   from the payload, it is *unshowable*: no url, no row, no way for the supplier to clear it in the
+ *   renter's eyes. Scoring it there would put every supplier permanently below 100% on evidence the
+ *   renter is never allowed to open. **Ownership stays OUT.**
+ * - **Fleet-backed input** (`GET /marketplace/bids/{bidId}/fleet` → `FleetMachine`) —
+ *   `supplier-fleet.service.ts` serves the map's rows **unstripped**, deliberately (owner, 2026-08-10:
+ *   ownership papers reach the renter on the MAP and nowhere else). The paper is present, carries a
+ *   usable url, and `ownershipCell` / the documents tab already read it **red** when it is missing.
+ *   **Ownership is SCORED**, exactly as the app scores it.
+ *
+ * So the difference is a property of the DATA a caller holds, not of the scorer — which is why it is an
+ * explicit argument ({@link UnitReadinessOptions.scoreOwnership}) defaulting to `false`, and never a
+ * constant in the fraction. A constant cannot be right for both families; a default-off argument is safe
+ * for a caller that does not know, and correct for the two that do.
+ *
+ * **The app already models both halves** and this is a port of that, not an invention:
+ * `bid_readiness.dart` exposes `total` / `done` (`2 + certs`, ownership counted) for the supplier who
+ * holds the papers, and `renteeTotal` / `renteeDone` (`1 + certs`, ownership never counted) behind a
+ * comment naming `RENTEE_HIDDEN_DOC_TYPES` as the reason. `scoreOwnership: true` reproduces the first;
+ * the default reproduces the second.
  *
  * **The app is the reference implementation** (owner's ruling, 2026-08-08: *"fix the web to be like the
  * app — always align with the app"*). The two families of certificate are matched differently and that
@@ -39,10 +73,41 @@ export interface UnitReadiness {
   photos: { slot: string; url: string | null }[];
   equipmentCerts: ReadinessCert[];
   operatorCerts: ReadinessCert[];
+  /**
+   * Does this machine hold a proof-of-ownership paper? — the app's `hasPoo`, computed **always**, on
+   * every caller, whatever {@link UnitReadinessOptions.scoreOwnership} says.
+   *
+   * Reported unconditionally on purpose: a bid-backed caller reads `false` here because the backend
+   * stripped the paper, and a surface that wants to say *"this machine's file has no ownership paper"*
+   * must not be able to reach that sentence from a number that only means *"the renter was not sent
+   * one"*. {@link ownershipScored} is the field that says whether this one entered the fraction.
+   */
+  ownershipPresent: boolean;
+  /** Whether {@link ownershipPresent} was counted in {@link total} / {@link done} — i.e. whether the
+   *  caller passed `scoreOwnership: true`. Exposed so a surface can state which fraction it is showing
+   *  rather than infer it from arithmetic. */
+  ownershipScored: boolean;
   done: number;
   total: number;
   percent: number;
   band: ReadinessBand;
+}
+
+/** Optional inputs to {@link computeUnitReadiness}. An options object rather than a fifth positional
+ *  boolean so the decision is legible at the call site — `scoreOwnership: true` says what it does; a
+ *  bare `true` after three lists does not. */
+export interface UnitReadinessOptions {
+  /**
+   * Count proof of ownership as a scored key — `total = 2 + certs` instead of `1 + certs`, the app's
+   * `total`/`done` rather than its `renteeTotal`/`renteeDone`.
+   *
+   * **Defaults to `false`**, so no existing caller changes by being compiled: a caller that has not
+   * thought about which family its data belongs to is, by construction, the one that must not score a
+   * paper it might never have been sent. Pass `true` ONLY where the input is a fleet row from
+   * `GET /marketplace/bids/{bidId}/fleet`, which `supplier-fleet.service.ts` serves unstripped. See the
+   * file header for the 2026-08-12 ruling and the two families.
+   */
+  scoreOwnership?: boolean;
 }
 
 export interface BidReadiness {
@@ -171,6 +236,30 @@ export function canonicalCertCode(x: string): string {
  */
 const heldDocType = (s: string): string => s.trim().toLowerCase().replace(/[\s-]+/g, "_");
 
+/**
+ * The document kinds that satisfy **proof of ownership** for scoring — a verbatim port of the app's
+ * `kPooDocTypes` (`bid_readiness.dart:11`), which is the source of truth for the percentage (owner's
+ * ruling, 2026-08-12: *"for the percentage use existing bid readiness in the app as source of truth"*).
+ *
+ * The app scores `hasPoo` as `docTypes.any(kPooDocTypes.contains)` — **any one** of these four papers
+ * resolves the key; a machine does not need all four. This mirrors that and nothing more.
+ *
+ * ⚠️ **Deliberately narrower than `OWNERSHIP_TYPES` in `machine-panel-model.ts`**, and the two are not
+ * to be merged. That set is a *display* allow-list: it decides which held papers get filed under the
+ * documents tab's ownership row and which spelling variants (`istimarah`, `registration`,
+ * `customs_card`, `sales_contract`, `ownership`, `proof_of_ownership`, `title_deed`, `combined`) the
+ * renter should see grouped there. This set decides a NUMBER, and the number has to be the number the
+ * supplier's own app shows him — so it may hold only what the app holds. Widening it is how the two
+ * percentages start disagreeing again, which is precisely what the 2026-08-12 ruling closed.
+ *
+ * The known cost of that choice, stated so nobody discovers it as a bug: a machine whose only ownership
+ * paper is filed under one of the display-only spellings (say `customs_card`) shows a GREEN ownership
+ * row on the documents tab while the fraction still counts it short. The row is right about what is on
+ * file; the fraction is right about what the app says. Fixing it means changing the APP's `kPooDocTypes`
+ * first — never this constant alone.
+ */
+const OWNERSHIP_DOC_TYPES = new Set(["istimara", "customs", "sale_contract", "saso_registration"]);
+
 const bandOf = (percent: number): ReadinessBand => (percent >= 100 ? "green" : percent >= 50 ? "yellow" : "red");
 const certLabel = (code: string): { labelEn: string; labelAr: string } => {
   const l = EQ_CERT_LABELS[code] ?? { en: code.toUpperCase(), ar: code.toUpperCase() };
@@ -200,7 +289,12 @@ export function computeUnitReadiness(
   reqEquipCerts: string[],
   reqOperatorCertKinds: string[],
   reqMinYear: number | null,
+  options: UnitReadinessOptions = {},
 ): UnitReadiness {
+  // Whether proof of ownership is one of the scored keys. **Never a constant** — see the file header
+  // and {@link UnitReadinessOptions.scoreOwnership}: the answer belongs to the caller's DATA (fleet rows
+  // carry the paper, the renter's bid projection has it stripped), not to the scorer.
+  const scoreOwnership = options.scoreOwnership === true;
   // Equipment certs fold through `canonicalCertCode`; operator-prefixed papers stay OUT of that bucket
   // so a held `operator_tuv` can never answer an equipment TÜV ask.
   const eqDocByCert = new Map<string, string | null>(); // canonical equipment cert → presigned url
@@ -235,8 +329,22 @@ export function computeUnitReadiness(
   const serial = unit.photoKeys.some((p) => /serial|plate/i.test(p.slot));
   const photosPresent = front && serial;
 
-  const total = 1 + equipmentCerts.length + operatorCerts.length; // 1 = mandatory photos (poo excluded)
-  const done = (photosPresent ? 1 : 0) + equipmentCerts.filter((c) => c.present).length + operatorCerts.filter((c) => c.present).length;
+  // The app's `hasPoo`: `docTypes.any(kPooDocTypes.contains)` — ANY one ownership paper resolves the
+  // key. Computed on every caller (see {@link UnitReadiness.ownershipPresent}); only whether it is
+  // COUNTED depends on `scoreOwnership`. Read through `docTypeUrl`, whose keys are already folded by
+  // `heldDocType`, so a machine filing `" Istimara"` answers the same key a machine filing `istimara`
+  // does — the same held-vocabulary fold every other branch of this scorer matches on.
+  const ownershipPresent = [...docTypeUrl.keys()].some((t) => OWNERSHIP_DOC_TYPES.has(t));
+
+  // `1` = the mandatory photos. `+1` for proof of ownership **only when the caller's data can carry
+  // it** — the app's `total` (`2 + certs`) when it can, the app's `renteeTotal` (`1 + certs`) when it
+  // cannot. Owner's ruling, 2026-08-12; the two families are named in the file header.
+  const total = 1 + (scoreOwnership ? 1 : 0) + equipmentCerts.length + operatorCerts.length;
+  const done =
+    (photosPresent ? 1 : 0) +
+    (scoreOwnership && ownershipPresent ? 1 : 0) +
+    equipmentCerts.filter((c) => c.present).length +
+    operatorCerts.filter((c) => c.present).length;
   const percent = total > 0 ? Math.round((done / total) * 100) : 100;
 
   // reqMinYear is the raw request value: a real min year (e.g. 2020) or an age. Only flag a conflict
@@ -259,6 +367,8 @@ export function computeUnitReadiness(
     photos: unit.photoKeys.map((p) => ({ slot: p.slot, url: p.url })),
     equipmentCerts,
     operatorCerts,
+    ownershipPresent,
+    ownershipScored: scoreOwnership,
     done,
     total,
     percent,
@@ -303,13 +413,29 @@ export function readinessInputsFor(src: {
   };
 }
 
-/** Compute readiness for a bid. Returns null for off-platform / non-unit bids (no `offeredUnitsDetail`). */
+/**
+ * Compute readiness for a bid. Returns null for off-platform / non-unit bids (no `offeredUnitsDetail`).
+ *
+ * **This function takes no `scoreOwnership` option, and that is the point.** Its input is a `BidCard`,
+ * which is by definition the renter's projection — `rentee.service.ts` has already stripped
+ * `RENTEE_HIDDEN_DOC_TYPES` out of `offeredUnitsDetail`, so `ownershipPresent` here is `false` for every
+ * supplier who ever filed a paper. There is no bid on any surface whose `offeredUnitsDetail` carries
+ * ownership, so an option would only ever be a way to get the wrong number — the 2026-08-12 ruling
+ * points the web at the app's numbers, and the app's own rentee subset (`renteeTotal` / `renteeDone`)
+ * is exactly this: `1 + certs`, ownership never counted. Scoring it here would hold every supplier
+ * permanently short on evidence the renter is not allowed to be shown.
+ *
+ * A caller that needs ownership in the fraction is holding fleet rows, not a bid, and calls
+ * `computeUnitReadiness(..., { scoreOwnership: true })` directly.
+ */
 export function computeBidReadiness(bid: BidCard): BidReadiness | null {
   const detail = bid.offeredUnitsDetail;
   if (!detail || detail.length === 0) return null;
 
   const { equipCerts: reqEquipCerts, operatorCerts: reqOperatorCerts } = readinessInputsFor(bid);
 
+  // No options argument: ownership is not scored on bid-backed input. See this function's own comment
+  // for why the omission is deliberate rather than an oversight.
   const units = detail.map((u) => computeUnitReadiness(u, reqEquipCerts, reqOperatorCerts, bid.reqMinYear));
   const sumDone = units.reduce((a, u) => a + u.done, 0);
   const sumTotal = units.reduce((a, u) => a + u.total, 0);

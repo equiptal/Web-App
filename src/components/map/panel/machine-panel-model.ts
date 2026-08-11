@@ -262,9 +262,11 @@ export function photoSlotOf(slot: string): PhotoSlot | null {
  * i.e. the unstripped side. So a missing one here is the supplier's omission, not a redaction, and
  * `ownershipCell` reads it red.
  *
- * (`bid-readiness.ts` still excludes proof-of-ownership from its readiness SCORE. That exclusion is
- * about a band that would otherwise hold every supplier short; it is not a statement that the renter
- * cannot see the document.)
+ * (~~`bid-readiness.ts` still excludes proof-of-ownership from its readiness SCORE.~~ **No longer true
+ * of this surface** — owner's ruling, 2026-08-12: *"for the percentage use existing bid readiness in the
+ * app as source of truth."* The exclusion survives only for BID-backed scoring, where the paper really
+ * is stripped; every scorer call in this file now passes {@link FLEET_READINESS_OPTS} and counts it,
+ * because the rows this file reads are the unstripped ones. See `bid-readiness.ts`'s header.)
  */
 const OWNERSHIP_TYPES = new Set([
   "istimara",
@@ -280,6 +282,30 @@ const OWNERSHIP_TYPES = new Set([
   "title_deed",
   "combined",
 ]);
+
+/**
+ * **The readiness options every scorer call in this file passes** — proof of ownership IS one of the
+ * scored keys here.
+ *
+ * Owner's ruling, 2026-08-12: *"for the percentage use existing bid readiness in the app as source of
+ * truth."* The app's `bid_readiness.dart` scores `total = 2 + certs` with proof of ownership as one of
+ * the two mandatory keys; the web used to score `1 + certs` unconditionally, so one machine with one set
+ * of papers read **50% to the supplier and 100% to the renter**. 004a §10 recorded that as an accepted
+ * divergence; the ruling withdraws the acceptance.
+ *
+ * **Why this file may opt in when the comparison workspace may not.** Everything here reads a
+ * `FleetMachine` — a row from `GET /marketplace/bids/{bidId}/fleet`, which `supplier-fleet.service.ts`
+ * serves **unstripped** (owner, 2026-08-10: ownership papers reach the renter on the map and nowhere
+ * else). The paper is present, it carries a usable url, `ownershipCell` already reads it red when it is
+ * missing and `equipmentDocGroups` already renders it as a required row. Scoring it costs the supplier
+ * nothing he cannot see and close. On the BID's projection the same paper is stripped by
+ * `RENTEE_HIDDEN_DOC_TYPES`, so scoring it there would be a permanent shortfall on evidence nobody can
+ * produce — which is why `computeBidReadiness` has no such option at all.
+ *
+ * Shared by `matchGrid` and `equipmentDocGroups` so the two cannot be scored two ways: they already
+ * derive their asks from one `readinessInputsFor`, and this is the other half of that agreement.
+ */
+const FLEET_READINESS_OPTS = { scoreOwnership: true } as const;
 
 /**
  * Operator-level documents.
@@ -360,7 +386,8 @@ export function presentPhotoSlots(machine: Pick<FleetMachine, "photoKeys">): Pho
  */
 export function matchGrid(machine: FleetMachine, request: MatchRequest): MatchCell[] {
   const asks = readinessInputsFor(request);
-  const readiness = computeUnitReadiness(machine, asks.equipCerts, asks.operatorCerts, asks.minYear);
+  // Ownership counts here — `machine` is an unstripped fleet row. See {@link FLEET_READINESS_OPTS}.
+  const readiness = computeUnitReadiness(machine, asks.equipCerts, asks.operatorCerts, asks.minYear, FLEET_READINESS_OPTS);
   const cells: Omit<MatchCell, "evidence">[] = [
     yearMakeCell(machine, readiness),
     attachmentsCell(request),
@@ -1331,13 +1358,15 @@ function unionCodes(requested: string[], held: Map<string, OfferedUnitDoc[]>): s
  * `bid_readiness.dart`, the supplier's own scorer: `kMandatoryPhotoSlots` (front + serial/plate) and
  * proof of ownership (`kReadinessPooKey` / `kPooDocTypes`).
  *
- * **Proof of ownership is required, and that is a chosen precedent.** `bid_readiness.dart` scores it as
- * one of two mandatory documents; `bid-readiness.ts` here excludes it from its fraction. This surface
- * follows the mobile scorer, because `ownershipCell` one tab away already reads an absent ownership
- * paper **red** — "not on the file — you can ask for it" — and a documents tab that hid the row would
- * leave the renter told to ask with nothing to ask with. (The web scorer's stated reason for excluding
- * it — that the renter's projection strips ownership papers — is true of the BID it scores and simply
- * does not describe this surface, which reads the unstripped fleet rows. See `ownershipCell`.)
+ * **Proof of ownership is required, and the fraction now agrees with the row.** `bid_readiness.dart`
+ * scores it as one of two mandatory documents, and since the owner's ruling of 2026-08-12 — *"for the
+ * percentage use existing bid readiness in the app as source of truth"* — so does this surface: the
+ * scorer takes {@link FLEET_READINESS_OPTS} at both call sites in this file. ~~`bid-readiness.ts` here
+ * excludes it from its fraction.~~ That exclusion is now scoped to bid-backed callers, whose
+ * `offeredUnitsDetail` really is stripped; it was never a description of THIS surface, which reads the
+ * unstripped fleet rows. So the required row and the number in front of the renter finally state the
+ * same thing — a machine with no ownership paper reads a **red** row *and* a fraction short by exactly
+ * one, instead of a red row beside a green 100%. See `ownershipCell`.
  *
  * ~~**A request with no operator needs no special case.**~~ **No request does, now**: with the group
  * gone, an operator paper is never a row here whatever the request asked and whatever the lessor holds.
@@ -1346,9 +1375,10 @@ function unionCodes(requested: string[], held: Map<string, OfferedUnitDoc[]>): s
  * bucket and the unclassified one.
  */
 export function equipmentDocGroups(machine: FleetMachine, request: MatchRequest): DocGroup[] {
-  // The SAME derivation the match grid scores with — never a second reading of the request.
+  // The SAME derivation the match grid scores with — never a second reading of the request, and now
+  // never a second answer about ownership either ({@link FLEET_READINESS_OPTS}).
   const asks = readinessInputsFor(request);
-  const readiness = computeUnitReadiness(machine, asks.equipCerts, asks.operatorCerts, asks.minYear);
+  const readiness = computeUnitReadiness(machine, asks.equipCerts, asks.operatorCerts, asks.minYear, FLEET_READINESS_OPTS);
 
   /* ── photos ── */
   const photoBySlot = new Map<PhotoSlot, { url: string | null; slot: string }[]>();

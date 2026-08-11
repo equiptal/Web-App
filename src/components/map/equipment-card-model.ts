@@ -202,10 +202,18 @@ export function equipmentCardModel(
     // so a certificate cannot read green on the card and red one screen deeper. `computeUnitReadiness`
     // returns exactly one entry per REQUESTED cert with its `present` flag, which is precisely the
     // list this line wants; nothing here re-derives what is asked for or what is held.
+    //
+    // **`scoreOwnership: true` because `machine` is a FLEET row** (owner's ruling, 2026-08-12: *"for the
+    // percentage use existing bid readiness in the app as source of truth"*). `supplier-fleet.service.ts`
+    // serves the map's rows unstripped, so proof of ownership is present and scoreable here — unlike the
+    // renter's bid projection, where `RENTEE_HIDDEN_DOC_TYPES` removes it. This card reads only
+    // `equipmentCerts`, so the flag moves no number ON THIS LINE today; it is passed anyway because the
+    // machine handed to the scorer is what decides the answer, and a fleet-backed call site that scores
+    // the rentee subset is a lie waiting for the first reader of `.percent`. The whole fleet family
+    // answers one way. See `bid-readiness.ts`'s header and `machine-panel-model.FLEET_READINESS_OPTS`.
     certs: request
-      ? computeUnitReadiness(machine, readinessInputsFor(request).equipCerts, [], null).equipmentCerts.map(
-          (c) => ({ code: c.code, label: { en: c.labelEn, ar: c.labelAr }, held: c.present }),
-        )
+      ? computeUnitReadiness(machine, readinessInputsFor(request).equipCerts, [], null, { scoreOwnership: true })
+          .equipmentCerts.map((c) => ({ code: c.code, label: { en: c.labelEn, ar: c.labelAr }, held: c.present }))
       : [],
     // The MACHINE's own verification, through the one helper that defines the word — never
     // `certs.length`, never a document count, never "has any approved doc". See the field's comment.

@@ -413,8 +413,23 @@ Also, still: a held operator paper must not fall back into **مستندات ال
 ### 004a §4.3 — counts are live until the room exists [EDGE]
 *How to test:* With no room, the supplier adds a unit → the renter's pills and shortfall move on refresh. With a room, the count change is refused. No copy on the renter's surface may imply the numbers are fixed before the room exists.
 
-### 004a §10 — the accepted readiness divergence [EDGE]
-*How to test:* A machine holding every requested certificate but **no** ownership paper shows a **red** ownership row while the readiness band reads green/100%. **Do not raise this as a bug** — web excludes proof of ownership from the fraction (`total = 1 + certs`), mobile includes it (`total = 2 + certs`), so the same machine reads 50% to the lessor and 100% to the renter.
+### 004a §10 — ~~the accepted readiness divergence~~ the app is the source of the percentage [EDGE] [RULED 2026-08-12]
+
+~~**Do not raise this as a bug** — web excludes proof of ownership from the fraction (`total = 1 + certs`), mobile includes it (`total = 2 + certs`), so the same machine reads 50% to the lessor and 100% to the renter.~~ **The acceptance is withdrawn.** Owner's ruling, 2026-08-12: *"for the percentage use existing bid readiness in the app as source of truth."* The standing rule applies — the app is the reference for shared logic, and the web changes.
+
+**It was not fixed by flipping the constant**, because the exclusion's stated reason (*"the backend strips it from the renter's `offeredUnitsDetail`"*) is true of one input family and false of the other. Whether ownership is scored is now an explicit argument (`scoreOwnership` on `computeUnitReadiness`), **defaulting to `false`** — and the app already models both readings itself: `total`/`done` (`2 + certs`) for the supplier, `renteeTotal`/`renteeDone` (`1 + certs`) for the renter.
+
+| surface | the data it reads | ownership in the fraction | denominator |
+| --- | --- | --- | --- |
+| **Map panel** — match grid, documents tab, equipment card, filter chips | fleet rows from `GET /marketplace/bids/{bidId}/fleet`, served **unstripped** by `supplier-fleet.service.ts` (owner, 2026-08-10) | **counted** — `scoreOwnership: true` at every call site | `2 + certs` |
+| **Bid surfaces** — comparison workspace, bid-card badge, eligibility modal | `bid.offeredUnitsDetail`, stripped of `RENTEE_HIDDEN_DOC_TYPES` by `rentee.service.ts` | **not counted** — `computeBidReadiness` exposes no such option | `1 + certs` |
+
+What remains between the two screens is a difference in the DATA each one holds, not two opinions about readiness.
+
+*How to test:*
+1. On the **map panel**, open a machine holding every requested certificate and both mandatory photos but **no** ownership paper. The ownership row is red **and the fraction is now short by exactly one** — with one requested certificate it reads **67%**, not the old green 100%. Add any one ownership paper (`istimara` · `customs` · `sale_contract` · `saso_registration` — the app's `kPooDocTypes`) and it reaches **100%**. That number now matches what the supplier's own app shows him for the same machine, which is the whole of the ruling.
+2. On the **comparison workspace / bid-card badge / eligibility modal** for the same bid, the percentage is **unchanged** from before the ruling — ownership is not a scored key there. A supplier who has filed everything must still be able to reach 100% on the renter's bid surfaces.
+3. Ownership appearing in a **bid** surface's fraction is a **fail**, not a stricter reading: the renter is never sent the paper, so it would be a shortfall no supplier could ever close.
 
 ### SDR-AC-15 → -19 — the mirror [EDGE, mobile]
 *How to test:* If shipped, every row reads in the **renter's** vocabulary, a problem row states **«يظهر لديه بالأحمر»** *before* its button, fixable rows sort first, and no percentage or grade appears anywhere.
