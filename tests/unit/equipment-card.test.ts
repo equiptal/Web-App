@@ -31,7 +31,9 @@ import { resolve } from "node:path";
 import {
   AVAILABILITY_COLOUR,
   REQUEST_ACTION_COLOUR,
+  arabicIndicDigits,
   availabilityView,
+  distanceDigits,
   unitAvailability,
 } from "@/lib/contract/bid-map";
 import { machineMarkers, offeredMachines } from "@/lib/contract/equipment-list";
@@ -396,6 +398,92 @@ describe("row 4 lists the certificates the REQUEST asked for, held or not", () =
 
   it("is empty when no request is supplied, rather than falling back to the machine's own papers", () => {
     expect(equipmentCardModel(fleet([{ id: "eq", docs: ["tuv"] }])[0]).certs).toEqual([]);
+  });
+});
+
+/* ═══════ the distance is never rounded to a whole kilometre (owner, 2026-08-11) ═══════
+   *"Do not round, always keep one decimal."*
+
+   The defect he caught: a supplier moved a machine to a genuinely nearer yard, the fleet read went
+   **8.2 → 7.5 km**, and `Math.round` rendered both as «8 km» — so the move was invisible. And because
+   `Math.round(7.5)` is 8, a yard 700 m closer displayed as *the same distance* as the one it replaced.
+   These machines are usually inside one city; whole kilometres are coarser than the differences the
+   renter is deciding on. */
+
+describe("the card states the distance to one decimal, never rounded to a whole kilometre", () => {
+  const km = (v: number | null) => equipmentCardModel(fleet([{ id: "eq", km: v }])[0]).km;
+
+  it("keeps 7.5 and 8.2 DIFFERENT — the exact regression the owner reported", () => {
+    // Under `Math.round` both of these were 8, which is what made a real move invisible. This is the
+    // one assertion that goes red the moment the rounding comes back.
+    expect(km(7.5)).toBe(7.5);
+    expect(km(8.2)).toBe(8.2);
+    expect(km(7.5)).not.toBe(km(8.2));
+  });
+
+  it("rounds to the decimal rather than past it, and does so at every magnitude", () => {
+    expect(km(7.46)).toBe(7.5);
+    expect(km(7.44)).toBe(7.4);
+    expect(km(140.28)).toBe(140.3);
+    // A whole number stays a whole number as a VALUE — the trailing `.0` is the formatter's job, not
+    // the model's, because this model holds no locale and both scripts write the separator differently.
+    expect(km(8)).toBe(8);
+  });
+
+  it("leaves an unknown distance null — it must never become 0 or 0.0", () => {
+    // The one way "always one decimal" could have been read as "always a number".
+    expect(km(null)).toBeNull();
+    expect(equipmentCardModel(mapFleet([{ equipmentId: "x", inBid: true, locationSource: "unit_yard", photoKeys: [], documentKeys: [] }])[0]).km).toBeNull();
+  });
+});
+
+describe("distanceDigits — the one formatter every surface's distance goes through", () => {
+  it("always shows one decimal, trailing zero and all, so a column is one shape to scan", () => {
+    expect(distanceDigits(8, false)).toBe("8.0");
+    expect(distanceDigits(7.5, false)).toBe("7.5");
+    expect(distanceDigits(140.3, false)).toBe("140.3");
+  });
+
+  it("writes Arabic-Indic digits with the ARABIC decimal separator, U+066B — not a Latin full stop", () => {
+    // Checked against `Intl.NumberFormat('ar-SA-u-nu-arab')`, which formats 7.5 as ٧٫٥. A Latin `.`
+    // would have LOOKED correct on screen — both characters are bidi class AN inside the `dir="ltr"`
+    // isolate the numeral carries — while being the wrong character in every string copied off it.
+    const arabic = distanceDigits(7.5, true);
+    expect(arabic).toBe("٧٫٥");
+    expect([...arabic].map((c) => c.codePointAt(0))).toEqual([0x0667, 0x066b, 0x0665]);
+    expect(arabic).not.toContain(".");
+    expect(distanceDigits(8, true)).toBe("٨٫٠");
+    // …and it agrees with the platform's own answer, so the separator is not our invention.
+    expect(arabic).toBe(new Intl.NumberFormat("ar-SA-u-nu-arab", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(7.5));
+  });
+
+  it("is NOT `arabicIndicDigits`, which truncates — the mutation this whole rule exists to stop", () => {
+    // The count formatter is right for counts and silently wrong for a measurement: it would state a
+    // 7.5 km yard as «٧». The two being separate functions is the fix.
+    expect(arabicIndicDigits(7.5)).toBe("٧");
+    expect(distanceDigits(7.5, true)).not.toBe(arabicIndicDigits(7.5));
+  });
+
+  it("is what ALL THREE surfaces state a distance through — the whole point of one formatter", () => {
+    /* The card, the marker's distance chip and the machine detail's own line describe one machine's
+       distance, and the failure this rule guards against is two of them disagreeing about it. So each
+       is proved to call the shared formatter, and proved NOT to hold a private one — the marker's
+       chip did, a truncating copy of `toArabicIndic`, which is why it could never have shown a
+       decimal however carefully the model carried one. */
+    const surfaces = [
+      "src/components/map/EquipmentList.tsx",
+      "src/components/map/MapCanvas.tsx",
+      "src/components/map/panel/EquipmentDetail.tsx",
+    ];
+    for (const file of surfaces) {
+      const src = stripComments(read(file));
+      expect(src, file).toMatch(/distanceDigits\(/);
+      // No second formatter, and no re-rounding at the render — either would be this rule written a
+      // second time, in the one place it has already been got wrong.
+      expect(src, file).not.toMatch(/ARABIC_INDIC|toArabicIndic/);
+      expect(src, file).not.toMatch(/Math\.round\((?:km|distanceKm)\)/);
+      expect(src, file).not.toMatch(/arabicIndicDigits\(km\)|arDigits\(.*km/);
+    }
   });
 });
 

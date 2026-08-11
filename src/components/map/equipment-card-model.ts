@@ -85,7 +85,19 @@ export interface EquipmentCardModel {
   /** The front photo, else any photo, else null — a card with none says so rather than shimmering. */
   photo: string | null;
   chip: EquipmentCardChip;
-  /** Whole kilometres to the project, or null. Never a 0 standing in for "unknown". */
+  /**
+   * Kilometres to the project **to one decimal**, or null. Never a 0 standing in for "unknown".
+   *
+   * ~~Whole kilometres.~~ Withdrawn (owner, 2026-08-11: *"do not round, always keep one decimal"*).
+   * `Math.round` was hiding real movement: a supplier moved a machine to a nearer yard, the fleet read
+   * went 8.2 → 7.5 km, and both rendered «8 km» — and because `Math.round(7.5)` is 8, a yard 700 m
+   * closer displayed as *the same distance*. On a surface whose machines are usually inside one city,
+   * a whole kilometre is coarser than the differences the renter is deciding on.
+   *
+   * A NUMBER, not a formatted string: this model holds no locale (see the file header), and the two
+   * scripts write both the digits and the decimal separator differently. `distanceDigits` does that,
+   * once, for the card and the marker and the detail alike.
+   */
   km: number | null;
   /** The yard is outside the request city's own radius — the fact that turns a delivery into a
    *  mobilisation. A qualifier on the offer, not a colour and not a filter. */
@@ -148,9 +160,12 @@ export function equipmentCardModel(
     },
     photo: heroPhotoUrl(machine),
     chip,
+    // One decimal, and rounded to it rather than to a whole kilometre (owner, 2026-08-11) — see
+    // `EquipmentCardModel.km`. `×10 / 10` rather than `toFixed`, because the model returns a NUMBER
+    // and `parseFloat(toFixed(1))` is the same value by a longer road.
     km:
       typeof machine.distanceKm === "number" && Number.isFinite(machine.distanceKm)
-        ? Math.round(machine.distanceKm)
+        ? Math.round(machine.distanceKm * 10) / 10
         : null,
     outOfCity: isOutOfCity(machine.distanceKm),
     // Scored by the SAME function the match grid and the readiness band use, fed the same request —

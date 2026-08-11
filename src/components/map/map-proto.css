@@ -197,6 +197,42 @@
   box-sizing: border-box;
   animation: dpHalo 1.9s ease-out infinite;
 }
+
+/* ── THE SELECTED MARKER, made unmissable (owner, 2026-08-11) ─────────────────────────────────────
+   *"In the map the selected equipment must be more visible."* It was a 2 px halo, a 3 px disc ring and
+   an 18 px tick — read against voyager's tiles, a bowed route, a distance chip and up to a dozen other
+   machines, none of which survives a glance across the canvas.
+
+   **Every value below is a GEOMETRY or the surface's selection blue — never a fill** (AC-19). Colour on
+   this canvas means availability and nothing else, so making a selected machine a third colour would
+   turn "the one I am looking at" into "a state a machine can be in". Size, lift, ring and glow cannot
+   be confused with a state, which is exactly why they are what selection is allowed to use.
+
+   The scale is on the STAGE, from its bottom edge: the machine grows upward and the ground point it
+   marks does not move an inch. Scaling `.bm-pin` itself would have dragged the label and the tag with
+   it, and scaling the art alone would have left the disc it stands on the size it was. 96 × 78 × 1.14
+   is 110 × 89, inside the 132 px divIcon box, so nothing is clipped and the marker's own hit area is
+   unchanged. */
+.bm-pin.is-on .bm-pin-stage {
+  transform: scale(1.14);
+  transform-origin: bottom center;
+}
+/* A SECOND ring, and a static one. `dpHalo` pulses — it is absent, or nearly so, for more than half of
+   every 1.9s cycle, and it does not animate at all under `prefers-reduced-motion`. This one never
+   leaves, so the marker is as findable in the trough of the pulse as at its peak. Blue: the selection
+   colour the tick and the disc ring already wear. */
+.bm-pin.is-on .bm-pin-ring {
+  position: absolute;
+  bottom: 1px;
+  left: 50%;
+  width: 68px;
+  height: 68px;
+  transform: translateX(-50%) scaleY(0.32);
+  border: 2px solid rgba(37, 99, 235, 0.85);
+  border-radius: 50%;
+  box-sizing: border-box;
+  box-shadow: 0 0 0 7px rgba(37, 99, 235, 0.13);
+}
 /* The state plate the machine stands on. Colour = availability, and availability only. */
 .bm-pin .bm-pin-disc {
   position: absolute;
@@ -288,6 +324,9 @@
   justify-content: center;
   border: 2px solid #fff;
   box-sizing: border-box;
+  /* Part of the 2026-08-11 emphasis: at 18 px flat on the tiles the tick was a blue speck. It only
+     ever renders selected, so the value moves here rather than into an `.is-on` rule of its own. */
+  box-shadow: 0 3px 8px rgba(15, 34, 56, 0.34);
 }
 /* ONE label, ONE fact: «مؤكّد توفرها» / «لم يؤكد توفرها بعد» (§6.8). Filled with the availability
    colour, so the marker states its own colour in words and cannot be read off the legend alone. */
@@ -300,6 +339,18 @@
   white-space: nowrap;
   color: #fff;
   box-shadow: 0 3px 10px rgba(15, 34, 56, 0.2);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+/* The label joins the emphasis: a step of scale, and a WHITE keyline that lifts it off whatever tile
+   it happens to land on. The keyline is a second shadow rather than a border — a border would change
+   the chip's box and make the selected label wider than the unselected one by two pixels of a colour
+   that is not its own. The fill is untouched and is still the availability colour's. */
+.bm-pin.is-on .bm-pin-chip {
+  transform: scale(1.1);
+  box-shadow: 0 0 0 2px #fff, 0 5px 14px rgba(15, 34, 56, 0.32);
+}
+@media (prefers-reduced-motion: reduce) {
+  .bm-pin .bm-pin-chip { transition: none; }
 }
 /* Only the focused marker names itself — the map stays quiet until the renter has chosen. The tag says
    «في هذا العرض» (AC-34); the prototype's «معروضة في اللوحة» describes the UI, not the offer. */
@@ -602,7 +653,29 @@
    `#EDF2F7`. Ours put the pills and the shortfall on the panel's white and only the list on the grey,
    so the column read as two stacked regions with a seam between them — and the filter bar drew a rule
    across it, which made three. The white here belongs to the CARDS, not to the ground they sit on. */
-.bidmap .bm-counts { flex-shrink: 0; display: flex; flex-wrap: wrap; gap: 6px; padding: 11px 15px 0; }
+/* ── THE COLUMN ABOVE THE LIST, CONDENSED (owner, 2026-08-11) ─────────────────────────────────────
+   *"In this screen it is taking too much space — it must be condensed. Consider users having 50
+   equipments: they want the space to see the equipment cards, not these."*
+
+   The five bands above the first card — the identity row, the pills, the shortfall, the count line and
+   the filter control — cost about 208 px of a column that is roughly 800 px tall on a laptop, so a
+   quarter of the panel was spent before the first machine. **Nothing below deletes information**: every
+   pill, the whole shortfall sentence, its ask and the count are all still on screen. What changes is
+   that they are sized for something read ONCE, in passing, on the way to the machines — which is what
+   they are — instead of being sized like the subject of the screen.
+
+   Two things deliberately did NOT move, and it is worth saying why here rather than in a review:
+
+   · **`.bm-head-id` keeps its 64px.** It is not this panel's height — it is the ONE header geometry
+     shared with the company panel's `.mp-cohead` and the chat drawer's own band, all three of which
+     replace this column. Shaving it here alone would make the same header jump 12 px whenever a
+     takeover opened. The three have to move together, and the other two are not this change's to edit.
+
+   · **The shortfall stays a full alert with its own ask** (RM3-AC-05/06) — tinted, outlined, orange,
+     stating the DIFFERENCE. It is the one thing on this column that says a machine the renter is being
+     charged for does not exist, and a fact like that does not become a footnote because the column is
+     busy. It is 15 px shorter; it is not quieter. */
+.bidmap .bm-counts { flex-shrink: 0; display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 14px 0; }
 /* BOTH PILLS ARE THE SAME WHITE PILL (decoded 3763–3766), and the difference between them is the word
    they carry, not their colour.
 
@@ -622,11 +695,13 @@
   background: #fff;
   border: 1px solid #e1e9f1;
   border-radius: 999px;
-  padding: 4px 11px;
+  /* `3px 9px`, from `4px 11px` — the pill is read once, and the number inside it is what carries the
+     weight, not the ring of white around the number. */
+  padding: 3px 9px;
   white-space: nowrap;
 }
-.bidmap .bm-pill-n { font-size: 13px; font-weight: 800; color: #16304f; }
-.bidmap .bm-pill-l { font-size: 10.5px; font-weight: 700; color: #6b8fa8; }
+.bidmap .bm-pill-n { font-size: 12.5px; font-weight: 800; color: #16304f; }
+.bidmap .bm-pill-l { font-size: 10px; font-weight: 700; color: #6b8fa8; }
 
 /* ── V4 · shortfall alert (§6.3) ─────────────────────────────────────────────────────────────────
    ORANGE, never red. Red on this surface means availability and nothing else; a shortfall is an
@@ -643,27 +718,31 @@
    paragraph («no location, documents or serial to show») spent three lines explaining a consequence
    the sentence already states. A shortfall is read in passing, above the list it is about; the alert
    is sized for that, not for being studied. */
+/* Condensed on 2026-08-11 and NOT demoted: `margin` 11→7, `padding` 8/10→5/8, and the sentence's own
+   line-height down from 1.65 to 1.4 — an alert read in passing does not need a paragraph's leading.
+   The tint, the outline, the orange and the ask are all untouched, because RM3-AC-05/06 are about what
+   this says and what colour it says it in, not about how much air it sits in. */
 .bidmap .bm-short {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 9px;
-  margin: 11px 15px 0;
-  padding: 8px 10px;
+  gap: 8px;
+  margin: 7px 14px 0;
+  padding: 5px 8px;
   background: rgba(232, 137, 12, 0.1);
   border: 1px solid rgba(232, 137, 12, 0.32);
-  border-radius: 10px;
+  border-radius: 9px;
 }
 /* The wrapper is `flex: 1` rather than the text itself, because the pending sentence below is OURS
    and can join it — see `.bm-short-s`. With nothing pending it collapses to exactly the prototype's
    single flexed span. */
 .bidmap .bm-short-body { flex: 1; min-width: 0; }
-.bidmap .bm-short-t { font-size: 11px; font-weight: 700; color: #8a4f08; line-height: 1.65; }
+.bidmap .bm-short-t { font-size: 10.5px; font-weight: 700; color: #8a4f08; line-height: 1.4; }
 /* NOT in the prototype, and deliberately kept: the one thing this line says is why the button beside
    it is inert, and a disabled control whose label merely changed to «تم الطلب» leaves the renter
    guessing whether the ask failed. It renders only while an ask is outstanding, so the resting alert
    is the prototype's one line. */
-.bidmap .bm-short-s { font-size: 9.5px; font-weight: 600; color: #6b8fa8; margin-top: 4px; line-height: 1.7; }
+.bidmap .bm-short-s { font-size: 9.5px; font-weight: 600; color: #6b8fa8; margin-top: 3px; line-height: 1.45; }
 /* WHITE and outlined, as the prototype draws it (decoded 3783) — a filled button inside a tinted
    alert makes the alert itself look pressed, and this is a small ask, not the surface's primary act.
 
@@ -678,8 +757,8 @@
   border: 1px solid rgba(37, 99, 235, 0.22);
   color: #2563eb;
   border-radius: 8px;
-  padding: 6px 10px;
-  font-size: 10.5px;
+  padding: 4px 9px;
+  font-size: 10px;
   font-weight: 800;
   cursor: pointer;
   font-family: inherit;
@@ -695,11 +774,14 @@
 /* `padding: 14px` on `#EDF2F7`, the prototype's own (decoded 2638). The `#F8FAFC` that was here is a
    near-white the v3 palette does not contain — `s2` is `#EDF2F7`, a cool blue-grey — and on it the
    white cards had almost no ground to sit on, which is what a scrolling column of cards needs most. */
+/* `11px 14px`, from a flat `14px` (owner, 2026-08-11). The horizontal gutter is the prototype's and
+   stays; the vertical one was buying a band of grey between the shortfall and the first card that the
+   flex `gap` below already pays for. */
 .bidmap .bm-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 14px;
+  padding: 11px 14px;
   background: #edf2f7;
   display: flex;
   flex-direction: column;
@@ -865,27 +947,62 @@
   align-items: center;
   justify-content: center;
 }
+/* ── The card's TWO CONTROLS, as one cluster (owner, 2026-08-11) ──────────────────────────────────
+   *"Check how buttons float — use shorter wordings, even on the equipment card."*
+
+   They floated for a reason that was structural, not decorative. «التفاصيل» was a WHITE pill on a
+   WHITE card: no ground under it, nothing sharing its line, hung off the end of the title row — the
+   one shape on the card that looked applied rather than built in. «اطلب التأكيد» was worse: a
+   borderless blue word with a hairline under it, dropped between a red chip and a brown qualifier, so
+   the state row carried three unlike objects and the eye could not tell which of them was pressable.
+
+   Both now sit in `.bm-eq-acts` on row 3, sharing ONE height, ONE radius and ONE baseline, anchored to
+   the row's trailing edge and flush with the text column's own padding. Two controls in a strip read
+   as the card's controls; two scattered over two rows read as things resting on it. They cost no
+   height — row 3 was already a full line holding one short figure — so the card is still exactly four
+   rows and every card in the column is still the same height.
+
+   **Both keep the grounds their rules give them.** The ask is still the blue of RM3-AC-33 (never navy:
+   beside a red chip navy reads as disabled) and is still a real button above the stretched open layer,
+   which is RM3-AC-13 — an unconfirmed machine is askable without opening the detail. What changes is
+   that the blue now has a tint and a hairline UNDER it instead of hanging in the white. */
+.bidmap .bm-eq .bm-eq-acts {
+  /* Pushes the cluster to the row's trailing edge in both scripts — a logical margin, so it is the
+     right edge in English and the left in Arabic without a second rule. */
+  margin-inline-start: auto;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .bidmap .bm-eq .bm-eq-details {
   pointer-events: auto;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: #fff;
-  border: 1px solid #c8d8e8;
+  /* `#F2F6FA`, not `#FFF`. A white control on a white card has no ground, which is the whole of
+     "floating"; the surface's own pale slate gives it one without adding a colour. */
+  background: #f2f6fa;
+  border: 1px solid #dbe6ef;
   color: #16304f;
-  border-radius: 20px;
+  border-radius: 999px;
   padding: 3px 9px;
   font-size: 10px;
   font-weight: 800;
+  line-height: 1.5;
   white-space: nowrap;
   cursor: pointer;
   font-family: inherit;
 }
+.bidmap .bm-eq .bm-eq-details:hover { background: #e6eef6; border-color: #c8d8e8; }
+/* On a selected card the ground IS `#F2F6FA`, so the tint above would vanish into it — the control
+   goes navy instead, which is the same slate the accent bar and the selected chip already use. */
 .bidmap .bm-eq.on .bm-eq-details { background: #1c3550; border-color: #1c3550; color: #fff; }
+.bidmap .bm-eq.on .bm-eq-details:hover { background: #16304f; border-color: #16304f; }
 
 /* Row 2 — ONE chip carrying availability AND commitment, never a chip plus a band (RM3-AC-32). The row
-   keeps its height whether or not the ask is beside it. */
+   keeps its height whether or not the out-of-city qualifier is beside it. */
 .bidmap .bm-eq .bm-eq-r2 { display: flex; align-items: center; gap: 8px; min-height: 19px; }
 .bidmap .bm-eq .bm-eq-chip {
   display: inline-flex;
@@ -925,27 +1042,42 @@
    already carries one chip, and a second would read as a second availability state. */
 .bidmap .bm-eq .bm-eq-far { flex-shrink: 0; font-size: 10.5px; font-weight: 700; color: #8a4f08; white-space: nowrap; }
 /* BLUE, never navy (RM3-AC-33): beside a red chip, navy reads as disabled, and this is the one control
-   the renter is supposed to press. The underline is the prototype's `C.blueBd` alpha — **.22**, not
-   the .4 drawn here: at .4 the rule competes with the text above it and the control reads as a
-   disabled input rather than a link. */
+   the renter is supposed to press.
+
+   **A tinted capsule, not an underlined word** (owner, 2026-08-11). It was `background: none` with a
+   1px rule under it — the prototype's link treatment, correct for a word sitting in a paragraph and
+   wrong for the most important control on a card, where it read as text that happened to be blue. The
+   fill and the hairline are the same `.08`/`.22` alphas of the same blue the ink already carries, so
+   the control gained a ground and not a colour, and it now matches «التفاصيل» beside it in height and
+   radius — which is what makes the pair read as one cluster.
+
+   `color` is still set INLINE from `askAvailability.colour`, so the model remains the one authority on
+   this control's colour; what is here is the ground it stands on. */
 .bidmap .bm-eq .bm-eq-ask {
   pointer-events: auto;
   flex-shrink: 0;
-  background: none;
-  border: 0;
-  border-bottom: 1px solid rgba(37, 99, 235, 0.22);
-  border-radius: 0;
-  padding: 0 0 1px;
+  display: inline-flex;
+  align-items: center;
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  border-radius: 999px;
+  padding: 3px 9px;
   color: #2563eb;
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 800;
+  line-height: 1.5;
   white-space: nowrap;
   cursor: pointer;
   font-family: inherit;
 }
+.bidmap .bm-eq .bm-eq-ask:hover:not(:disabled) { background: rgba(37, 99, 235, 0.14); border-color: rgba(37, 99, 235, 0.34); }
 .bidmap .bm-eq .bm-eq-ask:disabled { cursor: default; opacity: 0.5; }
 
-.bidmap .bm-eq .bm-eq-r3 { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+/* Row 3 — the distance, then the cluster hard against the trailing edge. `center`, not `baseline`:
+   two capsules and a 17px figure have no shared baseline worth aligning to, and the figure's own pair
+   keeps its baseline inside `.bm-eq-dist`. */
+.bidmap .bm-eq .bm-eq-r3 { display: flex; align-items: center; gap: 8px; min-height: 23px; white-space: nowrap; }
+.bidmap .bm-eq .bm-eq-dist { display: inline-flex; align-items: baseline; gap: 5px; min-width: 0; overflow: hidden; }
 .bidmap .bm-eq .bm-eq-km { font-family: ui-monospace, monospace; font-size: 17px; font-weight: 700; letter-spacing: -0.4px; color: #1c3550; }
 .bidmap .bm-eq .bm-eq-kmu { font-size: 11.5px; font-weight: 700; color: #6b8fa8; }
 
@@ -1000,28 +1132,32 @@
 .bidmap .bm-eqf {
   display: flex;
   flex-direction: column;
-  gap: 8px;
   /* No `margin-bottom`: the list container is a flex column with its own `gap: 10px` now, and a margin
      on top of it made the rule sit nearer the chips than the cards it separates them from.
      ~~`border-bottom: 1px solid #e6eef5`~~ — withdrawn 2026-08-11: the prototype bands the HEADER and
      nothing else, and a rule here cut the one ground into two. The gap below already separates the
-     bar from the first card; a line as well was saying it twice. */
-  padding-bottom: 10px;
+     bar from the first card; a line as well was saying it twice.
+     ~~`padding-bottom: 10px`, `gap: 8px`~~ — withdrawn the same day, and for the same reason twice
+     over: the groups no longer live under this bar (they are `.bm-eqfp` now), so there is nothing for
+     the `gap` to separate, and the body's own `gap: 10px` is already the space between this line and
+     the first card. Both were being paid twice, on the busiest column on the surface. */
 }
-.bidmap .bm-eqf-top { display: flex; align-items: center; gap: 8px; }
+.bidmap .bm-eqf-top { display: flex; align-items: center; gap: 8px; min-height: 26px; }
 /* The count takes the slack so the clear link and the filter control sit together on the far edge,
    rather than the three spreading across 392px with nothing between them. */
 .bidmap .bm-eqf-count { flex: 1; min-width: 0; }
 /* ── The filter control (owner, 2026-08-11) ──────────────────────────────────────────────────────
    The groups used to lie flat above every list: two labelled rows of chips the renter reads past to
    reach the machines. One icon says filtering exists and how much is on; the panel says the rest when
-   asked. Sized like the surface's other small controls — 28px, r9 — not a pill, because it toggles a
-   panel rather than naming a destination. */
+   asked. Sized like the surface's other small controls — 26px, r9 — not a pill, because it opens a
+   panel rather than naming a destination. (26, from 28, with the rest of the column's condensing on
+   2026-08-11; `.bm-eqfp-x`, which closes what this opens, is the one 28px twin left and is deliberate:
+   a close control on a panel that covers everything has to be findable, not merely present.) */
 .bidmap .bm-eqf-btn {
   flex-shrink: 0;
   position: relative;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1034,7 +1170,7 @@
 }
 .bidmap .bm-eqf-btn .material-icons-outlined { font-size: 16px; }
 .bidmap .bm-eqf-btn:hover { border-color: #c8d8e8; color: #16304f; }
-/* OPEN is navy, matching the surface's one selection colour — the panel below it is a state, and
+/* OPEN is navy, matching the surface's one selection colour — the panel over it is a state, and
    `#2563EB` here is the request action (AC-33), not "this is showing". */
 .bidmap .bm-eqf-btn.on { background: #16304f; border-color: #16304f; color: #fff; }
 /* The count of ACTIVE filters, so a collapsed panel still says the list is not the whole offer. */
@@ -1056,15 +1192,91 @@
   align-items: center;
   justify-content: center;
 }
-/* The panel itself — inset on the surface's own grey so it reads as a layer over the list rather than
-   as two more rows of the list. */
-.bidmap .bm-eqf-panel {
+/* ── The filter's OWN panel, over the existing one (owner, 2026-08-11) ────────────────────────────
+   *"The filter must open a panel, different and on the existing panel, with an X."*
+
+   ~~`.bm-eqf-panel` — an inset block that pushed the list down.~~ Withdrawn. On a 392 px column the
+   two groups it holds are 90-odd pixels, so opening the filter shoved the machines the chips are
+   about off the bottom of the screen at exactly the moment the renter was choosing between them, and
+   what he read while pressing was an empty grey column.
+
+   The geometry is `.mp-over`'s, deliberately — the company documents already open this way, and a
+   surface with two idioms for "a second layer" teaches the renter neither. `position: absolute;
+   inset: 0` against `.bm-panel`, which is the only positioned ancestor: the panel is what this
+   covers, NOT `.bm-body`, so it escapes the list's scroll and takes the header and the counts with
+   it rather than sliding away under them. `z-index: 11` sits it one below the company panel's 12 —
+   both can be open at once, and the documents are the later, more deliberate act. */
+.bidmap .bm-eqfp {
+  position: absolute;
+  inset: 0;
+  z-index: 11;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px;
+  background: #fff;
+  border-inline-end: 1px solid #e1e9f1;
+  box-shadow: 6px 0 24px rgba(15, 34, 56, 0.1);
+  animation: bmFilterIn 0.16s ease;
+}
+@keyframes bmFilterIn {
+  from { opacity: 0.4; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bidmap .bm-eqfp { animation: none; }
+}
+/* The head carries the panel's subject and its way out, on the surface's one header geometry — the
+   same 18px gutters every band on this column uses. Shorter than the 64px identity band on purpose:
+   this is a tool being held open, not a subject being read about. */
+.bidmap .bm-eqfp-head {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border-bottom: 1px solid #e1e9f1;
+  background: linear-gradient(180deg, #fbfdff, #f2f7fc);
+}
+.bidmap .bm-eqfp-t { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 800; color: #16304f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* An X, not a back chevron: the renter is putting a tool away, not travelling back to something. 28px
+   at r9 — the surface's own small-control size, the same one the filter button that opened it wears. */
+.bidmap .bm-eqfp-x {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid #e1e9f1;
-  border-radius: 12px;
+  border-radius: 9px;
+  background: #fff;
+  color: #6b8fa8;
+  cursor: pointer;
+  font-family: inherit;
+}
+.bidmap .bm-eqfp-x .material-icons-outlined { font-size: 16px; }
+.bidmap .bm-eqfp-x:hover { border-color: #c8d8e8; color: #16304f; }
+/* Its own scroller: a request naming eight certificates makes eight chips, and a panel that grew past
+   the column would put the clear control below the fold. */
+.bidmap .bm-eqfp-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+}
+/* Rule 3, restated where it is the only thing the renter can see. With the cards covered, «٣ من ٨» is
+   what tells him what a press just cost — and the denominator is still the WHOLE offer. */
+.bidmap .bm-eqfp-foot {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-top: 1px solid #e1e9f1;
   background: #f8fafc;
 }
 /* «٣ من ٨» — rule 3. Prominent enough to be read before the cards it describes, because a hidden

@@ -482,9 +482,45 @@ export function unitCountLabel(n: number): string {
 }
 
 /** The bare numeral in Arabic-Indic digits — for a pill whose noun comes from the taxonomy rather than
- *  from `unitCountLabel`'s literal «وحدة». Same formatter, without the noun. */
+ *  from `unitCountLabel`'s literal «وحدة». Same formatter, without the noun.
+ *
+ *  **Counts only.** It TRUNCATES, which is right for a count — there is no such thing as 2.4 machines —
+ *  and silently wrong for anything measured: `arabicIndicDigits(7.5)` is «٧». A distance goes through
+ *  {@link distanceDigits} instead, and that is the whole reason the two are separate functions. */
 export function arabicIndicDigits(n: number): string {
   return toArabicIndic(n);
+}
+
+/** **The Arabic decimal separator, U+066B «٫»** — not a Latin full stop. Checked rather than assumed:
+ *  `Intl.NumberFormat('ar-SA-u-nu-arab')` formats 7.5 as `٧٫٥`, which is U+0667 U+066B U+0665. Both
+ *  this and the Arabic-Indic digits are bidi class AN, so the run renders correctly inside the
+ *  `dir="ltr"` isolate every numeral on this surface already carries — a Latin `.` would have LOOKED
+ *  right there while being the wrong character in every string that leaves the page. */
+const ARABIC_DECIMAL_SEPARATOR = "٫";
+
+/**
+ * **One distance, one decimal, in the reader's digits** (owner, 2026-08-11: *"do not round, always keep
+ * one decimal"*).
+ *
+ * Every surface that says how far a machine is — the card, the marker's distance chip, the detail's own
+ * line — comes through here, because the failure this exists to prevent is precisely two of them
+ * disagreeing about one machine.
+ *
+ * **Whole kilometres were too coarse to be honest.** A supplier moved a machine to a genuinely nearer
+ * yard and the fleet read went 8.2 → 7.5 km; under `Math.round` both rendered «8 km», so the move was
+ * invisible — and since `Math.round(7.5)` is 8, a yard 700 m closer displayed as *the same distance*.
+ * These machines are usually inside one city, where the differences that matter are hundreds of metres.
+ *
+ * **The trailing `.0` is kept**, always: `8.0` and `٨٫٠`, never `8`. A column of distances is read by
+ * scanning down it, and one figure of a different shape is a figure the eye stops on for no reason.
+ *
+ * Callers keep the null case themselves — an unknown distance is a sentence, not a number, and must
+ * never be allowed to become `0.0`.
+ */
+export function distanceDigits(km: number, ar: boolean): string {
+  const fixed = Math.abs(km).toFixed(1);
+  if (!ar) return fixed;
+  return fixed.replace(/\d/g, (d) => ARABIC_INDIC_DIGITS[Number(d)]).replace(".", ARABIC_DECIMAL_SEPARATOR);
 }
 
 /**

@@ -9,8 +9,9 @@
  * filters kept equal by hand is exactly how a card and its marker start disagreeing (AC-15).
  *
  * Each card: photo · model · year · **one availability chip that also carries commitment** · distance
- * from the project · certificate chips or an explicit «لا شهادات على المعدّة» · **التفاصيل ›** ·
- * **اطلب التأكيد** when unconfirmed.
+ * from the project, **with the card's two controls («اطلب التأكيد» when unconfirmed, then «التفاصيل ›»)
+ * clustered against that row's trailing edge** · certificate chips or an explicit «لا شهادات على
+ * المعدّة».
  *
  * Three rules the card's shape enforces:
  *  - **No serial number and no load capacity** (AC-12). The serial identifies the machine to the
@@ -44,10 +45,27 @@
  * are `equipmentListView()`'s answers, arriving here as one `view` prop. This file only paints them —
  * which is what lets the workspace derive the marker set from the SAME `view.machines` the cards come
  * from (AC-15), and what makes rules 2, 3 and 4 testable without a DOM.
+ *
+ * **The filter opens its OWN panel, over the existing one, dismissed by an X** (owner, 2026-08-11).
+ * ~~An expanding block that pushes the list down.~~ Withdrawn: it did push the list down, which on a
+ * 392 px column meant the machines the chips are about left the screen at the moment the renter was
+ * choosing between them. It is now `.bm-eqfp` — the same idiom `.mp-over` gives the company
+ * documents: absolutely placed against `.bm-panel` (the panel is the positioned ancestor, so this
+ * escapes `.bm-body`'s scroll and covers the column edge to edge), a head carrying its title and the
+ * X, its own scroller for the groups, and a foot restating the count so «٣ من ٨» keeps answering
+ * while the chips move. Escape still closes it — a panel only its own button can dismiss is a panel
+ * the renter has to aim at twice.
+ *
+ * **None of the filter's RULES moved.** Which chips exist (only criteria the request asked for), what
+ * each keeps (a machine HAS the thing, never lacks it), whether a control that would split nothing
+ * renders at all, and both figures of the count are still `equipmentListView()`'s — this file gained
+ * a surface, not a decision.
  */
 
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
-import { arabicIndicDigits } from "@/lib/contract/bid-map";
+// Two numeral formatters, and the split is deliberate: `arabicIndicDigits` truncates, which is what a
+// COUNT wants, and `distanceDigits` keeps one decimal, which is what a measured distance wants.
+import { arabicIndicDigits, distanceDigits } from "@/lib/contract/bid-map";
 import { listEmptyState, type EquipmentListView } from "@/lib/contract/equipment-list";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import { equipmentCardModel } from "@/components/map/equipment-card-model";
@@ -126,9 +144,10 @@ export function EquipmentList({
   const num = (n: number) => (ar ? arabicIndicDigits(n) : String(n));
 
   /** The filter groups are behind a control now, so the bar is one line until asked. Escape closes
-   *  it — a panel that only its own button can dismiss is a panel the renter has to aim at twice. */
+   *  it — a panel that only its own button can dismiss is a panel the renter has to aim at twice.
+   *  (The `filterRef` that used to sit here was written and never read: a ref nothing measures is a
+   *  handle for a behaviour that does not exist.) */
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const filterRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!filtersOpen) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setFiltersOpen(false); };
@@ -171,15 +190,20 @@ export function EquipmentList({
   // The count is the numerals themselves, so each one carries `dir="ltr"` — an Arabic-Indic figure
   // inside an RTL run still reads left to right. The template is split rather than interpolated so
   // the two locales keep ONE key and the word order stays the dictionary's.
-  const countParts: ReactNode[] = t.bidMap.eqShownOfTotal.split(/(\{n\}|\{total\})/).map((part, i) =>
-    part === "{n}" ? (
-      <span key={i} dir="ltr">{num(view.shown)}</span>
-    ) : part === "{total}" ? (
-      <span key={i} dir="ltr">{num(view.total)}</span>
-    ) : (
-      <span key={i}>{part}</span>
-    ),
-  );
+  //
+  // A FUNCTION, because rule 3's count is now stated in two places: above the list, and again in the
+  // filter panel's foot, where the chips being pressed are what move it. One builder, so the two can
+  // never say the offer is two different sizes.
+  const countLine = (): ReactNode[] =>
+    t.bidMap.eqShownOfTotal.split(/(\{n\}|\{total\})/).map((part, i) =>
+      part === "{n}" ? (
+        <span key={i} dir="ltr">{num(view.shown)}</span>
+      ) : part === "{total}" ? (
+        <span key={i} dir="ltr">{num(view.total)}</span>
+      ) : (
+        <span key={i}>{part}</span>
+      ),
+    );
 
   return (
     <>
@@ -188,9 +212,9 @@ export function EquipmentList({
           The count renders whether or not anything is filtered, because «٨ من ٨» is the sentence that
           makes «٣ من ٨» readable later. */}
       {(view.groups.length > 0 || view.active.length > 0) && (
-        <div className="bm-eqf" role="group" aria-label={t.bidMap.eqFilterLabel} ref={filterRef}>
+        <div className="bm-eqf" role="group" aria-label={t.bidMap.eqFilterLabel}>
           <div className="bm-eqf-top">
-            <span className="bm-eqf-count">{countParts}</span>
+            <span className="bm-eqf-count">{countLine()}</span>
             {view.active.length > 0 && (
               <button type="button" className="bm-eqf-clear" onClick={onClearFilters}>
                 {t.bidMap.eqFilterClear}
@@ -204,7 +228,10 @@ export function EquipmentList({
               <button
                 type="button"
                 className={`bm-eqf-btn${filtersOpen ? " on" : ""}`}
-                aria-expanded={filtersOpen}
+                /* `aria-haspopup`, not `aria-expanded`: this no longer grows a region below itself,
+                   it opens a panel over the column. A reader told the control is "expanded" would go
+                   looking underneath it for content that is somewhere else entirely. */
+                aria-haspopup="dialog"
                 aria-label={t.bidMap.eqFilterLabel}
                 title={t.bidMap.eqFilterLabel}
                 onClick={() => setFiltersOpen((v) => !v)}
@@ -218,51 +245,93 @@ export function EquipmentList({
               </button>
             )}
           </div>
+        </div>
+      )}
 
-          {/* An expanding panel, not a floating popover: the column is 392px, and a popover in it
-              either clips against the panel edge or covers the machines the filter is about to
-              change. Opening pushes the list down, which is honest — the renter can see the chips and
-              the result of pressing them at the same time. */}
-          {filtersOpen && (
-          <div className="bm-eqf-panel">
-          {view.groups.map((g) => (
-            <div className="bm-eqf-row" key={g.kind}>
-              <span className="bm-eqf-label">{ar ? g.label.ar : g.label.en}</span>
-              <div className="bm-eqf-chips">
-                {g.options.map((o) => {
-                  const on = filterIds.includes(o.id);
-                  return (
-                    <button
-                      key={o.id}
-                      type="button"
-                      className={`bm-eqf-chip${on ? " on" : ""}`}
-                      aria-pressed={on}
-                      onClick={() => onToggleFilter(o.id)}
-                    >
-                      {ar ? o.label.ar : o.label.en}
-                      <span className="bm-eqf-n" dir="ltr">{num(o.matches)}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              {/* The note that used to sit here — «machines with an unknown distance are still
-                  shown» — is gone by decision (owner, 2026-08-08): a yard is required to register a
-                  machine, so a null distance needs a yard DELETED after the fact, or one the
-                  ownership gate refuses. Rare enough that a permanent line explaining it is clutter.
+      {/* ── The filter's OWN panel, over the existing one (owner, 2026-08-11) ─────────────────────
+          `.mp-over`'s idiom, and deliberately so: the company documents already open this way, and a
+          surface that has two ways of saying "a second layer" teaches the renter neither. Absolutely
+          placed, so its containing block is `.bm-panel` (the only positioned ancestor) rather than
+          `.bm-body` — which is what lets it escape the list's scroll and cover the column whole,
+          counts and header included, instead of scrolling away with the cards it is filtering.
 
-                  **The BEHAVIOUR it described is unchanged** — such a machine is still kept by every
-                  band. Filtering it out would delete a real offered machine on the strength of a fact
-                  nobody has, and «غير معروفة» is not «بعيدة». Only the explanation is withdrawn, not
-                  the rule.
+          It renders only while there is something to filter WITH: `view.groups` empty and the panel
+          has no content, and the control that opens it does not exist either.
 
-                  The `keepsUnknownDistance` flag that fed this note, and the `.bm-eqf-note` style and
-                  `eqFilterUnknownDistance` string that rendered it, are gone with it — a reporting
-                  channel with no reader. `equipment-list.test.ts` now pins the rule against
-                  `filterMachines` directly, which is where it actually lives. */}
-            </div>
-          ))}
+          `role="dialog"` with a name, and deliberately **no `aria-modal`**: nothing here traps focus,
+          and `aria-modal` tells a screen reader to hide everything else — which would be a claim the
+          keyboard can immediately disprove by tabbing straight out into the list behind it. The
+          company panel makes no ARIA claim at all; this one names itself because, unlike that panel,
+          it has no heading of its own in the reading order above it. */}
+      {filtersOpen && view.groups.length > 0 && (
+        <div className="bm-eqfp" role="dialog" aria-label={t.bidMap.eqFilterLabel}>
+          <div className="bm-eqfp-head">
+            <span className="bm-eqfp-t">{t.bidMap.eqFilterLabel}</span>
+            {/* An X, not a back chevron. The company panel goes BACK to what it covered; this one is
+                dismissed — the renter is not travelling anywhere, he is putting a tool away. */}
+            <button
+              type="button"
+              className="bm-eqfp-x"
+              aria-label={t.common.close}
+              title={t.common.close}
+              onClick={() => setFiltersOpen(false)}
+            >
+              <span className="material-icons-outlined">close</span>
+            </button>
           </div>
-          )}
+
+          <div className="bm-eqfp-body">
+            {view.groups.map((g) => (
+              <div className="bm-eqf-row" key={g.kind}>
+                <span className="bm-eqf-label">{ar ? g.label.ar : g.label.en}</span>
+                <div className="bm-eqf-chips">
+                  {g.options.map((o) => {
+                    const on = filterIds.includes(o.id);
+                    return (
+                      <button
+                        key={o.id}
+                        type="button"
+                        className={`bm-eqf-chip${on ? " on" : ""}`}
+                        aria-pressed={on}
+                        onClick={() => onToggleFilter(o.id)}
+                      >
+                        {ar ? o.label.ar : o.label.en}
+                        <span className="bm-eqf-n" dir="ltr">{num(o.matches)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* The note that used to sit here — «machines with an unknown distance are still
+                    shown» — is gone by decision (owner, 2026-08-08): a yard is required to register a
+                    machine, so a null distance needs a yard DELETED after the fact, or one the
+                    ownership gate refuses. Rare enough that a permanent line explaining it is clutter.
+
+                    **The BEHAVIOUR it described is unchanged** — such a machine is still kept by every
+                    band. Filtering it out would delete a real offered machine on the strength of a fact
+                    nobody has, and «غير معروفة» is not «بعيدة». Only the explanation is withdrawn, not
+                    the rule.
+
+                    The `keepsUnknownDistance` flag that fed this note, and the `.bm-eqf-note` style and
+                    `eqFilterUnknownDistance` string that rendered it, are gone with it — a reporting
+                    channel with no reader. `equipment-list.test.ts` now pins the rule against
+                    `filterMachines` directly, which is where it actually lives. */}
+              </div>
+            ))}
+          </div>
+
+          {/* The foot carries rule 3 a second time, and that is the point of covering the list: with
+              the cards hidden, «٣ من ٨» is the only thing telling the renter what a chip just cost
+              him — and it still names the WHOLE offer as the denominator. «امسح التصفية» is here as
+              well as in the bar because the bar is behind this panel: a renter three chips deep with
+              no way out would have to close the panel to find the control that undoes it. */}
+          <div className="bm-eqfp-foot">
+            <span className="bm-eqf-count">{countLine()}</span>
+            {view.active.length > 0 && (
+              <button type="button" className="bm-eqf-clear" onClick={onClearFilters}>
+                {t.bidMap.eqFilterClear}
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -399,7 +468,13 @@ function EquipmentCard({
 
         <div className="bm-eq-tx">
           {/* 1 · title — model · year, with the verified mark against the end of the NAME rather than
-              the far edge of the row. No serial, no capacity (AC-12). */}
+              the far edge of the row. No serial, no capacity (AC-12).
+
+              **«التفاصيل» is no longer here** (owner, 2026-08-11: *"check how buttons float"*). A white
+              pill on a white card, hung at the end of the title row, had no ground under it and read
+              as floating over the name rather than belonging to the card — and it was the FIRST thing
+              in the reading order after the machine's own name, which is the one place a secondary
+              control should not be. It moved to row 3's cluster, beside the other one. */}
           <div className="bm-eq-r1">
             <span className="bm-eq-name">
               <span className="bm-eq-title" title={title}>{title}</span>
@@ -413,19 +488,13 @@ function EquipmentCard({
                 </span>
               )}
             </span>
-            <button type="button" className="bm-eq-details" onClick={() => onOpenDetail(machine.equipmentId)}>
-              {t.bidMap.eqDetails}
-              {/* The prototype hard-codes «‹», which is correct in Arabic and backwards in English —
-                  it is an RTL-forward chevron in an RTL-only file. Kept locale-flipped by decision
-                  (owner, 2026-08-09; `design-v3.md` §9 records it): the chevron points the way the
-                  reader travels, and a control reading "Details ‹" in English points back at the text
-                  it is meant to lead away from. */}
-              <span aria-hidden="true">{ar ? "‹" : "›"}</span>
-            </button>
           </div>
 
-          {/* 2 · state — ONE chip (AC-32), the ask beside it (AC-13), and the out-of-city qualifier.
-              The row holds its height whether or not either is there. */}
+          {/* 2 · state — ONE chip (AC-32) and the out-of-city qualifier. The row holds its height
+              whether or not the qualifier is there. The ask left this row with «التفاصيل»: a
+              borderless blue link between a red chip and a brown qualifier was the second control on
+              the card with nothing under it, and three unlike things on one line is what made the
+              controls read as floating rather than as the card's own. */}
           <div className="bm-eq-r2">
             <span className={`bm-eq-chip${confirmed ? " ok" : " no"}`}>
               {/* Two states, two SHAPES, not one shape in two colours: the confirmed chip is a small
@@ -435,46 +504,80 @@ function EquipmentCard({
               {confirmed ? <span aria-hidden="true">✓</span> : <span className="bm-eq-dot" aria-hidden="true" />}
               {confirmed ? t.bidMap.eqChipConfirmed : t.bidMap.eqChipUnconfirmed}
             </span>
-            {/* The ask exists on an unconfirmed card and does not exist on a confirmed one (AC-13) —
-                `askAvailability` is the model's answer, not a condition re-derived here. Its colour
-                is the model's too: blue, never navy (AC-33), because beside a red chip navy reads as
-                disabled and this is the one control the renter is supposed to press. */}
-            {askAvailability && (
-              <button
-                type="button"
-                className="bm-eq-ask"
-                style={{ color: askAvailability.colour }}
-                // ── One ask, one card (owner, 2026-08-10) ────────────────────────────────────────
-                // The control STAYS on the card once the ask is out, disabled and relabelled. It is
-                // not removed: a control that vanished would read as «there is nothing to ask»,
-                // when the truth is that the question was asked and is waiting — and it is not left
-                // live either, because a second press would flood the lessor's conversation with a
-                // duplicate card (or, since the backend's own guard landed, meet a 409 the renter
-                // can do nothing with).
-                title={pending ? t.bidMap.askPendingWhy : t.bidMap.eqAskConfirmWhy}
-                onClick={() => onAskAvailability?.(machine)}
-                disabled={!onAskAvailability || pending}
-              >
-                {pending ? t.bidMap.eqAskPending : t.bidMap.eqAskConfirm}
-              </button>
-            )}
             {/* The yard is outside the request city's own radius — the fact that turns a delivery into
                 a mobilisation. It qualifies the offer, so it sits with the state and not with the
                 number it is derived from. */}
             {card.outOfCity && <span className="bm-eq-far">{t.bidMap.eqOutOfCity}</span>}
           </div>
 
-          {/* 3 · distance from the project. Numerals are `dir="ltr"` — an Arabic-Indic figure inside an
-              RTL run still reads left to right. */}
+          {/* 3 · distance from the project, and **the card's two controls, as one cluster** (owner,
+              2026-08-11). Numerals are `dir="ltr"` — an Arabic-Indic figure inside an RTL run still
+              reads left to right.
+
+              The cluster is anchored to the row's trailing edge and both controls share one height,
+              one radius and one baseline, which is the whole of "settle the layout": two controls in
+              one strip read as the card's controls, two scattered across two rows read as furniture
+              dropped on top of it. It costs NO extra height — the distance line was already a full
+              row carrying one short figure, and the controls fill the slack it was wasting. Every
+              card is still exactly four rows tall (AC-32's second half).
+
+              **AC-13 survives the move unchanged**: «اطلب التأكيد» is still a real button on the
+              card, above the stretched open layer, so an unconfirmed machine is still askable without
+              opening the detail. So does AC-33 — the ask is still `askAvailability.colour`, blue. */}
           <div className="bm-eq-r3">
-            {km != null ? (
-              <>
-                <span className="bm-eq-km" dir="ltr">{ar ? arabicIndicDigits(km) : String(km)}</span>
-                <span className="bm-eq-kmu">{t.bidMap.eqDistanceUnit}</span>
-              </>
-            ) : (
-              <span className="bm-eq-kmu">{t.bidMap.eqNoDistance}</span>
-            )}
+            <span className="bm-eq-dist">
+              {km != null ? (
+                <>
+                  {/* `distanceDigits`, never `arabicIndicDigits` — that one truncates, which is right
+                      for a count and would silently turn 7.5 km into «٧». One decimal always, trailing
+                      `.0` and all, so a column of distances is one shape to scan down. */}
+                  <span className="bm-eq-km" dir="ltr">{distanceDigits(km, ar)}</span>
+                  <span className="bm-eq-kmu">{t.bidMap.eqDistanceUnit}</span>
+                </>
+              ) : (
+                <span className="bm-eq-kmu">{t.bidMap.eqNoDistance}</span>
+              )}
+            </span>
+
+            <span className="bm-eq-acts">
+              {/* The ask exists on an unconfirmed card and does not exist on a confirmed one (AC-13) —
+                  `askAvailability` is the model's answer, not a condition re-derived here. Its colour
+                  is the model's too: blue, never navy (AC-33), because beside a red chip navy reads as
+                  disabled and this is the one control the renter is supposed to press. */}
+              {askAvailability && (
+                <button
+                  type="button"
+                  className="bm-eq-ask"
+                  style={{ color: askAvailability.colour }}
+                  // ── One ask, one card (owner, 2026-08-10) ──────────────────────────────────────
+                  // The control STAYS on the card once the ask is out, disabled and relabelled. It is
+                  // not removed: a control that vanished would read as «there is nothing to ask»,
+                  // when the truth is that the question was asked and is waiting — and it is not left
+                  // live either, because a second press would flood the lessor's conversation with a
+                  // duplicate card (or, since the backend's own guard landed, meet a 409 the renter
+                  // can do nothing with).
+                  title={pending ? t.bidMap.askPendingWhy : t.bidMap.eqAskConfirmWhy}
+                  onClick={() => onAskAvailability?.(machine)}
+                  disabled={!onAskAvailability || pending}
+                >
+                  {/* «تم الطلب» / «Asked» — the list-foot ask's own sent label, borrowed rather than
+                      duplicated (owner, 2026-08-11: *"use shorter wordings, even on the equipment
+                      card"*). `eqAskPending` reads «Asked — awaiting reply», which is a sentence in a
+                      22px control beside a second control; the same fact fits in one word, and the
+                      REASON the button is inert is already on its `title` in full. */}
+                  {pending ? t.bidMap.eqAskAnotherSent : t.bidMap.eqAskConfirm}
+                </button>
+              )}
+              <button type="button" className="bm-eq-details" onClick={() => onOpenDetail(machine.equipmentId)}>
+                {t.bidMap.eqDetails}
+                {/* The prototype hard-codes «‹», which is correct in Arabic and backwards in English —
+                    it is an RTL-forward chevron in an RTL-only file. Kept locale-flipped by decision
+                    (owner, 2026-08-09; `design-v3.md` §9 records it): the chevron points the way the
+                    reader travels, and a control reading "Details ‹" in English points back at the text
+                    it is meant to lead away from. */}
+                <span aria-hidden="true">{ar ? "‹" : "›"}</span>
+              </button>
+            </span>
           </div>
 
           {/* 4 · the REQUESTED certificates, held or not (owner, 2026-08-11). Always occupies its

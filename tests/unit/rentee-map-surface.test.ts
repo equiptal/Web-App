@@ -138,17 +138,52 @@ describe("one selected id reaches the map and the list alike (RM3-AC-15)", () =>
   });
 
   it("routes every change to that value through the one reducer", () => {
-    // SIX movers — press, open, land, bid change, filtered-out, and (2026-08-10) a request card in
-    // the chat pressed to open the machine it names — and every one of them is the reducer's answer.
-    // A `setSelectedMachineId` with no matching `nextSelection` is the rule written a second time,
-    // which is how the two surfaces start disagreeing.
+    /* FOUR movers — open, land, bid change, filtered-out — and every one of them is the reducer's
+       answer. A `setSelectedMachineId` with no matching `nextSelection` is the rule written a second
+       time, which is how the two surfaces start disagreeing.
+
+       ~~SIX.~~ Two went, and neither is a rule that stopped being enforced:
+
+       · the MARKER's own `press` (owner, 2026-08-11 — *"clicking an equipment on the map must open
+         the panel of this selected equipment"*). It is `openMachine` now, which is the next test;
+       · the request card's open in the chat, which was the third hand-written copy of the same four
+         statements and now calls `openMachine` after clearing the filters that are its own concern.
+
+       So the count going DOWN is the rule getting stronger — three entrances, one writer. */
     const calls = workspace.match(/nextSelection\(/g) ?? [];
     const sets = [...workspace.matchAll(/setSelectedMachineId\(([^\n]*)/g)].map((m) => m[1].trim());
-    expect(calls).toHaveLength(6);
+    expect(calls).toHaveLength(4);
     expect(sets).toHaveLength(calls.length);
     // …and none of them is handed a raw id, which is the shape a bypass would take.
     for (const arg of sets) expect(arg, arg).not.toMatch(/^(id|m\.equipmentId|equipmentId|null)\s*\)/);
-    expect(workspace).toMatch(/const next = nextSelection\(selectedMachineId, \{ kind: "press", id \}\)/);
+  });
+
+  it("opens the machine from the MAP as well as from the card, through one writer (owner, 2026-08-11)", () => {
+    /* ── The finding ────────────────────────────────────────────────────────────────────────────
+       *"Clicking an equipment on the map must open the panel of this selected equipment."* A marker
+       press used to only ring the machine and light a card the renter then had to find in a column of
+       fifty and press a second time.
+
+       ── The mutations this catches ──────────────────────────────────────────────────────────────
+       1 · the canvas re-pointed at a select-only handler, so a marker rings and opens nothing;
+       2 · a SECOND opener written for the map beside the list's, which is how one press ends up
+           setting the detail and the other only the selection;
+       3 · `press` creeping back into the opener — which would clear the selection the panel it is
+           about to fill is about, every time the renter pressed the machine already selected. */
+    const opener = region(read(WORKSPACE), "const openMachine = useCallback(", "[onSelectMachine],");
+    expect(opener).toMatch(/nextSelection\(cur, \{ kind: "open", id \}\)/);
+    expect(opener).toMatch(/setDetailId\(id\)/); // it OPENS — the half a select-only handler lacks
+    expect(opener).not.toMatch(/kind: "press"/);
+
+    // One writer, two surfaces: the canvas and the list are handed the SAME callback, not two.
+    expect(region(read(WORKSPACE), "<MapCanvas", "/>")).toMatch(/onOpenMachine=\{openMachine\}/);
+    expect(region(read(WORKSPACE), "<EquipmentList", "scrollRef=")).toMatch(/onOpenDetail=\{openMachine\}/);
+
+    // And the canvas really does hand a marker press up rather than absorbing it — without this the
+    // three assertions above would hold over a map whose markers are inert.
+    const canvas = strip(read(CANVAS));
+    expect(canvas).toMatch(/eventHandlers=\{\{ click: \(\) => onOpen\(pin\.id\) \}\}/);
+    expect(canvas).toMatch(/onOpen=\{\(id\) => onOpenMachine\?\.\(id\)\}/);
   });
 
   it("turns that id into the card's pressed state in the list", () => {
@@ -166,6 +201,154 @@ describe("one selected id reaches the map and the list alike (RM3-AC-15)", () =>
     expect(canvas).toMatch(/const selected = selectedId === pin\.id/);
     // …and the canvas derives no selection of its own to disagree with it.
     expect(canvas).not.toMatch(/useState<string \| null>/);
+  });
+});
+
+/* ═════════ RM3-AC-19 · the selected marker reads as SELECTED, not as a third state ═════════
+   Owner, 2026-08-11: *"in the map the selected equipment must be more visible."* The emphasis it
+   gained had one constraint — RM3-AC-19 fixes `unitAvailability` as the ONLY source of a marker's
+   colour, so a louder selection may take size, lift, ring and glow and may not take a fill. */
+
+describe("the selected marker is emphasised by geometry, never by a colour (RM3-AC-19)", () => {
+  const css = read(CSS);
+  const canvas = strip(read(CANVAS));
+
+  /** Every rule scoped to the SELECTED marker — the whole of what selection is allowed to do. */
+  const selectedRules = [...css.matchAll(/\.bm-pin\.is-on[^{]*\{([^}]*)\}/g)].map((m) => m[0]);
+
+  it("has selected-only rules at all, and one of them makes the machine BIGGER — the positive control", () => {
+    // Without this the sweep below passes over a stylesheet that dropped the emphasis entirely, which
+    // is the exact regression the owner reported and the one this file is here to hold.
+    expect(selectedRules.length).toBeGreaterThanOrEqual(3);
+    const stage = cssBlock(css, ".bm-pin.is-on .bm-pin-stage {");
+    const scale = Number((stage.match(/transform:\s*scale\(([\d.]+)\)/) ?? [])[1]);
+    expect(scale).toBeGreaterThan(1);
+    // From the STAGE's bottom edge, so the machine grows upward and the ground point it marks — the
+    // whole reason a marker is placed where it is — does not move.
+    expect(stage).toMatch(/transform-origin:\s*bottom center/);
+  });
+
+  it("draws a ring that does not depend on the pulse, so the marker is findable mid-cycle", () => {
+    // `dpHalo` is absent for most of its 1.9s and does not run at all under reduced motion. A halo is
+    // the only emphasis a marker had, which is why it kept disappearing.
+    const ring = cssBlock(css, ".bm-pin.is-on .bm-pin-ring {");
+    expect(ring).toMatch(/border:/);
+    expect(ring).not.toMatch(/animation/);
+  });
+
+  it("puts NO availability colour in any selected-only rule — selection is not a third state", () => {
+    // The mutation: "make it more visible" answered with `background: #2563EB` on the disc, or worse
+    // with a green/red of its own. Either turns "the one being looked at" into something a machine IS.
+    for (const rule of selectedRules) {
+      for (const availability of ["#16a34a", "#d9362a", "rgba(22, 163, 74", "rgba(217, 54, 42"]) {
+        expect(rule.toLowerCase(), rule).not.toContain(availability);
+      }
+    }
+  });
+
+  it("keeps the availability colour as the marker's ONLY fill, selected or not — the other control", () => {
+    // The negative above would be vacuous if the marker had stopped being coloured by availability.
+    expect(canvas).toMatch(/const ring = AVAILABILITY_COLOUR\[pin\.availability\]/);
+    expect(canvas).toMatch(/background:\$\{tint\}/);
+    // …and `is-on` is emitted on the selection and on nothing else — not on a distance, not on a
+    // state, which is the shape a "third availability" regression would actually take.
+    expect(canvas).toMatch(/bm-pin\$\{selected \? " is-on" : ""\}/);
+    expect(canvas.match(/is-on/g)).toHaveLength(1);
+  });
+});
+
+/* ═════════ §6.4a · the filter opens its OWN panel, over the existing one (owner, 2026-08-11) ═════════ */
+
+describe("the filter is a panel over the column, dismissed by an X", () => {
+  const list = strip(read(LIST));
+  const css = read(CSS);
+
+  it("renders a dialog with a close control — the positive control", () => {
+    expect(list).toMatch(/className="bm-eqfp"/);
+    expect(list).toMatch(/role="dialog"/);
+    expect(list).toMatch(/className="bm-eqfp-x"/);
+    expect(list).toMatch(/aria-label=\{t\.common\.close\}/);
+    // …and it is still Escape-dismissible: a panel only its own button can close is one the renter
+    // has to aim at twice.
+    expect(list).toMatch(/e\.key === "Escape"/);
+  });
+
+  it("covers the panel rather than pushing the list down — the whole point of the change", () => {
+    // The mutation: `position: static`, or `absolute` without `inset: 0`, either of which puts the
+    // groups back in the flow and shoves the machines the chips are about off the screen.
+    const panel = cssBlock(css, ".bidmap .bm-eqfp {");
+    expect(panel).toMatch(/position:\s*absolute/);
+    expect(panel).toMatch(/inset:\s*0/);
+    // Below the company documents' own `.mp-over` (12), so the two can coexist and the later, more
+    // deliberate act wins.
+    expect(Number((panel.match(/z-index:\s*(\d+)/) ?? [])[1])).toBeLessThan(12);
+    // The inline block it replaces is gone, not merely unused — a second way to draw the same chips.
+    // Matched as a RULE rather than as a string: the stylesheet names `.bm-eqf-panel` in the comment
+    // that records why it was withdrawn, which is prose and not a second panel.
+    expect(css).not.toMatch(/\.bm-eqf-panel\s*\{/);
+    expect(list).not.toContain("bm-eqf-panel");
+  });
+
+  it("still decides nothing about the filters itself — every rule stayed in the model", () => {
+    /* §6.4a's four rules: only criteria the request asked for, chips that select for what a machine
+       HAS, no control that would split nothing, and a count that always states the whole. All four
+       are `equipmentListView`'s, and the list gained a SURFACE, not a decision. */
+    expect(list).toMatch(/view\.groups\.map/);
+    expect(list).toMatch(/\{ar \? o\.label\.ar : o\.label\.en\}/); // the model's own bilingual labels
+    expect(list).toMatch(/\{num\(o\.matches\)\}/); // …and the model's own per-chip count
+    // Nothing that re-derives a group, a predicate or a total.
+    for (const forbidden of ["unitAvailability", "computeUnitReadiness", "DISTANCE_BANDS_KM", "filterMachines"]) {
+      expect(list, forbidden).not.toContain(forbidden);
+    }
+  });
+
+  it("states the count in BOTH places, from one builder, and always against the whole offer", () => {
+    // With the cards covered, the panel's foot is the only thing telling the renter what a chip just
+    // cost — and the mutation to catch is a second, hand-built count that reads `view.machines.length`
+    // over `view.shown`, or a denominator that quietly becomes the filtered figure.
+    expect(list.match(/countLine\(\)/g)).toHaveLength(2);
+    expect(list).toMatch(/num\(view\.total\)/);
+    expect(list).toMatch(/num\(view\.shown\)/);
+    expect(list).not.toMatch(/view\.machines\.length/);
+  });
+});
+
+/* ═════════ the card's controls are the CARD's, not floating on it (owner, 2026-08-11) ═════════ */
+
+describe("the two card controls sit in one cluster, and both keep their rules", () => {
+  const list = strip(read(LIST));
+  const css = read(CSS);
+
+  it("puts both controls in one cluster on the distance row — the positive control", () => {
+    const row = region(read(LIST), '<div className="bm-eq-r3">', '<div className="bm-eq-r4">');
+    expect(row).toMatch(/bm-eq-acts/);
+    expect(row).toMatch(/bm-eq-ask/);
+    expect(row).toMatch(/bm-eq-details/);
+    // …and neither is left behind on the rows they came from, which is what "floating" was.
+    const r1 = region(read(LIST), '<div className="bm-eq-r1">', "</div>");
+    expect(r1).not.toMatch(/bm-eq-details/);
+  });
+
+  it("keeps «اطلب التأكيد» a REAL button on the card, so an unconfirmed machine is askable without opening it (RM3-AC-13)", () => {
+    // The mutation the move could have introduced: the ask demoted to a link into the detail, or
+    // dropped under the stretched open layer where the card's own press would swallow it.
+    expect(list).toMatch(/\{askAvailability && \(\s*<button/);
+    expect(list).toMatch(/onClick=\{\(\) => onAskAvailability\?\.\(machine\)\}/);
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-ask {")).toMatch(/pointer-events:\s*auto/);
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-details {")).toMatch(/pointer-events:\s*auto/);
+  });
+
+  it("still takes the ask's colour from the model, never from the stylesheet (RM3-AC-33)", () => {
+    // The ground the control gained is the stylesheet's; the INK is still `askAvailability.colour`,
+    // which is the one place RM3-AC-33 is decided.
+    expect(list).toMatch(/style=\{\{ color: askAvailability\.colour \}\}/);
+  });
+
+  it("keeps the card exactly four rows, so every card in the column is still one height (RM3-AC-32)", () => {
+    // The cluster had to cost nothing: a fifth row for two controls would have been a worse answer to
+    // "give the list its room" than the floating controls it replaced.
+    for (const row of ["bm-eq-r1", "bm-eq-r2", "bm-eq-r3", "bm-eq-r4"]) expect(list, row).toContain(row);
+    expect(list).not.toContain("bm-eq-r5");
   });
 });
 
@@ -290,6 +473,32 @@ describe("the landing cue is finite (RM3-AC-35)", () => {
       expect(stop, stop).toMatch(/var\(--eq-rest\)/);
       expect(stop, stop).not.toMatch(/transform|margin|width|height|top|left/);
     }
+  });
+});
+
+/* ═════════ RM3-AC-05 · the column above the list was condensed, not emptied (owner, 2026-08-11) ═════════
+   *"It must be condensed. Consider users having 50 equipments: they want the space to see the
+   equipment cards, not these."* How much space the five bands take is a rendered fact and stays a
+   visual check; what is assertable — and what a "condense it" instruction actually endangers — is that
+   nothing was condensed by being deleted. */
+
+describe("the shortfall survived the condensing whole (RM3-AC-05)", () => {
+  const alert = region(read(WORKSPACE), "{shortfall && (", "</button>");
+
+  it("still states the DIFFERENCE, and still carries the ask", () => {
+    // `shortfall.claimed` is the difference; `counts.offered` is the sentence's one plausible wrong
+    // number, and it is not reachable from this model at all.
+    expect(alert).toMatch(/shortfall\.claimed/);
+    expect(alert).not.toMatch(/counts\.offered/);
+    expect(alert).toMatch(/composeShortfallRequest\(\)/);
+    expect(alert).toMatch(/t\.bidMap\.shortfallAction/);
+    // …and the reason the control is inert, when it is, is still a sentence rather than a state on a
+    // button — the line most at risk from a change made to save vertical space.
+    expect(alert).toMatch(/shortfallPending && <div className="bm-short-s">/);
+  });
+
+  it("is still gated on `short` alone, so its ABSENCE still means nothing is claimed", () => {
+    expect(strip(read(WORKSPACE))).toMatch(/const shortfall = counts \? shortfallAlert\(counts\) : null/);
   });
 });
 

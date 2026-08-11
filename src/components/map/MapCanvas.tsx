@@ -36,7 +36,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { MapContainer, Marker, Polyline, TileLayer, ZoomControl, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { AVAILABILITY_COLOUR, MIN_PIN_GAP_PX, decollide, isOutOfCity, type MapPoint } from "@/lib/contract/bid-map";
+import { AVAILABILITY_COLOUR, MIN_PIN_GAP_PX, decollide, distanceDigits, isOutOfCity, type MapPoint } from "@/lib/contract/bid-map";
 import { equipmentIcon } from "@/components/requests/EquipImg";
 import { useLocale, useT } from "@/lib/i18n";
 
@@ -90,9 +90,11 @@ function safeImageUrl(url: string | null | undefined): string | null {
   return url.replace(/["'\\)(\s]/g, (c) => encodeURIComponent(c));
 }
 
-const ARABIC_INDIC = "٠١٢٣٤٥٦٧٨٩";
-const digits = (n: number, ar: boolean): string =>
-  ar ? String(Math.trunc(Math.abs(n))).replace(/\d/g, (d) => ARABIC_INDIC[Number(d)]) : String(Math.trunc(Math.abs(n)));
+/* The local `digits()` that used to sit here — a second copy of `toArabicIndic`, truncating — is gone
+   (owner, 2026-08-11). It was the reason the chip could never have shown a decimal even once the model
+   carried one, and it was the exact shape of the defect the one-decimal ruling is about: the same
+   distance formatted by two functions in two files. `distanceDigits` is the one formatter now, shared
+   with the card and the detail. */
 
 /** Fit the view to everything that is drawn. One point → a centre + a sensible zoom; a fleet → a bounds
  *  fit over the site AND the machines, because a yard 200 km from the site would otherwise be plotted
@@ -158,14 +160,17 @@ function FleetLayer({
   site,
   points,
   selectedId,
-  onSelect,
+  onOpen,
   imageUrl,
   iconName,
 }: {
   site: SitePoint | null;
   points: MachinePin[];
   selectedId: string | null;
-  onSelect: (id: string) => void;
+  /** **Pressing a marker OPENS that machine** (owner, 2026-08-11), it does not merely ring it. Named
+   *  for what it does rather than for what it used to do: `onSelect` described a marker that lit a
+   *  card the renter then had to find and press a second time. */
+  onOpen: (id: string) => void;
   imageUrl: string | null;
   iconName: string;
 }) {
@@ -249,7 +254,9 @@ function FleetLayer({
         taken.push({ x, y });
         chip = {
           at: map.unproject([x, y], zoom),
-          km: Math.round(p.point.distanceKm),
+          // One decimal, the SAME arithmetic `equipmentCardModel` does — a chip and its card must
+          // not disagree about one machine by a rounding step (owner, 2026-08-11).
+          km: Math.round(p.point.distanceKm * 10) / 10,
           // Read off the UNROUNDED distance, and off the same `isOutOfCity` the card's «· خارج
           // المدينة» reads — the pill and the card line are one fact stated twice.
           far: isOutOfCity(p.point.distanceKm),
@@ -315,7 +322,7 @@ function FleetLayer({
               icon={machineIcon(pin, selected, src, iconName, t)}
               zIndexOffset={selected ? 900 : 760}
               riseOnHover
-              eventHandlers={{ click: () => onSelect(pin.id) }}
+              eventHandlers={{ click: () => onOpen(pin.id) }}
             />
           </Fragment>
         );
@@ -352,7 +359,7 @@ function distanceIcon(km: number, far: boolean, ar: boolean, unit: string, farLa
     iconAnchor: [75, 13],
     html:
       `<div class="bm-distchip" dir="rtl">` +
-      `<span><span dir="ltr">${esc(digits(km, ar))}</span> ${esc(unit)}</span>` +
+      `<span><span dir="ltr">${esc(distanceDigits(km, ar))}</span> ${esc(unit)}</span>` +
       (far ? `<span class="bm-distfar">${esc(farLabel)}</span>` : "") +
       `</div>`,
   });
@@ -385,6 +392,21 @@ function distanceIcon(km: number, far: boolean, ar: boolean, unit: string, farLa
  *
  * **Selection is a blue ring on the disc, a lift and a tick — never a new colour.** The only two
  * colours on this canvas are availability's.
+ *
+ * ── The selected marker had to be LOUDER (owner, 2026-08-11: *"the selected equipment must be more
+ * visible"*) ────────────────────────────────────────────────────────────────────────────────────
+ * It was a 2 px halo, a 3 px disc ring and a tick — at 96 px of stage on a busy voyager basemap, with
+ * a route, a distance chip and up to a dozen other machines around it, none of that survived a glance.
+ * What it gained is **size and lift**, never a fill: `.bm-pin.is-on` scales the stage 1.14 from its
+ * bottom edge (so the machine grows UPWARD and the ground point it marks does not move), the disc
+ * takes a wider blue ring under a blue glow, a second static ring is drawn around it, and the
+ * availability label scales and takes a white keyline so it reads off the tiles.
+ *
+ * **None of it is a colour** (AC-19). `ring` and `tint` are still `AVAILABILITY_COLOUR`'s and are
+ * still the only fills on this marker; every selected-only value is either a geometry (a scale, a
+ * width, a lift) or the surface's selection BLUE, which is what the tick and the disc ring already
+ * wore. That distinction is the point: a selected machine must read as *the one being looked at*,
+ * never as a third thing a machine can BE.
  *
  * **No numeric index badge** (`design.md` §7 decision 3): §6.3.3 banned exactly this invented per-unit
  * index, because nothing links a bid to a numbered unit and a renter asking "what about unit 2?" names
@@ -422,10 +444,20 @@ function machineIcon(
     iconSize: [PIN_W, PIN_H],
     iconAnchor: [PIN_W / 2, PIN_H],
     html:
-      `<div class="bm-pin" dir="rtl" style="direction:rtl">` +
+      // `is-on` carries the whole of the selected EMPHASIS — the scale, the glow, the label's
+      // keyline. It is a class rather than more inline style because none of those values is
+      // state-DEPENDENT in the way the colours are: they are one fixed treatment, switched on, and
+      // the stylesheet is where a fixed treatment belongs (and where it can be swept for the
+      // availability colours it must not contain).
+      `<div class="bm-pin${selected ? " is-on" : ""}" dir="rtl" style="direction:rtl">` +
       `<div class="bm-pin-stage">` +
-      (selected ? `<span class="bm-pin-halo" style="border:2px solid ${ring}"></span>` : "") +
-      `<span class="bm-pin-disc" style="background:${tint};border:2.5px solid ${ring}${selected ? ";box-shadow:0 0 0 3px rgba(37,99,235,.55)" : ""}"></span>` +
+      // A second, STATIC ring outside the breathing halo. The halo pulses to draw the eye and is
+      // therefore absent for more than half of every cycle; this one never leaves, so the marker is
+      // still unmistakable in the trough of the pulse and in a `prefers-reduced-motion` session
+      // where the halo does not animate at all.
+      (selected ? `<span class="bm-pin-ring"></span>` : "") +
+      (selected ? `<span class="bm-pin-halo" style="border:2.5px solid ${ring}"></span>` : "") +
+      `<span class="bm-pin-disc" style="background:${tint};border:2.5px solid ${ring}${selected ? ";box-shadow:0 0 0 4px rgba(37,99,235,.6),0 0 0 10px rgba(37,99,235,.16)" : ""}"></span>` +
       `<span class="bm-pin-shadow"></span>` +
       `<span class="bm-pin-art" style="${art}">` +
       `<span class="bm-pin-glyph material-icons-outlined">${esc(iconName)}</span>` +
@@ -435,7 +467,10 @@ function machineIcon(
       // containing block and drag the tick along with the lift.
       (selected ? `<span class="bm-pin-tick">✓</span>` : "") +
       `</div>` +
-      `<div class="bm-pin-chip" style="background:${ring};border:1px solid ${ring}${selected ? ";transform:scale(1.06)" : ""}">${esc(state)}</div>` +
+      // The label's own selected treatment — the scale and the white keyline — moved to `.bm-pin.is-on
+      // .bm-pin-chip`. An inline `transform` here could not be combined with the shadow the emphasis
+      // also wants, and would have overridden the stylesheet rather than joining it.
+      `<div class="bm-pin-chip" style="background:${ring};border:1px solid ${ring}">${esc(state)}</div>` +
       // Only the focused marker names itself — the map stays quiet until the renter has chosen (AC-34).
       (selected ? `<div class="bm-pin-tag">${esc(t.bidMap.pinInOffer)}</div>` : "") +
       `</div>`,
@@ -447,7 +482,7 @@ export default function MapCanvas({
   addressLabel,
   machines = [],
   selectedMachineId = null,
-  onSelectMachine,
+  onOpenMachine,
   itemImageUrl = null,
   itemName = null,
 }: {
@@ -456,7 +491,17 @@ export default function MapCanvas({
   /** The bid's OFFERED, plottable machines. Empty for an off-platform bid and while the fleet loads. */
   machines?: MachinePin[];
   selectedMachineId?: string | null;
-  onSelectMachine?: (id: string) => void;
+  /**
+   * **Pressing a marker opens that machine's panel** (owner, 2026-08-11: *"clicking an equipment on
+   * the map must open the panel of this selected equipment"*).
+   *
+   * ~~`onSelectMachine`.~~ Withdrawn with the behaviour it named: a marker press used to ring the
+   * machine and light its card, leaving the renter who had already pointed at the machine to hunt
+   * down that card and press it again to see anything. The canvas still does not decide what an
+   * "open" means — the host routes it through `nextSelection(…, "open")`, so ONE selection value
+   * still reaches this canvas and the list alike (AC-15) — but the name now says what a press does.
+   */
+  onOpenMachine?: (id: string) => void;
   /** The REQUEST ITEM's taxonomy image (subtype → category), per AC-80 decision 4. */
   itemImageUrl?: string | null;
   /** The item's taxonomy name — drives the icon fallback when no image loads. */
@@ -544,7 +589,7 @@ export default function MapCanvas({
           site={site}
           points={machines}
           selectedId={selectedMachineId}
-          onSelect={(id) => onSelectMachine?.(id)}
+          onOpen={(id) => onOpenMachine?.(id)}
           imageUrl={itemImageUrl}
           iconName={iconName}
         />

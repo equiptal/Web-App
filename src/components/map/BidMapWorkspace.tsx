@@ -395,19 +395,31 @@ export function BidMapWorkspace({
   const itemImageUrl = publicTaxonomyUrl(item?.subtypeImageUrl ?? item?.categoryImageUrl ?? null);
   const itemName = (ar ? item?.subtypeNameAr ?? item?.subtypeName : item?.subtypeName ?? item?.subtypeNameAr) ?? item?.subtypeName ?? null;
 
-  const selectMachine = useCallback(
+  /* ── One opener for BOTH surfaces (owner, 2026-08-11) ──────────────────────────────────────────
+     *"Clicking an equipment on the map must open the panel of this selected equipment."* A marker
+     press used to be `nextSelection(…, "press")` and nothing else: it rang the machine, lit its card
+     somewhere down a 50-card column, and left the renter — who had just pointed at the machine — to
+     find that card and press it a second time to see anything. The card had already stopped working
+     that way on 2026-08-10; this is the map catching up.
+
+     `"open"`, never `"press"`: opening the detail of the ALREADY selected machine must not toggle the
+     selection off underneath the panel it is about to fill. And it is ONE callback handed to the map
+     and to the list, not two that happen to agree — the same reason AC-15 wants one selection value.
+
+     The company panel is closed on the way in because it covers the whole column: a detail opened
+     under it would be invisible and the press would read as broken. That belonged to
+     `openMachineFromChat` alone and was a gap for the other two entrances. */
+  const openMachine = useCallback(
     (id: string) => {
-      // The ONE selection rule, for both surfaces (AC-15): re-pressing the selected machine deselects
-      // it — the only way back to an unselected map — and the value this returns is what reaches
-      // `EquipmentList.selectedId` and `MapCanvas.selectedMachineId` alike.
-      const next = nextSelection(selectedMachineId, { kind: "press", id });
-      setSelectedMachineId(next);
+      setSelectedMachineId((cur) => nextSelection(cur, { kind: "open", id }));
       // The renter has acted, so the landing cue has done its job and stops immediately. Waiting out
       // the remaining seconds would pulse a card he has already moved past.
       setCueId(null);
-      onSelectMachine?.(next);
+      setCompanyOpen(false);
+      setDetailId(id);
+      onSelectMachine?.(id);
     },
-    [selectedMachineId, onSelectMachine],
+    [onSelectMachine],
   );
 
   /* ── V17 · a filtered-out machine cannot stay selected ─────────────────────────────────────────
@@ -563,17 +575,12 @@ export function BidMapWorkspace({
     (equipmentId: string) => {
       if (!canOpenMachineFromChat(equipmentId)) return;
       setFilterIds((prev) => (prev.length > 0 ? [] : prev));
-      // `open`, never `press`: opening the detail of the ALREADY selected machine must not toggle the
-      // selection off underneath the panel it is about to fill — the list's own rule.
-      setSelectedMachineId((cur) => nextSelection(cur, { kind: "open", id: equipmentId }));
-      setCueId(null);
-      // The company panel opens OVER the whole panel, so a detail opened underneath it would be
-      // invisible and the press would read as broken.
-      setCompanyOpen(false);
-      setDetailId(equipmentId);
-      onSelectMachine?.(equipmentId);
+      // …and then the SAME open the map and the list perform. Clearing the filters is the one thing
+      // that is this entrance's own — the renter pressed a machine by name from a conversation, and
+      // honouring a chip he set for the list by silently doing nothing would be the worst of both.
+      openMachine(equipmentId);
     },
-    [canOpenMachineFromChat, onSelectMachine],
+    [canOpenMachineFromChat, openMachine],
   );
 
   /** Bilingual literal for V7/V8/V9, which take copy as a prop rather than reaching for the
@@ -734,7 +741,7 @@ export function BidMapWorkspace({
           addressLabel={request?.projectAddressLabel ?? null}
           machines={machines}
           selectedMachineId={selectedMachineId}
-          onSelectMachine={selectMachine}
+          onOpenMachine={openMachine}
           itemImageUrl={itemImageUrl}
           itemName={itemName}
         />
@@ -951,16 +958,10 @@ export function BidMapWorkspace({
                   onClearFilters={() => setFilterIds([])}
                   selectedId={selectedMachineId}
                   cueId={cueId}
-                  onOpenDetail={(id) => {
-                    // Opening a detail also focuses that machine, so coming back out leaves the map
-                    // where the renter left it rather than on the previous selection. `open`, never
-                    // `press`: opening the detail of the ALREADY selected card must not toggle the
-                    // selection off underneath the panel it is about to fill.
-                    setSelectedMachineId((cur) => nextSelection(cur, { kind: "open", id }));
-                    setCueId(null);
-                    setDetailId(id);
-                    onSelectMachine?.(id);
-                  }}
+                  // The SAME opener the map's markers press (owner, 2026-08-11). It was an inline
+                  // handler here, spelling out what `openMachine` above now spells once — and a rule
+                  // written twice is how a card and a marker start doing different things.
+                  onOpenDetail={openMachine}
                   // V11 landed the send path; V12 put a review card in front of it. `composeDraft` is
                   // the ONE seam every ask on this surface goes through — the shortfall, the card,
                   // the detail and both document surfaces — so there is exactly one place that stages

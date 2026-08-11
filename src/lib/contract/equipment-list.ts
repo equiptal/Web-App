@@ -542,11 +542,27 @@ export function machineMarkers(machines: readonly FleetMachine[]): MachineMarker
  * a TOGGLE, and spelling that out here is what stops one surface from toggling while the other sets.
  */
 export type SelectionAction =
-  /** The renter pressed a card or a marker. */
+  /**
+   * A press that TOGGLES — select, and re-select to clear.
+   *
+   * **No surface calls this today** (owner, 2026-08-11), and that is deliberate rather than rot. The
+   * card stopped pressing on 2026-08-10 (*"the whole card opens the machine"*) and the marker stopped
+   * on 2026-08-11 (*"clicking an equipment on the map must open the panel of this selected
+   * equipment"*): both entrances now `open`, which never toggles off, because a control that clears
+   * the very selection the panel it is filling is about is a control that undoes itself.
+   *
+   * It stays in the union because **RM3-AC-15 states the toggle in as many words** — *"exactly ONE
+   * machine id is selected on both surfaces at any moment and re-selecting the current one clears
+   * it"* — and this repo does not delete AC-backed behaviour from a model on the strength of a UI
+   * change. `equipment-list.test.ts` still pins it, and the Dart port still gets it. What the owner's
+   * two rulings have made unreachable is the only route the SURFACES had to an unselected map; that
+   * tension is the spec's to resolve, not this file's.
+   */
   | { kind: "press"; id: string }
-  /** «التفاصيل ›» — opening a machine also focuses it, so coming back out leaves the map where he
-   *  left it. Never a toggle: pressing «التفاصيل» on the selected card must not clear the selection
-   *  the detail is about to be about. */
+  /** **The press both surfaces make now.** «التفاصيل ›», the whole card, and a marker on the map:
+   *  opening a machine also focuses it, so coming back out leaves the map where he left it. Never a
+   *  toggle — opening the ALREADY selected machine must not clear the selection the detail is about
+   *  to be about. */
   | { kind: "open"; id: string }
   /** V6's landing pre-selection (RM3-AC-34). A set, never a toggle — there is nothing to toggle
    *  against, and it is the surface choosing rather than the renter. It is an action here rather than
