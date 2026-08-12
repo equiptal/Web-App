@@ -353,6 +353,68 @@ const EQUIPMENT_CERT_TYPES = new Set([
   "insurance",
 ]);
 
+/**
+ * **The four ownership papers, one row each** — owner, 2026-08-12 (spec §5.4):
+ *
+ * > *"I want it per doc, so the renter can select any type of ownership — shown each in a row."*
+ *
+ * ~~One row, `doc:ownership`, any-of over {@link OWNERSHIP_TYPES}, with its ask hard-coded to
+ * `askType: "istimara"`.~~ **Withdrawn.** The reasoning behind the single row was sound about the
+ * SCORE and wrong about the ASK: because any one paper proves the machine, the row went green on a
+ * sale contract — and then the ask raised from it demanded an *istimara*, a paper the supplier does
+ * not have, to prove something he had already proven. One row could only ever name one paper, and the
+ * paper it named was not the renter's choice.
+ *
+ * These four are exactly the app's `kPooDocTypes` (`bid_readiness.dart:11`) and exactly
+ * `OWNERSHIP_DOC_TYPES` in `bid-readiness.ts` — the set that decides the NUMBER. Keeping the rows on
+ * the same four keeps "what the renter can ask for" and "what would turn the fraction green" the same
+ * list, which is what stops a renter asking for a paper that would not count if it arrived.
+ *
+ * ⚠️ **The rows are four; the score is one.** `computeUnitReadiness` still scores ownership as a
+ * SINGLE any-of term (`ownershipPresent`, `+1` on `total`), and it must stay that way: the four are
+ * alternatives, and no machine holds all four, so a fraction with four ownership terms would put every
+ * supplier permanently short on papers nobody expects him to have. Four rows to read and choose from,
+ * one point in the fraction. {@link attentionCount} collapses them the same way for the same reason.
+ *
+ * ⚠️ **Ownership is exempt from the not-required rule** (owner, same day: *"Yes — separate each alone,
+ * each requestable regardless"*). Everywhere else an absent, unrequested paper is not a row at all, so
+ * the renter does not read a wall of red for papers nobody wants. Ownership does not follow it,
+ * because the renter is choosing WHICH proof he wants and cannot choose a paper the surface has
+ * hidden — and because the platform already treats ownership as mandatory rather than request-driven
+ * (`required: true` on the row this replaces).
+ */
+const OWNERSHIP_ROW_CODES = ["istimara", "customs", "sale_contract", "saso_registration"] as const;
+
+/**
+ * Which of the four rows a held ownership paper belongs to — or `null` for an ownership paper that
+ * names none of them.
+ *
+ * {@link OWNERSHIP_TYPES} is deliberately wider than the four: it is the DISPLAY allow-list, and it
+ * carries spelling variants (`istimarah`, `customs_card`, `sales_contract`) plus four generic names
+ * (`ownership`, `proof_of_ownership`, `title_deed`, `combined`) that name no particular paper. The
+ * variants fold onto their row. The generic four fold to `null` and get a row of their own under their
+ * own name further down — because a paper the machine actually holds must stay visible, and filing an
+ * unnamed "proof of ownership" under the *istimara* row would claim an istimara is on file.
+ */
+function ownershipRowCode(type: string): string | null {
+  switch (norm(type)) {
+    case "istimara":
+    case "istimarah":
+    case "registration":
+      return "istimara";
+    case "customs":
+    case "customs_card":
+      return "customs";
+    case "sale_contract":
+    case "sales_contract":
+      return "sale_contract";
+    case "saso_registration":
+      return "saso_registration";
+    default:
+      return null;
+  }
+}
+
 const isOwnershipDoc = (d: OfferedUnitDoc): boolean => OWNERSHIP_TYPES.has(norm(d.type));
 const isOperatorDoc = (d: OfferedUnitDoc): boolean => {
   const t = norm(d.type);
@@ -442,8 +504,17 @@ function matchCellEvidence(
     switch (cell.key) {
       case "photos":
         return first([...REQUIRED_PHOTO_SLOTS].map((s) => `photo:${s}`));
+      // ~~`first(["doc:ownership"])`~~ — one key, because ownership was one row. Since the owner's
+      // ruling of 2026-08-12 it is four ({@link OWNERSHIP_ROW_CODES}), and the cell is green when ANY
+      // of them is on the file, so the evidence is the first of the four that holds one — read in the
+      // order the renter sees them, which is what `first` already means for the photos.
+      // Every ownership row, in the order the renter reads them — the four named papers first, then any
+      // paper the machine holds that names none of them (`doc:ownership_other:*`). Taken off the row
+      // map rather than from a fixed list because `ownershipCell` goes green on the WIDER
+      // `OWNERSHIP_TYPES`, so a machine carrying only a `title_deed` has a green cell whose evidence
+      // lives on an extra row — and a green cell with nothing to open is the dead control AC-69 forbids.
       case "ownership":
-        return first(["doc:ownership"]);
+        return first([...rows.keys()].filter((k) => k.startsWith("doc:ownership")));
       case "equipment_cert":
         return first(requestedCertCodes.map((code) => `doc:equipment_cert:${code}`));
       // The year and the attachments are not documents at all, and the operator's certificates expose
@@ -857,7 +928,27 @@ export interface DocRow {
    * without a footnote: `status === "missing"` and nothing else.
    */
   requestable: boolean;
+  /**
+   * Rows that are ALTERNATIVES to one another, not a checklist — the machine needs **one** of them,
+   * not all. Present only on the four ownership rows ({@link OWNERSHIP_ROW_CODES}); absent everywhere
+   * else, so a row without it is judged entirely on its own.
+   *
+   * It exists for exactly one reader, {@link attentionCount}, and for exactly one reason: the owner's
+   * ruling of 2026-08-12 split ownership into four rows while leaving it **one term in the fraction**,
+   * and a badge saying *"3 need attention"* beside a machine whose ownership is proven — and whose
+   * percentage is therefore complete — would be the surface contradicting its own number. Four rows to
+   * read and choose from; one gap to close.
+   *
+   * ⚠️ **It is not, and must not become, a scoring input.** `computeUnitReadiness` knows nothing about
+   * it and must not: the fraction's ownership term is `ownershipPresent`, derived from the machine's
+   * papers, and a second route to the same answer is how the two numbers start to disagree.
+   */
+  anyOfGroup?: string;
 }
+
+/** The one `anyOfGroup` this surface has. Named rather than inlined so the row builder and
+ *  {@link attentionCount} cannot drift apart on a string literal. */
+const OWNERSHIP_ANY_OF = "ownership";
 
 /** ~~`| "operator"`~~ — the operator's group left this tab in the UAT of 2026-08-11; see
  *  {@link equipmentDocGroups}. Two groups, and both are the machine's. */
@@ -878,9 +969,35 @@ export interface DocGroup {
   attention: number;
 }
 
-/** Rows needing action. The one definition, used by both document surfaces. */
-export function attentionCount(rows: { status: PresenceStatus | CompanyDocStatus }[]): number {
-  return rows.filter((r) => r.status === "missing").length;
+/**
+ * Rows needing action. The one definition, used by both document surfaces.
+ *
+ * **A set of ALTERNATIVES counts once** (owner, 2026-08-12 — see {@link DocRow.anyOfGroup}). Rows
+ * sharing an `anyOfGroup` are ways of answering ONE question, so they contribute one outstanding item
+ * between them, and none at all once any of them is answered. Ownership is the only such group today:
+ * splitting it into four rows must not turn one missing paper into four things needing attention, nor
+ * leave a machine whose ownership IS proven reading *"3 need attention"* beside a complete percentage.
+ *
+ * Every other row is still counted individually, exactly as before — a row with no `anyOfGroup` is
+ * judged entirely on its own `status`, which is every row on the company panel and every photo,
+ * certificate and unnamed paper on the equipment tab.
+ */
+export function attentionCount(
+  rows: { status: PresenceStatus | CompanyDocStatus; anyOfGroup?: string }[],
+): number {
+  let count = 0;
+  // group → still outstanding? A group is outstanding while NOTHING in it is on the file.
+  const groups = new Map<string, boolean>();
+  for (const r of rows) {
+    if (!r.anyOfGroup) {
+      if (r.status === "missing") count += 1;
+      continue;
+    }
+    const outstanding = groups.get(r.anyOfGroup) ?? true;
+    groups.set(r.anyOfGroup, outstanding && r.status === "missing");
+  }
+  for (const outstanding of groups.values()) if (outstanding) count += 1;
+  return count;
 }
 
 /* ─────────────────── V15 — every document is openable (004a §7, RM3-AC-69) ─────────────────── */
@@ -1262,8 +1379,9 @@ function certRow(args: {
   held: OfferedUnitDoc[];
   required: boolean;
   askType: string;
+  anyOfGroup?: string;
 }): DocRow {
-  const { key, label, held, required, askType } = args;
+  const { key, label, held, required, askType, anyOfGroup } = args;
   const files = filesOf(held);
   const status: PresenceStatus = held.length === 0 ? "missing" : required ? "present" : "on_file";
   return {
@@ -1277,6 +1395,7 @@ function certRow(args: {
     docTypes: held.length > 0 ? [...new Set(held.map((d) => d.type))] : [askType],
     // You can only ask for what is not there — held or unrequired, there is nothing to chase.
     requestable: status === "missing",
+    ...(anyOfGroup ? { anyOfGroup } : {}),
   };
 }
 
@@ -1413,16 +1532,46 @@ export function equipmentDocGroups(machine: FleetMachine, request: MatchRequest)
   }
 
   /* ── the machine's papers ── */
+  //
+  // **Ownership: four rows, one per paper** (owner, 2026-08-12 — spec §5.4; the whole ruling and its
+  // two warnings are written at {@link OWNERSHIP_ROW_CODES}). Each names the paper it actually means,
+  // so the ask raised from a row asks for THAT paper and not for an istimara by default. All four
+  // render whether held or not: the renter cannot choose a proof the surface has hidden.
+  //
+  // ~~`certRow({key: "doc:ownership", …, askType: "istimara"})`~~ — the single any-of row this
+  // replaces. Its reasoning survives one step down, in the SCORE: `computeUnitReadiness` still counts
+  // ownership once, and `attentionCount` still counts these four as one gap.
   const ownershipHeld = machine.documentKeys.filter(isOwnershipDoc);
-  const paperRows: DocRow[] = [
+  // Keyed by the row the paper belongs to, falling back to its own name for the ones that belong to
+  // none — so the four rows and the extras below read one map and cannot file a paper twice.
+  const ownershipByCode = heldByCode(ownershipHeld, (t) => ownershipRowCode(t) ?? norm(t));
+  const paperRows: DocRow[] = OWNERSHIP_ROW_CODES.map((code) =>
     certRow({
-      key: "doc:ownership",
-      label: { en: "Proof of ownership / registration", ar: "إثبات الملكية / التسجيل" },
-      held: ownershipHeld,
-      required: true, // platform-mandatory, per `bid_readiness.dart` — never request-driven
-      askType: "istimara",
+      key: `doc:ownership:${code}`,
+      label: docTypeLabel(code),
+      held: ownershipByCode.get(code) ?? [],
+      // Platform-mandatory, per `bid_readiness.dart` — never request-driven. Per ROW rather than for
+      // the group, so a held paper reads green and an absent one reads red and can be asked for.
+      required: true,
+      // The paper the row is named after. This is the whole of the fix: the ask now says what the row
+      // says, and `assertKnownDocTypes` accepts all four (`istimara` · `customs` · `sale_contract` ·
+      // `saso_registration` are active catalogue rows).
+      askType: code,
+      anyOfGroup: OWNERSHIP_ANY_OF,
     }),
-  ];
+  );
+
+  // An ownership paper the machine holds that names none of the four — `ownership`,
+  // `proof_of_ownership`, `title_deed`, `combined`. It is on the file, so it is shown, under its own
+  // name; nothing requires it, so it is never red and never asked for. Without this the paper would
+  // simply vanish from the panel when the single any-of row went away, because the `otherHeld` bucket
+  // below excludes every ownership doc by construction.
+  for (const [code, held] of ownershipByCode) {
+    if ((OWNERSHIP_ROW_CODES as readonly string[]).includes(code)) continue;
+    paperRows.push(
+      certRow({ key: `doc:ownership_other:${code}`, label: docTypeLabel(code), held, required: false, askType: code }),
+    );
+  }
 
   const equipHeld = heldByCode(machine.documentKeys.filter(isEquipmentCertDoc), canonicalCertCode);
   const equipRequested = readiness.equipmentCerts.map((c) => c.code);
