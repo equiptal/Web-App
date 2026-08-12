@@ -34,6 +34,15 @@ const publicWebEnabled = () => process.env.NEXT_PUBLIC_PUBLIC_WEB_ENABLED !== "0
 // form `/bid/<token>`, opened by suppliers who have no login).
 const PUBLIC_PREFIXES = ["/bid"];
 
+/**
+ * The routes the requests workspace replaced. `/requests` itself is NOT one of them — it is the
+ * workspace — so the match is deliberately narrow: the comparison page, and anything BELOW
+ * `/requests/`, which is only ever the old detail pages.
+ */
+export function isRetiredRequestsRoute(pathname: string): boolean {
+  return pathname === "/compare" || pathname.startsWith("/compare/") || pathname.startsWith("/requests/");
+}
+
 function safeNext(next: string | null): string {
   // Only allow same-origin relative paths (block protocol-relative `//host`).
   return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
@@ -51,6 +60,24 @@ export function middleware(req: NextRequest) {
     dest.pathname = "/api/auth/handoff";
     dest.search = `?token=${encodeURIComponent(handoff)}`;
     return NextResponse.redirect(dest);
+  }
+
+  // Retired surfaces (docs/requests-workspace-disabled.md). The requests list, both request-detail
+  // pages and the comparison workspace are one page now, so their routes send the renter there.
+  //
+  // This is done here rather than with `redirect()` in a page, which was tried and does not work in
+  // this app: the thrown NEXT_REDIRECT is caught by a client error boundary in the provider tree and
+  // rendered as an error page, so the route answers 200 with a stack trace. At the edge it is a real
+  // 308 that never reaches React at all.
+  //
+  // The id is dropped rather than carried: the workspace resolves its own selection from the rail,
+  // and a stale or foreign id would land the renter on a request that is not theirs to see.
+  // 308, not 307 — these moved permanently, and the method is irrelevant on a GET-only surface.
+  if (isRetiredRequestsRoute(pathname)) {
+    const dest = req.nextUrl.clone();
+    dest.pathname = "/requests";
+    dest.search = "";
+    return NextResponse.redirect(dest, 308);
   }
 
   // A refresh token (normal sign-in) OR an idToken (handoff session, no refresh) counts as authed.

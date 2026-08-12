@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { publicTaxonomyUrl, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
 import type { BidCard } from "@/lib/contract/bids";
+import { BidDocumentsModal } from "@/components/workspace/BidDocumentsModal";
 
 /**
  * The dark strip under the rail. Two halves, and they answer different questions.
@@ -40,6 +42,7 @@ export function RequestStrip({
   const { locale } = useLocale();
   const ar = locale === "ar";
   const router = useRouter();
+  const [docsOpen, setDocsOpen] = useState(false);
 
   const requestRef = group.groupRef ?? item?.displayId ?? group.id;
   const raised = group.createdAt
@@ -149,15 +152,19 @@ export function RequestStrip({
             </button>
             <button
               type="button"
-              disabled
-              title={t.workspace.tabPending}
-              className="inline-flex items-center justify-center gap-1.5 rounded-full border border-white/25 px-4 py-1.5 text-[12.5px] font-bold text-white/85 disabled:opacity-40"
+              disabled={!bid}
+              onClick={() => bid && setDocsOpen(true)}
+              className="inline-flex items-center justify-center gap-1.5 rounded-full border border-white/25 px-4 py-1.5 text-[12.5px] font-bold text-white/85 transition hover:bg-white/10 disabled:opacity-40"
             >
               <Icon name="visibility" size={15} /> {t.workspace.viewDocuments}
             </button>
           </div>
         </div>
       </div>
+
+      {docsOpen && bid && (
+        <BidDocumentsModal bidId={bid.id} supplier={bid.supplierName} onClose={() => setDocsOpen(false)} />
+      )}
     </div>
   );
 }

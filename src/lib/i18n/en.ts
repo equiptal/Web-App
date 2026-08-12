@@ -1240,6 +1240,12 @@ export const en = {
     // A term the supplier never answered. Said out loud, because a blank cell reads as "nothing to pay".
     didntSay: "Didn't say",
     rankWithAi: "Rank with AI",
+    docsEquipment: "This machine",
+    docsCompany: "The company",
+    docsNone: "No documents on this bid yet.",
+    docsFailed: "Those documents could not be loaded.",
+    docOpen: "Open",
+    docNoLink: "No link",
     // ── The request drawer ──
     shareRequest: "Share request",
     editRequest: "Edit request",
