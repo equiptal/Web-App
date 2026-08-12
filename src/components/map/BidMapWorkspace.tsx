@@ -49,6 +49,7 @@ import { CompanyPanel, EquipmentDetail, type PanelRequestDraft } from "@/compone
 import type { BidCard } from "@/lib/contract/bids";
 import { fetchBidCompanyDocuments, fetchBidFleet } from "@/lib/api/client";
 import { companyPanelSource, type CompanyDocsPayload } from "@/lib/contract/company-documents";
+import { documentsTargetUnit } from "@/lib/contract/workspace";
 import {
   arabicIndicDigits,
   countCase,
@@ -145,6 +146,17 @@ export function BidMapWorkspace({
   const [cueId, setCueId] = useState<string | null>(null);
   /** V7 — the machine whose detail has TAKEN OVER the panel, or null for the list. */
   const [detailId, setDetailId] = useState<string | null>(null);
+  /**
+   * Arriving from `View documents` in the requests workspace (`?panel=documents`). The papers are the
+   * errand, so the detail opens on its documents tab rather than on the machine, and the renter does
+   * not have to press again for the thing he asked for.
+   *
+   * It is consumed ONCE, by `openedForDocuments`, and never re-read: pressing Back to the list and
+   * then opening another machine must land on the machine tab like any other, or the deep link would
+   * quietly re-target every panel opened for the rest of the visit.
+   */
+  const [openedForDocuments, setOpenedForDocuments] = useState(false);
+  const documentsDeepLinkUsed = useRef(false);
   /** V9 — the company panel, which takes over the same way. */
   const [companyOpen, setCompanyOpen] = useState(false);
   /**
@@ -438,6 +450,33 @@ export function BidMapWorkspace({
     },
     [onSelectMachine],
   );
+
+
+  /* ── Arriving from the workspace's `View documents` ────────────────────────────────────────────
+     Open the offered machine's detail on its documents tab, once the fleet is actually here — the
+     link cannot name a machine, because the workspace has the bid but not its fleet, so the choice is
+     made here where the machines are. `documentsTargetUnit` prefers one whose location the lessor
+     confirmed: that is the machine the renter is being asked to trust.
+
+     Guarded by a ref rather than by state so a re-render cannot re-fire it, and the query string is
+     scrubbed afterwards so a refresh — or a Back — does not reopen a panel the renter has closed. */
+  useEffect(() => {
+    if (documentsDeepLinkUsed.current || listed.length === 0) return;
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("panel") !== "documents") return;
+    documentsDeepLinkUsed.current = true;
+    const target = documentsTargetUnit(listed);
+    if (!target) return;
+    // `openMachine`, never a hand-written selection: it is the one writer that keeps the ring, the
+    // card and the pin agreeing (AC-15), and a fourth copy of those statements here is how the two
+    // surfaces begin to disagree.
+    openMachine(target);
+    setOpenedForDocuments(true);
+    params.delete("panel");
+    const q = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${q ? `?${q}` : ""}`);
+  }, [listed, openMachine]);
 
   /* ── V17 · a filtered-out machine cannot stay selected ─────────────────────────────────────────
      Cards and markers move together (AC-15), so a selection pointing at a machine no chip lets
@@ -820,9 +859,14 @@ export function BidMapWorkspace({
               request={bid}
               ar={ar}
               L={L}
-              onBack={() => setDetailId(null)}
+              onBack={() => {
+                setDetailId(null);
+                // The arrival is spent. The next machine opened is opened on the machine tab.
+                setOpenedForDocuments(false);
+              }}
               onRequest={sendPanelRequest}
               askPending={panelAskPending}
+              initialTab={openedForDocuments ? "documents" : undefined}
             />
           </div>
         ) : bid ? (

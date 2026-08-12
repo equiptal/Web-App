@@ -1099,6 +1099,7 @@ export const ar: Dictionary = {
     termNationality: "الجنسية",
     didntSay: "لم يذكر",
     rankWithAi: "ترتيب بالذكاء الاصطناعي",
+    exportPopupBlocked: "اسمح بالنوافذ المنبثقة لطباعة المقارنة.",
     docsEquipment: "هذه المعدّة",
     docsCompany: "الشركة",
     docsNone: "لا مستندات على هذا العرض بعد.",

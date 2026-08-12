@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   EMPTY_SELECTION,
+  documentsTargetUnit,
   filterBySource,
   isClosedGroup,
   isClosedRequest,
@@ -156,6 +157,27 @@ describe("selectedGroup / selectedItem", () => {
   it("returns null for a selection pointing nowhere", () => {
     expect(selectedGroup(groups, EMPTY_SELECTION)).toBeNull();
     expect(selectedItem(groups, EMPTY_SELECTION)).toBeNull();
+  });
+});
+
+describe("documentsTargetUnit", () => {
+  it("prefers a unit whose location the lessor confirmed", () => {
+    const units = [
+      { equipmentId: "a", locationSource: "bid_pin" },
+      { equipmentId: "b", locationSource: "unit_yard" },
+    ];
+    expect(documentsTargetUnit(units)).toBe("b");
+  });
+
+  it("falls back to the first offered unit, so the link always lands somewhere", () => {
+    expect(documentsTargetUnit([{ equipmentId: "a", locationSource: "listing_yard" }])).toBe("a");
+    expect(documentsTargetUnit([{ equipmentId: "a" }])).toBe("a");
+  });
+
+  it("has nothing to open when nothing was offered", () => {
+    expect(documentsTargetUnit([])).toBeNull();
+    expect(documentsTargetUnit(null)).toBeNull();
+    expect(documentsTargetUnit(undefined)).toBeNull();
   });
 });
 

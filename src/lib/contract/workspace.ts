@@ -147,6 +147,22 @@ export function termsDial(bid: BidCard, source: BidSource): TermsDial {
   return { met, against, unanswered, total: met + against + unanswered };
 }
 
+/**
+ * The machine the map should open on when the workspace sends the renter to a bid's documents.
+ *
+ * "The offered available unit" (owner, 2026-08-12): prefer one whose location the lessor has actually
+ * confirmed, because that is the machine the renter is being asked to trust; fall back to the first
+ * offered one, so the link always lands somewhere rather than dropping him on the list. Availability
+ * is read from `unitAvailability`'s own source field, never from `yardConfirmed`.
+ */
+export function documentsTargetUnit(
+  units: { equipmentId: string; locationSource?: string | null }[] | null | undefined,
+): string | null {
+  const offered = units ?? [];
+  if (offered.length === 0) return null;
+  return (offered.find((u) => u.locationSource === "unit_yard") ?? offered[0]).equipmentId;
+}
+
 /** What the drawer's Edit and Cancel controls may do with this request. */
 export interface RequestActions {
   /** Edit is shown. It stays visible after a bid lands rather than vanishing. */
