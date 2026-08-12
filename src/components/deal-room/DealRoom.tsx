@@ -102,9 +102,20 @@ type RenteeIdentity = { name: string; phone: string | null; email: string | null
 
 /**
  * Client-rendered deal-room quotation (the backend server PDF is disabled — the client renders it
- * now, app parity). Values mirror the app's `extractQuotationData`: rental = agreedRate × durationFactor
- * (PER_DAY = duration days, PER_WEEK = ceil(days/7), PER_MONTH = ceil(days/30), PER_JOB = 1); estimated
- * total = (rental + mobilization + demobilization) × units; VAT 15%.
+ * now, app parity).
+ *
+ * The money comes from `computeDealTotals`, NOT from anything computed here: rental is
+ * `(agreedRate ÷ divisor) × billableDays × units` — a six-day week, a 26-day month, Fridays excluded
+ * from an inclusive `[start, end]` window — plus mobilization and demobilization at their OWN unit
+ * counts, then VAT at `VAT_RATE`. That is the backend's `quotation.service.ts` formula
+ * (`MONTHLY_BILLABLE_DAYS` / `WEEKLY_BILLABLE_DAYS` + `countFridaysInclusive`), which is the authority
+ * both clients price against.
+ *
+ * This comment used to describe `extractQuotationData` and a `ceil(days/7)` / `ceil(days/30)` duration
+ * factor. Both are gone: that symbol no longer exists in the app, and the arithmetic it described
+ * charged the Fridays and used a seven-day week. A comment describing another repo's behaviour is how
+ * the duration off-by-one survived — if this one ever disagrees with `computeDealTotals`, the function
+ * is right and this paragraph is wrong.
  *
  * TWO kinds, and the distinction is the point:
  *
