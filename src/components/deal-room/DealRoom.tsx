@@ -13,7 +13,7 @@ import { ChatCard } from "@/components/deal-room/ChatCard";
 import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
 import { renderQuotationSection, wrapQuotationPage, type QuotationDoc, type QuotationLineItem, type QuotationCard } from "@/lib/quotation/render";
 import "@/components/deal-room/deal-room-proto.css";
-import { computeQuoteTotals, computeRentalTotal } from "@/lib/pricing/rental";
+import { computeQuoteTotals, computeRentalTotal, divisorNote } from "@/lib/pricing/rental";
 
 type StreamAttachment = { type?: string; image_url?: string; thumb_url?: string; asset_url?: string; title?: string; mime_type?: string; file_size?: number; fallback?: string };
 // `custom` carries the app's round payload (type:'rate_proposal', …) + location kind; i18n carries
@@ -657,7 +657,6 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const mobUnitsN = totals.mobUnitsN;
   const demobUnitsN = totals.demobUnitsN;
   const units = rentalUnits; // the rental count drives the card display
-  const perDayRate = totals.perDayRate;
   const rentalTotal = totals.rentalTotal;
   const mobTotal = totals.mobTotal;
   const demobTotal = totals.demobTotal;
@@ -673,17 +672,18 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
       default: return L("day", "يوم");
     }
   })();
-  // Rental factor label: no duration / one full period → base rate as-is ("1,600/week"); a whole number
-  // of periods → "× N"; a partial (day-count) duration → effective per-day rate × days ("229/day × 3 days").
-  const periodCount = totals.periodCount;
+  // Rental factor label, in the bid card's words: the supplier's RAW quoted rate over its own period,
+  // the divisor that turns it into days, and the BILLABLE day count it is charged across. It used to
+  // read "229/day × 61 days" off the calendar duration while the total charged 53 — a label stating an
+  // arithmetic its own total did not follow. Nothing prorated (PER_JOB, open-ended, no start date)
+  // keeps the bare rate, since there is no day count to explain.
+  const rentalDivisorNote = divisorNote(basisU, L);
   const rentalLabel =
     basisU === "PER_JOB"
       ? nf(rate)
-      : !hasDuration || periodCount === 1
+      : totals.rentalRaw
         ? `${nf(rate)}/${periodLabel}`
-        : Number.isInteger(periodCount)
-          ? `${nf(rate)}/${periodLabel} × ${periodCount}`
-          : `${nf(Math.round(perDayRate))}/${L("day", "يوم")} × ${room.periods} ${L("days", "يوم")}`;
+        : `${nf(rate)}/${periodLabel}${rentalDivisorNote ? ` · ${rentalDivisorNote}` : ""} × ${totals.billableDays} ${L("billable days", "يوم محتسب")}`;
   const closed = room.status === "CLOSED";
   const abandoned = room.status === "ABANDONED";
   const awaiting = room.status === "AWAITING_SUPPLIER_CONFIRMATION";
@@ -1256,8 +1256,10 @@ function CounterFlow({
   // columns → offered/requested → clamp) so the supplier's countered units land on the rentee side.
   const cap = Math.max(1, room.requestedUnits || units || 1);
   const liveRental = Math.max(1, Math.min(cap, latestRound?.rentalUnits ?? room.agreedUnits ?? units ?? 1));
-  const liveMob = Math.max(0, Math.min(liveRental, latestRound?.mobUnits ?? room.mobUnits ?? liveRental));
-  const liveDemob = Math.max(0, Math.min(liveRental, latestRound?.demobUnits ?? room.demobUnits ?? liveRental));
+  // Seeded UNCAPPED (app parity: `effectiveMobUnits` has no clamp) — the stepper's own `max` is what
+  // stops the renter PROPOSING more trips than machines; a count already on the table is shown as it is.
+  const liveMob = Math.max(0, latestRound?.mobUnits ?? room.mobUnits ?? liveRental);
+  const liveDemob = Math.max(0, latestRound?.demobUnits ?? room.demobUnits ?? liveRental);
   const [rentalUnits, setRentalUnits] = useState<number>(liveRental);
   const [mobUnitsN, setMobUnitsN] = useState<number>(liveMob);
   const [demobUnitsN, setDemobUnitsN] = useState<number>(liveDemob);
@@ -1283,15 +1285,26 @@ function CounterFlow({
   // It previously carried its own divisor table with a SEVEN-day week and no Friday exclusion, so a
   // counter-offer at an unchanged rate showed a different total from the price bar right above it.
   const rNU = editable ? rentalUnits : (room.agreedUnits ?? units);
-  const mNU = Math.min(editable ? mobUnitsN : (room.mobUnits ?? rNU), rNU);
-  const dNU = Math.min(editable ? demobUnitsN : (room.demobUnits ?? rNU), rNU);
+  // Editing is bounded by the stepper (you can't PROPOSE more trips than machines); READING is not —
+  // a stored count above the rental count is what the app bills, so the sheet shows and prices it.
+  const mNU = editable ? Math.min(mobUnitsN, rNU) : (room.mobUnits ?? rNU);
+  const dNU = editable ? Math.min(demobUnitsN, rNU) : (room.demobUnits ?? rNU);
   const mEx = editable ? mobExcluded : room.mobExcluded;
   const dEx = editable ? demobExcluded : room.demobExcluded;
   // Same date the price bar prorates against. It lives on `details`, NOT at the top of the room — a
   // `room.startDate` here type-checks under a loose signature and silently evaluates to undefined,
   // which turns proration off and shows the raw rate.
   const startDate = room.details?.startDate ?? null;
-  const perUnitRental = computeRentalTotal({ rate, priceUnit: room.priceUnit, startDate, durationDays: periods }).total;
+  // `periods` arrives as one full period when the room has no duration, so it must NOT be handed to the
+  // module as a window — that would strike out Fridays nobody booked and undercut the rate the renter
+  // typed. Open deals price at the bare rate, exactly as the app's open-deal branch does.
+  const rentalCalc = hasDuration
+    ? computeRentalTotal({ rate, priceUnit: room.priceUnit, startDate, durationDays: periods })
+    : { total: rate, billable: 0, raw: true, exact: true };
+  const perUnitRental = rentalCalc.total;
+  // The paper states the days the rate is actually charged across, not the calendar duration — the same
+  // number the bid card puts on its rental row, and the one `perUnitRental` above was built from.
+  const rentalDivisorNote = divisorNote(room.priceUnit, L);
   const lines = computeQuoteTotals({
     perUnitRental,
     rentalUnits: rNU,
@@ -1465,7 +1478,9 @@ function CounterFlow({
 
   // A price-table leg row (mob/demob): red ✕ exclude + trip stepper + green price box + المورد ref.
   const legTr = (label: string, sub: string, priceStr: string, setPrice: (s: string) => void, u: number, setU: (v: number) => void, ex: boolean, setEx: (b: boolean) => void, refPrice: number | null, refUnits: number | null, exTitle: string) => {
-    const line = ex ? 0 : num(priceStr) * Math.min(u, rentalUnits);
+    // Capped only while editing — see `mNU`/`dNU` above.
+    const shown = editable ? Math.min(u, rentalUnits) : u;
+    const line = ex ? 0 : num(priceStr) * shown;
     return (
       <tr className={ex ? "ex" : undefined}>
         <td>
@@ -1479,7 +1494,7 @@ function CounterFlow({
           </div>
         </td>
         <td className="mut">{L("Trip", "رحلة")}</td>
-        <td>{ex ? "—" : <div className="qp-qty">{editable && <span className="hint">{L("Your choice", "خيارك")}</span>}{editable ? <Stepper value={Math.min(u, rentalUnits)} min={0} max={rentalUnits} onChange={setU} /> : <b>{Math.min(u, rentalUnits)}</b>}{editable && refUnits != null && <div className={`qp-ref${changedFrom(Math.min(u, rentalUnits), refUnits) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {refUnits} {L("units", "وحدة")}</div>}</div>}</td>
+        <td>{ex ? "—" : <div className="qp-qty">{editable && <span className="hint">{L("Your choice", "خيارك")}</span>}{editable ? <Stepper value={shown} min={0} max={rentalUnits} onChange={setU} /> : <b>{shown}</b>}{editable && refUnits != null && <div className={`qp-ref${changedFrom(shown, refUnits) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {refUnits} {L("units", "وحدة")}</div>}</div>}</td>
         <td>
           {ex ? <span className="qp-excluded">{L("Excluded", "مستبعد")}</span>
             : editable ? <>{priceBox(priceStr, setPrice)}{refPrice != null && <div className={`qp-ref${changedFrom(num(priceStr), refPrice) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {nf(refPrice)}</div>}</>
@@ -1571,9 +1586,24 @@ function CounterFlow({
                 <tbody>
                   <tr>
                     <td><div className="lbl">{L("Base rental", "الإيجار الأساسي")}</div><div className="sub">{room.details.equipmentLabel ?? periodLabel}</div></td>
-                    <td className="mut">{hasDuration ? `${periods} ${L("days", "يوم")}` : "—"}</td>
+                    {/* Billable days, not the calendar duration — the rate below is charged across THESE,
+                        exactly as the bid card's rental row states it. The calendar span stays underneath
+                        so the renter can see where the number came from. */}
+                    <td className="mut">
+                      {hasDuration && !rentalCalc.raw ? (
+                        <>
+                          <div>{rentalCalc.billable} {L("days", "يوم")}</div>
+                          <div className="sub">{periods} {L("days, Fridays excluded", "يوم، باستثناء الجمعة")}</div>
+                        </>
+                      ) : hasDuration ? `${periods} ${L("days", "يوم")}` : "—"}
+                    </td>
                     <td><div className="qp-qty">{editable && <span className="hint">{L("Your choice", "خيارك")}</span>}{editable ? <Stepper value={rentalUnits} min={1} max={cap} onChange={(v) => { setRentalUnits(v); setMobUnitsN((u) => Math.min(u, v)); setDemobUnitsN((u) => Math.min(u, v)); }} /> : <b>{rNU}</b>}<span className="qp-qmatch">✓ {L("Qty", "العدد")} {rNU}</span>{editable && supRound?.rentalUnits != null && <div className={`qp-ref${changedFrom(rentalUnits, supRound.rentalUnits) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {supRound.rentalUnits} {L("units", "وحدة")}</div>}</div></td>
-                    <td>{editable ? <>{priceBox(rateStr, setRateStr)}{refRate != null && <div className={`qp-ref${changedFrom(rate, refRate) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {nf(refRate)}</div>}</> : <b className="tot">{money(rate)}</b>}</td>
+                    <td>
+                      {editable ? <>{priceBox(rateStr, setRateStr)}{refRate != null && <div className={`qp-ref${changedFrom(rate, refRate) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {nf(refRate)}</div>}</> : <b className="tot">{money(rate)}</b>}
+                      {/* The rate is per PERIOD, and the divisor is what turns it into the day count in the
+                          Duration column. Both stated the way the bid card states them. */}
+                      <div className="sub">/ {periodLabel}{rentalDivisorNote ? ` · ${rentalDivisorNote}` : ""}</div>
+                    </td>
                     <td><b className="tot">{money(rentalLine)}</b></td>
                   </tr>
                   {legTr(L("Mobilization — mob", "التعبئة — موب"), L("delivery", "توصيل"), mobStr, setMobStr, mobUnitsN, setMobUnitsN, mobExcluded, setMobExcluded, refMobPrice, supRound?.mobUnits ?? null, L("Cancel mobilization (delivery to site) from the supplier?", "إلغاء التعبئة (النقل إلى الموقع) من المورد؟"))}
@@ -1669,8 +1699,10 @@ function CounterFlow({
                   <div className="qp-rcard">
                     <div className="qp-rcard-h"><span className="material-icons-outlined">receipt_long</span>{L("Price summary", "ملخص عرض السعر")}</div>
                     <div className="qp-totals" style={{ borderTop: 0, paddingTop: 0 }}>
-                      <div className="qp-trow"><span className="l">{L("Quantity", "الكمية")}</span><span className="v">{rNU} {L("units", "وحدة")}{hasDuration ? ` · ${periods} ${L("days", "يوم")}` : ""}</span></div>
-                      <div className="qp-trow"><span className="l">{L("Base rental", "الإيجار الأساسي")}</span><span className="v">{money(rentalLine)}</span></div>
+                      {/* The days quoted here are the BILLABLE ones — the rental below is charged across
+                          exactly these, and naming the calendar span would overstate what the money buys. */}
+                      <div className="qp-trow"><span className="l">{L("Quantity", "الكمية")}</span><span className="v">{rNU} {L("units", "وحدة")}{hasDuration ? (rentalCalc.raw ? ` · ${periods} ${L("days", "يوم")}` : ` · ${rentalCalc.billable} ${L("billable days", "يوم محتسب")}`) : ""}</span></div>
+                      <div className="qp-trow"><span className="l">{L("Base rental", "الإيجار الأساسي")}</span><span className="v">{money(rentalLine)}{rentalDivisorNote ? <span className="sub"> · {rentalDivisorNote}</span> : null}</span></div>
                       <div className="qp-trow"><span className="l">{L("Mobilization", "التعبئة (موب)")}</span><span className="v">{mEx ? L("Excluded", "غير مشمولة") : money(mobLine)}</span></div>
                       <div className="qp-trow"><span className="l">{L("Return", "الإرجاع (ديموب)")}</span><span className="v">{dEx ? L("Excluded", "غير مشمول") : money(demobLine)}</span></div>
                       <div className="qp-trow"><span className="l">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="v">{money(subtotal)}</span></div>

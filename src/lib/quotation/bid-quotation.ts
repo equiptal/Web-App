@@ -20,10 +20,16 @@
  * negotiated count uses it. For a bid that was never negotiated (`mobExcluded` false, `mobUnits` null)
  * that is arithmetically identical to the old `price × units`, which is why the grouped download's
  * output is unchanged for every bid that has not been through a deal room.
+ *
+ * The RENTAL goes through `computeRentalTotal` from the same module, for the same reason: this document
+ * used to prorate over the raw calendar duration (charging the Fridays the bid card excludes) and to
+ * print one unit's rent beside transport legs it had already multiplied by the unit count. Same bid,
+ * three numbers. It now reads exactly as the bid card does — the supplier's raw quoted rate in the price
+ * column, the BILLABLE days in the quantity column, the divisor stated beside the total.
  */
 
 import { CERT_LABEL, type BidCard, type TermRow } from "@/lib/contract/bids";
-import { computeQuoteTotals, rentalDivisor, VAT_RATE } from "@/lib/pricing/rental";
+import { computeQuoteTotals, computeRentalTotal, divisorNote, rentalDivisor, VAT_RATE } from "@/lib/pricing/rental";
 import {
   quotationLegal,
   type QLang,
@@ -197,6 +203,12 @@ export function buildBidQuotationDoc(input: BuildBidQuotationInput): QuotationDo
     const durDays = e.durationDays ?? null;
     rowNum += 1;
     let lineSub: number, qtyCell: string, priceCell: string, totalCell: string, totalNote: string | null = null;
+    // The rental now prorates through the SHARED module — ÷6 week, ÷26 month, Fridays excluded — and is
+    // multiplied by the offered unit count, so this document totals the same deal the bid card beside it
+    // and the deal room both total. It used to compute `(rate ÷ divisor) × calendarDays` for ONE unit:
+    // it charged the Fridays, and it left every extra machine's rent out of a grand total whose
+    // transport legs were already counted × units.
+    const rental = computeRentalTotal({ rate, priceUnit: b.priceUnit, startDate: e.startDate ?? null, durationDays: durDays });
     if (durDays == null) {
       lineSub = rate; // open-ended: one-period PER-UNIT preview; billed "as operated" (app parity)
       qtyCell = "∞";
@@ -206,16 +218,24 @@ export function buildBidQuotationDoc(input: BuildBidQuotationInput): QuotationDo
       if (openRate == null) { openRate = rate; openPlabel = plabel; }
     } else if (dpp > 0) {
       anyCommitted = true;
-      const periods = durDays / dpp;
-      const pStr = Number.isInteger(periods) ? String(periods) : periods.toFixed(2);
-      lineSub = (rate / dpp) * durDays; // per-unit over the committed duration (units shown separately)
-      qtyCell = `${pStr} ${plabel}`;
+      lineSub = rental.total * units;
+      // Quantity is the BILLABLE days the rate is charged across, as the bid card's rental row states
+      // it — not the calendar period count, which counted the Fridays out of the total.
+      qtyCell = rental.raw
+        ? `1 ${plabel}${units > 1 ? ` × ${units}` : ""}`
+        : `${rental.billable} ${L("days", "يوم")}${units > 1 ? ` × ${units}` : ""}`;
       priceCell = `${m2(rate)} / ${plabel}`;
+      // The divisor that turns the quoted rate into those days — printed whether or not this period
+      // comes out exact (app parity: `rentalPeriodSubtitle`).
+      totalNote = divisorNote(b.priceUnit, L);
       totalCell = m2(lineSub);
     } else {
       anyCommitted = true;
-      lineSub = rate; // PER_JOB, per-unit
-      qtyCell = "1";
+      // PER_JOB — a flat price, but every unit offered is rented. Flat per spec 005 §2; the app's own
+      // retired-unit fallback charges it per calendar day instead, and prod deliberately does not
+      // follow that. See `computeRentalTotal`.
+      lineSub = rate * units;
+      qtyCell = String(units);
       priceCell = m2(rate);
       totalCell = m2(lineSub);
     }
@@ -223,15 +243,17 @@ export function buildBidQuotationDoc(input: BuildBidQuotationInput): QuotationDo
     // THE transport legs. `computeQuoteTotals` is the shared leg maths: an excluded leg contributes
     // zero however much price is still stored against it, and a leg carries its OWN negotiated count
     // (defaulting to, and capped by, the rental count). Passing `perUnitRental: 0` asks it for the legs
-    // only — the rental above is per-unit by design and must not be multiplied by the unit count.
+    // ONLY — `lineSub` above already carries the rental across all units, and passing it here would
+    // count it twice.
     const legTotals = computeQuoteTotals({
       perUnitRental: 0,
       rentalUnits: units,
       mob: { amount: b.mobPrice, units: b.mobUnits, excluded: b.mobExcluded },
       demob: { amount: b.demobPrice, units: b.demobUnits, excluded: b.demobExcluded },
     });
+    // Uncapped, matching the app's `effectiveMobUnits` — the leg's negotiated count is the count.
     const legQty = (excluded: boolean | undefined, own: number | null | undefined) =>
-      excluded ? 0 : Math.min(own ?? units, units);
+      excluded ? 0 : (own ?? units);
     const mobTotal = legTotals.overall.mob;
     const demobTotal = legTotals.overall.demob;
     sub += lineSub + mobTotal + demobTotal;

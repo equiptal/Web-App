@@ -135,11 +135,17 @@ export function computeBidQuote(
   const units = opts?.units ?? liveUnits;
   const dpp = rentalDivisor(bid.priceUnit);
   const fb = num(opts?.fallbackDays);
-  // No stated duration and no request fallback → ONE FULL PERIOD, which prorates to exactly the rate.
+  // No stated duration and no request fallback → ONE FULL PERIOD at exactly the quoted rate.
   // Never default to a single day: on a weekly/monthly bid that reads as a near-zero total.
-  const days = num(bid.duration) ?? (fb != null && fb > 0 ? fb : dpp || 1);
+  const stated = num(bid.duration) ?? (fb != null && fb > 0 ? fb : null);
+  const days = stated ?? (dpp || 1);
   // Friday-excluded proration, shared with the deal room and the quotation.
-  const rental = computeRentalTotal({ rate, priceUnit: bid.priceUnit, startDate: opts?.startDate, durationDays: days });
+  //
+  // `null`, NOT the synthesised one-period `days`, when no duration was stated: feeding the divisor back
+  // in as a window makes the module strike that window's Fridays out of a period nobody booked, so a
+  // monthly bid on an open request came back at 22⁄26 of its own rate. The app's open-deal branch
+  // (`rentalLineTotal`, `durationDays == null`) returns the bare rate outright, and so must this.
+  const rental = computeRentalTotal({ rate, priceUnit: bid.priceUnit, startDate: opts?.startDate, durationDays: stated });
   const perUnitRental = rental.total;
   // Periods are counted in BILLABLE days once proration ran, so the "× N periods" caption matches the
   // money beside it; an un-prorated (raw-rate) quote is one period by definition.
@@ -382,6 +388,10 @@ export interface DisplayQuote {
   mobDemob: number;
   /** Duration-based rental × units, or null when the request has no duration (§6: shown only then). */
   durationRental: number | null;
+  /** The days `durationRental` was actually charged across — duration minus its Fridays. The caption
+   *  beside that figure must use THIS, not the request's calendar duration, which counts days the
+   *  total excludes. 0 whenever `durationRental` is null. */
+  billableDays: number;
   /** durationRental ?? rentalForPeriod, + mobDemob. */
   subtotal: number;
   vat: number;
@@ -431,6 +441,7 @@ export function displayQuote(
     units, ratePerPeriod, rentalForPeriod,
     mobDemob: t.overall.mob + t.overall.demob,
     durationRental,
+    billableDays: rental.raw ? 0 : rental.billable,
     subtotal: t.overall.subtotal, vat: t.overall.vat, total: t.overall.total,
   };
 }

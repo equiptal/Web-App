@@ -69,12 +69,29 @@ describe("computeBidQuote (shared quote math — comparison ↔ quotation parity
     expect(q.perUnitRental).toBe(700);
   });
 
+  it("an open-ended bid is the bare rate, even when a start date could locate Fridays", () => {
+    // App parity (`rentalLineTotal`, open mode): no duration → `rate × units`. This used to fall back to
+    // ONE FULL PERIOD (26 days for a monthly rate) and hand that to the shared module as if it were a
+    // booked window, which then struck out its Fridays — 30,000/month came back at 22⁄26 of itself.
+    // An open request has nothing to prorate over; the quoted rate IS the period.
+    const q = computeBidQuote(
+      bc({ price: 30_000, priceUnit: "PER_MONTH", duration: null, numberOfUnits: 2, unitsOffered: 2 }),
+      { startDate: SUNDAY },
+    );
+    expect(q.perUnitRental).toBe(30_000);
+    expect(q.rentalSubtotal).toBe(60_000);
+    expect(q.billableDays).toBe(0);
+    expect(q.periods).toBe(1);
+  });
+
   it("monthly rate uses 26 working days", () => {
     const q = computeBidQuote(bc({ price: 2600, priceUnit: "PER_MONTH", duration: 26, numberOfUnits: 1 }));
     expect(q.perUnitRental).toBe(2600); // 2600 / 26 × 26
   });
 
   it("PER_JOB is a flat rate (no duration), × units", () => {
+    // Flat per spec 005 §2. The app charges a retired PER_JOB unit per calendar day instead; prod does
+    // not follow that until the legacy-row question is settled. See `computeRentalTotal`.
     const q = computeBidQuote(bc({ price: 5000, priceUnit: "PER_JOB", duration: 30, numberOfUnits: 2, unitsOffered: 2 }));
     expect(q.perUnitRental).toBe(5000);
     expect(q.rentalSubtotal).toBe(10000);

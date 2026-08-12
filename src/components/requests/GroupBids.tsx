@@ -18,6 +18,7 @@ import { bidSuppliers, bucketBidTerms, type BidCard } from "@/lib/contract/bids"
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { qualityFromSubmissionItem, type BidQuality } from "@/lib/contract/bid-quality";
 import { computeBidQuote } from "@/lib/contract/comparison";
+import { divisorNote } from "@/lib/pricing/rental";
 import { shortRef, type RequestGroup } from "@/lib/contract/requests";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { EquipImg } from "@/components/requests/EquipImg";
@@ -642,16 +643,16 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         // Mobile parity (v3_bid_card): collapsed headline = the PER-UNIT rental total (rate × periods),
         // excluding units/mob/demob/VAT — so bids compare on the unit rate. All-in lives in the grand total.
         const perUnitRentalTotal = Math.round((b.price ?? 0) * cq.periods);
-        // Rental label: one full period → "24,000/month"; a whole multiple → "× N"; a sub-period day
-        // count (e.g. 10 days on a monthly rate) → the effective per-day rate × days, so the factor is a
-        // clean integer, never a confusing "× 0.38" / "× 0.04".
+        // Rental label, in the bid card's words: the supplier's RAW quoted rate over its own period, the
+        // divisor behind it, and the BILLABLE days it is charged across. It used to fall back to a
+        // derived per-day rate times the CALENDAR duration — a factor whose arithmetic overshot the
+        // total beside it by exactly the Fridays that total had already dropped.
         const rentalLabel = ((): string => {
           const price = nf(b.price ?? 0);
           const per = periodOf(b.priceUnit);
-          if (cq.periods === 1) return `${price}/${per}`;
-          if (Number.isInteger(cq.periods)) return `${price}/${per} × ${cq.periods}`;
-          const perDay = nf(Math.round(cq.perUnitRental / (cq.days || 1)));
-          return `${perDay}/${L("day", "يوم")} × ${cq.days} ${L("days", "يوم")}`;
+          if (cq.billableDays <= 0) return `${price}/${per}`; // nothing prorated — the rate IS the period
+          const note = divisorNote(b.priceUnit, L);
+          return `${price}/${per}${note ? ` · ${note}` : ""} × ${cq.billableDays} ${L("billable days", "يوم محتسب")}`;
         })();
         const rentalTotalLabel = ((): string => {
           switch ((b.priceUnit ?? "PER_DAY").toUpperCase()) {

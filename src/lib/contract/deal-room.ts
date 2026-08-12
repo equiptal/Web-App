@@ -254,6 +254,16 @@ export interface DealTotals {
   rentalUnits: number; mobUnitsN: number; demobUnitsN: number;
   mobPrice: number; demobPrice: number; mobExcluded: boolean; demobExcluded: boolean;
   periods: number; hasDuration: boolean; periodCount: number;
+  /**
+   * Days actually charged — the duration minus its Fridays. This, NOT `periods`, is the number every
+   * surface must show beside the rate: `rentalTotal` is `(rate ÷ divisor) × billableDays × units`, so a
+   * label built from the raw duration states an arithmetic the total does not follow. 0 when the rental
+   * did not prorate (see `rentalRaw`).
+   */
+  billableDays: number;
+  /** True when `rentalTotal` is the bare quoted rate — no duration, no start date, PER_JOB, or a
+   *  collapsed window. Nothing prorated, so no day count is shown. */
+  rentalRaw: boolean;
   rentalTotal: number; mobTotal: number; demobTotal: number;
   subtotal: number; vat: number; grand: number;
 }
@@ -279,15 +289,26 @@ export function computeDealTotals(
   const hasDuration = room.periods != null && room.periods > 0;
   const periods = hasDuration ? (room.periods as number) : dpp; // duration in DAYS; no duration = one full period
   const rentalUnits = pick(override?.rentalUnits, room.agreedUnits ?? room.numberOfUnits ?? 1);
-  const mobUnitsN = Math.min(pick(override?.mobUnits, room.mobUnits ?? rentalUnits), rentalUnits);
-  const demobUnitsN = Math.min(pick(override?.demobUnits, room.demobUnits ?? rentalUnits), rentalUnits);
+  // NOT capped at the rental count. The app's `effectiveMobUnits` is `mobExcluded ? 0 : (mobUnits ??
+  // numberOfUnits)` with no clamp, so a room carrying 5 mob trips against 3 rented machines billed 5
+  // there and 3 here. The negotiated leg count is charged as negotiated.
+  const mobUnitsN = pick(override?.mobUnits, room.mobUnits ?? rentalUnits);
+  const demobUnitsN = pick(override?.demobUnits, room.demobUnits ?? rentalUnits);
   const perDayRate = rate / dpp;
   // Shared Friday-excluded proration. With no start date it returns the raw rate rather than a
   // Friday-blind total, so the room never shows a number the app wouldn't.
   // The Friday anchor lives under `details`, NOT at the root of the room — a `room.startDate` here
   // silently evaluates to undefined, which turns proration off and shows the raw rate on every room.
   const startDate = room.details?.startDate ?? null;
-  const perUnitRental = computeRentalTotal({ rate, priceUnit, startDate, durationDays: periods }).total;
+  // NO DURATION IS NOT A ONE-PERIOD WINDOW. The app's `rentalLineTotal` returns `rate × units` outright
+  // for an open deal (`durationDays == null → open mode`), and this used to say the same in its comment
+  // — but it synthesised `periods = divisor` and fed that to the shared module, which then struck the
+  // Fridays out of a window nobody had booked. A 30,000/month open deal over 2 units read 53,077 where
+  // the app read 60,000. The rate IS the period here; there is nothing to prorate over.
+  const rental = hasDuration
+    ? computeRentalTotal({ rate, priceUnit, startDate, durationDays: periods })
+    : { total: rate, billable: 0, raw: true, exact: true };
+  const perUnitRental = rental.total;
   const rentalTotal = perUnitRental * rentalUnits;
   const mobPrice = pick(override?.mobPrice, room.mobPrice ?? 0);
   const demobPrice = pick(override?.demobPrice, room.demobPrice ?? 0);
@@ -298,7 +319,10 @@ export function computeDealTotals(
   const subtotal = rentalTotal + mobTotal + demobTotal;
   const vat = Math.round(subtotal * VAT_RATE);
   const grand = subtotal + vat;
-  return { rate, priceUnit, perDayRate, rentalUnits, mobUnitsN, demobUnitsN, mobPrice, demobPrice, mobExcluded, demobExcluded, periods, hasDuration, periodCount: periods / dpp, rentalTotal, mobTotal, demobTotal, subtotal, vat, grand };
+  // Period count is derived from the BILLABLE days, not the calendar duration: a 61-day monthly job
+  // charges ~53 days, which is 2.04 months of rent, not the 2.35 the calendar suggests. The old raw
+  // figure disagreed with `rentalTotal` by exactly the Fridays.
+  return { rate, priceUnit, perDayRate, rentalUnits, mobUnitsN, demobUnitsN, mobPrice, demobPrice, mobExcluded, demobExcluded, periods, hasDuration, periodCount: (rental.raw ? periods : rental.billable) / dpp, billableDays: rental.raw ? 0 : rental.billable, rentalRaw: rental.raw, rentalTotal, mobTotal, demobTotal, subtotal, vat, grand };
 }
 
 export function mapDealRoom(raw: unknown): DealRoomView {
