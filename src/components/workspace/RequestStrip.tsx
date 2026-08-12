@@ -1,12 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { publicTaxonomyUrl, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
 import type { BidCard } from "@/lib/contract/bids";
-import { BidDocumentsModal } from "@/components/workspace/BidDocumentsModal";
 
 /**
  * The dark strip under the rail. Two halves, and they answer different questions.
@@ -42,7 +40,6 @@ export function RequestStrip({
   const { locale } = useLocale();
   const ar = locale === "ar";
   const router = useRouter();
-  const [docsOpen, setDocsOpen] = useState(false);
 
   const requestRef = group.groupRef ?? item?.displayId ?? group.id;
   const raised = group.createdAt
@@ -150,10 +147,13 @@ export function RequestStrip({
             >
               {t.workspace.reviewEquipment}
             </button>
+            {/* The same surface as Review equipment, opened on the papers instead of the machine.
+                The workspace does not know which unit that is — it has the bid, not its fleet — so
+                the map chooses, preferring one whose location the lessor confirmed. */}
             <button
               type="button"
               disabled={!bid}
-              onClick={() => bid && setDocsOpen(true)}
+              onClick={() => bid && router.push(`/bids/${encodeURIComponent(bid.id)}/equipment?panel=documents`)}
               className="inline-flex items-center justify-center gap-1.5 rounded-full border border-white/25 px-4 py-1.5 text-[12.5px] font-bold text-white/85 transition hover:bg-white/10 disabled:opacity-40"
             >
               <Icon name="visibility" size={15} /> {t.workspace.viewDocuments}
@@ -161,10 +161,6 @@ export function RequestStrip({
           </div>
         </div>
       </div>
-
-      {docsOpen && bid && (
-        <BidDocumentsModal bidId={bid.id} supplier={bid.supplierName} onClose={() => setDocsOpen(false)} />
-      )}
     </div>
   );
 }

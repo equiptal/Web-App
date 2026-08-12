@@ -115,10 +115,17 @@ export interface EquipmentDetailProps {
    * sent through, so the panel never invents a second spelling of what "the same question" means.
    */
   askPending?: (draft: PanelRequestDraft) => boolean;
+  /**
+   * Which tab the panel opens on. Defaults to the machine, which is what a renter who pressed a
+   * card came to see. `"documents"` is for arriving from `View documents` in the requests workspace,
+   * where the papers ARE the errand — landing on the machine would make him press one more time to
+   * reach what he asked for.
+   */
+  initialTab?: "machine" | "documents";
 }
 
-export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, askPending }: EquipmentDetailProps) {
-  const [tab, setTab] = useState<"machine" | "documents">("machine");
+export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, askPending, initialTab }: EquipmentDetailProps) {
+  const [tab, setTab] = useState<"machine" | "documents">(initialTab ?? "machine");
 
   /* ── The frame's second subject (owner, 2026-08-11) ─────────────────────────────────────────────
      What the viewer is holding instead of the machine's photograph, or null for the photograph. It
