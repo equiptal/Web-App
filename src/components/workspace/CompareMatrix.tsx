@@ -30,12 +30,16 @@ export function CompareMatrix({
   bids,
   selectedId,
   durationDays,
+  startDate,
   onSelect,
 }: {
   bids: WorkspaceBid[];
   selectedId: string | null;
   /** The request's duration — what the third total column is measured over, and named after. */
   durationDays: number | null;
+  /** The request's start date. Without it the Fridays cannot be located, so the duration column
+   *  falls back to the bare rate and says so rather than claiming a day count. */
+  startDate: string | null;
   onSelect: (bidId: string) => void;
 }) {
   const t = useT();
@@ -64,16 +68,17 @@ export function CompareMatrix({
           mob: { amount: b.card.mobPrice, excluded: b.card.mobExcluded },
           demob: { amount: b.card.demobPrice, excluded: b.card.demobExcluded },
           durationDays,
+          startDate,
           units: b.card.unitsOffered > 0 ? b.card.unitsOffered : b.card.numberOfUnits,
         }),
       );
     }
     return map;
-  }, [bids, durationDays]);
+  }, [bids, durationDays, startDate]);
 
   const lowRate = useMemo(() => cheapest(rows, (b) => b.card.price), [rows]);
   const lowFirst = useMemo(() => cheapest(rows, (b) => totals.get(b.card.id)?.firstCycle.total ?? null), [rows, totals]);
-  const lowHorizon = useMemo(() => cheapest(rows, (b) => totals.get(b.card.id)?.horizon?.total ?? null), [rows, totals]);
+  const lowDuration = useMemo(() => cheapest(rows, (b) => totals.get(b.card.id)?.duration?.total ?? null), [rows, totals]);
 
   const toggleGroup = (k: GroupKey) =>
     setCollapsed((c) => {
@@ -168,7 +173,7 @@ export function CompareMatrix({
                     <Col
                       label={t.workspace.overDays.replace("{n}", String(durationDays))}
                       info
-                      onInfo={() => setPopover(popover === "horizon" ? null : "horizon")}
+                      onInfo={() => setPopover(popover === "duration" ? null : "duration")}
                     />
                   ) : null}
                 </>
@@ -247,7 +252,7 @@ export function CompareMatrix({
                     <>
                       <Cell>{money(tot?.firstCycle.total, lowFirst.has(b.card.id))}</Cell>
                       <Cell>{money(tot?.everyCycleAfter?.total ?? null, false)}</Cell>
-                      {durationDays ? <Cell>{money(tot?.horizon?.total ?? null, lowHorizon.has(b.card.id))}</Cell> : null}
+                      {durationDays ? <Cell>{money(tot?.duration?.total ?? null, lowDuration.has(b.card.id))}</Cell> : null}
                     </>
                   )}
                   {!collapsed.has("asked") && (
@@ -384,13 +389,20 @@ function TermCell({ row, ar }: { row: TermRow | null; ar: boolean }) {
 /** The popover behind a total's ⓘ: the lines that figure was built from, and nothing else. */
 function BuildPopover({ which, totals, onClose }: { which: string; totals: CycleTotals; onClose: () => void }) {
   const t = useT();
-  const part = which === "first" ? totals.firstCycle : which === "after" ? totals.everyCycleAfter : totals.horizon;
+  const part = which === "first" ? totals.firstCycle : which === "after" ? totals.everyCycleAfter : totals.duration;
   if (!part) return null;
+  const dur = totals.duration;
   const heading =
     which === "first" ? t.workspace.howFirstCycle
     : which === "after" ? t.workspace.howEveryCycle
-    : t.workspace.howHorizon.replace("{n}", String(totals.horizon?.days ?? 0));
-  const cycles = which === "horizon" ? totals.horizon?.cycles ?? 1 : 1;
+    : t.workspace.howDuration.replace("{n}", String(dur?.days ?? 0));
+  // The duration column charges billable days, so it names them: "Rental ÷ 26 × 154 days". Where the
+  // rental could not be prorated at all — no start date, or a per-job price — it stays the bare rate
+  // and claims no day count, because there is none to claim.
+  const rentalLabel =
+    which === "duration" && dur && !dur.raw
+      ? t.workspace.rentalOverDays.replace("{n}", String(dur.billableDays))
+      : t.workspace.colRate;
 
   return (
     <div className="relative">
@@ -403,7 +415,7 @@ function BuildPopover({ which, totals, onClose }: { which: string; totals: Cycle
           </button>
         </div>
         <dl className="mt-3 space-y-1.5 text-[13px]">
-          <Line label={cycles > 1 ? `${t.workspace.colRate} × ${cycles}` : t.workspace.colRate} v={part.rental} />
+          <Line label={rentalLabel} v={part.rental} />
           <Line
             label={t.workspace.transportOnce}
             v={part.oneOff}
@@ -417,7 +429,12 @@ function BuildPopover({ which, totals, onClose }: { which: string; totals: Cycle
             <span>{formatSar(part.total)}</span>
           </div>
         </dl>
-        <p className="mt-2 text-[11px] font-semibold leading-snug text-muted">{t.workspace.vatNote}</p>
+        <p className="mt-2 text-[11px] font-semibold leading-snug text-muted">
+          {t.workspace.vatNote}
+          {which === "duration" && dur && !dur.raw && (
+            <> {t.workspace.fridaysNote.replace("{days}", String(dur.days)).replace("{billable}", String(dur.billableDays))}</>
+          )}
+        </p>
       </div>
     </div>
   );
