@@ -1,18 +1,13 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { use, useState } from "react";
-import { AppShell } from "@/components/AppShell";
-import { useLocale } from "@/lib/i18n";
-import { RequestDetail } from "@/components/requests/RequestDetail";
-
-/** /requests/[id] — full detail for one request (web-app/request-details-bids). */
-export default function RequestDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-  const { locale } = useLocale();
-  const [title, setTitle] = useState("");
-  return (
-    <AppShell title={title || (locale === "ar" ? "تفاصيل الطلب" : "Request details")}>
-      <RequestDetail id={id} onTitle={setTitle} />
-    </AppShell>
-  );
+/**
+ * /requests/[id] — retired. A request's detail is the workspace's drawer now, opened from the strip
+ * without leaving the bids behind (docs/requests-workspace-disabled.md).
+ *
+ * The id is dropped rather than carried: the workspace resolves its own selection from the rail, and
+ * a stale or foreign id would land the renter on a request that is not theirs to see. They arrive at
+ * their newest request, which is where the page starts anyway.
+ */
+export default function RequestDetailPage() {
+  redirect("/requests");
 }

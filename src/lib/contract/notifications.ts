@@ -69,17 +69,20 @@ export function mapNotificationList(raw: unknown): NotificationList {
  */
 export function notificationHref(n: NotificationItem): string | null {
   const d = n.data ?? {};
-  const requestId = str(d.requestId);
+  // `d.requestId` is deliberately not read any more — see the note on the switch below.
   const dealRoomId = str(d.dealRoomId);
+  // Every one of these used to name a page of its own — `/requests/{id}`, its `?view=bids` variant,
+  // and `/compare`. All three are the one workspace now (docs/requests-workspace-disabled.md), which
+  // opens on the renter's newest request and holds its bids and the comparison as tabs. The id is
+  // dropped rather than carried through a redirect: the workspace resolves its own selection, and a
+  // stale id would point at a request that may no longer be there to show.
   switch (n.type) {
     case "request.broadcast":
     case "request.direct":
-      return requestId ? `/requests/${requestId}` : null;
     case "bid.received":
     case "bid.accepted":
-      return requestId ? `/requests/${requestId}?view=bids` : null;
     case "RFQ_CLOSED_FOMO":
-      return "/compare";
+      return "/requests";
     default:
       break;
   }

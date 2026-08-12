@@ -121,7 +121,7 @@ export function HomeHub() {
       {newBids > 0 && (
         <button
           type="button"
-          onClick={() => router.push("/requests?tab=bids")}
+          onClick={() => router.push("/requests")}
           className="flex items-center gap-3 rounded-[14px] border border-[#f59e0b]/30 bg-[#f59e0b]/[0.06] p-3.5 text-start transition hover:bg-[#f59e0b]/[0.10]"
         >
           <span className="relative grid h-9 w-9 flex-none place-items-center rounded-[10px] bg-[#f59e0b]/[0.14]">
@@ -138,11 +138,13 @@ export function HomeHub() {
         </button>
       )}
 
-      {/* Activity cards — wired to the renter's requests/bids/deals screens. */}
+      {/* Activity cards. The bids and deals tabs are gone: the workspace shows a request and its
+          bids together, so "bids" is not a separate destination, and completed deals live in the
+          Inbox with their rooms (docs/requests-workspace-disabled.md). */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <ActivityCard accent="brand" icon="assignment" title={t.home.yourRequests} sub={t.home.reqSub} href="/requests" count={activity?.openRequests} />
-        <ActivityCard accent="info" icon="gavel" title={t.home.priceBids} sub={t.home.bidsSub} href="/requests?tab=bids" count={newBids} />
-        <ActivityCard accent="ok" icon="handshake" title={t.home.completedDeals} sub={t.home.dealsSub} href="/requests?tab=deals" count={activity?.completedDeals} />
+        <ActivityCard accent="info" icon="gavel" title={t.home.priceBids} sub={t.home.bidsSub} href="/requests" count={newBids} />
+        <ActivityCard accent="ok" icon="handshake" title={t.home.completedDeals} sub={t.home.dealsSub} href="/inbox" count={activity?.completedDeals} />
       </div>
 
       {/* Suggested suppliers — filter bar always shown; View all only adds cards (AC-05/10/11/12/13) */}
