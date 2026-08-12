@@ -14,7 +14,7 @@ import { CERT_LABEL } from "@/lib/contract/bids";
 import { publicTaxonomyUrl, type RequestGroup, type RequestListItem, type RequestRecord } from "@/lib/contract/requests";
 import { requestActions, type WorkspaceBid } from "@/lib/contract/workspace";
 import { ShareForBidsSheet } from "@/components/requests/ShareForBidsSheet";
-import { ConfirmCancelModal, EditRequestModal } from "@/components/requests/RequestDetail";
+import { ConfirmCancelModal, EditRequestModal } from "@/components/requests/RequestEditModals";
 
 /** What the share sheet needs about this request's public bid link. */
 export interface ShareLinkMeta {

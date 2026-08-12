@@ -1,18 +1,10 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { use, useState } from "react";
-import { AppShell } from "@/components/AppShell";
-import { useLocale } from "@/lib/i18n";
-import { RequestGroupDetail } from "@/components/requests/RequestGroupDetail";
-
-/** /requests/group/[groupId] — multi-item detail for one submission group (web-app/multi-item-requests). */
-export default function RequestGroupPage({ params }: { params: Promise<{ groupId: string }> }) {
-  const { groupId } = use(params);
-  const { locale } = useLocale();
-  const [title, setTitle] = useState("");
-  return (
-    <AppShell title={title || (locale === "ar" ? "تفاصيل الطلب" : "Request details")}>
-      <RequestGroupDetail groupId={decodeURIComponent(groupId)} onTitle={setTitle} />
-    </AppShell>
-  );
+/**
+ * /requests/group/[groupId] — retired. A multi-item RFQ is one tile in the workspace rail, with its
+ * items as chips in the dark strip, so there is no separate page for the group any more
+ * (docs/requests-workspace-disabled.md).
+ */
+export default function RequestGroupPage() {
+  redirect("/requests");
 }

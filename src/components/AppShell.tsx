@@ -229,19 +229,9 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                       >
                         <Icon name="business_center" size={16} /> {t.shell.company}
                       </button>
-                      {/* Compare kept a home here when the sidebar went, so the surface stays reachable
-                          from the chrome. It is folded into the requests workspace in phase 5 of
-                          docs/implementation-plans/requests-workspace/plan.md and goes with it. */}
-                      <button
-                        role="menuitem"
-                        onClick={() => {
-                          setMenuOpen(false);
-                          router.push("/compare");
-                        }}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-[13px] font-semibold text-navy-mid hover:bg-surface2"
-                      >
-                        <Icon name="compare_arrows" size={16} /> {t.shell.compare}
-                      </button>
+                      {/* Compare had a home here while it was still its own page. It is a tab of the
+                          requests workspace now (docs/requests-workspace-disabled.md), reached by
+                          the Requests tab in the dock, so a second entry to the same thing is gone. */}
                       <button
                         role="menuitem"
                         onClick={() => {

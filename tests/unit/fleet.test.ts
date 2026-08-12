@@ -573,6 +573,10 @@ describe("the ownership option is wired at the call sites, not just offered", ()
     );
   });
 
+  // NOTE: this file is DISABLED — line-commented in place with the rest of the old requests
+  // surfaces (docs/requests-workspace-disabled.md). The assertions still hold because commenting
+  // preserves the text, and they are kept deliberately: they are the rule the code must satisfy on
+  // the day it is switched back on. They do NOT describe a surface a renter can reach today.
   it("the BID-backed comparison workspace scores no ownership and cannot reach the option", () => {
     const src = read("src/components/compare/BidComparisonWorkspace.tsx");
     expect(src.match(/computeBidReadiness\(/g)).toHaveLength(3); // positive control — the file still scores
