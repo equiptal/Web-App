@@ -289,8 +289,11 @@ export function computeDealTotals(
   const hasDuration = room.periods != null && room.periods > 0;
   const periods = hasDuration ? (room.periods as number) : dpp; // duration in DAYS; no duration = one full period
   const rentalUnits = pick(override?.rentalUnits, room.agreedUnits ?? room.numberOfUnits ?? 1);
-  const mobUnitsN = Math.min(pick(override?.mobUnits, room.mobUnits ?? rentalUnits), rentalUnits);
-  const demobUnitsN = Math.min(pick(override?.demobUnits, room.demobUnits ?? rentalUnits), rentalUnits);
+  // NOT capped at the rental count. The app's `effectiveMobUnits` is `mobExcluded ? 0 : (mobUnits ??
+  // numberOfUnits)` with no clamp, so a room carrying 5 mob trips against 3 rented machines billed 5
+  // there and 3 here. The negotiated leg count is charged as negotiated.
+  const mobUnitsN = pick(override?.mobUnits, room.mobUnits ?? rentalUnits);
+  const demobUnitsN = pick(override?.demobUnits, room.demobUnits ?? rentalUnits);
   const perDayRate = rate / dpp;
   // Shared Friday-excluded proration. With no start date it returns the raw rate rather than a
   // Friday-blind total, so the room never shows a number the app wouldn't.

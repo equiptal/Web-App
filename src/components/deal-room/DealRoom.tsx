@@ -1256,8 +1256,10 @@ function CounterFlow({
   // columns → offered/requested → clamp) so the supplier's countered units land on the rentee side.
   const cap = Math.max(1, room.requestedUnits || units || 1);
   const liveRental = Math.max(1, Math.min(cap, latestRound?.rentalUnits ?? room.agreedUnits ?? units ?? 1));
-  const liveMob = Math.max(0, Math.min(liveRental, latestRound?.mobUnits ?? room.mobUnits ?? liveRental));
-  const liveDemob = Math.max(0, Math.min(liveRental, latestRound?.demobUnits ?? room.demobUnits ?? liveRental));
+  // Seeded UNCAPPED (app parity: `effectiveMobUnits` has no clamp) — the stepper's own `max` is what
+  // stops the renter PROPOSING more trips than machines; a count already on the table is shown as it is.
+  const liveMob = Math.max(0, latestRound?.mobUnits ?? room.mobUnits ?? liveRental);
+  const liveDemob = Math.max(0, latestRound?.demobUnits ?? room.demobUnits ?? liveRental);
   const [rentalUnits, setRentalUnits] = useState<number>(liveRental);
   const [mobUnitsN, setMobUnitsN] = useState<number>(liveMob);
   const [demobUnitsN, setDemobUnitsN] = useState<number>(liveDemob);
@@ -1283,8 +1285,10 @@ function CounterFlow({
   // It previously carried its own divisor table with a SEVEN-day week and no Friday exclusion, so a
   // counter-offer at an unchanged rate showed a different total from the price bar right above it.
   const rNU = editable ? rentalUnits : (room.agreedUnits ?? units);
-  const mNU = Math.min(editable ? mobUnitsN : (room.mobUnits ?? rNU), rNU);
-  const dNU = Math.min(editable ? demobUnitsN : (room.demobUnits ?? rNU), rNU);
+  // Editing is bounded by the stepper (you can't PROPOSE more trips than machines); READING is not —
+  // a stored count above the rental count is what the app bills, so the sheet shows and prices it.
+  const mNU = editable ? Math.min(mobUnitsN, rNU) : (room.mobUnits ?? rNU);
+  const dNU = editable ? Math.min(demobUnitsN, rNU) : (room.demobUnits ?? rNU);
   const mEx = editable ? mobExcluded : room.mobExcluded;
   const dEx = editable ? demobExcluded : room.demobExcluded;
   // Same date the price bar prorates against. It lives on `details`, NOT at the top of the room — a
@@ -1474,7 +1478,9 @@ function CounterFlow({
 
   // A price-table leg row (mob/demob): red ✕ exclude + trip stepper + green price box + المورد ref.
   const legTr = (label: string, sub: string, priceStr: string, setPrice: (s: string) => void, u: number, setU: (v: number) => void, ex: boolean, setEx: (b: boolean) => void, refPrice: number | null, refUnits: number | null, exTitle: string) => {
-    const line = ex ? 0 : num(priceStr) * Math.min(u, rentalUnits);
+    // Capped only while editing — see `mNU`/`dNU` above.
+    const shown = editable ? Math.min(u, rentalUnits) : u;
+    const line = ex ? 0 : num(priceStr) * shown;
     return (
       <tr className={ex ? "ex" : undefined}>
         <td>
@@ -1488,7 +1494,7 @@ function CounterFlow({
           </div>
         </td>
         <td className="mut">{L("Trip", "رحلة")}</td>
-        <td>{ex ? "—" : <div className="qp-qty">{editable && <span className="hint">{L("Your choice", "خيارك")}</span>}{editable ? <Stepper value={Math.min(u, rentalUnits)} min={0} max={rentalUnits} onChange={setU} /> : <b>{Math.min(u, rentalUnits)}</b>}{editable && refUnits != null && <div className={`qp-ref${changedFrom(Math.min(u, rentalUnits), refUnits) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {refUnits} {L("units", "وحدة")}</div>}</div>}</td>
+        <td>{ex ? "—" : <div className="qp-qty">{editable && <span className="hint">{L("Your choice", "خيارك")}</span>}{editable ? <Stepper value={shown} min={0} max={rentalUnits} onChange={setU} /> : <b>{shown}</b>}{editable && refUnits != null && <div className={`qp-ref${changedFrom(shown, refUnits) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {refUnits} {L("units", "وحدة")}</div>}</div>}</td>
         <td>
           {ex ? <span className="qp-excluded">{L("Excluded", "مستبعد")}</span>
             : editable ? <>{priceBox(priceStr, setPrice)}{refPrice != null && <div className={`qp-ref${changedFrom(num(priceStr), refPrice) ? " changed" : ""}`}>{L("Supplier", "المورد")}: {nf(refPrice)}</div>}</>

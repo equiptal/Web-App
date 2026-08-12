@@ -90,6 +90,8 @@ describe("computeBidQuote (shared quote math — comparison ↔ quotation parity
   });
 
   it("PER_JOB is a flat rate (no duration), × units", () => {
+    // Flat per spec 005 §2. The app charges a retired PER_JOB unit per calendar day instead; prod does
+    // not follow that until the legacy-row question is settled. See `computeRentalTotal`.
     const q = computeBidQuote(bc({ price: 5000, priceUnit: "PER_JOB", duration: 30, numberOfUnits: 2, unitsOffered: 2 }));
     expect(q.perUnitRental).toBe(5000);
     expect(q.rentalSubtotal).toBe(10000);

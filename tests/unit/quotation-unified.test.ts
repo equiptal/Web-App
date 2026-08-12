@@ -147,10 +147,11 @@ describe("per-leg unit counts are honoured", () => {
     expect(doc.totals.subtotal).toBe(34_100);
   });
 
-  it("caps a leg count at the rental count — you can't mobilise more than you rent", () => {
+  it("does NOT cap a leg count at the rental count — the app charges what was negotiated", () => {
+    // `effectiveMobUnits` has no clamp, so a leg carrying more trips than machines bills all of them.
     const doc = build([groupEntry(bc({ mobUnits: 9 }))]);
-    expect(legRow(doc, "Delivery to site").qty).toBe("3");
-    expect(legRow(doc, "Delivery to site").total).toBe("1,500.00");
+    expect(legRow(doc, "Delivery to site").qty).toBe("9");
+    expect(legRow(doc, "Delivery to site").total).toBe("4,500.00");
   });
 
   it("defaults an un-negotiated leg to the rental count (the un-negotiated bid is unchanged)", () => {
@@ -287,6 +288,7 @@ describe("the leg maths leaves an un-negotiated bid's legs where they were", () 
   });
 
   it("charges a PER_JOB bid its flat price once per unit", () => {
+    // Flat per spec 005 §2 — deliberately not the app's retired-unit `rate × durationDays` fallback.
     const doc = build([groupEntry(bc({ price: 7_700, priceUnit: "PER_JOB", mobPrice: 0, demobPrice: 0, unitsOffered: 2, numberOfUnits: 2 }))]);
     expect(doc.lineItems[0].qty).toBe("2");
     expect(doc.lineItems[0].totalNote).toBeNull(); // no divisor — a flat price has no period to explain
