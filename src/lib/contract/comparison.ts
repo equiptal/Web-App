@@ -382,6 +382,10 @@ export interface DisplayQuote {
   mobDemob: number;
   /** Duration-based rental × units, or null when the request has no duration (§6: shown only then). */
   durationRental: number | null;
+  /** The days `durationRental` was actually charged across — duration minus its Fridays. The caption
+   *  beside that figure must use THIS, not the request's calendar duration, which counts days the
+   *  total excludes. 0 whenever `durationRental` is null. */
+  billableDays: number;
   /** durationRental ?? rentalForPeriod, + mobDemob. */
   subtotal: number;
   vat: number;
@@ -431,6 +435,7 @@ export function displayQuote(
     units, ratePerPeriod, rentalForPeriod,
     mobDemob: t.overall.mob + t.overall.demob,
     durationRental,
+    billableDays: rental.raw ? 0 : rental.billable,
     subtotal: t.overall.subtotal, vat: t.overall.vat, total: t.overall.total,
   };
 }

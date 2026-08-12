@@ -1442,7 +1442,10 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                               {hasDuration && dq(c).durationRental != null && (
                                 <div className="mt-0.5 text-[11px] font-bold" style={{ color: C.rentee }}>
                                   {L("Est. rental", "الإيجار التقديري")}: {sar} {nf(dq(c).durationRental!)}
-                                  <span style={{ fontWeight: 600, opacity: 0.85 }}> · {durationDays} {L("days", "يوم")}{unitsOf(c) > 1 ? ` × ${unitsOf(c)}` : ""}</span>
+                                  {/* The BILLABLE days the figure was charged across, as the bid card
+                                      captions it — the request's calendar duration counts the Fridays
+                                      this total excludes. */}
+                                  <span style={{ fontWeight: 600, opacity: 0.85 }}> · {dq(c).billableDays} {L("billable days", "يوم محتسب")}{unitsOf(c) > 1 ? ` × ${unitsOf(c)}` : ""}</span>
                                 </div>
                               )}
                             </>)}

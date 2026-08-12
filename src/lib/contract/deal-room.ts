@@ -254,6 +254,16 @@ export interface DealTotals {
   rentalUnits: number; mobUnitsN: number; demobUnitsN: number;
   mobPrice: number; demobPrice: number; mobExcluded: boolean; demobExcluded: boolean;
   periods: number; hasDuration: boolean; periodCount: number;
+  /**
+   * Days actually charged — the duration minus its Fridays. This, NOT `periods`, is the number every
+   * surface must show beside the rate: `rentalTotal` is `(rate ÷ divisor) × billableDays × units`, so a
+   * label built from the raw duration states an arithmetic the total does not follow. 0 when the rental
+   * did not prorate (see `rentalRaw`).
+   */
+  billableDays: number;
+  /** True when `rentalTotal` is the bare quoted rate — no duration, no start date, PER_JOB, or a
+   *  collapsed window. Nothing prorated, so no day count is shown. */
+  rentalRaw: boolean;
   rentalTotal: number; mobTotal: number; demobTotal: number;
   subtotal: number; vat: number; grand: number;
 }
@@ -287,7 +297,8 @@ export function computeDealTotals(
   // The Friday anchor lives under `details`, NOT at the root of the room — a `room.startDate` here
   // silently evaluates to undefined, which turns proration off and shows the raw rate on every room.
   const startDate = room.details?.startDate ?? null;
-  const perUnitRental = computeRentalTotal({ rate, priceUnit, startDate, durationDays: periods }).total;
+  const rental = computeRentalTotal({ rate, priceUnit, startDate, durationDays: periods });
+  const perUnitRental = rental.total;
   const rentalTotal = perUnitRental * rentalUnits;
   const mobPrice = pick(override?.mobPrice, room.mobPrice ?? 0);
   const demobPrice = pick(override?.demobPrice, room.demobPrice ?? 0);
@@ -298,7 +309,10 @@ export function computeDealTotals(
   const subtotal = rentalTotal + mobTotal + demobTotal;
   const vat = Math.round(subtotal * VAT_RATE);
   const grand = subtotal + vat;
-  return { rate, priceUnit, perDayRate, rentalUnits, mobUnitsN, demobUnitsN, mobPrice, demobPrice, mobExcluded, demobExcluded, periods, hasDuration, periodCount: periods / dpp, rentalTotal, mobTotal, demobTotal, subtotal, vat, grand };
+  // Period count is derived from the BILLABLE days, not the calendar duration: a 61-day monthly job
+  // charges ~53 days, which is 2.04 months of rent, not the 2.35 the calendar suggests. The old raw
+  // figure disagreed with `rentalTotal` by exactly the Fridays.
+  return { rate, priceUnit, perDayRate, rentalUnits, mobUnitsN, demobUnitsN, mobPrice, demobPrice, mobExcluded, demobExcluded, periods, hasDuration, periodCount: (rental.raw ? periods : rental.billable) / dpp, billableDays: rental.raw ? 0 : rental.billable, rentalRaw: rental.raw, rentalTotal, mobTotal, demobTotal, subtotal, vat, grand };
 }
 
 export function mapDealRoom(raw: unknown): DealRoomView {
