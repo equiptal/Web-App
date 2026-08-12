@@ -6,7 +6,7 @@ import type { BidFormData, BidFormItem, LinkBidSubmission, LinkBidItem } from "@
 import { CERT_TERM_KEYS, certCodesFromValue, certConfKey, prettyCert } from "@/lib/contract/link-bids";
 import { fetchBidFormData } from "@/lib/api/client";
 import { hasVatInclusiveNote, stripVatInclusiveNote } from "@/lib/contract/vat-inclusive";
-import { computeRentalTotal, durationDaysBetween } from "@/lib/pricing/rental";
+import { computeRentalTotal, durationDaysBetween, VAT_RATE } from "@/lib/pricing/rental";
 import { qualityFromSubmission, qualityFromSubmissionItem } from "@/lib/contract/bid-quality";
 import { QualityRing } from "@/components/bid/QualityRing";
 import { BID_FORM_CSS } from "@/components/bid/bidFormStyles";
@@ -198,7 +198,7 @@ export function SharedBidSubmissionModal({
   /** True once ANY shown line was actually prorated — see the AC-216 note on `shownStoredGross`. */
   const proratedAny = (rows: LinkBidItem[]) => rows.some((a) => !itemRental(a).raw);
   const subtotal = (submission?.items ?? []).reduce((s, a) => s + itemSubtotal(a), 0);
-  const vat = subtotal * 0.15;
+  const vat = subtotal * VAT_RATE;
   // Focused on one item → total for THAT item only; otherwise the whole-submission grand total.
   const shownIds = new Set(shownItems.map((it) => it.requestItemId));
   const shownSubtotal = (submission?.items ?? []).filter((a) => shownIds.has(a.requestItemId)).reduce((s, a) => s + itemSubtotal(a), 0);
@@ -439,7 +439,7 @@ export function SharedBidSubmissionModal({
                           rental line above and with what the supplier saw on the form. */}
                       <div className="itot">
                         <span className="r">{L("Subtotal", "المجموع")}<b>{sub ? nf(sub) : "—"} {sar}</b></span>
-                        <span className="r">{L("VAT 15%", "ضريبة ١٥٪")}<b>{sub ? nf(sub * 0.15) : "—"} {sar}</b></span>
+                        <span className="r">{L("VAT 15%", "ضريبة ١٥٪")}<b>{sub ? nf(sub * VAT_RATE) : "—"} {sar}</b></span>
                         <span className="r t">{L("Item total", "إجمالي البند")}<b>{sub ? nf(sub * 1.15) : "—"} {sar}</b></span>
                       </div>
                       {(() => {
