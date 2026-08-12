@@ -2253,6 +2253,29 @@
   padding: 0;
 }
 .bidmap .bm-chat-x .material-icons-outlined { font-size: 16px; }
+/* The call control (owner, 2026-08-12) — the old deal room's, in this band's clothes. It borrows
+   `.bm-chat-x`'s geometry exactly, so the header reads as one row of controls rather than a circle
+   beside a differently-sized circle; only the ink differs, because reaching a person is an act and
+   closing a drawer is not. Locked when no number is on file: still a control, visibly inert, because
+   one that vanishes reads as a permission withdrawn rather than a number we do not hold. */
+.bidmap .bm-chat-call {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1.5px solid #c8d8e8;
+  color: #2563eb;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+.bidmap .bm-chat-call .material-icons-outlined { font-size: 16px; }
+.bidmap .bm-chat-call:hover { background: rgba(37, 99, 235, 0.08); border-color: rgba(37, 99, 235, 0.34); }
+.bidmap .bm-chat-call.is-locked { color: #c8d8e8; cursor: default; }
+.bidmap .bm-chat-call.is-locked:hover { background: #fff; border-color: #c8d8e8; }
 /* Rendered ONLY when this counterparty holds more than one bid in the RFQ group (RM3-AC-44). */
 .bidmap .bm-chat-tabs { flex-shrink: 0; display: flex; gap: 6px; padding: 8px 18px; overflow-x: auto; background: #fff; border-bottom: 1px solid #eff4f9; }
 .bidmap .bm-chat-tab {

@@ -758,6 +758,35 @@ export function ChatDock({
               {bid.supplierName}
               {bid.verified && <span className="bm-chat-tick material-icons-outlined">verified</span>}
             </span>
+            {/* ── The call control, restored (owner, 2026-08-12) ───────────────────────────────
+                ~~"the call control was excluded by name"~~, in the band's own comment above. It was
+                dropped alongside the presence dot and the two simulator buttons, as prototype
+                furniture that said nothing. That reading was wrong about this one: a number is not
+                decoration, it is the other way to reach the person the band names, and the OLD deal
+                room has carried it since B5 (`DealRoom.tsx:755`). The owner asked for that same
+                control here — *"use it like old deal room, just wire a phone icon"* — so this is an
+                icon that reaches the number, never the number printed into the band.
+
+                **The asymmetry is the server's, not ours** (AC-09). `supplier.phone` always reaches
+                the renter; `rentee.phone` stays null until the room is accepted or closed
+                (`deal-room.service.ts:1282`). This surface is the renter's, so the number is simply
+                there — and where it is not, the control still renders, locked, rather than
+                vanishing: a control that disappears reads as "you may not call him", when the truth
+                is only that we hold no number. That is the old room's own treatment, kept. */}
+            {bid.supplierPhone ? (
+              <a
+                className="bm-chat-call"
+                href={`tel:${bid.supplierPhone}`}
+                aria-label={t.chatDock.call}
+                title={t.chatDock.call}
+              >
+                <span className="material-icons-outlined">call</span>
+              </a>
+            ) : (
+              <span className="bm-chat-call is-locked" title={t.chatDock.callUnavailable}>
+                <span className="material-icons-outlined">call</span>
+              </span>
+            )}
             {/* ONE control decides the placement (prototype 1590). Not a resize handle — there are two
                 placements, not a continuum, and each is a whole layout rather than a width. */}
             <button

@@ -957,6 +957,8 @@ export const ar: Dictionary = {
     save: "حفظ",
     // The prototype's own two titles on this control (1591): «ملء الخريطة» / «لوحة بجانب الخريطة».
     placeFill: "ملء الخريطة",
+    call: "اتصل بالمورد",
+    callUnavailable: "لا يوجد رقم مسجّل",
     placeMirror: "لوحة بجانب الخريطة",
     // ── بطاقة المراجعة (RM3-AC-17) ──
     // الطلب يُنشأ في المحادثة أولاً، ولا يُرسل إلا بالضغط هنا. الإلغاء لا يكتب شيئاً — لا رسالة،
