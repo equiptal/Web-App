@@ -1048,6 +1048,10 @@ export const en = {
     // The placement control. Both labels name the STATE the press moves to, not the one it is in — a
     // toggle labelled with its current state is the oldest way to make a button lie.
     placeFill: "Fill the map area",
+    // The call control the old deal room has carried since B5, restored here (owner, 2026-08-12).
+    // The number is reached, never printed into the band.
+    call: "Call the supplier",
+    callUnavailable: "No number on file",
     placeMirror: "Show beside the map",
     // ── The review card (RM3-AC-17) ──
     // An ask is COMPOSED into the conversation and sent only when this is pressed. Cancelling writes
