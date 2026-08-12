@@ -10,24 +10,24 @@
  * |---|---|
  * | First cycle | the rate plus both legs — what leaving the yard actually costs |
  * | Every cycle after | the rate alone; the legs were paid once, in cycle 1 |
- * | The horizon | the whole request: the rate across every cycle, plus the legs once |
+ * | The duration | the whole request: rent across every billable day, plus the legs once |
  *
- * **Cycles here are calendar periods, not working days.** A monthly rate over 180 days is six
- * cycles, not 180 ÷ 26. That is deliberate and it is why this does not reuse `computeRentalTotal`,
- * which prorates a part-period across Friday-excluded working days: these columns answer *how many
- * times will I be billed*, and a lessor bills a month per month however many days it worked.
+ * **The first two columns are the quoted rate, untouched**, which is what `headlineAmount` shows on
+ * a weekly or monthly bid card: the renter is comparing what suppliers actually quoted.
+ *
+ * **The duration column is `computeRentalTotal`, and deliberately not whole cycles.** The owner's
+ * mockup drew it as `rate × 6 months` for a 180-day request. That is 481,260 where the platform's own
+ * equation gives 475,090 — 180 days holds 26 Fridays, and this platform does not bill Fridays, so
+ * the rental runs over 154 billable days at `rate ÷ 26` a day. Whole cycles would have made the same
+ * rental cost one number here and a different one in the deal room, on the quotation and on the bid
+ * card, which all share that module. Ruled 2026-08-12: the pricing module wins, and the popover says
+ * billable days out loud rather than claiming a count of months.
  *
  * **NO React, NO DOM, NO i18n.**
  */
 
+import { computeRentalTotal, rentalDivisor } from "@/lib/pricing/rental";
 import { VAT_RATE } from "./vat-inclusive";
-
-/** Calendar days in one billing cycle. `PER_JOB` has no cycle — the job is billed once, entire. */
-const CYCLE_DAYS: Record<string, number> = { PER_DAY: 1, PER_WEEK: 7, PER_MONTH: 30, PER_JOB: 0 };
-
-export function cycleDays(priceUnit: string | null | undefined): number {
-  return CYCLE_DAYS[(priceUnit ?? "PER_DAY").toUpperCase()] ?? 1;
-}
 
 /** One column of the matrix, with the lines its popover lists. */
 export interface CycleTotal {
@@ -39,11 +39,14 @@ export interface CycleTotal {
   total: number;
 }
 
-export interface HorizonTotal extends CycleTotal {
+export interface DurationTotal extends CycleTotal {
   /** The request's own duration, which is what the column is named after. */
   days: number;
-  /** How many times the rate is charged across it. */
-  cycles: number;
+  /** Days actually charged: the duration minus its Fridays. */
+  billableDays: number;
+  /** True when the rental is the bare quoted rate because it could not be prorated — no start date,
+   *  a per-job price, or a window that collapses. The popover must not then claim a day count. */
+  raw: boolean;
 }
 
 export interface CycleTotals {
@@ -51,7 +54,7 @@ export interface CycleTotals {
   /** Null on a `PER_JOB` quote: a job is billed once, so there is no second cycle to describe. */
   everyCycleAfter: CycleTotal | null;
   /** Null when the request never stated a duration — a horizon nobody set is not a number to show. */
-  horizon: HorizonTotal | null;
+  duration: DurationTotal | null;
 }
 
 export interface CycleInput {
@@ -60,8 +63,11 @@ export interface CycleInput {
   priceUnit: string | null;
   mob: { amount?: number | null; excluded?: boolean | null };
   demob: { amount?: number | null; excluded?: boolean | null };
-  /** The request's duration. Null or zero → no horizon column. */
+  /** The request's duration. Null or zero → no duration column. */
   durationDays?: number | null;
+  /** The request's start date. Without it the Fridays cannot be located and the rental cannot be
+   *  prorated at all — `computeRentalTotal` then returns the bare rate, and so does this. */
+  startDate?: string | null;
   /** Units the offer covers; every figure is multiplied by it. */
   units?: number | null;
 }
@@ -76,34 +82,34 @@ function withVat(rental: number, oneOff: number): CycleTotal {
   return { rental: money(rental), oneOff: money(oneOff), subtotal, vat, total: money(subtotal + vat) };
 }
 
-/**
- * How many times a rate is charged across a duration. A started cycle is a charged cycle — 45 days
- * on a monthly rate is two months, not one and a half — so this rounds up, and never below one:
- * a request shorter than a single cycle is still one cycle of rent.
- */
-export function cyclesIn(durationDays: number, priceUnit: string | null | undefined): number {
-  const per = cycleDays(priceUnit);
-  if (per <= 0) return 1; // PER_JOB — billed once, entire
-  return Math.max(1, Math.ceil(durationDays / per));
+/** A per-job price is billed once, entire — there is no second cycle and nothing recurs. */
+export function hasRecurringCycle(priceUnit: string | null | undefined): boolean {
+  return rentalDivisor(priceUnit) > 0;
 }
 
 export function computeCycleTotals(input: CycleInput): CycleTotals {
   const units = input.units && input.units > 0 ? input.units : 1;
   const rate = (input.rate ?? 0) * units;
   const oneOff = (leg(input.mob) + leg(input.demob)) * units;
-  const perJob = cycleDays(input.priceUnit) <= 0;
 
   const firstCycle = withVat(rate, oneOff);
   // The legs are gone from here — that is the whole point of the column. Stating them as zero would
   // read as "this supplier delivers free", which is a different claim entirely.
-  const everyCycleAfter = perJob ? null : withVat(rate, 0);
+  const everyCycleAfter = hasRecurringCycle(input.priceUnit) ? withVat(rate, 0) : null;
 
   const days = input.durationDays ?? 0;
-  let horizon: HorizonTotal | null = null;
+  let duration: DurationTotal | null = null;
   if (days > 0) {
-    const cycles = cyclesIn(days, input.priceUnit);
-    horizon = { ...withVat(rate * cycles, oneOff), days, cycles };
+    // The shared equation: (rate ÷ divisor) × billable days, Fridays excluded. Same call the deal
+    // room and the quotation make, so the three surfaces cannot state different totals.
+    const r = computeRentalTotal({
+      rate: input.rate ?? 0,
+      priceUnit: input.priceUnit,
+      startDate: input.startDate ?? null,
+      durationDays: days,
+    });
+    duration = { ...withVat(r.total * units, oneOff), days, billableDays: r.billable, raw: r.raw };
   }
 
-  return { firstCycle, everyCycleAfter, horizon };
+  return { firstCycle, everyCycleAfter, duration };
 }

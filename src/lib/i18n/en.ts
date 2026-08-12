@@ -1196,7 +1196,13 @@ export const en = {
     // Their popovers. Each lists the lines the figure was added from, in that order.
     howFirstCycle: "How first cycle is built",
     howEveryCycle: "How every cycle after is built",
-    howHorizon: "How {n} days is built",
+    howDuration: "How {n} days is built",
+    // The duration column charges billable days, so its popover names them rather than claiming a
+    // count of whole months. Ruled 2026-08-12: the shared pricing module governs this figure, and it
+    // prorates at rate ÷ 26 a day with Fridays excluded — the same equation the deal room and the
+    // quotation use, so one rental cannot cost two different amounts across the app.
+    rentalOverDays: "Rental ÷ 26 × {n} billable days",
+    fridaysNote: "{days} days minus its Fridays = {billable} billable days.",
     transportOnce: "Delivery + return",
     paidOnce: "paid once, cycle 1",
     vatNote: "All figures in SAR. VAT applied at 15% on the taxable lines above.",

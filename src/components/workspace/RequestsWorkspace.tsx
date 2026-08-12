@@ -258,6 +258,7 @@ export function RequestsWorkspace() {
               bids={shown}
               selectedId={resolved.bidId}
               durationDays={item?.durationDays ?? null}
+              startDate={item?.startDate ?? null}
               onSelect={pickBid}
             />
           )}
