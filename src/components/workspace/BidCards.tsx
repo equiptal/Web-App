@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
-import { computeQuoteTotals, divisorNote, formatSar } from "@/lib/pricing/rental";
+import { computeQuoteTotals, computeRentalTotal, divisorNote, formatSar, headlineAmount, legDisplay } from "@/lib/pricing/rental";
 import { startDealRoom } from "@/lib/api/client";
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
@@ -25,10 +25,15 @@ export function BidCards({
   selectedId,
   unreadByBid,
   submissionsByBid,
+  durationDays,
+  startDate,
   onSelect,
 }: {
   bids: WorkspaceBid[];
   selectedId: string | null;
+  /** The request's duration and start date — what the rental is prorated across. */
+  durationDays: number | null;
+  startDate: string | null;
   /** Unread chat messages per bid, from received-bids. */
   unreadByBid: Record<string, number>;
   /** The raw submission behind an off-platform card, for the viewer. */
@@ -57,6 +62,8 @@ export function BidCards({
           selected={b.card.id === selectedId}
           unread={unreadByBid[b.card.id] ?? 0}
           submission={submissionsByBid[b.card.id] ?? null}
+          durationDays={durationDays}
+          startDate={startDate}
           onSelect={() => onSelect(b.card.id)}
         />
       ))}
@@ -69,12 +76,16 @@ function BidCardTile({
   selected,
   unread,
   submission,
+  durationDays,
+  startDate,
   onSelect,
 }: {
   bid: WorkspaceBid;
   selected: boolean;
   unread: number;
   submission: LinkBidSubmission | null;
+  durationDays: number | null;
+  startDate: string | null;
   onSelect: () => void;
 }) {
   const t = useT();
@@ -91,22 +102,44 @@ function BidCardTile({
   const offline = bid.source === "offline";
   const dial = termsDial(card, bid.source);
 
-  // Per-unit figures, which is what the breakdown rows state. A multi-unit offer says so on its own
-  // line rather than quietly showing a bigger number under the same labels.
+  // ── The price block, built the way the app builds it ───────────────────────────────────────────
+  // Mirrors `v3_bid_card.dart` + `price_expanded_breakdown.dart`, checked against the source on
+  // 2026-08-12. Every row here is PER UNIT; a multi-unit offer adds an all-units row at the foot.
   const units = card.unitsOffered > 0 ? card.unitsOffered : card.numberOfUnits > 0 ? card.numberOfUnits : 1;
+  // The rental is prorated: (rate ÷ 26 or ÷ 6) × billable days, Fridays excluded. With no duration
+  // it stays the bare rate — never a fabricated single day, which would read as near-zero on a
+  // monthly bid.
+  const rental = computeRentalTotal({
+    rate: card.price,
+    priceUnit: card.priceUnit,
+    startDate,
+    durationDays,
+  });
   const totals = computeQuoteTotals({
-    perUnitRental: card.price ?? 0,
+    perUnitRental: rental.total,
     rentalUnits: units,
     mob: { amount: card.mobPrice, units: card.mobUnits, excluded: card.mobExcluded },
     demob: { amount: card.demobPrice, units: card.demobUnits, excluded: card.demobExcluded },
   });
-  const periodWord =
-    card.priceUnit === "PER_MONTH" ? t.priceFooter.month
-    : card.priceUnit === "PER_WEEK" ? t.priceFooter.week
-    : card.priceUnit === "PER_JOB" ? t.priceFooter.job
-    : t.priceFooter.day;
-  const rentalLabel = t.workspace.rentalPer.replace("{period}", periodWord);
+  // The headline is the RATE on a weekly or monthly bid, so suppliers compare on what they quoted;
+  // the prorated total moves into the breakdown. A daily bid headlines its total, as the app does.
+  const headline = headlineAmount(card.priceUnit, card.price ?? 0, rental.total);
+  const rentalTypeLabel =
+    card.priceUnit === "PER_MONTH" ? t.workspace.rentalMonthly
+    : card.priceUnit === "PER_WEEK" ? t.workspace.rentalWeekly
+    : card.priceUnit === "PER_JOB" ? t.workspace.rentalJob
+    : t.workspace.rentalDaily;
+  const headlineLabel = units > 1 ? t.workspace.perUnitLabel.replace("{label}", rentalTypeLabel) : rentalTypeLabel;
+  // The rental row explains the headline, so it is dropped when there is nothing left to explain:
+  // an exact period on a single-unit bid means the headline already IS the total.
+  const showRentalRow = !(rental.exact && units <= 1);
+  const rentalRowLabel = rental.raw
+    ? t.workspace.rentalRowNoDuration
+    : durationDays
+      ? t.workspace.rentalRowDays.replace("{n}", String(rental.billable))
+      : t.workspace.rentalRowCustom;
   const basis = divisorNote(card.priceUnit, L);
+  const accepted = card.status === "ACCEPTED" || card.wonViaSurvey === true;
   const submitted = card.submittedAt
     ? new Date(card.submittedAt).toLocaleString(ar ? "ar" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
     : null;
@@ -192,14 +225,17 @@ function BidCardTile({
 
       {/* The money. */}
       <div className="px-3 py-3">
-        <div className="flex items-start gap-2">
+        {/* The headline: the rental type, and the rate or the total depending on the unit. An
+            accepted bid is the only status that touches this block — green, and a tick. */}
+        <div className={`flex items-start gap-2 ${accepted ? "-mx-3 -mt-3 mb-2.5 rounded-t-[13px] border-b-2 border-ok bg-ok-soft px-3 pb-2 pt-3" : ""}`}>
           <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-extrabold text-navy">{rentalLabel}</div>
+            <div className="text-[13px] font-extrabold text-navy">{headlineLabel}</div>
             {basis && <div className="text-[11px] font-semibold text-muted">{basis}</div>}
           </div>
           <div className="flex flex-none items-center gap-1">
-            <b className="text-[17px] font-black text-navy">{formatSar(totals.perUnit.rental)}</b>
+            <b className="text-[17px] font-black text-navy">{formatSar(headline)}</b>
             <span className="text-[10.5px] font-bold text-muted">{t.priceFooter.currency}</span>
+            {accepted && <Icon name="check_circle" size={16} className="text-ok" />}
             <button
               type="button"
               onClick={(e) => {
@@ -217,34 +253,40 @@ function BidCardTile({
 
         {open && (
           <div className="mt-2.5 rounded-[10px] bg-surface2 px-3 py-2.5">
-            <Row label={t.priceFooter.mobilisation} value={totals.perUnit.mob} excluded={card.mobExcluded} />
-            <Row label={t.priceFooter.demobilisation} value={totals.perUnit.demob} excluded={card.demobExcluded} />
+            {/* The rental, prorated across the billable days — what the headline's rate adds up to
+                over this request. Dropped when the headline already is the total. */}
+            {showRentalRow && <Row label={rentalRowLabel} value={totals.perUnit.rental} />}
+            <LegRow label={t.workspace.deliveryToSite} amount={card.mobPrice} excluded={card.mobExcluded} />
+            <LegRow label={t.workspace.returnFromSite} amount={card.demobPrice} excluded={card.demobExcluded} />
             <div className="my-2 border-t border-border" />
             <Row label={t.priceFooter.subtotal} value={totals.perUnit.subtotal} muted />
             <Row label={t.priceFooter.vat} value={totals.perUnit.vat} muted />
           </div>
         )}
 
-        <div className="mt-2.5 flex items-center justify-between gap-2 rounded-[10px] border border-border px-3 py-2.5">
-          <span className="text-[12.5px] font-extrabold text-navy">
-            {t.workspace.grandTotal} · {periodWord}
-          </span>
-          <span className="flex-none">
-            <b className="text-[16px] font-black text-navy">{formatSar(totals.perUnit.total)}</b>{" "}
-            <span className="text-[10.5px] font-bold text-muted">{t.priceFooter.currency}</span>
-          </span>
-        </div>
-
-        {/* Only when there is more than one machine, and stated rather than folded into the rows
-            above — the breakdown is per unit, and a bigger number under the same labels would lie. */}
-        {units > 1 && (
-          <div className="mt-1.5 flex items-center justify-between gap-2 px-1 text-[11.5px] font-bold text-muted">
-            <span>{t.workspace.allUnits.replace("{n}", String(units))}</span>
-            <span>
-              {formatSar(totals.overall.total)} {t.priceFooter.currency}
+        <div className="mt-2.5 rounded-[10px] border border-border px-3 py-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[12.5px] font-extrabold text-navy">{t.workspace.grandTotalInclVat}</span>
+            <span className="flex-none">
+              <b className="text-[16px] font-black text-navy">{formatSar(totals.perUnit.total)}</b>{" "}
+              <span className="text-[10.5px] font-bold text-muted">{t.priceFooter.currency}</span>
             </span>
           </div>
-        )}
+
+          {/* Multi-unit: a second row in the SAME box, carrying the real all-units figure. It is not
+              the per-unit total × units — each transport leg carries its own count. */}
+          {units > 1 && (
+            <div className="mt-2 flex items-center justify-between gap-2 border-t border-border pt-2">
+              <span className="text-[12px] font-extrabold text-brand">
+                {t.workspace.overallTotal} <span className="font-bold text-muted">· {units}</span>
+              </span>
+              <span className="flex-none">
+                <b className="text-[15px] font-black text-brand">{formatSar(totals.overall.total)}</b>{" "}
+                <span className="text-[10.5px] font-bold text-muted">{t.priceFooter.currency}</span>
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* The way on. */}
@@ -315,18 +357,38 @@ function BidCardTile({
   );
 }
 
-function Row({ label, value, muted, excluded }: { label: string; value: number; muted?: boolean; excluded?: boolean | null }) {
+function Row({ label, value, muted }: { label: string; value: number; muted?: boolean }) {
   const t = useT();
   return (
     <div className={`flex items-center justify-between gap-2 py-0.5 text-[12.5px] ${muted ? "text-muted" : "text-navy"}`}>
       <span className="font-semibold">{label}</span>
       <span className="flex-none font-bold">
-        {excluded ? (
+        {formatSar(value)} <span className="text-[10px] font-bold text-muted">{t.priceFooter.currency}</span>
+      </span>
+    </div>
+  );
+}
+
+/**
+ * A transport leg. It falls back to words rather than a number, in the app's own priority: excluded
+ * first, then a price that was never quoted. A zero would claim the supplier delivers free, and a
+ * blank would claim nothing at all — both say more than the quote does.
+ */
+function LegRow({ label, amount, excluded }: { label: string; amount: number | null; excluded?: boolean | null }) {
+  const t = useT();
+  const leg = legDisplay({ amount, excluded });
+  return (
+    <div className="flex items-center justify-between gap-2 py-0.5 text-[12.5px] text-navy">
+      <span className="font-semibold">{label}</span>
+      <span className={`flex-none font-bold ${leg.kind === "amount" ? "" : "text-muted"}`}>
+        {leg.kind === "amount" ? (
+          <>
+            {formatSar(leg.amount)} <span className="text-[10px] font-bold text-muted">{t.priceFooter.currency}</span>
+          </>
+        ) : leg.kind === "excluded" ? (
           t.priceFooter.excluded
         ) : (
-          <>
-            {formatSar(value)} <span className="text-[10px] font-bold text-muted">{t.priceFooter.currency}</span>
-          </>
+          t.workspace.notQuoted
         )}
       </span>
     </div>

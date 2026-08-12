@@ -1173,9 +1173,26 @@ export const en = {
     notOnApp: "Not on the app",
     openChat: "Open the conversation",
     // "{period}" is the rental period the bid quoted in — Monthly rental, Weekly rental, and so on.
-    rentalPer: "Rental / {period}",
+    // The price block mirrors the app's bid card (`v3_bid_card.dart`, `price_expanded_breakdown.dart`,
+    // checked 2026-08-12). The headline names the rental type; on a weekly or monthly bid it carries
+    // the RATE, so suppliers compare on what they quoted, and the prorated total moves into the rows.
+    rentalDaily: "Daily rental",
+    rentalWeekly: "Weekly rental",
+    rentalMonthly: "Monthly rental",
+    rentalJob: "Job price",
+    perUnitLabel: "{label} per unit",
+    // The rental row explains the headline: the rate spread across the days actually billed.
+    rentalRowDays: "Rental · {n} days",
+    rentalRowNoDuration: "Rental",
+    rentalRowCustom: "Rental for the specified period",
+    deliveryToSite: "Delivery to site",
+    returnFromSite: "Return from site",
+    notQuoted: "Not quoted",
     grandTotal: "Grand total",
-    allUnits: "All {n} units",
+    grandTotalInclVat: "Grand total · incl. VAT",
+    // Multi-unit only, in the same box: the true all-units figure, which is not the per-unit total
+    // times the count — each transport leg carries its own unit count.
+    overallTotal: "Overall total",
     // Off-platform pair. The invite has no action behind it yet and says so when pressed.
     inviteToApp: "Invite to Moedatech",
     viewQuote: "View quote",

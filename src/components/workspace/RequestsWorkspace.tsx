@@ -251,6 +251,8 @@ export function RequestsWorkspace() {
               selectedId={resolved.bidId}
               unreadByBid={unreadByBid}
               submissionsByBid={submissionsByBid}
+              durationDays={item?.durationDays ?? null}
+              startDate={item?.startDate ?? null}
               onSelect={pickBid}
             />
           ) : (
