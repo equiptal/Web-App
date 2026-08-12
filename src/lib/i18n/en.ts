@@ -1235,6 +1235,26 @@ export const en = {
     // A term the supplier never answered. Said out loud, because a blank cell reads as "nothing to pay".
     didntSay: "Didn't say",
     rankWithAi: "Rank with AI",
+    // ── The request drawer ──
+    shareRequest: "Share request",
+    editRequest: "Edit request",
+    cancelRequest: "Cancel this request",
+    unitsCount: "{n} units",
+    factStarts: "Starts",
+    factDuration: "Duration",
+    factSite: "Site",
+    factRequested: "Requested",
+    factBidsIn: "Bids in",
+    daysValue: "{n} days",
+    // "4 · 2 via the app, 2 added offline" — the total alone hides that half were typed in by hand.
+    bidsSplit: "{app} via the app, {offline} added offline",
+    certsRequired: "Certificates required",
+    // The one-time post-bid edit, in the app's own words (`app_en.arb`, editOnceConfirm*). The web
+    // used to hide Edit entirely once a bid arrived; the app has allowed exactly one since 2026-08-05.
+    editOnceTitle: "One-time edit",
+    editOnceBody: "You can edit this request only once after a bid has been placed. Continue to the edit form?",
+    editOnceContinue: "Continue editing",
+    editCapUsed: "You've already used your one edit for this request",
   },
   survey: {
     navTitle: "Surveys",

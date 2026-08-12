@@ -147,6 +147,43 @@ export function termsDial(bid: BidCard, source: BidSource): TermsDial {
   return { met, against, unanswered, total: met + against + unanswered };
 }
 
+/** What the drawer's Edit and Cancel controls may do with this request. */
+export interface RequestActions {
+  /** Edit is shown. It stays visible after a bid lands rather than vanishing. */
+  canEdit: boolean;
+  /** Shown, but spent — disabled, and it must say why. */
+  editCapUsed: boolean;
+  /** Editing costs the one allowed post-bid edit, so it is confirmed first. */
+  editNeedsConfirm: boolean;
+  canCancel: boolean;
+}
+
+/**
+ * Mirror of the mobile app's rule (`request_detail_page.dart:165-174`, `638-674`), which the web
+ * contradicted: web hid Edit the moment a bid arrived, the app has allowed one post-bid edit since
+ * 2026-08-05 and it is live on `main`.
+ *
+ * - Open or active → Edit is shown. It never disappears, so the renter is told why rather than left
+ *   hunting for a button that used to be there.
+ * - No bids → edit freely, as often as you like.
+ * - Bids, first edit → confirm, because it is the only one.
+ * - Bids, edit spent → disabled, with the reason.
+ *
+ * The cap is the server's to enforce (`request.service.ts:830` updates conditionally on
+ * `bidCount > 0 && renteeEditUsed === false`); this only decides what the renter is shown, so that
+ * the refusal arrives before the form rather than after it.
+ */
+export function requestActions(req: Pick<RequestListItem, "status" | "bidCount" | "renteeEditUsed">): RequestActions {
+  const live = req.status === "OPEN" || req.status === "ACTIVE";
+  const hasBids = req.bidCount > 0;
+  return {
+    canEdit: live,
+    editCapUsed: live && hasBids && req.renteeEditUsed,
+    editNeedsConfirm: live && hasBids && !req.renteeEditUsed,
+    canCancel: live,
+  };
+}
+
 /**
  * The bid ids holding the lowest figure in a column. Ties all win — two suppliers charging the same
  * to deliver are equally the cheapest, and picking one of them by list order would invent a
