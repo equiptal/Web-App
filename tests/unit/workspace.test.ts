@@ -5,6 +5,7 @@ import {
   isClosedGroup,
   isClosedRequest,
   railTiles,
+  requestActions,
   resolveSelection,
   selectedGroup,
   selectedItem,
@@ -31,6 +32,8 @@ function item(id: string, status: RequestStatus = "OPEN", qty = 1, imageUrl: str
     durationDays: null,
     createdAt: null,
     bidCount: 0,
+    renteeEditUsed: false,
+    requiredCerts: [],
     mobByRentee: null,
     demobByRentee: null,
     item: { name: `item ${id}`, nameAr: "", qty, imageUrl, categoryId: null },
@@ -153,6 +156,52 @@ describe("selectedGroup / selectedItem", () => {
   it("returns null for a selection pointing nowhere", () => {
     expect(selectedGroup(groups, EMPTY_SELECTION)).toBeNull();
     expect(selectedItem(groups, EMPTY_SELECTION)).toBeNull();
+  });
+});
+
+describe("requestActions — the app's post-bid edit rule", () => {
+  const req = (status: RequestStatus, bidCount: number, renteeEditUsed = false) => ({ status, bidCount, renteeEditUsed });
+
+  it("shows Edit on a live request whether or not bids have arrived", () => {
+    expect(requestActions(req("OPEN", 0)).canEdit).toBe(true);
+    expect(requestActions(req("ACTIVE", 4)).canEdit).toBe(true);
+  });
+
+  it("edits freely before any bid — no confirmation, no cap", () => {
+    const a = requestActions(req("OPEN", 0));
+    expect(a.editNeedsConfirm).toBe(false);
+    expect(a.editCapUsed).toBe(false);
+  });
+
+  it("confirms the first edit once a bid exists, because it is the only one", () => {
+    const a = requestActions(req("OPEN", 1));
+    expect(a.editNeedsConfirm).toBe(true);
+    expect(a.editCapUsed).toBe(false);
+  });
+
+  it("disables Edit once that one edit is spent, still showing it", () => {
+    const a = requestActions(req("OPEN", 1, true));
+    expect(a.canEdit).toBe(true);
+    expect(a.editCapUsed).toBe(true);
+    expect(a.editNeedsConfirm).toBe(false);
+  });
+
+  it("does not spend the cap on a request that never had bids", () => {
+    // `renteeEditUsed` can be true from an earlier life; with no bids the edit is free again.
+    expect(requestActions(req("OPEN", 0, true)).editCapUsed).toBe(false);
+  });
+
+  it("offers neither edit nor cancel once the request is over", () => {
+    for (const s of ["CLOSED", "EXPIRED", "ACCEPTED"] as RequestStatus[]) {
+      const a = requestActions(req(s, 2));
+      expect(a.canEdit).toBe(false);
+      expect(a.canCancel).toBe(false);
+    }
+  });
+
+  it("allows cancelling while the request is live", () => {
+    expect(requestActions(req("OPEN", 0)).canCancel).toBe(true);
+    expect(requestActions(req("ACTIVE", 3)).canCancel).toBe(true);
   });
 });
 

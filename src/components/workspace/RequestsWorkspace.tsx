@@ -24,6 +24,7 @@ import { RequestRail } from "@/components/workspace/RequestRail";
 import { RequestStrip } from "@/components/workspace/RequestStrip";
 import { BidCards } from "@/components/workspace/BidCards";
 import { CompareMatrix } from "@/components/workspace/CompareMatrix";
+import { RequestDrawer, type ShareLinkMeta } from "@/components/workspace/RequestDrawer";
 
 type Tab = "cards" | "compare";
 
@@ -55,6 +56,9 @@ export function RequestsWorkspace() {
   const [tab, setTab] = useState<Tab>("cards");
   const [source, setSource] = useState<SourceFilter>("all");
   const [reloads, setReloads] = useState(0);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  // The public bid link's own settings, which the share sheet edits.
+  const [link, setLink] = useState<ShareLinkMeta | null>(null);
 
   // ── The renter's requests ──
   useEffect(() => {
@@ -102,6 +106,13 @@ export function RequestsWorkspace() {
       );
       setBids([...app.bids.map((card): WorkspaceBid => ({ card, source: "app" })), ...offline.map((o) => o.bid)]);
       setSubmissionsByBid(Object.fromEntries(offline.map((o) => [o.bid.card.id, o.sub])));
+      // The same call already carries the public bid link's settings; the drawer's share sheet edits
+      // them, so keep them rather than throwing them away with the rest of the envelope.
+      setLink(
+        "renterName" in link
+          ? { renterName: link.renterName, bidDeadline: link.bidDeadline, logoUrl: link.logoUrl }
+          : null,
+      );
     });
     return () => {
       live = false;
@@ -184,8 +195,7 @@ export function RequestsWorkspace() {
         bid={bid}
         bidCount={bids.length}
         onPickItem={pickItem}
-        // Phase 4 builds the drawer; until then the site and the id are drawn as links and do nothing.
-        onOpenRequest={null}
+        onOpenRequest={() => setDrawerOpen(true)}
       />
 
       <div className="mx-3 mt-4 sm:mx-5">
@@ -266,6 +276,22 @@ export function RequestsWorkspace() {
           )}
         </div>
       </div>
+
+      {drawerOpen && (
+        <RequestDrawer
+          group={group}
+          item={item}
+          bids={bids}
+          link={link}
+          onClose={() => setDrawerOpen(false)}
+          // An edit or a cancellation changes the rail and the bids under it, so both are re-read
+          // rather than patched in place — the page has one source for its data and keeps it.
+          onChanged={() => {
+            setGroups(null);
+            setReloads((n) => n + 1);
+          }}
+        />
+      )}
     </div>
   );
 }
