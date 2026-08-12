@@ -89,10 +89,19 @@ describe("computeBidQuote (shared quote math — comparison ↔ quotation parity
     expect(q.perUnitRental).toBe(2600); // 2600 / 26 × 26
   });
 
-  it("PER_JOB is a flat rate (no duration), × units", () => {
+  it("PER_JOB takes the app's unrecognized-unit fallback: rate × calendar days × units", () => {
+    // PER_JOB was retired in the app on 2026-08-05 and now falls out of its divisor lookup onto
+    // `rate × durationDays × units`. Adopted over spec 005's "flat, never prorated" so the two clients
+    // price a legacy PER_JOB row identically.
     const q = computeBidQuote(bc({ price: 5000, priceUnit: "PER_JOB", duration: 30, numberOfUnits: 2, unitsOffered: 2 }));
+    expect(q.perUnitRental).toBe(150_000); // 5,000 × 30
+    expect(q.rentalSubtotal).toBe(300_000);
+  });
+
+  it("a PER_JOB bid with no duration is still just the rate — nothing to multiply", () => {
+    const q = computeBidQuote(bc({ price: 5000, priceUnit: "PER_JOB", duration: null, numberOfUnits: 2, unitsOffered: 2 }));
     expect(q.perUnitRental).toBe(5000);
-    expect(q.rentalSubtotal).toBe(10000);
+    expect(q.rentalSubtotal).toBe(10_000);
   });
 
   it("mobilization/demobilization are per-unit (× units); VAT is 15% of the pre-VAT subtotal", () => {

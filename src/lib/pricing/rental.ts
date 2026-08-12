@@ -28,6 +28,17 @@ export function rentalDivisor(unit: string | null | undefined): number {
 }
 
 /**
+ * Whether the unit is one the divisor table actually prices.
+ *
+ * `rentalDivisor` answers 1 for anything it doesn't know, which silently prices a garbage unit as
+ * PER_DAY. The app instead routes an unrecognized unit to its `rate × durationDays` fallback, so the
+ * two need to be told apart. Null/empty counts as PER_DAY, matching `rentalDivisor`'s own default.
+ */
+export function isKnownRentalUnit(unit: string | null | undefined): boolean {
+  return (unit ?? "PER_DAY").toUpperCase() in RENTAL_DIVISOR;
+}
+
+/**
  * Fridays in the inclusive window `[start, start + durationDays − 1]`.
  *
  * Counted arithmetically rather than by iterating, so an open-ended multi-year duration can't turn a
@@ -47,10 +58,21 @@ export function countFridays(startDate: string | Date | null | undefined, durati
 /**
  * The rental window's length in days, from the request's start + end dates.
  *
- * Mirrors the mobile app's `end.difference(start).inDays` plus the deal room's `d < 1 ? 1` clamp — a
- * plain difference, NOT an inclusive count, so 15 Aug → 15 Oct is 61 days rather than 62. Both dates
- * are read as calendar days in UTC so the length can't shift with the viewer's timezone. A bare
- * `YYYY-MM-DD` (which `Date` would otherwise parse as UTC midnight anyway) is pinned explicitly.
+ * BOTH ENDS INCLUSIVE — 15 Aug → 15 Oct is **62** days, not 61. This is the backend's
+ * `inclusiveDurationDays` (`bid.service.ts`: `(endUTC − startUTC) / DAY + 1`), which is the figure both
+ * clients price against, and the app's own `_computeDurationDays`
+ * (`create_request_bloc.dart`: `end.difference(start).inDays + 1`) stamps the same count onto the
+ * request at creation.
+ *
+ * It used to drop the `+ 1`, on a comment claiming to mirror `end.difference(start).inDays` — the app
+ * expression WITHOUT the `+ 1` the app actually applies to it. Every surface that derives its own
+ * duration (the supplier's bid form and the off-platform submission viewer always do; the request
+ * mapper only when the backend omits `estimatedDurationDays`) was therefore pricing a day short of the
+ * backend's own estimate for the same bid — and, because the Friday window is anchored on this length,
+ * sometimes two days short.
+ *
+ * Both dates are read as calendar days in UTC so the length can't shift with the viewer's timezone. A
+ * bare `YYYY-MM-DD` (which `Date` would otherwise parse as UTC midnight anyway) is pinned explicitly.
  *
  * Returns null when either end is missing — an open-ended request has no period to prorate over, and
  * `computeRentalTotal` correctly falls back to the raw quoted rate.
@@ -60,7 +82,7 @@ export function durationDaysBetween(start: string | null | undefined, end: strin
   const s = new Date(start.length <= 10 ? `${start}T00:00:00Z` : start).getTime();
   const e = new Date(end.length <= 10 ? `${end}T00:00:00Z` : end).getTime();
   if (Number.isNaN(s) || Number.isNaN(e)) return null;
-  const d = Math.floor((e - s) / 86_400_000);
+  const d = Math.round((e - s) / 86_400_000) + 1;
   return d < 1 ? 1 : d;
 }
 
@@ -104,9 +126,22 @@ export function computeRentalTotal(args: {
   const divisor = rentalDivisor(args.priceUnit);
   const bare: RentalTotal = { total: rate, billable: 0, raw: true, exact: true };
 
-  if (divisor === 0) return bare; // PER_JOB — a flat price, nothing to prorate
   const duration = Number(args.durationDays);
-  if (!Number.isFinite(duration) || duration <= 0) return bare;
+  const hasDuration = Number.isFinite(duration) && duration > 0;
+
+  // PER_JOB and any unrecognized unit take the app's UNRECOGNIZED-UNIT fallback: `rate × durationDays`,
+  // every calendar day, no divisor and no Friday exclusion. Both app copies do this
+  // (`rental_pricing.dart` / `deal_room_pricing.dart`: `if (divisor == null) return rate * durationDays`)
+  // because PER_JOB was retired on 2026-08-05 and now falls through their divisor lookup.
+  //
+  // ⚠ This is NOT "flat, never prorated" — spec 005 §2 says that, and this deliberately overrides it on
+  // the owner's instruction to match the app in every case. A 7,700 job price over a 62-day window now
+  // reads 477,400, per unit. There is no PER_JOB data path left in the app, so this only reaches legacy
+  // rows; if those exist in prod, this is the line to revisit.
+  if (divisor === 0 || !isKnownRentalUnit(args.priceUnit)) {
+    return hasDuration ? { total: rate * duration, billable: duration, raw: false, exact: rate * duration === rate } : bare;
+  }
+  if (!hasDuration) return bare;
 
   // No start date ⇒ the Fridays can't be located ⇒ the bare rate, exactly as mobile §3 specifies.
   //
@@ -214,10 +249,13 @@ export function computeQuoteTotals(args: {
   const units = args.rentalUnits > 0 ? args.rentalUnits : 1;
   const legPerUnit = (l: { amount?: number | null; excluded?: boolean | null }) =>
     l.excluded || l.amount == null || !Number.isFinite(Number(l.amount)) ? 0 : Number(l.amount);
-  // A leg's own count defaults to the rental count and is capped by it — a bid can't mobilize more
-  // machines than it rents.
+  // A leg's own count defaults to the rental count and is NOT capped by it. The web used to cap
+  // ("a bid can't mobilize more machines than it rents"), but the app doesn't — `effectiveMobUnits`
+  // is `mobExcluded ? 0 : (mobUnits ?? numberOfUnits)`, no clamp — so a room storing 5 mob trips
+  // against 3 rented machines billed 5 in the app and 3 here. Whatever count the parties negotiated
+  // onto the leg is the count both clients now charge.
   const legUnits = (l: { units?: number | null; excluded?: boolean | null }) =>
-    l.excluded ? 0 : Math.min(l.units ?? units, units);
+    l.excluded ? 0 : (l.units ?? units);
 
   const mobEach = legPerUnit(args.mob);
   const demobEach = legPerUnit(args.demob);
