@@ -21,16 +21,22 @@ a mechanical revert. Same pattern as `docs/surveys-disabled.md`.
 
 ### The routes
 
-All four now redirect to `/requests` rather than 404:
+`/compare`, `/requests/[id]` and `/requests/group/[groupId]` **308 to `/requests`**, handled in
+`src/middleware.ts` (`isRetiredRequestsRoute`). Their `page.tsx` files are gone — the redirect never
+reaches the router.
 
-- `src/app/compare/page.tsx`
-- `src/app/requests/[id]/page.tsx`
-- `src/app/requests/group/[groupId]/page.tsx`
+They redirect rather than 404 because the routes are in notification deep links and in whatever
+people bookmarked; a 404 would say the feature is gone when it has only moved. **The id is dropped
+rather than carried** — the workspace resolves its own selection from the rail, and a stale or
+foreign id would land the renter on a request that is not theirs to see.
 
-They are kept because the routes are in notification deep links and in whatever people bookmarked. A
-404 would say the feature is gone; it has only moved. **The id is dropped rather than carried** — the
-workspace resolves its own selection from the rail, and a stale or foreign id would land the renter
-on a request that is not theirs to see.
+> **This was first written as `redirect()` in a page, and that does not work here.** The thrown
+> `NEXT_REDIRECT` is caught by a client error boundary in the app's provider tree and rendered as an
+> error page, so the route answered **200 with a stack trace in its body** — in dev and in a
+> production build alike. `export const dynamic = "force-dynamic"` did not change it. It was found by
+> curling the running server, not by any test, which is why
+> `tests/unit/middleware.test.ts` now pins the status code, the destination, and that the id is
+> dropped. Do not move this back into a page.
 
 ### What moved out before the lights went off
 
@@ -96,7 +102,9 @@ behaviour keep passing. Two do, and both were annotated in place rather than lef
 
 1. Strip the leading `// ` from the seven files, and delete the three-line `// DISABLED` banner at the
    top of each.
-2. Restore the four page files from git history (they are now three-line redirects).
+2. Restore the three deleted `page.tsx` files from git history, and remove `isRetiredRequestsRoute`
+   and its branch from `src/middleware.ts` — otherwise the routes redirect away before the restored
+   pages can render.
 3. Decide what to do about `EditRequestModal` / `ConfirmCancelModal`: either re-export them from
    `RequestDetail.tsx` and delete `RequestEditModals.tsx`, or leave them where they are and have the
    revived page import them. **Do not end up with two copies.**
