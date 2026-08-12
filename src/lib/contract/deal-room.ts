@@ -297,7 +297,14 @@ export function computeDealTotals(
   // The Friday anchor lives under `details`, NOT at the root of the room — a `room.startDate` here
   // silently evaluates to undefined, which turns proration off and shows the raw rate on every room.
   const startDate = room.details?.startDate ?? null;
-  const rental = computeRentalTotal({ rate, priceUnit, startDate, durationDays: periods });
+  // NO DURATION IS NOT A ONE-PERIOD WINDOW. The app's `rentalLineTotal` returns `rate × units` outright
+  // for an open deal (`durationDays == null → open mode`), and this used to say the same in its comment
+  // — but it synthesised `periods = divisor` and fed that to the shared module, which then struck the
+  // Fridays out of a window nobody had booked. A 30,000/month open deal over 2 units read 53,077 where
+  // the app read 60,000. The rate IS the period here; there is nothing to prorate over.
+  const rental = hasDuration
+    ? computeRentalTotal({ rate, priceUnit, startDate, durationDays: periods })
+    : { total: rate, billable: 0, raw: true, exact: true };
   const perUnitRental = rental.total;
   const rentalTotal = perUnitRental * rentalUnits;
   const mobPrice = pick(override?.mobPrice, room.mobPrice ?? 0);
