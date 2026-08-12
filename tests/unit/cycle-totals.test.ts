@@ -98,11 +98,14 @@ describe("computeCycleTotals — the edges", () => {
     expect(computeCycleTotals({ ...MOCKUP, durationDays: 0 }).duration).toBeNull();
   });
 
-  it("has no second cycle on a per-job quote, and never prorates it", () => {
+  it("has no second cycle on a per-job quote — it is billed once, not per period", () => {
     const t = computeCycleTotals({ ...MOCKUP, priceUnit: "PER_JOB" });
     expect(t.everyCycleAfter).toBeNull();
-    expect(t.duration?.raw).toBe(true);
-    expect(t.duration?.rental).toBe(80210);
+    // The AMOUNT follows the app's unrecognized-unit fallback (PER_JOB was retired there, so it falls
+    // out of the divisor lookup onto `rate × durationDays`) — 80,210 × 180 calendar days. That is the
+    // app's arithmetic, deliberately adopted over spec 005's "flat, never prorated".
+    expect(t.duration?.raw).toBe(false);
+    expect(t.duration?.rental).toBe(80210 * 180);
   });
 
   it("treats a missing rate as nothing rather than crashing", () => {

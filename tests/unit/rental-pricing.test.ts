@@ -70,15 +70,18 @@ describe("countFridays", () => {
 });
 
 describe("durationDaysBetween", () => {
-  it("is a plain difference, NOT an inclusive count — mobile's end.difference(start).inDays", () => {
-    expect(durationDaysBetween("2026-08-15", "2026-10-15")).toBe(61);
-    expect(durationDaysBetween("2026-08-09", "2026-08-22")).toBe(13);
+  it("counts BOTH ends — the backend's inclusiveDurationDays, which is what the money is priced on", () => {
+    // `bid.service.ts`: `(endUTC − startUTC) / DAY + 1`, and the app stamps the same count onto the
+    // request at creation (`_computeDurationDays`: `end.difference(start).inDays + 1`). This used to
+    // drop the `+ 1`, pricing every self-derived window a day short of the backend's own estimate.
+    expect(durationDaysBetween("2026-08-15", "2026-10-15")).toBe(62);
+    expect(durationDaysBetween("2026-08-09", "2026-08-22")).toBe(14);
   });
 
   it("accepts bare dates and full ISO timestamps alike, reading both in UTC", () => {
-    expect(durationDaysBetween("2026-08-09T00:00:00.000Z", "2026-08-22T00:00:00.000Z")).toBe(13);
+    expect(durationDaysBetween("2026-08-09T00:00:00.000Z", "2026-08-22T00:00:00.000Z")).toBe(14);
     // Late-evening UTC is already the next day in Riyadh; the length must follow the calendar.
-    expect(durationDaysBetween("2026-08-09T23:00:00.000Z", "2026-08-22T23:00:00.000Z")).toBe(13);
+    expect(durationDaysBetween("2026-08-09T23:00:00.000Z", "2026-08-22T23:00:00.000Z")).toBe(14);
   });
 
   it("clamps a same-day or reversed window to one day, never 0 or negative", () => {
@@ -95,15 +98,15 @@ describe("durationDaysBetween", () => {
 });
 
 describe("the supplier bid form's worked example (public /bid/{token} page)", () => {
-  // 15 Aug 2026 is a Saturday. 15 Aug → 15 Oct = 61 days containing 8 Fridays → 53 billable.
+  // 15 Aug 2026 is a Saturday. 15 Aug → 15 Oct = 62 days (both ends) with 8 Fridays → 54 billable.
   const START = "2026-08-15";
   const days = durationDaysBetween(START, "2026-10-15");
 
   it("turns a monthly RATE into the period's money — the form's whole reason to change", () => {
     const r = computeRentalTotal({ rate: 30000, priceUnit: "PER_MONTH", startDate: START, durationDays: days });
-    expect(days).toBe(61);
-    expect(r.billable).toBe(53);
-    expect(Math.round(r.total)).toBe(61154); // (30,000 ÷ 26) × 53
+    expect(days).toBe(62);
+    expect(r.billable).toBe(54);
+    expect(Math.round(r.total)).toBe(62308); // (30,000 ÷ 26) × 54
     // What the form showed before it knew about the calendar: one month's money for a two-month job.
     expect(Math.round(r.total)).not.toBe(30000);
   });
@@ -111,11 +114,11 @@ describe("the supplier bid form's worked example (public /bid/{token} page)", ()
   it("multiplies by the offered units while transport legs stay flat per unit", () => {
     const rental = computeRentalTotal({ rate: 30000, priceUnit: "PER_MONTH", startDate: START, durationDays: days });
     const t = computeQuoteTotals({ perUnitRental: rental.total, rentalUnits: 2, mob: { amount: 1500 }, demob: { amount: 0 } });
-    expect(Math.round(t.overall.rental)).toBe(122308);
+    expect(Math.round(t.overall.rental)).toBe(124615);
     expect(t.overall.mob).toBe(3000); // 1,500 per unit — a trip, not a period
-    expect(Math.round(t.overall.subtotal)).toBe(125308);
-    expect(Math.round(t.overall.vat)).toBe(18796);
-    expect(Math.round(t.overall.total)).toBe(144104);
+    expect(Math.round(t.overall.subtotal)).toBe(127615);
+    expect(Math.round(t.overall.vat)).toBe(19142);
+    expect(Math.round(t.overall.total)).toBe(146758);
   });
 
   it("VAT-inclusive entry lands back exactly on the gross the supplier typed", () => {
@@ -183,8 +186,16 @@ describe("computeRentalTotal — falls back to the bare rate, never 0", () => {
     expect(r.raw).toBe(true);
   });
 
-  it("PER_JOB is flat", () => {
-    expect(bare({ priceUnit: "PER_JOB" }).total).toBe(4200);
+  it("PER_JOB takes the app's unrecognized-unit fallback: rate × every calendar day", () => {
+    // Both app copies drop PER_JOB out of their divisor lookup (retired 2026-08-05) and land on
+    // `rate × durationDays`. Deliberately NOT spec 005's "flat, never prorated" — matching the app in
+    // every case was the instruction, and this is the one case where the two rules disagree.
+    expect(bare({ priceUnit: "PER_JOB", durationDays: 10 }).total).toBe(42_000);
+    expect(bare({ priceUnit: "PER_JOB", durationDays: 10 }).billable).toBe(10); // calendar days, Fridays and all
+    // An unrecognized unit follows the same path instead of being silently priced as PER_DAY.
+    expect(bare({ priceUnit: "WHATEVER", durationDays: 10 }).total).toBe(42_000);
+    // With no duration there is nothing to multiply — the bare rate, as before.
+    expect(bare({ priceUnit: "PER_JOB", durationDays: null }).total).toBe(4200);
   });
 
   it("marks an exact period, which lets the card drop its rental row", () => {
@@ -275,9 +286,11 @@ describe("computeQuoteTotals — per-unit vs overall", () => {
     expect(t.overall.total).not.toBe(t.perUnit.total * 3);
   });
 
-  it("a leg's count is capped by the rental count", () => {
+  it("a leg's count is NOT capped by the rental count — the app doesn't cap either", () => {
+    // `effectiveMobUnits` is `mobExcluded ? 0 : (mobUnits ?? numberOfUnits)`, no clamp. The web used to
+    // cap here, so a room carrying more trips than machines billed differently on the two clients.
     const t = computeQuoteTotals({ ...base, rentalUnits: 2, mob: { amount: 300, units: 99 }, demob: { amount: 0 } });
-    expect(t.overall.mob).toBe(600);
+    expect(t.overall.mob).toBe(29_700);
   });
 
   it("an excluded leg contributes zero however much price is stored on it", () => {

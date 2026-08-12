@@ -231,8 +231,10 @@ export function buildBidQuotationDoc(input: BuildBidQuotationInput): QuotationDo
       totalCell = m2(lineSub);
     } else {
       anyCommitted = true;
-      lineSub = rate * units; // PER_JOB — a flat price, but every unit offered is rented
-      qtyCell = String(units);
+      // PER_JOB / unrecognized unit — `rate × durationDays × units`, straight off the shared module's
+      // app-matching fallback. Not "flat": the app charges every calendar day of the window here.
+      lineSub = rental.total * units;
+      qtyCell = `${durDays} ${L("days", "يوم")}${units > 1 ? ` × ${units}` : ""}`;
       priceCell = m2(rate);
       totalCell = m2(lineSub);
     }
@@ -248,8 +250,9 @@ export function buildBidQuotationDoc(input: BuildBidQuotationInput): QuotationDo
       mob: { amount: b.mobPrice, units: b.mobUnits, excluded: b.mobExcluded },
       demob: { amount: b.demobPrice, units: b.demobUnits, excluded: b.demobExcluded },
     });
+    // Uncapped, matching the app's `effectiveMobUnits` — the leg's negotiated count is the count.
     const legQty = (excluded: boolean | undefined, own: number | null | undefined) =>
-      excluded ? 0 : Math.min(own ?? units, units);
+      excluded ? 0 : (own ?? units);
     const mobTotal = legTotals.overall.mob;
     const demobTotal = legTotals.overall.demob;
     sub += lineSub + mobTotal + demobTotal;
