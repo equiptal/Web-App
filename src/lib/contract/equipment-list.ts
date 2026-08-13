@@ -22,12 +22,22 @@ import { computeUnitReadiness, readinessInputsFor, type UnitReadiness } from "./
 import type { FleetMachine } from "./fleet";
 
 /**
- * The list, exactly (§6.4, AC-09/AC-10).
+ * The list, exactly (§6.4, AC-09/AC-10 — both superseded 2026-08-13, see below).
  *
- * **Two filters, then one sort.**
- *  - `inBid === true` — **offered machines only**. The fleet response also carries machines the
- *    supplier owns and did *not* put on the table; §6.4 is explicit that they are *"not a second list
- *    to scan"* but one request («اطلب معدّة أخرى»), so they are not represented here at all.
+ * ── The whole matching fleet, not only the offer (owner, 2026-08-13) ────────────────────────────
+ * ~~`inBid === true` — offered machines only. §6.4 is explicit that the others are "not a second list
+ * to scan" but one request («اطلب معدّة أخرى»), so they are not represented here at all.~~
+ *
+ * **Withdrawn.** The owner: *"all equipments will be shown."* v2 drew the non-offered ones as hollow
+ * pins, v3 removed them outright, and this restores them as full cards — told apart by COLOUR rather
+ * than by absence (`unitAvailability` now reads `inBid`, and a machine he did not offer is red).
+ *
+ * The reasoning v3 removed them for was that a second set of machines is a second thing to read off
+ * one surface. What changed the answer is what the renter actually sees without them: a pill saying
+ * "3 registered" above a list of one, and no way to tell "he has only one" from "he offered only one".
+ * The ask row survives — it is now how you reach a machine he does not own, rather than one he does.
+ *
+ * **One filter, then one sort.**
  *  - availability is not `absent`. `unitAvailability` returns `absent` for `unidentified` — a quoted
  *    count with no machine behind it — which has no serial, no documents and no location, so there is
  *    nothing for a card to state. This also makes the list and the pin set the SAME set modulo
@@ -43,7 +53,7 @@ import type { FleetMachine } from "./fleet";
  */
 export function offeredMachines(fleet: readonly FleetMachine[]): FleetMachine[] {
   return fleet
-    .filter((m) => m.inBid === true && unitAvailability(m) !== "absent")
+    .filter((m) => unitAvailability(m) !== "absent")
     .slice()
     .sort((a, b) => distanceRank(a) - distanceRank(b));
 }
@@ -520,8 +530,9 @@ export interface MachineMarker extends MapPoint {
   lat: number;
   lng: number;
   /** From {@link availabilityView}, which is also what the card's chip is built on — so the two are
-   *  one fact and not two agreeing derivations (RM3-AC-19). */
-  availability: "confirmed" | "unconfirmed";
+   *  one fact and not two agreeing derivations (RM3-AC-19). Three values since 2026-08-13; the map
+   *  now draws the whole matching fleet, so a pin can be a machine he never offered. */
+  availability: "confirmed" | "in_offer" | "unconfirmed";
   /** Distance to the project, for the chip riding this machine's route. Null → no chip, never a 0. */
   distanceKm: number | null;
 }
