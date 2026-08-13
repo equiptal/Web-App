@@ -167,7 +167,7 @@ export function unitAvailability(
  * chip must be the same derivation, not two derivations that currently agree.
  *
  * **`absent` collapses to `unconfirmed` here, and that is deliberate.** Nothing that reaches a card or
- * a marker can be `absent` — `offeredMachines` drops it before either — but the colour map has no key
+ * a marker can be `absent` — `listedMachines` drops it before either — but the colour map has no key
  * for it, so the fall-through has to resolve somewhere, and it resolves to the state that claims LEAST.
  * A caller that needs the four-state answer calls `unitAvailability` directly; a caller that is about
  * to paint something calls this.
@@ -202,7 +202,7 @@ export function availabilityView(
 export const REQUEST_ACTION_COLOUR = "#2563EB";
 
 /**
- * **The shortfall alert's one colour** (RM3-AC-06) — ORANGE, and never either availability colour.
+ * **The shortfall alert's one colour** (RM3-AC-06) — ORANGE, and never the availability RED.
  *
  * Red on this surface means availability and nothing else. A shortfall is an INCOMPLETE OFFER, not an
  * unavailable machine, and painting both red collapses two different problems into one signal. Stated

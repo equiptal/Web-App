@@ -8,7 +8,7 @@
  *
  * **The composition owner.** It holds the panel's shell (V2), the counts (V3), the shortfall (V4) and
  * the equipment list (V5), and it mounts V7's detail and V9's company panel as takeovers. It is also
- * the one place a machine list is DERIVED — `offeredMachines(fleet)` — which the map then draws minus
+ * the one place a machine list is DERIVED — `listedMachines(fleet)` — which the map then draws minus
  * whatever has no coordinates. One derivation is what keeps a card and its marker in step (AC-15) and
  * what makes their colours a single fact (AC-19).
  *
@@ -65,7 +65,7 @@ import {
   landingSelectionId,
   machineMarkers,
   nextSelection,
-  offeredMachines,
+  listedMachines,
 } from "@/lib/contract/equipment-list";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import {
@@ -378,7 +378,7 @@ export function BidMapWorkspace({
   })();
 
   /* ── V5 · the list, and V10's pin set derived from it ───────────────────────────────────────────
-     `offeredMachines` is the single filter+sort: `inBid === true`, availability not `absent`, nearest
+     `listedMachines` is the single filter+sort: `inBid === true`, availability not `absent`, nearest
      first (§6.4, AC-09/AC-10). The map then draws the SAME set minus what has no coordinates, so the
      card list and the marker set cannot fall out of step (AC-15) — a machine is on the map only if it
      is in the list, and the one difference is stated: `isPlottable`.
@@ -386,7 +386,7 @@ export function BidMapWorkspace({
      Only this bid's supplier's machines are ever assembled here (AC-75) — the endpoint is bid-scoped,
      so no other supplier's fleet is even in memory. Claimed units never reach either: the fleet is
      registered machines only, and the shortfall is stated in the panel's alert instead (§6.3). */
-  const listed = useMemo(() => (fleet ? offeredMachines(fleet) : []), [fleet]);
+  const listed = useMemo(() => (fleet ? listedMachines(fleet) : []), [fleet]);
 
   /* ── V17 · the filters (§6.4a, RM3-AC-28a→28e) ─────────────────────────────────────────────────
      One model call answers all of it: which chips exist (only what the request asked for, and only

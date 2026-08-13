@@ -36,7 +36,7 @@ import {
   distanceDigits,
   unitAvailability,
 } from "@/lib/contract/bid-map";
-import { machineMarkers, offeredMachines } from "@/lib/contract/equipment-list";
+import { machineMarkers, listedMachines } from "@/lib/contract/equipment-list";
 import { mapFleet, type FleetMachine } from "@/lib/contract/fleet";
 import { equipmentCardModel } from "@/components/map/equipment-card-model";
 
@@ -157,7 +157,7 @@ describe("the card's chip and the machine's marker are one derivation (RM3-AC-19
   });
 
   it("agrees across a whole mixed offer, machine by machine", () => {
-    const listed = offeredMachines(
+    const listed = listedMachines(
       fleet([
         { id: "a", source: "unit_yard", yardConfirmed: false },
         { id: "b", source: "listing_yard", yardConfirmed: true },
@@ -325,7 +325,7 @@ describe("«اطلب التأكيد» is offered iff availability is unconfirmed
   it("is an IFF, machine by machine, across a mixed offer", () => {
     // The mutation this catches: `askAvailability` rendered unconditionally, or gated on something
     // else — a missing document, a distance — that happens to correlate on a two-machine fixture.
-    const listed = offeredMachines(
+    const listed = listedMachines(
       fleet([
         { id: "a", source: "unit_yard", docs: ["tuv"] },
         { id: "b", source: "listing_yard", docs: ["tuv"] },
@@ -634,7 +634,7 @@ describe("the request action is blue, never navy (RM3-AC-33)", () => {
 /* ══════════ RM3-AC-21 / RM3-AC-15 · one marker per plottable offered machine ══════════ */
 
 describe("machineMarkers — one marker per plottable offered machine (RM3-AC-21, RM3-AC-15, RM3-AC-22)", () => {
-  const listed = offeredMachines(
+  const listed = listedMachines(
     fleet([
       { id: "near", source: "unit_yard", km: 8 },
       { id: "far", source: "listing_yard", km: 300 },
@@ -670,7 +670,7 @@ describe("machineMarkers — one marker per plottable offered machine (RM3-AC-21
   });
 
   it("carries a real distance or null — never a 0 standing in for 'unknown'", () => {
-    const withUnknown = offeredMachines(fleet([{ id: "u", km: null }]));
+    const withUnknown = listedMachines(fleet([{ id: "u", km: null }]));
     expect(machineMarkers(withUnknown)[0].distanceKm).toBeNull();
     expect(machineMarkers(listed)[0].distanceKm).toBe(8);
   });
