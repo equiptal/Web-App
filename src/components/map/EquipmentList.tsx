@@ -66,7 +66,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 // Two numeral formatters, and the split is deliberate: `arabicIndicDigits` truncates, which is what a
 // COUNT wants, and `distanceDigits` keeps one decimal, which is what a measured distance wants.
-import { arabicIndicDigits, distanceDigits } from "@/lib/contract/bid-map";
+import { arabicIndicDigits, distanceDigits, OFFER_BADGE_COLOUR } from "@/lib/contract/bid-map";
 import { listEmptyState, type EquipmentListView } from "@/lib/contract/equipment-list";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import { equipmentCardModel } from "@/components/map/equipment-card-model";
@@ -86,6 +86,17 @@ export interface EquipmentListProps {
    * marked held or missing, and never a certificate the machine happens to carry that nobody wanted.
    */
   request?: MatchRequest;
+  /**
+   * **Which single machine wears «في هذا العرض»** — `offerBadgeUnitId(...)`'s answer, computed by the
+   * workspace against the UNFILTERED list and handed down (owner, 2026-08-13).
+   *
+   * Not derived here, for two reasons. The map draws the same badge, and two derivations of "which
+   * one" is how the pin and the card start naming different machines. And this component only ever
+   * sees `view.machines` — the FILTERED half — so a renter ticking a distance chip that hides the
+   * badged machine would silently move the badge to another one. The offer does not change because
+   * of a filter.
+   */
+  badgeUnitId?: string | null;
   /** The chip ids currently pressed. Owned by the workspace, because the map filters on them too. */
   filterIds: readonly string[];
   /** Toggle one chip. OR within a group, AND across groups — the model does the combining. */
@@ -127,6 +138,7 @@ export interface EquipmentListProps {
 export function EquipmentList({
   view,
   request,
+  badgeUnitId,
   filterIds,
   onToggleFilter,
   onClearFilters,
@@ -365,6 +377,8 @@ export function EquipmentList({
               // and since the fallback is deliberately "no chips" rather than the machine's papers,
               // the omission was silent on the surface and visible only as an unused prop.
               request={request}
+              // ONE badge in the list, decided above it — see `badgeUnitId` on the props.
+              badgeUnitId={badgeUnitId}
               selected={selectedId === m.equipmentId}
               cue={cueId === m.equipmentId}
               ar={ar}
@@ -391,6 +405,7 @@ function EquipmentCard({
   onAskAvailability,
   askPending,
   request,
+  badgeUnitId,
 }: {
   machine: FleetMachine;
   index: number;
@@ -407,12 +422,17 @@ function EquipmentCard({
    *  (owner, 2026-08-11). Absent → no certificate chips, which reads as "nothing was asked for"
    *  rather than as an inventory of what the machine happens to carry. */
   request?: MatchRequest;
+  /** The one machine in the list wearing «في هذا العرض», or null — decided by the workspace. */
+  badgeUnitId?: string | null;
 }) {
   // Everything this card states — and everything it is allowed to know — is one model call. The chip
   // is `availabilityView`'s, which is the SAME call `machineMarkers` makes for this machine's pin
   // (AC-19), and the model carries no serial, no capacity and no second band for the card to reach
   // for even by accident (AC-12, AC-32).
-  const card = useMemo(() => equipmentCardModel(machine, request), [machine, request]);
+  const card = useMemo(
+    () => equipmentCardModel(machine, request, badgeUnitId),
+    [machine, request, badgeUnitId],
+  );
   const { chip, certs, photo, askAvailability, verified } = card;
   /* ~~`const confirmed = chip.availability === "confirmed"`~~ — a boolean cannot carry three states,
      and every reader of it had to be revisited when the third arrived (owner, 2026-08-13). The chip's
@@ -468,6 +488,21 @@ function EquipmentCard({
           {/* A 3px hairline of the machine's own state down the photo's inner edge — the card's
               quietest signal, and the same derivation as the chip and the pin. */}
           <span className="bm-eq-hair" style={{ background: colour }} aria-hidden="true" />
+
+          {/* ── «في هذا العرض» — the offer badge, on ONE card in the list (owner, 2026-08-13) ─────
+              Over the photo's TOP-START corner: top-left in English, top-right in Arabic. The
+              stylesheet places it with `inset-inline-start`, so the corner follows the reader's
+              direction rather than being flipped by hand here.
+
+              It is a stamp on the machine, not a chip in the state row, because it answers a
+              different question — *which machine is this offer built on?* — and the previous attempt
+              at putting that answer INSIDE the availability scale is exactly what the owner
+              withdrew. A colour off the availability palette, in a place off the chip's row. */}
+          {card.inOffer && (
+            <span className="bm-eq-offer" style={{ background: OFFER_BADGE_COLOUR }}>
+              {t.bidMap.pinInOffer}
+            </span>
+          )}
         </span>
 
         <div className="bm-eq-tx">
@@ -510,29 +545,21 @@ function EquipmentCard({
               the card with nothing under it, and three unlike things on one line is what made the
               controls read as floating rather than as the card's own. */}
           <div className="bm-eq-r2">
-            <span
-              className={`bm-eq-chip${
-                chip.availability === "confirmed" ? " ok" : chip.availability === "in_offer" ? " mid" : " no"
-              }`}
-            >
-              {/* THREE states, and the shape still carries the meaning, not the colour alone: the
-                  confirmed chip is a small squared label with a ✓; the other two are capsules with a
-                  dot that breathes, because both are live questions. Anyone reading this list with a
-                  red-green deficiency has the ✓ and the words — and orange against red is a distinction
-                  the words carry too («في هذا العرض» against «لم يؤكد توفرها بعد»).
+            <span className={`bm-eq-chip${chip.availability === "confirmed" ? " ok" : " no"}`}>
+              {/* TWO states, and the shape carries the meaning, not the colour alone: the confirmed
+                  chip is a small squared label with a ✓, the unconfirmed one a capsule with a dot that
+                  breathes, because it is a live question. Anyone reading this list with a red-green
+                  deficiency has the ✓ and the words.
 
-                  Third state added 2026-08-13 with the whole-fleet list: a machine he offered but has
-                  not placed, which used to wear the same red as one he never offered at all. */}
+                  ~~Three states.~~ The `in_offer` orange lasted from 975ca79 to this commit and is
+                  withdrawn: offer membership is a separate fact and now has its own badge over the
+                  photo. The chip is back to answering only "has he named its yard?". */}
               {chip.availability === "confirmed" ? (
                 <span aria-hidden="true">✓</span>
               ) : (
                 <span className="bm-eq-dot" aria-hidden="true" />
               )}
-              {chip.availability === "confirmed"
-                ? t.bidMap.eqChipConfirmed
-                : chip.availability === "in_offer"
-                  ? t.bidMap.pinInOffer
-                  : t.bidMap.eqChipUnconfirmed}
+              {chip.availability === "confirmed" ? t.bidMap.eqChipConfirmed : t.bidMap.eqChipUnconfirmed}
             </span>
             {/* The yard is outside the request city's own radius — the fact that turns a delivery into
                 a mobilisation. It qualifies the offer, so it sits with the state and not with the

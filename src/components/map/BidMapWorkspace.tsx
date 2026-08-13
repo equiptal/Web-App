@@ -55,6 +55,7 @@ import {
   countCase,
   isPlottable,
   LANDING_CUE_MS,
+  offerBadgeUnitId,
   requestTypeWord,
   shortfallAlert,
   unitCountLabel,
@@ -397,6 +398,22 @@ export function BidMapWorkspace({
   const view = useMemo(() => equipmentListView(listed, bid, filterIds), [listed, bid, filterIds]);
   const visible = view.machines;
 
+  /* **Which single machine wears «في هذا العرض»** (owner, 2026-08-13). Decided ONCE, here, and handed
+     to both readers — the card stamps it over its photo, the selected pin draws it as its tag — so the
+     two can never name different machines. Same discipline as the availability colour (AC-19), applied
+     to the fact that replaced the withdrawn orange state.
+
+     Against `listed`, the UNFILTERED list, deliberately: ticking a distance chip that hides the badged
+     machine must not move the badge onto another one. The badge names the machine the OFFER is built
+     on, and the offer does not change because the renter narrowed his view. */
+  const badgeUnitId = useMemo(
+    // `bid.equipment.id` is the bid's PRIMARY machine — the one the offer is built around, and the
+    // first candidate for the badge. Null on a bid whose primary was not resolved; then the rule falls
+    // through to the first qualifying machine in list order.
+    () => offerBadgeUnitId(listed, bid?.equipment?.id ?? null),
+    [listed, bid],
+  );
+
   /* The marker set is `machineMarkers(view.machines)` and nothing else — the FILTERED list minus what
      cannot be drawn (AC-15, AC-21, AC-22). The derivation lives in the model beside the list's own,
      so each marker's availability is the SAME `availabilityView` call the card's chip is built on
@@ -411,12 +428,12 @@ export function BidMapWorkspace({
      certificate line on the surface, which is the failure RM3-AC-19 and the one-decimal ruling are
      both about. `bid` is the request a card is read against, exactly as it is for `<EquipmentList>`. */
   const machines: MachinePin[] = useMemo(() => {
-    const cards = new Map(visible.map((m) => [m.equipmentId, equipmentCardModel(m, bid ?? undefined)] as const));
+    const cards = new Map(visible.map((m) => [m.equipmentId, equipmentCardModel(m, bid ?? undefined, badgeUnitId)] as const));
     // Spread onto `machineMarkers`' answer rather than mapping `visible` ourselves: the marker SET is
     // the model's decision (offered · plottable · filtered), and this must stay a passthrough that
     // cannot add a pin the list does not have.
-    return machineMarkers(visible).map((marker) => ({ ...marker, card: cards.get(marker.id) }));
-  }, [visible, bid]);
+    return machineMarkers(visible, badgeUnitId).map((marker) => ({ ...marker, card: cards.get(marker.id) }));
+  }, [visible, bid, badgeUnitId]);
 
   // AC-80 decision 4: the REQUEST ITEM's taxonomy image, falling back to the category image, then a
   // generic icon inside the pin. The taxonomy bucket differs per env, so the URL is rebuilt against
@@ -1012,6 +1029,7 @@ export function BidMapWorkspace({
                 <EquipmentList
                   view={view}
                   request={bid}
+                  badgeUnitId={badgeUnitId}
                   filterIds={filterIds}
                   onToggleFilter={(id) =>
                     setFilterIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))

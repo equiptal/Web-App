@@ -537,9 +537,13 @@ export interface MachineMarker extends MapPoint {
   lat: number;
   lng: number;
   /** From {@link availabilityView}, which is also what the card's chip is built on — so the two are
-   *  one fact and not two agreeing derivations (RM3-AC-19). Three values since 2026-08-13; the map
-   *  now draws the whole matching fleet, so a pin can be a machine he never offered. */
-  availability: "confirmed" | "in_offer" | "unconfirmed";
+   *  one fact and not two agreeing derivations (RM3-AC-19). TWO values: offer membership is not on
+   *  this scale, it is {@link inOffer}. */
+  availability: "confirmed" | "unconfirmed";
+  /** **«في هذا العرض» — true on at most ONE marker in the set** (owner, 2026-08-13). Decided by
+   *  {@link offerBadgeUnitId} and passed in, never re-derived here: the card and the pin have to name
+   *  the same machine, and two derivations of "which one" is how they stop doing that. */
+  inOffer: boolean;
   /** Distance to the project, for the chip riding this machine's route. Null → no chip, never a 0. */
   distanceKm: number | null;
 }
@@ -552,16 +556,25 @@ export interface MachineMarker extends MapPoint {
  * difference between the two sets is `isPlottable`, which reads coordinates and never the
  * availability, never the filter and never `yardConfirmed`.
  *
- * One marker per plottable offered machine — no supplier pins, no bid pins, no claimed-unit ghost
- * (AC-22, AC-72): an `absent` unit never reaches here, because `listedMachines` dropped it, and a
- * machine with no coordinates is not given an invented position.
+ * One marker per plottable machine — no supplier pins, no bid pins, no claimed-unit ghost (AC-22,
+ * AC-72): an `absent` unit never reaches here, because `listedMachines` dropped it, and a machine
+ * with no coordinates is not given an invented position.
+ *
+ * `badgeUnitId` is {@link offerBadgeUnitId}'s answer, computed by the caller against the UNFILTERED
+ * list and handed down. Computing it here instead would let a filter that hides the badged machine
+ * move the badge to a different one — the badge names the offer's machine, and the offer does not
+ * change because the renter ticked a distance chip.
  */
-export function machineMarkers(machines: readonly FleetMachine[]): MachineMarker[] {
+export function machineMarkers(
+  machines: readonly FleetMachine[],
+  badgeUnitId?: string | null,
+): MachineMarker[] {
   return machines.filter((m) => isPlottable(m)).map((m) => ({
     id: m.equipmentId,
     lat: m.lat as number,
     lng: m.lng as number,
     availability: availabilityView(m).availability,
+    inOffer: !!badgeUnitId && m.equipmentId === badgeUnitId,
     distanceKm: typeof m.distanceKm === "number" && Number.isFinite(m.distanceKm) ? m.distanceKm : null,
   }));
 }

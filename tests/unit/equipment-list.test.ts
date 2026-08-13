@@ -81,7 +81,7 @@ describe("listedMachines — RM3-AC-09 / RM3-AC-10", () => {
        the renter reads "3 registered" above a list of one and cannot tell "he owns one" from "he
        offered one". */
     expect(ids(list)).toEqual(["offered-a", "owned-only", "offered-b"]);
-    expect(list.map((m) => unitAvailability(m))).toEqual(["in_offer", "unconfirmed", "in_offer"]);
+    expect(list.map((m) => unitAvailability(m))).toEqual(["unconfirmed", "unconfirmed", "unconfirmed"]);
   });
 
   it("sorts nearest first", () => {
@@ -112,7 +112,7 @@ describe("listedMachines — RM3-AC-09 / RM3-AC-10", () => {
     // photos and documents, so the card is meaningful even though the marker is not.
     const list = listedMachines(fleet([{ id: "no-coords", source: "none", lat: null, lng: null }]));
     expect(ids(list)).toEqual(["no-coords"]);
-    expect(unitAvailability(list[0])).toBe("in_offer");
+    expect(unitAvailability(list[0])).toBe("unconfirmed");
   });
 
   it("does not reorder the caller's array in place", () => {
@@ -325,7 +325,7 @@ describe("the marker set is the list minus what cannot be drawn — RM3-AC-15 / 
 
     // `in_offer` since 2026-08-13 — both fixtures are `inBid: true`, so the trap is orange rather than
     // red. What the test defends is untouched: the boolean did NOT turn it green.
-    expect(drawn.map((m) => unitAvailability(m))).toEqual(["in_offer", "confirmed"]);
+    expect(drawn.map((m) => unitAvailability(m))).toEqual(["unconfirmed", "confirmed"]);
   });
 });
 

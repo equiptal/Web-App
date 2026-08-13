@@ -1068,6 +1068,40 @@
    the same derivation as the chip and the pin (RM3-AC-19). */
 .bidmap .bm-eq .bm-eq-hair { position: absolute; inset-inline-end: 0; top: 0; bottom: 0; width: 3px; opacity: 0.85; }
 
+/* «في هذا العرض» — the offer badge, on ONE card in the list (owner, 2026-08-13).
+   *Top-left in English, top-right in Arabic*, which is `inset-inline-start` — the START corner in the
+   reader's own direction, so nothing here is flipped by hand and the two locales cannot drift apart.
+   `top` is physical because there is no vertical direction to follow.
+
+   A STAMP on the machine, not a chip in the state row: it answers "which machine is this offer built
+   on?", a different question from the chip's "has he named its yard?", and the attempt at folding
+   those two into one scale is what the owner withdrew. The colour is off the availability palette for
+   the same reason — orange here can never be misread as a third availability state, because it never
+   appears where availability is stated.
+
+   `pointer-events: none` — the whole card is one press target (it opens the machine), and a badge that
+   swallowed the click would make the offer's own machine the one card that does not open. */
+.bidmap .bm-eq .bm-eq-offer {
+  position: absolute;
+  top: 6px;
+  inset-inline-start: 6px;
+  z-index: 2;
+  pointer-events: none;
+  padding: 2.5px 7px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1.35;
+  letter-spacing: 0.1px;
+  color: #fff;
+  white-space: nowrap;
+  max-width: calc(100% - 12px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Reads over any photo, light or dark, without dimming the machine underneath. */
+  box-shadow: 0 1px 3px rgba(11, 23, 35, 0.35);
+}
+
 .bidmap .bm-eq .bm-eq-tx { flex: 1; min-width: 0; padding: 11px 13px; display: flex; flex-direction: column; gap: 7px; }
 .bidmap .bm-eq .bm-eq-r1 { display: flex; align-items: center; gap: 8px; }
 /* Title and its verified mark travel together, so the mark sits against the end of the NAME rather
@@ -1190,14 +1224,10 @@
   border: 1px solid rgba(22, 163, 74, 0.34);
 }
 .bidmap .bm-eq .bm-eq-chip.no { color: #d9362a; background: rgba(217, 54, 42, 0.1); border: 1px solid rgba(217, 54, 42, 0.3); }
-/* «في هذا العرض» — offered, and no yard named for it yet (owner, 2026-08-13). It wears the surface's
-   own orange, `AVAILABILITY_COLOUR.in_offer`, which is the hex the shortfall alert also draws: one
-   surface, one orange. It sits between the other two in every sense — the machine IS on the table, so
-   it is not red; nothing has been placed, so it is not green. */
-.bidmap .bm-eq .bm-eq-chip.mid { color: #e8890c; background: rgba(232, 137, 12, 0.1); border: 1px solid rgba(232, 137, 12, 0.3); }
-/* An unanswered question is live, not a closed verdict — so only the two unsettled dots breathe. */
-.bidmap .bm-eq .bm-eq-chip.no .bm-eq-dot,
-.bidmap .bm-eq .bm-eq-chip.mid .bm-eq-dot { animation: dpDot 1.7s ease-in-out infinite; }
+/* ~~`.bm-eq-chip.mid`, an orange third state.~~ Withdrawn 2026-08-13. Availability is two states
+   again and offer membership moved off this scale entirely — see `.bm-eq-offer` over the photo. */
+/* An unanswered question is live, not a closed verdict — so the unconfirmed dot breathes. */
+.bidmap .bm-eq .bm-eq-chip.no .bm-eq-dot { animation: dpDot 1.7s ease-in-out infinite; }
 /* «· خارج المدينة» (decoded 4026) — the yard is outside the request city's own radius, which is what
    turns a delivery into a mobilisation worth asking about. Stated in the state row rather than beside
    the distance: it qualifies the offer, not the number. Deliberately plain text, not a chip — the row

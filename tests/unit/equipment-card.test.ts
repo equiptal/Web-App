@@ -34,8 +34,10 @@ import {
   arabicIndicDigits,
   availabilityView,
   distanceDigits,
+  offerBadgeUnitId,
   unitAvailability,
 } from "@/lib/contract/bid-map";
+import type { UnitLocationSource } from "@/lib/contract/bids";
 import { machineMarkers, listedMachines } from "@/lib/contract/equipment-list";
 import { mapFleet, type FleetMachine } from "@/lib/contract/fleet";
 import { equipmentCardModel } from "@/components/map/equipment-card-model";
@@ -134,7 +136,7 @@ describe("the card's chip and the machine's marker are one derivation (RM3-AC-19
     // Without this, both assertions below could pass on a machine where every reading agrees, and the
     // test would be green over a fixture that cannot distinguish the right rule from the wrong one.
     expect(trap.yardConfirmed).toBe(true);
-    expect(unitAvailability(trap)).toBe("in_offer");
+    expect(unitAvailability(trap)).toBe("unconfirmed");
     expect(mirror.yardConfirmed).toBe(false);
     expect(unitAvailability(mirror)).toBe("confirmed");
   });
@@ -146,7 +148,7 @@ describe("the card's chip and the machine's marker are one derivation (RM3-AC-19
     // Not "both happen to be unconfirmed" — both are the same value, produced by the same call.
     expect(card.chip).toEqual(availabilityView(trap));
     expect(marker.availability).toBe(card.chip.availability);
-    expect(card.chip).toEqual({ availability: "in_offer", colour: AVAILABILITY_COLOUR.in_offer });
+    expect(card.chip).toEqual({ availability: "unconfirmed", colour: AVAILABILITY_COLOUR.unconfirmed });
   });
 
   it("agrees the other way too — the boolean says no and both surfaces still say confirmed", () => {
@@ -174,19 +176,109 @@ describe("the card's chip and the machine's marker are one derivation (RM3-AC-19
     }
     // …and the mixed offer really is mixed, or "they agree" would be trivially true.
     expect(new Set(listed.map((m) => equipmentCardModel(m).chip.availability))).toEqual(
-      new Set(["confirmed", "in_offer"]),
+      new Set(["confirmed", "unconfirmed"]),
     );
   });
 
   it("carries ONE availability colour per machine, and never a second", () => {
-    /* ~~"only the two availability colours"~~ — there are three since 2026-08-13. The rule this test
-       actually defends is unchanged: a card wears exactly ONE of them, so it cannot state two states
-       at once. The trap fixture is offered, so its one colour is the orange. */
+    /* Two colours. An orange third state existed for part of 2026-08-13 and was withdrawn; the rule
+       this test defends never moved — a card wears exactly ONE availability colour, so it cannot
+       state two states at once. */
     const card = equipmentCardModel(trap);
     const palette = valuesDeep(card).filter((v) => /^#[0-9a-f]{6}$/i.test(v));
-    expect(palette.filter((v) => v.toUpperCase() === AVAILABILITY_COLOUR.in_offer.toUpperCase())).toHaveLength(1);
+    expect(palette.filter((v) => v.toUpperCase() === AVAILABILITY_COLOUR.unconfirmed.toUpperCase())).toHaveLength(1);
     expect(palette.filter((v) => v.toUpperCase() === AVAILABILITY_COLOUR.confirmed.toUpperCase())).toHaveLength(0);
-    expect(palette.filter((v) => v.toUpperCase() === AVAILABILITY_COLOUR.unconfirmed.toUpperCase())).toHaveLength(0);
+  });
+});
+
+/* ══════════════ the offer badge — one machine, and NOT on the availability scale ══════════════
+   The owner, 2026-08-13: *"i wanna make not confirmed - confirmed available independent from the in
+   this offer chip, it is different — a flag that sits on only one equipment, depending on what the
+   unit has yard set and in the bid, so only one at a time will have this badge."* */
+describe("offerBadgeUnitId — «في هذا العرض» lands on exactly one machine", () => {
+  const unit = (id: string, source: UnitLocationSource, inBid = true) =>
+    ({ equipmentId: id, locationSource: source, inBid }) as FleetMachine & { inBid: boolean };
+
+  it("names the machine that is BOTH in the bid and has its yard set", () => {
+    const list = [unit("a", "listing_yard"), unit("b", "unit_yard"), unit("c", "bid_yard")];
+    expect(offerBadgeUnitId(list, null)).toBe("b");
+  });
+
+  it("never names a machine the supplier did not offer, however precise its yard", () => {
+    const list = [unit("owned", "unit_yard", false), unit("offered", "unit_yard", true)];
+    expect(offerBadgeUnitId(list, null)).toBe("offered");
+    expect(offerBadgeUnitId([unit("owned", "unit_yard", false)], null)).toBeNull();
+  });
+
+  it("prefers the bid's PRIMARY machine when it qualifies — the offer is built around it", () => {
+    const list = [unit("near", "unit_yard"), unit("primary", "unit_yard")];
+    // `near` is first in list order, so the fallback alone would pick it.
+    expect(offerBadgeUnitId(list, null)).toBe("near");
+    expect(offerBadgeUnitId(list, "primary")).toBe("primary");
+    expect(offerBadgeUnitId(list, "  primary  ")).toBe("primary");
+  });
+
+  it("falls through when the primary does NOT qualify, rather than badging nothing", () => {
+    const list = [unit("primary", "listing_yard"), unit("placed", "unit_yard")];
+    expect(offerBadgeUnitId(list, "primary")).toBe("placed");
+    expect(offerBadgeUnitId(list, "not-in-this-fleet")).toBe("placed");
+  });
+
+  it("returns null when nothing qualifies — a badge with nothing behind it is worse than none", () => {
+    expect(offerBadgeUnitId([unit("a", "listing_yard"), unit("b", "none")], "a")).toBeNull();
+    expect(offerBadgeUnitId([], "a")).toBeNull();
+  });
+
+  it("is ONE id, so no two cards can wear it — the whole point of returning an id", () => {
+    const list = [unit("a", "unit_yard"), unit("b", "unit_yard"), unit("c", "unit_yard")];
+    const badge = offerBadgeUnitId(list, null);
+    expect(list.filter((m) => m.equipmentId === badge)).toHaveLength(1);
+    // Three machines qualify; exactly one is named. "Only one at a time" is PRODUCED here, not assumed
+    // of the data — a multi-unit bid really can have several offered machines with yards named.
+    expect(list.filter((m) => m.inBid && m.locationSource === "unit_yard")).toHaveLength(3);
+  });
+
+  it("treats an absent inBid as offered — surfaces that only ever hold offered units", () => {
+    const noFlag = { equipmentId: "x", locationSource: "unit_yard" } as FleetMachine;
+    expect(offerBadgeUnitId([noFlag], null)).toBe("x");
+  });
+
+  it("puts the badge and the availability chip on DIFFERENT axes", () => {
+    // The badged machine is green because its yard is set, NOT because it is badged. A machine can be
+    // green without the badge, and an offered machine can be red. Neither fact implies the other —
+    // which is the whole of the owner's ruling.
+    const list = [unit("badged", "unit_yard"), unit("green-too", "unit_yard"), unit("red", "bid_yard")];
+    expect(offerBadgeUnitId(list, "badged")).toBe("badged");
+    expect(unitAvailability(list[1])).toBe("confirmed"); // green, no badge
+    expect(unitAvailability(list[2])).toBe("unconfirmed"); // red, and offered
+  });
+
+  /* Through `fleet(...)` from here down, because these two exercise the MODEL and the MARKER rather
+     than the rule — and both read fields (`photoKeys`, coordinates) that only the parser produces. */
+  it("stamps the badged card and only the badged card", () => {
+    const list = fleet([
+      { id: "a", source: "unit_yard" },
+      { id: "b", source: "unit_yard" },
+    ]);
+    const badge = offerBadgeUnitId(list, "b");
+    expect(badge).toBe("b");
+    expect(list.map((m) => equipmentCardModel(m, undefined, badge).inOffer)).toEqual([false, true]);
+    // No badge id → no card wears it, which is the right default for a caller with no list in hand.
+    expect(list.map((m) => equipmentCardModel(m).inOffer)).toEqual([false, false]);
+  });
+
+  it("gives the card and its marker the SAME badge — one derivation, two renderings", () => {
+    const list = fleet([
+      { id: "a", source: "unit_yard" },
+      { id: "b", source: "unit_yard" },
+    ]);
+    const badge = offerBadgeUnitId(list, "b");
+    const markers = machineMarkers(list, badge);
+    for (const m of list) {
+      const card = equipmentCardModel(m, undefined, badge);
+      expect(markers.find((k) => k.id === m.equipmentId)?.inOffer, m.equipmentId).toBe(card.inOffer);
+    }
+    expect(markers.filter((m) => m.inOffer)).toHaveLength(1);
   });
 });
 
@@ -311,7 +403,7 @@ describe("«اطلب التأكيد» is offered iff availability is unconfirmed
   it("offers it on every unconfirmed level, without opening the detail", () => {
     for (const source of ["listing_yard", "bid_yard", "bid_pin", "none"]) {
       const card = one({ id: "eq", source, lat: source === "none" ? null : 24.7, lng: source === "none" ? null : 46.7 });
-      expect(card.chip.availability, source).toBe("in_offer");
+      expect(card.chip.availability, source).toBe("unconfirmed");
       expect(card.askAvailability, source).not.toBeNull();
     }
   });
@@ -662,7 +754,7 @@ describe("machineMarkers — one marker per plottable offered machine (RM3-AC-21
 
   it("takes each marker's availability from `unitAvailability`, not from the boolean", () => {
     const markers = machineMarkers(listed);
-    expect(markers.map((m) => m.availability)).toEqual(["confirmed", "unconfirmed", "in_offer"]);
+    expect(markers.map((m) => m.availability)).toEqual(["confirmed", "unconfirmed", "unconfirmed"]);
     for (const marker of markers) {
       const machine = listed.find((m) => m.equipmentId === marker.id) as FleetMachine;
       expect(marker.availability).toBe(unitAvailability(machine));
@@ -678,6 +770,10 @@ describe("machineMarkers — one marker per plottable offered machine (RM3-AC-21
   it("exposes no `inBid`, no readiness and no `yardConfirmed` on a marker", () => {
     // The pin says what it is and nothing else (§6.8). "Not in this offer" is not a state this type
     // can represent, which is stronger than a branch that happens never to be taken.
-    expect(Object.keys(machineMarkers(listed)[0]).sort()).toEqual(["availability", "distanceKm", "id", "lat", "lng"]);
+    // `inOffer` IS on the marker, and is the one addition — a boolean the caller decided, not a fact
+    // the marker read for itself. Everything the pin must not know is still absent.
+    expect(Object.keys(machineMarkers(listed)[0]).sort()).toEqual([
+      "availability", "distanceKm", "id", "inOffer", "lat", "lng",
+    ]);
   });
 });

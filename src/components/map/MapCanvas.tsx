@@ -72,11 +72,15 @@ export interface MachinePin extends MapPoint {
    * from the `yardConfirmed` boolean, which is true for every readiness-written entry and so would
    * paint the whole map green — `bid-map.ts` records the full reason.
    *
-   * **Three values since 2026-08-13.** The canvas now draws the supplier's whole matching fleet, so a
-   * marker can be a machine he never offered (red) beside one he offered and has not placed (orange)
-   * beside one he confirmed (green).
+   * **Two values.** An orange third state existed between 975ca79 and 2026-08-13 and is withdrawn:
+   * this scale answers *"has he named its yard?"* and nothing else. Whether the machine is in the
+   * offer is {@link inOffer}.
    */
-  availability: "confirmed" | "in_offer" | "unconfirmed";
+  availability: "confirmed" | "unconfirmed";
+  /** **«في هذا العرض» — true on at most ONE pin.** `offerBadgeUnitId`'s answer, computed over the
+   *  whole list and passed down, never re-derived here: the pin and the card have to name the same
+   *  machine. Drawn as the selected pin's tag. */
+  inOffer: boolean;
   /** Distance to the project, for the chip riding this machine's route. Null → no chip, never a 0. */
   distanceKm: number | null;
   /**
@@ -672,18 +676,15 @@ function machineIcon(
   // state cannot be added to one and forgotten in the other.
   const tint = {
     confirmed: "rgba(22,163,74,.34)",
-    in_offer: "rgba(232,137,12,.32)",
     unconfirmed: "rgba(217,54,42,.32)",
   }[pin.availability];
 
-  // «مؤكّد توفرها» / «في هذا العرض» / «لم يؤكد توفرها بعد». Every one of them reads as a STATE and
-  // none carries a reason, a cause or a location-source explanation (AC-20, AC-30) — «في هذا العرض»
-  // says the machine is on the table, not why its yard is still unnamed.
-  const state = {
-    confirmed: t.bidMap.pinAvailable,
-    in_offer: t.bidMap.pinInOffer,
-    unconfirmed: t.bidMap.pinUnconfirmed,
-  }[pin.availability];
+  // «مؤكّد توفرها» / «لم يؤكد توفرها بعد». Both read as a STATE and neither carries a reason, a cause
+  // or a location-source explanation (AC-20, AC-30).
+  //
+  // ~~A third, «في هذا العرض».~~ Withdrawn 2026-08-13 with the orange state: offer membership is a
+  // separate fact and is drawn as the pin's own tag, on one pin, from `pin.inOffer`.
+  const state = pin.availability === "confirmed" ? t.bidMap.pinAvailable : t.bidMap.pinUnconfirmed;
 
   // The object's own motion and shadow, both prototype values. `drop-shadow`, not `box-shadow`: it has
   // to follow the machine's silhouette, which is the point of shadowing the art rather than a box.
@@ -742,12 +743,16 @@ function machineIcon(
       /* Only the focused marker names itself — the map stays quiet until the renter has chosen
          (AC-34).
 
-         The tag says «في هذا العرض», and since 2026-08-13 that is no longer true of every marker: the
-         canvas draws the whole matching fleet, so a selected pin may be a machine the supplier never
-         offered. It is therefore drawn only when the machine IS on the offer — and on those the chip
-         above already says «في هذا العرض» in orange, so the tag would repeat it. Hence: on a CONFIRMED
-         machine only, where the chip says «مؤكّد توفرها» and the commitment is the thing left unsaid. */
-      (selected && pin.availability === "confirmed"
+         The tag is «في هذا العرض», and it names the ONE machine this offer is built on (owner,
+         2026-08-13). `pin.inOffer` is `offerBadgeUnitId`'s answer over the whole list, handed down —
+         so the pin and that machine's CARD, which stamps the same words over its photo, can never
+         name different machines.
+
+         ~~Drawn on any selected CONFIRMED pin.~~ That was the orange state's leftover: while
+         availability still carried commitment, "selected and green" was the closest thing to "in the
+         offer" a pin could see. It has the fact itself now. Selection still gates it, because the map
+         stays quiet until the renter has chosen (AC-34). */
+      (selected && pin.inOffer
         ? `<div class="bm-pin-tag">${esc(t.bidMap.pinInOffer)}</div>`
         : "") +
       `</div>`,

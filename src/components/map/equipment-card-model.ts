@@ -26,22 +26,20 @@ import { isEquipmentVerified } from "@/lib/contract/equipment-verification";
 import { heroPhotoUrl, type MatchRequest } from "@/components/map/panel/machine-panel-model";
 
 /**
- * **The card's ONE state chip** (RM3-AC-32).
+ * **The card's ONE state chip** (RM3-AC-32) — and it answers ONE question.
  *
- * Availability and commitment are the same question on this surface — *did the supplier commit this
- * machine to this bid?* — so they are one value, not a chip plus a band. There is no second field
- * here and no second field on the model: a card carrying both a chip and a readiness band would make
- * the renter reconcile two summaries of one machine before reading either.
+ * *Has the supplier named the yard this machine leaves from for this bid?* Green or red, nothing
+ * else. AC-32 still holds — one chip, never a chip plus a band — but its old reading, *"availability
+ * and commitment are the same question on this surface"*, is **withdrawn** (owner, 2026-08-13:
+ * *"not confirmed / confirmed available is independent from the in-this-offer chip, it is
+ * different"*). Commitment moved to {@link EquipmentCardModel.inOffer}. That is not a second chip: it
+ * is a badge over the PHOTO, in a colour off this scale, answering a different question.
  */
 export interface EquipmentCardChip {
   /** From {@link availabilityView} — the same call the marker set makes (RM3-AC-19). */
-  availability: "confirmed" | "in_offer" | "unconfirmed";
-  /** `#16A34A` / `#E8890C` / `#D9362A`. The chip, and the hairline down the photo's inner edge, are
-   *  this one colour; the marker's disc and caption are the same one for the same machine.
-   *
-   *  Three since 2026-08-13 (owner): the list now carries machines he did NOT offer, and "offered but
-   *  not placed" had been sharing red with "not offered at all" — two different questions in one
-   *  colour and one sentence. */
+  availability: "confirmed" | "unconfirmed";
+  /** `#16A34A` / `#D9362A`. The chip, and the hairline down the photo's inner edge, are this one
+   *  colour; the marker's disc and caption are the same one for the same machine. */
   colour: string;
 }
 
@@ -90,6 +88,18 @@ export interface EquipmentCardModel {
   /** The front photo, else any photo, else null — a card with none says so rather than shimmering. */
   photo: string | null;
   chip: EquipmentCardChip;
+  /**
+   * **«في هذا العرض» — the offer badge, on at most ONE card in the list** (owner, 2026-08-13).
+   *
+   * A flag, not a state: it says *this is the machine the offer is built on* and says nothing about
+   * availability, which is why it wears {@link OFFER_BADGE_COLOUR} and not either chip colour. It is
+   * drawn over the photo's **top-start** corner — top-left in English, top-right in Arabic — so it
+   * reads as a stamp on the machine rather than as a second chip competing with the first.
+   *
+   * Decided by `offerBadgeUnitId` and PASSED IN, never derived here: which machine wears it is a
+   * property of the whole list, not of one machine, and a card cannot see the list.
+   */
+  inOffer: boolean;
   /**
    * Kilometres to the project **to one decimal**, or null. Never a 0 standing in for "unknown".
    *
@@ -174,6 +184,12 @@ export function equipmentCardModel(
    * the certificate line is empty, which reads as "nothing asked for" rather than inventing a list.
    */
   request?: MatchRequest,
+  /**
+   * `offerBadgeUnitId(...)`'s answer for the WHOLE list. Only the card whose `equipmentId` matches
+   * draws the badge; every other card gets `inOffer: false`. Omitted → no card wears it, which is
+   * the right default for a caller that has no list in hand.
+   */
+  badgeUnitId?: string | null,
 ): EquipmentCardModel {
   const chip = availabilityView(machine);
   const name = [machine.manufacturer, machine.modelName].filter(Boolean).join(" ").trim();
@@ -194,6 +210,7 @@ export function equipmentCardModel(
     },
     photo: heroPhotoUrl(machine),
     chip,
+    inOffer: !!badgeUnitId && machine.equipmentId === badgeUnitId,
     // One decimal, and rounded to it rather than to a whole kilometre (owner, 2026-08-11) — see
     // `EquipmentCardModel.km`. `×10 / 10` rather than `toFixed`, because the model returns a NUMBER
     // and `parseFloat(toFixed(1))` is the same value by a longer road.

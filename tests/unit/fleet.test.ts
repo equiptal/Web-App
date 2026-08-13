@@ -113,7 +113,7 @@ describe("mapFleet — the machine half is the SAME parse as offeredUnitsDetail"
     expect(m.locationSource).toBeUndefined();
     // `in_offer` since 2026-08-13: the fixture is on the offer, so orange. Red now means "he never
     // offered this one", which an unrecognised level says nothing about either way.
-    expect(unitAvailability(m)).toBe("in_offer");
+    expect(unitAvailability(m)).toBe("unconfirmed");
   });
 });
 
@@ -136,7 +136,7 @@ describe("the pin's colour comes from unitAvailability, never from yardConfirmed
     // turn a pin green, whatever it says.
     const [m] = mapFleet([row({ locationSource: "listing_yard", yardConfirmed: true })]);
     expect(m.yardConfirmed).toBe(true);
-    expect(unitAvailability(m)).toBe("in_offer");
+    expect(unitAvailability(m)).toBe("unconfirmed");
     expect(unitAvailability(m)).not.toBe("confirmed");
   });
 
@@ -164,7 +164,7 @@ describe("what gets plotted (RMAP-AC-19) — coordinates only", () => {
     const [m] = mapFleet([row({ locationSource: "none", lat: null, lng: null })]);
     expect(isPlottable(m)).toBe(false);
     // …but it is still colourable, not `absent`: it is a real machine with documents to score.
-    expect(unitAvailability(m)).toBe("in_offer");
+    expect(unitAvailability(m)).toBe("unconfirmed");
     expect(unitAvailability(m)).not.toBe("absent");
   });
 });
