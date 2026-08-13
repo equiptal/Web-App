@@ -1190,8 +1190,14 @@
   border: 1px solid rgba(22, 163, 74, 0.34);
 }
 .bidmap .bm-eq .bm-eq-chip.no { color: #d9362a; background: rgba(217, 54, 42, 0.1); border: 1px solid rgba(217, 54, 42, 0.3); }
-/* An unanswered question is live, not a closed verdict — so only the unconfirmed dot breathes. */
-.bidmap .bm-eq .bm-eq-chip.no .bm-eq-dot { animation: dpDot 1.7s ease-in-out infinite; }
+/* «في هذا العرض» — offered, and no yard named for it yet (owner, 2026-08-13). It wears the surface's
+   own orange, `AVAILABILITY_COLOUR.in_offer`, which is the hex the shortfall alert also draws: one
+   surface, one orange. It sits between the other two in every sense — the machine IS on the table, so
+   it is not red; nothing has been placed, so it is not green. */
+.bidmap .bm-eq .bm-eq-chip.mid { color: #e8890c; background: rgba(232, 137, 12, 0.1); border: 1px solid rgba(232, 137, 12, 0.3); }
+/* An unanswered question is live, not a closed verdict — so only the two unsettled dots breathe. */
+.bidmap .bm-eq .bm-eq-chip.no .bm-eq-dot,
+.bidmap .bm-eq .bm-eq-chip.mid .bm-eq-dot { animation: dpDot 1.7s ease-in-out infinite; }
 /* «· خارج المدينة» (decoded 4026) — the yard is outside the request city's own radius, which is what
    turns a delivery into a mobilisation worth asking about. Stated in the state row rather than beside
    the distance: it qualifies the offer, not the number. Deliberately plain text, not a chip — the row

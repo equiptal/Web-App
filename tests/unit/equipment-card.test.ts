@@ -134,7 +134,7 @@ describe("the card's chip and the machine's marker are one derivation (RM3-AC-19
     // Without this, both assertions below could pass on a machine where every reading agrees, and the
     // test would be green over a fixture that cannot distinguish the right rule from the wrong one.
     expect(trap.yardConfirmed).toBe(true);
-    expect(unitAvailability(trap)).toBe("unconfirmed");
+    expect(unitAvailability(trap)).toBe("in_offer");
     expect(mirror.yardConfirmed).toBe(false);
     expect(unitAvailability(mirror)).toBe("confirmed");
   });
@@ -146,7 +146,7 @@ describe("the card's chip and the machine's marker are one derivation (RM3-AC-19
     // Not "both happen to be unconfirmed" — both are the same value, produced by the same call.
     expect(card.chip).toEqual(availabilityView(trap));
     expect(marker.availability).toBe(card.chip.availability);
-    expect(card.chip).toEqual({ availability: "unconfirmed", colour: AVAILABILITY_COLOUR.unconfirmed });
+    expect(card.chip).toEqual({ availability: "in_offer", colour: AVAILABILITY_COLOUR.in_offer });
   });
 
   it("agrees the other way too — the boolean says no and both surfaces still say confirmed", () => {
@@ -174,16 +174,19 @@ describe("the card's chip and the machine's marker are one derivation (RM3-AC-19
     }
     // …and the mixed offer really is mixed, or "they agree" would be trivially true.
     expect(new Set(listed.map((m) => equipmentCardModel(m).chip.availability))).toEqual(
-      new Set(["confirmed", "unconfirmed"]),
+      new Set(["confirmed", "in_offer"]),
     );
   });
 
-  it("carries only the two availability colours, and only one of them per machine", () => {
-    // A third colour anywhere on a card is a third state the surface is not allowed to have.
+  it("carries ONE availability colour per machine, and never a second", () => {
+    /* ~~"only the two availability colours"~~ — there are three since 2026-08-13. The rule this test
+       actually defends is unchanged: a card wears exactly ONE of them, so it cannot state two states
+       at once. The trap fixture is offered, so its one colour is the orange. */
     const card = equipmentCardModel(trap);
     const palette = valuesDeep(card).filter((v) => /^#[0-9a-f]{6}$/i.test(v));
-    expect(palette.filter((v) => v.toUpperCase() === AVAILABILITY_COLOUR.unconfirmed.toUpperCase())).toHaveLength(1);
+    expect(palette.filter((v) => v.toUpperCase() === AVAILABILITY_COLOUR.in_offer.toUpperCase())).toHaveLength(1);
     expect(palette.filter((v) => v.toUpperCase() === AVAILABILITY_COLOUR.confirmed.toUpperCase())).toHaveLength(0);
+    expect(palette.filter((v) => v.toUpperCase() === AVAILABILITY_COLOUR.unconfirmed.toUpperCase())).toHaveLength(0);
   });
 });
 
@@ -308,7 +311,7 @@ describe("«اطلب التأكيد» is offered iff availability is unconfirmed
   it("offers it on every unconfirmed level, without opening the detail", () => {
     for (const source of ["listing_yard", "bid_yard", "bid_pin", "none"]) {
       const card = one({ id: "eq", source, lat: source === "none" ? null : 24.7, lng: source === "none" ? null : 46.7 });
-      expect(card.chip.availability, source).toBe("unconfirmed");
+      expect(card.chip.availability, source).toBe("in_offer");
       expect(card.askAvailability, source).not.toBeNull();
     }
   });
@@ -333,7 +336,10 @@ describe("«اطلب التأكيد» is offered iff availability is unconfirmed
     expect(listed).toHaveLength(4);
     for (const machine of listed) {
       const card = equipmentCardModel(machine);
-      expect(card.askAvailability !== null, machine.equipmentId).toBe(card.chip.availability === "unconfirmed");
+      // The ask is offered on BOTH unsettled states since 2026-08-13 — «اطلب التأكيد» answers the
+      // orange "where is it?" and the red "will you offer it?" alike. Only a confirmed card has
+      // nothing left to ask.
+      expect(card.askAvailability !== null, machine.equipmentId).toBe(card.chip.availability !== "confirmed");
     }
   });
 });
@@ -639,21 +645,24 @@ describe("machineMarkers — one marker per plottable offered machine (RM3-AC-21
   );
 
   it("draws one marker for each machine that has a card AND coordinates, and no others", () => {
-    expect(listed.map((m) => m.equipmentId)).toEqual(["near", "far", "no-coords"]);
-    expect(machineMarkers(listed).map((m) => m.id)).toEqual(["near", "far"]);
+    // `owned-only` has a card since 2026-08-13 and it has coordinates, so it is drawn. Only `claimed`
+    // (no machine at all) and `no-coords` (no point) are not. The rule is untouched: a marker needs a
+    // card AND coordinates.
+    expect(listed.map((m) => m.equipmentId)).toEqual(["near", "owned-only", "far", "no-coords"]);
+    expect(machineMarkers(listed).map((m) => m.id)).toEqual(["near", "owned-only", "far"]);
   });
 
   it("never invents a marker for a machine that has no card", () => {
-    // A supplier-owned machine he did not offer, and a claimed count with no machine at all.
+    // A claimed count names no machine, so it has neither a card nor a marker. (A machine he owns and
+    // did not offer now has BOTH — 2026-08-13 — which is why it is no longer named here.)
     const cardIds = new Set(listed.map((m) => m.equipmentId));
     for (const marker of machineMarkers(listed)) expect(cardIds.has(marker.id)).toBe(true);
-    expect(machineMarkers(listed).map((m) => m.id)).not.toContain("owned-only");
     expect(machineMarkers(listed).map((m) => m.id)).not.toContain("claimed");
   });
 
   it("takes each marker's availability from `unitAvailability`, not from the boolean", () => {
     const markers = machineMarkers(listed);
-    expect(markers.map((m) => m.availability)).toEqual(["confirmed", "unconfirmed"]);
+    expect(markers.map((m) => m.availability)).toEqual(["confirmed", "unconfirmed", "in_offer"]);
     for (const marker of markers) {
       const machine = listed.find((m) => m.equipmentId === marker.id) as FleetMachine;
       expect(marker.availability).toBe(unitAvailability(machine));

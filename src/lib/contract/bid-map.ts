@@ -20,21 +20,43 @@ import type { BidCard, OfferedUnitDetail, UnitLocationSource } from "./bids";
 /* ────────────────────────────────── availability — the one colour ────────────────────────────────── */
 
 /**
- * `confirmed` → green, `unconfirmed` → red, `absent` → not drawn and not coloured at all.
- * There is no fourth state and there is no amber (AC-129/130/167/168).
+ * `confirmed` → green, `in_offer` → orange, `unconfirmed` → red, `absent` → not drawn and not coloured.
+ *
+ * ── THREE states since 2026-08-13, and the third is the owner's ─────────────────────────────────
+ * ~~"There is no fourth state and there is no amber."~~ Withdrawn with the list's offered-only rule
+ * (RM3-AC-09/10). The owner: *"all equipments will be shown, and if in the offer but not confirmed
+ * then this green will be orange and called 'in this offer' with the same request-confirm beside it…
+ * for red keep it not confirmed."*
+ *
+ * The states now answer TWO questions at once, which is why there are three of them:
+ *
+ *   • `confirmed`   — he offered it AND named the yard it leaves from. Nothing outstanding.
+ *   • `in_offer`    — he offered it and has NOT named a yard. The renter's question is "where is it?"
+ *   • `unconfirmed` — he owns it and did not offer it. The question is "will you offer this one?"
+ *
+ * Both of the latter carry «اطلب التأكيد», because both are answered by the same ask; what differs is
+ * what the renter is looking at, and the colour is what says so.
+ *
+ * `absent` is unchanged and still means "there is no machine here to colour".
  */
-export type UnitAvailability = "confirmed" | "unconfirmed" | "absent";
+export type UnitAvailability = "confirmed" | "in_offer" | "unconfirmed" | "absent";
 
 /**
- * §6.3.1 / §6.3.2 fills. Kept next to the states they belong to so a surface cannot invent a third.
+ * §6.3.1 / §6.3.2 fills. Kept next to the states they belong to so a surface cannot invent a fourth.
  *
  * **The prototype's pair, not §6.3.1's** (`design.md` §7 decision 1, settled 2026-08-06). The spec asks
  * for `#12904A` / `#C62A2A` on the header chip while the prototype's pin, machine chip and composition
  * bar all use `#16A34A` / `#D9362A`. AC-168 requires all four surfaces to be the *same* red, so there
  * can only be one pair — and the prototype's is the one three of the four already draw.
+ *
+ * `in_offer` takes the prototype's own `orange`, which is the hex {@link SHORTFALL_COLOUR} also names.
+ * They are deliberately two constants over one value: the shortfall alert answers "units were claimed
+ * with no machine behind them" and this answers "this machine has no yard yet". One surface, one
+ * orange — but if either question ever wants its own tone, the other must not follow it by accident.
  */
-export const AVAILABILITY_COLOUR: Record<"confirmed" | "unconfirmed", string> = {
+export const AVAILABILITY_COLOUR: Record<"confirmed" | "in_offer" | "unconfirmed", string> = {
   confirmed: "#16A34A",
+  in_offer: "#E8890C",
   unconfirmed: "#D9362A",
 };
 
@@ -90,21 +112,43 @@ function reportedLocationSource(unit: Pick<OfferedUnitDetail, "locationSource">)
  * both give `absent`: neither can be drawn, so neither can carry a colour. They stay distinct on the
  * unit itself because the renter's exposure differs — see `UnitLocationSource`.
  */
-export function unitAvailability(unit: Pick<OfferedUnitDetail, "locationSource">): UnitAvailability {
-  switch (reportedLocationSource(unit)) {
+export function unitAvailability(
+  unit: Pick<OfferedUnitDetail, "locationSource"> & { inBid?: boolean },
+): UnitAvailability {
+  const source = reportedLocationSource(unit);
+
+  /* ── Not in the offer is its own state, and it is read FIRST (owner, 2026-08-13) ─────────────
+     The list now carries the supplier's whole matching fleet, not only what he offered, so a machine
+     can be here without being on the table. That is a different question from "where does it leave
+     from", and it outranks the location entirely: a machine he never offered is `unconfirmed`
+     whatever its yard says, because the renter is asking him to offer it, not to place it.
+
+     `inBid` is absent on surfaces that only ever hold offered units (the bid list's
+     `offeredUnitsDetail` has no such field). Absent means "this caller has no non-offered machines to
+     tell apart", so it defaults to true and those surfaces keep their previous answer exactly. */
+  if (unit.inBid === false && source !== "unidentified") return "unconfirmed";
+
+  switch (source) {
     case "unit_yard":
       return "confirmed";
+    // Offered, with no yard committed to THIS bid. Orange since 2026-08-13 — it used to share red
+    // with the not-offered case, which made "he hasn't placed it" and "he hasn't offered it" one
+    // colour and one sentence.
     case "bid_pin":
     case "bid_yard":
     case "listing_yard":
-      return "unconfirmed";
+      return "in_offer";
     // A REGISTERED machine whose every location level is null (its yard was deleted — `bids.yard_id`
     // is ON DELETE SET NULL). The supplier never committed it to this bid from a named yard, so it is
     // `unconfirmed`, NOT `absent`: it still has photos and documents, so its readiness band is
     // meaningful and AC-58 strips indicators only for `unidentified`. It simply cannot be plotted —
     // that is `isPlottable`'s job, which reads coordinates and never this function.
+    //
+    // It reads `in_offer` since 2026-08-13, not `unconfirmed`: we reach here only when the machine IS
+    // on the offer (the not-offered case returned above), so the honest reading is "offered, nowhere
+    // to draw it" — and red is now reserved for a machine he has not offered at all.
     case "none":
-      return "unconfirmed";
+      return "in_offer";
     // No machine at all — padding in `unitsOffered` beyond the machines named. Nothing to score, no
     // yard to confirm, never drawn (§6.2, §6.6, AC-58).
     case "unidentified":
@@ -123,20 +167,27 @@ export function unitAvailability(unit: Pick<OfferedUnitDetail, "locationSource">
  * chip must be the same derivation, not two derivations that currently agree.
  *
  * **`absent` collapses to `unconfirmed` here, and that is deliberate.** Nothing that reaches a card or
- * a marker can be `absent` — `offeredMachines` drops it before either — but the colour map has two
- * keys, so the fall-through has to resolve somewhere, and it resolves to the state that claims LESS.
- * A caller that needs the three-state answer calls `unitAvailability` directly; a caller that is about
+ * a marker can be `absent` — `offeredMachines` drops it before either — but the colour map has no key
+ * for it, so the fall-through has to resolve somewhere, and it resolves to the state that claims LEAST.
+ * A caller that needs the four-state answer calls `unitAvailability` directly; a caller that is about
  * to paint something calls this.
+ *
+ * **Three paintable states since 2026-08-13** — see {@link UnitAvailability}. `in_offer` is passed
+ * through rather than folded, because the whole point of the owner's ruling is that "offered, not
+ * placed" and "not offered at all" stop wearing one colour.
  *
  * **Never reads `yardConfirmed`** — `unitAvailability`'s doc block above records the full reason.
  */
 export interface AvailabilityView {
-  availability: "confirmed" | "unconfirmed";
+  availability: "confirmed" | "in_offer" | "unconfirmed";
   colour: string;
 }
 
-export function availabilityView(unit: Pick<OfferedUnitDetail, "locationSource">): AvailabilityView {
-  const availability = unitAvailability(unit) === "confirmed" ? "confirmed" : "unconfirmed";
+export function availabilityView(
+  unit: Pick<OfferedUnitDetail, "locationSource"> & { inBid?: boolean },
+): AvailabilityView {
+  const state = unitAvailability(unit);
+  const availability = state === "absent" ? "unconfirmed" : state;
   return { availability, colour: AVAILABILITY_COLOUR[availability] };
 }
 

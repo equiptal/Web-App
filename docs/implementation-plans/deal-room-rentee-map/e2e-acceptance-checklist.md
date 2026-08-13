@@ -45,10 +45,10 @@ Walk it in the order given — it follows a tester's own path through the featur
 ### RM3-AC-19 — pin colour and card chip come from one derivation [CORE]
 Both take colour from `unitAvailability(unit)` (via `locationSource`), **never** from `yardConfirmed`.
 
-*How to test:* Every card reading **«مؤكّد توفرها»** (green `#12904A`) has a green marker; every **«لم يؤكد توفرها بعد»** (red `#C62A2A`) has a red one. Walk all machines — no pair may disagree. **All-pins-green on a bid you know has unconfirmed yards is the classic symptom of reading `yardConfirmed`** — fail it.
+*How to test:* Every card reading **«مؤكّد توفرها»** (green) has a green marker; **«في هذا العرض»** (orange) an orange one; **«لم يؤكد توفرها بعد»** (red) a red one. Walk all machines — no pair may disagree. **All-pins-green on a bid you know has unconfirmed yards is the classic symptom of reading `yardConfirmed`** — fail it. *(Three states since 2026-08-13 — see RM3-AC-19a. Colours are now `#16A34A` / `#E8890C` / `#D9362A`.)*
 
 ### RM3-AC-22 — an undrawable unit is not drawn [CORE]
-*How to test:* On a 5-offered / 3-registered bid, count markers — exactly **3**. No grey or hollow marker stands in for the 2 claimed units. A machine whose yard was deleted (`locationSource: none`) also has no marker, while still being listed in the panel.
+*How to test:* On a 5-offered / 3-registered bid, count markers from the **offer** — exactly **3**. No grey or hollow marker stands in for the 2 claimed units. A machine whose yard was deleted (`locationSource: none`) also has no marker, while still being listed in the panel. The rule is unchanged by the whole-fleet change (RM3-AC-10): a marker needs a **card and coordinates**, so a machine he owns but did not offer is drawn if it has a yard — in red — and a *claimed count*, which names no machine at all, still is not.
 
 ### RM3-AC-20 — unconfirmed reads as unanswered, never refused [CORE]
 *How to test:* Red machines must read **«لم يؤكد توفرها بعد»**. Fail on «غير متاحة», «رفض», "unavailable", "declined".
@@ -106,11 +106,28 @@ Both take colour from `unitAvailability(unit)` (via `locationSource`), **never**
 
 ## 4 · The equipment list, filters and sort
 
-### RM3-AC-09 — flat, nearest first, offered only [CORE]
-*How to test:* Distances ascend top-to-bottom. No group headings. Card count equals the `inBid` machines. **There is no sort control** — if you see a sort dropdown, fail it.
+### RM3-AC-09 — flat, nearest first, the whole matching fleet [CORE] [AMENDED 2026-08-13]
+~~*offered only — card count equals the `inBid` machines.*~~ Owner, 2026-08-13: *"all equipments will be shown."*
 
-### RM3-AC-10 — owned-but-not-offered machines are not listed [CORE]
-*How to test:* Owned-total 8 / in-offer 3 → **3 cards**, not 8. No "خارج العرض" section, no greyed cards. The only route to the others is the dashed **«اطلب معدّة أخرى»** row.
+*How to test:* Distances ascend top-to-bottom. No group headings. Card count equals **every** matching machine the supplier owns, offered or not. **There is no sort control** — if you see a sort dropdown, fail it.
+
+### RM3-AC-10 — owned-but-not-offered machines ARE listed, in red [CORE] [SUPERSEDED 2026-08-13]
+~~*Owned-total 8 / in-offer 3 → 3 cards, not 8. No "خارج العرض" section, no greyed cards. The only route to the others is the dashed «اطلب معدّة أخرى» row.*~~
+
+**Withdrawn.** v2 drew them as hollow dashed pins, v3 removed them outright, this restores them as full cards — told apart by **colour**, not by absence. What changed the answer is what the renter saw without them: a pill reading «٣ مسجّلة» above a list of one, with no way to tell *"he owns one"* from *"he offered one"*.
+
+*How to test:* Owned-total 8 / in-offer 3 → **8 cards**. The five he did not offer are **red**, labelled «لم يؤكد توفرها بعد», each carrying «اطلب التأكيد». No section heading, no greyed cards — the colour is the whole distinction. The dashed **«اطلب معدّة أخرى»** row stays, but it now means a machine outside this fleet match, not merely one outside the offer.
+
+### RM3-AC-19a — THREE availability states, not two [CORE] [NEW 2026-08-13]
+Owner: *"if in the offer but not confirmed then this green will be orange and called 'in this offer' with the same request-confirm beside it… for red keep it not confirmed."*
+
+| state | colour | chip | action |
+|---|---|---|---|
+| offered **and** a yard named (`unit_yard`) | green `#16A34A` | «مؤكّد توفرها» | none |
+| offered, no yard named | **orange `#E8890C`** | «في هذا العرض» | «اطلب التأكيد» |
+| owned, **not** offered | red `#D9362A` | «لم يؤكد توفرها بعد» | «اطلب التأكيد» |
+
+*How to test:* All three on one screen where the data allows. A machine's chip and its **marker** carry the same colour — one derivation, so RM3-AC-19 still holds, now over three values. The count pills and the shortfall are unmoved: they describe the **offer**, so listing non-offered machines must not change «٣ مسجّلة», «١ في هذا العرض» or the shortfall arithmetic (RM3-AC-31). RM3-AC-30 also still holds — none of the three labels states a *reason*.
 
 ### RM3-AC-11 — what a card carries [CORE]
 *How to test:* All six — photo, model, year, availability chip, distance from **your project**, and either certificate chips or the explicit **«لا شهادات على المعدّة»**. An empty gap is a fail.
@@ -118,11 +135,11 @@ Both take colour from `unitAvailability(unit)` (via `locationSource`), **never**
 ### RM3-AC-12 — no serial and no load capacity on the card [CORE]
 *How to test:* No serial (e.g. `FD30T-118207`) and no tonnage on any list card. (Serials do appear supplier-side and inside request cards — correct.)
 
-### RM3-AC-32 — availability and commitment are one chip [CORE]
-*How to test:* A green in-offer machine carries **one** chip, not a chip plus a separate "في هذا العرض" band. Every card in the list is the same height.
+### RM3-AC-32 — availability and commitment are one chip [CORE] [AMENDED 2026-08-13]
+*How to test:* Still **one** chip per card, never a chip plus a separate band — but the chip now carries the commitment too: «في هذا العرض» is the orange chip's own text (RM3-AC-19a), not a second element beside a green one. Every card in the list is the same height. On the map, the selected-pin tag «في هذا العرض» is drawn only over a **green** pin — on an orange one it would repeat the pin's own label.
 
-### RM3-AC-13 — the confirm ask is on the card [CORE]
-*How to test:* **«اطلب التأكيد»** is visible on a red card and composes without entering **التفاصيل**. Absent on a green card.
+### RM3-AC-13 — the confirm ask is on the card [CORE] [AMENDED 2026-08-13]
+*How to test:* **«اطلب التأكيد»** is visible on a red card **and on an orange one** — both are unsettled — and composes without entering **التفاصيل**. Absent on a green card only.
 
 ### RM3-AC-33 — the request action is blue, not navy [CORE]
 *How to test:* **«اطلب التأكيد»** beside the red chip is saturated blue `#2563EB`. If it renders navy `#1C3550`, fail. *(The documents-footer buttons are deliberately navy — a different control.)*
@@ -168,7 +185,7 @@ Both take colour from `unitAvailability(unit)` (via `locationSource`), **never**
 *How to test:* On a minimum-year request, a machine built before it reads red; a compliant one reads green. Header and grid must never disagree about the machine on screen.
 
 ### RM3-AC-19 (detail line) — the chip matches the pin [CORE]
-*How to test:* A red machine's detail chip is red and its marker is still red.
+*How to test:* A red machine's detail chip is red and its marker is still red; an orange machine's are both orange (RM3-AC-19a).
 
 ---
 

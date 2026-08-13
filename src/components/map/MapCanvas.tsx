@@ -8,10 +8,14 @@
  * are not reliable enough to plot, and a pin in roughly the wrong place invites distance judgements
  * that are wrong. **Every marker on this canvas is one machine.**
  *
- * Four rules the marker set enforces, all of them "draw less" rules:
- *  - **Offered machines only** (§6.8, V10). The fleet response also carries machines the supplier owns
- *    and did not put on the table; v2 drew them as a hollow dashed "you can request it" pin and v3
- *    removes the variant outright — they are one request, not a second thing to read off the map.
+ * Three rules the marker set enforces, all of them "draw less" rules:
+ *  - ~~**Offered machines only** (§6.8, V10)~~ — **withdrawn 2026-08-13** (AC-10). The fleet response
+ *    also carries machines the supplier owns and did not put on the table. v2 drew them as a hollow
+ *    dashed "you can request it" pin, v3 removed the variant outright, and the owner's ruling restores
+ *    them as ordinary machines: *"all equipments will be shown."* They are not a fourth pin variant —
+ *    they take the same pin every other machine takes, in **red**, and are told apart by colour alone
+ *    (AC-19a). What made the absence untenable is that the panel read «٣ مسجّلة» above a list of one,
+ *    with nothing to distinguish "he owns it" from "he offered it".
  *  - **Only this bid's supplier's machines** (AC-75). The fleet endpoint is bid-scoped and this
  *    component is handed one list, so there is no state in which two suppliers' machines coexist.
  *  - **An `absent` unit is not drawn** (AC-22). A claimed count (`unidentified`) has no equipment
@@ -67,8 +71,12 @@ export interface MachinePin extends MapPoint {
    * **The only source of the marker's colour** (AC-19, §6.8), straight from `unitAvailability`. Never
    * from the `yardConfirmed` boolean, which is true for every readiness-written entry and so would
    * paint the whole map green — `bid-map.ts` records the full reason.
+   *
+   * **Three values since 2026-08-13.** The canvas now draws the supplier's whole matching fleet, so a
+   * marker can be a machine he never offered (red) beside one he offered and has not placed (orange)
+   * beside one he confirmed (green).
    */
-  availability: "confirmed" | "unconfirmed";
+  availability: "confirmed" | "in_offer" | "unconfirmed";
   /** Distance to the project, for the chip riding this machine's route. Null → no chip, never a 0. */
   distanceKm: number | null;
   /**
@@ -660,11 +668,22 @@ function machineIcon(
 ): L.DivIcon {
   const box = pinBox(scale);
   const ring = AVAILABILITY_COLOUR[pin.availability];
-  const tint = pin.availability === "confirmed" ? "rgba(22,163,74,.34)" : "rgba(217,54,42,.32)";
+  // The disc's fill is the ring at low alpha — one value per state, kept beside the ring so a fourth
+  // state cannot be added to one and forgotten in the other.
+  const tint = {
+    confirmed: "rgba(22,163,74,.34)",
+    in_offer: "rgba(232,137,12,.32)",
+    unconfirmed: "rgba(217,54,42,.32)",
+  }[pin.availability];
 
-  // «مؤكّد توفرها» / «لم يؤكد توفرها بعد». "Not confirmed" reads as UNANSWERED — the label carries no
-  // reason, no cause and no location-source explanation (AC-20, AC-30).
-  const state = pin.availability === "confirmed" ? t.bidMap.pinAvailable : t.bidMap.pinUnconfirmed;
+  // «مؤكّد توفرها» / «في هذا العرض» / «لم يؤكد توفرها بعد». Every one of them reads as a STATE and
+  // none carries a reason, a cause or a location-source explanation (AC-20, AC-30) — «في هذا العرض»
+  // says the machine is on the table, not why its yard is still unnamed.
+  const state = {
+    confirmed: t.bidMap.pinAvailable,
+    in_offer: t.bidMap.pinInOffer,
+    unconfirmed: t.bidMap.pinUnconfirmed,
+  }[pin.availability];
 
   // The object's own motion and shadow, both prototype values. `drop-shadow`, not `box-shadow`: it has
   // to follow the machine's silhouette, which is the point of shadowing the art rather than a box.
@@ -720,8 +739,17 @@ function machineIcon(
       // .bm-pin-chip`. An inline `transform` here could not be combined with the shadow the emphasis
       // also wants, and would have overridden the stylesheet rather than joining it.
       `<div class="bm-pin-chip" style="background:${ring};border:1px solid ${ring}">${esc(state)}</div>` +
-      // Only the focused marker names itself — the map stays quiet until the renter has chosen (AC-34).
-      (selected ? `<div class="bm-pin-tag">${esc(t.bidMap.pinInOffer)}</div>` : "") +
+      /* Only the focused marker names itself — the map stays quiet until the renter has chosen
+         (AC-34).
+
+         The tag says «في هذا العرض», and since 2026-08-13 that is no longer true of every marker: the
+         canvas draws the whole matching fleet, so a selected pin may be a machine the supplier never
+         offered. It is therefore drawn only when the machine IS on the offer — and on those the chip
+         above already says «في هذا العرض» in orange, so the tag would repeat it. Hence: on a CONFIRMED
+         machine only, where the chip says «مؤكّد توفرها» and the commitment is the thing left unsaid. */
+      (selected && pin.availability === "confirmed"
+        ? `<div class="bm-pin-tag">${esc(t.bidMap.pinInOffer)}</div>`
+        : "") +
       `</div>`,
   });
 }

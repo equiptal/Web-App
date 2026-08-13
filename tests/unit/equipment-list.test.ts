@@ -66,7 +66,7 @@ const ids = (ms: readonly FleetMachine[]) => ms.map((m) => m.equipmentId);
 /* ────────────────────────── V5 · which machines the list shows ────────────────────────── */
 
 describe("offeredMachines — RM3-AC-09 / RM3-AC-10", () => {
-  it("keeps only machines this bid offered", () => {
+  it("keeps EVERY matching machine, offered or not (owner, 2026-08-13)", () => {
     const list = offeredMachines(
       fleet([
         { id: "offered-a" },
@@ -74,9 +74,14 @@ describe("offeredMachines — RM3-AC-09 / RM3-AC-10", () => {
         { id: "offered-b" },
       ]),
     );
-    // Machines he owns but did not offer are NOT a second list — they are reachable only as an
-    // «اطلب معدّة أخرى» request, so they are not represented here at all.
-    expect(ids(list)).toEqual(["offered-a", "offered-b"]);
+    /* ~~Machines he owns but did not offer are NOT a second list — they are reachable only as an
+       «اطلب معدّة أخرى» request, so they are not represented here at all.~~
+
+       Withdrawn 2026-08-13. They ARE listed, told apart by COLOUR rather than by absence: without them
+       the renter reads "3 registered" above a list of one and cannot tell "he owns one" from "he
+       offered one". */
+    expect(ids(list)).toEqual(["offered-a", "owned-only", "offered-b"]);
+    expect(list.map((m) => unitAvailability(m))).toEqual(["in_offer", "unconfirmed", "in_offer"]);
   });
 
   it("sorts nearest first", () => {
@@ -107,7 +112,7 @@ describe("offeredMachines — RM3-AC-09 / RM3-AC-10", () => {
     // photos and documents, so the card is meaningful even though the marker is not.
     const list = offeredMachines(fleet([{ id: "no-coords", source: "none", lat: null, lng: null }]));
     expect(ids(list)).toEqual(["no-coords"]);
-    expect(unitAvailability(list[0])).toBe("unconfirmed");
+    expect(unitAvailability(list[0])).toBe("in_offer");
   });
 
   it("does not reorder the caller's array in place", () => {
@@ -118,7 +123,9 @@ describe("offeredMachines — RM3-AC-09 / RM3-AC-10", () => {
 
   it("returns nothing for a supplier who registered no machines (RM3-AC-26)", () => {
     expect(offeredMachines([])).toEqual([]);
-    expect(offeredMachines(fleet([{ id: "owned", inBid: false }]))).toEqual([]);
+    // A machine he owns and did not offer IS listed since 2026-08-13, so an empty list now means an
+    // empty FLEET — which is the only thing AC-26 was ever about.
+    expect(ids(offeredMachines(fleet([{ id: "owned", inBid: false }])))).toEqual(["owned"]);
   });
 });
 
@@ -147,9 +154,15 @@ describe("landingSelectionId — RM3-AC-34", () => {
     expect(landingSelectionId("not-in-this-fleet", list)).toBe("mid-confirmed");
   });
 
-  it("falls back when the primary was owned but not offered", () => {
+  it("lands on the primary even when it is not offered — it is on screen now (2026-08-13)", () => {
+    /* ~~"falls back when the primary was owned but not offered"~~ — the fallback existed because such
+       a machine had no card to land on. It has one now, so landing on it is the honest answer: the
+       renter is oriented on the machine the BID names, whatever colour that machine wears.
+
+       The fallback itself is untouched and still covers the case that can really strand it — a primary
+       missing from the fleet response entirely, which the test above this one pins. */
     const list = offeredMachines(fleet([{ id: "primary", inBid: false }, { id: "offered", source: "unit_yard" }]));
-    expect(landingSelectionId("primary", list)).toBe("offered");
+    expect(landingSelectionId("primary", list)).toBe("primary");
   });
 
   it("selects nothing when there is no primary and nothing is confirmed", () => {
@@ -291,8 +304,11 @@ describe("the marker set is the list minus what cannot be drawn — RM3-AC-15 / 
     const list = offeredMachines(all);
     const drawn = list.filter(plottable);
 
-    expect(ids(list)).toEqual(["offered-plottable", "offered-no-coords"]);
-    expect(ids(drawn)).toEqual(["offered-plottable"]);
+    // The whole matching fleet is listed since 2026-08-13, so `owned-only` has a card too; only
+    // `claimed` — a count naming no machine — is still absent. The map is then the list minus what has
+    // no coordinates, which is the rule this test defends and is unchanged.
+    expect(ids(list)).toEqual(["offered-plottable", "offered-no-coords", "owned-only"]);
+    expect(ids(drawn)).toEqual(["offered-plottable", "owned-only"]);
     // Every drawn machine has a card; the reverse is not required, and the one difference is stated.
     for (const m of drawn) expect(ids(list)).toContain(m.equipmentId);
   });
@@ -307,7 +323,9 @@ describe("the marker set is the list minus what cannot be drawn — RM3-AC-15 / 
       ]),
     ).filter(plottable);
 
-    expect(drawn.map((m) => unitAvailability(m))).toEqual(["unconfirmed", "confirmed"]);
+    // `in_offer` since 2026-08-13 — both fixtures are `inBid: true`, so the trap is orange rather than
+    // red. What the test defends is untouched: the boolean did NOT turn it green.
+    expect(drawn.map((m) => unitAvailability(m))).toEqual(["in_offer", "confirmed"]);
   });
 });
 

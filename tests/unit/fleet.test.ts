@@ -111,7 +111,9 @@ describe("mapFleet — the machine half is the SAME parse as offeredUnitsDetail"
     const [m] = mapFleet([row({ locationSource: "supplier_hq" })]);
     // Undefined, not `unit_yard` — the only value that could turn a pin green.
     expect(m.locationSource).toBeUndefined();
-    expect(unitAvailability(m)).toBe("unconfirmed");
+    // `in_offer` since 2026-08-13: the fixture is on the offer, so orange. Red now means "he never
+    // offered this one", which an unrecognised level says nothing about either way.
+    expect(unitAvailability(m)).toBe("in_offer");
   });
 });
 
@@ -128,10 +130,14 @@ describe("mapFleet — rows the map cannot represent", () => {
 });
 
 describe("the pin's colour comes from unitAvailability, never from yardConfirmed", () => {
-  it("is RED for a listing_yard machine even when yardConfirmed is true", () => {
+  it("is NOT GREEN for a listing_yard machine even when yardConfirmed is true", () => {
+    // ~~"is RED"~~ — orange since 2026-08-13, because the machine IS offered and only its yard is
+    // unnamed. What this test defends is untouched and is the half that matters: the boolean cannot
+    // turn a pin green, whatever it says.
     const [m] = mapFleet([row({ locationSource: "listing_yard", yardConfirmed: true })]);
     expect(m.yardConfirmed).toBe(true);
-    expect(unitAvailability(m)).toBe("unconfirmed");
+    expect(unitAvailability(m)).toBe("in_offer");
+    expect(unitAvailability(m)).not.toBe("confirmed");
   });
 
   it("is GREEN for a unit_yard machine even when yardConfirmed is false", () => {
@@ -157,8 +163,9 @@ describe("what gets plotted (RMAP-AC-19) — coordinates only", () => {
   it("does NOT plot a registered machine whose every level resolved to none", () => {
     const [m] = mapFleet([row({ locationSource: "none", lat: null, lng: null })]);
     expect(isPlottable(m)).toBe(false);
-    // …but it is still `unconfirmed`, not `absent`: it is a real machine with documents to score.
-    expect(unitAvailability(m)).toBe("unconfirmed");
+    // …but it is still colourable, not `absent`: it is a real machine with documents to score.
+    expect(unitAvailability(m)).toBe("in_offer");
+    expect(unitAvailability(m)).not.toBe("absent");
   });
 });
 
