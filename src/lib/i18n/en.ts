@@ -1241,7 +1241,9 @@ export const en = {
     didntSay: "Didn't say",
     rankWithAi: "Rank with AI",
     exportPopupBlocked: "Allow pop-ups to print the comparison.",
-    docsEquipment: "This machine",
+    // "equipment", never "machine", in English copy — the ruling recorded under `eqVerifiedMachine`
+    // applies to every string on every surface, not only that one. Arabic already says «هذه المعدّة».
+    docsEquipment: "This equipment",
     docsCompany: "The company",
     docsNone: "No documents on this bid yet.",
     docsFailed: "Those documents could not be loaded.",
