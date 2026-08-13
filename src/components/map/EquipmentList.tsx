@@ -4,8 +4,9 @@
  * **V5 — the equipment list**, plus **V6's card half** of the landing pre-selection
  * (spec 004 §6.4; RM3-AC-09→13, AC-15, AC-32, AC-33, AC-34, AC-35).
  *
- * **Flat, nearest first, offered machines only.** The filter and the sort are not here — they are
- * `offeredMachines()` in `lib/contract/equipment-list.ts`, because the map draws the same set and two
+ * **Flat, nearest first, the whole matching fleet** (AC-10, superseded 2026-08-13 — machines he did
+ * not offer are listed in red, not withheld). The filter and the sort are not here — they are
+ * `listedMachines()` in `lib/contract/equipment-list.ts`, because the map draws the same set and two
  * filters kept equal by hand is exactly how a card and its marker start disagreeing (AC-15).
  *
  * Each card: photo · model · year · **one availability chip that also carries commitment** · distance
@@ -74,7 +75,7 @@ import { fmt, useLocale, useT } from "@/lib/i18n";
 
 export interface EquipmentListProps {
   /**
-   * `equipmentListView(offeredMachines(fleet), bid, filterIds)` — the chips, the machines that survive
+   * `equipmentListView(listedMachines(fleet), bid, filterIds)` — the chips, the machines that survive
    * them, and the two figures. Never a bare machine array: the count has to state the whole offer, and
    * a component holding only the filtered half cannot.
    */

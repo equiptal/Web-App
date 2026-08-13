@@ -928,7 +928,8 @@ export const en = {
     keyCountOnly: "Units added as a count only don't appear on the map — no equipment is registered for them.",
     // V10 — the machine marker's availability label (§6.8). One scale, two labels, and "not confirmed"
     // reads as UNANSWERED — never refused, never unavailable (RM3-AC-20). The "you can request it"
-    // variant is gone with the hollow marker: v3 draws offered machines only.
+    // variant is gone with the hollow marker; a machine he did not offer is now an ORDINARY red pin
+    // (RM3-AC-10, 2026-08-13), not a variant, and `pinUnconfirmed` is its label.
     pinAvailable: "Availability confirmed",
     pinUnconfirmed: "Not confirmed yet",
     /** The selected marker's in-offer tag (§6.4 landing pre-selection, RM3-AC-34). */
@@ -937,7 +938,7 @@ export const en = {
     mapOutOfCity: "Outside the city",
     loadingFleet: "Loading this supplier's equipment…",
     /* ── V5 · the equipment list (§6.4) ──
-       Flat, nearest first, OFFERED machines only. No serial number and no load capacity (RM3-AC-12):
+       Flat, nearest first, the WHOLE matching fleet. No serial number and no load capacity (RM3-AC-12):
        the serial identifies the machine to the system, and the type and size are already stated once,
        in the count pills. */
     // ONE chip carrying availability AND commitment (RM3-AC-32) — never a chip plus a band below it,

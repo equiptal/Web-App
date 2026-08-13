@@ -37,6 +37,13 @@ import type { FleetMachine } from "./fleet";
  * "3 registered" above a list of one, and no way to tell "he has only one" from "he offered only one".
  * The ask row survives — it is now how you reach a machine he does not own, rather than one he does.
  *
+ * ~~`offeredMachines`~~ **renamed to `listedMachines`, 2026-08-13.** The rename is not cosmetic: the
+ * old name survived the behaviour change, so every call site read `offeredMachines(fleet)` and stated
+ * a filter this function no longer applies. A reader auditing the branch concluded from the call site
+ * alone that the web had not been fixed — which is exactly the failure a name that outlives its rule
+ * produces. This function returns what the LIST holds; whether a machine is offered is `inBid`, and
+ * the only surface that answers it is the colour.
+ *
  * **One filter, then one sort.**
  *  - availability is not `absent`. `unitAvailability` returns `absent` for `unidentified` — a quoted
  *    count with no machine behind it — which has no serial, no documents and no location, so there is
@@ -51,7 +58,7 @@ import type { FleetMachine } from "./fleet";
  *
  * Returns a new array — the caller's `FleetMachine[]` is never reordered in place.
  */
-export function offeredMachines(fleet: readonly FleetMachine[]): FleetMachine[] {
+export function listedMachines(fleet: readonly FleetMachine[]): FleetMachine[] {
   return fleet
     .filter((m) => unitAvailability(m) !== "absent")
     .slice()
@@ -81,7 +88,7 @@ function distanceRank(m: Pick<FleetMachine, "distanceKm">): number {
  * arbitrary unconfirmed machine would put an accent and a nine-second pulse on a card for no stated
  * reason, and the renter would read the emphasis as a recommendation.
  *
- * `listed` must already be `offeredMachines(...)` output — the fallback says *first*, and first is
+ * `listed` must already be `listedMachines(...)` output — the fallback says *first*, and first is
  * only defined against that order.
  */
 export function landingSelectionId(
@@ -225,7 +232,7 @@ const finiteKm = (m: FleetMachine): number | null =>
  * **A machine with no distance is kept by every band, never hidden.** `locationSource: 'none'` means
  * *unknown*, not *far*: hiding it would silently delete a real offered machine on the strength of a
  * fact nobody has. It is also the rule v2 wrote for exactly this control, and it is the only reading
- * consistent with `offeredMachines`, which sorts a null LAST without ever calling it distant.
+ * consistent with `listedMachines`, which sorts a null LAST without ever calling it distant.
  *
  * The group used to report this as `keepsUnknownDistance` so the chip row could print a note about it.
  * The note was withdrawn (owner, 2026-08-08 — a null distance needs a yard deleted after the fact, too
@@ -425,7 +432,7 @@ function certificateGroup(listed: readonly FleetMachine[], scored: ReadonlyMap<s
 /**
  * Every group, in §6.4a's order, already reduced to the ones that render.
  *
- * `listed` must be `offeredMachines(...)` output: every count here is stated against the offer, and an
+ * `listed` must be `listedMachines(...)` output: every count here is stated against the offer, and an
  * unfiltered fleet would put machines the supplier never put on the table into the denominator.
  */
 function buildGroups(listed: readonly FleetMachine[], request: EquipmentFilterRequest | null | undefined): BuiltGroup[] {
@@ -546,7 +553,7 @@ export interface MachineMarker extends MapPoint {
  * availability, never the filter and never `yardConfirmed`.
  *
  * One marker per plottable offered machine — no supplier pins, no bid pins, no claimed-unit ghost
- * (AC-22, AC-72): an `absent` unit never reaches here, because `offeredMachines` dropped it, and a
+ * (AC-22, AC-72): an `absent` unit never reaches here, because `listedMachines` dropped it, and a
  * machine with no coordinates is not given an invented position.
  */
 export function machineMarkers(machines: readonly FleetMachine[]): MachineMarker[] {

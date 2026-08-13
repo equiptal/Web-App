@@ -23,7 +23,7 @@ import {
   listEmptyState,
   machineMarkers,
   nextSelection,
-  offeredMachines,
+  listedMachines,
   type EquipmentFilterRequest,
 } from "@/lib/contract/equipment-list";
 import { mapFleet, type FleetMachine } from "@/lib/contract/fleet";
@@ -65,9 +65,9 @@ const ids = (ms: readonly FleetMachine[]) => ms.map((m) => m.equipmentId);
 
 /* ────────────────────────── V5 · which machines the list shows ────────────────────────── */
 
-describe("offeredMachines — RM3-AC-09 / RM3-AC-10", () => {
+describe("listedMachines — RM3-AC-09 / RM3-AC-10", () => {
   it("keeps EVERY matching machine, offered or not (owner, 2026-08-13)", () => {
-    const list = offeredMachines(
+    const list = listedMachines(
       fleet([
         { id: "offered-a" },
         { id: "owned-only", inBid: false },
@@ -85,24 +85,24 @@ describe("offeredMachines — RM3-AC-09 / RM3-AC-10", () => {
   });
 
   it("sorts nearest first", () => {
-    const list = offeredMachines(fleet([{ id: "far", km: 180 }, { id: "near", km: 4 }, { id: "mid", km: 42 }]));
+    const list = listedMachines(fleet([{ id: "far", km: 180 }, { id: "near", km: 4 }, { id: "mid", km: 42 }]));
     expect(ids(list)).toEqual(["near", "mid", "far"]);
   });
 
   it("puts a machine with no distance LAST, never first", () => {
     // A null read as 0 would put the one machine whose location is unknown at the top of a list
     // ordered by how close it is.
-    const list = offeredMachines(fleet([{ id: "unknown", km: null }, { id: "near", km: 3 }]));
+    const list = listedMachines(fleet([{ id: "unknown", km: null }, { id: "near", km: 3 }]));
     expect(ids(list)).toEqual(["near", "unknown"]);
   });
 
   it("keeps equal distances in the response's own order", () => {
-    const list = offeredMachines(fleet([{ id: "a", km: 10 }, { id: "b", km: 10 }, { id: "c", km: 10 }]));
+    const list = listedMachines(fleet([{ id: "a", km: 10 }, { id: "b", km: 10 }, { id: "c", km: 10 }]));
     expect(ids(list)).toEqual(["a", "b", "c"]);
   });
 
   it("drops an `absent` unit — it has nothing for a card to state", () => {
-    const list = offeredMachines(fleet([{ id: "real" }, { id: "claimed", source: "unidentified" }]));
+    const list = listedMachines(fleet([{ id: "real" }, { id: "claimed", source: "unidentified" }]));
     expect(ids(list)).toEqual(["real"]);
     expect(unitAvailability({ locationSource: "unidentified" })).toBe("absent");
   });
@@ -110,22 +110,22 @@ describe("offeredMachines — RM3-AC-09 / RM3-AC-10", () => {
   it("keeps a machine that cannot be PLOTTED — the list is the offer, the map is what can be drawn", () => {
     // `locationSource: none` (its yard was deleted) is `unconfirmed`, not `absent`: it still has
     // photos and documents, so the card is meaningful even though the marker is not.
-    const list = offeredMachines(fleet([{ id: "no-coords", source: "none", lat: null, lng: null }]));
+    const list = listedMachines(fleet([{ id: "no-coords", source: "none", lat: null, lng: null }]));
     expect(ids(list)).toEqual(["no-coords"]);
     expect(unitAvailability(list[0])).toBe("in_offer");
   });
 
   it("does not reorder the caller's array in place", () => {
     const source = fleet([{ id: "far", km: 90 }, { id: "near", km: 1 }]);
-    offeredMachines(source);
+    listedMachines(source);
     expect(ids(source)).toEqual(["far", "near"]);
   });
 
   it("returns nothing for a supplier who registered no machines (RM3-AC-26)", () => {
-    expect(offeredMachines([])).toEqual([]);
+    expect(listedMachines([])).toEqual([]);
     // A machine he owns and did not offer IS listed since 2026-08-13, so an empty list now means an
     // empty FLEET — which is the only thing AC-26 was ever about.
-    expect(ids(offeredMachines(fleet([{ id: "owned", inBid: false }])))).toEqual(["owned"]);
+    expect(ids(listedMachines(fleet([{ id: "owned", inBid: false }])))).toEqual(["owned"]);
   });
 });
 
@@ -133,7 +133,7 @@ describe("offeredMachines — RM3-AC-09 / RM3-AC-10", () => {
 
 describe("landingSelectionId — RM3-AC-34", () => {
   it("selects the bid's PRIMARY machine even when another is nearer and confirmed", () => {
-    const list = offeredMachines(
+    const list = listedMachines(
       fleet([
         { id: "near-confirmed", km: 2, source: "unit_yard" },
         { id: "primary", km: 90, source: "listing_yard" },
@@ -144,7 +144,7 @@ describe("landingSelectionId — RM3-AC-34", () => {
   });
 
   it("falls back to the first CONFIRMED machine when the primary is absent from the fleet", () => {
-    const list = offeredMachines(
+    const list = listedMachines(
       fleet([
         { id: "near-unconfirmed", km: 2, source: "listing_yard" },
         { id: "mid-confirmed", km: 20, source: "unit_yard" },
@@ -161,13 +161,13 @@ describe("landingSelectionId — RM3-AC-34", () => {
 
        The fallback itself is untouched and still covers the case that can really strand it — a primary
        missing from the fleet response entirely, which the test above this one pins. */
-    const list = offeredMachines(fleet([{ id: "primary", inBid: false }, { id: "offered", source: "unit_yard" }]));
+    const list = listedMachines(fleet([{ id: "primary", inBid: false }, { id: "offered", source: "unit_yard" }]));
     expect(landingSelectionId("primary", list)).toBe("primary");
   });
 
   it("selects nothing when there is no primary and nothing is confirmed", () => {
     // An accent and a nine-second pulse on an arbitrary card read as a recommendation.
-    const list = offeredMachines(fleet([{ id: "a", source: "listing_yard" }, { id: "b", source: "bid_yard" }]));
+    const list = listedMachines(fleet([{ id: "a", source: "listing_yard" }, { id: "b", source: "bid_yard" }]));
     expect(landingSelectionId(null, list)).toBeNull();
     expect(landingSelectionId("", list)).toBeNull();
     expect(landingSelectionId(undefined, list)).toBeNull();
@@ -178,7 +178,7 @@ describe("landingSelectionId — RM3-AC-34", () => {
   });
 
   it("ignores surrounding whitespace on the primary id", () => {
-    const list = offeredMachines(fleet([{ id: "primary" }]));
+    const list = listedMachines(fleet([{ id: "primary" }]));
     expect(landingSelectionId("  primary  ", list)).toBe("primary");
   });
 });
@@ -301,7 +301,7 @@ describe("the marker set is the list minus what cannot be drawn — RM3-AC-15 / 
       { id: "owned-only", inBid: false },
       { id: "claimed", source: "unidentified" },
     ]);
-    const list = offeredMachines(all);
+    const list = listedMachines(all);
     const drawn = list.filter(plottable);
 
     // The whole matching fleet is listed since 2026-08-13, so `owned-only` has a card too; only
@@ -314,7 +314,7 @@ describe("the marker set is the list minus what cannot be drawn — RM3-AC-15 / 
   });
 
   it("gives every drawn machine a colour that came from `unitAvailability`, never `yardConfirmed`", () => {
-    const drawn = offeredMachines(
+    const drawn = listedMachines(
       mapFleet([
         // The trap: `yardConfirmed: true` on an inferred level. Supplier-side the boolean is just
         // `yardId != null`, so reading it for colour turns the whole map green.
@@ -392,7 +392,7 @@ describe("nextSelection — one selection rule for both surfaces (RM3-AC-15)", (
 
 /* ──────────────── RM3-AC-26 · the lessor's empty state, and the filter's ────────────────
    Two states that must never be mistakable for each other. RM3-AC-26 was proven only as
-   `offeredMachines([])` returning `[]` — an array, which is not a state, and which stays green if
+   `listedMachines([])` returning `[]` — an array, which is not a state, and which stays green if
    the explanatory branch is deleted outright. `listEmptyState` is the branch, as a value. */
 
 describe("listEmptyState — the two empty states, told apart (RM3-AC-26 / RM3-AC-28e)", () => {
@@ -409,7 +409,7 @@ describe("listEmptyState — the two empty states, told apart (RM3-AC-26 / RM3-A
   });
 
   it("says `filtered` when chips emptied a real offer", () => {
-    const crossed = offeredMachines(
+    const crossed = listedMachines(
       fleet([
         { id: "near-bare", km: 10, docs: [] },
         { id: "far-tuv", km: 500, docs: ["tuv"] },
@@ -423,7 +423,7 @@ describe("listEmptyState — the two empty states, told apart (RM3-AC-26 / RM3-A
   });
 
   it("says nothing at all when there are cards to draw", () => {
-    const list = offeredMachines(fleet([{ id: "a" }, { id: "b" }]));
+    const list = listedMachines(fleet([{ id: "a" }, { id: "b" }]));
     expect(listEmptyState(equipmentListView(list, asking(), []))).toBeNull();
   });
 
@@ -436,7 +436,7 @@ describe("listEmptyState — the two empty states, told apart (RM3-AC-26 / RM3-A
   });
 
   it("agrees with `emptiedByFilter`, which is the model's own name for the same fact", () => {
-    const list = offeredMachines(fleet([{ id: "a", km: 10 }, { id: "b", km: 500 }]));
+    const list = listedMachines(fleet([{ id: "a", km: 10 }, { id: "b", km: 500 }]));
     for (const selection of [[], ["distance:50"], ["distance:9999"]]) {
       const v = equipmentListView(list, asking(), selection);
       expect(listEmptyState(v) === "filtered", JSON.stringify(selection)).toBe(v.emptiedByFilter);
@@ -459,7 +459,7 @@ const groupKinds = (gs: ReturnType<typeof equipmentFilters>) => gs.map((g) => g.
 const optionIds = (gs: ReturnType<typeof equipmentFilters>) => gs.flatMap((g) => g.options.map((o) => o.id));
 
 describe("rule 1 — only criteria the request asked for (RM3-AC-28a)", () => {
-  const mixed = offeredMachines(
+  const mixed = listedMachines(
     fleet([
       { id: "near-confirmed", km: 10, source: "unit_yard", year: 2022, docs: ["tuv"] },
       { id: "far-unconfirmed", km: 300, year: 2010, docs: [] },
@@ -472,7 +472,7 @@ describe("rule 1 — only criteria the request asked for (RM3-AC-28a)", () => {
 
   it("offers a certificate chip only for a certificate the request named", () => {
     // The machine holds a TÜV and an ARAMCO; only the TÜV was asked for, so only the TÜV is offered.
-    const list = offeredMachines(
+    const list = listedMachines(
       fleet([
         { id: "papers", docs: ["tuv", "aramco"] },
         { id: "bare", docs: [] },
@@ -483,7 +483,7 @@ describe("rule 1 — only criteria the request asked for (RM3-AC-28a)", () => {
   });
 
   it("offers the year control only once the request asked for a minimum year", () => {
-    const list = offeredMachines(
+    const list = listedMachines(
       fleet([
         { id: "new", year: 2022 },
         { id: "old", year: 2010 },
@@ -496,7 +496,7 @@ describe("rule 1 — only criteria the request asked for (RM3-AC-28a)", () => {
   it("never offers the attachments control — the request can ask, but no machine's file can answer", () => {
     // `FleetMachine`/`OfferedUnitDetail` carries no attachments field, so a chip here would empty the
     // list and read as a verdict on the lessor drawn entirely from OUR missing column. Rule 2 drops it.
-    const list = offeredMachines(fleet([{ id: "a" }, { id: "b" }]));
+    const list = listedMachines(fleet([{ id: "a" }, { id: "b" }]));
     const ask = asking({ attachmentIds: ["bucket"], customAttachments: ["hammer"] });
     expect(groupKinds(equipmentFilters(list, ask))).not.toContain("attachments");
   });
@@ -504,29 +504,29 @@ describe("rule 1 — only criteria the request asked for (RM3-AC-28a)", () => {
 
 describe("rule 2 — a control appears only when it would split the list (RM3-AC-28b)", () => {
   it("drops the availability chip when every machine is confirmed, and again when none is", () => {
-    const allConfirmed = offeredMachines(fleet([{ id: "a", source: "unit_yard" }, { id: "b", source: "unit_yard" }]));
-    const noneConfirmed = offeredMachines(fleet([{ id: "a" }, { id: "b" }]));
+    const allConfirmed = listedMachines(fleet([{ id: "a", source: "unit_yard" }, { id: "b", source: "unit_yard" }]));
+    const noneConfirmed = listedMachines(fleet([{ id: "a" }, { id: "b" }]));
     expect(groupKinds(equipmentFilters(allConfirmed, asking()))).not.toContain("availability");
     expect(groupKinds(equipmentFilters(noneConfirmed, asking()))).not.toContain("availability");
   });
 
   it("offers the availability chip exactly when the list mixes the two states", () => {
-    const list = offeredMachines(fleet([{ id: "yes", source: "unit_yard" }, { id: "no" }]));
+    const list = listedMachines(fleet([{ id: "yes", source: "unit_yard" }, { id: "no" }]));
     const group = equipmentFilters(list, asking()).find((g) => g.kind === "availability");
     expect(group?.options).toHaveLength(1);
     expect(group?.options[0]).toMatchObject({ id: "availability:confirmed", matches: 1 });
   });
 
   it("drops a certificate chip that every machine satisfies, and one that none satisfies", () => {
-    const everyone = offeredMachines(fleet([{ id: "a", docs: ["tuv"] }, { id: "b", docs: ["tuv"] }]));
-    const nobody = offeredMachines(fleet([{ id: "a", docs: [] }, { id: "b", docs: [] }]));
+    const everyone = listedMachines(fleet([{ id: "a", docs: ["tuv"] }, { id: "b", docs: ["tuv"] }]));
+    const nobody = listedMachines(fleet([{ id: "a", docs: [] }, { id: "b", docs: [] }]));
     const ask = asking({ reqEquipmentCerts: ["tuv"] });
     expect(groupKinds(equipmentFilters(everyone, ask))).not.toContain("certificate");
     expect(groupKinds(equipmentFilters(nobody, ask))).not.toContain("certificate");
   });
 
   it("drops the whole distance row when every machine is inside the tightest band", () => {
-    const close = offeredMachines(fleet([{ id: "a", km: 5 }, { id: "b", km: 12 }]));
+    const close = listedMachines(fleet([{ id: "a", km: 5 }, { id: "b", km: 12 }]));
     expect(groupKinds(equipmentFilters(close, asking()))).not.toContain("distance");
   });
 
@@ -542,14 +542,14 @@ describe("the distance bands v2 shipped, reinstated (RM3-AC-28, RM3-AC-28c)", ()
 
   it("collapses bands that hide exactly the same machines down to the tightest one", () => {
     // 10 · 60 · 300 km: ≤100 and ≤200 keep the same two, so only ≤50 and ≤100 are worth a chip.
-    const list = offeredMachines(fleet([{ id: "a", km: 10 }, { id: "b", km: 60 }, { id: "c", km: 300 }]));
+    const list = listedMachines(fleet([{ id: "a", km: 10 }, { id: "b", km: 60 }, { id: "c", km: 300 }]));
     const group = equipmentFilters(list, asking()).find((g) => g.kind === "distance");
     expect(group?.options.map((o) => o.id)).toEqual(["distance:50", "distance:100"]);
     expect(group?.options.map((o) => o.matches)).toEqual([1, 2]);
   });
 
   it("labels a band in both locales, with Arabic-Indic numerals in the Arabic one", () => {
-    const list = offeredMachines(fleet([{ id: "a", km: 10 }, { id: "c", km: 300 }]));
+    const list = listedMachines(fleet([{ id: "a", km: 10 }, { id: "c", km: 300 }]));
     const group = equipmentFilters(list, asking()).find((g) => g.kind === "distance");
     expect(group?.options[0].label).toEqual({ en: "≤ 50 km", ar: "≤ ٥٠ كم" });
   });
@@ -558,7 +558,7 @@ describe("the distance bands v2 shipped, reinstated (RM3-AC-28, RM3-AC-28c)", ()
 describe("a machine with no distance is kept by every band, never hidden (RM3-AC-28c)", () => {
   // `locationSource: 'none'` means UNKNOWN, not FAR. Hiding it would silently delete a real offered
   // machine on the strength of a fact nobody has — v2's own rule for this control, restated.
-  const list = offeredMachines(
+  const list = listedMachines(
     fleet([
       { id: "near", km: 10 },
       { id: "far", km: 900 },
@@ -588,14 +588,14 @@ describe("a machine with no distance is kept by every band, never hidden (RM3-AC
   });
 
   it("does not keep a MEASURED machine that the band excludes — the rule is about unknown only", () => {
-    const measured = offeredMachines(fleet([{ id: "near", km: 10 }, { id: "far", km: 900 }]));
+    const measured = listedMachines(fleet([{ id: "near", km: 10 }, { id: "far", km: 900 }]));
     expect(ids(filterMachines(measured, asking(), ["distance:50"]))).toEqual(["near"]);
   });
 });
 
 describe("the year chip — a machine with no year on file does not satisfy a year ask", () => {
   it("filters it out, agreeing with the match grid's red on the same machine", () => {
-    const list = offeredMachines(
+    const list = listedMachines(
       fleet([
         { id: "meets", year: 2022 },
         { id: "older", year: 2010 },
@@ -608,13 +608,13 @@ describe("the year chip — a machine with no year on file does not satisfy a ye
   it("offers no year control when the ask reads as an AGE rather than a year", () => {
     // `reqMinYear: 5` is "at most five years old". The one scorer already refuses to read it as a
     // year, and re-deriving that test here is the second scorer `bid-readiness.ts` refuses to be.
-    const list = offeredMachines(fleet([{ id: "a", year: 2022 }, { id: "b", year: 2010 }]));
+    const list = listedMachines(fleet([{ id: "a", year: 2022 }, { id: "b", year: 2010 }]));
     expect(groupKinds(equipmentFilters(list, asking({ reqMinYear: 5 })))).not.toContain("year");
   });
 });
 
 describe("the certificate chips — both families, matched by the one scorer", () => {
-  const list = offeredMachines(
+  const list = listedMachines(
     fleet([
       { id: "eq-only", docs: ["tuv"] },
       { id: "op-only", docs: ["operator_spsp"] },
@@ -637,7 +637,7 @@ describe("the certificate chips — both families, matched by the one scorer", (
 });
 
 describe("the predicate — AND between groups, OR within one (RM3-AC-28a)", () => {
-  const list = offeredMachines(
+  const list = listedMachines(
     fleet([
       { id: "near-tuv", km: 10, docs: ["tuv"], year: 2022 },
       { id: "near-spsp", km: 20, docs: ["spsp"], year: 2022 },
@@ -681,7 +681,7 @@ describe("the predicate — AND between groups, OR within one (RM3-AC-28a)", () 
 });
 
 describe("rule 3 — the count states the WHOLE offer (RM3-AC-28d)", () => {
-  const list = offeredMachines(
+  const list = listedMachines(
     fleet([
       { id: "a", km: 10 },
       { id: "b", km: 20 },
@@ -707,7 +707,7 @@ describe("rule 3 — the count states the WHOLE offer (RM3-AC-28d)", () => {
 
 describe("rule 4 — the marker set is the FILTERED list minus what cannot be plotted (RM3-AC-15 / RM3-AC-28e)", () => {
   it("takes a filtered-out machine off the map with its card", () => {
-    const list = offeredMachines(
+    const list = listedMachines(
       fleet([
         { id: "near", km: 10 },
         { id: "far", km: 500 },
@@ -731,7 +731,7 @@ describe("the filtered empty state is not RM3-AC-26's (RM3-AC-28e)", () => {
   // Rule 2 makes ONE chip incapable of emptying the list — an option that keeps nothing never became
   // an option. Only a combination can, which is why the empty state names every active chip and not
   // just the last one pressed.
-  const crossed = offeredMachines(
+  const crossed = listedMachines(
     fleet([
       { id: "near-bare", km: 10, docs: [] },
       { id: "far-tuv", km: 500, docs: ["tuv"] },

@@ -969,7 +969,7 @@
 .bidmap .bm-takeover > * { flex: 1; min-height: 0; }
 
 /* ── V5 · the equipment list (§6.4) ──────────────────────────────────────────────────────────────
-   Flat, nearest first, OFFERED machines only — the filter and the sort are `offeredMachines()`, not
+   Flat, nearest first, the WHOLE matching fleet — the filter and the sort are `listedMachines()`, not
    CSS. Everything below is static geometry from `design-v3.md` §2/§3; only the availability colour and
    the arrival delay are inline, which is this repo's `*-proto.css` convention. */
 .bidmap .bm-eqlist { display: flex; flex-direction: column; gap: 10px; list-style: none; margin: 0; padding: 0; }
