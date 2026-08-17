@@ -47,6 +47,7 @@ import {
   presentPhotoSlots,
   selectionModeOf,
   type CompanyDocKey,
+  type DocGroup,
   type DocRow,
   type MatchCell,
   type MatchCellKey,
@@ -593,21 +594,57 @@ const asking = (equip: string[] = [], operator = ""): MatchRequest => ({
 const groupBy = (m: FleetMachine, r: MatchRequest) =>
   Object.fromEntries(equipmentDocGroups(m, r).map((g) => [g.key, g]));
 
+/* The papers, read as one set.
+
+   The tab carries TWO paper groups since 2026-08-17 — «إثبات الملكية» and «الشهادات», app parity. The
+   split changed which HEADING a row sits under; it did not change which rows exist, nor how many of
+   them need action. So assertions about rows read both groups as one, and the split itself is pinned
+   by its own tests above rather than by rewriting twenty-five row lookups into whichever group each
+   happens to land in. */
+const papers = (g: Record<string, DocGroup>): DocRow[] => [...(g.ownership?.rows ?? []), ...(g.certificates?.rows ?? [])];
+const paperAttention = (g: Record<string, DocGroup>): number =>
+  (g.ownership?.attention ?? 0) + (g.certificates?.attention ?? 0);
+
 describe("equipmentDocGroups — the groups, and each one's own attention count (RM3-AC-42)", () => {
-  it("splits photos from documents, and never merges the counts", () => {
+  it("splits photos, ownership and certificates, and never merges the counts", () => {
     const groups = equipmentDocGroups(
       machine({ photos: ALL_FOUR, docs: [{ type: "istimara" }, { type: "operator_tuv" }] }),
       asking(["tuv"], "tuv"),
     );
-    // TWO groups, both the machine's. The third — the operator's — left on 2026-08-11, and the
-    // `operator_tuv` this machine holds raises no row in either of the two that remain.
-    expect(groups.map((g) => g.key)).toEqual(["photos", "documents"]);
+    /* THREE groups, all the machine's (app parity, 2026-08-17). ~~TWO.~~ Ownership left the single
+       "Equipment documents" heading: it is what the platform requires of every machine and answers
+       "is this really his to rent", which is a different question from "does it carry the
+       certificates this request asked for".
+
+       The operator's group is still gone — it left on 2026-08-11 — and the `operator_tuv` this
+       machine holds raises no row in any of the three that remain. */
+    expect(groups.map((g) => g.key)).toEqual(["photos", "ownership", "certificates"]);
+  });
+
+  it("files each paper under the heading it belongs to", () => {
+    const g = groupBy(
+      machine({ docs: [{ type: "istimara" }, { type: "tuv" }, { type: "spec_sheet" }] }),
+      asking(["tuv"]),
+    );
+    // Ownership rows are the four the platform names, plus any ownership paper naming none of them.
+    expect(g.ownership.rows.every((r) => r.key.startsWith("doc:ownership"))).toBe(true);
+    // Certificates carry the asked-for certs AND the papers that belong to no named row — the app
+    // files both under one heading rather than inventing a third for the leftovers.
+    expect(g.certificates.rows.map((r) => r.key)).toContain("doc:equipment_cert:tuv");
+    expect(g.certificates.rows.map((r) => r.key)).toContain("doc:other:spec_sheet");
+  });
+
+  it("counts each group's own attention separately, so one heading cannot hide the other's gap", () => {
+    // Every ownership paper missing, the asked-for certificate on the file.
+    const g = groupBy(machine({ docs: [{ type: "tuv" }] }), asking(["tuv"]));
+    expect(g.ownership.attention).toBe(1);
+    expect(g.certificates.attention).toBe(0);
   });
 
   it("counts ROWS NEEDING ACTION, never totals", () => {
     const g = groupBy(machine({ photos: [{ slot: "front" }], docs: [{ type: "tuv" }] }), asking(["tuv"], "spsp"));
     expect(g.photos.attention).toBe(1); // the plate shot, and nothing else — meter and side are not required
-    expect(g.documents.attention).toBe(1); // ownership; the asked-for TÜV is on the file
+    expect(paperAttention(g)).toBe(1); // ownership; the asked-for TÜV is on the file
     // The asked-for operator SPSP is missing and is counted NOWHERE here — it is the match grid's
     // operator cell that reports it, which is the whole of the 2026-08-11 ruling.
     expect(groupBy(machine({ photos: [{ slot: "front" }], docs: [{ type: "tuv" }] }), asking(["tuv"], "spsp")).operator).toBeUndefined();
@@ -620,14 +657,14 @@ describe("equipmentDocGroups — the groups, and each one's own attention count 
     );
     // Two counts, both numbers. ~~`[0, 0, null]`~~ — the `null` was the operator's group saying "I make
     // no attention claim", and there is no group left that can say it.
-    expect(groups.map((g) => g.attention)).toEqual([0, 0]);
+    expect(groups.map((g) => g.attention)).toEqual([0, 0, 0]);
   });
 
   it("does not call a spec sheet an equipment safety certificate — it calls it a spec sheet", () => {
     const g = groupBy(machine({ docs: [{ type: "spec_sheet" }, { type: "other" }] }), asking(["tuv"]));
-    const cert = g.documents.rows.find((r) => r.key === "doc:equipment_cert:tuv")!;
+    const cert = papers(g).find((r) => r.key === "doc:equipment_cert:tuv")!;
     expect(cert.status).toBe("missing");
-    expect(g.documents.rows.find((r) => r.key === "doc:other:spec_sheet")?.label.en).toBe("Spec sheet");
+    expect(papers(g).find((r) => r.key === "doc:other:spec_sheet")?.label.en).toBe("Spec sheet");
   });
 
   it("shows PRESENCE ONLY — never a verification badge or an expiry (RM3-AC-39, §6.6)", () => {
@@ -698,7 +735,7 @@ describe("a document nobody asked for is never shown as missing (owner, 2026-08-
     // the owner's ruling of 2026-08-12 that is FOUR rows, one per paper, all four rendered whether held
     // or not so the renter can choose which proof he asks for. Ownership is the one family exempt from
     // the rule this describe block states; nothing else absent-and-unrequested is a row.
-    expect(g.documents.rows.map((r) => r.key)).toEqual([
+    expect(papers(g).map((r) => r.key)).toEqual([
       "doc:ownership:istimara",
       "doc:ownership:customs",
       "doc:ownership:sale_contract",
@@ -712,18 +749,18 @@ describe("a document nobody asked for is never shown as missing (owner, 2026-08-
     // supplier holding a sale contract had a green row and an ask demanding a paper he does not have,
     // to prove something already proven (owner, 2026-08-12 — spec §5.4).
     const g = groupBy(machine({ docs: [] }), NO_ASKS);
-    expect(g.documents.rows.map((r) => r.docTypes)).toEqual([
+    expect(papers(g).map((r) => r.docTypes)).toEqual([
       ["istimara"],
       ["customs"],
       ["sale_contract"],
       ["saso_registration"],
     ]);
-    for (const row of g.documents.rows) expect(row.requestable).toBe(true);
+    for (const row of papers(g)) expect(row.requestable).toBe(true);
   });
 
   it("holding ONE ownership paper leaves the other three askable and the count at one", () => {
     const g = groupBy(machine({ docs: [{ type: "sale_contract" }] }), NO_ASKS);
-    const byKey = new Map(g.documents.rows.map((r) => [r.key, r]));
+    const byKey = new Map(papers(g).map((r) => [r.key, r]));
     expect(byKey.get("doc:ownership:sale_contract")!.status).toBe("present");
     expect(byKey.get("doc:ownership:sale_contract")!.requestable).toBe(false);
     for (const key of ["doc:ownership:istimara", "doc:ownership:customs", "doc:ownership:saso_registration"]) {
@@ -733,13 +770,13 @@ describe("a document nobody asked for is never shown as missing (owner, 2026-08-
     // ⚠ The rows are four; the gap is one, and here it is CLOSED. A badge reading "3 need attention"
     // beside a machine whose ownership is proven — and whose percentage is therefore complete — would
     // be the surface contradicting its own number.
-    expect(g.documents.attention).toBe(0);
+    expect(paperAttention(g)).toBe(0);
   });
 
   it("holding NONE of them is ONE gap, not four", () => {
     const g = groupBy(machine({ docs: [] }), NO_ASKS);
-    expect(g.documents.rows.filter((r) => r.status === "missing")).toHaveLength(4);
-    expect(g.documents.attention).toBe(1);
+    expect(papers(g).filter((r) => r.status === "missing")).toHaveLength(4);
+    expect(paperAttention(g)).toBe(1);
   });
 
   it("an ownership paper that names none of the four is still shown, under its own name", () => {
@@ -747,14 +784,14 @@ describe("a document nobody asked for is never shown as missing (owner, 2026-08-
     // `OWNERSHIP_DOC_TYPES`). It is on the machine's file, so it is visible; nothing requires it, so it
     // is never red and never asked for. Filing it under the istimara row would claim an istimara.
     const g = groupBy(machine({ docs: [{ type: "title_deed" }] }), NO_ASKS);
-    const extra = g.documents.rows.find((r) => r.key === "doc:ownership_other:title_deed")!;
+    const extra = papers(g).find((r) => r.key === "doc:ownership_other:title_deed")!;
     expect([extra.status, extra.requestable]).toEqual(["on_file", false]);
-    expect(g.documents.rows.find((r) => r.key === "doc:ownership:istimara")!.status).toBe("missing");
+    expect(papers(g).find((r) => r.key === "doc:ownership:istimara")!.status).toBe("missing");
   });
 
   it("an unrequested cert the machine DOES hold is shown, openable, and carries no verdict", () => {
     const g = groupBy(machine({ docs: [{ type: "tuv" }] }), NO_ASKS);
-    const row = g.documents.rows.find((r) => r.key === "doc:equipment_cert:tuv")!;
+    const row = papers(g).find((r) => r.key === "doc:equipment_cert:tuv")!;
     expect(row.status).toBe("on_file"); // not "present" — nothing was passed, because nothing was asked
     expect(row.statusLine.en).toBe("on the unit's file · not requested");
     expect(docRowActions(row).map((a) => a.kind)).toEqual(["view"]);
@@ -765,7 +802,7 @@ describe("a document nobody asked for is never shown as missing (owner, 2026-08-
 
   it("a held-but-unrequested row raises NOBODY's attention count", () => {
     const g = groupBy(machine({ docs: [{ type: "istimara" }, { type: "tuv" }, { type: "operator_tuv" }] }), NO_ASKS);
-    expect(g.documents.attention).toBe(0);
+    expect(paperAttention(g)).toBe(0);
     // The held `operator_tuv` raises no count either, because it raises no row: there is no operator
     // group to hold it and `isOperatorDoc` keeps it out of the equipment's papers.
     expect(g.operator).toBeUndefined();
@@ -775,7 +812,7 @@ describe("a document nobody asked for is never shown as missing (owner, 2026-08-
     const g = groupBy(machine({ docs: [{ type: "tuv" }, { type: "operator_tuv" }] }), NO_ASKS);
     // Ownership is required of every lessor and this machine holds none, so its four rows are the
     // askable ones — the held TÜV is not, and the held `operator_tuv` is not even a row.
-    for (const row of g.documents.rows) expect(row.requestable).toBe(row.key.startsWith("doc:ownership:"));
+    for (const row of papers(g)) expect(row.requestable).toBe(row.key.startsWith("doc:ownership:"));
   });
 });
 
@@ -784,8 +821,8 @@ describe("a document nobody asked for is never shown as missing (owner, 2026-08-
 describe("a document already on the file is never requestable", () => {
   it("a requested cert is askable when it is ABSENT and not when it is HELD", () => {
     const g = groupBy(machine({ docs: [{ type: "tuv" }] }), asking(["tuv", "spsp"]));
-    const held = g.documents.rows.find((r) => r.key === "doc:equipment_cert:tuv")!;
-    const gap = g.documents.rows.find((r) => r.key === "doc:equipment_cert:spsp")!;
+    const held = papers(g).find((r) => r.key === "doc:equipment_cert:tuv")!;
+    const gap = papers(g).find((r) => r.key === "doc:equipment_cert:spsp")!;
     // The earlier rule made a held-and-required row askable too, so a renter could chase a legible
     // re-scan. Withdrawn: an ask naming a paper the lessor can see on his own file has one possible
     // answer — "it is already there".
@@ -820,12 +857,12 @@ describe("a document already on the file is never requestable", () => {
 
   it("a group with nothing missing offers nothing to tick", () => {
     const g = groupBy(machine({ docs: [{ type: "istimara" }, { type: "tuv" }] }), asking(["tuv"]));
-    expect(g.documents.attention).toBe(0);
+    expect(paperAttention(g)).toBe(0);
     // ~~`…filter((r) => r.requestable)` is empty~~ — the three unheld ownership rows ARE requestable
     // since 2026-08-12, and deliberately: the renter may ask for a customs card even from a machine
     // whose ownership an istimara has already proven. What "nothing missing" now means is that nothing
     // needs attention — the ownership gap is closed and the requested TÜV is on the file.
-    expect(g.documents.rows.filter((r) => r.requestable).map((r) => r.key)).toEqual([
+    expect(papers(g).filter((r) => r.requestable).map((r) => r.key)).toEqual([
       "doc:ownership:customs",
       "doc:ownership:sale_contract",
       "doc:ownership:saso_registration",
@@ -966,7 +1003,7 @@ describe("a row holding several files exposes EVERY one of them", () => {
       }),
       NO_ASKS,
     );
-    const row = g.documents.rows.find((r) => r.key === "doc:ownership:istimara")!;
+    const row = papers(g).find((r) => r.key === "doc:ownership:istimara")!;
     expect(row.files.map((f) => f.url)).toEqual(["https://x/ist", "https://x/ist2"]);
     expect(docRowActions(row).map((a) => a.href)).toEqual(["https://x/ist", "https://x/ist2"]);
     // The invariant survives the second file: exactly one primary, and it is the first file's view.
@@ -984,7 +1021,7 @@ describe("a row holding several files exposes EVERY one of them", () => {
       }),
       NO_ASKS,
     );
-    const byKey = new Map(g.documents.rows.map((r) => [r.key, r]));
+    const byKey = new Map(papers(g).map((r) => [r.key, r]));
     expect(byKey.get("doc:ownership:istimara")!.files.map((f) => f.url)).toEqual(["https://x/ist"]);
     expect(byKey.get("doc:ownership:customs")!.files.map((f) => f.url)).toEqual(["https://x/cus"]);
     // Neither paper is lost and neither is duplicated: `customs_card` is the customs row's spelling.
@@ -1001,7 +1038,7 @@ describe("a row holding several files exposes EVERY one of them", () => {
       }),
       asking(["tuv"]),
     );
-    const row = g.documents.rows.find((r) => r.key === "doc:equipment_cert:tuv")!;
+    const row = papers(g).find((r) => r.key === "doc:equipment_cert:tuv")!;
     expect(row.files.map((f) => f.url)).toEqual(["https://x/tuv-a", "https://x/tuv-b"]);
     expect(docRowActions(row)).toHaveLength(2);
   });
@@ -1016,7 +1053,7 @@ describe("a row holding several files exposes EVERY one of them", () => {
       }),
       asking(["tuv"]),
     );
-    const row = g.documents.rows.find((r) => r.key === "doc:equipment_cert:tuv")!;
+    const row = papers(g).find((r) => r.key === "doc:equipment_cert:tuv")!;
     // `tüv` is not in `DOC_TYPE_LABEL`, so it humanises to its own spelling — which is the point: each
     // file is named after ITS type, not after the row's.
     expect(row.files.map((f) => f.label.en)).toEqual(["TÜV certificate", "Tüv"]);
@@ -1028,7 +1065,7 @@ describe("a row holding several files exposes EVERY one of them", () => {
       machine({ docs: [{ type: "istimara", url: null }, { type: "istimarah", url: "https://x/ist2" }] }),
       NO_ASKS,
     );
-    const row = g.documents.rows.find((r) => r.key === "doc:ownership:istimara")!;
+    const row = papers(g).find((r) => r.key === "doc:ownership:istimara")!;
     expect(row.status).toBe("present"); // the paper IS on the file; only its link is absent
     expect(docRowActions(row).map((a) => a.href)).toEqual(["https://x/ist2"]);
   });
@@ -1044,7 +1081,7 @@ describe("the batch ask raised from the equipment's papers (RM3-AC-38)", () => {
 
   it("an equipment ask names the precise cert where the catalogue is known to accept it", () => {
     const g = groupBy(machine({ docs: [] }), asking(["tuv", "spsp", "aramco"]));
-    const rows = g.documents.rows.filter((r) => r.key.startsWith("doc:equipment_cert:"));
+    const rows = papers(g).filter((r) => r.key.startsWith("doc:equipment_cert:"));
     const draft = batchDocumentRequest("eq-1", rows, new Set(rows.map((r) => r.key)));
     expect(draft && draft.kind === "document" && draft.docTypes).toEqual([
       "tuv",
@@ -1058,7 +1095,7 @@ describe("the batch ask raised from the equipment's papers (RM3-AC-38)", () => {
     // The held istimara and the held TÜV are both dropped — that is the rule, and it is what this
     // asserts. ~~"the batch is null"~~: it is not null any more, because the three ownership papers
     // this machine does NOT hold are rows now (owner, 2026-08-12) and each is legitimately askable.
-    const draft = batchDocumentRequest("eq-1", g.documents.rows, new Set(g.documents.rows.map((r) => r.key)));
+    const draft = batchDocumentRequest("eq-1", papers(g), new Set(papers(g).map((r) => r.key)));
     expect(draft && draft.kind === "document" && draft.docTypes).toEqual([
       "customs",
       "sale_contract",
@@ -1068,7 +1105,7 @@ describe("the batch ask raised from the equipment's papers (RM3-AC-38)", () => {
 
   it("drops a held row from the ask even when it was somehow ticked", () => {
     const g = groupBy(machine({ docs: [{ type: "tuv" }] }), asking(["tuv", "spsp"]));
-    const draft = batchDocumentRequest("eq-1", g.documents.rows, new Set(g.documents.rows.map((r) => r.key)));
+    const draft = batchDocumentRequest("eq-1", papers(g), new Set(papers(g).map((r) => r.key)));
     // All four ownership papers and the SPSP are missing; the held TÜV is not in the payload however
     // the set was arrived at. Each ownership type names itself — the whole of the 2026-08-12 ruling.
     expect(draft && draft.kind === "document" && draft.docTypes).toEqual([
@@ -1171,8 +1208,8 @@ describe("docRowActions — view, and neither a download glyph nor a dead button
 describe("every document family on this surface is openable (RM3-AC-69)", () => {
   it("equipment PAPERS — a held paper gets view, an absent one gets nothing", () => {
     const g = groupBy(machine({ docs: [{ type: "istimara" }] }), asking(["tuv"], "tuv"));
-    const ownership = g.documents.rows.find((r) => r.key === "doc:ownership:istimara")!;
-    const cert = g.documents.rows.find((r) => r.key === "doc:equipment_cert:tuv")!;
+    const ownership = papers(g).find((r) => r.key === "doc:ownership:istimara")!;
+    const cert = papers(g).find((r) => r.key === "doc:equipment_cert:tuv")!;
     expect(docRowActions(ownership).map((a) => a.kind)).toEqual(["view"]);
     expect(docRowActions(cert)).toEqual([]);
     // ~~The operator's rows are the deliberate exception — never openable, held or not.~~ There is no
@@ -1743,7 +1780,7 @@ describe("the company panel's batch — download, and only over rows with a file
  */
 describe("SASO — registration vs. certificate on the machine panel (owner's ruling, 2026-08-09)", () => {
   const SASO_ASK = asking(["saso"]);
-  const rowsOf = (m: FleetMachine) => groupBy(m, SASO_ASK).documents.rows;
+  const rowsOf = (m: FleetMachine) => papers(groupBy(m, SASO_ASK));
   const find = (m: FleetMachine, key: string) => rowsOf(m).find((r) => r.key === key)!;
 
   it("saso_registration satisfies PROOF OF OWNERSHIP — it is a real paper and it counts as one", () => {

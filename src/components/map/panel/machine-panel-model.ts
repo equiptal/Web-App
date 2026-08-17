@@ -952,7 +952,7 @@ const OWNERSHIP_ANY_OF = "ownership";
 
 /** ~~`| "operator"`~~ — the operator's group left this tab in the UAT of 2026-08-11; see
  *  {@link equipmentDocGroups}. Two groups, and both are the machine's. */
-export type DocGroupKey = "photos" | "documents";
+export type DocGroupKey = "photos" | "ownership" | "certificates";
 
 export interface DocGroup {
   key: DocGroupKey;
@@ -1545,7 +1545,7 @@ export function equipmentDocGroups(machine: FleetMachine, request: MatchRequest)
   // Keyed by the row the paper belongs to, falling back to its own name for the ones that belong to
   // none — so the four rows and the extras below read one map and cannot file a paper twice.
   const ownershipByCode = heldByCode(ownershipHeld, (t) => ownershipRowCode(t) ?? norm(t));
-  const paperRows: DocRow[] = OWNERSHIP_ROW_CODES.map((code) =>
+  const ownershipRows: DocRow[] = OWNERSHIP_ROW_CODES.map((code) =>
     certRow({
       key: `doc:ownership:${code}`,
       label: docTypeLabel(code),
@@ -1568,16 +1568,18 @@ export function equipmentDocGroups(machine: FleetMachine, request: MatchRequest)
   // below excludes every ownership doc by construction.
   for (const [code, held] of ownershipByCode) {
     if ((OWNERSHIP_ROW_CODES as readonly string[]).includes(code)) continue;
-    paperRows.push(
+    ownershipRows.push(
       certRow({ key: `doc:ownership_other:${code}`, label: docTypeLabel(code), held, required: false, askType: code }),
     );
   }
 
+  // Certificates and any paper that belongs to no named row — the app files both under one heading.
+  const certRows: DocRow[] = [];
   const equipHeld = heldByCode(machine.documentKeys.filter(isEquipmentCertDoc), canonicalCertCode);
   const equipRequested = readiness.equipmentCerts.map((c) => c.code);
   const equipRequiredSet = new Set(equipRequested);
   for (const code of unionCodes(equipRequested, equipHeld)) {
-    paperRows.push(
+    certRows.push(
       certRow({
         key: `doc:equipment_cert:${code}`,
         label: equipmentCertRowLabel(code),
@@ -1598,7 +1600,7 @@ export function equipmentDocGroups(machine: FleetMachine, request: MatchRequest)
     (t) => norm(t),
   );
   for (const [code, held] of otherHeld) {
-    paperRows.push(
+    certRows.push(
       certRow({ key: `doc:other:${code}`, label: docTypeLabel(code), held, required: false, askType: code }),
     );
   }
@@ -1613,7 +1615,12 @@ export function equipmentDocGroups(machine: FleetMachine, request: MatchRequest)
     // `bidReadinessGapPhotos` (app_en.arb:8739 · app_ar.arb:6241) and `bidReadinessDocsEquipmentGroup`
     // (app_en.arb:5415 · app_ar.arb:3638 — already word-for-word what this file had).
     { key: "photos" as const, label: { en: "Unit photos", ar: "صور الوحدة" }, rows: photoRows },
-    { key: "documents" as const, label: { en: "Equipment documents", ar: "مستندات المعدّة" }, rows: paperRows },
+    // Ownership before certificates: it is what the platform requires of every machine, and it is the
+    // answer to "is this really his to rent". Headings are the app's own «إثبات الملكية» /
+    // «الشهادات» — `docProofOfOwnership` / `docCertificates`, which the supplier reads on his side of
+    // the same papers, so the two ends of one conversation name them alike.
+    { key: "ownership" as const, label: { en: "Proof of Ownership", ar: "إثبات الملكية" }, rows: ownershipRows },
+    { key: "certificates" as const, label: { en: "Certificates", ar: "الشهادات" }, rows: certRows },
   ]
     // A group with nothing to say is not a heading with an empty body — it is absent.
     .filter((g) => g.rows.length > 0)
