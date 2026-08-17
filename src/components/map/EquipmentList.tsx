@@ -510,30 +510,22 @@ function EquipmentCard({
               the card with nothing under it, and three unlike things on one line is what made the
               controls read as floating rather than as the card's own. */}
           <div className="bm-eq-r2">
-            <span
-              className={`bm-eq-chip${
-                chip.availability === "confirmed" ? " ok" : chip.availability === "in_offer" ? " mid" : " no"
-              }`}
-            >
-              {/* THREE states, and the shape still carries the meaning, not the colour alone: the
-                  confirmed chip is a small squared label with a ✓; the other two are capsules with a
-                  dot that breathes, because both are live questions. Anyone reading this list with a
-                  red-green deficiency has the ✓ and the words — and orange against red is a distinction
-                  the words carry too («في هذا العرض» against «لم يؤكد توفرها بعد»).
-
-                  Third state added 2026-08-13 with the whole-fleet list: a machine he offered but has
-                  not placed, which used to wear the same red as one he never offered at all. */}
+            <span className={`bm-eq-chip${chip.availability === "confirmed" ? " ok" : " no"}`}>
+              {/* TWO states, and the shape carries the meaning, not the colour alone: the confirmed
+                  chip is a small squared label with a ✓; the other is a capsule with a dot that
+                  breathes, because it is a live question. Anyone reading this list with a red-green
+                  deficiency has the ✓ and the words. */}
               {chip.availability === "confirmed" ? (
                 <span aria-hidden="true">✓</span>
               ) : (
                 <span className="bm-eq-dot" aria-hidden="true" />
               )}
-              {chip.availability === "confirmed"
-                ? t.bidMap.eqChipConfirmed
-                : chip.availability === "in_offer"
-                  ? t.bidMap.pinInOffer
-                  : t.bidMap.eqChipUnconfirmed}
+              {chip.availability === "confirmed" ? t.bidMap.eqChipConfirmed : t.bidMap.eqChipUnconfirmed}
             </span>
+            {/* Membership, as a badge beside the state and never as its colour (app parity,
+                2026-08-17). The chip answers "has he named the yard"; this answers "is it on the
+                offer". Two questions, two marks — folding them made one of them lie. */}
+            {card.inOffer && <span className="bm-eq-inoffer">{t.bidMap.pinInOffer}</span>}
             {/* The yard is outside the request city's own radius — the fact that turns a delivery into
                 a mobilisation. It qualifies the offer, so it sits with the state and not with the
                 number it is derived from. */}

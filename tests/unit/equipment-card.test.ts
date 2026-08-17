@@ -30,6 +30,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   AVAILABILITY_COLOUR,
+  IN_OFFER_BADGE_COLOUR,
   REQUEST_ACTION_COLOUR,
   arabicIndicDigits,
   availabilityView,
@@ -134,7 +135,7 @@ describe("the card's chip and the machine's marker are one derivation (RM3-AC-19
     // Without this, both assertions below could pass on a machine where every reading agrees, and the
     // test would be green over a fixture that cannot distinguish the right rule from the wrong one.
     expect(trap.yardConfirmed).toBe(true);
-    expect(unitAvailability(trap)).toBe("in_offer");
+    expect(unitAvailability(trap)).toBe("unconfirmed");
     expect(mirror.yardConfirmed).toBe(false);
     expect(unitAvailability(mirror)).toBe("confirmed");
   });
@@ -146,7 +147,7 @@ describe("the card's chip and the machine's marker are one derivation (RM3-AC-19
     // Not "both happen to be unconfirmed" — both are the same value, produced by the same call.
     expect(card.chip).toEqual(availabilityView(trap));
     expect(marker.availability).toBe(card.chip.availability);
-    expect(card.chip).toEqual({ availability: "in_offer", colour: AVAILABILITY_COLOUR.in_offer });
+    expect(card.chip).toEqual({ availability: "unconfirmed", colour: AVAILABILITY_COLOUR.unconfirmed });
   });
 
   it("agrees the other way too — the boolean says no and both surfaces still say confirmed", () => {
@@ -174,19 +175,29 @@ describe("the card's chip and the machine's marker are one derivation (RM3-AC-19
     }
     // …and the mixed offer really is mixed, or "they agree" would be trivially true.
     expect(new Set(listed.map((m) => equipmentCardModel(m).chip.availability))).toEqual(
-      new Set(["confirmed", "in_offer"]),
+      new Set(["confirmed", "unconfirmed"]),
     );
   });
 
   it("carries ONE availability colour per machine, and never a second", () => {
-    /* ~~"only the two availability colours"~~ — there are three since 2026-08-13. The rule this test
-       actually defends is unchanged: a card wears exactly ONE of them, so it cannot state two states
-       at once. The trap fixture is offered, so its one colour is the orange. */
+    /* ~~there are three since 2026-08-13~~ — back to TWO on 2026-08-17, aligning with the app. The
+       rule this test defends never changed: a card wears exactly ONE availability colour, so it
+       cannot state two states at once. The trap fixture's yard is inferred, so its one colour is red.
+
+       The orange is NOT in this palette and must not be: it is the in-offer badge, a different
+       question, and the moment it appears among the availability colours it has become a third
+       state again. */
     const card = equipmentCardModel(trap);
     const palette = valuesDeep(card).filter((v) => /^#[0-9a-f]{6}$/i.test(v));
-    expect(palette.filter((v) => v.toUpperCase() === AVAILABILITY_COLOUR.in_offer.toUpperCase())).toHaveLength(1);
+    expect(palette.filter((v) => v.toUpperCase() === AVAILABILITY_COLOUR.unconfirmed.toUpperCase())).toHaveLength(1);
     expect(palette.filter((v) => v.toUpperCase() === AVAILABILITY_COLOUR.confirmed.toUpperCase())).toHaveLength(0);
-    expect(palette.filter((v) => v.toUpperCase() === AVAILABILITY_COLOUR.unconfirmed.toUpperCase())).toHaveLength(0);
+    expect(palette.filter((v) => v.toUpperCase() === IN_OFFER_BADGE_COLOUR.toUpperCase())).toHaveLength(0);
+  });
+
+  it("says membership as a flag, not as a colour", () => {
+    // The badge is a boolean on the model. If it ever arrives carrying a hex, the split has collapsed.
+    expect(equipmentCardModel(trap).inOffer).toBe(true);
+    expect(equipmentCardModel({ ...trap, inBid: false }).inOffer).toBe(false);
   });
 });
 
@@ -311,7 +322,7 @@ describe("«اطلب التأكيد» is offered iff availability is unconfirmed
   it("offers it on every unconfirmed level, without opening the detail", () => {
     for (const source of ["listing_yard", "bid_yard", "bid_pin", "none"]) {
       const card = one({ id: "eq", source, lat: source === "none" ? null : 24.7, lng: source === "none" ? null : 46.7 });
-      expect(card.chip.availability, source).toBe("in_offer");
+      expect(card.chip.availability, source).toBe("unconfirmed");
       expect(card.askAvailability, source).not.toBeNull();
     }
   });
@@ -662,7 +673,7 @@ describe("machineMarkers — one marker per plottable offered machine (RM3-AC-21
 
   it("takes each marker's availability from `unitAvailability`, not from the boolean", () => {
     const markers = machineMarkers(listed);
-    expect(markers.map((m) => m.availability)).toEqual(["confirmed", "unconfirmed", "in_offer"]);
+    expect(markers.map((m) => m.availability)).toEqual(["confirmed", "unconfirmed", "unconfirmed"]);
     for (const marker of markers) {
       const machine = listed.find((m) => m.equipmentId === marker.id) as FleetMachine;
       expect(marker.availability).toBe(unitAvailability(machine));

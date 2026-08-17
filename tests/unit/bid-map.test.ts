@@ -13,6 +13,7 @@ import {
   resolveUnitLocation,
   shortfallAlert,
   unitAvailability,
+  isInOffer,
   unitCountLabel,
   unitCounts,
   unitIndicators,
@@ -71,23 +72,33 @@ describe("unitAvailability — the single source of the map's colour (RM3-AC-19)
     expect(unitAvailability(located("unit_yard"))).toBe("confirmed");
   });
 
-  it("is in_offer for every inferred level — bid_pin, bid_yard, listing_yard", () => {
+  it("is unconfirmed for every inferred level — bid_pin, bid_yard, listing_yard", () => {
     // ~~`unconfirmed`~~ until 2026-08-13. Red now answers "he never offered it"; a machine that IS on
     // the offer with no yard named is orange. Two different questions, two colours, one ask.
-    expect(unitAvailability(located("bid_pin"))).toBe("in_offer");
-    expect(unitAvailability(located("bid_yard"))).toBe("in_offer");
-    expect(unitAvailability(located("listing_yard"))).toBe("in_offer");
+    expect(unitAvailability(located("bid_pin"))).toBe("unconfirmed");
+    expect(unitAvailability(located("bid_yard"))).toBe("unconfirmed");
+    expect(unitAvailability(located("listing_yard"))).toBe("unconfirmed");
   });
 
-  it("is unconfirmed for a machine he did NOT offer, whatever its yard says (owner, 2026-08-13)", () => {
-    // The list carries his whole matching fleet now, so `inBid` is asked FIRST: a machine he never put
-    // on the table is red even when its own registered yard is precise, because what the renter wants
-    // is for him to OFFER it, not to place it.
-    expect(unitAvailability({ ...located("unit_yard"), inBid: false })).toBe("unconfirmed");
+  it("does NOT read `inBid` — the colour answers the yard and only the yard (app parity, 2026-08-17)", () => {
+    /* ~~`inBid` is asked FIRST: a machine he never put on the table is red even when its own
+       registered yard is precise.~~ Withdrawn. That made one level read two ways and left a machine
+       standing in a named yard looking unconfirmed because this bid had not offered it. Membership is
+       `isInOffer`, drawn as a badge. */
+    expect(unitAvailability({ ...located("unit_yard"), inBid: false })).toBe("confirmed");
+    expect(unitAvailability({ ...located("unit_yard"), inBid: true })).toBe("confirmed");
     expect(unitAvailability({ ...located("listing_yard"), inBid: false })).toBe("unconfirmed");
+    expect(unitAvailability({ ...located("listing_yard"), inBid: true })).toBe("unconfirmed");
     // Absent `inBid` means the caller holds only offered units — the bid list's own projection carries
-    // no such field — so it defaults to offered and those surfaces answer exactly as before.
+    // no such field — so it answers exactly as it always did.
     expect(unitAvailability(located("unit_yard"))).toBe("confirmed");
+  });
+
+  it("says membership separately, and it is the ONLY thing that reads `inBid`", () => {
+    expect(isInOffer({ inBid: true })).toBe(true);
+    expect(isInOffer({ inBid: false })).toBe(false);
+    // Absent means "this caller has no non-offered machines to tell apart".
+    expect(isInOffer({})).toBe(true);
   });
 
   it("a unit_yard unit is confirmed while a listing_yard unit is not, however precise the coordinate", () => {
@@ -95,7 +106,7 @@ describe("unitAvailability — the single source of the map's colour (RM3-AC-19)
     const committed = located("unit_yard", { equipmentId: "a" });
     const registered = located("listing_yard", { equipmentId: "b" });
     expect(unitAvailability(committed)).toBe("confirmed");
-    expect(unitAvailability(registered)).toBe("in_offer");
+    expect(unitAvailability(registered)).toBe("unconfirmed");
   });
 
   it("is absent ONLY for unidentified — there is no machine to colour (RMAP-AC-58, spec 001 v2 §6.6)", () => {
@@ -105,18 +116,18 @@ describe("unitAvailability — the single source of the map's colour (RM3-AC-19)
   it("is unconfirmed for none — a REGISTERED machine whose yard was deleted still has documents", () => {
     // §7.3 distinguishes the two deliberately: `unidentified` is no machine, `none` is a real machine
     // with an unknown location. It cannot be plotted (isPlottable), but it is not indicator-less.
-    expect(unitAvailability(unit({ locationSource: "none" }))).toBe("in_offer");
+    expect(unitAvailability(unit({ locationSource: "none" }))).toBe("unconfirmed");
   });
 
   it("never turns green off the yardConfirmed boolean — supplier-side it is just yardId != null", () => {
     // RMAP-AC-10 (spec 001 v2) / the 2026-08-05 colour decision: the flag is reported verbatim and
     // rendered nowhere. RM3-AC-27 restates the reporting half for this feature's own fleet read.
-    expect(unitAvailability(located("listing_yard", { yardConfirmed: true, yardId: "y-1" }))).toBe("in_offer");
+    expect(unitAvailability(located("listing_yard", { yardConfirmed: true, yardId: "y-1" }))).toBe("unconfirmed");
     expect(unitAvailability(located("unit_yard", { yardConfirmed: false }))).toBe("confirmed");
   });
 
   it("defaults a missing locationSource to the WEAKEST level, so an absent field cannot read as green", () => {
-    expect(unitAvailability(unit())).toBe("in_offer");
+    expect(unitAvailability(unit())).toBe("unconfirmed");
   });
 
   it("stays confirmed regardless of dates — the accepted approximation of §6.9.4 (TC-111)", () => {
@@ -417,7 +428,7 @@ describe("unitIndicators — two independent signals (RMAP-AC-55→58, spec 001 
 
   it("lets the two disagree without either masking the other (RMAP-AC-57)", () => {
     // Fully documented, yard unconfirmed…
-    expect(unitIndicators(located("listing_yard"), readiness("green"))).toEqual({ readinessBand: "green", availability: "in_offer" });
+    expect(unitIndicators(located("listing_yard"), readiness("green"))).toEqual({ readinessBand: "green", availability: "unconfirmed" });
     // …and the reverse.
     expect(unitIndicators(located("unit_yard"), readiness("red"))).toEqual({ readinessBand: "red", availability: "confirmed" });
   });
@@ -429,7 +440,7 @@ describe("unitIndicators — two independent signals (RMAP-AC-55→58, spec 001 
   it("KEEPS the readiness band for a registered machine with no resolvable location (RMAP-AC-58 is about unidentified only)", () => {
     // Its yard was deleted, so it cannot be plotted — but it still holds photos and documents, so the
     // band is meaningful and the pair stays visible in the panel and the list.
-    expect(unitIndicators(unit({ locationSource: "none" }), readiness("green"))).toEqual({ readinessBand: "green", availability: "in_offer" });
+    expect(unitIndicators(unit({ locationSource: "none" }), readiness("green"))).toEqual({ readinessBand: "green", availability: "unconfirmed" });
   });
 
   it("reports readiness as UNAVAILABLE, never red, when there is nothing to score (RMAP-AC-59)", () => {
@@ -565,7 +576,7 @@ describe("bids contract — per-unit location reaches the client (T8, §7.2)", (
     // Never green off a payload that says nothing. `in_offer` since 2026-08-13 rather than
     // `unconfirmed`: this row came off the BID's own projection, which only ever holds offered units,
     // so "he did not offer it" is not a reading this payload can support.
-    expect(unitAvailability(u)).toBe("in_offer");
+    expect(unitAvailability(u)).toBe("unconfirmed");
   });
 
   it("ignores an unrecognised locationSource instead of inventing a level", () => {

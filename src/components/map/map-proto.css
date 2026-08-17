@@ -1190,14 +1190,22 @@
   border: 1px solid rgba(22, 163, 74, 0.34);
 }
 .bidmap .bm-eq .bm-eq-chip.no { color: #d9362a; background: rgba(217, 54, 42, 0.1); border: 1px solid rgba(217, 54, 42, 0.3); }
-/* «في هذا العرض» — offered, and no yard named for it yet (owner, 2026-08-13). It wears the surface's
-   own orange, `AVAILABILITY_COLOUR.in_offer`, which is the hex the shortfall alert also draws: one
-   surface, one orange. It sits between the other two in every sense — the machine IS on the table, so
-   it is not red; nothing has been placed, so it is not green. */
-.bidmap .bm-eq .bm-eq-chip.mid { color: #e8890c; background: rgba(232, 137, 12, 0.1); border: 1px solid rgba(232, 137, 12, 0.3); }
-/* An unanswered question is live, not a closed verdict — so only the two unsettled dots breathe. */
-.bidmap .bm-eq .bm-eq-chip.no .bm-eq-dot,
-.bidmap .bm-eq .bm-eq-chip.mid .bm-eq-dot { animation: dpDot 1.7s ease-in-out infinite; }
+/* «في هذا العرض» — the machine is on the offer. A BADGE beside the state chip, never a third chip
+   colour (app parity, 2026-08-17): it answers a different question from the chip, so painting it as
+   an availability state is what made one of the two lie. It wears `IN_OFFER_BADGE_COLOUR`, the hex
+   the shortfall alert also draws — one surface, one orange. */
+.bidmap .bm-eq .bm-eq-inoffer {
+  color: #e8890c;
+  background: rgba(232, 137, 12, 0.1);
+  border: 1px solid rgba(232, 137, 12, 0.3);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+/* An unanswered question is live, not a closed verdict — so the unsettled dot breathes. */
+.bidmap .bm-eq .bm-eq-chip.no .bm-eq-dot { animation: dpDot 1.7s ease-in-out infinite; }
 /* «· خارج المدينة» (decoded 4026) — the yard is outside the request city's own radius, which is what
    turns a delivery into a mobilisation worth asking about. Stated in the state row rather than beside
    the distance: it qualifies the offer, not the number. Deliberately plain text, not a chip — the row

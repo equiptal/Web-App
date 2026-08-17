@@ -18,7 +18,7 @@
  * the contract files carry a mechanical-Dart-port promise this one does not.
  */
 
-import { arabicIndicDigits, availabilityView, isOutOfCity, REQUEST_ACTION_COLOUR } from "@/lib/contract/bid-map";
+import { arabicIndicDigits, availabilityView, isInOffer, isOutOfCity, REQUEST_ACTION_COLOUR } from "@/lib/contract/bid-map";
 import type { Bilingual } from "@/lib/contract/equipment-list";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import { computeUnitReadiness, readinessInputsFor } from "@/lib/contract/bid-readiness";
@@ -35,7 +35,7 @@ import { heroPhotoUrl, type MatchRequest } from "@/components/map/panel/machine-
  */
 export interface EquipmentCardChip {
   /** From {@link availabilityView} — the same call the marker set makes (RM3-AC-19). */
-  availability: "confirmed" | "in_offer" | "unconfirmed";
+  availability: "confirmed" | "unconfirmed";
   /** `#16A34A` / `#E8890C` / `#D9362A`. The chip, and the hairline down the photo's inner edge, are
    *  this one colour; the marker's disc and caption are the same one for the same machine.
    *
@@ -156,6 +156,15 @@ export interface EquipmentCardModel {
   verified: boolean;
   /** Non-null **iff** {@link EquipmentCardChip.availability} is `unconfirmed` (AC-13). */
   askAvailability: EquipmentCardAsk | null;
+  /**
+   * **Is this machine on the offer?** — drawn as the «ضمن العرض» badge, never as a colour (app
+   * parity, 2026-08-17).
+   *
+   * A second, independent flag rather than a fourth chip state: a machine can be offered with no yard
+   * named yet, and a machine can stand in a named yard without being offered at all. The chip answers
+   * the yard; this answers the offer.
+   */
+  inOffer: boolean;
 }
 
 /**
@@ -223,5 +232,6 @@ export function equipmentCardModel(
     // `certs.length`, never a document count, never "has any approved doc". See the field's comment.
     verified: isEquipmentVerified(machine.verificationStatus),
     askAvailability: chip.availability === "confirmed" ? null : { colour: REQUEST_ACTION_COLOUR },
+    inOffer: isInOffer(machine),
   };
 }

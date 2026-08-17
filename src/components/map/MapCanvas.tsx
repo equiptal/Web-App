@@ -76,7 +76,7 @@ export interface MachinePin extends MapPoint {
    * marker can be a machine he never offered (red) beside one he offered and has not placed (orange)
    * beside one he confirmed (green).
    */
-  availability: "confirmed" | "in_offer" | "unconfirmed";
+  availability: "confirmed" | "unconfirmed";
   /** Distance to the project, for the chip riding this machine's route. Null → no chip, never a 0. */
   distanceKm: number | null;
   /**
@@ -672,16 +672,17 @@ function machineIcon(
   // state cannot be added to one and forgotten in the other.
   const tint = {
     confirmed: "rgba(22,163,74,.34)",
-    in_offer: "rgba(232,137,12,.32)",
     unconfirmed: "rgba(217,54,42,.32)",
   }[pin.availability];
 
-  // «مؤكّد توفرها» / «في هذا العرض» / «لم يؤكد توفرها بعد». Every one of them reads as a STATE and
-  // none carries a reason, a cause or a location-source explanation (AC-20, AC-30) — «في هذا العرض»
-  // says the machine is on the table, not why its yard is still unnamed.
+  // «مؤكّد توفرها» / «لم يؤكد توفرها بعد». Both read as a STATE and neither carries a reason, a cause
+  // or a location-source explanation (AC-20, AC-30).
+  //
+  // **No in-offer pin caption**, and that is a decision rather than an omission (app parity,
+  // `bid_map_strings.dart:708`): membership is a badge on the CARD. A pin caption saying it too would
+  // put a second answer on the surface for the reader to reconcile against the colour.
   const state = {
     confirmed: t.bidMap.pinAvailable,
-    in_offer: t.bidMap.pinInOffer,
     unconfirmed: t.bidMap.pinUnconfirmed,
   }[pin.availability];
 

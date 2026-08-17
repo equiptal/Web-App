@@ -20,26 +20,30 @@ import type { BidCard, OfferedUnitDetail, UnitLocationSource } from "./bids";
 /* ────────────────────────────────── availability — the one colour ────────────────────────────────── */
 
 /**
- * `confirmed` → green, `in_offer` → orange, `unconfirmed` → red, `absent` → not drawn and not coloured.
+ * `confirmed` → green, `unconfirmed` → red, `absent` → not drawn and not coloured.
  *
- * ── THREE states since 2026-08-13, and the third is the owner's ─────────────────────────────────
- * ~~"There is no fourth state and there is no amber."~~ Withdrawn with the list's offered-only rule
- * (RM3-AC-09/10). The owner: *"all equipments will be shown, and if in the offer but not confirmed
- * then this green will be orange and called 'in this offer' with the same request-confirm beside it…
- * for red keep it not confirmed."*
+ * ── TWO ring colours, and membership is a badge (aligned with the app, 2026-08-17) ──────────────
+ * This asks exactly one question: **has the lessor named the yard this machine leaves from, for this
+ * bid?** Green says yes, red says not yet. Nothing else changes it.
  *
- * The states now answer TWO questions at once, which is why there are three of them:
+ * ~~THREE states since 2026-08-13.~~ ~~`in_offer` — offered, no yard named — took orange, and a
+ * machine he had NOT offered was forced to red whatever its yard said. The owner, on the web side:
+ * *"all equipments will be shown, and if in the offer but not confirmed then this green will be
+ * orange and called 'in this offer' … for red keep it not confirmed."*~~
  *
- *   • `confirmed`   — he offered it AND named the yard it leaves from. Nothing outstanding.
- *   • `in_offer`    — he offered it and has NOT named a yard. The renter's question is "where is it?"
- *   • `unconfirmed` — he owns it and did not offer it. The question is "will you offer this one?"
+ * **Withdrawn 2026-08-17.** The app reached the opposite conclusion on the same day from the same
+ * owner (`bid_map.dart:196`), and it is the one that stands: folding membership into the colour
+ * *"made one level read two ways and left a machine standing in a named yard looking unconfirmed
+ * because this bid had not offered it."* Both quotes are kept because a reader who cannot see that a
+ * decision was reversed will reverse it again.
  *
- * Both of the latter carry «اطلب التأكيد», because both are answered by the same ask; what differs is
- * what the renter is looking at, and the colour is what says so.
+ * Membership did not disappear — it moved. {@link isInOffer} answers it, and it is drawn as the
+ * «ضمن العرض» badge in {@link IN_OFFER_BADGE_COLOUR}, which is deliberately NEITHER availability
+ * colour: painting it as one would make it read as a third availability state and undo the split.
  *
  * `absent` is unchanged and still means "there is no machine here to colour".
  */
-export type UnitAvailability = "confirmed" | "in_offer" | "unconfirmed" | "absent";
+export type UnitAvailability = "confirmed" | "unconfirmed" | "absent";
 
 /**
  * §6.3.1 / §6.3.2 fills. Kept next to the states they belong to so a surface cannot invent a fourth.
@@ -49,16 +53,43 @@ export type UnitAvailability = "confirmed" | "in_offer" | "unconfirmed" | "absen
  * bar all use `#16A34A` / `#D9362A`. AC-168 requires all four surfaces to be the *same* red, so there
  * can only be one pair — and the prototype's is the one three of the four already draw.
  *
- * `in_offer` takes the prototype's own `orange`, which is the hex {@link SHORTFALL_COLOUR} also names.
- * They are deliberately two constants over one value: the shortfall alert answers "units were claimed
- * with no machine behind them" and this answers "this machine has no yard yet". One surface, one
- * orange — but if either question ever wants its own tone, the other must not follow it by accident.
+ * Two entries, not three: orange left this map on 2026-08-17 — see {@link IN_OFFER_BADGE_COLOUR}.
  */
-export const AVAILABILITY_COLOUR: Record<"confirmed" | "in_offer" | "unconfirmed", string> = {
+export const AVAILABILITY_COLOUR: Record<"confirmed" | "unconfirmed", string> = {
   confirmed: "#16A34A",
-  in_offer: "#E8890C",
   unconfirmed: "#D9362A",
 };
+
+/**
+ * **The «ضمن العرض» badge's fill** — this surface's single accent orange.
+ *
+ * It is deliberately NEITHER availability colour. The badge answers a different question from the
+ * ring, so painting it green or red would read as a third availability state and undo the whole point
+ * of splitting them (`bid_map.dart:52`, app parity).
+ *
+ * Same hex as {@link SHORTFALL_COLOUR}, deliberately two constants over one value: the shortfall
+ * answers "units were claimed with no machine behind them" and this answers "this machine is on the
+ * offer". One surface, one orange — but if either ever wants its own tone, the other must not follow
+ * it by accident.
+ */
+export const IN_OFFER_BADGE_COLOUR = "#E8890C";
+
+/**
+ * **Is this machine in the offer?** — the second, INDEPENDENT flag, drawn as a badge rather than a
+ * colour (app parity, `bid_map.dart:230`).
+ *
+ * It reads `inBid` and nothing else: whether this bid's `unitsOffered` names the machine. Deliberately
+ * not folded into {@link unitAvailability} — one signal cannot answer two questions without lying
+ * about one of them. A machine can be offered with no yard named yet, and a machine can stand in a
+ * named yard without being offered at all. Two flags say both.
+ *
+ * `inBid` is absent on surfaces that only ever hold offered units (the bid list's `offeredUnitsDetail`
+ * has no such field). Absent means "this caller has no non-offered machines to tell apart", so it
+ * answers true and those surfaces read exactly as they did.
+ */
+export function isInOffer(unit: { inBid?: boolean }): boolean {
+  return unit.inBid !== false;
+}
 
 /**
  * «خارج المدينة» — the distance past which a machine is no longer a same-city job.
@@ -117,38 +148,30 @@ export function unitAvailability(
 ): UnitAvailability {
   const source = reportedLocationSource(unit);
 
-  /* ── Not in the offer is its own state, and it is read FIRST (owner, 2026-08-13) ─────────────
-     The list now carries the supplier's whole matching fleet, not only what he offered, so a machine
-     can be here without being on the table. That is a different question from "where does it leave
-     from", and it outranks the location entirely: a machine he never offered is `unconfirmed`
-     whatever its yard says, because the renter is asking him to offer it, not to place it.
+  /* ── It does NOT read `inBid` (app parity, 2026-08-17) ────────────────────────────────────────
+     ~~`inBid === false` outranked the precedence entirely.~~ Withdrawn: that made one level read two
+     ways and left a machine standing in a named yard looking unconfirmed because this bid had not
+     offered it. Membership is {@link isInOffer} and is drawn as a badge.
 
-     `inBid` is absent on surfaces that only ever hold offered units (the bid list's
-     `offeredUnitsDetail` has no such field). Absent means "this caller has no non-offered machines to
-     tell apart", so it defaults to true and those surfaces keep their previous answer exactly. */
-  if (unit.inBid === false && source !== "unidentified") return "unconfirmed";
-
+     In practice a machine outside the bid still reads unconfirmed, because only an entry in this
+     bid's `unitsOffered` can produce `unit_yard` — the backend hands the rest their listing yard. The
+     difference is where the rule lives: in the data, not in a second reading of `inBid` here. */
   switch (source) {
     case "unit_yard":
       return "confirmed";
-    // Offered, with no yard committed to THIS bid. Orange since 2026-08-13 — it used to share red
-    // with the not-offered case, which made "he hasn't placed it" and "he hasn't offered it" one
-    // colour and one sentence.
+    // Precise coordinates with no per-unit commitment behind them. The yard for THIS bid is still
+    // unnamed, which is the only question this function asks.
     case "bid_pin":
     case "bid_yard":
     case "listing_yard":
-      return "in_offer";
+      return "unconfirmed";
     // A REGISTERED machine whose every location level is null (its yard was deleted — `bids.yard_id`
     // is ON DELETE SET NULL). The supplier never committed it to this bid from a named yard, so it is
     // `unconfirmed`, NOT `absent`: it still has photos and documents, so its readiness band is
     // meaningful and AC-58 strips indicators only for `unidentified`. It simply cannot be plotted —
     // that is `isPlottable`'s job, which reads coordinates and never this function.
-    //
-    // It reads `in_offer` since 2026-08-13, not `unconfirmed`: we reach here only when the machine IS
-    // on the offer (the not-offered case returned above), so the honest reading is "offered, nowhere
-    // to draw it" — and red is now reserved for a machine he has not offered at all.
     case "none":
-      return "in_offer";
+      return "unconfirmed";
     // No machine at all — padding in `unitsOffered` beyond the machines named. Nothing to score, no
     // yard to confirm, never drawn (§6.2, §6.6, AC-58).
     case "unidentified":
@@ -172,14 +195,13 @@ export function unitAvailability(
  * A caller that needs the four-state answer calls `unitAvailability` directly; a caller that is about
  * to paint something calls this.
  *
- * **Three paintable states since 2026-08-13** — see {@link UnitAvailability}. `in_offer` is passed
- * through rather than folded, because the whole point of the owner's ruling is that "offered, not
- * placed" and "not offered at all" stop wearing one colour.
+ * **Two paintable states since 2026-08-17** — see {@link UnitAvailability}. Membership is not a
+ * colour; it is {@link isInOffer}, drawn as a badge.
  *
  * **Never reads `yardConfirmed`** — `unitAvailability`'s doc block above records the full reason.
  */
 export interface AvailabilityView {
-  availability: "confirmed" | "in_offer" | "unconfirmed";
+  availability: "confirmed" | "unconfirmed";
   colour: string;
 }
 

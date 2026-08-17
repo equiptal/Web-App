@@ -58,24 +58,30 @@ describe("the chip's model collapses the reason away (RM3-AC-30)", () => {
     // The fixture must actually cover four different sources, or "they all agree" is trivial.
     expect(new Set(UNCONFIRMED_SOURCES).size).toBe(4);
     expect(new Set(results).size).toBe(1);
-    expect(results[0]).toBe("in_offer");
+    expect(results[0]).toBe("unconfirmed");
     // A primitive has nowhere to hang a `reason` on. If this ever became an object the chip would be
     // able to state a cause without a single change to the copy.
     for (const r of results) expect(typeof r).toBe("string");
   });
 
-  it("returns a FOUR-state enum and nothing wider — no per-cause state to render", () => {
-    /* ~~THREE.~~ A fourth arrived on 2026-08-13 with the whole-fleet list, and it does NOT weaken this
-       rule: the fourth answers a different QUESTION (did he offer it?), not a different CAUSE of the
-       same one. All four location levels below still collapse to one value, which is what AC-30 is
-       about — the renter is never told WHY a yard is unnamed. */
+  it("returns a THREE-state enum and nothing wider — no per-cause state to render", () => {
+    /* ~~A fourth arrived on 2026-08-13 with the whole-fleet list.~~ Withdrawn 2026-08-17, aligning
+       with the app: membership is not an availability state, it is `isInOffer` drawn as a badge. The
+       four location levels collapse to one value, which is what AC-30 is about — the renter is never
+       told WHY a yard is unnamed. */
     const every: UnitLocationSource[] = [...UNCONFIRMED_SOURCES, "unit_yard", "unidentified"];
     const offered = new Set(every.map((locationSource) => unitAvailability({ locationSource })));
-    expect([...offered].sort()).toEqual(["absent", "confirmed", "in_offer"]);
+    expect([...offered].sort()).toEqual(["absent", "confirmed", "unconfirmed"]);
+  });
 
-    // …and the fourth is reachable only by asking that other question.
-    const notOffered = unitAvailability({ locationSource: "listing_yard", inBid: false });
-    expect(notOffered).toBe("unconfirmed");
+  it("does not read `inBid` — a named yard is confirmed whether or not this bid offered it", () => {
+    // The regression the app withdrew and this alignment undoes: folding membership into the colour
+    // left a machine standing in its own yard looking unconfirmed because this bid had not offered it.
+    expect(unitAvailability({ locationSource: "unit_yard", inBid: false })).toBe("confirmed");
+    expect(unitAvailability({ locationSource: "unit_yard", inBid: true })).toBe("confirmed");
+    // And the converse: not naming a yard is unconfirmed whether or not it is on the offer.
+    expect(unitAvailability({ locationSource: "listing_yard", inBid: true })).toBe("unconfirmed");
+    expect(unitAvailability({ locationSource: "listing_yard", inBid: false })).toBe("unconfirmed");
   });
 
   it("hands the chip a view model with exactly two keys, neither of them a cause", () => {
@@ -180,7 +186,7 @@ describe("no chip renderer can reach `locationSource` at all (RM3-AC-30)", () =>
     const body = stripComments(canvas.slice(at, canvas.indexOf("\n}", at)));
     // Three paintable states since 2026-08-13 — still an enum of STATES, with no field for a cause,
     // which is the whole of what this test defends.
-    expect(body).toContain('availability: "confirmed" | "in_offer" | "unconfirmed"');
+    expect(body).toContain('availability: "confirmed" | "unconfirmed"');
     for (const forbidden of ["locationSource", "reason", "cause"]) expect(body).not.toContain(forbidden);
     // Four declared fields and no fifth — the pin has no room for a cause.
     expect([...body.matchAll(/\n\s*(\w+)\s*:/g)].map((m) => m[1]).sort()).toEqual([

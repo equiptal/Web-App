@@ -537,9 +537,9 @@ export interface MachineMarker extends MapPoint {
   lat: number;
   lng: number;
   /** From {@link availabilityView}, which is also what the card's chip is built on — so the two are
-   *  one fact and not two agreeing derivations (RM3-AC-19). Three values since 2026-08-13; the map
-   *  now draws the whole matching fleet, so a pin can be a machine he never offered. */
-  availability: "confirmed" | "in_offer" | "unconfirmed";
+   *  one fact and not two agreeing derivations (RM3-AC-19). TWO values since 2026-08-17; the map
+   *  draws the whole matching fleet, and membership is a badge on the card rather than a colour. */
+  availability: "confirmed" | "unconfirmed";
   /** Distance to the project, for the chip riding this machine's route. Null → no chip, never a 0. */
   distanceKm: number | null;
 }
