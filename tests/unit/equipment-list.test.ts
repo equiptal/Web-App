@@ -42,13 +42,15 @@ interface RawMachine {
   lng?: number | null;
   docs?: string[];
   year?: number | null;
+  /** The maker's own spelling. Undefined keeps the fixture's default, null means the file names none. */
+  make?: string | null;
 }
 
 const fleet = (rows: RawMachine[]): FleetMachine[] =>
   mapFleet(
     rows.map((r) => ({
       equipmentId: r.id,
-      manufacturer: "Caterpillar",
+      manufacturer: r.make === undefined ? "Caterpillar" : r.make,
       modelName: "320D",
       year: r.year === undefined ? 2022 : r.year,
       locationSource: r.source ?? "listing_yard",
@@ -764,5 +766,57 @@ describe("the filtered empty state is not RM3-AC-26's (RM3-AC-28e)", () => {
       emptied: false,
       groups: [],
     });
+  });
+});
+
+/* ─────────────────── the manufacturer filter (app parity, 2026-08-17) ─────────────────── */
+
+describe("manufacturer filter — الصانع", () => {
+  const mixedMakes = fleet([
+    { id: "cat-1", make: "Caterpillar" },
+    { id: "cat-2", make: "Caterpillar" },
+    { id: "komatsu", make: "Komatsu" },
+  ]);
+
+  it("draws one chip per maker the fleet holds, sorted, counting its own machines", () => {
+    const group = equipmentFilters(mixedMakes, asking()).find((g) => g.kind === "manufacturer");
+    expect(group?.options.map((o) => o.id)).toEqual(["make:Caterpillar", "make:Komatsu"]);
+    expect(group?.options.map((o) => o.matches)).toEqual([2, 1]);
+  });
+
+  it("names the chip in the supplier's own spelling, the same in both languages", () => {
+    const group = equipmentFilters(mixedMakes, asking()).find((g) => g.kind === "manufacturer");
+    // A brand is a name, not a word to translate.
+    expect(group?.options[0].label).toEqual({ en: "Caterpillar", ar: "Caterpillar" });
+  });
+
+  it("draws nothing when every machine shares one maker — rule 2, it splits nothing", () => {
+    const oneMake = fleet([{ id: "a" }, { id: "b" }]); // both default to Caterpillar
+    expect(groupKinds(equipmentFilters(oneMake, asking()))).not.toContain("manufacturer");
+  });
+
+  it("draws nothing when no machine names a maker", () => {
+    const noMakes = fleet([{ id: "a", make: null }, { id: "b", make: null }]);
+    expect(groupKinds(equipmentFilters(noMakes, asking()))).not.toContain("manufacturer");
+  });
+
+  it("ignores the machines that name no maker rather than grouping them together", () => {
+    // An empty maker is not a maker. Two unnamed machines are not "the same brand".
+    const some = fleet([{ id: "a", make: "Volvo" }, { id: "b", make: null }, { id: "c", make: "Hitachi" }]);
+    const group = equipmentFilters(some, asking()).find((g) => g.kind === "manufacturer");
+    expect(group?.options.map((o) => o.id)).toEqual(["make:Hitachi", "make:Volvo"]);
+  });
+
+  it("never normalises two spellings into one maker", () => {
+    // Guessing that «كوماتسو» and `Komatsu` are one brand is how a filter starts hiding machines.
+    const spellings = fleet([{ id: "a", make: "Komatsu" }, { id: "b", make: "كوماتسو" }]);
+    const group = equipmentFilters(spellings, asking()).find((g) => g.kind === "manufacturer");
+    expect(group?.options).toHaveLength(2);
+  });
+
+  it("keeps only that maker's machines when its chip is picked", () => {
+    const group = equipmentFilters(mixedMakes, asking()).find((g) => g.kind === "manufacturer");
+    const kept = filterMachines(mixedMakes, asking(), [group!.options[1].id]);
+    expect(ids(kept)).toEqual(["komatsu"]);
   });
 });

@@ -128,7 +128,7 @@ export interface Bilingual {
   ar: string;
 }
 
-export type EquipmentFilterKind = "distance" | "availability" | "year" | "attachments" | "certificate";
+export type EquipmentFilterKind = "distance" | "availability" | "year" | "attachments" | "certificate" | "manufacturer";
 
 /** One chip. `id` is the selection key, stable across renders and safe to persist. */
 export interface EquipmentFilterOption {
@@ -199,6 +199,7 @@ const GROUP_LABEL: Record<EquipmentFilterKind, Bilingual> = {
   year: { en: "Year", ar: "السنة" },
   attachments: { en: "Attachments", ar: "الملحقات" },
   certificate: { en: "Certificates", ar: "الشهادات" },
+  manufacturer: { en: "Manufacturer", ar: "الصانع" },
 };
 
 /** An option plus the predicate behind it. The predicate never leaves this module. */
@@ -398,6 +399,46 @@ function recordsAttachments(): boolean {
  * Equipment certs come first, in the request's own order, then the operator's — the order the detail
  * already reads them in.
  */
+/**
+ * **الصانع** — one chip per manufacturer the fleet actually holds (app parity, 2026-08-17).
+ *
+ * The renter's bid list has filtered by brand for a long time and the map had no counterpart, so a
+ * renter comparing eight machines could narrow by distance and by year but not by who built them.
+ * The app added this on 2026-08-14 for exactly that reason; this is the web's side of it.
+ *
+ * **Named by the data, never by a catalogue.** The chip carries the string the supplier's own file
+ * holds. Nothing here normalises «كوماتسو» and `Komatsu` into one maker — guessing that two spellings
+ * are one brand is how a filter starts hiding machines.
+ *
+ * Rule 2 still applies: a fleet where every machine shares one maker, or where none names one, splits
+ * nothing and draws no chips.
+ */
+function manufacturerGroup(listed: readonly FleetMachine[]): BuiltGroup | null {
+  const counts = new Map<string, number>();
+  for (const m of listed) {
+    const make = (m.manufacturer ?? "").trim();
+    if (!make) continue;
+    counts.set(make, (counts.get(make) ?? 0) + 1);
+  }
+  // Fewer than two makers cannot split the list — one chip that keeps everything is not a filter.
+  if (counts.size < 2) return null;
+
+  const built: BuiltOption[] = [...counts.keys()]
+    .sort()
+    .map((make) => ({
+      option: {
+        id: `make:${make}`,
+        kind: "manufacturer" as const,
+        // The maker's own spelling, in both languages: a brand is a name, not a word to translate.
+        label: { en: make, ar: make },
+        matches: counts.get(make) ?? 0,
+      },
+      keep: (m: FleetMachine) => (m.manufacturer ?? "").trim() === make,
+    }));
+
+  return { kind: "manufacturer", label: GROUP_LABEL.manufacturer, built };
+}
+
 function certificateGroup(listed: readonly FleetMachine[], scored: ReadonlyMap<string, UnitReadiness>): BuiltGroup | null {
   const first = listed.map((m) => scored.get(m.equipmentId)).find((r): r is UnitReadiness => !!r);
   if (!first) return null;
@@ -463,6 +504,7 @@ function buildGroups(listed: readonly FleetMachine[], request: EquipmentFilterRe
     yearGroup(listed, scored),
     attachmentsGroup(listed, req),
     certificateGroup(listed, scored),
+    manufacturerGroup(listed),
   ].filter((g): g is BuiltGroup => g != null);
 }
 
