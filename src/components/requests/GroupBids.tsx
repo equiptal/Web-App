@@ -6,8 +6,6 @@ import { useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
 import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/client";
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
-import { BidReadinessBadge, BidEligibilityModal } from "@/components/requests/BidReadiness";
-import { computeBidReadiness } from "@/lib/contract/bid-readiness";
 import { mayOpenEquipmentSurface } from "@/lib/contract/bid-equipment-access";
 import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
@@ -21,7 +19,6 @@ import { qualityFromSubmissionItem, type BidQuality } from "@/lib/contract/bid-q
 import { computeBidQuote } from "@/lib/contract/comparison";
 import { divisorNote } from "@/lib/pricing/rental";
 import { shortRef, type RequestGroup } from "@/lib/contract/requests";
-import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { quotationDownloadName } from "@/lib/compare/quotation-token";
 import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/render";
@@ -119,11 +116,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   const [allUnitsIds, setAllUnitsIds] = useState<Set<string>>(new Set());
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [selectMode, setSelectMode] = useState(false); // prototype: pick bids to compare/export
-  const [equipBid, setEquipBid] = useState<GroupBid | null>(null);
-  const [termsBid, setTermsBid] = useState<GroupBid | null>(null);
-  const [eligBid, setEligBid] = useState<GroupBid | null>(null); // bid-readiness — eligibility view for a native bid's offered units
-  const [langPick, setLangPick] = useState(false); // quotation language chooser (Arabic | English)
+  const [selectMode, setSelectMode] = useState(false); // prototype: pick bids to compare/export  const [termsBid, setTermsBid] = useState<GroupBid | null>(null);  const [langPick, setLangPick] = useState(false); // quotation language chooser (Arabic | English)
   // Bids captured the instant "Download quotations" is clicked. The language/verify modals aren't part
   // of the selection UI, so opening one trips the click-outside handler and CLEARS `selected` before the
   // download fires — which then fell back to exporting EVERY supplier. Snapshotting here keeps the PDF
@@ -809,21 +802,22 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
               <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Equipment", "المعدة")}</span>
               {/* No cert chips on the card — all equipment detail lives in the Details modal only. */}
               <div style={{ flex: 1 }} />
-              {/* Bid readiness — compact N/N + eye ON this row (opens the per-unit eligibility view); native
-                  bids only (computeBidReadiness null for off-platform). Replaces the old bulky section. */}
-              {!selectMode && (() => { const rd = computeBidReadiness(b); return rd ? <BidReadinessBadge r={rd} L={L} onClick={() => setEligBid(b)} /> : null; })()}
-              {!selectMode && (
-                <button onClick={() => setEquipBid(b)} style={blueLink}>{L("Details", "التفاصيل")} ›</button>
-              )}
-              {/* RMAP V1 — the entry to the equipment-verification surface. A LINK, not a view flag:
-                  the surface is addressable by `bidId` alone, so this caller needs to know nothing
-                  about how it is built, and the next entry point (the redesigned all-bids view, the
-                  inbox, a notification) is the same href. Following it creates no deal room.
+              {/* ONE way into the equipment, and it is the map (owner, 2026-08-17).
 
-                  V13/RM3-AC-25 — never offered for an off-platform bid. Such a bid already takes the
-                  `SharedLinkBidCard` branch above and never reaches this row, so today the predicate
-                  is belt to that structural brace; it is stated anyway because the branch is a
-                  rendering choice, not a rule, and the next entry point will copy this row. */}
+                  This row used to offer three: a readiness badge that opened the eligibility view, a
+                  `Details` modal, and this link. All three answered the same question — *is this
+                  machine what I asked for?* — in three different depths, and the renter had to guess
+                  which one held the answer he wanted. The verification surface is the one that holds
+                  all of it: the units, their papers, their readiness and where they are.
+
+                  RMAP V1 — a LINK, not a view flag: the surface is addressable by `bidId` alone, so
+                  this caller needs to know nothing about how it is built, and every other entry point
+                  is the same href. Following it creates no deal room.
+
+                  V13/RM3-AC-25 — never offered for an off-platform bid. Such a bid takes the
+                  `SharedLinkBidCard` branch above and never reaches this row, so the predicate is
+                  belt to that structural brace; it is stated anyway because the branch is a rendering
+                  choice, not a rule. */}
               {!selectMode && mayOpenEquipmentSurface(b) && (
                 <Link href={`/bids/${encodeURIComponent(b.id)}/equipment`} style={{ ...blueLink, textDecoration: "none" }}>
                   {t.bidMap.verifyEntry} ›
@@ -970,15 +964,6 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         </div>
       )}
 
-      {equipBid && (
-        <BidEquipmentModal
-          bid={equipBid}
-          busy={busyId === equipBid.id}
-          onRequestDetails={() => startNegotiation(equipBid)}
-          onClose={() => setEquipBid(null)}
-        />
-      )}
-
       {/* Terms modal (prototype "Terms — <supplier>") — per-class term status + Negotiate terms */}
       {termsBid && (
         <BidTermsModal
@@ -993,8 +978,6 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         />
       )}
 
-      {/* bid-readiness — read-only eligibility view for a native bid's offered units */}
-      {eligBid && (() => { const rd = computeBidReadiness(eligBid); return rd ? <BidEligibilityModal r={rd} supplierName={eligBid.supplierName} ar={ar} L={L} onClose={() => setEligBid(null)} /> : null; })()}
 
       {/* Issue-quotation gate for an unverified renter (company name vs personal name). */}
       {quoteGate && (
