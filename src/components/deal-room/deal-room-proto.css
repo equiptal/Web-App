@@ -673,3 +673,29 @@
 .dlproto .qp-thist .material-icons-outlined { font-size: 12px; }
 /* The payment row lays its label out inline, so the notes need the label to become a column. */
 .dlproto .qp-pay-row .k { display: flex; flex-direction: column; gap: 1px; }
+
+/* ── the sibling strip: this renter's other conversations with the same supplier ─────────────────
+   Under the top bar, because it is navigation BETWEEN rooms rather than part of one. It scrolls
+   sideways on a narrow screen rather than wrapping — a wrapped strip changes the page's height as
+   the renter moves between items, so the conversation below would jump each time. */
+.dlproto .dr-sibs {
+  display: flex; gap: 6px; overflow-x: auto; padding: 0 2px 12px;
+  margin-top: -6px; scrollbar-width: none;
+}
+.dlproto .dr-sibs::-webkit-scrollbar { display: none; }
+.dlproto .dr-sibs button {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px;
+  font: inherit; font-size: 12.5px; font-weight: 700; color: var(--navy-mid);
+  background: var(--surface1); border: 1px solid var(--border);
+  border-radius: 999px; padding: 7px 14px; cursor: pointer; white-space: nowrap;
+}
+.dlproto .dr-sibs button:hover:not(:disabled) { background: var(--surface2); color: var(--navy); }
+/* The current tab is inert, so it reads as a position rather than as a control that does nothing. */
+.dlproto .dr-sibs button.on {
+  background: var(--navy); border-color: var(--navy); color: #fff; cursor: default;
+}
+/* A conversation nobody has opened yet. A quiet dot, not a word — the tab still works. */
+.dlproto .dr-sibs button .dot {
+  width: 5px; height: 5px; border-radius: 50%; background: var(--muted); flex: 0 0 auto;
+}
+.dlproto .dr-sibs button.on .dot { background: rgba(255, 255, 255, .55); }

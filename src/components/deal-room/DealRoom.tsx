@@ -6,7 +6,7 @@ import { type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
 import { STREAM_API_KEY, leaseStream } from "@/lib/chat/stream-connection";
 import { useHeaderBack } from "@/components/AppShell";
-import { fetchBidFleet, fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, closeDealRoom, ApiError } from "@/lib/api/client";
+import { fetchBidFleet, fetchBids, fetchRequestDetail, fetchRequestGroup, fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, closeDealRoom, ApiError } from "@/lib/api/client";
 import { computeDealTotals, buildDealRoomQuotationDoc, quotationLinkKind, lastTermMove, type DealRoomView, type DealTerm, type DealRoomDocument, type DealRoomDocuments, type QuotationView } from "@/lib/contract/deal-room";
 import { reconstructRounds, collapseRounds, latestRoundBy, withOpeningRound, chatCardOfMessage, chatCardTime, buildChatCardView, requestRepliesByRef, requestThreadCards, respondedProposalIds, latestProposalId, type DealRound } from "@/lib/contract/deal-rounds";
 import type { FleetMachine } from "@/lib/contract/fleet";
@@ -14,6 +14,8 @@ import { RENTEE_REQUEST_CARD_TYPE, RENTEE_REQUEST_REPLY_CARD_TYPE } from "@/lib/
 import { ANSWER_CUE_MS, answeredAskRefs, latestAnsweredRef, postedSubject, replyFoldsIntoAsk, requestCardView, requestDocLabel, type RequestCardCtx } from "@/lib/contract/request-card";
 import { valText, type ResolutionsMap } from "@/components/deal-room/DealRoomTerms";
 import { cityLabel, rentalTypeLabel, urgencyLabel, termValueLabel } from "@/lib/contract/labels";
+import { buildSiblingTabs, type SiblingItemTab } from "@/lib/contract/sibling-tabs";
+import type { BidCard } from "@/lib/contract/bids";
 import { ChatCard } from "@/components/deal-room/ChatCard";
 import { RequestCard } from "@/components/map/RequestCard";
 import { fleetMachineResolver } from "@/components/map/request-card-ctx";
@@ -141,6 +143,7 @@ export function DealRoom({ id, onTitle, initialFlow }: {
   const [cancelOpen, setCancelOpen] = useState(false); // cancel-the-deal reasons modal
   const [cancelling, setCancelling] = useState(false);
   const [cancelErr, setCancelErr] = useState<string | null>(null);
+  const [siblingTabs, setSiblingTabs] = useState<SiblingItemTab[]>([]);
   // Touch device → dial (tel:). Desktop/laptop → just SHOW the number (you can't place a call from a laptop).
   const [canCall, setCanCall] = useState(false);
   useEffect(() => { setCanCall(typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true); }, []);
@@ -353,6 +356,60 @@ export function DealRoom({ id, onTitle, initialFlow }: {
       active = false;
     };
   }, [room?.bidId]);
+
+
+  /* ── The sibling strip (app parity: `sibling_item_tabs.dart`) ────────────────────────────────────
+     A multi-item post fans out into one request per item, so a renter who posted three machines and
+     got bids from one supplier has three rooms with that firm — and, the deal room being a route, no
+     way between them but backing out to the offers list.
+
+     Three reads, and the first two are cheap: the group id usually rides on the room payload, and
+     falling back to the request detail is one call. The per-sibling bid lists then run in parallel,
+     each catching its own failure — an unreadable list costs its own tab, never the whole strip.
+
+     The whole effect is silent on failure. There is nothing for the renter to do about a strip that
+     did not load, and the conversation he came for is untouched. */
+  useEffect(() => {
+    const requestId = room?.requestId;
+    const supplierId = room?.supplierId;
+    if (!requestId || supplierId == null) return;
+    let active = true;
+
+    void (async () => {
+      try {
+        const groupId = room?.requestGroupId
+          ?? ((await fetchRequestDetail(requestId).catch(() => null))?.requestGroupId as string | undefined)
+          ?? null;
+        if (!active || !groupId) return;
+
+        const { requests } = await fetchRequestGroup(groupId);
+        // A group of one has nothing to switch between; the rule refuses it too, but there is no
+        // reason to fetch a bid list to be told so.
+        if (!active || requests.length < 2) return;
+
+        const byRequest = new Map<string, BidCard[]>();
+        await Promise.all(
+          requests.map((r) =>
+            fetchBids(r.id)
+              .then((d) => { byRequest.set(r.id, d.bids); })
+              .catch(() => { /* this sibling loses its tab; the rest of the strip still draws */ }),
+          ),
+        );
+        if (!active) return;
+
+        setSiblingTabs(buildSiblingTabs({
+          siblings: requests,
+          currentRequestId: requestId,
+          bidOn: (rid) => {
+            const hit = (byRequest.get(rid) ?? []).find((x) => String(x.supplierId ?? "") === String(supplierId));
+            return hit ? { bidId: hit.id, dealRoomId: hit.dealRoomId } : null;
+          },
+        }));
+      } catch { /* silent — see the block comment */ }
+    })();
+
+    return () => { active = false; };
+  }, [room?.requestId, room?.requestGroupId, room?.supplierId]);
 
 
   // Live chat (GetStream).
@@ -806,6 +863,33 @@ export function DealRoom({ id, onTitle, initialFlow }: {
           <span className="tb-ic" role="button" tabIndex={0} aria-haspopup="menu" aria-expanded={menuOpen} title={L("More", "المزيد")} onClick={() => setMenuOpen((o) => !o)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setMenuOpen((o) => !o)}><span className="material-icons-outlined">more_vert</span></span>
         </div>
       </div>
+
+      {/* ── The sibling strip (app parity: `sibling_item_tabs.dart`) ───────────────────────────────
+          The renter's other conversations with THIS supplier about the same submission. Absent
+          unless there are at least two and one of them is this room — both refusals are the model's,
+          so this renders the array or nothing.
+
+          A tab with no room yet still navigates: opening a conversation creates nothing, and the
+          first message is what creates the room. With no room id to go to, the destination is that
+          bid's equipment surface — the one addressable place for an offer nobody has spoken in. */}
+      {siblingTabs.length > 1 && (
+        <div className="dr-sibs" role="tablist" aria-label={L("Other items in this request", "بنود أخرى في هذا الطلب")}>
+          {siblingTabs.map((tab) => (
+            <button
+              key={tab.requestId}
+              type="button"
+              role="tab"
+              aria-selected={tab.isCurrent}
+              className={tab.isCurrent ? "on" : undefined}
+              disabled={tab.isCurrent}
+              onClick={() => router.push(tab.dealRoomId ? `/deal-room/${encodeURIComponent(tab.dealRoomId)}` : `/bids/${encodeURIComponent(tab.bidId)}/equipment`)}
+            >
+              {ar ? tab.label.ar : tab.label.en}
+              {!tab.dealRoomId && <span className="dot" title={L("Not started", "لم تبدأ")} />}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* The kebab's menu is a sibling of the top bar, NOT a child of it: `.topbar` scrolls sideways
           on a narrow screen (`overflow-x: auto`), and a dropdown inside a scroll box is clipped by it.

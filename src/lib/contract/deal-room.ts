@@ -153,6 +153,16 @@ export interface DealRoomView {
   requestedUnits: number;
   /** Request short code (REQ-NNNNN) for the room header label. */
   shortCode: string | null;
+  /**
+   * The request this room settles. Top-level on the payload and dropped by this mapper until now.
+   *
+   * Needed to reach the rest of a multi-item submission: a renter who posted three items and got bids
+   * from one supplier has three rooms with that firm, and nothing here could name the other two.
+   */
+  requestId: string | null;
+  /** The submission group, when the payload carries it. Null is "unknown", NOT "no group" — the field
+   *  is absent on some responses, so a caller must look it up before concluding there are no siblings. */
+  requestGroupId: string | null;
   /** Who made the last counter ("rentee" | "supplier" | null). The renter is the rentee. */
   lastCounterBy: string | null;
   /** Convenience: is it the renter's turn to act (accept/counter)? */
@@ -583,6 +593,8 @@ export function mapDealRoom(raw: unknown): DealRoomView {
     demobExcluded: d.demobExcluded === true,
     requestedUnits,
     shortCode: s(reqObj.shortCode),
+    requestId: s(d.requestId) ?? s(reqObj.id),
+    requestGroupId: s(reqObj.requestGroupId) ?? s(d.requestGroupId),
     lastCounterBy,
     myTurn,
     terms,
