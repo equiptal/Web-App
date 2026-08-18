@@ -88,7 +88,9 @@ describe("uploadCompanyPile — presign → PUT → complete", () => {
   });
 
   it("refuses an 11th file and a bad type before any network call", async () => {
-    const fetchMock = vi.fn();
+    // Typed so `mock.calls[0]` is the (url, init) pair the assertions below index into — a bare
+    // `vi.fn()` infers no arguments, and then no cast can reach `calls[0][1]`.
+    const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>();
     vi.stubGlobal("fetch", fetchMock);
     const many = Array.from({ length: COMPANY_PILE_MAX_FILES + 1 }, (_, i) => doc(`f${i}.pdf`));
     await expect(uploadCompanyPile(many)).rejects.toThrow("too_many_files");
@@ -198,7 +200,7 @@ describe("uploadCompanyPile — presign → PUT → complete", () => {
 
 describe("POST /api/verification/pile/presign", () => {
   it("pins source + docLane server-side and forwards only the files", async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
       reply(200, { success: true, data: presignBody(["a.pdf"]) }),
     );
     vi.stubGlobal("fetch", fetchMock);
@@ -216,7 +218,7 @@ describe("POST /api/verification/pile/presign", () => {
   });
 
   it("ignores a client-supplied source and docLane — both are claims the browser cannot make", async () => {
-    const fetchMock = vi.fn(async () => reply(200, { success: true, data: presignBody(["a.pdf"]) }));
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => reply(200, { success: true, data: presignBody(["a.pdf"]) }));
     vi.stubGlobal("fetch", fetchMock);
 
     await pilePresign(
@@ -239,7 +241,7 @@ describe("POST /api/verification/pile/presign", () => {
 
 describe("POST /api/verification/pile/{id}/complete", () => {
   it("forwards the echoed keys and reports ok", async () => {
-    const fetchMock = vi.fn(async () => reply(200, { success: true, data: { ok: true, fileCount: 2 } }));
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => reply(200, { success: true, data: { ok: true, fileCount: 2 } }));
     vi.stubGlobal("fetch", fetchMock);
 
     const req = new Request("http://localhost/api/verification/pile/sub_1/complete", {
@@ -343,7 +345,7 @@ describe("GET /api/verification/docs — readable once submitted", () => {
 
 describe("POST /api/verification/submit — the pile shape and the member guard", () => {
   it("forwards the identity body untouched, with no document keys", async () => {
-    const fetchMock = vi.fn(async () => reply(200, { success: true, data: { supplierStatus: 1 } }));
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => reply(200, { success: true, data: { supplierStatus: 1 } }));
     vi.stubGlobal("fetch", fetchMock);
     const { POST } = await import("@/app/api/verification/submit/route");
     const res = await POST(
