@@ -1536,14 +1536,20 @@ function fmtDocsTitle(L: (en: string, arr: string) => string, supplierName: stri
 
 /**
  * Guided counter/accept flow — app parity (counter_offer_flow_sheet + accept flow). One 3-step modal
- * (Terms → Price → Summary) drives BOTH modes:
- *  · Step 1 Terms — reuses `DealRoomTerms` so the renter resolves each differing term LOCALLY
- *    (accept / keep-mine / counter). Next is gated until nothing is left unresolved (the app's
- *    "resolve all first" rule; the backend's accept-all-terms 409s otherwise).
- *  · Step 2 Price — line items (daily rate / mobilization / return) with a live estimated total. In
- *    ACCEPT mode these are read-only (you're accepting the standing offer); in COUNTER mode editable.
- *  · Step 3 Summary — the composed offer + (accept only) a contract-type selector, plus an
+ * drives BOTH modes, in the order `STEPS` states: PRICE → TERMS → REVIEW.
+ *  · Step 1 Price — the quotation paper's line items (rental / mobilization / return) with unit
+ *    steppers and a live total, plus the payment-terms card. In ACCEPT mode these are read-only
+ *    (you're accepting the standing offer); in COUNTER mode editable. Next is gated on a valid rate.
+ *  · Step 2 Terms — the operating-terms table: unsettled rows first, grouped by category, then
+ *    Settled, then Acknowledge. Each is resolved LOCALLY (accept / counter). Next is gated until
+ *    nothing is unresolved (the app's "resolve all first" rule; accept-all-terms 409s otherwise).
+ *  · Step 3 Review — the composed offer + (accept only) a contract-type selector, plus an
  *    acknowledgment. The CTA morphs: "Send counter offer" vs "Accept offer".
+ *
+ * ~~"reuses `DealRoomTerms`"~~ — it never did. That component rendered nowhere and has been removed;
+ * the terms step is the table below. `payment_terms` sits on step 1 rather than step 2 (`PAY_KEYS`),
+ * matching the app: it is settled beside the money it governs, and drawing it in both places asked
+ * the renter for the same schedule twice.
  * Accept is preceded by a binding-commitment warning. Nothing is submitted until the final CTA — the
  * parent's `submitCounter`/`doAccept` do the batched term + rate/accept-all call.
  */
