@@ -49,7 +49,15 @@
   display: flex;
   align-items: stretch;
   flex: 1;
-  min-height: 520px;
+  /* NO vertical floor. The floor is what used to push the surface past the shell's viewport column
+     and hand the PAGE its own scrollbar — and the first thing a scrolling page takes off screen is
+     the price footer at the bottom of it. The shell bounds this surface (`min-h-screen` root,
+     `flex-1 overflow-hidden` main); `min-height: 0` keeps it inside those bounds at every viewport
+     height, which is also what lets `.bm-body` be the one thing that scrolls (a flex child refuses
+     to shrink below its content without it). */
+  min-height: 0;
+  /* …and never taller than the viewport, whatever the shell above it grows into. */
+  max-height: 100dvh;
   overflow: hidden;
   font-size: 14px;
   color: #16304f;
@@ -1852,6 +1860,7 @@
    "…and now restate every colour for the dark slab" block further down the file to keep in sync. */
 .bidmap .bm-foot {
   flex-shrink: 0;
+
   /* ── It is the floor of the column, and it stays there (owner, 2026-08-19) ────────────────────
      *"the price footer must be fixed not scrollable at the end."*
 
@@ -1868,6 +1877,7 @@
   flex-direction: column;
   min-height: 0;
   max-height: 68%;
+
   /* DARK, the prototype's `#0F2238` — the one slab on this surface. Everything above is white cards
      on grey, and the bar that prices them must not read as one more card. */
   background: #0f2238;
@@ -1883,6 +1893,9 @@
   /* The part that yields when the column is short: it scrolls, the rate bar below never does. */
   min-height: 0;
   overflow-y: auto;
+  /* …and its scroll stays its own: reaching the end of the breakdown must not carry on into the
+     equipment list behind it. */
+  overscroll-behavior: contain;
 }
 .bidmap .bm-foot-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 3.5px 0; }
 .bidmap .bm-foot-k { font-size: 11.5px; font-weight: 700; color: #fff; min-width: 0; }
