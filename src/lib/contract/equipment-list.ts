@@ -17,7 +17,7 @@
  * the marker set arguing with the cards about what the lessor offered.
  */
 
-import { arabicIndicDigits, availabilityView, isPlottable, unitAvailability, type MapPoint } from "./bid-map";
+import { arabicIndicDigits, availabilityView, isInOffer, isPlottable, unitAvailability, type MapPoint } from "./bid-map";
 import { computeUnitReadiness, readinessInputsFor, type UnitReadiness } from "./bid-readiness";
 import type { FleetMachine } from "./fleet";
 
@@ -178,6 +178,21 @@ export interface EquipmentListView {
   /** Rule 3 — «٣ من ٨». `total` is the whole offer and is NEVER the filtered figure. */
   shown: number;
   total: number;
+  /**
+   * How many machines survive the filters but sit OUTSIDE this bid's offer.
+   *
+   * Stated whether or not they are currently shown, because it is the same number either way — the
+   * count the expander names when it offers them («+3 more in his fleet») and the count it names
+   * when it offers to put them away again. Zero means there is nothing to expand: either the
+   * supplier offered his whole matching fleet, or the filters left none of the others standing.
+   */
+  beyondOffer: number;
+  /**
+   * True when the others are being shown. Not the caller's `showAll` echoed back: a surface with
+   * nothing outside the offer is EXPANDED by definition, and a collapsed list of nothing would be an
+   * empty panel with a control offering to reveal nothing.
+   */
+  showingAll: boolean;
   /**
    * A filter is active and it left nothing. **Distinct from AC-26's "no machine is registered"**: that
    * is a fact about the lessor, this is a fact about the chips the renter pressed, and the two must
@@ -546,24 +561,64 @@ export function filterMachines(
  * count is made of.
  *
  * The caller derives the marker set from `machines` and nothing else — that is rule 4, and it is why
- * this returns the list rather than a set of ids for the component to re-filter.
+ * this returns the list rather than a set of ids for the component to re-filter. It is also why the
+ * offer/rest split below happens HERE rather than in the component: a narrowing applied after this
+ * call would leave the map drawing machines the list is not showing, which is the one thing rule 4
+ * exists to make impossible.
+ *
+ * ── The offer first, and alone until asked (owner, 2026-08-19) ──────────────────────────────────
+ * *"only show at beginning the ones in the offer and then at bottom option to show all equipments."*
+ *
+ * The third position this list has held, and it settles the tension between the first two rather than
+ * reversing either. ~~v3: offered machines only~~ hid the rest so completely that a renter could not
+ * tell "he has only one" from "he offered only one". ~~2026-08-13: all of them, told apart by
+ * colour~~ answered that, and cost the renter a scan through machines nobody had offered him to find
+ * the ones he was actually being sold. Landing on the offer and keeping the rest one press away
+ * answers both: the surface opens on what is being sold, and what else exists is stated, counted and
+ * reachable.
+ *
+ * Two consequences worth stating, because both are departures:
+ *
+ *  · **Order is offer-first, then nearest.** `listedMachines` sorts purely by distance; this regroups
+ *    that order without disturbing it within either group (`filter` is stable), so the offer reads
+ *    nearest-first and so does the remainder. A nearer machine outside the offer therefore sits below
+ *    a farther one inside it — correct, because the question this surface answers first is what is
+ *    being offered, not what is closest.
+ *  · **A supplier who offered nothing matching is expanded by definition.** With an empty offer there
+ *    is nothing to collapse to, and a collapsed empty list under a control offering to reveal the
+ *    rest states the opposite of the truth. Same for a filter that leaves the offer empty while the
+ *    others stand: `showingAll` comes back true and the expander has nothing to say.
  */
 export function equipmentListView(
   listed: readonly FleetMachine[],
   request: EquipmentFilterRequest | null | undefined,
   selection: readonly string[] | null | undefined,
+  opts?: { showAll?: boolean },
 ): EquipmentListView {
   const groups = equipmentFilters(listed, request);
   const known = new Map(groups.flatMap((g) => g.options.map((o) => [o.id, o] as const)));
   const active = (selection ?? []).map((id) => known.get(id)).filter((o): o is EquipmentFilterOption => !!o);
-  const machines = active.length === 0 ? listed.slice() : filterMachines(listed, request, active.map((o) => o.id));
+  const filtered = active.length === 0 ? listed.slice() : filterMachines(listed, request, active.map((o) => o.id));
+
+  const inOffer = filtered.filter((m) => isInOffer(m));
+  const rest = filtered.filter((m) => !isInOffer(m));
+  // Collapsible only when there is something to keep AND something to hide.
+  const collapsible = inOffer.length > 0 && rest.length > 0;
+  const showingAll = !collapsible || opts?.showAll === true;
+  const machines = showingAll ? [...inOffer, ...rest] : inOffer;
+
   return {
     groups,
     active,
     machines,
     shown: machines.length,
     total: listed.length,
-    emptiedByFilter: active.length > 0 && machines.length === 0 && listed.length > 0,
+    beyondOffer: collapsible ? rest.length : 0,
+    showingAll,
+    // Read against the FILTERED set, not against what the expander is currently showing: the chips
+    // emptying the list is a different fact from the offer being collapsed, and a collapsed list is
+    // never "emptied by filter".
+    emptiedByFilter: active.length > 0 && filtered.length === 0 && listed.length > 0,
   };
 }
 

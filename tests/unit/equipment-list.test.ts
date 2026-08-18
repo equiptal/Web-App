@@ -820,3 +820,101 @@ describe("manufacturer filter — الصانع", () => {
     expect(ids(kept)).toEqual(["komatsu"]);
   });
 });
+
+/* ══════════════ V18 · the offer first, the rest on request (owner, 2026-08-19) ══════════════
+   *"only show at beginning the ones in the offer and then at bottom option to show all equipments
+   … and show others on map."*
+
+   The third position this list has held. What is guarded here is not just the narrowing but the two
+   things that make it safe: the MAP follows the same array (so a pin can never appear for a card that
+   is not there), and a surface with nothing to collapse to never collapses. */
+describe("equipmentListView — the offer first (owner, 2026-08-19)", () => {
+  const mixed = listedMachines(
+    fleet([
+      { id: "offered-near", km: 10 },
+      { id: "fleet-nearest", km: 1, inBid: false },
+      { id: "offered-far", km: 50 },
+      { id: "fleet-far", km: 90, inBid: false },
+    ]),
+  );
+
+  it("shows only the offered machines on arrival, and counts the rest", () => {
+    const v = equipmentListView(mixed, asking(), []);
+    expect(ids(v.machines)).toEqual(["offered-near", "offered-far"]);
+    expect(v.beyondOffer).toBe(2);
+    expect(v.showingAll).toBe(false);
+  });
+
+  it("appends the others BELOW the offer when asked, keeping each group nearest-first", () => {
+    // `fleet-nearest` is 1km away — nearer than either offered machine — and still sorts below them.
+    // The question this surface answers first is what is being offered, not what is closest.
+    const v = equipmentListView(mixed, asking(), [], { showAll: true });
+    expect(ids(v.machines)).toEqual(["offered-near", "offered-far", "fleet-nearest", "fleet-far"]);
+    expect(v.showingAll).toBe(true);
+    expect(v.beyondOffer).toBe(2);
+  });
+
+  it("states the count against the whole fleet either way — a collapsed list is not a smaller offer", () => {
+    expect(equipmentListView(mixed, asking(), []).total).toBe(4);
+    expect(equipmentListView(mixed, asking(), []).shown).toBe(2);
+    expect(equipmentListView(mixed, asking(), [], { showAll: true }).shown).toBe(4);
+  });
+
+  it("the MAP follows the list, collapsed and expanded", () => {
+    // Rule 4, which the narrowing had to preserve: the marker set is derived from `machines` and
+    // nothing else, so a machine that is not in the list cannot have a pin.
+    const collapsed = equipmentListView(mixed, asking(), []);
+    expect(machineMarkers(collapsed.machines).map((m) => m.id)).toEqual(["offered-near", "offered-far"]);
+    const opened = equipmentListView(mixed, asking(), [], { showAll: true });
+    expect(machineMarkers(opened.machines).map((m) => m.id)).toEqual([
+      "offered-near", "offered-far", "fleet-nearest", "fleet-far",
+    ]);
+  });
+
+  it("never collapses to nothing when the supplier offered nothing matching", () => {
+    // Collapsing here would render an empty panel under a control offering to reveal the rest —
+    // which states the opposite of the truth.
+    const noneOffered = listedMachines(fleet([{ id: "a", inBid: false }, { id: "b", inBid: false }]));
+    const v = equipmentListView(noneOffered, asking(), []);
+    expect(ids(v.machines)).toEqual(["a", "b"]);
+    expect(v.showingAll).toBe(true);
+    expect(v.beyondOffer).toBe(0);
+  });
+
+  it("offers no expander when the supplier offered his whole matching fleet", () => {
+    const allOffered = listedMachines(fleet([{ id: "a" }, { id: "b" }]));
+    const v = equipmentListView(allOffered, asking(), []);
+    expect(v.beyondOffer).toBe(0);
+    expect(v.showingAll).toBe(true);
+  });
+
+  it("collapses on its own when the chips leave none of the others standing", () => {
+    // The renter asked to see the fleet, then filtered it down to the offer. The flag is still set,
+    // but there is nothing left for it to reveal, so the expander has nothing to say.
+    const list = listedMachines(
+      fleet([
+        { id: "offered-near", km: 10 },
+        { id: "fleet-far", km: 900, inBid: false },
+      ]),
+    );
+    const v = equipmentListView(list, asking(), ["distance:50"], { showAll: true });
+    expect(ids(v.machines)).toEqual(["offered-near"]);
+    expect(v.beyondOffer).toBe(0);
+  });
+
+  it("reads emptiedByFilter against the FILTERED set, never against the collapse", () => {
+    // A collapsed list is not "emptied by filter" — that state names the chips, and blaming them for
+    // the offer being folded away would send the renter to clear filters that are doing nothing.
+    const list = listedMachines(
+      fleet([
+        { id: "offered-near-bare", km: 10, docs: [] },
+        { id: "fleet-far-tuv", km: 500, docs: ["tuv"], inBid: false },
+      ]),
+    );
+    const ask = asking({ reqEquipmentCerts: ["tuv"] });
+    // Collapsed, with the offer standing: not emptied.
+    expect(equipmentListView(list, ask, []).emptiedByFilter).toBe(false);
+    // A combination that leaves nothing at all: emptied, and it is the chips that did it.
+    expect(equipmentListView(list, ask, ["distance:50", "cert:equipment:tuv"]).emptiedByFilter).toBe(true);
+  });
+});

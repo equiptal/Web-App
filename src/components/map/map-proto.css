@@ -1852,6 +1852,22 @@
    "…and now restate every colour for the dark slab" block further down the file to keep in sync. */
 .bidmap .bm-foot {
   flex-shrink: 0;
+  /* ── It is the floor of the column, and it stays there (owner, 2026-08-19) ────────────────────
+     *"the price footer must be fixed not scrollable at the end."*
+
+     Structurally it always was — a sibling of `.bm-body`, which is the only scroller — but the
+     BREAKDOWN could undo that. `التفاصيل` grew the footer with no ceiling, so on a short viewport a
+     six-line breakdown pushed the rate and the two CTAs past the bottom of a panel that clips
+     (`.bm-panel { overflow: hidden }`), and the figures the bar exists for went off-screen.
+
+     So the footer is capped and given its own column: the breakdown scrolls INSIDE it and the rate
+     bar below is `flex-shrink: 0`. The rate and the hand-off are on screen at every scroll position
+     and at every viewport height, expanded or not — which is what "fixed" has to mean here. The cap
+     is a share of the panel rather than a pixel figure so it holds when the renter drags the grip. */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 68%;
   /* DARK, the prototype's `#0F2238` — the one slab on this surface. Everything above is white cards
      on grey, and the bar that prices them must not read as one more card. */
   background: #0f2238;
@@ -1862,7 +1878,12 @@
 /* ── the breakdown, above the rate ──────────────────────────────────────────────────────────────
    Above, not below: the reader who opened it is checking arithmetic, and the total it builds to
    should finish next to the rate it explains rather than trailing off the bottom of the column. */
-.bidmap .bm-foot-break { padding-bottom: 11px; }
+.bidmap .bm-foot-break {
+  padding-bottom: 11px;
+  /* The part that yields when the column is short: it scrolls, the rate bar below never does. */
+  min-height: 0;
+  overflow-y: auto;
+}
 .bidmap .bm-foot-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 3.5px 0; }
 .bidmap .bm-foot-k { font-size: 11.5px; font-weight: 700; color: #fff; min-width: 0; }
 /* The basis rides inside the label — beside the thing it is the basis of, in the app's grey. */
@@ -1889,7 +1910,7 @@
    The rule only appears once the breakdown is open: with the footer at rest there is nothing above
    the bar to separate it from. `wrap` because 392px is a hard ceiling — the two acts stay whole and
    drop below the rate rather than shrinking their labels to fit. */
-.bidmap .bm-foot-bar { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.bidmap .bm-foot-bar { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; flex-shrink: 0; }
 .bidmap .bm-foot.is-open .bm-foot-bar { padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.14); }
 .bidmap .bm-foot-figs { flex: 1; min-width: 0; }
 .bidmap .bm-foot-rate { display: flex; align-items: baseline; gap: 6px; }
@@ -2532,3 +2553,44 @@
    camera, the picture opens the machine — which is why it needs its own stacking context. */
 .bidmap .bm-eq .bm-eq-photo.is-open { position: relative; z-index: 2; cursor: pointer; }
 .bidmap .bm-eq .bm-eq-photo.is-open:focus-visible { outline: 2px solid var(--action, #2563eb); outline-offset: 2px; }
+
+/* ── V18 · where the offer ends, and the control that reaches past it (owner, 2026-08-19) ────────
+   The list opens on the machines this bid actually names; the rest of the supplier's matching fleet
+   is one press away. When it arrives it arrives BELOW a stated boundary rather than mixed in — the
+   cards are identical in every other respect, so without the rule the renter cannot tell which of
+   them he is being sold. */
+.bidmap .bm-eqsplit {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 2px 0;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #6b8fa8;
+}
+/* Rules on BOTH sides, so the label reads as a divider rather than as a heading over the cards below
+   — the machines under it are not a section of the offer, they are outside it. */
+.bidmap .bm-eqsplit::before,
+.bidmap .bm-eqsplit::after { content: ""; flex: 1; height: 1px; background: #d5e2ee; }
+
+/* Solid where `.bm-eqask` is dashed: this reveals machines that are already there, while the ask
+   below it sends a message to a person. Two different kinds of act should not wear one shape. */
+.bidmap .bm-eqmore {
+  flex-shrink: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #fff;
+  border: 1px solid #c8d8e8;
+  color: #1c3550;
+  border-radius: 12px;
+  padding: 10px 11px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.bidmap .bm-eqmore .material-icons-outlined { font-size: 17px; color: #6b8fa8; }
+.bidmap .bm-eqmore.on { background: #eff4f9; }

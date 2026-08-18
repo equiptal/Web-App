@@ -382,7 +382,20 @@ export function BidMapWorkspace({
      made of. `bid` is passed as the request — a `BidCard` carries the request's asks projected onto
      the bid, which is the same object the match grid is scored against, so a chip and a grid cell can
      never disagree about the same certificate. */
-  const view = useMemo(() => equipmentListView(listed, bid, filterIds), [listed, bid, filterIds]);
+  /* ── V18 · the offer first, the rest on request (owner, 2026-08-19) ────────────────────────────
+     *"only show at beginning the ones in the offer and then at bottom option to show all equipments
+     … and show others on map."* One flag, read by the model, and BOTH surfaces follow it — the cards
+     because they render `view.machines`, the map because its pins are derived from the same array.
+     Wiring the map separately would have been a second answer to "what is on screen".
+
+     Not reset when the filters change: a renter who opened the fleet has said what he wants to see,
+     and pressing a chip is not a retraction of it. `equipmentListView` collapses on its own when the
+     expansion stops meaning anything (nothing outside the offer survives the chips). */
+  const [showAllEquipment, setShowAllEquipment] = useState(false);
+  const view = useMemo(
+    () => equipmentListView(listed, bid, filterIds, { showAll: showAllEquipment }),
+    [listed, bid, filterIds, showAllEquipment],
+  );
   const visible = view.machines;
 
   /* The marker set is `machineMarkers(view.machines)` and nothing else — the FILTERED list minus what
@@ -1011,6 +1024,7 @@ export function BidMapWorkspace({
                   // …and the same composer read for the other verb: a card whose «اطلب التأكيد» is
                   // already out shows it as asked instead of offering to ask again (owner, 2026-08-10).
                   askPending={(m) => askPending(composeMachineRequest("availability", m.equipmentId))}
+                  onToggleShowAll={() => setShowAllEquipment((v) => !v)}
                   scrollRef={bodyRef}
                 />
               )}

@@ -1045,6 +1045,13 @@ export const en = {
     // The list-foot ask (§6.4). The prototype says «المورد»; this surface says «المؤجّر» / supplier.
     eqAskAnother: "Ask the supplier to add another {type}",
     eqAskAnotherSent: "Asked",
+    // The offer-first expander (owner, 2026-08-19). The count is in the label because pressing this
+    // adds cards AND pins: the renter should know how much is about to arrive on both surfaces.
+    eqShowAll: "Show {n} more in his fleet",
+    eqShowOfferOnly: "Show only what he offered",
+    // The divider where the offer ends. It says these are the supplier's, not this offer's — without
+    // it the extra cards read as offered machines that were hiding.
+    eqBeyondOffer: "Also in his fleet — not in this offer",
     backToEquipment: "Back to the equipment",
     // What the map is NOT showing, in words. Silence would read as "this supplier has no machines".
     //

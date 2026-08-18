@@ -71,10 +71,10 @@
  * a surface, not a decision.
  */
 
-import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 // Two numeral formatters, and the split is deliberate: `arabicIndicDigits` truncates, which is what a
 // COUNT wants, and `distanceDigits` keeps one decimal, which is what a measured distance wants.
-import { arabicIndicDigits, distanceDigits } from "@/lib/contract/bid-map";
+import { arabicIndicDigits, distanceDigits, isInOffer } from "@/lib/contract/bid-map";
 import { listEmptyState, type EquipmentListView } from "@/lib/contract/equipment-list";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import { equipmentCardModel } from "@/components/map/equipment-card-model";
@@ -128,6 +128,10 @@ export interface EquipmentListProps {
    * and a list that assembled its own key would be the rule spelled a second time.
    */
   askPending?: (machine: FleetMachine) => boolean;
+  /** Show the supplier's other matching machines, or put them away again (owner, 2026-08-19). The
+   *  workspace owns the flag because the MAP reads it too — the pins are derived from the same
+   *  `view.machines` these cards come from, so one press moves both surfaces. */
+  onToggleShowAll?: () => void;
   /** The panel's scroller, so a selection made ON THE MAP brings its card into view. Deliberately the
    *  container's `scrollTop` rather than `scrollIntoView`, which scrolls every ancestor and moves the
    *  whole page. */
@@ -146,6 +150,7 @@ export function EquipmentList({
   onFocusMachine,
   onAskAvailability,
   askPending,
+  onToggleShowAll,
   scrollRef,
 }: EquipmentListProps) {
   const t = useT();
@@ -367,8 +372,17 @@ export function EquipmentList({
       ) : (
         <ul className="bm-eqlist" ref={listRef}>
           {machines.map((m, i) => (
+            <Fragment key={m.equipmentId}>
+              {/* Where the offer ends. Drawn once, before the first machine that is not in it, so the
+                  renter knows why the cards below appeared rather than finding them mixed in. The
+                  model orders the array offer-first, which is what makes "the first one that isn't"
+                  a real boundary rather than a guess. */}
+              {!isInOffer(m) && (i === 0 || isInOffer(machines[i - 1])) && (
+                <li className="bm-eqsplit" aria-hidden="true">
+                  <span>{t.bidMap.eqBeyondOffer}</span>
+                </li>
+              )}
             <EquipmentCard
-              key={m.equipmentId}
               machine={m}
               index={i}
               // The request reaches the CARD, which is what decides which certificates it names.
@@ -385,8 +399,34 @@ export function EquipmentList({
               onAskAvailability={onAskAvailability}
               askPending={askPending}
             />
+            </Fragment>
           ))}
         </ul>
+      )}
+
+      {/* ── The expander (owner, 2026-08-19) ─────────────────────────────────────────────────────
+          «+٣ أخرى في أسطوله» — the machines this supplier has that this offer does not name. It
+          closes the list because that is where the question arises: a renter reaches the end of what
+          he is being sold and asks whether that is everything the supplier has.
+
+          It states the COUNT, not just "show all". A control that will add three cards and three
+          pins should say so before it is pressed — the panel is 392px wide and the map is already
+          drawn, and both change under the renter at once.
+
+          Absent when `beyondOffer` is 0, which covers both the supplier who offered his whole
+          matching fleet and the filters that left none of the others standing. */}
+      {view.beyondOffer > 0 && (
+        <button
+          type="button"
+          className={`bm-eqmore${view.showingAll ? " on" : ""}`}
+          aria-expanded={view.showingAll}
+          onClick={onToggleShowAll}
+        >
+          <span className="material-icons-outlined">{view.showingAll ? "expand_less" : "expand_more"}</span>
+          {view.showingAll
+            ? t.bidMap.eqShowOfferOnly
+            : fmt(t.bidMap.eqShowAll, { n: num(view.beyondOffer) })}
+        </button>
       )}
     </>
   );
