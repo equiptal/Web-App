@@ -691,28 +691,14 @@ export const en = {
     step2: "Verify company",
     done: "done",
     title: "Verify your company",
-    subtitle: "Submit your company details for review to become a verified renter.",
+    subtitle: "Send your company documents for review to become a verified renter.",
     authorityRole: "Your authority",
     roleOwner: "Owner",
     roleManager: "Manager",
     roleEmployee: "Employee",
-    companyName: "Company name",
-    companyLegalName: "Legal Company Name",
-    companyLegalNameHint: "Enter the registered legal company name",
     nationalId: "National ID",
     companyCity: "Company city",
     cityPlaceholder: "Select a city",
-    companyAddress: "Company address",
-    companyLocation: "Company location",
-    crDoc: "Commercial Registration (CR)",
-    vatDoc: "VAT certificate",
-    nationalAddressDoc: "National Address document",
-    localContentDoc: "Local Content certificate",
-    sasoDoc: "SASO Heavy Equipment certificate",
-    otherDoc: "Other document",
-    docsTitle: "Company documents",
-    moreDocsTitle: "Additional documents",
-    detailsTitle: "Company details",
     optional: "optional",
     upload: "Upload",
     uploading: "Uploading…",
@@ -729,17 +715,85 @@ export const en = {
     rejectedBody: "Your submission wasn't approved. You can adjust your details and resubmit.", // AC-17
     errors: {
       role: "Select your authority.", // AC-09
-      companyName: "Company name must be 2–200 characters.", // AC-09
-      companyLegalName: "Legal company name must be 2–200 characters.",
-      cr: "The CR document is required.", // AC-10
-      vat: "The VAT document is required.", // AC-10
-      nationalAddress: "The National Address document is required.", // required to match the app (company_verification_page.dart:302 + '*' label); AC-10 lists only CR/VAT
       docType: "Only JPEG, PNG, WebP, or PDF files are accepted.", // AC-11
       submit: "We couldn't submit. Please try again.",
       // E12004: this account was deleted, so every gated call is refused until it's restored. Retrying
       // the form can never work — send them through sign-in, where the restore prompt is waiting.
       accountDeleted: "This account was deleted. Sign out and sign in again to restore it, then submit.",
       offline: "You appear to be offline. Your input is kept — try again.", // AC-23
+    },
+    /**
+     * The single-pile company-documents flow. Copy is taken verbatim from the mobile app's
+     * `companyDocs*` / `companyLogo*` strings so both products say the same thing in both languages;
+     * only the handful of browser-specific messages at the end have no app counterpart.
+     */
+    pile: {
+      title: "Add company documents",
+      heroTitle: "Upload your documents in one go",
+      heroSubtitle: "Send us everything you have — our team will review it and confirm your request.",
+      requiredSection: "Required to continue",
+      requiredPill: "Required",
+      optionalSection: "Additional documents",
+      optionalPill: "Optional",
+      reqCr: "Commercial Registration",
+      reqNationalAddress: "National Address",
+      reqVat: "VAT",
+      optBank: "Bank details",
+      optLocalContent: "Local Content",
+      optQualifications: "Qualifications",
+      optSaso: "SASO certificate",
+      dropzoneTitle: "Drag or upload your documents here",
+      dropzoneSubtitle: "Commercial registration, national address, tax, and any extra documents — in one batch",
+      dropzoneHint: "Images or PDF · up to {max} documents",
+      limitReached: "Maximum reached ({count} documents)",
+      remove: "Remove",
+      submit: "Send documents",
+      identityTitle: "A quick confirmation of your identity",
+      roleLabel: "Your role at the company",
+      roleEmployee: "Non-authorized employee",
+      roleManager: "Authorized employee",
+      roleOwner: "Owner",
+      nationalIdLabel: "National ID / Iqama number",
+      cityLabel: "City",
+      logoLabel: "Company logo",
+      logoNote: "Appears on your quotations, your shared request link, and the bid form suppliers open.",
+      logoChange: "Change",
+      logoUpload: "Upload",
+      logoRemove: "Remove",
+      continue: "Continue",
+      confirmHeadline:
+        "Not uploading the required company documents may lead to your registration being rejected",
+      confirmEstimate: "We review and get back to you within 24–48 hours",
+      confirmSubmit: "Confirm and send",
+      confirmBack: "Back",
+      sentTitle: "Documents sent",
+      sentBody:
+        "Our team will review your request within 24 to 48 hours, and we'll let you know if we need anything else.",
+      // What the reviewer typed, shown above the form for a renter who is here to resubmit.
+      rejectionLabel: "Not approved",
+      // The read-only side: what actually reached us, for a renter who has already submitted.
+      docsOnFileTitle: "Your submitted documents",
+      docsOnFileCr: "Commercial Registration",
+      docsOnFileVat: "VAT certificate",
+      docsOnFileNationalAddress: "National Address certificate",
+      docsOnFileView: "View",
+      noDocsTitle: "No documents received yet",
+      noDocsBody: "Your request is under review. We'll let you know once it has been checked.",
+      // Browser-only messages — the app has no equivalent because a phone screen cannot be reloaded
+      // out from under an upload the way a tab can.
+      errors: {
+        unsupportedType: "Only JPEG, PNG, WebP, or PDF files are accepted.",
+        tooLarge: "Each document must be 100 MB or smaller.",
+        empty: "That file is empty.",
+        tooMany: "You can send up to {max} documents at once.",
+        presign: "We couldn't start the upload. Please try again.",
+        partial: "Some documents didn't upload. Press Send documents again to retry just those.",
+        // CO1013 — a member of a company they do not own. The backend's own wording is shown when it
+        // arrives; this is the fallback.
+        memberCannotVerify:
+          "You belong to a company you do not own. Only its owner submits it for verification.",
+      },
+      unloadWarning: "Your documents are still uploading. Leave this page and they won't be sent.",
     },
   },
   profile: {
