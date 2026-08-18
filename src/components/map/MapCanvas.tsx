@@ -622,16 +622,23 @@ function hoverBoxHtml(card: EquipmentCardModel, ar: boolean, scale: number, t: R
     `</div>` +
     // The certificates the REQUEST asked for, held or missing — the card's row 4, verbatim. The mark
     // is not decoration: at this size the two fills are close enough that colour alone would decide it.
-    `<div class="bm-pinfo-c">` +
+    //
+    // **Nothing asked for → no row at all** (owner, 2026-08-19), which is the card's rule reaching the
+    // same answer by the other route. The card renders an EMPTY row because every card in a scanned
+    // column has to be one height; this box is a popover that opens beside one machine, has nothing to
+    // line up with, and closes again — so an empty line here would be furniture, and the sentence that
+    // used to fill it («لم تُطلب شهادات») explained an absence nobody had asked about. Both surfaces
+    // now say the same thing about a machine whose request named no certificate: nothing.
     (card.certs.length > 0
-      ? card.certs
+      ? `<div class="bm-pinfo-c">` +
+        card.certs
           .map(
             (c) =>
               `<span class="bm-pinfo-cert ${c.held ? "held" : "missing"}">${c.held ? "✓" : "!"} ${esc(ar ? c.label.ar : c.label.en)}</span>`,
           )
-          .join("")
-      : `<span class="bm-pinfo-none">${esc(t.bidMap.eqNoCerts)}</span>`) +
-    `</div>` +
+          .join("") +
+        `</div>`
+      : "") +
     `</div>`
   );
 }

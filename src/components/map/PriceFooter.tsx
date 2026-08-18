@@ -35,11 +35,15 @@
  * machinery existed to keep the rate on screen while the breakdown was open; with no breakdown the
  * rate simply never leaves.
  *
- * **The arithmetic did NOT move surfaces — it moved back to where it already lived.** Every one of
- * those six figures is `computeDealTotals`', and the deal room's own `qp-foot` prices and prints them
- * for a reader who came to read them. `priceFooterModel` is untouched and still returns the full
- * `totals`; this component now reads `rate`, `priceUnit` and the two counts off it. **What a renter
- * loses here is the VAT and the grand total at a glance** — one press on either act now reaches them.
+ * **Nothing was lost with it.** The six figures are `computeDealTotals`', and TWO surfaces the renter
+ * has already passed through print them in full: the **bid card** he opened this panel from breaks the
+ * price down per unit — rental, the transport legs, subtotal before VAT, VAT at 15%, the grand total,
+ * and an overall total besides when the bid is multi-unit (`RequestBids.tsx:535`) — and the deal room's
+ * own `qp-foot` prices the same lines for a reader who came to negotiate them.
+ *
+ * So this footer was the THIRD place the same arithmetic was drawn, and the only one where it had to be
+ * folded behind a control and given a scroller to fit. `priceFooterModel` is untouched and still returns
+ * the full `totals`; this component now reads `rate`, `priceUnit` and the two counts off it.
  *
  * ── The no-room case is the COMMON one ───────────────────────────────────────────────────────────
  * Most bids have `dealRoomId === null`. Then the footer shows the **bid's own** figures, no status

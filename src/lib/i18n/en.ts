@@ -1021,11 +1021,12 @@ export const en = {
     eqDetails: "Details",
     // The card body's own label — it finds the machine on the map rather than opening its panel.
     eqFind: "Show on map",
-    // The certificate row always occupies its line, so a machine with no certificates is a shorter
-    // LINE and not a shorter CARD.
-    // The line now answers the REQUEST, so its empty case is "you asked for none" — not "the machine
-    // has none", which is a claim about the machine this card no longer makes (owner, 2026-08-11).
-    eqNoCerts: "No certificates requested",
+    // `eqNoCerts` deleted (owner, 2026-08-19). A machine whose request named no certificate now says
+    // NOTHING — the card's row 4 renders empty and holds its line on `min-height`, and the map pin's
+    // hover box drops the row entirely. Neither wording survived reading: "No certificates on the
+    // machine" is a claim about the MACHINE this line cannot make (it lists what the REQUEST asked
+    // for), and "No certificates requested" explained an absence nobody had asked about. No readers
+    // are left, so the key went with them.
     eqDistanceUnit: "km from your project",
     eqNoDistance: "Distance not known",
     eqNoPhoto: "No photo",
