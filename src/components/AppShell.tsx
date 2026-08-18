@@ -144,7 +144,12 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
 
   return (
     <BackContext.Provider value={registerBack}>
-    <div className="flex min-h-screen">
+    {/* `fullBleed` pins the shell to EXACTLY the viewport instead of merely filling it. `min-h-screen`
+        alone lets the page grow past the fold, and on a surface whose own footer is the last thing in
+        the column — the bid map's price bar — the page's scrollbar is what takes that bar off screen.
+        A full-bleed surface owns its own scrolling regions (the equipment list, the map); the PAGE
+        must have none. Paged layouts keep `min-h-screen` and keep scrolling normally. */}
+    <div className={`flex ${fullBleed ? "h-dvh overflow-hidden" : "min-h-screen"}`}>
       {/* Sidebar (navy) — AC-02. Sticky full-height so the tier card stays in view (no page-scroll). */}
       <aside className={`hidden flex-none flex-col self-start bg-gradient-to-b from-[#1e3a5f] to-[#0f1e2e] py-5 text-white transition-[width] duration-200 md:flex md:sticky md:top-0 md:h-screen md:overflow-y-auto ${collapsed ? "w-[68px] px-2" : "w-[232px] px-3.5"}`}>
         <div className={`flex items-center pb-2 pt-1 ${collapsed ? "justify-center px-0" : "justify-between px-2"}`}>
@@ -293,7 +298,11 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
         {/* One consistent page container across the app (T1/T2): My Requests' 1440px width + a slightly
             larger horizontal gutter so content isn't flush to the sidebar / page edge. `wide` stays
             uncapped (My Requests caps itself at 1440 via .rproto). */}
-        <main className={fullBleed ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" : `mx-auto w-full px-6 py-6 pb-24 sm:px-12 sm:pt-7 md:py-7 lg:px-20 xl:px-28 ${wide ? "max-w-none" : "max-w-[1440px]"}`}>{children}</main>
+        {/* The mobile bottom nav is `fixed`, so it paints OVER a full-bleed surface: without this
+            reserve it sits on the bid map's price bar, which is the one thing on that surface that
+            must never be covered. 54px is the nav's own height (py-2 ×2 + a 21px icon + its label).
+            The nav is `md:hidden`, so the reserve ends where the nav does. */}
+        <main className={fullBleed ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-[54px] md:pb-0" : `mx-auto w-full px-6 py-6 pb-24 sm:px-12 sm:pt-7 md:py-7 lg:px-20 xl:px-28 ${wide ? "max-w-none" : "max-w-[1440px]"}`}>{children}</main>
       </div>
 
       {/* Mobile bottom nav — the navy sidebar is desktop-only, so phones navigate from here. */}
