@@ -374,6 +374,18 @@ export function releaseDeal(id: string, reason?: string): Promise<unknown> {
   return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/release`, reason ? { reason } : {});
 }
 
+/**
+ * Abandon this negotiation, with the renter's stated reason (app parity: the cancel-reasons modal).
+ *
+ * Distinct from every other exit the room has. `releaseDeal` reopens a deal already WON;
+ * `withdrawAcceptance` takes back a pending acceptance. This one ends a negotiation that never got
+ * there — the room goes ABANDONED and the reason is posted into the conversation, so the supplier is
+ * told rather than left watching a room go quiet.
+ */
+export function closeDealRoom(id: string, reasonText?: string): Promise<unknown> {
+  return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/close`, reasonText ? { reasonText } : {});
+}
+
 /** Withdraw a pending acceptance (app parity: "withdraw acceptance"). Flips
  *  AWAITING_SUPPLIER_CONFIRMATION → NEGOTIATING, clears reserved units, re-arms the bid. */
 export function withdrawAcceptance(id: string): Promise<unknown> {

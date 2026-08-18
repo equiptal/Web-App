@@ -6,7 +6,7 @@ import { type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
 import { STREAM_API_KEY, leaseStream } from "@/lib/chat/stream-connection";
 import { useHeaderBack } from "@/components/AppShell";
-import { fetchBidFleet, fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, ApiError } from "@/lib/api/client";
+import { fetchBidFleet, fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, closeDealRoom, ApiError } from "@/lib/api/client";
 import { computeDealTotals, buildDealRoomQuotationDoc, quotationLinkKind, type DealRoomView, type DealTerm, type DealRoomDocument, type DealRoomDocuments, type QuotationView } from "@/lib/contract/deal-room";
 import { reconstructRounds, collapseRounds, latestRoundBy, withOpeningRound, chatCardOfMessage, chatCardTime, buildChatCardView, requestRepliesByRef, requestThreadCards, respondedProposalIds, latestProposalId, type DealRound } from "@/lib/contract/deal-rounds";
 import type { FleetMachine } from "@/lib/contract/fleet";
@@ -135,6 +135,11 @@ export function DealRoom({ id, onTitle, initialFlow }: {
   const [counterErr, setCounterErr] = useState<string | null>(null);
   const [showDocs, setShowDocs] = useState(false);
   const [callOpen, setCallOpen] = useState(false); // call-supplier modal (shows the number + dial/copy)
+  const [menuOpen, setMenuOpen] = useState(false); // ⋮ kebab (equipment · company · cancel)
+  const [showRequest, setShowRequest] = useState(false); // request-summary modal, off the header chip
+  const [cancelOpen, setCancelOpen] = useState(false); // cancel-the-deal reasons modal
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelErr, setCancelErr] = useState<string | null>(null);
   // Touch device → dial (tel:). Desktop/laptop → just SHOW the number (you can't place a call from a laptop).
   const [canCall, setCanCall] = useState(false);
   useEffect(() => { setCanCall(typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true); }, []);
@@ -204,6 +209,26 @@ export function DealRoom({ id, onTitle, initialFlow }: {
       setReleaseErr(e instanceof ApiError ? e.message : L("Couldn't reopen the deal. Please try again.", "تعذّر إعادة فتح الصفقة. حاول مرة أخرى."));
     } finally {
       setReleasing(false);
+    }
+  }
+
+  // Cancel the negotiation (app parity: `DealRoomCloseRequested`). Backend flips the room to
+  // ABANDONED and releases whatever the bid was holding; loadRoom then renders the read-only room.
+  //
+  // The reason text is what the renter picked in the modal — one of the five canned reasons, or his
+  // own words under "Other". It is sent as written rather than as a code because that is what the
+  // backend stores and what the supplier is shown.
+  async function doCancel(reasonText: string) {
+    setCancelErr(null);
+    setCancelling(true);
+    try {
+      await closeDealRoom(id, reasonText);
+      setCancelOpen(false);
+      await loadRoom();
+    } catch (e) {
+      setCancelErr(errMsg(e, L("Couldn't cancel the deal. Please try again.", "تعذّر إلغاء الصفقة. حاول مرة أخرى.")));
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -728,9 +753,13 @@ export function DealRoom({ id, onTitle, initialFlow }: {
           </span>
         </button>
         <span className="tb-div" />
-        {/* equipment / request block */}
-        <div className="tb-eq">
-          <span className="ic"><span className="material-icons-outlined">construction</span></span>
+        {/* Request block — now a BUTTON onto the request-summary modal (app parity).
+            The app's chip pairs a clipboard with the request ref, on the reasoning that a control
+            should say what it opens and that a renter with three rooms open needs to know WHICH
+            request this one settles. The web block already carried the ref and the meta line, so it
+            becomes the chip rather than gaining a second one beside it. */}
+        <button type="button" className="tb-eq" onClick={() => setShowRequest(true)} title={L("Request details", "تفاصيل الطلب")}>
+          <span className="ic"><span className="material-icons-outlined">assignment</span></span>
           <span className="meta">
             <span className="t">
               {room.shortCode && <span className="tb-code">{room.shortCode}</span>}
@@ -740,7 +769,8 @@ export function DealRoom({ id, onTitle, initialFlow }: {
             </span>
             <span className="sub">{[room.details.location, periods ? `${periods} ${L("days", "يوم")}` : room.details.rentalType].filter(Boolean).join(" · ")}</span>
           </span>
-        </div>
+          <span className="material-icons-outlined chev">chevron_right</span>
+        </button>
         {/* phase pill (status label placement — §5.2) */}
         <span className="tb-phase">
           <span className="dot" />
@@ -755,8 +785,48 @@ export function DealRoom({ id, onTitle, initialFlow }: {
           {!room.supplier.phone
             ? <span className="tb-ic call locked" title={L("Number unavailable", "الرقم غير متاح")}><span className="material-icons-outlined">call</span></span>
             : <span className="tb-ic call" role="button" tabIndex={0} title={L("Call", "اتصال")} onClick={() => setCallOpen(true)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setCallOpen(true)}><span className="material-icons-outlined">call</span></span>}
+          {/* ── The ⋮ kebab (app parity) ────────────────────────────────────────────────────────
+              Three entries, and the app's own reasoning for each:
+
+                · INSPECT THE EQUIPMENT — the machine this room is about. The chip beside the kebab
+                  names the REQUEST; nothing here named the plant. Disabled when the payload carried
+                  no bid id, since the equipment map is addressed by it.
+                · COMPANY DETAILS — the counterparty's papers, through the same documents modal the
+                  supplier chip opens, so one firm's documents are read one way wherever they open.
+                · CANCEL THE DEAL — here because it is where both parties already know to look for it
+                  (owner, 2026-08-17: *"i want the same place as existing one before our design"*,
+                  after a redesign moved it onto the request sheet and had to move it back).
+
+              REQUEST DETAILS is deliberately NOT here — it sits on the chip beside the kebab, where
+              the app puts it, so the control names the request it opens.
+
+              Cancelling is hidden on a read-only room — CLOSED or ABANDONED — where there is nothing
+              left to cancel. Same gate as the app's `showCancel: !room.isReadOnly`. */}
+          <span className="tb-ic" role="button" tabIndex={0} aria-haspopup="menu" aria-expanded={menuOpen} title={L("More", "المزيد")} onClick={() => setMenuOpen((o) => !o)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setMenuOpen((o) => !o)}><span className="material-icons-outlined">more_vert</span></span>
         </div>
       </div>
+
+      {/* The kebab's menu is a sibling of the top bar, NOT a child of it: `.topbar` scrolls sideways
+          on a narrow screen (`overflow-x: auto`), and a dropdown inside a scroll box is clipped by it.
+          It anchors to `.dlproto` instead, pinned under the bar's end corner. */}
+      {menuOpen && (
+        <>
+          <div className="dr-menu-scrim" onClick={() => setMenuOpen(false)} />
+          <div className="dr-menu" role="menu">
+            <button type="button" role="menuitem" disabled={!room.bidId} onClick={() => { setMenuOpen(false); if (room.bidId) router.push(`/bids/${encodeURIComponent(room.bidId)}/equipment`); }}>
+              <span className="material-icons-outlined">construction</span>{L("Inspect the equipment", "فحص المعدّة")}
+            </button>
+            <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setShowDocs(true); }}>
+              <span className="material-icons-outlined">business_center</span>{L("Company details", "بيانات الشركة")}
+            </button>
+            {!closed && !abandoned && (
+              <button type="button" role="menuitem" className="danger" onClick={() => { setMenuOpen(false); setCancelOpen(true); }}>
+                <span className="material-icons-outlined">cancel</span>{L("Cancel the deal", "إلغاء الصفقة")}
+              </button>
+            )}
+          </div>
+        </>
+      )}
 
       {/* price bar — prototype navy banner: centered hero price + end-side status/CTA cluster + breakdown popover */}
       <div className="price-bar">
@@ -1129,6 +1199,19 @@ export function DealRoom({ id, onTitle, initialFlow }: {
       {callOpen && room.supplier.phone && (
         <CallModal ar={ar} L={L} phone={room.supplier.phone} name={room.supplier.name} canCall={canCall} onClose={() => setCallOpen(false)} />
       )}
+
+      {showRequest && <RequestSummaryModal room={room} ar={ar} L={L} onClose={() => setShowRequest(false)} />}
+
+      {cancelOpen && (
+        <CancelReasonsModal
+          ar={ar}
+          L={L}
+          busy={cancelling}
+          error={cancelErr}
+          onSubmit={(reason) => void doCancel(reason)}
+          onClose={() => { setCancelOpen(false); setCancelErr(null); }}
+        />
+      )}
     </div>
   );
 }
@@ -1223,6 +1306,221 @@ function DocumentsModal({ id, ar, L, supplierName, onClose }: { id: string; ar: 
               <Section title={L("Company", "مستندات الشركة")} items={docs.companyDocuments} />
               <Section title={L("Equipment", "مستندات المعدة")} items={docs.equipmentDocuments} />
             </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The renter's five canned cancellation reasons, plus "Other".
+ *
+ * Verbatim from the app's `cancelReason1..5` + `cancelReasonOther` — the same six a renter is offered
+ * on the phone, so a deal cancelled from either surface reads the same way in the supplier's inbox
+ * and in whatever reporting counts them. The SUPPLIER's list (`supplierCancelReason1..5`) is a
+ * different five; the web room is the renter's, so it is not carried here.
+ *
+ * The submitted value is the reason's own TEXT, not an index — that is what the backend stores.
+ */
+const CANCEL_REASONS: ReadonlyArray<{ en: string; ar: string }> = [
+  { en: "Found a better offer", ar: "وجدت عرضاً أفضل" },
+  { en: "Price is not suitable", ar: "السعر غير مناسب" },
+  { en: "Equipment does not match", ar: "المعدات غير مطابقة" },
+  { en: "Delayed response", ar: "تأخر في الرد" },
+  { en: "Emergency circumstances", ar: "ظروف طارئة" },
+  { en: "Other reason", ar: "سبب آخر" },
+];
+
+/**
+ * Cancel-the-deal reasons modal — app parity (`showCancelReasonsModal`).
+ *
+ * Six radio rows; the last one ("Other reason") opens a free-text box and is the only row that can
+ * hold the renter back — an empty "Other" submits nothing useful, so Confirm stays disabled until
+ * he writes something. Every other row is submittable the moment it is picked.
+ */
+function CancelReasonsModal({ ar, L, busy, error, onSubmit, onClose }: {
+  ar: boolean;
+  L: (en: string, arr: string) => string;
+  busy: boolean;
+  error: string | null;
+  onSubmit: (reason: string) => void;
+  onClose: () => void;
+}) {
+  const [picked, setPicked] = useState<number | null>(null);
+  const [other, setOther] = useState("");
+  const isOther = picked === CANCEL_REASONS.length - 1;
+  const reason = picked === null ? "" : isOther ? other.trim() : L(CANCEL_REASONS[picked].en, CANCEL_REASONS[picked].ar);
+  const canSubmit = !busy && reason.length > 0;
+
+  return (
+    <div dir={ar ? "rtl" : "ltr"} onClick={busy ? undefined : onClose} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(16,38,63,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, maxHeight: "90vh", overflowY: "auto", background: "#fff", borderRadius: 20, boxShadow: "0 24px 60px rgba(16,38,63,.35)", padding: "26px 22px 22px", textAlign: "center" }}>
+        <span style={{ display: "inline-flex", width: 44, height: 44, borderRadius: "50%", background: "var(--danger-bg, #fdeceb)", color: "var(--danger, #d9362a)", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+          <span className="material-icons-outlined" style={{ fontSize: 22 }}>cancel</span>
+        </span>
+        <h3 style={{ fontSize: 16, fontWeight: 900, color: "#1c3550", margin: "0 0 14px" }}>{L("Cancellation Reason", "سبب الإلغاء")}</h3>
+
+        <div style={{ display: "grid", gap: 8, textAlign: ar ? "right" : "left" }}>
+          {CANCEL_REASONS.map((r, i) => {
+            const on = picked === i;
+            return (
+              <button
+                key={r.en}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                disabled={busy}
+                onClick={() => setPicked(i)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "inherit",
+                  padding: "12px 12px", borderRadius: 12, cursor: busy ? "default" : "pointer",
+                  background: on ? "rgba(217,54,42,.06)" : "#f4f7fa",
+                  border: `${on ? 1.5 : 1}px solid ${on ? "rgba(217,54,42,.4)" : "rgba(203,216,227,.5)"}`,
+                }}
+              >
+                <span style={{ width: 20, height: 20, borderRadius: "50%", flex: "0 0 auto", border: `${on ? 6 : 2}px solid ${on ? "var(--danger, #d9362a)" : "#6b8fa8"}` }} />
+                <span style={{ fontSize: 13, fontWeight: on ? 700 : 600, color: "#1c3550" }}>{L(r.en, r.ar)}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {isOther && (
+          <textarea
+            rows={3}
+            value={other}
+            disabled={busy}
+            onChange={(e) => setOther(e.target.value)}
+            placeholder={L("Write the reason...", "اكتب السبب...")}
+            style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: 12, background: "#f4f7fa", border: "1px solid rgba(203,216,227,.5)", fontSize: 14, color: "#1c3550", resize: "vertical" }}
+          />
+        )}
+
+        {error && <p className="dl-err" style={{ marginTop: 12 }}>{error}</p>}
+
+        <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+          <button type="button" className="dl-mbtn" style={{ flex: 1 }} disabled={busy} onClick={onClose}>{L("Back", "رجوع")}</button>
+          <button type="button" className="dl-mbtn danger" style={{ flex: 1 }} disabled={!canSubmit} onClick={() => onSubmit(reason)}>
+            {busy ? L("Cancelling…", "جارٍ الإلغاء…") : L("Confirm Cancellation", "تأكيد الإلغاء")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Request-summary modal — app parity (`showRequestSummarySheet`). A statement of what this room is
+ * about, in the app's four sections: equipment, location, duration, preferences.
+ *
+ * Every row reads `room.details`, which the deal-room payload already carries, so the modal fetches
+ * nothing. Rows whose value is missing are DROPPED rather than shown empty — the payload maps the
+ * request tolerantly and a blank "Working hours: —" states less than no row at all.
+ *
+ * The app's equipment section also carries a YEAR and an asking PRICE. Neither is on the web's
+ * `DealItemDetails`, so neither is rendered; nothing here is fabricated from the negotiated rate,
+ * which is a different number from the request's ask.
+ */
+function RequestSummaryModal({ room, ar, L, onClose }: {
+  room: DealRoomView;
+  ar: boolean;
+  L: (en: string, arr: string) => string;
+  onClose: () => void;
+}) {
+  const d = room.details;
+  const yn = (v: boolean | null, yes: [string, string], no: [string, string]) =>
+    v === null ? null : v ? L(yes[0], yes[1]) : L(no[0], no[1]);
+  const urgency = ({ ASAP: L("As soon as possible", "في أقرب وقت"), SOON: L("Soon", "قريباً"), FAR_FUTURE: L("Later", "لاحقاً") } as Record<string, string>)[d.urgency ?? ""] ?? d.urgency;
+
+  const sections: Array<{ title: string; icon: string; rows: Array<[string, string | null]> }> = [
+    {
+      title: L("Equipment", "المعدّة"), icon: "construction",
+      rows: [
+        [L("Name", "الاسم"), [ar ? d.equipmentLabelAr ?? d.equipmentLabel : d.equipmentLabel, ar ? d.equipmentSizeAr ?? d.equipmentSize : d.equipmentSize].filter(Boolean).join(" · ") || null],
+        [L("Units", "عدد الوحدات"), room.requestedUnits > 0 ? String(room.requestedUnits) : null],
+        [L("Operator", "المشغّل"), yn(d.operatorIncluded, ["Included", "مشمول"], ["Not included", "غير مشمول"])],
+        [L("Operator nationality", "جنسية المشغّل"), d.operatorNationality],
+        [L("Operators", "عدد المشغّلين"), d.numberOfOperators ? String(d.numberOfOperators) : null],
+      ],
+    },
+    {
+      title: L("Location", "الموقع"), icon: "place",
+      rows: [[L("Address", "العنوان"), d.location]],
+    },
+    {
+      title: L("Duration", "المدة"), icon: "event",
+      rows: [
+        [L("Start date", "تاريخ البدء"), d.startDate],
+        [L("End date", "تاريخ الانتهاء"), d.endDate],
+        [L("Working hours", "ساعات العمل"), d.workingHoursPerDay ? `${d.workingHoursPerDay}h / ${L("day", "يوم")}` : null],
+        [L("Working days", "أيام العمل"), d.workingDaysPerWeek ? `${d.workingDaysPerWeek} / ${L("week", "أسبوع")}` : null],
+        [L("Rental type", "نوع التأجير"), d.rentalType],
+        [L("Night shift", "وردية ليلية"), yn(d.nightShift, ["Yes", "نعم"], ["No", "لا"])],
+        [L("Extendable", "قابل للتمديد"), yn(d.extendable, ["Yes", "نعم"], ["No", "لا"])],
+      ],
+    },
+    {
+      title: L("Preferences", "التفضيلات"), icon: "tune",
+      rows: [
+        [L("Urgency", "الاستعجال"), urgency],
+        [L("Subletting", "التأجير من الباطن"), yn(d.subletting, ["Allowed", "مسموح"], ["Not allowed", "غير مسموح"])],
+        [L("Local content", "المحتوى المحلي"), yn(d.localContent, ["Required", "مطلوب"], ["Not required", "غير مطلوب"])],
+        [L("Overtime rate", "أجر العمل الإضافي"), d.overtimeRate],
+        [L("Notes", "ملاحظات"), d.additionalNotes],
+      ],
+    },
+  ];
+
+  return (
+    <div dir={ar ? "rtl" : "ltr"} onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(16,38,63,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, maxHeight: "88vh", display: "flex", flexDirection: "column", background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 60px rgba(16,38,63,.35)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "18px 20px", borderBottom: "1px solid #eef2f6" }}>
+          <span className="material-icons-outlined" style={{ color: "#1c3550" }}>assignment</span>
+          <span style={{ flex: 1, textAlign: ar ? "right" : "left" }}>
+            <span style={{ display: "block", fontSize: 15, fontWeight: 900, color: "#1c3550" }}>{L("Request details", "تفاصيل الطلب")}</span>
+            {room.shortCode && <span style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#6b8fa8" }}>{room.shortCode}</span>}
+          </span>
+          <button type="button" onClick={onClose} aria-label={L("Close", "إغلاق")} style={{ background: "none", border: 0, cursor: "pointer", color: "#6b8fa8", display: "flex" }}>
+            <span className="material-icons-outlined">close</span>
+          </button>
+        </div>
+
+        <div style={{ overflowY: "auto", padding: "6px 20px 20px" }}>
+          {sections.map((sec) => {
+            const rows = sec.rows.filter(([, v]) => v);
+            if (!rows.length) return null;
+            return (
+              <div key={sec.title} style={{ marginTop: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, color: "#1c3550" }}>
+                  <span className="material-icons-outlined" style={{ fontSize: 16 }}>{sec.icon}</span>
+                  <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: ".02em", textTransform: "uppercase" }}>{sec.title}</span>
+                </div>
+                <div style={{ display: "grid", gap: 1, background: "#eef2f6", borderRadius: 12, overflow: "hidden" }}>
+                  {rows.map(([k, v]) => (
+                    <div key={k} style={{ display: "flex", gap: 12, justifyContent: "space-between", background: "#f9fbfc", padding: "10px 12px" }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: "#6b8fa8" }}>{k}</span>
+                      <span style={{ fontSize: 12.5, fontWeight: 700, color: "#1c3550", textAlign: ar ? "left" : "right" }}>{v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Certificates the request asked for — flat chips, since each is a name and nothing more. */}
+          {(room.details.equipmentCerts.length > 0 || room.details.operatorCerts.length > 0) && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, color: "#1c3550" }}>
+                <span className="material-icons-outlined" style={{ fontSize: 16 }}>verified</span>
+                <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: ".02em", textTransform: "uppercase" }}>{L("Certificates", "الشهادات")}</span>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {[...room.details.equipmentCerts, ...room.details.operatorCerts].map((c) => (
+                  <span key={c} style={{ fontSize: 12, fontWeight: 700, color: "#1c3550", background: "#f4f7fa", border: "1px solid rgba(203,216,227,.6)", borderRadius: 999, padding: "4px 10px" }}>{c}</span>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </div>
