@@ -112,6 +112,15 @@
 .dlproto .pb-brow .v.ex { color: rgba(255, 255, 255, 0.4); font-family: inherit; font-weight: 700; }
 .dlproto .pb-brow.tot { border-top: 1px solid rgba(255, 255, 255, 0.2); margin-top: 4px; padding-top: 10px; }
 .dlproto .pb-brow.tot .l { font-weight: 800; color: #fff; } .dlproto .pb-brow.tot .v { font-size: 17px; color: #8fd0ff; }
+/* «Per unit» — the heading that makes the block under it readable on a multi-unit deal, and which a
+   single-unit deal never draws because there would be nothing to distinguish it from. */
+.dlproto .pb-bhead { font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(255, 255, 255, 0.5); padding-bottom: 2px; }
+/* The overall row is the one the renter is actually paying, so it outweighs the per-unit total above
+   it — a heavier rule and white ink, where the per-unit total keeps the panel's blue. The leg counts
+   ride under the label as a `sub`, because they are WHY the two figures are not a multiplication. */
+.dlproto .pb-brow.tot.overall { border-top-width: 2px; margin-top: 8px; padding-top: 12px; }
+.dlproto .pb-brow.tot.overall .v { color: #fff; }
+.dlproto .pb-brow.tot.overall .l .sub { display: block; margin-top: 2px; font-size: 11px; font-weight: 600; color: rgba(255, 255, 255, 0.55); }
 /* below-bar strips (resolve-terms warning / awaiting / abandoned) */
 .dlproto .pb-strip { margin: -4px 0 16px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-md); padding: 11px 14px; font-size: 13px; font-weight: 700; color: var(--navy-mid); display: flex; align-items: center; gap: 8px; }
 .dlproto .pb-strip .material-icons-outlined { font-size: 18px; color: var(--warning); }

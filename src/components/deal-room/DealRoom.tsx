@@ -713,12 +713,33 @@ export function DealRoom({ id, onTitle, initialFlow }: {
   const mobUnitsN = totals.mobUnitsN;
   const demobUnitsN = totals.demobUnitsN;
   const units = rentalUnits; // the rental count drives the card display
-  const rentalTotal = totals.rentalTotal;
-  const mobTotal = totals.mobTotal;
-  const demobTotal = totals.demobTotal;
-  const subtotal = totals.subtotal;
-  const vat = totals.vat;
+  // `rentalTotal` / `mobTotal` / `demobTotal` / `subtotal` / `vat` are no longer unpacked here: the
+  // breakdown states those five lines PER UNIT now (see below), and `grand` is the one all-units
+  // figure still drawn — on the overall row. They remain on `totals` for any caller that wants them.
   const grand = totals.grand;
+  /**
+   * ── The breakdown states its lines PER UNIT, as the bid card does (owner, 2026-08-19) ──────────
+   *
+   * The renter reaches this room from a bid card whose price panel breaks the same offer down for one
+   * machine and then totals it across the count (`RequestBids.tsx:522`). This panel showed all-units
+   * figures only, so the two screens put two different numbers against the same offer and neither said
+   * which was which. One shape now, on both.
+   *
+   * `computeQuoteTotals` is the bid card's own line maths, fed the per-unit rental this room already
+   * computed — NOT a second derivation. Its `overall` block is `computeDealTotals`' to the riyal
+   * (verified across PER_DAY/WEEK/MONTH/JOB and fractional bases), which is why the figures above are
+   * still read from `totals` and only the PER-UNIT block comes from here: the money is unchanged, the
+   * rows it is stated in are what moved.
+   */
+  const perUnit = computeQuoteTotals({
+    perUnitRental: totals.perUnitRental,
+    rentalUnits: units,
+    mob: { amount: room.mobPrice, units: mobUnitsN, excluded: room.mobExcluded },
+    demob: { amount: room.demobPrice, units: demobUnitsN, excluded: room.demobExcluded },
+  }).perUnit;
+  /** Multi-unit is the only case where the two blocks differ, so it is the only case that draws both
+   *  and the only case that has to say which is which. One machine → one set of rows, unlabelled. */
+  const multi = units > 1;
   // Billing-period label from the bid's price unit (same mapping the bid cards use).
   const periodLabel = (() => {
     switch ((room.priceUnit ?? "PER_DAY").toUpperCase()) {
@@ -981,16 +1002,39 @@ export function DealRoom({ id, onTitle, initialFlow }: {
           <>
             <div className="pb-bd-backdrop" onClick={() => setBreakdown(false)} />
           <div className="pb-breakdown">
-            <div className="pb-brow"><span className="l">{L("Rental", "الإيجار")} ({rentalLabel}{units > 1 ? ` × ${units}` : ""})</span><span className="v">{nf(rentalTotal)}</span></div>
+            {/* The bid card's shape (owner, 2026-08-19): every line below is for ONE machine, and the
+                count is applied once, at the foot. A multi-unit deal says so in a heading rather than
+                by hanging «× ٣» off each row — three multipliers down a column is arithmetic the
+                reader has to carry, and the overall row is where it lands anyway. */}
+            {multi && <div className="pb-bhead">{L("Per unit", "لكل وحدة")}</div>}
+            <div className="pb-brow"><span className="l">{L("Rental", "الإيجار")} ({rentalLabel})</span><span className="v">{nf(perUnit.rental)}</span></div>
             {room.mobExcluded
               ? <div className="pb-brow"><span className="l">{L("Mobilization", "التعبئة — موب")}</span><span className="v ex">{L("Not included", "غير مشمول")}</span></div>
-              : room.mobPrice ? <div className="pb-brow"><span className="l">{L("Mobilization", "التعبئة — موب")}{mobUnitsN > 1 ? ` (${nf(room.mobPrice)} × ${mobUnitsN})` : ""}</span><span className="v">{nf(mobTotal)}</span></div> : null}
+              : room.mobPrice ? <div className="pb-brow"><span className="l">{L("Mobilization", "التعبئة — موب")}</span><span className="v">{nf(perUnit.mob)}</span></div> : null}
             {room.demobExcluded
               ? <div className="pb-brow"><span className="l">{L("Return", "الإرجاع — ديموب")}</span><span className="v ex">{L("Not included", "غير مشمول")}</span></div>
-              : room.demobPrice ? <div className="pb-brow"><span className="l">{L("Return", "الإرجاع — ديموب")}{demobUnitsN > 1 ? ` (${nf(room.demobPrice)} × ${demobUnitsN})` : ""}</span><span className="v">{nf(demobTotal)}</span></div> : null}
-            <div className="pb-brow"><span className="l">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="v">{nf(subtotal)}</span></div>
-            <div className="pb-brow"><span className="l">{L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)")}</span><span className="v">{nf(vat)}</span></div>
-            <div className="pb-brow tot"><span className="l">{L("Estimated total", "الإجمالي التقديري")}</span><span className="v">{nf(grand)} {L("SAR", "ر.س")}</span></div>
+              : room.demobPrice ? <div className="pb-brow"><span className="l">{L("Return", "الإرجاع — ديموب")}</span><span className="v">{nf(perUnit.demob)}</span></div> : null}
+            <div className="pb-brow"><span className="l">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="v">{nf(perUnit.subtotal)}</span></div>
+            <div className="pb-brow"><span className="l">{L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)")}</span><span className="v">{nf(perUnit.vat)}</span></div>
+            <div className="pb-brow tot"><span className="l">{L("Estimated total", "الإجمالي التقديري")}</span><span className="v">{nf(perUnit.total)} {L("SAR", "ر.س")}</span></div>
+
+            {/* NOT per-unit × units. The transport legs carry their own negotiated counts — a room with
+                five delivery trips against three rented machines bills five — so the overall row is
+                `computeDealTotals`' own figure and never a multiplication of the block above it. The
+                leg counts are named here, where they are the thing that makes the two blocks differ. */}
+            {multi && (
+              <div className="pb-brow tot overall">
+                <span className="l">
+                  {L("Overall total", "الإجمالي الكلي")}
+                  <span className="sub">
+                    {L("Units", "الوحدات")}: {units}
+                    {!room.mobExcluded && room.mobPrice && mobUnitsN !== units ? ` · ${L("delivery", "نقل")} × ${mobUnitsN}` : ""}
+                    {!room.demobExcluded && room.demobPrice && demobUnitsN !== units ? ` · ${L("return", "إرجاع")} × ${demobUnitsN}` : ""}
+                  </span>
+                </span>
+                <span className="v">{nf(grand)} {L("SAR", "ر.س")}</span>
+              </div>
+            )}
           </div>
           </>
         )}

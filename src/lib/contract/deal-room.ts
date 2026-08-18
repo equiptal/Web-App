@@ -379,6 +379,17 @@ export interface DealTotals {
   /** True when `rentalTotal` is the bare quoted rate — no duration, no start date, PER_JOB, or a
    *  collapsed window. Nothing prorated, so no day count is shown. */
   rentalRaw: boolean;
+  /**
+   * The rental for ONE machine — `rentalTotal ÷ rentalUnits`, but returned rather than divided back
+   * out, because it is what the function computes first and the division is a place for a rounding
+   * error to enter.
+   *
+   * Exposed for the price breakdown, which states its lines PER UNIT the way the bid card does
+   * (owner, 2026-08-19), then totals them across the count. Every other figure the per-unit block
+   * needs is `computeQuoteTotals`' from this one number, so the two surfaces reach the same rows
+   * through the same function instead of each dividing the totals by hand.
+   */
+  perUnitRental: number;
   rentalTotal: number; mobTotal: number; demobTotal: number;
   subtotal: number; vat: number; grand: number;
 }
@@ -454,7 +465,7 @@ export function computeDealTotals(
   // Period count is derived from the BILLABLE days, not the calendar duration: a 61-day monthly job
   // charges ~53 days, which is 2.04 months of rent, not the 2.35 the calendar suggests. The old raw
   // figure disagreed with `rentalTotal` by exactly the Fridays.
-  return { rate, priceUnit, perDayRate, rentalUnits, mobUnitsN, demobUnitsN, mobPrice, demobPrice, mobExcluded, demobExcluded, periods, hasDuration, periodCount: (rental.raw ? periods : rental.billable) / dpp, billableDays: rental.raw ? 0 : rental.billable, rentalRaw: rental.raw, rentalTotal, mobTotal, demobTotal, subtotal, vat, grand };
+  return { rate, priceUnit, perDayRate, rentalUnits, mobUnitsN, demobUnitsN, mobPrice, demobPrice, mobExcluded, demobExcluded, periods, hasDuration, periodCount: (rental.raw ? periods : rental.billable) / dpp, billableDays: rental.raw ? 0 : rental.billable, rentalRaw: rental.raw, perUnitRental, rentalTotal, mobTotal, demobTotal, subtotal, vat, grand };
 }
 
 export function mapDealRoom(raw: unknown): DealRoomView {
