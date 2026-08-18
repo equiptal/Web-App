@@ -4,6 +4,7 @@
  * rentee party. Live chat runs over GetStream (channel = streamChannelId; token via stream-token).
  */
 import { computeRentalTotal, divisorNote, rentalDivisor, VAT_RATE } from "@/lib/pricing/rental";
+import { cityLabel, urgencyLabel, rentalTypeLabel, fulfillmentLabel, termValueLabel } from "@/lib/contract/labels";
 // Type-only — the deal-room quotation BUILDER lives here (pure, testable in the node suite); the
 // rendering itself stays in the shared template module.
 import type { QuotationDoc, QuotationLineItem, QuotationCard } from "@/lib/quotation/render";
@@ -720,8 +721,11 @@ export function buildDealRoomQuotationDoc(
   };
   const detailRows: { label: string; value: string }[] = [];
   addRow(detailRows, L("Equipment", "المعدة"), ar ? dd.equipmentLabelAr ?? dd.equipmentLabel : dd.equipmentLabel);
-  addRow(detailRows, L("Location", "الموقع"), dd.location);
-  addRow(detailRows, L("Rental type", "نوع الإيجار"), dd.rentalType);
+  // The four rows below carry backend ENUMS, not prose. Printed raw, an Arabic quotation read
+  // «الأولوية: FAR_FUTURE» — a code on the document the two parties hold each other to. See
+  // `contract/labels.ts`; anything those maps don't know still prints as it arrived.
+  addRow(detailRows, L("Location", "الموقع"), dd.location ? cityLabel(dd.location, L) : null);
+  addRow(detailRows, L("Rental type", "نوع الإيجار"), dd.rentalType ? rentalTypeLabel(dd.rentalType, L) : null);
   addRow(detailRows, L("Contract type", "نوع العقد"), contractType);
   addRow(detailRows, L("Start date", "تاريخ البدء"), fmtDate(dd.startDate));
   addRow(detailRows, L("End date", "تاريخ الانتهاء"), fmtDate(dd.endDate));
@@ -730,13 +734,25 @@ export function buildDealRoomQuotationDoc(
   // (working_hours / working_days / local_content / crosshire) are dropped from the term cards below.
   addRow(detailRows, L("Working hours/day", "ساعات العمل/يوم"), dd.workingHoursPerDay);
   addRow(detailRows, L("Working days/week", "أيام العمل/أسبوع"), dd.workingDaysPerWeek);
-  addRow(detailRows, L("Fulfillment", "التنفيذ"), dd.fulfillment);
-  addRow(detailRows, L("Urgency", "الأولوية"), dd.urgency);
+  addRow(detailRows, L("Fulfillment", "التنفيذ"), dd.fulfillment ? fulfillmentLabel(dd.fulfillment, L) : null);
+  addRow(detailRows, L("Urgency", "الأولوية"), dd.urgency ? urgencyLabel(dd.urgency, L) : null);
   addRow(detailRows, L("Subletting", "التأجير من الباطن"), yn(dd.subletting));
   addRow(detailRows, L("Local content", "المحتوى المحلي"), yn(dd.localContent));
   addRow(detailRows, L("Rental extendable", "قابل للتمديد"), yn(dd.extendable));
   addRow(detailRows, L("Additional notes", "ملاحظات إضافية"), dd.additionalNotes);
   if (detailRows.length) cards.push({ title: L("Rental & equipment details", "تفاصيل الإيجار والمعدة"), rows: detailRows });
+
+  /**
+   * A term's value for print. The KEY decides the vocabulary — an SLA term's `FOUR_HR` and a
+   * maintenance term's `SUPPLIER` are both bare strings and only the key says which is which.
+   *
+   * Falls through to `valFmt` for everything else, which is most of the catalogue: the free-text and
+   * numeric terms, and the booleans that `valFmt` already reads as Yes/No.
+   */
+  const termFmt = (term: DealTerm): string => {
+    const v = term.value ?? term.platformDefault;
+    return termValueLabel(term.key, v, L) ?? valFmt(v);
+  };
 
   // Price extras (app parity): overtime rate + cost-responsibility terms ("fuel -> supplier"). Read from
   // the LIVE room only — the second loop over the snapshot's copy went with the rest of the hybrid.
@@ -747,7 +763,7 @@ export function buildDealRoomQuotationDoc(
   for (const term of room.terms) {
     if (!isCost(term.key) || seenCost.has(term.key)) continue;
     seenCost.add(term.key);
-    priceExtras.push({ label: ar ? term.labelAr : term.label, value: valFmt(term.value ?? term.platformDefault) });
+    priceExtras.push({ label: ar ? term.labelAr : term.label, value: termFmt(term) });
   }
 
   // Term cards, LIVE. The states mirror the rule the backend snapshots by at close
@@ -756,7 +772,7 @@ export function buildDealRoomQuotationDoc(
   const termRows = (pred: (term: DealTerm) => boolean) =>
     room.terms
       .filter((term) => pred(term) && !isCost(term.key) && !DETAILS_OWNED_TERM_KEYS.has(term.key))
-      .map((term) => ({ label: ar ? term.labelAr : term.label, value: valFmt(term.value ?? term.platformDefault) }));
+      .map((term) => ({ label: ar ? term.labelAr : term.label, value: termFmt(term) }));
   const agreedRows = termRows((term) => term.state === "agreed" || term.state === "soft_accepted");
   if (agreedRows.length) cards.push({ title: L("Agreed terms", "الشروط المتفق عليها"), rows: agreedRows });
   const fixedRows = termRows((term) => term.state === "fixed");

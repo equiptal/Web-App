@@ -13,6 +13,7 @@ import type { FleetMachine } from "@/lib/contract/fleet";
 import { RENTEE_REQUEST_CARD_TYPE, RENTEE_REQUEST_REPLY_CARD_TYPE } from "@/lib/contract/rentee-request";
 import { ANSWER_CUE_MS, answeredAskRefs, latestAnsweredRef, postedSubject, replyFoldsIntoAsk, requestCardView, requestDocLabel, type RequestCardCtx } from "@/lib/contract/request-card";
 import { valText, type ResolutionsMap } from "@/components/deal-room/DealRoomTerms";
+import { cityLabel, rentalTypeLabel, urgencyLabel, termValueLabel } from "@/lib/contract/labels";
 import { ChatCard } from "@/components/deal-room/ChatCard";
 import { RequestCard } from "@/components/map/RequestCard";
 import { fleetMachineResolver } from "@/components/map/request-card-ctx";
@@ -1431,7 +1432,10 @@ function RequestSummaryModal({ room, ar, L, onClose }: {
   const d = room.details;
   const yn = (v: boolean | null, yes: [string, string], no: [string, string]) =>
     v === null ? null : v ? L(yes[0], yes[1]) : L(no[0], no[1]);
-  const urgency = ({ ASAP: L("As soon as possible", "في أقرب وقت"), SOON: L("Soon", "قريباً"), FAR_FUTURE: L("Later", "لاحقاً") } as Record<string, string>)[d.urgency ?? ""] ?? d.urgency;
+  // The shared vocabulary, not a local copy. This modal briefly had its own — which read `FAR_FUTURE`
+  // as "Later" while the app read it as "Flexible", two answers to one code on two surfaces a renter
+  // sees minutes apart.
+  const urgency = d.urgency ? urgencyLabel(d.urgency, L) : null;
 
   const sections: Array<{ title: string; icon: string; rows: Array<[string, string | null]> }> = [
     {
@@ -1446,7 +1450,7 @@ function RequestSummaryModal({ room, ar, L, onClose }: {
     },
     {
       title: L("Location", "الموقع"), icon: "place",
-      rows: [[L("Address", "العنوان"), d.location]],
+      rows: [[L("Address", "العنوان"), d.location ? cityLabel(d.location, L) : null]],
     },
     {
       title: L("Duration", "المدة"), icon: "event",
@@ -1455,7 +1459,7 @@ function RequestSummaryModal({ room, ar, L, onClose }: {
         [L("End date", "تاريخ الانتهاء"), d.endDate],
         [L("Working hours", "ساعات العمل"), d.workingHoursPerDay ? `${d.workingHoursPerDay}h / ${L("day", "يوم")}` : null],
         [L("Working days", "أيام العمل"), d.workingDaysPerWeek ? `${d.workingDaysPerWeek} / ${L("week", "أسبوع")}` : null],
-        [L("Rental type", "نوع التأجير"), d.rentalType],
+        [L("Rental type", "نوع التأجير"), d.rentalType ? rentalTypeLabel(d.rentalType, L) : null],
         [L("Night shift", "وردية ليلية"), yn(d.nightShift, ["Yes", "نعم"], ["No", "لا"])],
         [L("Extendable", "قابل للتمديد"), yn(d.extendable, ["Yes", "نعم"], ["No", "لا"])],
       ],
@@ -1777,6 +1781,16 @@ function CounterFlow({
   const badgeLabel = (b: Dec["badge"]) => (b === "match" ? L("Match", "مطابق") : b === "conflict" ? L("Differs", "يختلف") : b === "locked" ? L("Fixed", "مثبّت") : L("Not set", "لم تحدّد"));
   const isSettled = (b: Dec["badge"]) => b === "match" || b === "locked";
 
+  /**
+   * A term's value as a renter reads it, in the term's OWN vocabulary.
+   *
+   * `valText` alone handles booleans, arrays and the responsibility words, but not the enums whose
+   * meaning depends on which term they belong to — an SLA's `FOUR_HR` and a maintenance term's
+   * `SUPPLIER` are both bare strings, and only the key says which is which. Same helper the quotation
+   * uses, so a term reads identically here and on the paper the renter signs.
+   */
+  const tval = (t: DealTerm, v: unknown): string => termValueLabel(t.key, v, L) ?? valText(v, L);
+
   // ── term provenance + history (app parity: TermSource + the checklist's history hint) ──
   //
   // A term carries three reference values — the renter's preference, the supplier's declaration and
@@ -1804,7 +1818,7 @@ function CounterFlow({
       : h.action;
     const when = new Date(h.at);
     const stamp = Number.isNaN(when.getTime()) ? null : when.toLocaleDateString(ar ? "ar" : "en", { day: "numeric", month: "short" });
-    const val = h.value == null || h.value === "" ? null : valText(h.value, L);
+    const val = h.value == null || h.value === "" ? null : tval(t, h.value);
     return [val ? `${verb}: ${val}` : verb, stamp].filter(Boolean).join(" · ");
   };
 
@@ -2022,7 +2036,7 @@ function CounterFlow({
                           <option value="__none">{L("— choose —", "— اختر —")}</option>
                           {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                         </select>
-                      ) : <b style={{ flex: 1 }}>{valText(d.chosen ?? t.supplierDeclared, L)}</b>}
+                      ) : <b style={{ flex: 1 }}>{tval(t, d.chosen ?? t.supplierDeclared)}</b>}
                       <span className={`qp-badge ${isSettled(d.badge) ? "match" : d.badge === "conflict" ? "diff" : "none"}`}>{badgeLabel(d.badge)}</span>
                     </div>
                   ); })}
@@ -2049,13 +2063,13 @@ function CounterFlow({
                         {list.map((t) => { const d = decide(t); const opts = choicesFor(t); return (
                           <tr key={t.key}>
                             <td className="lbl">{ar ? t.labelAr : t.label}{termNotes(t)}</td>
-                            <td className="sup">{valText(t.supplierDeclared, L)}</td>
+                            <td className="sup">{tval(t, t.supplierDeclared)}</td>
                             <td>{editable ? (
                               <select className="qp-sel" value={chosenSel(t)} onChange={(e) => pickTerm(t, e.target.value)}>
                                 <option value="__none">{L("— choose —", "— اختر —")}</option>
                                 {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                               </select>
-                            ) : <span className="sup">{valText(d.chosen, L)}</span>}</td>
+                            ) : <span className="sup">{tval(t, d.chosen)}</span>}</td>
                             <td><span className={`qp-ttbadge ${d.badge}`}>{badgeLabel(d.badge)}</span></td>
                           </tr>
                         ); })}
@@ -2076,7 +2090,7 @@ function CounterFlow({
                         {operatingTerms.filter((t) => decide(t).badge === "match").map((t) => { const d = decide(t); return (
                           <tr key={t.key}>
                             <td className="lbl">{ar ? t.labelAr : t.label}{termNotes(t)}</td>
-                            <td className="sup" colSpan={2}>{valText(d.chosen ?? t.value, L)}{editable && !d.server && <button type="button" className="qp-ttreopen" title={L("Reopen", "إعادة فتح")} onClick={() => onReopenLocal(t.key)}>↻</button>}</td>
+                            <td className="sup" colSpan={2}>{tval(t, d.chosen ?? t.value)}{editable && !d.server && <button type="button" className="qp-ttreopen" title={L("Reopen", "إعادة فتح")} onClick={() => onReopenLocal(t.key)}>↻</button>}</td>
                             <td><span className={`qp-ttbadge ${d.badge}`}>{badgeLabel(d.badge)}</span></td>
                           </tr>
                         ); })}
@@ -2088,7 +2102,7 @@ function CounterFlow({
                         {operatingTerms.filter((t) => decide(t).badge === "locked").map((t) => { const d = decide(t); return (
                           <tr key={t.key} className="locked">
                             <td className="lbl">🔒 {ar ? t.labelAr : t.label}{termNotes(t)}</td>
-                            <td className="sup" colSpan={2}>{valText(d.chosen ?? t.value, L)}</td>
+                            <td className="sup" colSpan={2}>{tval(t, d.chosen ?? t.value)}</td>
                             <td><span className={`qp-ttbadge ${d.badge}`}>{badgeLabel(d.badge)}</span></td>
                           </tr>
                         ); })}
@@ -2106,7 +2120,7 @@ function CounterFlow({
               {qhead()}
               {room.details.location && (
                 <div className="qp-addr">
-                  <div className="qp-addrbox"><span className="k">{L("Address", "العنوان")}</span><span className="v">{room.details.location}</span></div>
+                  <div className="qp-addrbox"><span className="k">{L("Address", "العنوان")}</span><span className="v">{room.details.location ? cityLabel(room.details.location, L) : "—"}</span></div>
                   <div className="qp-addrbox"><span className="k">{L("City", "المدينة")}</span><span className="v">{room.details.location.split(/[·,،]/).map((s) => s.trim()).filter(Boolean).pop()}</span></div>
                 </div>
               )}
@@ -2131,7 +2145,7 @@ function CounterFlow({
                     <div className="qp-rcard">
                       <div className="qp-rcard-h"><span className="material-icons-outlined">credit_card</span>{L("Payment terms", "شروط الدفع")}</div>
                       <div className="qp-totals" style={{ borderTop: 0, paddingTop: 0 }}>
-                        {payTerms.map((t) => { const d = decide(t); return <div key={t.key} className="qp-trow"><span className="l">{ar ? t.labelAr : t.label}</span><span className="v" style={{ fontFamily: "inherit", color: d.badge === "conflict" ? "var(--danger,#d9362a)" : "var(--navy,#1c3550)" }}>{valText(d.chosen ?? t.supplierDeclared, L)}</span></div>; })}
+                        {payTerms.map((t) => { const d = decide(t); return <div key={t.key} className="qp-trow"><span className="l">{ar ? t.labelAr : t.label}</span><span className="v" style={{ fontFamily: "inherit", color: d.badge === "conflict" ? "var(--danger,#d9362a)" : "var(--navy,#1c3550)" }}>{tval(t, d.chosen ?? t.supplierDeclared)}</span></div>; })}
                       </div>
                     </div>
                   )}
