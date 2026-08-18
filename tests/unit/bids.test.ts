@@ -91,7 +91,7 @@ describe("bidSuppliers", () => {
   const bc = (p: Partial<BidCard>): BidCard => ({
     id: "b", status: "PENDING", supplierId: null, supplierCompanyId: null, supplierName: "S", verified: false, rating: null,
     distanceKm: null, submittedAt: null, validUntil: null, price: null, mobPrice: null, demobPrice: null,
-    priceUnit: null, duration: null, numberOfUnits: 1, unitsOffered: 1, reqMinYear: null, equipment: null, eqVerified: false,
+    priceUnit: null, duration: null, numberOfUnits: 1, unitsOffered: 1, openingPrice: null, lastCounterBy: null, requestChangedAt: null, liveStatus: null, reqMinYear: null, equipment: null, eqVerified: false,
     compliance: { entityType: "individual", activityLicense: false, taxNumber: false, nationalAddress: false, safety: false, saso: false, localContent: false },
     matchCount: 0, conflictCount: 0, dealRoomId: null, expired: false,
     note: null, requiredCerts: [], heldCertCodes: [], ownershipDocs: [], mobLeadTime: null, demobLeadTime: null,

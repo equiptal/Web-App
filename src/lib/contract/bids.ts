@@ -6,6 +6,8 @@
  */
 
 
+import { mapBidLiveStatus, type BidLiveStatus } from "@/lib/contract/bid-live-status";
+
 export type BidStatus =
   | "PENDING"
   | "OPEN_FOR_NEGOTIATION"
@@ -275,6 +277,28 @@ export interface BidCard {
   /** Units THIS supplier offered to cover (bid.units_offered length). ≤ numberOfUnits. Drives
    *  fulfillment ("covers X of Y units"); defaults to numberOfUnits when the bid doesn't specify. */
   unitsOffered: number;
+  /**
+   * The supplier's OPENING rate — `priceAmount`, before anyone countered.
+   *
+   * Kept beside `price` rather than folded into it: `price` is the LIVE number and collapses the
+   * opening one away, so a card holding only `price` cannot say a negotiation has moved, let alone
+   * by how much. That is what `bidCounterDelta` needs, and why it was unbuildable on the web until
+   * this field existed. Null when the payload carries no original — then no delta is drawn, which is
+   * the correct silence rather than a move measured from a guess.
+   */
+  openingPrice: number | null;
+  /** When the RFQ last changed under this bid — tier 1 of the status slot. Null when it has not. */
+  requestChangedAt: string | null;
+  /** What the other side last did on this bid, as the server resolved it. See `bid-live-status.ts`. */
+  liveStatus: BidLiveStatus | null;
+  /**
+   * Who moved last, in the deal room's own vocabulary ("rentee" | "supplier"). Null when nobody has.
+   *
+   * `uiState` is the server's *reading* of this ("your-turn" / "waiting") and cannot substitute: the
+   * delta has to name whose counter it is drawing, and an unknown mover means no delta at all rather
+   * than a chip that might label the supplier's number as the renter's own.
+   */
+  lastCounterBy: string | null;
   /** Live deal-room unit overlay (app parity: v3_bid_card `_liveRentalUnits`/`_buildPriceArgs`). The
    *  negotiated rental count (agreedUnits, else the mid-negotiation currentRentalUnits) + per-leg mob/
    *  demob counts + exclusion. null → not negotiated. Drives the card price so it tracks the deal room. */
@@ -904,6 +928,15 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
     // An EMPTY array means the supplier didn't pick a subset → they bid the request as posted (covers
     // its full unit count), NOT 0 — otherwise the header tile reads 0/1 while the card says "covers 1 of 1".
     unitsOffered: Array.isArray(raw.unitsOffered) && raw.unitsOffered.length > 0 ? raw.unitsOffered.length : (n(raw.unitsOffered) ?? n(rqItem.numberOfUnits) ?? 1),
+    // The OPENING rate, kept whole beside the live one above. `price` prefers `currentPrice`, which
+    // the backend defaults to `priceAmount` — so an unmoved bid arrives as two equal numbers and
+    // `bidCounterDelta` reads that as "nothing moved", exactly as the app does.
+    openingPrice: n(raw.priceAmount) ?? null,
+    lastCounterBy: s(raw.lastCounterBy ?? raw.last_counter_by),
+    // Both have been on the wire since the app shipped its live-status slot; the web simply never
+    // read them, so its card could not say anything had happened on the bid.
+    requestChangedAt: s(raw.requestChangedAt ?? raw.request_changed_at),
+    liveStatus: mapBidLiveStatus(raw.liveStatus),
     // Live deal-room unit overlay (app parity) — camel/snake, null when not negotiated.
     agreedUnits: n(raw.agreedUnits ?? raw.agreed_units),
     currentRentalUnits: n(raw.currentRentalUnits ?? raw.current_rental_units),

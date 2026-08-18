@@ -340,6 +340,13 @@ export function normalizedBidToBidCard(
     progress: { agreed: 0, total: 0 },
     lastEventAr: null,
     round: 1,
+    // An agent-sourced bid has no deal room, so nothing has countered and there is no opening to
+    // measure from. Null rather than the bid price: a delta of zero is still a claim that a
+    // negotiation happened.
+    requestChangedAt: null,
+    liveStatus: null,
+    openingPrice: null,
+    lastCounterBy: null,
     uiState: null,
   } as BidCard;
 }

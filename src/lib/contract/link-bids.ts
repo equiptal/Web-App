@@ -486,6 +486,12 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
     progress: { agreed: 0, total: 0 },
     lastEventAr: null,
     round: 1,
+    // An off-platform submission negotiates in its own modal flow, not a deal room, so there is no
+    // `lastCounterBy` and no counter delta to draw on the card.
+    requestChangedAt: null,
+    liveStatus: null,
+    openingPrice: null,
+    lastCounterBy: null,
     uiState: null,
     viaSharedLink: true,
     // Per-item card → that item's total (incl VAT); whole-submission card → the grand total.

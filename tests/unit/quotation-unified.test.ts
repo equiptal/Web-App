@@ -20,7 +20,7 @@ const bc = (p: Partial<BidCard>): BidCard => ({
   id: "b1", status: "PENDING", supplierId: "sup-1", supplierCompanyId: null, supplierName: "Acme Cranes",
   verified: true, rating: null, distanceKm: null, submittedAt: null, validUntil: "2026-09-01T00:00:00.000Z",
   price: 1200, mobPrice: 500, demobPrice: 400, priceUnit: "PER_DAY", duration: null,
-  numberOfUnits: 3, unitsOffered: 3, reqMinYear: null,
+  numberOfUnits: 3, unitsOffered: 3, openingPrice: null, lastCounterBy: null, requestChangedAt: null, liveStatus: null, reqMinYear: null,
   equipment: { id: "e1", make: "Cat", model: "320", year: 2022, imageUrl: null }, eqVerified: true,
   compliance: { entityType: "company", activityLicense: true, taxNumber: true, nationalAddress: true, safety: true, saso: false, localContent: false },
   matchCount: 0, conflictCount: 0, dealRoomId: null, expired: false,
