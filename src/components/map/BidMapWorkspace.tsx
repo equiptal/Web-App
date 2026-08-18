@@ -426,6 +426,28 @@ export function BidMapWorkspace({
      The company panel is closed on the way in because it covers the whole column: a detail opened
      under it would be invisible and the press would read as broken. That belonged to
      `openMachineFromChat` alone and was a gap for the other two entrances. */
+  /**
+   * **Find this machine on the map** — the card body's press (app parity, owner 2026-08-15).
+   *
+   * It selects, and hands the canvas a focus token so the camera flies in. It deliberately does NOT
+   * open the detail: the panel would cover the very map the renter just asked a question about.
+   *
+   * The token is what makes a second press on the same card fly again. Selection alone could not:
+   * re-selecting the current machine is a no-op by design (`nextSelection`'s "open" never toggles),
+   * so a renter comparing two machines would get one flight and then silence.
+   */
+  const [focus, setFocus] = useState<{ id: string; token: number } | null>(null);
+  const focusMachine = useCallback(
+    (id: string) => {
+      setSelectedMachineId((cur) => nextSelection(cur, { kind: "open", id }));
+      // The landing cue has done its job the moment the renter acts on any card.
+      setCueId(null);
+      setFocus((f) => ({ id, token: (f?.token ?? 0) + 1 }));
+      onSelectMachine?.(id);
+    },
+    [onSelectMachine],
+  );
+
   const openMachine = useCallback(
     (id: string) => {
       setSelectedMachineId((cur) => nextSelection(cur, { kind: "open", id }));
@@ -758,6 +780,7 @@ export function BidMapWorkspace({
           addressLabel={request?.projectAddressLabel ?? null}
           machines={machines}
           selectedMachineId={selectedMachineId}
+          focus={focus}
           onOpenMachine={openMachine}
           itemImageUrl={itemImageUrl}
           itemName={itemName}
@@ -979,6 +1002,7 @@ export function BidMapWorkspace({
                   // handler here, spelling out what `openMachine` above now spells once — and a rule
                   // written twice is how a card and a marker start doing different things.
                   onOpenDetail={openMachine}
+                  onFocusMachine={focusMachine}
                   // V11 landed the send path; V12 put a review card in front of it. `composeDraft` is
                   // the ONE seam every ask on this surface goes through — the shortfall, the card,
                   // the detail and both document surfaces — so there is exactly one place that stages

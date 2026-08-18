@@ -929,6 +929,7 @@ export const ar: Dictionary = {
     eqAskConfirm: "اطلب التأكيد",
     eqAskConfirmWhy: "اطلب من المورد تأكيد توفّر هذه المعدّة",
     eqDetails: "التفاصيل",
+    eqFind: "أظهرها على الخريطة",
     eqNoCerts: "لم تُطلب شهادات",
     eqDistanceUnit: "كم من مشروعك",
     eqNoDistance: "المسافة غير معروفة",

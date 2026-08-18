@@ -72,9 +72,9 @@ export interface MachinePin extends MapPoint {
    * from the `yardConfirmed` boolean, which is true for every readiness-written entry and so would
    * paint the whole map green — `bid-map.ts` records the full reason.
    *
-   * **Three values since 2026-08-13.** The canvas now draws the supplier's whole matching fleet, so a
-   * marker can be a machine he never offered (red) beside one he offered and has not placed (orange)
-   * beside one he confirmed (green).
+   * **Two values since 2026-08-17** (app parity). The canvas draws the supplier's whole matching
+   * fleet, and the colour answers one question — has he named the yard this machine leaves from.
+   * Whether it is on the offer is a badge on the card, never a third pin colour.
    */
   availability: "confirmed" | "unconfirmed";
   /** Distance to the project, for the chip riding this machine's route. Null → no chip, never a 0. */
@@ -104,6 +104,19 @@ const FALLBACK_CENTRE: [number, number] = [24.0, 45.0];
 const FALLBACK_ZOOM = 5;
 const SITE_ZOOM = 11;
 
+/**
+ * Where the camera lands when a card is pressed (app parity, `kFocusZoom`).
+ *
+ * ── It only zooms IN ──────────────────────────────────────────────────────────────────────────
+ * Applied through `max`, so a renter already closer keeps his own level and the camera merely pans.
+ * The objection to snapping the zoom — that he may have pulled out to see the whole city, and
+ * yanking that back on every press takes the map off him — is real, and survives in exactly that one
+ * case. It is outweighed the rest of the time: at city zoom the pins sit a few points apart, so
+ * "centre on this one" moves the camera by almost nothing and answers the renter's question — WHICH
+ * of these is it — not at all.
+ */
+const FOCUS_ZOOM = 15.5;
+
 /** The site label is i18n copy plus, optionally, the request's own address string — which is user
  *  data going into `divIcon`'s HTML. Escape it rather than trusting it. */
 function esc(s: string): string {
@@ -127,6 +140,29 @@ function safeImageUrl(url: string | null | undefined): string | null {
 /** Fit the view to everything that is drawn. One point → a centre + a sensible zoom; a fleet → a bounds
  *  fit over the site AND the machines, because a yard 200 km from the site would otherwise be plotted
  *  off-screen and the map would read as empty. */
+/**
+ * Fly to the focused machine (app parity, owner 2026-08-15: *"take him zoomed in to the equipment on
+ * the map with an animation so he sees which one he clicked"*).
+ *
+ * It runs on the FOCUS token rather than on the selected id, so pressing the same card twice flies
+ * again — a renter comparing two machines presses back and forth, and a handler that ignored the
+ * repeat would answer him once and then go quiet. A machine with no coordinates is not flown to;
+ * there is nowhere to go, and the list already says so.
+ */
+function FocusView({ focus, points }: { focus: { id: string; token: number } | null; points: MachinePin[] }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!focus) return;
+    const target = points.find((p) => p.id === focus.id);
+    if (!target) return;
+    map.flyTo([target.lat, target.lng], Math.max(map.getZoom(), FOCUS_ZOOM), { duration: 0.7 });
+    // `points` is deliberately absent: the flight belongs to the press, and re-running it because the
+    // marker set re-rendered would drag the camera back while the renter is panning away from it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus?.id, focus?.token, map]);
+  return null;
+}
+
 function FitView({ site, points }: { site: SitePoint | null; points: MachinePin[] }) {
   const map = useMap();
   // Fit on the SET of plotted machines, not on every render: re-fitting when only the selection
@@ -760,6 +796,7 @@ export default function MapCanvas({
   addressLabel,
   machines = [],
   selectedMachineId = null,
+  focus = null,
   onOpenMachine,
   itemImageUrl = null,
   itemName = null,
@@ -769,6 +806,11 @@ export default function MapCanvas({
   /** The bid's OFFERED, plottable machines. Empty for an off-platform bid and while the fleet loads. */
   machines?: MachinePin[];
   selectedMachineId?: string | null;
+  /**
+   * The machine to fly the camera to, with a token that changes on every press so pressing the same
+   * card twice flies again (app parity, owner 2026-08-15). Null until something has been focused.
+   */
+  focus?: { id: string; token: number } | null;
   /**
    * **Pressing a marker opens that machine's panel** (owner, 2026-08-11: *"clicking an equipment on
    * the map must open the panel of this selected equipment"*).
@@ -879,6 +921,7 @@ export default function MapCanvas({
           iconName={iconName}
         />
         <FitView site={site} points={machines} />
+        <FocusView focus={focus} points={machines} />
       </MapContainer>
     </div>
   );

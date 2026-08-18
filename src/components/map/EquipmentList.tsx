@@ -28,10 +28,18 @@
  * This file receives an `EquipmentCardModel` and paints it; what a card is allowed to KNOW is swept
  * with `Object.keys` over that model instead.
  *
- * **The whole card OPENS the machine** (owner, 2026-08-11). ~~The card body selects; «التفاصيل»
- * opens.~~ Withdrawn: the largest target on the card did the least, and a renter who had already
- * pressed the machine had to find a 10 px pill to get what they had asked for. «التفاصيل» stays as
- * the visible affordance — it names what the press does — but it is no longer the only way in.
+ * **The card body FINDS the machine on the map; «التفاصيل ›» and the photo OPEN it** (app parity,
+ * owner 2026-08-15: *"take him zoomed in to the equipment on the map with an animation so he sees
+ * which one he clicked"*).
+ *
+ * ~~The whole card opens the machine (owner, 2026-08-11), because the largest target on the card did
+ * the least.~~ Withdrawn. That reasoning was about the card in isolation; beside a map it inverted —
+ * the largest target covered the surface the renter was asking a question about. A list beside a map
+ * answers *which of these is where*, so the body now flies the camera and never toggles: press the
+ * same card again and it flies again, which is what comparing two machines actually looks like.
+ *
+ * The panel did not get further away. «التفاصيل ›» is the app's one way in, and the photo is a second
+ * this surface keeps — it is already the part of the card about looking at the machine closely.
  *
  * **Both ACs still hold, which is why this was the owner's to change.** AC-15 asks that ONE selection
  * value reach the map and the list; opening routes through `nextSelection(…, "open")`, so it still
@@ -105,6 +113,8 @@ export interface EquipmentListProps {
    *  handler: a second route to the same state that no control calls is a trap for the next reader.
    *  The map's own pins still select without opening; that path does not come through here. */
   onOpenDetail: (equipmentId: string) => void;
+  /** Fly the map to this machine without opening its panel (app parity, 2026-08-15). */
+  onFocusMachine: (equipmentId: string) => void;
   /** «اطلب التأكيد» — V11 owns the composer and the send; this only says which machine was asked
    *  about. Absent → the control renders disabled rather than claiming an ask was sent. */
   onAskAvailability?: (machine: FleetMachine) => void;
@@ -133,6 +143,7 @@ export function EquipmentList({
   selectedId,
   cueId,
   onOpenDetail,
+  onFocusMachine,
   onAskAvailability,
   askPending,
   scrollRef,
@@ -370,6 +381,7 @@ export function EquipmentList({
               ar={ar}
               t={t}
               onOpenDetail={onOpenDetail}
+              onFocusMachine={onFocusMachine}
               onAskAvailability={onAskAvailability}
               askPending={askPending}
             />
@@ -388,6 +400,7 @@ function EquipmentCard({
   ar,
   t,
   onOpenDetail,
+  onFocusMachine,
   onAskAvailability,
   askPending,
   request,
@@ -401,6 +414,7 @@ function EquipmentCard({
   /** No `onSelect`: the card OPENS now, and opening selects on its way in. A select-only handler
    *  here would be a second way to change the same state that nothing calls. */
   onOpenDetail: (id: string) => void;
+  onFocusMachine: (id: string) => void;
   onAskAvailability?: (machine: FleetMachine) => void;
   askPending?: (machine: FleetMachine) => boolean;
   /** The request this machine is read against — the source of WHICH certificates the card names
@@ -446,19 +460,48 @@ function EquipmentCard({
       <button
         type="button"
         className="bm-eq-select"
-        aria-label={`${t.bidMap.eqDetails} — ${title}`}
+        aria-label={`${t.bidMap.eqFind} — ${title}`}
         /* `aria-current`, not `aria-pressed`. AC-15 still needs the selected id to reach the card as
            a state a reader can perceive, but this control no longer TOGGLES anything — it navigates,
            and `aria-pressed` on a non-toggle announces a button that can be un-pressed. "The current
            machine in this list" is what the accent means and what this now says. */
         aria-current={selected || undefined}
-        onClick={() => onOpenDetail(machine.equipmentId)}
+        /* ── The card body FINDS the machine; it no longer opens the panel (app parity, owner
+           2026-08-15) ──────────────────────────────────────────────────────────────────────────
+           *"when user clicks on equipment card on the fleet it now opens its details, but I want
+           instead to take him zoomed in to the equipment on the map with an animation so he sees
+           which one he clicked."*
+
+           The map is the surface, and a list beside a map answers "which of these is where?" —
+           pressing a card to have the map fly to that machine is the question the pairing exists to
+           answer, where opening a panel covered the very thing being asked about.
+
+           Never a toggle: pressing the same card again flies again, which is what a renter comparing
+           two machines actually wants. The panel is still one press away — the «التفاصيل ›» pill and
+           the photo both open it, so nothing became unreachable. */
+        onClick={() => onFocusMachine(machine.equipmentId)}
       />
 
       <div className="bm-eq-in">
         {/* The cell shimmers while a photo decodes. `is-empty` stops it for a machine that has none:
             nothing is arriving, and a placeholder travelling forever says otherwise. */}
-        <span className={`bm-eq-photo${photo ? "" : " is-empty"}`}>
+        {/* The photo OPENS, above the stretched focus layer (owner, 2026-08-18). The app leaves the
+            «التفاصيل ›» pill as the only way in; this keeps a second, which costs nothing here — the
+            picture is the one part of the card that is already about looking at the machine closely,
+            so pressing it to see it closely is not a rule the renter has to learn. */}
+        <span
+          role="button"
+          tabIndex={0}
+          aria-label={`${t.bidMap.eqDetails} — ${title}`}
+          className={`bm-eq-photo is-open${photo ? "" : " is-empty"}`}
+          onClick={() => onOpenDetail(machine.equipmentId)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onOpenDetail(machine.equipmentId);
+            }
+          }}
+        >
           {photo ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={photo} alt="" className="bm-eq-art" />

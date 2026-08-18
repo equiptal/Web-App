@@ -1016,6 +1016,8 @@ export const en = {
     eqAskConfirm: "Ask him to confirm",
     eqAskConfirmWhy: "Ask the supplier to confirm this equipment is available",
     eqDetails: "Details",
+    // The card body's own label — it finds the machine on the map rather than opening its panel.
+    eqFind: "Show on map",
     // The certificate row always occupies its line, so a machine with no certificates is a shorter
     // LINE and not a shorter CARD.
     // The line now answers the REQUEST, so its empty case is "you asked for none" — not "the machine

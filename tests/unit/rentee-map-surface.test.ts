@@ -150,9 +150,14 @@ describe("one selected id reaches the map and the list alike (RM3-AC-15)", () =>
          statements and now calls `openMachine` after clearing the filters that are its own concern.
 
        So the count going DOWN is the rule getting stronger — three entrances, one writer. */
+    /* FIVE since 2026-08-18. `focusMachine` joined them — the card body's press, which flies the
+       camera to a machine WITHOUT opening its panel (app parity). It is a genuine fifth entrance to
+       the selection, not a bypass: it goes through the reducer like the other four, which is the only
+       thing this test is about. The count going up is not the rule weakening; the assertion below,
+       that no writer is handed a raw id, is what carries it. */
     const calls = workspace.match(/nextSelection\(/g) ?? [];
     const sets = [...workspace.matchAll(/setSelectedMachineId\(([^\n]*)/g)].map((m) => m[1].trim());
-    expect(calls).toHaveLength(4);
+    expect(calls).toHaveLength(5);
     expect(sets).toHaveLength(calls.length);
     // …and none of them is handed a raw id, which is the shape a bypass would take.
     for (const arg of sets) expect(arg, arg).not.toMatch(/^(id|m\.equipmentId|equipmentId|null)\s*\)/);

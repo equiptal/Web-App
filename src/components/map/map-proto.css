@@ -2526,3 +2526,9 @@
    white. The footer's rules are dark-native now (see §6.10 above), so a second copy of its palette
    down here could only drift out of step with the first — and, sitting later in the file at equal
    specificity, it would silently win. Every declaration it carried now lives at the point of use. */
+
+/* The photo is a second way into the panel (owner, 2026-08-18), so it has to look pressable and take
+   a focus ring like the controls do. It sits ABOVE the stretched focus layer — the body flies the
+   camera, the picture opens the machine — which is why it needs its own stacking context. */
+.bidmap .bm-eq .bm-eq-photo.is-open { position: relative; z-index: 2; cursor: pointer; }
+.bidmap .bm-eq .bm-eq-photo.is-open:focus-visible { outline: 2px solid var(--action, #2563eb); outline-offset: 2px; }
