@@ -741,3 +741,55 @@ function renteeRequestCardView(
     outcomeIcon: outcome?.icon ?? null,
   };
 }
+
+/* ══════════════ the room's LIVE position (app parity: `resolveLivePosition`) ══════════════ */
+
+/**
+ * The room's own position — **the latest round from either side**.
+ *
+ * The app resolves this with `perspective: null` and describes what it is for in as many words:
+ * *"what the deal is worth right now — the price bar, the breakdown, the quotation."* Its ladder puts
+ * the latest round FIRST, ahead of the room's `agreedUnits`.
+ *
+ * That ordering is the whole point and is easy to get backwards. `agreedUnits` is the last thing both
+ * parties SETTLED; the latest round is what is on the table. A room mid-negotiation is about the
+ * second, and the surfaces that read it already label whose position it is.
+ *
+ * Null only for a round list that is empty, which `withOpeningRound` prevents for any real room — it
+ * synthesises round 0 from the room's own columns, so a room nobody has countered in resolves to
+ * exactly the figures it always did.
+ */
+export function liveRound(rounds: readonly DealRound[]): DealRound | null {
+  return rounds.length > 0 ? rounds[rounds.length - 1] : null;
+}
+
+/**
+ * One round as a `computeDealTotals` override — the rest of the app's chain, written once.
+ *
+ * A field the round does not carry passes through as `null`, and `computeDealTotals` then falls back
+ * to the room's own column: that is `latest?.x ?? roomX ?? bid.x` expressed as two steps instead of
+ * three. Shared by the price bar, the compare card and the quotation, so the three cannot price one
+ * round three ways.
+ *
+ * **The rental count is clamped to [1, requested]**, as the app clamps its own. The backend enforces
+ * the same bound, so a count outside it is a stale or malformed message rather than a real proposal —
+ * and pricing five units against a request for three states a deal that cannot close. A `null` count
+ * is left alone: it means the round named none, not that it named zero.
+ */
+export function roundOverride(room: { requestedUnits: number }, r: DealRound) {
+  // A room that does not know what was requested imposes NO ceiling. Treating a missing cap as 1 —
+  // which `Math.max(1, requestedUnits)` quietly does — would shrink every counter to a single unit on
+  // exactly the rooms whose payload is thinnest.
+  const cap = room.requestedUnits > 0 ? room.requestedUnits : null;
+  const units = r.rentalUnits == null
+    ? null
+    : cap == null
+      ? Math.max(1, r.rentalUnits)
+      : Math.min(Math.max(1, r.rentalUnits), cap);
+  return {
+    rate: r.rate, priceUnit: r.priceUnit, mobPrice: r.mobPrice, demobPrice: r.demobPrice,
+    rentalUnits: units,
+    mobUnits: r.mobUnits, demobUnits: r.demobUnits,
+    mobExcluded: r.mobExcluded, demobExcluded: r.demobExcluded,
+  };
+}

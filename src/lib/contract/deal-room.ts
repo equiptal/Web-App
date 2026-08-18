@@ -668,14 +668,20 @@ export function buildDealRoomQuotationDoc(
   ar: boolean,
   L: (en: string, arr: string) => string,
   opts?: { logoUrl?: string },
+  /** The live position’s override, as the price bar builds it. See the note beside `computeDealTotals`
+   *  below — omitted, the paper prices on the room’s standing columns. */
+  live?: Parameters<typeof computeDealTotals>[1] | null,
 ): QuotationDoc {
   const lang = ar ? "ar" : "en";
   const sar = L("SAR", "ر.س");
   const kind = quotationLinkKind(room.status) ?? "preview";
 
-  // EXACT same math as the live price bar — no snapshot override, so the paper always carries the
-  // number the renter is looking at in the room.
-  const t = computeDealTotals(room);
+  // EXACT same math as the live price bar, which is why `live` is threaded in rather than resolved
+  // again here: the bar prices on the LATEST ROUND (app parity, `resolveLivePosition`), and a paper
+  // that re-derived from the room’s columns would print the last AGREEMENT under a heading the renter
+  // just read a counter on. Absent — or on a CLOSED room, where the agreement IS the latest position
+  // — this falls through to the columns and lands on the same figures either way.
+  const t = computeDealTotals(room, live ?? undefined);
   const rate = t.rate;
   const unit = t.priceUnit;
   const units = t.rentalUnits;

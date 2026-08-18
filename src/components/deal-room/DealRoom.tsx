@@ -8,7 +8,7 @@ import { STREAM_API_KEY, leaseStream } from "@/lib/chat/stream-connection";
 import { useHeaderBack } from "@/components/AppShell";
 import { fetchBidFleet, fetchBids, fetchRequestDetail, fetchRequestGroup, fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, closeDealRoom, ApiError } from "@/lib/api/client";
 import { computeDealTotals, buildDealRoomQuotationDoc, quotationLinkKind, lastTermMove, type DealRoomView, type DealTerm, type DealRoomDocument, type DealRoomDocuments, type QuotationView } from "@/lib/contract/deal-room";
-import { reconstructRounds, collapseRounds, latestRoundBy, withOpeningRound, chatCardOfMessage, chatCardTime, buildChatCardView, requestRepliesByRef, requestThreadCards, respondedProposalIds, latestProposalId, type DealRound } from "@/lib/contract/deal-rounds";
+import { reconstructRounds, collapseRounds, latestRoundBy, withOpeningRound, liveRound, roundOverride, chatCardOfMessage, chatCardTime, buildChatCardView, requestRepliesByRef, requestThreadCards, respondedProposalIds, latestProposalId, type DealRound } from "@/lib/contract/deal-rounds";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import { RENTEE_REQUEST_CARD_TYPE, RENTEE_REQUEST_REPLY_CARD_TYPE } from "@/lib/contract/rentee-request";
 import { ANSWER_CUE_MS, answeredAskRefs, latestAnsweredRef, postedSubject, replyFoldsIntoAsk, requestCardView, requestDocLabel, type RequestCardCtx } from "@/lib/contract/request-card";
@@ -53,13 +53,14 @@ function roomOpeningRound(room: DealRoomView) {
   };
 }
 const eqNum = (a: number | null, b: number | null) => (a == null || b == null ? a == b : Math.round(a) === Math.round(b));
-/** Total for one reconstructed round (reuses computeDealTotals with the round's full snapshot). */
+/** Total for one reconstructed round. The ladder itself is `roundOverride`, in the contract. */
 function roundTotals(room: DealRoomView, r: DealRound) {
-  return computeDealTotals(room, {
-    rate: r.rate, priceUnit: r.priceUnit, mobPrice: r.mobPrice, demobPrice: r.demobPrice,
-    rentalUnits: r.rentalUnits, mobUnits: r.mobUnits, demobUnits: r.demobUnits,
-    mobExcluded: r.mobExcluded, demobExcluded: r.demobExcluded,
-  });
+  return computeDealTotals(room, roundOverride(room, r));
+}
+
+/** The room's live position, from the raw message list: reconstruct the rounds, take the last. */
+function liveRoundOf(room: DealRoomView, msgs: readonly unknown[]): DealRound | null {
+  return liveRound(withOpeningRound(collapseRounds(reconstructRounds(msgs as unknown[])), roomOpeningRound(room)));
 }
 
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
@@ -90,11 +91,13 @@ function buildQuotationHtml(
   rentee: { name: string; phone?: string | null; email?: string | null },
   ar: boolean,
   L: LFn,
+  /** The room’s live position, so the paper and the price bar cannot print two different deals. */
+  live?: DealRound | null,
 ): string {
   const kind = quotationLinkKind(room.status) ?? "preview";
   const doc = buildDealRoomQuotationDoc(room, q, rentee, ar, L, {
     logoUrl: typeof window !== "undefined" ? `${window.location.origin}/moedatech-logomark.svg` : undefined,
-  });
+  }, live ? roundOverride(room, live) : null);
   return wrapQuotationPage(renderQuotationSection(doc), {
     lang: doc.lang,
     title: kind === "final" ? L("Final quotation", "عرض السعر النهائي") : L("Preview quotation", "معاينة عرض السعر"),
@@ -301,7 +304,9 @@ export function DealRoom({ id, onTitle, initialFlow }: {
         setQuoteErr(L("Allow pop-ups to open the quotation.", "اسمح بالنوافذ المنبثقة لفتح عرض السعر."));
         return;
       }
-      w.document.write(buildQuotationHtml(room, q, rentee, ar, L));
+      // The SAME live position the price bar prices on — a paper that re-derived from the room’s
+      // columns would print the last agreement under a heading the renter just read a counter on.
+      w.document.write(buildQuotationHtml(room, q, rentee, ar, L, liveRoundOf(room, messages)));
       w.document.close();
     } catch (e) {
       setQuoteErr(errMsg(e, L("Couldn’t load the quotation.", "تعذّر تحميل عرض السعر.")));
@@ -704,7 +709,26 @@ export function DealRoom({ id, onTitle, initialFlow }: {
   // Single source of truth for the money — SHARED with the confirmed quotation via computeDealTotals so
   // the price bar and the quotation can never diverge. Prorated ÷26/÷7; PER_JOB / no-duration = one full
   // period; mob/demob use their own counts + honor exclusion; VAT 15%.
-  const totals = computeDealTotals(room);
+  // deal-room/negotiation rounds — reconstructed from the chat's rate_proposal messages (app parity).
+  // Drive the allMatched accept gate, the turn badges, the round-history log AND the money below.
+  // Falls back to the room's standing values if the chat custom data isn't reachable.
+  const rounds = withOpeningRound(collapseRounds(reconstructRounds(messages as unknown[])), roomOpeningRound(room));
+  /* ── The LIVE position, not the last agreement (app parity: `resolveLivePosition`) ───────────────
+     The app resolves the room's own position as *"the latest round from EITHER side — what the deal
+     is worth right now"*, and spends it on exactly these three: the price bar, the breakdown and the
+     quotation. Its ladder puts the latest round FIRST, ahead of `agreedUnits`.
+
+     ~~The web started at `agreedUnits`.~~ So a supplier who countered 3 units down to 2 left the room
+     pricing 3 while the bid card — which reads `currentRentalUnits` — already showed 2. Worse, the
+     price bar's own source line said «Supplier's counter» over units from the last agreement: it
+     named a counter and priced something else.
+
+     A count nobody has accepted is the POINT of a room mid-negotiation, and the label already says
+     whose position it is. `roundTotals` is the same seam the compare card uses, and every field it
+     passes falls back to the room's column when the round does not carry it — which is the rest of
+     the app's chain. */
+  const livePosition = liveRound(rounds);
+  const totals = livePosition ? roundTotals(room, livePosition) : computeDealTotals(room);
   const rate = totals.rate;
   const basisU = totals.priceUnit;
   const hasDuration = totals.hasDuration;
@@ -775,10 +799,6 @@ export function DealRoom({ id, onTitle, initialFlow }: {
   // Equipment title — real name + size (like the request/bid cards), not the bare "Equipment" fallback.
   const eqName = (ar ? room.details.equipmentLabelAr || room.details.equipmentLabel : room.details.equipmentLabel) || L("Equipment", "المعدّة");
   const eqSize = ar ? room.details.equipmentSizeAr || room.details.equipmentSize : room.details.equipmentSize || room.details.equipmentSizeAr;
-  // deal-room/negotiation rounds — reconstructed from the chat's rate_proposal messages (app parity).
-  // Drive the allMatched accept gate, the turn badges, and the round-history log. Falls back to the
-  // room's standing values if the chat custom data isn't reachable (never breaks the live flow).
-  const rounds = withOpeningRound(collapseRounds(reconstructRounds(messages as unknown[])), roomOpeningRound(room));
   const rRound = latestRoundBy(rounds, "rentee");
   const sRound = latestRoundBy(rounds, "supplier");
   // DRCARD — which rate proposals a later `rate_response` has settled, and which one is still the live
