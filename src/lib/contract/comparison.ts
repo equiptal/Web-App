@@ -116,6 +116,15 @@ export interface BidQuote {
   subtotalPreVat: number;
   vat: number;
   total: number;
+  /**
+   * The same money, PER UNIT — what the app's breakdown rows state (`price_expanded_breakdown.dart`).
+   *
+   * Every row above is all-units; every row the bid card draws is per-unit, and a multi-unit offer
+   * states the all-units figure once, as its own "Overall total" line. Both were already computed
+   * here — only the all-units half was returned, so the card had to divide back out or toggle between
+   * two bases. Returning both is what lets the rows and the overall line be one calculation.
+   */
+  perUnit: { rental: number; mob: number; demob: number; subtotal: number; vat: number; total: number };
 }
 export function computeBidQuote(
   bid: BidCard,
@@ -163,6 +172,7 @@ export function computeBidQuote(
     rentalExact: rental.exact,
     rentalSubtotal: t.overall.rental, mobTotal: t.overall.mob, demobTotal: t.overall.demob,
     subtotalPreVat: t.overall.subtotal, vat: t.overall.vat, total: t.overall.total,
+    perUnit: t.perUnit,
   };
 }
 

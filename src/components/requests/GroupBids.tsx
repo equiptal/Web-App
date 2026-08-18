@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
 import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/client";
+import { CredentialPills } from "@/components/requests/CredentialPills";
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
 import { mayOpenEquipmentSurface } from "@/lib/contract/bid-equipment-access";
 import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
@@ -17,7 +18,7 @@ import { bidSuppliers, bidSupplierKey, bucketBidTerms, type BidCard } from "@/li
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { qualityFromSubmissionItem, type BidQuality } from "@/lib/contract/bid-quality";
 import { computeBidQuote } from "@/lib/contract/comparison";
-import { divisorNote } from "@/lib/pricing/rental";
+import { divisorNote, headlineAmount } from "@/lib/pricing/rental";
 import { shortRef, type RequestGroup } from "@/lib/contract/requests";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { quotationDownloadName } from "@/lib/compare/quotation-token";
@@ -74,6 +75,36 @@ function offerSuffix(uiState: string | null, L: (en: string, ar: string) => stri
 // ONE identical template.
 
 /**
+ * One transport leg, in the app's own priority (`price_expanded_breakdown.dart` §7).
+ *
+ * A supplier can say four different things about delivery, and the card used to show three of them
+ * identically — as no row at all. That let "he delivers free" and "he never answered" read alike, and
+ * free delivery is worth real money when two bids are side by side.
+ *
+ *   1. `Excluded`   — he says it is not his job
+ *   2. `Bundled`    — folded into the rental price. **Not reachable yet**: the web's `BidCard` carries
+ *                     no `mobBundled`/`demobBundled`, so the branch is written and waits for the field
+ *                     rather than being guessed at from a zero
+ *   3. `Not quoted` — he never answered. A price the bid does not carry, NOT a zero
+ *   4. the amount   — including a real `0`, which is a quoted price and says so
+ *
+ * Returns a one-row array, or none where the leg has no place on this card at all.
+ */
+function legRow(
+  label: string,
+  amount: number,
+  excluded: boolean | null | undefined,
+  quoted: number | null | undefined,
+  leadTime: string | null,
+  L: (en: string, ar: string) => string,
+): [string, number | string, string | null][] {
+  if (excluded) return [[label, L("Excluded", "مستبعد"), null]];
+  // `null` is silence; `0` is a price. Reading them alike is the whole defect this replaces.
+  if (quoted == null) return [[label, L("Not quoted", "لم يُحدد"), null]];
+  return [[label, amount, leadTime]];
+}
+
+/**
  * Grouped My Bids (web-app/multi-item-requests, Phase 2). Fetches bids for every request in the
  * group, merges them, and shows a supplier Level-2 filter + equipment-focused bid cards across the
  * whole submission, plus select-for-quotation. `getBidList` is per-request, so we fan the fetch out.
@@ -83,15 +114,6 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   const t = useT();
   const ar = locale === "ar";
   const L = (en: string, arr: string) => (ar ? arr : en);
-  // Period label from the bid's billing unit — for the collapsed "rate / period" on the card.
-  const periodOf = (u: string | null) => {
-    switch ((u ?? "PER_DAY").toUpperCase()) {
-      case "PER_WEEK": return L("week", "أسبوع");
-      case "PER_MONTH": return L("month", "شهر");
-      case "PER_JOB": return L("job", "مهمة");
-      default: return L("day", "يوم");
-    }
-  };
   const router = useRouter();
 
   const [bids, setBids] = useState<GroupBid[] | null>(null);
@@ -700,34 +722,37 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         // startDate is what lets the rental drop its Fridays — without it the shared maths falls back
         // to the raw rate rather than a Friday-blind proration.
         const cq = computeBidQuote(b, { units: u, fallbackDays: gi?.durationDays ?? null, startDate: gi?.startDate ?? null });
-        const rental = cq.rentalSubtotal;
-        const deliv = cq.mobTotal;
-        const ret = cq.demobTotal;
-        const sub = cq.subtotalPreVat;
-        const vat = Math.round(cq.vat);
         const grand = Math.round(cq.total);
-        // Mobile parity (v3_bid_card): collapsed headline = the PER-UNIT rental total (rate × periods),
-        // excluding units/mob/demob/VAT — so bids compare on the unit rate. All-in lives in the grand total.
-        const perUnitRentalTotal = Math.round((b.price ?? 0) * cq.periods);
-        // Rental label, in the bid card's words: the supplier's RAW quoted rate over its own period, the
-        // divisor behind it, and the BILLABLE days it is charged across. It used to fall back to a
-        // derived per-day rate times the CALENDAR duration — a factor whose arithmetic overshot the
-        // total beside it by exactly the Fridays that total had already dropped.
-        const rentalLabel = ((): string => {
-          const price = nf(b.price ?? 0);
-          const per = periodOf(b.priceUnit);
-          if (cq.billableDays <= 0) return `${price}/${per}`; // nothing prorated — the rate IS the period
-          const note = divisorNote(b.priceUnit, L);
-          return `${price}/${per}${note ? ` · ${note}` : ""} × ${cq.billableDays} ${L("billable days", "يوم محتسب")}`;
-        })();
-        const rentalTotalLabel = ((): string => {
+        /* ── The headline is the RATE on a weekly or monthly bid (app parity, 2026-08-18) ──────────
+           `headlineShowsRawRate`: a weekly or monthly bid headlines what the supplier quoted, so two
+           of them compare on the same basis; the prorated total moves into the breakdown's rental
+           row. A daily bid headlines its total, because there the rate and the basis are the same
+           number and a rate headline would say nothing new.
+
+           ~~The headline was the prorated total for every unit.~~ It was honest — the caption spelled
+           out `rate/period · 26 working days/month × N billable days` — but it made two monthly bids
+           compare on totals whose durations the renter had to read before the figures meant anything. */
+        const headline = Math.round(headlineAmount(b.priceUnit, b.price ?? 0, cq.perUnit.rental));
+        /* The rental TYPE, not a total — the headline now carries the rate, so "…total" would name the
+           wrong number. Multi-unit suffixes "per unit", exactly as the app's `priceRateLabelPerUnit`
+           does, because every figure on this card is per unit until the overall line at the foot. */
+        const rentalTypeLabel = ((): string => {
           switch ((b.priceUnit ?? "PER_DAY").toUpperCase()) {
-            case "PER_WEEK": return L("Weekly rental total", "إجمالي الإيجار الأسبوعي");
-            case "PER_MONTH": return L("Monthly rental total", "إجمالي الإيجار الشهري");
-            case "PER_JOB": return L("Job total", "إجمالي المهمة");
-            default: return L("Daily rental total", "إجمالي الإيجار اليومي");
+            case "PER_WEEK": return L("Weekly rental", "الإيجار الأسبوعي");
+            case "PER_MONTH": return L("Monthly rental", "الإيجار الشهري");
+            case "PER_JOB": return L("Job price", "سعر المهمة");
+            default: return L("Daily rental", "الإيجار اليومي");
           }
         })();
+        const headlineLabel = liveUnits > 1 ? L(`${rentalTypeLabel} per unit`, `${rentalTypeLabel} للوحدة`) : rentalTypeLabel;
+        // The basis under the headline — «٢٦ يوم عمل/شهر». Weekly and monthly only; a daily rate has none.
+        const headlineBasis = divisorNote(b.priceUnit, L);
+        /* The rental ROW explains the headline, so it is dropped when there is nothing left to explain:
+           an exact period on a single-unit bid means the headline already IS the total (app §8). */
+        const showRentalRow = !(cq.rentalExact && liveUnits <= 1);
+        const rentalRowLabel = cq.billableDays > 0
+          ? L(`Rental · ${cq.billableDays} days`, `الإيجار · ${cq.billableDays} يومًا`)
+          : L("Rental", "الإيجار");
         const isAccepted = (b.status ?? "").toUpperCase() === "ACCEPTED" || wonSurvey; // decided → accepted/awarded styling
         // B1: the card tally uses the SAME bucketing as the Terms modal (bucketBidTerms) so the card's
         // "Conflict N · Matched N" always equals what the modal lists when opened.
@@ -776,6 +801,12 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                   <span style={{ width: 22, height: 22, borderRadius: "50%", background: "#1c3550", color: "#fff", fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{(b.supplierName || "S").charAt(0).toUpperCase()}</span>
                   <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550" }}>{b.supplierName}</span>
                   {b.verified && <span className="material-icons-outlined" style={{ fontSize: 16, color: "#1daf58" }}>verified</span>}
+                  {/* One pill per certificate the REQUEST asked for — green when he holds it, red when
+                      not, and nothing at all when the request asked for none (app parity,
+                      `CredentialPillRow`). The component was already built and already used by the
+                      per-request bid list; the grouped card, which is the one `/requests` shows, was
+                      simply never given it. */}
+                  <CredentialPills required={b.requiredCerts} held={b.heldCertCodes} ar={ar} />
                 </div>
               </div>
               {!selectMode && (
@@ -845,11 +876,11 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ ...iconBox, background: "#fff4e5" }}><span className="material-icons-outlined" style={{ fontSize: 20, color: "#f79009" }}>payments</span></div>
                 <div style={{ minWidth: 0 }}>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{rentalTotalLabel}</span>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#6b8fa8", marginTop: 1 }}>{rentalLabel} · {L("per unit", "للوحدة")}</div>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{headlineLabel}</span>
+                  {headlineBasis && <div style={{ fontSize: 11, fontWeight: 600, color: "#6b8fa8", marginTop: 1 }}>{headlineBasis}</div>}
                 </div>
                 <div style={{ flex: 1 }} />
-                <span style={{ fontSize: 17, fontWeight: 900, color: "#f79009" }}>{nf(perUnitRentalTotal)} {L("SAR", "ر.س")}</span>
+                <span style={{ fontSize: 17, fontWeight: 900, color: "#f79009" }}>{nf(headline)} {L("SAR", "ر.س")}</span>
                 {isAccepted && <span className="material-icons-outlined" style={{ fontSize: 18, color: "#1daf58" }} title={L("Accepted", "مقبول")}>check_circle</span>}
                 {!selectMode && (
                   <button onClick={() => { setOpenPrices((s) => { const n = new Set(s); if (n.has(b.id)) n.delete(b.id); else n.add(b.id); return n; }); setAllUnitsIds((s) => { const n = new Set(s); n.delete(b.id); return n; }); }} style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #d4e0ec", background: "#F7FAFC", color: "#6b8fa8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -859,28 +890,37 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
               </div>
               {priceOpen && !selectMode && (
                 <div style={{ marginTop: 12 }}>
-                  {liveUnits > 1 && (
-                    <div style={{ display: "inline-flex", background: "#eff4f9", borderRadius: 10, padding: 3, marginBottom: 12 }}>
-                      {([[false, L(`All ${liveUnits} units`, `كل ${liveUnits} وحدات`)], [true, L("Per unit", "لكل وحدة")]] as [boolean, string][]).map(([v, lab]) => (
-                        <button key={String(v)} onClick={() => setAllUnitsIds((s) => { const n = new Set(s); if (v) n.delete(b.id); else n.add(b.id); return n; })} style={{ padding: "6px 13px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12.5, fontFamily: "inherit", background: perUnit === v ? "#1c3550" : "transparent", color: perUnit === v ? "#fff" : "#6b8fa8" }}>{lab}</button>
-                      ))}
-                    </div>
-                  )}
+                  {/* ~~A per-unit / all-units toggle.~~ Gone (app parity, 2026-08-18): every row here is
+                      PER UNIT and a multi-unit offer states the all-units figure once, in the total box
+                      below. The toggle made the renter switch bases to see both, and a figure whose
+                      basis depends on a control he last touched a minute ago is a figure he has to
+                      check before he can trust it. */}
                   {([
-                    [`${L("Rental", "الإيجار")} (${rentalLabel}${u > 1 ? ` × ${u}` : ""})`, rental, null],
-                    ...(deliv ? [[u > 1 ? L(`Delivery to site (${nf(Math.round(deliv / u))} × ${u} units)`, `النقل إلى الموقع (${nf(Math.round(deliv / u))} × ${u} وحدة)`) : L("Delivery to site", "النقل إلى الموقع"), deliv, b.mobLeadTime]] as [string, number, string | null][] : []),
-                    ...(ret ? [[u > 1 ? L(`Return from site (${nf(Math.round(ret / u))} × ${u} units)`, `الإرجاع من الموقع (${nf(Math.round(ret / u))} × ${u} وحدة)`) : L("Return from site", "الإرجاع من الموقع"), ret, b.demobLeadTime]] as [string, number, string | null][] : []),
-                    [L("Subtotal before VAT", "المجموع قبل الضريبة"), sub, null],
-                    [L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"), vat, null],
-                  ] as [string, number, string | null][]).map(([lab, val, note], i) => (
+                    ...(showRentalRow ? [[rentalRowLabel, cq.perUnit.rental, null]] as [string, number, string | null][] : []),
+                    ...legRow(L("Delivery to site", "النقل إلى الموقع"), cq.perUnit.mob, b.mobExcluded, b.mobPrice, b.mobLeadTime, L),
+                    ...legRow(L("Return from site", "الإرجاع من الموقع"), cq.perUnit.demob, b.demobExcluded, b.demobPrice, b.demobLeadTime, L),
+                    [L("Subtotal before VAT", "المجموع قبل الضريبة"), cq.perUnit.subtotal, null],
+                    [L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"), cq.perUnit.vat, null],
+                  ] as [string, number | string, string | null][]).map(([lab, val, note], i) => (
                     <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 0", borderBottom: "1px solid #F2F5F8" }}>
                       <span style={{ fontSize: 13.5, color: "#2a4f72", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>{lab}{note ? <span style={{ fontSize: 11, color: "#6b8fa8", background: "#eff4f9", padding: "1px 7px", borderRadius: 20, whiteSpace: "nowrap" }}>{note}</span> : null}</span>
-                      <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550", fontVariantNumeric: "tabular-nums" }}>{nf(val)}</span>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: typeof val === "string" ? "#6b8fa8" : "#1c3550", fontVariantNumeric: "tabular-nums" }}>{typeof val === "string" ? val : nf(val)}</span>
                     </div>
                   ))}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, padding: "12px 14px", borderRadius: 10, background: "#FAFCFE", border: "1.5px solid #1c3550" }}>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Grand total", "الإجمالي الكلي")}</span>
-                    <span style={{ fontSize: 18, fontWeight: 900, color: "#1c3550" }}>{nf(grand)} <span style={{ color: "#f79009" }}>{L("SAR", "ر.س")}</span></span>
+                  <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 10, background: "#FAFCFE", border: "1.5px solid #1c3550" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Grand total", "الإجمالي الكلي")}</span>
+                      <span style={{ fontSize: 18, fontWeight: 900, color: "#1c3550" }}>{nf(cq.perUnit.total)} <span style={{ color: "#f79009" }}>{L("SAR", "ر.س")}</span></span>
+                    </div>
+                    {/* Multi-unit only, in the SAME box: the true all-units figure. Not the per-unit
+                        total times the count — each leg carries its own unit count, and an excluded
+                        leg contributes nothing however much price is stored against it. */}
+                    {liveUnits > 1 && (
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, paddingTop: 10, borderTop: "1px solid #E4EDF5" }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 800, color: "#f79009" }}>{L("Overall total", "الإجمالي الكلي للوحدات")} <span style={{ color: "#6b8fa8", fontWeight: 700 }}>· {liveUnits}</span></span>
+                        <span style={{ fontSize: 16, fontWeight: 900, color: "#f79009" }}>{nf(grand)} {L("SAR", "ر.س")}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
