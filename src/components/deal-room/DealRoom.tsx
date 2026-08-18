@@ -15,6 +15,7 @@ import { ANSWER_CUE_MS, answeredAskRefs, latestAnsweredRef, postedSubject, reply
 import { valText, type ResolutionsMap } from "@/components/deal-room/DealRoomTerms";
 import { cityLabel, rentalTypeLabel, urgencyLabel, termValueLabel } from "@/lib/contract/labels";
 import { buildSiblingTabs, type SiblingItemTab } from "@/lib/contract/sibling-tabs";
+import { dealSystemEventIcon } from "@/lib/contract/deal-system-event";
 import type { BidCard } from "@/lib/contract/bids";
 import { ChatCard } from "@/components/deal-room/ChatCard";
 import { RequestCard } from "@/components/map/RequestCard";
@@ -1104,7 +1105,10 @@ export function DealRoom({ id, onTitle, initialFlow }: {
             if (m.user?.id === "system_bot") {
               return (
                 <div className="sysev" key={m.id}>
-                  <span className="material-icons-outlined">bolt</span>
+                  {/* The glyph says WHICH move this was — the app reads the same five out of the same
+                      narration, in both locales, because the backend sends no type beside it. One
+                      lightning bolt for every line said only "something happened". */}
+                  <span className="material-icons-outlined">{dealSystemEventIcon(m.text)}</span>
                   <span>{m.text}</span>
                 </div>
               );

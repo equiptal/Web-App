@@ -21,12 +21,36 @@
    would tie two unrelated things together. Geometry is the prototype's — r14, a 1.5px frame, a 34px
    tile at r9, `9px 11px` on the strip and `10px 11px` on the body. */
 .bm-rq {
-  background: #fff;
-  border: 1.5px solid #e4edf5;
-  border-radius: 14px;
+  /* The card's own hue, set by its state below. Everything that follows reads it, so a new state is
+     one variable rather than a sweep through the file. */
+  --rq-accent: #e8890c;
+  --rq-tint: #fef8f0;
+  /* 55%, the app's tinted value; its untinted 35% disappeared against a filled card. Spelled as a
+     literal per state rather than mixed from `--rq-accent`: this is the card's FRAME, and a browser
+     that cannot parse the mix drops the whole declaration and renders a frameless card. */
+  --rq-edge: rgba(232, 137, 12, 0.55);
+  --rq-rule: rgba(232, 137, 12, 0.22);
+  background: var(--rq-tint);
+  border: 1.5px solid var(--rq-edge);
+  border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
+
+/* ── The card wears its state (app parity: `rentee_request_card.dart`) ────────────────────────────
+   ~~One neutral grey card whatever had happened to the ask.~~ The app tints the whole card and moves
+   its hue as the ask settles — orange while it waits, green once he acted, red once he did not — and
+   the owner ruled on the open state directly (2026-08-17): an open ask is the only thing in the
+   thread waiting on somebody, and it was the palest card on the screen.
+
+   The tints are the app's `alphaBlend(accent @ 6%, white)` computed out rather than left to
+   `color-mix`, because they are the card's BACKGROUND: a browser without `color-mix` would fall back
+   to no fill at all, where a border that fails the same way merely renders untinted. 6% is the app's
+   measured value — enough to name the outcome down a scrolling thread, not enough to fight the navy
+   text on top of it. */
+.bm-rq.is-open { --rq-accent: #e8890c; --rq-tint: #fef8f0; --rq-edge: rgba(232, 137, 12, 0.55); --rq-rule: rgba(232, 137, 12, 0.22); }
+.bm-rq.is-done { --rq-accent: #1daf58; --rq-tint: #f1faf5; --rq-edge: rgba(29, 175, 88, 0.55); --rq-rule: rgba(29, 175, 88, 0.22); }
+.bm-rq.is-refused { --rq-accent: #d9362a; --rq-tint: #fdf3f2; --rq-edge: rgba(217, 54, 42, 0.55); --rq-rule: rgba(217, 54, 42, 0.22); }
 /* The DRAFT is the same card, in blue and lifted — the prototype's only two differences besides the
    buttons. It has to read as "not yet in the conversation" at a glance, from the frame alone. */
 .bm-rq.is-draft { border-color: #2563eb; box-shadow: 0 6px 18px rgba(37, 99, 235, 0.16); }
@@ -67,17 +91,20 @@
   gap: 9px;
   width: 100%;
   padding: 9px 11px;
-  background: #f8fafc;
+  /* Translucent, so it reads as a band ON the tinted card rather than as a white strip fighting it.
+     A fixed #f8fafc looked right only while every card was white. */
+  background: rgba(255, 255, 255, 0.55);
   border: 0;
-  border-bottom: 1px solid #e4edf5;
+  border-bottom: 1px solid var(--rq-rule);
   font: inherit;
   text-align: start;
 }
 /* Pressable, and it says so before it is pressed — the affordance the owner asked for. A card with no
    machine (`scope: "company"`) never gets this class and stays a plain strip. */
 .bm-rq-id.is-open { cursor: pointer; }
-.bm-rq-id.is-open:hover, .bm-rq-id.is-open:focus-visible { background: rgba(37, 99, 235, 0.08); }
-.bm-rq-id.is-open:hover .bm-rq-go, .bm-rq-id.is-open:focus-visible .bm-rq-go { color: #2563eb; }
+/* The hover follows the card's hue, not a fixed blue — which lit a settled green card blue on press. */
+.bm-rq-id.is-open:hover, .bm-rq-id.is-open:focus-visible { background: color-mix(in srgb, var(--rq-accent) 8%, transparent); }
+.bm-rq-id.is-open:hover .bm-rq-go, .bm-rq-id.is-open:focus-visible .bm-rq-go { color: var(--rq-accent); }
 /* The EQUIPMENT's picture (owner, 2026-08-11: the card should show the equipment, *"not a generic
    glyph tile"*). The gold gradient was drawn for a glyph on it, and every machine got the same one;
    the tile now holds the unit's own photo, and the icon it falls back to is derived from what the
@@ -133,18 +160,28 @@
 .bm-rq-go { flex-shrink: 0; font-size: 16px; color: #c8d8e8; }
 [dir="rtl"] .bm-rq-go { transform: scaleX(-1); }
 .bm-rq-body { padding: 10px 11px; }
-.bm-rq-kind { font-size: 10px; font-weight: 800; color: #2563eb; margin-bottom: 5px; }
+/* The ask's NAME, in the card's own colour and at the size the app sets (12/900).
+   ~~10px, weight 800, fixed blue.~~ Two problems: it sat below the chips beneath it in the reading
+   order, and a fixed blue said nothing once the card had moved to green or red. The accent is what
+   separates the ask's name from the ask's SENTENCE directly under it — rendered in one colour the
+   two ran together as a single dark paragraph. */
+.bm-rq-kind { font-size: 12px; font-weight: 900; color: var(--rq-accent); margin-bottom: 3px; }
 .bm-rq-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 7px; }
 .bm-rq-chip {
   font-size: 9.5px;
   font-weight: 700;
   color: #1c3550;
-  background: #f8fafc;
-  border: 1px solid #e4edf5;
-  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(107, 143, 168, 0.22);
+  /* r12 and 8/3 — the app's doc-chip geometry. */
+  border-radius: 12px;
   padding: 3px 8px;
 }
-.bm-rq-ask { font-size: 11.5px; font-weight: 600; color: #1c3550; line-height: 1.7; margin: 0 0 7px; }
+/* **The sentence IS the ask** (app, owner 2026-08-15) — navy and heavy, the weightiest line on the
+   card after the machine's name.
+   ~~11.5px at weight 600.~~ That set the instruction lighter than the chips beneath it, so the eye
+   landed on «TÜV certificate» and had to climb back up to learn what to do with it. */
+.bm-rq-ask { font-size: 12px; font-weight: 800; color: #1c3550; line-height: 1.45; margin: 0 0 7px; }
 /* The live status row. Dashed divider above it, because the verdict is not part of the ask — it is
    what the ask reads as RIGHT NOW, and it changes under a card that never moves. */
 .bm-rq-state {

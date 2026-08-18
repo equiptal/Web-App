@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { buildSiblingTabs } from "@/lib/contract/sibling-tabs";
+import { dealSystemEventKind, dealSystemEventIcon, SYSTEM_EVENT_ICON } from "@/lib/contract/deal-system-event";
 
 /**
  * **Cancelling a negotiation from the web room** (app parity, module 4A).
@@ -183,5 +184,51 @@ describe("buildSiblingTabs", () => {
     expect(tabs[0].label.en).toBe("Crawler excavator · 30 ton");
     // One locale missing is not a reason to fall back to a code — the other still names the machine.
     expect(tabs[1].label).toEqual({ en: "رافعة", ar: "رافعة" });
+  });
+});
+
+/* ══════════════ the system line's glyph (app parity: `dealSystemEventType`) ══════════════
+   The backend narrates every move as a plain sentence and sends no type beside it, so both clients
+   read the sentence — in whichever language the room was acted in. What is guarded here is the
+   ORDER (a line can hold two of these words) and the fallback. */
+describe("dealSystemEventKind", () => {
+  it("reads each move in English and in Arabic", () => {
+    expect(dealSystemEventKind("Supplier proposed 4,000 SAR")).toBe("offer-received");
+    expect(dealSystemEventKind("اقترح المورد سعراً جديداً")).toBe("offer-received");
+    expect(dealSystemEventKind("Rentee countered")).toBe("counter-sent");
+    expect(dealSystemEventKind("عرض مضاد من المستأجر")).toBe("counter-sent");
+    expect(dealSystemEventKind("Supplier accepted all terms")).toBe("accepted");
+    expect(dealSystemEventKind("قبل جميع الشروط")).toBe("accepted");
+    expect(dealSystemEventKind("Supplier declined")).toBe("cancelled");
+    expect(dealSystemEventKind("أغلق غرفة التفاوض")).toBe("cancelled");
+  });
+
+  it("treats a withdrawn acceptance as a counter, not a cancellation", () => {
+    // The room goes back to negotiating; nothing was cancelled.
+    expect(dealSystemEventKind("Rentee withdrew their acceptance")).toBe("counter-sent");
+    expect(dealSystemEventKind("سحب المستأجر قبوله")).toBe("counter-sent");
+  });
+
+  it("resolves a line holding two of the words to the act that changed the room", () => {
+    // "countered" is tested before "declined", so this reads as the counter it is. Reordering these
+    // silently relabels real conversations, which is why the order is the app's.
+    expect(dealSystemEventKind("Rentee countered, supplier declined")).toBe("counter-sent");
+  });
+
+  it("falls back to the neutral glyph rather than to nothing", () => {
+    expect(dealSystemEventKind("Something nobody has taught this yet")).toBe("room-opened");
+    expect(dealSystemEventKind("")).toBe("room-opened");
+    expect(dealSystemEventKind(null)).toBe("room-opened");
+  });
+
+  it("honours the caller's room-opened flag over the text", () => {
+    // The app keys this off a synthetic message id the web does not mint, so the caller says so.
+    expect(dealSystemEventKind("Supplier proposed 4,000", { isRoomOpened: true })).toBe("room-opened");
+  });
+
+  it("gives each kind its own glyph — one bolt for everything said only 'something happened'", () => {
+    const icons = new Set(Object.values(SYSTEM_EVENT_ICON));
+    expect(icons.size).toBe(Object.keys(SYSTEM_EVENT_ICON).length);
+    expect(dealSystemEventIcon("Supplier accepted all terms")).toBe("check_circle");
   });
 });

@@ -120,9 +120,25 @@
 
 /* thread — the chat panel (prototype: the #E9EEF3 chat area under the price bar) */
 .dlproto .thread { flex: 1; display: flex; flex-direction: column; gap: 3px; padding: 14px 16px 16px; background: #E9EEF3; }
-.dlproto .sysev { align-self: center; display: inline-flex; align-items: center; gap: 7px; background: rgba(107, 143, 168, 0.16); border: 1px solid rgba(107, 143, 168, 0.28); color: var(--navy-mid); border-radius: var(--r-full); padding: 6px 13px; font-size: 12px; font-weight: 700; margin: 8px 0; max-width: 90%; text-align: center; }
-.dlproto .sysev .material-icons-outlined { font-size: 15px; }
-.dlproto .sysev.ok { background: var(--success-bg); border-color: rgba(29, 175, 88, 0.3); color: var(--success); }
+/* ── the system line, measured against the app (`deal_system_events.dart`) ────────────────────────
+   Same pill on both clients, down to the alphas: muted at 20% behind a 30% hairline, radius full,
+   7px/12px, at most 85% of the width.
+
+   **Two colours, not one.** The app writes the SENTENCE in navy and leaves the GLYPH muted, so the
+   line reads at body weight while its icon stays chrome. The web had both in `--navy-mid`, which
+   made the icon compete with the words it labels.
+
+   ~~`.sysev.ok` — a green pill for a settled deal.~~ Removed, and it had never been applied. The app
+   has no colour variants here at all: the outcome already owns the phase pill, the price bar and the
+   card, and a fourth green thing in the thread competes with all three and wins none. */
+.dlproto .sysev {
+  align-self: center; display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(107, 143, 168, 0.2); border: 1px solid rgba(107, 143, 168, 0.3);
+  color: var(--navy); border-radius: var(--r-full);
+  padding: 7px 12px; font-size: 12px; font-weight: 700; line-height: 1.2;
+  margin: 4px 0; max-width: 85%; text-align: center;
+}
+.dlproto .sysev .material-icons-outlined { font-size: 14px; color: var(--muted); flex-shrink: 0; }
 /* negotiation chat cards (DRCARD) — the structured `custom` payload rendered as itself. These used to
    collapse into the single `.sysev` pill above: one identical grey chip for a rate proposal, a rate
    acceptance, a term accept, a counter and a term edit. Each tone below is what makes them distinct.

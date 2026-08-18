@@ -121,8 +121,27 @@ export function RequestCard({
     </>
   );
 
+  /*
+   * **The card wears its own state** (app parity: `rentee_request_card.dart`).
+   *
+   * ~~One neutral grey card whatever had happened to the ask.~~ The app tints the whole card and
+   * moves its hue as the ask settles: orange while it waits, green once he acted, red once he did
+   * not. The owner's 2026-08-17 ruling is explicit about the open state — *"make this card
+   * highlighted and outlined in orange … so it becomes more visible"* — on the reasoning that an
+   * open ask is the only thing in the thread waiting on somebody, and it was the palest card there.
+   *
+   * The STATUS LINE keeps its own tones and is deliberately not folded into this: a `partial` is
+   * green here (he acted) and amber there (what he sent was not what was asked for), which is the
+   * app's split and the honest reading of both.
+   *
+   * A draft is none of these — it is not in the conversation yet — so it keeps the blue frame that
+   * says exactly that, and `is-draft` still wins by coming later in the stylesheet.
+   */
+  const tone = view.status?.tone;
+  const accent = tone === "answered" || tone === "partial" ? " is-done" : tone === "refused" ? " is-refused" : " is-open";
+
   return (
-    <article className={`bm-rq${draft ? " is-draft" : ""}${cue ? " is-cued" : ""}`}>
+    <article className={`bm-rq${accent}${draft ? " is-draft" : ""}${cue ? " is-cued" : ""}`}>
       {view.openable && view.equipmentId && onOpenMachine ? (
         <button
           type="button"
