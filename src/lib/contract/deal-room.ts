@@ -20,6 +20,59 @@ export interface DealParty {
 
 export type TermState = "fixed" | "soft_accepted" | "disputed" | "pending" | "agreed" | string;
 
+/**
+ * WHERE a term's current value came from (app parity: `TermSource`).
+ *
+ * The three reference values a term carries — the renter's preference, the supplier's declaration and
+ * the platform default — are all shown, but only ONE of them is the value in force. Without this the
+ * renter reads three numbers and has to infer which one binds him; with it the row says so.
+ *
+ * Unknown strings fall back to `platform_default`, as the app's `TermSource.fromString` does: an
+ * unrecognised provenance is the weakest claim, not a stronger one.
+ */
+export type TermSource = "rentee_fixed" | "supplier_declared" | "platform_default";
+
+const TERM_SOURCES = new Set<string>(["rentee_fixed", "supplier_declared", "platform_default"]);
+export const asTermSource = (v: unknown): TermSource =>
+  typeof v === "string" && TERM_SOURCES.has(v) ? (v as TermSource) : "platform_default";
+
+/**
+ * One recorded move on a term (backend `history[]`).
+ *
+ * `action` is the backend's own verb — `counter`, `accept`, `propose_update` — and `by` the side that
+ * made it. Neither is narrowed to a union: an action the web does not recognise is still shown, under
+ * its raw name, rather than dropped. A move the renter cannot read beats a move he cannot see.
+ */
+export interface TermHistoryEntry {
+  action: string;
+  by: string;
+  value: unknown;
+  /** ISO-8601, as it arrived. Never parsed at map time — a bad date must not cost the whole term. */
+  at: string;
+}
+
+/**
+ * The last move on a term, or null when it has never moved.
+ *
+ * The app shows exactly this one line ("Countered: 30 days · Mar 4") rather than a full log: a term
+ * that has gone back and forth three times is still decided on its LATEST position, and the whole
+ * thread already lives in the conversation.
+ *
+ * Ordered by `at` rather than by array position — the backend appends in order today, and this does
+ * not depend on it continuing to. Entries with an unparseable `at` sort oldest, so a malformed
+ * timestamp cannot promote a stale move over a real one.
+ */
+export function lastTermMove(term: Pick<DealTerm, "history">): TermHistoryEntry | null {
+  let best: TermHistoryEntry | null = null;
+  let bestAt = -Infinity;
+  for (const h of term.history) {
+    const t = Date.parse(h.at);
+    const at = Number.isNaN(t) ? -Infinity : t;
+    if (best === null || at >= bestAt) { best = h; bestAt = at; }
+  }
+  return best;
+}
+
 /** One negotiable term in the deal room (mirrors the app's term list). */
 export interface DealTerm {
   key: string;
@@ -31,6 +84,10 @@ export interface DealTerm {
   supplierDeclared: unknown;
   /** The platform's default/fallback value for this term (app parity — shown as a third reference row). */
   platformDefault: unknown;
+  /** Which of the three reference values is the one in force. See `TermSource`. */
+  source: TermSource;
+  /** Every recorded move on this term, oldest-first as the backend sends it. Empty when untouched. */
+  history: TermHistoryEntry[];
   /** Mandatory terms must be resolved to close the deal (app shows a red "Mandatory" badge). */
   isMandatory: boolean;
   itemLabel: string | null;
@@ -419,6 +476,13 @@ export function mapDealRoom(raw: unknown): DealRoomView {
       renteePreference: t.renteePreference,
       supplierDeclared: t.supplierDeclared,
       platformDefault: t.platformDefault ?? t.platform_default ?? t.defaultValue ?? null,
+      source: asTermSource(t.source),
+      // Entries missing an action or a timestamp are DROPPED, not defaulted: the hint reads
+      // "<action>: <value> · <date>", and a row that cannot say what happened or when says nothing.
+      // The value itself may legitimately be absent (an `accept` carries no new one).
+      history: (Array.isArray(t.history) ? (t.history as Record<string, unknown>[]) : [])
+        .filter((h) => s(h.action) && s(h.at))
+        .map((h) => ({ action: s(h.action) ?? "", by: s(h.by) ?? "", value: h.value, at: s(h.at) ?? "" })),
       isMandatory: t.isMandatory === true || t.mandatory === true,
       itemLabel: s(t.itemLabel),
       options: (Array.isArray(t.options) ? (t.options as Record<string, unknown>[]) : []).map((o) => ({

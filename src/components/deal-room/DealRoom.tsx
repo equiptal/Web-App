@@ -7,7 +7,7 @@ import { useLocale } from "@/lib/i18n";
 import { STREAM_API_KEY, leaseStream } from "@/lib/chat/stream-connection";
 import { useHeaderBack } from "@/components/AppShell";
 import { fetchBidFleet, fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, closeDealRoom, ApiError } from "@/lib/api/client";
-import { computeDealTotals, buildDealRoomQuotationDoc, quotationLinkKind, type DealRoomView, type DealTerm, type DealRoomDocument, type DealRoomDocuments, type QuotationView } from "@/lib/contract/deal-room";
+import { computeDealTotals, buildDealRoomQuotationDoc, quotationLinkKind, lastTermMove, type DealRoomView, type DealTerm, type DealRoomDocument, type DealRoomDocuments, type QuotationView } from "@/lib/contract/deal-room";
 import { reconstructRounds, collapseRounds, latestRoundBy, withOpeningRound, chatCardOfMessage, chatCardTime, buildChatCardView, requestRepliesByRef, requestThreadCards, respondedProposalIds, latestProposalId, type DealRound } from "@/lib/contract/deal-rounds";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import { RENTEE_REQUEST_CARD_TYPE, RENTEE_REQUEST_REPLY_CARD_TYPE } from "@/lib/contract/rentee-request";
@@ -1770,6 +1770,50 @@ function CounterFlow({
   };
   const badgeLabel = (b: Dec["badge"]) => (b === "match" ? L("Match", "مطابق") : b === "conflict" ? L("Differs", "يختلف") : b === "locked" ? L("Fixed", "مثبّت") : L("Not set", "لم تحدّد"));
   const isSettled = (b: Dec["badge"]) => b === "match" || b === "locked";
+
+  // ── term provenance + history (app parity: TermSource + the checklist's history hint) ──
+  //
+  // A term carries three reference values — the renter's preference, the supplier's declaration and
+  // the platform default — and the table can only show one of them per column. `source` says which
+  // one is actually IN FORCE, so the renter is not left inferring which of three numbers binds him.
+  //
+  // A FIXED term needs no such line: locked means the value came from the renter's own request and
+  // was accepted by the act of bidding, which the lock already says.
+  const srcNote = (t: DealTerm): string | null => {
+    if (t.state === "fixed") return null;
+    return t.source === "rentee_fixed" ? L("from your request", "من طلبك")
+      : t.source === "supplier_declared" ? L("supplier's declaration", "إقرار المورد")
+      : L("platform default", "الافتراضي");
+  };
+
+  // The LAST move on a term, one line — "Countered: 30 days · 4 Mar". The app shows the same single
+  // line rather than a log: a term argued three times is still decided on its latest position, and
+  // the whole exchange is already in the conversation above.
+  const histNote = (t: DealTerm): string | null => {
+    const h = lastTermMove(t);
+    if (!h) return null;
+    const verb = h.action === "counter" ? L("Countered", "عرض مضاد")
+      : h.action === "accept" ? L("Accepted", "قُبل")
+      : h.action === "propose_update" ? L("Proposed", "اقتُرح")
+      : h.action;
+    const when = new Date(h.at);
+    const stamp = Number.isNaN(when.getTime()) ? null : when.toLocaleDateString(ar ? "ar" : "en", { day: "numeric", month: "short" });
+    const val = h.value == null || h.value === "" ? null : valText(h.value, L);
+    return [val ? `${verb}: ${val}` : verb, stamp].filter(Boolean).join(" · ");
+  };
+
+  /** The two sub-label lines a term row carries, when it has them. */
+  const termNotes = (t: DealTerm) => {
+    const src = srcNote(t);
+    const hist = histNote(t);
+    if (!src && !hist) return null;
+    return (
+      <>
+        {src && <span className="qp-tsrc">{src}</span>}
+        {hist && <span className="qp-thist"><span className="material-icons-outlined">history</span>{hist}</span>}
+      </>
+    );
+  };
   const groupByCat = (list: DealTerm[]): [string, DealTerm[]][] => {
     const m = new Map<string, DealTerm[]>();
     for (const t of list) { const c = catOf(t.key); const g = m.get(c) ?? []; g.push(t); m.set(c, g); }
@@ -1966,7 +2010,7 @@ function CounterFlow({
                   <div className="qp-sech">{L("Payment terms", "شروط الدفع")}</div>
                   {payTerms.map((t) => { const d = decide(t); const opts = choicesFor(t); return (
                     <div key={t.key} className="qp-pay-row">
-                      <span className="k">{ar ? t.labelAr : t.label}</span>
+                      <span className="k">{ar ? t.labelAr : t.label}{termNotes(t)}</span>
                       {editable && !d.server ? (
                         <select className="qp-sel" value={chosenSel(t)} onChange={(e) => pickTerm(t, e.target.value)}>
                           <option value="__none">{L("— choose —", "— اختر —")}</option>
@@ -1998,7 +2042,7 @@ function CounterFlow({
                         <tr className="cat"><td colSpan={4}>{cat}</td></tr>
                         {list.map((t) => { const d = decide(t); const opts = choicesFor(t); return (
                           <tr key={t.key}>
-                            <td className="lbl">{ar ? t.labelAr : t.label}</td>
+                            <td className="lbl">{ar ? t.labelAr : t.label}{termNotes(t)}</td>
                             <td className="sup">{valText(t.supplierDeclared, L)}</td>
                             <td>{editable ? (
                               <select className="qp-sel" value={chosenSel(t)} onChange={(e) => pickTerm(t, e.target.value)}>
@@ -2011,13 +2055,34 @@ function CounterFlow({
                         ); })}
                       </Fragment>
                     ))}
-                    {operatingTerms.some((t) => isSettled(decide(t).badge)) && (
+                    {/* SETTLED and ACKNOWLEDGE are two sections, not one (app parity: the terms page's
+                        Negotiable and Acknowledge buckets).
+
+                        ~~One "Settled & fixed terms" section.~~ It put two unlike things under one
+                        heading: a term the renter just settled, which he chose and can reopen, beside
+                        a term FIXED by his own request and accepted by the act of bidding, which was
+                        never his to argue. Both carried the right badge, so nothing was wrong — but a
+                        renter scanning headings had to read every badge to learn which rows were still
+                        his to touch. */}
+                    {operatingTerms.some((t) => decide(t).badge === "match") && (
                       <>
-                        <tr className="cat settled"><td colSpan={4}>{L("Settled & fixed terms", "البنود المحسومة والمقرّرة")}</td></tr>
-                        {operatingTerms.filter((t) => isSettled(decide(t).badge)).map((t) => { const d = decide(t); return (
-                          <tr key={t.key} className={d.badge === "locked" ? "locked" : undefined}>
-                            <td className="lbl">{d.badge === "locked" ? "🔒 " : ""}{ar ? t.labelAr : t.label}</td>
+                        <tr className="cat settled"><td colSpan={4}>{L("Settled", "البنود المحسومة")}</td></tr>
+                        {operatingTerms.filter((t) => decide(t).badge === "match").map((t) => { const d = decide(t); return (
+                          <tr key={t.key}>
+                            <td className="lbl">{ar ? t.labelAr : t.label}{termNotes(t)}</td>
                             <td className="sup" colSpan={2}>{valText(d.chosen ?? t.value, L)}{editable && !d.server && <button type="button" className="qp-ttreopen" title={L("Reopen", "إعادة فتح")} onClick={() => onReopenLocal(t.key)}>↻</button>}</td>
+                            <td><span className={`qp-ttbadge ${d.badge}`}>{badgeLabel(d.badge)}</span></td>
+                          </tr>
+                        ); })}
+                      </>
+                    )}
+                    {operatingTerms.some((t) => decide(t).badge === "locked") && (
+                      <>
+                        <tr className="cat settled"><td colSpan={4}>{L("Acknowledge — fixed by your request", "للعلم — مثبّتة من طلبك")}</td></tr>
+                        {operatingTerms.filter((t) => decide(t).badge === "locked").map((t) => { const d = decide(t); return (
+                          <tr key={t.key} className="locked">
+                            <td className="lbl">🔒 {ar ? t.labelAr : t.label}{termNotes(t)}</td>
+                            <td className="sup" colSpan={2}>{valText(d.chosen ?? t.value, L)}</td>
                             <td><span className={`qp-ttbadge ${d.badge}`}>{badgeLabel(d.badge)}</span></td>
                           </tr>
                         ); })}

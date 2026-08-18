@@ -834,3 +834,14 @@
 
 /* Destructive confirm button, alongside `.warn` and `.green`. */
 .dlproto .dl-mbtn.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+/* ── term provenance + last-move hint ───────────────────────────────────────────────────────────
+   Two sub-label lines under a term's name: WHERE its value came from, and the last move made on it.
+   Both are quiet by design — a term is read on its label and its value; these answer the questions
+   that come second. */
+.dlproto .qp-tsrc,
+.dlproto .qp-thist { display: block; font-size: 10.5px; font-weight: 600; color: var(--muted); line-height: 1.5; }
+.dlproto .qp-thist { display: flex; align-items: center; gap: 3px; }
+.dlproto .qp-thist .material-icons-outlined { font-size: 12px; }
+/* The payment row lays its label out inline, so the notes need the label to become a column. */
+.dlproto .qp-pay-row .k { display: flex; flex-direction: column; gap: 1px; }
