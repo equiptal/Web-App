@@ -51,10 +51,26 @@ import type { FleetMachine } from "./fleet";
  *    coordinates, which is what keeps AC-15's card↔marker focus in step by construction rather than by
  *    two filters that have to be kept equal by hand.
  *
- * **Nearest first**, by `distanceKm`. A machine with no distance sorts **last**, never first: a null
- * read as 0 would put the one machine whose location is unknown at the top of a list ordered by how
- * close it is. `Array.prototype.sort` is stable, so machines at equal distance keep the order the fleet
- * response gave them.
+ * **The offer first, then nearest** (app parity — `equipment_list.dart`, owner 2026-08-15: *"always
+ * show the one in the offer at top and other below it"*).
+ *
+ * ~~Distance alone.~~ It put the offered machine LAST whenever it happened to sit in a farther yard —
+ * the app's fleet screenshot showed two machines the supplier had not offered sitting above the one
+ * he had. The renter opened this surface to read an OFFER; the machines around it are context, and
+ * context does not outrank its subject by being nearer.
+ *
+ * **The web missed this for four days.** The rule landed in the app on 2026-08-15 and the module-2
+ * audit did not carry it over, because that pass compared what each surface SHOWS — membership,
+ * colour, filters, focus — and never diffed how each ORDERS. It matters beyond the reading order:
+ * `landingSelectionId` falls back to *the first confirmed machine in list order*, so a distance-only
+ * sort pre-selected a machine the supplier never offered whenever the nearest confirmed one was not
+ * in the bid, while the app pre-selected an offered one. One sort, two surfaces, two different cards
+ * accented on arrival.
+ *
+ * Within each group **nearest first**, by `distanceKm` — so RM3-AC-09 holds where it still means
+ * anything. A machine with no distance sorts **last**, never first: a null read as 0 would put the one
+ * machine whose location is unknown at the top of a list ordered by how close it is.
+ * `Array.prototype.sort` is stable, so machines tied on both keys keep the fleet response's order.
  *
  * Returns a new array — the caller's `FleetMachine[]` is never reordered in place.
  */
@@ -62,7 +78,12 @@ export function listedMachines(fleet: readonly FleetMachine[]): FleetMachine[] {
   return fleet
     .filter((m) => unitAvailability(m) !== "absent")
     .slice()
-    .sort((a, b) => distanceRank(a) - distanceRank(b));
+    .sort((a, b) => offerRank(a) - offerRank(b) || distanceRank(a) - distanceRank(b));
+}
+
+/** 0 for a machine this bid names, 1 for one the supplier merely owns. */
+function offerRank(m: FleetMachine): number {
+  return isInOffer(m) ? 0 : 1;
 }
 
 /** `distanceKm` for sorting, with a missing distance pushed past every real one. */
@@ -579,11 +600,10 @@ export function filterMachines(
  *
  * Two consequences worth stating, because both are departures:
  *
- *  · **Order is offer-first, then nearest.** `listedMachines` sorts purely by distance; this regroups
- *    that order without disturbing it within either group (`filter` is stable), so the offer reads
- *    nearest-first and so does the remainder. A nearer machine outside the offer therefore sits below
- *    a farther one inside it — correct, because the question this surface answers first is what is
- *    being offered, not what is closest.
+ *  · **This narrowing does NOT decide the order.** `listedMachines` already sorts offer-first (app
+ *    parity, 2026-08-15), so the split below only cuts an array that is already grouped. The two
+ *    `filter` passes are what the COLLAPSE needs — a set to keep and a set to hide — not a re-sort,
+ *    and they preserve the incoming order in both halves.
  *  · **A supplier who offered nothing matching is expanded by definition.** With an empty offer there
  *    is nothing to collapse to, and a collapsed empty list under a control offering to reveal the
  *    rest states the opposite of the truth. Same for a filter that leaves the offer empty while the

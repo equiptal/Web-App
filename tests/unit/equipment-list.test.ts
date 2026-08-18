@@ -82,12 +82,15 @@ describe("listedMachines — RM3-AC-09 / RM3-AC-10", () => {
        Withdrawn 2026-08-13. They ARE listed, told apart by COLOUR rather than by absence: without them
        the renter reads "3 registered" above a list of one and cannot tell "he owns one" from "he
        offered one". */
-    expect(ids(list)).toEqual(["offered-a", "owned-only", "offered-b"]);
+    /* ~~`["offered-a", "owned-only", "offered-b"]` — the fleet's own order, under a distance-only
+       sort.~~ Superseded 2026-08-19: the offer sorts FIRST (app parity, `equipment_list.dart`, owner
+       2026-08-15). All three are still LISTED, which is what this case is about. */
+    expect(ids(list)).toEqual(["offered-a", "offered-b", "owned-only"]);
     /* ~~told apart by COLOUR~~ — told apart by the in-offer BADGE since 2026-08-17 (app parity). The
        colour answers the yard, which none of these three has named, so all three read unconfirmed;
        what distinguishes them on the card is `isInOffer`. */
     expect(list.map((m) => unitAvailability(m))).toEqual(["unconfirmed", "unconfirmed", "unconfirmed"]);
-    expect(list.map((m) => isInOffer(m))).toEqual([true, false, true]);
+    expect(list.map((m) => isInOffer(m))).toEqual([true, true, false]);
   });
 
   it("sorts nearest first", () => {
@@ -916,5 +919,58 @@ describe("equipmentListView — the offer first (owner, 2026-08-19)", () => {
     expect(equipmentListView(list, ask, []).emptiedByFilter).toBe(false);
     // A combination that leaves nothing at all: emptied, and it is the chips that did it.
     expect(equipmentListView(list, ask, ["distance:50", "cert:equipment:tuv"]).emptiedByFilter).toBe(true);
+  });
+});
+
+/* ══════════ the offer sorts first — and what that fixes downstream (app parity, 2026-08-15) ══════════
+   The app changed this on 2026-08-15 (*"always show the one in the offer at top and other below it"*)
+   and the web ran four days without it. The reading order was the visible half; the half that matters
+   more is `landingSelectionId`, which falls back to *the first confirmed machine in list order*. */
+describe("listedMachines — the offer sorts before distance", () => {
+  it("puts an offered machine above a nearer one the supplier merely owns", () => {
+    const list = listedMachines(
+      fleet([
+        { id: "fleet-1km", km: 1, inBid: false },
+        { id: "offered-50km", km: 50 },
+        { id: "fleet-2km", km: 2, inBid: false },
+        { id: "offered-10km", km: 10 },
+      ]),
+    );
+    expect(ids(list)).toEqual(["offered-10km", "offered-50km", "fleet-1km", "fleet-2km"]);
+  });
+
+  it("keeps nearest-first WITHIN each group, so RM3-AC-09 holds where it still means anything", () => {
+    const list = listedMachines(
+      fleet([{ id: "off-far", km: 90 }, { id: "off-near", km: 3 }, { id: "own-far", km: 80, inBid: false }, { id: "own-near", km: 5, inBid: false }]),
+    );
+    expect(ids(list)).toEqual(["off-near", "off-far", "own-near", "own-far"]);
+  });
+
+  it("still sorts a machine with no distance last, inside its own group", () => {
+    const list = listedMachines(
+      fleet([{ id: "own-known", km: 40, inBid: false }, { id: "off-unknown", km: null }, { id: "off-known", km: 60 }]),
+    );
+    expect(ids(list)).toEqual(["off-known", "off-unknown", "own-known"]);
+  });
+
+  it("pre-selects an OFFERED machine rather than a nearer one that was never offered", () => {
+    // The bug the distance-only sort left behind. With no primary on the bid, the fallback takes the
+    // first confirmed machine in list order — which under the old sort was whichever confirmed machine
+    // happened to be closest, offered or not. The renter landed on a machine nobody had sold him, with
+    // the accent and the nine-second pulse on its card.
+    const list = listedMachines(
+      fleet([
+        { id: "fleet-confirmed-1km", km: 1, source: "unit_yard", inBid: false },
+        { id: "offered-confirmed-40km", km: 40, source: "unit_yard" },
+      ]),
+    );
+    expect(landingSelectionId(null, list)).toBe("offered-confirmed-40km");
+  });
+
+  it("still prefers the bid's primary machine over both", () => {
+    const list = listedMachines(
+      fleet([{ id: "offered-near", km: 2, source: "unit_yard" }, { id: "primary", km: 300, source: "unit_yard" }]),
+    );
+    expect(landingSelectionId("primary", list)).toBe("primary");
   });
 });

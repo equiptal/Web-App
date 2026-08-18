@@ -659,8 +659,13 @@ describe("machineMarkers — one marker per plottable offered machine (RM3-AC-21
     // `owned-only` has a card since 2026-08-13 and it has coordinates, so it is drawn. Only `claimed`
     // (no machine at all) and `no-coords` (no point) are not. The rule is untouched: a marker needs a
     // card AND coordinates.
-    expect(listed.map((m) => m.equipmentId)).toEqual(["near", "owned-only", "far", "no-coords"]);
-    expect(machineMarkers(listed).map((m) => m.id)).toEqual(["near", "owned-only", "far"]);
+    //
+    // ~~`["near", "owned-only", "far", "no-coords"]`~~ — distance-only order. Superseded 2026-08-19:
+    // the offer sorts first (app parity), so `owned-only` drops below the three offered machines
+    // including the one with no distance at all. WHICH machines are drawn is unchanged, which is what
+    // this case is about.
+    expect(listed.map((m) => m.equipmentId)).toEqual(["near", "far", "no-coords", "owned-only"]);
+    expect(machineMarkers(listed).map((m) => m.id)).toEqual(["near", "far", "owned-only"]);
   });
 
   it("never invents a marker for a machine that has no card", () => {
