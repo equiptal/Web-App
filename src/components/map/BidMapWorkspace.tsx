@@ -880,7 +880,24 @@ export function BidMapWorkspace({
                     <span className="bm-title" title={bid.supplierName}>{bid.supplierName}</span>
                     {bid.verified && (
                       <span className="bm-verified">
-                        <span className="material-icons-outlined">verified</span>
+                        {/* A bare CHECK, drawn at 11px in the chip's own ink — `rVerifiedChip`
+                            (prototype 4056). It was Material's `verified` badge, a filled rosette
+                            whose scallops carry their own meaning at 13px and read as a second mark
+                            beside the word rather than as the tick for it. The stroke here is the
+                            prototype's 2.6, so the glyph keeps the chip's weight without a fill. */}
+                        <svg
+                          width="11"
+                          height="11"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M20 6L9 17l-5-5" />
+                        </svg>
                         {t.bidMap.verifiedCompany}
                       </span>
                     )}

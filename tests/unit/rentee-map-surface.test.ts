@@ -324,24 +324,30 @@ describe("the card's controls each keep a row, and both keep their rules", () =>
   const list = strip(read(LIST));
   const css = read(CSS);
 
-  // ── Superseded (owner, 2026-08-11) ───────────────────────────────────────────────────────────
-  // ~~"puts both controls in one cluster on the distance row"~~. The owner withdrew the cluster on
-  // seeing it: *"for the asked make it beside not confirmed"*, *"the details button make it as
-  // before"*. Row 3 is `nowrap`, so on a card whose ask was already out the pair clipped the
-  // distance mid-word — and the distance is the fact this list is sorted on.
-  it("puts the ask beside the availability chip, and «التفاصيل» alone on the distance row", () => {
+  // ── Superseded twice, and the second one is the v3 prototype's own card ──────────────────────
+  // ~~"puts both controls in one cluster on the distance row"~~ (owner, 2026-08-11) — withdrawn on
+  // sight: *"for the asked make it beside not confirmed"*, *"the details button make it as before"*.
+  // ~~"«التفاصيل» alone on the distance row"~~ (same day) — withdrawn 2026-08-19 against
+  // `app-decoded.js:4009`, which draws it on the TITLE row. What cured the "floating" pill was the
+  // `#F2F6FA` ground it gained, not the row it was moved to, and the ground travels with it.
+  //
+  // The rule that survived both moves is the one being pinned here: row 3 carries the distance and
+  // nothing else. It is `nowrap`, so any control sharing it clips the distance mid-word — and the
+  // distance is the fact this list is sorted on.
+  it("puts the ask beside the availability chip, «التفاصيل» on the title row, and NOTHING beside the distance", () => {
+    const r1 = region(read(LIST), '<div className="bm-eq-r1">', '<div className="bm-eq-r2">');
     const r2 = region(read(LIST), '<div className="bm-eq-r2">', '<div className="bm-eq-r3">');
     const r3 = region(read(LIST), '<div className="bm-eq-r3">', '<div className="bm-eq-r4">');
+    // Details rides the trailing edge of the title, which is where the reader's eye already is.
+    expect(r1).toMatch(/bm-eq-acts/);
+    expect(r1).toMatch(/bm-eq-details/);
     // The ask answers the chip, so it shares the chip's row…
     expect(r2).toMatch(/bm-eq-chip/);
     expect(r2).toMatch(/bm-eq-ask/);
-    // …and is not left behind on the row it came from.
+    // …and neither control is left on the distance row, which is now the distance alone.
     expect(r3).not.toMatch(/bm-eq-ask/);
-    // Details keeps the trailing edge, alone, so it lands in one place on every card in the column.
-    expect(r3).toMatch(/bm-eq-acts/);
-    expect(r3).toMatch(/bm-eq-details/);
-    const r1 = region(read(LIST), '<div className="bm-eq-r1">', "</div>");
-    expect(r1).not.toMatch(/bm-eq-details/);
+    expect(r3).not.toMatch(/bm-eq-details/);
+    expect(r3).not.toMatch(/bm-eq-acts/);
   });
 
   it("keeps «اطلب التأكيد» a REAL button on the card, so an unconfirmed machine is askable without opening it (RM3-AC-13)", () => {

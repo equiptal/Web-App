@@ -557,11 +557,14 @@ function EquipmentCard({
           {/* 1 · title — model · year, with the verified mark against the end of the NAME rather than
               the far edge of the row. No serial, no capacity (AC-12).
 
-              **«التفاصيل» is no longer here** (owner, 2026-08-11: *"check how buttons float"*). A white
-              pill on a white card, hung at the end of the title row, had no ground under it and read
-              as floating over the name rather than belonging to the card — and it was the FIRST thing
-              in the reading order after the machine's own name, which is the one place a secondary
-              control should not be. It moved to row 3's cluster, beside the other one. */}
+              **«التفاصيل» is back on this row** (owner, 2026-08-19, against the v3 prototype's own
+              card — `app-decoded.js:4009`). ~~It moved to row 3's cluster on 2026-08-11 because a white
+              pill on a white card had no ground under it and read as floating.~~ Withdrawn: the ground
+              was the fix, not the row. The pill keeps the `#F2F6FA` tint it gained there, so it is no
+              longer white-on-white — and it returns to the trailing edge of the title, which is where
+              the prototype puts it and where the reader's eye already is after the machine's name.
+
+              Row 3 keeps the distance alone, which is what it was clipping the distance to avoid. */}
           <div className="bm-eq-r1">
             <span className="bm-eq-name">
               <span className="bm-eq-title" title={title}>{title}</span>
@@ -585,13 +588,23 @@ function EquipmentCard({
                 </span>
               )}
             </span>
+
+            <span className="bm-eq-acts">
+              <button type="button" className="bm-eq-details" onClick={() => onOpenDetail(machine.equipmentId)}>
+                {t.bidMap.eqDetails}
+                {/* The prototype hard-codes «‹», which is correct in Arabic and backwards in English —
+                    it is an RTL-forward chevron in an RTL-only file. Kept locale-flipped by decision
+                    (owner, 2026-08-09; `design-v3.md` §9 records it): the chevron points the way the
+                    reader travels, and a control reading "Details ‹" in English points back at the text
+                    it is meant to lead away from. */}
+                <span aria-hidden="true">{ar ? "‹" : "›"}</span>
+              </button>
+            </span>
           </div>
 
-          {/* 2 · state — ONE chip (AC-32) and the out-of-city qualifier. The row holds its height
-              whether or not the qualifier is there. The ask left this row with «التفاصيل»: a
-              borderless blue link between a red chip and a brown qualifier was the second control on
-              the card with nothing under it, and three unlike things on one line is what made the
-              controls read as floating rather than as the card's own. */}
+          {/* 2 · state — ONE chip (AC-32), the in-offer badge and the out-of-city qualifier. The row
+              holds its height whether or not either qualifier is there. The ask sits here, beside the
+              chip it answers, and «التفاصيل» is back on row 1 (owner, 2026-08-19). */}
           <div className="bm-eq-r2">
             <span className={`bm-eq-chip${chip.availability === "confirmed" ? " ok" : " no"}`}>
               {/* TWO states, and the shape carries the meaning, not the colour alone: the confirmed
@@ -659,13 +672,16 @@ function EquipmentCard({
             )}
           </div>
 
-          {/* 3 · distance from the project, and «التفاصيل» alone at the row's trailing edge. Numerals
-              are `dir="ltr"` — an Arabic-Indic figure inside an RTL run still reads left to right.
+          {/* 3 · distance from the project, and NOTHING else (owner, 2026-08-19; the v3 prototype's
+              own card, `app-decoded.js:4029`). Numerals are `dir="ltr"` — an Arabic-Indic figure
+              inside an RTL run still reads left to right.
 
-              The ask used to share this row. It moved up beside the availability chip (see row 2):
-              the row is `nowrap`, and two controls on it clipped the distance on any card that had
-              been asked. Details alone also means it lands in the same place on every card in the
-              column, asked or not, which is what makes a list scannable down its trailing edge.
+              Both controls have now left this row: the ask went up beside the availability chip it
+              answers (2026-08-11), and «التفاصيل» went back to row 1's trailing edge. The row is
+              `nowrap`, and a control on it clipped the distance mid-word on any card that carried
+              one — which is why nothing shares it now. The distance is the fact this list is sorted
+              on, so it gets the line to itself.
+
               Every card is still exactly four rows tall (AC-32's second half). */}
           <div className="bm-eq-r3">
             <span className="bm-eq-dist">
@@ -681,37 +697,30 @@ function EquipmentCard({
                 <span className="bm-eq-kmu">{t.bidMap.eqNoDistance}</span>
               )}
             </span>
-
-            <span className="bm-eq-acts">
-              <button type="button" className="bm-eq-details" onClick={() => onOpenDetail(machine.equipmentId)}>
-                {t.bidMap.eqDetails}
-                {/* The prototype hard-codes «‹», which is correct in Arabic and backwards in English —
-                    it is an RTL-forward chevron in an RTL-only file. Kept locale-flipped by decision
-                    (owner, 2026-08-09; `design-v3.md` §9 records it): the chevron points the way the
-                    reader travels, and a control reading "Details ‹" in English points back at the text
-                    it is meant to lead away from. */}
-                <span aria-hidden="true">{ar ? "‹" : "›"}</span>
-              </button>
-            </span>
           </div>
 
-          {/* 4 · the REQUESTED certificates, held or not (owner, 2026-08-11). Always occupies its
-              line. A certificate the machine holds but nobody asked for is not here — it is on the
-              documents tab, where the renter goes to see everything the machine carries. */}
+          {/* 4 · the REQUESTED certificates, held or not (owner, 2026-08-11). A certificate the
+              machine holds but nobody asked for is not here — it is on the documents tab, where the
+              renter goes to see everything the machine carries.
+
+              **Empty renders NOTHING** (owner, 2026-08-19). The row used to carry a sentence when no
+              certificate was asked for, and neither wording survived reading: the prototype's «لا
+              شهادات على المعدّة» claims the MACHINE has none, which this row cannot know — it lists
+              what the REQUEST named — and «لم تُطلب شهادات» was a line explaining an absence nobody
+              had asked about. An empty row states the same fact and states it quietly.
+
+              **The row still occupies its line**, empty or not: `min-height` on `.bm-eq-r4` holds it,
+              so a machine with no certificates is a shorter LINE and not a shorter CARD (AC-32). */}
           <div className="bm-eq-r4">
-            {certs.length > 0 ? (
-              // The mark is not decoration. At this size the two fills are close enough that colour
-              // would be the only carrier, and a renter who cannot separate them reads a missing
-              // certificate as a present one — the exact misreading this line exists to prevent.
-              certs.map((c) => (
-                <span key={c.code} className={`bm-eq-cert ${c.held ? "held" : "missing"}`}>
-                  <span aria-hidden="true">{c.held ? "✓" : "!"}</span>
-                  {ar ? c.label.ar : c.label.en}
-                </span>
-              ))
-            ) : (
-              <span className="bm-eq-nocert">{t.bidMap.eqNoCerts}</span>
-            )}
+            {/* The mark is not decoration. At this size the two fills are close enough that colour
+                would be the only carrier, and a renter who cannot separate them reads a missing
+                certificate as a present one — the exact misreading this line exists to prevent. */}
+            {certs.map((c) => (
+              <span key={c.code} className={`bm-eq-cert ${c.held ? "held" : "missing"}`}>
+                <span aria-hidden="true">{c.held ? "✓" : "!"}</span>
+                {ar ? c.label.ar : c.label.en}
+              </span>
+            ))}
           </div>
         </div>
       </div>

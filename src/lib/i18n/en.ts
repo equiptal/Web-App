@@ -995,11 +995,14 @@ export const en = {
        Flat, nearest first, the WHOLE matching fleet. No serial number and no load capacity (RM3-AC-12):
        the serial identifies the machine to the system, and the type and size are already stated once,
        in the count pills. */
-    // ONE chip carrying availability AND commitment (RM3-AC-32) — never a chip plus a band below it,
-    // which made cards unequal in height and split one fact across two rows. Every card in this list is
-    // in the offer, so the confirmed chip is the one that states both; the unconfirmed chip states the
-    // unanswered availability and nothing else (RM3-AC-30 — no reason, no cause).
-    eqChipConfirmed: "Availability confirmed · in this offer",
+    // ONE chip carrying availability (RM3-AC-32) — never a chip plus a band below it, which made cards
+    // unequal in height and split one fact across two rows. The unconfirmed chip states the unanswered
+    // availability and nothing else (RM3-AC-30 — no reason, no cause).
+    //
+    // «· in this offer» was dropped from the confirmed chip (owner, 2026-08-19). Offer membership is
+    // carried by the orange `pinInOffer` badge sitting beside this chip on the same row, so the chip was
+    // stating the same fact twice on one line.
+    eqChipConfirmed: "Availability confirmed",
     eqChipUnconfirmed: "Not confirmed yet",
     // Blue, never navy (RM3-AC-33) — beside a red chip, navy reads as disabled.
     // A mark on the title: the platform CHECKED this equipment's papers (`verificationStatus ===
@@ -1129,6 +1132,16 @@ export const en = {
   /* ── V12 · the price footer (spec 004 §6.10, 004a §4a.1 + §4a.4) ──
      Figures and a hand-off. It never edits a figure and never re-implements negotiation. */
   priceFooter: {
+    // ── SIXTEEN OF THESE KEYS NO LONGER REACH A SCREEN (owner, 2026-08-19) ─────────────────────
+    // The footer's breakdown was withdrawn with «Show details»; `PriceFooter.tsx` now prints the rate,
+    // its period, the source line and the two acts, and nothing else. Everything below that named a
+    // breakdown line — `currency`, `rental`, `rentalBasis`, `rentalBasisFlat`, `divisorWeek`,
+    // `divisorMonth`, `mobilisation`, `demobilisation`, `excluded`, `subtotal`, `vat`, `total`,
+    // `noDuration`, `unitOne`, `unitMany`, `days` — has no reader on this surface.
+    //
+    // They are kept rather than deleted because the words are the ONE wording for
+    // `computeDealTotals`' six lines, and the decision that removed them was about where a renter
+    // reads them, not about what they say. Deleting them is a separate call.
     perPeriod: "SAR / {unit}",
     // Every figure in the breakdown carries the currency, exactly as the app's bid footer prints it.
     currency: "SAR",

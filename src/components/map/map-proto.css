@@ -781,7 +781,9 @@
   border-radius: 999px;
   padding: 2px 9px;
 }
-.bidmap .bm-verified .material-icons-outlined { font-size: 13px; }
+/* An 11px stroked check, not Material's filled `verified` rosette (owner, 2026-08-19; prototype 4056).
+   `flex-shrink` because the name beside it takes the row's slack and must not squeeze the tick. */
+.bidmap .bm-verified svg { flex-shrink: 0; }
 /* The one entry to the company's papers. The header states identity; verification state and expiry
    live on the rows behind this control (§6.1, V9). */
 /* A PILL on the header's trailing edge (prototype 2633), not a full-width row. It was `width: 100%`
@@ -1108,28 +1110,24 @@
   align-items: center;
   justify-content: center;
 }
-/* ── The card's TWO CONTROLS, as one cluster (owner, 2026-08-11) ──────────────────────────────────
-   *"Check how buttons float — use shorter wordings, even on the equipment card."*
+/* ── «التفاصيل» — row 1's trailing edge, where the prototype puts it (owner, 2026-08-19) ──────────
+   `app-decoded.js:4009` draws it inside the title row: the name takes the slack, the pill keeps its
+   width, and the reader meets it exactly where their eye already is after reading the machine's name.
 
-   They floated for a reason that was structural, not decorative. «التفاصيل» was a WHITE pill on a
-   WHITE card: no ground under it, nothing sharing its line, hung off the end of the title row — the
-   one shape on the card that looked applied rather than built in. «اطلب التأكيد» was worse: a
-   borderless blue word with a hairline under it, dropped between a red chip and a brown qualifier, so
-   the state row carried three unlike objects and the eye could not tell which of them was pressable.
+   It spent 2026-08-11 → 08-19 on row 3 instead, and the reason it was moved is worth keeping because
+   the fix survived the move: as drawn then it was a WHITE pill on a WHITE card — no ground under it,
+   hung off the end of the title row, the one shape on the card that looked applied rather than built
+   in. What cured that was the `#F2F6FA` ground below, not the row. The ground stays; the row goes back.
 
-   «التفاصيل» sits in `.bm-eq-acts`, alone, at row 3's trailing edge, flush with the text column's own
-   padding. The ask joined it there briefly and the owner withdrew that on sight (2026-08-11: *"for the
-   asked make it beside not confirmed"* / *"the details button make it as before"*) — row 3 is `nowrap`,
-   so on an asked card the pair clipped the distance mid-word, and the distance is the fact this list is
-   sorted on. The ask now sits beside the availability chip on row 2, where it reads as the answer to
-   it. Details alone also lands in the same place on every card, asked or not, which is what makes the
-   column scannable down its trailing edge. Neither costs height — row 2 and row 3 were both already
-   full lines — so the card is still exactly four rows and every card is still the same height.
+   Row 3 is now the distance ALONE, which is the arrangement both moves were reaching for: the row is
+   `nowrap`, and any control sharing it clipped the distance mid-word — and the distance is the fact
+   this list is sorted on.
 
-   **Both keep the grounds their rules give them.** The ask is still the blue of RM3-AC-33 (never navy:
-   beside a red chip navy reads as disabled) and is still a real button above the stretched open layer,
-   which is RM3-AC-13 — an unconfirmed machine is askable without opening the detail. What changes is
-   that the blue now has a tint and a hairline UNDER it instead of hanging in the white. */
+   The ask stays on row 2 beside the availability chip it answers (owner, 2026-08-11: *"for the asked
+   make it beside not confirmed"*), as an underlined link rather than a capsule — see `.bm-eq-ask`.
+   It is still a real button above the stretched open layer, which is RM3-AC-13: an unconfirmed machine
+   is askable without opening the detail. Nothing here costs height, so the card is still exactly four
+   rows and every card in the column is still one height (RM3-AC-32). */
 .bidmap .bm-eq .bm-eq-acts {
   /* Pushes the cluster to the row's trailing edge in both scripts — a logical margin, so it is the
      right edge in English and the left in Arabic without a second rule. */
@@ -1222,45 +1220,50 @@
 /* BLUE, never navy (RM3-AC-33): beside a red chip, navy reads as disabled, and this is the one control
    the renter is supposed to press.
 
-   **A tinted capsule, not an underlined word** (owner, 2026-08-11). It was `background: none` with a
-   1px rule under it — the prototype's link treatment, correct for a word sitting in a paragraph and
-   wrong for the most important control on a card, where it read as text that happened to be blue. The
-   fill and the hairline are the same `.08`/`.22` alphas of the same blue the ink already carries, so
-   the control gained a ground and not a colour, and it now matches «التفاصيل» beside it in height and
-   radius — which is what makes the pair read as one cluster.
+   **AN UNDERLINED WORD, not a tinted capsule** (owner, 2026-08-19 — the v3 prototype's own card,
+   `app-decoded.js:4024`). ~~It was given a `.08` fill and a `.22` hairline on 2026-08-11 so it would
+   match «التفاصيل» in height and radius and the two would read as one cluster.~~ Withdrawn with the
+   cluster itself: «التفاصيل» has gone back to row 1, so there is no pair here to match, and a second
+   capsule beside the availability chip put two pill-shaped objects on one row where only one of them
+   is pressable. A word with a rule under it is unmistakably a link and unmistakably not a chip.
 
    `color` is still set INLINE from `askAvailability.colour`, so the model remains the one authority on
-   this control's colour; what is here is the ground it stands on. */
+   this control's colour; the rule under it borrows the same ink at `.34`. */
 .bidmap .bm-eq .bm-eq-ask {
   pointer-events: auto;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  background: rgba(37, 99, 235, 0.08);
-  border: 1px solid rgba(37, 99, 235, 0.22);
-  border-radius: 999px;
-  padding: 3px 9px;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid rgba(37, 99, 235, 0.34);
+  border-radius: 0;
+  padding: 0 0 1px;
   color: #2563eb;
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 800;
   line-height: 1.5;
   white-space: nowrap;
   cursor: pointer;
   font-family: inherit;
 }
-.bidmap .bm-eq .bm-eq-ask:hover:not(:disabled) { background: rgba(37, 99, 235, 0.14); border-color: rgba(37, 99, 235, 0.34); }
+.bidmap .bm-eq .bm-eq-ask:hover:not(:disabled) { border-bottom-color: currentColor; }
 .bidmap .bm-eq .bm-eq-ask:disabled { cursor: default; opacity: 0.5; }
 
-/* Row 3 — the distance, then the cluster hard against the trailing edge. `center`, not `baseline`:
-   two capsules and a 17px figure have no shared baseline worth aligning to, and the figure's own pair
-   keeps its baseline inside `.bm-eq-dist`. */
+/* Row 3 — the distance, ALONE (owner, 2026-08-19). Both controls have left it: the ask sits beside the
+   chip it answers on row 2, «التفاصيل» is back on the title row. The row is `nowrap`, and anything
+   sharing it clipped the distance mid-word on a 392px panel — which is why nothing shares it now.
+   `center`, not `baseline`: the figure's own pair keeps its baseline inside `.bm-eq-dist`. */
 .bidmap .bm-eq .bm-eq-r3 { display: flex; align-items: center; gap: 8px; min-height: 23px; white-space: nowrap; }
 .bidmap .bm-eq .bm-eq-dist { display: inline-flex; align-items: baseline; gap: 5px; min-width: 0; overflow: hidden; }
 .bidmap .bm-eq .bm-eq-km { font-family: ui-monospace, monospace; font-size: 17px; font-weight: 700; letter-spacing: -0.4px; color: #1c3550; }
 .bidmap .bm-eq .bm-eq-kmu { font-size: 11.5px; font-weight: 700; color: #6b8fa8; }
 
 /* Row 4 — the certificate line ALWAYS occupies its line, empty or not, so a machine with no
-   certificates is a shorter LINE and not a shorter CARD. */
+   certificates is a shorter LINE and not a shorter CARD.
+
+   `min-height` is what holds it now, not a placeholder sentence: the row renders NOTHING when the
+   request named no certificate (owner, 2026-08-19). `.bm-eq-nocert` went with that sentence. */
 .bidmap .bm-eq .bm-eq-r4 { display: flex; align-items: center; gap: 5px; min-height: 19px; overflow: hidden; }
 .bidmap .bm-eq .bm-eq-cert {
   flex-shrink: 0;
@@ -1294,7 +1297,6 @@
   background: rgba(217, 54, 42, 0.1);
   border-color: rgba(217, 54, 42, 0.32);
 }
-.bidmap .bm-eq .bm-eq-nocert { font-size: 10.5px; font-weight: 700; color: #6b8fa8; opacity: 0.7; }
 
 /* RM3-AC-26 — a price and a count were given, and that is the whole statement. No card furniture. */
 .bidmap .bm-eqnone { padding: 18px 6px; text-align: center; }
@@ -1865,104 +1867,71 @@
      *"the price footer must be fixed not scrollable at the end."*
 
      Structurally it always was — a sibling of `.bm-body`, which is the only scroller — but the
-     BREAKDOWN could undo that. `التفاصيل` grew the footer with no ceiling, so on a short viewport a
-     six-line breakdown pushed the rate and the two CTAs past the bottom of a panel that clips
-     (`.bm-panel { overflow: hidden }`), and the figures the bar exists for went off-screen.
+     BREAKDOWN could undo that: «عرض التفاصيل» grew the footer with no ceiling, so on a short viewport
+     six lines pushed the rate and the two CTAs past the bottom of a panel that clips
+     (`.bm-panel { overflow: hidden }`). It was answered with a `max-height` cap and an inner
+     scroller; the breakdown is now gone entirely, and the cap, the scroller and the
+     `overscroll-behavior` that guarded it went with it. Nothing here can grow but the units note.
 
-     So the footer is capped and given its own column: the breakdown scrolls INSIDE it and the rate
-     bar below is `flex-shrink: 0`. The rate and the hand-off are on screen at every scroll position
-     and at every viewport height, expanded or not — which is what "fixed" has to mean here. The cap
-     is a share of the panel rather than a pixel figure so it holds when the renter drags the grip. */
+     **76px, the prototype's own footer geometry** (`app-decoded.js:2653`), matching the 64px header
+     at the other end of the column: fixed height, 18px gutters, contents vertically centred.
+     `min-height` rather than `height` for exactly one reason — `.bm-foot-units` (RM3-AC-66), which
+     appears only when a negotiation moved the count and must not be clipped to hold a number. */
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  max-height: 68%;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 76px;
 
-  /* DARK, the prototype's `#0F2238` — the one slab on this surface. Everything above is white cards
-     on grey, and the bar that prices them must not read as one more card. */
-  background: #0f2238;
-  padding: 12px 15px 14px;
+  /* DARK, the prototype's `#152C46 → #0F2238` — the one slab on this surface. Everything above is
+     white cards on grey, and the bar that prices them must not read as one more card. The hairline
+     is white at `.08`, which is the slab's own edge rather than a rule borrowed from the light half
+     of the column. */
+  background: linear-gradient(180deg, #152c46, #0f2238);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 12px 18px;
   color: #fff;
 }
 
-/* ── the breakdown, above the rate ──────────────────────────────────────────────────────────────
-   Above, not below: the reader who opened it is checking arithmetic, and the total it builds to
-   should finish next to the rate it explains rather than trailing off the bottom of the column. */
-.bidmap .bm-foot-break {
-  padding-bottom: 11px;
-  /* The part that yields when the column is short: it scrolls, the rate bar below never does. */
-  min-height: 0;
-  overflow-y: auto;
-  /* …and its scroll stays its own: reaching the end of the breakdown must not carry on into the
-     equipment list behind it. */
-  overscroll-behavior: contain;
-}
-.bidmap .bm-foot-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 3.5px 0; }
-.bidmap .bm-foot-k { font-size: 11.5px; font-weight: 700; color: #fff; min-width: 0; }
-/* The basis rides inside the label — beside the thing it is the basis of, in the app's grey. */
-.bidmap .bm-foot-sub { margin-inline-start: 7px; font-size: 9.5px; font-weight: 600; color: rgba(255, 255, 255, 0.45); }
-.bidmap .bm-foot-v {
-  flex-shrink: 0;
-  font-size: 12.5px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.94);
-  font-family: "IBM Plex Sans", monospace;
-  white-space: nowrap;
-}
-/* «ر.س» rides with every figure, as the app prints it — quieter than the digits, because the reader
-   is comparing amounts and the currency is the same on all six lines. */
-.bidmap .bm-foot-cur { margin-inline-start: 4px; font-size: 9.5px; font-weight: 700; color: rgba(255, 255, 255, 0.5); }
-/* الإجمالي — the line the other five add up to, so it is the only one given weight and a rule. */
-.bidmap .bm-foot-row.is-total { margin-top: 5px; padding-top: 9px; border-top: 1px solid rgba(255, 255, 255, 0.14); }
-.bidmap .bm-foot-row.is-total .bm-foot-k { font-size: 12.5px; font-weight: 800; }
-.bidmap .bm-foot-row.is-total .bm-foot-v { font-size: 17px; font-weight: 800; }
-.bidmap .bm-foot-row.is-muted .bm-foot-v { color: rgba(255, 255, 255, 0.55); font-weight: 600; }
-.bidmap .bm-foot-note { margin-top: 7px; font-size: 9.5px; font-weight: 600; color: rgba(255, 255, 255, 0.5); line-height: 1.7; }
-
 /* ── the rate + the two acts ────────────────────────────────────────────────────────────────────
-   The rule only appears once the breakdown is open: with the footer at rest there is nothing above
-   the bar to separate it from. `wrap` because 392px is a hard ceiling — the two acts stay whole and
-   drop below the rate rather than shrinking their labels to fit. */
+   `wrap` because 392px is a hard ceiling — the two acts stay whole and drop below the rate rather
+   than shrinking their labels to fit. */
 .bidmap .bm-foot-bar { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; flex-shrink: 0; }
-.bidmap .bm-foot.is-open .bm-foot-bar { padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.14); }
 .bidmap .bm-foot-figs { flex: 1; min-width: 0; }
 .bidmap .bm-foot-rate { display: flex; align-items: baseline; gap: 6px; }
-/* Hero size — the one number on this surface a renter is actually deciding about. */
-.bidmap .bm-foot-amt { font-size: 25px; font-weight: 800; line-height: 1.1; letter-spacing: -0.5px; color: #fff; font-family: "IBM Plex Sans", monospace; }
-.bidmap .bm-foot-unit { font-size: 11px; font-weight: 700; color: rgba(255, 255, 255, 0.62); }
-.bidmap .bm-foot-meta { display: flex; align-items: baseline; gap: 8px; margin-top: 3px; flex-wrap: wrap; }
-/* The SOURCE of the figure, never the state of the conversation. */
-.bidmap .bm-foot-src { font-size: 10px; font-weight: 600; color: rgba(255, 255, 255, 0.55); }
-/* A text LINK, not a button with a chevron: it names the state it moves to («إخفاء التفاصيل»), and an
-   underline is how a reader is told a word is pressable without giving it a control's weight — which
-   this must not have next to the two acts. */
-.bidmap .bm-foot-det {
-  background: none;
-  border: 0;
-  padding: 0;
-  font: inherit;
-  font-size: 10px;
+/* Hero size — the one number on this surface a renter is actually deciding about. The prototype's
+   own metrics: 24px, weight 700, `-0.8px` tracking, in the monospace it prints every figure in. */
+.bidmap .bm-foot-amt {
+  font-family: ui-monospace, "IBM Plex Sans", monospace;
+  font-size: 24px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.88);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  cursor: pointer;
+  line-height: 1.1;
+  letter-spacing: -0.8px;
+  color: #fff;
 }
-/* «اطلب سعراً أقل» — the WHITE pill, and the loudest thing on the slab. The renter reached this
+.bidmap .bm-foot-unit { font-size: 12px; font-weight: 700; color: rgba(255, 255, 255, 0.62); }
+/* The SOURCE of the figure, never the state of the conversation. Its own line now — «عرض التفاصيل»
+   was the only other thing on the row it used to share, so `.bm-foot-meta` went with that control. */
+.bidmap .bm-foot-src { margin-top: 3px; font-size: 11px; font-weight: 600; color: rgba(255, 255, 255, 0.62); line-height: 1.6; }
+/* «اطلب سعراً أقل» — the WHITE button, and the loudest thing on the slab. The renter reached this
    footer to argue about a price; the app makes countering the obvious act and approving the quiet
    one, and inverting that here would be this surface disagreeing with the app about what a bid is
-   for. Neither button settles anything (004a §4a.2) — both open the room's own sheets. */
+   for. Neither button settles anything (004a §4a.2) — both open the room's own sheets.
+
+   `11px` radius, not a 999px capsule (prototype 3941): the pills read as two more chips on a surface
+   whose every other rounded thing — count pill, availability chip, certificate — is a label rather
+   than a control. A softened rectangle is the one shape here that only the acts wear. */
 .bidmap .bm-foot-cta {
   flex-shrink: 0;
   background: #fff;
   border: 1px solid #fff;
   color: #0f2238;
-  border-radius: 999px;
+  border-radius: 11px;
   /* Sized so the ENGLISH pair — «Counter this price» beside «Approve», the longer of the two — still
      shares one line with the hero rate inside the panel's 392px. Arabic has room to spare. */
-  padding: 10px 15px;
+  padding: 11px 16px;
   font: inherit;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 800;
   cursor: pointer;
   white-space: nowrap;
@@ -1971,11 +1940,11 @@
    exists: the room's own `canAccept` decides on arrival, so a control that used to grey out on a
    rule it could not evaluate now simply asks the room. */
 .bidmap .bm-foot-cta.is-confirm {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.12);
   border-color: rgba(255, 255, 255, 0.18);
   color: rgba(255, 255, 255, 0.94);
   font-weight: 700;
-  padding: 10px 16px;
+  padding: 11px 14px;
 }
 .bidmap .bm-foot-cta:disabled { opacity: 0.55; cursor: default; }
 /* The one place the offered count and the agreed count are reconciled (RM3-AC-66). Neutral, because
