@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { bidCounterDelta, ctaShowsCounterDelta } from "@/lib/contract/bid-counter-delta";
 import { unitCountNotes, distinctMachinesOffered } from "@/lib/contract/unit-count-notes";
 import { mapBidLiveStatus, resolveBidLiveStatus, resolveRenteeBidChip } from "@/lib/contract/bid-live-status";
+import { termsCheck, equipmentCheck, equipmentCheckOf, checkArcs } from "@/lib/contract/bid-card-checks";
+import type { UnitReadiness } from "@/lib/contract/bid-readiness";
 
 /**
  * **Three rentee bid-card rules the app has had and the web never did.**
@@ -157,5 +159,87 @@ describe("bid live status", () => {
     // lifecycle to fall back on — an empty slot reads as a card still loading.
     expect(resolveRenteeBidChip({ bidStatus: "PENDING", liveStatus: null })).toBe("state");
     expect(resolveRenteeBidChip({ bidStatus: null, liveStatus: null })).toBe("state");
+  });
+});
+
+/* ══════════════════════════ BC-2 · the checks row ══════════════════════════ */
+describe("bid card checks", () => {
+  it("collapses an all-clear half to a solid ring with no counts", () => {
+    // Printing «0 missing» beside «3 met» is the crowding this row exists to remove.
+    const t = termsCheck({ matched: 4, conflict: 0, pending: 0 });
+    expect(t.allClear).toBe(true);
+    expect(t.parts).toEqual([]);
+    expect(checkArcs(t)).toEqual([]);
+    expect(equipmentCheck({ met: 3, missing: 0 }).allClear).toBe(true);
+  });
+
+  it("prints the good count even at ZERO once something is outstanding", () => {
+    // «●0» says the supplier has agreed to nothing yet — a different fact from a row that simply
+    // does not mention agreement (owner's prototype, 2026-08-15).
+    const t = termsCheck({ matched: 0, conflict: 2, pending: 3 });
+    expect(t.parts).toEqual([
+      { tone: "good", count: 0 },
+      { tone: "bad", count: 2 },
+      { tone: "warn", count: 3 },
+    ]);
+    expect(t.total).toBe(5);
+  });
+
+  it("draws no arc for a part whose count is zero", () => {
+    // The ring never carries a slice the counts do not state.
+    const t = termsCheck({ matched: 0, conflict: 2, pending: 3 });
+    expect(checkArcs(t)).toEqual([0, 2 / 5, 3 / 5]);
+  });
+
+  it("separates 'nothing was asked for' from 'all clear'", () => {
+    // A request that named no certificates has no proportion to draw, and must not claim a green
+    // all-clear the data does not support.
+    const e = equipmentCheck({ met: 0, missing: 0 });
+    expect(e.empty).toBe(true);
+    expect(e.allClear).toBe(false);
+    expect(checkArcs(e)).toEqual([]);
+  });
+
+  it("greys a dead offer and counts nothing, on both halves", () => {
+    // An expired offer's terms were never resolved and never will be; counting them would invite a
+    // renter to act on an offer that cannot be acted on.
+    for (const c of [termsCheck({ matched: 3, conflict: 2, pending: 1, dead: true }), equipmentCheck({ met: 3, missing: 2, dead: true })]) {
+      expect(c.dead).toBe(true);
+      expect(c.parts).toEqual([]);
+      expect(c.allClear).toBe(false);
+      expect(c.empty).toBe(false);
+    }
+  });
+
+  it("drops news on a dead offer — there is nothing left to have answered", () => {
+    expect(termsCheck({ matched: 1, conflict: 1, pending: 0, dead: true, hasNews: true }).hasNews).toBe(false);
+    expect(termsCheck({ matched: 1, conflict: 1, pending: 0, hasNews: true }).hasNews).toBe(true);
+  });
+
+  it("counts REQUIREMENTS across units, not units that are fully ready", () => {
+    // Three units each one paper short is «6 met · 3 missing», not «0 of 3 ready» — the second reads
+    // as total failure for a supplier who is one paper short per machine.
+    const unit = (done: number, total: number): UnitReadiness => ({
+      equipmentId: "e", titleEn: "", titleAr: "", year: null, reqMinYear: null, yearConflict: false,
+      photosPresent: false, photos: [], equipmentCerts: [], operatorCerts: [],
+      ownershipPresent: false, ownershipScored: false, done, total, percent: 0, band: "red",
+    });
+    const e = equipmentCheckOf([unit(2, 3), unit(2, 3), unit(2, 3)]);
+    expect(e.parts).toEqual([{ tone: "good", count: 6 }, { tone: "bad", count: 3 }]);
+  });
+
+  it("reports the RENTEE fraction even when the caller scored ownership", () => {
+    // The app has separate `renteeDone`/`renteeTotal` fields; the web has one pair whose meaning
+    // depends on `scoreOwnership`. Left uncorrected, a caller that scored ownership would paint a
+    // fully compliant supplier one paper short on every machine.
+    const scored = (done: number, total: number, ownershipPresent: boolean): UnitReadiness => ({
+      equipmentId: "e", titleEn: "", titleAr: "", year: null, reqMinYear: null, yearConflict: false,
+      photosPresent: false, photos: [], equipmentCerts: [], operatorCerts: [],
+      ownershipPresent, ownershipScored: true, done, total, percent: 0, band: "red",
+    });
+    // total 3 = 1 photo + 1 ownership + 1 cert; done 3 = all held. Rentee reading: 2 of 2 → all clear.
+    expect(equipmentCheckOf([scored(3, 3, true)]).allClear).toBe(true);
+    // Ownership absent and scored: done 2 of 3 → rentee reading 2 of 2, still all clear.
+    expect(equipmentCheckOf([scored(2, 3, false)]).allClear).toBe(true);
   });
 });

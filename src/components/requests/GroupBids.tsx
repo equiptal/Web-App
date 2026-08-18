@@ -6,6 +6,11 @@ import { useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
 import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/client";
 import { CredentialPills } from "@/components/requests/CredentialPills";
+import { BidCardChecks } from "@/components/requests/BidCardChecks";
+import { equipmentCheckOf, termsCheck } from "@/lib/contract/bid-card-checks";
+import { bidCounterDelta, ctaShowsCounterDelta } from "@/lib/contract/bid-counter-delta";
+import { unitCountNotes, distinctMachinesOffered } from "@/lib/contract/unit-count-notes";
+import { computeBidReadiness } from "@/lib/contract/bid-readiness";
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
 import { mayOpenEquipmentSurface } from "@/lib/contract/bid-equipment-access";
 import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
@@ -757,11 +762,27 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         // B1: the card tally uses the SAME bucketing as the Terms modal (bucketBidTerms) so the card's
         // "Conflict N · Matched N" always equals what the modal lists when opened.
         const termCounts = bucketBidTerms(b.terms, b.negotiableTerms).counts;
-        const termChips = [
-          { label: L("Conflict", "تعارض"), n: termCounts.conflict, c: "#d9362a" },
-          { label: L("Pending review", "بانتظار المراجعة"), n: termCounts.pending, c: "#d4780a" },
-          { label: L("Matched", "مطابق"), n: termCounts.matched, c: "#1daf58" },
-        ];
+        // EXPIRED / WITHDRAWN only. An ACCEPTED bid is decided, not dead: its checks still describe
+        // what was agreed, and greying them would hide the record of the deal the renter took.
+        const bidIsDead = ["EXPIRED", "WITHDRAWN"].includes((b.status ?? "").toUpperCase());
+        // The renter reads every card, so `viewerRole` is always "rentee" here. `hasOpenAsk` is
+        // false for the same reason the app passes false: his asks live in the deal room, not on
+        // this card, so nothing competes with the delta for the button.
+        // What the counts owe the reader. `liveUnits` is the PRICED count — the same one the money
+        // below is built on — and `unitsOffered` is what the bid claims; the machines behind it are
+        // counted distinctly, never as the padded entry list, because the padding repeats a machine.
+        const countNotes = unitCountNotes({
+          priced: liveUnits,
+          offered: offered,
+          machinesNamed: distinctMachinesOffered(b.offeredUnitsDetail),
+        });
+        const counterDelta = bidCounterDelta({
+          originalPrice: b.openingPrice,
+          currentPrice: b.price,
+          lastCounterBy: b.lastCounterBy,
+          viewerRole: "rentee",
+          status: b.status,
+        });
         const rowSep = { borderTop: "1px solid #EFF2F6" } as const;
         const iconBox = { width: 40, height: 40, borderRadius: 11, background: "#eff4f9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } as const;
         const blueLink = { background: "none", border: "none", color: "#1a7ec8", fontWeight: 800, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" } as const;
@@ -825,51 +846,53 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
               <span style={{ fontSize: 12, color: "#6b8fa8", fontWeight: 700, whiteSpace: "nowrap" }}>{[b.rating != null ? `★ ${b.rating.toFixed(1)}` : "", b.distanceKm != null ? `${Math.round(b.distanceKm)} km` : ""].filter(Boolean).join(" · ")}</span>
             </div>
 
-            {/* Equipment row */}
-            <div style={{ ...rowSep, display: "flex", alignItems: "center", gap: 12, padding: "13px 16px" }}>
-              <div style={iconBox}>
-                <EquipImg src={b.itemImage} categoryId={b.categoryId} name={ar ? b.itemLabelAr : b.itemLabel} box="" img="h-5 w-5 object-contain" iconSize={20} />
-              </div>
-              <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Equipment", "المعدة")}</span>
-              {/* No cert chips on the card — all equipment detail lives in the Details modal only. */}
-              <div style={{ flex: 1 }} />
-              {/* ONE way into the equipment, and it is the map (owner, 2026-08-17).
-
-                  This row used to offer three: a readiness badge that opened the eligibility view, a
-                  `Details` modal, and this link. All three answered the same question — *is this
-                  machine what I asked for?* — in three different depths, and the renter had to guess
-                  which one held the answer he wanted. The verification surface is the one that holds
-                  all of it: the units, their papers, their readiness and where they are.
-
-                  RMAP V1 — a LINK, not a view flag: the surface is addressable by `bidId` alone, so
-                  this caller needs to know nothing about how it is built, and every other entry point
-                  is the same href. Following it creates no deal room.
-
-                  V13/RM3-AC-25 — never offered for an off-platform bid. Such a bid takes the
-                  `SharedLinkBidCard` branch above and never reaches this row, so the predicate is
-                  belt to that structural brace; it is stated anyway because the branch is a rendering
-                  choice, not a rule. */}
-              {!selectMode && mayOpenEquipmentSurface(b) && (
-                <Link href={`/bids/${encodeURIComponent(b.id)}/equipment`} style={{ ...blueLink, textDecoration: "none" }}>
-                  {t.bidMap.verifyEntry} ›
-                </Link>
-              )}
-            </div>
-
-            {/* Terms row */}
-            <div style={{ ...rowSep, display: "flex", alignItems: "center", gap: 12, padding: "13px 16px" }}>
-              <div style={iconBox}><span className="material-icons-outlined" style={{ fontSize: 20, color: "#6b8fa8" }}>description</span></div>
-              <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Terms", "الشروط")}</span>
-              <div style={{ display: "flex", gap: 4, flexWrap: "nowrap", flex: 1, minWidth: 0, overflowX: "auto" }} className="no-sb">
-                {termChips.map((t) => (
-                  <span key={t.label} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 800, color: t.n > 0 ? t.c : "#9AA7B8", whiteSpace: "nowrap" }}>
-                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: t.n > 0 ? t.c : "#c3d2e0" }} />{t.label} {t.n}
+            {/* ── What the counts owe the reader (app parity: `unit_count_notes.dart`) ────────────
+                A bid carries three counts and only one of them prices anything. The band above states
+                the OFFER; these two lines state the two ways the priced count can disagree with it —
+                and the machines actually behind it. Silent when they agree, which is most bids. */}
+            {!countNotes.isEmpty && (
+              <div style={{ margin: "-6px 16px 14px", display: "flex", flexDirection: "column", gap: 3 }}>
+                {countNotes.hasPricedNote && (
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: "#6b8fa8" }}>
+                    {countNotes.relation === "below"
+                      ? L(`Priced on ${countNotes.priced} of the ${countNotes.offered} offered`, `مسعّر على ${countNotes.priced} من ${countNotes.offered} معروضة`)
+                      : L(`Countered at ${countNotes.priced} — ${countNotes.priced - countNotes.offered} above the ${countNotes.offered} offered`, `عرض مضاد على ${countNotes.priced} — ${countNotes.priced - countNotes.offered} فوق ${countNotes.offered} المعروضة`)}
                   </span>
-                ))}
+                )}
+                {countNotes.hasClaimedNote && (
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: "#d4780a" }}>
+                    {L(`${countNotes.claimedUnits} of the priced units have no registered machine`, `${countNotes.claimedUnits} من الوحدات المسعّرة بلا معدّة مسجّلة`)}
+                  </span>
+                )}
               </div>
-              {!selectMode && <button onClick={() => setTermsBid(b)} style={blueLink}>{L("View", "عرض")} ›</button>}
-            </div>
+            )}
 
+            {/* ── BC-2 · the checks row (app parity) ────────────────────────────────────────────────
+                ~~An Equipment row and a Terms row.~~ Two rows, each an icon, a word and a link, and
+                between them one line of tallies — «Conflict 2 · Pending 3 · Matched 0» — that a
+                renter had to read word by word to learn whether the offer needed him. The app
+                collapsed the same four sections into one row of two rings; this follows it.
+
+                Both entry points survive: the equipment half still links to the verification map,
+                the terms half still opens the terms modal. The collapse was about crowding, not
+                about taking routes away.
+
+                Every number is `bid-card-checks.ts`. `hasNews` is deliberately not passed — the
+                app plumbs it and does not pass it either, and inventing a web-only reading of "the
+                supplier answered" would put a dot on this card that the phone never shows. */}
+            <BidCardChecks
+              L={L}
+              equipment={equipmentCheckOf(computeBidReadiness(b)?.units ?? [], { dead: bidIsDead })}
+              terms={termsCheck({ matched: termCounts.matched, conflict: termCounts.conflict, pending: termCounts.pending, dead: bidIsDead })}
+              equipmentAction={
+                !selectMode && mayOpenEquipmentSurface(b) ? (
+                  <Link href={`/bids/${encodeURIComponent(b.id)}/equipment`} style={{ ...blueLink, textDecoration: "none" }}>
+                    {t.bidMap.verifyEntry} ›
+                  </Link>
+                ) : null
+              }
+              termsAction={!selectMode ? <button onClick={() => setTermsBid(b)} style={blueLink}>{L("View", "عرض")} ›</button> : null}
+            />
 
             {/* Price row — headline is the PER-UNIT rental total (mobile parity); rate shown in the caption */}
             <div style={{ ...rowSep, padding: "13px 16px", ...(isAccepted ? { background: "#e7f7ee" } : {}) }}>
@@ -938,7 +961,26 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
             {!selectMode && (
               <div style={{ marginTop: "auto", padding: "12px 16px 16px" }}>
                 <button disabled={disabled || busyId === b.id} onClick={() => startNegotiation(b)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "14px", borderRadius: 14, border: "none", background: disabled ? "#9AA7B8" : "#1c3550", color: "#fff", fontWeight: 800, fontSize: 15, cursor: disabled ? "default" : "pointer", fontFamily: "inherit", opacity: busyId === b.id ? 0.7 : 1 }}>
-                  <span className="material-icons-outlined" style={{ fontSize: 18 }}>{b.status === "ACCEPTED" ? "receipt_long" : "forum"}</span>{pillLabel(b.status, L)}{offerSuffix(b.uiState, L) ? ` · ${offerSuffix(b.uiState, L)}` : ""}
+                  <span className="material-icons-outlined" style={{ fontSize: 18 }}>{b.status === "ACCEPTED" ? "receipt_long" : "forum"}</span>
+                  {/* ── The CTA names the MOVE once a number has moved (app parity) ──────────────
+                      With nothing moved the button names the lifecycle step, as it always has. Once
+                      someone has countered it names the counter instead — whose it was, and from
+                      what to what — because that is the fact a renter is deciding on, and it was
+                      previously reachable only by opening the room.
+
+                      `ctaShowsCounterDelta` is asked rather than `delta != null` being tested here:
+                      the precedence between a price move and an open ask is a rule, and it lives in
+                      the model where the app keeps it. */}
+                  {ctaShowsCounterDelta({ hasOpenAsk: false, delta: counterDelta }) && counterDelta ? (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                      <span>{counterDelta.side === "mine" ? L("Your counter", "عرضك") : L("Their counter", "عرضهم")}</span>
+                      <span dir="ltr" style={{ textDecoration: "line-through", opacity: 0.6, fontWeight: 700 }}>{nf(counterDelta.from)}</span>
+                      <span aria-hidden="true">→</span>
+                      <span dir="ltr">{nf(counterDelta.to)}</span>
+                    </span>
+                  ) : (
+                    <>{pillLabel(b.status, L)}{offerSuffix(b.uiState, L) ? ` · ${offerSuffix(b.uiState, L)}` : ""}</>
+                  )}
                 </button>
               </div>
             )}
