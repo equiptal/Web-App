@@ -84,9 +84,15 @@ import "@/components/map/map-proto.css";
 // `MapLocationPicker`/`GoogleMapLocationPicker` need in this repo.
 const MapCanvas = dynamic(() => import("@/components/map/MapCanvas"), { ssr: false });
 
-/** §5's fixed panel width, and the FLOOR the resize handle enforces. T41 judges every wrapping check
- *  on this surface at exactly 392 px, so the panel may be widened but never narrowed past it. */
-const PANEL_MIN_W = 392;
+/**
+ * The panel's width, and the FLOOR the resize handle enforces — it may be widened, never narrowed
+ * past this. Kept in step with `--bm-panel-w`'s fallback in `map-proto.css`; the two are the same
+ * figure and a drift between them means the grip can drag below the width the cards are drawn for.
+ *
+ * ~~392, §5's figure.~~ **460 since 2026-08-20** (owner: *"make the cards and panel wider"*). See the
+ * `.bm-panel` rule for what 392 had started costing the card.
+ */
+const PANEL_MIN_W = 460;
 
 /** A bid this surface can resolve. v3 scopes the view to exactly ONE of these (spec 004 §4). */
 export type MapBid = BidCard & { itemLabel?: string; itemLabelAr?: string };

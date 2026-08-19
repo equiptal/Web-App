@@ -787,3 +787,45 @@ describe("no ask control on this surface writes — they compose (owner, 2026-08
     expect(mounted).toMatch(/dealRoomId=\{sender\.dealRoomId\}/);
   });
 });
+
+/* ── The availability chip is never stripped (owner, 2026-08-20) ─────────────────────────────────
+   *"Keep the not confirmed shown totally, not stripped."*
+
+   The chip had been rendering «Not confirmed …» on exactly the cards whose open question is whether
+   the machine is confirmed — because `.bm-eq-ask` carries `flex-shrink: 0` and the chip did not, so
+   when «Ask him to confirm» and the chip could not both fit on one nowrap line, the CHIP was what
+   gave way.
+
+   Widening the panel fixed the symptom at one width. These pin the RULE, which holds at every width:
+   nothing on row 2 shrinks, and the row wraps instead. */
+describe("the availability chip reads whole at any panel width", () => {
+  const css = read(CSS);
+
+  it("lets row 2 wrap rather than squeezing what is on it", () => {
+    const r2 = cssBlock(css, ".bidmap .bm-eq .bm-eq-r2 {");
+    expect(r2).toMatch(/flex-wrap:\s*wrap/);
+    // A row that wraps needs a row-gap, or the two lines touch.
+    expect(r2).toMatch(/gap:\s*\d+px\s+\d+px/);
+  });
+
+  it("never lets the chip be the thing that gives", () => {
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-chip {")).toMatch(/flex-shrink:\s*0/);
+  });
+
+  it("truncates the chip's label nowhere — an ellipsis is still a stripped label", () => {
+    const label = cssBlock(css, ".bidmap .bm-eq .bm-eq-chip .bm-eq-chip-l {");
+    expect(label).not.toMatch(/text-overflow/);
+    expect(label).not.toMatch(/overflow:\s*hidden/);
+    // `nowrap` stays: the label breaking across two lines inside a capsule is its own kind of wrong.
+    expect(label).toMatch(/white-space:\s*nowrap/);
+  });
+
+  it("keeps the panel's width and the resize floor in step", () => {
+    // Two figures for one width: the CSS fallback governs an untouched surface, `PANEL_MIN_W` governs
+    // the grip. A drift lets the renter drag the panel below the width the cards are drawn for.
+    const cssW = /var\(--bm-panel-w,\s*(\d+)px\)/.exec(cssBlock(css, ".bidmap .bm-panel {"))?.[1];
+    const floor = /const PANEL_MIN_W = (\d+);/.exec(read("src/components/map/BidMapWorkspace.tsx"))?.[1];
+    expect(cssW).toBeTruthy();
+    expect(floor).toBe(cssW);
+  });
+});

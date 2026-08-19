@@ -362,7 +362,14 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
     // FILL is sized from the SAME variable the panel is, so the resize grip moves the seam with it
     // and the two columns can never overlap.
     const fill = cssBlockOf(cssSrc, ".bidmap .bm-chat.is-fill {");
-    expect(fill).toContain("var(--bm-panel-w, 392px)");
+    // Asserted as the INVARIANT rather than as a literal: the two must read the same variable AND
+    // fall back to the same figure, because the fallback is what governs an untouched surface — a
+    // dock still defaulting to 392 beside a 460 panel would overlap it by 68px before the grip is
+    // ever dragged. Pinning the number instead sent the width change of 2026-08-20 through a test
+    // edit that could as easily have been made by updating only this line.
+    const panelW = /var\(--bm-panel-w,\s*(\d+)px\)/.exec(cssBlockOf(cssSrc, ".bidmap .bm-panel {"))?.[1];
+    expect(panelW).toBeTruthy();
+    expect(fill).toContain(`var(--bm-panel-w, ${panelW}px)`);
     expect(fill).toMatch(/inset-inline-end:\s*0/);
     // MIRROR is `rDrawer`'s own resting width — 420px (`04-machine-panel.js:20`), the value the
     // placement control switches away from and back to. 436 was a rounding of it and nothing more

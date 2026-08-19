@@ -650,11 +650,21 @@
      to change which edge it paints on is a large diff for a visual outcome. The cost is that keyboard
      order still follows the DOM — map, then panel. */
   order: -1;
-  /* 392px is §5's width AND the floor; `--bm-panel-w` is set only once the renter drags the grip, so
-     an untouched surface is exactly what T41 judges. The 62% cap is unchanged and the drag clamps to
-     it, so widening the panel can never leave the map narrower than the panel. */
-  flex: 0 0 var(--bm-panel-w, 392px);
-  width: var(--bm-panel-w, 392px);
+  /* **460px** — the width AND the floor. `--bm-panel-w` is set only once the renter drags the grip, so
+     an untouched surface is exactly this. The 62% cap is unchanged and the drag clamps to it, so
+     widening the panel can never leave the map narrower than the panel.
+
+     ~~392px, §5's figure.~~ Widened on 2026-08-20 (owner: *"make the cards and panel wider"*). 392
+     had become the binding constraint on the card rather than a spec to hold: the text column was
+     262px against roughly 278px of content, and what gave way was the availability chip — truncated
+     to «Not confirmed …» on exactly the cards where availability is the open question. Moving the
+     in-offer badge onto the photo bought some of it back; this buys the rest.
+
+     A DEPARTURE from §5, recorded as one. Every wrapping judgement made at 392 still holds — the
+     panel only got wider, and the rules that mattered are now enforced by the layout instead: the
+     chip cannot shrink and row 2 wraps, so no width can strip it again. */
+  flex: 0 0 var(--bm-panel-w, 460px);
+  width: var(--bm-panel-w, 460px);
   max-width: 62%;
   display: flex;
   flex-direction: column;
@@ -1175,7 +1185,16 @@
 
 /* Row 2 — ONE chip carrying availability AND commitment, never a chip plus a band (RM3-AC-32). The row
    keeps its height whether or not the out-of-city qualifier is beside it. */
-.bidmap .bm-eq .bm-eq-r2 { display: flex; align-items: center; gap: 8px; min-height: 19px; }
+/* **The row WRAPS, and the chip never gives** (owner, 2026-08-20: *"keep the not confirmed shown
+   totally, not stripped"*).
+   ~~One nowrap line where the chip was the only shrinkable thing on it.~~ `.bm-eq-ask` carries
+   `flex-shrink: 0`, so when «Ask him to confirm» and the chip could not both fit, the CHIP was what
+   truncated — «Not confirmed …» — on precisely the cards whose open question is whether the machine
+   is confirmed. That is the one word on the row that had to survive.
+   Now nothing on the row shrinks and the row wraps instead: at any width the chip reads whole, and
+   the ask drops to a second line rather than eating it. The `row-gap` is what keeps the two lines
+   from touching when it does. */
+.bidmap .bm-eq .bm-eq-r2 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 19px; }
 .bidmap .bm-eq .bm-eq-chip {
   display: inline-flex;
   align-items: center;
@@ -1185,16 +1204,17 @@
   font-size: 10.5px;
   font-weight: 800;
   white-space: nowrap;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Never the thing that gives — see the row above. */
+  flex-shrink: 0;
 }
 .bidmap .bm-eq .bm-eq-chip .bm-eq-dot { flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-/* The chip's WORDS, as their own element — `text-overflow` acts on a block's inline content, and the
-   chip is a flex container, so the ellipsis declared up there governed nothing and the row's own
-   overflow cut the label mid-glyph. The mark beside it never shrinks: a ✓ or a dot narrowed to make
-   room is a state that stopped being legible. */
-.bidmap .bm-eq .bm-eq-chip .bm-eq-chip-l { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The chip's WORDS, as their own element.
+   ~~`min-width: 0; overflow: hidden; text-overflow: ellipsis`~~ — the machinery that produced «Not
+   confirmed …». It was the right fix for the bug it was written against (the row's overflow cutting
+   the label mid-glyph, with no ellipsis because `text-overflow` cannot act on a flex container), and
+   it is the wrong outcome here: an ellipsis is still a stripped label. The row wraps now, so there is
+   nothing left to truncate FOR. */
+.bidmap .bm-eq .bm-eq-chip .bm-eq-chip-l { white-space: nowrap; }
 /* THE CONFIRMED CHIP IS A DIFFERENT SHAPE, on purpose (decoded 4014 vs 4015–4020). It is a small
    squared label — `border-radius: 7px`, `padding: 2px 8px`, weight 700 — carrying a ✓ and **no dot**;
    the unconfirmed one is a full capsule at weight 800 with a breathing dot. A settled fact and an open
@@ -2197,7 +2217,7 @@
 /* Fill: from the panel's edge to the far side. `--bm-panel-w` is the same variable `.bm-panel` sizes
    itself from, so dragging the grip moves this seam with it and the two never overlap. */
 .bidmap .bm-chat.is-fill {
-  inset-inline-start: var(--bm-panel-w, 392px);
+  inset-inline-start: var(--bm-panel-w, 460px);
   inset-inline-end: 0;
 }
 /* Mirror: `rDrawer`'s own resting width — **420px** (`04-machine-panel.js:20`, `w = drawerMax ?
