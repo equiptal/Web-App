@@ -97,3 +97,25 @@ describe("a room nobody has countered in prices exactly as it always did", () =>
     expect(live.rentalUnits).toBe(computeDealTotals(r).rentalUnits);
   });
 });
+
+describe("the legs are clamped on the LIVE path only", () => {
+  it("caps mob and demob at the rental count, as resolveLivePosition does", () => {
+    // A leg count above the rental count is an illegal position the backend would refuse.
+    const o = roundOverride(room({ requestedUnits: 5 }), round({ rentalUnits: 2, mobUnits: 4, demobUnits: 3 }));
+    expect(o.mobUnits).toBe(2);
+    expect(o.demobUnits).toBe(2);
+  });
+
+  it("leaves a leg the round did not name alone, so the room's own column still answers", () => {
+    const o = roundOverride(room(), round({ rentalUnits: 2, mobUnits: null, demobUnits: null }));
+    expect(o.mobUnits).toBeNull();
+    expect(o.demobUnits).toBeNull();
+  });
+
+  it("never clamps the QUOTATION's legs — a frozen snapshot records what was agreed", () => {
+    // The app's `QuotationModel.effectiveMobUnits` has no clamp, and this is why the rule lives on the
+    // round rather than inside `computeDealTotals`: putting it there would rewrite signed snapshots.
+    const t = computeDealTotals(room({ agreedUnits: 2, mobUnits: 4, mobPrice: 100 }));
+    expect(t.mobUnitsN).toBe(4);
+  });
+});

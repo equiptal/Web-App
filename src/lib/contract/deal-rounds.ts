@@ -786,10 +786,26 @@ export function roundOverride(room: { requestedUnits: number }, r: DealRound) {
     : cap == null
       ? Math.max(1, r.rentalUnits)
       : Math.min(Math.max(1, r.rentalUnits), cap);
+  /*
+   * **The legs are clamped to the rental count on the LIVE path, and only there** (app parity).
+   *
+   * The app looks like it contradicts itself here and does not. `resolveLivePosition` clamps
+   * (`(latest?.mobUnits ?? roomMobUnits ?? rentalUnits).clamp(0, rentalUnits)`) and
+   * `QuotationModel.effectiveMobUnits` does not (`mobExcluded ? 0 : (mobUnits ?? numberOfUnits)`) —
+   * but they govern different surfaces. The first is the live room, where a leg count above the
+   * rental count is an illegal position the backend would refuse. The second reads a FROZEN
+   * quotation snapshot, which records what was actually agreed and must not be second-guessed after
+   * the fact.
+   *
+   * So the clamp belongs here, on the round, and NOT in `computeDealTotals` — whose unclamped default
+   * is what the quotation and the price footer read. Putting it there would rewrite signed snapshots.
+   */
+  const legCap = units == null ? null : units;
+  const leg = (n: number | null) => (n == null || legCap == null ? n : Math.min(Math.max(0, n), legCap));
   return {
     rate: r.rate, priceUnit: r.priceUnit, mobPrice: r.mobPrice, demobPrice: r.demobPrice,
     rentalUnits: units,
-    mobUnits: r.mobUnits, demobUnits: r.demobUnits,
+    mobUnits: leg(r.mobUnits), demobUnits: leg(r.demobUnits),
     mobExcluded: r.mobExcluded, demobExcluded: r.demobExcluded,
   };
 }

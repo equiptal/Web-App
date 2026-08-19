@@ -252,15 +252,19 @@ export function DocRowList({
   // the lessor. It also matches the company panel, whose single kind of row has only ever offered «حدّد
   // كل المتاح».
   //
-  // The loser is a **fallback, not a discard**: when the preferred list is already fully ticked the other
-  // is offered if it has anything left, so a group can never end up with tickable rows and no way to tick
-  // them at once. (While a mode holds the other list is empty, so this only ever fires at neutral.)
+  // ~~The loser is a **fallback, not a discard**: when the preferred list is already fully ticked the
+  // other was offered if it had anything left.~~ **Removed 2026-08-19 — the app offers one entry and
+  // never falls back** (`selectAllModeFor`: the held mode, else the majority, else null). Verified in
+  // its source rather than inferred, on the owner's ruling that the app decides.
+  //
+  // The web reproduces the "held mode" half without a branch for it: while a mode holds, the other
+  // list is empty, so the majority already picks the only non-empty one.
   const byMajority: { keys: string[]; label: Bilingual }[] = [
     { keys: downloadKeys, label: { en: "Select all available", ar: "حدّد كل المتاح" } },
     { keys: requestKeys, label: { en: "Select all missing", ar: "حدّد كل الناقص" } },
   ];
   if (requestKeys.length > downloadKeys.length) byMajority.reverse();
-  const selectAll = hasSelection ? (byMajority.find((s) => notAllOn(s.keys)) ?? null) : null;
+  const selectAll = hasSelection ? (byMajority.find((s) => s.keys.length > 0) ?? null) : null;
 
   // **The bar's control is a CHECKBOX again** (2026-08-09) — the prototype's and the owner's screenshot
   // both put a real box beside the label, and this had become two text link-buttons sitting next to
@@ -272,7 +276,15 @@ export function DocRowList({
   // left to tick, so it answers "unchecked"; when it is null every list is either empty or fully
   // ticked, and the first non-empty one is the list this bar governs — checked, and unticking it is
   // what the box then does. A checked box that cannot be unchecked is the dead control AC-69 forbids.
-  const governing = hasSelection ? (selectAll ?? byMajority.find((s) => s.keys.length > 0) ?? null) : null;
+  // `selectAll` is now the one entry the app would offer, so there is nothing left for `governing` to
+  // fall back TO — it is the same value, kept as its own name because the box below reads its state.
+  //
+  // **The tick state stays**, and is the one thing here the app has no equivalent of: its select-all
+  // is a link that SETS, so pressing it on a fully-ticked list does nothing. The box was the owner's
+  // own ruling for the web (2026-08-09, from his screenshot), and a box that shows "on" and unticks is
+  // what keeps that same press from being dead. Clearing is reachable either way — both clients carry
+  // the «Clear selection (n)» control beside it.
+  const governing = selectAll;
   const governingOn = !!governing && !notAllOn(governing.keys);
 
   return (

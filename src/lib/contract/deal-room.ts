@@ -804,8 +804,22 @@ export function buildDealRoomQuotationDoc(
       .map((term) => ({ label: ar ? term.labelAr : term.label, value: termFmt(term) }));
   const agreedRows = termRows((term) => term.state === "agreed" || term.state === "soft_accepted");
   if (agreedRows.length) cards.push({ title: L("Agreed terms", "الشروط المتفق عليها"), rows: agreedRows });
-  const fixedRows = termRows((term) => term.state === "fixed");
-  if (fixedRows.length) cards.push({ title: L("Fixed terms", "الشروط الثابتة"), rows: fixedRows });
+
+  /*
+   * ~~A "Fixed terms" card, listing every `state === "fixed"` term.~~ **Removed 2026-08-19 — the app
+   * prints no such section** (`quotation_page.dart` renders `agreedTerms` and nothing else, and the
+   * server's `agreedTerms` drops fixed terms at `quotation.service.ts:893`). Verified against the app
+   * rather than inferred: the only mention of `fixedTerms` on that page is a comment noting its
+   * absence.
+   *
+   * The owner ruled on 2026-08-19 that the app decides, and this is one of the two places the web was
+   * ahead rather than behind. It is recorded here rather than silently dropped, because the reason it
+   * existed is still true: a fixed term IS part of the contract, it was accepted by the act of
+   * bidding, and a quotation that omits it states less than the deal contains. The renter can still
+   * read every fixed term in the room, on the terms step's Acknowledge section.
+   *
+   * Restoring it is these three lines and a matching change on the app — not a web-side decision.
+   */
 
   return {
     lang,

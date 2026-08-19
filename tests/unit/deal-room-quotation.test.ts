@@ -239,10 +239,23 @@ describe("no request fact is printed twice under two names", () => {
     expect(count(out, /local content/gi)).toBe(1);
   });
 
-  it("keeps the terms that are NOT request facts", () => {
+  it("keeps the AGREED terms that are not request facts", () => {
     const out = html(room({ status: "CLOSED" }), staleSnapshot());
     expect(out).toMatch(/payment terms/i);
-    expect(out).toMatch(/night shift/i);
+  });
+
+  it("prints no FIXED term — the app's quotation has no such section (2026-08-19)", () => {
+    // ~~`expect(out).toMatch(/night shift/i)` — the web printed a "Fixed terms" card.~~ The app's
+    // `quotation_page.dart` renders `agreedTerms` and nothing else, and the server drops fixed terms
+    // from that list, so the section exists on no app quotation. Followed on the owner's ruling that
+    // the app decides.
+    //
+    // The loss is real and is asserted rather than deleted: `night_shift` is `state: "fixed"` in this
+    // fixture, it IS part of the contract, and it no longer reaches the paper. The renter still reads
+    // every fixed term in the room, under the terms step's Acknowledge section.
+    const out = html(room({ status: "CLOSED" }), staleSnapshot());
+    expect(out).not.toMatch(/night shift/i);
+    expect(out).not.toMatch(/fixed terms/i);
   });
 });
 
