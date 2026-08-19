@@ -2271,7 +2271,10 @@
    «شركة موثّقة» chip: the panel two columns away already carries that chip, and repeating it here
    would state the same credential twice on one screen. Green, matching the avatar — it is the same
    claim about the same firm, and on white it needs a colour of its own to read as one. */
-.bidmap .bm-chat-tick { flex-shrink: 0; font-size: 15px; color: #16a34a; }
+/* A stroked check now, not Material's filled rosette (owner, 2026-08-19) — the panel header's
+   glyph and the prototype's, so one company reads one way wherever it is named. `font-size` went with
+   the glyph: an svg is sized by its own attributes. */
+.bidmap .bm-chat-tick { flex-shrink: 0; color: #16a34a; }
 /* The placement control — the prototype's one square button, 30px at r9. It changes WHERE the
    conversation sits and nothing about the conversation, which is why it is a quiet outline rather
    than an action. Outlined in the surface's own border tone now that the band is white: the

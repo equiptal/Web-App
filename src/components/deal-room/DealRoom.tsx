@@ -21,6 +21,9 @@ import { ChatCard } from "@/components/deal-room/ChatCard";
 import { RequestCard } from "@/components/map/RequestCard";
 import { fleetMachineResolver } from "@/components/map/request-card-ctx";
 import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
+// Extracted so the map's chat dock mounts the SAME sheet rather than growing a second answer to
+// "call the supplier" (owner, 2026-08-19). Its own file carries the reasoning.
+import { CallModal } from "@/components/deal-room/CallModal";
 import {
   CHAT_ACCEPT,
   CHAT_MAX_MEDIA,
@@ -848,7 +851,16 @@ export function DealRoom({ id, onTitle, initialFlow }: {
         <button type="button" className="tb-sup" onClick={() => setShowDocs(true)}>
           <span className="av">{room.supplier.name.charAt(0).toUpperCase()}</span>
           <span className="nm">
-            <span className="n">{room.supplier.name}{room.supplier.isVerified && <span className="material-icons-outlined">verified</span>}</span>
+            <span className="n">{room.supplier.name}{room.supplier.isVerified && (
+              /* The stroked check the panel header and the chat dock both draw (owner, 2026-08-19).
+                 Material's filled rosette was a second mark beside the name rather than the tick for
+                 it, and it made one company read two ways across the product. */
+              <svg className="tb-tick" width="12" height="12" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
+                aria-label={L("Verified", "شركة موثّقة")} role="img">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            )}</span>
             <span className="sub">{L("Supplier", "المورد")}</span>
           </span>
         </button>
@@ -1370,36 +1382,6 @@ export function DealRoom({ id, onTitle, initialFlow }: {
 }
 
 /** Call-supplier modal: shows the number, dials it (tel:) on a touch device, and copies it anywhere. */
-function CallModal({ ar, L, phone, name, canCall, onClose }: { ar: boolean; L: (en: string, arr: string) => string; phone: string; name: string; canCall: boolean; onClose: () => void }) {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    try { await navigator.clipboard.writeText(phone); setCopied(true); setTimeout(() => setCopied(false), 1600); } catch { /* clipboard blocked */ }
-  };
-  return (
-    <div dir={ar ? "rtl" : "ltr"} onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(16,38,63,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 60px rgba(16,38,63,.35)", padding: "26px 22px 22px", textAlign: "center" }}>
-        <span style={{ display: "inline-flex", width: 56, height: 56, borderRadius: "50%", background: "#e7f7ee", color: "#1daf58", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
-          <span className="material-icons-outlined" style={{ fontSize: 28 }}>call</span>
-        </span>
-        <h3 style={{ fontSize: 16, fontWeight: 900, color: "#1c3550", margin: 0 }}>{L("Call supplier", "الاتصال بالمؤجّر")}</h3>
-        <p style={{ fontSize: 13, fontWeight: 600, color: "#6b8fa8", margin: "4px 0 16px" }}>{name}</p>
-        <div style={{ direction: "ltr", unicodeBidi: "plaintext", fontSize: 22, fontWeight: 900, color: "#1c3550", letterSpacing: 0.5, userSelect: "all", marginBottom: 18 }}>{phone}</div>
-        <div style={{ display: "flex", gap: 10 }}>
-          {canCall && (
-            <a href={`tel:${phone}`} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px", borderRadius: 13, border: "none", background: "#1daf58", color: "#fff", fontWeight: 800, fontSize: 14, textDecoration: "none" }}>
-              <span className="material-icons-outlined" style={{ fontSize: 18 }}>call</span>{L("Call", "اتصال")}
-            </a>
-          )}
-          <button onClick={copy} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px", borderRadius: 13, border: "1.5px solid #d4e0ec", background: "#fff", color: "#1c3550", fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
-            <span className="material-icons-outlined" style={{ fontSize: 18 }}>{copied ? "check" : "content_copy"}</span>{copied ? L("Copied", "تم النسخ") : L("Copy number", "نسخ الرقم")}
-          </button>
-        </div>
-        <button onClick={onClose} style={{ marginTop: 12, width: "100%", padding: "11px", borderRadius: 13, border: "none", background: "#eff4f9", color: "#6b8fa8", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" }}>{L("Close", "إغلاق")}</button>
-      </div>
-    </div>
-  );
-}
-
 /**
  * Documents sheet — mirrors the app's deal-room documents sheet. The backend returns the OTHER
  * party's documents only (for the renter: the supplier's company + equipment docs). Each doc opens

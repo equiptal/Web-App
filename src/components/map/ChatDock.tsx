@@ -45,6 +45,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Channel } from "stream-chat";
+import { CallModal } from "@/components/deal-room/CallModal";
 import { ChatCard } from "@/components/deal-room/ChatCard";
 import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
 import { RequestCard } from "@/components/map/RequestCard";
@@ -229,6 +230,13 @@ export function ChatDock({
    * message. That is why it lives here rather than in the surface's state.
    */
   const [place, setPlace] = useState<"fill" | "mirror">("fill");
+  /** The call sheet — the deal room's own, so the icon in this header behaves as it does there
+   *  (owner, 2026-08-19). A view state like `place`: it reaches nothing and writes nothing. */
+  const [callOpen, setCallOpen] = useState(false);
+  /** Touch device → offer to dial. Desktop → show and copy only, because a laptop cannot place the
+   *  call. The room's own test, so the sheet offers the same buttons on both surfaces. */
+  const [canCall, setCanCall] = useState(false);
+  useEffect(() => { setCanCall(typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true); }, []);
   const [rows, setRows] = useState<InboxBid[]>([]);
   const [activeBidId, setActiveBidId] = useState(bid.id);
   /** Rooms this dock created by sending, before the feed has caught up with them. */
@@ -756,7 +764,18 @@ export function ChatDock({
             <span className="bm-chat-av" aria-hidden="true">{initials}</span>
             <span className="bm-chat-who">
               {bid.supplierName}
-              {bid.verified && <span className="bm-chat-tick material-icons-outlined">verified</span>}
+              {bid.verified && (
+                /* A stroked check, the panel header's and the prototype's `rVerifiedChip` (owner,
+                   2026-08-19). Material's filled `verified` rosette carries its own meaning at this
+                   size and read as a second mark beside the name rather than as the tick for it — and
+                   the same fact about the same company was being drawn two ways depending on which
+                   surface named him. */
+                <svg className="bm-chat-tick" width="12" height="12" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
+                  aria-label={t.bidMap.verifiedCompany} role="img">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+              )}
             </span>
             {/* ── The call control, restored (owner, 2026-08-12) ───────────────────────────────
                 ~~"the call control was excluded by name"~~, in the band's own comment above. It was
@@ -773,15 +792,22 @@ export function ChatDock({
                 there — and where it is not, the control still renders, locked, rather than
                 vanishing: a control that disappears reads as "you may not call him", when the truth
                 is only that we hold no number. That is the old room's own treatment, kept. */}
+            {/* ── The deal room's call SHEET, not a `tel:` link (owner, 2026-08-19) ────────────────
+                Same glyph, same place in the header, and until now two different behaviours: this was
+                a bare `<a href="tel:…">`, which on a laptop opens nothing at all and never shows the
+                renter the number he was reaching for. The room's sheet prints the number, dials it
+                where dialling is possible and copies it where it is not — and it is now one component
+                (`CallModal`), so the two surfaces cannot drift again. */}
             {bid.supplierPhone ? (
-              <a
+              <button
+                type="button"
                 className="bm-chat-call"
-                href={`tel:${bid.supplierPhone}`}
+                onClick={() => setCallOpen(true)}
                 aria-label={t.chatDock.call}
                 title={t.chatDock.call}
               >
                 <span className="material-icons-outlined">call</span>
-              </a>
+              </button>
             ) : (
               <span className="bm-chat-call is-locked" title={t.chatDock.callUnavailable}>
                 <span className="material-icons-outlined">call</span>
@@ -1082,6 +1108,20 @@ export function ChatDock({
             )}
           </div>
         </section>
+      )}
+
+      {/* Outside the drawer, so it is not clipped by `overflow: hidden` and does not move with the
+          placement toggle. Gated on the phone as well as on the flag: the control that opens it only
+          renders when a number reached us, and a sheet printing an empty number is worse than none. */}
+      {callOpen && bid.supplierPhone && (
+        <CallModal
+          ar={ar}
+          L={L}
+          phone={bid.supplierPhone}
+          name={bid.supplierName}
+          canCall={canCall}
+          onClose={() => setCallOpen(false)}
+        />
       )}
     </>
   );
