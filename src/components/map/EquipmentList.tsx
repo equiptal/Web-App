@@ -616,7 +616,15 @@ function EquipmentCard({
               ) : (
                 <span className="bm-eq-dot" aria-hidden="true" />
               )}
-              {chip.availability === "confirmed" ? t.bidMap.eqChipConfirmed : t.bidMap.eqChipUnconfirmed}
+              {/* The label is its own element so it can ELLIPSISE. `text-overflow` acts on a block's
+                  inline content, and the chip is a flex container — so the rule sat on `.bm-eq-chip`
+                  doing nothing while the row's overflow cut the words mid-glyph («لم يؤكد تو»). At
+                  392px, on a card carrying both the in-offer badge and the ask, this row genuinely
+                  runs out of width; what this fixes is that it now degrades to «لم يؤكد توفرها…»
+                  instead of to a severed word. */}
+              <span className="bm-eq-chip-l">
+                {chip.availability === "confirmed" ? t.bidMap.eqChipConfirmed : t.bidMap.eqChipUnconfirmed}
+              </span>
             </span>
             {/* Membership, as a badge beside the state and never as its colour (app parity,
                 2026-08-17). The chip answers "has he named the yard"; this answers "is it on the

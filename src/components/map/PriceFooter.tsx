@@ -81,11 +81,20 @@ export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooter
   const model = priceFooterModel(bid, durationDays, startDate);
   const { totals } = model;
 
-  /** Money, always LTR — an Arabic reader reads the digits left-to-right like everyone else. */
-  const money = (n: number): string => {
-    const s = Math.round(n).toLocaleString("en-US");
-    return ar ? arDigits(s) : s;
-  };
+  /**
+   * Money — **Latin digits, in both locales** (`formatSar`, `rental.ts:290`).
+   *
+   * This converted to Arabic-Indic under `ar` and printed «٣٬٠٠٠», which disagreed with every other
+   * price the renter had already seen. The rule is not this file's to make: mobile inserts an ASCII
+   * comma by hand and shows the figure unchanged in the Arabic UI, so the bid card, the comparison,
+   * the quotation and the signed PDF all print `3,000` — and the v3 prototype's own footer calls
+   * `fmtEN(rate)` for exactly this reason. One bid was reading as two different prices depending on
+   * which screen you were standing on.
+   *
+   * COUNTS are the other way round and stay so: `num` below still renders «٣» / «٥», which is what
+   * the count pills, the distance and the prototype's `AR()` all do. Money is Latin, counts are not.
+   */
+  const money = (n: number): string => Math.round(n).toLocaleString("en-US");
   const num = (n: number): string => (ar ? arDigits(String(n)) : String(n));
   /**
    * The billing period the rate is quoted over — «ر.س / يوم».

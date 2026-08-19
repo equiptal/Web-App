@@ -1176,6 +1176,11 @@
   text-overflow: ellipsis;
 }
 .bidmap .bm-eq .bm-eq-chip .bm-eq-dot { flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+/* The chip's WORDS, as their own element — `text-overflow` acts on a block's inline content, and the
+   chip is a flex container, so the ellipsis declared up there governed nothing and the row's own
+   overflow cut the label mid-glyph. The mark beside it never shrinks: a ✓ or a dot narrowed to make
+   room is a state that stopped being legible. */
+.bidmap .bm-eq .bm-eq-chip .bm-eq-chip-l { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* THE CONFIRMED CHIP IS A DIFFERENT SHAPE, on purpose (decoded 4014 vs 4015–4020). It is a small
    squared label — `border-radius: 7px`, `padding: 2px 8px`, weight 700 — carrying a ✓ and **no dot**;
    the unconfirmed one is a full capsule at weight 800 with a breathing dot. A settled fact and an open
