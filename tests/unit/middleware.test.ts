@@ -76,3 +76,39 @@ describe("login + handoff (flag-independent)", () => {
     expect(loc.pathname).toBe("/");
   });
 });
+
+/* ── Link-preview crawlers on /bid: cacheable, so WhatsApp will build a card ────────────────────── */
+describe("unfurl crawlers on a shared bid link", () => {
+  afterEach(() => { delete process.env[FLAG]; });
+
+  /**
+   * `/bid/<token>` reads request headers to build its Open Graph tags, so Next serves it with
+   * `Cache-Control: private, no-cache, no-store`. Telegram ignores that and previews anyway; WhatsApp
+   * honours it and shows a bare URL. The header is relaxed for crawlers only — the page is a form, and
+   * serving a real supplier a five-minute-stale copy would be a different bug.
+   */
+  const bot = (ua: string) =>
+    new NextRequest(new URL("http://localhost/bid/eq-rental-abc"), { headers: { "user-agent": ua } });
+
+  it("gets a cacheable response", () => {
+    for (const ua of ["WhatsApp/2.23.20.0", "facebookexternalhit/1.1", "TelegramBot (like TwitterBot)", "Slackbot-LinkExpanding 1.0"]) {
+      expect(middleware(bot(ua)).headers.get("cache-control"), ua).toBe("public, max-age=300, s-maxage=300");
+    }
+  });
+
+  it("still passes the request through rather than answering it", () => {
+    expect(isNext(middleware(bot("WhatsApp/2.23.20.0")))).toBe(true);
+  });
+
+  it("leaves a real browser on the uncached response", () => {
+    const res = middleware(bot("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0 Safari/537.36"));
+    expect(res.headers.get("cache-control")).toBeNull();
+  });
+
+  it("does not relax caching outside /bid", () => {
+    const res = middleware(
+      new NextRequest(new URL("http://localhost/requests"), { headers: { "user-agent": "WhatsApp/2.23.20.0" } }),
+    );
+    expect(res.headers.get("cache-control")).toBeNull();
+  });
+});
