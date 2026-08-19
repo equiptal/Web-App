@@ -1,0 +1,278 @@
+/**
+ * Browser-side client for the custom bid-comparison export templates.
+ *
+ * Everything goes through this app's BFF routes (`/api/me/export-templates/…`), which attach the
+ * signed-in renter's token — the browser never talks to the Moedatech backend directly.
+ */
+
+import type {
+  ExportPayload,
+  ExportResult,
+  ExportTemplateList,
+  MappedCorrection,
+  NoHomeResolution,
+  ReconciliationView,
+  SheetView,
+  UnfilledResolution,
+} from "@/lib/contract/export-templates";
+
+const BASE = "/api/me/export-templates";
+
+/** A backend rejection with both languages, so callers can show the right one. */
+export class TemplateError extends Error {
+  constructor(
+    message: string,
+    readonly messageAr: string | null,
+    readonly status: number,
+    readonly details?: Record<string, unknown>
+  ) {
+    super(message);
+    this.name = "TemplateError";
+  }
+}
+
+/**
+ * Raised when the chosen template cannot render yet (still mapping, or mapping failed).
+ *
+ * Deliberately its own type: the caller must fall back to the built-in export rather than
+ * showing an error. A template that failed to map must never leave someone unable to export.
+ */
+export class TemplateNotReadyError extends TemplateError {
+  constructor(message: string, messageAr: string | null, readonly templateStatus: string) {
+    super(message, messageAr, 400, { reason: "template_not_ready", templateStatus });
+    this.name = "TemplateNotReadyError";
+  }
+}
+
+async function parseError(res: Response): Promise<never> {
+  let body: Record<string, unknown> = {};
+  try {
+    body = (await res.json()) as Record<string, unknown>;
+  } catch {
+    /* non-JSON error body — fall through to the status text */
+  }
+  const message = String(body.message ?? body.error ?? res.statusText ?? "Request failed");
+  const messageAr = typeof body.messageAr === "string" ? body.messageAr : null;
+  const details = (body.details ?? {}) as Record<string, unknown>;
+
+  if (details.fallback === "builtin_export") {
+    throw new TemplateNotReadyError(message, messageAr, String(details.templateStatus ?? "unknown"));
+  }
+  throw new TemplateError(message, messageAr, res.status, details);
+}
+
+async function json<T>(res: Response): Promise<T> {
+  if (!res.ok) await parseError(res);
+  return (await res.json()) as T;
+}
+
+export async function listTemplates(): Promise<ExportTemplateList> {
+  return json<ExportTemplateList>(await fetch(BASE, { cache: "no-store" }));
+}
+
+export async function getTemplate(id: string): Promise<ReconciliationView> {
+  return json<ReconciliationView>(
+    await fetch(`${BASE}/${encodeURIComponent(id)}`, { cache: "no-store" })
+  );
+}
+
+export async function deleteTemplate(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) await parseError(res);
+}
+
+/** What registering a template returns. `mapping` means the job is running — poll it. */
+export interface RegisterResult {
+  id: string;
+  name: string;
+  status: string;
+  mappingError: string | null;
+  /** Present while `status === "mapping"`. Feed it to `waitForMapping`. */
+  jobId?: string;
+}
+
+/**
+ * Upload a template and register it. Three steps behind one call: presign → PUT to S3 →
+ * register, which STARTS the mapping and returns `status: "mapping"` with a job id.
+ *
+ * Registering deliberately does not wait for the mapping — it takes 20-60s on a real template
+ * and the SSR gateway cuts off at ~30s, which used to surface as a 504 while the work carried
+ * on invisibly. Call `waitForMapping` with the returned `jobId`.
+ *
+ * The `.xlsx` check here is a courtesy so the user finds out before the upload; the real gate
+ * is server-side on register, where a renamed `.docx` or `.pdf` is caught by actually parsing.
+ */
+export async function uploadTemplate(file: File, name: string): Promise<RegisterResult> {
+  if (!/\.(xlsx|csv)$/i.test(file.name)) {
+    throw new TemplateError(
+      "Only Excel (.xlsx) and .csv templates are supported.",
+      "ندعم قوالب Excel (.xlsx) و .csv فقط.",
+      400
+    );
+  }
+  // Must match the content type the presigned PUT was signed for, or S3 rejects the upload.
+  const isCsv = /\.csv$/i.test(file.name);
+
+  const presigned = await json<{ uploadUrl: string; s3Key: string }>(
+    await fetch(`${BASE}/upload-url`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ filename: file.name }),
+    })
+  );
+
+  const put = await fetch(presigned.uploadUrl, {
+    method: "PUT",
+    body: file,
+    headers: {
+      "content-type": isCsv
+        ? "text/csv"
+        : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    },
+  });
+  if (!put.ok) {
+    throw new TemplateError(
+      "The upload didn't complete. Check your connection and try again.",
+      "لم يكتمل الرفع. تحقق من الاتصال وحاول مجدداً.",
+      put.status
+    );
+  }
+
+  return json<RegisterResult>(
+    await fetch(BASE, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, s3Key: presigned.s3Key, originalFileName: file.name }),
+    })
+  );
+}
+
+/** One poll. Returns `mapping` while the job runs — with a possibly NEW jobId after a retry. */
+async function pollMapping(id: string, jobId: string): Promise<RegisterResult> {
+  return json<RegisterResult>(
+    await fetch(
+      `${BASE}/${encodeURIComponent(id)}/mapping?jobId=${encodeURIComponent(jobId)}`,
+      { cache: "no-store" }
+    )
+  );
+}
+
+/**
+ * Poll until the mapping settles, then return its final state.
+ *
+ * `jobId` is re-read from every response on purpose: a spec the validator rejects triggers one
+ * corrective retry, which is a NEW job. Polling the original id after that would wait on a job
+ * that is already done and never see the correction land.
+ *
+ * The ceiling is a real answer, not a safety net — at `POLL_MS` intervals it allows several
+ * minutes, well past the slowest observed mapping, and stopping with "it's taking too long"
+ * beats a spinner with no end. The row keeps its own status either way, so a template that
+ * finishes after we stop watching is still there on the next open.
+ */
+export async function waitForMapping(
+  id: string,
+  jobId: string,
+  opts: { signal?: AbortSignal } = {}
+): Promise<RegisterResult> {
+  const POLL_MS = 2500;
+  const MAX_WAIT_MS = 5 * 60 * 1000;
+  const deadline = Date.now() + MAX_WAIT_MS;
+
+  let currentJob = jobId;
+  for (;;) {
+    if (opts.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    await new Promise((r) => setTimeout(r, POLL_MS));
+    if (opts.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+
+    const next = await pollMapping(id, currentJob);
+    if (next.status !== "mapping") return next;
+    if (next.jobId) currentJob = next.jobId;
+
+    if (Date.now() > deadline) {
+      return {
+        id,
+        name: next.name ?? "",
+        status: "mapping",
+        mappingError: "This is taking longer than expected. It may still finish — check back shortly.",
+        jobId: currentJob,
+      };
+    }
+  }
+}
+
+/**
+ * Their template as a grid: what each cell receives, AND the real value it gets.
+ *
+ * POST because it carries the comparison to resolve. One call rather than two — describing
+ * the cells and filling them are the same question, and splitting them meant two round trips,
+ * two workbook reads on the server, and two shapes that could disagree about which cells exist.
+ *
+ * `payload` is optional: without it the grid still says which field feeds each cell, which is
+ * what a template with nothing to export needs.
+ */
+export async function getTemplateSheet(id: string, payload?: ExportPayload): Promise<SheetView> {
+  return json<SheetView>(
+    await fetch(`${BASE}/${encodeURIComponent(id)}/sheet`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload ?? {}),
+      cache: "no-store",
+    })
+  );
+}
+
+export async function applyResolutions(
+  id: string,
+  body: {
+    theirsUnfilled?: Record<string, UnfilledResolution>;
+    oursNoHome?: Record<string, NoHomeResolution>;
+    /** Corrections to cells the mapper already filled. `field: null` clears one. */
+    mapped?: Record<string, MappedCorrection>;
+    name?: string;
+  }
+): Promise<ReconciliationView> {
+  return json<ReconciliationView>(
+    await fetch(`${BASE}/${encodeURIComponent(id)}/mapping`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    })
+  );
+}
+
+/** Render the comparison. Throws `TemplateNotReadyError` when the caller should fall back. */
+export async function exportWithTemplate(id: string, payload: ExportPayload): Promise<ExportResult> {
+  return json<ExportResult>(
+    await fetch(`${BASE}/${encodeURIComponent(id)}/export`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+  );
+}
+
+/**
+ * Save the rendered workbook.
+ *
+ * Fetched as a blob rather than navigated to: the presigned URL is cross-origin, so a plain
+ * anchor would open it in a tab instead of downloading with the template's own name.
+ */
+export async function downloadExport(url: string, fileName: string): Promise<void> {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new TemplateError(
+      "The download link expired. Export again.",
+      "انتهت صلاحية رابط التنزيل. صدّر مرة أخرى.",
+      res.status
+    );
+  }
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = /\.(xlsx|csv)$/i.test(fileName) ? fileName : `${fileName}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(objectUrl);
+}

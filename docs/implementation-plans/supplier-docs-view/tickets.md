@@ -1,3 +1,4 @@
+
 # Tickets — Supplier doc view (bid-scoped documents endpoint)
 
 Plan: bid-scoped `GET /agents/bids/{bidId}/documents` (backend-agents) returning the supplier's

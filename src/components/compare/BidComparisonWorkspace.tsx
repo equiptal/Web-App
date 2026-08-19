@@ -17,8 +17,10 @@ import { BidReadinessBadge, BidEligibilityModal } from "@/components/requests/Bi
 import { qualityFromSubmissionItem, type BidQuality } from "@/lib/contract/bid-quality";
 import { QualityBadge } from "@/components/bid/QualityRing";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
-import { buildItemComparison, sortByPreset, displayQuote, responsibilityTone, rowWinners, type BidColumn, type Preset, type CostResponsibility, type RatePeriod, type PricesFor } from "@/lib/contract/comparison";
+import { buildItemComparison, sortByPreset, displayQuote, responsibilityTone, rowWinners, type BidColumn, type Money, type Preset, type CostResponsibility, type RatePeriod, type PricesFor } from "@/lib/contract/comparison";
 import { VAT_RATE } from "@/lib/pricing/rental";
+import { ExportTemplateDialog } from "@/components/compare/ExportTemplateDialog";
+import { buildExportPayload, rankingSourceOf, type ExportPayload } from "@/lib/contract/export-templates";
 import { bidColumnToComputed, normalizedBidToBidCard, presetToAgent, type RecommendResult, type NormalizedBid } from "@/lib/contract/agent-bids";
 import { BID_VERIFY_ENABLED } from "@/lib/flags";
 import { bidQuoteToFormDraft, type BidFormDraft, type TransformRequestCtx } from "@/lib/contract/bid-form";
@@ -139,6 +141,7 @@ export function BidComparisonWorkspace() {
   const [submissions, setSubmissions] = useState<LinkBidSubmission[]>([]); // off-platform shared-link bids for the active item
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [preset, setPreset] = useState<Preset>("best");
+  const [exportOpen, setExportOpen] = useState(false);
   const [period, setPeriod] = useState<RatePeriod>("PER_DAY"); // RATE PERIOD toggle (Day/Week/Month) — display + totals
   const [pricesFor, setPricesFor] = useState<PricesFor>("unit"); // PRICES FOR toggle — default PER UNIT
   const [eligBid, setEligBid] = useState<BidCard | null>(null); // bid-readiness — eligibility view for a native bid
@@ -663,6 +666,24 @@ export function BidComparisonWorkspace() {
   // (offeredUnitsDetail) when available — a cert counts as held only if it's present on EVERY offered
   // unit (partial = "K/M"). Native app bids only; off-platform bids have no unit data (rd null) → the
   // rows fall back to the bid-level codes. Memoized once per column.
+  //
+  // ── Proof of ownership is NOT in this fraction, and that is deliberate ────────────────────────────
+  // The owner's ruling of 2026-08-12 — *"for the percentage use existing bid readiness in the app as
+  // source of truth"* — points the web at the app's numbers, and the app has TWO: `total`/`done`
+  // (`2 + certs`, ownership counted) for the supplier who holds the papers, and `renteeTotal`/
+  // `renteeDone` (`1 + certs`, ownership never counted) for the renter. This workspace is the renter's
+  // surface and reads `bid.offeredUnitsDetail`, which the backend has already stripped of ownership
+  // papers (`RENTEE_HIDDEN_DOC_TYPES`, `rentee.service.ts`) — istimara, customs, sale_contract and
+  // saso_registration arrive absent and url-less, deliberately: they are supplier-private everywhere
+  // except the map's document section (owner, 2026-08-10).
+  //
+  // So counting ownership here would not be strictness, it would be a permanent shortfall on evidence
+  // this screen is not allowed to display — every supplier held below 100% on a paper the renter can
+  // never open and the supplier can never clear in the renter's eyes. That is why `computeBidReadiness`
+  // exposes no `scoreOwnership` option at all: a bid-backed reading has nothing to score. The map's
+  // panel reads unstripped FLEET rows and therefore does count it (`FLEET_READINESS_OPTS` in
+  // `machine-panel-model.ts`); the difference between the two screens is a difference in the DATA each
+  // one holds, not two opinions about readiness. See `bid-readiness.ts`'s header.
   const rdByBid = new Map(cols.map((c) => [c.bid.id, computeBidReadiness(c.bid)]));
   const unitCert = (bidId: string, certCode: string, kind: "equipment" | "operator") => {
     const rd = rdByBid.get(bidId);
@@ -953,6 +974,53 @@ export function BidComparisonWorkspace() {
     }
   }
 
+  /**
+   * Build the payload for an export into the company's own .xlsx template.
+   *
+   * We send the FIGURES because the comparison maths lives here, not in the backend —
+   * re-deriving it there would let the exported sheet disagree with this screen. The backend
+   * resolves supplier/renter identity (CR/VAT) itself and ignores anything we send for it.
+   *
+   * `stated` rides along on every money value: `false` means the supplier didn't say, and its
+   * value is 0 — flattened to a number the sheet would print SAR 0, which reads as "this costs
+   * nothing" in a document going to finance.
+   */
+  function buildTemplatePayload(): ExportPayload | null {
+    if (!cols.length) return null;
+    const totals: Record<string, { grandTotal?: Money; mobDemob?: Money; rental?: Money }> = {};
+    for (const c of cols) {
+      /* The rental EXACTLY as this table renders it. displayQuote falls back to rate x units
+       * when the request has no duration, so the screen shows a total; computeRental refuses
+       * to assume a period and reports "not stated". Sending our own figure is what stops the
+       * exported sheet reading "no data" under a row the user can see filled in. */
+      const q = dq(c);
+      totals[String(c.bid.id)] = {
+        grandTotal: { value: grandTotal(c), stated: hasCost(c) },
+        mobDemob: { value: mobDemobTotal(c), stated: c.mob.stated || c.demob.stated },
+        rental: { value: q.subtotal - q.mobDemob, stated: c.bid.price != null },
+      };
+    }
+    return buildExportPayload({
+      requestId: String(activeItem ?? ""),
+      // The workspace's active item IS the request — `activeItem` is the id used everywhere
+      // else (analytics, askBids). There is no separate item id to send.
+      itemId: null,
+      columns: cols,
+      totals,
+      header: {
+        requestDisplayId: group?.items[0]?.displayId ?? null,
+        itemName: (ar ? activeItemObj?.item?.nameAr : activeItemObj?.item?.name) ?? null,
+        location: loc?.label ?? null,
+        durationDays,
+        units,
+      },
+      rankingSource: rankingSourceOf(preset, freeApplied, agentLive, Boolean(rec?.ranking?.length)),
+      rec,
+      agentLive,
+      lang: ar ? "ar" : "en",
+    });
+  }
+
   // Export the current comparison as a print-ready sheet (Save as PDF from the print dialog).
   function exportPdf() {
     if (!cols.length) { toast(L("Nothing to export yet.", "لا شيء للتصدير بعد.")); return; }
@@ -1216,7 +1284,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                 {(() => {
                   const whatif = [
                     { label: L("Lowest all-in?", "الأقل إجمالاً؟"), message: "rank by lowest all-in cost", icon: "savings" },
-                    { label: L("Newest machine?", "أحدث معدّة؟"), message: "rank by newest machine", icon: "new_releases" },
+                    { label: L("Newest equipment?", "أحدث معدّة؟"), message: "rank by newest machine", icon: "new_releases" },
                     { label: L("Fuel included only?", "الوقود مشمول فقط؟"), message: "only the bids where fuel is included", icon: "local_gas_station" },
                     { label: L("Closest to site?", "الأقرب للموقع؟"), message: "rank by closest distance to site", icon: "place" },
                     { label: L("Most trusted?", "الأكثر ثقة؟"), message: "rank by most trusted supplier", icon: "verified_user" },
@@ -1276,7 +1344,7 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                         <div className="flex h-[40px] min-w-[220px] flex-1 items-center gap-2 rounded-full border ps-3.5 pe-1.5" style={{ background: "#fff", borderColor: C.border }}>
                           <span className="material-icons-outlined" style={{ fontSize: 17, color: C.action }}>auto_awesome</span>
                           <input value={freeText} onChange={(e) => setFreeText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") applyFreeText(); }}
-                            placeholder={L("Ask AI — e.g. closest machine, newest with operator…", "اسأل الذكاء — مثلاً أقرب معدّة، الأحدث مع مشغّل…")}
+                            placeholder={L("Ask AI — e.g. closest equipment, newest with operator…", "اسأل الذكاء — مثلاً أقرب معدّة، الأحدث مع مشغّل…")}
                             className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold outline-none" style={{ color: C.navy }} />
                           <button onClick={applyFreeText} className="inline-flex flex-none items-center gap-1 rounded-full px-3 py-1.5 text-[12.5px] font-extrabold text-white" style={{ background: C.action }}>
                             <span className="material-icons-outlined" style={{ fontSize: 15, transform: ar ? "scaleX(-1)" : undefined }}>send</span>{L("Re-rank", "إعادة")}
@@ -1348,7 +1416,10 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
                             </div>
                             {/* bid-readiness — equipment eligibility badge (native bids only); an
                                 off-platform bid declares no per-unit eligibility, so the same slot shows
-                                its bid-quality % instead, opening the full submission on click. */}
+                                its bid-quality % instead, opening the full submission on click.
+                                Bid-backed, so the badge's % excludes proof of ownership — the renter's
+                                `offeredUnitsDetail` is stripped of it and scoring it would hold every
+                                supplier permanently short. Full reasoning at `rdByBid` above. */}
                             {(() => {
                               const rd = computeBidReadiness(c.bid);
                               if (rd) return <div className="mt-1.5"><BidReadinessBadge r={rd} L={L} onClick={() => setEligBid(c.bid)} /></div>;
@@ -1824,11 +1895,11 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
             </div>
           </div>
 
-          {/* table footer — export the comparison (§6) */}
+          {/* table footer — export the comparison (§6), in our layout or the company's own template */}
           <div className="mt-3 flex flex-wrap items-center gap-2.5">
-            <span className="flex-1 text-[11.5px] font-semibold" style={{ color: C.muted, minWidth: 140 }}>{L("Export this comparison as a PDF to share or keep.", "صدّر هذه المقارنة كملف PDF للمشاركة أو الحفظ.")}</span>
-            <button onClick={exportPdf} className="inline-flex items-center gap-1.5 rounded-[10px] border px-3.5 py-[9px] text-[12.5px] font-extrabold" style={{ borderColor: C.border, color: C.navy, background: "#fff" }}>
-              <span className="material-icons-outlined" style={{ fontSize: 17 }}>picture_as_pdf</span>{L("Export PDF", "تصدير PDF")}
+            <span className="flex-1 text-[11.5px] font-semibold" style={{ color: C.muted, minWidth: 140 }}>{L("Export this comparison to share or keep — in our layout or your company's own template.", "صدّر هذه المقارنة للمشاركة أو الحفظ — بتنسيقنا أو بقالب شركتك.")}</span>
+            <button onClick={() => setExportOpen(true)} className="inline-flex items-center gap-1.5 rounded-[10px] px-3.5 py-[9px] text-[12.5px] font-extrabold text-white" style={{ background: C.action }}>
+              <span className="material-icons-outlined" style={{ fontSize: 17 }}>ios_share</span>{L("Export", "تصدير")}
             </button>
           </div>
 
@@ -1895,6 +1966,17 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
           </div>
         </div>
       )}
+
+      {/* ── export: our layout, or the company's own .xlsx template ── */}
+      <ExportTemplateDialog
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        ar={ar}
+        L={L}
+        buildPayload={buildTemplatePayload}
+        onBuiltinExport={exportPdf}
+        toast={toast}
+      />
 
       {/* ── confirm-before-adding a flagged uploaded quote (match.needs_confirmation) ── */}
       {verify && (
@@ -2076,7 +2158,9 @@ ${row(L("Company documents", "وثائق الشركة"), docsOf)}
           </div>
         </div>
       )}
-      {/* bid-readiness — read-only eligibility view for a native bid's offered units */}
+      {/* bid-readiness — read-only eligibility view for a native bid's offered units. Bid-backed, so
+          proof of ownership is not one of the scored keys here (the renter's projection strips it);
+          the fleet-backed map panel does score it. Full reasoning at `rdByBid` above. */}
       {eligBid && (() => { const rd = computeBidReadiness(eligBid); return rd ? <BidEligibilityModal r={rd} supplierName={eligBid.supplierName} ar={ar} L={L} onClose={() => setEligBid(null)} /> : null; })()}
       {/* off-platform — read-only viewer of the shared-link submission behind the quality badge */}
       {subBid && (() => {

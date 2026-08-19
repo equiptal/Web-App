@@ -28,6 +28,17 @@ export function rentalDivisor(unit: string | null | undefined): number {
 }
 
 /**
+ * Whether the unit is one the divisor table actually prices.
+ *
+ * `rentalDivisor` answers 1 for anything it doesn't know, which silently prices a garbage unit as
+ * PER_DAY. The app instead routes an unrecognized unit to its `rate × durationDays` fallback, so the
+ * two need to be told apart. Null/empty counts as PER_DAY, matching `rentalDivisor`'s own default.
+ */
+export function isKnownRentalUnit(unit: string | null | undefined): boolean {
+  return (unit ?? "PER_DAY").toUpperCase() in RENTAL_DIVISOR;
+}
+
+/**
  * Fridays in the inclusive window `[start, start + durationDays − 1]`.
  *
  * Counted arithmetically rather than by iterating, so an open-ended multi-year duration can't turn a
@@ -118,14 +129,18 @@ export function computeRentalTotal(args: {
   const duration = Number(args.durationDays);
   const hasDuration = Number.isFinite(duration) && duration > 0;
 
-  // PER_JOB is FLAT — spec 005 §2, "flat, never prorated".
+  // PER_JOB and any unrecognized unit take the app's UNRECOGNIZED-UNIT fallback: `rate × durationDays`,
+  // every calendar day, no divisor and no Friday exclusion. Both app copies do this
+  // (`rental_pricing.dart` / `deal_room_pricing.dart`: `if (divisor == null) return rate * durationDays`)
+  // because PER_JOB was retired on 2026-08-05 and now falls through their divisor lookup.
   //
-  // ⚠ NOT what the app does, and knowingly so. The app retired PER_JOB on 2026-08-05, so it now falls
-  // out of both divisor lookups onto their unrecognized-unit fallback, `rate × durationDays` — every
-  // calendar day, no divisor. The staging branch matches the app here; prod deliberately does not,
-  // because that reading turns a 7,700 job price over a 62-day window into 477,400 per unit and nobody
-  // has yet confirmed whether prod holds legacy PER_JOB rows. Flip this branch once that is known.
-  if (divisor === 0) return bare;
+  // ⚠ This is NOT "flat, never prorated" — spec 005 §2 says that, and this deliberately overrides it on
+  // the owner's instruction to match the app in every case. A 7,700 job price over a 62-day window now
+  // reads 477,400, per unit. There is no PER_JOB data path left in the app, so this only reaches legacy
+  // rows; if those exist in prod, this is the line to revisit.
+  if (divisor === 0 || !isKnownRentalUnit(args.priceUnit)) {
+    return hasDuration ? { total: rate * duration, billable: duration, raw: false, exact: rate * duration === rate } : bare;
+  }
   if (!hasDuration) return bare;
 
   // No start date ⇒ the Fridays can't be located ⇒ the bare rate, exactly as mobile §3 specifies.

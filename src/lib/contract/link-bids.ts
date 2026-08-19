@@ -392,6 +392,10 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
     status: "PENDING",
     // Unique synthetic supplier id so the comparison treats each submission as its own column.
     supplierId: `link-${sub.id}`,
+    // NULL on purpose: an off-platform supplier has no account and therefore no `Company` row. Reusing
+    // the synthetic supplier id here would be harmless today but would make two submissions from the
+    // same firm look like one counterparty with one chat, which off-platform offers do not have.
+    supplierCompanyId: null,
     supplierName: sub.companyName || "Supplier",
     verified: false,
     rating: null,
@@ -482,6 +486,12 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
     progress: { agreed: 0, total: 0 },
     lastEventAr: null,
     round: 1,
+    // An off-platform submission negotiates in its own modal flow, not a deal room, so there is no
+    // `lastCounterBy` and no counter delta to draw on the card.
+    requestChangedAt: null,
+    liveStatus: null,
+    openingPrice: null,
+    lastCounterBy: null,
     uiState: null,
     viaSharedLink: true,
     // Per-item card → that item's total (incl VAT); whole-submission card → the grand total.

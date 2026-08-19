@@ -11,6 +11,7 @@ import {
   rentalDivisor,
   rentalPeriodSubtitle,
 } from "@/lib/pricing/rental";
+import { computeDealTotals } from "@/lib/contract/deal-room";
 
 /**
  * Parity with the mobile app's `computeRentalTotal()` (`core/utils/rental_pricing.dart`) — the maths
@@ -186,12 +187,16 @@ describe("computeRentalTotal — falls back to the bare rate, never 0", () => {
     expect(r.raw).toBe(true);
   });
 
-  it("PER_JOB is flat — spec 005 §2, and deliberately NOT the app's retired-unit fallback", () => {
-    // The app dropped PER_JOB out of its divisor lookup on 2026-08-05, so there it lands on
-    // `rate × durationDays` — 42,000 for this window. Prod keeps it flat until someone confirms
-    // whether any legacy PER_JOB rows exist here. The staging branch carries the app's reading.
-    expect(bare({ priceUnit: "PER_JOB" }).total).toBe(4200);
-    expect(bare({ priceUnit: "PER_JOB" }).raw).toBe(true);
+  it("PER_JOB takes the app's unrecognized-unit fallback: rate × every calendar day", () => {
+    // Both app copies drop PER_JOB out of their divisor lookup (retired 2026-08-05) and land on
+    // `rate × durationDays`. Deliberately NOT spec 005's "flat, never prorated" — matching the app in
+    // every case was the instruction, and this is the one case where the two rules disagree.
+    expect(bare({ priceUnit: "PER_JOB", durationDays: 10 }).total).toBe(42_000);
+    expect(bare({ priceUnit: "PER_JOB", durationDays: 10 }).billable).toBe(10); // calendar days, Fridays and all
+    // An unrecognized unit follows the same path instead of being silently priced as PER_DAY.
+    expect(bare({ priceUnit: "WHATEVER", durationDays: 10 }).total).toBe(42_000);
+    // With no duration there is nothing to multiply — the bare rate, as before.
+    expect(bare({ priceUnit: "PER_JOB", durationDays: null }).total).toBe(4200);
   });
 
   it("marks an exact period, which lets the card drop its rental row", () => {
@@ -309,5 +314,75 @@ describe("formatSar", () => {
     expect(formatSar(null)).toBe("—");
     expect(formatSar(undefined)).toBe("—");
     expect(formatSar(Number.NaN)).toBe("—");
+  });
+});
+
+/**
+ * ── ONE breakdown across every price surface (owner, 2026-08-19) ─────────────────────────────────
+ *
+ * *"use bid card in all prices surface."*
+ *
+ * The renter reaches the deal room from a bid card that breaks the offer down PER MACHINE and then
+ * totals it across the count. The room used to print all-units rows only, so the two screens put two
+ * different figures against one offer and neither said which was which. The room now draws the card's
+ * shape — `DealRoom.tsx` feeds `computeQuoteTotals` the per-unit rental `computeDealTotals` already
+ * computed, and prints `perUnit` above an overall row.
+ *
+ * That rests on ONE claim, pinned here: **the two engines price the same basis identically**, so
+ * changing which rows are drawn cannot change what is owed. `computeDealTotals` rounds its VAT and
+ * `computeQuoteTotals` does not, which is the only arithmetic that differs between them — and since
+ * every subtotal is a sum of stated riyal prices, `round(S + 0.15S)` and `S + round(0.15S)` land on
+ * the same figure.
+ */
+describe("the deal room's per-unit block IS the bid card's (owner, 2026-08-19)", () => {
+  const BASES = [
+    { name: "PER_DAY · 14 days · 2 units", rate: 3000, priceUnit: "PER_DAY", periods: 14, units: 2, mob: 1500, demob: 1500, mobU: null, demobU: null, start: "2026-08-15" },
+    { name: "PER_WEEK · 30 days · 3 units · 5 delivery runs", rate: 21000, priceUnit: "PER_WEEK", periods: 30, units: 3, mob: 2200, demob: 0, mobU: 5, demobU: null, start: "2026-09-01" },
+    { name: "PER_MONTH · 61 days · 1 unit · 2 returns", rate: 78000, priceUnit: "PER_MONTH", periods: 61, units: 1, mob: 0, demob: 3333, mobU: null, demobU: 2, start: "2026-10-03" },
+    { name: "PER_JOB · open-ended · 4 units", rate: 45000, priceUnit: "PER_JOB", periods: null, units: 4, mob: 1111, demob: 999, mobU: null, demobU: null, start: null },
+    { name: "fractional rate and leg · 3 units", rate: 1234.5, priceUnit: "PER_DAY", periods: 7, units: 3, mob: 777.7, demob: 0, mobU: 1, demobU: null, start: "2026-08-16" },
+  ];
+
+  for (const b of BASES) {
+    it(`agrees to the riyal — ${b.name}`, () => {
+      const deal = computeDealTotals({
+        rate: b.rate, priceUnit: b.priceUnit, periods: b.periods, startDate: b.start,
+        agreedUnits: null, numberOfUnits: b.units,
+        mobUnits: b.mobU, demobUnits: b.demobU, mobPrice: b.mob, demobPrice: b.demob,
+        mobExcluded: false, demobExcluded: false,
+      });
+      // Exactly what `DealRoom.tsx` does to draw the per-unit block.
+      const q = computeQuoteTotals({
+        perUnitRental: deal.perUnitRental,
+        rentalUnits: deal.rentalUnits,
+        mob: { amount: b.mob, units: deal.mobUnitsN, excluded: false },
+        demob: { amount: b.demob, units: deal.demobUnitsN, excluded: false },
+      });
+      // The money is untouched: the overall block the room still reads off `totals` is the same money
+      // the card's engine reaches from the same basis.
+      expect(Math.round(q.overall.subtotal)).toBe(Math.round(deal.subtotal));
+      expect(Math.round(q.overall.total)).toBe(Math.round(deal.grand));
+      // …and the per-unit rental the block is built from is the room's own, not a division.
+      expect(q.perUnit.rental).toBe(deal.perUnitRental);
+      expect(deal.perUnitRental * deal.rentalUnits).toBe(deal.rentalTotal);
+    });
+  }
+
+  it("the OVERALL row is never per-unit × units when a leg carries its own count", () => {
+    // 3 machines, 5 delivery runs — the case the row's `sub` names, and the reason the room reads the
+    // overall figure off `computeDealTotals` rather than multiplying the block above it.
+    const deal = computeDealTotals({
+      rate: 21000, priceUnit: "PER_WEEK", periods: 30, startDate: "2026-09-01",
+      agreedUnits: null, numberOfUnits: 3,
+      mobUnits: 5, demobUnits: null, mobPrice: 2200, demobPrice: 0,
+      mobExcluded: false, demobExcluded: false,
+    });
+    const q = computeQuoteTotals({
+      perUnitRental: deal.perUnitRental, rentalUnits: deal.rentalUnits,
+      mob: { amount: 2200, units: deal.mobUnitsN, excluded: false },
+      demob: { amount: 0, units: deal.demobUnitsN, excluded: false },
+    });
+    expect(deal.mobUnitsN).toBe(5);
+    expect(Math.round(q.perUnit.total * 3)).not.toBe(Math.round(deal.grand));
   });
 });

@@ -133,20 +133,9 @@ export function buildBidMetadata({
   const path = `/bid/${slug}${lang === "ar" ? "?lang=ar" : ""}`;
   // Absolute, from the host actually serving this page — never resolved through metadataBase.
   const canonical = origin ? `${origin}${path}` : path;
-  /**
-   * The card image is DRAWN FOR THIS REQUEST (`/bid/{slug}/og`), not a fixed brand asset.
-   *
-   * WhatsApp and friends build the card themselves and accept only a title, one line and a picture —
-   * so the picture is the only place the request's details can reach them. The route renders the
-   * reference, equipment, location, basis and deadline into a 1200×630 image.
-   *
-   * Needs an absolute URL, hence `origin`: with none, we fall back to the static asset the backend
-   * points at, since a relative URL here would be resolved against the hardcoded production
-   * `metadataBase` and could name the wrong host.
-   */
-  const image = origin
-    ? `${origin}/bid/${slug}/og${lang === "ar" ? "?lang=ar" : ""}`
-    : preview?.imageUrl || OG_CARD_IMAGE;
+  // The backend already returns an absolute, stage-correct image URL; the constant is the fallback
+  // for a failed fetch, and gets the same absolute treatment so it can't point at the wrong host.
+  const image = preview?.imageUrl || (origin ? `${origin}${OG_CARD_IMAGE}` : OG_CARD_IMAGE);
 
   return {
     // The root layout's title template appends " — Moedatech", which is where the brand comes from.
@@ -160,13 +149,7 @@ export function buildBidMetadata({
       description,
       url: canonical,
       locale: lang === "ar" ? "ar_SA" : "en_US",
-      /**
-       * The dimensions are declared, not left to be discovered. WhatsApp is stricter than Telegram
-       * here: given no `og:image:width`/`height` it can drop the image, and a card with no image
-       * collapses to a bare link — which is exactly what a shared bid link was doing while the same
-       * link previewed correctly in Telegram.
-       */
-      images: [{ url: image, alt: title, width: 1200, height: 630, type: "image/png" }],
+      images: [{ url: image, alt: title }],
     },
     twitter: { card: "summary_large_image", title, description, images: [image] },
   };

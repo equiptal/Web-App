@@ -57,7 +57,7 @@ const shownStrings = (v: ReturnType<typeof buildChatCardView>): string[] => [
   ...(v.transition ? [v.transition.from, v.transition.to] : []),
 ];
 
-describe("DRCARD-TC-01 — rate_proposal parses, and renders from i18n not from m.text (AC-01, AC-02)", () => {
+describe("DRCARD-TC-01 — rate_proposal parses, and renders from i18n not from m.text (DRCARD-AC-01, DRCARD-AC-02)", () => {
   it("parses the rate and price unit off the payload", () => {
     const card = parseChatCard(RATE_PROPOSAL);
     expect(card?.type).toBe("rate_proposal");
@@ -89,7 +89,7 @@ describe("DRCARD-TC-01 — rate_proposal parses, and renders from i18n not from 
   });
 });
 
-describe("DRCARD-TC-02 — rate_response renders an Arabic acceptance (AC-03)", () => {
+describe("DRCARD-TC-02 — rate_response renders an Arabic acceptance (DRCARD-AC-03)", () => {
   it("parses and renders without touching the English m.text", () => {
     const card = parseChatCard({ type: "rate_response", originalMessageId: "msg_1", response: "accepted" });
     expect(card).toEqual({ type: "rate_response", response: "accepted", originalMessageId: "msg_1" });
@@ -103,7 +103,7 @@ describe("DRCARD-TC-02 — rate_response renders an Arabic acceptance (AC-03)", 
   });
 });
 
-describe("DRCARD-TC-03 — counter figures survive, term keys are localised (AC-04, AC-05)", () => {
+describe("DRCARD-TC-03 — counter figures survive, term keys are localised (DRCARD-AC-04, DRCARD-AC-05)", () => {
   it("carries BOTH oldValue and newValue — before this the counter's numbers only existed in custom", () => {
     const card = parseChatCard({ type: "counter", termKey: "PRICE", oldValue: 3000, newValue: 2600 });
     expect(card).toEqual({ type: "counter", termKey: "PRICE", oldValue: 3000, newValue: 2600 });
@@ -136,7 +136,7 @@ describe("DRCARD-TC-03 — counter figures survive, term keys are localised (AC-
   });
 });
 
-describe("DRCARD-TC-04 — the four term actions are four distinct cards (AC-06, AC-07)", () => {
+describe("DRCARD-TC-04 — the four term actions are four distinct cards (DRCARD-AC-06, DRCARD-AC-07)", () => {
   it("gives each its own kind, icon and tone", () => {
     const views = [
       { type: "term_accepted", termKey: "payment_terms", value: "net_30" },
@@ -159,7 +159,7 @@ describe("DRCARD-TC-04 — the four term actions are four distinct cards (AC-06,
   });
 });
 
-describe("DRCARD-TC-05 — unknown and absent custom both fall back to m.text (AC-08, AC-09)", () => {
+describe("DRCARD-TC-05 — unknown and absent custom both fall back to m.text (DRCARD-AC-08, DRCARD-AC-09)", () => {
   it("returns null for a type the registry does not know", () => {
     expect(parseChatCard({ type: "rentee_request", requestId: 9 })).toBeNull();
     expect(parseChatCard({ type: "something_shipped_next_year" })).toBeNull();
@@ -176,7 +176,7 @@ describe("DRCARD-TC-05 — unknown and absent custom both fall back to m.text (A
   });
 });
 
-describe("DRCARD-TC-05b — reading the card off a raw Stream message (AC-08, AC-09)", () => {
+describe("DRCARD-TC-05b — reading the card off a raw Stream message (DRCARD-AC-08, DRCARD-AC-09)", () => {
   it("finds the payload nested under `custom`, as the backend sends it", () => {
     const card = chatCardOfMessage({ id: "m1", type: "regular", text: RATE_PROPOSAL_TEXT, custom: RATE_PROPOSAL });
     expect(card?.type).toBe("rate_proposal");
@@ -189,7 +189,7 @@ describe("DRCARD-TC-05b — reading the card off a raw Stream message (AC-08, AC
     expect(chatCardOfMessage({ id: "m2", type: "rate_proposal", proposedRate: 3000 })).toBeNull();
   });
 
-  it("returns null for a plain typed message — behaviour identical to today (AC-09)", () => {
+  it("returns null for a plain typed message — behaviour identical to today (DRCARD-AC-09)", () => {
     expect(chatCardOfMessage({ id: "m3", type: "regular", text: "when can you deliver?" })).toBeNull();
     expect(chatCardOfMessage({ id: "m4", custom: { kind: "location", lat: 24.7, lng: 46.7 } })).toBeNull();
   });
@@ -214,7 +214,7 @@ describe("DRCARD-TC-05b — reading the card off a raw Stream message (AC-08, AC
   });
 });
 
-describe("DRCARD-TC-06 — malformed payloads return null and never throw (AC-10)", () => {
+describe("DRCARD-TC-06 — malformed payloads return null and never throw (DRCARD-AC-10)", () => {
   const bad: unknown[] = [
     { type: "rate_proposal" },                                    // no rate
     { type: "rate_proposal", proposedRate: "3000" },              // a numeric STRING is not a rate
@@ -253,7 +253,7 @@ describe("DRCARD-TC-06 — malformed payloads return null and never throw (AC-10
   });
 });
 
-describe("DRCARD-TC-07 — action selector (AC-11, AC-12, AC-13)", () => {
+describe("DRCARD-TC-07 — action selector (DRCARD-AC-11, DRCARD-AC-12, DRCARD-AC-13)", () => {
   const supplierProposal = parseChatCard(RATE_PROPOSAL)!;
   const myProposal = parseChatCard({ ...RATE_PROPOSAL, proposedByRole: "rentee" })!;
 
@@ -353,7 +353,7 @@ describe("DRCARD-TC-07 — action selector (AC-11, AC-12, AC-13)", () => {
   });
 });
 
-describe("DRCARD-TC-08 — mob, demob and unit counts reach the view-model (AC-14)", () => {
+describe("DRCARD-TC-08 — mob, demob and unit counts reach the view-model (DRCARD-AC-14)", () => {
   it("parses all three off the payload", () => {
     expect(parseChatCard(RATE_PROPOSAL)).toMatchObject({ mobPrice: 800, demobPrice: 650, rentalUnits: 2 });
   });
@@ -376,13 +376,13 @@ describe("DRCARD-TC-08 — mob, demob and unit counts reach the view-model (AC-1
     expect(view.rows.map((r) => r.label)).toContain("التعبئة — موب");
   });
 
-  it("marks every numeric run LTR so it survives an RTL bubble (AC-15, structural half)", () => {
+  it("marks every numeric run LTR so it survives an RTL bubble (DRCARD-AC-15, structural half)", () => {
     const view = buildChatCardView(parseChatCard(RATE_PROPOSAL)!, ctx());
     expect(view.rows.every((r) => r.ltr === true)).toBe(true);
   });
 });
 
-describe("DRCARD-TC-09 — every card kind carries the message timestamp (AC-16)", () => {
+describe("DRCARD-TC-09 — every card kind carries the message timestamp (DRCARD-AC-16)", () => {
   const all: unknown[] = [
     RATE_PROPOSAL,
     { type: "rate_response", response: "accepted" },
@@ -425,6 +425,7 @@ describe("DRCARD — the registry covers every modelled type", () => {
   it("builds a view for each member of the union", () => {
     const kinds: ChatCard["type"][] = [
       "rate_proposal", "rate_response", "term_accepted", "counter", "term_updated", "term_reopened",
+      "rentee_request", "rentee_request_reply",
     ];
     const built = kinds.map((k) => {
       const custom =
@@ -432,9 +433,76 @@ describe("DRCARD — the registry covers every modelled type", () => {
         : k === "rate_response" ? { type: k, response: "accepted" }
         : k === "term_accepted" ? { type: k, termKey: "insurance", value: true }
         : k === "term_reopened" ? { type: k, termKey: "insurance" }
+        : k === "rentee_request" ? RENTEE_REQUEST
+        : k === "rentee_request_reply" ? { type: k, inReplyTo: "RQ-7F3A", equipmentId: "eq-1", resolution: "provided" }
         : { type: k, termKey: "insurance", oldValue: true, newValue: false };
       return buildChatCardView(parseChatCard(custom)!, ctx()).kind;
     });
     expect(built).toEqual(kinds);
+  });
+});
+
+/**
+ * V11/V12 — the request loop travels in the SAME channel as the negotiation vocabulary, and
+ * RM3-AC-48 says every custom type renders as a card in every tab, never as a bare grey pill. It is
+ * asserted through the same `parseChatCard` the negotiation types use, because the union was extended
+ * rather than forked: a second parser is how a message becomes a card in one renderer and a pill in
+ * the other.
+ */
+const RENTEE_REQUEST = {
+  type: "rentee_request",
+  ref: "RQ-7F3A",
+  scope: "equipment",
+  equipmentId: "eq-1",
+  serial: "SER-9",
+  kind: "availability",
+};
+
+describe("DRCARD — the request loop parses through the same reader (RM3-AC-48)", () => {
+  it("renders the renter's ask as a card, naming the machine and the reference", () => {
+    const view = buildChatCardView(parseChatCard(RENTEE_REQUEST)!, ctx());
+    expect(view.tone).toBe("ask");
+    expect(view.rows.map((r) => r.value)).toContain("RQ-7F3A");
+    // The serial is the fallback name — the fleet's own label wins when a request context supplies it.
+    expect(view.rows.map((r) => r.value)).toContain("SER-9");
+  });
+
+  it("states NO verdict without a request context — showing less beats guessing", () => {
+    /* This used to be titled "the deal-room route holds no fleet", and that is no longer why it
+       matters. `/deal-room/[id]` fetches the bid's fleet and draws the full `RequestCard` since the
+       owner's ruling of 2026-08-11 (*"i want it like request card"*), so this generic form is now the
+       FALLBACK on both surfaces: what renders before a non-blocking fleet read lands, and what
+       renders forever if it fails. The rule under it is unchanged and is exactly what made that fetch
+       safe to make non-blocking — a card with no fleet behind it says what was asked and never
+       whether it landed. */
+    expect(buildChatCardView(parseChatCard(RENTEE_REQUEST)!, ctx()).outcome).toBeNull();
+  });
+
+  it("re-derives the verdict from the machine when one is supplied (RM3-AC-18)", () => {
+    const withFleet = (locationSource: string) =>
+      buildChatCardView(parseChatCard(RENTEE_REQUEST)!, ctx({
+        requestCtx: {
+          machine: () => ({ locationSource, documentKeys: [], label: "CAT 320" }),
+          reply: () => null,
+        },
+      }));
+    expect(withFleet("listing_yard").outcomeTone).toBe("waiting");
+    expect(withFleet("unit_yard").outcomeTone).toBe("accepted");
+    // The fleet's label replaces the stamped serial once we hold the row.
+    expect(withFleet("unit_yard").rows.map((r) => r.value)).toContain("CAT 320");
+  });
+
+  it("renders the supplier's answer as its own card, never folded into the ask", () => {
+    const view = buildChatCardView(
+      parseChatCard({ type: "rentee_request_reply", inReplyTo: "RQ-7F3A", equipmentId: "eq-1", resolution: "declined" })!,
+      ctx(),
+    );
+    expect(view.tone).toBe("ask-reply");
+    expect(view.rows.map((r) => r.value)).toContain("RQ-7F3A");
+  });
+
+  it("falls back to `message.text` for a malformed ask rather than rendering half a card", () => {
+    expect(parseChatCard({ type: "rentee_request", kind: "availability" })).toBeNull();
+    expect(parseChatCard({ type: "rentee_request_reply", inReplyTo: "RQ-1", resolution: "shrug" })).toBeNull();
   });
 });

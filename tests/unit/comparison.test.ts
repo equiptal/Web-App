@@ -3,9 +3,9 @@ import { buildItemComparison, computeBidQuote, daysPerPeriod, sortByPreset, disp
 import type { BidCard, TermRow } from "@/lib/contract/bids";
 
 const bc = (p: Partial<BidCard>): BidCard => ({
-  id: "b", status: "PENDING", supplierId: null, supplierName: "S", verified: false, rating: null,
+  id: "b", status: "PENDING", supplierId: null, supplierCompanyId: null, supplierName: "S", verified: false, rating: null,
   distanceKm: null, submittedAt: null, validUntil: null, price: null, mobPrice: null, demobPrice: null,
-  priceUnit: null, duration: null, numberOfUnits: 1, unitsOffered: 1, reqMinYear: null, equipment: null, eqVerified: false,
+  priceUnit: null, duration: null, numberOfUnits: 1, unitsOffered: 1, openingPrice: null, lastCounterBy: null, requestChangedAt: null, liveStatus: null, reqMinYear: null, equipment: null, eqVerified: false,
   compliance: { entityType: "individual", activityLicense: false, taxNumber: false, nationalAddress: false, safety: false, saso: false, localContent: false },
   matchCount: 0, conflictCount: 0, dealRoomId: null, expired: false,
   note: null, requiredCerts: [], heldCertCodes: [], ownershipDocs: [], mobLeadTime: null, demobLeadTime: null,
@@ -89,12 +89,19 @@ describe("computeBidQuote (shared quote math — comparison ↔ quotation parity
     expect(q.perUnitRental).toBe(2600); // 2600 / 26 × 26
   });
 
-  it("PER_JOB is a flat rate (no duration), × units", () => {
-    // Flat per spec 005 §2. The app charges a retired PER_JOB unit per calendar day instead; prod does
-    // not follow that until the legacy-row question is settled. See `computeRentalTotal`.
+  it("PER_JOB takes the app's unrecognized-unit fallback: rate × calendar days × units", () => {
+    // PER_JOB was retired in the app on 2026-08-05 and now falls out of its divisor lookup onto
+    // `rate × durationDays × units`. Adopted over spec 005's "flat, never prorated" so the two clients
+    // price a legacy PER_JOB row identically.
     const q = computeBidQuote(bc({ price: 5000, priceUnit: "PER_JOB", duration: 30, numberOfUnits: 2, unitsOffered: 2 }));
+    expect(q.perUnitRental).toBe(150_000); // 5,000 × 30
+    expect(q.rentalSubtotal).toBe(300_000);
+  });
+
+  it("a PER_JOB bid with no duration is still just the rate — nothing to multiply", () => {
+    const q = computeBidQuote(bc({ price: 5000, priceUnit: "PER_JOB", duration: null, numberOfUnits: 2, unitsOffered: 2 }));
     expect(q.perUnitRental).toBe(5000);
-    expect(q.rentalSubtotal).toBe(10000);
+    expect(q.rentalSubtotal).toBe(10_000);
   });
 
   it("mobilization/demobilization are per-unit (× units); VAT is 15% of the pre-VAT subtotal", () => {
@@ -135,7 +142,7 @@ describe("computeBidQuote (shared quote math — comparison ↔ quotation parity
   });
 });
 
-describe("buildItemComparison — all-in (AC-09/10/35)", () => {
+describe("buildItemComparison — all-in (specs#306-AC-09/10/35)", () => {
   it("normalizes rate to the period × duration × units + stated mob/demob", () => {
     // 200/day · 30 days · 2 units = 12,000 + 800 mob + 800 demob = 13,600
     const { columns } = buildItemComparison([
@@ -183,7 +190,7 @@ describe("buildItemComparison — all-in (AC-09/10/35)", () => {
   });
 });
 
-describe("buildItemComparison — +X% vs lowest (AC-09)", () => {
+describe("buildItemComparison — +X% vs lowest (specs#306-AC-09)", () => {
   it("flags the lowest and computes the premium for the rest", () => {
     const { columns } = buildItemComparison([
       bc({ id: "a", supplierId: "1", price: 100, priceUnit: "PER_DAY", duration: 10 }), // 1000
@@ -197,7 +204,7 @@ describe("buildItemComparison — +X% vs lowest (AC-09)", () => {
   });
 });
 
-describe("buildItemComparison — latest live round per supplier (AC-38)", () => {
+describe("buildItemComparison — latest live round per supplier (specs#306-AC-38)", () => {
   it("keeps only the latest round and drops expired/withdrawn", () => {
     const { columns } = buildItemComparison([
       bc({ id: "r1", supplierId: "1", price: 100, priceUnit: "PER_DAY", duration: 1, round: 1 }),
@@ -209,7 +216,7 @@ describe("buildItemComparison — latest live round per supplier (AC-38)", () =>
   });
 });
 
-describe("buildItemComparison — qualification + excluded (AC-08/16/33)", () => {
+describe("buildItemComparison — qualification + excluded (specs#306-AC-08/16/33)", () => {
   it("counts conflicts and excludes a bid that fails every requirement", () => {
     const { columns, excluded } = buildItemComparison([
       bc({ id: "ok", supplierId: "1", price: 100, priceUnit: "PER_DAY", duration: 1, terms: { equipment: [term("year", "matched")], contract: [], supplier: [] } }),
@@ -221,7 +228,7 @@ describe("buildItemComparison — qualification + excluded (AC-08/16/33)", () =>
   });
 });
 
-describe("renter-entered cost (AC-12)", () => {
+describe("renter-entered cost (specs#306-AC-12)", () => {
   const rt = (maint: string) => ({ operatorIncluded: null, operatorNationality: null, fuelType: null, paymentMethod: null, paymentTerms: null, breakdownResponseSla: null, overtimeRate: null, maintenanceResponsibility: maint });
   it("adds the renter cost only where the responsibility lands on the renter", () => {
     // maintenance on the renter ("renter" → bidSide "me") → +500
@@ -233,7 +240,7 @@ describe("renter-entered cost (AC-12)", () => {
   });
 });
 
-describe("sortByPreset (AC-20 web side)", () => {
+describe("sortByPreset (specs#306-AC-20 web side)", () => {
   it("lowest sorts by all-in ascending", () => {
     const { columns } = buildItemComparison([
       bc({ id: "hi", supplierId: "1", price: 300, priceUnit: "PER_DAY", duration: 1 }),

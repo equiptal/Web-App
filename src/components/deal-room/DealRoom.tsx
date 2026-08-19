@@ -1,21 +1,51 @@
 "use client";
 
-import { useEffect, useRef, useState, Fragment } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
-import { StreamChat, type Channel } from "stream-chat";
+import { type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
+import { STREAM_API_KEY, leaseStream } from "@/lib/chat/stream-connection";
 import { useHeaderBack } from "@/components/AppShell";
-import { fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, ApiError } from "@/lib/api/client";
-import { computeDealTotals, type DealRoomView, type DealTerm, type DealRoomDocument, type DealRoomDocuments, type QuotationView } from "@/lib/contract/deal-room";
-import { reconstructRounds, collapseRounds, latestRoundBy, withOpeningRound, chatCardOfMessage, buildChatCardView, respondedProposalIds, latestProposalId, type DealRound } from "@/lib/contract/deal-rounds";
+import { fetchBidFleet, fetchBids, fetchRequestDetail, fetchRequestGroup, fetchDealRoom, fetchStreamToken, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, closeDealRoom, ApiError } from "@/lib/api/client";
+import { computeDealTotals, buildDealRoomQuotationDoc, quotationLinkKind, lastTermMove, type DealRoomView, type DealTerm, type QuotationView } from "@/lib/contract/deal-room";
+import { reconstructRounds, collapseRounds, latestRoundBy, withOpeningRound, liveRound, roundOverride, chatCardOfMessage, chatCardTime, buildChatCardView, requestRepliesByRef, requestThreadCards, respondedProposalIds, latestProposalId, type DealRound } from "@/lib/contract/deal-rounds";
+import type { FleetMachine } from "@/lib/contract/fleet";
+import { RENTEE_REQUEST_CARD_TYPE, RENTEE_REQUEST_REPLY_CARD_TYPE } from "@/lib/contract/rentee-request";
+import { ANSWER_CUE_MS, answeredAskRefs, latestAnsweredRef, postedSubject, replyFoldsIntoAsk, requestCardView, requestDocLabel, type RequestCardCtx } from "@/lib/contract/request-card";
 import { valText, type ResolutionsMap } from "@/components/deal-room/DealRoomTerms";
+import { cityLabel, rentalTypeLabel, urgencyLabel, termValueLabel } from "@/lib/contract/labels";
+import { buildSiblingTabs, type SiblingItemTab } from "@/lib/contract/sibling-tabs";
+import { dealSystemEventIcon } from "@/lib/contract/deal-system-event";
+import type { BidCard } from "@/lib/contract/bids";
 import { ChatCard } from "@/components/deal-room/ChatCard";
+import { RequestCard } from "@/components/map/RequestCard";
+import { fleetMachineResolver } from "@/components/map/request-card-ctx";
 import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
-import { renderQuotationSection, wrapQuotationPage, type QuotationDoc, type QuotationLineItem, type QuotationCard } from "@/lib/quotation/render";
+// Extracted so the map's chat dock mounts the SAME sheet rather than growing a second answer to
+// "call the supplier" (owner, 2026-08-19). Its own file carries the reasoning.
+import { CallModal } from "@/components/deal-room/CallModal";
+// Extracted alongside `CallModal` so the map's chat dock can offer the same cancellation, with the
+// same six reasons the supplier will be shown (owner, 2026-08-19).
+import { CancelReasonsModal } from "@/components/deal-room/CancelReasonsModal";
+import {
+  CHAT_ACCEPT,
+  CHAT_MAX_MEDIA,
+  chatAttachmentFilename,
+  chatFileRejection,
+  chatSendFailure,
+  classifyChatFile,
+  saveChatAttachment,
+  sendChatAttachment,
+  sendChatVoiceNote,
+  type ChatAttachment,
+} from "@/lib/chat/chat-attachments";
+import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/render";
 import "@/components/deal-room/deal-room-proto.css";
 import { computeQuoteTotals, computeRentalTotal, divisorNote } from "@/lib/pricing/rental";
 
-type StreamAttachment = { type?: string; image_url?: string; thumb_url?: string; asset_url?: string; title?: string; mime_type?: string; file_size?: number; fallback?: string };
+// The attachment shape is the SHARED one — this surface and the map's chat dock read the same
+// channel, so a second declaration here is a second thing to keep in step.
+type StreamAttachment = ChatAttachment;
 // `custom` carries the app's round payload (type:'rate_proposal', …) + location kind; i18n carries
 // Stream's message translations. Both are read defensively (reconstructRounds / the translate toggle).
 type ChatMsg = { id: string; text?: string; user?: { id?: string }; created_at?: string | Date; attachments?: StreamAttachment[]; custom?: Record<string, unknown>; i18n?: Record<string, unknown> };
@@ -29,285 +59,79 @@ function roomOpeningRound(room: DealRoomView) {
   };
 }
 const eqNum = (a: number | null, b: number | null) => (a == null || b == null ? a == b : Math.round(a) === Math.round(b));
-/** Total for one reconstructed round (reuses computeDealTotals with the round's full snapshot). */
+/** Total for one reconstructed round. The ladder itself is `roundOverride`, in the contract. */
 function roundTotals(room: DealRoomView, r: DealRound) {
-  return computeDealTotals(room, {
-    rate: r.rate, priceUnit: r.priceUnit, mobPrice: r.mobPrice, demobPrice: r.demobPrice,
-    rentalUnits: r.rentalUnits, mobUnits: r.mobUnits, demobUnits: r.demobUnits,
-    mobExcluded: r.mobExcluded, demobExcluded: r.demobExcluded,
-  });
+  return computeDealTotals(room, roundOverride(room, r));
 }
 
-const STREAM_KEY = process.env.NEXT_PUBLIC_STREAM_API_KEY ?? "";
+/** The room's live position, from the raw message list: reconstruct the rounds, take the last. */
+function liveRoundOf(room: DealRoomView, msgs: readonly unknown[]): DealRound | null {
+  return liveRound(withOpeningRound(collapseRounds(reconstructRounds(msgs as unknown[])), roomOpeningRound(room)));
+}
+
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
 type LFn = (en: string, arr: string) => string;
 
 /** A chat attachment's filename. `attName` produces a LOCALISED label for the bubble ("مرفق"), which is
- *  the wrong thing to write to disk — prefer the real title, then the name off the URL. */
+ *  the wrong thing to write to disk — prefer the real title, then the name off the URL. The rule and
+ *  the save itself moved to `lib/chat/chat-attachments` when the map's dock grew the same control:
+ *  one channel, one answer to what a file is called (owner, 2026-08-11). */
 function attFilename(a: StreamAttachment): string {
-  const title = (a.title ?? "").trim();
-  if (title) return title;
-  const path = (a.asset_url || a.image_url || a.thumb_url || "").split(/[?#]/)[0];
-  const last = decodeURIComponent(path.split("/").pop() ?? "");
-  return last || "attachment";
+  return chatAttachmentFilename({ title: a.title, url: a.asset_url || a.image_url || a.thumb_url });
 }
 
 /**
- * SAVE a chat attachment to the device, as opposed to opening it.
+ * The rentee's quotation, as an HTML page.
  *
- * The bubble's anchor navigates to the file, which for a PDF or an image means the browser renders it in
- * a tab — you can read it, but there's no in-page way to keep a copy. This fetches the bytes and hands
- * the browser a blob with a filename, the same idiom the export/quotation downloads use.
+ * A thin wrapper now: the document itself is built by `buildDealRoomQuotationDoc`, which reads the LIVE
+ * room the way the app does. It used to be built here out of a HYBRID of the frozen `Quotation` row and
+ * the room — see that function for exactly which fields moved.
  *
- * `download` on a plain anchor would NOT do: the attachment lives on Stream's CDN, and browsers ignore
- * the attribute cross-origin.
- *
- * Falls back to opening the URL if the fetch is refused (a CDN that sends no CORS headers). That's the
- * behaviour the anchor already gives, so the button can never be worse than not having it.
+ * A PREVIEW does not auto-print. The app never prints either; and offering a print dialog for a document
+ * that is explicitly not final invites a mid-negotiation draft onto paper as if it were the deal. The
+ * FINAL keeps auto-print, because that is what the Download CTA promises.
  */
-async function saveAttachment(url: string, filename: string): Promise<void> {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const blob = await res.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = objectUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(objectUrl);
-  } catch {
-    window.open(url, "_blank", "noopener,noreferrer");
-  }
-}
-
-// Deal-room chat attachments — matched EXACTLY to the mobile app (chat_input_bar.dart): images +
-// documents ≤ 10 MB, video ≤ 25 MB, and ONE attachment per message. The web used to allow any file,
-// any size, multiple at once — these bring it in line.
-const CHAT_IMAGE_EXT = ["jpg", "jpeg", "png", "webp", "heic"];
-const CHAT_DOC_EXT = ["pdf", "doc", "docx", "xls", "xlsx", "csv", "txt", "ppt", "pptx"];
-const CHAT_VIDEO_EXT = ["mp4", "mov", "m4v", "webm", "3gp"];
-const CHAT_ACCEPT = [
-  "image/jpeg", "image/png", "image/webp", "image/heic", ".jpg", ".jpeg", ".png", ".webp", ".heic",
-  ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt", ".ppt", ".pptx",
-  "video/mp4", "video/quicktime", "video/webm", ".mp4", ".mov", ".m4v", ".webm", ".3gp",
-].join(",");
-const CHAT_MAX_MEDIA = 10 * 1024 * 1024; // images + documents
-const CHAT_MAX_VIDEO = 25 * 1024 * 1024; // video
-
-/** Who the rentee party is, for the quotation's party block (from `/api/me` — the renter is themselves). */
-type RenteeIdentity = { name: string; phone: string | null; email: string | null };
-
-/**
- * Client-rendered deal-room quotation (the backend server PDF is disabled — the client renders it
- * now, app parity).
- *
- * The money comes from `computeDealTotals`, NOT from anything computed here: rental is
- * `(agreedRate ÷ divisor) × billableDays × units` — a six-day week, a 26-day month, Fridays excluded
- * from an inclusive `[start, end]` window — plus mobilization and demobilization at their OWN unit
- * counts, then VAT at `VAT_RATE`. That is the backend's `quotation.service.ts` formula
- * (`MONTHLY_BILLABLE_DAYS` / `WEEKLY_BILLABLE_DAYS` + `countFridaysInclusive`), which is the authority
- * both clients price against.
- *
- * This comment used to describe `extractQuotationData` and a `ceil(days/7)` / `ceil(days/30)` duration
- * factor. Both are gone: that symbol no longer exists in the app, and the arithmetic it described
- * charged the Fridays and used a seven-day week. A comment describing another repo's behaviour is how
- * the duration off-by-one survived — if this one ever disagrees with `computeDealTotals`, the function
- * is right and this paragraph is wrong.
- *
- * TWO kinds, and the distinction is the point:
- *
- *   • `final` (room CLOSED) — the signed document. Agreed values come from the confirmed Quotation
- *     row (+ the deal room for mob/demob/units/fixed terms/supplier name).
- *
- *   • `draft` (before CLOSED) — there is no Quotation row yet, so EVERYTHING comes from the live deal
- *     room. `q` is null. This is deliberately built from the room and not from the bid: the bid only
- *     tracks the negotiated PRICE (the backend writes price counters back to `bid.priceAmount`), so a
- *     bid-derived document silently misses negotiated unit counts, excluded delivery/return legs and
- *     non-price terms — i.e. it can state the right number for the wrong deal. The room has all of it.
- *     Rendered with a DRAFT badge + watermark and no quotation number; see `draftLabel` in render.ts.
- */
-function buildQuotationHtml(room: DealRoomView, q: QuotationView | null, rentee: RenteeIdentity, ar: boolean, L: (en: string, arr: string) => string, kind: "final" | "draft"): string {
-  const draft = kind === "draft";
-  const lang = ar ? "ar" : "en";
-  const sar = L("SAR", "ر.س");
-  // EXACT same math as the live price bar (computeDealTotals) — prorated ÷26/÷7, PER_JOB / no-duration =
-  // one full period, mob/demob use their own counts + honor leg exclusion, VAT 15%. Guarantees the
-  // quotation total == the number the renter saw in the room.
-  const t = computeDealTotals(room, { rate: q?.agreedRate ?? room.rate, priceUnit: q?.priceUnit ?? room.priceUnit });
-  const rate = t.rate;
-  const unit = t.priceUnit;
-  const units = t.rentalUnits;
-  const days = room.periods;
-  const periodLabel = unit === "PER_WEEK" ? L("week", "أسبوع") : unit === "PER_MONTH" ? L("month", "شهر") : unit === "PER_JOB" ? L("job", "مهمة") : L("day", "يوم");
-  const rentalTotal = t.rentalTotal;
-  const subtotal = t.subtotal;
-  const vat = t.vat;
-  const total = t.grand;
-  const dateStr = new Date().toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
-  // A DRAFT must NOT carry a quotation number — an issued reference is precisely what makes a document
-  // read as final. Cite the REQUEST code instead: a reference to the negotiation, not to a quotation.
-  const qnum = draft ? (room.shortCode || "—") : ((q?.quotationNumber ?? "").slice(0, 8).toUpperCase() || "—");
-  const contractType = q?.contractType ?? room.contractType;
-
-  const valFmt = (v: unknown): string => {
-    if (v == null || v === "") return "—";
-    if (Array.isArray(v)) return v.length ? v.map(String).join(", ") : "—";
-    if (typeof v === "boolean") return v ? L("Yes", "نعم") : L("No", "لا");
-    const t = String(v).toLowerCase();
-    if (t === "supplier") return L("Supplier", "المؤجّر");
-    if (t === "rentee" || t === "renter") return L("Rentee", "المستأجر");
-    if (t === "true" || t === "included" || t === "yes") return L("Yes", "نعم");
-    if (t === "false" || t === "excluded" || t === "not_included" || t === "no") return L("No", "لا");
-    return String(v);
-  };
-
-  // Invoice line items (rental + delivery + return) — SAME 6-column table as the bid-card quotation.
-  const lineItems: QuotationLineItem[] = [];
-  // Rental qty/price columns mirror the live price bar's factor logic: PER_JOB → units jobs; whole
-  // period count → "N × units"; a partial (day-count) duration → effective per-day rate × days.
-  const factorInt = Number.isInteger(t.periodCount) ? t.periodCount : null;
-  const partial = unit !== "PER_JOB" && t.hasDuration && factorInt == null;
-  const rentalQty = unit === "PER_JOB"
-    ? String(units)
-    : partial
-      ? `${room.periods} ${L("days", "يوم")}${units > 1 ? ` × ${units}` : ""}`
-      : `${factorInt ?? 1}${units > 1 ? ` × ${units}` : ""}`;
-  lineItems.push({
-    num: 1, label: L("Rental", "الإيجار"), detail: room.supplier.name,
-    unit: partial ? L("day", "يوم") : periodLabel,
-    qty: rentalQty,
-    price: partial ? `${nf(Math.round(t.perDayRate))} / ${L("day", "يوم")}` : `${nf(rate)} / ${periodLabel}`,
-    total: nf(rentalTotal),
-  });
-  // Mob/demob ALWAYS shown; honor each leg's OWN unit count + exclusion (excluded → "Not included",
-  // matching the price bar which contributes 0 for an excluded leg).
-  const logiRow = (label: string, excluded: boolean, price: number, unitsN: number, lineTotal: number, byRentee: boolean): QuotationLineItem =>
-    excluded
-      ? { num: null, label, detail: L("Not included", "غير مشمول"), unit: "—", qty: "—", price: "—", total: L("Not included", "غير مشمول") }
-      : price > 0
-        ? { num: null, label, detail: room.supplier.name, unit: L("Trip", "رحلة"), qty: String(unitsN), price: nf(price), total: nf(lineTotal) }
-        : { num: null, label, detail: byRentee ? L("Arranged by the rentee", "يُرتّبه المستأجر") : L("Included", "مشمول"), unit: "—", qty: "—", price: "—", total: byRentee ? L("By rentee", "على المستأجر") : L("Included", "مشمول") };
-  lineItems.push(logiRow(L("Delivery to site", "النقل إلى الموقع"), t.mobExcluded, t.mobPrice, t.mobUnitsN, t.mobTotal, room.mobByRentee === true));
-  lineItems.push(logiRow(L("Return from site", "الإرجاع من الموقع"), t.demobExcluded, t.demobPrice, t.demobUnitsN, t.demobTotal, room.demobByRentee === true));
-
-  const cards: QuotationCard[] = [];
-  // Structured rental/equipment details (from the request item) — rows with no value are skipped
-  // (field names best-effort). Operator/safety + cost responsibilities are NOT separate cards: they
-  // flow through the Agreed/Fixed terms + the price extras below, matching the app.
-  const dd = room.details;
-  const yn = (b: boolean | null) => (b == null ? null : b ? L("Yes", "نعم") : L("No", "لا"));
-  const fmtDate = (v: string | null) => { if (!v) return null; const dt = new Date(v); return isNaN(dt.getTime()) ? v : dt.toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" }); };
-  const addRow = (rowsArr: { label: string; value: string }[], label: string, v: unknown) => {
-    if (v == null || v === "" || (Array.isArray(v) && !v.length)) return;
-    rowsArr.push({ label, value: Array.isArray(v) ? v.join(", ") : String(v) });
-  };
-  const detailRows: { label: string; value: string }[] = [];
-  addRow(detailRows, L("Equipment", "المعدة"), dd.equipmentLabel);
-  addRow(detailRows, L("Location", "الموقع"), dd.location);
-  addRow(detailRows, L("Rental type", "نوع الإيجار"), dd.rentalType);
-  addRow(detailRows, L("Contract type", "نوع العقد"), contractType);
-  addRow(detailRows, L("Start date", "تاريخ البدء"), fmtDate(dd.startDate));
-  addRow(detailRows, L("End date", "تاريخ الانتهاء"), fmtDate(dd.endDate));
-  addRow(detailRows, L("Duration", "المدة"), days != null ? `${days} ${L("days", "يوم")}` : null);
-  addRow(detailRows, L("Working hours/day", "ساعات العمل/يوم"), dd.workingHoursPerDay);
-  addRow(detailRows, L("Working days/week", "أيام العمل/أسبوع"), dd.workingDaysPerWeek);
-  addRow(detailRows, L("Fulfillment", "التنفيذ"), dd.fulfillment);
-  addRow(detailRows, L("Urgency", "الأولوية"), dd.urgency);
-  addRow(detailRows, L("Subletting", "التأجير من الباطن"), yn(dd.subletting));
-  addRow(detailRows, L("Local content", "المحتوى المحلي"), yn(dd.localContent));
-  addRow(detailRows, L("Rental extendable", "قابل للتمديد"), yn(dd.extendable));
-  addRow(detailRows, L("Additional notes", "ملاحظات إضافية"), dd.additionalNotes);
-  if (detailRows.length) cards.push({ title: L("Rental & equipment details", "تفاصيل الإيجار والمعدة"), rows: detailRows });
-
-  // Price extras (app parity): overtime rate + cost-responsibility items ("fuel → supplier"), shown in
-  // the price section. These cost keys are excluded from the term cards below to avoid duplication.
-  const COST_KEYS = new Set(["fuel", "maintenance", "overtime", "overtime_rate", "operator_food", "fat_food", "operator_transport_accommodation", "fat_accommodation_transport", "operator_transport"]);
-  const isCost = (k: string) => COST_KEYS.has(k);
-  const priceExtras: { label: string; value: string }[] = [];
-  if (dd.overtimeRate) priceExtras.push({ label: L("Overtime rate", "سعر العمل الإضافي"), value: /^\d+(\.\d+)?$/.test(dd.overtimeRate) ? `${dd.overtimeRate}x` : dd.overtimeRate });
-  const seenCost = new Set<string>();
-  for (const term of q?.agreedTerms ?? []) if (isCost(term.key) && !seenCost.has(term.key)) { seenCost.add(term.key); priceExtras.push({ label: ar ? term.labelAr : term.label, value: valFmt(term.value) }); }
-  for (const term of room.terms) if (isCost(term.key) && !seenCost.has(term.key)) { seenCost.add(term.key); priceExtras.push({ label: ar ? term.labelAr : term.label, value: valFmt(term.value ?? term.platformDefault) }); }
-
-  // FINAL reads the agreed snapshot off the Quotation row. DRAFT has no snapshot, so it derives from the
-  // room's live term states — and SPLITS them. A term the two sides haven't settled has no agreed value,
-  // so listing its current value under "Agreed" would assert something untrue; those get their own card.
-  const roomRows = (ts: DealTerm[]) => ts.filter((tm) => tm.key !== "PRICE" && !isCost(tm.key)).map((tm) => ({ label: ar ? tm.labelAr : tm.label, value: valFmt(tm.value ?? tm.platformDefault) }));
-  if (draft) {
-    const settledRows = roomRows(room.terms.filter((tm) => tm.state === "agreed" || tm.state === "soft_accepted"));
-    if (settledRows.length) cards.push({ title: L("Agreed so far", "ما اتُّفق عليه حتى الآن"), rows: settledRows });
-    const openRows = room.terms
-      .filter((tm) => tm.key !== "PRICE" && !isCost(tm.key) && (tm.state === "disputed" || tm.state === "pending"))
-      .map((tm) => ({ label: ar ? tm.labelAr : tm.label, value: L("Under negotiation", "قيد التفاوض") }));
-    if (openRows.length) cards.push({ title: L("Still under negotiation", "لا يزال قيد التفاوض"), rows: openRows });
-  } else {
-    const agreedRows = (q?.agreedTerms ?? []).filter((tm) => tm.key !== "PRICE" && !isCost(tm.key)).map((tm) => ({ label: ar ? tm.labelAr : tm.label, value: valFmt(tm.value) }));
-    if (agreedRows.length) cards.push({ title: L("Agreed terms", "الشروط المتفق عليها"), rows: agreedRows });
-  }
-  const fixedRows = roomRows(room.terms.filter((tm) => tm.state === "fixed"));
-  if (fixedRows.length) cards.push({ title: L("Fixed terms", "الشروط الثابتة"), rows: fixedRows });
-
-  const doc: QuotationDoc = {
-    lang,
-    title: draft ? L("Draft quotation", "مسودة عرض سعر") : L("Equipment rental quotation", "عرض سعر تأجير معدات"),
-    quotationNumber: qnum,
-    dateStr,
-    supplier: {
-      label: L("Supplier", "المؤجِّر"),
-      name: room.supplier.name,
-      idRows: [
-        { label: L("National Address", "العنوان الوطني"), verified: room.supplier.isVerified },
-        { label: L("CR #", "س.ت"), verified: room.supplier.isVerified },
-        { label: L("VAT #", "ض.ق.م"), verified: room.supplier.isVerified },
-        // Pre-close there's no Quotation row: the room always carries the supplier's phone
-        // (server-gated, see DealParty.phone). Supplier email isn't on the deal-room projection yet.
-        { label: L("Phone", "الهاتف"), value: q?.supplierPhone ?? room.supplier.phone },
-        { label: L("Email", "البريد"), value: q?.supplierEmail },
-      ],
-      // Verified shows on the CR/VAT rows ("✓ Verified") — no standalone orphan party chip.
-      chips: [],
-    },
-    rentee: {
-      label: L("Rentee", "المُستأجِر"),
-      name: rentee.name,
-      idRows: [
-        // The rentee IS the viewer, so /api/me backfills their own contact pre-close (the room gates
-        // rentee.phone to CLOSED).
-        { label: L("Phone", "الهاتف"), value: q?.renteePhone ?? rentee.phone },
-        { label: L("Email", "البريد"), value: q?.renteeEmail ?? rentee.email },
-      ],
-      chips: [],
-    },
+function buildQuotationHtml(
+  room: DealRoomView,
+  q: QuotationView | null,
+  rentee: { name: string; phone?: string | null; email?: string | null },
+  ar: boolean,
+  L: LFn,
+  /** The room’s live position, so the paper and the price bar cannot print two different deals. */
+  live?: DealRound | null,
+): string {
+  const kind = quotationLinkKind(room.status) ?? "preview";
+  const doc = buildDealRoomQuotationDoc(room, q, rentee, ar, L, {
     logoUrl: typeof window !== "undefined" ? `${window.location.origin}/moedatech-logomark.svg` : undefined,
-    meta: [], // no meta strip (app parity) — reference/contract/period live in the details card
-    priceExtras,
-    lineItems,
-    currency: sar,
-    totals: { subtotal, vat, total },
-    cards,
-    showSigned: false,
-    draftLabel: draft ? L("Draft — not final", "مسودة — غير نهائية") : null,
-    // Short disclaimer instead of the full legal clause list + signed block (app parity). A draft gets a
-    // DIFFERENT one: no validity period (it isn't an offer, so there's nothing to expire) and an explicit
-    // statement that neither party is bound — the renter may forward this file to a third party.
-    legal: draft
-      ? [L("This is a DRAFT of a deal still under negotiation — it is not a quotation, not an offer, and not binding on either party. The supplier has not confirmed it, and the price, quantities and terms can still change. A final quotation is issued only once both sides confirm.", "هذه مسودة لصفقة لا تزال قيد التفاوض — وهي ليست عرض سعر ولا إيجابًا، وغير ملزمة لأي من الطرفين. لم يؤكّدها المؤجّر بعد، وقد تتغيّر الأسعار والكميات والشروط. يُصدَر عرض السعر النهائي فقط بعد تأكيد الطرفين.")]
-      : [L("This quotation is generated electronically via Moedatech, valid for 7 days from the issue date. Prices exclude anything not listed above; VAT at 15% applies per Saudi tax law.", "صدر هذا العرض إلكترونيًا عبر منصة معداتك، وهو ساري المفعول لمدة ٧ أيام من تاريخ الإصدار. الأسعار لا تشمل ما لم يُذكر أعلاه، وتُطبَّق ضريبة القيمة المضافة بنسبة ١٥٪ وفقًا للنظام السعودي.")],
-  };
-  // The window title is what the browser offers as the print/save filename — so it must carry DRAFT too.
-  const pageTitle = draft
-    ? `${L("DRAFT", "مسودة")} · ${room.shortCode || L("Deal room", "غرفة الصفقة")}`
-    : L("Confirmed Quotation", "عرض سعر مؤكّد");
-  return wrapQuotationPage(renderQuotationSection(doc), { lang, title: pageTitle });
+  }, live ? roundOverride(room, live) : null);
+  return wrapQuotationPage(renderQuotationSection(doc), {
+    lang: doc.lang,
+    title: kind === "final" ? L("Final quotation", "عرض السعر النهائي") : L("Preview quotation", "معاينة عرض السعر"),
+    autoPrint: kind === "final",
+  });
 }
 
-export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) => void }) {
+export function DealRoom({ id, onTitle, initialFlow }: {
+  id: string;
+  onTitle?: (t: string) => void;
+  /**
+   * Open one of the two flows on arrival — the deep link behind `/deal-room/[id]?act=counter|accept`
+   * (owner, 2026-08-11).
+   *
+   * The rentee-map price footer's buttons are *these* buttons pressed from a surface that cannot host
+   * the flow (004a §4a.2); without this they landed the renter on the room and asked him to press
+   * Negotiate again for the thing he had already asked for. It seeds `openFlow` and nothing else — no
+   * part of the flow is reachable, or duplicated, through this prop.
+   */
+  initialFlow?: "counter" | "accept";
+}) {
   const { locale } = useLocale();
   const ar = locale === "ar";
-  const L = (en: string, arr: string) => (ar ? arr : en);
+  /* `useCallback`, as the map's dock declares the same helper. Identical semantics — it is still
+     "pick the string for this script" — but a STABLE reference, which the request-card context below
+     lists as a dependency. Re-created every render it would rebuild that context on every render,
+     which is the one thing a memo exists not to do. */
+  const L = useCallback((en: string, arr: string) => (ar ? arr : en), [ar]);
   const router = useRouter();
   // In-app Back arrow in the AppShell header → the Inbox (the deal-room list). A deal room is a
   // drill-down, so this gives an explicit way up instead of relying on the browser back button.
@@ -322,8 +146,13 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   // Accept. `flowMode` picks which — null = closed.
   const [flowMode, setFlowMode] = useState<"counter" | "accept" | null>(null);
   const [counterErr, setCounterErr] = useState<string | null>(null);
-  const [showDocs, setShowDocs] = useState(false);
   const [callOpen, setCallOpen] = useState(false); // call-supplier modal (shows the number + dial/copy)
+  const [menuOpen, setMenuOpen] = useState(false); // ⋮ kebab (equipment · company · cancel)
+  const [showRequest, setShowRequest] = useState(false); // request-summary modal, off the header chip
+  const [cancelOpen, setCancelOpen] = useState(false); // cancel-the-deal reasons modal
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelErr, setCancelErr] = useState<string | null>(null);
+  const [siblingTabs, setSiblingTabs] = useState<SiblingItemTab[]>([]);
   // Touch device → dial (tel:). Desktop/laptop → just SHOW the number (you can't place a call from a laptop).
   const [canCall, setCanCall] = useState(false);
   useEffect(() => { setCanCall(typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true); }, []);
@@ -340,6 +169,31 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   // App parity: term accept/counter are collected LOCALLY here and submitted once (batched) on
   // Counter/Accept — nothing is PATCHed per click.
   const [resolutions, setResolutions] = useState<ResolutionsMap>({});
+
+  /**
+   * ── V12b · the bid's fleet, so a request card can be a CARD here too (owner, 2026-08-11) ────────
+   * The ruling: *"i want it like request card"*. The map's chat dock renders the renter's ask — and
+   * the supplier's answer — as the prototype's `rRequestCard`: an identity strip naming the machine,
+   * the ask, and a live status row. This route rendered the SAME two messages off the SAME channel as
+   * a title and a list of key/value rows, because the one thing it lacked was the machine's NAME:
+   * `RenteeRequestCardPayload` carries `equipmentId` and a display-only `serial` (§7.3) and no label,
+   * so the name can only come from the fleet.
+   *
+   * So the fleet is fetched here, by the SAME client function the map uses (`fetchBidFleet`, keyed by
+   * bid because `inBid`/`yardConfirmed` are only meaningful relative to one bid). Three properties
+   * this state exists to guarantee, in order of how badly each would hurt:
+   *
+   * 1. **The conversation never waits for it.** `null` is the initial value and the thread renders
+   *    immediately; the cards fill in when it lands. A chat that blocks on a fleet read is a chat
+   *    broken by an endpoint that has nothing to do with talking.
+   * 2. **A failure changes nothing.** The catch leaves this `null`, which is exactly the state this
+   *    route was in before today — `fleetKnown: false`, the generic `ChatCard`, the ask stated and no
+   *    verdict claimed. Latching a failure flag would only give the surface something to say about it,
+   *    and there is nothing here to say it in.
+   * 3. **It is a READ.** Opening a deal room that already exists creates nothing, and this must not
+   *    become a second write path — `GET` all the way down.
+   */
+  const [fleet, setFleet] = useState<FleetMachine[] | null>(null);
 
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [myStreamId, setMyStreamId] = useState<string | null>(null);
@@ -371,6 +225,26 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     }
   }
 
+  // Cancel the negotiation (app parity: `DealRoomCloseRequested`). Backend flips the room to
+  // ABANDONED and releases whatever the bid was holding; loadRoom then renders the read-only room.
+  //
+  // The reason text is what the renter picked in the modal — one of the five canned reasons, or his
+  // own words under "Other". It is sent as written rather than as a code because that is what the
+  // backend stores and what the supplier is shown.
+  async function doCancel(reasonText: string) {
+    setCancelErr(null);
+    setCancelling(true);
+    try {
+      await closeDealRoom(id, reasonText);
+      setCancelOpen(false);
+      await loadRoom();
+    } catch (e) {
+      setCancelErr(errMsg(e, L("Couldn't cancel the deal. Please try again.", "تعذّر إلغاء الصفقة. حاول مرة أخرى.")));
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   // deal-room/negotiation — withdraw a pending acceptance (AWAITING → NEGOTIATING). App parity:
   // "withdraw acceptance"; backend clears the reserved units + re-arms the bid, loadRoom restores the
   // negotiate controls. Distinct from release (which reopens a CLOSED deal).
@@ -387,31 +261,39 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     }
   }
 
-  // The confirmed-deal quotation. The server-side PDF is disabled (app parity — the client renders it
-  // now), so we build it CLIENT-SIDE from the confirmed Quotation row's AGREED snapshot (agreedRate,
-  // agreedTerms, contractType, phones/emails) + the deal room (mob/demob, units, fixed terms, supplier
-  // name) + the renter's name (/api/me), matching the app's extractQuotationData. If a real presigned
-  // pdfUrl ever exists it's opened as-is (fallback).
-  async function downloadQuotation(kind: "final" | "draft") {
+  // The rentee's quotation — ALWAYS RENDERED, never a stored file, at any status (app parity:
+  // `bid_quotation_page` re-renders from a fresh `getBidDetail` on every open).
+  //
+  // ⚠ The app is NOT missing a PDF button — it has one. What it has no path to is a STORED file: its
+  // "تنزيل PDF" rasterizes the document it has just rendered (`buildRasterizedQuotationPdf`) rather than
+  // downloading one the server made. What is commented out is the SERVER-side generation, in the
+  // backend's `confirmDeal`. So "the app always renders" is about the source of the document, not about
+  // the absence of an export.
+  //
+  // This used to prefer `q.pdfUrl` and open the stored PDF instead of rendering. Server-side generation
+  // was switched off on 2026-06-23, so only deals closed before then have a file — but
+  // `POST /quotation/retry-pdf` accepts PENDING and can still mint one for ANY deal, and from that
+  // moment that deal's quotation stopped being live forever. The endpoint stays (owner's call); it is
+  // the RENDERER that no longer defers to it. A pre-June deal now shows the same rendered document
+  // every other deal shows, built from the room that deal closed on.
+  //
+  // The Quotation row exists only once the deal is CLOSED — `GET .../quotation` 404s before that — so
+  // the fetch is best-effort and `null` is a perfectly good answer. It supplies only the formal
+  // quotation number and the supplier's e-mail; every other value comes off the live room.
+  async function openQuotation() {
     if (quoteBusy || !room) return;
     setQuoteBusy(true);
     setQuoteErr(null);
     try {
-      // FINAL only: the Quotation row is created by the SUPPLIER's confirm, so requesting it before the
-      // room is CLOSED would fail and land in the catch below as "couldn't load". A draft never asks.
-      let q: QuotationView | null = null;
-      if (kind === "final") {
-        q = await fetchQuotation(id);
-        if (q.pdfUrl) {
-          window.open(q.pdfUrl, "_blank", "noopener,noreferrer");
-          return;
-        }
-      }
-      let rentee: RenteeIdentity = { name: "", phone: null, email: null };
+      const q = await fetchQuotation(id).catch(() => null);
+      // The buyer block, live from the signed-in rentee (the app fills it from the profile the same way).
+      let rentee: { name: string; phone?: string | null; email?: string | null } = { name: "" };
       try {
         const meRes = await fetch("/api/me", { cache: "no-store" });
         if (meRes.ok) {
-          const d = (await meRes.json()) as { user?: { firstName?: string | null; lastName?: string | null; companyName?: string | null; phone?: string | null; email?: string | null } };
+          const d = (await meRes.json()) as {
+            user?: { firstName?: string | null; lastName?: string | null; companyName?: string | null; phone?: string | null; email?: string | null };
+          };
           const u = d.user ?? {};
           rentee = {
             name: (u.companyName?.trim() || [u.firstName, u.lastName].filter(Boolean).join(" ")) ?? "",
@@ -420,14 +302,16 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
           };
         }
       } catch {
-        /* identity is best-effort */
+        /* the buyer block is best-effort */
       }
       const w = window.open("", "_blank");
       if (!w) {
         setQuoteErr(L("Allow pop-ups to open the quotation.", "اسمح بالنوافذ المنبثقة لفتح عرض السعر."));
         return;
       }
-      w.document.write(buildQuotationHtml(room, q, rentee, ar, L, kind));
+      // The SAME live position the price bar prices on — a paper that re-derived from the room’s
+      // columns would print the last agreement under a heading the renter just read a counter on.
+      w.document.write(buildQuotationHtml(room, q, rentee, ar, L, liveRoundOf(room, messages)));
       w.document.close();
     } catch (e) {
       setQuoteErr(errMsg(e, L("Couldn’t load the quotation.", "تعذّر تحميل عرض السعر.")));
@@ -460,18 +344,106 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     if (room && onTitle) onTitle(room.supplier.name);
   }, [room, onTitle]);
 
+  /* ── The fleet behind the request cards — once per room, and never in the way ────────────────────
+     Fired off the moment the room answers with a bid id, in its own effect: it is not on the chat's
+     path, not on the room's, and nothing renders behind it. `room.bidId` is the whole dependency, so
+     the 15s room poll above cannot re-request it — a bid id does not change under a deal room
+     (`DealRoom.bidId` is `@unique`).
+
+     The catch is EMPTY on purpose. Every plausible failure here — the endpoint refusing a caller it
+     does not serve, a network drop, a bid whose supplier has since delisted — leaves `fleet` null,
+     and null is precisely the state this route shipped in until today: the ask still states what was
+     asked and simply claims no verdict (`fleetKnown: false`). There is nothing for the renter to do
+     about a fleet read, so there is nothing to tell him about one; the conversation is what he came
+     for and it is untouched. */
+  useEffect(() => {
+    const bidId = room?.bidId;
+    if (!bidId) return;
+    let active = true;
+    fetchBidFleet(bidId)
+      .then((r) => { if (active) setFleet(r.machines); })
+      .catch(() => { /* the cards fall back to the fleet-less form — see the state's comment */ });
+    return () => {
+      active = false;
+    };
+  }, [room?.bidId]);
+
+
+  /* ── The sibling strip (app parity: `sibling_item_tabs.dart`) ────────────────────────────────────
+     A multi-item post fans out into one request per item, so a renter who posted three machines and
+     got bids from one supplier has three rooms with that firm — and, the deal room being a route, no
+     way between them but backing out to the offers list.
+
+     Three reads, and the first two are cheap: the group id usually rides on the room payload, and
+     falling back to the request detail is one call. The per-sibling bid lists then run in parallel,
+     each catching its own failure — an unreadable list costs its own tab, never the whole strip.
+
+     The whole effect is silent on failure. There is nothing for the renter to do about a strip that
+     did not load, and the conversation he came for is untouched. */
+  useEffect(() => {
+    const requestId = room?.requestId;
+    const supplierId = room?.supplierId;
+    if (!requestId || supplierId == null) return;
+    let active = true;
+
+    void (async () => {
+      try {
+        const groupId = room?.requestGroupId
+          ?? ((await fetchRequestDetail(requestId).catch(() => null))?.requestGroupId as string | undefined)
+          ?? null;
+        if (!active || !groupId) return;
+
+        const { requests } = await fetchRequestGroup(groupId);
+        // A group of one has nothing to switch between; the rule refuses it too, but there is no
+        // reason to fetch a bid list to be told so.
+        if (!active || requests.length < 2) return;
+
+        const byRequest = new Map<string, BidCard[]>();
+        await Promise.all(
+          requests.map((r) =>
+            fetchBids(r.id)
+              .then((d) => { byRequest.set(r.id, d.bids); })
+              .catch(() => { /* this sibling loses its tab; the rest of the strip still draws */ }),
+          ),
+        );
+        if (!active) return;
+
+        setSiblingTabs(buildSiblingTabs({
+          siblings: requests,
+          currentRequestId: requestId,
+          bidOn: (rid) => {
+            const hit = (byRequest.get(rid) ?? []).find((x) => String(x.supplierId ?? "") === String(supplierId));
+            return hit ? { bidId: hit.id, dealRoomId: hit.dealRoomId } : null;
+          },
+        }));
+      } catch { /* silent — see the block comment */ }
+    })();
+
+    return () => { active = false; };
+  }, [room?.requestId, room?.requestGroupId, room?.supplierId]);
+
 
   // Live chat (GetStream).
+  //
+  // The connection is taken from the shared, REFERENCE-COUNTED module rather than owned here. It used
+  // to be `StreamChat.getInstance(...)` + an unconditional `disconnectUser()` on unmount — which is
+  // safe only while exactly one component ever connects. The chat dock on the equipment-verification
+  // surface (004a §4a.3) breaks that: whichever of the two unmounted first would silently kill the
+  // other's channels. Now the last release disconnects, and this component's cleanup is a release.
   useEffect(() => {
-    if (!STREAM_KEY) return;
-    let client: StreamChat | null = null;
+    if (!STREAM_API_KEY) return;
+    // The lease is opened SYNCHRONOUSLY, before the token fetch. Cleanup runs synchronously at
+    // unmount, so a flag set *after* the await would still read false there and the reference taken
+    // a moment later would never be given back — pinning `refCount` above zero and leaving every
+    // later visit on a cached client that is never re-authenticated. The lease records the release
+    // instead, and whichever of the two runs last honours it.
+    const lease = leaseStream();
     let cancelled = false;
     (async () => {
       try {
         const tok = await fetchStreamToken(id);
         if (cancelled || !tok.token || !tok.userId || !tok.channelId) return;
-        client = StreamChat.getInstance(STREAM_KEY);
-        await client.connectUser({ id: tok.userId }, tok.token);
+        const client = await lease.connect(tok.userId, tok.token);
         if (cancelled) return;
         setMyStreamId(tok.userId);
         const ch = client.channel("messaging", tok.channelId);
@@ -496,7 +468,9 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
       cancelled = true;
       channelRef.current = null;
       if (roomRefetchTimer.current) clearTimeout(roomRefetchTimer.current);
-      client?.disconnectUser().catch(() => {});
+      // Release, never disconnect: another surface may still be reading the same client. Releasing
+      // the LEASE (rather than a `held` flag) is what makes an unmount-during-connect safe.
+      lease.release();
     };
     // loadRoom just re-reads fetchDealRoom(id) (id stable) — don't re-open the chat connection for it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -517,37 +491,24 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     }
   }
 
-  /** Upload + send ONE attachment via GetStream, gated to the app's allowed types + size caps. */
+  /** Upload + send ONE attachment via GetStream. The gate, the caps and the message shape are the
+   *  SHARED ones (`lib/chat/chat-attachments`) — the map's chat dock sends through the same pair, so
+   *  a file is the same object whichever surface it left from. */
   async function sendFiles(files: FileList | null) {
     const ch = channelRef.current;
-    if (!ch || !files || !files.length) return;
-    setFileErr(null);
     // App parity: one attachment per message — take the first only.
-    const file = files[0];
-    const ext = (file.name.split(".").pop() ?? "").toLowerCase();
-    const isImg = file.type.startsWith("image/") || CHAT_IMAGE_EXT.includes(ext);
-    const isVideo = file.type.startsWith("video/") || CHAT_VIDEO_EXT.includes(ext);
-    const isDoc = CHAT_DOC_EXT.includes(ext);
-    if (!isImg && !isVideo && !isDoc) {
-      setFileErr(L("That file type isn't supported.", "نوع الملف غير مدعوم."));
-      return;
-    }
-    const cap = isVideo ? CHAT_MAX_VIDEO : CHAT_MAX_MEDIA;
-    if (file.size > cap) {
-      setFileErr(L(`File is too large (max ${Math.round(cap / (1024 * 1024))} MB).`, `الملف كبير جدًا (الحد ${Math.round(cap / (1024 * 1024))} ميغابايت).`));
-      return;
-    }
+    const file = files?.[0];
+    if (!ch || !file) return;
+    setFileErr(null);
+    const verdict = classifyChatFile(file);
+    // A refusal never reached the wire, so no spinner is owed for it.
+    if (!verdict.ok) { setFileErr(chatFileRejection(verdict, L)); return; }
     setUploading(true);
     try {
-      const res = isImg ? await ch.sendImage(file) : await ch.sendFile(file);
-      const attachment: StreamAttachment = isImg
-        ? { type: "image", image_url: res.file, fallback: file.name }
-        : { type: "file", asset_url: res.file, title: file.name, mime_type: file.type, file_size: file.size };
-      const body = text.trim();
-      await ch.sendMessage({ text: body || undefined, attachments: [attachment] });
+      await sendChatAttachment(ch, file, verdict.kind, text);
       setText("");
     } catch {
-      setFileErr(L("Upload failed — please try again.", "فشل الرفع — حاول مجددًا."));
+      setFileErr(chatSendFailure("attachment", L));
     } finally {
       setUploading(false);
     }
@@ -560,10 +521,9 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     setFileErr(null);
     setUploading(true);
     try {
-      const res = await ch.sendFile(file);
-      await ch.sendMessage({ attachments: [{ type: "audio", asset_url: res.file, title: file.name, mime_type: file.type, file_size: file.size }] });
+      await sendChatVoiceNote(ch, file);
     } catch {
-      setFileErr(L("Couldn't send the voice note.", "تعذّر إرسال الملاحظة الصوتية."));
+      setFileErr(chatSendFailure("voice", L));
     } finally {
       setUploading(false);
     }
@@ -574,6 +534,31 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     setCounterErr(null);
     setFlowMode(mode);
   }
+
+  // ── The `?act=` deep link (owner, 2026-08-11) ───────────────────────────────────────────────────
+  // Seeded ONCE per visit, through `openFlow` itself, so the flow keeps every guard it already had —
+  // including the one this file states twice over: nothing opens before the room is here or while a
+  // submit is in flight.
+  const seededFlow = useRef(false);
+  // Written during the render below, read here. The verdict belongs to that render — `canAccept`
+  // compares the room's terms against the last two negotiation rounds and is derived long past the
+  // early returns, far past where a hook may be declared. A ref is the only way the two can meet, and
+  // it is a pure mirror of what this render's own buttons carry, so a discarded render costs nothing.
+  const flowGate = useRef<{ counter: boolean; accept: boolean }>({ counter: false, accept: false });
+  useEffect(() => {
+    if (seededFlow.current || !initialFlow || !room || busy) return;
+    // Accept waits for the chat, Counter does not. `canAccept`'s price/units halves are reconstructed
+    // from the message stream; judged before it lands they degrade to "nothing to compare", so an
+    // outstanding supplier counter would be invisible and the gate would read open when it is shut.
+    // Counter's own condition is `room.myTurn` — a field of the room — so it needs nothing else.
+    // Where the chat never connects at all the accept link simply never fires, leaving the renter on
+    // the room: the same place a blocked accept leaves him, under the same strip.
+    if (initialFlow === "accept" && !chatReady && STREAM_API_KEY) return;
+    seededFlow.current = true; // whatever the verdict — closing the sheet must not reopen it
+    if (flowGate.current[initialFlow]) openFlow(initialFlow);
+    // `openFlow` is redeclared every render; the one-shot ref above is what actually bounds this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFlow, room, busy, chatReady]);
 
   // Collect a term resolution locally (no server call — app parity). Submitted on Counter/Accept.
   const setResolution = (key: string, action: "accept" | "counter", value?: unknown) =>
@@ -653,13 +638,102 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     }
   }
 
+  /* ── V12b · the request loop's context, exactly as the map's dock assembles it ───────────────────
+     Owner, 2026-08-11: *"i want it like request card"*. Everything below is SHARED with `ChatDock`
+     rather than restated: `requestThreadCards` is the one projection of a message list into asks and
+     answers, `requestRepliesByRef` the one reading of what was answered, `fleetMachineResolver` the
+     one answer to what a machine is called and looks like, and `requestDocLabel` the one word for a
+     paper. Two surfaces, one channel, one set of cards — a second copy of any of these is how the
+     renter's screen and the supplier's start describing the same ask differently.
+
+     These are hooks, so they sit ABOVE the two early returns below: a room that has not loaded yet
+     still has to run them, and a conversation with no cards in it costs three empty derivations. */
+  const threadCards = useMemo(() => requestThreadCards(messages as unknown[]), [messages]);
+  const repliesByRef = useMemo(() => requestRepliesByRef(threadCards), [threadCards]);
+  const machineOf = useMemo(() => fleetMachineResolver(fleet, ar), [fleet, ar]);
+
+  /* ── V12c · ONE card per request, and the light cue on it (owner, 2026-08-11) ───────────────────
+     *"make it one card for request and show his answer, but light plumbing or something to show the
+     answer when opening the chat"*. Both halves are decided in the contract layer and are therefore
+     the SAME fold the map's dock performs — the supplier reads this conversation from the other chair
+     and must not see a different number of cards in it.
+
+     `answeredRefs` suppresses the reply whose ask is on screen carrying the answer; `cueRef` names the
+     card that answer landed in. The cue is finite (`ANSWER_CUE_MS`) and cannot re-fire on the room's
+     15s poll: `latestAnsweredRef` returns the same string for the same conversation, so the effect
+     does not re-run. It DOES fire on arriving at the route, which is this surface's "opening the
+     chat". */
+  const answeredRefs = useMemo(() => answeredAskRefs(threadCards), [threadCards]);
+  const cueRef = useMemo(() => latestAnsweredRef(threadCards), [threadCards]);
+  const [cuedRef, setCuedRef] = useState<string | null>(null);
+  useEffect(() => {
+    if (!cueRef) {
+      setCuedRef(null);
+      return;
+    }
+    setCuedRef(cueRef);
+    const timer = window.setTimeout(() => setCuedRef(null), ANSWER_CUE_MS);
+    return () => window.clearTimeout(timer);
+  }, [cueRef]);
+
+  const cardCtx: RequestCardCtx = useMemo(
+    () => ({
+      L,
+      /* The rule this route documented and now finally satisfies (see `RequestCardCtx.fleetKnown`):
+         **the status row is omitted when the fleet is genuinely unknown, never guessed.** Until the
+         fetch lands — and forever, if it fails — this is false and the card states the ask without a
+         verdict, which is what `/deal-room/[id]` has always done. Once the fleet is in hand the
+         verdict is derived on every render (RM3-AC-18) from the machine as the fleet holds it NOW.
+
+         A machine MISSING from a fleet we do hold is a different answer again: `machineOf` returns
+         null, `renteeRequestState` reads `unknown`, and the card says the equipment is not in his
+         current list — a statement the fleet supports, rather than one made out of our ignorance. */
+      fleetKnown: fleet != null,
+      machine: machineOf,
+      reply: (ref: string) => repliesByRef.get(ref) ?? null,
+      docLabel: (docType: string) => requestDocLabel(docType, L),
+      /* **Nothing here is pressable, and the card must say so before it is pressed.** The card's whole
+         reason to exist is that pressing it lands the reader on the machine (owner, 2026-08-10) — but
+         that detail is the MAP's panel, and this route has no equipment surface to open. A chevron
+         that did nothing would be worse than one that never claimed to be there. */
+      canOpen: () => false,
+      /* The REQUEST's type word — "Crawler Excavator 30 ton" — which only an `alternative` card reads.
+         Null here by the rule `RequestCardCtx.typeWord` already states for this surface: the deal
+         room holds the accepted BID's equipment, not the request's taxonomy, and `details.equipmentLabel`
+         falls back to the bid's make+model. Naming one machine where the card means a TYPE would make
+         the ask read as a swap for that unit, which is the exact misreading the type word was added
+         to remove. The card names no type instead. */
+      typeWord: null,
+    }),
+    [L, fleet, machineOf, repliesByRef],
+  );
+
   if (error) return <div className="dlproto"><div className="rempty">{L("Couldn’t open this deal room.", "تعذّر فتح غرفة الصفقة.")}</div></div>;
   if (!room) return <div className="dlproto"><div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 28 }}>progress_activity</span></div></div>;
 
   // Single source of truth for the money — SHARED with the confirmed quotation via computeDealTotals so
   // the price bar and the quotation can never diverge. Prorated ÷26/÷7; PER_JOB / no-duration = one full
   // period; mob/demob use their own counts + honor exclusion; VAT 15%.
-  const totals = computeDealTotals(room);
+  // deal-room/negotiation rounds — reconstructed from the chat's rate_proposal messages (app parity).
+  // Drive the allMatched accept gate, the turn badges, the round-history log AND the money below.
+  // Falls back to the room's standing values if the chat custom data isn't reachable.
+  const rounds = withOpeningRound(collapseRounds(reconstructRounds(messages as unknown[])), roomOpeningRound(room));
+  /* ── The LIVE position, not the last agreement (app parity: `resolveLivePosition`) ───────────────
+     The app resolves the room's own position as *"the latest round from EITHER side — what the deal
+     is worth right now"*, and spends it on exactly these three: the price bar, the breakdown and the
+     quotation. Its ladder puts the latest round FIRST, ahead of `agreedUnits`.
+
+     ~~The web started at `agreedUnits`.~~ So a supplier who countered 3 units down to 2 left the room
+     pricing 3 while the bid card — which reads `currentRentalUnits` — already showed 2. Worse, the
+     price bar's own source line said «Supplier's counter» over units from the last agreement: it
+     named a counter and priced something else.
+
+     A count nobody has accepted is the POINT of a room mid-negotiation, and the label already says
+     whose position it is. `roundTotals` is the same seam the compare card uses, and every field it
+     passes falls back to the room's column when the round does not carry it — which is the rest of
+     the app's chain. */
+  const livePosition = liveRound(rounds);
+  const totals = livePosition ? roundTotals(room, livePosition) : computeDealTotals(room);
   const rate = totals.rate;
   const basisU = totals.priceUnit;
   const hasDuration = totals.hasDuration;
@@ -668,12 +742,33 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const mobUnitsN = totals.mobUnitsN;
   const demobUnitsN = totals.demobUnitsN;
   const units = rentalUnits; // the rental count drives the card display
-  const rentalTotal = totals.rentalTotal;
-  const mobTotal = totals.mobTotal;
-  const demobTotal = totals.demobTotal;
-  const subtotal = totals.subtotal;
-  const vat = totals.vat;
+  // `rentalTotal` / `mobTotal` / `demobTotal` / `subtotal` / `vat` are no longer unpacked here: the
+  // breakdown states those five lines PER UNIT now (see below), and `grand` is the one all-units
+  // figure still drawn — on the overall row. They remain on `totals` for any caller that wants them.
   const grand = totals.grand;
+  /**
+   * ── The breakdown states its lines PER UNIT, as the bid card does (owner, 2026-08-19) ──────────
+   *
+   * The renter reaches this room from a bid card whose price panel breaks the same offer down for one
+   * machine and then totals it across the count (`RequestBids.tsx:522`). This panel showed all-units
+   * figures only, so the two screens put two different numbers against the same offer and neither said
+   * which was which. One shape now, on both.
+   *
+   * `computeQuoteTotals` is the bid card's own line maths, fed the per-unit rental this room already
+   * computed — NOT a second derivation. Its `overall` block is `computeDealTotals`' to the riyal
+   * (verified across PER_DAY/WEEK/MONTH/JOB and fractional bases), which is why the figures above are
+   * still read from `totals` and only the PER-UNIT block comes from here: the money is unchanged, the
+   * rows it is stated in are what moved.
+   */
+  const perUnit = computeQuoteTotals({
+    perUnitRental: totals.perUnitRental,
+    rentalUnits: units,
+    mob: { amount: room.mobPrice, units: mobUnitsN, excluded: room.mobExcluded },
+    demob: { amount: room.demobPrice, units: demobUnitsN, excluded: room.demobExcluded },
+  }).perUnit;
+  /** Multi-unit is the only case where the two blocks differ, so it is the only case that draws both
+   *  and the only case that has to say which is which. One machine → one set of rows, unlabelled. */
+  const multi = units > 1;
   // Billing-period label from the bid's price unit (same mapping the bid cards use).
   const periodLabel = (() => {
     switch ((room.priceUnit ?? "PER_DAY").toUpperCase()) {
@@ -698,13 +793,17 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
   const closed = room.status === "CLOSED";
   const abandoned = room.status === "ABANDONED";
   const awaiting = room.status === "AWAITING_SUPPLIER_CONFIRMATION";
+  // The quotation link — offered at every status except ABANDONED (app parity, quotation_button.dart).
+  // `final` only once the deal is CLOSED; everything before it is a `preview`, and the label has to say
+  // so: an agreed price the supplier hasn't confirmed yet is not a signed deal, and a rentee who reads
+  // one as if it were stops chasing the deal.
+  const quoteKind = quotationLinkKind(room.status);
+  const quoteLabel = quoteKind === "final"
+    ? L("Final quotation", "عرض السعر النهائي")
+    : L("Preview quotation", "معاينة عرض السعر");
   // Equipment title — real name + size (like the request/bid cards), not the bare "Equipment" fallback.
   const eqName = (ar ? room.details.equipmentLabelAr || room.details.equipmentLabel : room.details.equipmentLabel) || L("Equipment", "المعدّة");
   const eqSize = ar ? room.details.equipmentSizeAr || room.details.equipmentSize : room.details.equipmentSize || room.details.equipmentSizeAr;
-  // deal-room/negotiation rounds — reconstructed from the chat's rate_proposal messages (app parity).
-  // Drive the allMatched accept gate, the turn badges, and the round-history log. Falls back to the
-  // room's standing values if the chat custom data isn't reachable (never breaks the live flow).
-  const rounds = withOpeningRound(collapseRounds(reconstructRounds(messages as unknown[])), roomOpeningRound(room));
   const rRound = latestRoundBy(rounds, "rentee");
   const sRound = latestRoundBy(rounds, "supplier");
   // DRCARD — which rate proposals a later `rate_response` has settled, and which one is still the live
@@ -740,6 +839,26 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
     : L("Match the supplier's latest price and quantities before you can accept", "طابق أحدث سعر وكميات المورد قبل القبول");
   // Turn cue (app `negotiateFresh` vs `negotiate`): the supplier countered last vs the renter's opening move.
   const supplierCountered = room.myTurn && room.lastCounterBy === "supplier";
+  // What the two buttons below would allow right now, handed to the `?act=` deep link. Read off the
+  // SAME expressions the buttons are gated by, on the same render, so a deep link can never open a
+  // sheet the renter could not have opened himself with a press.
+  /* ── What the `?act=` link is allowed to open (owner, 2026-08-19) ────────────────────────────────
+     *"when i click counter this price from the map footer it will open the 3 style sheet not the chat."*
+
+     COUNTER is gated on `live` alone now, not on `showAct`. `showAct = live && (myTurn || canAccept)`
+     governs whether the price bar DRAWS its two buttons — a different question from whether the flow
+     may open. A renter who pressed «اطلب سعراً أقل» on the map has already chosen to counter; landing
+     him in the conversation because the room happens to read as the supplier's turn answers a question
+     he did not ask. Negotiating is available whenever the deal is live, which is the app's own rule and
+     what the price bar's comment already claims: *"Negotiate is always available."*
+
+     `live` is still a real gate and the one that matters: a CLOSED, ABANDONED or AWAITING room has
+     nothing to counter — in an awaiting room the renter has accepted and the bar offers Withdraw — so
+     the link falls through and he lands on the room, under the strip that says why.
+
+     ACCEPT keeps `showAct && canAccept` untouched. Accepting is settling, and its gate is the room's
+     own comparison of terms, price and units; nothing here loosens it. */
+  flowGate.current = { counter: live, accept: showAct && canAccept };
 
   return (
     <div className="dlproto" dir={ar ? "rtl" : "ltr"}>
@@ -747,17 +866,38 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
       <div className="topbar">
         {/* supplier chip → profile & documents. NOTE: the deal-room payload only carries name + isVerified
             (no rating/deals/commitment), so that prototype stat line is omitted rather than fabricated. */}
-        <button type="button" className="tb-sup" onClick={() => setShowDocs(true)}>
+        {/* The chip goes where the kebab's «Company details» goes — one destination for one firm's
+            papers (owner, 2026-08-19). It opened the room's own documents modal; two controls in one
+            bar opening two differently-shaped surfaces onto the same question is what this removes. */}
+        <button
+          type="button"
+          className="tb-sup"
+          disabled={!room.bidId}
+          onClick={() => { if (room.bidId) router.push(`/bids/${encodeURIComponent(room.bidId)}/equipment?company=1`); }}
+        >
           <span className="av">{room.supplier.name.charAt(0).toUpperCase()}</span>
           <span className="nm">
-            <span className="n">{room.supplier.name}{room.supplier.isVerified && <span className="material-icons-outlined">verified</span>}</span>
+            <span className="n">{room.supplier.name}{room.supplier.isVerified && (
+              /* The stroked check the panel header and the chat dock both draw (owner, 2026-08-19).
+                 Material's filled rosette was a second mark beside the name rather than the tick for
+                 it, and it made one company read two ways across the product. */
+              <svg className="tb-tick" width="12" height="12" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
+                aria-label={L("Verified", "شركة موثّقة")} role="img">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            )}</span>
             <span className="sub">{L("Supplier", "المورد")}</span>
           </span>
         </button>
         <span className="tb-div" />
-        {/* equipment / request block */}
-        <div className="tb-eq">
-          <span className="ic"><span className="material-icons-outlined">construction</span></span>
+        {/* Request block — now a BUTTON onto the request-summary modal (app parity).
+            The app's chip pairs a clipboard with the request ref, on the reasoning that a control
+            should say what it opens and that a renter with three rooms open needs to know WHICH
+            request this one settles. The web block already carried the ref and the meta line, so it
+            becomes the chip rather than gaining a second one beside it. */}
+        <button type="button" className="tb-eq" onClick={() => setShowRequest(true)} title={L("Request details", "تفاصيل الطلب")}>
+          <span className="ic"><span className="material-icons-outlined">assignment</span></span>
           <span className="meta">
             <span className="t">
               {room.shortCode && <span className="tb-code">{room.shortCode}</span>}
@@ -767,7 +907,8 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
             </span>
             <span className="sub">{[room.details.location, periods ? `${periods} ${L("days", "يوم")}` : room.details.rentalType].filter(Boolean).join(" · ")}</span>
           </span>
-        </div>
+          <span className="material-icons-outlined chev">chevron_right</span>
+        </button>
         {/* phase pill (status label placement — §5.2) */}
         <span className="tb-phase">
           <span className="dot" />
@@ -776,14 +917,98 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
         <span className="tb-spacer" />
         {/* icon actions — documents + call */}
         <div className="tb-icons">
-          <span className="tb-ic" role="button" tabIndex={0} title={L("Documents", "المستندات")} onClick={() => setShowDocs(true)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setShowDocs(true)}><span className="material-icons-outlined">description</span></span>
+          {/* ── The documents icon is GONE (owner, 2026-08-19) ──────────────────────────────────
+              It was the third way into the supplier's papers from one bar — the chip on the left, this
+              icon, and the kebab's «Company details» all opened the same sheet. One entry now, in the
+              kebab, and it goes to the documents PANEL rather than a modal of its own. */}
           {/* deal-room/negotiation (B5): the rentee gets the supplier's number from the start (server-gated).
               A single Call button opens a modal with the number — dial on touch, copy on desktop. */}
           {!room.supplier.phone
             ? <span className="tb-ic call locked" title={L("Number unavailable", "الرقم غير متاح")}><span className="material-icons-outlined">call</span></span>
             : <span className="tb-ic call" role="button" tabIndex={0} title={L("Call", "اتصال")} onClick={() => setCallOpen(true)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setCallOpen(true)}><span className="material-icons-outlined">call</span></span>}
+          {/* ── The ⋮ kebab (app parity) ────────────────────────────────────────────────────────
+              Three entries, and the app's own reasoning for each:
+
+                · INSPECT THE EQUIPMENT — the machine this room is about. The chip beside the kebab
+                  names the REQUEST; nothing here named the plant. Disabled when the payload carried
+                  no bid id, since the equipment map is addressed by it.
+                · COMPANY DETAILS — the counterparty's papers, through the same documents modal the
+                  supplier chip opens, so one firm's documents are read one way wherever they open.
+                · CANCEL THE DEAL — here because it is where both parties already know to look for it
+                  (owner, 2026-08-17: *"i want the same place as existing one before our design"*,
+                  after a redesign moved it onto the request sheet and had to move it back).
+
+              REQUEST DETAILS is deliberately NOT here — it sits on the chip beside the kebab, where
+              the app puts it, so the control names the request it opens.
+
+              Cancelling is hidden on a read-only room — CLOSED or ABANDONED — where there is nothing
+              left to cancel. Same gate as the app's `showCancel: !room.isReadOnly`. */}
+          <span className="tb-ic" role="button" tabIndex={0} aria-haspopup="menu" aria-expanded={menuOpen} title={L("More", "المزيد")} onClick={() => setMenuOpen((o) => !o)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setMenuOpen((o) => !o)}><span className="material-icons-outlined">more_vert</span></span>
         </div>
       </div>
+
+      {/* ── The sibling strip (app parity: `sibling_item_tabs.dart`) ───────────────────────────────
+          The renter's other conversations with THIS supplier about the same submission. Absent
+          unless there are at least two and one of them is this room — both refusals are the model's,
+          so this renders the array or nothing.
+
+          A tab with no room yet still navigates: opening a conversation creates nothing, and the
+          first message is what creates the room. With no room id to go to, the destination is that
+          bid's equipment surface — the one addressable place for an offer nobody has spoken in. */}
+      {siblingTabs.length > 1 && (
+        <div className="dr-sibs" role="tablist" aria-label={L("Other items in this request", "بنود أخرى في هذا الطلب")}>
+          {siblingTabs.map((tab) => (
+            <button
+              key={tab.requestId}
+              type="button"
+              role="tab"
+              aria-selected={tab.isCurrent}
+              className={tab.isCurrent ? "on" : undefined}
+              disabled={tab.isCurrent}
+              onClick={() => router.push(tab.dealRoomId ? `/deal-room/${encodeURIComponent(tab.dealRoomId)}` : `/bids/${encodeURIComponent(tab.bidId)}/equipment`)}
+            >
+              {ar ? tab.label.ar : tab.label.en}
+              {!tab.dealRoomId && <span className="dot" title={L("Not started", "لم تبدأ")} />}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* The kebab's menu is a sibling of the top bar, NOT a child of it: `.topbar` scrolls sideways
+          on a narrow screen (`overflow-x: auto`), and a dropdown inside a scroll box is clipped by it.
+          It anchors to `.dlproto` instead, pinned under the bar's end corner. */}
+      {menuOpen && (
+        <>
+          <div className="dr-menu-scrim" onClick={() => setMenuOpen(false)} />
+          <div className="dr-menu" role="menu">
+            <button type="button" role="menuitem" disabled={!room.bidId} onClick={() => { setMenuOpen(false); if (room.bidId) router.push(`/bids/${encodeURIComponent(room.bidId)}/equipment`); }}>
+              <span className="material-icons-outlined">construction</span>{L("Inspect the equipment", "فحص المعدّة")}
+            </button>
+            {/* ── «Company details» goes to the PANEL, not a modal (owner, 2026-08-19) ────────────
+                The company documents surface is V9's takeover on the bid's own equipment page — the
+                one the panel header's «مستندات الشركة ›» opens — and it is where a renter reads a
+                firm's papers everywhere else in the product. Opening a second, differently-shaped
+                sheet from here made the same papers two surfaces.
+
+                Disabled without a `bidId`, exactly as «Inspect the equipment» above is: the panel is
+                addressed by bid, and a menu entry that cannot reach its destination should say so by
+                being inert rather than by failing after the press. */}
+            <button
+              type="button"
+              role="menuitem"
+              disabled={!room.bidId}
+              onClick={() => { setMenuOpen(false); if (room.bidId) router.push(`/bids/${encodeURIComponent(room.bidId)}/equipment?company=1`); }}
+            >
+              <span className="material-icons-outlined">business_center</span>{L("Company details", "بيانات الشركة")}
+            </button>
+            {!closed && !abandoned && (
+              <button type="button" role="menuitem" className="danger" onClick={() => { setMenuOpen(false); setCancelOpen(true); }}>
+                <span className="material-icons-outlined">cancel</span>{L("Cancel the deal", "إلغاء الصفقة")}
+              </button>
+            )}
+          </div>
+        </>
+      )}
 
       {/* price bar — prototype navy banner: centered hero price + end-side status/CTA cluster + breakdown popover */}
       <div className="price-bar">
@@ -827,7 +1052,10 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
           {/* CTAs — centered below the price */}
           {closed ? (
             <div className="pb-btns">
-              <button className="pb-btn accept" disabled={quoteBusy} onClick={() => downloadQuotation("final")}><span className="material-icons-outlined">download</span>{L("Download quote", "تنزيل العرض")}</button>
+              {/* The CLOSED price-bar CTA — app parity (`TurnCtaKind.download`), which the app also shows
+                  only at CLOSED. Everything before CLOSED reaches the quotation through the pinned link
+                  under the composer instead, exactly as the app arranges it. */}
+              <button className="pb-btn accept" disabled={quoteBusy} onClick={openQuotation}><span className="material-icons-outlined">download</span>{L("Download quote", "تنزيل العرض")}</button>
               <button className="pb-btn ghost" onClick={() => setReleaseOpen(true)}><span className="material-icons-outlined">refresh</span>{L("Reopen", "إعادة فتح")}</button>
             </div>
           ) : abandoned ? null : awaiting ? (
@@ -843,36 +1071,45 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
               <button className="pb-btn accept" disabled={busy || !canAccept} onClick={() => openFlow("accept")}><span className="material-icons-outlined">check</span>{L("Accept", "قبول")}</button>
             </div>
           ) : null}
-          {/* Pre-confirmation DRAFT of the quotation (app parity: the rentee's "معاينة" link). Built from
-              the LIVE room, so it reflects negotiated units, excluded legs and term states — not just the
-              price. Deliberately SECONDARY: whatever the state's real CTA is stays primary (Withdraw keeps
-              precedence while AWAITING). Hidden once CLOSED (the signed download takes over) and for an
-              abandoned room, which has no deal to quote. */}
-          {!closed && !abandoned && (
-            <div className="pb-draft-row">
-              <button type="button" className="pb-draft" disabled={quoteBusy} onClick={() => downloadQuotation("draft")}>
-                <span className="material-icons-outlined">description</span>
-                {quoteBusy ? L("Preparing…", "جارٍ التجهيز…") : L("Preview quotation", "معاينة عرض السعر")}
-              </button>
-              {quoteErr && <span className="pb-draft-err">{quoteErr}</span>}
-            </div>
-          )}
         </div>
 
         {breakdown && (
           <>
             <div className="pb-bd-backdrop" onClick={() => setBreakdown(false)} />
           <div className="pb-breakdown">
-            <div className="pb-brow"><span className="l">{L("Rental", "الإيجار")} ({rentalLabel}{units > 1 ? ` × ${units}` : ""})</span><span className="v">{nf(rentalTotal)}</span></div>
+            {/* The bid card's shape (owner, 2026-08-19): every line below is for ONE machine, and the
+                count is applied once, at the foot. A multi-unit deal says so in a heading rather than
+                by hanging «× ٣» off each row — three multipliers down a column is arithmetic the
+                reader has to carry, and the overall row is where it lands anyway. */}
+            {multi && <div className="pb-bhead">{L("Per unit", "لكل وحدة")}</div>}
+            <div className="pb-brow"><span className="l">{L("Rental", "الإيجار")} ({rentalLabel})</span><span className="v">{nf(perUnit.rental)}</span></div>
             {room.mobExcluded
               ? <div className="pb-brow"><span className="l">{L("Mobilization", "التعبئة — موب")}</span><span className="v ex">{L("Not included", "غير مشمول")}</span></div>
-              : room.mobPrice ? <div className="pb-brow"><span className="l">{L("Mobilization", "التعبئة — موب")}{mobUnitsN > 1 ? ` (${nf(room.mobPrice)} × ${mobUnitsN})` : ""}</span><span className="v">{nf(mobTotal)}</span></div> : null}
+              : room.mobPrice ? <div className="pb-brow"><span className="l">{L("Mobilization", "التعبئة — موب")}</span><span className="v">{nf(perUnit.mob)}</span></div> : null}
             {room.demobExcluded
               ? <div className="pb-brow"><span className="l">{L("Return", "الإرجاع — ديموب")}</span><span className="v ex">{L("Not included", "غير مشمول")}</span></div>
-              : room.demobPrice ? <div className="pb-brow"><span className="l">{L("Return", "الإرجاع — ديموب")}{demobUnitsN > 1 ? ` (${nf(room.demobPrice)} × ${demobUnitsN})` : ""}</span><span className="v">{nf(demobTotal)}</span></div> : null}
-            <div className="pb-brow"><span className="l">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="v">{nf(subtotal)}</span></div>
-            <div className="pb-brow"><span className="l">{L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)")}</span><span className="v">{nf(vat)}</span></div>
-            <div className="pb-brow tot"><span className="l">{L("Estimated total", "الإجمالي التقديري")}</span><span className="v">{nf(grand)} {L("SAR", "ر.س")}</span></div>
+              : room.demobPrice ? <div className="pb-brow"><span className="l">{L("Return", "الإرجاع — ديموب")}</span><span className="v">{nf(perUnit.demob)}</span></div> : null}
+            <div className="pb-brow"><span className="l">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="v">{nf(perUnit.subtotal)}</span></div>
+            <div className="pb-brow"><span className="l">{L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)")}</span><span className="v">{nf(perUnit.vat)}</span></div>
+            <div className="pb-brow tot"><span className="l">{L("Estimated total", "الإجمالي التقديري")}</span><span className="v">{nf(perUnit.total)} {L("SAR", "ر.س")}</span></div>
+
+            {/* NOT per-unit × units. The transport legs carry their own negotiated counts — a room with
+                five delivery trips against three rented machines bills five — so the overall row is
+                `computeDealTotals`' own figure and never a multiplication of the block above it. The
+                leg counts are named here, where they are the thing that makes the two blocks differ. */}
+            {multi && (
+              <div className="pb-brow tot overall">
+                <span className="l">
+                  {L("Overall total", "الإجمالي الكلي")}
+                  <span className="sub">
+                    {L("Units", "الوحدات")}: {units}
+                    {!room.mobExcluded && room.mobPrice && mobUnitsN !== units ? ` · ${L("delivery", "نقل")} × ${mobUnitsN}` : ""}
+                    {!room.demobExcluded && room.demobPrice && demobUnitsN !== units ? ` · ${L("return", "إرجاع")} × ${demobUnitsN}` : ""}
+                  </span>
+                </span>
+                <span className="v">{nf(grand)} {L("SAR", "ر.س")}</span>
+              </div>
+            )}
           </div>
           </>
         )}
@@ -890,7 +1127,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
 
       {/* thread */}
       <div className="thread">
-        {!STREAM_KEY ? (
+        {!STREAM_API_KEY ? (
           <div className="sysev">{L("Chat is unavailable.", "المحادثة غير متاحة.")}</div>
         ) : !chatReady ? (
           <div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 22 }}>progress_activity</span></div>
@@ -903,6 +1140,52 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
             // `system_bot`, so the early return used to swallow them into one grey pill, showing English
             // `text` in an Arabic chat and dropping a counter-offer's figures entirely.
             const card = chatCardOfMessage(m);
+            /* ── WHOSE message this is, and why the CARDS ask it too (owner, 2026-08-11) ───────────
+               *"make these cards appear like messages sent by the other side or by me whether the
+               request or the response."*
+
+               The side is read from the Stream AUTHOR, never from the card's TYPE — the renter and
+               the supplier read the SAME channel from opposite chairs, and "an ask is mine, a reply
+               is theirs" is true from one of them and inverted from the other. Authorship is the one
+               reading that is correct from both, and it is the reading the plain bubbles below have
+               always used. The dock sides its cards off this same fact; this route centred every one
+               of them, so a renter's own request read as narration the room had emitted. */
+            const cardMine = myStreamId != null && m.user?.id === myStreamId;
+            /* ── The renter's ASK, as the card he sent (owner, 2026-08-11: "i want it like request
+               card") ──────────────────────────────────────────────────────────────────────────────
+               The identity strip, the ask, the reference and — now that this route holds the fleet —
+               the live verdict, built by the very function the map's dock builds it with. Both sides
+               of the conversation are looking at one object; it must not be one object on one surface
+               and a list of rows on the other. */
+            if (card?.type === RENTEE_REQUEST_CARD_TYPE) {
+              return (
+                <div key={m.id} className={`dl-rq-card ${cardMine ? "is-mine" : "is-them"}`}>
+                  <RequestCard
+                    view={requestCardView(postedSubject(card.card), cardCtx)}
+                    // The SAME clock face every other card in this thread carries (AC-16).
+                    at={chatCardTime(m.created_at, ar)}
+                    // The answer folds into THIS card (V12c), wherever in the thread the question was
+                    // asked — so this is the card that points at itself when the answer is new.
+                    cue={cuedRef != null && cuedRef === card.card.ref}
+                  />
+                </div>
+              );
+            }
+            /* ── The supplier's ANSWER has no card of its own (owner, 2026-08-11) ──────────────────
+               *"make it one card for request and show his answer"* — which SUPERSEDES this morning's
+               *"the supplier response must arrive in the same format of the sent card"*. That ruling
+               drew the ask's card a second time under the reply (`replyCardView`, now withdrawn), and
+               because each card takes its own author's side the pair sat on opposite edges of the
+               column both stating the answer in different words. The ask's card carries it now, in the
+               reply's own kind-specific wording.
+
+               The fallback survives and is why this suppresses rather than deletes: a reply whose ask
+               is NOT in the loaded window — an older page, a partial channel read — falls through to
+               the bare `ChatCard` below, which states the reference and the answer and names no
+               equipment nobody read. */
+            if (card?.type === RENTEE_REQUEST_REPLY_CARD_TYPE && replyFoldsIntoAsk(answeredRefs, card.reply)) {
+              return null;
+            }
             if (card) {
               const view = buildChatCardView(card, {
                 ar, L, terms: room.terms, at: m.created_at,
@@ -910,9 +1193,8 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
                 superseded: card.type === "rate_proposal" && lastProposalId !== null && lastProposalId !== m.id,
                 live,
               });
-              return (
+              const chatCard = (
                 <ChatCard
-                  key={m.id}
                   view={view}
                   ar={ar}
                   L={L}
@@ -924,6 +1206,16 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
                   translation={translations[m.id]}
                 />
               );
+              /* An unpaired ANSWER is still a message somebody wrote, so it takes his side the way
+                 the full card above does — the bare form is a smaller card, not a different kind of
+                 event. The negotiation vocabulary is NOT sided: a rate, a counter, an acceptance is
+                 an event in the room rather than either party's remark, and `.chatcard` centres
+                 itself for exactly that reason (a wrapper here would turn its `align-self` inert). */
+              return card.type === RENTEE_REQUEST_REPLY_CARD_TYPE ? (
+                <div key={m.id} className={`dl-rq-card ${cardMine ? "is-mine" : "is-them"}`}>{chatCard}</div>
+              ) : (
+                <Fragment key={m.id}>{chatCard}</Fragment>
+              );
             }
             // deal-room/negotiation — system narration (posted by the backend's `system_bot`) renders as a
             // centered chip (prototype's role-tinted narration), NOT a left/right bubble. An UNKNOWN
@@ -932,7 +1224,10 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
             if (m.user?.id === "system_bot") {
               return (
                 <div className="sysev" key={m.id}>
-                  <span className="material-icons-outlined">bolt</span>
+                  {/* The glyph says WHICH move this was — the app reads the same five out of the same
+                      narration, in both locales, because the backend sends no type beside it. One
+                      lightning bolt for every line said only "something happened". */}
+                  <span className="material-icons-outlined">{dealSystemEventIcon(m.text)}</span>
                   <span>{m.text}</span>
                 </div>
               );
@@ -978,7 +1273,7 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
                         </a>
                       )}
                       {src && (
-                        <button type="button" className="msg-att-dl" onClick={() => void saveAttachment(src, attFilename(a))}>
+                        <button type="button" className="msg-att-dl" onClick={() => void saveChatAttachment(src, attFilename(a))}>
                           <span className="material-icons-outlined">download</span>
                           {L("Save", "حفظ")}
                         </button>
@@ -999,18 +1294,18 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
         <div ref={bottomRef} />
       </div>
 
-      {/* composer */}
+      {/* Footer — the composer (or what replaces it) with the quotation link PINNED underneath. One
+          sticky container, because two `position: sticky; bottom: 0` siblings would both pin to the
+          viewport bottom and overlap. */}
+      <div className="dl-footer">
       {closed ? (
         <div className="composer ro quote-bar">
-          <button type="button" className="dl-quote" onClick={() => downloadQuotation("final")} disabled={quoteBusy}>
-            <span className="material-icons-outlined">{quoteBusy ? "hourglass_top" : "download"}</span>
-            {quoteBusy ? L("Preparing quotation…", "يتم تجهيز عرض السعر…") : L("Download quotation", "تنزيل عرض السعر")}
-          </button>
+          {/* The quotation itself has moved to the pinned link below — this bar keeps only the action
+              that is specific to a closed room. Leaving both here printed the same link twice. */}
           <button type="button" className="dl-quote reopen" onClick={() => { setReleaseErr(null); setReleaseOpen(true); }} disabled={releasing}>
             <span className="material-icons-outlined">lock_open</span>
             {L("Reopen negotiation", "إعادة فتح التفاوض")}
           </button>
-          {quoteErr && <span className="ro-note quote-err">{quoteErr}</span>}
         </div>
       ) : abandoned ? (
         <div className="composer ro"><span className="ro-note">{L("Deal room has been cancelled", "تم إلغاء غرفة الصفقة")}</span></div>
@@ -1042,6 +1337,25 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
           {fileErr && <span className="ro-note quote-err">{fileErr}</span>}
         </div>
       )}
+
+      {/* The rentee's quotation link, PINNED below the composer — app parity (quotation_button.dart).
+          It sits outside the thread so it never scrolls away with the conversation, it is there at
+          EVERY status except ABANDONED (an abandoned room has no deal to quote), there is no
+          verification or tier gate, and its LABEL carries what the availability alone would destroy:
+          «معاينة» before the deal closes, «النهائي» after. */}
+      {quoteKind && (
+        <div className="composer ro quote-bar quote-link-bar">
+          <button type="button" className={`dl-quote quote-link ${quoteKind}`} onClick={openQuotation} disabled={quoteBusy}>
+            <span className="material-icons-outlined">
+              {quoteBusy ? "hourglass_top" : quoteKind === "final" ? "receipt_long" : "description"}
+            </span>
+            {quoteBusy ? L("Preparing quotation…", "يتم تجهيز عرض السعر…") : quoteLabel}
+            <span className="material-icons-outlined chev">chevron_right</span>
+          </button>
+          {quoteErr && <span className="ro-note quote-err">{quoteErr}</span>}
+        </div>
+      )}
+      </div>
 
       {flowMode && (
         <CounterFlow
@@ -1088,128 +1402,164 @@ export function DealRoom({ id, onTitle }: { id: string; onTitle?: (t: string) =>
         </div>
       )}
 
-      {showDocs && <DocumentsModal id={id} ar={ar} L={L} supplierName={room.supplier.name} onClose={() => setShowDocs(false)} />}
-
+      
       {callOpen && room.supplier.phone && (
         <CallModal ar={ar} L={L} phone={room.supplier.phone} name={room.supplier.name} canCall={canCall} onClose={() => setCallOpen(false)} />
+      )}
+
+      {showRequest && <RequestSummaryModal room={room} ar={ar} L={L} onClose={() => setShowRequest(false)} />}
+
+      {cancelOpen && (
+        <CancelReasonsModal
+          ar={ar}
+          L={L}
+          busy={cancelling}
+          error={cancelErr}
+          onSubmit={(reason) => void doCancel(reason)}
+          onClose={() => { setCancelOpen(false); setCancelErr(null); }}
+        />
       )}
     </div>
   );
 }
 
-/** Call-supplier modal: shows the number, dials it (tel:) on a touch device, and copies it anywhere. */
-function CallModal({ ar, L, phone, name, canCall, onClose }: { ar: boolean; L: (en: string, arr: string) => string; phone: string; name: string; canCall: boolean; onClose: () => void }) {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    try { await navigator.clipboard.writeText(phone); setCopied(true); setTimeout(() => setCopied(false), 1600); } catch { /* clipboard blocked */ }
-  };
+/**
+ * Request-summary modal — app parity (`showRequestSummarySheet`). A statement of what this room is
+ * about, in the app's four sections: equipment, location, duration, preferences.
+ *
+ * Every row reads `room.details`, which the deal-room payload already carries, so the modal fetches
+ * nothing. Rows whose value is missing are DROPPED rather than shown empty — the payload maps the
+ * request tolerantly and a blank "Working hours: —" states less than no row at all.
+ *
+ * The app's equipment section also carries a YEAR and an asking PRICE. Neither is on the web's
+ * `DealItemDetails`, so neither is rendered; nothing here is fabricated from the negotiated rate,
+ * which is a different number from the request's ask.
+ */
+function RequestSummaryModal({ room, ar, L, onClose }: {
+  room: DealRoomView;
+  ar: boolean;
+  L: (en: string, arr: string) => string;
+  onClose: () => void;
+}) {
+  const d = room.details;
+  const yn = (v: boolean | null, yes: [string, string], no: [string, string]) =>
+    v === null ? null : v ? L(yes[0], yes[1]) : L(no[0], no[1]);
+  // The shared vocabulary, not a local copy. This modal briefly had its own — which read `FAR_FUTURE`
+  // as "Later" while the app read it as "Flexible", two answers to one code on two surfaces a renter
+  // sees minutes apart.
+  const urgency = d.urgency ? urgencyLabel(d.urgency, L) : null;
+
+  const sections: Array<{ title: string; icon: string; rows: Array<[string, string | null]> }> = [
+    {
+      title: L("Equipment", "المعدّة"), icon: "construction",
+      rows: [
+        [L("Name", "الاسم"), [ar ? d.equipmentLabelAr ?? d.equipmentLabel : d.equipmentLabel, ar ? d.equipmentSizeAr ?? d.equipmentSize : d.equipmentSize].filter(Boolean).join(" · ") || null],
+        [L("Units", "عدد الوحدات"), room.requestedUnits > 0 ? String(room.requestedUnits) : null],
+        [L("Operator", "المشغّل"), yn(d.operatorIncluded, ["Included", "مشمول"], ["Not included", "غير مشمول"])],
+        [L("Operator nationality", "جنسية المشغّل"), d.operatorNationality],
+        [L("Operators", "عدد المشغّلين"), d.numberOfOperators ? String(d.numberOfOperators) : null],
+      ],
+    },
+    {
+      title: L("Location", "الموقع"), icon: "place",
+      rows: [[L("Address", "العنوان"), d.location ? cityLabel(d.location, L) : null]],
+    },
+    {
+      title: L("Duration", "المدة"), icon: "event",
+      rows: [
+        [L("Start date", "تاريخ البدء"), d.startDate],
+        [L("End date", "تاريخ الانتهاء"), d.endDate],
+        [L("Working hours", "ساعات العمل"), d.workingHoursPerDay ? `${d.workingHoursPerDay}h / ${L("day", "يوم")}` : null],
+        [L("Working days", "أيام العمل"), d.workingDaysPerWeek ? `${d.workingDaysPerWeek} / ${L("week", "أسبوع")}` : null],
+        [L("Rental type", "نوع التأجير"), d.rentalType ? rentalTypeLabel(d.rentalType, L) : null],
+        [L("Night shift", "وردية ليلية"), yn(d.nightShift, ["Yes", "نعم"], ["No", "لا"])],
+        [L("Extendable", "قابل للتمديد"), yn(d.extendable, ["Yes", "نعم"], ["No", "لا"])],
+      ],
+    },
+    {
+      title: L("Preferences", "التفضيلات"), icon: "tune",
+      rows: [
+        [L("Urgency", "الاستعجال"), urgency],
+        [L("Subletting", "التأجير من الباطن"), yn(d.subletting, ["Allowed", "مسموح"], ["Not allowed", "غير مسموح"])],
+        [L("Local content", "المحتوى المحلي"), yn(d.localContent, ["Required", "مطلوب"], ["Not required", "غير مطلوب"])],
+        [L("Overtime rate", "أجر العمل الإضافي"), d.overtimeRate],
+        [L("Notes", "ملاحظات"), d.additionalNotes],
+      ],
+    },
+  ];
+
   return (
     <div dir={ar ? "rtl" : "ltr"} onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(16,38,63,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 60px rgba(16,38,63,.35)", padding: "26px 22px 22px", textAlign: "center" }}>
-        <span style={{ display: "inline-flex", width: 56, height: 56, borderRadius: "50%", background: "#e7f7ee", color: "#1daf58", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
-          <span className="material-icons-outlined" style={{ fontSize: 28 }}>call</span>
-        </span>
-        <h3 style={{ fontSize: 16, fontWeight: 900, color: "#1c3550", margin: 0 }}>{L("Call supplier", "الاتصال بالمؤجّر")}</h3>
-        <p style={{ fontSize: 13, fontWeight: 600, color: "#6b8fa8", margin: "4px 0 16px" }}>{name}</p>
-        <div style={{ direction: "ltr", unicodeBidi: "plaintext", fontSize: 22, fontWeight: 900, color: "#1c3550", letterSpacing: 0.5, userSelect: "all", marginBottom: 18 }}>{phone}</div>
-        <div style={{ display: "flex", gap: 10 }}>
-          {canCall && (
-            <a href={`tel:${phone}`} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px", borderRadius: 13, border: "none", background: "#1daf58", color: "#fff", fontWeight: 800, fontSize: 14, textDecoration: "none" }}>
-              <span className="material-icons-outlined" style={{ fontSize: 18 }}>call</span>{L("Call", "اتصال")}
-            </a>
-          )}
-          <button onClick={copy} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px", borderRadius: 13, border: "1.5px solid #d4e0ec", background: "#fff", color: "#1c3550", fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
-            <span className="material-icons-outlined" style={{ fontSize: 18 }}>{copied ? "check" : "content_copy"}</span>{copied ? L("Copied", "تم النسخ") : L("Copy number", "نسخ الرقم")}
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, maxHeight: "88vh", display: "flex", flexDirection: "column", background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 60px rgba(16,38,63,.35)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "18px 20px", borderBottom: "1px solid #eef2f6" }}>
+          <span className="material-icons-outlined" style={{ color: "#1c3550" }}>assignment</span>
+          <span style={{ flex: 1, textAlign: ar ? "right" : "left" }}>
+            <span style={{ display: "block", fontSize: 15, fontWeight: 900, color: "#1c3550" }}>{L("Request details", "تفاصيل الطلب")}</span>
+            {room.shortCode && <span style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#6b8fa8" }}>{room.shortCode}</span>}
+          </span>
+          <button type="button" onClick={onClose} aria-label={L("Close", "إغلاق")} style={{ background: "none", border: 0, cursor: "pointer", color: "#6b8fa8", display: "flex" }}>
+            <span className="material-icons-outlined">close</span>
           </button>
         </div>
-        <button onClick={onClose} style={{ marginTop: 12, width: "100%", padding: "11px", borderRadius: 13, border: "none", background: "#eff4f9", color: "#6b8fa8", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" }}>{L("Close", "إغلاق")}</button>
-      </div>
-    </div>
-  );
-}
 
-/**
- * Documents sheet — mirrors the app's deal-room documents sheet. The backend returns the OTHER
- * party's documents only (for the renter: the supplier's company + equipment docs). Each doc opens
- * its backend-presigned URL (pdf/image) in a new tab.
- */
-function DocumentsModal({ id, ar, L, supplierName, onClose }: { id: string; ar: boolean; L: (en: string, arr: string) => string; supplierName: string; onClose: () => void }) {
-  const [docs, setDocs] = useState<DealRoomDocuments | null>(null);
-  const [error, setError] = useState(false);
+        <div style={{ overflowY: "auto", padding: "6px 20px 20px" }}>
+          {sections.map((sec) => {
+            const rows = sec.rows.filter(([, v]) => v);
+            if (!rows.length) return null;
+            return (
+              <div key={sec.title} style={{ marginTop: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, color: "#1c3550" }}>
+                  <span className="material-icons-outlined" style={{ fontSize: 16 }}>{sec.icon}</span>
+                  <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: ".02em", textTransform: "uppercase" }}>{sec.title}</span>
+                </div>
+                <div style={{ display: "grid", gap: 1, background: "#eef2f6", borderRadius: 12, overflow: "hidden" }}>
+                  {rows.map(([k, v]) => (
+                    <div key={k} style={{ display: "flex", gap: 12, justifyContent: "space-between", background: "#f9fbfc", padding: "10px 12px" }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: "#6b8fa8" }}>{k}</span>
+                      <span style={{ fontSize: 12.5, fontWeight: 700, color: "#1c3550", textAlign: ar ? "left" : "right" }}>{v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
 
-  useEffect(() => {
-    let active = true;
-    fetchDealRoomDocuments(id)
-      .then((d) => active && setDocs(d))
-      .catch(() => active && setError(true));
-    return () => {
-      active = false;
-    };
-  }, [id]);
-
-  const total = (docs?.companyDocuments.length ?? 0) + (docs?.equipmentDocuments.length ?? 0);
-
-  const Row = ({ d }: { d: DealRoomDocument }) => (
-    <a href={d.url} target="_blank" rel="noopener noreferrer" className="dl-docrow">
-      <span className="material-icons-outlined ft" style={{ color: d.fileType === "image" ? "var(--rentee)" : "var(--danger)" }}>
-        {d.fileType === "image" ? "image" : "picture_as_pdf"}
-      </span>
-      <span className="nm">{ar && d.labelAr ? d.labelAr : d.label}</span>
-      <span className="material-icons-outlined go">open_in_new</span>
-    </a>
-  );
-
-  const Section = ({ title, items }: { title: string; items: DealRoomDocument[] }) =>
-    items.length === 0 ? null : (
-      <div className="dl-docsec">
-        <div className="dl-docsec-h">{title}</div>
-        {items.map((d) => <Row key={d.type} d={d} />)}
-      </div>
-    );
-
-  return (
-    <div className="dl-modal" dir={ar ? "rtl" : "ltr"} onClick={onClose}>
-      <div className="dl-modal-card" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
-        <div className="dl-modal-head">
-          <span className="dl-modal-ic"><span className="material-icons-outlined">folder</span></span>
-          <div className="dl-modal-tt"><div className="dl-modal-title">{fmtDocsTitle(L, supplierName)}</div></div>
-          <button className="dl-modal-x" onClick={onClose} aria-label={L("Close", "إغلاق")}><span className="material-icons-outlined">close</span></button>
-        </div>
-        <div className="dl-modal-body">
-          {error ? (
-            <p className="dl-modal-note">{L("Couldn’t load documents.", "تعذّر تحميل المستندات.")}</p>
-          ) : !docs ? (
-            <div style={{ display: "grid", placeItems: "center", padding: "24px 0" }}><span className="material-icons-outlined" style={{ fontSize: 24, color: "var(--muted)" }}>progress_activity</span></div>
-          ) : total === 0 ? (
-            <p className="dl-modal-note">{L("No documents shared yet.", "لا توجد مستندات بعد.")}</p>
-          ) : (
-            <>
-              <Section title={L("Company", "مستندات الشركة")} items={docs.companyDocuments} />
-              <Section title={L("Equipment", "مستندات المعدة")} items={docs.equipmentDocuments} />
-            </>
+          {/* Certificates the request asked for — flat chips, since each is a name and nothing more. */}
+          {(room.details.equipmentCerts.length > 0 || room.details.operatorCerts.length > 0) && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, color: "#1c3550" }}>
+                <span className="material-icons-outlined" style={{ fontSize: 16 }}>verified</span>
+                <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: ".02em", textTransform: "uppercase" }}>{L("Certificates", "الشهادات")}</span>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {[...room.details.equipmentCerts, ...room.details.operatorCerts].map((c) => (
+                  <span key={c} style={{ fontSize: 12, fontWeight: 700, color: "#1c3550", background: "#f4f7fa", border: "1px solid rgba(203,216,227,.6)", borderRadius: 999, padding: "4px 10px" }}>{c}</span>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </div>
     </div>
   );
-}
-
-/** "Supplier's documents" titled with the supplier name, matching the app's docsSheetTitle. */
-function fmtDocsTitle(L: (en: string, arr: string) => string, supplierName: string): string {
-  const name = supplierName || L("the supplier", "المؤجّر");
-  return L(`${name}’s documents`, `مستندات ${name}`);
 }
 
 /**
  * Guided counter/accept flow — app parity (counter_offer_flow_sheet + accept flow). One 3-step modal
- * (Terms → Price → Summary) drives BOTH modes:
- *  · Step 1 Terms — reuses `DealRoomTerms` so the renter resolves each differing term LOCALLY
- *    (accept / keep-mine / counter). Next is gated until nothing is left unresolved (the app's
- *    "resolve all first" rule; the backend's accept-all-terms 409s otherwise).
- *  · Step 2 Price — line items (daily rate / mobilization / return) with a live estimated total. In
- *    ACCEPT mode these are read-only (you're accepting the standing offer); in COUNTER mode editable.
- *  · Step 3 Summary — the composed offer + (accept only) a contract-type selector, plus an
+ * drives BOTH modes, in the order `STEPS` states: PRICE → TERMS → REVIEW.
+ *  · Step 1 Price — the quotation paper's line items (rental / mobilization / return) with unit
+ *    steppers and a live total, plus the payment-terms card. In ACCEPT mode these are read-only
+ *    (you're accepting the standing offer); in COUNTER mode editable. Next is gated on a valid rate.
+ *  · Step 2 Terms — the operating-terms table: unsettled rows first, grouped by category, then
+ *    Settled, then Acknowledge. Each is resolved LOCALLY (accept / counter). Next is gated until
+ *    nothing is unresolved (the app's "resolve all first" rule; accept-all-terms 409s otherwise).
+ *  · Step 3 Review — the composed offer + (accept only) a contract-type selector, plus an
  *    acknowledgment. The CTA morphs: "Send counter offer" vs "Accept offer".
+ *
+ * ~~"reuses `DealRoomTerms`"~~ — it never did. That component rendered nowhere and has been removed;
+ * the terms step is the table below. `payment_terms` sits on step 1 rather than step 2 (`PAY_KEYS`),
+ * matching the app: it is settled beside the money it governs, and drawing it in both places asked
+ * the renter for the same schedule twice.
  * Accept is preceded by a binding-commitment warning. Nothing is submitted until the final CTA — the
  * parent's `submitCounter`/`doAccept` do the batched term + rate/accept-all call.
  */
@@ -1436,6 +1786,60 @@ function CounterFlow({
   };
   const badgeLabel = (b: Dec["badge"]) => (b === "match" ? L("Match", "مطابق") : b === "conflict" ? L("Differs", "يختلف") : b === "locked" ? L("Fixed", "مثبّت") : L("Not set", "لم تحدّد"));
   const isSettled = (b: Dec["badge"]) => b === "match" || b === "locked";
+
+  /**
+   * A term's value as a renter reads it, in the term's OWN vocabulary.
+   *
+   * `valText` alone handles booleans, arrays and the responsibility words, but not the enums whose
+   * meaning depends on which term they belong to — an SLA's `FOUR_HR` and a maintenance term's
+   * `SUPPLIER` are both bare strings, and only the key says which is which. Same helper the quotation
+   * uses, so a term reads identically here and on the paper the renter signs.
+   */
+  const tval = (t: DealTerm, v: unknown): string => termValueLabel(t.key, v, L) ?? valText(v, L);
+
+  // ── term provenance + history (app parity: TermSource + the checklist's history hint) ──
+  //
+  // A term carries three reference values — the renter's preference, the supplier's declaration and
+  // the platform default — and the table can only show one of them per column. `source` says which
+  // one is actually IN FORCE, so the renter is not left inferring which of three numbers binds him.
+  //
+  // A FIXED term needs no such line: locked means the value came from the renter's own request and
+  // was accepted by the act of bidding, which the lock already says.
+  const srcNote = (t: DealTerm): string | null => {
+    if (t.state === "fixed") return null;
+    return t.source === "rentee_fixed" ? L("from your request", "من طلبك")
+      : t.source === "supplier_declared" ? L("supplier's declaration", "إقرار المورد")
+      : L("platform default", "الافتراضي");
+  };
+
+  // The LAST move on a term, one line — "Countered: 30 days · 4 Mar". The app shows the same single
+  // line rather than a log: a term argued three times is still decided on its latest position, and
+  // the whole exchange is already in the conversation above.
+  const histNote = (t: DealTerm): string | null => {
+    const h = lastTermMove(t);
+    if (!h) return null;
+    const verb = h.action === "counter" ? L("Countered", "عرض مضاد")
+      : h.action === "accept" ? L("Accepted", "قُبل")
+      : h.action === "propose_update" ? L("Proposed", "اقتُرح")
+      : h.action;
+    const when = new Date(h.at);
+    const stamp = Number.isNaN(when.getTime()) ? null : when.toLocaleDateString(ar ? "ar" : "en", { day: "numeric", month: "short" });
+    const val = h.value == null || h.value === "" ? null : tval(t, h.value);
+    return [val ? `${verb}: ${val}` : verb, stamp].filter(Boolean).join(" · ");
+  };
+
+  /** The two sub-label lines a term row carries, when it has them. */
+  const termNotes = (t: DealTerm) => {
+    const src = srcNote(t);
+    const hist = histNote(t);
+    if (!src && !hist) return null;
+    return (
+      <>
+        {src && <span className="qp-tsrc">{src}</span>}
+        {hist && <span className="qp-thist"><span className="material-icons-outlined">history</span>{hist}</span>}
+      </>
+    );
+  };
   const groupByCat = (list: DealTerm[]): [string, DealTerm[]][] => {
     const m = new Map<string, DealTerm[]>();
     for (const t of list) { const c = catOf(t.key); const g = m.get(c) ?? []; g.push(t); m.set(c, g); }
@@ -1632,13 +2036,13 @@ function CounterFlow({
                   <div className="qp-sech">{L("Payment terms", "شروط الدفع")}</div>
                   {payTerms.map((t) => { const d = decide(t); const opts = choicesFor(t); return (
                     <div key={t.key} className="qp-pay-row">
-                      <span className="k">{ar ? t.labelAr : t.label}</span>
+                      <span className="k">{ar ? t.labelAr : t.label}{termNotes(t)}</span>
                       {editable && !d.server ? (
                         <select className="qp-sel" value={chosenSel(t)} onChange={(e) => pickTerm(t, e.target.value)}>
                           <option value="__none">{L("— choose —", "— اختر —")}</option>
                           {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                         </select>
-                      ) : <b style={{ flex: 1 }}>{valText(d.chosen ?? t.supplierDeclared, L)}</b>}
+                      ) : <b style={{ flex: 1 }}>{tval(t, d.chosen ?? t.supplierDeclared)}</b>}
                       <span className={`qp-badge ${isSettled(d.badge) ? "match" : d.badge === "conflict" ? "diff" : "none"}`}>{badgeLabel(d.badge)}</span>
                     </div>
                   ); })}
@@ -1664,26 +2068,47 @@ function CounterFlow({
                         <tr className="cat"><td colSpan={4}>{cat}</td></tr>
                         {list.map((t) => { const d = decide(t); const opts = choicesFor(t); return (
                           <tr key={t.key}>
-                            <td className="lbl">{ar ? t.labelAr : t.label}</td>
-                            <td className="sup">{valText(t.supplierDeclared, L)}</td>
+                            <td className="lbl">{ar ? t.labelAr : t.label}{termNotes(t)}</td>
+                            <td className="sup">{tval(t, t.supplierDeclared)}</td>
                             <td>{editable ? (
                               <select className="qp-sel" value={chosenSel(t)} onChange={(e) => pickTerm(t, e.target.value)}>
                                 <option value="__none">{L("— choose —", "— اختر —")}</option>
                                 {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                               </select>
-                            ) : <span className="sup">{valText(d.chosen, L)}</span>}</td>
+                            ) : <span className="sup">{tval(t, d.chosen)}</span>}</td>
                             <td><span className={`qp-ttbadge ${d.badge}`}>{badgeLabel(d.badge)}</span></td>
                           </tr>
                         ); })}
                       </Fragment>
                     ))}
-                    {operatingTerms.some((t) => isSettled(decide(t).badge)) && (
+                    {/* SETTLED and ACKNOWLEDGE are two sections, not one (app parity: the terms page's
+                        Negotiable and Acknowledge buckets).
+
+                        ~~One "Settled & fixed terms" section.~~ It put two unlike things under one
+                        heading: a term the renter just settled, which he chose and can reopen, beside
+                        a term FIXED by his own request and accepted by the act of bidding, which was
+                        never his to argue. Both carried the right badge, so nothing was wrong — but a
+                        renter scanning headings had to read every badge to learn which rows were still
+                        his to touch. */}
+                    {operatingTerms.some((t) => decide(t).badge === "match") && (
                       <>
-                        <tr className="cat settled"><td colSpan={4}>{L("Settled & fixed terms", "البنود المحسومة والمقرّرة")}</td></tr>
-                        {operatingTerms.filter((t) => isSettled(decide(t).badge)).map((t) => { const d = decide(t); return (
-                          <tr key={t.key} className={d.badge === "locked" ? "locked" : undefined}>
-                            <td className="lbl">{d.badge === "locked" ? "🔒 " : ""}{ar ? t.labelAr : t.label}</td>
-                            <td className="sup" colSpan={2}>{valText(d.chosen ?? t.value, L)}{editable && !d.server && <button type="button" className="qp-ttreopen" title={L("Reopen", "إعادة فتح")} onClick={() => onReopenLocal(t.key)}>↻</button>}</td>
+                        <tr className="cat settled"><td colSpan={4}>{L("Settled", "البنود المحسومة")}</td></tr>
+                        {operatingTerms.filter((t) => decide(t).badge === "match").map((t) => { const d = decide(t); return (
+                          <tr key={t.key}>
+                            <td className="lbl">{ar ? t.labelAr : t.label}{termNotes(t)}</td>
+                            <td className="sup" colSpan={2}>{tval(t, d.chosen ?? t.value)}{editable && !d.server && <button type="button" className="qp-ttreopen" title={L("Reopen", "إعادة فتح")} onClick={() => onReopenLocal(t.key)}>↻</button>}</td>
+                            <td><span className={`qp-ttbadge ${d.badge}`}>{badgeLabel(d.badge)}</span></td>
+                          </tr>
+                        ); })}
+                      </>
+                    )}
+                    {operatingTerms.some((t) => decide(t).badge === "locked") && (
+                      <>
+                        <tr className="cat settled"><td colSpan={4}>{L("Acknowledge — fixed by your request", "للعلم — مثبّتة من طلبك")}</td></tr>
+                        {operatingTerms.filter((t) => decide(t).badge === "locked").map((t) => { const d = decide(t); return (
+                          <tr key={t.key} className="locked">
+                            <td className="lbl">🔒 {ar ? t.labelAr : t.label}{termNotes(t)}</td>
+                            <td className="sup" colSpan={2}>{tval(t, d.chosen ?? t.value)}</td>
                             <td><span className={`qp-ttbadge ${d.badge}`}>{badgeLabel(d.badge)}</span></td>
                           </tr>
                         ); })}
@@ -1701,7 +2126,7 @@ function CounterFlow({
               {qhead()}
               {room.details.location && (
                 <div className="qp-addr">
-                  <div className="qp-addrbox"><span className="k">{L("Address", "العنوان")}</span><span className="v">{room.details.location}</span></div>
+                  <div className="qp-addrbox"><span className="k">{L("Address", "العنوان")}</span><span className="v">{room.details.location ? cityLabel(room.details.location, L) : "—"}</span></div>
                   <div className="qp-addrbox"><span className="k">{L("City", "المدينة")}</span><span className="v">{room.details.location.split(/[·,،]/).map((s) => s.trim()).filter(Boolean).pop()}</span></div>
                 </div>
               )}
@@ -1726,7 +2151,7 @@ function CounterFlow({
                     <div className="qp-rcard">
                       <div className="qp-rcard-h"><span className="material-icons-outlined">credit_card</span>{L("Payment terms", "شروط الدفع")}</div>
                       <div className="qp-totals" style={{ borderTop: 0, paddingTop: 0 }}>
-                        {payTerms.map((t) => { const d = decide(t); return <div key={t.key} className="qp-trow"><span className="l">{ar ? t.labelAr : t.label}</span><span className="v" style={{ fontFamily: "inherit", color: d.badge === "conflict" ? "var(--danger,#d9362a)" : "var(--navy,#1c3550)" }}>{valText(d.chosen ?? t.supplierDeclared, L)}</span></div>; })}
+                        {payTerms.map((t) => { const d = decide(t); return <div key={t.key} className="qp-trow"><span className="l">{ar ? t.labelAr : t.label}</span><span className="v" style={{ fontFamily: "inherit", color: d.badge === "conflict" ? "var(--danger,#d9362a)" : "var(--navy,#1c3550)" }}>{tval(t, d.chosen ?? t.supplierDeclared)}</span></div>; })}
                       </div>
                     </div>
                   )}

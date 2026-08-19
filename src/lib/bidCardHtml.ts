@@ -23,7 +23,7 @@
 export interface BidCardPreview {
   title: string;
   description: string;
-  /** 1200×630, displayed at 440×231 — the generated card (see `bidCardImageUrl`). */
+  /** 880×320, displayed at 440×160 — the prototype's band. */
   imageUrl: string;
   url: string;
 }
@@ -33,35 +33,6 @@ const GROUP_ID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 
 export function bidTokenFromUrl(shareUrl: string): string | null {
   return shareUrl.match(GROUP_ID_RE)?.[0] ?? null;
-}
-
-/** The band's aspect ratio — 1200×630 rendered at 440 wide. Fixed pixels, not a percentage: Outlook
- *  ignores `object-fit` and Gmail strips `max-width`, so the only reliable sizing is both dimensions. */
-export const CARD_IMAGE_WIDTH = 440;
-export const CARD_IMAGE_HEIGHT = 231;
-
-/**
- * The image band for a share link: the same per-request card WhatsApp unfurls.
- *
- * `/bid/{slug}/og` draws the request — reference, equipment, location, basis, deadline — into a
- * 1200×630 picture. Pointing the copied card at it is what makes "one card everywhere" literal: a
- * supplier who meets the link in Gmail and again in WhatsApp is looking at the identical image, and
- * the detail survives on a surface (Gmail) whose card we draw and one (WhatsApp) whose we don't.
- *
- * Returns null for anything that isn't a `/bid/` URL, so the caller keeps the backend's static asset.
- */
-export function bidCardImageUrl(shareUrl: string, lang: "en" | "ar" = "en"): string | null {
-  try {
-    const u = new URL(shareUrl);
-    if (!u.pathname.startsWith("/bid/")) return null;
-    u.pathname = `${u.pathname.replace(/\/+$/, "")}/og`;
-    u.search = lang === "ar" ? "?lang=ar" : "";
-    u.hash = "";
-    return u.toString();
-  } catch {
-    // Not an absolute URL — nothing to build an image URL from.
-    return null;
-  }
 }
 
 function escapeHtml(s: string): string {
@@ -80,11 +51,8 @@ function hostOf(url: string): string {
 
 /**
  * Table-based with inline styles, because that is what survives a paste into Gmail and Outlook —
- * both strip `<style>` blocks and ignore flex/grid. The image carries fixed pixel dimensions rather
- * than `object-fit: cover`, which Outlook does not support; the rendered card is already that shape.
- *
- * Widths are pinned in pixels on BOTH the table and the image. Gmail strips `max-width`, so a card
- * sized with `width="100%"` stretched to the full width of the compose window.
+ * both strip `<style>` blocks and ignore flex/grid. The image is a fixed 160px band rather than
+ * `object-fit: cover`, which Outlook does not support; the asset is already that shape.
  */
 export function bidCardHtml(card: BidCardPreview, lang: "en" | "ar" = "en"): string {
   const dir = lang === "ar" ? "rtl" : "ltr";
@@ -94,7 +62,7 @@ export function bidCardHtml(card: BidCardPreview, lang: "en" | "ar" = "en"): str
   return `<a href="${url}" style="text-decoration:none;color:inherit;display:block;max-width:440px;">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="440" dir="${dir}" style="width:440px;max-width:100%;border:1px solid #E1E4E8;border-radius:10px;border-collapse:separate;overflow:hidden;background:#ffffff;font-family:'Segoe UI',Roboto,Arial,sans-serif;">
     <tr><td style="padding:0;line-height:0;">
-      <img src="${escapeHtml(card.imageUrl)}" alt="${escapeHtml(card.title)}" width="${CARD_IMAGE_WIDTH}" height="${CARD_IMAGE_HEIGHT}" style="display:block;width:${CARD_IMAGE_WIDTH}px;max-width:100%;height:${CARD_IMAGE_HEIGHT}px;border:0;outline:none;text-decoration:none;background-color:#1C3550;">
+      <img src="${escapeHtml(card.imageUrl)}" alt="" width="440" height="160" style="display:block;width:440px;max-width:100%;height:160px;border:0;outline:none;text-decoration:none;background-color:#1C3550;">
     </td></tr>
     <tr><td align="${align}" style="padding:14px 16px 16px;">
       <div style="font-size:13.5px;font-weight:700;color:#1a1a1a;line-height:1.35;">${escapeHtml(card.title)}</div>
@@ -131,11 +99,9 @@ export async function copyBidLink(shareUrl: string, lang: "en" | "ar" = "en"): P
     const copy = lang === "ar" ? p.ar : p.en;
     const title = copy?.title ?? p.title;
     const description = copy?.description ?? p.description;
-    // The per-request card first; the backend's static asset only if this isn't a shareable /bid/ URL.
-    const imageUrl = bidCardImageUrl(shareUrl, lang) ?? p.imageUrl;
-    if (!title || !description || !imageUrl) throw new Error("incomplete preview");
+    if (!title || !description || !p.imageUrl) throw new Error("incomplete preview");
 
-    const html = bidCardHtml({ title, description, imageUrl, url: shareUrl }, lang);
+    const html = bidCardHtml({ title, description, imageUrl: p.imageUrl, url: shareUrl }, lang);
     await navigator.clipboard.write([
       new ClipboardItem({
         "text/html": new Blob([html], { type: "text/html" }),

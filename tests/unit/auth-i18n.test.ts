@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { detectLocale, isLocale } from "@/lib/i18n/config";
 import { normalizeTier } from "@/lib/contract/auth";
 
-describe("detectLocale — browser-locale default (AC-21)", () => {
+describe("detectLocale — browser-locale default (specs#235-AC-21)", () => {
   it("Arabic browser locales → ar", () => {
     expect(detectLocale("ar")).toBe("ar");
     expect(detectLocale("ar-SA")).toBe("ar");
@@ -24,7 +24,7 @@ describe("isLocale", () => {
   });
 });
 
-describe("normalizeTier — tier carry-over (AC-04/05)", () => {
+describe("normalizeTier — tier carry-over (specs#235-AC-04/05)", () => {
   it("passes known tiers through", () => {
     expect(normalizeTier("guest")).toBe("guest");
     expect(normalizeTier("basic")).toBe("basic");

@@ -17,10 +17,10 @@ import type { BidCard } from "@/lib/contract/bids";
  */
 
 const bc = (p: Partial<BidCard>): BidCard => ({
-  id: "b1", status: "PENDING", supplierId: "sup-1", supplierName: "Acme Cranes",
+  id: "b1", status: "PENDING", supplierId: "sup-1", supplierCompanyId: null, supplierName: "Acme Cranes",
   verified: true, rating: null, distanceKm: null, submittedAt: null, validUntil: "2026-09-01T00:00:00.000Z",
   price: 1200, mobPrice: 500, demobPrice: 400, priceUnit: "PER_DAY", duration: null,
-  numberOfUnits: 3, unitsOffered: 3, reqMinYear: null,
+  numberOfUnits: 3, unitsOffered: 3, openingPrice: null, lastCounterBy: null, requestChangedAt: null, liveStatus: null, reqMinYear: null,
   equipment: { id: "e1", make: "Cat", model: "320", year: 2022, imageUrl: null }, eqVerified: true,
   compliance: { entityType: "company", activityLicense: true, taxNumber: true, nationalAddress: true, safety: true, saso: false, localContent: false },
   matchCount: 0, conflictCount: 0, dealRoomId: null, expired: false,
@@ -287,12 +287,13 @@ describe("the leg maths leaves an un-negotiated bid's legs where they were", () 
     expect(three.totals.subtotal).toBe(one.totals.subtotal * 3);
   });
 
-  it("charges a PER_JOB bid its flat price once per unit", () => {
-    // Flat per spec 005 §2 — deliberately not the app's retired-unit `rate × durationDays` fallback.
+  it("charges a PER_JOB bid over the calendar window, as the app's fallback does", () => {
+    // NOT flat. PER_JOB fell out of the app's divisor lookup when it was retired, landing on
+    // `rate × durationDays × units` — 10 calendar days here, Fridays included.
     const doc = build([groupEntry(bc({ price: 7_700, priceUnit: "PER_JOB", mobPrice: 0, demobPrice: 0, unitsOffered: 2, numberOfUnits: 2 }))]);
-    expect(doc.lineItems[0].qty).toBe("2");
-    expect(doc.lineItems[0].totalNote).toBeNull(); // no divisor — a flat price has no period to explain
-    expect(doc.totals.subtotal).toBe(15_400);
+    expect(doc.lineItems[0].qty).toBe("10 days × 2");
+    expect(doc.lineItems[0].totalNote).toBeNull(); // no divisor to explain — there isn't one
+    expect(doc.totals.subtotal).toBe(154_000);
   });
 
   it("falls back to one full period, never a Friday-blind proration, with no start date", () => {

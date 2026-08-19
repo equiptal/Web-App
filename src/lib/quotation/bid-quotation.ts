@@ -231,11 +231,10 @@ export function buildBidQuotationDoc(input: BuildBidQuotationInput): QuotationDo
       totalCell = m2(lineSub);
     } else {
       anyCommitted = true;
-      // PER_JOB — a flat price, but every unit offered is rented. Flat per spec 005 §2; the app's own
-      // retired-unit fallback charges it per calendar day instead, and prod deliberately does not
-      // follow that. See `computeRentalTotal`.
-      lineSub = rate * units;
-      qtyCell = String(units);
+      // PER_JOB / unrecognized unit — `rate × durationDays × units`, straight off the shared module's
+      // app-matching fallback. Not "flat": the app charges every calendar day of the window here.
+      lineSub = rental.total * units;
+      qtyCell = `${durDays} ${L("days", "يوم")}${units > 1 ? ` × ${units}` : ""}`;
       priceCell = m2(rate);
       totalCell = m2(lineSub);
     }

@@ -40,3 +40,31 @@ export function hasVatInclusiveNote(notes: string | null | undefined): boolean {
 export function stripVatInclusiveNote(notes: string | null | undefined): string | null {
   return (notes ?? "").replace(VAT_INCLUSIVE_LINE_RE, "").trim() || null;
 }
+
+export interface VatLines {
+  /** Net — the sum of the components, which are always stored VAT-EXCLUSIVE. */
+  subtotal: number;
+  /** Gross − net. NEVER `subtotal × VAT_RATE`. */
+  vat: number;
+  /** Gross — the stored figure when there is one, so the rows reconcile with what the supplier sent. */
+  total: number;
+}
+
+/**
+ * The three rows of a submission's price breakdown (RMAP AC-216, §6.13.9).
+ *
+ * **VAT is derived as `total − subtotal`, never recomputed as `subtotal × 0.15`.** A submission stores an
+ * already-rounded gross total; recomputing the tax from the net components produces a breakdown whose
+ * rows do not add up to the figure the supplier actually sent — off by a riyal on the exact screen the
+ * renter uses to decide. Deriving it makes `subtotal + vat === total` true by construction.
+ *
+ * `storedGross` is `item.total` (per item) or `submission.grandTotal` (whole submission). It is null only
+ * for rows written before those fields existed, where `× (1 + VAT_RATE)` is the honest fallback.
+ *
+ * Shared deliberately: the submission modal and the read-only bottom bar (§6.13.9) must agree line for
+ * line, and they only can if they compute in one place.
+ */
+export function vatLines(subtotal: number, storedGross?: number | null): VatLines {
+  const total = storedGross ?? subtotal * (1 + VAT_RATE);
+  return { subtotal, vat: total - subtotal, total };
+}

@@ -4,6 +4,13 @@ import { supplierStatusToVerification } from "@/lib/contract/onboarding";
 
 interface BackendProfileStatus {
   supplierStatus?: number | null;
+  /**
+   * What the reviewer typed when they refused the submission — set only while `supplierStatus === 3`,
+   * and only when whoever reviewed the documents gave a reason. A bare "not approved" tells a renter
+   * to try again without telling them what to change, so they re-send the same papers.
+   * `submitCompanyDetails` clears it when they resubmit, so it never travels with a pending row.
+   */
+  verificationRejectionReason?: string | null;
   authorityRole?: string | null;
   companyName?: string | null;
   nationalId?: string | null;
@@ -31,6 +38,7 @@ export async function GET(req: Request) {
       const s = await call<BackendProfileStatus>("/users/me/profile-status");
       return NextResponse.json({
         status: supplierStatusToVerification(s.supplierStatus),
+        rejectionReason: s.verificationRejectionReason ?? null,
         submission: {
           authorityRole: s.authorityRole ?? null,
           companyName: s.companyName ?? null,

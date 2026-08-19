@@ -394,7 +394,34 @@ export function pinAirportFirst(groups: RequestGroup[]): RequestGroup[] {
   return [...groups.filter(isAir), ...groups.filter((g) => !isAir(g))];
 }
 
-/** Detail passes the record through largely intact (the screen renders every field). */
+/**
+ * Detail passes the record through largely intact (the screen renders every field) — with ONE
+ * correction it cannot skip.
+ *
+ * **`projectLat` / `projectLng` arrive as STRINGS.** They are Prisma `Decimal` columns, and a Decimal
+ * serialises to JSON as a string: the live payload is `{"projectLat":"24.7135983"}`, not a number.
+ * `RequestRecord` declares them `number | null`, so the old body — a bare `raw as RequestRecord` —
+ * asserted a type the wire never satisfied.
+ *
+ * That lie surfaced in exactly one place, which is why it survived: `BidMapWorkspace`'s project pin
+ * guards with `typeof lat !== "number"` (deliberately — a half-resolved point is worse than none),
+ * so it discarded a perfectly good location and the map reported **"This request has no project
+ * location"** on every request. Distances were unaffected and looked right, because `bids.ts` reads
+ * the same fields through `pickNum`, which coerces. One coordinate pair, two readers, one of them
+ * lenient — so the surface disagreed with itself.
+ *
+ * Coerced here rather than at the guard: the guard is correct and shared, and a cast that claims
+ * `number` should deliver one. Anything unparseable becomes null, never NaN — `Number("")` is 0,
+ * which would put the pin in the Gulf of Guinea.
+ *
+ * Found on staging, 2026-08-10.
+ */
 export function mapRequestDetail(raw: unknown): RequestRecord {
-  return raw as RequestRecord;
+  const o = (raw ?? {}) as Record<string, unknown>;
+  const coord = (v: unknown): number | null => {
+    if (v == null || v === "") return null;
+    const n = typeof v === "number" ? v : Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  return { ...o, projectLat: coord(o.projectLat), projectLng: coord(o.projectLng) } as RequestRecord;
 }

@@ -271,7 +271,7 @@ describe("draftToCreateRequest — §4.2 fields", () => {
   });
 });
 
-describe("draftToCreateRequest — postable items (AC-33/43)", () => {
+describe("draftToCreateRequest — postable items (specs#245-AC-33/43)", () => {
   it("excludes no-match and removed items", () => {
     const items = [
       makeItem({ id: "ok" }),

@@ -52,10 +52,15 @@
 .dlproto .tb-sup .av { width: 38px; height: 38px; border-radius: 50%; background: var(--supplier); color: #fff; font-weight: 800; font-size: 15px; display: grid; place-items: center; flex: 0 0 auto; }
 .dlproto .tb-sup .nm { display: flex; flex-direction: column; gap: 1px; min-width: 0; text-align: start; }
 .dlproto .tb-sup .nm .n { display: inline-flex; align-items: center; gap: 5px; font-size: 15px; font-weight: 800; color: var(--info); white-space: nowrap; }
-.dlproto .tb-sup .nm .n .material-icons-outlined { font-size: 15px; color: var(--success); }
+/* The verified tick is a stroked svg now (owner, 2026-08-19) — sized by its own attributes, so only
+   the ink is set here. The old rule targeted Material's glyph and no longer matches anything. */
+.dlproto .tb-sup .nm .n .tb-tick { flex-shrink: 0; color: var(--success); }
 .dlproto .tb-sup .nm .sub { font-size: 11.5px; font-weight: 600; color: var(--muted); white-space: nowrap; }
 .dlproto .tb-div { width: 1px; height: 34px; background: #cfe6f7; flex: 0 0 auto; }
-.dlproto .tb-eq { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+.dlproto .tb-eq { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; font: inherit; text-align: start; background: none; border: 0; padding: 0; cursor: pointer; border-radius: 12px; }
+.dlproto .tb-eq:hover .meta .t { text-decoration: underline; }
+.dlproto .tb-eq .chev { font-size: 18px; color: var(--muted); flex: 0 0 auto; }
+.dlproto .tb-eq:dir(rtl) .chev { transform: scaleX(-1); }
 .dlproto .tb-eq .ic { width: 40px; height: 40px; border-radius: 11px; background: var(--action-dim); border: 1px solid rgba(247, 144, 9, 0.4); color: var(--action); display: grid; place-items: center; flex: 0 0 auto; }
 .dlproto .tb-eq .ic .material-icons-outlined { font-size: 20px; }
 .dlproto .tb-eq .meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -109,6 +114,15 @@
 .dlproto .pb-brow .v.ex { color: rgba(255, 255, 255, 0.4); font-family: inherit; font-weight: 700; }
 .dlproto .pb-brow.tot { border-top: 1px solid rgba(255, 255, 255, 0.2); margin-top: 4px; padding-top: 10px; }
 .dlproto .pb-brow.tot .l { font-weight: 800; color: #fff; } .dlproto .pb-brow.tot .v { font-size: 17px; color: #8fd0ff; }
+/* «Per unit» — the heading that makes the block under it readable on a multi-unit deal, and which a
+   single-unit deal never draws because there would be nothing to distinguish it from. */
+.dlproto .pb-bhead { font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(255, 255, 255, 0.5); padding-bottom: 2px; }
+/* The overall row is the one the renter is actually paying, so it outweighs the per-unit total above
+   it — a heavier rule and white ink, where the per-unit total keeps the panel's blue. The leg counts
+   ride under the label as a `sub`, because they are WHY the two figures are not a multiplication. */
+.dlproto .pb-brow.tot.overall { border-top-width: 2px; margin-top: 8px; padding-top: 12px; }
+.dlproto .pb-brow.tot.overall .v { color: #fff; }
+.dlproto .pb-brow.tot.overall .l .sub { display: block; margin-top: 2px; font-size: 11px; font-weight: 600; color: rgba(255, 255, 255, 0.55); }
 /* below-bar strips (resolve-terms warning / awaiting / abandoned) */
 .dlproto .pb-strip { margin: -4px 0 16px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-md); padding: 11px 14px; font-size: 13px; font-weight: 700; color: var(--navy-mid); display: flex; align-items: center; gap: 8px; }
 .dlproto .pb-strip .material-icons-outlined { font-size: 18px; color: var(--warning); }
@@ -116,16 +130,38 @@
 .dlproto .pb-strip .pb-inline-btn { margin-inline-start: auto; border: 0; background: var(--surface1); border: 1px solid var(--border); border-radius: var(--r-md); padding: 7px 12px; font: inherit; font-weight: 800; font-size: 12.5px; color: var(--navy); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
 
 /* thread — the chat panel (prototype: the #E9EEF3 chat area under the price bar) */
-.dlproto .thread { flex: 1; display: flex; flex-direction: column; gap: 3px; padding: 14px 16px 16px; background: #E9EEF3; }
-.dlproto .sysev { align-self: center; display: inline-flex; align-items: center; gap: 7px; background: rgba(107, 143, 168, 0.16); border: 1px solid rgba(107, 143, 168, 0.28); color: var(--navy-mid); border-radius: var(--r-full); padding: 6px 13px; font-size: 12px; font-weight: 700; margin: 8px 0; max-width: 90%; text-align: center; }
-.dlproto .sysev .material-icons-outlined { font-size: 15px; }
-.dlproto .sysev.ok { background: var(--success-bg); border-color: rgba(29, 175, 88, 0.3); color: var(--success); }
+/* The map dock's stream rhythm (`.bm-chat-body`): an 8px gap carries the spacing between bubbles, so
+   the bubbles themselves have no margin. It was a 3px gap with `margin: 5px 0` on each bubble — the
+   same total, reached two ways, which is why a card and a bubble sat differently in the two routes. */
+.dlproto .thread { flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 16px; background: #E9EEF3; }
+/* ── the system line, measured against the app (`deal_system_events.dart`) ────────────────────────
+   Same pill on both clients, down to the alphas: muted at 20% behind a 30% hairline, radius full,
+   7px/12px, at most 85% of the width.
+
+   **Two colours, not one.** The app writes the SENTENCE in navy and leaves the GLYPH muted, so the
+   line reads at body weight while its icon stays chrome. The web had both in `--navy-mid`, which
+   made the icon compete with the words it labels.
+
+   ~~`.sysev.ok` — a green pill for a settled deal.~~ Removed, and it had never been applied. The app
+   has no colour variants here at all: the outcome already owns the phase pill, the price bar and the
+   card, and a fourth green thing in the thread competes with all three and wins none. */
+.dlproto .sysev {
+  align-self: center; display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(107, 143, 168, 0.2); border: 1px solid rgba(107, 143, 168, 0.3);
+  color: var(--navy); border-radius: var(--r-full);
+  padding: 7px 12px; font-size: 12px; font-weight: 700; line-height: 1.2;
+  margin: 4px 0; max-width: 85%; text-align: center;
+}
+.dlproto .sysev .material-icons-outlined { font-size: 14px; color: var(--muted); flex-shrink: 0; }
 /* negotiation chat cards (DRCARD) — the structured `custom` payload rendered as itself. These used to
    collapse into the single `.sysev` pill above: one identical grey chip for a rate proposal, a rate
    acceptance, a term accept, a counter and a term edit. Each tone below is what makes them distinct.
    Centered like `.sysev` (they are narration, not a party bubble) but a card, since they carry values. */
 /* The tone stripe is on the inline-START edge so it mirrors correctly under `dir=rtl`. */
-.dlproto .chatcard { align-self: center; width: min(340px, 92%); margin: 8px 0; padding: 11px 13px; background: var(--surface1); border: 1px solid var(--border); border-inline-start: 3px solid var(--border); border-radius: 14px; box-shadow: 0 1px 3px rgba(9, 20, 34, 0.06); }
+/* Centred, because the negotiation vocabulary is an EVENT in the room rather than either party's
+   remark — the dock reaches the same answer through `.bm-chat-event`. The dock's ceiling and no
+   margin, for the reason `.dl-rq-card` above carries. */
+.dlproto .chatcard { align-self: center; width: 86%; max-width: min(86%, 376px); margin: 0; padding: 11px 13px; background: var(--surface1); border: 1px solid var(--border); border-inline-start: 3px solid var(--border); border-radius: 14px; box-shadow: 0 1px 3px rgba(9, 20, 34, 0.06); }
 .dlproto .cc-head { display: flex; align-items: center; gap: 7px; }
 .dlproto .cc-head .material-icons-outlined { font-size: 17px; flex: 0 0 auto; }
 .dlproto .cc-title { font-size: 12.5px; font-weight: 800; color: var(--navy); line-height: 1.35; }
@@ -159,6 +195,41 @@
 .dlproto .cc-tr { background: none; border: 0; padding: 0; font: inherit; font-size: 11px; font-weight: 800; color: var(--info); cursor: pointer; }
 .dlproto .cc-tr:disabled { opacity: 0.6; cursor: default; }
 .dlproto .cc-at { margin-inline-start: auto; font-size: 10.5px; font-weight: 700; color: var(--muted); }
+/* ── Two weights, one component (owner's ruling 2026-08-08) ──────────────────────────────────────
+   The request and its reply keep the card. The negotiation vocabulary steps back to a quiet line: it
+   narrates moves the renter already made, or already saw on the price bar, and when everything wore
+   the same white card the one thing waiting on him stopped standing out.
+
+   Only the CHROME changes. Every string still comes from the payload, so the quiet events keep their
+   Arabic, their figures and their translate control — the three things `923b90f` fixed. */
+.dlproto .chatcard.cc-quiet {
+  width: min(300px, 88%);
+  margin: 5px 0;
+  padding: 7px 11px;
+  background: transparent;
+  /* The tone stripe survives at half width: it is the only thing distinguishing an acceptance from a
+     counter at a glance, and losing it would make the thread unreadable rather than merely quieter.
+
+     So only the three edges that are NOT the stripe go transparent. `border-color` here is (0,3,0)
+     and beat the tone rules below at (0,2,0), which meant this rule silently erased the very stripe
+     the paragraph above promises — every negotiation card in the thread lost it, and tone survived
+     only in the icon, whose rules happen to be (0,4,0). Named edges keep the cascade honest. */
+  border-block-color: transparent;
+  border-inline-end-color: transparent;
+  border-inline-start-width: 2px;
+  border-radius: 8px;
+  box-shadow: none;
+}
+.dlproto .chatcard.cc-quiet .cc-title { font-size: 11.5px; font-weight: 700; color: var(--navy-mid); }
+.dlproto .chatcard.cc-quiet .cc-head .material-icons-outlined { font-size: 15px; }
+.dlproto .chatcard.cc-quiet .cc-rows { margin-top: 5px; gap: 2px; }
+.dlproto .chatcard.cc-quiet .cc-k { font-size: 10.5px; }
+.dlproto .chatcard.cc-quiet .cc-v { font-size: 11.5px; font-weight: 700; }
+.dlproto .chatcard.cc-quiet .cc-foot { margin-top: 5px; }
+/* `.cc-accepted` paints a success wash; at this weight that reads as a highlight, which is the
+   emphasis this rule exists to remove. The stripe already carries the meaning. */
+.dlproto .chatcard.cc-quiet.cc-accepted { background: transparent; }
+
 /* six distinct tones — a rate proposal, a rate acceptance, and the four term actions */
 .dlproto .cc-rate { border-inline-start-color: var(--action); }
 .dlproto .cc-rate .cc-head .material-icons-outlined { color: var(--action); }
@@ -172,11 +243,83 @@
 .dlproto .cc-term-edit .cc-head .material-icons-outlined { color: var(--info); }
 .dlproto .cc-term-reopen { border-inline-start-color: var(--muted); }
 .dlproto .cc-term-reopen .cc-head .material-icons-outlined { color: var(--muted); }
-.dlproto .msg { max-width: 70%; margin: 5px 0; padding: 10px 14px; border-radius: 14px; font-size: 13.5px; line-height: 1.45; }
+/* V11 — the request loop. Its own two tones: an ask about a machine is not a move on the price, and
+   collapsing it into `.cc-rate` would put a question and an offer in the same colour. */
+.dlproto .cc-ask { border-inline-start-color: var(--action); background: rgba(37, 99, 235, 0.04); }
+.dlproto .cc-ask .cc-head .material-icons-outlined { color: var(--action); }
+.dlproto .cc-ask-reply { border-inline-start-color: var(--info); }
+.dlproto .cc-ask-reply .cc-head .material-icons-outlined { color: var(--info); }
+/* An unanswered ask is neither good news nor history — it is simply open, so it is muted rather than
+   tinted with either. A refusal is amber, never red: red on this feature means availability only. */
+.dlproto .cc-out-waiting { color: var(--muted); }
+.dlproto .cc-out-refused { color: var(--warning); }
+/* `partial` — "Amber. Not 'provided', not 'declined'." (owner ruling, 2026-08-11, §8). He sent
+   something other than what was asked: it must never take `--success` (that would read as answered)
+   and it is given its own deeper amber rather than sharing `--warning` with the refusal, so the two
+   are distinguishable and neither is restyled by a change meant for the other. The same pairing the
+   map's card draws (`map/request-card.css` `.bm-rq-state.is-partial`) — one channel, one colour. */
+.dlproto .cc-out-partial { color: #b45309; }
+/* ── V12b · the request card, sided by its AUTHOR (owner, 2026-08-11) ─────────────────────────────
+   Two rulings meet on this wrapper. *"i want it like request card"* put the map's `rRequestCard` in
+   this thread — the card's own chrome travels with the component now (`map/request-card.css`), so
+   nothing of its appearance is restated here. And *"make these cards appear like messages sent by the
+   other side or by me whether the request or the response"* is what this wrapper is: a request and a
+   reply are things a PARTY said, so each hugs its author's edge, while the negotiation vocabulary
+   stays centred as `.chatcard` centres itself — an event in the room belongs to neither chair.
+
+   THE SIDE AND THE WIDTH ARE BOTH ON THE WRAPPER. A card carrying a width of its own inside a sided
+   wrapper is a second opinion about one geometry, and the disagreement is what leaves a card floating
+   in from the edge. `align-self` on a child of this wrapper is inert, which is exactly why the
+   fallback `.chatcard` inside it is re-stated rather than left to centre itself. */
+/* The dock's ceiling (`.bm-chat-card`), and no margin — the thread's 8px gap is the rhythm now, so a
+   margin here would spend it twice and park a card further from its neighbours than a bubble is. */
+.dlproto .thread .dl-rq-card { width: 86%; max-width: min(86%, 376px); margin: 0; }
+.dlproto .thread .dl-rq-card.is-mine { align-self: flex-end; }
+.dlproto .thread .dl-rq-card.is-them { align-self: flex-start; }
+.dlproto .thread .dl-rq-card .bm-rq,
+.dlproto .thread .dl-rq-card .chatcard { width: 100%; max-width: none; margin: 0; }
+/* ── ONE chat, two routes (owner, 2026-08-19) ────────────────────────────────────────────────────
+   *"we have now 2 chats style… i want both to be the same, the style i want is the one in the map."*
+
+   These are the MAP DOCK's bubbles, promoted from an override to the base. The dock's root is
+   `bm-chat dlproto` (`ChatDock.tsx:743`), so it has always read this block and then overridden it from
+   `map-proto.css` under a heavier `.bidmap .bm-chat` selector — which is exactly how one conversation
+   came to look like two products depending on where the renter opened it. Those overrides are deleted
+   with this change; the values below ARE them, so the dock renders identically and the deal room now
+   matches it.
+
+   ~~70% · `10px 14px` · r14 · 13.5px/1.45, incoming bordered, outgoing a saturated `--rentee` fill
+   with white text.~~ Withdrawn. The old override's own comment defended the fork — *"that surface has
+   its own spec and its own prototype… none of it may move for this one"* — and the owner has now
+   ruled the other way: the map's is the style, and the deal room follows it.
+
+   What actually changes for a reader here: the outgoing bubble stops being a saturated blue with white
+   ink and becomes pale `#D9EEFF` with the SAME dark ink as the incoming one, so a thread reads as one
+   conversation rather than two voices in two liveries; the incoming bubble drops its border for the
+   shadow both now share; and the tail notch moves to the far edge. */
+.dlproto .msg { max-width: 80%; margin: 0; padding: 9px 12px; border-radius: 13px; font-size: 12.5px; line-height: 1.7; }
 .dlproto .msg .meta { font-size: 10.5px; font-weight: 700; margin-top: 5px; opacity: 0.7; }
-.dlproto .msg.them { align-self: flex-start; background: var(--surface1); border: 1px solid var(--border); border-start-start-radius: 5px; color: var(--navy); }
-.dlproto .msg.mine { align-self: flex-end; background: var(--rentee); color: #fff; border-start-end-radius: 5px; }
+.dlproto .msg.them {
+  align-self: flex-start;
+  background: #fff;
+  border: 0;
+  color: #16304f;
+  border-end-end-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.dlproto .msg.mine {
+  align-self: flex-end;
+  background: #d9eeff;
+  border: 0;
+  color: #16304f;
+  border-end-start-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
 .dlproto .msg.mine .meta { text-align: end; }
+/* «حفظ» beside an attachment, in the bubble's own ink both sides — the outgoing fill is pale now, so
+   the white this used to be on `.msg.mine` would be invisible. */
+.dlproto .msg .msg-att-dl { color: #2563eb; }
+.dlproto .msg.mine .msg-att-dl { color: #1d4ed8; }
 /* supplier-started banner */
 .dlproto .started-banner { display: flex; align-items: center; gap: 8px; margin: 10px 0; padding: 10px 13px; border-radius: 10px; background: var(--info-bg); color: var(--info); font-size: 12.5px; font-weight: 700; }
 .dlproto .started-banner .material-icons-outlined { font-size: 17px; flex: 0 0 auto; }
@@ -184,16 +327,31 @@
 .dlproto .msg-att-img { display: block; margin-top: 6px; }
 .dlproto .msg-att-img img { max-width: 220px; max-height: 220px; border-radius: 10px; display: block; }
 .dlproto .msg-att-file { display: inline-flex; align-items: center; gap: 7px; margin-top: 6px; padding: 8px 11px; border-radius: 10px; background: rgba(0,0,0,.06); color: inherit; text-decoration: none; font-size: 12.5px; font-weight: 700; max-width: 240px; }
-.dlproto .msg.mine .msg-att-file { background: rgba(255,255,255,.18); }
+/* `rgba(255,255,255,.18)` was a white wash for the saturated outgoing fill this bubble no longer has;
+   on pale `#D9EEFF` it is invisible. Both sides now take the same dark wash. */
+.dlproto .msg.mine .msg-att-file { background: rgba(0, 0, 0, 0.06); }
 .dlproto .msg-att-file .material-icons-outlined { font-size: 18px; flex: 0 0 auto; }
 .dlproto .msg-att-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* composer */
-.dlproto .composer { position: sticky; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 12px 0; background: var(--surface1); border-top: 1px solid var(--border); }
-.dlproto .composer .ib { width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface1); color: var(--navy-mid); display: flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; }
-.dlproto .composer input { flex: 1; height: 44px; border: 1px solid var(--border); border-radius: var(--r-full); padding: 0 16px; font: inherit; font-size: 14px; outline: 0; background: var(--surface2); }
-.dlproto .composer input:focus { border-color: var(--action); background: #fff; }
-.dlproto .composer .send { background: var(--action); border-color: var(--action); color: #fff; }
+/* ── The composer is the dock's too (owner, 2026-08-19) ──────────────────────────────────────────
+   `.bm-chat-compose`'s numbers, on this route's own class name — the two markups are the same shape
+   (`.ib` · input · `.ib send`), so only the skin was ever different. 38px round controls on white
+   inside `#C8D8E8`, an r20 field on `#F8FAFC`, 18px gutters.
+
+   The send goes BLUE — `#2563EB`, the dock's. It was `--action`, the product's orange, and the reason
+   for the change is simply that the dock is the style being adopted; nothing in the price bar above is
+   orange, so this is not resolving a clash. It does line the send up with `.pb-btn.neg`, which is the
+   same blue: the live control in the composer and the live control in the bar now read as one family,
+   with «Accept» keeping the green that separates settling from negotiating. */
+.dlproto .composer { position: sticky; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 12px 18px; background: var(--surface1); border-top: 1px solid var(--border); }
+.dlproto .composer .ib { width: 38px; height: 38px; padding: 0; border-radius: 50%; border: 1px solid #c8d8e8; background: #fff; color: #6b8fa8; display: flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; }
+.dlproto .composer .ib .material-icons-outlined { font-size: 17px; }
+.dlproto .composer .ib:disabled { opacity: 0.5; cursor: default; }
+.dlproto .composer input { flex: 1; min-width: 0; height: auto; border: 1px solid #c8d8e8; border-radius: 20px; padding: 10px 14px; font: inherit; font-size: 12.5px; color: #16304f; outline: 0; background: #f8fafc; }
+.dlproto .composer input:focus { border-color: #2563eb; background: #fff; }
+.dlproto .composer input:disabled { opacity: 0.65; }
+.dlproto .composer .send { background: #2563eb; border-color: #2563eb; color: #fff; }
 .dlproto .composer.ro { justify-content: center; } .dlproto .ro-note { font-size: 13px; font-weight: 700; color: var(--muted); }
 /* closed-deal quotation download (app parity) */
 .dlproto .composer.quote-bar { flex-direction: column; gap: 6px; }
@@ -202,190 +360,24 @@
 .dlproto .dl-quote:disabled { opacity: 0.7; cursor: default; }
 .dlproto .dl-quote .material-icons-outlined { font-size: 19px; }
 .dlproto .quote-err { color: var(--danger, #d92d20); }
-/* Pre-confirmation draft-quotation link — a quiet text link, NOT a filled CTA: the state's real action
-   (Negotiate / Accept / Withdraw) must stay visually primary. */
-.dlproto .pb-draft-row { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 8px; }
-.dlproto .pb-draft { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 4px 6px; font: inherit; font-size: 12.5px; font-weight: 800; color: var(--action); cursor: pointer; }
-.dlproto .pb-draft:hover:not(:disabled) { text-decoration: underline; }
-.dlproto .pb-draft:disabled { opacity: 0.6; cursor: default; }
-.dlproto .pb-draft .material-icons-outlined { font-size: 16px; }
-.dlproto .pb-draft-err { font-size: 11.5px; font-weight: 700; color: var(--danger, #d92d20); text-align: center; }
 .dlproto[dir="rtl"] .composer .send .material-icons-outlined { transform: scaleX(-1); }
+
+/* The composer and the quotation link share ONE sticky footer, so the link sits BELOW the composer
+   (app parity: quotation_button.dart is the last widget in the column, under the chat input) instead of
+   two `sticky; bottom: 0` bars fighting for the same edge and overlapping. */
+.dlproto .dl-footer { position: sticky; bottom: 0; z-index: 2; background: var(--surface1); }
+.dlproto .dl-footer .composer { position: static; }
+/* A plain text link, not a boxed card: it sits under the chat input, where a box would eat the vertical
+   space the conversation needs. Blue while the deal is a PREVIEW, green once it is FINAL — the app's two
+   accents, carrying the same distinction as the label. */
+.dlproto .quote-link-bar { border-top: 0; padding: 0 0 8px; }
+.dlproto .dl-quote.quote-link { background: none; color: var(--info); padding: 8px 10px; font-size: 13px; gap: 6px; }
+.dlproto .dl-quote.quote-link.final { color: var(--success); }
+.dlproto .dl-quote.quote-link .material-icons-outlined { font-size: 16px; }
+.dlproto[dir="rtl"] .dl-quote.quote-link .chev { transform: scaleX(-1); }
 
 .dlproto .rstate { display: grid; place-items: center; padding: 50px 0; color: var(--muted); }
 .dlproto .rempty { border: 1px dashed var(--border); background: rgba(239, 244, 249, 0.4); border-radius: var(--r-lg); padding: 36px; text-align: center; font-size: 13.5px; color: var(--muted); }
-
-/* Terms card — negotiable terms + differing-term resolution (web-app/request-details-bids). */
-.dlproto .terms-card { margin-top: 14px; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface1); overflow: hidden; }
-.dlproto .tc-h { display: flex; align-items: center; gap: 8px; padding: 12px 14px; font-size: 13.5px; font-weight: 800; color: var(--navy); border-bottom: 1px solid var(--border); }
-.dlproto .tc-h .material-icons-outlined { font-size: 18px; color: var(--action); }
-.dlproto .tc-toggle { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--border); cursor: pointer; text-align: start; }
-.dlproto .tc-toggle .tc-h-meta { margin-inline-start: auto; font-size: 11.5px; font-weight: 700; color: var(--muted); }
-.dlproto .tc-toggle .tc-chev { font-size: 18px; color: var(--muted) !important; transition: transform .15s; }
-.dlproto .tc-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-bottom: 1px solid var(--border); }
-.dlproto .tc-row:last-child { border-bottom: 0; }
-.dlproto .tc-row.differ { background: var(--warning-bg); }
-.dlproto .tc-main { flex: 1; min-width: 0; }
-.dlproto .tc-lab { display: block; font-size: 13px; font-weight: 700; color: var(--navy); }
-.dlproto .tc-lab em { font-style: normal; font-weight: 600; color: var(--muted); }
-.dlproto .tc-val { display: block; margin-top: 2px; font-size: 12.5px; color: var(--navy-mid); }
-.dlproto .tc-diff { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 3px; font-size: 12px; color: var(--navy-mid); }
-.dlproto .tc-diff b { color: var(--navy); }
-.dlproto .tc-acts { display: flex; gap: 8px; flex: 0 0 auto; }
-.dlproto .tc-btn { border-radius: var(--r-md); padding: 7px 11px; font-size: 12px; font-weight: 700; cursor: pointer; border: 1px solid var(--border); }
-.dlproto .tc-btn.ghost { background: var(--surface1); color: var(--navy); }
-.dlproto .tc-btn.solid { background: var(--action); border-color: var(--action); color: #fff; }
-.dlproto .tc-btn:disabled { opacity: .5; cursor: default; }
-.dlproto .tc-ok { flex: 0 0 auto; color: var(--success); display: flex; }
-.dlproto .tc-ok .material-icons-outlined { font-size: 19px; }
-
-/* ── App-parity terms review (DealRoomTerms): tiers + state cards + inline counter ── */
-.dlproto .terms-review { display: flex; flex-direction: column; gap: 14px; padding: 4px 2px 2px; }
-.dlproto .tier { display: flex; flex-direction: column; gap: 8px; }
-.dlproto .tier-h { display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); }
-.dlproto .tier-h .material-icons-outlined { font-size: 15px; }
-.dlproto .tier-critical .tier-h { color: var(--danger); }
-.dlproto .tier-review .tier-h { color: var(--warning); }
-.dlproto .tier-toggle { background: none; border: 0; cursor: pointer; font: inherit; font-weight: 800; text-transform: uppercase; padding: 0; width: 100%; }
-.dlproto .tier-chev { margin-inline-start: auto; transition: transform .15s; }
-
-.dlproto .tcard { border: 1px solid var(--border); border-radius: var(--r-md, 12px); background: var(--surface1); padding: 12px 14px; }
-.dlproto .tcard-critical { border-inline-start: 3px solid var(--danger); }
-.dlproto .tcard-review { display: flex; align-items: center; gap: 10px; padding: 10px 14px; }
-.dlproto .tcard-matched { display: flex; align-items: center; gap: 10px; padding: 9px 14px; background: var(--surface2); }
-.dlproto .tcard-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-.dlproto .tcard-lab { font-size: 13.5px; font-weight: 800; color: var(--navy); }
-.dlproto .tcard-lab em { font-style: normal; font-weight: 600; color: var(--muted); }
-.dlproto .tcard-main { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
-.dlproto .tcard-val { font-size: 13px; font-weight: 700; color: var(--navy-mid); }
-.dlproto .tcard-review .tcard-val, .dlproto .tcard-matched .tcard-val { margin-inline-start: auto; }
-
-/* state badges (5 states) */
-.dlproto .tcard-state { flex: 0 0 auto; font-size: 10.5px; font-weight: 800; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
-.dlproto .tcard-state.st-fixed { background: var(--surface3); color: var(--navy); }
-.dlproto .tcard-state.st-agreed { background: var(--success-bg); color: var(--success); }
-.dlproto .tcard-state.st-soft { background: #e6f2fb; color: var(--info); }
-.dlproto .tcard-state.st-disputed { background: var(--danger-bg); color: var(--danger); }
-.dlproto .tcard-state.st-pending { background: var(--warning-bg); color: var(--warning); }
-
-/* supplier vs you */
-.dlproto .tcard-vals { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
-.dlproto .tcard-v { display: flex; flex-direction: column; gap: 2px; background: var(--surface2); border-radius: 9px; padding: 7px 10px; }
-.dlproto .tcard-v.mine { background: #eef4ff; }
-.dlproto .tcard-v .k { font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--muted); }
-.dlproto .tcard-v b { font-size: 13.5px; color: var(--navy); }
-
-/* actions */
-.dlproto .tcard-acts { display: flex; flex-wrap: wrap; gap: 8px; }
-.dlproto .tc-btn { border: 1px solid var(--border); background: var(--surface1); border-radius: 9px; padding: 8px 13px; font: inherit; font-weight: 800; font-size: 12.5px; color: var(--navy); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
-.dlproto .tc-btn.sm { padding: 6px 11px; font-size: 12px; margin-inline-start: auto; }
-.dlproto .tc-btn.ghost { background: var(--surface2); border-color: transparent; }
-.dlproto .tc-btn.outline { background: var(--surface1); color: var(--navy-mid); }
-.dlproto .tc-btn.solid { background: var(--navy); border-color: var(--navy); color: #fff; }
-.dlproto .tc-btn:disabled { opacity: .5; cursor: not-allowed; }
-
-/* inline counter editor */
-.dlproto .tc-counter { display: flex; flex-direction: column; gap: 9px; margin-top: 2px; border-top: 1px dashed var(--border); padding-top: 10px; }
-.dlproto .tc-counter-in { display: flex; align-items: center; gap: 8px; }
-.dlproto .tc-counter-in input { flex: 1 1 auto; min-width: 0; border: 1px solid var(--border); border-radius: 9px; padding: 9px 11px; font: inherit; font-size: 14px; background: var(--surface2); color: var(--navy); }
-.dlproto .tc-unit { font-size: 12px; font-weight: 800; color: var(--muted); }
-.dlproto .tc-pills { display: flex; flex-wrap: wrap; gap: 7px; }
-.dlproto .tc-pill { border: 1px solid var(--border); background: var(--surface1); border-radius: 999px; padding: 7px 14px; font: inherit; font-weight: 700; font-size: 12.5px; color: var(--navy-mid); cursor: pointer; }
-.dlproto .tc-pill.on { background: var(--navy); border-color: var(--navy); color: #fff; }
-.dlproto .tc-counter-acts { display: flex; gap: 8px; justify-content: flex-end; }
-
-/* ── Read-only terms on the main page (tcard-ro) + "review & counter" CTA ── */
-.dlproto .terms-review.ro { gap: 8px; }
-.dlproto .tcard-ro { display: flex; align-items: center; gap: 10px; }
-.dlproto .tcard-diff { display: flex; flex-direction: column; gap: 1px; font-size: 12px; color: var(--muted); }
-.dlproto .tcard-diff b { color: var(--navy); }
-.dlproto .co-open { width: 100%; margin-top: 4px; }
-
-/* ── Counter-offer flow sheet (CounterOfferFlow) ── */
-.dlproto .co-backdrop, .co-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.45); display: flex; align-items: flex-end; justify-content: center; }
-@media (min-width: 640px) { .co-backdrop { align-items: center; padding: 16px; } }
-.co-sheet { display: flex; flex-direction: column; width: 100%; max-width: 560px; max-height: 92vh; background: var(--surface1,#fff); border-radius: 18px 18px 0 0; overflow: hidden; font-family: inherit; color: var(--navy,#1c3550); }
-@media (min-width: 640px) { .co-sheet { border-radius: 16px; } }
-.co-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border,#d4e0ec); }
-.co-title { font-size: 16px; font-weight: 800; }
-.co-x { display: grid; place-items: center; width: 32px; height: 32px; border: 0; background: none; cursor: pointer; color: var(--muted,#6b8fa8); border-radius: 50%; }
-.co-x:hover { background: var(--surface2,#eff4f9); }
-.co-steps { display: flex; gap: 6px; padding: 12px 18px; border-bottom: 1px solid var(--border,#d4e0ec); }
-.co-step { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; color: var(--muted,#6b8fa8); flex: 1; }
-.co-step i { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--surface3,#e4edf5); color: var(--muted,#6b8fa8); font-style: normal; font-size: 11px; flex: 0 0 auto; }
-.co-step.on { color: var(--navy,#1c3550); }
-.co-step.on i { background: var(--navy,#1c3550); color: #fff; }
-.co-step.done i { background: var(--success,#1daf58); color: #fff; }
-.co-body { flex: 1 1 auto; overflow-y: auto; padding: 16px 18px; }
-
-/* price line items */
-.co-price { display: flex; flex-direction: column; gap: 12px; }
-.co-line { border: 1px solid var(--border,#d4e0ec); border-radius: 12px; padding: 12px 14px; }
-.co-line.removed { background: var(--surface2,#eff4f9); }
-.co-line-h { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
-.co-line-h .material-icons-outlined { font-size: 18px; color: var(--navy-mid,#2a4f72); }
-.co-line-lab { font-size: 13.5px; font-weight: 800; }
-.co-line-rm { margin-inline-start: auto; background: none; border: 0; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; color: var(--danger,#d9362a); }
-.co-line-undo { margin-inline-start: auto; background: none; border: 0; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; color: var(--info,#1a7ec8); }
-.co-line-in { display: flex; align-items: center; gap: 8px; }
-.co-line-in input { flex: 1 1 auto; min-width: 0; border: 1px solid var(--border,#d4e0ec); border-radius: 9px; padding: 10px 12px; font: inherit; font-size: 15px; font-weight: 700; background: var(--surface2,#eff4f9); color: var(--navy,#1c3550); }
-.co-unit { font-size: 12px; font-weight: 800; color: var(--muted,#6b8fa8); white-space: nowrap; }
-.co-line-removed { font-size: 12.5px; font-weight: 700; color: var(--muted,#6b8fa8); }
-
-/* summary */
-.co-summary { display: flex; flex-direction: column; gap: 12px; }
-.co-sum-h { font-size: 14px; font-weight: 800; }
-.co-sum-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.co-sum-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--surface2,#eff4f9); border-radius: 9px; padding: 9px 12px; font-size: 13px; }
-.co-sum-list li span { color: var(--navy-mid,#2a4f72); font-weight: 700; }
-.co-sum-list li b { color: var(--navy,#1c3550); }
-.co-sum-list li.ok b { color: var(--success,#1daf58); }
-.co-ack { display: flex; align-items: flex-start; gap: 9px; font-size: 12.5px; color: var(--navy-mid,#2a4f72); line-height: 1.5; cursor: pointer; }
-.co-ack input { margin-top: 2px; flex: 0 0 auto; }
-.co-warn { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--warning,#d4780a); }
-.co-warn .material-icons-outlined { font-size: 16px; }
-.co-empty { font-size: 13px; color: var(--muted,#6b8fa8); padding: 8px 2px; }
-
-.co-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 18px; border-top: 1px solid var(--border,#d4e0ec); }
-.co-foot .btn { min-width: 110px; }
-
-/* turn chip variants on the price card */
-.dlproto .turn-chip.mine { background: rgba(247,144,9,.14); color: #8a5a06; }
-.dlproto .turn-chip.done { background: var(--success-bg,#e7f7ee); color: var(--success,#1daf58); }
-
-/* ── One-screen deal-room terms (DealRoomTerms): conflicts open/red, matched collapsed/green ── */
-.dlproto .terms-list { display: flex; flex-direction: column; gap: 8px; padding: 4px 2px 2px; }
-.dlproto .tcard-pending { border-inline-start: 3px solid var(--warning,#d4780a); }
-/* resolved (matched / accepted) → collapsed green row, tap to peek */
-.dlproto .tcard-resolved { padding: 0; background: var(--success-bg,#e7f7ee); border-color: rgba(29,175,88,.28); }
-.dlproto .tcard-resolved-h { display: flex; align-items: center; gap: 9px; width: 100%; background: none; border: 0; cursor: pointer; padding: 10px 14px; font: inherit; text-align: start; }
-.dlproto .tcard-resolved-h .ok-tick { color: var(--success,#1daf58); font-size: 18px; flex: 0 0 auto; }
-.dlproto .tcard-resolved .tcard-val { margin-inline-start: auto; color: var(--navy-mid,#2a4f72); font-weight: 700; }
-.dlproto .tcard-peek { display: flex; flex-direction: column; gap: 8px; padding: 0 14px 11px 38px; font-size: 12px; color: var(--muted,#6b8fa8); }
-.dlproto .tcard-peek b { color: var(--navy,#1c3550); }
-
-/* ── App-parity term rows: grouping + progress meter + 4 reference value rows ── */
-.dlproto .terms-progress { padding: 6px 4px 2px; }
-.dlproto .terms-progress-h { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 800; color: var(--navy,#1c3550); margin-bottom: 5px; }
-.dlproto .terms-progress-h .tp-open { color: var(--warning,#d4780a); }
-.dlproto .terms-progress-bar { height: 6px; border-radius: 6px; background: var(--surface3,#e4eaf1); overflow: hidden; }
-.dlproto .terms-progress-bar > div { height: 100%; border-radius: 6px; background: var(--success,#1daf58); transition: width .25s; }
-.dlproto .terms-group { display: flex; flex-direction: column; gap: 8px; }
-.dlproto .terms-group-h { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--muted,#6b8fa8); margin: 8px 2px 0; }
-.dlproto .terms-group-h span { background: var(--surface3,#e4eaf1); color: var(--navy-mid,#2a4f72); border-radius: 999px; padding: 0 7px; font-size: 10px; }
-/* reference value rows (Current / You / Supplier / Platform default) */
-.dlproto .tcard-vrs { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
-.dlproto .tcard-vr { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.dlproto .tcard-vr .k { font-size: 11px; font-weight: 700; color: var(--muted,#6b8fa8); }
-.dlproto .tcard-vr b { font-size: 13px; font-weight: 600; color: var(--navy,#1c3550); text-align: end; }
-.dlproto .tcard-vr b.cur { font-weight: 800; }
-.dlproto .tcard-warn { color: var(--warning,#d4780a); font-size: 17px; flex: 0 0 auto; }
-/* fixed (locked) row + mandatory badge */
-.dlproto .tcard-fixed { padding: 0; background: var(--surface2,#f2f6fa); }
-.dlproto .tcard-fixed .lock-tick { color: var(--navy,#1c3550); font-size: 17px; flex: 0 0 auto; }
-.dlproto .tcard-state.st-mand { background: rgba(217,54,42,.12); color: var(--danger,#d9362a); font-weight: 900; }
-.dlproto .tcard-reopen { align-self: flex-start; background: none; border: 0; padding: 0; font: inherit; font-size: 11.5px; font-weight: 700; color: var(--navy-mid,#2a4f72); text-decoration: underline; cursor: pointer; }
-.dlproto .tcard-reopen:disabled { opacity: .5; cursor: default; }
 
 /* ════════════════════════════════════════════════════════════════════════════════════════════
    Negotiation sheet — quotation-paper 3-step wizard (spec §6). Scoped .qp-*; scrim class .qp-scrim
@@ -731,3 +723,66 @@
 .dlproto .msg-att-dl { display: inline-flex; align-items: center; gap: 4px; margin-top: 5px; background: none; border: 0; padding: 0; font: inherit; font-size: 11.5px; font-weight: 800; color: var(--info); cursor: pointer; }
 .dlproto .msg-att-dl .material-icons-outlined { font-size: 15px; }
 .dlproto .msg.mine .msg-att-dl { color: rgba(255, 255, 255, .85); }
+
+/* ── the ⋮ kebab's dropdown ─────────────────────────────────────────────────────────────────────
+   Anchored to `.dlproto` rather than to the top bar, which scrolls sideways and would clip it.
+   The scrim is what closes the menu on an outside click — no document listener, so nothing has to
+   be torn down when the room unmounts mid-menu. */
+.dlproto { position: relative; }
+.dlproto .dr-menu-scrim { position: fixed; inset: 0; z-index: 60; }
+.dlproto .dr-menu {
+  position: absolute; z-index: 61; top: 62px; inset-inline-end: 6px; min-width: 218px;
+  background: var(--surface1); border: 1px solid var(--border); border-radius: 14px;
+  box-shadow: 0 18px 44px rgba(16, 38, 63, .22); padding: 6px; display: grid; gap: 2px;
+}
+.dlproto .dr-menu button {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: start;
+  font: inherit; font-size: 13px; font-weight: 700; color: var(--navy);
+  background: none; border: 0; border-radius: 10px; padding: 10px 12px; cursor: pointer;
+}
+.dlproto .dr-menu button:hover:not(:disabled) { background: var(--surface2); }
+.dlproto .dr-menu button:disabled { color: var(--text-disabled); cursor: not-allowed; }
+.dlproto .dr-menu button .material-icons-outlined { font-size: 18px; color: var(--muted); }
+.dlproto .dr-menu button.danger,
+.dlproto .dr-menu button.danger .material-icons-outlined { color: var(--danger); }
+.dlproto .dr-menu button.danger:hover { background: var(--danger-bg); }
+
+/* Destructive confirm button, alongside `.warn` and `.green`. */
+.dlproto .dl-mbtn.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+/* ── term provenance + last-move hint ───────────────────────────────────────────────────────────
+   Two sub-label lines under a term's name: WHERE its value came from, and the last move made on it.
+   Both are quiet by design — a term is read on its label and its value; these answer the questions
+   that come second. */
+.dlproto .qp-tsrc,
+.dlproto .qp-thist { display: block; font-size: 10.5px; font-weight: 600; color: var(--muted); line-height: 1.5; }
+.dlproto .qp-thist { display: flex; align-items: center; gap: 3px; }
+.dlproto .qp-thist .material-icons-outlined { font-size: 12px; }
+/* The payment row lays its label out inline, so the notes need the label to become a column. */
+.dlproto .qp-pay-row .k { display: flex; flex-direction: column; gap: 1px; }
+
+/* ── the sibling strip: this renter's other conversations with the same supplier ─────────────────
+   Under the top bar, because it is navigation BETWEEN rooms rather than part of one. It scrolls
+   sideways on a narrow screen rather than wrapping — a wrapped strip changes the page's height as
+   the renter moves between items, so the conversation below would jump each time. */
+.dlproto .dr-sibs {
+  display: flex; gap: 6px; overflow-x: auto; padding: 0 2px 12px;
+  margin-top: -6px; scrollbar-width: none;
+}
+.dlproto .dr-sibs::-webkit-scrollbar { display: none; }
+.dlproto .dr-sibs button {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px;
+  font: inherit; font-size: 12.5px; font-weight: 700; color: var(--navy-mid);
+  background: var(--surface1); border: 1px solid var(--border);
+  border-radius: 999px; padding: 7px 14px; cursor: pointer; white-space: nowrap;
+}
+.dlproto .dr-sibs button:hover:not(:disabled) { background: var(--surface2); color: var(--navy); }
+/* The current tab is inert, so it reads as a position rather than as a control that does nothing. */
+.dlproto .dr-sibs button.on {
+  background: var(--navy); border-color: var(--navy); color: #fff; cursor: default;
+}
+/* A conversation nobody has opened yet. A quiet dot, not a word — the tab still works. */
+.dlproto .dr-sibs button .dot {
+  width: 5px; height: 5px; border-radius: 50%; background: var(--muted); flex: 0 0 auto;
+}
+.dlproto .dr-sibs button.on .dot { background: rgba(255, 255, 255, .55); }

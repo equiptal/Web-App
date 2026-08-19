@@ -289,6 +289,7 @@ export function normalizedBidToBidCard(
     id: nb.bid_id ?? `upload:${nb.source_file ?? nb.supplier_name ?? "quote"}`,
     status: "PENDING",
     supplierId: nb.supplier_user_id != null ? String(nb.supplier_user_id) : null,
+    supplierCompanyId: null, // an uploaded quote carries no platform company — it groups by its own name
     supplierName: nb.supplier_name ?? "Uploaded quote",
     verified: false,
     rating: null,
@@ -339,6 +340,13 @@ export function normalizedBidToBidCard(
     progress: { agreed: 0, total: 0 },
     lastEventAr: null,
     round: 1,
+    // An agent-sourced bid has no deal room, so nothing has countered and there is no opening to
+    // measure from. Null rather than the bid price: a delta of zero is still a claim that a
+    // negotiation happened.
+    requestChangedAt: null,
+    liveStatus: null,
+    openingPrice: null,
+    lastCounterBy: null,
     uiState: null,
   } as BidCard;
 }

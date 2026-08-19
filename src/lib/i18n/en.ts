@@ -691,28 +691,14 @@ export const en = {
     step2: "Verify company",
     done: "done",
     title: "Verify your company",
-    subtitle: "Submit your company details for review to become a verified renter.",
+    subtitle: "Send your company documents for review to become a verified renter.",
     authorityRole: "Your authority",
     roleOwner: "Owner",
     roleManager: "Manager",
     roleEmployee: "Employee",
-    companyName: "Company name",
-    companyLegalName: "Legal Company Name",
-    companyLegalNameHint: "Enter the registered legal company name",
     nationalId: "National ID",
     companyCity: "Company city",
     cityPlaceholder: "Select a city",
-    companyAddress: "Company address",
-    companyLocation: "Company location",
-    crDoc: "Commercial Registration (CR)",
-    vatDoc: "VAT certificate",
-    nationalAddressDoc: "National Address document",
-    localContentDoc: "Local Content certificate",
-    sasoDoc: "SASO Heavy Equipment certificate",
-    otherDoc: "Other document",
-    docsTitle: "Company documents",
-    moreDocsTitle: "Additional documents",
-    detailsTitle: "Company details",
     optional: "optional",
     upload: "Upload",
     uploading: "Uploading…",
@@ -729,17 +715,85 @@ export const en = {
     rejectedBody: "Your submission wasn't approved. You can adjust your details and resubmit.", // AC-17
     errors: {
       role: "Select your authority.", // AC-09
-      companyName: "Company name must be 2–200 characters.", // AC-09
-      companyLegalName: "Legal company name must be 2–200 characters.",
-      cr: "The CR document is required.", // AC-10
-      vat: "The VAT document is required.", // AC-10
-      nationalAddress: "The National Address document is required.", // required to match the app (company_verification_page.dart:302 + '*' label); AC-10 lists only CR/VAT
       docType: "Only JPEG, PNG, WebP, or PDF files are accepted.", // AC-11
       submit: "We couldn't submit. Please try again.",
       // E12004: this account was deleted, so every gated call is refused until it's restored. Retrying
       // the form can never work — send them through sign-in, where the restore prompt is waiting.
       accountDeleted: "This account was deleted. Sign out and sign in again to restore it, then submit.",
       offline: "You appear to be offline. Your input is kept — try again.", // AC-23
+    },
+    /**
+     * The single-pile company-documents flow. Copy is taken verbatim from the mobile app's
+     * `companyDocs*` / `companyLogo*` strings so both products say the same thing in both languages;
+     * only the handful of browser-specific messages at the end have no app counterpart.
+     */
+    pile: {
+      title: "Add company documents",
+      heroTitle: "Upload your documents in one go",
+      heroSubtitle: "Send us everything you have — our team will review it and confirm your request.",
+      requiredSection: "Required to continue",
+      requiredPill: "Required",
+      optionalSection: "Additional documents",
+      optionalPill: "Optional",
+      reqCr: "Commercial Registration",
+      reqNationalAddress: "National Address",
+      reqVat: "VAT",
+      optBank: "Bank details",
+      optLocalContent: "Local Content",
+      optQualifications: "Qualifications",
+      optSaso: "SASO certificate",
+      dropzoneTitle: "Drag or upload your documents here",
+      dropzoneSubtitle: "Commercial registration, national address, tax, and any extra documents — in one batch",
+      dropzoneHint: "Images or PDF · up to {max} documents",
+      limitReached: "Maximum reached ({count} documents)",
+      remove: "Remove",
+      submit: "Send documents",
+      identityTitle: "A quick confirmation of your identity",
+      roleLabel: "Your role at the company",
+      roleEmployee: "Non-authorized employee",
+      roleManager: "Authorized employee",
+      roleOwner: "Owner",
+      nationalIdLabel: "National ID / Iqama number",
+      cityLabel: "City",
+      logoLabel: "Company logo",
+      logoNote: "Appears on your quotations, your shared request link, and the bid form suppliers open.",
+      logoChange: "Change",
+      logoUpload: "Upload",
+      logoRemove: "Remove",
+      continue: "Continue",
+      confirmHeadline:
+        "Not uploading the required company documents may lead to your registration being rejected",
+      confirmEstimate: "We review and get back to you within 24–48 hours",
+      confirmSubmit: "Confirm and send",
+      confirmBack: "Back",
+      sentTitle: "Documents sent",
+      sentBody:
+        "Our team will review your request within 24 to 48 hours, and we'll let you know if we need anything else.",
+      // What the reviewer typed, shown above the form for a renter who is here to resubmit.
+      rejectionLabel: "Not approved",
+      // The read-only side: what actually reached us, for a renter who has already submitted.
+      docsOnFileTitle: "Your submitted documents",
+      docsOnFileCr: "Commercial Registration",
+      docsOnFileVat: "VAT certificate",
+      docsOnFileNationalAddress: "National Address certificate",
+      docsOnFileView: "View",
+      noDocsTitle: "No documents received yet",
+      noDocsBody: "Your request is under review. We'll let you know once it has been checked.",
+      // Browser-only messages — the app has no equivalent because a phone screen cannot be reloaded
+      // out from under an upload the way a tab can.
+      errors: {
+        unsupportedType: "Only JPEG, PNG, WebP, or PDF files are accepted.",
+        tooLarge: "Each document must be 100 MB or smaller.",
+        empty: "That file is empty.",
+        tooMany: "You can send up to {max} documents at once.",
+        presign: "We couldn't start the upload. Please try again.",
+        partial: "Some documents didn't upload. Press Send documents again to retry just those.",
+        // CO1013 — a member of a company they do not own. The backend's own wording is shown when it
+        // arrives; this is the fallback.
+        memberCannotVerify:
+          "You belong to a company you do not own. Only its owner submits it for verification.",
+      },
+      unloadWarning: "Your documents are still uploading. Leave this page and they won't be sent.",
     },
   },
   profile: {
@@ -818,6 +872,355 @@ export const en = {
     phoneInUse: "That number is already registered to another account.",
     deleteError: "We couldn't delete your account. Please try again.",
     offline: "You appear to be offline. Please try again.",
+  },
+  /**
+   * Deal-room rentee map (RMAP, spec §6.6). Every string on the map surface, in one block.
+   *
+   * Terminology: the supplier is **«المؤجّر»**, never «المورد» — decision 5 in the RMAP design
+   * reference. The shipped app uses «المؤجّر» 79 times against 21, so the spec's own wording is
+   * superseded and this block is the reference for the rest of the feature.
+   *
+   * Freshness copy (AC-230): nothing here may imply that offers update on their own. There is no
+   * push — `freshnessNote` states the three triggers explicitly (§7.5.1).
+   */
+  bidMap: {
+    /* ── v3 · the equipment-verification surface (spec 004 §5, §6.1–§6.3) ──
+       The route, the panel header, the count pills and the shortfall alert. */
+    // V1 — the route, and the entry to it from a bid card
+    surfaceTitle: "Equipment in this offer",
+    verifyEntry: "Check the equipment",
+    loadingBid: "Loading this offer…",
+    bidFailed: "This offer couldn't be loaded",
+    bidFailedWhy: "It may have been withdrawn, or the link may be out of date. Open it again from your bids.",
+    backToBids: "Back to the bids",
+    signInTitle: "Sign in to check this offer's equipment",
+    signInBody: "Offers are tied to your account.",
+    signIn: "Sign in",
+    // Off-platform offers never open this surface (RM3-AC-25) — they keep their own viewer.
+    offPlatformNotHere: "This offer came in through your shared link",
+    offPlatformNotHereWhy: "It carries items, not registered equipment — so there is nothing here to place or verify. Open it from your bids to read the submission and reply.",
+    // V2 — panel header. Identity only: no contact details, no deals count, no IBAN, CR or VAT.
+    //
+    // ── Both were SHORTENED because they were eating the supplier's name (owner, 2026-08-19) ──────
+    // The panel is 392px. «Verified company» and «Company documents» took 118px and 148px of it, and
+    // with the gutters and gaps that left about 73px for the name — so every real supplier rendered
+    // as «Al-Faisal …» and the header identified nobody. The Arabic pair is «شركة موثّقة» /
+    // «مستندات الشركة», roughly half the width, which is why the prototype's header fits and ours
+    // did not: the long wording is the web's own, not the app's, and it is the part that gives way.
+    //
+    // Neither word is lost. This header shows one company and its name is the line above; «Verified»
+    // there can only mean the company, and «Documents ›» can only be its papers — the machine's own
+    // papers live behind «Details ›» on each card and are never reached from here. The full phrases
+    // survive where there is room for them: the company panel's own heading still reads «Company
+    // documents», and the chip carries «Verified company on the platform» on its title.
+    verifiedCompany: "Verified",
+    /** The chip's full sentence, on its `title` — the prototype puts it there too. */
+    verifiedCompanyWhy: "Verified company on the platform",
+    companyDocuments: "Documents",
+    // V3 — the count pills. `type` is the REQUEST's own equipment type, and it agrees with the count.
+    // "With the supplier" means machines that FIT this request, never his whole yard.
+    // «registered», not the prototype's «لدى المورد» / "with the supplier" (owner, 2026-08-10). The
+    // count is of machines on the supplier's FILE that fit this request — "with the supplier" reads as
+    // physical possession, which is a different claim and one this number cannot make. "Registered"
+    // is also the word the rest of this surface already uses for the same fact («لا توجد معدّة مسجّلة»).
+    countOwned: "{n} {type} registered",
+    countInOffer: "{n} in this offer",
+    // V4 — the shortfall alert. It states the DIFFERENCE, not the offered total, and it is the WHOLE
+    // alert: one sentence beside one button, the same shape the Arabic and the prototype have.
+    //
+    // It carries no noun where the Arabic carries «وحدة», because Arabic's counted noun keeps one
+    // literal form at every count (the decision `unitCountLabel` records) and English's does not — a
+    // literal "units" here would print "1 units" on the reachable one-unit shortfall. The count reads
+    // against the «{n} in this offer» pill directly above it, which is where the noun already is.
+    // ONE LINE beside the button, at the panel's 392px (owner, 2026-08-11). ~~"{n} in this offer have
+    // no registered machine — they don't appear on the map"~~ wrapped to three. The dash clause went
+    // with it: "no registered machine" already says it is not on a map, and the alert sits above the
+    // list it is absent from.
+    shortfall: "{n} in this offer with no registered equipment",
+    // "it", not "them" — the count reads «1 unit» far more often than not, and a plural button beside
+    // a singular line is the kind of mismatch a reader trips on before they can say why.
+    shortfallAction: "Ask him to add it",
+    // V11 — the send. Sending is also what creates the deal room, so the control acknowledges that a
+    // question left, and a failure says so rather than letting the renter assume it arrived.
+    shortfallSending: "Sending…",
+    shortfallSent: "Asked",
+    requestFailed: "The request didn't reach the supplier. Try again.",
+    requestInvalid: "This request can't be sent as it is.",
+    // One ask, one card (owner, 2026-08-10). Both of these say the same thing in two places: the
+    // reason a control is disabled, and the reason a send came back refused. Neither may read as a
+    // failure — "try again" is precisely what the rule exists to stop, and the question is already
+    // with the supplier.
+    askPendingWhy: "You've already asked this, and the supplier hasn't answered yet.",
+    requestAlreadyPending: "You've already asked this. It's with the supplier — you'll see his answer in the chat.",
+    // Map canvas
+    // The prototype's copy verbatim: «مشروعك». "Your site" names a place on a map; the pin names the
+    // PROJECT, which is the thing every distance on this surface is measured from.
+    yourSite: "Your project",
+    noSiteLocation: "This request has no project location",
+    noBids: "No bids on this item yet",
+    // Availability vocabulary — ONE scale (§6.9.1)
+    confirmed: "Confirmed",
+    assumed: "Not confirmed",
+    noLocation: "Location not shared",
+    unitOf: "Unit {i} of {n}",
+    multiLocation: "{n} locations",
+    unitsConfirmed: "{c} confirmed · {a} not confirmed",
+    // T13 — the bid list panel
+    title: "Offers received",
+    pickSupplier: "Pick a supplier from the list to see their equipment",
+    sortPrice: "Lowest price",
+    sortNearest: "Nearest",
+    sortNearestOff: "Nearest — needs a project location",
+    rate: "Offer price",
+    ratePer: "SAR / {unit}",
+    perDay: "day",
+    perWeek: "week",
+    perMonth: "month",
+    perJob: "job",
+    distance: "Distance",
+    km: "km",
+    cheapest: "Lowest price of all offers",
+    offPlatform: "Off-platform",
+    justArrived: "Just arrived",
+    unitsOfferedLine: "{n} offered",
+    unitsIdentifiedLine: "{n} identified — serial, documents and location",
+    unitsUnidentifiedLine: "{n} unidentified — readiness can't be checked",
+    refresh: "Refresh",
+    refreshing: "Refreshing…",
+    freshnessNote: "Offers update when you open this page, come back to it, or press refresh.",
+    // T15 — the colour key, hosted inside the panel
+    keyToggle: "What do the colours mean?",
+    keyHeading: "Every pin on the map is one piece of equipment",
+    keyConfirmed: "Confirmed — the supplier confirmed its yard in the offer readiness",
+    keyUnconfirmed: "Not confirmed — he hasn't confirmed it yet",
+    keyNotUnavailable:
+      "“Not confirmed” does not mean unavailable — it means the supplier hasn't named its yard in the offer readiness yet. Ask him to confirm from the equipment panel.",
+    keyCountOnly: "Units added as a count only don't appear on the map — no equipment is registered for them.",
+    // V10 — the machine marker's availability label (§6.8). One scale, two labels, and "not confirmed"
+    // reads as UNANSWERED — never refused, never unavailable (RM3-AC-20). The "you can request it"
+    // variant is gone with the hollow marker; a machine he did not offer is now an ORDINARY red pin
+    // (RM3-AC-10, 2026-08-13), not a variant, and `pinUnconfirmed` is its label.
+    pinAvailable: "Availability confirmed",
+    pinUnconfirmed: "Not confirmed yet",
+    /** The selected marker's in-offer tag (§6.4 landing pre-selection, RM3-AC-34). */
+    pinInOffer: "In this offer",
+    // A flag beside the distance on the map. Never a warning colour: colour here is availability's.
+    mapOutOfCity: "Outside the city",
+    loadingFleet: "Loading this supplier's equipment…",
+    /* ── V5 · the equipment list (§6.4) ──
+       Flat, nearest first, the WHOLE matching fleet. No serial number and no load capacity (RM3-AC-12):
+       the serial identifies the machine to the system, and the type and size are already stated once,
+       in the count pills. */
+    // ONE chip carrying availability (RM3-AC-32) — never a chip plus a band below it, which made cards
+    // unequal in height and split one fact across two rows. The unconfirmed chip states the unanswered
+    // availability and nothing else (RM3-AC-30 — no reason, no cause).
+    //
+    // «· in this offer» was dropped from the confirmed chip (owner, 2026-08-19). Offer membership is
+    // carried by the orange `pinInOffer` badge sitting beside this chip on the same row, so the chip was
+    // stating the same fact twice on one line.
+    eqChipConfirmed: "Availability confirmed",
+    eqChipUnconfirmed: "Not confirmed yet",
+    // Blue, never navy (RM3-AC-33) — beside a red chip, navy reads as disabled.
+    // A mark on the title: the platform CHECKED this equipment's papers (`verificationStatus ===
+    // "VERIFIED"`). A fact about the platform's verdict, not about whether it is available.
+    // ~~"Documented machine".~~ Two changes, one ruling (owner, 2026-08-11 — "make sure it is read
+    // the equipment status is it verified really or not"): the mark used to fire on "the request
+    // named a certificate", and "documented" was the honest word for that weaker claim. Now that it
+    // states verification, the copy has to as well — a renter reading "documented" beside a tick
+    // cannot tell whether anyone checked. ("equipment", never "machine", in English copy.)
+    eqVerifiedMachine: "Verified equipment",
+    // Qualifies the offer, not the number: the yard sits outside the request city's own radius, so
+    // delivery is a mobilisation worth asking about.
+    eqOutOfCity: "· Outside the city",
+    eqAskConfirm: "Ask him to confirm",
+    eqAskConfirmWhy: "Ask the supplier to confirm this equipment is available",
+    eqDetails: "Details",
+    // The card body's own label — it finds the machine on the map rather than opening its panel.
+    eqFind: "Show on map",
+    // `eqNoCerts` deleted (owner, 2026-08-19). A machine whose request named no certificate now says
+    // NOTHING — the card's row 4 renders empty and holds its line on `min-height`, and the map pin's
+    // hover box drops the row entirely. Neither wording survived reading: "No certificates on the
+    // machine" is a claim about the MACHINE this line cannot make (it lists what the REQUEST asked
+    // for), and "No certificates requested" explained an absence nobody had asked about. No readers
+    // are left, so the key went with them.
+    eqDistanceUnit: "km from your project",
+    eqNoDistance: "Distance not known",
+    eqNoPhoto: "No photo",
+    eqSelect: "Show this equipment on the map",
+    // RM3-AC-26 — a price and a count were given, and nothing else. No empty card furniture.
+    eqNoneRegistered: "No equipment is registered in this offer",
+    eqNoneRegisteredWhy: "The supplier gave a price and a count only, so there is nothing here to place or verify.",
+    // V17 — the list's filters (§6.4a). Chips select for what a machine HAS, never for what it lacks,
+    // and the count always states the whole (RM3-AC-28a→28e). Group and chip copy comes from the
+    // model, bilingual, so the list and a Dart port cannot label the same band differently.
+    eqFilterLabel: "Filter the equipment in this offer",
+    eqFilterClear: "Clear filters",
+    // «3 of 8» — the numerator is what is shown, the denominator is the whole offer.
+    eqShownOfTotal: "{n} of {total}",
+    // The filtered empty state — deliberately unlike RM3-AC-26's. That one is a statement about the
+    // supplier; this one is a statement about the chips the renter pressed.
+    eqFilterEmpty: "No equipment matches what you chose",
+    eqFilterEmptyWhy: "Active filters: {filters}. This offer has {total} — clear the filters to see them all.",
+    // The company panel's own back control, and the detail's.
+    // The list-foot ask (§6.4). The prototype says «المورد»; this surface says «المؤجّر» / supplier.
+    eqAskAnother: "Ask the supplier to add another {type}",
+    eqAskAnotherSent: "Asked",
+    // The offer-first expander (owner, 2026-08-19). The count is in the label because pressing this
+    // adds cards AND pins: the renter should know how much is about to arrive on both surfaces.
+    eqShowAll: "Show {n} more in his fleet",
+    eqShowOfferOnly: "Show only what he offered",
+    // The divider where the offer ends. It says these are the supplier's, not this offer's — without
+    // it the extra cards read as offered machines that were hiding.
+    eqBeyondOffer: "Also in his fleet — not in this offer",
+    backToEquipment: "Back to the equipment",
+    // What the map is NOT showing, in words. Silence would read as "this supplier has no machines".
+    //
+    // The V4 shortfall alert has no subtitle key any more (2026-08-11, aligning to the v3 prototype,
+    // whose alert is one line of text and a button): `shortfall` is the whole alert. The paragraph
+    // that lived here — "They were added as a count only — no machine is registered for them, so they
+    // have no location, documents or serial to show." — spent three grey lines unpacking a
+    // consequence "no registered machine — they don't appear on the map" already carries. An earlier
+    // `claimedNotDrawn` headline went the same way and for the same reason: one slot, one sentence.
+    noLocatable: "None of this supplier's equipment can be placed",
+    // The resize grip's accessible name. Says what dragging does and what returns it, because the
+    // control is invisible until hovered and a screen reader never sees the cursor change.
+    resizePanel: "Drag to widen the panel — double-click, or Home, to restore",
+    noLocatableWhy:
+      "He hasn't shared a yard for any equipment that fits this request, so nothing can be drawn. Ask him to confirm a yard.",
+    offPlatformNoPins: "An off-platform offer has no pin",
+    offPlatformNoPinsWhy: "It was submitted through your shared link, so it carries no registered equipment and no location.",
+    fleetFailed: "The equipment couldn't be loaded",
+    fleetFailedWhy: "This isn't a statement about the offer. Press refresh to try again.",
+    keyOffPlatform: "Off-platform offers carry no location, so they get no pin.",
+  },
+  /* ── V12 · the chat dock (spec 004 §6.9, 004a §2) ──
+     One supplier, a tab per item. The unread badge is REST, so nothing here may imply immediacy. */
+  chatDock: {
+    title: "Chat",
+    close: "Close the chat",
+    dismiss: "Dismiss",
+    itemFallback: "This item",
+    // A tab whose bid has no room is compose-only — the room is created by SENDING, never by opening.
+    composeOnly: "No messages yet. Your first message starts the conversation with the supplier.",
+    empty: "No messages yet.",
+    unavailable: "Chat isn't available right now.",
+    placeholder: "Write a message…",
+    // The notice is refresh-timed (mount · focus · post-send · the poll). It states that a reply IS
+    // there — never that it just arrived, which is a recency it cannot know.
+    noticeTitle: "You have a reply from the supplier",
+    // What KIND of arrival, in a chip beside the sender's name. A refusal takes the bubble's warm
+    // tone — not red, which on this surface belongs to availability alone.
+    kindReply: "Reply to your ask",
+    kindRefusal: "Your ask was refused",
+    kindMessage: "New message",
+    // The bubble QUOTES the message itself (owner, 2026-08-11). This is what it says when there are
+    // no words to quote — a file or a shared point — so it still reports what came rather than
+    // inventing a sentence the supplier never wrote.
+    noticeAttachment: "Sent you an attachment",
+    // The composer's send control. The prototype labels it «إرسال» in words; ours draws a glyph, so
+    // the word has to reach a screen reader some other way or the button announces as "button".
+    send: "Send",
+    // The attach control (owner, 2026-08-11: «just add things already exist in the existing chat
+    // like upload and voice note»). A glyph again, so the word reaches a screen reader from here.
+    // What it is ALLOWED to attach, and what it says when it refuses, is the shared gate's — only
+    // the label is this surface's, because this surface's strings are keyed here.
+    attach: "Attach a file",
+    // Beside an attachment, never instead of it: the bubble OPENS the file, this KEEPS it. Same word
+    // and the same control the deal room already carries (owner, 2026-08-11) — a paper the supplier
+    // sends in the chat has to be savable from wherever the renter is reading the conversation.
+    save: "Save",
+    // The placement control. Both labels name the STATE the press moves to, not the one it is in — a
+    // toggle labelled with its current state is the oldest way to make a button lie.
+    placeFill: "Fill the map area",
+    // The call control the old deal room has carried since B5, restored here (owner, 2026-08-12).
+    // The number is reached, never printed into the band.
+    call: "Call the supplier",
+    callUnavailable: "No number on file",
+    placeMirror: "Show beside the map",
+    // ── The review card (RM3-AC-17) ──
+    // An ask is COMPOSED into the conversation and sent only when this is pressed. Cancelling writes
+    // nothing at all — not a message, and not the deal room, which the send is what creates.
+    draftCancel: "Cancel",
+    draftSend: "Send the request",
+    // The card's press target. The card names a machine, and the reason it is pressable is that the
+    // supplier reading it has to reach that machine to add a document or confirm its yard.
+    openMachine: "Open this equipment",
+  },
+  /* ── V12 · the price footer (spec 004 §6.10, 004a §4a.1 + §4a.4) ──
+     Figures and a hand-off. It never edits a figure and never re-implements negotiation. */
+  priceFooter: {
+    perPeriod: "SAR / {unit}",
+    // Every figure in the breakdown carries the currency, exactly as the app's bid footer prints it.
+    currency: "SAR",
+    day: "day",
+    week: "week",
+    month: "month",
+    job: "job",
+    // Plurals — for the rental basis line ONLY ("… × 14 days × 1 unit"), which counts periods and
+    // units out loud. The singular keys above still label the rate itself ("SAR / day").
+    days: "days",
+    weeks: "weeks",
+    months: "months",
+    jobs: "jobs",
+    unitOne: "unit",
+    unitMany: "units",
+    openingOffer: "Opening offer",
+    fromDealRoom: "From the deal room",
+    // A text link that says what pressing it DOES, both ways round — the app's footer names the next
+    // state rather than the section (owner, 2026-08-11, from the app screenshot). The old single
+    // "Details" + chevron left the reader to decode the arrow.
+    showDetails: "Show details",
+    hideDetails: "Hide details",
+    // The footer's two ways in, named by INTENT rather than by destination (owner, 2026-08-11).
+    // ~~"Negotiate" / "Continue in the deal room"~~ — both described the room the renter arrives in,
+    // which he has not seen yet and cannot want; these describe what he is about to do with the price
+    // in front of him. "Counter this price" is the owner's own wording (2026-08-11); the Arabic pair
+    // «اطلب سعراً أقل» / «اعتمد» is the app's, verbatim.
+    //
+    // Both now land in `/deal-room/[id]?act=…`, which opens the room's OWN three-step flow on
+    // arrival. The price is still settled in exactly one place (004a §4a.2) — this only removes the
+    // second press that used to stand between the renter and the sheet he had already asked for.
+    counterPrice: "Counter this price",
+    // "Accept", not "Approve" (owner, 2026-08-11). The Arabic keeps the app's «اعتمد», but in
+    // English this button and the deal room's own are one act reached from two surfaces, and the
+    // room says Accept. A renter who pressed "Approve" and landed on a sheet headed "Accept" would
+    // have had to work out that they are the same thing.
+    confirmPrice: "Accept",
+    // The one place the offered and the agreed count are reconciled (RM3-AC-66).
+    unitsDiffer: "Priced on {agreed} agreed units — the offer was made of {offered}.",
+    rental: "Rental",
+    // The basis, restated under the label the way the BID CARD restates it: the raw quoted rate over its
+    // own period, the days it is actually charged across, then how many units — so the rental total is
+    // arithmetic the reader can check, not a claim. Billable days, never the calendar span: the total
+    // excludes the Fridays, and a basis line that counted them stated a sum its own figure contradicted.
+    // ── The map footer's basis lines, PER MACHINE (owner, 2026-08-19) ────────────────────────────
+    // The two above state the basis for the whole offer — "{rate}/{unit} × {days} × {n} units" — which
+    // is right where the figure beside them is a whole-offer figure. The map footer's breakdown states
+    // its lines per machine and applies the count once at the foot, so its basis must not carry the
+    // unit count as well: printed there it would multiply a number the line below it multiplies again.
+    rentalBasisDays: "{rate}/{unit} × {days} billable days",
+    rentalBasisUnit: "{rate}/{unit}",
+    // The heading over that per-machine block, and the row that closes it. Only drawn on a multi-unit
+    // offer, where the two blocks differ; a single machine draws one set and needs neither.
+    perUnitHead: "Per unit",
+    overallTotal: "Overall total",
+    unitsCount: "{n} units",
+    rentalBasis: "{rate}/{unit} × {days} billable days × {n} {units} in your request",
+    // Nothing to prorate — open-ended, per-job, or no start date. One full period, as quoted.
+    rentalBasisFlat: "{rate}/{unit} × {n} {units} in your request",
+    // The fixed divisor behind a weekly/monthly rate — what turns the quoted rate into the day count
+    // beside it. Printed whether or not this particular period comes out exact (app parity).
+    divisorWeek: "6 working days/week",
+    divisorMonth: "26 working days/month",
+    // The legs keep their internal names as KEYS (mob/demob is what the backend and the deal room
+    // call them) but wear the app's plain words, which is what a renter reading a price expects.
+    mobilisation: "Delivery",
+    demobilisation: "Return",
+    excluded: "Not charged",
+    subtotal: "Subtotal before VAT",
+    vat: "VAT (15%)",
+    total: "Total",
+    noDuration: "This request has no duration, so the figures cover one full period.",
   },
   survey: {
     navTitle: "Surveys",

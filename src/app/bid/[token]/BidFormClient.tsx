@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { fetchBidFormData, submitBidForm, ApiError, type BidUploadedFile } from "@/lib/api/client";
 import type { BidFormData, BidFormItem, BidPhotoKind, BidDocKind, CompanyDocKind, LinkBidConfirmations } from "@/lib/contract/link-bids";
 import { CERT_TERM_KEYS, certCodesFromValue, certConfKey, prettyCert } from "@/lib/contract/link-bids";
-import { buildSubmissionNotes, priceToStore } from "@/lib/contract/vat-inclusive";
+import { buildSubmissionNotes, priceToStore, VAT_RATE } from "@/lib/contract/vat-inclusive";
 import { computeQuoteTotals, computeRentalTotal, durationDaysBetween, rentalDivisor, rentalPeriodSubtitle } from "@/lib/pricing/rental";
 import { FileUploader, type UploaderKind } from "@/components/bid/FileUploader";
 import { QualityRing } from "@/components/bid/QualityRing";
@@ -465,7 +465,7 @@ export default function BidFormClient({ token }: { token: string }) {
   return (
     <div dir={dir} className={`bidpage${ar ? " rtl" : ""}`}>
       <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=Inter:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
+      <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
       <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" />
       {/* Material Symbols covers equipment glyphs the classic set lacks (e.g. forklift) — used for the item icon. */}
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0" />
@@ -787,7 +787,7 @@ export default function BidFormClient({ token }: { token: string }) {
                 )}
                 <div className="itot">
                   <span className="r">{vatIncluded ? L("Net (before VAT)", "الصافي (قبل الضريبة)") : L("Subtotal", "المجموع")}<b>{sub ? nf(sub) : "—"} {sar}</b></span>
-                  <span className="r">{L("VAT 15%", "ضريبة ١٥٪")}<b>{sub ? nf(sub * 0.15) : "—"} {sar}</b></span>
+                  <span className="r">{L("VAT 15%", "ضريبة ١٥٪")}<b>{sub ? nf(sub * VAT_RATE) : "—"} {sar}</b></span>
                   <span className="r t">{vatIncluded ? L("Item total (incl. VAT)", "إجمالي البند (شامل الضريبة)") : L("Item total", "إجمالي البند")}<b>{sub ? nf(sub * 1.15) : "—"} {sar}</b></span>
                 </div>
 

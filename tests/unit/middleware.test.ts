@@ -65,12 +65,12 @@ describe("login + handoff (flag-independent)", () => {
     expect(isNext(middleware(req("/login")))).toBe(true);
   });
 
-  it("authenticated on /login?next=/foo → redirect to /foo (AC-07)", () => {
+  it("authenticated on /login?next=/foo → redirect to /foo (specs#235-AC-07)", () => {
     const res = middleware(req("/login?next=/foo", AUTHED));
     expect(res.headers.get("location") ?? "").toContain("/foo");
   });
 
-  it("authenticated on /login with no next → redirect home (AC-08)", () => {
+  it("authenticated on /login with no next → redirect home (specs#235-AC-08)", () => {
     const res = middleware(req("/login", AUTHED));
     const loc = new URL(res.headers.get("location") ?? "http://localhost/x");
     expect(loc.pathname).toBe("/");

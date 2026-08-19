@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { mapBidList, bidSuppliers, type BidCard } from "@/lib/contract/bids";
+import { mapBidList, bidSuppliers, mapOfferedUnit, type BidCard } from "@/lib/contract/bids";
+import { matchGrid } from "@/components/map/panel/machine-panel-model";
+import { equipmentFilters } from "@/lib/contract/equipment-list";
+import { mapFleet } from "@/lib/contract/fleet";
 
 describe("mapBidList — unitsOffered (supplier's chosen quantity)", () => {
   const req = { request: { equipmentItems: [{ numberOfUnits: 10 }] } };
@@ -86,9 +89,9 @@ describe("mapBidList — compliance block", () => {
 
 describe("bidSuppliers", () => {
   const bc = (p: Partial<BidCard>): BidCard => ({
-    id: "b", status: "PENDING", supplierId: null, supplierName: "S", verified: false, rating: null,
+    id: "b", status: "PENDING", supplierId: null, supplierCompanyId: null, supplierName: "S", verified: false, rating: null,
     distanceKm: null, submittedAt: null, validUntil: null, price: null, mobPrice: null, demobPrice: null,
-    priceUnit: null, duration: null, numberOfUnits: 1, unitsOffered: 1, reqMinYear: null, equipment: null, eqVerified: false,
+    priceUnit: null, duration: null, numberOfUnits: 1, unitsOffered: 1, openingPrice: null, lastCounterBy: null, requestChangedAt: null, liveStatus: null, reqMinYear: null, equipment: null, eqVerified: false,
     compliance: { entityType: "individual", activityLicense: false, taxNumber: false, nationalAddress: false, safety: false, saso: false, localContent: false },
     matchCount: 0, conflictCount: 0, dealRoomId: null, expired: false,
     note: null, requiredCerts: [], heldCertCodes: [], ownershipDocs: [], mobLeadTime: null, demobLeadTime: null,
@@ -119,5 +122,166 @@ describe("bidSuppliers", () => {
     expect(s[0].key).toBe("A");
     expect(s[0].verified).toBe(true);
     expect(s[0].count).toBe(2);
+  });
+});
+
+/**
+ * The backend signs a document by OVERWRITING `key` — `toSignedStructured` returns
+ * `{...entry, key: <presigned URL>}` and never fills `url`. Every consumer on this side reads
+ * `url`, so before this was resolved a real document rendered with no view control, no thumbnail,
+ * and could not be put in the download batch.
+ *
+ * The payloads below are the shape staging actually returned on 2026-08-10 with seeded documents.
+ */
+describe("mapOfferedUnit — the openable link (backend signs into `key`, not `url`)", () => {
+  const SIGNED =
+    "https://moedatech-staging-eu.s3.eu-central-1.amazonaws.com/default/equipment/documents/1786381128000-istimara-seed.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Signature=fa6f";
+
+  it("resolves a document's url from the presigned key when url is null", () => {
+    const u = mapOfferedUnit({ equipmentId: "eq-1", documentKeys: [{ type: "istimara", key: SIGNED, url: null }] });
+    expect(u.documentKeys[0].url).toBe(SIGNED);
+    // `key` stays as-is — it is still the row's identity for dedupe.
+    expect(u.documentKeys[0].key).toBe(SIGNED);
+  });
+
+  it("resolves a photo's url the same way", () => {
+    const u = mapOfferedUnit({ equipmentId: "eq-1", photoKeys: [{ slot: "front", key: SIGNED, url: null }] });
+    expect(u.photoKeys[0].url).toBe(SIGNED);
+  });
+
+  it("passes an explicit url through verbatim — it is the backend's own answer", () => {
+    const u = mapOfferedUnit({ equipmentId: "eq-1", documentKeys: [{ type: "tuv", key: SIGNED, url: "https://cdn/explicit.pdf" }] });
+    expect(u.documentKeys[0].url).toBe("https://cdn/explicit.pdf");
+  });
+
+  it("does not second-guess an explicit url's shape — the http test is for the key fallback only", () => {
+    // `fleet.test.ts` has always asserted a bare "u1" passes through. Applying the absolute-link
+    // test to the explicit url too silently nulled it, which is how this was caught.
+    const u = mapOfferedUnit({ equipmentId: "eq-1", documentKeys: [{ type: "tuv", key: "k1", url: "u1" }] });
+    expect(u.documentKeys[0].url).toBe("u1");
+  });
+
+  it("does NOT invent a url from a bare S3 key", () => {
+    // No bucket origin is known here, so a fabricated link would look live and 404. Null keeps the
+    // row rendering without a view action, which is what an unopenable paper should do.
+    const u = mapOfferedUnit({ equipmentId: "eq-1", documentKeys: [{ type: "istimara", key: "default/equipment/documents/x.pdf", url: null }] });
+    expect(u.documentKeys[0].url).toBeNull();
+    expect(u.documentKeys[0].key).toBe("default/equipment/documents/x.pdf");
+  });
+
+  it("leaves a row with neither url nor key unopenable", () => {
+    const u = mapOfferedUnit({ equipmentId: "eq-1", documentKeys: [{ type: "istimara" }] });
+    expect(u.documentKeys[0].url).toBeNull();
+  });
+});
+
+/**
+ * **The request's asks, projected onto the bid — read off the wire the backend actually sends.**
+ *
+ * Both defects these cover were invisible to a suite that hand-built the asks onto a `MatchRequest`
+ * literal: the panel model was right, the MAPPER never produced the fields, and nothing crossed the
+ * seam. So every case here starts at a raw bid in the shape staging returned on 2026-08-10 and ends at
+ * the surface that consumes it.
+ *
+ * The item shapes are live: `minimumEquipmentYear: 2020` on request `c4d18b6f`, `2021` on `f0438260`,
+ * `attachmentIds: ["6ef091c4-…"]` on `90dfe350` — and NOT ONE of them carries `maxEquipmentAge`.
+ */
+describe("mapBidList — the request's year ask (RM3-AC-28a / 28c / 37)", () => {
+  const bidWith = (item: Record<string, unknown>) => mapBidList({ activeBids: [{ id: "b1", request: { equipmentItems: [item] } }] })[0];
+
+  it("reads `minimumEquipmentYear` — the field the live backend sends", () => {
+    expect(bidWith({ minimumEquipmentYear: 2020 }).reqMinYear).toBe(2020);
+    expect(bidWith({ minimumEquipmentYear: 2021 }).reqMinYear).toBe(2021);
+  });
+
+  it("still reads the deprecated `maxEquipmentAge` alias, for requests old app builds posted", () => {
+    expect(bidWith({ maxEquipmentAge: 2018 }).reqMinYear).toBe(2018);
+  });
+
+  it("prefers the live field when a payload carries both", () => {
+    expect(bidWith({ minimumEquipmentYear: 2020, maxEquipmentAge: 2015 }).reqMinYear).toBe(2020);
+  });
+
+  it("stays null when the request asked for no year", () => {
+    expect(bidWith({ minimumEquipmentYear: null }).reqMinYear).toBeNull();
+    expect(bidWith({}).reqMinYear).toBeNull();
+  });
+
+  it("the Terms modal and the card agree — one reader, one answer", () => {
+    // They disagreed for real: the modal read the live field, the card read the dead alias.
+    const bid = bidWith({ minimumEquipmentYear: 2020 });
+    const year = bid.terms.equipment.find((t) => t.key === "year");
+    expect(bid.reqMinYear).toBe(2020);
+    expect(year).toBeTruthy();
+  });
+
+  it("carries far enough for the match grid to state the ask, not deny it (RM3-AC-37)", () => {
+    const bid = bidWith({ minimumEquipmentYear: 2020 });
+    const machine = mapFleet([{ equipmentId: "eq-1", manufacturer: "BOMAG", year: 2026, inBid: true }])[0];
+    const cell = matchGrid(machine, bid).find((c) => c.key === "year_make")!;
+    expect(cell.state).toBe("green");
+    // The ✓ IS the statement — the app's satisfied year cell is `'${year} · $make'` and carries no
+    // "· meets 2020 or newer" clause (`bid_readiness_sheets.dart:1128`). The verdict tail is the grid's
+    // shared shape 1 since the owner's UAT of 2026-08-11 (`machine-panel-model.ts`), not a clause of
+    // approval. What this test guards is unchanged: the ask reached the grid, so the cell is green and
+    // does NOT deny the ask.
+    expect(cell.finding.en).toBe("2026 · BOMAG — on the unit's file");
+    expect(cell.finding.ar).not.toContain("لم يُطلب"); // the falsehood the dead alias produced
+  });
+
+  it("carries far enough for the السنة control to exist at all (RM3-AC-28a)", () => {
+    // Rule 2 needs the ask to actually split the offer, so two machines — one meeting it, one not.
+    const bid = bidWith({ minimumEquipmentYear: 2020 });
+    const fleet = mapFleet([
+      { equipmentId: "new", year: 2026, inBid: true },
+      { equipmentId: "old", year: 2005, inBid: true },
+    ]);
+    expect(equipmentFilters(fleet, bid).map((g) => g.kind)).toContain("year");
+  });
+});
+
+describe("mapBidList — the request's attachments ask (RM3-AC-37)", () => {
+  const bidWith = (item: Record<string, unknown>) => mapBidList({ activeBids: [{ id: "b1", request: { equipmentItems: [item] } }] })[0];
+
+  it("carries the item's attachment ids and the renter's free-text ones", () => {
+    const bid = bidWith({ attachmentIds: ["6ef091c4-fc08-4073-93fd-0ee5af27bcf5"], customAttachments: ["ripper"] });
+    expect(bid.attachmentIds).toEqual(["6ef091c4-fc08-4073-93fd-0ee5af27bcf5"]);
+    expect(bid.customAttachments).toEqual(["ripper"]);
+  });
+
+  it("accepts the snake_case spelling too, and drops blanks", () => {
+    const bid = bidWith({ attachment_ids: ["a1", "   "], custom_attachments: [""] });
+    expect(bid.attachmentIds).toEqual(["a1"]);
+    expect(bid.customAttachments).toEqual([]);
+  });
+
+  it("reads a missing/non-array field as nothing asked for, never as one blank ask", () => {
+    expect(bidWith({}).attachmentIds).toEqual([]);
+    expect(bidWith({ attachmentIds: null, customAttachments: {} }).customAttachments).toEqual([]);
+  });
+
+  it("makes the attachments cell say what was asked instead of «لم يُطلب شيء»", () => {
+    const bid = bidWith({ attachmentIds: ["6ef091c4-fc08-4073-93fd-0ee5af27bcf5"] });
+    const machine = mapFleet([{ equipmentId: "eq-1", year: 2020, inBid: true }])[0];
+    const cell = matchGrid(machine, bid).find((c) => c.key === "attachments")!;
+    // ~~«1 asked for · …»~~ — one of the three spellings of the ask the owner read side by side on
+    // 2026-08-11; the grid says «requested» everywhere now.
+    expect(cell.finding.en).toBe("1 requested — not recorded on the unit's file");
+    // STILL GREY, and that is the decision `attachmentsCell` documents: no fleet row records the
+    // attachments a machine comes with, so red here would accuse the supplier of failing a check the
+    // platform never ran. Plumbing the ask must not turn this cell into an accusation.
+    expect(cell.state).toBe("grey");
+  });
+
+  it("does NOT switch on the الملحقات filter — it now exits at rule 2, not on a zero ask (§6.4a)", () => {
+    // The control was suppressed for the wrong reason while `asked` was permanently 0. With the ask
+    // real, `splits()` is what drops it: no machine's file can be shown to have the attachments, so a
+    // chip would empty the list and read as a claim about the lessor drawn from our own missing column.
+    const bid = bidWith({ attachmentIds: ["a1"], customAttachments: ["ripper"] });
+    const fleet = mapFleet([
+      { equipmentId: "eq-1", year: 2026, inBid: true },
+      { equipmentId: "eq-2", year: 2005, inBid: true },
+    ]);
+    expect(equipmentFilters(fleet, bid).map((g) => g.kind)).not.toContain("attachments");
   });
 });

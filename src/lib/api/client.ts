@@ -1,12 +1,15 @@
 import type { AgentDraft, RfqRequestPayload, Taxonomy } from "@/lib/contract";
 import type { RequestListItem, RequestRecord } from "@/lib/contract/requests";
 import type { BidCard } from "@/lib/contract/bids";
+import type { FleetMachine } from "@/lib/contract/fleet";
+import type { CompanyDocsPayload } from "@/lib/contract/company-documents";
 import type { DealRoomView, DealRoomDocuments, QuotationView } from "@/lib/contract/deal-room";
 import type { ComputedBid, RecommendResult, BidAskResult, BidParseResult, AwardNudgeResult, PreferencePreset, RankingPreference, RankedBid, BidEventInput, NormalizedBid, TermMatch, QuoteMatchCheck } from "@/lib/contract/agent-bids";
 import type { TransformRequestCtx } from "@/lib/contract/bid-form";
 import { mapBidFormData, mapLinkSubmissions, type BidFormData, type LinkBidSubmission, type SubmitBidFormPayload } from "@/lib/contract/link-bids";
 // DISABLED (Outcome Survey): import type { PendingResponse, RespondBody, RespondResult } from "@/lib/contract/survey";
 import type { InboxBid } from "@/lib/contract/inbox";
+import type { RenteeRequestDraft } from "@/lib/contract/rentee-request";
 import type { NotificationList, NotificationFilter } from "@/lib/contract/notifications";
 
 /** Body of POST /api/me/bids/recommend. user_id is attached server-side. */
@@ -236,14 +239,68 @@ export function fetchBids(requestId: string): Promise<{ bids: BidCard[] }> {
   return getJson<{ bids: BidCard[] }>(`/api/me/requests/${encodeURIComponent(requestId)}/bids`);
 }
 
+/**
+ * RMAP T16 — every qualifying machine the BID's supplier owns, for the map's fleet pins.
+ *
+ * Keyed by BID, not by supplier: one firm can hold several bids on one request, and `inBid` /
+ * `yardConfirmed` differ between them — so a supplier-keyed cache would show one bid's offer on
+ * another's map. Callers cache by `bidId` for the same reason.
+ */
+export function fetchBidFleet(bidId: string): Promise<{ machines: FleetMachine[] }> {
+  return getJson<{ machines: FleetMachine[] }>(`/api/me/bids/${encodeURIComponent(bidId)}/fleet`);
+}
+
+/**
+ * V14/V15 — the BID supplier's company papers, presigned, for the renter's company panel
+ * (RM3-AC-68 / AC-69 / AC-70). The sibling of `fetchBidFleet`: one serves the firm's machines, this
+ * one its paperwork, and both are bid-scoped because the backend derives the supplier FROM the bid.
+ *
+ * **A READ, and only a read.** Opening the company panel creates no deal room (004a §4.5) — a
+ * `DealRoom` row freezes the supplier's offered count — so this is a `GET` all the way down and must
+ * never be routed through `startDealRoom`.
+ *
+ * Cached by `bidId` by its caller, for `fetchBidFleet`'s reason: one firm can hold several bids on one
+ * request, and the papers are fetched through the bid's own access check.
+ */
+export function fetchBidCompanyDocuments(bidId: string): Promise<CompanyDocsPayload> {
+  return getJson<CompanyDocsPayload>(`/api/me/bids/${encodeURIComponent(bidId)}/company-documents`);
+}
+
+/**
+ * Spec 004 V1 — ONE bid and the request it answers, by `bidId` alone.
+ *
+ * The equipment-verification surface is a route (`/bids/[bidId]/equipment`), so it has no request id
+ * to list by and no caller to inherit one from. This is a READ: opening the surface creates no deal
+ * room, because a `DealRoom` row would freeze the supplier's offered count.
+ */
+export function fetchBidDetail(bidId: string): Promise<{ bid: BidCard; request: RequestRecord | null }> {
+  return getJson<{ bid: BidCard; request: RequestRecord | null }>(`/api/me/bids/${encodeURIComponent(bidId)}`);
+}
+
 /** Accept a supplier's bid. */
 export function acceptBid(bidId: string): Promise<unknown> {
   return postJson(`/api/me/bids/${encodeURIComponent(bidId)}/accept`, {});
 }
 
-/** Create (or fetch) the deal room for a bid → its id. */
+/** Create (or fetch) the deal room for a bid → its id.
+ *
+ *  **This WRITES.** A `DealRoom` row freezes the supplier's offered count (`BID_OFFER_LOCKED`), so it
+ *  is called only by the three room-creating acts (004a §4.5): negotiate/accept, sending a request
+ *  card, and sending the first chat message. Never by opening, selecting or reading. */
 export function startDealRoom(bidId: string): Promise<{ id: string }> {
   return postJson<{ id: string }>("/api/me/deal-rooms", { bidId });
+}
+
+/** V11 — post one `rentee_request` card into a deal room's conversation (spec 004 §6.7).
+ *  `ref` is minted and `serial` stamped server-side; neither is accepted from here (§7.3). */
+export function sendRenteeRequest(
+  dealRoomId: string,
+  draft: RenteeRequestDraft,
+): Promise<{ ref: string; messageId: string }> {
+  return postJson<{ ref: string; messageId: string }>(
+    `/api/me/deal-rooms/${encodeURIComponent(dealRoomId)}/requests`,
+    draft,
+  );
 }
 
 /** A deal room the renter is party to. */
@@ -315,6 +372,18 @@ export function acceptDeal(
  *  NEGOTIATING and re-arms the bid so the renter can re-negotiate + re-confirm (re-issues the quotation). */
 export function releaseDeal(id: string, reason?: string): Promise<unknown> {
   return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/release`, reason ? { reason } : {});
+}
+
+/**
+ * Abandon this negotiation, with the renter's stated reason (app parity: the cancel-reasons modal).
+ *
+ * Distinct from every other exit the room has. `releaseDeal` reopens a deal already WON;
+ * `withdrawAcceptance` takes back a pending acceptance. This one ends a negotiation that never got
+ * there — the room goes ABANDONED and the reason is posted into the conversation, so the supplier is
+ * told rather than left watching a room go quiet.
+ */
+export function closeDealRoom(id: string, reasonText?: string): Promise<unknown> {
+  return postJson(`/api/me/deal-rooms/${encodeURIComponent(id)}/close`, reasonText ? { reasonText } : {});
 }
 
 /** Withdraw a pending acceptance (app parity: "withdraw acceptance"). Flips

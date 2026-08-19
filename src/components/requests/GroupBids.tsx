@@ -1,26 +1,29 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useLocale } from "@/lib/i18n";
+import { useLocale, useT } from "@/lib/i18n";
 import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/client";
-import { BidTermsModal } from "@/components/requests/BidTermsModal";
-import { BidReadinessBadge, BidEligibilityModal } from "@/components/requests/BidReadiness";
+import { BidCardChecks } from "@/components/requests/BidCardChecks";
+import { equipmentCheckOf, termsCheck } from "@/lib/contract/bid-card-checks";
+import { bidCounterDelta, ctaShowsCounterDelta } from "@/lib/contract/bid-counter-delta";
+import { unitCountNotes, distinctMachinesOffered } from "@/lib/contract/unit-count-notes";
 import { computeBidReadiness } from "@/lib/contract/bid-readiness";
+import { BidTermsModal } from "@/components/requests/BidTermsModal";
+import { mayOpenEquipmentSurface } from "@/lib/contract/bid-equipment-access";
 import { SharedLinkBidCard } from "@/components/requests/SharedLinkBidCard";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
 import { SharedBidNegotiateRoom } from "@/components/requests/SharedBidNegotiateRoom";
 import { NEGOTIATE_ENABLED } from "@/lib/config/flags";
 import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
 import { useSession } from "@/lib/session";
-
-import { bidSuppliers, bucketBidTerms, type BidCard } from "@/lib/contract/bids";
+import { bidSuppliers, bidSupplierKey, bucketBidTerms, type BidCard } from "@/lib/contract/bids";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { qualityFromSubmissionItem, type BidQuality } from "@/lib/contract/bid-quality";
 import { computeBidQuote } from "@/lib/contract/comparison";
-import { divisorNote } from "@/lib/pricing/rental";
+import { divisorNote, headlineAmount } from "@/lib/pricing/rental";
 import { shortRef, type RequestGroup } from "@/lib/contract/requests";
-import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
 import { EquipImg } from "@/components/requests/EquipImg";
 import { quotationDownloadName } from "@/lib/compare/quotation-token";
 import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/render";
@@ -76,27 +79,59 @@ function offerSuffix(uiState: string | null, L: (en: string, ar: string) => stri
 // ONE identical template.
 
 /**
+ * One transport leg, in the app's own priority (`price_expanded_breakdown.dart` §7).
+ *
+ * A supplier can say four different things about delivery, and the card used to show three of them
+ * identically — as no row at all. That let "he delivers free" and "he never answered" read alike, and
+ * free delivery is worth real money when two bids are side by side.
+ *
+ *   1. `Excluded`   — he says it is not his job
+ *   2. `Bundled`    — folded into the rental price. **Not reachable yet**: the web's `BidCard` carries
+ *                     no `mobBundled`/`demobBundled`, so the branch is written and waits for the field
+ *                     rather than being guessed at from a zero
+ *   3. `Not quoted` — he never answered. A price the bid does not carry, NOT a zero
+ *   4. the amount   — including a real `0`, which is a quoted price and says so
+ *
+ * Returns a one-row array, or none where the leg has no place on this card at all.
+ */
+function legRow(
+  label: string,
+  amount: number,
+  excluded: boolean | null | undefined,
+  quoted: number | null | undefined,
+  leadTime: string | null,
+  L: (en: string, ar: string) => string,
+): [string, number | string, string | null][] {
+  if (excluded) return [[label, L("Excluded", "مستبعد"), null]];
+  // `null` is silence; `0` is a price. Reading them alike is the whole defect this replaces.
+  if (quoted == null) return [[label, L("Not quoted", "لم يُحدد"), null]];
+  return [[label, amount, leadTime]];
+}
+
+/**
  * Grouped My Bids (web-app/multi-item-requests, Phase 2). Fetches bids for every request in the
  * group, merges them, and shows a supplier Level-2 filter + equipment-focused bid cards across the
  * whole submission, plus select-for-quotation. `getBidList` is per-request, so we fan the fetch out.
  */
 export function GroupBids({ group, initialItemId }: { group: RequestGroup; initialItemId?: string | null }) {
   const { locale } = useLocale();
+  const t = useT();
   const ar = locale === "ar";
   const L = (en: string, arr: string) => (ar ? arr : en);
-  // Period label from the bid's billing unit — for the collapsed "rate / period" on the card.
-  const periodOf = (u: string | null) => {
-    switch ((u ?? "PER_DAY").toUpperCase()) {
-      case "PER_WEEK": return L("week", "أسبوع");
-      case "PER_MONTH": return L("month", "شهر");
-      case "PER_JOB": return L("job", "مهمة");
-      default: return L("day", "يوم");
-    }
-  };
   const router = useRouter();
 
   const [bids, setBids] = useState<GroupBid[] | null>(null);
   const [error, setError] = useState(false);
+  // ── RMAP · freshness ───────────────────────────────────────────────────────────────────────────
+  // The `[list │ map]` toggle and its hardcoded `mapBidId` are gone with V1: the verification surface
+  // is its own route, `/bids/[bidId]/equipment`, entered by opening ONE bid. This screen keeps the
+  // refetch freshness path, which that route reuses, and nothing about the map.
+  // Re-entrancy is a REF, not state: nothing on this screen renders a "refreshing" affordance since
+  // the map panel that hosted one moved to its own route, and a state nobody reads is a state that
+  // silently re-renders the whole bid grid on every focus event.
+  const bidsRef = useRef<GroupBid[] | null>(null); // current list, for the arrival diff without re-running the fetch
+  const lastFetchRef = useRef(0);
+  const refreshingRef = useRef(false);
   const [supplierKey, setSupplierKey] = useState<string>("all");
   const [selectedItem, setSelectedItem] = useState<string>(initialItemId ?? "all"); // scope bids to one request item
   const [itemMenuOpen, setItemMenuOpen] = useState(false);
@@ -107,11 +142,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
   const [allUnitsIds, setAllUnitsIds] = useState<Set<string>>(new Set());
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [selectMode, setSelectMode] = useState(false); // prototype: pick bids to compare/export
-  const [equipBid, setEquipBid] = useState<GroupBid | null>(null);
-  const [termsBid, setTermsBid] = useState<GroupBid | null>(null);
-  const [eligBid, setEligBid] = useState<GroupBid | null>(null); // bid-readiness — eligibility view for a native bid's offered units
-  const [langPick, setLangPick] = useState(false); // quotation language chooser (Arabic | English)
+  const [selectMode, setSelectMode] = useState(false); // prototype: pick bids to compare/export  const [termsBid, setTermsBid] = useState<GroupBid | null>(null);  const [langPick, setLangPick] = useState(false); // quotation language chooser (Arabic | English)
   // Bids captured the instant "Download quotations" is clicked. The language/verify modals aren't part
   // of the selection UI, so opening one trips the click-outside handler and CLEARS `selected` before the
   // download fires — which then fell back to exporting EVERY supplier. Snapshotting here keeps the PDF
@@ -154,29 +185,42 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
     return () => { active = false; };
   }, []);
 
+  // One fetch of every item's bids, merged and tagged with the item they belong to. Extracted so the
+  // mount load and the §7.5.1 refetch triggers run the SAME request — a second implementation is how
+  // the list and the map end up disagreeing about what has arrived.
+  const fetchGroupBids = useCallback(
+    () =>
+      Promise.all(
+        group.items.map((it) =>
+          fetchBids(it.id)
+            .then((d) =>
+              d.bids.map((b): GroupBid => ({
+                ...b,
+                requestId: it.id,
+                itemLabel: it.item?.name ?? it.displayId,
+                itemLabelAr: it.item?.nameAr ?? it.displayId,
+                categoryId: it.item?.categoryId ?? null,
+                itemImage: it.item?.imageUrl ?? null,
+              })),
+            )
+            .catch(() => [] as GroupBid[]),
+        ),
+      ).then((lists) => lists.flat()),
+    [group.items],
+  );
+
   useEffect(() => {
     let active = true;
     setBids(null);
     setError(false);
     setSupplierKey("all");
     setSelected(new Set());
-    Promise.all(
-      group.items.map((it) =>
-        fetchBids(it.id)
-          .then((d) =>
-            d.bids.map((b): GroupBid => ({
-              ...b,
-              requestId: it.id,
-              itemLabel: it.item?.name ?? it.displayId,
-              itemLabelAr: it.item?.nameAr ?? it.displayId,
-              categoryId: it.item?.categoryId ?? null,
-              itemImage: it.item?.imageUrl ?? null,
-            })),
-          )
-          .catch(() => [] as GroupBid[]),
-      ),
-    )
-      .then((lists) => active && setBids(lists.flat()))
+    fetchGroupBids()
+      .then((list) => {
+        if (!active) return;
+        lastFetchRef.current = Date.now();
+        setBids(list);
+      })
       .catch(() => active && setError(true));
     // Off-platform shared-link submissions are stored once per GROUP (a single bid covers all items),
     // so fetch them once by the group id — not per item (which would duplicate them). Best-effort.
@@ -185,10 +229,56 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
     return () => {
       active = false;
     };
-  }, [group.id, group.items]);
+  }, [group.id, group.items, fetchGroupBids]);
 
   // Scope to the item the renter tapped "View Bids" on (or "all" when entering via "View all bids").
   useEffect(() => { setSelectedItem(initialItemId ?? "all"); }, [initialItemId, group.id]);
+
+  /* ── RMAP §7.5.1 · freshness ─────────────────────────────────────────────────────────────────────
+     There is NO push (§7.5 withdrawn), so refetch is the entire mechanism, not a fallback: on mount,
+     on window focus, after the renter sends, plus a manual affordance (AC-190, AC-229). "Arrival"
+     means *the refetch returned a bid that was not there before* — nothing here claims recency, and no
+     copy on the surface implies instant updating (AC-230).
+
+     A 15s staleness window keeps a burst of focus events (alt-tab, devtools, a modal closing) from
+     firing a fan-out of one request per item; the manual button forces past it. */
+  const STALE_MS = 15_000;
+
+  useEffect(() => { bidsRef.current = bids; }, [bids]);
+
+  const refreshBids = useCallback(
+    async (force: boolean) => {
+      if (refreshingRef.current) return;
+      if (!force && Date.now() - lastFetchRef.current < STALE_MS) return;
+      refreshingRef.current = true;
+      try {
+        const next = await fetchGroupBids();
+        lastFetchRef.current = Date.now();
+        const known = new Set((bidsRef.current ?? []).map((b) => b.id));
+        const arrived = next.filter((b) => !known.has(b.id)).map((b) => b.id);
+        // Replace the list wholesale: the sort is applied to the NEW array on render, so an arriving
+        // bid lands in price order instead of appending to the bottom of a cheapest-first list (AC-170).
+        setBids(next);
+        // The «وصل الآن» marker belonged to v2's offers list, which the v3 rescope deleted — this
+        // surface shows one bid, so there is no list for an arrival to appear in. The detection is
+        // kept (it costs nothing and V-tickets may want it) but nothing consumes it today.
+        void arrived;
+      } catch {
+        // Keep what we have — a failed refresh must never empty a list the renter is reading.
+      } finally {
+        refreshingRef.current = false;
+      }
+    },
+    [fetchGroupBids],
+  );
+
+  // Returning from the verification surface (or from anywhere else) refetches, under the same
+  // staleness guard. It is no longer confined to a view mode, because there is no view mode.
+  useEffect(() => {
+    const onFocus = () => { void refreshBids(false); };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refreshBids]);
 
   // B4: while comparing, a click anywhere outside the selection UI (toolbar / cards / action bar, all
   // tagged data-select-ui) exits selection — replaces the old Cancel button.
@@ -397,7 +487,9 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
       }
       return a.requestId.localeCompare(b.requestId);
     });
-  const base = supplierKey === "all" ? orderForView(allBids) : orderForView(allBids.filter((b) => (b.supplierId ?? b.supplierName) === supplierKey));
+  // Must use the SAME key `bidSuppliers` built the chips from (company → member → name, AC-70), or a
+  // chip counts bids its own filter then drops.
+  const base = supplierKey === "all" ? orderForView(allBids) : orderForView(allBids.filter((b) => bidSupplierKey(b) === supplierKey));
   const shown = base.filter(
     (b) =>
       (selectedItem === "all" || b.requestId === selectedItem) &&
@@ -418,7 +510,7 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
     count: allBids.filter((b) => b.requestId === it.id).length,
   }));
   const selItem = itemList.find((i) => i.id === selectedItem) ?? null;
-  const shownSuppliers = new Set(shown.map((b) => b.supplierId ?? b.supplierName)).size;
+  const shownSuppliers = new Set(shown.map(bidSupplierKey)).size;
   // Card width scales with how many bids there are: 1–2 grow to fill the row (no empty side margin);
   // 3+ take a fixed width so the third card peeks at the edge, hinting the horizontal scroll.
   const cardFlex = shown.length <= 2 ? "1 1 0" : "0 0 calc(44% - 8px)";
@@ -634,43 +726,62 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         // startDate is what lets the rental drop its Fridays — without it the shared maths falls back
         // to the raw rate rather than a Friday-blind proration.
         const cq = computeBidQuote(b, { units: u, fallbackDays: gi?.durationDays ?? null, startDate: gi?.startDate ?? null });
-        const rental = cq.rentalSubtotal;
-        const deliv = cq.mobTotal;
-        const ret = cq.demobTotal;
-        const sub = cq.subtotalPreVat;
-        const vat = Math.round(cq.vat);
         const grand = Math.round(cq.total);
-        // Mobile parity (v3_bid_card): collapsed headline = the PER-UNIT rental total (rate × periods),
-        // excluding units/mob/demob/VAT — so bids compare on the unit rate. All-in lives in the grand total.
-        const perUnitRentalTotal = Math.round((b.price ?? 0) * cq.periods);
-        // Rental label, in the bid card's words: the supplier's RAW quoted rate over its own period, the
-        // divisor behind it, and the BILLABLE days it is charged across. It used to fall back to a
-        // derived per-day rate times the CALENDAR duration — a factor whose arithmetic overshot the
-        // total beside it by exactly the Fridays that total had already dropped.
-        const rentalLabel = ((): string => {
-          const price = nf(b.price ?? 0);
-          const per = periodOf(b.priceUnit);
-          if (cq.billableDays <= 0) return `${price}/${per}`; // nothing prorated — the rate IS the period
-          const note = divisorNote(b.priceUnit, L);
-          return `${price}/${per}${note ? ` · ${note}` : ""} × ${cq.billableDays} ${L("billable days", "يوم محتسب")}`;
-        })();
-        const rentalTotalLabel = ((): string => {
+        /* ── The headline is the RATE on a weekly or monthly bid (app parity, 2026-08-18) ──────────
+           `headlineShowsRawRate`: a weekly or monthly bid headlines what the supplier quoted, so two
+           of them compare on the same basis; the prorated total moves into the breakdown's rental
+           row. A daily bid headlines its total, because there the rate and the basis are the same
+           number and a rate headline would say nothing new.
+
+           ~~The headline was the prorated total for every unit.~~ It was honest — the caption spelled
+           out `rate/period · 26 working days/month × N billable days` — but it made two monthly bids
+           compare on totals whose durations the renter had to read before the figures meant anything. */
+        const headline = Math.round(headlineAmount(b.priceUnit, b.price ?? 0, cq.perUnit.rental));
+        /* The rental TYPE, not a total — the headline now carries the rate, so "…total" would name the
+           wrong number. Multi-unit suffixes "per unit", exactly as the app's `priceRateLabelPerUnit`
+           does, because every figure on this card is per unit until the overall line at the foot. */
+        const rentalTypeLabel = ((): string => {
           switch ((b.priceUnit ?? "PER_DAY").toUpperCase()) {
-            case "PER_WEEK": return L("Weekly rental total", "إجمالي الإيجار الأسبوعي");
-            case "PER_MONTH": return L("Monthly rental total", "إجمالي الإيجار الشهري");
-            case "PER_JOB": return L("Job total", "إجمالي المهمة");
-            default: return L("Daily rental total", "إجمالي الإيجار اليومي");
+            case "PER_WEEK": return L("Weekly rental", "الإيجار الأسبوعي");
+            case "PER_MONTH": return L("Monthly rental", "الإيجار الشهري");
+            case "PER_JOB": return L("Job price", "سعر المهمة");
+            default: return L("Daily rental", "الإيجار اليومي");
           }
         })();
+        const headlineLabel = liveUnits > 1 ? L(`${rentalTypeLabel} per unit`, `${rentalTypeLabel} للوحدة`) : rentalTypeLabel;
+        // The basis under the headline — «٢٦ يوم عمل/شهر». Weekly and monthly only; a daily rate has none.
+        const headlineBasis = divisorNote(b.priceUnit, L);
+        /* The rental ROW explains the headline, so it is dropped when there is nothing left to explain:
+           an exact period on a single-unit bid means the headline already IS the total (app §8). */
+        const showRentalRow = !(cq.rentalExact && liveUnits <= 1);
+        const rentalRowLabel = cq.billableDays > 0
+          ? L(`Rental · ${cq.billableDays} days`, `الإيجار · ${cq.billableDays} يومًا`)
+          : L("Rental", "الإيجار");
         const isAccepted = (b.status ?? "").toUpperCase() === "ACCEPTED" || wonSurvey; // decided → accepted/awarded styling
         // B1: the card tally uses the SAME bucketing as the Terms modal (bucketBidTerms) so the card's
         // "Conflict N · Matched N" always equals what the modal lists when opened.
         const termCounts = bucketBidTerms(b.terms, b.negotiableTerms).counts;
-        const termChips = [
-          { label: L("Conflict", "تعارض"), n: termCounts.conflict, c: "#d9362a" },
-          { label: L("Pending review", "بانتظار المراجعة"), n: termCounts.pending, c: "#d4780a" },
-          { label: L("Matched", "مطابق"), n: termCounts.matched, c: "#1daf58" },
-        ];
+        // EXPIRED / WITHDRAWN only. An ACCEPTED bid is decided, not dead: its checks still describe
+        // what was agreed, and greying them would hide the record of the deal the renter took.
+        const bidIsDead = ["EXPIRED", "WITHDRAWN"].includes((b.status ?? "").toUpperCase());
+        // The renter reads every card, so `viewerRole` is always "rentee" here. `hasOpenAsk` is
+        // false for the same reason the app passes false: his asks live in the deal room, not on
+        // this card, so nothing competes with the delta for the button.
+        // What the counts owe the reader. `liveUnits` is the PRICED count — the same one the money
+        // below is built on — and `unitsOffered` is what the bid claims; the machines behind it are
+        // counted distinctly, never as the padded entry list, because the padding repeats a machine.
+        const countNotes = unitCountNotes({
+          priced: liveUnits,
+          offered: offered,
+          machinesNamed: distinctMachinesOffered(b.offeredUnitsDetail),
+        });
+        const counterDelta = bidCounterDelta({
+          originalPrice: b.openingPrice,
+          currentPrice: b.price,
+          lastCounterBy: b.lastCounterBy,
+          viewerRole: "rentee",
+          status: b.status,
+        });
         const rowSep = { borderTop: "1px solid #EFF2F6" } as const;
         const iconBox = { width: 40, height: 40, borderRadius: 11, background: "#eff4f9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } as const;
         const blueLink = { background: "none", border: "none", color: "#1a7ec8", fontWeight: 800, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" } as const;
@@ -710,6 +821,13 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                   <span style={{ width: 22, height: 22, borderRadius: "50%", background: "#1c3550", color: "#fff", fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{(b.supplierName || "S").charAt(0).toUpperCase()}</span>
                   <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550" }}>{b.supplierName}</span>
                   {b.verified && <span className="material-icons-outlined" style={{ fontSize: 16, color: "#1daf58" }}>verified</span>}
+                  {/* ── The certificate pills are gone here too (owner, 2026-08-19) ────────────────
+                      Same ruling as the per-request card: *"all these details are in the equipment
+                      details."* They stated `requiredCerts` against the SUPPLIER's `heldCertCodes`,
+                      and the certificate that decides anything is the one the MACHINE carries — which
+                      the equipment list and each machine's detail panel state, read against the
+                      request. Removing it from one card and not the other would have left the same
+                      offer making a claim on `/requests` that it does not make one screen deeper. */}
                 </div>
               </div>
               {!selectMode && (
@@ -728,47 +846,64 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
               <span style={{ fontSize: 12, color: "#6b8fa8", fontWeight: 700, whiteSpace: "nowrap" }}>{[b.rating != null ? `★ ${b.rating.toFixed(1)}` : "", b.distanceKm != null ? `${Math.round(b.distanceKm)} km` : ""].filter(Boolean).join(" · ")}</span>
             </div>
 
-            {/* Equipment row */}
-            <div style={{ ...rowSep, display: "flex", alignItems: "center", gap: 12, padding: "13px 16px" }}>
-              <div style={iconBox}>
-                <EquipImg src={b.itemImage} categoryId={b.categoryId} name={ar ? b.itemLabelAr : b.itemLabel} box="" img="h-5 w-5 object-contain" iconSize={20} />
-              </div>
-              <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Equipment", "المعدة")}</span>
-              {/* No cert chips on the card — all equipment detail lives in the Details modal only. */}
-              <div style={{ flex: 1 }} />
-              {/* Bid readiness — compact N/N + eye ON this row (opens the per-unit eligibility view); native
-                  bids only (computeBidReadiness null for off-platform). Replaces the old bulky section. */}
-              {!selectMode && (() => { const rd = computeBidReadiness(b); return rd ? <BidReadinessBadge r={rd} L={L} onClick={() => setEligBid(b)} /> : null; })()}
-              {!selectMode && (
-                <button onClick={() => setEquipBid(b)} style={blueLink}>{L("Details", "التفاصيل")} ›</button>
-              )}
-            </div>
-
-            {/* Terms row */}
-            <div style={{ ...rowSep, display: "flex", alignItems: "center", gap: 12, padding: "13px 16px" }}>
-              <div style={iconBox}><span className="material-icons-outlined" style={{ fontSize: 20, color: "#6b8fa8" }}>description</span></div>
-              <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Terms", "الشروط")}</span>
-              <div style={{ display: "flex", gap: 4, flexWrap: "nowrap", flex: 1, minWidth: 0, overflowX: "auto" }} className="no-sb">
-                {termChips.map((t) => (
-                  <span key={t.label} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 800, color: t.n > 0 ? t.c : "#9AA7B8", whiteSpace: "nowrap" }}>
-                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: t.n > 0 ? t.c : "#c3d2e0" }} />{t.label} {t.n}
+            {/* ── What the counts owe the reader (app parity: `unit_count_notes.dart`) ────────────
+                A bid carries three counts and only one of them prices anything. The band above states
+                the OFFER; these two lines state the two ways the priced count can disagree with it —
+                and the machines actually behind it. Silent when they agree, which is most bids. */}
+            {!countNotes.isEmpty && (
+              <div style={{ margin: "-6px 16px 14px", display: "flex", flexDirection: "column", gap: 3 }}>
+                {countNotes.hasPricedNote && (
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: "#6b8fa8" }}>
+                    {countNotes.relation === "below"
+                      ? L(`Priced on ${countNotes.priced} of the ${countNotes.offered} offered`, `مسعّر على ${countNotes.priced} من ${countNotes.offered} معروضة`)
+                      : L(`Countered at ${countNotes.priced} — ${countNotes.priced - countNotes.offered} above the ${countNotes.offered} offered`, `عرض مضاد على ${countNotes.priced} — ${countNotes.priced - countNotes.offered} فوق ${countNotes.offered} المعروضة`)}
                   </span>
-                ))}
+                )}
+                {countNotes.hasClaimedNote && (
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: "#d4780a" }}>
+                    {L(`${countNotes.claimedUnits} of the priced units have no registered machine`, `${countNotes.claimedUnits} من الوحدات المسعّرة بلا معدّة مسجّلة`)}
+                  </span>
+                )}
               </div>
-              {!selectMode && <button onClick={() => setTermsBid(b)} style={blueLink}>{L("View", "عرض")} ›</button>}
-            </div>
+            )}
 
+            {/* ── BC-2 · the checks row (app parity) ────────────────────────────────────────────────
+                ~~An Equipment row and a Terms row.~~ Two rows, each an icon, a word and a link, and
+                between them one line of tallies — «Conflict 2 · Pending 3 · Matched 0» — that a
+                renter had to read word by word to learn whether the offer needed him. The app
+                collapsed the same four sections into one row of two rings; this follows it.
+
+                Both entry points survive: the equipment half still links to the verification map,
+                the terms half still opens the terms modal. The collapse was about crowding, not
+                about taking routes away.
+
+                Every number is `bid-card-checks.ts`. `hasNews` is deliberately not passed — the
+                app plumbs it and does not pass it either, and inventing a web-only reading of "the
+                supplier answered" would put a dot on this card that the phone never shows. */}
+            <BidCardChecks
+              L={L}
+              equipment={equipmentCheckOf(computeBidReadiness(b)?.units ?? [], { dead: bidIsDead })}
+              terms={termsCheck({ matched: termCounts.matched, conflict: termCounts.conflict, pending: termCounts.pending, dead: bidIsDead })}
+              equipmentAction={
+                !selectMode && mayOpenEquipmentSurface(b) ? (
+                  <Link href={`/bids/${encodeURIComponent(b.id)}/equipment`} style={{ ...blueLink, textDecoration: "none" }}>
+                    {t.bidMap.verifyEntry} ›
+                  </Link>
+                ) : null
+              }
+              termsAction={!selectMode ? <button onClick={() => setTermsBid(b)} style={blueLink}>{L("View", "عرض")} ›</button> : null}
+            />
 
             {/* Price row — headline is the PER-UNIT rental total (mobile parity); rate shown in the caption */}
             <div style={{ ...rowSep, padding: "13px 16px", ...(isAccepted ? { background: "#e7f7ee" } : {}) }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ ...iconBox, background: "#fff4e5" }}><span className="material-icons-outlined" style={{ fontSize: 20, color: "#f79009" }}>payments</span></div>
                 <div style={{ minWidth: 0 }}>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{rentalTotalLabel}</span>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#6b8fa8", marginTop: 1 }}>{rentalLabel} · {L("per unit", "للوحدة")}</div>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{headlineLabel}</span>
+                  {headlineBasis && <div style={{ fontSize: 11, fontWeight: 600, color: "#6b8fa8", marginTop: 1 }}>{headlineBasis}</div>}
                 </div>
                 <div style={{ flex: 1 }} />
-                <span style={{ fontSize: 17, fontWeight: 900, color: "#f79009" }}>{nf(perUnitRentalTotal)} {L("SAR", "ر.س")}</span>
+                <span style={{ fontSize: 17, fontWeight: 900, color: "#f79009" }}>{nf(headline)} {L("SAR", "ر.س")}</span>
                 {isAccepted && <span className="material-icons-outlined" style={{ fontSize: 18, color: "#1daf58" }} title={L("Accepted", "مقبول")}>check_circle</span>}
                 {!selectMode && (
                   <button onClick={() => { setOpenPrices((s) => { const n = new Set(s); if (n.has(b.id)) n.delete(b.id); else n.add(b.id); return n; }); setAllUnitsIds((s) => { const n = new Set(s); n.delete(b.id); return n; }); }} style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #d4e0ec", background: "#F7FAFC", color: "#6b8fa8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -778,28 +913,37 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
               </div>
               {priceOpen && !selectMode && (
                 <div style={{ marginTop: 12 }}>
-                  {liveUnits > 1 && (
-                    <div style={{ display: "inline-flex", background: "#eff4f9", borderRadius: 10, padding: 3, marginBottom: 12 }}>
-                      {([[false, L(`All ${liveUnits} units`, `كل ${liveUnits} وحدات`)], [true, L("Per unit", "لكل وحدة")]] as [boolean, string][]).map(([v, lab]) => (
-                        <button key={String(v)} onClick={() => setAllUnitsIds((s) => { const n = new Set(s); if (v) n.delete(b.id); else n.add(b.id); return n; })} style={{ padding: "6px 13px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12.5, fontFamily: "inherit", background: perUnit === v ? "#1c3550" : "transparent", color: perUnit === v ? "#fff" : "#6b8fa8" }}>{lab}</button>
-                      ))}
-                    </div>
-                  )}
+                  {/* ~~A per-unit / all-units toggle.~~ Gone (app parity, 2026-08-18): every row here is
+                      PER UNIT and a multi-unit offer states the all-units figure once, in the total box
+                      below. The toggle made the renter switch bases to see both, and a figure whose
+                      basis depends on a control he last touched a minute ago is a figure he has to
+                      check before he can trust it. */}
                   {([
-                    [`${L("Rental", "الإيجار")} (${rentalLabel}${u > 1 ? ` × ${u}` : ""})`, rental, null],
-                    ...(deliv ? [[u > 1 ? L(`Delivery to site (${nf(Math.round(deliv / u))} × ${u} units)`, `النقل إلى الموقع (${nf(Math.round(deliv / u))} × ${u} وحدة)`) : L("Delivery to site", "النقل إلى الموقع"), deliv, b.mobLeadTime]] as [string, number, string | null][] : []),
-                    ...(ret ? [[u > 1 ? L(`Return from site (${nf(Math.round(ret / u))} × ${u} units)`, `الإرجاع من الموقع (${nf(Math.round(ret / u))} × ${u} وحدة)`) : L("Return from site", "الإرجاع من الموقع"), ret, b.demobLeadTime]] as [string, number, string | null][] : []),
-                    [L("Subtotal before VAT", "المجموع قبل الضريبة"), sub, null],
-                    [L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"), vat, null],
-                  ] as [string, number, string | null][]).map(([lab, val, note], i) => (
+                    ...(showRentalRow ? [[rentalRowLabel, cq.perUnit.rental, null]] as [string, number, string | null][] : []),
+                    ...legRow(L("Delivery to site", "النقل إلى الموقع"), cq.perUnit.mob, b.mobExcluded, b.mobPrice, b.mobLeadTime, L),
+                    ...legRow(L("Return from site", "الإرجاع من الموقع"), cq.perUnit.demob, b.demobExcluded, b.demobPrice, b.demobLeadTime, L),
+                    [L("Subtotal before VAT", "المجموع قبل الضريبة"), cq.perUnit.subtotal, null],
+                    [L("VAT (15%)", "ضريبة القيمة المضافة (١٥٪)"), cq.perUnit.vat, null],
+                  ] as [string, number | string, string | null][]).map(([lab, val, note], i) => (
                     <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 0", borderBottom: "1px solid #F2F5F8" }}>
                       <span style={{ fontSize: 13.5, color: "#2a4f72", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>{lab}{note ? <span style={{ fontSize: 11, color: "#6b8fa8", background: "#eff4f9", padding: "1px 7px", borderRadius: 20, whiteSpace: "nowrap" }}>{note}</span> : null}</span>
-                      <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550", fontVariantNumeric: "tabular-nums" }}>{nf(val)}</span>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: typeof val === "string" ? "#6b8fa8" : "#1c3550", fontVariantNumeric: "tabular-nums" }}>{typeof val === "string" ? val : nf(val)}</span>
                     </div>
                   ))}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, padding: "12px 14px", borderRadius: 10, background: "#FAFCFE", border: "1.5px solid #1c3550" }}>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Grand total", "الإجمالي الكلي")}</span>
-                    <span style={{ fontSize: 18, fontWeight: 900, color: "#1c3550" }}>{nf(grand)} <span style={{ color: "#f79009" }}>{L("SAR", "ر.س")}</span></span>
+                  <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 10, background: "#FAFCFE", border: "1.5px solid #1c3550" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: "#1c3550" }}>{L("Grand total", "الإجمالي الكلي")}</span>
+                      <span style={{ fontSize: 18, fontWeight: 900, color: "#1c3550" }}>{nf(cq.perUnit.total)} <span style={{ color: "#f79009" }}>{L("SAR", "ر.س")}</span></span>
+                    </div>
+                    {/* Multi-unit only, in the SAME box: the true all-units figure. Not the per-unit
+                        total times the count — each leg carries its own unit count, and an excluded
+                        leg contributes nothing however much price is stored against it. */}
+                    {liveUnits > 1 && (
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, paddingTop: 10, borderTop: "1px solid #E4EDF5" }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 800, color: "#f79009" }}>{L("Overall total", "الإجمالي الكلي للوحدات")} <span style={{ color: "#6b8fa8", fontWeight: 700 }}>· {liveUnits}</span></span>
+                        <span style={{ fontSize: 16, fontWeight: 900, color: "#f79009" }}>{nf(grand)} {L("SAR", "ر.س")}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -817,7 +961,26 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
             {!selectMode && (
               <div style={{ marginTop: "auto", padding: "12px 16px 16px" }}>
                 <button disabled={disabled || busyId === b.id} onClick={() => startNegotiation(b)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "14px", borderRadius: 14, border: "none", background: disabled ? "#9AA7B8" : "#1c3550", color: "#fff", fontWeight: 800, fontSize: 15, cursor: disabled ? "default" : "pointer", fontFamily: "inherit", opacity: busyId === b.id ? 0.7 : 1 }}>
-                  <span className="material-icons-outlined" style={{ fontSize: 18 }}>{b.status === "ACCEPTED" ? "receipt_long" : "forum"}</span>{pillLabel(b.status, L)}{offerSuffix(b.uiState, L) ? ` · ${offerSuffix(b.uiState, L)}` : ""}
+                  <span className="material-icons-outlined" style={{ fontSize: 18 }}>{b.status === "ACCEPTED" ? "receipt_long" : "forum"}</span>
+                  {/* ── The CTA names the MOVE once a number has moved (app parity) ──────────────
+                      With nothing moved the button names the lifecycle step, as it always has. Once
+                      someone has countered it names the counter instead — whose it was, and from
+                      what to what — because that is the fact a renter is deciding on, and it was
+                      previously reachable only by opening the room.
+
+                      `ctaShowsCounterDelta` is asked rather than `delta != null` being tested here:
+                      the precedence between a price move and an open ask is a rule, and it lives in
+                      the model where the app keeps it. */}
+                  {ctaShowsCounterDelta({ hasOpenAsk: false, delta: counterDelta }) && counterDelta ? (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                      <span>{counterDelta.side === "mine" ? L("Your counter", "عرضك") : L("Their counter", "عرضهم")}</span>
+                      <span dir="ltr" style={{ textDecoration: "line-through", opacity: 0.6, fontWeight: 700 }}>{nf(counterDelta.from)}</span>
+                      <span aria-hidden="true">→</span>
+                      <span dir="ltr">{nf(counterDelta.to)}</span>
+                    </span>
+                  ) : (
+                    <>{pillLabel(b.status, L)}{offerSuffix(b.uiState, L) ? ` · ${offerSuffix(b.uiState, L)}` : ""}</>
+                  )}
                 </button>
               </div>
             )}
@@ -883,15 +1046,6 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         </div>
       )}
 
-      {equipBid && (
-        <BidEquipmentModal
-          bid={equipBid}
-          busy={busyId === equipBid.id}
-          onRequestDetails={() => startNegotiation(equipBid)}
-          onClose={() => setEquipBid(null)}
-        />
-      )}
-
       {/* Terms modal (prototype "Terms — <supplier>") — per-class term status + Negotiate terms */}
       {termsBid && (
         <BidTermsModal
@@ -906,8 +1060,6 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
         />
       )}
 
-      {/* bid-readiness — read-only eligibility view for a native bid's offered units */}
-      {eligBid && (() => { const rd = computeBidReadiness(eligBid); return rd ? <BidEligibilityModal r={rd} supplierName={eligBid.supplierName} ar={ar} L={L} onClose={() => setEligBid(null)} /> : null; })()}
 
       {/* Issue-quotation gate for an unverified renter (company name vs personal name). */}
       {quoteGate && (

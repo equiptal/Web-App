@@ -5,8 +5,8 @@ import type { BidCard } from "@/lib/contract/bids";
 import type { BidFormData, BidFormItem, LinkBidSubmission, LinkBidItem } from "@/lib/contract/link-bids";
 import { CERT_TERM_KEYS, certCodesFromValue, certConfKey, prettyCert } from "@/lib/contract/link-bids";
 import { fetchBidFormData } from "@/lib/api/client";
-import { hasVatInclusiveNote, stripVatInclusiveNote } from "@/lib/contract/vat-inclusive";
-import { computeRentalTotal, durationDaysBetween, VAT_RATE } from "@/lib/pricing/rental";
+import { hasVatInclusiveNote, stripVatInclusiveNote, vatLines } from "@/lib/contract/vat-inclusive";
+import { computeRentalTotal, durationDaysBetween } from "@/lib/pricing/rental";
 import { qualityFromSubmission, qualityFromSubmissionItem } from "@/lib/contract/bid-quality";
 import { QualityRing } from "@/components/bid/QualityRing";
 import { BID_FORM_CSS } from "@/components/bid/bidFormStyles";
@@ -99,10 +99,12 @@ export function SharedBidSubmissionModal({
   );
   // A company field the supplier gave as text OR a document — render whichever they submitted, in place.
   const coDoc = (type: string) => submission?.companyDocuments?.find((d) => d.type === type);
+  /** AC-218 — a row the supplier left empty says so, rather than showing a dash that reads like a gap. */
+  const notEntered = L("— not entered", "— غير مُدخل");
   const CoField = ({ label, text, docType }: { label: string; text?: string | null; docType: string }) => {
     if (text && text.trim()) return <RoField label={label} value={text} />;
     const doc = coDoc(docType);
-    if (!doc) return <RoField label={label} value={null} />;
+    if (!doc) return <RoField label={label} value={null} empty={notEntered} />;
     return (
       <div className="field" style={{ marginBottom: 12 }}>
         <label>{label}</label>
@@ -198,16 +200,25 @@ export function SharedBidSubmissionModal({
   /** True once ANY shown line was actually prorated — see the AC-216 note on `shownStoredGross`. */
   const proratedAny = (rows: LinkBidItem[]) => rows.some((a) => !itemRental(a).raw);
   const subtotal = (submission?.items ?? []).reduce((s, a) => s + itemSubtotal(a), 0);
-  const vat = subtotal * VAT_RATE;
   // Focused on one item → total for THAT item only; otherwise the whole-submission grand total.
   const shownIds = new Set(shownItems.map((it) => it.requestItemId));
-  const shownSubtotal = (submission?.items ?? []).filter((a) => shownIds.has(a.requestItemId)).reduce((s, a) => s + itemSubtotal(a), 0);
-  // The backend's stored `grandTotal` is computed RATE-BASED — it never prorates, so once the rental
-  // has a period applied it is one period's money for a multi-period job (wrong by ~4× on a two-month
-  // rental). Dropped in that case and recomputed; still honoured when there was nothing to prorate.
+  const shownItemAnswers = (submission?.items ?? []).filter((a) => shownIds.has(a.requestItemId));
+  const shownSubtotal = shownItemAnswers.reduce((s, a) => s + itemSubtotal(a), 0);
+  // RMAP AC-216 — prefer the STORED gross figure over a recomputation, so a supplier who quoted
+  // VAT-inclusive sees their exact number back rather than a re-rounded one. `×1.15` is the fallback
+  // for rows stored before `total` existed.
+  //
+  // BUT the stored total is computed by the backend RATE-BASED — it never prorates. Once the rental has
+  // a period applied, that figure is one period's money for a multi-period job (wrong by ~4× on a
+  // two-month rental), so it is dropped and the total is recomputed. AC-216's exactness is only worth
+  // preserving while the number it protects is right; a rounding riyal is not worth a factor of four.
+  const storedGross = (rows: LinkBidItem[]) =>
+    proratedAny(rows) ? null : rows.reduce<number | null>((s, a) => (a.total == null ? s : (s ?? 0) + a.total), null);
+  const shownStoredGross = storedGross(shownItemAnswers);
+  const allItemAnswers = submission?.items ?? [];
   const grandIncl = singleItem
-    ? shownSubtotal * 1.15
-    : proratedAny(submission?.items ?? []) ? subtotal + vat : (submission?.grandTotal ?? subtotal + vat);
+    ? vatLines(shownSubtotal, shownStoredGross).total
+    : vatLines(subtotal, proratedAny(allItemAnswers) ? null : (submission?.grandTotal ?? shownStoredGross)).total;
   // Per-ITEM quality when opened from a single item's card (focusItemId) — this item's terms/docs +
   // the shared company details; otherwise the whole-submission score.
   const focusedSub = focusItemId ? submission?.items.find((a) => a.requestItemId === focusItemId) : null;
@@ -435,13 +446,22 @@ export function SharedBidSubmissionModal({
                           ) : null}
                         </tbody>
                       </table></div>
-                      {/* `sub` is already prorated (see `itemSubtotal`), so these rows reconcile with the
-                          rental line above and with what the supplier saw on the form. */}
-                      <div className="itot">
-                        <span className="r">{L("Subtotal", "المجموع")}<b>{sub ? nf(sub) : "—"} {sar}</b></span>
-                        <span className="r">{L("VAT 15%", "ضريبة ١٥٪")}<b>{sub ? nf(sub * VAT_RATE) : "—"} {sar}</b></span>
-                        <span className="r t">{L("Item total", "إجمالي البند")}<b>{sub ? nf(sub * 1.15) : "—"} {sar}</b></span>
-                      </div>
+                      {/* VAT is `total − subtotal`, NEVER `subtotal × 0.15` (RMAP AC-216). The submission
+                          stores an already-rounded gross `total`, so recomputing the tax produces a
+                          breakdown whose rows do not add up to the figure the supplier actually sent.
+                          Falls back to ×1.15 only for older rows that carry no stored total. */}
+                      {(() => {
+                        // Stored gross dropped once the rental was prorated — it is the backend's
+                        // rate-based figure and would no longer reconcile with the rows above it.
+                        const lines = vatLines(sub, rental.raw ? a?.total : null);
+                        return (
+                          <div className="itot">
+                            <span className="r">{L("Subtotal", "المجموع")}<b>{sub ? nf(lines.subtotal) : "—"} {sar}</b></span>
+                            <span className="r">{L("VAT 15%", "ضريبة ١٥٪")}<b>{sub ? nf(lines.vat) : "—"} {sar}</b></span>
+                            <span className="r t">{L("Item total", "إجمالي البند")}<b>{sub ? nf(lines.total) : "—"} {sar}</b></span>
+                          </div>
+                        );
+                      })()}
                       {(() => {
                         const docs = a?.documents ?? [];
                         const ownership = docs.filter((d) => OWNERSHIP_TYPES.has(d.type));
@@ -488,7 +508,7 @@ export function SharedBidSubmissionModal({
                 {/* ── Supplier's details (read-only) ── */}
                 <div className="sec">
                   <div className="sec-h"><span className="material-icons-outlined hdic">badge</span><h3>{L("Supplier's details", "بيانات المؤجّر")}</h3></div>
-                  <RoField label={L("Company name", "اسم الشركة")} value={submission.companyName} />
+                  <RoField label={L("Company name", "اسم الشركة")} value={submission.companyName} empty={notEntered} />
                   <div className="frow">
                     <CoField label={L("CR number", "رقم السجل التجاري")} text={submission.crNumber} docType="cr" />
                     <CoField label={L("VAT number", "الرقم الضريبي")} text={submission.vatNumber} docType="vat_cert" />
@@ -496,7 +516,7 @@ export function SharedBidSubmissionModal({
                   <CoField label={L("National address", "العنوان الوطني")} text={submission.nationalAddress} docType="national_address" />
                   {/* Contact info — shown plainly (the supplier's real phone). The masked "negotiate via
                       relay" variant is deferred until the relay ships; for now the renter gets the number. */}
-                  <RoField label={L("Contact info", "بيانات التواصل")} value={submission.contactInfo} />
+                  <RoField label={L("Contact info", "بيانات التواصل")} value={submission.contactInfo} empty={notEntered} />
                   {supplierNotes && <RoField label={L("Notes — for the whole quotation", "ملاحظات — لكامل عرض السعر")} value={supplierNotes} multiline />}
                 </div>
 
@@ -544,11 +564,14 @@ function RoAns({ ok, L }: { ok: boolean | undefined; L: (e: string, a: string) =
 }
 
 /** Read-only company field — label + boxed value (mirrors the form's `.field`, non-editable). */
-function RoField({ label, value, multiline }: { label: string; value: string | null | undefined; multiline?: boolean }) {
+/** A key/value ROW. Absent values read «— غير مُدخل», not a bare dash (RMAP AC-218): §6.13.7 makes the
+ *  em-dash the convention for a TILE in a spec grid and the spelled-out form the convention for a row,
+ *  so the renter can tell "not provided" from a rendering gap. Never blank, never dropped. */
+function RoField({ label, value, multiline, empty }: { label: string; value: string | null | undefined; multiline?: boolean; empty?: string }) {
   return (
     <div className="field" style={{ marginBottom: 12 }}>
       <label>{label}</label>
-      <div style={{ minHeight: multiline ? undefined : 42, border: "1px solid var(--border)", borderRadius: "var(--r-md)", padding: "10px 12px", fontSize: 13.5, fontWeight: 600, color: value ? "var(--navy)" : "var(--muted)", background: "var(--surface2)", whiteSpace: multiline ? "pre-wrap" : undefined, lineHeight: multiline ? 1.6 : undefined }}>{value || "—"}</div>
+      <div style={{ minHeight: multiline ? undefined : 42, border: "1px solid var(--border)", borderRadius: "var(--r-md)", padding: "10px 12px", fontSize: 13.5, fontWeight: 600, color: value ? "var(--navy)" : "var(--muted)", background: "var(--surface2)", whiteSpace: multiline ? "pre-wrap" : undefined, lineHeight: multiline ? 1.6 : undefined }}>{value || empty || "—"}</div>
     </div>
   );
 }

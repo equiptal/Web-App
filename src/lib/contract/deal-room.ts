@@ -3,7 +3,11 @@
  * Source: app backend `GET /api/deal-rooms/{id}` (deal-room.service.getDealRoom). The renter is the
  * rentee party. Live chat runs over GetStream (channel = streamChannelId; token via stream-token).
  */
-import { computeRentalTotal, rentalDivisor, VAT_RATE } from "@/lib/pricing/rental";
+import { computeRentalTotal, divisorNote, rentalDivisor, VAT_RATE } from "@/lib/pricing/rental";
+import { cityLabel, urgencyLabel, rentalTypeLabel, fulfillmentLabel, termValueLabel } from "@/lib/contract/labels";
+// Type-only — the deal-room quotation BUILDER lives here (pure, testable in the node suite); the
+// rendering itself stays in the shared template module.
+import type { QuotationDoc, QuotationLineItem, QuotationCard } from "@/lib/quotation/render";
 
 export type DealRoomStatus = "OPEN" | "NEGOTIATING" | "AWAITING_SUPPLIER_CONFIRMATION" | "CLOSED" | "ABANDONED" | string;
 
@@ -17,6 +21,59 @@ export interface DealParty {
 
 export type TermState = "fixed" | "soft_accepted" | "disputed" | "pending" | "agreed" | string;
 
+/**
+ * WHERE a term's current value came from (app parity: `TermSource`).
+ *
+ * The three reference values a term carries — the renter's preference, the supplier's declaration and
+ * the platform default — are all shown, but only ONE of them is the value in force. Without this the
+ * renter reads three numbers and has to infer which one binds him; with it the row says so.
+ *
+ * Unknown strings fall back to `platform_default`, as the app's `TermSource.fromString` does: an
+ * unrecognised provenance is the weakest claim, not a stronger one.
+ */
+export type TermSource = "rentee_fixed" | "supplier_declared" | "platform_default";
+
+const TERM_SOURCES = new Set<string>(["rentee_fixed", "supplier_declared", "platform_default"]);
+export const asTermSource = (v: unknown): TermSource =>
+  typeof v === "string" && TERM_SOURCES.has(v) ? (v as TermSource) : "platform_default";
+
+/**
+ * One recorded move on a term (backend `history[]`).
+ *
+ * `action` is the backend's own verb — `counter`, `accept`, `propose_update` — and `by` the side that
+ * made it. Neither is narrowed to a union: an action the web does not recognise is still shown, under
+ * its raw name, rather than dropped. A move the renter cannot read beats a move he cannot see.
+ */
+export interface TermHistoryEntry {
+  action: string;
+  by: string;
+  value: unknown;
+  /** ISO-8601, as it arrived. Never parsed at map time — a bad date must not cost the whole term. */
+  at: string;
+}
+
+/**
+ * The last move on a term, or null when it has never moved.
+ *
+ * The app shows exactly this one line ("Countered: 30 days · Mar 4") rather than a full log: a term
+ * that has gone back and forth three times is still decided on its LATEST position, and the whole
+ * thread already lives in the conversation.
+ *
+ * Ordered by `at` rather than by array position — the backend appends in order today, and this does
+ * not depend on it continuing to. Entries with an unparseable `at` sort oldest, so a malformed
+ * timestamp cannot promote a stale move over a real one.
+ */
+export function lastTermMove(term: Pick<DealTerm, "history">): TermHistoryEntry | null {
+  let best: TermHistoryEntry | null = null;
+  let bestAt = -Infinity;
+  for (const h of term.history) {
+    const t = Date.parse(h.at);
+    const at = Number.isNaN(t) ? -Infinity : t;
+    if (best === null || at >= bestAt) { best = h; bestAt = at; }
+  }
+  return best;
+}
+
 /** One negotiable term in the deal room (mirrors the app's term list). */
 export interface DealTerm {
   key: string;
@@ -28,6 +85,10 @@ export interface DealTerm {
   supplierDeclared: unknown;
   /** The platform's default/fallback value for this term (app parity — shown as a third reference row). */
   platformDefault: unknown;
+  /** Which of the three reference values is the one in force. See `TermSource`. */
+  source: TermSource;
+  /** Every recorded move on this term, oldest-first as the backend sends it. Empty when untouched. */
+  history: TermHistoryEntry[];
   /** Mandatory terms must be resolved to close the deal (app shows a red "Mandatory" badge). */
   isMandatory: boolean;
   itemLabel: string | null;
@@ -38,6 +99,20 @@ export interface DealTerm {
 
 export interface DealRoomView {
   id: string;
+  /**
+   * **The BID this room settles** (owner, 2026-08-11: *"i want it like request card"*).
+   *
+   * `DealRoom.bidId` is `@unique` — one bid = one item = one room = one Stream channel — so the room
+   * resolves exactly one bid, and every bid-scoped read the room needs is addressed by it. The one
+   * that made this field necessary is `GET /marketplace/bids/{bidId}/fleet`: the request cards in
+   * this conversation name a machine by `equipmentId` and nothing on the wire carries its NAME, so
+   * without the fleet the deal room could only render the generic key/value form the ruling replaced.
+   *
+   * Null when the payload does not carry it. Never fabricated from the room id — a wrong bid id would
+   * fetch ANOTHER supplier's fleet and put his machines' names on this conversation's cards, which is
+   * worse in every direction than the fleet-less fallback.
+   */
+  bidId: string | null;
   status: DealRoomStatus;
   contractType: string | null;
   streamChannelId: string | null;
@@ -54,8 +129,16 @@ export interface DealRoomView {
   demobByRentee: boolean | null;
   periods: number | null;
   priceUnit: string | null;
-  /** Units the RFQ asked for — the rate is PER-UNIT, so the rental total multiplies by this
-   *  (consistent with the bid cards + quotations + the backend deal quotation). */
+  /**
+   * The PRICE-BASIS unit count — `agreedUnits ?? bid.unitsOffered.length ?? request.numberOfUnits`
+   * (see the assignment, `priceUnits`), NOT the count the RFQ asked for. The rate is per-unit, so the
+   * rental total multiplies by this, matching the bid cards, the quotations and the backend deal
+   * quotation, all of which scale by what the SUPPLIER offered rather than what was requested.
+   *
+   * The requested count is `requestedUnits` on this same view. The two differ on every partial bid, so
+   * the old "units the RFQ asked for" comment named the wrong one of the two fields (AC-191).
+   * Deliberately NOT renamed — every consumer reads it as the price basis already.
+   */
   numberOfUnits: number;
   // ── deal-room/negotiation — per-type units + leg exclusion (shared backend) ──
   /** Matched RENTAL count (drives coverage); `null` = single-supplier/single-unit "full request". */
@@ -70,6 +153,16 @@ export interface DealRoomView {
   requestedUnits: number;
   /** Request short code (REQ-NNNNN) for the room header label. */
   shortCode: string | null;
+  /**
+   * The request this room settles. Top-level on the payload and dropped by this mapper until now.
+   *
+   * Needed to reach the rest of a multi-item submission: a renter who posted three items and got bids
+   * from one supplier has three rooms with that firm, and nothing here could name the other two.
+   */
+  requestId: string | null;
+  /** The submission group, when the payload carries it. Null is "unknown", NOT "no group" — the field
+   *  is absent on some responses, so a caller must look it up before concluding there are no siblings. */
+  requestGroupId: string | null;
   /** Who made the last counter ("rentee" | "supplier" | null). The renter is the rentee. */
   lastCounterBy: string | null;
   /** Convenience: is it the renter's turn to act (accept/counter)? */
@@ -158,17 +251,18 @@ function mapDoc(raw: Record<string, unknown>): DealRoomDocument {
  * fresh presigned download link. `pdfStatus` is `PENDING` while the PDF is still being generated
  * (the app polls until it's ready), then ready.
  */
-/** Terms the APP hides from the deal-room table (deal_room_models hidden keys) — hidden here for parity
- *  so the web never renders rows / phantom conflicts the app suppresses. PRICE + mob/demob PRICING are
- *  priced line items (settled on the counter Price page); the rest are handled elsewhere or retired on
- *  the deal-room surface (certs, operator nationality, payment method, offer duration, fat, lead time).
+/** Terms the APP hides from EVERY deal-room term surface (`kHiddenDealRoomTermKeys`) — hidden here for
+ *  parity so the web never renders rows / phantom conflicts the app suppresses. PRICE + mob/demob
+ *  PRICING are priced line items (settled on the counter Price page); the rest are handled elsewhere or
+ *  RETIRED on the deal-room surface (certs, operator nationality, payment method, offer duration, the
+ *  legacy combined `fat`, mobilization lead time, fulfillment type, required attachments).
  *
  *  ⚠ Applied at PARSE on BOTH payloads, exactly as the app applies it. `Quotation.agreedTerms` was
  *  snapshotted at close and is never rewritten, so every deal closed BEFORE the retirement still carries
  *  `operator_nationality` and `safety_certifications` in its snapshot. Filtering only the live room left
  *  the web printing those two on the quotation while the app printed neither — one contract, two
  *  documents. */
-const HIDDEN_DEAL_ROOM_TERM_KEYS = new Set<string>([
+export const HIDDEN_DEAL_ROOM_TERM_KEYS = new Set<string>([
   "PRICE", "mobilization_pricing", "demobilization_pricing",
   "fulfillment_type", "required_attachments", "mobilization_lead_time",
   "operator_nationality", "operator_certification", "safety_certifications",
@@ -235,6 +329,27 @@ export function mapQuotation(raw: unknown): QuotationView {
   };
 }
 
+/**
+ * WHEN the rentee's quotation link shows, and WHICH document it is (app parity —
+ * `quotation_button.dart`, pinned below the deal room's chat composer).
+ *
+ * Available at EVERY status except ABANDONED (an abandoned room has no deal to quote); no verification
+ * and no tier gate. The two labels are the whole point of the distinction:
+ *
+ *   • CLOSED → `final`. The deal is signed.
+ *   • before → `preview`. **An agreed price is not a closed deal** — the supplier still has to confirm.
+ *     An unlabelled "quotation" mid-negotiation is how a rentee concludes the deal is done and stops
+ *     chasing it, so the label has to carry that on its own.
+ *
+ * The web used to offer the quotation only once CLOSED, on both entry points.
+ */
+export type QuotationLinkKind = "preview" | "final";
+
+export function quotationLinkKind(status: DealRoomStatus): QuotationLinkKind | null {
+  if (status === "ABANDONED") return null;
+  return status === "CLOSED" ? "final" : "preview";
+}
+
 export function mapDealRoomDocuments(raw: unknown): DealRoomDocuments {
   const r = (raw ?? {}) as Record<string, unknown>;
   const company = Array.isArray(r.companyDocuments) ? (r.companyDocuments as Record<string, unknown>[]) : [];
@@ -264,6 +379,17 @@ export interface DealTotals {
   /** True when `rentalTotal` is the bare quoted rate — no duration, no start date, PER_JOB, or a
    *  collapsed window. Nothing prorated, so no day count is shown. */
   rentalRaw: boolean;
+  /**
+   * The rental for ONE machine — `rentalTotal ÷ rentalUnits`, but returned rather than divided back
+   * out, because it is what the function computes first and the division is a place for a rounding
+   * error to enter.
+   *
+   * Exposed for the price breakdown, which states its lines PER UNIT the way the bid card does
+   * (owner, 2026-08-19), then totals them across the count. Every other figure the per-unit block
+   * needs is `computeQuoteTotals`' from this one number, so the two surfaces reach the same rows
+   * through the same function instead of each dividing the totals by hand.
+   */
+  perUnitRental: number;
   rentalTotal: number; mobTotal: number; demobTotal: number;
   subtotal: number; vat: number; grand: number;
 }
@@ -274,7 +400,21 @@ export interface DealTotals {
  *  exclusion; VAT 15%. `override` lets the quotation pass the agreed rate / price unit, or a single
  *  negotiation round pass its full snapshot (rate + prices + per-type units + exclusion). */
 export function computeDealTotals(
-  room: DealRoomView,
+  /** Only the price basis, not a whole room — so the equipment-verification surface's footer (spec 004
+   *  §6.10, V12) can price a bid that has **no room yet** from the bid's own figures, using this one
+   *  function rather than a second implementation that would eventually disagree with it. */
+  room: Pick<
+    DealRoomView,
+    | "rate" | "priceUnit" | "periods" | "agreedUnits" | "numberOfUnits"
+    | "mobUnits" | "demobUnits" | "mobPrice" | "demobPrice" | "mobExcluded" | "demobExcluded"
+  > & {
+    /** The Friday anchor. On a real `DealRoomView` it lives under `details`; callers that synthesize a
+     *  basis (the map's price footer prices a bid with no room yet) pass it at the top level instead.
+     *  Read BOTH — reading only the root silently returned undefined for every real room, which made
+     *  the deal room stop prorating and quietly show the raw rate. */
+    startDate?: string | null;
+    details?: { startDate?: string | null } | null;
+  },
   override?: {
     rate?: number | null; priceUnit?: string | null;
     mobPrice?: number | null; demobPrice?: number | null;
@@ -297,9 +437,12 @@ export function computeDealTotals(
   const perDayRate = rate / dpp;
   // Shared Friday-excluded proration. With no start date it returns the raw rate rather than a
   // Friday-blind total, so the room never shows a number the app wouldn't.
-  // The Friday anchor lives under `details`, NOT at the root of the room — a `room.startDate` here
-  // silently evaluates to undefined, which turns proration off and shows the raw rate on every room.
-  const startDate = room.details?.startDate ?? null;
+  //
+  // On a real `DealRoomView` the Friday anchor lives under `details`, NOT at the root — reading the
+  // root ALONE silently evaluates to undefined, which turns proration off and shows the raw rate on
+  // every room. The root is accepted first only for callers that pass the room flattened; the
+  // `details` fallback is what actually fires in the app.
+  const startDate = room.startDate ?? room.details?.startDate ?? null;
   // NO DURATION IS NOT A ONE-PERIOD WINDOW. The app's `rentalLineTotal` returns `rate × units` outright
   // for an open deal (`durationDays == null → open mode`), and this used to say the same in its comment
   // — but it synthesised `periods = divisor` and fed that to the shared module, which then struck the
@@ -322,7 +465,7 @@ export function computeDealTotals(
   // Period count is derived from the BILLABLE days, not the calendar duration: a 61-day monthly job
   // charges ~53 days, which is 2.04 months of rent, not the 2.35 the calendar suggests. The old raw
   // figure disagreed with `rentalTotal` by exactly the Fridays.
-  return { rate, priceUnit, perDayRate, rentalUnits, mobUnitsN, demobUnitsN, mobPrice, demobPrice, mobExcluded, demobExcluded, periods, hasDuration, periodCount: (rental.raw ? periods : rental.billable) / dpp, billableDays: rental.raw ? 0 : rental.billable, rentalRaw: rental.raw, rentalTotal, mobTotal, demobTotal, subtotal, vat, grand };
+  return { rate, priceUnit, perDayRate, rentalUnits, mobUnitsN, demobUnitsN, mobPrice, demobPrice, mobExcluded, demobExcluded, periods, hasDuration, periodCount: (rental.raw ? periods : rental.billable) / dpp, billableDays: rental.raw ? 0 : rental.billable, rentalRaw: rental.raw, perUnitRental, rentalTotal, mobTotal, demobTotal, subtotal, vat, grand };
 }
 
 export function mapDealRoom(raw: unknown): DealRoomView {
@@ -355,6 +498,13 @@ export function mapDealRoom(raw: unknown): DealRoomView {
       renteePreference: t.renteePreference,
       supplierDeclared: t.supplierDeclared,
       platformDefault: t.platformDefault ?? t.platform_default ?? t.defaultValue ?? null,
+      source: asTermSource(t.source),
+      // Entries missing an action or a timestamp are DROPPED, not defaulted: the hint reads
+      // "<action>: <value> · <date>", and a row that cannot say what happened or when says nothing.
+      // The value itself may legitimately be absent (an `accept` carries no new one).
+      history: (Array.isArray(t.history) ? (t.history as Record<string, unknown>[]) : [])
+        .filter((h) => s(h.action) && s(h.at))
+        .map((h) => ({ action: s(h.action) ?? "", by: s(h.by) ?? "", value: h.value, at: s(h.at) ?? "" })),
       isMandatory: t.isMandatory === true || t.mandatory === true,
       itemLabel: s(t.itemLabel),
       options: (Array.isArray(t.options) ? (t.options as Record<string, unknown>[]) : []).map((o) => ({
@@ -421,6 +571,10 @@ export function mapDealRoom(raw: unknown): DealRoomView {
 
   return {
     id: String(d.id ?? ""),
+    // `getDealRoom` includes the bid rather than selecting it, so the room's own `bidId` column comes
+    // back alongside the nested `bid.id`. Both are read — the column first, because it is the FK the
+    // `@unique` is on — so a projection that trims the nested object still yields the id.
+    bidId: s(d.bidId) ?? s(bid.id) ?? null,
     status,
     contractType: s(d.contractType),
     streamChannelId: s(d.streamChannelId),
@@ -450,11 +604,269 @@ export function mapDealRoom(raw: unknown): DealRoomView {
     demobExcluded: d.demobExcluded === true,
     requestedUnits,
     shortCode: s(reqObj.shortCode),
+    requestId: s(d.requestId) ?? s(reqObj.id),
+    requestGroupId: s(reqObj.requestGroupId) ?? s(d.requestGroupId),
     lastCounterBy,
     myTurn,
     terms,
     hasDisputedTerms,
     supplierFirstEntry: d.supplierFirstEntry === true,
     details,
+  };
+}
+
+// ── The deal-room quotation document ────────────────────────────────────────────────────────────────
+
+/** Cost-responsibility terms — they render in the price section (`priceExtras`), not as term rows. */
+const COST_TERM_KEYS = new Set([
+  "fuel", "maintenance", "overtime", "overtime_rate", "operator_food", "fat_food",
+  "operator_transport_accommodation", "fat_accommodation_transport", "operator_transport",
+]);
+
+/** Four ACKNOWLEDGE terms are not facts of their own: the backend fills them straight from the request
+ *  columns the "Rental & equipment details" card already prints — `working_hours` ← workingHoursPerDay,
+ *  `working_days` ← workingDaysPerWeek, `local_content` ← localContent, and `crosshire` ← **subletting**
+ *  (`deal-room.service.ts`: "`subletting` in schema ↔ `crosshire` in canonical term-key map").
+ *  Printing them as term rows as well put each fact on the paper twice — and the subletting one twice
+ *  under two different names: "Subletting" in one card and "Crosshire" in the other, from one field.
+ *  The DETAILS card owns them. Its labels carry the unit ("Working hours/day"), it uses the rentee's own
+ *  word for the field, and the rest of the request's facts are already there. The term cards drop them. */
+const DETAILS_OWNED_TERM_KEYS = new Set(["working_hours", "working_days", "local_content", "crosshire"]);
+
+const nfQ = (v: number) => Math.round(v).toLocaleString("en-US");
+
+/**
+ * The deal-room quotation document — built LIVE off the room, the way the app builds it.
+ *
+ * The app's quotation link (`quotation_button.dart` -> `bid_quotation_page.dart`) re-fetches and
+ * re-renders on every open; no snapshot is in the path at all. The web's was a HYBRID: the rate, the
+ * price unit, the contract type and the whole terms list came off the frozen `Quotation` row while
+ * everything else came off the live room. That broke in two directions — the snapshot does not exist
+ * before the deal closes (so no preview was possible at all), and it still carries terms that have since
+ * been retired (so a pre-retirement deal printed rows the app doesn't). Everything the app reads live is
+ * now read live:
+ *
+ *   agreedRate    -> `room.rate`            (lastProposedRate ?? bid.priceAmount — what the bar shows)
+ *   priceUnit     -> `room.priceUnit`
+ *   contractType  -> `room.contractType`
+ *   agreedTerms   -> `room.terms`           (already parse-filtered; the states mirror the rule the
+ *                                            backend snapshots by at close: agreed|soft_accepted|fixed)
+ *   renteePhone   -> `/api/me`.phone        (passed in as `rentee`)
+ *   renteeEmail   -> `/api/me`.email
+ *   supplierPhone -> `room.supplier.phone`  (the deal-room payload always carries it)
+ *
+ * `q` is therefore OPTIONAL, and supplies only what has no live source anywhere: the formal quotation
+ * number (the Quotation row's id, which exists only once the deal closes) and the supplier's e-mail.
+ * Pass `null` for a preview — `GET /api/deal-rooms/{id}/quotation` 404s until the deal is closed.
+ */
+export function buildDealRoomQuotationDoc(
+  room: DealRoomView,
+  /** The confirmed Quotation row, when one exists. `null` for every pre-close preview. */
+  q: QuotationView | null,
+  /** The signed-in rentee, from `/api/me` — the live source for the buyer block. */
+  rentee: { name: string; phone?: string | null; email?: string | null },
+  ar: boolean,
+  L: (en: string, arr: string) => string,
+  opts?: { logoUrl?: string },
+  /** The live position’s override, as the price bar builds it. See the note beside `computeDealTotals`
+   *  below — omitted, the paper prices on the room’s standing columns. */
+  live?: Parameters<typeof computeDealTotals>[1] | null,
+): QuotationDoc {
+  const lang = ar ? "ar" : "en";
+  const sar = L("SAR", "ر.س");
+  const kind = quotationLinkKind(room.status) ?? "preview";
+
+  // EXACT same math as the live price bar, which is why `live` is threaded in rather than resolved
+  // again here: the bar prices on the LATEST ROUND (app parity, `resolveLivePosition`), and a paper
+  // that re-derived from the room’s columns would print the last AGREEMENT under a heading the renter
+  // just read a counter on. Absent — or on a CLOSED room, where the agreement IS the latest position
+  // — this falls through to the columns and lands on the same figures either way.
+  const t = computeDealTotals(room, live ?? undefined);
+  const rate = t.rate;
+  const unit = t.priceUnit;
+  const units = t.rentalUnits;
+  const days = room.periods;
+  const periodLabel = unit === "PER_WEEK" ? L("week", "أسبوع") : unit === "PER_MONTH" ? L("month", "شهر") : unit === "PER_JOB" ? L("job", "مهمة") : L("day", "يوم");
+  const dateStr = new Date().toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
+  // The Quotation row's id is the only formal reference this document has, and it exists only once the
+  // deal closes. A preview falls back to the request's short code — the reference the rentee already
+  // knows the room by — rather than printing a blank.
+  const qnum = (q?.quotationNumber ?? "").slice(0, 8).toUpperCase() || room.shortCode || "—";
+  const contractType = room.contractType;
+
+  const valFmt = (v: unknown): string => {
+    if (v == null || v === "") return "—";
+    if (Array.isArray(v)) return v.length ? v.map(String).join(", ") : "—";
+    if (typeof v === "boolean") return v ? L("Yes", "نعم") : L("No", "لا");
+    const x = String(v).toLowerCase();
+    if (x === "supplier") return L("Supplier", "المؤجّر");
+    if (x === "rentee" || x === "renter") return L("Rentee", "المستأجر");
+    if (x === "true" || x === "included" || x === "yes") return L("Yes", "نعم");
+    if (x === "false" || x === "excluded" || x === "not_included" || x === "no") return L("No", "لا");
+    return String(v);
+  };
+
+  // Invoice line items (rental + delivery + return) — the SAME 6-column table as the bid-card quotation.
+  const lineItems: QuotationLineItem[] = [];
+  // Rental qty/price columns read exactly as the bid card does: the PRICE column always carries the
+  // supplier's raw quoted rate over its own period, and the QTY column carries the BILLABLE days the
+  // rate is prorated across — never the calendar duration, which charges the Fridays the total does
+  // not. Nothing prorated (PER_JOB, open-ended, no start date) shows a plain period count instead.
+  const rentalQty = unit === "PER_JOB" || t.rentalRaw
+    ? `${units}`
+    : `${t.billableDays} ${L("days", "يوم")}${units > 1 ? ` × ${units}` : ""}`;
+  lineItems.push({
+    num: 1, label: L("Rental", "الإيجار"), detail: room.supplier.name,
+    unit: periodLabel,
+    qty: rentalQty,
+    price: `${nfQ(rate)} / ${periodLabel}`,
+    // The fixed-divisor assumption behind a weekly/monthly rate, stated whether or not this particular
+    // period comes out exact (app parity: `rentalPeriodSubtitle`) — it is what turns the rate into the
+    // day count beside it.
+    totalNote: divisorNote(unit, L),
+    total: nfQ(t.rentalTotal),
+  });
+  // Mob/demob are ALWAYS shown; each honours its OWN unit count + exclusion (excluded -> "Not included",
+  // matching the price bar, which contributes 0 for an excluded leg).
+  const logiRow = (label: string, excluded: boolean, price: number, unitsN: number, lineTotal: number, byRentee: boolean): QuotationLineItem =>
+    excluded
+      ? { num: null, label, detail: L("Not included", "غير مشمول"), unit: "—", qty: "—", price: "—", total: L("Not included", "غير مشمول") }
+      : price > 0
+        ? { num: null, label, detail: room.supplier.name, unit: L("Trip", "رحلة"), qty: String(unitsN), price: nfQ(price), total: nfQ(lineTotal) }
+        : { num: null, label, detail: byRentee ? L("Arranged by the rentee", "يُرتّبه المستأجر") : L("Included", "مشمول"), unit: "—", qty: "—", price: "—", total: byRentee ? L("By rentee", "على المستأجر") : L("Included", "مشمول") };
+  lineItems.push(logiRow(L("Delivery to site", "النقل إلى الموقع"), t.mobExcluded, t.mobPrice, t.mobUnitsN, t.mobTotal, room.mobByRentee === true));
+  lineItems.push(logiRow(L("Return from site", "الإرجاع من الموقع"), t.demobExcluded, t.demobPrice, t.demobUnitsN, t.demobTotal, room.demobByRentee === true));
+
+  const cards: QuotationCard[] = [];
+  // Structured rental/equipment details (from the request item) — rows with no value are skipped.
+  // Operator/safety + cost responsibilities are NOT separate cards: they flow through the term cards +
+  // the price extras below, matching the app.
+  const dd = room.details;
+  const yn = (b: boolean | null) => (b == null ? null : b ? L("Yes", "نعم") : L("No", "لا"));
+  const fmtDate = (v: string | null) => { if (!v) return null; const dt = new Date(v); return isNaN(dt.getTime()) ? v : dt.toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" }); };
+  const addRow = (rowsArr: { label: string; value: string }[], label: string, v: unknown) => {
+    if (v == null || v === "" || (Array.isArray(v) && !v.length)) return;
+    rowsArr.push({ label, value: Array.isArray(v) ? v.join(", ") : String(v) });
+  };
+  const detailRows: { label: string; value: string }[] = [];
+  addRow(detailRows, L("Equipment", "المعدة"), ar ? dd.equipmentLabelAr ?? dd.equipmentLabel : dd.equipmentLabel);
+  // The four rows below carry backend ENUMS, not prose. Printed raw, an Arabic quotation read
+  // «الأولوية: FAR_FUTURE» — a code on the document the two parties hold each other to. See
+  // `contract/labels.ts`; anything those maps don't know still prints as it arrived.
+  addRow(detailRows, L("Location", "الموقع"), dd.location ? cityLabel(dd.location, L) : null);
+  addRow(detailRows, L("Rental type", "نوع الإيجار"), dd.rentalType ? rentalTypeLabel(dd.rentalType, L) : null);
+  addRow(detailRows, L("Contract type", "نوع العقد"), contractType);
+  addRow(detailRows, L("Start date", "تاريخ البدء"), fmtDate(dd.startDate));
+  addRow(detailRows, L("End date", "تاريخ الانتهاء"), fmtDate(dd.endDate));
+  addRow(detailRows, L("Duration", "المدة"), days != null ? `${days} ${L("days", "يوم")}` : null);
+  // These four rows are the ONLY print of their fact — the matching ACKNOWLEDGE terms
+  // (working_hours / working_days / local_content / crosshire) are dropped from the term cards below.
+  addRow(detailRows, L("Working hours/day", "ساعات العمل/يوم"), dd.workingHoursPerDay);
+  addRow(detailRows, L("Working days/week", "أيام العمل/أسبوع"), dd.workingDaysPerWeek);
+  addRow(detailRows, L("Fulfillment", "التنفيذ"), dd.fulfillment ? fulfillmentLabel(dd.fulfillment, L) : null);
+  addRow(detailRows, L("Urgency", "الأولوية"), dd.urgency ? urgencyLabel(dd.urgency, L) : null);
+  addRow(detailRows, L("Subletting", "التأجير من الباطن"), yn(dd.subletting));
+  addRow(detailRows, L("Local content", "المحتوى المحلي"), yn(dd.localContent));
+  addRow(detailRows, L("Rental extendable", "قابل للتمديد"), yn(dd.extendable));
+  addRow(detailRows, L("Additional notes", "ملاحظات إضافية"), dd.additionalNotes);
+  if (detailRows.length) cards.push({ title: L("Rental & equipment details", "تفاصيل الإيجار والمعدة"), rows: detailRows });
+
+  /**
+   * A term's value for print. The KEY decides the vocabulary — an SLA term's `FOUR_HR` and a
+   * maintenance term's `SUPPLIER` are both bare strings and only the key says which is which.
+   *
+   * Falls through to `valFmt` for everything else, which is most of the catalogue: the free-text and
+   * numeric terms, and the booleans that `valFmt` already reads as Yes/No.
+   */
+  const termFmt = (term: DealTerm): string => {
+    const v = term.value ?? term.platformDefault;
+    return termValueLabel(term.key, v, L) ?? valFmt(v);
+  };
+
+  // Price extras (app parity): overtime rate + cost-responsibility terms ("fuel -> supplier"). Read from
+  // the LIVE room only — the second loop over the snapshot's copy went with the rest of the hybrid.
+  const isCost = (k: string) => COST_TERM_KEYS.has(k);
+  const priceExtras: { label: string; value: string }[] = [];
+  if (dd.overtimeRate) priceExtras.push({ label: L("Overtime rate", "سعر العمل الإضافي"), value: /^\d+(\.\d+)?$/.test(dd.overtimeRate) ? `${dd.overtimeRate}x` : dd.overtimeRate });
+  const seenCost = new Set<string>();
+  for (const term of room.terms) {
+    if (!isCost(term.key) || seenCost.has(term.key)) continue;
+    seenCost.add(term.key);
+    priceExtras.push({ label: ar ? term.labelAr : term.label, value: termFmt(term) });
+  }
+
+  // Term cards, LIVE. The states mirror the rule the backend snapshots by at close
+  // (`agreed | fixed | soft_accepted`), so a closed deal prints the rows it always did — it just reads
+  // them from the room instead of from the frozen copy.
+  const termRows = (pred: (term: DealTerm) => boolean) =>
+    room.terms
+      .filter((term) => pred(term) && !isCost(term.key) && !DETAILS_OWNED_TERM_KEYS.has(term.key))
+      .map((term) => ({ label: ar ? term.labelAr : term.label, value: termFmt(term) }));
+  const agreedRows = termRows((term) => term.state === "agreed" || term.state === "soft_accepted");
+  if (agreedRows.length) cards.push({ title: L("Agreed terms", "الشروط المتفق عليها"), rows: agreedRows });
+
+  /*
+   * ~~A "Fixed terms" card, listing every `state === "fixed"` term.~~ **Removed 2026-08-19 — the app
+   * prints no such section** (`quotation_page.dart` renders `agreedTerms` and nothing else, and the
+   * server's `agreedTerms` drops fixed terms at `quotation.service.ts:893`). Verified against the app
+   * rather than inferred: the only mention of `fixedTerms` on that page is a comment noting its
+   * absence.
+   *
+   * The owner ruled on 2026-08-19 that the app decides, and this is one of the two places the web was
+   * ahead rather than behind. It is recorded here rather than silently dropped, because the reason it
+   * existed is still true: a fixed term IS part of the contract, it was accepted by the act of
+   * bidding, and a quotation that omits it states less than the deal contains. The renter can still
+   * read every fixed term in the room, on the terms step's Acknowledge section.
+   *
+   * Restoring it is these three lines and a matching change on the app — not a web-side decision.
+   */
+
+  return {
+    lang,
+    title: L("Equipment rental quotation", "عرض سعر تأجير معدات"),
+    quotationNumber: qnum,
+    dateStr,
+    supplier: {
+      label: L("Supplier", "المؤجِّر"),
+      name: room.supplier.name,
+      idRows: [
+        { label: L("National Address", "العنوان الوطني"), verified: room.supplier.isVerified },
+        { label: L("CR #", "س.ت"), verified: room.supplier.isVerified },
+        { label: L("VAT #", "ض.ق.م"), verified: room.supplier.isVerified },
+        // Live — the deal-room payload always carries the supplier's phone; the snapshot only backstops.
+        { label: L("Phone", "الهاتف"), value: room.supplier.phone ?? q?.supplierPhone ?? null },
+        // SNAPSHOT-ONLY: nothing on the live room payload carries the supplier's e-mail, so a preview
+        // omits the row rather than inventing one.
+        { label: L("Email", "البريد"), value: q?.supplierEmail ?? null },
+      ],
+      // Verified shows on the CR/VAT rows ("✓ Verified") — no standalone orphan party chip.
+      chips: [],
+    },
+    rentee: {
+      label: L("Rentee", "المُستأجِر"),
+      name: rentee.name,
+      idRows: [
+        { label: L("Phone", "الهاتف"), value: rentee.phone ?? q?.renteePhone ?? null },
+        { label: L("Email", "البريد"), value: rentee.email ?? q?.renteeEmail ?? null },
+      ],
+      chips: [],
+    },
+    logoUrl: opts?.logoUrl,
+    meta: [], // no meta strip (app parity) — reference/contract/period live in the details card
+    priceExtras,
+    lineItems,
+    currency: sar,
+    totals: { subtotal: t.subtotal, vat: t.vat, total: t.grand },
+    cards,
+    showSigned: false,
+    // Short disclaimer instead of the full legal clause list + signed block (app parity).
+    legal: [
+      // A preview says so ON the paper, in the app's own words (`dealViewQuotationDraftHint`). The link
+      // label alone doesn't survive a print-out or a forward.
+      ...(kind === "preview"
+        ? [L("Draft — reflects the current offer, final once the supplier confirms.", "مسودة — تعكس العرض الحالي، وتُعتمد بعد تأكيد المورد.")]
+        : []),
+      L("This quotation is generated electronically via Moedatech, valid for 7 days from the issue date. Prices exclude anything not listed above; VAT at 15% applies per Saudi tax law.", "صدر هذا العرض إلكترونيًا عبر منصة معداتك، وهو ساري المفعول لمدة ٧ أيام من تاريخ الإصدار. الأسعار لا تشمل ما لم يُذكر أعلاه، وتُطبَّق ضريبة القيمة المضافة بنسبة ١٥٪ وفقًا للنظام السعودي."),
+    ],
   };
 }
