@@ -6,8 +6,8 @@ import { type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
 import { STREAM_API_KEY, leaseStream } from "@/lib/chat/stream-connection";
 import { useHeaderBack } from "@/components/AppShell";
-import { fetchBidFleet, fetchBids, fetchRequestDetail, fetchRequestGroup, fetchDealRoom, fetchStreamToken, fetchDealRoomDocuments, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, closeDealRoom, ApiError } from "@/lib/api/client";
-import { computeDealTotals, buildDealRoomQuotationDoc, quotationLinkKind, lastTermMove, type DealRoomView, type DealTerm, type DealRoomDocument, type DealRoomDocuments, type QuotationView } from "@/lib/contract/deal-room";
+import { fetchBidFleet, fetchBids, fetchRequestDetail, fetchRequestGroup, fetchDealRoom, fetchStreamToken, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, closeDealRoom, ApiError } from "@/lib/api/client";
+import { computeDealTotals, buildDealRoomQuotationDoc, quotationLinkKind, lastTermMove, type DealRoomView, type DealTerm, type QuotationView } from "@/lib/contract/deal-room";
 import { reconstructRounds, collapseRounds, latestRoundBy, withOpeningRound, liveRound, roundOverride, chatCardOfMessage, chatCardTime, buildChatCardView, requestRepliesByRef, requestThreadCards, respondedProposalIds, latestProposalId, type DealRound } from "@/lib/contract/deal-rounds";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import { RENTEE_REQUEST_CARD_TYPE, RENTEE_REQUEST_REPLY_CARD_TYPE } from "@/lib/contract/rentee-request";
@@ -24,6 +24,10 @@ import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
 // Extracted so the map's chat dock mounts the SAME sheet rather than growing a second answer to
 // "call the supplier" (owner, 2026-08-19). Its own file carries the reasoning.
 import { CallModal } from "@/components/deal-room/CallModal";
+// Extracted alongside `CallModal` so the map's chat dock can offer the same papers and the same
+// cancellation, with the same six reasons (owner, 2026-08-19). Each file carries its own reasoning.
+import { CancelReasonsModal } from "@/components/deal-room/CancelReasonsModal";
+import { DocumentsModal } from "@/components/deal-room/DocumentsModal";
 import {
   CHAT_ACCEPT,
   CHAT_MAX_MEDIA,
@@ -1381,170 +1385,6 @@ export function DealRoom({ id, onTitle, initialFlow }: {
   );
 }
 
-/** Call-supplier modal: shows the number, dials it (tel:) on a touch device, and copies it anywhere. */
-/**
- * Documents sheet — mirrors the app's deal-room documents sheet. The backend returns the OTHER
- * party's documents only (for the renter: the supplier's company + equipment docs). Each doc opens
- * its backend-presigned URL (pdf/image) in a new tab.
- */
-function DocumentsModal({ id, ar, L, supplierName, onClose }: { id: string; ar: boolean; L: (en: string, arr: string) => string; supplierName: string; onClose: () => void }) {
-  const [docs, setDocs] = useState<DealRoomDocuments | null>(null);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    fetchDealRoomDocuments(id)
-      .then((d) => active && setDocs(d))
-      .catch(() => active && setError(true));
-    return () => {
-      active = false;
-    };
-  }, [id]);
-
-  const total = (docs?.companyDocuments.length ?? 0) + (docs?.equipmentDocuments.length ?? 0);
-
-  const Row = ({ d }: { d: DealRoomDocument }) => (
-    <a href={d.url} target="_blank" rel="noopener noreferrer" className="dl-docrow">
-      <span className="material-icons-outlined ft" style={{ color: d.fileType === "image" ? "var(--rentee)" : "var(--danger)" }}>
-        {d.fileType === "image" ? "image" : "picture_as_pdf"}
-      </span>
-      <span className="nm">{ar && d.labelAr ? d.labelAr : d.label}</span>
-      <span className="material-icons-outlined go">open_in_new</span>
-    </a>
-  );
-
-  const Section = ({ title, items }: { title: string; items: DealRoomDocument[] }) =>
-    items.length === 0 ? null : (
-      <div className="dl-docsec">
-        <div className="dl-docsec-h">{title}</div>
-        {items.map((d) => <Row key={d.type} d={d} />)}
-      </div>
-    );
-
-  return (
-    <div className="dl-modal" dir={ar ? "rtl" : "ltr"} onClick={onClose}>
-      <div className="dl-modal-card" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
-        <div className="dl-modal-head">
-          <span className="dl-modal-ic"><span className="material-icons-outlined">folder</span></span>
-          <div className="dl-modal-tt"><div className="dl-modal-title">{fmtDocsTitle(L, supplierName)}</div></div>
-          <button className="dl-modal-x" onClick={onClose} aria-label={L("Close", "إغلاق")}><span className="material-icons-outlined">close</span></button>
-        </div>
-        <div className="dl-modal-body">
-          {error ? (
-            <p className="dl-modal-note">{L("Couldn’t load documents.", "تعذّر تحميل المستندات.")}</p>
-          ) : !docs ? (
-            <div style={{ display: "grid", placeItems: "center", padding: "24px 0" }}><span className="material-icons-outlined" style={{ fontSize: 24, color: "var(--muted)" }}>progress_activity</span></div>
-          ) : total === 0 ? (
-            <p className="dl-modal-note">{L("No documents shared yet.", "لا توجد مستندات بعد.")}</p>
-          ) : (
-            <>
-              <Section title={L("Company", "مستندات الشركة")} items={docs.companyDocuments} />
-              <Section title={L("Equipment", "مستندات المعدة")} items={docs.equipmentDocuments} />
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * The renter's five canned cancellation reasons, plus "Other".
- *
- * Verbatim from the app's `cancelReason1..5` + `cancelReasonOther` — the same six a renter is offered
- * on the phone, so a deal cancelled from either surface reads the same way in the supplier's inbox
- * and in whatever reporting counts them. The SUPPLIER's list (`supplierCancelReason1..5`) is a
- * different five; the web room is the renter's, so it is not carried here.
- *
- * The submitted value is the reason's own TEXT, not an index — that is what the backend stores.
- */
-const CANCEL_REASONS: ReadonlyArray<{ en: string; ar: string }> = [
-  { en: "Found a better offer", ar: "وجدت عرضاً أفضل" },
-  { en: "Price is not suitable", ar: "السعر غير مناسب" },
-  { en: "Equipment does not match", ar: "المعدات غير مطابقة" },
-  { en: "Delayed response", ar: "تأخر في الرد" },
-  { en: "Emergency circumstances", ar: "ظروف طارئة" },
-  { en: "Other reason", ar: "سبب آخر" },
-];
-
-/**
- * Cancel-the-deal reasons modal — app parity (`showCancelReasonsModal`).
- *
- * Six radio rows; the last one ("Other reason") opens a free-text box and is the only row that can
- * hold the renter back — an empty "Other" submits nothing useful, so Confirm stays disabled until
- * he writes something. Every other row is submittable the moment it is picked.
- */
-function CancelReasonsModal({ ar, L, busy, error, onSubmit, onClose }: {
-  ar: boolean;
-  L: (en: string, arr: string) => string;
-  busy: boolean;
-  error: string | null;
-  onSubmit: (reason: string) => void;
-  onClose: () => void;
-}) {
-  const [picked, setPicked] = useState<number | null>(null);
-  const [other, setOther] = useState("");
-  const isOther = picked === CANCEL_REASONS.length - 1;
-  const reason = picked === null ? "" : isOther ? other.trim() : L(CANCEL_REASONS[picked].en, CANCEL_REASONS[picked].ar);
-  const canSubmit = !busy && reason.length > 0;
-
-  return (
-    <div dir={ar ? "rtl" : "ltr"} onClick={busy ? undefined : onClose} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(16,38,63,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, maxHeight: "90vh", overflowY: "auto", background: "#fff", borderRadius: 20, boxShadow: "0 24px 60px rgba(16,38,63,.35)", padding: "26px 22px 22px", textAlign: "center" }}>
-        <span style={{ display: "inline-flex", width: 44, height: 44, borderRadius: "50%", background: "var(--danger-bg, #fdeceb)", color: "var(--danger, #d9362a)", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
-          <span className="material-icons-outlined" style={{ fontSize: 22 }}>cancel</span>
-        </span>
-        <h3 style={{ fontSize: 16, fontWeight: 900, color: "#1c3550", margin: "0 0 14px" }}>{L("Cancellation Reason", "سبب الإلغاء")}</h3>
-
-        <div style={{ display: "grid", gap: 8, textAlign: ar ? "right" : "left" }}>
-          {CANCEL_REASONS.map((r, i) => {
-            const on = picked === i;
-            return (
-              <button
-                key={r.en}
-                type="button"
-                role="radio"
-                aria-checked={on}
-                disabled={busy}
-                onClick={() => setPicked(i)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "inherit",
-                  padding: "12px 12px", borderRadius: 12, cursor: busy ? "default" : "pointer",
-                  background: on ? "rgba(217,54,42,.06)" : "#f4f7fa",
-                  border: `${on ? 1.5 : 1}px solid ${on ? "rgba(217,54,42,.4)" : "rgba(203,216,227,.5)"}`,
-                }}
-              >
-                <span style={{ width: 20, height: 20, borderRadius: "50%", flex: "0 0 auto", border: `${on ? 6 : 2}px solid ${on ? "var(--danger, #d9362a)" : "#6b8fa8"}` }} />
-                <span style={{ fontSize: 13, fontWeight: on ? 700 : 600, color: "#1c3550" }}>{L(r.en, r.ar)}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {isOther && (
-          <textarea
-            rows={3}
-            value={other}
-            disabled={busy}
-            onChange={(e) => setOther(e.target.value)}
-            placeholder={L("Write the reason...", "اكتب السبب...")}
-            style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: 12, background: "#f4f7fa", border: "1px solid rgba(203,216,227,.5)", fontSize: 14, color: "#1c3550", resize: "vertical" }}
-          />
-        )}
-
-        {error && <p className="dl-err" style={{ marginTop: 12 }}>{error}</p>}
-
-        <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-          <button type="button" className="dl-mbtn" style={{ flex: 1 }} disabled={busy} onClick={onClose}>{L("Back", "رجوع")}</button>
-          <button type="button" className="dl-mbtn danger" style={{ flex: 1 }} disabled={!canSubmit} onClick={() => onSubmit(reason)}>
-            {busy ? L("Cancelling…", "جارٍ الإلغاء…") : L("Confirm Cancellation", "تأكيد الإلغاء")}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /**
  * Request-summary modal — app parity (`showRequestSummarySheet`). A statement of what this room is
  * about, in the app's four sections: equipment, location, duration, preferences.
@@ -1664,12 +1504,6 @@ function RequestSummaryModal({ room, ar, L, onClose }: {
       </div>
     </div>
   );
-}
-
-/** "Supplier's documents" titled with the supplier name, matching the app's docsSheetTitle. */
-function fmtDocsTitle(L: (en: string, arr: string) => string, supplierName: string): string {
-  const name = supplierName || L("the supplier", "المؤجّر");
-  return L(`${name}’s documents`, `مستندات ${name}`);
 }
 
 /**

@@ -20,6 +20,10 @@ import { dealSystemEventKind, dealSystemEventIcon, SYSTEM_EVENT_ICON } from "@/l
  */
 
 const ROOM = readFileSync(resolve(process.cwd(), "src/components/deal-room/DealRoom.tsx"), "utf8");
+/* The reasons and the sheet that collects them moved out of `DealRoom.tsx` on 2026-08-19, so the map's
+   chat dock could offer the SAME cancellation from its kebab rather than growing a second one. The
+   rules below are unchanged — only the file that holds them is. */
+const CANCEL_MODAL = readFileSync(resolve(process.cwd(), "src/components/deal-room/CancelReasonsModal.tsx"), "utf8");
 const CSS = readFileSync(resolve(process.cwd(), "src/components/deal-room/deal-room-proto.css"), "utf8");
 
 vi.mock("@/lib/api/app-backend-authed", () => ({
@@ -73,7 +77,7 @@ describe("the cancel entry in the room's ⋮ kebab", () => {
   it("offers the renter the app's six reasons, with the free-text one LAST", () => {
     // The free-text box is keyed by position (`picked === CANCEL_REASONS.length - 1`), so a reason
     // appended after "Other reason" would silently take the textarea with it.
-    const list = ROOM.slice(ROOM.indexOf("const CANCEL_REASONS"));
+    const list = CANCEL_MODAL.slice(CANCEL_MODAL.indexOf("const CANCEL_REASONS"));
     const reasons = [...list.slice(0, list.indexOf("];")).matchAll(/\{ en: "([^"]+)"/g)].map((m) => m[1]);
     expect(reasons).toEqual([
       "Found a better offer",

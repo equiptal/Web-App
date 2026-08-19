@@ -2580,3 +2580,118 @@
 }
 .bidmap .bm-eqmore .material-icons-outlined { font-size: 17px; color: #6b8fa8; }
 .bidmap .bm-eqmore.on { background: #eff4f9; }
+
+/* ══════════ V12b · what the dock's header gained from the room (owner, 2026-08-19) ══════════
+   *"did we miss anything — do the header icons all exist in both chats?"* Three of them did not.
+   Every value below is `deal-room-proto.css`'s own, restated at this surface's scale: the room's
+   header is a full-width bar on a page, the dock's is a 64px band in a drawer, so the pill and the
+   round control lose a size while keeping their shape, their ink and their meaning. */
+
+/* The deal's phase, in the room's five words. `--info` and its `#cfe6f7` keyline are `.tb-phase`'s;
+   a CLOSED room goes green and an ABANDONED one grey, because a finished deal and a dead one are not
+   the same fact and the pill is the only place either is stated here. */
+.bidmap .bm-chat-phase {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #cfe6f7;
+  color: #2563eb;
+  font-size: 10.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.bidmap .bm-chat-phase .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.bidmap .bm-chat-phase.is-done { color: #16a34a; border-color: rgba(22, 163, 74, 0.32); }
+.bidmap .bm-chat-phase.is-off { color: #6b8fa8; border-color: #dbe6ef; }
+
+/* The ⋮ — the same 30px round control the close button is, because they sit on one row and a kebab
+   that outweighed the close would read as the louder act. */
+.bidmap .bm-chat-more {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  background: #fff;
+  border: 1.5px solid #c8d8e8;
+  color: #6b8fa8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.bidmap .bm-chat-more .material-icons-outlined { font-size: 17px; }
+
+/* The dropdown. `.dr-menu`'s geometry, anchored to `.bm-chat` — which is already positioned, so this
+   needs no new containing block. A sibling of the header rather than a child, for the reason the room
+   records: a 64px row with its own overflow is a row a dropdown cannot escape. */
+.bidmap .bm-chat-menu-scrim { position: fixed; inset: 0; z-index: 60; }
+.bidmap .bm-chat-menu {
+  position: absolute;
+  z-index: 61;
+  top: 58px;
+  inset-inline-end: 10px;
+  min-width: 200px;
+  background: #fff;
+  border: 1px solid #e1e9f1;
+  border-radius: 14px;
+  box-shadow: 0 18px 44px rgba(16, 38, 63, 0.22);
+  padding: 6px;
+  display: grid;
+  gap: 2px;
+}
+.bidmap .bm-chat-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: start;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #16304f;
+  background: none;
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 11px;
+  cursor: pointer;
+}
+.bidmap .bm-chat-menu button:hover { background: #f2f6fa; }
+.bidmap .bm-chat-menu button .material-icons-outlined { font-size: 18px; color: #6b8fa8; }
+.bidmap .bm-chat-menu button.danger,
+.bidmap .bm-chat-menu button.danger .material-icons-outlined { color: #d9362a; }
+.bidmap .bm-chat-menu button.danger:hover { background: rgba(217, 54, 42, 0.07); }
+
+/* What the conversation is ABOUT — the room's `assignment` chip as a quiet strip under the identity
+   band. It STATES and does not navigate (see the component), so it carries no chevron and no hover:
+   a strip that looked pressable and was not is worse than one that plainly is not. */
+.bidmap .bm-chat-req {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-bottom: 1px solid #eff4f9;
+  background: #fff;
+  min-width: 0;
+}
+.bidmap .bm-chat-req .material-icons-outlined { flex-shrink: 0; font-size: 16px; color: #6b8fa8; }
+.bidmap .bm-chat-req-t {
+  min-width: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #16304f;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The short code is the thing a renter with three conversations open actually scans for. */
+.bidmap .bm-chat-req-code { flex-shrink: 0; font-family: ui-monospace, monospace; font-size: 10.5px; font-weight: 700; color: #6b8fa8; }
+.bidmap .bm-chat-req-s { flex-shrink: 0; margin-inline-start: auto; font-size: 10.5px; font-weight: 700; color: #6b8fa8; white-space: nowrap; }

@@ -46,11 +46,13 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Channel } from "stream-chat";
 import { CallModal } from "@/components/deal-room/CallModal";
+import { CancelReasonsModal } from "@/components/deal-room/CancelReasonsModal";
+import { DocumentsModal } from "@/components/deal-room/DocumentsModal";
 import { ChatCard } from "@/components/deal-room/ChatCard";
 import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
 import { RequestCard } from "@/components/map/RequestCard";
 import { fleetMachineResolver } from "@/components/map/request-card-ctx";
-import { fetchReceivedBids, fetchStreamToken } from "@/lib/api/client";
+import { closeDealRoom, fetchReceivedBids, fetchStreamToken } from "@/lib/api/client";
 import {
   CHAT_ACCEPT,
   CHAT_MAX_MEDIA,
@@ -237,6 +239,12 @@ export function ChatDock({
    *  call. The room's own test, so the sheet offers the same buttons on both surfaces. */
   const [canCall, setCanCall] = useState(false);
   useEffect(() => { setCanCall(typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true); }, []);
+  /** The ⋮ menu and the two sheets it reaches — the room's own components (owner, 2026-08-19). */
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showDocs, setShowDocs] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelErr, setCancelErr] = useState<string | null>(null);
   const [rows, setRows] = useState<InboxBid[]>([]);
   const [activeBidId, setActiveBidId] = useState(bid.id);
   /** Rooms this dock created by sending, before the feed has caught up with them. */
@@ -312,6 +320,34 @@ export function ChatDock({
 
   const active = tabs.find((tb) => tb.bidId === activeBidId) ?? tabs[0] ?? null;
   const unreadTotal = dockUnreadTotal(tabs);
+
+  /**
+   * The FEED ROW behind the active tab — the deal room's own facts, which this dock was already
+   * fetching and throwing away (owner, 2026-08-19).
+   *
+   * `dockTabs` reduces a row to what the tab strip needs (a label, an unread count, a room id), so the
+   * header had nothing to say about the DEAL: no phase, no request, no route to the papers. All three
+   * are on `InboxBid` and have been all along — `dealRoomStatus` in the very same vocabulary
+   * `DealRoomView` uses, and `request` carrying the short code, the equipment summary and the site.
+   *
+   * Null while the first poll is in flight, and for a sibling tab the feed's first page did not
+   * contain. Every control below renders only on what it actually has.
+   */
+  const activeRow = useMemo(
+    () => rows.find((r) => r.bidId === (active?.bidId ?? bid.id)) ?? null,
+    [rows, active, bid.id],
+  );
+  /** The room's phase, in the room's words. Absent until a room exists — which is the moment anything
+   *  is sent (004a §4.5), so a conversation the renter can read always has one. */
+  const phase = activeRow?.dealRoomStatus ?? null;
+  const phaseClosed = phase === "CLOSED";
+  const phaseAbandoned = phase === "ABANDONED";
+  const phaseLabel =
+    phase === "CLOSED" ? L("Closed", "مغلق")
+    : phase === "ABANDONED" ? L("Cancelled", "ملغاة")
+    : phase === "AWAITING_SUPPLIER_CONFIRMATION" ? L("Awaiting confirmation", "بانتظار التأكيد")
+    : phase ? L("Negotiating", "قيد التفاوض")
+    : null;
 
   /* ── the connection (Stream) ─────────────────────────────────────────────────────────────────── */
 
@@ -598,6 +634,32 @@ export function ChatDock({
    * Answers whether the post LANDED, because each caller clears something different afterwards (the
    * typed line, the caption, nothing at all) and none of them may clear it on a failure.
    */
+  /**
+   * Cancel the negotiation — the room's own act, reached from the dock's kebab (owner, 2026-08-19).
+   *
+   * The WRITE is `closeDealRoom`, the same one `/deal-room/[id]` calls; `CancelReasonsModal` only
+   * collects the reason, so there is still exactly one place that flips a room to ABANDONED and the
+   * supplier reads the same six words whichever surface the renter cancelled from.
+   *
+   * Afterwards this refreshes the FEED rather than a room record, because the feed is what this dock
+   * holds — `dealRoomStatus` comes back ABANDONED and the phase pill and the kebab's own gate follow
+   * from it without a second source of truth.
+   */
+  async function cancelDeal(roomId: string, reasonText: string) {
+    if (cancelling) return;
+    setCancelErr(null);
+    setCancelling(true);
+    try {
+      await closeDealRoom(roomId, reasonText);
+      setCancelOpen(false);
+      refresh();
+    } catch {
+      setCancelErr(L("Couldn't cancel the deal. Please try again.", "تعذّر إلغاء الصفقة. حاول مرة أخرى."));
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   async function deliver(post: (channel: Channel) => Promise<void>): Promise<boolean> {
     if (!active || busy) return false;
     setBusy(true);
@@ -798,6 +860,20 @@ export function ChatDock({
                 renter the number he was reaching for. The room's sheet prints the number, dials it
                 where dialling is possible and copies it where it is not — and it is now one component
                 (`CallModal`), so the two surfaces cannot drift again. */}
+            {/* ── The deal's PHASE, in the room's own words (owner, 2026-08-19) ────────────────────
+                The dock showed no deal state at all, so a renter could type into a room that had been
+                closed or cancelled and read nothing that said so. `dealRoomStatus` rides the feed row
+                this dock already fetches and uses the same five values `DealRoomView` does, so this is
+                the room's pill rather than a second vocabulary invented for the map.
+
+                Absent until a room exists — which is the moment anything is sent — so a compose-only
+                tab claims no phase instead of guessing at one. */}
+            {phaseLabel && (
+              <span className={`bm-chat-phase${phaseClosed ? " is-done" : phaseAbandoned ? " is-off" : ""}`}>
+                <span className="dot" aria-hidden="true" />
+                {phaseLabel}
+              </span>
+            )}
             {bid.supplierPhone ? (
               <button
                 type="button"
@@ -812,6 +888,31 @@ export function ChatDock({
               <span className="bm-chat-call is-locked" title={t.chatDock.callUnavailable}>
                 <span className="material-icons-outlined">call</span>
               </span>
+            )}
+            {/* ── The ⋮ kebab, the room's own (owner, 2026-08-19) ──────────────────────────────────
+                TWO entries, not the room's three. «Inspect the equipment» is the third there and does
+                not survive the move: it routes to `/bids/{id}/equipment`, which is the very surface
+                this dock is open on top of, so it would be a control that goes nowhere.
+
+                Both entries need a ROOM, and both are hidden without one. That is not the rare case
+                the map worried about: a room is created by the first thing sent — a message, an
+                availability ask, a counter (004a §4.5) — so any conversation with something in it has
+                one. A bid nobody has written to has nothing to cancel and no papers filed against it.
+
+                Cancel is further gated on the phase: a CLOSED or ABANDONED room has nothing left to
+                cancel, which is the room's own `!closed && !abandoned`. */}
+            {activeRoomId && (
+              <button
+                type="button"
+                className="bm-chat-more"
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                onClick={() => setMenuOpen((o) => !o)}
+                aria-label={L("More", "المزيد")}
+                title={L("More", "المزيد")}
+              >
+                <span className="material-icons-outlined">more_vert</span>
+              </button>
             )}
             {/* ONE control decides the placement (prototype 1590). Not a resize handle — there are two
                 placements, not a continuum, and each is a whole layout rather than a width. */}
@@ -830,6 +931,46 @@ export function ChatDock({
               <span className="material-icons-outlined">close</span>
             </button>
           </header>
+
+          {/* The kebab's menu, a sibling of the header rather than a child — the header is a fixed 64px
+              row with `overflow` of its own, and a dropdown inside it is a dropdown nobody can see.
+              Same reasoning the deal room records for `.dr-menu`. */}
+          {menuOpen && activeRoomId && (
+            <>
+              <div className="bm-chat-menu-scrim" onClick={() => setMenuOpen(false)} />
+              <div className="bm-chat-menu" role="menu">
+                <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setShowDocs(true); }}>
+                  <span className="material-icons-outlined">business_center</span>
+                  {L("Company details", "بيانات الشركة")}
+                </button>
+                {!phaseClosed && !phaseAbandoned && (
+                  <button type="button" role="menuitem" className="danger" onClick={() => { setMenuOpen(false); setCancelOpen(true); }}>
+                    <span className="material-icons-outlined">cancel</span>
+                    {L("Cancel the deal", "إلغاء الصفقة")}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* ── What this conversation is ABOUT (owner, 2026-08-19) ──────────────────────────────
+              The room's `assignment` chip, on the feed row's own `request`. A renter with several
+              conversations open needs to know which request each one settles, and the dock said only
+              who he was talking to.
+
+              A BUTTON in the room, because there it opens the request sheet. Here it is a plain strip:
+              the sheet takes a `DealRoomView` this dock does not fetch, and the panel behind this
+              drawer is already the request's own surface. It states; it does not navigate. */}
+          {activeRow?.request && (activeRow.request.shortCode || activeRow.request.equipmentSummary) && (
+            <div className="bm-chat-req">
+              <span className="material-icons-outlined">assignment</span>
+              <span className="bm-chat-req-t">
+                {activeRow.request.shortCode && <span className="bm-chat-req-code">{activeRow.request.shortCode}</span>}
+                {activeRow.request.equipmentSummary ?? activeRow.equipmentType.name ?? ""}
+              </span>
+              {activeRow.request.location && <span className="bm-chat-req-s">{activeRow.request.location}</span>}
+            </div>
+          )}
 
           {/* A tab per item — and NO strip at all when this counterparty holds one bid (RM3-AC-44). */}
           {tabs.length > 1 && (
@@ -1121,6 +1262,31 @@ export function ChatDock({
           name={bid.supplierName}
           canCall={canCall}
           onClose={() => setCallOpen(false)}
+        />
+      )}
+
+      {/* The room's own sheets, mounted here rather than reimplemented — both are addressed by the
+          ACTIVE tab's room, so a renter reading a sibling conversation gets that supplier's papers and
+          cancels that deal, not the anchor's. */}
+      {showDocs && activeRoomId && (
+        <DocumentsModal
+          id={activeRoomId}
+          ar={ar}
+          L={L}
+          // The feed row's name when we have it — the dock groups tabs by counterparty, so a sibling
+          // tab is the same firm, but the row is the one that actually names him.
+          supplierName={activeRow?.supplierName ?? bid.supplierName}
+          onClose={() => setShowDocs(false)}
+        />
+      )}
+      {cancelOpen && activeRoomId && (
+        <CancelReasonsModal
+          ar={ar}
+          L={L}
+          busy={cancelling}
+          error={cancelErr}
+          onSubmit={(reason) => void cancelDeal(activeRoomId, reason)}
+          onClose={() => { setCancelOpen(false); setCancelErr(null); }}
         />
       )}
     </>
