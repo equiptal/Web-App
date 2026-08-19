@@ -899,8 +899,23 @@ export const en = {
     offPlatformNotHere: "This offer came in through your shared link",
     offPlatformNotHereWhy: "It carries items, not registered equipment — so there is nothing here to place or verify. Open it from your bids to read the submission and reply.",
     // V2 — panel header. Identity only: no contact details, no deals count, no IBAN, CR or VAT.
-    verifiedCompany: "Verified company",
-    companyDocuments: "Company documents",
+    //
+    // ── Both were SHORTENED because they were eating the supplier's name (owner, 2026-08-19) ──────
+    // The panel is 392px. «Verified company» and «Company documents» took 118px and 148px of it, and
+    // with the gutters and gaps that left about 73px for the name — so every real supplier rendered
+    // as «Al-Faisal …» and the header identified nobody. The Arabic pair is «شركة موثّقة» /
+    // «مستندات الشركة», roughly half the width, which is why the prototype's header fits and ours
+    // did not: the long wording is the web's own, not the app's, and it is the part that gives way.
+    //
+    // Neither word is lost. This header shows one company and its name is the line above; «Verified»
+    // there can only mean the company, and «Documents ›» can only be its papers — the machine's own
+    // papers live behind «Details ›» on each card and are never reached from here. The full phrases
+    // survive where there is room for them: the company panel's own heading still reads «Company
+    // documents», and the chip carries «Verified company on the platform» on its title.
+    verifiedCompany: "Verified",
+    /** The chip's full sentence, on its `title` — the prototype puts it there too. */
+    verifiedCompanyWhy: "Verified company on the platform",
+    companyDocuments: "Documents",
     // V3 — the count pills. `type` is the REQUEST's own equipment type, and it agrees with the count.
     // "With the supplier" means machines that FIT this request, never his whole yard.
     // «registered», not the prototype's «لدى المورد» / "with the supplier" (owner, 2026-08-10). The

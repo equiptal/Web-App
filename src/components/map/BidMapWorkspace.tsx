@@ -878,8 +878,11 @@ export function BidMapWorkspace({
                 <div className="bm-head-row">
                   <span className="bm-head-name">
                     <span className="bm-title" title={bid.supplierName}>{bid.supplierName}</span>
+                    {/* The chip's label is short so the supplier's NAME survives the 392px row
+                        (`en.ts`, owner 2026-08-19); the full sentence rides on `title`, where the
+                        width costs nothing. The prototype's chip carries the same phrase there. */}
                     {bid.verified && (
-                      <span className="bm-verified">
+                      <span className="bm-verified" title={t.bidMap.verifiedCompanyWhy}>
                         {/* A bare CHECK, drawn at 11px in the chip's own ink — `rVerifiedChip`
                             (prototype 4056). It was Material's `verified` badge, a filled rosette
                             whose scallops carry their own meaning at 13px and read as a second mark

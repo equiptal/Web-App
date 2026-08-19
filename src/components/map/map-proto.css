@@ -747,13 +747,27 @@
   .bidmap .bm-head-id::after { animation: none; opacity: 0; }
 }
 .bidmap .bm-head-row { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
-/* The name and its tick travel together and take the slack; the documents pill keeps its width. */
-.bidmap .bm-head-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; }
+/* The name and its tick travel together and take the slack; the documents pill keeps its width.
+
+   **The pair WRAPS** (owner, 2026-08-19). It was one nowrap line, so the only thing that could give
+   when the row ran out of width was the name — and the name is the entire point of the header. A
+   supplier rendered as «Al-Faisal …» is a header that identifies nobody.
+
+   Wrapping puts the chip on a second line instead, which the 64px band has room for (a 19px name over
+   an 18px chip), and hands the first line's full width to the name. Shortening the two English labels
+   above it means this almost never fires — it is the escape hatch for a genuinely long name, not the
+   normal state. `row-gap` is tight so the two lines read as one block rather than as two rows. */
+.bidmap .bm-head-name { flex: 1; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 2px 7px; }
 .bidmap .bm-title {
   font-size: 16px;
   font-weight: 800;
   color: #16304f;
-  min-width: 0;
+  /* A FLOOR, not `min-width: 0` (owner, 2026-08-19). Zero is what let the name absorb every pixel the
+     chip and the documents pill wanted: `white-space: nowrap` with `overflow: hidden` gives an element
+     a min-content width of nothing, so flexbox shrank the name to «Al-Faisal …» rather than wrapping
+     the chip that `.bm-head-name` is now willing to wrap. Twelve characters is the point below which a
+     supplier stops being identifiable; past it the chip drops to the second line instead. */
+  min-width: 12ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
