@@ -1918,6 +1918,8 @@
    "…and now restate every colour for the dark slab" block further down the file to keep in sync. */
 .bidmap .bm-foot {
   flex-shrink: 0;
+  /* The anchor for the breakdown popover, which opens on this edge and grows upward. */
+  position: relative;
 
   /* ── It is the floor of the column, and it stays there (owner, 2026-08-19) ────────────────────
      *"the price footer must be fixed not scrollable at the end."*
@@ -1968,7 +1970,79 @@
 .bidmap .bm-foot-unit { font-size: 12px; font-weight: 700; color: rgba(255, 255, 255, 0.62); }
 /* The SOURCE of the figure, never the state of the conversation. Its own line now — «عرض التفاصيل»
    was the only other thing on the row it used to share, so `.bm-foot-meta` went with that control. */
-.bidmap .bm-foot-src { margin-top: 3px; font-size: 11px; font-weight: 600; color: rgba(255, 255, 255, 0.62); line-height: 1.6; }
+/* The source line and the way into the arithmetic, on one line under the rate. */
+.bidmap .bm-foot-meta { display: flex; align-items: baseline; gap: 8px; margin-top: 3px; flex-wrap: wrap; }
+.bidmap .bm-foot-src { font-size: 11px; font-weight: 600; color: rgba(255, 255, 255, 0.62); line-height: 1.6; }
+/* A text LINK naming the state it moves to («إخفاء التفاصيل»), not a button with a chevron: it sits
+   inches from two real acts and must not carry a control's weight beside them. */
+.bidmap .bm-foot-det {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.88);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* ── The breakdown, as a POPOVER above the slab (owner, 2026-08-19) ──────────────────────────────
+   It expanded the footer itself until this morning, which is why the bar carried a `max-height` cap,
+   an inner scroller and `overscroll-behavior` — all of it there to stop the rate being pushed off
+   screen by its own explanation. Opening OVER the list instead means the 76px floor never moves and
+   none of that comes back: the popover takes its own height, scrolls inside itself if a very short
+   panel demands it, and the bar below is untouched.
+
+   Anchored to `.bm-panel`, which is the positioned ancestor (the same one `.bm-eqfp` and `.mp-over`
+   use), so it spans the column rather than the footer's inner width. */
+/* FIXED, not absolute: the popover is anchored to the footer, so a scrim scoped to the footer would
+   cover only the bar it opened from and leave the list behind it pressable. */
+.bidmap .bm-foot-scrim { position: fixed; inset: 0; z-index: 40; }
+.bidmap .bm-foot-break {
+  position: absolute;
+  z-index: 41;
+  inset-inline: 10px;
+  /* Sits on the footer's own top edge and grows upward. */
+  bottom: calc(100% - 6px);
+  max-height: 62vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #12263a;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 18px 44px rgba(9, 20, 34, 0.45);
+}
+/* «لكل وحدة» — the heading that makes the block under it readable on a multi-unit offer, and which a
+   single-unit offer never draws because there would be nothing to distinguish it from. */
+.bidmap .bm-foot-bhead { font-size: 10px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(255, 255, 255, 0.5); padding-bottom: 4px; }
+.bidmap .bm-foot-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 3.5px 0; }
+.bidmap .bm-foot-k { font-size: 11.5px; font-weight: 700; color: #fff; min-width: 0; }
+/* The basis rides inside the label — beside the thing it is the basis of, as the bid card keeps it. */
+.bidmap .bm-foot-sub { margin-inline-start: 7px; font-size: 9.5px; font-weight: 600; color: rgba(255, 255, 255, 0.45); }
+.bidmap .bm-foot-v {
+  flex-shrink: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.94);
+  font-family: ui-monospace, "IBM Plex Sans", monospace;
+  white-space: nowrap;
+}
+/* «ر.س» rides with every figure — quieter than the digits, because the reader is comparing amounts
+   and the currency is the same on all of them. */
+.bidmap .bm-foot-cur { margin-inline-start: 4px; font-size: 9.5px; font-weight: 700; color: rgba(255, 255, 255, 0.5); }
+.bidmap .bm-foot-row.is-total { margin-top: 5px; padding-top: 9px; border-top: 1px solid rgba(255, 255, 255, 0.14); }
+.bidmap .bm-foot-row.is-total .bm-foot-k { font-size: 12.5px; font-weight: 800; }
+.bidmap .bm-foot-row.is-total .bm-foot-v { font-size: 16px; font-weight: 800; }
+/* The overall row is the one the renter actually pays, so it outweighs the per-unit total above it —
+   a heavier rule, and the count under its label because that is WHY the two are not a multiplication. */
+.bidmap .bm-foot-row.is-overall { border-top-width: 2px; margin-top: 8px; padding-top: 11px; }
+.bidmap .bm-foot-row.is-overall .bm-foot-sub { display: block; margin: 2px 0 0; }
+.bidmap .bm-foot-row.is-muted .bm-foot-v { color: rgba(255, 255, 255, 0.55); font-weight: 600; }
+.bidmap .bm-foot-note { margin-top: 7px; font-size: 9.5px; font-weight: 600; color: rgba(255, 255, 255, 0.5); line-height: 1.7; }
 /* «اطلب سعراً أقل» — the WHITE button, and the loudest thing on the slab. The renter reached this
    footer to argue about a price; the app makes countering the obvious act and approving the quiet
    one, and inverting that here would be this surface disagreeing with the app about what a bid is

@@ -9,7 +9,6 @@ import { computeBidQuote } from "@/lib/contract/comparison";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { qualityFromSubmission, type BidQuality } from "@/lib/contract/bid-quality";
 import { BidEquipmentModal } from "@/components/requests/BidEquipmentModal";
-import { CredentialPills } from "@/components/requests/CredentialPills";
 import { TermsPanel } from "@/components/requests/TermsPanel";
 import { DealRoomBanner, SupplierDocs, EquipmentDocs } from "@/components/requests/BidCardExtras";
 import { QuotationVerifyGate } from "@/components/requests/QuotationVerifyGate";
@@ -417,7 +416,18 @@ export function RequestBids({
                     <span className="credpill cp-miss"><span className="material-icons-outlined">remove</span>{L("Not verified", "غير موثّق")}</span>
                   )}
                   {b.rating != null && <span className="credpill cp-ok"><span className="material-icons-outlined">star</span>{b.rating.toFixed(1)}</span>}
-                  <CredentialPills required={b.requiredCerts} held={b.heldCertCodes} ar={ar} />
+                  {/* ── The certificate pills are GONE from this card (owner, 2026-08-19) ──────────
+                      *"no need to mention aramco certified on the bid card, all these details are in
+                      the equipment details."*
+
+                      They were `requiredCerts` matched against `heldCertCodes` — a fact about the
+                      SUPPLIER's file, printed on a card the renter reads as being about an offer of
+                      machines. The certificate that decides anything is the one the MACHINE carries,
+                      and that is stated where it is true: on the equipment list's fourth row and on
+                      each machine's own detail panel, both read against the request.
+
+                      Verified and the rating stay. They are facts about the counterparty, which is
+                      what the rest of this row is. */}
                 </div>
                 {/* Company documents on file (Level 1) — CR / VAT / National address + LC / SASO registration */}
                 <SupplierDocs compliance={b.compliance} companyCerts={b.companyCertCodes ?? []} ar={ar} />

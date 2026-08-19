@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
 import { fetchBids, fetchRequestSubmissions, startDealRoom } from "@/lib/api/client";
-import { CredentialPills } from "@/components/requests/CredentialPills";
 import { BidCardChecks } from "@/components/requests/BidCardChecks";
 import { equipmentCheckOf, termsCheck } from "@/lib/contract/bid-card-checks";
 import { bidCounterDelta, ctaShowsCounterDelta } from "@/lib/contract/bid-counter-delta";
@@ -822,12 +821,13 @@ export function GroupBids({ group, initialItemId }: { group: RequestGroup; initi
                   <span style={{ width: 22, height: 22, borderRadius: "50%", background: "#1c3550", color: "#fff", fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{(b.supplierName || "S").charAt(0).toUpperCase()}</span>
                   <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550" }}>{b.supplierName}</span>
                   {b.verified && <span className="material-icons-outlined" style={{ fontSize: 16, color: "#1daf58" }}>verified</span>}
-                  {/* One pill per certificate the REQUEST asked for — green when he holds it, red when
-                      not, and nothing at all when the request asked for none (app parity,
-                      `CredentialPillRow`). The component was already built and already used by the
-                      per-request bid list; the grouped card, which is the one `/requests` shows, was
-                      simply never given it. */}
-                  <CredentialPills required={b.requiredCerts} held={b.heldCertCodes} ar={ar} />
+                  {/* ── The certificate pills are gone here too (owner, 2026-08-19) ────────────────
+                      Same ruling as the per-request card: *"all these details are in the equipment
+                      details."* They stated `requiredCerts` against the SUPPLIER's `heldCertCodes`,
+                      and the certificate that decides anything is the one the MACHINE carries — which
+                      the equipment list and each machine's detail panel state, read against the
+                      request. Removing it from one card and not the other would have left the same
+                      offer making a claim on `/requests` that it does not make one screen deeper. */}
                 </div>
               </div>
               {!selectMode && (

@@ -1148,16 +1148,6 @@ export const en = {
   /* ── V12 · the price footer (spec 004 §6.10, 004a §4a.1 + §4a.4) ──
      Figures and a hand-off. It never edits a figure and never re-implements negotiation. */
   priceFooter: {
-    // ── SIXTEEN OF THESE KEYS NO LONGER REACH A SCREEN (owner, 2026-08-19) ─────────────────────
-    // The footer's breakdown was withdrawn with «Show details»; `PriceFooter.tsx` now prints the rate,
-    // its period, the source line and the two acts, and nothing else. Everything below that named a
-    // breakdown line — `currency`, `rental`, `rentalBasis`, `rentalBasisFlat`, `divisorWeek`,
-    // `divisorMonth`, `mobilisation`, `demobilisation`, `excluded`, `subtotal`, `vat`, `total`,
-    // `noDuration`, `unitOne`, `unitMany`, `days` — has no reader on this surface.
-    //
-    // They are kept rather than deleted because the words are the ONE wording for
-    // `computeDealTotals`' six lines, and the decision that removed them was about where a renter
-    // reads them, not about what they say. Deleting them is a separate call.
     perPeriod: "SAR / {unit}",
     // Every figure in the breakdown carries the currency, exactly as the app's bid footer prints it.
     currency: "SAR",
@@ -1202,6 +1192,18 @@ export const en = {
     // own period, the days it is actually charged across, then how many units — so the rental total is
     // arithmetic the reader can check, not a claim. Billable days, never the calendar span: the total
     // excludes the Fridays, and a basis line that counted them stated a sum its own figure contradicted.
+    // ── The map footer's basis lines, PER MACHINE (owner, 2026-08-19) ────────────────────────────
+    // The two above state the basis for the whole offer — "{rate}/{unit} × {days} × {n} units" — which
+    // is right where the figure beside them is a whole-offer figure. The map footer's breakdown states
+    // its lines per machine and applies the count once at the foot, so its basis must not carry the
+    // unit count as well: printed there it would multiply a number the line below it multiplies again.
+    rentalBasisDays: "{rate}/{unit} × {days} billable days",
+    rentalBasisUnit: "{rate}/{unit}",
+    // The heading over that per-machine block, and the row that closes it. Only drawn on a multi-unit
+    // offer, where the two blocks differ; a single machine draws one set and needs neither.
+    perUnitHead: "Per unit",
+    overallTotal: "Overall total",
+    unitsCount: "{n} units",
     rentalBasis: "{rate}/{unit} × {days} billable days × {n} {units} in your request",
     // Nothing to prorate — open-ended, per-job, or no start date. One full period, as quoted.
     rentalBasisFlat: "{rate}/{unit} × {n} {units} in your request",

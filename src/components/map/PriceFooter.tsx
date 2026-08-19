@@ -24,26 +24,24 @@
  * the room's `canAccept`; blocked, the renter simply lands on the room and its existing strip says
  * why). Not one line of the flow is copied or re-implemented here: this file only names the mode.
  *
- * ── SHAPE: the v3 prototype's own footer (owner, 2026-08-19) ─────────────────────────────────────
- * ONE fixed 76px slab: the rate at hero size with its unit, the negotiation state under it, and the
- * two acts on the trailing edge. Nothing here opens, nothing here grows, and there is no scroller.
+ * ── SHAPE: the v3 prototype's footer, plus a breakdown that opens OVER it ────────────────────────
+ * A fixed 76px slab: the rate at hero size with its unit, the negotiation state under it, «عرض
+ * التفاصيل» beside that, and the two acts on the trailing edge. The slab itself never grows.
  *
- * ~~A breakdown above the rate, behind «عرض التفاصيل» (owner's app screenshot, 2026-08-11).~~
- * Withdrawn. It priced six lines — rental with its basis, mobilisation, demobilisation, subtotal, VAT,
- * total — inside a 392px column, which meant the footer had to be capped, given its own scroller and
- * `overscroll-behavior`, and re-measured whenever the renter dragged the panel grip. All of that
- * machinery existed to keep the rate on screen while the breakdown was open; with no breakdown the
- * rate simply never leaves.
+ * The breakdown has been here, withdrawn, and asked for again in one day (owner, 2026-08-19), and the
+ * shape it came back in is the whole point of the round trip. It used to EXPAND THE BAR, which is why
+ * the footer needed a `max-height` cap, an inner scroller and `overscroll-behavior` merely to keep the
+ * rate on screen on a short viewport — the figure the bar exists for could be pushed off by its own
+ * explanation. It is now a POPOVER above the slab, over the equipment list, the way the deal room's
+ * `.pb-breakdown` opens below its bar. The floor never moves and none of that machinery is back.
  *
- * **Nothing was lost with it.** The six figures are `computeDealTotals`', and TWO surfaces the renter
- * has already passed through print them in full: the **bid card** he opened this panel from breaks the
- * price down per unit — rental, the transport legs, subtotal before VAT, VAT at 15%, the grand total,
- * and an overall total besides when the bid is multi-unit (`RequestBids.tsx:535`) — and the deal room's
- * own `qp-foot` prices the same lines for a reader who came to negotiate them.
+ * ITS LINES ARE THE BID CARD'S — per machine, with the count applied once at the foot, through the bid
+ * card's own `computeQuoteTotals`. That is the arrangement the deal room took on the same day, so the
+ * three surfaces that price one offer now read alike (owner: *"use bid card in all prices surface"*).
  *
- * So this footer was the THIRD place the same arithmetic was drawn, and the only one where it had to be
- * folded behind a control and given a scroller to fit. `priceFooterModel` is untouched and still returns
- * the full `totals`; this component now reads `rate`, `priceUnit` and the two counts off it.
+ * The overall row is `computeDealTotals`' own `grand` and never the per-unit block multiplied: the
+ * transport legs carry their own negotiated counts, so a room billing five delivery runs against three
+ * rented machines does not reconcile by multiplication.
  *
  * ── The no-room case is the COMMON one ───────────────────────────────────────────────────────────
  * Most bids have `dealRoomId === null`. Then the footer shows the **bid's own** figures, no status
@@ -55,6 +53,7 @@ import { useState } from "react";
 import { ensureDealRoom } from "@/lib/chat/ensure-deal-room";
 import type { BidCard } from "@/lib/contract/bids";
 import { priceFooterModel } from "@/lib/contract/price-footer";
+import { computeQuoteTotals } from "@/lib/pricing/rental";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 
 const ARABIC_INDIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
@@ -77,9 +76,29 @@ export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooter
   const ar = locale === "ar";
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  /** The breakdown popover. Closed on every mount: it explains the figure, it is not the figure. */
+  const [expanded, setExpanded] = useState(false);
 
   const model = priceFooterModel(bid, durationDays, startDate);
   const { totals } = model;
+
+  /**
+   * The breakdown's lines, PER MACHINE — the bid card's shape, reached through the bid card's own
+   * function (owner, 2026-08-19).
+   *
+   * Fed `computeDealTotals`' `perUnitRental`, so nothing is derived twice and nothing is divided back
+   * out of a total. `computeQuoteTotals`' `overall` block is `computeDealTotals`' to the riyal
+   * (`rental-pricing.test.ts` pins it across all four price units), which is why the OVERALL row below
+   * still reads `totals.grand` while the per-unit block comes from here.
+   */
+  const perUnit = computeQuoteTotals({
+    perUnitRental: totals.perUnitRental,
+    rentalUnits: totals.rentalUnits,
+    mob: { amount: totals.mobPrice, units: totals.mobUnitsN, excluded: totals.mobExcluded },
+    demob: { amount: totals.demobPrice, units: totals.demobUnitsN, excluded: totals.demobExcluded },
+  }).perUnit;
+  /** Multi-unit is the only case where the two blocks differ, so the only case that draws both. */
+  const multi = totals.rentalUnits > 1;
 
   /**
    * Money — **Latin digits, in both locales** (`formatSar`, `rental.ts:290`).
@@ -96,13 +115,8 @@ export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooter
    */
   const money = (n: number): string => Math.round(n).toLocaleString("en-US");
   const num = (n: number): string => (ar ? arDigits(String(n)) : String(n));
-  /**
-   * The billing period the rate is quoted over — «ر.س / يوم».
-   *
-   * Singular only. The plural half served the breakdown's basis line («× ١٤ يوم»), which this footer
-   * no longer prints; the dictionary keeps both words because the deal room's own bar still needs the
-   * pair. Kept as a parameterised helper rather than inlined so the two surfaces stay one lookup.
-   */
+  /** The billing period the rate is quoted over — «ر.س / يوم» for the rate, and the plural for the
+   *  breakdown's basis line («× ١٤ يوم»). */
   const periodWord = (plural: boolean): string => {
     switch ((totals.priceUnit || "PER_DAY").toUpperCase()) {
       case "PER_WEEK": return plural ? t.priceFooter.weeks : t.priceFooter.week;
@@ -111,6 +125,31 @@ export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooter
       default: return plural ? t.priceFooter.days : t.priceFooter.day;
     }
   };
+
+  /** The fixed divisor behind a weekly/monthly rate, in the bid card's words. */
+  const divisorText = ((): string | null => {
+    switch ((totals.priceUnit || "PER_DAY").toUpperCase()) {
+      case "PER_WEEK": return t.priceFooter.divisorWeek;
+      case "PER_MONTH": return t.priceFooter.divisorMonth;
+      default: return null;
+    }
+  })();
+  /**
+   * The rental line's basis, as the bid card states it: the quoted rate over its own period, and the
+   * BILLABLE days it is charged across — never the calendar span, which counts the Fridays the total
+   * excludes and would state an arithmetic its own figure contradicts.
+   *
+   * Per machine, like the line it sits under, so the unit count is absent here and applied once at the
+   * foot. Nothing prorated (PER_JOB, open-ended, no start date) keeps the bare rate: there is no day
+   * count to explain.
+   */
+  const rentalBasis = totals.rentalRaw
+    ? fmt(t.priceFooter.rentalBasisUnit, { rate: money(totals.rate), unit: periodWord(false) })
+    : fmt(t.priceFooter.rentalBasisDays, {
+        rate: money(totals.rate),
+        unit: periodWord(false),
+        days: num(totals.billableDays),
+      }) + (divisorText ? ` · ${divisorText}` : "");
 
   /**
    * Hand off to the deal room **with the act attached**.
@@ -133,9 +172,62 @@ export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooter
 
   return (
     <footer className="bm-foot">
-      {/* ONE bar, 76px, nothing above it (owner, 2026-08-19). The breakdown that used to sit here —
-          six figures behind «عرض التفاصيل» — is gone; see the file header for what moved and what a
-          renter loses. What is left is the prototype's own footer: the figure, its state, the acts. */}
+      {/* ── The breakdown, back — and as a POPOVER, not a growing bar (owner, 2026-08-19) ──────────
+          It was withdrawn this morning and is asked for again. What returns is not what left: the old
+          one expanded the footer itself, which is why the bar needed a `max-height` cap, an inner
+          scroller and `overscroll-behavior` just to keep the rate on screen on a short viewport.
+
+          This opens ABOVE the slab and over the equipment list, the way the deal room's own
+          `.pb-breakdown` opens below its bar — so the 76px floor never moves, the rate never leaves,
+          and none of that machinery comes back with it. A scrim closes it, because a popover whose
+          only exit is the control that opened it is one the renter has to aim at twice.
+
+          The lines are the BID CARD's shape, per machine with the count applied once at the foot,
+          which is the arrangement the deal room took on this morning. Three surfaces, one reading. */}
+      {expanded && (
+        <>
+          <div className="bm-foot-scrim" onClick={() => setExpanded(false)} />
+          <div className="bm-foot-break" role="dialog" aria-label={t.priceFooter.showDetails}>
+            {multi && <div className="bm-foot-bhead">{t.priceFooter.perUnitHead}</div>}
+            <Line
+              label={t.priceFooter.rental}
+              sub={rentalBasis}
+              value={money(perUnit.rental)}
+              currency={t.priceFooter.currency}
+            />
+            <Line
+              label={t.priceFooter.mobilisation}
+              value={totals.mobExcluded ? t.priceFooter.excluded : money(perUnit.mob)}
+              currency={totals.mobExcluded ? undefined : t.priceFooter.currency}
+              muted={totals.mobExcluded}
+            />
+            <Line
+              label={t.priceFooter.demobilisation}
+              value={totals.demobExcluded ? t.priceFooter.excluded : money(perUnit.demob)}
+              currency={totals.demobExcluded ? undefined : t.priceFooter.currency}
+              muted={totals.demobExcluded}
+            />
+            <Line label={t.priceFooter.subtotal} value={money(perUnit.subtotal)} currency={t.priceFooter.currency} />
+            <Line label={t.priceFooter.vat} value={money(perUnit.vat)} currency={t.priceFooter.currency} />
+            <Line label={t.priceFooter.total} value={money(perUnit.total)} currency={t.priceFooter.currency} total />
+            {/* NOT per-unit × units: the transport legs carry their own negotiated counts, so the
+                overall figure is `computeDealTotals`' own and never a multiplication of the block
+                above it. The same rule, and the same wording, the deal room states. */}
+            {multi && (
+              <Line
+                label={t.priceFooter.overallTotal}
+                sub={fmt(t.priceFooter.unitsCount, { n: num(model.pricedUnits) })}
+                value={money(totals.grand)}
+                currency={t.priceFooter.currency}
+                total
+                overall
+              />
+            )}
+            {!totals.hasDuration && <div className="bm-foot-note">{t.priceFooter.noDuration}</div>}
+          </div>
+        </>
+      )}
+
       <div className="bm-foot-bar">
         <div className="bm-foot-figs">
           <div className="bm-foot-rate">
@@ -145,12 +237,22 @@ export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooter
             <span className="bm-foot-unit">{fmt(t.priceFooter.perPeriod, { unit: periodWord(false) })}</span>
           </div>
           {/* The SOURCE of the figure, not the state of the conversation. A room whose price nothing
-              has moved still reads as the opening offer.
+              has moved still reads as the opening offer — and beside it, the way into the arithmetic.
 
-              It is a plain line now, not a row: «عرض التفاصيل» was the only other thing on it, and a
-              flex row holding one span is a wrapper for nothing. */}
-          <div className="bm-foot-src">
-            {model.source === "opening_offer" ? t.priceFooter.openingOffer : t.priceFooter.fromDealRoom}
+              A text LINK naming the state it moves to, not a button with a chevron: it sits inches
+              from two real acts and must not carry a control's weight next to them. */}
+          <div className="bm-foot-meta">
+            <span className="bm-foot-src">
+              {model.source === "opening_offer" ? t.priceFooter.openingOffer : t.priceFooter.fromDealRoom}
+            </span>
+            <button
+              type="button"
+              className="bm-foot-det"
+              onClick={() => setExpanded((v) => !v)}
+              aria-expanded={expanded}
+            >
+              {expanded ? t.priceFooter.hideDetails : t.priceFooter.showDetails}
+            </button>
           </div>
         </div>
         {/* TWO controls, always both — the deal room's own pair (`DealRoom.tsx:648`): Negotiate is
@@ -184,5 +286,32 @@ export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooter
         </div>
       )}
     </footer>
+  );
+}
+
+/**
+ * One breakdown line: what it is, on what basis, and how much.
+ *
+ * `sub` rides INSIDE the label rather than on its own row — the bid card keeps the basis beside the
+ * thing it is the basis of, and a second row would read as another figure.
+ */
+function Line({
+  label, sub, value, currency, total, overall, muted,
+}: {
+  label: string; sub?: string; value: string; currency?: string; total?: boolean; overall?: boolean; muted?: boolean;
+}) {
+  return (
+    <div className={`bm-foot-row${total ? " is-total" : ""}${overall ? " is-overall" : ""}${muted ? " is-muted" : ""}`}>
+      <span className="bm-foot-k">
+        {label}
+        {sub && <span className="bm-foot-sub">{sub}</span>}
+      </span>
+      {/* Every figure is a numeral run: LTR inside the RTL column, like every other number here. The
+          currency follows it in reading order, so it sits on the far side in Arabic. */}
+      <span className="bm-foot-v">
+        <span dir="ltr">{value}</span>
+        {currency && <span className="bm-foot-cur">{currency}</span>}
+      </span>
+    </div>
   );
 }
