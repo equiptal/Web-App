@@ -20,7 +20,8 @@
  * **Opening it creates nothing.** Both reads (`GET /api/me/bids/:id` and its fleet) are reads.
  */
 
-import { use, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, use, useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { useAuthGate } from "@/components/auth/AuthGate";
@@ -41,7 +42,10 @@ export default function BidEquipmentPage({ params }: { params: Promise<{ bidId: 
     // the standard `max-w-[1440px]` page gutter, which drew it as a card floating in the middle of a
     // desktop viewport with the map squeezed into what was left.
     <AppShell fullBleed title={t.bidMap.surfaceTitle}>
-      <BidEquipmentGate bidId={decodeURIComponent(bidId)} />
+      {/* Suspense boundary: the surface below reads `useSearchParams` for `?company=1`, which needs one. */}
+      <Suspense fallback={null}>
+        <BidEquipmentGate bidId={decodeURIComponent(bidId)} />
+      </Suspense>
     </AppShell>
   );
 }
@@ -91,6 +95,9 @@ function BidEquipmentGate({ bidId }: { bidId: string }) {
  */
 function BidEquipment({ bidId }: { bidId: string }) {
   const t = useT();
+  /** `?company=1` — see the note at the workspace below. Read once, as an INITIAL state rather than a
+   *  live one: the renter closing the panel must not have it reopened by a URL that has not changed. */
+  const openCompanyDocs = useSearchParams().get("company") === "1";
   const [bid, setBid] = useState<BidCard | null>(null);
   const [request, setRequest] = useState<RequestRecord | null>(null);
   const [failed, setFailed] = useState(false);
@@ -156,6 +163,11 @@ function BidEquipment({ bidId }: { bidId: string }) {
       bid={bid}
       request={request}
       refreshing={refreshing}
+      // `?company=1` — the renter asked for this firm's papers somewhere else and arrives already
+      // wanting them (owner, 2026-08-19). The deal room's «Company details» is the caller: its own
+      // documents modal is withdrawn, so the one surface for a company's papers is V9's panel here.
+      // Any other value is simply not the flag; a hand-edited URL opens the map as it always does.
+      openCompanyDocs={openCompanyDocs}
       // The surface owns its own writes now (V11/V12): the four requests, the chat dock's first
       // message and the footer's hand-off each create the deal room themselves, and none of them
       // needs a handler from here. V9's company panel still lands with the ticket that owns it, so

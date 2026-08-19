@@ -351,7 +351,15 @@ describe("both card types render through RequestCard, sided by their author", ()
 
   it("does not disturb the `?act=` deep link added the same day", () => {
     expect(DEAL_ROOM).toContain("initialFlow");
-    expect(DEAL_ROOM).toMatch(/flowGate\.current = \{ counter: showAct, accept: showAct && canAccept \};/);
+    /* COUNTER opens on `live`, not on `showAct` (owner, 2026-08-19: *"when i click counter this price
+       from the map footer it will open the 3 style sheet not the chat"*). `showAct` also asks whose
+       TURN it is, which governs whether the price bar draws its buttons — a different question from
+       whether a renter who already pressed «اطلب سعراً أقل» may counter. `live` still refuses a CLOSED,
+       ABANDONED or AWAITING room, where there is nothing to counter.
+
+       ACCEPT is deliberately untouched: settling keeps the room's own comparison of terms, price and
+       units, and a deep link must not be a way around it. */
+    expect(DEAL_ROOM).toMatch(/flowGate\.current = \{ counter: live, accept: showAct && canAccept \};/);
   });
 });
 

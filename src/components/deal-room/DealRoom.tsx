@@ -24,10 +24,9 @@ import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
 // Extracted so the map's chat dock mounts the SAME sheet rather than growing a second answer to
 // "call the supplier" (owner, 2026-08-19). Its own file carries the reasoning.
 import { CallModal } from "@/components/deal-room/CallModal";
-// Extracted alongside `CallModal` so the map's chat dock can offer the same papers and the same
-// cancellation, with the same six reasons (owner, 2026-08-19). Each file carries its own reasoning.
+// Extracted alongside `CallModal` so the map's chat dock can offer the same cancellation, with the
+// same six reasons the supplier will be shown (owner, 2026-08-19).
 import { CancelReasonsModal } from "@/components/deal-room/CancelReasonsModal";
-import { DocumentsModal } from "@/components/deal-room/DocumentsModal";
 import {
   CHAT_ACCEPT,
   CHAT_MAX_MEDIA,
@@ -147,7 +146,6 @@ export function DealRoom({ id, onTitle, initialFlow }: {
   // Accept. `flowMode` picks which — null = closed.
   const [flowMode, setFlowMode] = useState<"counter" | "accept" | null>(null);
   const [counterErr, setCounterErr] = useState<string | null>(null);
-  const [showDocs, setShowDocs] = useState(false);
   const [callOpen, setCallOpen] = useState(false); // call-supplier modal (shows the number + dial/copy)
   const [menuOpen, setMenuOpen] = useState(false); // ⋮ kebab (equipment · company · cancel)
   const [showRequest, setShowRequest] = useState(false); // request-summary modal, off the header chip
@@ -844,7 +842,23 @@ export function DealRoom({ id, onTitle, initialFlow }: {
   // What the two buttons below would allow right now, handed to the `?act=` deep link. Read off the
   // SAME expressions the buttons are gated by, on the same render, so a deep link can never open a
   // sheet the renter could not have opened himself with a press.
-  flowGate.current = { counter: showAct, accept: showAct && canAccept };
+  /* ── What the `?act=` link is allowed to open (owner, 2026-08-19) ────────────────────────────────
+     *"when i click counter this price from the map footer it will open the 3 style sheet not the chat."*
+
+     COUNTER is gated on `live` alone now, not on `showAct`. `showAct = live && (myTurn || canAccept)`
+     governs whether the price bar DRAWS its two buttons — a different question from whether the flow
+     may open. A renter who pressed «اطلب سعراً أقل» on the map has already chosen to counter; landing
+     him in the conversation because the room happens to read as the supplier's turn answers a question
+     he did not ask. Negotiating is available whenever the deal is live, which is the app's own rule and
+     what the price bar's comment already claims: *"Negotiate is always available."*
+
+     `live` is still a real gate and the one that matters: a CLOSED, ABANDONED or AWAITING room has
+     nothing to counter — in an awaiting room the renter has accepted and the bar offers Withdraw — so
+     the link falls through and he lands on the room, under the strip that says why.
+
+     ACCEPT keeps `showAct && canAccept` untouched. Accepting is settling, and its gate is the room's
+     own comparison of terms, price and units; nothing here loosens it. */
+  flowGate.current = { counter: live, accept: showAct && canAccept };
 
   return (
     <div className="dlproto" dir={ar ? "rtl" : "ltr"}>
@@ -852,7 +866,15 @@ export function DealRoom({ id, onTitle, initialFlow }: {
       <div className="topbar">
         {/* supplier chip → profile & documents. NOTE: the deal-room payload only carries name + isVerified
             (no rating/deals/commitment), so that prototype stat line is omitted rather than fabricated. */}
-        <button type="button" className="tb-sup" onClick={() => setShowDocs(true)}>
+        {/* The chip goes where the kebab's «Company details» goes — one destination for one firm's
+            papers (owner, 2026-08-19). It opened the room's own documents modal; two controls in one
+            bar opening two differently-shaped surfaces onto the same question is what this removes. */}
+        <button
+          type="button"
+          className="tb-sup"
+          disabled={!room.bidId}
+          onClick={() => { if (room.bidId) router.push(`/bids/${encodeURIComponent(room.bidId)}/equipment?company=1`); }}
+        >
           <span className="av">{room.supplier.name.charAt(0).toUpperCase()}</span>
           <span className="nm">
             <span className="n">{room.supplier.name}{room.supplier.isVerified && (
@@ -895,7 +917,10 @@ export function DealRoom({ id, onTitle, initialFlow }: {
         <span className="tb-spacer" />
         {/* icon actions — documents + call */}
         <div className="tb-icons">
-          <span className="tb-ic" role="button" tabIndex={0} title={L("Documents", "المستندات")} onClick={() => setShowDocs(true)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setShowDocs(true)}><span className="material-icons-outlined">description</span></span>
+          {/* ── The documents icon is GONE (owner, 2026-08-19) ──────────────────────────────────
+              It was the third way into the supplier's papers from one bar — the chip on the left, this
+              icon, and the kebab's «Company details» all opened the same sheet. One entry now, in the
+              kebab, and it goes to the documents PANEL rather than a modal of its own. */}
           {/* deal-room/negotiation (B5): the rentee gets the supplier's number from the start (server-gated).
               A single Call button opens a modal with the number — dial on touch, copy on desktop. */}
           {!room.supplier.phone
@@ -959,7 +984,21 @@ export function DealRoom({ id, onTitle, initialFlow }: {
             <button type="button" role="menuitem" disabled={!room.bidId} onClick={() => { setMenuOpen(false); if (room.bidId) router.push(`/bids/${encodeURIComponent(room.bidId)}/equipment`); }}>
               <span className="material-icons-outlined">construction</span>{L("Inspect the equipment", "فحص المعدّة")}
             </button>
-            <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setShowDocs(true); }}>
+            {/* ── «Company details» goes to the PANEL, not a modal (owner, 2026-08-19) ────────────
+                The company documents surface is V9's takeover on the bid's own equipment page — the
+                one the panel header's «مستندات الشركة ›» opens — and it is where a renter reads a
+                firm's papers everywhere else in the product. Opening a second, differently-shaped
+                sheet from here made the same papers two surfaces.
+
+                Disabled without a `bidId`, exactly as «Inspect the equipment» above is: the panel is
+                addressed by bid, and a menu entry that cannot reach its destination should say so by
+                being inert rather than by failing after the press. */}
+            <button
+              type="button"
+              role="menuitem"
+              disabled={!room.bidId}
+              onClick={() => { setMenuOpen(false); if (room.bidId) router.push(`/bids/${encodeURIComponent(room.bidId)}/equipment?company=1`); }}
+            >
               <span className="material-icons-outlined">business_center</span>{L("Company details", "بيانات الشركة")}
             </button>
             {!closed && !abandoned && (
@@ -1363,8 +1402,7 @@ export function DealRoom({ id, onTitle, initialFlow }: {
         </div>
       )}
 
-      {showDocs && <DocumentsModal id={id} ar={ar} L={L} supplierName={room.supplier.name} onClose={() => setShowDocs(false)} />}
-
+      
       {callOpen && room.supplier.phone && (
         <CallModal ar={ar} L={L} phone={room.supplier.phone} name={room.supplier.name} canCall={canCall} onClose={() => setCallOpen(false)} />
       )}

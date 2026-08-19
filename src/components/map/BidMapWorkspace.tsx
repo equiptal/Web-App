@@ -116,6 +116,14 @@ export interface BidMapWorkspaceProps {
   /** Optional hook for a caller that wants to know the company panel was opened (analytics, a route
    *  change). The panel itself opens here — V9's component is mounted below. */
   onOpenCompanyDocs?: () => void;
+  /**
+   * Open V9's company-documents panel on arrival — the route's `?company=1` (owner, 2026-08-19).
+   *
+   * The deal room's «Company details» sends the renter here rather than opening a documents modal of
+   * its own, so a firm's papers are ONE surface wherever they are asked for. Read once, as the panel's
+   * INITIAL state: a renter who closes it must not have it reopened by a URL that has not changed.
+   */
+  openCompanyDocs?: boolean;
 }
 
 export function BidMapWorkspace({
@@ -125,6 +133,7 @@ export function BidMapWorkspace({
   onSelectMachine,
   onRequestSent,
   onOpenCompanyDocs,
+  openCompanyDocs = false,
 }: BidMapWorkspaceProps) {
   const t = useT();
   const { locale } = useLocale();
@@ -146,7 +155,7 @@ export function BidMapWorkspace({
   /** V7 — the machine whose detail has TAKEN OVER the panel, or null for the list. */
   const [detailId, setDetailId] = useState<string | null>(null);
   /** V9 — the company panel, which takes over the same way. */
-  const [companyOpen, setCompanyOpen] = useState(false);
+  const [companyOpen, setCompanyOpen] = useState(openCompanyDocs);
   /**
    * V17 — the pressed filter chips (§6.4a). **Empty on arrival, always**: a renter who cannot see all
    * the machines in an offer cannot tell whether the lessor sent few or a chip is hiding some. It lives
@@ -634,6 +643,21 @@ export function BidMapWorkspace({
     },
     [canOpenMachineFromChat, openMachine],
   );
+
+  /**
+   * **Read this firm's papers** — the chat dock's kebab entry (owner, 2026-08-19).
+   *
+   * A named intention of this surface's own, exactly as `openMachineFromChat` is, and for the same
+   * reason: the dock must never hold a setter of the panel's state. It reports that the renter asked
+   * for the company's documents; this surface decides that the answer is V9's panel.
+   *
+   * The deal room's «Company details» arrives at the same panel by another road — `?company=1` on this
+   * route — so a firm's papers are one surface however the renter got to them.
+   */
+  const openCompanyDocsFromChat = useCallback(() => {
+    setCompanyOpen(true);
+    onOpenCompanyDocs?.();
+  }, [onOpenCompanyDocs]);
 
   /** Bilingual literal for V7/V8/V9, which take copy as a prop rather than reaching for the
    *  dictionary — the pattern that directory already ships. */
@@ -1127,6 +1151,10 @@ export function BidMapWorkspace({
           // state is derived from (RM3-AC-18). A sibling tab's cards state the ask and claim nothing
           // about the answer.
           fleet={fleet}
+          // The kebab's «Company details» raises the panel behind the drawer rather than opening a
+          // documents modal of its own (owner, 2026-08-19) — the same surface the deal room now sends
+          // the renter to, and the same one the header's «مستندات الشركة ›» opens.
+          onOpenCompanyDocs={openCompanyDocsFromChat}
           sendNonce={sender.nonce}
           // The conversation is the only record of these cards, and the dock is the only thing here
           // that reads it — so the outstanding asks travel UP from it. A set of opaque strings and

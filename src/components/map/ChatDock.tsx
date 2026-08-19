@@ -47,7 +47,6 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import type { Channel } from "stream-chat";
 import { CallModal } from "@/components/deal-room/CallModal";
 import { CancelReasonsModal } from "@/components/deal-room/CancelReasonsModal";
-import { DocumentsModal } from "@/components/deal-room/DocumentsModal";
 import { ChatCard } from "@/components/deal-room/ChatCard";
 import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
 import { RequestCard } from "@/components/map/RequestCard";
@@ -155,6 +154,16 @@ export interface ChatDockProps {
    *  Null until it arrives; a sibling tab has none, and its cards then state the ask without claiming
    *  an answer either way. */
   fleet: FleetMachine[] | null;
+  /**
+   * Open the panel's company-documents takeover (V9) behind this drawer (owner, 2026-08-19).
+   *
+   * The kebab's «Company details» calls it. This dock is open ON the equipment page, so the papers
+   * are already one press away in the column behind it — mounting a second, modal-shaped copy of the
+   * same documents would be the very duplication the deal room just shed.
+   *
+   * Absent → the entry is not drawn, rather than drawn and inert.
+   */
+  onOpenCompanyDocs?: () => void;
   /** Bumped by the surface after it sends a request card, so the dock refreshes on **post-send** —
    *  one of the four refresh points of 004a §2.1. */
   sendNonce?: number;
@@ -207,6 +216,7 @@ export function ChatDock({
   dealRoomId = null,
   typeWord = null,
   fleet,
+  onOpenCompanyDocs,
   sendNonce = 0,
   onOutstandingAsks,
   draft = null,
@@ -241,7 +251,6 @@ export function ChatDock({
   useEffect(() => { setCanCall(typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true); }, []);
   /** The ⋮ menu and the two sheets it reaches — the room's own components (owner, 2026-08-19). */
   const [menuOpen, setMenuOpen] = useState(false);
-  const [showDocs, setShowDocs] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [cancelErr, setCancelErr] = useState<string | null>(null);
@@ -939,10 +948,15 @@ export function ChatDock({
             <>
               <div className="bm-chat-menu-scrim" onClick={() => setMenuOpen(false)} />
               <div className="bm-chat-menu" role="menu">
-                <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setShowDocs(true); }}>
-                  <span className="material-icons-outlined">business_center</span>
-                  {L("Company details", "بيانات الشركة")}
-                </button>
+                {/* Opens the PANEL behind this drawer, never a modal of its own (owner, 2026-08-19).
+                    The deal room's «Company details» navigates to that same panel; this dock is
+                    already standing on it, so it only has to raise it. */}
+                {onOpenCompanyDocs && (
+                  <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onOpenCompanyDocs(); }}>
+                    <span className="material-icons-outlined">business_center</span>
+                    {L("Company details", "بيانات الشركة")}
+                  </button>
+                )}
                 {!phaseClosed && !phaseAbandoned && (
                   <button type="button" role="menuitem" className="danger" onClick={() => { setMenuOpen(false); setCancelOpen(true); }}>
                     <span className="material-icons-outlined">cancel</span>
@@ -1268,17 +1282,6 @@ export function ChatDock({
       {/* The room's own sheets, mounted here rather than reimplemented — both are addressed by the
           ACTIVE tab's room, so a renter reading a sibling conversation gets that supplier's papers and
           cancels that deal, not the anchor's. */}
-      {showDocs && activeRoomId && (
-        <DocumentsModal
-          id={activeRoomId}
-          ar={ar}
-          L={L}
-          // The feed row's name when we have it — the dock groups tabs by counterparty, so a sibling
-          // tab is the same firm, but the row is the one that actually names him.
-          supplierName={activeRow?.supplierName ?? bid.supplierName}
-          onClose={() => setShowDocs(false)}
-        />
-      )}
       {cancelOpen && activeRoomId && (
         <CancelReasonsModal
           ar={ar}

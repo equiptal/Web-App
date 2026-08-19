@@ -615,6 +615,10 @@ describe("the chat dock's tab strip touches no map state (RM3-AC-49)", () => {
       "groupKey",
       "onCancelDraft",
       "onConfirmDraft",
+      // `onOpenCompanyDocs` joined on 2026-08-19 with the dock's ⋮ kebab. It is a REPORT, not a
+      // handle: the dock says the renter asked for the firm's papers and this surface decides that
+      // the answer is V9's panel. The rule below still holds — no setter crosses the boundary.
+      "onOpenCompanyDocs",
       "onOpenMachine",
       "onOutstandingAsks",
       "sendNonce",
@@ -669,6 +673,9 @@ describe("the chat dock's tab strip touches no map state (RM3-AC-49)", () => {
       "canOpenMachine",
       "onCancelDraft",
       "onConfirmDraft",
+      // Reports that the renter asked for the company's papers, and names no surface — the workspace
+      // answers it with V9's panel, and the dock cannot tell it to do anything else.
+      "onOpenCompanyDocs",
       "onOpenMachine",
       "onOutstandingAsks",
     ]);
