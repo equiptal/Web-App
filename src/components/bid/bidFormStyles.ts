@@ -6,7 +6,7 @@
 export const BID_FORM_CSS = `
 .bidpage{--navy:#1C3550;--navy-deep:#12263A;--navy-mid:#2A4F72;--action:#F79009;--action-dim:#FFF4E5;--rentee:#2563EB;--success:#1DAF58;--success-bg:#E7F7EE;--danger:#D9362A;--danger-bg:#FCEBEA;--muted:#6B8FA8;--surface1:#fff;--surface2:#EFF4F9;--border:#D4E0EC;--line:#E4EDF5;--r-md:10px;--r-lg:14px;--r-full:100px;
   min-height:100vh;background:var(--surface2);color:var(--navy);font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
-.bidpage.rtl{font-family:"Tajawal","Inter",sans-serif}
+.bidpage.rtl{font-family:"IBM Plex Sans Arabic","Inter",sans-serif}
 .bidpage *{box-sizing:border-box}
 .bidpage .material-icons-outlined{font-family:'Material Icons Outlined';line-height:1}
 .pubbar{background:var(--surface1);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50}

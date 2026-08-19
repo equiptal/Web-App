@@ -59,10 +59,13 @@ body {
   font-family: var(--font-nunito), var(--font-inter), -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
-/* Arabic uses Tajawal; layout is RTL-capable via logical properties (AC-46, flag-gated). */
+/* Arabic uses IBM Plex Sans Arabic — the prototype's own face (owner, 2026-08-19; `layout.tsx` carries
+   the full reasoning and the three things it fixed). ~~Tajawal.~~ Withdrawn: it runs wider at the same
+   sizes, and every RTL screen's geometry is measured against Plex Arabic in the prototype.
+   Layout is RTL-capable via logical properties (AC-46, flag-gated). */
 :lang(ar) body,
 [dir="rtl"] body {
-  font-family: var(--font-tajawal), var(--font-inter), sans-serif;
+  font-family: var(--font-arabic), var(--font-inter), sans-serif;
 }
 
 .material-symbols-rounded {

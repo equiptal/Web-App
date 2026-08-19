@@ -1,17 +1,31 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, IBM_Plex_Sans, Tajawal, Nunito } from "next/font/google";
+import { Inter, IBM_Plex_Sans, IBM_Plex_Sans_Arabic, Nunito } from "next/font/google";
 import "./globals.css";
 import { LocaleProvider } from "@/lib/i18n";
 import { SessionProvider } from "@/lib/session";
 
 // Nunito is the prototype's brand typeface (weights 400–900) — the default sans for the redesign, used
 // on every page → preload it. The other three are contextual (Inter on prototype screens, IBM Plex for
-// numerics, Tajawal for Arabic/RTL only), so `preload: false` avoids "preloaded but not used" warnings —
-// they still load on demand via their @font-face when a screen actually references them.
+// numerics, IBM Plex Sans Arabic for Arabic/RTL only), so `preload: false` avoids "preloaded but not
+// used" warnings — they still load on demand via their @font-face when a screen actually references them.
+//
+// ── The Arabic face is IBM Plex Sans Arabic, not Tajawal (owner, 2026-08-19) ─────────────────────
+// The prototype every RTL screen is drawn from sets `font-family:'IBM Plex Sans Arabic'` (`app.css:3`),
+// and its geometry — 392px panel, 64px header, one-line pills — is measured in that face. Tajawal runs
+// wider at the same sizes, so the bid-map panel truncated the supplier's name, wrapped the shortfall
+// sentence onto a second line and crowded the count pills, none of which happens in the prototype at
+// the same width. Rendered side by side, swapping only the font fixed all three at once; nothing about
+// the layout rules had to change.
+//
+// It also puts the Arabic and the Latin on ONE superfamily: `--font-plex` was already the numeric face,
+// so a figure inside an Arabic run no longer changes typeface mid-line.
 const nunito = Nunito({ variable: "--font-nunito", subsets: ["latin"], weight: ["400", "500", "600", "700", "800", "900"] });
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], preload: false });
 const plex = IBM_Plex_Sans({ variable: "--font-plex", subsets: ["latin"], weight: ["400", "500", "600", "700"], preload: false });
-const tajawal = Tajawal({ variable: "--font-tajawal", subsets: ["arabic"], weight: ["400", "500", "700", "800"], preload: false });
+// 800 is carried because the surface asks for it (titles, chips, pills). Plex Arabic ships no 900; the
+// few 900s in the stylesheets fall back to 700 rather than being synthesised, which is the safe
+// direction — a faux-bold Arabic is worse than a slightly lighter one.
+const plexArabic = IBM_Plex_Sans_Arabic({ variable: "--font-arabic", subsets: ["arabic"], weight: ["400", "500", "600", "700"], preload: false });
 
 const siteUrl = "https://web.moedatech.net";
 
@@ -57,7 +71,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,500,0,0" />
       </head>
-      <body className={`${nunito.variable} ${inter.variable} ${plex.variable} ${tajawal.variable} antialiased`}>
+      <body className={`${nunito.variable} ${inter.variable} ${plex.variable} ${plexArabic.variable} antialiased`}>
         <LocaleProvider>
           <SessionProvider>{children}</SessionProvider>
         </LocaleProvider>

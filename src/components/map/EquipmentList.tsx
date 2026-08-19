@@ -551,6 +551,24 @@ function EquipmentCard({
           {/* A 3px hairline of the machine's own state down the photo's inner edge — the card's
               quietest signal, and the same derivation as the chip and the pin. */}
           <span className="bm-eq-hair" style={{ background: colour }} aria-hidden="true" />
+
+          {/* ── «في هذا العرض», ON THE PHOTO (owner, 2026-08-19) ──────────────────────────────────
+              Membership is still a badge and still never the chip's colour (app parity, 2026-08-17):
+              the chip answers "has he named the yard", this answers "is it on the offer", and folding
+              them made one of the two lie. What moved is only where it sits.
+
+              It sat beside the chip on row 2, and that row does not fit. At 392px the text column is
+              262px and the chip, this badge and «اطلب التأكيد» together need about 278 — so on an
+              unconfirmed machine that IS in the offer, the one thing the renter scans for was
+              truncated to «لم يؤكد تو…» to make room for the one thing the count pills already say.
+
+              The photo is the right ground for it: it is the only part of the card with unused
+              surface, the badge is a fact about the whole card rather than about the state line, and
+              a corner tag is how a picture has always carried a label. Row 2 gets its width back and
+              the chip reads whole again. */}
+          {card.inOffer && (
+            <span className="bm-eq-inoffer">{t.bidMap.pinInOffer}</span>
+          )}
         </span>
 
         <div className="bm-eq-tx">
@@ -626,10 +644,6 @@ function EquipmentCard({
                 {chip.availability === "confirmed" ? t.bidMap.eqChipConfirmed : t.bidMap.eqChipUnconfirmed}
               </span>
             </span>
-            {/* Membership, as a badge beside the state and never as its colour (app parity,
-                2026-08-17). The chip answers "has he named the yard"; this answers "is it on the
-                offer". Two questions, two marks — folding them made one of them lie. */}
-            {card.inOffer && <span className="bm-eq-inoffer">{t.bidMap.pinInOffer}</span>}
             {/* The yard is outside the request city's own radius — the fact that turns a delivery into
                 a mobilisation. It qualifies the offer, so it sits with the state and not with the
                 number it is derived from. */}

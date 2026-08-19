@@ -1197,19 +1197,40 @@
   border: 1px solid rgba(22, 163, 74, 0.34);
 }
 .bidmap .bm-eq .bm-eq-chip.no { color: #d9362a; background: rgba(217, 54, 42, 0.1); border: 1px solid rgba(217, 54, 42, 0.3); }
-/* «في هذا العرض» — the machine is on the offer. A BADGE beside the state chip, never a third chip
-   colour (app parity, 2026-08-17): it answers a different question from the chip, so painting it as
-   an availability state is what made one of the two lie. It wears `IN_OFFER_BADGE_COLOUR`, the hex
-   the shortfall alert also draws — one surface, one orange. */
+/* «في هذا العرض» — the machine is on the offer. Still a BADGE and never a third chip colour (app
+   parity, 2026-08-17): it answers a different question from the chip, so painting it as an
+   availability state is what made one of the two lie. It wears `IN_OFFER_BADGE_COLOUR`, the hex the
+   shortfall alert also draws — one surface, one orange.
+
+   **ON THE PHOTO, not on the state row** (owner, 2026-08-19). Row 2 is 262px and the chip, this badge
+   and «اطلب التأكيد» need about 278, so the badge was costing the availability chip its words on
+   exactly the cards where availability is the open question. The photo is the card's only unused
+   surface, and this is a fact about the whole card rather than about the state line.
+
+   Opaque fill rather than the 10% tint it wore on white: over a photograph a translucent badge takes
+   the colour of whatever is behind it, and the shadow is what keeps its edge on a light machine
+   against a light sky. `z-index` clears the hairline; `pointer-events: none` keeps the whole cell one
+   target, since the photo opens the machine. */
 .bidmap .bm-eq .bm-eq-inoffer {
-  color: #e8890c;
-  background: rgba(232, 137, 12, 0.1);
-  border: 1px solid rgba(232, 137, 12, 0.3);
+  position: absolute;
+  z-index: 2;
+  top: 6px;
+  inset-inline-start: 6px;
+  pointer-events: none;
+  color: #8a4f08;
+  background: #fdf0dd;
+  border: 1px solid rgba(232, 137, 12, 0.45);
+  box-shadow: 0 1px 4px rgba(15, 34, 56, 0.18);
   border-radius: 999px;
-  padding: 2px 8px;
-  font-size: 11px;
+  padding: 2px 7px;
+  font-size: 9.5px;
   font-weight: 800;
+  line-height: 1.5;
   white-space: nowrap;
+  /* The cell is 104px wide; a long label is clipped rather than allowed to grow past the picture. */
+  max-width: calc(100% - 12px);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 /* An unanswered question is live, not a closed verdict — so the unsettled dot breathes. */
 .bidmap .bm-eq .bm-eq-chip.no .bm-eq-dot { animation: dpDot 1.7s ease-in-out infinite; }

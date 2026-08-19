@@ -350,6 +350,27 @@ describe("the card's controls each keep a row, and both keep their rules", () =>
     expect(r3).not.toMatch(/bm-eq-acts/);
   });
 
+  /* ── «في هذا العرض» rides the PHOTO, and row 2 is why (owner, 2026-08-19) ──────────────────────
+     Rendered against fixtures at the panel's real 392px, row 2 does not fit: the text column is 262px
+     and the availability chip, this badge and «اطلب التأكيد» need about 278. What gave way was the
+     chip — truncated to «لم يؤكد تو…» on exactly the cards where availability is the open question,
+     to make room for a fact the count pills above already state.
+
+     The badge did not go: it answers a different question from the chip (app parity, 2026-08-17) and
+     folding the two made one of them lie. It moved to the photo, the card's only unused surface.
+
+     Pinned because the constraint is invisible in the markup — a later edit could move it back into
+     row 2, and everything would still typecheck, render and read fine on a wide panel. */
+  it("puts the in-offer badge on the PHOTO, never back on the state row", () => {
+    const src = read(LIST);
+    const photo = region(src, "className={`bm-eq-photo", '<div className="bm-eq-tx">');
+    const r2 = region(src, '<div className="bm-eq-r2">', '<div className="bm-eq-r3">');
+    expect(photo).toMatch(/bm-eq-inoffer/);
+    expect(r2).not.toMatch(/bm-eq-inoffer/);
+    // …and it is positioned onto the picture rather than sitting in the cell's flow.
+    expect(cssBlock(read(CSS), ".bidmap .bm-eq .bm-eq-inoffer {")).toMatch(/position:\s*absolute/);
+  });
+
   it("keeps «اطلب التأكيد» a REAL button on the card, so an unconfirmed machine is askable without opening it (RM3-AC-13)", () => {
     // The mutation the move could have introduced: the ask demoted to a link into the detail, or
     // dropped under the stretched open layer where the card's own press would swallow it.
