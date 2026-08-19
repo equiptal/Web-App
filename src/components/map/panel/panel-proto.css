@@ -918,14 +918,26 @@ span.mp-rowopen { cursor: default; }
 /* Its OWN dark header — the signal that this list belongs to the firm and not to the machine below it.
    `64px` on `0 18px`, the prototype's, in place of a 14 px box that sized itself off two stacked
    lines of text. A header the renter meets on every firm should be the same height on every firm. */
+/* ── The name is what this header is FOR (owner, 2026-08-20) ─────────────────────────────────────
+   *"fix the header to show everything."* «Al-Faisal Contrac…» — a header naming a company, cut before
+   it finishes naming it.
+
+   The row holds a back control, a 40px initials tile, the name and the verified chip inside 392px,
+   and the name was the only thing that could give: it alone carried `min-width: 0` while the other
+   three are `flex-shrink: 0`. Same defect and same fix as the map panel's own header — the name gets a
+   floor, and the CHIP wraps to a second line when the row runs out. `height` becomes `min-height` so
+   the band can take that second line on a long name instead of clipping it.
+
+   `align-items: center` still centres a single-line header, which is every short name. */
 .mp-cohead {
   flex-shrink: 0;
   box-sizing: border-box;
-  height: 64px;
+  min-height: 64px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 18px;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 8px 18px;
   background: #16304f;
   color: #fff;
 }
@@ -945,7 +957,19 @@ span.mp-rowopen { cursor: default; }
 }
 .mp-coname {
   flex: 1;
-  min-width: 0;
+  /* ── The name asks for its own WIDTH, and the chip is what yields ────────────────────────────────
+     `min-width: 0` let the name absorb every pixel the tile, the back control and the chip wanted:
+     `nowrap` with `overflow: hidden` gives an element a min-content width of nothing, so flexbox
+     shrank the one thing the header exists to show. A fixed floor (`12ch`) was not enough either —
+     at 392px the row still left the name ~156px, more than twelve characters and less than a company
+     name, so it truncated without ever forcing the wrap.
+
+     `min-content` is the honest floor: on a `nowrap` element it is the WHOLE name, so the row cannot
+     fit the chip beside a long one and drops it to the second line the wrapping header now allows.
+     `max-width: 100%` is the backstop — a name longer than the row itself is clamped and ellipsised
+     rather than overflowing the panel. */
+  min-width: min-content;
+  max-width: 100%;
   font-size: 15px;
   font-weight: 800;
   white-space: nowrap;

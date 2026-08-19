@@ -212,7 +212,22 @@ export function CompanyPanel({ companyName, verified, docs, ar, L, onBack }: Com
         <span className="mp-coname">{companyName}</span>
         {verified && (
           <span className="mp-vchip">
-            <span aria-hidden="true">✓</span>
+            {/* The stroked check every other surface draws (owner, 2026-08-19) — the map panel's
+                header, both chats, and this. A typed «✓» sat at whatever weight the running font gave
+                it, which on IBM Plex Sans Arabic is not the 2.6 stroke the others carry. */}
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M20 6L9 17l-5-5" />
+            </svg>
             {L("Verified company", "شركة موثّقة")}
           </span>
         )}

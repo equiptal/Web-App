@@ -731,12 +731,16 @@
   position: relative;
   overflow: hidden;
   flex-shrink: 0;
-  height: 64px;
+  /* `min-height`, not `height` (owner, 2026-08-20). 64px is still the band's geometry and still what
+     every short name draws — but the row wraps now, and a hard height with `overflow: hidden` clipped
+     the first line off a two-line header instead of growing by the ~18px the chip needs. The clip was
+     silent and only appeared on the longest names, which are exactly the ones the wrap exists for. */
+  min-height: 64px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 0 18px;
+  padding: 6px 18px;
   background: linear-gradient(180deg, #fbfdff, #f2f7fc);
 }
 .bidmap .bm-head-id::after {
@@ -772,12 +776,18 @@
   font-size: 16px;
   font-weight: 800;
   color: #16304f;
-  /* A FLOOR, not `min-width: 0` (owner, 2026-08-19). Zero is what let the name absorb every pixel the
-     chip and the documents pill wanted: `white-space: nowrap` with `overflow: hidden` gives an element
-     a min-content width of nothing, so flexbox shrank the name to «Al-Faisal …» rather than wrapping
-     the chip that `.bm-head-name` is now willing to wrap. Twelve characters is the point below which a
-     supplier stops being identifiable; past it the chip drops to the second line instead. */
-  min-width: 12ch;
+  /* The name asks for its own WIDTH, and the chip is what yields (owner, 2026-08-19/20).
+     `min-width: 0` let the name absorb every pixel the chip and the documents pill wanted, since
+     `nowrap` with `overflow: hidden` gives an element a min-content width of nothing — that is how it
+     became «Al-Faisal …». A fixed `12ch` floor fixed the common names and not the long ones: it left
+     the name more than twelve characters and less than its whole self, so it truncated without ever
+     forcing the wrap `.bm-head-name` allows.
+
+     `min-content` on a `nowrap` element is the WHOLE name, so a long one cannot fit the chip beside it
+     and the chip takes the second line. `max-width: 100%` is the backstop for a name longer than the
+     row itself: clamped and ellipsised rather than overflowing the panel. Same pair as `.mp-coname`. */
+  min-width: min-content;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
