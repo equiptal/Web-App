@@ -128,7 +128,10 @@
 .dlproto .pb-strip .pb-inline-btn { margin-inline-start: auto; border: 0; background: var(--surface1); border: 1px solid var(--border); border-radius: var(--r-md); padding: 7px 12px; font: inherit; font-weight: 800; font-size: 12.5px; color: var(--navy); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
 
 /* thread — the chat panel (prototype: the #E9EEF3 chat area under the price bar) */
-.dlproto .thread { flex: 1; display: flex; flex-direction: column; gap: 3px; padding: 14px 16px 16px; background: #E9EEF3; }
+/* The map dock's stream rhythm (`.bm-chat-body`): an 8px gap carries the spacing between bubbles, so
+   the bubbles themselves have no margin. It was a 3px gap with `margin: 5px 0` on each bubble — the
+   same total, reached two ways, which is why a card and a bubble sat differently in the two routes. */
+.dlproto .thread { flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 16px; background: #E9EEF3; }
 /* ── the system line, measured against the app (`deal_system_events.dart`) ────────────────────────
    Same pill on both clients, down to the alphas: muted at 20% behind a 30% hairline, radius full,
    7px/12px, at most 85% of the width.
@@ -153,7 +156,10 @@
    acceptance, a term accept, a counter and a term edit. Each tone below is what makes them distinct.
    Centered like `.sysev` (they are narration, not a party bubble) but a card, since they carry values. */
 /* The tone stripe is on the inline-START edge so it mirrors correctly under `dir=rtl`. */
-.dlproto .chatcard { align-self: center; width: min(340px, 92%); margin: 8px 0; padding: 11px 13px; background: var(--surface1); border: 1px solid var(--border); border-inline-start: 3px solid var(--border); border-radius: 14px; box-shadow: 0 1px 3px rgba(9, 20, 34, 0.06); }
+/* Centred, because the negotiation vocabulary is an EVENT in the room rather than either party's
+   remark — the dock reaches the same answer through `.bm-chat-event`. The dock's ceiling and no
+   margin, for the reason `.dl-rq-card` above carries. */
+.dlproto .chatcard { align-self: center; width: 86%; max-width: min(86%, 376px); margin: 0; padding: 11px 13px; background: var(--surface1); border: 1px solid var(--border); border-inline-start: 3px solid var(--border); border-radius: 14px; box-shadow: 0 1px 3px rgba(9, 20, 34, 0.06); }
 .dlproto .cc-head { display: flex; align-items: center; gap: 7px; }
 .dlproto .cc-head .material-icons-outlined { font-size: 17px; flex: 0 0 auto; }
 .dlproto .cc-title { font-size: 12.5px; font-weight: 800; color: var(--navy); line-height: 1.35; }
@@ -263,16 +269,55 @@
    wrapper is a second opinion about one geometry, and the disagreement is what leaves a card floating
    in from the edge. `align-self` on a child of this wrapper is inert, which is exactly why the
    fallback `.chatcard` inside it is re-stated rather than left to centre itself. */
-.dlproto .thread .dl-rq-card { width: min(340px, 92%); margin: 8px 0; }
+/* The dock's ceiling (`.bm-chat-card`), and no margin — the thread's 8px gap is the rhythm now, so a
+   margin here would spend it twice and park a card further from its neighbours than a bubble is. */
+.dlproto .thread .dl-rq-card { width: 86%; max-width: min(86%, 376px); margin: 0; }
 .dlproto .thread .dl-rq-card.is-mine { align-self: flex-end; }
 .dlproto .thread .dl-rq-card.is-them { align-self: flex-start; }
 .dlproto .thread .dl-rq-card .bm-rq,
 .dlproto .thread .dl-rq-card .chatcard { width: 100%; max-width: none; margin: 0; }
-.dlproto .msg { max-width: 70%; margin: 5px 0; padding: 10px 14px; border-radius: 14px; font-size: 13.5px; line-height: 1.45; }
+/* ── ONE chat, two routes (owner, 2026-08-19) ────────────────────────────────────────────────────
+   *"we have now 2 chats style… i want both to be the same, the style i want is the one in the map."*
+
+   These are the MAP DOCK's bubbles, promoted from an override to the base. The dock's root is
+   `bm-chat dlproto` (`ChatDock.tsx:743`), so it has always read this block and then overridden it from
+   `map-proto.css` under a heavier `.bidmap .bm-chat` selector — which is exactly how one conversation
+   came to look like two products depending on where the renter opened it. Those overrides are deleted
+   with this change; the values below ARE them, so the dock renders identically and the deal room now
+   matches it.
+
+   ~~70% · `10px 14px` · r14 · 13.5px/1.45, incoming bordered, outgoing a saturated `--rentee` fill
+   with white text.~~ Withdrawn. The old override's own comment defended the fork — *"that surface has
+   its own spec and its own prototype… none of it may move for this one"* — and the owner has now
+   ruled the other way: the map's is the style, and the deal room follows it.
+
+   What actually changes for a reader here: the outgoing bubble stops being a saturated blue with white
+   ink and becomes pale `#D9EEFF` with the SAME dark ink as the incoming one, so a thread reads as one
+   conversation rather than two voices in two liveries; the incoming bubble drops its border for the
+   shadow both now share; and the tail notch moves to the far edge. */
+.dlproto .msg { max-width: 80%; margin: 0; padding: 9px 12px; border-radius: 13px; font-size: 12.5px; line-height: 1.7; }
 .dlproto .msg .meta { font-size: 10.5px; font-weight: 700; margin-top: 5px; opacity: 0.7; }
-.dlproto .msg.them { align-self: flex-start; background: var(--surface1); border: 1px solid var(--border); border-start-start-radius: 5px; color: var(--navy); }
-.dlproto .msg.mine { align-self: flex-end; background: var(--rentee); color: #fff; border-start-end-radius: 5px; }
+.dlproto .msg.them {
+  align-self: flex-start;
+  background: #fff;
+  border: 0;
+  color: #16304f;
+  border-end-end-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.dlproto .msg.mine {
+  align-self: flex-end;
+  background: #d9eeff;
+  border: 0;
+  color: #16304f;
+  border-end-start-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
 .dlproto .msg.mine .meta { text-align: end; }
+/* «حفظ» beside an attachment, in the bubble's own ink both sides — the outgoing fill is pale now, so
+   the white this used to be on `.msg.mine` would be invisible. */
+.dlproto .msg .msg-att-dl { color: #2563eb; }
+.dlproto .msg.mine .msg-att-dl { color: #1d4ed8; }
 /* supplier-started banner */
 .dlproto .started-banner { display: flex; align-items: center; gap: 8px; margin: 10px 0; padding: 10px 13px; border-radius: 10px; background: var(--info-bg); color: var(--info); font-size: 12.5px; font-weight: 700; }
 .dlproto .started-banner .material-icons-outlined { font-size: 17px; flex: 0 0 auto; }
@@ -280,16 +325,31 @@
 .dlproto .msg-att-img { display: block; margin-top: 6px; }
 .dlproto .msg-att-img img { max-width: 220px; max-height: 220px; border-radius: 10px; display: block; }
 .dlproto .msg-att-file { display: inline-flex; align-items: center; gap: 7px; margin-top: 6px; padding: 8px 11px; border-radius: 10px; background: rgba(0,0,0,.06); color: inherit; text-decoration: none; font-size: 12.5px; font-weight: 700; max-width: 240px; }
-.dlproto .msg.mine .msg-att-file { background: rgba(255,255,255,.18); }
+/* `rgba(255,255,255,.18)` was a white wash for the saturated outgoing fill this bubble no longer has;
+   on pale `#D9EEFF` it is invisible. Both sides now take the same dark wash. */
+.dlproto .msg.mine .msg-att-file { background: rgba(0, 0, 0, 0.06); }
 .dlproto .msg-att-file .material-icons-outlined { font-size: 18px; flex: 0 0 auto; }
 .dlproto .msg-att-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* composer */
-.dlproto .composer { position: sticky; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 12px 0; background: var(--surface1); border-top: 1px solid var(--border); }
-.dlproto .composer .ib { width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface1); color: var(--navy-mid); display: flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; }
-.dlproto .composer input { flex: 1; height: 44px; border: 1px solid var(--border); border-radius: var(--r-full); padding: 0 16px; font: inherit; font-size: 14px; outline: 0; background: var(--surface2); }
-.dlproto .composer input:focus { border-color: var(--action); background: #fff; }
-.dlproto .composer .send { background: var(--action); border-color: var(--action); color: #fff; }
+/* ── The composer is the dock's too (owner, 2026-08-19) ──────────────────────────────────────────
+   `.bm-chat-compose`'s numbers, on this route's own class name — the two markups are the same shape
+   (`.ib` · input · `.ib send`), so only the skin was ever different. 38px round controls on white
+   inside `#C8D8E8`, an r20 field on `#F8FAFC`, 18px gutters.
+
+   The send goes BLUE — `#2563EB`, the dock's. It was `--action`, the product's orange, and the reason
+   for the change is simply that the dock is the style being adopted; nothing in the price bar above is
+   orange, so this is not resolving a clash. It does line the send up with `.pb-btn.neg`, which is the
+   same blue: the live control in the composer and the live control in the bar now read as one family,
+   with «Accept» keeping the green that separates settling from negotiating. */
+.dlproto .composer { position: sticky; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 12px 18px; background: var(--surface1); border-top: 1px solid var(--border); }
+.dlproto .composer .ib { width: 38px; height: 38px; padding: 0; border-radius: 50%; border: 1px solid #c8d8e8; background: #fff; color: #6b8fa8; display: flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; }
+.dlproto .composer .ib .material-icons-outlined { font-size: 17px; }
+.dlproto .composer .ib:disabled { opacity: 0.5; cursor: default; }
+.dlproto .composer input { flex: 1; min-width: 0; height: auto; border: 1px solid #c8d8e8; border-radius: 20px; padding: 10px 14px; font: inherit; font-size: 12.5px; color: #16304f; outline: 0; background: #f8fafc; }
+.dlproto .composer input:focus { border-color: #2563eb; background: #fff; }
+.dlproto .composer input:disabled { opacity: 0.65; }
+.dlproto .composer .send { background: #2563eb; border-color: #2563eb; color: #fff; }
 .dlproto .composer.ro { justify-content: center; } .dlproto .ro-note { font-size: 13px; font-weight: 700; color: var(--muted); }
 /* closed-deal quotation download (app parity) */
 .dlproto .composer.quote-bar { flex-direction: column; gap: 6px; }

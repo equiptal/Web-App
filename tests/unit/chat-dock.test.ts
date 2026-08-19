@@ -417,9 +417,25 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
     // The avatar the band is built around — the prototype's 42px circle of initials.
     expect(cssBlockOf(cssSrc, ".bidmap .bm-chat-av {")).toMatch(/width:\s*42px/);
     expect(cssBlockOf(cssSrc, ".bidmap .bm-chat-body {").toLowerCase()).toContain("#e9eef3");
-    const them = cssBlockOf(cssSrc, ".bidmap .bm-chat .msg.them {");
+    /* ── The bubbles now live in the BASE, and BOTH routes wear them (owner, 2026-08-19) ──────────
+       *"we have now 2 chats style… i want both to be the same, the style i want is the one in the
+       map."* This block used to be `.bidmap .bm-chat .msg.*` — an override that let the deal room
+       keep a saturated outgoing fill while the dock had the pale one. The dock's root is
+       `bm-chat dlproto`, so it reads `.dlproto .msg` already; promoting the values there gives both
+       surfaces one style and leaves nothing to drift. */
+    const dealCss = readFileSync(resolve(process.cwd(), "src/components/deal-room/deal-room-proto.css"), "utf8");
+    const them = cssBlockOf(dealCss, ".dlproto .msg.them {");
     expect(them).toContain("box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08)");
     expect(them).toMatch(/border:\s*0/);
+    // Outgoing is the PALE fill with dark ink, not a brand colour with white text — the single change
+    // a reader of the deal room actually sees, and the one most likely to be "fixed" back.
+    const mine = cssBlockOf(dealCss, ".dlproto .msg.mine {");
+    expect(mine.toLowerCase()).toContain("#d9eeff");
+    expect(mine.toLowerCase()).toContain("#16304f");
+    expect(mine).not.toContain("var(--rentee)");
+    // And the fork is GONE, not merely equal. Two blocks holding the same values is how they came to
+    // hold different ones.
+    expect(cssSrc).not.toContain(".bidmap .bm-chat .msg");
     // A card is a message, so it takes a side and the prototype's 86% (05:140–141) rather than
     // stretching the column and reading as a banner — and it is CAPPED on the same wrapper, so a
     // drawer that fills the canvas cannot leave the card floating in the middle of it.
