@@ -1221,6 +1221,147 @@ export const en = {
     total: "Total",
     noDuration: "This request has no duration, so the figures cover one full period.",
   },
+  /* ── The requests workspace (docs/implementation-plans/requests-workspace/plan.md) ──
+     One page for every request, its items and its bids. Phase 1 is the shell: the rail, the strip
+     that names what is selected, and the two tabs. */
+  workspace: {
+    title: "My Requests",
+    // The rail's first tile. It is an action, not a request, so it says what it makes.
+    newRequest: "New",
+    closed: "Closed",
+    // The units a request asked for, on the rail tile. Rendered only when it is more than one.
+    unitsBadge: "×{n}",
+    railScrollNext: "More requests",
+    railScrollPrev: "Earlier requests",
+    // The dark strip, left half — the request itself.
+    bidsCount: "{n} bids",
+    oneBid: "1 bid",
+    openRequest: "Open the request",
+    // The dark strip, right half — the item, and what the selected supplier offers against it.
+    offers: "{supplier} offers",
+    noBidSelected: "No bid selected",
+    noBidsYet: "No bids on this item yet",
+    reviewEquipment: "Review equipment",
+    viewDocuments: "View documents",
+    // The two tabs and the export beside them.
+    tabCards: "Cards",
+    tabCompare: "Compare",
+    download: "Download",
+    // The source filter. "Via app" is a bid placed through Moedatech; "Offline" is one that arrived
+    // through the share link or was typed in by the renter.
+    source: "Source",
+    sourceAll: "All",
+    sourceApp: "Via app",
+    sourceOffline: "Offline",
+    // Empty states.
+    emptyTitle: "No requests yet",
+    emptyBody: "Create your first request to start getting supplier bids — you'll set up your account when you submit.",
+    emptyCta: "Create request",
+    signedOutTitle: "Sign in to see your requests",
+    signedOutBody: "Your requests, the bids on them, and every comparison live here once you're signed in.",
+    signedOutCta: "Sign in",
+    loading: "Loading your requests…",
+    loadFailed: "Your requests could not be loaded. Check your connection and try again.",
+    retry: "Try again",
+    // Phase 1 ships the shell; the two panes arrive with phases 2 and 3.
+    tabPending: "This view is still being built.",
+    // ── The bid card ──
+    // The card's source line, said in full. The header chip above is the short form.
+    sourceAppLong: "Via Moedatech app",
+    sourceOfflineLong: "Offline · added by you",
+    notOnApp: "Not on the app",
+    openChat: "Open the conversation",
+    // "{period}" is the rental period the bid quoted in — Monthly rental, Weekly rental, and so on.
+    // The price block mirrors the app's bid card (`v3_bid_card.dart`, `price_expanded_breakdown.dart`,
+    // checked 2026-08-12). The headline names the rental type; on a weekly or monthly bid it carries
+    // the RATE, so suppliers compare on what they quoted, and the prorated total moves into the rows.
+    rentalDaily: "Daily rental",
+    rentalWeekly: "Weekly rental",
+    rentalMonthly: "Monthly rental",
+    rentalJob: "Job price",
+    perUnitLabel: "{label} per unit",
+    // The rental row explains the headline: the rate spread across the days actually billed.
+    rentalRowDays: "Rental · {n} days",
+    rentalRowNoDuration: "Rental",
+    rentalRowCustom: "Rental for the specified period",
+    deliveryToSite: "Delivery to site",
+    returnFromSite: "Return from site",
+    notQuoted: "Not quoted",
+    grandTotal: "Grand total",
+    grandTotalInclVat: "Grand total · incl. VAT",
+    // Multi-unit only, in the same box: the true all-units figure, which is not the per-unit total
+    // times the count — each transport leg carries its own unit count.
+    overallTotal: "Overall total",
+    // Off-platform pair. The invite has no action behind it yet and says so when pressed.
+    inviteToApp: "Invite to Moedatech",
+    viewQuote: "View quote",
+    notBuiltYet: "Not available yet.",
+    // ── The comparison matrix ──
+    // "Pick one" focuses the row — it drives the strip above. It never awards; that is the deal room.
+    supplierPickOne: "Supplier · pick one",
+    removeColumn: "Take off the comparison",
+    recommended: "Recommended",
+    awaitingReply: "Awaiting reply",
+    inNegotiation: "In negotiation",
+    perCycle: "Per cycle",
+    colRate: "Rental",
+    // The three totals. The third is named after the request's own duration.
+    firstCycle: "First cycle",
+    everyCycleAfter: "Every cycle after",
+    overDays: "{n} days",
+    // Their popovers. Each lists the lines the figure was added from, in that order.
+    howFirstCycle: "How first cycle is built",
+    howEveryCycle: "How every cycle after is built",
+    howDuration: "How {n} days is built",
+    // The duration column charges billable days, so its popover names them rather than claiming a
+    // count of whole months. Ruled 2026-08-12: the shared pricing module governs this figure, and it
+    // prorates at rate ÷ 26 a day with Fridays excluded — the same equation the deal room and the
+    // quotation use, so one rental cannot cost two different amounts across the app.
+    rentalOverDays: "Rental ÷ 26 × {n} billable days",
+    fridaysNote: "{days} days minus its Fridays = {billable} billable days.",
+    transportOnce: "Delivery + return",
+    paidOnce: "paid once, cycle 1",
+    vatNote: "All figures in SAR. VAT applied at 15% on the taxable lines above.",
+    // The terms split: what the request asked for, against what suppliers volunteered.
+    termsYouSet: "Terms you set",
+    theyOffered: "They offered on their own",
+    termOperator: "Operator",
+    termFuel: "Fuel",
+    termPayment: "Payment",
+    termSla: "Maintenance SLA",
+    termOvertime: "Overtime",
+    termNationality: "Nationality",
+    // A term the supplier never answered. Said out loud, because a blank cell reads as "nothing to pay".
+    didntSay: "Didn't say",
+    rankWithAi: "Rank with AI",
+    exportPopupBlocked: "Allow pop-ups to print the comparison.",
+    docsEquipment: "This machine",
+    docsCompany: "The company",
+    docsNone: "No documents on this bid yet.",
+    docsFailed: "Those documents could not be loaded.",
+    docOpen: "Open",
+    docNoLink: "No link",
+    // ── The request drawer ──
+    shareRequest: "Share request",
+    editRequest: "Edit request",
+    cancelRequest: "Cancel this request",
+    unitsCount: "{n} units",
+    factStarts: "Starts",
+    factDuration: "Duration",
+    factSite: "Site",
+    factRequested: "Requested",
+    factBidsIn: "Bids in",
+    daysValue: "{n} days",
+    // "4 · 2 via the app, 2 added offline" — the total alone hides that half were typed in by hand.
+    bidsSplit: "{app} via the app, {offline} added offline",
+    certsRequired: "Certificates required",
+    // The one-time post-bid edit, in the app's own words (`app_en.arb`, editOnceConfirm*). The web
+    // used to hide Edit entirely once a bid arrived; the app has allowed exactly one since 2026-08-05.
+    editOnceTitle: "One-time edit",
+    editOnceBody: "You can edit this request only once after a bid has been placed. Continue to the edit form?",
+    editOnceContinue: "Continue editing",
+    editCapUsed: "You've already used your one edit for this request",
+  },
   survey: {
     navTitle: "Surveys",
     badgeAria: "You have a survey waiting",

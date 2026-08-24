@@ -94,6 +94,8 @@ const li = (p: Partial<RequestListItem>): RequestListItem => ({
   durationDays: null,
   createdAt: null,
   bidCount: 0,
+  renteeEditUsed: false,
+  requiredCerts: [],
   mobByRentee: null,
   demobByRentee: null,
   item: null,

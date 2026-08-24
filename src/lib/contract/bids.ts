@@ -37,6 +37,11 @@ function toCert(raw: string): CertCode | null {
   if (/SPSP/.test(u)) return "SPSP";
   return null;
 }
+/** Normalise whatever the backend calls a certificate into the enum, dropping what it can't name.
+ *  The request drawer needs this to render a request's required certificates as chips. */
+export function toCertCodes(v: unknown): CertCode[] {
+  return certList(v);
+}
 function certList(v: unknown): CertCode[] {
   const out: CertCode[] = [];
   for (const x of Array.isArray(v) ? v : []) {

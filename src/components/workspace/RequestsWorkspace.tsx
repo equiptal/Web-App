@@ -1,0 +1,398 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocale, useT } from "@/lib/i18n";
+import { useSession } from "@/lib/session";
+import { Icon } from "@/components/ui";
+import { SignInPrompt } from "@/components/common/SignInPrompt";
+import { fetchAllMyRequests, fetchBids, fetchReceivedBids, fetchRequestSubmissions } from "@/lib/api/client";
+import { groupRequests, type RequestGroup } from "@/lib/contract/requests";
+import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
+import {
+  EMPTY_SELECTION,
+  filterBySource,
+  railTiles,
+  resolveSelection,
+  selectedGroup,
+  selectedItem,
+  sourceCounts,
+  type SourceFilter,
+  type WorkspaceBid,
+  type WorkspaceSelection,
+} from "@/lib/contract/workspace";
+import { RequestRail } from "@/components/workspace/RequestRail";
+import { RequestStrip } from "@/components/workspace/RequestStrip";
+import { BidCards } from "@/components/workspace/BidCards";
+import { CompareMatrix } from "@/components/workspace/CompareMatrix";
+import { RequestDrawer, type ShareLinkMeta } from "@/components/workspace/RequestDrawer";
+import { ExportTemplateDialog } from "@/components/compare/ExportTemplateDialog";
+import { buildExportPayload, type ExportPayload } from "@/lib/contract/export-templates";
+import { buildItemComparison } from "@/lib/contract/comparison";
+import { orderColumnsForExport, workspaceExportTotals } from "@/lib/contract/workspace-export";
+import { formatSar } from "@/lib/pricing/rental";
+
+type Tab = "cards" | "compare";
+
+/**
+ * The requests workspace — one page for every request, its items and its bids, replacing the old
+ * list / detail / comparison trio (docs/implementation-plans/requests-workspace/plan.md).
+ *
+ * This is phase 1: the rail, the strip, the tabs and the selection that drives them. The two panes
+ * arrive with phases 2 (cards) and 3 (compare).
+ *
+ * **Selection is never trusted, only resolved.** The three choices are held as ids, and
+ * `resolveSelection` re-reads them against the data on every render — so a request that closed, an
+ * item that belongs to another group, or a bid from the item you just left can never be what the
+ * page is showing. Nothing here has to remember to clean up after a change.
+ */
+export function RequestsWorkspace() {
+  const t = useT();
+  const { locale } = useLocale();
+  const ar = locale === "ar";
+  const L = (en: string, arr: string) => (ar ? arr : en);
+  const { status } = useSession();
+
+  const [groups, setGroups] = useState<RequestGroup[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [bids, setBids] = useState<WorkspaceBid[]>([]);
+  // The submission behind each off-platform card, kept so its viewer has the original to show.
+  const [submissionsByBid, setSubmissionsByBid] = useState<Record<string, LinkBidSubmission>>({});
+  // Unread chat per bid. `fetchDealRoomUnread` is one global total for the Inbox badge; the per-bid
+  // number lives on received-bids, which reads it out of Stream's own per-channel counts.
+  const [unreadByBid, setUnreadByBid] = useState<Record<string, number>>({});
+  const [wanted, setWanted] = useState<WorkspaceSelection>(EMPTY_SELECTION);
+  const [tab, setTab] = useState<Tab>("cards");
+  const [source, setSource] = useState<SourceFilter>("all");
+  const [reloads, setReloads] = useState(0);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  // The public bid link's own settings, which the share sheet edits.
+  const [link, setLink] = useState<ShareLinkMeta | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  // ── The renter's requests ──
+  useEffect(() => {
+    if (status !== "authed") return;
+    let live = true;
+    setFailed(false);
+    fetchAllMyRequests()
+      .then((r) => live && setGroups(groupRequests(r.requests)))
+      .catch(() => {
+        if (!live) return;
+        setGroups([]);
+        setFailed(true);
+      });
+    return () => {
+      live = false;
+    };
+  }, [status, reloads]);
+
+  const resolved = useMemo(() => resolveSelection(groups ?? [], bids, wanted), [groups, bids, wanted]);
+  const group = useMemo(() => selectedGroup(groups ?? [], resolved), [groups, resolved]);
+  const item = useMemo(() => selectedItem(groups ?? [], resolved), [groups, resolved]);
+
+  // ── The selected item's bids: those placed through the app, then those that arrived off it ──
+  // Keyed on the item, so switching item drops the previous item's bids rather than showing them
+  // against the wrong machine while the new ones load.
+  const itemId = resolved.itemId;
+  useEffect(() => {
+    if (status !== "authed" || !itemId) {
+      setBids([]);
+      setSubmissionsByBid({});
+      return;
+    }
+    let live = true;
+    setBids([]);
+    setSubmissionsByBid({});
+    Promise.all([
+      fetchBids(itemId).catch(() => ({ bids: [] })),
+      fetchRequestSubmissions(itemId).catch(() => ({ submissions: [] as Awaited<ReturnType<typeof fetchRequestSubmissions>>["submissions"] })),
+    ]).then(([app, link]) => {
+      if (!live) return;
+      // One card per item of a submission — an off-platform supplier can answer several lines of the
+      // same RFQ in one go, and each line is its own offer to compare.
+      const offline = link.submissions.flatMap((sub) =>
+        (sub.items.length ? sub.items : [undefined]).map((it) => ({ bid: { card: submissionToBidCard(sub, it), source: "offline" } as WorkspaceBid, sub })),
+      );
+      setBids([...app.bids.map((card): WorkspaceBid => ({ card, source: "app" })), ...offline.map((o) => o.bid)]);
+      setSubmissionsByBid(Object.fromEntries(offline.map((o) => [o.bid.card.id, o.sub])));
+      // The same call already carries the public bid link's settings; the drawer's share sheet edits
+      // them, so keep them rather than throwing them away with the rest of the envelope.
+      setLink(
+        "renterName" in link
+          ? { renterName: link.renterName, bidDeadline: link.bidDeadline, logoUrl: link.logoUrl }
+          : null,
+      );
+    });
+    return () => {
+      live = false;
+    };
+  }, [status, itemId]);
+
+  // Unread is per bid across every request, so it is fetched once for the session rather than per
+  // item — switching item does not change anyone's unread count.
+  useEffect(() => {
+    if (status !== "authed") return;
+    let live = true;
+    fetchReceivedBids()
+      .then((r) => live && setUnreadByBid(Object.fromEntries(r.bids.map((b) => [b.bidId, b.unreadCount]))))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [status]);
+
+  const pickGroup = useCallback((groupId: string) => setWanted({ groupId, itemId: null, bidId: null }), []);
+  const pickItem = useCallback((id: string) => setWanted((w) => ({ groupId: w.groupId, itemId: id, bidId: null })), []);
+  const pickBid = useCallback((bidId: string) => setWanted((w) => ({ groupId: w.groupId, itemId: w.itemId, bidId })), []);
+
+
+  const tiles = useMemo(() => railTiles(groups ?? []), [groups]);
+  const shown = useMemo(() => filterBySource(bids, source), [bids, source]);
+  const counts = useMemo(() => sourceCounts(bids), [bids]);
+  const bid = useMemo(() => bids.find((b) => b.card.id === resolved.bidId)?.card ?? null, [bids, resolved.bidId]);
+
+  /**
+   * The export payload, built from what the Compare tab is showing.
+   *
+   * `buildItemComparison` supplies the columns — the same engine the matrix and `Rank with AI` use —
+   * and the totals come from `workspaceExportTotals`, which reads the matrix's own figures rather
+   * than recomputing them. A sheet that recomputes independently is how the old export came to print
+   * "no data" under rows the renter could see filled in.
+   */
+  const buildExport = useCallback((): ExportPayload | null => {
+    if (!item || shown.length === 0) return null;
+    const { columns } = buildItemComparison(
+      shown.map((b) => b.card),
+      { requestDurationDays: item.durationDays ?? undefined },
+    );
+    if (columns.length === 0) return null;
+    return buildExportPayload({
+      requestId: item.id,
+      itemId: item.id,
+      columns: orderColumnsForExport(columns, shown.map((b) => b.card.id)),
+      totals: workspaceExportTotals({ bids: shown, durationDays: item.durationDays, startDate: item.startDate }),
+      header: {
+        requestDisplayId: group?.groupRef ?? item.displayId,
+        itemName: item.item ? (ar ? item.item.nameAr || item.item.name : item.item.name) : null,
+        location: group?.locationLabel ?? null,
+        durationDays: item.durationDays,
+        units: item.item?.qty ?? null,
+      },
+      // The sheet carries the order on screen, which the matrix builds from the figures it shows.
+      // `RankingSource` has no "manual" member, and claiming "agent" would credit a ranking nobody
+      // ran — so it reports the preset whose ordering this actually is.
+      rankingSource: "preset:lowest",
+      agentLive: false,
+      lang: ar ? "ar" : "en",
+    });
+  }, [ar, group, item, shown]);
+
+  /** The fallback the dialog falls back TO: the browser's own print dialog over a plain sheet. */
+  const printComparison = useCallback(() => {
+    if (typeof window === "undefined" || !item || shown.length === 0) return;
+    const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch] as string);
+    const totals = workspaceExportTotals({ bids: shown, durationDays: item.durationDays, startDate: item.startDate });
+    const title = item.item ? (ar ? item.item.nameAr || item.item.name : item.item.name) : item.displayId;
+    const rows = shown
+      .map((b) => {
+        const tot = totals[b.card.id];
+        const cell = (m: { value: number; stated: boolean } | undefined) =>
+          m?.stated ? formatSar(m.value) : `<span class="q">${esc(t.workspace.didntSay)}</span>`;
+        return `<tr><td>${esc(b.card.supplierName)}</td><td>${cell(tot?.rental)}</td><td>${cell(tot?.mobDemob)}</td><td><b>${cell(tot?.grandTotal)}</b></td></tr>`;
+      })
+      .join("");
+    const w = window.open("", "_blank");
+    if (!w) {
+      setToast(t.workspace.exportPopupBlocked);
+      return;
+    }
+    w.document.write(
+      `<!doctype html><html dir="${ar ? "rtl" : "ltr"}"><head><meta charset="utf-8"><title>${esc(title)}</title>` +
+        `<style>body{font:14px system-ui,sans-serif;padding:28px;color:#1c3550}h1{font-size:18px;margin:0 0 2px}` +
+        `p{margin:0 0 18px;color:#6b8fa8;font-size:12px}table{border-collapse:collapse;width:100%}` +
+        `th,td{border:1px solid #d4e0ec;padding:8px 10px;text-align:${ar ? "right" : "left"};font-size:12.5px}` +
+        `th{background:#f2f7fb;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px}.q{color:#9AA7B8}</style></head><body>` +
+        `<h1>${esc(title)}</h1><p>${esc(group?.locationLabel ?? "")} · ${esc(group?.groupRef ?? item.displayId)}` +
+        (item.durationDays ? ` · ${esc(t.workspace.overDays.replace("{n}", String(item.durationDays)))}` : "") +
+        `</p><table><thead><tr><th>${esc(t.workspace.supplierPickOne)}</th><th>${esc(t.workspace.colRate)}</th>` +
+        `<th>${esc(t.workspace.transportOnce)}</th><th>${esc(t.workspace.grandTotalInclVat)}</th></tr></thead>` +
+        `<tbody>${rows}</tbody></table></body></html>`,
+    );
+    w.document.close();
+    w.focus();
+    w.print();
+  }, [ar, group, item, shown, t]);
+
+  // ── The states before there is a workspace to show ──
+  if (status === "anon") {
+    return (
+      <SignInPrompt
+        icon="assignment"
+        title={t.workspace.signedOutTitle}
+        body={t.workspace.signedOutBody}
+        ctaLabel={t.workspace.signedOutCta}
+      />
+    );
+  }
+  if (groups === null) {
+    return <div className="p-10 text-center text-[13px] font-semibold text-muted">{t.workspace.loading}</div>;
+  }
+  if (failed) {
+    return (
+      <div className="p-10 text-center">
+        <p className="text-[13px] font-semibold text-muted">{t.workspace.loadFailed}</p>
+        <button
+          type="button"
+          onClick={() => {
+            setGroups(null);
+            setReloads((n) => n + 1);
+          }}
+          className="mt-3 rounded-full bg-brand px-4 py-2 text-[12.5px] font-bold text-white"
+        >
+          {t.workspace.retry}
+        </button>
+      </div>
+    );
+  }
+  if (groups.length === 0 || !group) {
+    return (
+      <SignInPrompt
+        icon="assignment"
+        title={t.workspace.emptyTitle}
+        body={t.workspace.emptyBody}
+        ctaLabel={t.workspace.emptyCta}
+        ctaHref="/create"
+      />
+    );
+  }
+
+  return (
+    <div className="-mx-6 -my-6 flex min-h-0 flex-col sm:-mx-12 sm:-mt-7 lg:-mx-20 xl:-mx-28">
+      <RequestRail tiles={tiles} activeKey={resolved.groupId} onPick={pickGroup} />
+
+      <RequestStrip
+        group={group}
+        item={item}
+        items={group.items}
+        bid={bid}
+        bidCount={bids.length}
+        onPickItem={pickItem}
+        onOpenRequest={() => setDrawerOpen(true)}
+      />
+
+      <div className="mx-3 mt-4 sm:mx-5">
+        {/* Tabs, and the export beside them. */}
+        <div className="flex items-end justify-between gap-3">
+          <div className="flex gap-1">
+            {(["cards", "compare"] as Tab[]).map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setTab(k)}
+                aria-current={tab === k ? "page" : undefined}
+                className={`rounded-t-[10px] border border-b-0 px-5 py-2 text-[13px] font-extrabold transition ${
+                  tab === k ? "border-border bg-surface text-navy" : "border-transparent bg-surface2 text-muted hover:text-navy-mid"
+                }`}
+              >
+                {k === "cards" ? t.workspace.tabCards : t.workspace.tabCompare}
+              </button>
+            ))}
+          </div>
+          {/* The same export the comparison workspace had: the renter's own templates, with the
+              built-in sheet as the fallback whenever a template cannot be used. Nothing is rebuilt —
+              `buildExportPayload` and the dialog are the originals. */}
+          <button
+            type="button"
+            disabled={shown.length === 0}
+            onClick={() => setExportOpen(true)}
+            className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3.5 py-1.5 text-[12.5px] font-bold text-navy-mid transition hover:border-navy-mid disabled:opacity-40"
+          >
+            {t.workspace.download} <Icon name="download" size={15} />
+          </button>
+        </div>
+
+        <div className="rounded-b-[14px] rounded-tr-[14px] border border-border bg-surface">
+          {/* The source filter sits inside the panel, above whichever pane is showing — it narrows
+              both of them, so it belongs to neither. */}
+          <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
+            <span className="inline-flex items-center gap-1 text-[10.5px] font-extrabold uppercase tracking-wide text-muted">
+              <Icon name="filter_list" size={14} /> {t.workspace.source}
+            </span>
+            {(
+              [
+                ["all", t.workspace.sourceAll],
+                ["app", t.workspace.sourceApp],
+                ["offline", t.workspace.sourceOffline],
+              ] as [SourceFilter, string][]
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setSource(key)}
+                aria-current={source === key ? "true" : undefined}
+                className={`rounded-full px-2.5 py-1 text-[12px] font-bold transition ${
+                  source === key ? "bg-navy text-white" : "text-navy-mid hover:bg-surface2"
+                }`}
+              >
+                {label}
+                <span className={source === key ? "text-white/60" : "text-muted"}> {counts[key]}</span>
+              </button>
+            ))}
+          </div>
+
+          {tab === "cards" ? (
+            <BidCards
+              bids={shown}
+              selectedId={resolved.bidId}
+              unreadByBid={unreadByBid}
+              submissionsByBid={submissionsByBid}
+              durationDays={item?.durationDays ?? null}
+              startDate={item?.startDate ?? null}
+              onSelect={pickBid}
+            />
+          ) : (
+            <CompareMatrix
+              bids={shown}
+              selectedId={resolved.bidId}
+              durationDays={item?.durationDays ?? null}
+              startDate={item?.startDate ?? null}
+              onSelect={pickBid}
+            />
+          )}
+        </div>
+      </div>
+
+      <ExportTemplateDialog
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        ar={ar}
+        L={L}
+        buildPayload={buildExport}
+        onBuiltinExport={printComparison}
+        toast={(m) => setToast(m)}
+      />
+      {toast && (
+        <div className="fixed inset-x-0 bottom-28 z-[70] mx-auto w-fit rounded-full bg-navy px-4 py-2 text-[12.5px] font-bold text-white shadow-lg">
+          {toast}
+        </div>
+      )}
+
+      {drawerOpen && (
+        <RequestDrawer
+          group={group}
+          item={item}
+          bids={bids}
+          link={link}
+          onClose={() => setDrawerOpen(false)}
+          // An edit or a cancellation changes the rail and the bids under it, so both are re-read
+          // rather than patched in place — the page has one source for its data and keeps it.
+          onChanged={() => {
+            setGroups(null);
+            setReloads((n) => n + 1);
+          }}
+        />
+      )}
+    </div>
+  );
+}

@@ -11,6 +11,7 @@
  */
 
 import { durationDaysBetween } from "@/lib/pricing/rental";
+import { toCertCodes, type CertCode } from "./bids";
 
 export type RequestStatus = "OPEN" | "ACTIVE" | "PARTIALLY_ACCEPTED" | "ACCEPTED" | "EXPIRED" | "FORCE_EXPIRED" | "HUB_CLOSED" | "CLOSED" | string;
 export type RequestType = "BROADCAST" | "DIRECT" | string;
@@ -210,6 +211,15 @@ export interface RequestListItem {
   durationDays: number | null;
   createdAt: string | null;
   bidCount: number;
+  /**
+   * The one post-bid edit has been spent. The cap is enforced server-side — `request.service.ts`
+   * updates conditionally on `bidCount > 0 && renteeEditUsed === false` — and the app reads this
+   * field to disable its Edit button and say why. Without it the renter fills the whole form and is
+   * only refused at save. Defaults false when the payload predates the field.
+   */
+  renteeEditUsed: boolean;
+  /** Certificates the request demands, normalised to the enum — the drawer's chips. */
+  requiredCerts: CertCode[];
   /** Who the request assigned mobilization / demobilization to (true = renter bears it, false = supplier). */
   mobByRentee: boolean | null;
   demobByRentee: boolean | null;
@@ -311,6 +321,10 @@ export function mapRequestListItem(r: RequestRecord): RequestListItem {
     durationDays: num(r.estimatedDurationDays) ?? durationDaysBetween(str(r.startDate), str(r.endDate)),
     createdAt: str(r.createdAt),
     bidCount: num(r.bidCount) ?? 0,
+    // `my-requests` spreads the whole request row, so this arrives already — it was simply never
+    // read here, which is why the web had no idea the one post-bid edit had been spent.
+    renteeEditUsed: r.renteeEditUsed === true,
+    requiredCerts: toCertCodes(r.requiredCerts),
     mobByRentee: it?.mobilizationByRentee ?? null,
     demobByRentee: it?.demobilizationByRentee ?? null,
     item: it
