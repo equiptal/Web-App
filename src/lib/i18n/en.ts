@@ -866,6 +866,7 @@ export const en = {
     // Errors
     loadError: "Couldn't load your profile.",
     saveError: "We couldn't save your changes. Please try again.",
+    cantClear: "This can't be removed once saved. Please keep a value here.",
     changePhoneError: "We couldn't send the code. Please try again.",
     otpError: "That code isn't right. Please try again.",
     phoneInUse: "That number is already registered to another account.",
