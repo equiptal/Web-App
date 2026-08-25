@@ -189,7 +189,12 @@ export function RequestStrip({
                   {offered ?? "—"}
                   {offeredYear ? ` · ${offeredYear}` : ""}
                 </span>
-                {!bid.eqVerified && (
+                {/* Only where there IS a machine to check. An off-platform submission registers no
+                    equipment at all (`link-bids` maps `equipment: null`, `eqVerified: false`), so
+                    this chip would read as «somebody looked and it failed» on every offline bid,
+                    when the truth is that nobody was ever asked for papers. Same silence the
+                    availability pill keeps, for the same reason. */}
+                {bid.equipment?.id && !bid.eqVerified && (
                   <span className="rounded-md border border-danger/25 bg-danger-soft px-2 py-[3px] text-[9.5px] font-bold text-danger">
                     {t.workspace.papersNotChecked}
                   </span>
