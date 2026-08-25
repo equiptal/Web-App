@@ -23,7 +23,7 @@ import { useRfq } from "@/lib/store/rfq-store";
 import { Icon, TextInput, Toggle } from "@/components/ui";
 import { CanvasField, ChoiceChips, ChoiceRow, PanelDot } from "@/components/create/Provenance";
 import { useProvenance } from "@/components/create/hooks";
-import { OPERATOR_CERTIFICATES, PARTIES, type EquipmentItem, type OperatorCertificate, type Party } from "@/lib/contract";
+import { OPERATOR_CERTIFICATES, type EquipmentItem, type OperatorCertificate, type Party } from "@/lib/contract";
 
 export function OperatorRail({ item }: { item: EquipmentItem }) {
   const t = useT();
@@ -40,10 +40,10 @@ export function OperatorRail({ item }: { item: EquipmentItem }) {
     actions.patchItemOperator(item.id, patch);
   };
 
-  const partyOptions = PARTIES.map((p) => ({
-    value: p,
-    label: p === "supplier" ? t.create.party.supplier : t.create.party.weCover,
-  }));
+  const partyOptions: { value: Party; label: string }[] = [
+    { value: "supplier", label: t.create.party.supplier },
+    { value: "me", label: t.create.party.weCover },
+  ];
 
   // ---- Collapsed: the prototype's 72px strip. ----
   if (!on) {
@@ -66,7 +66,7 @@ export function OperatorRail({ item }: { item: EquipmentItem }) {
   }
 
   return (
-    <div className="flex w-full flex-none flex-col gap-4 rounded-[14px] border border-border bg-surface p-3.5 lg:w-[380px]">
+    <div className="flex w-full flex-none flex-col gap-4 rounded-[14px] border border-border bg-surface p-3.5 lg:min-h-[530px] lg:w-[380px]">
       <div className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-2">
           <PanelDot complete={complete} />
@@ -112,7 +112,7 @@ export function OperatorRail({ item }: { item: EquipmentItem }) {
                 certificate: op.certificate.includes(v) ? op.certificate.filter((c) => c !== v) : [...op.certificate, v],
               })
             }
-            options={OPERATOR_CERTIFICATES.map((c) => ({ value: c, label: t.options.safetyCert[c] }))}
+            options={OPERATOR_CERTIFICATES.map((c) => ({ value: c, label: t.create.operatorCard.certShort[c] ?? t.options.safetyCert[c] }))}
           />
         </CanvasField>
         {op.certificate.includes("other") && (

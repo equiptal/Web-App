@@ -78,7 +78,8 @@ describe("operator certificates (MREQ-AC-27)", () => {
     const labels = within(field)
       .getAllByRole("button")
       .map((b) => b.textContent!.trim());
-    expect(labels).toEqual(["TÜV", "SPSP", "SASO technical inspection", "Other"]);
+    // Short chip forms; the stored codes are still OPERATOR_CERTIFICATES.
+    expect(labels).toEqual(["TÜV", "SPSP", "SASO", "Other"]);
     expect(OPERATOR_CERTIFICATES).toEqual(["tuv", "spsp", "saso-technical", "other"]);
     // The prototype offered an "Any" operator certificate, which the platform has no code for.
     expect(labels).not.toContain("Any");

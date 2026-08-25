@@ -29,7 +29,6 @@ import { useItemAttachments, useItemOverrides, useItemTaxonomy, useProvenance } 
 import {
   EQUIPMENT_YEARS,
   FUEL_TYPES,
-  PARTIES,
   SAFETY_CERTIFICATES,
   type EquipmentItem,
   type FuelType,
@@ -41,7 +40,17 @@ import {
 /** A sentinel for "No certificate" — an explicit answer that stores as an empty list (MREQ-AC-55). */
 const NO_CERT = "__none__";
 
-export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps: RequiredGap[]; shaking: boolean }) {
+export function MachineCard({
+  item,
+  gaps,
+  shaking,
+  onCollapse,
+}: {
+  item: EquipmentItem;
+  gaps: RequiredGap[];
+  shaking: boolean;
+  onCollapse?: () => void;
+}) {
   const t = useT();
   const { state, actions } = useRfq();
   const tax = useItemTaxonomy(item, state.taxonomy);
@@ -59,18 +68,31 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
   };
 
   const notAvailable = item.verdict === "no-match";
-  const partyOptions = (renterLabel: string) =>
-    PARTIES.map((p) => ({ value: p, label: p === "supplier" ? t.create.party.supplier : renterLabel }));
+  /**
+   * Supplier first, the renter's own obligation second — the order the prototype uses on every one of
+   * these. `PARTIES` is ["me","supplier"], so reading it in array order put ours back to front.
+   */
+  const partyOptions = (renterLabel: string): { value: Party; label: string }[] => [
+    { value: "supplier", label: t.create.party.supplier },
+    { value: "me", label: renterLabel },
+  ];
 
   return (
     <div className="min-w-0 flex-1 rounded-[14px] border border-border bg-surface p-3.5">
-      <div className="mb-4 flex items-center gap-2">
-        <PanelDot complete={gaps.length === 0} />
-        <h2 className="whitespace-nowrap text-[15px] font-extrabold text-navy">{t.create.machine}</h2>
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2">
+          <PanelDot complete={gaps.length === 0} />
+          <h2 className="whitespace-nowrap text-[15px] font-extrabold text-navy">{t.create.machine}</h2>
+        </span>
+        {onCollapse && (
+          <button type="button" onClick={onCollapse} className="text-[12px] font-semibold text-muted hover:text-navy-mid">
+            {t.create.collapse}
+          </button>
+        )}
       </div>
 
       {/* The prototype's 2fr / 3fr split, 20px gutter, columns aligned to the top. */}
-      <div className="grid gap-5 lg:grid-cols-[2fr_3fr] lg:items-stretch">
+      <div className="grid gap-5 lg:grid-cols-[1fr_2fr] lg:items-stretch">
         {/* ---------------- The 450px panel, and the four controls on its corners ---------------- */}
         <div className="relative h-full min-h-[450px] w-full min-w-0 overflow-hidden rounded-xl bg-[#f0f1f3]">
           <div className="grid h-full place-content-center justify-items-center gap-2 px-6 text-center">
@@ -148,7 +170,6 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
                 searchPlaceholder={t.create.machineCard.fuel}
                 label={t.create.machineCard.fuel}
                 tone="overlay"
-                prefix={t.create.machineCard.fuel}
                 options={FUEL_TYPES.map((f) => ({ value: f, label: t.options.fuelType[f] }))}
                 onChange={(v) => set("fuel_type", { fuelType: v as FuelType })}
               />
@@ -236,16 +257,32 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
             </div>
           )}
 
-          {/* Logistics: the prototype's 2fr / 1fr — the two haulage legs together, fuel on its own. */}
-          <div className="grid items-start gap-3.5 sm:grid-cols-2">
-            <div className="min-w-0 rounded-[10px] bg-surface2 p-3.5">
-              <div className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.05em] text-muted">{t.create.machineCard.logistics}</div>
-              <div className="flex flex-col gap-3.5">
+          {/* Logistics, at the prototype's geometry: all three choices on ONE row — the two haulage
+              legs inside a single box, fuel in its own — as a 2fr/1fr split, which lands the three
+              groups at roughly equal width.
+
+              The row is why the chip type is 12px rather than the prototype's 13px. Its own labels
+              are "Supplier" and "Me"; ours name the obligation ("We collect"), which is longer, and
+              at 13px they overflowed ~60px of chip and forced the legs to stack. Smaller type keeps
+              the prototype's layout AND the wording that says what the choice means. */}
+          <div className="grid items-start gap-3.5 sm:grid-cols-[2fr_1fr]">
+            <div className="grid min-w-0 gap-3.5 rounded-[10px] bg-surface2 p-3.5 sm:grid-cols-2">
+              {/* Delivery is the amber-highlighted one in the prototype, with its note beneath. */}
+              <div className="-mx-2 -my-1 min-w-0 rounded-lg border border-[#f5c98f] bg-[#fff9f0] px-1.5 py-2.5">
                 <CanvasField
                   label={t.create.machineCard.delivery}
+                  amber
                   missing={gapFor("delivery")}
                   shake={shake("delivery")}
                   source={prov.itemSource("delivery", overrides.delivery, "deliveryOverride", true)}
+                  icon={
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-none" aria-hidden>
+                      <rect x="1" y="7" width="13" height="9" rx="1" />
+                      <path d="M14 10h4l3 3v3h-7z" />
+                      <circle cx="6" cy="18" r="1.6" />
+                      <circle cx="17" cy="18" r="1.6" />
+                    </svg>
+                  }
                 >
                   <ChoiceRow<Party>
                     value={overrides.delivery}
@@ -253,25 +290,35 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
                     options={partyOptions(t.create.party.weCollect)}
                   />
                 </CanvasField>
-                <CanvasField
-                  label={t.create.machineCard.returnFromSite}
-                  missing={gapFor("return")}
-                  shake={shake("return")}
-                  source={prov.itemSource("return", overrides.returnFromSite, "returnOverride", true)}
-                >
-                  <ChoiceRow<Party>
-                    value={overrides.returnFromSite}
-                    onChange={(v) => set("return", { returnOverride: v })}
-                    options={partyOptions(t.create.party.weReturn)}
-                  />
-                </CanvasField>
               </div>
+              <CanvasField
+                label={t.create.machineCard.returnFromSite}
+                missing={gapFor("return")}
+                shake={shake("return")}
+                source={prov.itemSource("return", overrides.returnFromSite, "returnOverride", true)}
+                icon={
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-none" aria-hidden>
+                    <path d="M19 12H5M12 5l-7 7 7 7" />
+                  </svg>
+                }
+              >
+                <ChoiceRow<Party>
+                  value={overrides.returnFromSite}
+                  onChange={(v) => set("return", { returnOverride: v })}
+                  options={partyOptions(t.create.party.weReturn)}
+                />
+              </CanvasField>
             </div>
-            {/* The label carries the fuel type, so "We pay" is unambiguous about what is paid for. */}
             <div className="min-w-0 rounded-[10px] bg-surface2 p-3.5">
               <CanvasField
-                label={fmt(t.create.machineCard.fuelResponsibility, { fuel: t.options.fuelType[item.fuelType].toLowerCase() })}
+                label={t.create.machineCard.fuelResponsibility}
                 source={prov.itemSource("fuel_responsibility", overrides.fuelResponsibility, "fuelResponsibilityOverride", true)}
+                icon={
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-none" aria-hidden>
+                    <path d="M3 22V4a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v18M3 10h9M14 22v-8l3-3h2a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-1" />
+                    <circle cx="17.5" cy="18.5" r="1.2" />
+                  </svg>
+                }
               >
                 <ChoiceRow<Party>
                   value={overrides.fuelResponsibility}
@@ -311,6 +358,7 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
               <TextArea
                 value={item.additionalNotes}
                 rows={3}
+                className="h-24"
                 placeholder={t.create.machineCard.notesPlaceholder}
                 onChange={(e) => actions.patchItem(item.id, { additionalNotes: e.target.value })}
               />

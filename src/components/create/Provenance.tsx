@@ -126,7 +126,7 @@ export function ChoiceRow<T extends string>({
   columns?: number;
 }) {
   return (
-    <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+    <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
       {options.map((o) => {
         const on = value === o.value;
         return (
@@ -140,7 +140,7 @@ export function ChoiceRow<T extends string>({
              * whose label is cut off has lost the only thing that says what it means. A wrapped chip
              * is ugly; a clipped one is wrong.
              */
-            className={`rounded-lg border px-1.5 py-2 text-center text-[13px] leading-tight transition ${
+            className={`rounded-lg border px-0.5 py-2 text-center text-[12px] leading-tight transition ${
               on ? "border-navy bg-navy font-bold text-white shadow-[0_0_0_2px_#dbe6f1]" : "border-border bg-surface font-semibold text-navy-mid"
             }`}
           >

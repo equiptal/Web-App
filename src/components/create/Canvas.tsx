@@ -143,7 +143,7 @@ export function Canvas() {
           </span>
           <div className="min-w-0">
             <div className="text-[10px] font-bold uppercase tracking-[0.05em] text-warn">{t.create.youWrote}</div>
-            <p className="mt-0.5 truncate text-[13px] italic text-navy-mid">{state.text || "—"}</p>
+            <p className="mt-0.5 truncate text-[13px] italic text-navy-mid">{state.text ? `"${state.text}"` : "—"}</p>
           </div>
         </div>
         <div className="flex flex-none items-center gap-3.5">
@@ -179,7 +179,12 @@ export function Canvas() {
       {/* ---------------- Equipment ---------------- */}
       {item && (
         <div ref={equipmentRef} className="mb-3.5 flex flex-col gap-4 lg:flex-row lg:items-start">
-          <MachineCard item={item} gaps={equipmentGaps} shaking={shaking} />
+          <MachineCard
+            item={item}
+            gaps={equipmentGaps}
+            shaking={shaking}
+            onCollapse={() => actions.openSection(state.activeSection === "equipment" ? null : "equipment")}
+          />
           <OperatorRail item={item} />
         </div>
       )}

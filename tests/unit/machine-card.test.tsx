@@ -204,11 +204,13 @@ describe("crane-only work type (MREQ-AC-23)", () => {
 });
 
 describe("logistics terms name the obligation (MREQ-AC-62/63)", () => {
-  it("says what the renter would do, not who they are", async () => {
+  // The prototype's own labels, since the row layout is the prototype's — but our option wording,
+  // which names the act rather than the party.
+  it("uses the prototype's labels and our obligation wording", async () => {
     await card();
-    expect(screen.getByText("LOGISTICS")).toBeTruthy();
-    expect(screen.getByText("To site — mobilisation")).toBeTruthy();
-    expect(screen.getByText("From site — demobilisation")).toBeTruthy();
+    expect(screen.getByText("DELIVERY TO SITE")).toBeTruthy();
+    expect(screen.getByText("RETURN FROM SITE")).toBeTruthy();
+    expect(screen.getByText("FUEL RESPONSIBILITY")).toBeTruthy();
     expect(screen.getByText("We collect")).toBeTruthy();
     expect(screen.getByText("We return")).toBeTruthy();
     expect(screen.getByText("We pay")).toBeTruthy();
@@ -216,9 +218,19 @@ describe("logistics terms name the obligation (MREQ-AC-62/63)", () => {
     expect(screen.queryByText("Me")).toBeNull();
   });
 
-  it("names the fuel type in the label so 'We pay' is unambiguous", async () => {
-    await card();
-    expect(screen.getByText("Fuel — diesel")).toBeTruthy();
+  // All three sit on ONE row, which is what the smaller chip type buys: the two haulage legs share
+  // a box as a 2-column grid, and fuel has its own beside it.
+  it("keeps all three choices on one row", async () => {
+    const { view } = await card();
+    const delivery = screen.getByText("DELIVERY TO SITE").closest("div")!.parentElement!;
+    const ret = screen.getByText("RETURN FROM SITE").closest("div")!.parentElement!;
+    const fuel = screen.getByText("FUEL RESPONSIBILITY").closest("div")!.parentElement!;
+    // Delivery and return share a grid; fuel is a sibling box in the same row container.
+    // Attribute match rather than a class selector: Tailwind arbitrary values contain brackets
+    // that querySelector parses as pseudo-class syntax.
+    const row = view.container.querySelector('[class*="2fr_1fr"]');
+    expect(row).toBeTruthy();
+    for (const el of [delivery, ret, fuel]) expect(row!.contains(el)).toBe(true);
   });
 });
 
