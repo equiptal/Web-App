@@ -373,7 +373,7 @@ export function RequestsWorkspace() {
         onOpenRequest={() => { setDrawerShare(false); setDrawerOpen(true); }}
       />
 
-      <div className={`${PAGE_MX_BLEED} mt-3 flex min-h-0 flex-1 flex-col pb-3`}>
+      <div className={`${PAGE_MX_BLEED} mt-2 flex min-h-0 flex-1 flex-col pb-2`}>
         {/* Tabs, and the export beside them. The open tab is part of the panel below it — it carries
             the panel's own border and covers the hairline between them, which is why the panel's
             top-start corner is square. */}
@@ -434,7 +434,7 @@ export function RequestsWorkspace() {
               rather than a row of pills, because it is a filter over the table, not an action on it.
               It appears only when there is a mix to narrow: with every bid from one source, three
               choices that change nothing are furniture. */}
-          <div className="flex flex-none flex-wrap items-center gap-4 border-b border-border px-4 py-2.5">
+          <div className="flex flex-none flex-wrap items-center gap-4 border-b border-border px-4 py-2">
               <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wide text-muted">
                 <Icon name="filter_list" size={14} /> {t.workspace.source}
               </span>
