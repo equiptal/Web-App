@@ -195,30 +195,24 @@ export function MachineCard({
           ) : (
             /* The amber-tinted taxonomy trio, at the prototype's minmax columns. */
             <div className="grid gap-2.5 rounded-[10px] border border-[#f5c98f] bg-[#fff9f0] p-3 sm:grid-cols-[minmax(132px,1fr)_minmax(150px,1.5fr)_minmax(104px,0.9fr)]">
+              {/* Derived, never picked. The renter chooses a TYPE and the category follows from it —
+                  so this shows the taxonomy's `tag` (its canonical grouping, e.g. "Earthmoving") as a
+                  read-only box, exactly as the prototype does. No chevron, because there is nothing
+                  here to open. */}
               <CanvasField
                 label={t.create.machineCard.category}
                 amber
-                missing={gapFor("category")}
-                shake={shake("category")}
                 source={prov.itemSource("category", item.ref.categoryId, "ref")}
               >
-                <SearchSelect
-                  value={item.ref.categoryId}
-                  placeholder={t.create.machineCard.category}
-                  searchPlaceholder={t.create.machineCard.searchTypes}
-                  label={t.create.machineCard.category}
-                  options={tax.categories}
-                  onChange={(v) => {
-                    prov.touch("category");
-                    actions.setItemCategory(item.id, v);
-                  }}
-                />
+                <div className="truncate rounded-lg border border-border bg-surface px-3 py-2.5 text-[13px] text-navy">
+                  {tax.tagName || "—"}
+                </div>
               </CanvasField>
               <CanvasField
                 label={t.create.machineCard.type}
                 amber
-                missing={gapFor("subtype")}
-                shake={shake("subtype")}
+                missing={gapFor("subtype") || gapFor("category")}
+                shake={shake("subtype") || shake("category")}
                 source={prov.itemSource("subtype", item.ref.subcategoryId)}
               >
                 <SearchSelect
@@ -226,10 +220,15 @@ export function MachineCard({
                   placeholder={t.create.machineCard.type}
                   searchPlaceholder={t.create.machineCard.searchTypes}
                   label={t.create.machineCard.type}
-                  disabled={!item.ref.categoryId}
-                  options={tax.subtypes}
+                  options={tax.allSubtypes}
                   onChange={(v) => {
+                    // One pick, both ids: the parent category comes from the chosen subtype rather
+                    // than being asked for separately.
+                    const chosen = tax.allSubtypes.find((o) => o.value === v);
                     prov.touch("subtype");
+                    if (chosen && chosen.categoryId !== item.ref.categoryId) {
+                      actions.setItemCategory(item.id, chosen.categoryId);
+                    }
                     actions.setItemSubcategory(item.id, v);
                   }}
                 />

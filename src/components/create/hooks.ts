@@ -44,13 +44,32 @@ export function useItemTaxonomy(item: EquipmentItem, taxonomy: Taxonomy) {
     const categories: TaxonomyOption[] = taxonomy.map((c) => ({ value: c.id, label: taxName(c, locale) }));
     const subtypes: TaxonomyOption[] = (category?.subcategories ?? []).map((s) => ({ value: s.id, label: taxName(s, locale) }));
     const sizes: TaxonomyOption[] = (subcategory?.measurements ?? []).map((m) => ({ value: m.id, label: taxName(m, locale) }));
+    /**
+     * Every subtype across every category, each carrying the parent it belongs to.
+     *
+     * The renter picks a TYPE and nothing else: category is derived from whatever they chose, so the
+     * list cannot be scoped to a category that has not been picked yet. Choosing from here sets both
+     * ids at once.
+     */
+    const allSubtypes: (TaxonomyOption & { categoryId: string })[] = taxonomy.flatMap((c) =>
+      c.subcategories.map((sub) => ({ value: sub.id, label: taxName(sub, locale), categoryId: c.id })),
+    );
+
     return {
       category,
       subcategory,
       measurement,
       categories,
       subtypes,
+      allSubtypes,
       sizes,
+      /**
+       * What the CATEGORY box shows: the taxonomy's `tag` — its canonical grouping, e.g.
+       * "Earthmoving" or "Lifting, Cranes & Aerial". Tags live on CATEGORY rows and a subcategory
+       * inherits its parent's, so this reads off whichever is resolved. Falls back to the category's
+       * own name for a taxonomy row that carries no tag.
+       */
+      tagName: subcategory?.tag ?? category?.tag ?? taxName(category, locale),
       categoryName: taxName(category, locale),
       subtypeName: taxName(subcategory, locale),
       sizeName: taxName(measurement, locale),

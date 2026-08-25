@@ -133,25 +133,44 @@ describe("option lists come from the contract (MREQ-AC-17/18/19)", () => {
   });
 });
 
-describe("taxonomy (MREQ-AC-20/21)", () => {
+describe("taxonomy — one pick, category derived (MREQ-AC-20/21)", () => {
   it("shows the resolved names, never a hardcoded label", async () => {
     await card();
-    // "Earthmoving" here comes from the fixture taxonomy via the item's ref — the prototype
-    // hardcoded that exact word, so the assertion is that it is reachable through the ref.
     expect(screen.getByText("Crawler excavator")).toBeTruthy();
     expect(screen.getByText("30 ton")).toBeTruthy();
+    // CATEGORY renders the taxonomy's `tag`, which is what the prototype shows there.
     expect(screen.getByText("Earthmoving")).toBeTruthy();
   });
 
-  it("filters the type list and cascades the size list", async () => {
+  // The renter picks a TYPE and nothing else, so the list spans every category rather than being
+  // scoped to one that has not been chosen yet.
+  it("lists every subtype across all categories", async () => {
     const handle = await card();
-    expect(await optionsOf(handle, "TYPE")).toEqual(["Crawler excavator", "Wheel loader"]);
+    expect(await optionsOf(handle, "TYPE")).toEqual(["Crawler excavator", "Wheel loader", "Mobile crane"]);
+  });
 
-    // Switching category clears the levels below, so the size list follows the new category.
-    await handle.run(() => {
-      handle.store().actions.setItemCategory(handle.store().state.draft!.items[0].id, "cat-lifting");
-    });
-    expect(await optionsOf(handle, "TYPE")).toEqual(["Mobile crane"]);
+  it("offers no category control at all — it is derived", async () => {
+    await card();
+    expect(screen.getByText("CATEGORY")).toBeTruthy();
+    expect(screen.queryByRole("combobox", { name: "CATEGORY" })).toBeNull();
+  });
+
+  it("sets BOTH ids from one pick, and re-tags the category", async () => {
+    const handle = await card();
+    await pick(handle, "TYPE", "Mobile crane");
+
+    const ref = handle.store().state.draft!.items[0].ref;
+    expect(ref.subcategoryId).toBe("sub-mobile-crane");
+    expect(ref.categoryId).toBe("cat-lifting");
+    // The derived category follows, shown as that branch's tag.
+    expect(screen.getByText("Lifting, Cranes & Aerial")).toBeTruthy();
+    expect(handle.store().state.draft!.touchedFields).toContain("line_items[a0].subtype");
+  });
+
+  it("cascades the size list to the newly chosen subtype", async () => {
+    const handle = await card();
+    await pick(handle, "TYPE", "Mobile crane");
+    expect(await optionsOf(handle, "SIZE")).toEqual(["50 ton"]);
   });
 
   it("disables size until a type is chosen", async () => {
