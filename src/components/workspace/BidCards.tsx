@@ -9,7 +9,6 @@ import { Icon } from "@/components/ui";
 import { bidCounterDelta } from "@/lib/contract/bid-counter-delta";
 import { distinctMachinesOffered, unitCountNotes } from "@/lib/contract/unit-count-notes";
 import { computeQuoteTotals, computeRentalTotal, divisorNote, formatSar, headlineAmount, legDisplay } from "@/lib/pricing/rental";
-import { computeCycleTotals } from "@/lib/contract/cycle-totals";
 import { startDealRoom } from "@/lib/api/client";
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
@@ -163,8 +162,10 @@ function BidCardTile({
     mob: { amount: card.mobPrice, units: card.mobUnits, excluded: card.mobExcluded },
     demob: { amount: card.demobPrice, units: card.demobUnits, excluded: card.demobExcluded },
   });
-  // The headline is the RATE on a weekly or monthly bid, so suppliers compare on what they quoted;
-  // the prorated total moves into the breakdown. A daily bid headlines its total, as the app does.
+  // The headline is the quoted RATE — on a daily bid too (owner, 2026-08-26). It used to headline the
+  // period total there, which put a total in the same column as the other units' rates and made the
+  // rental row below a restatement of it. `headlineShowsRawRate` is the app's own rule and its own
+  // name for it. The prorated figure lives in the breakdown, one row down, for every unit alike.
   const headline = headlineAmount(card.priceUnit, card.price ?? 0, rental.total);
   const rentalTypeLabel =
     card.priceUnit === "PER_MONTH" ? t.workspace.rentalMonthly
@@ -182,27 +183,14 @@ function BidCardTile({
       : t.workspace.rentalRowCustom;
   const basis = divisorNote(card.priceUnit, L);
   /**
-   * The two grand totals in the box at the foot of the money — one cycle, then the whole request.
+   * `computeCycleTotals` is deliberately NOT called here any more.
    *
-   * The SAME engine the comparison's own columns use, at `units: 1`, because every row on this card
-   * is per unit and the all-units figure has its own line. A second calculation here is how a card
-   * and a table come to print two different totals for one bid.
+   * It is the comparison table's engine, and the table needs it: three columns that separate what
+   * recurs from what is paid once are the whole point of that view. A card is one bid read on its
+   * own, and the per-period column has no one to be compared against here — it only competed with the
+   * card's own total. `computeQuoteTotals` already gives this card the request's figure, and the two
+   * agree to the riyal at one unit, so nothing is lost by asking the simpler question.
    */
-  const cycle = computeCycleTotals({
-    rate: card.price,
-    priceUnit: card.priceUnit,
-    mob: { amount: card.mobPrice, excluded: card.mobExcluded },
-    demob: { amount: card.demobPrice, excluded: card.demobExcluded },
-    durationDays,
-    startDate,
-    units: 1,
-  });
-  /** What one cycle is called on this bid — the period the supplier quoted in. */
-  const cycleWord =
-    card.priceUnit === "PER_MONTH" ? L("monthly", "شهريًا")
-    : card.priceUnit === "PER_WEEK" ? L("weekly", "أسبوعيًا")
-    : card.priceUnit === "PER_JOB" ? L("the job", "المهمة")
-    : L("daily", "يوميًا");
   const accepted = card.status === "ACCEPTED" || card.wonViaSurvey === true;
   const submitted = card.submittedAt
     ? new Date(card.submittedAt).toLocaleString(ar ? "ar" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
@@ -343,40 +331,34 @@ function BidCardTile({
         )}
 
         <div className="flex flex-none flex-col gap-2 rounded-[8px] border border-border px-3 py-2.5">
-          {/* ── Both grand totals, as the prototype reads them (owner, 2026-08-25) ─────────────────
-              One cycle, then the whole request. They come from `computeCycleTotals` — the comparison's
-              own engine — so a figure on a card and the same figure in the table cannot differ. Both
-              are PER UNIT, like every row above them; the all-units figure keeps its own row below. */}
+          {/* ── One grand total, as the app and prod both state it (owner, 2026-08-26) ─────────────
+              There were two here: one billing period, then the whole request. The per-period one is
+              gone, and the app is where that was already settled — it carried the same pair, removed
+              it, and left the reasoning in `price_expanded_breakdown.dart:190-206`:
+
+                · **Delivery and return are charged ONCE, not per period.** Folding them into a "per
+                  month" subtotal makes 80,210 + 1,500 read as the cost of a month when the 1,500 is
+                  paid one time across the whole rental. On a daily bid it was worse than untidy — a
+                  5/day machine with a 20 delivery showed «Grand total · day 28.75», which multiplies
+                  out to 402 against a real total of 92.
+                · **Two shapes meant two rules**, so no one sentence described the card and the rental
+                  row restated the headline on daily bids.
+
+              On this web card it also printed a figure SMALLER than the subtotal directly above it —
+              93,967 under 476,590 — with both rows called «Grand total». Nothing told the reader
+              which one was the answer.
+
+              What is left is the request's own total, which is what the app's single grand total and
+              prod's «Grand total · incl. VAT» both are. The day count keeps its place in the rental
+              row above rather than being restated here. PER UNIT, like every row above it; the
+              all-units figure keeps its own row below. */}
           <div className="flex items-baseline justify-between gap-2.5">
-            <span className="text-[12.5px] font-extrabold text-navy">
-              {t.workspace.grandTotal} · {cycleWord}
-            </span>
+            <span className="text-[12.5px] font-extrabold text-navy">{t.workspace.grandTotalInclVat}</span>
             <span className="flex-none whitespace-nowrap">
-              <b className="text-[16px] font-extrabold text-navy">{formatSar(cycle.firstCycle.total)}</b>{" "}
+              <b className="text-[16px] font-extrabold text-navy">{formatSar(totals.perUnit.total)}</b>{" "}
               <span className="text-[10.5px] font-semibold text-muted">{t.priceFooter.currency}</span>
             </span>
           </div>
-
-          {cycle.duration && durationDays ? (
-            <div className="flex flex-col gap-1 border-t border-border/70 pt-2.5">
-              <div className="flex items-baseline justify-between gap-2.5">
-                <span className="text-[12.5px] font-extrabold text-navy">
-                  {t.workspace.grandTotal} · {t.workspace.overDays.replace("{n}", String(durationDays))}
-                </span>
-                <span className="flex-none whitespace-nowrap">
-                  <b className="text-[16px] font-extrabold text-navy">{formatSar(cycle.duration.total)}</b>{" "}
-                  <span className="text-[10.5px] font-semibold text-muted">{t.priceFooter.currency}</span>
-                </span>
-              </div>
-              {!cycle.duration.raw && (
-                <span className="text-[10.5px] font-medium text-muted">
-                  {t.workspace.fridaysNote
-                    .replace("{days}", String(cycle.duration.days))
-                    .replace("{billable}", String(cycle.duration.billableDays))}
-                </span>
-              )}
-            </div>
-          ) : null}
 
           {/* Multi-unit: a second row in the SAME box, carrying the real all-units figure. It is not
               the per-unit total × units — each transport leg carries its own count. */}

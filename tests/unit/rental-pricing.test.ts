@@ -7,6 +7,7 @@ import {
   durationDaysBetween,
   formatSar,
   headlineAmount,
+  headlineShowsRawRate,
   legDisplay,
   rentalDivisor,
   rentalPeriodSubtitle,
@@ -209,15 +210,35 @@ describe("computeRentalTotal — falls back to the bare rate, never 0", () => {
   });
 });
 
-describe("headlineAmount — rate vs prorated total", () => {
+/**
+ * The headline is the quoted RATE, for every price unit (owner, 2026-08-26).
+ *
+ * This assertion is inverted from what it was for daily, and against the app rather than against a
+ * mockup: `rental_pricing.dart:179` is `headlineShowsRawRate(String) => true`, unconditional. The web
+ * answered false for daily and headlined the period total — which is still what prod does — so a daily
+ * bid showed a TOTAL in the same column where weekly and monthly bids show a RATE, and the breakdown
+ * needed two shapes to accommodate it.
+ */
+describe("headlineAmount — always the quoted rate", () => {
   it("weekly and monthly show the RAW quoted rate", () => {
     expect(headlineAmount("PER_WEEK", 4200, 7700)).toBe(4200);
     expect(headlineAmount("PER_MONTH", 26000, 11000)).toBe(26000);
   });
 
-  it("daily shows the prorated total", () => {
-    expect(headlineAmount("PER_DAY", 600, 6600)).toBe(6600);
-    expect(headlineAmount(null, 600, 6600)).toBe(6600);
+  it("daily shows its rate too, not the prorated total", () => {
+    expect(headlineAmount("PER_DAY", 600, 6600)).toBe(600);
+    expect(headlineAmount(null, 600, 6600)).toBe(600);
+  });
+
+  it("per-job and an unrecognized unit are no exception", () => {
+    expect(headlineAmount("PER_JOB", 7700, 477400)).toBe(7700);
+    expect(headlineAmount("PER_FORTNIGHT", 900, 12000)).toBe(900);
+  });
+
+  it("states the rule through the app's own predicate", () => {
+    for (const u of ["PER_DAY", "PER_WEEK", "PER_MONTH", "PER_JOB", null]) {
+      expect(headlineShowsRawRate(u)).toBe(true);
+    }
   });
 });
 

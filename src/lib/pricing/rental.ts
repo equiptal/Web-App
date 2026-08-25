@@ -168,15 +168,37 @@ export function computeRentalTotal(args: {
 }
 
 /**
- * The number shown on the collapsed bid card.
+ * Whether the collapsed bid card headlines the supplier's RAW QUOTED RATE.
  *
- * NOT simply "the total": weekly and monthly bids show the supplier's RAW QUOTED RATE so they compare
- * like-for-like on what was actually quoted, and the prorated figure appears only in the expanded
- * breakdown. Daily bids show the prorated total for the period.
+ * **True for every price unit**, daily included — the app's own rule, kept as a named predicate the
+ * same way it is there (`rental_pricing.dart:179`, `headlineShowsRawRate(String) => true`).
+ *
+ * The web used to answer false for daily and headline the prorated total instead, which is still what
+ * prod does. Two things were wrong with it. A renter comparing bids compares what suppliers QUOTED,
+ * and on a daily bid the web was showing a period total against the other units' rates — different
+ * questions in the same column. And it forced two shapes on the breakdown below: "the whole rental"
+ * for daily and "one period" for weekly and monthly, which is what made the daily rental row a
+ * restatement of its own headline. The app records both faults where it removed them.
+ *
+ * Kept as a predicate rather than deleted, for the reason the app gives: this is where the decision
+ * is written down, and the call site reads better for asking than for assuming.
+ */
+export function headlineShowsRawRate(priceUnit: string | null | undefined): boolean {
+  // The unit is read and then ignored, on purpose: the answer is the same for all of them, and a
+  // predicate that takes no argument would stop being the place a per-unit exception could land.
+  void priceUnit;
+  return true;
+}
+
+/**
+ * The number shown on the collapsed bid card — the supplier's quoted rate, whatever the unit.
+ *
+ * `proratedTotal` is still taken, and still returned when the predicate above says a unit does not
+ * headline its rate. Nothing does today; the argument is what a future exception would come back
+ * through, and dropping it would make that exception a signature change across every card.
  */
 export function headlineAmount(priceUnit: string | null | undefined, rate: number, proratedTotal: number): number {
-  const key = (priceUnit ?? "PER_DAY").toUpperCase();
-  return key === "PER_WEEK" || key === "PER_MONTH" ? rate : proratedTotal;
+  return headlineShowsRawRate(priceUnit) ? rate : proratedTotal;
 }
 
 /**
