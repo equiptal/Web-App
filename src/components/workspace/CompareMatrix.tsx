@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
-import { formatSar } from "@/lib/pricing/rental";
+import { formatSar, rentalDivisor } from "@/lib/pricing/rental";
 import { computeCycleTotals, type CycleTotals } from "@/lib/contract/cycle-totals";
 import { cheapest, findTerm, type WorkspaceBid } from "@/lib/contract/workspace";
 import { termValueLabel } from "@/lib/contract/labels";
@@ -149,8 +149,8 @@ export function CompareMatrix({
         computeCycleTotals({
           rate: b.card.price,
           priceUnit: b.card.priceUnit,
-          mob: { amount: b.card.mobPrice, excluded: b.card.mobExcluded },
-          demob: { amount: b.card.demobPrice, excluded: b.card.demobExcluded },
+          mob: { amount: b.card.mobPrice, units: b.card.mobUnits, excluded: b.card.mobExcluded },
+          demob: { amount: b.card.demobPrice, units: b.card.demobUnits, excluded: b.card.demobExcluded },
           durationDays,
           startDate,
           units: b.card.unitsOffered > 0 ? b.card.unitsOffered : b.card.numberOfUnits,
@@ -287,7 +287,12 @@ export function CompareMatrix({
                 onInfo={c.info ? () => setPopover((p) => (p === c.info ? null : c.info!)) : undefined}
                 popover={
                   c.info && popover === c.info ? (
-                    <BuildPopover which={c.info} totals={pickTotals(totals, selectedId, rows)} onClose={() => setPopover(null)} />
+                    <BuildPopover
+                      which={c.info}
+                      totals={pickTotals(totals, selectedId, rows)}
+                      priceUnit={pickBid(selectedId, rows).card.priceUnit}
+                      onClose={() => setPopover(null)}
+                    />
                   ) : null
                 }
               />
@@ -485,6 +490,15 @@ function initials(name: string): string {
 /** Whose totals the ⓘ panels explain: the picked row, else the first one on the table. */
 function pickTotals(totals: Map<string, CycleTotals>, selectedId: string | null, rows: WorkspaceBid[]): CycleTotals {
   return (selectedId ? totals.get(selectedId) : null) ?? totals.get(rows[0].card.id)!;
+}
+
+/**
+ * The bid those totals belong to — picked by the same rule, so the popover explains the figures it
+ * is standing over. It needs the price unit: the divisor in the sentence is 6 on a weekly bid and 26
+ * on a monthly one, and reading it off the totals is not possible because they are only money.
+ */
+function pickBid(selectedId: string | null, rows: WorkspaceBid[]): WorkspaceBid {
+  return (selectedId ? rows.find((b) => b.card.id === selectedId) : null) ?? rows[0];
 }
 
 /** The word above a group of columns, and the control that folds the group away. */
@@ -763,7 +777,17 @@ function ColRail({ label, hint, onClick }: { label: string; hint: string; onClic
 }
 
 /** The panel behind a total's ⓘ: the lines that figure was built from, and nothing else. */
-function BuildPopover({ which, totals, onClose }: { which: "first" | "after" | "duration"; totals: CycleTotals; onClose: () => void }) {
+function BuildPopover({
+  which,
+  totals,
+  priceUnit,
+  onClose,
+}: {
+  which: "first" | "after" | "duration";
+  totals: CycleTotals;
+  priceUnit: string | null;
+  onClose: () => void;
+}) {
   const t = useT();
   const part = which === "first" ? totals.firstCycle : which === "after" ? totals.everyCycleAfter : totals.duration;
   if (!part) return null;
@@ -772,12 +796,25 @@ function BuildPopover({ which, totals, onClose }: { which: "first" | "after" | "
     which === "first" ? t.workspace.howFirstCycle
     : which === "after" ? t.workspace.howEveryCycle
     : t.workspace.howDuration.replace("{n}", String(dur?.days ?? 0));
-  // The duration column charges billable days, so it names them: "Rental ÷ 26 × 154 days". Where the
-  // rental could not be prorated at all — no start date, or a per-job price — it stays the bare rate
-  // and claims no day count, because there is none to claim.
+  /**
+   * The duration column charges billable days, so it names them — and it names the divisor it
+   * actually used (owner, 2026-08-26). That number was the literal 26 in both bundles, so a weekly
+   * bid read «Rental ÷ 26 × 11 billable days» over a figure built on ÷ 6. Anyone who checked the
+   * sentence got 1,777 where the column said 8,855.
+   *
+   * A divisor of 1 or 0 has no division to explain — daily bills every billable day at its rate, and
+   * a per-job price has no period at all — so those take the sentence without it rather than printing
+   * «÷ 1» or «÷ 0».
+   *
+   * Where the rental could not be prorated at all it stays the bare rate and claims no day count,
+   * because there is none to claim.
+   */
+  const divisor = rentalDivisor(priceUnit);
   const rentalLabel =
     which === "duration" && dur && !dur.raw
-      ? t.workspace.rentalOverDays.replace("{n}", String(dur.billableDays))
+      ? divisor > 1
+        ? t.workspace.rentalOverDays.replace("{d}", String(divisor)).replace("{n}", String(dur.billableDays))
+        : t.workspace.rentalOverDaysFlat.replace("{n}", String(dur.billableDays))
       : t.workspace.colRate;
 
   return (

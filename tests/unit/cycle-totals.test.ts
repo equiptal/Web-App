@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { computeCycleTotals, hasRecurringCycle } from "@/lib/contract/cycle-totals";
+import { computeQuoteTotals, computeRentalTotal } from "@/lib/pricing/rental";
 
 /**
  * The bid in the owner's mockup: 80,210/month, nothing to deliver, 1,500 to return, over the
@@ -112,5 +113,43 @@ describe("computeCycleTotals — the edges", () => {
     const t = computeCycleTotals({ ...MOCKUP, rate: null });
     expect(t.firstCycle.rental).toBe(0);
     expect(t.firstCycle.subtotal).toBe(1500);
+  });
+});
+
+/**
+ * Each transport leg at ITS OWN count (owner, 2026-08-26).
+ *
+ * This module multiplied both legs by the RENTAL count and ignored the leg counts entirely, so the
+ * comparison and the bid card printed two different all-units totals for one bid. The card was right:
+ * `computeQuoteTotals` has always used the leg's own count, which is the app's `effectiveMobUnits`
+ * (`mobExcluded ? 0 : (mobUnits ?? numberOfUnits)`, uncapped — a room can settle five trips against
+ * three machines). These pin the two against each other so they cannot drift apart again.
+ */
+describe("transport legs carry their own unit counts", () => {
+  const perUnitRental = () =>
+    computeRentalTotal({ rate: 80210, priceUnit: "PER_MONTH", startDate: MOCKUP.startDate, durationDays: 180 }).total;
+
+  it("charges five mobilization trips against three rented machines", () => {
+    const t = computeCycleTotals({ ...MOCKUP, mob: { amount: 2000, units: 5 }, demob: { amount: 1500, units: 3 }, units: 3 });
+    expect(t.firstCycle.oneOff).toBe(2000 * 5 + 1500 * 3);
+    // What it used to do: both legs at the rental count, understating by two trips.
+    expect(t.firstCycle.oneOff).not.toBe((2000 + 1500) * 3);
+  });
+
+  it("agrees with the bid card to the riyal, which is the whole point", () => {
+    const legs = { mob: { amount: 2000, units: 5 }, demob: { amount: 1500, units: 3 } };
+    const matrix = computeCycleTotals({ ...MOCKUP, ...legs, units: 3 });
+    const card = computeQuoteTotals({ perUnitRental: perUnitRental(), rentalUnits: 3, ...legs });
+    expect(Math.round(matrix.duration!.total)).toBe(Math.round(card.overall.total));
+  });
+
+  it("still defaults a leg with no count of its own to the rental count", () => {
+    const t = computeCycleTotals({ ...MOCKUP, mob: { amount: 2000 }, demob: { amount: 1500 }, units: 3 });
+    expect(t.firstCycle.oneOff).toBe((2000 + 1500) * 3);
+  });
+
+  it("an excluded leg contributes nothing however many units are stored against it", () => {
+    const t = computeCycleTotals({ ...MOCKUP, mob: { amount: 2000, units: 9, excluded: true }, demob: { amount: 1500 }, units: 3 });
+    expect(t.firstCycle.oneOff).toBe(1500 * 3);
   });
 });

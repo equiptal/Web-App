@@ -40,8 +40,8 @@ export function workspaceExportTotals(
     const totals = computeCycleTotals({
       rate: card.price,
       priceUnit: card.priceUnit,
-      mob: { amount: card.mobPrice, excluded: card.mobExcluded },
-      demob: { amount: card.demobPrice, excluded: card.demobExcluded },
+      mob: { amount: card.mobPrice, units: card.mobUnits, excluded: card.mobExcluded },
+      demob: { amount: card.demobPrice, units: card.demobUnits, excluded: card.demobExcluded },
       durationDays: input.durationDays,
       startDate: input.startDate,
       units: card.unitsOffered > 0 ? card.unitsOffered : card.numberOfUnits,

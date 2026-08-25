@@ -57,12 +57,26 @@ export interface CycleTotals {
   duration: DurationTotal | null;
 }
 
+/**
+ * One transport leg, and the count it is actually charged at.
+ *
+ * `units` DEFAULTS to the rental count and is deliberately not capped by it — a deal room can settle
+ * five mobilization trips against three rented machines, and both clients then charge five. It is the
+ * app's `effectiveMobUnits` rule (`mobExcluded ? 0 : (mobUnits ?? numberOfUnits)`), which the bid
+ * card's `computeQuoteTotals` has always applied.
+ */
+export interface CycleLeg {
+  amount?: number | null;
+  excluded?: boolean | null;
+  units?: number | null;
+}
+
 export interface CycleInput {
   /** The live rate, per unit, per cycle. */
   rate: number | null;
   priceUnit: string | null;
-  mob: { amount?: number | null; excluded?: boolean | null };
-  demob: { amount?: number | null; excluded?: boolean | null };
+  mob: CycleLeg;
+  demob: CycleLeg;
   /** The request's duration. Null or zero → no duration column. */
   durationDays?: number | null;
   /** The request's start date. Without it the Fridays cannot be located and the rental cannot be
@@ -73,7 +87,7 @@ export interface CycleInput {
 }
 
 const money = (v: number) => Math.round(v * 100) / 100;
-const leg = (l: { amount?: number | null; excluded?: boolean | null }) =>
+const leg = (l: CycleLeg) =>
   l.excluded || l.amount == null || !Number.isFinite(Number(l.amount)) ? 0 : Number(l.amount);
 
 function withVat(rental: number, oneOff: number): CycleTotal {
@@ -90,7 +104,17 @@ export function hasRecurringCycle(priceUnit: string | null | undefined): boolean
 export function computeCycleTotals(input: CycleInput): CycleTotals {
   const units = input.units && input.units > 0 ? input.units : 1;
   const rate = (input.rate ?? 0) * units;
-  const oneOff = (leg(input.mob) + leg(input.demob)) * units;
+  /**
+   * Each leg at ITS OWN count, not at the rental's (owner, 2026-08-26).
+   *
+   * This multiplied both legs by the rental count and ignored `mobUnits` / `demobUnits` entirely, so
+   * a bid renting 3 machines with 5 mobilization trips negotiated read 1,661,779 in the comparison
+   * against 1,666,379 on its own card — the same bid, two totals, on two tabs of one screen. The card
+   * was the correct one: `computeQuoteTotals` has always used the leg's own count, which is the app's
+   * `effectiveMobUnits`. The gap was exactly the two uncounted trips plus their VAT.
+   */
+  const legUnits = (l: CycleLeg) => (l.excluded ? 0 : l.units ?? units);
+  const oneOff = leg(input.mob) * legUnits(input.mob) + leg(input.demob) * legUnits(input.demob);
 
   const firstCycle = withVat(rate, oneOff);
   // The legs are gone from here — that is the whole point of the column. Stating them as zero would

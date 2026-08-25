@@ -1388,9 +1388,17 @@ export const en = {
     howDuration: "How {n} days is built",
     // The duration column charges billable days, so its popover names them rather than claiming a
     // count of whole months. Ruled 2026-08-12: the shared pricing module governs this figure, and it
-    // prorates at rate ÷ 26 a day with Fridays excluded — the same equation the deal room and the
-    // quotation use, so one rental cannot cost two different amounts across the app.
-    rentalOverDays: "Rental ÷ 26 × {n} billable days",
+    // prorates at rate ÷ divisor a day with Fridays excluded — the same equation the deal room and
+    // the quotation use, so one rental cannot cost two different amounts across the app.
+    //
+    // `{d}` is that divisor, and it used to be the literal 26 (owner, 2026-08-26). A weekly bid was
+    // therefore told «Rental ÷ 26 × 11 billable days» over a figure built on ÷ 6 — the money was
+    // right and the sentence explaining it was not, and a reader who checked it would have got 1,777
+    // where the column said 8,855.
+    rentalOverDays: "Rental ÷ {d} × {n} billable days",
+    // Daily has a divisor of 1 and a per-job price has none at all, so neither has a division to
+    // explain and both would read as noise («÷ 1», «÷ 0») if forced through the sentence above.
+    rentalOverDaysFlat: "Rental × {n} billable days",
     fridaysNote: "{days} days minus its Fridays = {billable} billable days.",
     transportOnce: "Delivery + return",
     paidOnce: "paid once, cycle 1",
