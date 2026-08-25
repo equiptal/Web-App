@@ -14,14 +14,13 @@ import { unitAvailability } from "@/lib/contract/bid-map";
  * The left half names the **request**: where the work is, its id, how many bids arrived, when it was
  * raised. Both the site and the id open the request drawer.
  *
- * The right half is a white card carrying the **item and the terms the request sets on it** — the
- * machine asked for, when it starts, how long, how many, and the certificates a supplier must hold.
- * It is the REQUEST throughout and does not move with the selection (owner, 2026-08-25): what a
- * supplier offered against it is an answer, and answers live on the cards, in the comparison and on
- * the map behind «Check availability».
+ * The middle is a white card carrying the **item**, and — once a bid is picked — that supplier's
+ * answer to it: the machine offered, and whether a yard has been confirmed for it. With nothing
+ * picked the card states what the REQUEST asks instead, so it is never blank and never mixes an ask
+ * with an answer.
  *
- * The controls beside it are the exception — they act on the picked bid, which is why they read as
- * inert until there is one.
+ * The two controls stand on the NAVY at the trailing edge, outside the card: they act on the picked
+ * bid rather than describing it, and out there they hold the same place whatever the card is saying.
  */
 export function RequestStrip({
   group,
@@ -146,13 +145,11 @@ export function RequestStrip({
           )}
         </div>
 
-        {/* ── The item, and what the REQUEST asks of it ─────────────────────────────────────────
-            This half is the request, and only the request (owner, 2026-08-25): the machine asked
-            for, when it starts, how long, how many, and the certificates it requires. It does NOT
-            change with the picked bid — what a supplier offered, and whether his papers or his yard
-            have been checked, are answers, and they belong on the cards, in the comparison and on
-            the map that «Check availability» opens. Reading a supplier’s verification here made the
-            request line say something about the request that the request never said. */}
+        {/* ── The item, and the offer against it ────────────────────────────────────────────────
+            The card states the ITEM and, once a bid is picked, that supplier's answer to it: the
+            machine offered and whether a yard has been confirmed for it. With nothing picked it
+            states what the REQUEST asks instead — start, duration, units, operator, certificates —
+            so the line is never empty and never mixes an ask with an answer. */}
         <div className="flex min-w-0 flex-1 flex-col gap-3 rounded-[10px] bg-surface p-2 sm:flex-row sm:items-center sm:gap-3 sm:pe-3">
           {/* The thumbnail carries the state of the picked machine: a ribbon naming it, and a tick
               once the supplier has put it in a yard he confirmed. Nothing picked, nothing claimed. */}
@@ -240,32 +237,41 @@ export function RequestStrip({
             )}
           </div>
 
-          {/* ── The two ways into the picked bid (owner's reference, 2026-08-25) ─────────────────
-              «Review equipment» opens the machines on the map, where availability is answered in
-              full; «View documents» opens the same surface on the papers. Both need a bid to point
-              at, so they read as inert until one is picked. */}
-          <div className="flex flex-none flex-col gap-1.5">
-            <button
-              type="button"
-              disabled={!bid}
-              onClick={() => goEquipment()}
-              className={`whitespace-nowrap rounded-[7px] px-3 py-2 text-[12px] font-bold transition ${
-                bid ? "bg-navy text-white hover:brightness-110" : "cursor-default bg-surface2 text-muted"
-              }`}
-            >
-              {t.workspace.reviewEquipment}
-            </button>
-            <button
-              type="button"
-              disabled={!bid}
-              onClick={() => goEquipment("documents")}
-              className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[7px] border px-3 py-2 text-[12px] font-bold transition ${
-                bid ? "border-border bg-surface text-navy hover:bg-surface2" : "cursor-default border-border/60 bg-surface2 text-muted"
-              }`}
-            >
-              <Icon name="visibility" size={14} /> {t.workspace.viewDocuments}
-            </button>
-          </div>
+        </div>
+
+        {/* ── The two ways into the picked bid ──────────────────────────────────────────────────────
+            **On the navy, outside the white card** (owner, 2026-08-25: "the buttons of the header
+            pane"). They were inside it, which put the renter's two actions inside the panel that
+            states the facts — and made the card's own width depend on how long their labels are. The
+            reference has them standing on the strip itself, at its trailing edge, so they hold the
+            same place whatever the card is saying.
+
+            «Review equipment» opens the machines on the map, where availability is answered in full;
+            «View documents» opens that same surface on the papers. Both need a bid to point at, so
+            they read as inert until one is picked. */}
+        <div className="flex flex-none flex-col gap-2 lg:w-[180px]">
+          <button
+            type="button"
+            disabled={!bid}
+            onClick={() => goEquipment()}
+            className={`whitespace-nowrap rounded-[8px] border px-3.5 py-2 text-[12px] font-bold transition ${
+              bid
+                ? "border-white/20 bg-white/[.14] text-white hover:bg-white/25"
+                : "cursor-default border-white/10 bg-white/[.06] text-white/40"
+            }`}
+          >
+            {t.workspace.reviewEquipment}
+          </button>
+          <button
+            type="button"
+            disabled={!bid}
+            onClick={() => goEquipment("documents")}
+            className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[8px] border px-3.5 py-2 text-[12px] font-bold transition ${
+              bid ? "border-white/20 text-white/90 hover:bg-white/10" : "cursor-default border-white/10 text-white/40"
+            }`}
+          >
+            <Icon name="visibility" size={14} /> {t.workspace.viewDocuments}
+          </button>
         </div>
       </div>
     </div>
