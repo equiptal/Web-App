@@ -37,19 +37,5 @@ export const useRealAgent = Boolean(serverEnv.mansourUrl);
 /** True when the real app catalogue + submit endpoints are configured (need URL + token). */
 export const useRealApp = Boolean(serverEnv.agentsApiUrl && serverEnv.agentsApiToken);
 
-/**
- * Export templates fall back to an in-memory dev store.
- *
- * Has its OWN switch rather than riding on `useRealApp`, because the two are needed in
- * opposite directions at the same time: the comparison page needs the real agents backend for
- * requests and bids, while export-templates may not be deployed there yet. Tying them together
- * forced a choice between real data and a working template UI.
- *
- * Set `EXPORT_TEMPLATES_MOCK=1` for that combination; otherwise it follows `useRealApp`, so a
- * fully-configured environment is never accidentally mocked.
- */
-export const mockExportTemplates =
-  process.env.EXPORT_TEMPLATES_MOCK === "1" || !useRealApp;
-
 /** True when the renter-auth backend (web-app/001 `/auth/*`) is configured. */
 export const useRealAuth = Boolean(serverEnv.appApiUrl);

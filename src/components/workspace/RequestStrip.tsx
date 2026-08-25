@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
@@ -108,217 +108,264 @@ export function RequestStrip({
   const withOperator = (bid?.requestTerms?.operatorIncluded ?? "").toUpperCase() === "YES";
 
 
+  /**
+   * The submission's OTHER machines. A multi-item RFQ fans out into one request per machine and this
+   * page shows one at a time, so the rest are a row of chips beside the one on screen — never the one
+   * already named there, which would be a chip that changes nothing.
+   */
+  const siblings = items.filter((it) => it.id !== item?.id);
+  const hidden = siblings.slice(SIBLINGS_SHOWN);
+  const [moreOpen, setMoreOpen] = useState(false);
+
   const goEquipment = (panel?: "documents") => {
     if (!bid) return;
     router.push(`/bids/${encodeURIComponent(bid.id)}/equipment${panel ? "?panel=documents" : ""}`);
   };
 
   return (
-    <div className={`${PAGE_MX_BLEED} mt-2 flex flex-none items-stretch gap-3`}>
-      {/* Thinner (owner, 2026-08-25). `py-3` became `py-2` and the site name 18px → 16px: on a page
-          that must end at the fold, the strip's job is to NAME the request, and a name does not need
-          a display size to do it. The white card inside keeps its own padding — squeezing that would
-          crowd the thumbnail rather than the row. */}
-      <div className="flex min-w-0 flex-1 flex-col gap-2 rounded-[14px] bg-navy px-4 py-1.5 text-white lg:flex-row lg:items-center lg:gap-4 lg:px-4">
+    <div className={`${PAGE_MX_BLEED} mt-2 flex-none`}>
+      {/* ── The request header, as the owner's reference draws it (2026-08-26) ────────────────────
+          ONE white card, with the request itself as a navy block inset at its leading edge. It was
+          the other way round — a navy strip with a white card floating in it — which spent the
+          brightest surface on the chrome and left the machine, the offer and the controls sharing a
+          panel inside it. The card is the subject now; the navy names what it belongs to. */}
+      <div className="flex items-stretch gap-3 rounded-[14px] bg-surface p-1.5 shadow-[0_2px_10px_rgba(19,44,74,.07)]">
         {/* ── The request ── */}
-        <div className="flex flex-none flex-col gap-1.5">
+        <div className="flex flex-none flex-col justify-center gap-1 rounded-[11px] bg-navy px-4 py-2.5 text-white">
           <button
             type="button"
             onClick={onOpenRequest ?? undefined}
             disabled={!onOpenRequest}
-            className="flex items-center gap-1.5 text-start text-[16px] font-extrabold leading-[1.15] tracking-[-.01em] underline-offset-4 hover:underline disabled:no-underline"
+            className="flex items-center gap-1.5 text-start text-[15px] font-extrabold leading-tight tracking-[-.01em] underline-offset-4 hover:underline disabled:no-underline"
             title={group.address ?? group.locationLabel}
           >
             {group.locationLabel}
-            <Icon name="north_east" size={15} className="text-white/50 rtl:scale-x-[-1]" />
+            <Icon name="north_east" size={14} className="flex-none text-white/50 rtl:scale-x-[-1]" />
           </button>
-          <div className="flex flex-wrap items-baseline gap-2">
+          <div className="flex flex-wrap items-baseline gap-1.5">
             {requestRef && (
               <button
                 type="button"
                 onClick={onOpenRequest ?? undefined}
                 disabled={!onOpenRequest}
-                className="text-[12.5px] font-semibold text-white/60 underline decoration-white/30 underline-offset-4 hover:decoration-white disabled:no-underline"
+                className="text-[11.5px] font-semibold text-white/60 underline decoration-white/30 underline-offset-4 hover:decoration-white disabled:no-underline"
               >
-                {requestRef} ·
+                {requestRef}
               </button>
             )}
-            <span className="text-[14px] font-extrabold text-brand">{bidCount}</span>
-            <span className="text-[12.5px] font-semibold text-white/60">
-              {bidCount === 1 ? t.workspace.bidWord : t.workspace.bidsWord}
+            <span className="text-[11.5px] font-semibold text-white/35">·</span>
+            <span className="text-[12px] font-extrabold text-brand">
+              {bidCount} {bidCount === 1 ? t.workspace.bidWord : t.workspace.bidsWord}
             </span>
-            {raised && <span className="ms-2.5 text-[10.5px] font-medium text-white/40">{raised}</span>}
-          </div>
-
-          {/* Item chips — only when the request holds more than one, since a single item is already
-              named in full on the white card. */}
-          {items.length > 1 && (
-            <div className="mt-1 flex flex-wrap gap-1.5">
-              {items.map((it) => {
-                const on = it.id === item?.id;
-                const label = it.item ? (ar ? it.item.nameAr || it.item.name : it.item.name) : it.displayId;
-                return (
-                  <button
-                    key={it.id}
-                    type="button"
-                    onClick={() => onPickItem(it.id)}
-                    aria-current={on ? "true" : undefined}
-                    className={`max-w-[190px] truncate rounded-full px-2.5 py-1 text-[11px] font-bold transition ${
-                      on ? "bg-white text-navy" : "bg-white/10 text-white/70 hover:bg-white/20"
-                    }`}
-                  >
-                    {label}
-                    {(it.item?.qty ?? 1) > 1 && <span className={on ? "text-navy-mid" : "text-white/50"}> ×{it.item?.qty}</span>}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* ── The item, and the offer against it ────────────────────────────────────────────────
-            The card states the ITEM and, once a bid is picked, that supplier's answer to it: the
-            machine offered and whether a yard has been confirmed for it. With nothing picked it
-            states what the REQUEST asks instead — start, duration, units, operator, certificates —
-            so the line is never empty and never mixes an ask with an answer. */}
-        <div className="flex min-w-0 flex-1 flex-col gap-2 rounded-[10px] bg-surface p-1.5 sm:flex-row sm:items-center sm:gap-2.5 sm:pe-2.5">
-          {/* ── The thumbnail says two different things at once (owner's reference, 2026-08-25) ──────
-              The RIBBON is availability — has the supplier named a yard for this machine — and the
-              TICK is the papers: `eqVerified`, whether the listing was checked. They are separate
-              facts and the reference draws them separately, which is why a machine can carry a green
-              tick under an UNCONFIRMED ribbon.
-
-              The ribbon reads in full: it was clipped to «UNCONFI…», and a word cut in half is worse
-              than no word — it takes the one state a renter must not misread and makes him guess. So
-              the plate is wider, the type is 6.5px, and the word never wraps or truncates. */}
-          <span className="relative grid h-11 w-[68px] flex-none place-items-center overflow-hidden rounded-[7px] border border-border bg-surface2">
-            {photo ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={photo} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <Icon name="precision_manufacturing" size={20} className="text-muted" />
-            )}
-            {bid && (
+            {raised && (
               <>
-                <span
-                  className={`absolute inset-x-0 bottom-0 whitespace-nowrap px-0.5 py-[2px] text-center text-[6.5px] font-extrabold uppercase tracking-[.04em] text-white ${
-                    confirmed ? "bg-ok/90" : "bg-navy/85"
-                  }`}
-                >
-                  {confirmed ? t.workspace.ribbonConfirmed : t.workspace.ribbonUnconfirmed}
-                </span>
-                {bid.eqVerified && (
-                  <span
-                    className="absolute -end-1 -top-1 grid h-[15px] w-[15px] place-items-center rounded-full bg-ok text-white ring-2 ring-surface"
-                    title={t.bidMap.eqVerifiedMachine}
-                  >
-                    <Icon name="check" size={10} />
-                  </span>
-                )}
+                <span className="text-[11.5px] font-semibold text-white/35">·</span>
+                <span className="text-[11px] font-medium text-white/45">{raised}</span>
               </>
             )}
-          </span>
+          </div>
+        </div>
 
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] font-bold leading-snug text-navy">{itemLabel}</div>
+        {/* ── The thumbnail says two different things at once ──────────────────────────────────────
+            The RIBBON is availability — has the supplier named a yard for this machine — and the TICK
+            is the papers (`eqVerified`, whether the listing was checked). Separate facts, drawn
+            separately, which is why a machine can carry a green tick under an UNCONFIRMED ribbon. The
+            ribbon reads in full: half a word is worse than none on the one state a renter must not
+            misread. */}
+        <span className="relative my-1 grid h-12 w-[70px] flex-none place-items-center overflow-hidden rounded-[8px] border border-border bg-surface2">
+          {photo ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={photo} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <Icon name="precision_manufacturing" size={20} className="text-muted" />
+          )}
+          {bid && (
+            <>
+              <span
+                className={`absolute inset-x-0 bottom-0 whitespace-nowrap px-0.5 py-[2px] text-center text-[6.5px] font-extrabold uppercase tracking-[.04em] text-white ${
+                  confirmed ? "bg-ok/90" : "bg-navy/85"
+                }`}
+              >
+                {confirmed ? t.workspace.ribbonConfirmed : t.workspace.ribbonUnconfirmed}
+              </span>
+              {bid.eqVerified && (
+                <span
+                  className="absolute -end-1 -top-1 grid h-[15px] w-[15px] place-items-center rounded-full bg-ok text-white ring-2 ring-surface"
+                  title={t.bidMap.eqVerifiedMachine}
+                >
+                  <Icon name="check" size={10} />
+                </span>
+              )}
+            </>
+          )}
+        </span>
 
-            {bid ? (
-              /* What the picked supplier put against it, and whether the machine behind it has been
-                 checked. Both are HIS answers — the request's own chips take this line back the
-                 moment nothing is picked. */
-              <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                <span className="flex-none text-[11px] font-semibold text-muted">
-                  {t.workspace.offers.replace("{supplier}", bid.supplierName)}
+        {/* ── The item, and the offer against it ── */}
+        <div className="flex min-w-0 flex-1 flex-col justify-center">
+          <div className="truncate text-[15px] font-extrabold leading-tight text-navy">{itemLabel}</div>
+
+          {bid ? (
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <span className="flex-none text-[12px] font-semibold text-muted">
+                {t.workspace.offers.replace("{supplier}", bid.supplierName)}
+              </span>
+              <span className="flex-none text-[12.5px] font-extrabold text-navy">
+                {offered ?? "—"}
+                {offeredYear ? ` · ${offeredYear}` : ""}
+              </span>
+              {/* `unitAvailability`'s rule and no other — the map's pins and the equipment list's chips
+                  read the same function. An off-platform submission registers no machines at all, so
+                  it says nothing: nobody was ever asked. */}
+              {units.length > 0 && (
+                <span
+                  className={`rounded-md border px-2 py-[3px] text-[11px] font-semibold ${
+                    confirmed ? "border-ok/25 bg-ok-soft text-ok" : "border-border bg-surface2 text-navy-mid"
+                  }`}
+                >
+                  {confirmed ? t.workspace.availabilityConfirmed : t.workspace.availabilityNotChecked}
                 </span>
-                <span className="flex-none text-[12px] font-extrabold text-navy">
-                  {offered ?? "—"}
-                  {offeredYear ? ` · ${offeredYear}` : ""}
-                </span>
-                {/* `unitAvailability`'s rule and no other — the map's pins and the equipment list's
-                    chips read the same function. An off-platform submission registers no machines at
-                    all, so it says nothing: nobody was ever asked. */}
-                {units.length > 0 && (
-                  <span
-                    className={`rounded-md border px-2 py-[3px] text-[11px] font-semibold ${
-                      confirmed ? "border-ok/25 bg-ok-soft text-ok" : "border-border bg-surface2 text-navy-mid"
-                    }`}
-                  >
-                    {confirmed ? t.workspace.availabilityConfirmed : t.workspace.availabilityNotChecked}
+              )}
+            </div>
+          ) : (
+            /* What the REQUEST asks for, while no bid is picked. Nothing here is derived — a chip is a
+               requirement, and one invented from `rentalType` would be a claim it never made. */
+            (startsOn || item?.durationDays || certs.length > 0 || unitCount > 1 || withOperator) && (
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                {startsOn && <Chip>{fmt(t.workspace.chipStarts, { date: startsOn })}</Chip>}
+                {item?.durationDays ? (
+                  <Chip tone="duration" lead={t.workspace.factDuration}>
+                    {fmt(t.workspace.chipDuration, { n: String(item.durationDays) })}
+                  </Chip>
+                ) : null}
+                {unitCount > 1 && <Chip>{fmt(t.workspace.unitsCount, { n: String(unitCount) })}</Chip>}
+                {withOperator && <Chip>{t.workspace.chipOperator}</Chip>}
+                {certs.slice(0, 2).map((c) => (
+                  <Chip key={c} tone="cert">
+                    {ar ? CERT_LABEL[c].ar : CERT_LABEL[c].en}
+                  </Chip>
+                ))}
+                {certs.length > 2 && (
+                  <span className="text-[11px] font-semibold text-muted">
+                    {fmt(t.workspace.chipMore, { n: String(certs.length - 2) })}
                   </span>
                 )}
               </div>
-            ) : (
-              /* What the REQUEST asks for. Drawer-only until now, which made the renter open a panel
-                 to recall what he had asked for. Nothing here is derived — a chip is a requirement,
-                 and one invented from `rentalType` would be a claim the request never made. */
-              (startsOn || item?.durationDays || certs.length > 0 || unitCount > 1 || withOperator) && (
-                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                  {startsOn && <Chip>{fmt(t.workspace.chipStarts, { date: startsOn })}</Chip>}
-                  {item?.durationDays ? (
-                    <Chip tone="duration" lead={t.workspace.factDuration}>
-                      {fmt(t.workspace.chipDuration, { n: String(item.durationDays) })}
-                    </Chip>
-                  ) : null}
-                  {unitCount > 1 && <Chip>{fmt(t.workspace.unitsCount, { n: String(unitCount) })}</Chip>}
-                  {withOperator && <Chip>{t.workspace.chipOperator}</Chip>}
-                  {/* The certificates the request REQUIRES — the papers a supplier must hold to
-                      answer it. Two, then a count; the drawer lists them in full. */}
-                  {certs.slice(0, 2).map((c) => (
-                    <Chip key={c} tone="cert">
-                      {ar ? CERT_LABEL[c].ar : CERT_LABEL[c].en}
-                    </Chip>
+            )
+          )}
+        </div>
+
+        {/* ── The rest of the submission, beside the machine it is not (owner, 2026-08-26) ──────────
+            A multi-item RFQ fans out into one request per machine, and this page shows ONE of them at
+            a time. The siblings used to sit under the request as pills on the navy, which read as
+            facts about the request rather than as the other machines in it. Beside the name they read
+            as what they are: the rest of the submission, one press away.
+
+            Three at most, then «+n» opens the remainder — a row that grows with the RFQ pushes the
+            controls off the end of the card, and a chip nobody can reach is not a chip. */}
+        {siblings.length > 0 && (
+          <div className="relative flex flex-none items-center gap-1.5 self-center">
+            {siblings.slice(0, SIBLINGS_SHOWN).map((it) => (
+              <SiblingChip key={it.id} item={it} ar={ar} onPick={() => onPickItem(it.id)} />
+            ))}
+            {hidden.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setMoreOpen((o) => !o)}
+                aria-expanded={moreOpen}
+                aria-label={fmt(t.workspace.chipMore, { n: String(hidden.length) })}
+                className="flex-none rounded-full border border-brand/25 bg-brand-soft px-2.5 py-1.5 text-[11.5px] font-extrabold text-brand transition hover:brightness-95"
+              >
+                +{hidden.length}
+              </button>
+            )}
+            {moreOpen && hidden.length > 0 && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setMoreOpen(false)} />
+                <div className="absolute end-0 top-[calc(100%+8px)] z-50 flex min-w-[190px] flex-col gap-1.5 rounded-[14px] border border-border bg-surface p-2.5 shadow-[0_14px_34px_rgba(19,44,74,.18)]">
+                  {hidden.map((it) => (
+                    <SiblingChip
+                      key={it.id}
+                      item={it}
+                      ar={ar}
+                      block
+                      onPick={() => {
+                        setMoreOpen(false);
+                        onPickItem(it.id);
+                      }}
+                    />
                   ))}
-                  {certs.length > 2 && (
-                    <span className="text-[11px] font-semibold text-muted">
-                      {fmt(t.workspace.chipMore, { n: String(certs.length - 2) })}
-                    </span>
-                  )}
                 </div>
-              )
+              </>
             )}
           </div>
+        )}
 
-          {/* ── The two ways into the picked bid (owner's reference, 2026-08-26) ───────────────────
-              «Review equipment» opens the machines on the map, where availability is answered in
-              full; «View documents» opens that same surface on the papers — and nothing else stands
-              here. A five-control cluster was tried and is not what the reference draws: the
-              request's own details and its share link belong to the drawer the site name and the id
-              already open, and crowding them onto the strip made the row about the controls rather
-              than the request.
-
-              They used to sit out on the NAVY, beside the card rather than in it, on the reasoning
-              that a fixed place outside kept them steady whatever the card was saying. The owner's
-              newer reference puts them INSIDE, at the card's trailing edge, and it reads better for
-              a plain reason: they act on the machine the card is describing, so they belong to it.
-              Being on white, «Review equipment» takes the solid navy it could not take on navy, and
-              «View documents» becomes the outlined one.
-
-              Both need a bid to point at, so they read as inert until one is picked. */}
-          <div className="flex w-[152px] flex-none flex-col justify-center gap-1.5 sm:ms-auto">
-            <button
-              type="button"
-              disabled={!bid}
-              onClick={() => goEquipment()}
-              className={`whitespace-nowrap rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
-                bid ? "bg-navy text-white hover:bg-navy-mid" : "cursor-default bg-navy/25 text-white/70"
-              }`}
-            >
-              {t.workspace.reviewEquipment}
-            </button>
-            <button
-              type="button"
-              disabled={!bid}
-              onClick={() => goEquipment("documents")}
-              className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-bold transition ${
-                bid ? "border-border bg-surface text-navy hover:bg-surface2" : "cursor-default border-border/60 bg-surface text-navy/35"
-              }`}
-            >
-              <Icon name="visibility" size={13} /> {t.workspace.viewDocuments}
-            </button>
-          </div>
+        {/* ── The two ways into the picked bid ─────────────────────────────────────────────────────
+            «Review equipment» opens the machines on the map, where availability is answered in full;
+            «View documents» opens that same surface on the papers. Both need a bid to point at, so
+            they read as inert until one is picked. */}
+        <div className="flex w-[152px] flex-none flex-col justify-center gap-1.5 pe-1">
+          <button
+            type="button"
+            disabled={!bid}
+            onClick={() => goEquipment()}
+            className={`whitespace-nowrap rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
+              bid ? "bg-navy text-white hover:bg-navy-mid" : "cursor-default bg-navy/25 text-white/70"
+            }`}
+          >
+            {t.workspace.reviewEquipment}
+          </button>
+          <button
+            type="button"
+            disabled={!bid}
+            onClick={() => goEquipment("documents")}
+            className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-bold transition ${
+              bid ? "border-border bg-surface text-navy hover:bg-surface2" : "cursor-default border-border/60 bg-surface text-navy/35"
+            }`}
+          >
+            <Icon name="visibility" size={13} /> {t.workspace.viewDocuments}
+          </button>
         </div>
       </div>
     </div>
+  );
+}
+
+/** How many of the submission's other machines stand on the card before «+n» takes the rest. */
+const SIBLINGS_SHOWN = 3;
+
+/**
+ * One of the submission's OTHER machines. Pressing it makes it the one the page is showing.
+ *
+ * It carries the machine's full name and its count — «Flatbed Truck ×3» — because that is what tells
+ * two lines of one RFQ apart; an abbreviated chip would need opening to identify.
+ */
+function SiblingChip({
+  item,
+  ar,
+  block,
+  onPick,
+}: {
+  item: RequestListItem;
+  ar: boolean;
+  /** In the «+n» panel the chips stack, so each takes the full width rather than shrinking to fit. */
+  block?: boolean;
+  onPick: () => void;
+}) {
+  const label = item.item ? (ar ? item.item.nameAr || item.item.name : item.item.name) : item.displayId;
+  const qty = item.item?.qty ?? 1;
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      title={label}
+      className={`truncate rounded-full border border-border bg-surface2 px-3 py-1.5 text-[11.5px] font-bold text-navy-mid transition hover:border-navy-mid hover:bg-surface3 ${
+        block ? "w-full text-center" : "max-w-[150px] flex-none"
+      }`}
+    >
+      {label}
+      {qty > 1 && <span className="text-muted"> ×{qty}</span>}
+    </button>
   );
 }
 
