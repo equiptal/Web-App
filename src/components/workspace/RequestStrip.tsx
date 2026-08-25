@@ -31,6 +31,7 @@ export function RequestStrip({
   bidCount,
   onPickItem,
   onOpenRequest,
+  onShare,
   fetchedCode,
 }: {
   group: RequestGroup;
@@ -40,8 +41,10 @@ export function RequestStrip({
   bid: BidCard | null;
   bidCount: number;
   onPickItem: (itemId: string) => void;
-  /** Opens the request drawer, which is also where sharing lives. */
+  /** Opens the request drawer. */
   onOpenRequest: (() => void) | null;
+  /** Opens that same drawer on its share sheet — «Share» enters it there. */
+  onShare?: (() => void) | null;
   /** The request's own code, fetched from its detail record when the list row arrived without one. */
   fetchedCode?: string | null;
 }) {
@@ -170,9 +173,16 @@ export function RequestStrip({
             states what the REQUEST asks instead — start, duration, units, operator, certificates —
             so the line is never empty and never mixes an ask with an answer. */}
         <div className="flex min-w-0 flex-1 flex-col gap-2 rounded-[10px] bg-surface p-1.5 sm:flex-row sm:items-center sm:gap-2.5 sm:pe-2.5">
-          {/* The thumbnail carries the state of the picked machine: a ribbon naming it, and a tick
-              once the supplier has put it in a yard he confirmed. Nothing picked, nothing claimed. */}
-          <span className="relative grid h-10 w-14 flex-none place-items-center overflow-hidden rounded-[7px] border border-border bg-surface2">
+          {/* ── The thumbnail says two different things at once (owner's reference, 2026-08-25) ──────
+              The RIBBON is availability — has the supplier named a yard for this machine — and the
+              TICK is the papers: `eqVerified`, whether the listing was checked. They are separate
+              facts and the reference draws them separately, which is why a machine can carry a green
+              tick under an UNCONFIRMED ribbon.
+
+              The ribbon reads in full: it was clipped to «UNCONFI…», and a word cut in half is worse
+              than no word — it takes the one state a renter must not misread and makes him guess. So
+              the plate is wider, the type is 6.5px, and the word never wraps or truncates. */}
+          <span className="relative grid h-11 w-[68px] flex-none place-items-center overflow-hidden rounded-[7px] border border-border bg-surface2">
             {photo ? (
               /* eslint-disable-next-line @next/next/no-img-element */
               <img src={photo} alt="" className="h-full w-full object-cover" />
@@ -182,14 +192,17 @@ export function RequestStrip({
             {bid && (
               <>
                 <span
-                  className={`absolute inset-x-0 bottom-0 truncate px-1 py-[2px] text-center text-[8px] font-extrabold uppercase tracking-wide text-white ${
-                    confirmed ? "bg-ok/90" : "bg-navy/80"
+                  className={`absolute inset-x-0 bottom-0 whitespace-nowrap px-0.5 py-[2px] text-center text-[6.5px] font-extrabold uppercase tracking-[.04em] text-white ${
+                    confirmed ? "bg-ok/90" : "bg-navy/85"
                   }`}
                 >
                   {confirmed ? t.workspace.ribbonConfirmed : t.workspace.ribbonUnconfirmed}
                 </span>
-                {confirmed && (
-                  <span className="absolute -end-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-ok text-white ring-2 ring-surface">
+                {bid.eqVerified && (
+                  <span
+                    className="absolute -end-1 -top-1 grid h-[15px] w-[15px] place-items-center rounded-full bg-ok text-white ring-2 ring-surface"
+                    title={t.bidMap.eqVerifiedMachine}
+                  >
                     <Icon name="check" size={10} />
                   </span>
                 )}
@@ -218,7 +231,7 @@ export function RequestStrip({
                 {units.length > 0 && (
                   <span
                     className={`rounded-md border px-2 py-[3px] text-[11px] font-semibold ${
-                      confirmed ? "border-ok/25 bg-ok-soft text-ok" : "border-border bg-surface2 text-navy-mid"
+                      confirmed ? "border-ok/25 bg-ok-soft text-ok" : "border-brand/25 bg-brand-soft text-brand"
                     }`}
                   >
                     {confirmed ? t.workspace.availabilityConfirmed : t.workspace.availabilityNotChecked}
@@ -258,39 +271,79 @@ export function RequestStrip({
 
         </div>
 
-        {/* ── The two ways into the picked bid ──────────────────────────────────────────────────────
-            **On the navy, outside the white card** (owner, 2026-08-25: "the buttons of the header
-            pane"). They were inside it, which put the renter's two actions inside the panel that
-            states the facts — and made the card's own width depend on how long their labels are. The
-            reference has them standing on the strip itself, at its trailing edge, so they hold the
-            same place whatever the card is saying.
+        {/* ── The controls, as the reference clusters them (owner, 2026-08-25) ──────────────────────
+            Two columns on the navy, at the trailing edge, split by what they act ON:
 
-            «Review equipment» opens the machines on the map, where availability is answered in full;
-            «View documents» opens that same surface on the papers. Both need a bid to point at, so
-            they read as inert until one is picked. */}
-        <div className="flex flex-none flex-col gap-2 lg:w-[180px]">
-          <button
-            type="button"
-            disabled={!bid}
-            onClick={() => goEquipment()}
-            className={`whitespace-nowrap rounded-[8px] border px-3.5 py-2 text-[12px] font-bold transition ${
-              bid
-                ? "border-white/15 bg-black/25 text-white hover:bg-black/35"
-                : "cursor-default border-white/10 bg-black/10 text-white/40"
-            }`}
-          >
-            {t.workspace.reviewEquipment}
-          </button>
-          <button
-            type="button"
-            disabled={!bid}
-            onClick={() => goEquipment("documents")}
-            className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[8px] px-3.5 py-2 text-[12px] font-bold transition ${
-              bid ? "bg-surface text-navy hover:bg-surface2" : "cursor-default bg-surface/40 text-navy/40"
-            }`}
-          >
-            <Icon name="visibility" size={14} /> {t.workspace.viewDocuments}
-          </button>
+              • the BID — «Check availability» over «Documents» and «Quotation ↓». The primary names
+                its own precondition while nothing is picked («Select a bid first») rather than sitting
+                there greyed and mute;
+              • the REQUEST — «Full details ↗» and «Share», which are about the request itself and so
+                never depend on a bid.
+
+            It shipped as two buttons, which lost the quotation, the share and the whole distinction.
+            They stay OUTSIDE the white card: the card states facts, and out here the controls hold the
+            same place whatever it is saying. */}
+        <div className="flex flex-none items-stretch gap-2.5">
+          <div className="flex w-[172px] flex-none flex-col gap-1.5">
+            <button
+              type="button"
+              disabled={!bid}
+              onClick={() => goEquipment()}
+              className={`whitespace-nowrap rounded-[8px] border px-3 py-[7px] text-[12px] font-bold transition ${
+                bid
+                  ? "border-white/15 bg-black/25 text-white hover:bg-black/35"
+                  : "cursor-default border-white/10 bg-black/10 text-white/45"
+              }`}
+            >
+              {bid ? t.workspace.checkAvailability : t.workspace.selectBidFirst}
+            </button>
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                disabled={!bid}
+                onClick={() => goEquipment("documents")}
+                className={`inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-[8px] px-2.5 py-[7px] text-[11.5px] font-bold transition ${
+                  bid ? "bg-surface text-navy hover:bg-surface2" : "cursor-default bg-surface/40 text-navy/40"
+                }`}
+              >
+                <Icon name="visibility" size={13} /> {t.workspace.docsShort}
+              </button>
+              {/* The quotation is issued in the deal room, which is where the price it prints was
+                  settled; before there is a room there is no settled figure to issue. */}
+              <button
+                type="button"
+                disabled={!bid?.dealRoomId}
+                title={bid?.dealRoomId ? undefined : t.workspace.quotationNeedsRoom}
+                onClick={() => bid?.dealRoomId && router.push(`/deal-room/${encodeURIComponent(bid.dealRoomId)}`)}
+                className={`inline-flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-[8px] px-2.5 py-[7px] text-[11.5px] font-bold transition ${
+                  bid?.dealRoomId ? "bg-surface text-navy hover:bg-surface2" : "cursor-default bg-surface/40 text-navy/40"
+                }`}
+              >
+                {t.workspace.quotation} ↓
+              </button>
+            </div>
+          </div>
+
+          <div className="hidden w-px flex-none self-stretch bg-white/15 lg:block" />
+
+          <div className="flex w-[118px] flex-none flex-col gap-1.5">
+            <button
+              type="button"
+              onClick={onOpenRequest ?? undefined}
+              disabled={!onOpenRequest}
+              className="whitespace-nowrap rounded-[8px] bg-surface px-3 py-[7px] text-[11.5px] font-bold text-navy transition hover:bg-surface2 disabled:opacity-50"
+            >
+              {t.workspace.fullDetails} ↗
+            </button>
+            <button
+              type="button"
+              onClick={onShare ?? onOpenRequest ?? undefined}
+              disabled={!onShare && !onOpenRequest}
+              className="whitespace-nowrap rounded-[8px] bg-brand-soft px-3 py-[7px] text-[11.5px] font-bold text-brand transition hover:brightness-95 disabled:opacity-50"
+            >
+              {t.workspace.share}
+            </button>
+          </div>
         </div>
       </div>
     </div>

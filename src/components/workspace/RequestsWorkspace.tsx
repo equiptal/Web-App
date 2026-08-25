@@ -396,6 +396,7 @@ export function RequestsWorkspace() {
         bidCount={bids.length}
         onPickItem={pickItem}
         onOpenRequest={() => { setDrawerShare(false); setDrawerOpen(true); }}
+        onShare={() => { setDrawerShare(true); setDrawerOpen(true); }}
         fetchedCode={fetchedCode}
       />
 

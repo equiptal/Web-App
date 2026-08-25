@@ -1275,6 +1275,7 @@ export const en = {
     noBidsYet: "No bids on this item yet",
     reviewEquipment: "Review equipment",
     viewDocuments: "View documents",
+    docsShort: "Documents",
     // The picked machine, as the reference shows it: a ribbon on the thumbnail and a chip beside
     // the model. «Not checked» is the honest state — nobody has confirmed a yard for it yet.
     ribbonConfirmed: "Confirmed",
