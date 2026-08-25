@@ -16,12 +16,20 @@ import { Icon, Modal } from "@/components/ui";
 export function CarryForwardModal({
   open,
   itemNumber,
+  copied = true,
   onClose,
   onContinue,
 }: {
   open: boolean;
   /** 1-based number of the item being moved TO. */
   itemNumber: number;
+  /**
+   * Whether the destination inherits this machine's other details.
+   *
+   * True moving between parsed items. False for a machine the renter adds by hand, which starts
+   * blank — claiming its details already match would be a promise the form does not keep.
+   */
+  copied?: boolean;
   onClose: () => void;
   onContinue: () => void;
 }) {
@@ -35,12 +43,14 @@ export function CarryForwardModal({
           </span>
           {t.create.carry.locked}
         </p>
-        <p className="flex items-start gap-3 text-[13.5px] leading-relaxed text-navy-mid">
-          <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-surface2 text-navy">
-            <Icon name="content_copy" size={15} />
-          </span>
-          {t.create.carry.copied}
-        </p>
+        {copied && (
+          <p className="flex items-start gap-3 text-[13.5px] leading-relaxed text-navy-mid">
+            <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-surface2 text-navy">
+              <Icon name="content_copy" size={15} />
+            </span>
+            {t.create.carry.copied}
+          </p>
+        )}
       </div>
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <button

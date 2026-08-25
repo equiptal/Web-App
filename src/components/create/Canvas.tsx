@@ -34,7 +34,7 @@ export function Canvas() {
   const [shaking, setShaking] = useState(false);
   const [shakingWhere, setShakingWhere] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
-  const [carryTo, setCarryTo] = useState<number | null>(null);
+  const [carryTo, setCarryTo] = useState<{ index: number; isNew: boolean } | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   /** The equipment block — expanded card or collapsed strip — so a refusal can bring it into view. */
   const equipmentRef = useRef<HTMLElement | null>(null);
@@ -120,21 +120,49 @@ export function Canvas() {
     actions.openSection(section);
   };
 
+  /**
+   * Move on.
+   *
+   * The two destinations have different bars, and conflating them deadlocked the flow: it required
+   * the WHOLE draft to be complete even to reach the next machine, while only one machine is
+   * editable at a time. With five parsed items, item 1 could be finished and the button would still
+   * refuse — forever, because the only way to answer items 2-5 was to get past item 1.
+   *
+   *   next machine → this machine must be finished
+   *   review       → the whole request must be
+   */
   const advance = () => {
-    if (gaps.length > 0) {
-      // Point at whichever panel actually holds the blocker rather than shaking the one on screen.
-      const first = gaps[0];
-      if (first.panel !== "equipment" && state.activeSection !== first.panel && equipmentGaps.length === 0) {
-        actions.openSection(first.panel);
-      }
-      shakeNow(!whereOk && equipmentGaps.length === 0 ? "where" : "fields");
+    if (equipmentGaps.length > 0) {
+      shakeNow("fields");
       return;
     }
     if (!isLastItem) {
-      setCarryTo(index + 1);
+      setCarryTo({ index: index + 1, isNew: false });
+      return;
+    }
+    if (gaps.length > 0) {
+      // Point at whichever panel actually holds the blocker rather than shaking the one on screen.
+      const first = gaps[0];
+      if (first.panel !== "equipment" && state.activeSection !== first.panel) actions.openSection(first.panel);
+      shakeNow(!whereOk ? "where" : "fields");
       return;
     }
     actions.setReadyToSend(true);
+  };
+
+  /**
+   * Add a machine by hand.
+   *
+   * Same modal as moving between parsed items, because the same thing is true of both — the site and
+   * schedule already apply — and the renter should be told that before landing on a new blank card.
+   * It finishes the current machine first, so adding is not a way to leave one half-answered.
+   */
+  const addMachine = () => {
+    if (equipmentGaps.length > 0) {
+      shakeNow("fields");
+      return;
+    }
+    setCarryTo({ index: live.length, isNew: true });
   };
 
   const needsYou =
@@ -282,10 +310,7 @@ export function Canvas() {
         )}
         <div className="flex flex-wrap items-center gap-2.5">
           <button
-            onClick={() => {
-              actions.addItem();
-              actions.goItem(live.length);
-            }}
+            onClick={addMachine}
             className="rounded-[10px] bg-warn/15 px-5 py-2.5 text-[13px] font-bold text-warn transition hover:bg-warn/25"
           >
             + {t.create.addAnother}
@@ -302,10 +327,15 @@ export function Canvas() {
 
       <CarryForwardModal
         open={carryTo != null}
-        itemNumber={(carryTo ?? 0) + 1}
+        itemNumber={(carryTo?.index ?? 0) + 1}
+        // A hand-added machine starts blank, so "its other details already match this one" would be
+        // untrue for it. Only a parsed item inherits.
+        copied={carryTo?.isNew === false}
         onClose={() => setCarryTo(null)}
         onContinue={() => {
-          if (carryTo != null) actions.goItem(carryTo);
+          if (!carryTo) return;
+          if (carryTo.isNew) actions.addItem();
+          actions.goItem(carryTo.index);
           setCarryTo(null);
         }}
       />

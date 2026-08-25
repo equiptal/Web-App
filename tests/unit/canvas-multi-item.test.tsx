@@ -116,7 +116,7 @@ describe("the last item reviews instead of advancing", () => {
 });
 
 describe("adding a machine by hand", () => {
-  it("appends an item and moves to it", async () => {
+  it("asks first, then appends and moves to it", async () => {
     const handle = await renderCanvas(<Canvas />, {
       draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
       prepare: answered(["a0"]),
@@ -124,9 +124,89 @@ describe("adding a machine by hand", () => {
 
     await handle.run(() => screen.getByText(/Add another machine/).closest("button")!.click());
 
+    // The same modal as moving between parsed items — the site and schedule apply to this one too.
+    expect(screen.getByText("Equipment #2")).toBeTruthy();
+    expect(screen.getByText(/site and schedule already apply/)).toBeTruthy();
+    // But a hand-added machine starts blank, so it must NOT claim the details are inherited.
+    expect(screen.queryByText(/start out matching this equipment/)).toBeNull();
+    // Nothing added until the renter continues.
+    expect(handle.store().state.draft!.items.length).toBe(1);
+
+    await handle.run(() => screen.getByRole("button", { name: "Continue" }).click());
+
     expect(handle.store().state.draft!.items.length).toBe(2);
     expect(handle.store().state.itemIndex).toBe(1);
     // A fresh item has no taxonomy yet, so it blocks — and says so.
     expect(screen.getByText(/things need you|thing needs you/)).toBeTruthy();
+  });
+
+  it("will not add while this machine is unanswered", async () => {
+    const handle = await renderCanvas(<Canvas />, {
+      draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
+      // Year and certificate deliberately left open.
+    });
+
+    await handle.run(() => screen.getByText(/Add another machine/).closest("button")!.click());
+
+    expect(screen.queryByText("Equipment #2")).toBeNull();
+    expect(handle.store().state.draft!.items.length).toBe(1);
+  });
+});
+
+/**
+ * Reaching the NEXT machine and reaching REVIEW are different bars.
+ *
+ * They used to be the same one — the whole draft had to be complete — which deadlocked a multi-item
+ * request outright: only one machine is editable at a time, so with five parsed items, finishing
+ * item 1 still left item 2-5's gaps blocking the only button that could reach them.
+ */
+describe("the bar for the next machine is this machine", () => {
+  it("moves on with the current machine done, even while later ones are not", async () => {
+    const handle = await renderCanvas(<Canvas />, {
+      draft: twoItems(),
+      // Only item 1 answered; item 2 deliberately left open.
+      prepare: (store) => {
+        store.actions.touchField("line_items[a0].equipment_year");
+        store.actions.touchField("line_items[a0].safety_certificates");
+      },
+    });
+    expect(handle.store().state.draft!.touchedFields).not.toContain("line_items[a1].equipment_year");
+
+    await handle.run(() => screen.getByText(/Next equipment/).closest("button")!.click());
+    expect(screen.getByText("Equipment #2")).toBeTruthy();
+
+    await handle.run(() => screen.getByRole("button", { name: "Continue" }).click());
+    expect(handle.store().state.itemIndex).toBe(1);
+  });
+
+  it("still refuses the next machine while THIS one is unanswered", async () => {
+    const handle = await renderCanvas(<Canvas />, { draft: twoItems() });
+    await handle.run(() => screen.getByText(/Next equipment/).closest("button")!.click());
+    expect(screen.queryByText("Equipment #2")).toBeNull();
+    expect(handle.store().state.itemIndex).toBe(0);
+  });
+
+  // Review is the point where the whole request has to hold together.
+  it("holds the review screen until every machine is done", async () => {
+    const handle = await renderCanvas(<Canvas />, {
+      draft: twoItems(),
+      prepare: (store) => {
+        store.actions.touchField("line_items[a0].equipment_year");
+        store.actions.touchField("line_items[a0].safety_certificates");
+        store.actions.setChargedDaysUnderstood(true);
+        store.actions.goItem(1);
+      },
+    });
+
+    // On the last item, so the button reads Review & send — but item 2 is unanswered.
+    await handle.run(() => screen.getByText(/Review & send/).closest("button")!.click());
+    expect(handle.store().state.readyToSend).toBe(false);
+
+    await handle.run(() => {
+      handle.store().actions.touchField("line_items[a1].equipment_year");
+      handle.store().actions.touchField("line_items[a1].safety_certificates");
+    });
+    await handle.run(() => screen.getByText(/Review & send/).closest("button")!.click());
+    expect(handle.store().state.readyToSend).toBe(true);
   });
 });
