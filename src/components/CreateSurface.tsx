@@ -6,7 +6,8 @@ import { useT } from "@/lib/i18n";
 import { Intake } from "@/components/screens/Intake";
 import { Processing } from "@/components/screens/Processing";
 import { Confirmation } from "@/components/screens/Confirmation";
-import { Wizard } from "@/components/wizard/Wizard";
+import { Canvas } from "@/components/create/Canvas";
+import { ReadyToSend } from "@/components/create/ReadyToSend";
 import { Icon } from "@/components/ui";
 
 /**
@@ -27,8 +28,10 @@ export function CreateSurface() {
         return <Intake />;
       case "processing":
         return <Processing />;
+      // MREQ — the four-step wizard is gone. The same phase now renders one canvas, and the
+      // Ready-to-send review is a mode of it rather than a fifth step.
       case "wizard":
-        return <Wizard />;
+        return state.readyToSend ? <ReadyToSend /> : <Canvas />;
       case "confirmation":
         return <Confirmation />;
     }

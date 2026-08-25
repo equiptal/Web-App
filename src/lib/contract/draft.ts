@@ -242,6 +242,20 @@ export interface RfqDraft {
   justifications?: string[];
   /** Field-keyed agent notes (dotted path → note), rendered inline beside each field. */
   fieldNotes?: Record<string, string>;
+  /**
+   * MREQ-AC-56/59/60 — dotted paths the renter has personally edited, in the same key vocabulary as
+   * {@link AgentDraft.fieldNotes} (e.g. `line_items[m101].equipment_year`).
+   *
+   * **Web-only. Never sent to either backend.** It exists because three provenances collapse to the
+   * same stored value: a field the agent filled, a field we defaulted, and a field the renter
+   * deliberately set to the same thing are indistinguishable by value alone. `agentMatches` separates
+   * agent from non-agent; this separates our default from the renter's own choice, which is what the
+   * "Default" badge and the year/certificate gates both hang on.
+   *
+   * Persisted with the draft, so a control the renter already answered does not demand attention
+   * again after a reload.
+   */
+  touchedFields?: string[];
 }
 
 /** Posted to /api/requests (AC-42/43). Mirrors the shared app request shape. */

@@ -24,7 +24,12 @@ import { draftToRfqCorrection } from "@/lib/api/agent-adapters";
 import { useSession } from "@/lib/session";
 
 export type Phase = "intake" | "processing" | "wizard" | "confirmation";
-export type Step = 1 | 2 | 3 | 4;
+
+/**
+ * Which canvas panel is open (MREQ-AC-01). Replaces the four-step `Step`: the canvas has no steps,
+ * only three accordion panels and a review screen, and `null` means every panel is collapsed.
+ */
+export type Section = "equipment" | "where" | "when";
 
 /**
  * localStorage key for the persisted RFQ draft (web-app/002 save-on-reload).
@@ -47,7 +52,19 @@ export function agentMatches(current: unknown, original: unknown): boolean {
 
 export interface RfqState {
   phase: Phase;
-  step: Step;
+  /** The open canvas panel; `null` when all three are collapsed. */
+  activeSection: Section | null;
+  /** Which equipment item the canvas is showing (0-based index into the live items). */
+  itemIndex: number;
+  /**
+   * MREQ-AC-05 — the renter has read and accepted how many days suppliers will actually price.
+   * Gates *When it runs*, and with it the review screen. Deliberately NOT part of the draft: it is
+   * an acknowledgement of a figure, and a figure that changes (new dates, new billing basis) has
+   * not been acknowledged yet.
+   */
+  chargedDaysUnderstood: boolean;
+  /** MREQ-AC-42 — the read-only Ready-to-send screen is showing instead of the canvas. */
+  readyToSend: boolean;
   taxonomy: Taxonomy;
   draft: RfqDraft | null;
   // intake inputs (preserved across errors — AC-10)
@@ -88,7 +105,10 @@ export interface RfqState {
 /** Exported alongside {@link reducer} so tests start from the real initial state. */
 export const initialState: RfqState = {
   phase: "intake",
-  step: 1,
+  activeSection: "equipment",
+  itemIndex: 0,
+  chargedDaysUnderstood: false,
+  readyToSend: false,
   taxonomy: [],
   draft: null,
   text: "",
@@ -123,7 +143,11 @@ type Action =
   | { t: "RESUME_WIZARD" }
   | { t: "GO_INTAKE" }
   | { t: "RESUME_DRAFT" }
-  | { t: "GO_STEP"; step: Step }
+  | { t: "OPEN_SECTION"; section: Section | null }
+  | { t: "GO_ITEM"; index: number }
+  | { t: "SET_CHARGED_DAYS_UNDERSTOOD"; value: boolean }
+  | { t: "SET_READY_TO_SEND"; value: boolean }
+  | { t: "TOUCH_FIELD"; key: string }
   | { t: "PATCH_LOCATION"; patch: Partial<ProjectDetails["location"]> }
   | { t: "CONFIRM_LOCATION" }
   | { t: "RESOLVE_LOCATION_CONFLICT"; source: "text" | "file" }
@@ -221,6 +245,9 @@ export function reducer(state: RfqState, a: Action): RfqState {
           summary: a.draft.summary,
           justifications: a.draft.justifications ?? [],
           fieldNotes: a.draft.fieldNotes ?? {},
+          // MREQ-AC-59 — a freshly parsed draft has been touched by nobody. Every value on it came
+          // from the agent or from our own seeds, and the canvas says so on each control.
+          touchedFields: [],
         },
         // Snapshot the agent's values (refs are safe — all edits are immutable copies). The SEEDED
         // items are snapshotted, not the raw ones: the cert seed is our default, not a renter edit, so
@@ -233,13 +260,13 @@ export function reducer(state: RfqState, a: Action): RfqState {
     case "PROCESS_ERROR":
       return { ...state, busy: false, error: a.kind, errorDetail: a.detail ?? null };
     case "ENTER_WIZARD":
-      return { ...state, phase: "wizard", step: 1 };
+      return { ...state, phase: "wizard", activeSection: "equipment", itemIndex: 0, readyToSend: false };
     case "RESUME_WIZARD":
       // Return to the wizard at the SAME step (e.g. from the "Your request" input step) — no re-parse.
       return { ...state, phase: "wizard", error: null };
     case "GO_INTAKE":
-      // Return to intake preserving text/files (AC-10: input preserved). Keeps `step` so the renter
-      // can jump back to the wizard where they were ("Your request" step → back to review).
+      // Return to intake preserving text/files (AC-10: input preserved). Keeps `activeSection` and
+      // `itemIndex` so returning to the canvas lands where the renter left it.
       return { ...state, phase: "intake", error: null };
     case "RESUME_DRAFT":
       // "Continue draft": dismiss the prompt and drop the renter back INTO the review wizard at the
@@ -247,8 +274,21 @@ export function reducer(state: RfqState, a: Action): RfqState {
       // primary action is "Re-analyze" and would discard their edits. A rehydrated draft has always
       // already been processed (the prompt only shows when a saved draft exists).
       return { ...state, draftPrompt: false, phase: "wizard", error: null };
-    case "GO_STEP":
-      return { ...state, step: a.step };
+    case "OPEN_SECTION":
+      return { ...state, activeSection: a.section };
+    case "GO_ITEM":
+      // The canvas always opens a new item on its equipment panel — the site and schedule are
+      // request-wide, so there is nothing item-specific behind the other two.
+      return { ...state, itemIndex: Math.max(0, a.index), activeSection: "equipment" };
+    case "SET_CHARGED_DAYS_UNDERSTOOD":
+      return { ...state, chargedDaysUnderstood: a.value };
+    case "SET_READY_TO_SEND":
+      return { ...state, readyToSend: a.value, activeSection: a.value ? null : "equipment" };
+    case "TOUCH_FIELD":
+      // Idempotent: the renter answering the same control twice is still one answer.
+      return withDraft(state, (d) =>
+        (d.touchedFields ?? []).includes(a.key) ? d : { ...d, touchedFields: [...(d.touchedFields ?? []), a.key] },
+      );
     case "PATCH_LOCATION":
       // AC-16: changing the location (map/search/GPS) invalidates a prior confirmation — require a
       // fresh confirm. The patch can still set `confirmed` explicitly (e.g. the "Change" button).
@@ -273,8 +313,19 @@ export function reducer(state: RfqState, a: Action): RfqState {
       });
     case "DISMISS_MULTILOCATION":
       return { ...state, multiLocationDismissed: true };
-    case "PATCH_TIMING":
-      return withDraft(state, (d) => ({ ...d, project: { ...d.project, timing: { ...d.project.timing, ...a.patch } } }));
+    case "PATCH_TIMING": {
+      // MREQ-AC-05 — the charged-day acknowledgement is about a specific number. Changing a date,
+      // the billing basis or the hours changes that number, so the previous acceptance no longer
+      // refers to anything and the renter is asked again. Silently keeping the tick would let a
+      // request go out against a figure nobody ever saw.
+      const changesFigure =
+        a.patch.startDate !== undefined ||
+        a.patch.endDate !== undefined ||
+        a.patch.rentalBasis !== undefined ||
+        a.patch.hoursPerDay !== undefined;
+      const next = withDraft(state, (d) => ({ ...d, project: { ...d.project, timing: { ...d.project.timing, ...a.patch } } }));
+      return changesFigure ? { ...next, chargedDaysUnderstood: false } : next;
+    }
     case "PATCH_ADVANCED":
       return withDraft(state, (d) => {
         const advanced = { ...d.project.advanced, ...a.patch };
@@ -505,7 +556,12 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
     resumeWizard: () => dispatch({ t: "RESUME_WIZARD" }),
     goIntake: () => dispatch({ t: "GO_INTAKE" }),
     resumeDraft: () => dispatch({ t: "RESUME_DRAFT" }),
-    goStep: (step: Step) => dispatch({ t: "GO_STEP", step }),
+    openSection: (section: Section | null) => dispatch({ t: "OPEN_SECTION", section }),
+    goItem: (index: number) => dispatch({ t: "GO_ITEM", index }),
+    setChargedDaysUnderstood: (value: boolean) => dispatch({ t: "SET_CHARGED_DAYS_UNDERSTOOD", value }),
+    setReadyToSend: (value: boolean) => dispatch({ t: "SET_READY_TO_SEND", value }),
+    /** MREQ-AC-59 — record that the renter personally answered this control. */
+    touchField: (key: string) => dispatch({ t: "TOUCH_FIELD", key }),
 
     patchLocation: (patch: Partial<ProjectDetails["location"]>) => dispatch({ t: "PATCH_LOCATION", patch }),
     confirmLocation: () => dispatch({ t: "CONFIRM_LOCATION" }),
@@ -641,7 +697,7 @@ export function RfqProvider({ children }: { children: ReactNode }) {
 
   // Persist the editable draft + position whenever they change (skip processing/confirmation phases).
   // Stamp the owning user id so a later session can tell whose draft this is.
-  const { phase, step, draft, text, multiLocationDismissed, seq, agentOrigin, isTrial } = state;
+  const { phase, activeSection, itemIndex, draft, text, multiLocationDismissed, seq, agentOrigin, isTrial } = state;
   useEffect(() => {
     try {
       if (draft && (phase === "intake" || phase === "wizard")) {
@@ -649,7 +705,22 @@ export function RfqProvider({ children }: { children: ReactNode }) {
           DRAFT_STORAGE_KEY,
           // mobile/016 — `isTrial` rides along so a reload mid-flow resumes as a trial. Without it a
           // rehydrated draft would submit as a REAL (dispatched) request the renter never asked for.
-          JSON.stringify({ phase, step, draft, text, multiLocationDismissed, seq, agentOrigin, isTrial, userId: user?.id ?? null }),
+          //
+          // `chargedDaysUnderstood` is deliberately NOT persisted: it acknowledges a figure, and the
+          // renter should meet that figure again on a fresh visit rather than find it pre-accepted.
+          // `touchedFields` rides inside `draft` (MREQ-AC-56/60).
+          JSON.stringify({
+            phase,
+            activeSection,
+            itemIndex,
+            draft,
+            text,
+            multiLocationDismissed,
+            seq,
+            agentOrigin,
+            isTrial,
+            userId: user?.id ?? null,
+          }),
         );
       } else if (phase === "confirmation") {
         window.localStorage.removeItem(DRAFT_STORAGE_KEY); // request sent → clear the saved draft
@@ -657,12 +728,17 @@ export function RfqProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore quota/availability errors */
     }
-  }, [phase, step, draft, text, multiLocationDismissed, seq, agentOrigin, isTrial, user]);
+  }, [phase, activeSection, itemIndex, draft, text, multiLocationDismissed, seq, agentOrigin, isTrial, user]);
 
-  // ---- Browser history ⇄ wizard position. The browser Back/Forward buttons step through the wizard
-  // like the in-app Back/Next: each forward step pushes a history entry; Back/Forward fire popstate,
-  // which moves the store to that step. Backward in-app nav (Back button / step chips / "Your request")
-  // routes through window.history too (see Wizard), so both stay in sync. ----
+  // ---- Browser history ⇄ canvas position (MREQ-AC-06/07).
+  //
+  // The wizard mapped one history entry per step, so Back walked 4 → 3 → 2 → 1 → intake. The canvas
+  // has no steps to walk. Panels are accordions, not pages: opening one is not somewhere the renter
+  // navigated TO, and pushing an entry for it would make Back close a panel instead of leaving —
+  // which is worse still under the gating, since Back could land on a panel that Forward can't
+  // reopen.
+  //
+  // So the chain is exactly three stops: intake (0) → canvas (1) → ready-to-send (2). ----
   const poppingRef = useRef(false);
   const lastOrdRef = useRef(0);
   useEffect(() => {
@@ -678,7 +754,7 @@ export function RfqProvider({ children }: { children: ReactNode }) {
       const s = stateRef.current;
       if (target >= 1 && s.draft) {
         dispatch({ t: "RESUME_WIZARD" });
-        dispatch({ t: "GO_STEP", step: Math.min(Math.max(target, 1), 4) as Step });
+        dispatch({ t: "SET_READY_TO_SEND", value: target >= 2 });
       } else {
         dispatch({ t: "GO_INTAKE" }); // baseline / no draft → the input screen ("Your request")
       }
@@ -687,10 +763,11 @@ export function RfqProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  // Push a history entry whenever the renter moves FORWARD (intake→step, step→next) so each is a
-  // Back-stop. Backward moves arrive via popstate (poppingRef) and must not re-push.
+  // Push an entry only on a genuine forward move. Backward moves arrive via popstate (poppingRef)
+  // and must not re-push.
+  const readyToSend = state.readyToSend;
   useEffect(() => {
-    const ord = phase === "wizard" ? step : phase === "intake" ? 0 : -1;
+    const ord = phase === "wizard" ? (readyToSend ? 2 : 1) : phase === "intake" ? 0 : -1;
     if (ord < 0) return; // processing / confirmation aren't part of the back/forward chain
     if (poppingRef.current) {
       poppingRef.current = false;
@@ -705,7 +782,7 @@ export function RfqProvider({ children }: { children: ReactNode }) {
       }
     }
     lastOrdRef.current = ord;
-  }, [phase, step]);
+  }, [phase, readyToSend]);
 
   // Load the taxonomy once.
   useEffect(() => {

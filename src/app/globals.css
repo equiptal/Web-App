@@ -87,3 +87,44 @@ body {
   transform-origin: 70% 70%;
   animation: wave 2.2s ease 0.3s 2;
 }
+
+/* ---- Request canvas (MREQ) ----
+   A refused move shakes the blocks that caused it (MREQ-AC-02/03/15). The canvas gates its panels in
+   order and does not explain why, so the shake is the whole of the feedback — it has to be visible
+   without being alarming, hence the inset ring rather than a colour change on the content itself.
+   Respecting `prefers-reduced-motion` leaves the ring, which is the part that carries the meaning. */
+@keyframes shake-x {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-5px); }
+  40%, 60% { transform: translateX(5px); }
+}
+.shake-error {
+  animation: shake-x 0.4s ease;
+  box-shadow: inset 0 0 0 2px var(--color-brand, #f5871f);
+  border-radius: 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shake-error {
+    animation: none;
+  }
+}
+
+/* A value carried from the previous equipment item (MREQ-AC-41) — the renter needs to see what was
+   inherited rather than chosen, so it pulses once on arrival and keeps the halo. */
+@keyframes carried-bump {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.06); }
+  60% { transform: scale(0.98); }
+  100% { transform: scale(1); }
+}
+.carried-mark {
+  animation: carried-bump 0.5s ease-out;
+  box-shadow: 0 0 0 3px var(--color-brand-soft, #fde0c7);
+  border-radius: 10px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .carried-mark {
+    animation: none;
+  }
+}

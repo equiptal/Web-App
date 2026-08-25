@@ -11,7 +11,6 @@ import {
   SAFETY_CERTIFICATES,
   splitSafetyCerts,
   PAYMENT_TERMS,
-  PAYMENT_METHODS,
   MAINTENANCE_RESPONSIBILITIES,
   BID_WINDOWS,
   type FuelType,
@@ -23,7 +22,6 @@ import {
   type OperatorCertificate,
   type OtherCertificate,
   type PaymentTerm,
-  type PaymentMethod,
   type MaintenanceResponsibility,
   type MaintenanceSla,
   type BidWindow,
@@ -426,7 +424,10 @@ function toProject(h: RFQHeader): ProjectDetails {
 function toPreferences(h: RFQHeader): Preferences {
   const p = defaultPreferences();
   p.payment.terms = (pick(h.payment_terms, PAYMENT_TERMS) as PaymentTerm | undefined) ?? null;
-  p.payment.method = (pick(h.payment_method, PAYMENT_METHODS) as PaymentMethod | undefined) ?? null;
+  // MREQ-AC-44 — the agent's `payment_method` inference is deliberately NOT read. The canvas offers
+  // no control for it, so reading it would submit a payment method (cash, say) that the renter never
+  // chose and cannot see anywhere in the flow. `app-adapters.ts` maps a null method to `undefined`,
+  // which the request path already accepts, so the field simply stops being sent from the web.
   p.maintenance.responsibility =
     (pick(h.maintenance_responsibility, MAINTENANCE_RESPONSIBILITIES) as MaintenanceResponsibility | undefined) ?? "supplier";
   p.maintenance.sla = h.breakdown_response_sla ? SLA_IN[h.breakdown_response_sla] ?? null : null;

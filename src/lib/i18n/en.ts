@@ -541,6 +541,20 @@ export const en = {
     chooseRentalBasis: "Choose a rental basis to continue.", // AC-12/13
     resolveLocationConflict: "Resolve the location conflict to continue.", // AC-47
     resolveItems: "Resolve the flagged equipment items to continue.", // AC-29
+    // MREQ-AC-09 — the app's required set, named per control so the dot lands on what's empty.
+    noItems: "Add at least one machine to continue.",
+    categoryMissing: "Choose a category.",
+    subtypeMissing: "Choose a type.",
+    capacityMissing: "Choose a size.",
+    fuelMissing: "Choose a fuel type.",
+    quantityMissing: "Set how many you need.",
+    deliveryMissing: "Say who delivers to site.",
+    returnMissing: "Say who returns it from site.",
+    locationMissing: "Set where the machine goes.",
+    // MREQ-AC-54 — web-only gates, each satisfied by an explicit "nothing" answer.
+    yearMissing: "Choose a minimum year, or Any year.",
+    certMissing: "Choose a certificate, or No certificate.",
+    confirmChargedDays: "Confirm how many days you'll be charged for.",
   },
   errors: {
     emptyTitle: "We couldn't read a request from that", // AC-09 tentative
@@ -1244,6 +1258,12 @@ export const en = {
     noBidsYet: "No bids on this item yet",
     reviewEquipment: "Review equipment",
     viewDocuments: "View documents",
+    // The request's own terms, as chips on the strip beside the item they qualify. They were
+    // drawer-only, which made the renter open a panel to recall what he had asked for while reading
+    // what he was being offered.
+    chipStarts: "Starts {date}",
+    chipDuration: "{n} days",
+    chipMore: "+{n} more",
     // The two tabs and the export beside them.
     tabCards: "Cards",
     tabCompare: "Compare",
@@ -1293,10 +1313,26 @@ export const en = {
     // Multi-unit only, in the same box: the true all-units figure, which is not the per-unit total
     // times the count — each transport leg carries its own unit count.
     overallTotal: "Overall total",
-    // Off-platform pair. The invite has no action behind it yet and says so when pressed.
+    // ── Off-platform pair ────────────────────────────────────────────────────────────────────────
+    // The invite reaches the supplier through the renter's OWN WhatsApp, the way «Provide it for me?»
+    // reaches support (owner, 2026-08-25) — so the message is written in the renter's voice and says
+    // what the supplier gets, not what Moedatech wants. It names the firm so a supplier holding
+    // several conversations knows which renter is asking.
     inviteToApp: "Invite to Moedatech",
+    inviteSent: "Invite opened",
+    inviteNoContact: "This bid carries no number to reach the supplier on.",
+    inviteMessage:
+      "Hello {supplier} — I received your bid through Moedatech. If you install the Moedatech app you'll see my requests directly and can bid on more of them. https://moedatech.net",
     viewQuote: "View quote",
     notBuiltYet: "Not available yet.",
+    // ── When a bid's three counts disagree (`unit-count-notes`) ──────────────────────────────────
+    // Said only where they genuinely diverge. `priced` is what the money was built on, `offered` is
+    // what the bid claims, and `named` is how many distinct machines are actually behind it — a
+    // supplier may commit to more units than he holds machines for, and the padding is invisible
+    // without this line.
+    countPricedAbove: "Priced on {priced} units, though the offer lists {offered}.",
+    countPricedBelow: "Priced on {priced} of the {offered} units offered.",
+    countClaimed: "{n} of these units name no machine — {named} machines were listed.",
     // ── The comparison matrix ──
     // "Pick one" focuses the row — it drives the strip above. It never awards; that is the deal room.
     supplierPickOne: "Supplier · pick one",
@@ -1383,6 +1419,150 @@ export const en = {
     q2Body: "Try loosening your requirements so more suppliers can take part — otherwise we'll close this request for you.",
     edit: "Edit my requirements",
     close: "Close the request",
+  },
+
+  /**
+   * The request canvas (MREQ). Replaces the four-step wizard's own key groups; `step1`–`step3` stay
+   * for now because other surfaces still read a handful of their labels.
+   */
+  create: {
+    youWrote: "YOU WROTE",
+    needsYou: "{n} things need you",
+    needsYouOne: "1 thing needs you",
+    startOver: "Start over",
+    machine: "The machine",
+    operator: "The operator",
+    operatorRail: "OPERATOR",
+    where: "Where it goes",
+    when: "When it runs",
+    lockedForRequest: "locked for the whole request",
+    collapse: "collapse",
+    change: "change",
+    nextEquipment: "Next equipment",
+    previousEquipment: "Previous equipment",
+    addAnother: "Add another machine",
+    reviewAndSend: "Review & send",
+    itemOfCount: "Equipment #{n} of {total}",
+    provenance: {
+      agent: "AI selected",
+      default: "Default",
+      renter: "changed by you",
+    },
+    machineCard: {
+      category: "CATEGORY",
+      type: "TYPE",
+      size: "SIZE",
+      searchTypes: "Search types…",
+      searchSizes: "Search sizes…",
+      fuel: "FUEL",
+      minYear: "MINIMUM YEAR",
+      anyYear: "Any year",
+      cert: "CERTIFICATE",
+      noCert: "No certificate",
+      certOther: "Name the certificate",
+      quantity: "QUANTITY",
+      delivery: "DELIVERY TO SITE",
+      returnFromSite: "RETURN FROM SITE",
+      fuelResponsibility: "FUEL RESPONSIBILITY",
+      attachment: "ATTACHMENT",
+      workType: "WORK TYPE",
+      workTypePlaceholder: "What will it lift?",
+      notes: "NOTES",
+      notesOptional: "(optional)",
+      notesPlaceholder: "Anything else the supplier should know…",
+      unavailableTitle: "{equipment} isn't available from suppliers right now.",
+      unavailableWhatsapp: "Message us on WhatsApp",
+      unavailableChoose: "Choose another type",
+      sourcingRequested: "We're looking for this one — we'll be in touch.",
+    },
+    operatorCard: {
+      food: "FOOD",
+      accommodation: "ACCOM. & TRANSPORT",
+      certificates: "OPERATOR CERTIFICATES",
+      moreDetails: "MORE DETAILS",
+      nationality: "NATIONALITY",
+      nationalityAny: "Any",
+      nationalityRestricted: "Restricted",
+      nationalityCustom: "Which nationalities work for you?",
+      nightShift: "NIGHT SHIFT",
+      nightIncluded: "Included",
+      nightDayOnly: "Day only",
+      noOperator: "No operator needed — we drive it ourselves",
+      withOperator: "with an operator",
+    },
+    wherePanel: {
+      searchPlaceholder: "Search a place, or paste a Maps link / coordinates",
+      dragHint: "Drag the map, or drop a pin where the machine goes",
+      confirm: "This is the right spot",
+      useMyLocation: "Use my location",
+    },
+    whenPanel: {
+      dates: "START & END DATE",
+      startDate: "START DATE",
+      endDate: "END DATE",
+      duration: "Duration",
+      billing: "HOW YOU'RE BILLED",
+      extendable: "Extendable",
+      quoteRate: "Suppliers quote you a {basis} rate.",
+      moreDetails: "MORE DETAILS",
+      moreDetailsHint: "hours a day, overtime",
+      hours: "HOURS A DAY",
+      hoursStandard: "KSA STANDARD",
+      overtime: "OVERTIME RATE",
+      // MREQ-AC-33/34 — the charged-day disclosure. "Billable days" was jargon and the old
+      // "N calendar days less M Fridays" read as arithmetic rather than a sentence.
+      chargedLabel: "DAYS YOU'LL BE CHARGED FOR",
+      chargedExplain:
+        "Your rental runs {total} calendar days. Fridays are not charged, and there are {fridays} of them, so suppliers price {charged} days at {hours} hours each.",
+      chargedNoDates: "Add a start and end date and we'll show exactly how many days you'll be charged for. Fridays are never charged.",
+      confirmCharged: "I understand suppliers will price {charged} days, not {total}.",
+      confirmChargedNoDates: "I understand suppliers will price without a fixed end date.",
+      tooShortMonthly: "Your dates cover {days} days. Monthly billing usually needs 30 days or more.",
+      tooShortWeekly: "Your dates cover {days} days. Weekly billing usually needs 7 days or more.",
+      nudgeBoth: "Suppliers quote lower when they don't know your dates. Add a start and end date to get better bids.",
+      nudgeEnd: "Suppliers quote lower when they don't know your end date. Add one to get better bids.",
+      nudgeStart: "Suppliers quote lower when they don't know your start date. Add one to get better bids.",
+    },
+    carry: {
+      title: "Equipment #{n}",
+      locked: "The site and schedule already apply to your whole request, so this equipment uses the same ones automatically.",
+      copied: "Its other details — like delivery, food, and certificates — start out matching this equipment, but you can change any of them.",
+      editFirst: "Edit this item first",
+      continue: "Continue",
+    },
+    ready: {
+      title: "Ready to send",
+      subtitle: "This is exactly what suppliers will see. Terms and payment come after the bids arrive — nothing else to fill in here.",
+      where: "Where it goes",
+      when: "When it runs",
+      machineAndOperator: "The machine & operator",
+      preferences: "Preferences",
+      equipment: "Equipment",
+      billingDuration: "BILLING & DURATION",
+      hoursOvertime: "HOURS & OVERTIME",
+      chargedDays: "DAYS CHARGED",
+      equipmentTile: "EQUIPMENT",
+      logistics: "LOGISTICS",
+      operatorTile: "OPERATOR",
+      foodStay: "FOOD & STAY",
+      paymentTerms: "PAYMENT TERMS",
+      maintenance: "MAINTENANCE",
+      maintenanceSla: "RESPONSE TIME",
+      budget: "BUDGET CEILING · SAR",
+      bidWindow: "OFFER / BID WINDOW",
+      supplierFilters: "SUPPLIER FILTERS",
+      verifiedOnly: "Verified suppliers only",
+      sublettingAllowed: "Allow subletting / crosshire",
+      additionalNotes: "ADDITIONAL NOTES",
+      notesPlaceholder: "Anything else…",
+      optional: "(optional)",
+      inviteTitle: "Invite suppliers you already know",
+      inviteBody:
+        "Once you send this, you'll get a shareable link to invite suppliers to bid — even ones off Moedatech. Their bids land right here for you to compare.",
+      backToEditing: "Back to editing",
+      send: "Send to suppliers",
+      notSet: "not set",
+    },
   },
 };
 
