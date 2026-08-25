@@ -13,7 +13,7 @@ import { AuthGateProvider, useAuthGate } from "@/components/auth/AuthGate";
 import { PUBLIC_WEB_ENABLED } from "@/lib/flags";
 import { fetchDealRoomUnread } from "@/lib/api/client";
 import { NotificationsBell } from "@/components/NotificationsBell";
-import { AppNav, type NavItem } from "@/components/AppNav";
+import { AppNav, AppNavMobile, type NavItem } from "@/components/AppNav";
 
 /**
  * App shell for the renter web app (web-app/004, AC-01/02/03/09/25). One bar across the top holding
@@ -225,23 +225,19 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
               `title` is still taken, and still used — see the document-title effect above. */}
 
           <div className="ms-auto flex flex-none items-center gap-2 text-[13px] font-semibold text-navy-mid sm:gap-3">
-            <span className="inline-flex overflow-hidden rounded-md border border-border">
-              {(["en", "ar"] as Locale[]).map((l) => (
-                <button
-                  key={l}
-                  onClick={() => setLocale(l)}
-                  className={`px-2.5 py-1 text-xs font-bold ${locale === l ? "bg-navy text-white" : "bg-surface text-muted"}`}
-                >
-                  {l === "en" ? "EN" : "ع"}
-                </button>
-              ))}
+            {/* ── The language toggle steps out of the bar on a phone (owner, 2026-08-25) ──────────
+                It is ~70px of a 360px row and it is pressed roughly never — a reader picks a language
+                once. Below `sm` it moves into the nav sheet, under the three places, which is room
+                the bar does not have to find. It is not removed anywhere. */}
+            <span className="hidden sm:inline-flex">
+              <LocaleToggle locale={locale} setLocale={setLocale} />
             </span>
 
             {/* Signed-out visitors browse freely; this opens the auth modal (no /login page). */}
             {status === "anon" && (
               <button
                 onClick={() => openAuth()}
-                className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3.5 py-1.5 text-[12.5px] font-bold text-white transition hover:brightness-105"
+                className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3 py-1.5 text-[12.5px] font-bold text-white transition hover:brightness-105 sm:px-3.5"
               >
                 <Icon name="login" size={16} /> {t.shell.signIn}
               </button>
@@ -356,6 +352,15 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                 )}
               </div>
             )}
+
+            {/* ── Navigation, for a bar too narrow to lay it out (owner, 2026-08-25) ───────────────
+                Last in the row rather than first: the leading edge already belongs to Back and the
+                logomark, and on a page that shows Back a third control there would crowd all three.
+
+                It carries the language toggle down with it — see the note on that control above. */}
+            <AppNavMobile items={navItems}>
+              <LocaleToggle locale={locale} setLocale={setLocale} />
+            </AppNavMobile>
           </div>
         </header>
 
@@ -379,6 +384,25 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
 
     </div>
     </BackContext.Provider>
+  );
+}
+
+/** The EN/AR pair. Lifted out of the bar so the identical control can be rendered in two places —
+ *  the header on a tablet and up, the nav sheet on a phone — without the markup being written twice
+ *  and drifting apart. */
+function LocaleToggle({ locale, setLocale }: { locale: Locale; setLocale: (l: Locale) => void }) {
+  return (
+    <span className="inline-flex overflow-hidden rounded-md border border-border">
+      {(["en", "ar"] as Locale[]).map((l) => (
+        <button
+          key={l}
+          onClick={() => setLocale(l)}
+          className={`px-2.5 py-1 text-xs font-bold ${locale === l ? "bg-navy text-white" : "bg-surface text-muted"}`}
+        >
+          {l === "en" ? "EN" : "ع"}
+        </button>
+      ))}
+    </span>
   );
 }
 

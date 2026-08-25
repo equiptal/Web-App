@@ -47,6 +47,7 @@ export const ar: Dictionary = {
     inbox: "الوارد",
     request: "طلب",
     account: "الحساب",
+    menu: "القائمة",
     // مدخل قائمة الحساب إلى `/profile`. المسار ومحتواه لم يتغيّرا؛ «الإعدادات» هي ما يبحث عنه القارئ
     // بجانب تسجيل الخروج، وتُبقي الرأس على أربعة تبويبات.
     settings: "الإعدادات",
@@ -1265,8 +1266,8 @@ export const ar: Dictionary = {
     reviewAndSend: "المراجعة والإرسال",
     itemOfCount: "المعدة رقم {n} من {total}",
     provenance: {
-      agent: "اختاره الذكاء الاصطناعي",
-      default: "افتراضي",
+      agent: "اكتشفه الذكاء الاصطناعي",
+      default: "افتراضي بالذكاء الاصطناعي",
       renter: "غيّرته بنفسك",
     },
     party: {
@@ -1305,6 +1306,18 @@ export const ar: Dictionary = {
       sourcingRequested: "نبحث عن هذه المعدة — سنتواصل معك.",
     },
     operatorCard: {
+      /**
+       * Short forms for the certificate CHIPS only. `options.safetyCert` spells
+       * "SASO technical inspection", which is right in a table cell and wraps this row onto two
+       * lines. The stored value is untouched — this is a label, not a vocabulary.
+       */
+      certShort: {
+        "tuv": "TÜV",
+        "spsp": "SPSP",
+        "saso-technical": "ساسو",
+        "aramco": "أرامكو",
+        "other": "أخرى",
+      } as Record<string, string>,
       food: "الطعام",
       accommodation: "السكن والتنقل",
       certificates: "شهادات المشغّل",

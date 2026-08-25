@@ -45,6 +45,9 @@ export const en = {
     inbox: "Inbox",
     request: "Request",
     account: "Account",
+    // The phone menu button, which opens the nav sheet — the three places the centred row holds
+    // on a wider bar.
+    menu: "Menu",
     // The account menu's entry to . The route and its content are unchanged; «Settings» is
     // what a reader looks for beside Sign out, and it keeps the header to four tabs.
     settings: "Settings",
@@ -1456,8 +1459,8 @@ export const en = {
     reviewAndSend: "Review & send",
     itemOfCount: "Equipment #{n} of {total}",
     provenance: {
-      agent: "AI selected",
-      default: "Default",
+      agent: "AI detected",
+      default: "AI default",
       renter: "changed by you",
     },
     /**
@@ -1505,6 +1508,18 @@ export const en = {
       sourcingRequested: "We're looking for this one — we'll be in touch.",
     },
     operatorCard: {
+      /**
+       * Short forms for the certificate CHIPS only. `options.safetyCert` spells
+       * "SASO technical inspection", which is right in a table cell and wraps this row onto two
+       * lines. The stored value is untouched — this is a label, not a vocabulary.
+       */
+      certShort: {
+        "tuv": "TÜV",
+        "spsp": "SPSP",
+        "saso-technical": "SASO",
+        "aramco": "Aramco",
+        "other": "Other",
+      } as Record<string, string>,
       food: "FOOD",
       accommodation: "ACCOM. & TRANSPORT",
       certificates: "OPERATOR CERTIFICATES",
