@@ -168,3 +168,65 @@ describe("collapsing is always free", () => {
     expect(handle.store().state.activeSection).toBeNull();
   });
 });
+
+/**
+ * MREQ — one panel open at a time.
+ *
+ * `activeSection` is a single value, so Where and When could never both be open; the equipment block
+ * used to render unconditionally alongside them, which left two panels expanded and the page twice
+ * as long as it needed to be.
+ */
+describe("the canvas is an accordion", () => {
+  const complete = (store: ReturnType<typeof import("@/lib/store/rfq-store").useRfq>) => {
+    store.actions.touchField("line_items[a0].equipment_year");
+    store.actions.touchField("line_items[a0].safety_certificates");
+    store.actions.setChargedDaysUnderstood(true);
+  };
+
+  it("collapses equipment to a strip when another panel opens", async () => {
+    const handle = await renderCanvas(<Canvas />, {
+      draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
+      prepare: complete,
+    });
+    // Equipment starts open: its controls are on screen.
+    expect(screen.getByText("CATEGORY")).toBeTruthy();
+
+    await handle.run(() => screen.getByText("Where it goes").closest("button")!.click());
+
+    expect(handle.store().state.activeSection).toBe("where");
+    expect(screen.queryByText("CATEGORY")).toBeNull();
+    // And it says what it holds, so the renter need not open it to check.
+    expect(screen.getByText("The machine & operator")).toBeTruthy();
+    expect(screen.getByText(/Crawler excavator/)).toBeTruthy();
+  });
+
+  it("reopens from the strip, which closes whichever was open", async () => {
+    const handle = await renderCanvas(<Canvas />, {
+      draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
+      prepare: complete,
+    });
+    // Opened in its own step: batching it with setChargedDaysUnderstood lets the auto-return effect
+    // (accepting the figure sends you back to equipment) fire and undo it.
+    await handle.run(() => handle.store().actions.openSection("when"));
+    expect(screen.queryByText("CATEGORY")).toBeNull();
+
+    await handle.run(() => screen.getByText("The machine & operator").closest("button")!.click());
+
+    expect(handle.store().state.activeSection).toBe("equipment");
+    expect(screen.getByText("CATEGORY")).toBeTruthy();
+  });
+
+  // A refusal shakes the blocking fields, which cannot happen while they are unmounted.
+  it("opens equipment before shaking it, even when collapsed", async () => {
+    const handle = await renderCanvas(<Canvas />, {
+      draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
+      prepare: (store) => store.actions.openSection("when"),
+    });
+    expect(screen.queryByText("CATEGORY")).toBeNull();
+
+    await handle.run(() => screen.getByText("Where it goes").closest("button")!.click());
+
+    expect(handle.store().state.activeSection).toBe("equipment");
+    expect(screen.getByText("CATEGORY")).toBeTruthy();
+  });
+});

@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { fmt, useT } from "@/lib/i18n";
+import { fmt, useLocale, useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { Icon, Modal } from "@/components/ui";
 import { MachineCard } from "@/components/create/MachineCard";
@@ -22,20 +22,22 @@ import { OperatorRail } from "@/components/create/OperatorRail";
 import { WherePanel } from "@/components/create/WherePanel";
 import { WhenPanel } from "@/components/create/WhenPanel";
 import { CarryForwardModal } from "@/components/create/CarryForwardModal";
-import { gateWhen, gateWhere, itemGaps, panelGaps, postableItems, requiredGaps, transportGaps } from "@/lib/contract";
+import { PanelDot } from "@/components/create/Provenance";
+import { gateWhen, gateWhere, itemGaps, panelGaps, postableItems, requiredGaps, resolveRef, taxName, transportGaps } from "@/lib/contract";
 
 const SHAKE_MS = 450;
 
 export function Canvas() {
   const t = useT();
+  const { locale } = useLocale();
   const { state, actions } = useRfq();
   const [shaking, setShaking] = useState(false);
   const [shakingWhere, setShakingWhere] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [carryTo, setCarryTo] = useState<number | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  /** The equipment block, so a refused move can bring its shake into view. */
-  const equipmentRef = useRef<HTMLDivElement>(null);
+  /** The equipment block — expanded card or collapsed strip — so a refusal can bring it into view. */
+  const equipmentRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     const t0 = timers.current;
@@ -86,7 +88,12 @@ export function Canvas() {
    */
   const shakeNow = (which: "fields" | "where") => {
     const set = which === "where" ? setShakingWhere : setShaking;
-    if (which === "fields") equipmentRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    if (which === "fields") {
+      // The blocking fields must be on screen to shake at all — and now that equipment collapses,
+      // they may not even be rendered. Open it first, then bring it into view.
+      if (state.activeSection !== "equipment") actions.openSection("equipment");
+      equipmentRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
     set(true);
     timers.current.push(setTimeout(() => set(false), SHAKE_MS));
   };
@@ -133,6 +140,26 @@ export function Canvas() {
   const needsYou =
     gaps.length === 1 ? t.create.needsYouOne : fmt(t.create.needsYou, { n: gaps.length });
 
+  /**
+   * What the collapsed equipment strip says it holds.
+   *
+   * Enough to recognise the machine without opening it — what it is, how many, and whether an
+   * operator comes with it. A strip that only said "The machine & operator" would make the renter
+   * open it to find out whether they had already dealt with it.
+   */
+  const equipmentSummary = (() => {
+    if (!item) return "";
+    const { subcategory, measurement } = resolveRef(state.taxonomy, item.ref);
+    return [
+      taxName(subcategory, locale) || null,
+      taxName(measurement, locale) || null,
+      item.quantity > 1 ? `×${item.quantity}` : null,
+      item.operatorNeeded === "yes" ? t.create.operatorCard.withOperator : t.create.operatorCard.noOperator,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  })();
+
   return (
     <div>
       {/* ---------------- The renter's own words, and what's left ---------------- */}
@@ -177,17 +204,36 @@ export function Canvas() {
       )}
 
       {/* ---------------- Equipment ---------------- */}
-      {item && (
-        <div ref={equipmentRef} className="mb-3.5 flex flex-col gap-4 lg:flex-row lg:items-stretch">
-          <MachineCard
-            item={item}
-            gaps={equipmentGaps}
-            shaking={shaking}
-            onCollapse={() => actions.openSection(state.activeSection === "equipment" ? null : "equipment")}
-          />
-          <OperatorRail item={item} />
-        </div>
-      )}
+      {/* ---------------- Equipment ----------------
+          One panel at a time. `activeSection` already made Where and When mutually exclusive, but
+          the equipment block used to render unconditionally, so opening either of the others left
+          two things expanded and the page twice as long as it needed to be. Collapsed, it states
+          what it holds — the prototype's own closed state. */}
+      {item &&
+        (state.activeSection === "equipment" ? (
+          <div ref={equipmentRef as React.Ref<HTMLDivElement>} className="mb-3.5 flex flex-col gap-4 lg:flex-row lg:items-stretch">
+            <MachineCard item={item} gaps={equipmentGaps} shaking={shaking} onCollapse={() => actions.openSection(null)} />
+            <OperatorRail item={item} />
+          </div>
+        ) : (
+          <button
+            ref={equipmentRef as React.Ref<HTMLButtonElement>}
+            type="button"
+            onClick={() => actions.openSection("equipment")}
+            className={`mb-3.5 flex w-full items-center justify-between gap-3 rounded-[14px] border px-5 py-4 text-start transition ${
+              equipmentGaps.length === 0 ? "border-ok/40 bg-ok/[0.06]" : "border-border bg-surface"
+            }`}
+            aria-expanded={false}
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              <PanelDot complete={equipmentGaps.length === 0} />
+              <Icon name="construction" size={16} className="flex-none text-navy" />
+              <span className="flex-none text-[15px] font-extrabold text-navy">{t.create.ready.machineAndOperator}</span>
+              <span className="truncate text-[13px] text-muted">{equipmentSummary}</span>
+            </span>
+            <Icon name="expand_more" size={18} className="flex-none text-muted" />
+          </button>
+        ))}
 
       {/* ---------------- Site and schedule ----------------
           Request-wide, so from the second machine onwards they are shown as settled rather than

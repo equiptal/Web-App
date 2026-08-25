@@ -127,7 +127,8 @@ describe("Arabic (MREQ-AC-51)", () => {
     });
 
     expect(screen.getByText("ما كتبته")).toBeTruthy();
-    expect(screen.getByText("الآلة")).toBeTruthy();
+    // The schedule is open, so equipment is collapsed to its strip — which is the label to assert.
+    expect(screen.getByText("الآلة والمشغّل")).toBeTruthy();
     expect(screen.getByText("مدة التشغيل")).toBeTruthy();
     // 155 charged days, in the digits the rest of the app uses.
     expect(screen.getByText("١٥٥")).toBeTruthy();
