@@ -28,6 +28,7 @@ import { SearchSelect } from "@/components/create/SearchSelect";
 import { useItemAttachments, useItemOverrides, useItemTaxonomy, useProvenance } from "@/components/create/hooks";
 import {
   EQUIPMENT_YEARS,
+  isTouched,
   FUEL_TYPES,
   SAFETY_CERTIFICATES,
   type EquipmentItem,
@@ -67,6 +68,17 @@ export function MachineCard({
     actions.patchItem(item.id, patch);
   };
 
+  /**
+   * What the certificate chip displays: the chosen cert, or the explicit "No certificate" once the
+   * renter has answered that way, or nothing at all while the question is still open. `[]` alone
+   * cannot tell "none, deliberately" from "not yet asked".
+   */
+  const certValue = overrides.safetyCerts.length
+    ? overrides.safetyCerts[0]
+    : isTouched(state.draft!, prov.key("safety_certificates"))
+      ? NO_CERT
+      : null;
+
   const notAvailable = item.verdict === "no-match";
   /**
    * Supplier first, the renter second — the order the prototype uses on every one of these, and the
@@ -94,7 +106,7 @@ export function MachineCard({
       {/* The prototype's 2fr / 3fr split, 20px gutter, columns aligned to the top. */}
       <div className="grid gap-5 lg:grid-cols-[2fr_3fr] lg:items-stretch">
         {/* ---------------- The 450px panel, and the four controls on its corners ---------------- */}
-        <div className="relative h-full min-h-[450px] w-full min-w-0 overflow-hidden rounded-xl bg-[#f0f1f3]">
+        <div className="relative h-full min-h-[450px] w-full min-w-0 rounded-xl bg-[#f0f1f3]">
           <div className="grid h-full place-content-center justify-items-center gap-2 px-6 text-center">
             <Icon name={equipmentIcon(tax.subtypeName || tax.categoryName)} size={132} className="text-navy/20" />
             {(tax.subtypeName || tax.categoryName) && (
@@ -110,8 +122,8 @@ export function MachineCard({
             <div className="min-w-0 max-w-[58%]">
               <div className={shake("safety_certificates") ? "shake-error" : undefined}>
                 <SearchSelect
-                  value={overrides.safetyCerts.length ? overrides.safetyCerts[0] : NO_CERT}
-                  placeholder={t.create.machineCard.noCert}
+                  value={certValue}
+                  placeholder={t.create.machineCard.cert}
                   searchPlaceholder={t.create.machineCard.cert}
                   label={t.create.machineCard.cert}
                   tone={gapFor("safety_certificates") ? "brand" : "overlay"}
@@ -176,8 +188,8 @@ export function MachineCard({
             </div>
             <div className={`min-w-0 max-w-[48%] ${shake("equipment_year") ? "shake-error" : ""}`}>
               <SearchSelect
-                value={overrides.equipmentYear ?? "any"}
-                placeholder={t.create.machineCard.anyYear}
+                value={overrides.equipmentYear}
+                placeholder={t.create.machineCard.minYear}
                 searchPlaceholder={t.create.machineCard.minYear}
                 label={t.create.machineCard.minYear}
                 tone={gapFor("equipment_year") ? "brand" : "overlay"}
@@ -194,7 +206,7 @@ export function MachineCard({
             <UnavailableCard item={item} label={item.rawLabel ?? tax.subtypeName ?? ""} />
           ) : (
             /* The amber-tinted taxonomy trio, at the prototype's minmax columns. */
-            <div className="grid gap-2.5 rounded-[10px] border border-[#f5c98f] bg-[#fff9f0] p-3 sm:grid-cols-[minmax(132px,1fr)_minmax(150px,1.5fr)_minmax(104px,0.9fr)]">
+            <div className="grid gap-2.5 rounded-[10px] bg-surface2 p-3.5 sm:grid-cols-[minmax(132px,1fr)_minmax(150px,1.5fr)_minmax(104px,0.9fr)]">
               {/* Derived, never picked. The renter chooses a TYPE and the category follows from it —
                   so this shows the taxonomy's `tag` (its canonical grouping, e.g. "Earthmoving") as a
                   read-only box, exactly as the prototype does. No chevron, because there is nothing

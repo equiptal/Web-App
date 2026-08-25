@@ -92,7 +92,7 @@ export function CanvasField({
     <div className={`min-w-0 ${shake ? "shake-error" : ""}`}>
       <div
         className={`mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase leading-tight tracking-[0.05em] ${
-          missing ? "text-brand" : isSystemChosen(source) ? "text-[#c9660f]" : "text-muted"
+          missing ? "text-brand" : "text-muted"
         }`}
       >
         {icon}

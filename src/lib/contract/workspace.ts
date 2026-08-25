@@ -32,6 +32,8 @@ export interface RailTile {
   label: string;
   /** Total units asked for across the group. Rendered only when it is more than one. */
   units: number;
+  /** Bids that have arrived on the group — the badge on the tile. Zero draws no badge. */
+  bids: number;
   imageUrl: string | null;
   /** Greyed and captioned in the rail; still selectable, because its bids are still worth reading. */
   closed: boolean;
@@ -69,6 +71,7 @@ export function railTiles(groups: RequestGroup[]): RailTile[] {
     // The RFQ code is the group's own name; a lone request has none and answers to its REQ id.
     label: g.groupRef ?? g.items[0]?.displayId ?? g.id,
     units: g.totalUnits,
+    bids: g.totalBids,
     imageUrl: g.items.find((i) => i.item?.imageUrl)?.item?.imageUrl ?? null,
     closed: isClosedGroup(g),
   }));

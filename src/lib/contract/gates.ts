@@ -102,8 +102,22 @@ export function itemWebGaps(item: EquipmentItem, draft: Pick<RfqDraft, "touchedF
   if (item.removed || item.verdict === "no-match") return [];
   const gaps: RequiredGap[] = [];
   const at = (field: string, reason: string) => gaps.push({ panel: "equipment", itemId: item.id, field, reason });
-  if (!isTouched(draft, itemFieldKey(item.id, "equipment_year"))) at("equipment_year", "gate.yearMissing");
-  if (!isTouched(draft, itemFieldKey(item.id, "safety_certificates"))) at("safety_certificates", "gate.certMissing");
+
+  /**
+   * Answered means: the RFQ named one, or the renter picked one.
+   *
+   * A value the agent extracted from the renter's own words is already their answer — they wrote
+   * it — so demanding they re-pick it asks the same question twice. What must not pass is a value
+   * nobody supplied. The touch flag carries the case where the renter's answer IS "nothing": both
+   * "No certificate" and "Any year" store as absent, and only `touchedFields` tells that apart from
+   * never having been asked.
+   */
+  const yearAnswered = item.equipmentYear != null || isTouched(draft, itemFieldKey(item.id, "equipment_year"));
+  const certAnswered =
+    (item.safetyCertsOverride ?? []).length > 0 || isTouched(draft, itemFieldKey(item.id, "safety_certificates"));
+
+  if (!yearAnswered) at("equipment_year", "gate.yearMissing");
+  if (!certAnswered) at("safety_certificates", "gate.certMissing");
   return gaps;
 }
 

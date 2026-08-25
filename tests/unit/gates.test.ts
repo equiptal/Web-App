@@ -101,9 +101,15 @@ describe("itemAppGaps — the app's required set (MREQ-AC-09)", () => {
 });
 
 describe("itemWebGaps — year and certificate (MREQ-AC-54/55)", () => {
-  it("blocks until the renter has answered, even when a value is already present", () => {
+  it("accepts a value the RFQ named — that is already the renter's answer", () => {
     const item = makeItem({ equipmentYear: "2018+", safetyCertsOverride: ["tuv"] });
-    // Agent-prefilled, renter never looked: still blocking.
+    expect(itemWebGaps(item, { touchedFields: [] })).toEqual([]);
+  });
+
+  it("blocks a value nobody supplied", () => {
+    // Neither the RFQ nor the renter said anything: an empty cert list and a null year are the
+    // form's silence, not an answer.
+    const item = makeItem({ equipmentYear: null, safetyCertsOverride: [] });
     expect(itemWebGaps(item, { touchedFields: [] }).map((g) => g.field)).toEqual(["equipment_year", "safety_certificates"]);
   });
 
