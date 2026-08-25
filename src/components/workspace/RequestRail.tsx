@@ -38,24 +38,30 @@ export function RequestRail({
   // Roughly three tiles a press — far enough to feel like progress, short enough to keep your place.
   const scrollBy = (dir: 1 | -1) => scroller.current?.scrollBy({ left: dir * 300, behavior: "smooth" });
 
-  // ── 76px, and every pixel of it is spoken for (owner, 2026-08-25) ──────────────────────────────
-  // It was 96, then 80 — and 80 CLIPPED, because this row is `overflow-hidden` and a tile draws
-  // taller than its circle, so the tops disappeared behind the header's rule. The lesson was not
-  // "make it taller", it was "count it". The tallest tile needs
+  // ── 88px, and every pixel of it is spoken for (owner, 2026-08-25) ──────────────────────────────
+  // It was 96, then 80, then 76 — and each of those CLIPPED, because this row is `overflow-hidden`
+  // and a tile draws taller than its circle. The count that produced 76 was wrong twice: it charged
+  // 4px for the share badge's overhang when the real figure is 2 (the badge's `-top-1` is measured
+  // from a span already inset 2px by the ring's padding), and it then declared 76 sufficient for a
+  // 77 it had just added up. So the circles sat against the header's rule with the badge half
+  // behind it — which is exactly what the owner is looking at.
   //
-  //     4  badge overhang above the ring (`-top-1` on the share control)
+  // What a tile actually occupies, from its highest ink to its lowest:
+  //
+  //     2  the share badge's overhang above the ring
   //   +44  the circle
   //   + 4  the gap under it
   //   +13  the name
   //   + 2  the gap under that
   //   +10  «CLOSED», on the tiles that carry it
-  //   = 77
+  //   = 75
   //
-  // 76 holds it because the row centres its content and the last pixel is the caption's descender,
-  // which has half a pixel of room at each end. If a tile ever gains a row, this number moves with
-  // it — that is what the sum is here for.
+  // 88 leaves 6px clear above the badge and 7 below the caption, so the row reads as a row rather
+  // than as something pressed against its own edge. The flow height is 73 of that 75 — the badge
+  // hangs out of it absolutely — which is the number the margins further down are cut from. Change
+  // any line above and both figures move with it; that is what the sum is here for.
   return (
-    <div className={`flex h-[76px] flex-none items-center gap-4 overflow-hidden border-b border-border bg-surface3/60 ${PAGE_X_BLEED}`}>
+    <div className={`flex h-[88px] flex-none select-none items-center gap-4 overflow-hidden border-b border-border bg-surface3/60 ${PAGE_X_BLEED}`}>
       <Link href="/create" className="group flex flex-none flex-col items-center gap-1">
         <span className="grid h-11 w-11 place-items-center rounded-full border-2 border-dashed border-border text-muted transition group-hover:border-brand group-hover:text-brand">
           <Icon name="add" size={20} />
@@ -64,7 +70,7 @@ export function RequestRail({
       </Link>
 
       {/* ── The 29px under this rule, and under the chevron at the far end (owner, 2026-08-25) ─────
-          A tile is 73px tall in a 76px row — a 44px circle, a 4px gap, a 25px label block — so the
+          A tile is 73px of flow in an 88px row — a 44px circle, a 4px gap, a 25px label block — so the
           row centres the TILE, which leaves the circle above the row's own middle. Anything centred
           on the row itself misses the circles; the chevron used to pay for that with a `-mt-2` that
           got it roughly half way. Borrowing the tile's own 4 + 25 as a bottom margin gives these two
@@ -77,7 +83,7 @@ export function RequestRail({
 
            The scroller was `items-start` while `New` was centred by the rail, so the two aligned to
            different things: tiles hung from the top of the scroller, `New` sat in the middle of the
-           76px bar, and the circles missed each other. Centring both is not enough on its own —
+           row, and the circles missed each other. Centring both is not enough on its own —
            `CLOSED` gives some tiles a second label line, so their columns are taller and centring
            would push their circles UP relative to the rest. The label block therefore has a fixed
            height (13px label + 2px gap + 10px CLOSED) whether or not the second line is present, so
@@ -115,13 +121,21 @@ export function RequestRail({
                          read as one set. A photograph gives up a little size for that; a drawing
                          stops rattling around inside its ring.
 
-                         What it does NOT get is padding on top of that. There was a 3px inset here,
-                         and it cost the artwork a sixth of a 36px box on every side while `contain`
-                         was already keeping the picture clear of the ring. That is why the rail read
-                         smaller than the prototype (owner, 2026-08-25); the machine now has the
-                         whole circle to fill. */
+                         The 3px inset is geometry, not taste — do not take it out again. `contain`
+                         fits the picture inside its BOX; the mask over it is a CIRCLE, and a
+                         rectangle that fits the box still pokes out of the circle. Most of this
+                         artwork is landscape, so scaled to the full 36px width it stands about 24
+                         tall — and a 36px circle is only 27 wide at that height, so its left and
+                         right tips get cut by the round mask. That is the machine the owner saw
+                         crossing the ring (2026-08-25), and it appeared the moment the inset was
+                         removed in the name of filling more of the circle.
+
+                         Inscribing a 3:2 rectangle in a circle of radius 18 gives 30 × 20, which is
+                         what a 36px box less 3px a side is. So 3 is the largest inset that shows
+                         every machine whole. Reaching further needs a bigger circle, not less
+                         padding. */
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={img} alt="" className="h-full w-full object-contain" />
+                      <img src={img} alt="" draggable={false} className="h-full w-full object-contain p-[3px]" />
                     ) : (
                       <Icon name="precision_manufacturing" size={20} className="text-muted" />
                     )}
