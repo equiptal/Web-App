@@ -3,6 +3,7 @@ import { Inter, IBM_Plex_Sans, IBM_Plex_Sans_Arabic, Nunito } from "next/font/go
 import "./globals.css";
 import { LocaleProvider } from "@/lib/i18n";
 import { SessionProvider } from "@/lib/session";
+import { IntercomWidget } from "@/components/support/IntercomWidget";
 
 // Nunito is the prototype's brand typeface (weights 400–900) — the default sans for the redesign, used
 // on every page → preload it. The other three are contextual (Inter on prototype screens, IBM Plex for
@@ -73,7 +74,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       </head>
       <body className={`${nunito.variable} ${inter.variable} ${plex.variable} ${plexArabic.variable} antialiased`}>
         <LocaleProvider>
-          <SessionProvider>{children}</SessionProvider>
+          <SessionProvider>
+            {children}
+            {/* Inside the providers because it reads the session and the locale, and at the root so the
+                launcher is on every page — support is least reachable exactly where it is most needed. */}
+            <IntercomWidget />
+          </SessionProvider>
         </LocaleProvider>
       </body>
     </html>
