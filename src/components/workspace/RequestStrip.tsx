@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
-import { publicTaxonomyUrl, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
+import { publicTaxonomyUrl, shortRef, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
 import { CERT_LABEL, type BidCard } from "@/lib/contract/bids";
 import { unitAvailability } from "@/lib/contract/bid-map";
 
@@ -46,7 +46,15 @@ export function RequestStrip({
   const ar = locale === "ar";
   const router = useRouter();
 
-  const requestRef = group.groupRef ?? item?.displayId ?? group.id;
+  /**
+   * What the renter calls this request.
+   *
+   * The RFQ code where the submission has one, else the request's own REQ id — and where the record
+   * carries NEITHER (older rows predate both), a short uppercase stub of the internal id rather than
+   * the id itself. It used to fall through to `group.id` raw, which printed a cuid on the strip:
+   * «cex…» is a database key, not a reference a renter can quote down the phone.
+   */
+  const requestRef = group.groupRef ?? item?.displayId ?? shortRef(group.id);
   const raised = group.createdAt
     ? new Date(group.createdAt).toLocaleDateString(ar ? "ar" : "en-GB", { day: "numeric", month: "short", year: "numeric" })
     : null;
@@ -260,8 +268,8 @@ export function RequestStrip({
             onClick={() => goEquipment()}
             className={`whitespace-nowrap rounded-[8px] border px-3.5 py-2 text-[12px] font-bold transition ${
               bid
-                ? "border-white/20 bg-white/[.14] text-white hover:bg-white/25"
-                : "cursor-default border-white/10 bg-white/[.06] text-white/40"
+                ? "border-white/15 bg-black/25 text-white hover:bg-black/35"
+                : "cursor-default border-white/10 bg-black/10 text-white/40"
             }`}
           >
             {t.workspace.reviewEquipment}
@@ -270,8 +278,8 @@ export function RequestStrip({
             type="button"
             disabled={!bid}
             onClick={() => goEquipment("documents")}
-            className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[8px] border px-3.5 py-2 text-[12px] font-bold transition ${
-              bid ? "border-white/20 text-white/90 hover:bg-white/10" : "cursor-default border-white/10 text-white/40"
+            className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[8px] px-3.5 py-2 text-[12px] font-bold transition ${
+              bid ? "bg-surface text-navy hover:bg-surface2" : "cursor-default bg-surface/40 text-navy/40"
             }`}
           >
             <Icon name="visibility" size={14} /> {t.workspace.viewDocuments}
