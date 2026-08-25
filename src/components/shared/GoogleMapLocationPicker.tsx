@@ -48,9 +48,17 @@ interface MapLocationPickerProps {
   label?: string | null;
   onChange: (lat: number, lng: number, address: string) => void;
   height?: string;
+  /**
+   * Suppress the resolved-address line under the map.
+   *
+   * For a caller that needs the address on ONE row with a control of its own beside it. The line is
+   * not moved into a slot here on purpose: this component is `next/dynamic` and renders as nothing until
+   * it loads (and as nothing at all under jsdom), so anything gating a step must not live inside it.
+   */
+  hideAddress?: boolean;
 }
 
-export default function GoogleMapLocationPicker({ value, label, onChange, height = "300px" }: MapLocationPickerProps) {
+export default function GoogleMapLocationPicker({ value, label, onChange, height = "300px", hideAddress }: MapLocationPickerProps) {
   const t = useT();
   const mp = t.step1.location.mapPicker;
 
@@ -304,10 +312,10 @@ export default function GoogleMapLocationPicker({ value, label, onChange, height
         )}
       </div>
 
-      {value && (
+      {value && !hideAddress && (
         <div className="flex items-start gap-1.5 rounded-lg border border-border bg-surface2 px-3 py-2">
           <MapPin className="mt-0.5 h-3.5 w-3.5 flex-none text-brand" />
-          <div className="min-w-0 text-sm">
+          <div className="min-w-0 flex-1 text-sm">
             <div className="font-semibold leading-tight">
               {resolved || (resolving ? mp.locating : label?.trim() || mp.pinnedNoAddress)}
             </div>

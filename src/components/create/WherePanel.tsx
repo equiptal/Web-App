@@ -44,6 +44,30 @@ export function WherePanel({
   const hasLocation = loc.lat != null && loc.lng != null;
   const multi = (state.draft?.detectedLocations ?? []).filter(Boolean);
 
+  /**
+   * Confirming the site, as one control rendered in one of two places.
+   *
+   * With a pin down it rides the address line inside the picker; with no pin there is no address line
+   * to ride, so it falls to the row below beside the hint that says what to do. Building it once
+   * keeps those two places from drifting into two different buttons.
+   */
+  const confirmControl = loc.confirmed ? (
+    <span className="flex flex-none items-center gap-1.5 rounded-[10px] border border-ok/30 bg-ok-soft px-3 py-2 text-[13px] font-bold text-ok">
+      <Icon name="check_circle" size={17} /> {t.step1.location.confirmed}
+    </span>
+  ) : (
+    <button
+      type="button"
+      disabled={!hasLocation}
+      onClick={() => actions.confirmLocation()}
+      className={`flex-none rounded-[10px] bg-navy px-4 py-2 text-[13px] font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 ${
+        shakeConfirm ? "shake-error" : ""
+      }`}
+    >
+      {t.create.wherePanel.confirm}
+    </button>
+  );
+
   return (
     <section
       className={`mb-3.5 rounded-[14px] border transition ${complete && !open ? "border-ok/40 bg-ok/[0.06]" : "border-border bg-surface"}`}
@@ -100,41 +124,44 @@ export function WherePanel({
 
           {!conflictUnresolved && (
             <div className="rounded-[10px] bg-surface2 p-3.5">
+              {/* ── The answer sits beside the question (owner, 2026-08-26) ──────────────────────
+                  «This is the right spot» was a row of its own under the address box, which read as a
+                  second step rather than as the confirmation OF that address. Address and control now
+                  share one line.
+
+                  The line is drawn HERE rather than inside the picker, with the picker's own copy
+                  suppressed. The picker is loaded through `next/dynamic`: it renders as nothing until it
+                  loads, as nothing at all under jsdom, and its address box needs Google to answer
+                  first. A button that gates the panel cannot be hostage to any of that. The address
+                  is the same string either way — the picker hands it to `patchLocation` as it
+                  resolves it, so what is printed below is what it resolved. */}
               <MapLocationPicker
                 value={hasLocation ? { lat: loc.lat as number, lng: loc.lng as number } : null}
                 label={loc.label}
                 onChange={(lat, lng, address) => actions.patchLocation({ lat, lng, label: address || loc.label, source: "map" })}
+                hideAddress
               />
 
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                {/* The picker prints the resolved address and its coordinates itself, so repeating the
-                    label here showed the same street twice, one line apart. This line now exists only
-                    for the case the picker cannot cover: no pin yet, and a disabled confirm button
-                    that would otherwise sit there with nothing saying what to do. */}
                 {hasLocation ? (
-                  <span className="min-w-0 flex-1" />
+                  <span className="flex min-w-0 flex-1 items-start gap-1.5 rounded-lg border border-border bg-surface px-3 py-2">
+                    <Icon name="location_on" size={15} className="mt-px flex-none text-brand" />
+                    <span className="min-w-0">
+                      <span className="block text-[13px] font-semibold leading-tight text-navy">
+                        {loc.label?.trim() || t.step1.location.mapPicker.pinnedNoAddress}
+                      </span>
+                      <span className="block text-[11px] text-muted">
+                        {(loc.lat as number).toFixed(6)}, {(loc.lng as number).toFixed(6)}
+                      </span>
+                    </span>
+                  </span>
                 ) : (
                   <p className="min-w-0 flex-1 text-[13px] leading-snug text-navy-mid">
                     <Icon name="location_on" size={15} className="me-1 align-[-3px] text-brand" />
                     {t.create.wherePanel.dragHint}
                   </p>
                 )}
-                {loc.confirmed ? (
-                  <span className="flex items-center gap-1.5 rounded-[10px] border border-ok/30 bg-ok-soft px-3.5 py-2.5 text-[13px] font-bold text-ok">
-                    <Icon name="check_circle" size={17} /> {t.step1.location.confirmed}
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={!hasLocation}
-                    onClick={() => actions.confirmLocation()}
-                    className={`flex-none rounded-[10px] bg-navy px-5 py-3 text-[14px] font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 ${
-                      shakeConfirm ? "shake-error" : ""
-                    }`}
-                  >
-                    {t.create.wherePanel.confirm}
-                  </button>
-                )}
+                {confirmControl}
               </div>
             </div>
           )}

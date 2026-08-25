@@ -16,8 +16,8 @@
 import { useState } from "react";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
-import { Icon, Seg2, Toggle } from "@/components/ui";
-import { CanvasField, PanelDot } from "@/components/create/Provenance";
+import { Icon, Toggle } from "@/components/ui";
+import { CanvasField, ChoiceRow, PanelDot } from "@/components/create/Provenance";
 import { useProvenance } from "@/components/create/hooks";
 import { computeChargedDays, OVERTIME_RATES, RENTAL_BASES, type OvertimeRate, type RentalBasis } from "@/lib/contract";
 import { arabicIndicDigits } from "@/lib/contract/bid-map";
@@ -161,8 +161,14 @@ export function WhenPanel({
                 missing={!timing.rentalBasis}
                 hint={timing.rentalBasis ? fmt(t.create.whenPanel.quoteRate, { basis: t.options.rentalBasis[timing.rentalBasis].toLowerCase() }) : undefined}
               >
+                {/* ── One control for every choice on the canvas (owner, 2026-08-26) ─────────────
+                     These three were a segmented pill — grey labels on a grey track, 15px — while
+                     every other choice the renter makes is a bordered box that turns navy when it is
+                     picked. Two shapes for one act, and the selected billing basis read as quieter
+                     than the unselected fuel option next to it. ChoiceRow is what the rest use. */}
                 <div className="flex flex-wrap items-center gap-2">
-                  <Seg2<RentalBasis>
+                  <ChoiceRow<RentalBasis>
+                    columns={RENTAL_BASES.length}
                     value={timing.rentalBasis}
                     onChange={(v) => setTiming({ rentalBasis: v }, "timing.rental_basis")}
                     options={RENTAL_BASES.map((b) => ({ value: b, label: t.options.rentalBasis[b] }))}
@@ -242,14 +248,16 @@ export function WhenPanel({
             {moreOpen && (
               <div className="grid gap-4 px-4 pb-4 md:grid-cols-2">
                 <CanvasField label={t.create.whenPanel.hours} source={hoursSource} hint={t.create.whenPanel.hoursStandard}>
-                  <Seg2<string>
+                  <ChoiceRow<string>
+                    columns={HOURS_OPTIONS.length}
                     value={String(timing.hoursPerDay)}
                     onChange={(v) => setTiming({ hoursPerDay: Number(v) }, "timing.hours_per_day")}
                     options={HOURS_OPTIONS.map((h) => ({ value: String(h), label: num(h) }))}
                   />
                 </CanvasField>
                 <CanvasField label={t.create.whenPanel.overtime} source={overtimeSource}>
-                  <Seg2<OvertimeRate>
+                  <ChoiceRow<OvertimeRate>
+                    columns={OVERTIME_RATES.length}
                     value={advanced.overtimeRate}
                     onChange={(v) => {
                       prov.touchRaw("advanced.overtime_rate");
