@@ -96,6 +96,23 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
     // this effect; `tier` is deliberately read via tierRef instead of being a dependency.
   }, [status, refreshSession]);
 
+  /**
+   * The page's title now names the BROWSER TAB rather than a slot in the bar (owner, 2026-08-25).
+   *
+   * Eleven pages pass one, and the bar no longer prints it; dropping the prop would have thrown that
+   * away and left eleven call sites lying. A tab is where a title still earns its place — it is how
+   * you find this page among twenty others. The suffix is the same one `layout.tsx` sets as its
+   * metadata template, so a shell page and a static one read alike.
+   *
+   * These pages are client components, so Next's metadata export is not open to them; this is.
+   */
+  useEffect(() => {
+    if (!title) return;
+    const prev = document.title;
+    document.title = `${title} — Moedatech`;
+    return () => { document.title = prev; };
+  }, [title]);
+
   // Unread deal-room messages (inbox badge) — role-scoped total from the app-backend.
   const [unread, setUnread] = useState(0);
   useEffect(() => {
@@ -131,7 +148,6 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
     { key: "company", label: t.shell.company, href: "/company" },
   ];
   const initials = (name.trim() ? name.trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("") : "").toUpperCase();
-  const greeting = `${t.shell.welcome}${name ? `, ${name}` : ""}`;
   // Tier badge beside the avatar: green = verified, blue = basic, grey = guest.
   const tierBadge: Record<string, { label: string; cls: string }> = {
     verified: { label: t.shell.tierVerified, cls: "border-ok/30 bg-ok-soft text-ok" },
@@ -199,16 +215,14 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
             </div>
           </div>
 
-          {/* The title YIELDS: contextual, truncating, and capped so it can never run under the
-              centred nav. Hidden below `sm`, where the bar has room for the mark and the cluster
-              and nothing else. */}
-          <b className="hidden min-w-0 max-w-[26ch] flex-1 truncate text-[15px] font-extrabold tracking-[-.4px] text-navy sm:block">
-            {title ?? (
-              <>
-                {greeting} <span className="wave-emoji">👋</span>
-              </>
-            )}
-          </b>
+          {/* ── No page title in the bar (owner, 2026-08-25) ────────────────────────────────────────
+              It used to stand here, truncating, capped so it could not run under the centred nav —
+              and on the home route it fell back to a greeting. Both are gone. The bar now says what
+              the APP is and where you are in it; what the PAGE is, the page's own first heading
+              already says, one row below and larger. Saying it twice bought nothing and cost the
+              only span of the bar wide enough to be quiet.
+
+              `title` is still taken, and still used — see the document-title effect above. */}
 
           <div className="ms-auto flex flex-none items-center gap-2 text-[13px] font-semibold text-navy-mid sm:gap-3">
             <span className="inline-flex overflow-hidden rounded-md border border-border">
