@@ -60,14 +60,29 @@ export function RequestRail({
         <span className="grid h-11 w-11 place-items-center rounded-full border-2 border-dashed border-border text-muted transition group-hover:border-brand group-hover:text-brand">
           <Icon name="add" size={20} />
         </span>
-        <span className="text-[11px] font-semibold leading-[13px] text-muted">{t.workspace.newRequest}</span>
+        <span className="flex h-[25px] flex-col items-center text-[11px] font-semibold leading-[13px] text-muted">{t.workspace.newRequest}</span>
       </Link>
 
-      <div className="h-9 w-px flex-none bg-border/70" />
+      {/* ── The 29px under this rule, and under the chevron at the far end (owner, 2026-08-25) ─────
+          A tile is 73px tall in a 76px row — a 44px circle, a 4px gap, a 25px label block — so the
+          row centres the TILE, which leaves the circle above the row's own middle. Anything centred
+          on the row itself misses the circles; the chevron used to pay for that with a `-mt-2` that
+          got it roughly half way. Borrowing the tile's own 4 + 25 as a bottom margin gives these two
+          a tile's column height, so one `items-center` lands all three on the circles' line. */}
+      <div className="mb-[29px] h-9 w-px flex-none bg-border/70" />
 
       <div
         ref={scroller}
-        className="flex min-w-0 flex-1 items-start gap-4 overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        /* Every circle on one line, `New` included (owner, 2026-08-25).
+
+           The scroller was `items-start` while `New` was centred by the rail, so the two aligned to
+           different things: tiles hung from the top of the scroller, `New` sat in the middle of the
+           76px bar, and the circles missed each other. Centring both is not enough on its own —
+           `CLOSED` gives some tiles a second label line, so their columns are taller and centring
+           would push their circles UP relative to the rest. The label block therefore has a fixed
+           height (13px label + 2px gap + 10px CLOSED) whether or not the second line is present, so
+           every tile is the same height and one `items-center` lands every circle on the same line. */
+        className="flex min-w-0 flex-1 items-center gap-4 overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {tiles.map((tile) => {
           const active = tile.key === activeKey;
@@ -98,9 +113,15 @@ export function RequestRail({
 
                          `contain` shows every machine whole and inset the same way, so the circles
                          read as one set. A photograph gives up a little size for that; a drawing
-                         stops rattling around inside its ring. */
+                         stops rattling around inside its ring.
+
+                         What it does NOT get is padding on top of that. There was a 3px inset here,
+                         and it cost the artwork a sixth of a 36px box on every side while `contain`
+                         was already keeping the picture clear of the ring. That is why the rail read
+                         smaller than the prototype (owner, 2026-08-25); the machine now has the
+                         whole circle to fill. */
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={img} alt="" className="h-full w-full object-contain p-[3px]" />
+                      <img src={img} alt="" className="h-full w-full object-contain" />
                     ) : (
                       <Icon name="precision_manufacturing" size={20} className="text-muted" />
                     )}
@@ -138,7 +159,7 @@ export function RequestRail({
                   ) : null}
                 </span>
               </span>
-              <span className="flex flex-col items-center gap-0.5">
+              <span className="flex h-[25px] flex-col items-center gap-0.5">
                 <span className={`max-w-[104px] truncate text-[11px] leading-[13px] ${active ? "font-bold text-navy" : "font-semibold text-navy-mid"}`}>
                   {tile.label}
                 </span>
@@ -158,7 +179,7 @@ export function RequestRail({
         onClick={() => scrollBy(1)}
         aria-label={t.workspace.railScrollNext}
         title={t.workspace.railScrollNext}
-        className="-mt-2 grid h-7 w-7 flex-none place-items-center self-center rounded-full border border-border bg-surface/60 text-muted transition hover:bg-surface"
+        className="mb-[29px] grid h-7 w-7 flex-none place-items-center rounded-full border border-border bg-surface/60 text-muted transition hover:bg-surface"
       >
         <Icon name="chevron_right" size={16} className="rtl:scale-x-[-1]" />
       </button>
