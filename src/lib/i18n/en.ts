@@ -1263,11 +1263,6 @@ export const en = {
     // The bid count on the navy, said as three parts so the number can carry its own weight.
     bidsWord: "bids",
     bidWord: "bid",
-    // The thumbnail's ribbon: what this picture IS at this moment.
-    ribbonPickBid: "Pick a bid",
-    ribbonConfirmed: "Confirmed ✓",
-    ribbonUnconfirmed: "Unconfirmed",
-    papersNotChecked: "papers not checked",
     // The primary control acts on the picked bid, so it says why it is inert.
     selectBidFirst: "Select a bid first",
     fullDetails: "Full details",

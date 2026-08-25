@@ -6,7 +6,6 @@ import { fmt, useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { publicTaxonomyUrl, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
 import { CERT_LABEL, type BidCard } from "@/lib/contract/bids";
-import { unitAvailability } from "@/lib/contract/bid-map";
 
 /**
  * The dark strip under the rail. Two halves, and they answer different questions.
@@ -14,14 +13,14 @@ import { unitAvailability } from "@/lib/contract/bid-map";
  * The left half names the **request**: where the work is, its id, how many bids arrived, when it was
  * raised. Both the site and the id open the request drawer.
  *
- * The right half is a white card carrying the **item** — what was asked for, as chips — and, once a
- * bid is picked, **that supplier's answer to it**: the machine offered, whether its papers are
- * checked, and whether the supplier has actually named a yard for it. The controls beside it act on
- * the picked bid, which is why they read as inert until there is one.
+ * The right half is a white card carrying the **item and the terms the request sets on it** — the
+ * machine asked for, when it starts, how long, how many, and the certificates a supplier must hold.
+ * It is the REQUEST throughout and does not move with the selection (owner, 2026-08-25): what a
+ * supplier offered against it is an answer, and answers live on the cards, in the comparison and on
+ * the map behind «Check availability».
  *
- * The shape is the prototype's (owner, 2026-08-25): the request on the navy, the offer on the white,
- * and every control in one column so the renter's eye lands on the same place each time the
- * selection moves.
+ * The controls beside it are the exception — they act on the picked bid, which is why they read as
+ * inert until there is one.
  */
 export function RequestStrip({
   group,
@@ -57,11 +56,6 @@ export function RequestStrip({
   const itemLabel = item?.item ? (ar ? item.item.nameAr || item.item.name : item.item.name) : "—";
   const photo = publicTaxonomyUrl(item?.item?.imageUrl ?? null);
 
-  // What the supplier put against this item: make, model and year, as the renter would name it.
-  const offered = bid?.equipment
-    ? [bid.equipment.make, bid.equipment.model].filter(Boolean).join(" ") || null
-    : null;
-  const offeredYear = bid?.equipment?.year ?? null;
 
   /** The request's own terms, for the chip row below the item name. */
   const startsOn = item?.startDate
@@ -79,16 +73,6 @@ export function RequestStrip({
    */
   const withOperator = (bid?.requestTerms?.operatorIncluded ?? "").toUpperCase() === "YES";
 
-  /**
-   * Has this bid's equipment been placed in a yard the lessor confirmed?
-   *
-   * `unitAvailability`'s rule and no other — the map's pins and the equipment list's chips read the
-   * same function, so a machine cannot be confirmed on one surface and unconfirmed on another. An
-   * off-platform submission has no registered machines at all, so it says nothing: «unconfirmed»
-   * there would read as a supplier who had not answered, when nobody was ever asked.
-   */
-  const units = bid?.offeredUnitsDetail ?? [];
-  const confirmed = units.length > 0 && units.every((u) => unitAvailability(u) === "confirmed");
 
   const goEquipment = (panel?: "documents") => {
     if (!bid) return;
@@ -152,90 +136,54 @@ export function RequestStrip({
           )}
         </div>
 
-        {/* ── The item, and this supplier's answer to it ── */}
+        {/* ── The item, and what the REQUEST asks of it ─────────────────────────────────────────
+            This half is the request, and only the request (owner, 2026-08-25): the machine asked
+            for, when it starts, how long, how many, and the certificates it requires. It does NOT
+            change with the picked bid — what a supplier offered, and whether his papers or his yard
+            have been checked, are answers, and they belong on the cards, in the comparison and on
+            the map that «Check availability» opens. Reading a supplier’s verification here made the
+            request line say something about the request that the request never said. */}
         <div className="flex min-w-0 flex-1 flex-col gap-3 rounded-[10px] bg-surface p-2 sm:flex-row sm:items-center sm:gap-3 sm:pe-3">
-          <span
-            className={`relative grid h-[46px] w-16 flex-none place-items-center overflow-hidden rounded-[7px] bg-surface2 ${
-              bid ? "border border-border" : "border-[1.5px] border-dashed border-brand/40"
-            }`}
-          >
+          <span className="relative grid h-[46px] w-16 flex-none place-items-center overflow-hidden rounded-[7px] border border-border bg-surface2">
             {photo ? (
               /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={photo} alt="" className={`h-full w-full object-cover ${bid ? "" : "opacity-40 grayscale"}`} />
+              <img src={photo} alt="" className="h-full w-full object-cover" />
             ) : (
               <Icon name="precision_manufacturing" size={20} className="text-muted" />
             )}
-            {/* The ribbon says what this thumbnail IS: an invitation while nothing is picked, then
-                whether the picked machine has a confirmed yard behind it. */}
-            <span
-              className={`absolute inset-x-0 bottom-0 truncate px-1 py-[2px] text-center text-[6.5px] font-extrabold uppercase tracking-[.06em] text-white ${
-                !bid ? "bg-navy-mid/90" : confirmed ? "bg-ok/90" : "bg-danger/85"
-              }`}
-            >
-              {!bid ? t.workspace.ribbonPickBid : confirmed ? t.workspace.ribbonConfirmed : t.workspace.ribbonUnconfirmed}
-            </span>
           </span>
 
           <div className="min-w-0 flex-1">
             <div className="truncate text-[13px] font-bold leading-[1.3] text-navy">{itemLabel}</div>
 
-            {bid ? (
-              /* What the picked supplier offers against it. */
-              <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                <span className="flex-none whitespace-nowrap text-[10.5px] font-bold text-muted">
-                  {t.workspace.offers.replace("{supplier}", bid.supplierName)}
-                </span>
-                <span className="flex-none whitespace-nowrap text-[11.5px] font-extrabold text-navy">
-                  {offered ?? "—"}
-                  {offeredYear ? ` · ${offeredYear}` : ""}
-                </span>
-                {/* Only where there IS a machine to check. An off-platform submission registers no
-                    equipment at all (`link-bids` maps `equipment: null`, `eqVerified: false`), so
-                    this chip would read as «somebody looked and it failed» on every offline bid,
-                    when the truth is that nobody was ever asked for papers. Same silence the
-                    availability pill keeps, for the same reason. */}
-                {bid.equipment?.id && !bid.eqVerified && (
-                  <span className="rounded-md border border-danger/25 bg-danger-soft px-2 py-[3px] text-[9.5px] font-bold text-danger">
-                    {t.workspace.papersNotChecked}
-                  </span>
-                )}
-                {units.length > 0 && (
-                  <span
-                    className={`rounded-md border px-2 py-[3px] text-[9.5px] font-bold ${
-                      confirmed ? "border-ok/25 bg-ok-soft text-ok" : "border-danger/25 bg-danger-soft text-danger"
-                    }`}
-                  >
-                    {confirmed ? t.bidMap.eqChipConfirmed : t.bidMap.eqChipUnconfirmed}
+            {/* These facts were drawer-only, which meant the renter had to open a panel to recall
+                what he had asked for while reading what he was being offered. Nothing here is
+                derived — a chip is a requirement, and one invented from `rentalType` would be a
+                claim the request never made. */}
+            {(startsOn || item?.durationDays || certs.length > 0 || unitCount > 1 || withOperator) && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                {startsOn && <Chip>{fmt(t.workspace.chipStarts, { date: startsOn })}</Chip>}
+                {item?.durationDays ? (
+                  <Chip tone="duration" lead={t.workspace.factDuration}>
+                    {fmt(t.workspace.chipDuration, { n: String(item.durationDays) })}
+                  </Chip>
+                ) : null}
+                {unitCount > 1 && <Chip>{fmt(t.workspace.unitsCount, { n: String(unitCount) })}</Chip>}
+                {withOperator && <Chip>{t.workspace.chipOperator}</Chip>}
+                {/* The certificates the request REQUIRES — the papers a supplier has to hold to
+                    answer it. Two, then a count, so the row keeps one line on a narrow card; the
+                    drawer lists them in full. */}
+                {certs.slice(0, 2).map((c) => (
+                  <Chip key={c} tone="cert">
+                    {ar ? CERT_LABEL[c].ar : CERT_LABEL[c].en}
+                  </Chip>
+                ))}
+                {certs.length > 2 && (
+                  <span className="text-[10.5px] font-semibold text-muted">
+                    {fmt(t.workspace.chipMore, { n: String(certs.length - 2) })}
                   </span>
                 )}
               </div>
-            ) : (
-              /* ── What the REQUEST asks for (owner, 2026-08-25: "match prototype") ────────────────
-                  These facts were drawer-only, which meant the renter had to open a panel to recall
-                  what he had asked for. Nothing here is derived — a chip is a requirement, and one
-                  invented from `rentalType` would be a claim the request never made. */
-              (startsOn || item?.durationDays || certs.length > 0 || unitCount > 1 || bidCount === 0) && (
-                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                  {startsOn && <Chip>{fmt(t.workspace.chipStarts, { date: startsOn })}</Chip>}
-                  {item?.durationDays ? (
-                    <Chip tone="duration" lead={t.workspace.factDuration}>
-                      {fmt(t.workspace.chipDuration, { n: String(item.durationDays) })}
-                    </Chip>
-                  ) : null}
-                  {unitCount > 1 && <Chip>{fmt(t.workspace.unitsCount, { n: String(unitCount) })}</Chip>}
-                  {withOperator && <Chip>{t.workspace.chipOperator}</Chip>}
-                  {certs.slice(0, 2).map((c) => (
-                    <Chip key={c} tone="cert">
-                      {ar ? CERT_LABEL[c].ar : CERT_LABEL[c].en}
-                    </Chip>
-                  ))}
-                  {certs.length > 2 && (
-                    <span className="text-[10.5px] font-semibold text-muted">
-                      {fmt(t.workspace.chipMore, { n: String(certs.length - 2) })}
-                    </span>
-                  )}
-                </div>
-              )
             )}
           </div>
 
