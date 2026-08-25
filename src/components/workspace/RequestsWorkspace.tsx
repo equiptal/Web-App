@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocale, useT } from "@/lib/i18n";
+import { fmt, useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import { SignInPrompt } from "@/components/common/SignInPrompt";
@@ -148,7 +148,34 @@ export function RequestsWorkspace() {
 
 
   const tiles = useMemo(() => railTiles(groups ?? []), [groups]);
-  const shown = useMemo(() => filterBySource(bids, source), [bids, source]);
+
+  /**
+   * Bids the renter has taken off the comparison. Owned here rather than inside the matrix so the
+   * EXPORT can read it (owner, 2026-08-25): a sheet that printed a bid he had just removed from the
+   * table in front of him is a sheet that disagrees with its own screen.
+   *
+   * Cleared whenever the item changes — a bench is about the comparison being read, and the next
+   * item is a different comparison.
+   */
+  const [benched, setBenched] = useState<Set<string>>(new Set());
+  const benchBid = useCallback((bidId: string, off: boolean) => {
+    setBenched((s) => {
+      const next = new Set(s);
+      if (off) next.add(bidId);
+      else next.delete(bidId);
+      return next;
+    });
+  }, []);
+  // A bench is about the comparison being read, and the next item is a different comparison.
+  useEffect(() => { setBenched(new Set()); }, [itemId]);
+
+  /** What the source filter allows, minus what the renter benched. Both panes and the export read it. */
+  const shown = useMemo(
+    () => filterBySource(bids, source).filter((b) => !benched.has(b.card.id)),
+    [bids, source, benched],
+  );
+  /** Everything the filter allows, benched or not — what the matrix needs to draw the bench itself. */
+  const shownAll = useMemo(() => filterBySource(bids, source), [bids, source]);
   const counts = useMemo(() => sourceCounts(bids), [bids]);
   const bid = useMemo(() => bids.find((b) => b.card.id === resolved.bidId)?.card ?? null, [bids, resolved.bidId]);
 
@@ -302,14 +329,30 @@ export function RequestsWorkspace() {
           {/* The same export the comparison workspace had: the renter's own templates, with the
               built-in sheet as the fallback whenever a template cannot be used. Nothing is rebuilt —
               `buildExportPayload` and the dialog are the originals. */}
-          <button
-            type="button"
-            disabled={shown.length === 0}
-            onClick={() => setExportOpen(true)}
-            className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3.5 py-1.5 text-[12.5px] font-bold text-navy-mid transition hover:border-navy-mid disabled:opacity-40"
-          >
-            {t.workspace.download} <Icon name="download" size={15} />
-          </button>
+          <div className="mb-1 flex items-center gap-2">
+            {/* ── «Select all» puts the whole comparison back (owner, 2026-08-25) ─────────────────
+                The export covers what the comparison covers, so putting a bid back on the table is
+                the same act as putting it back in the sheet — one concept, not two. It appears only
+                when something is actually off, because a control that clears nothing is furniture,
+                and it names the count so the renter knows what he is about to bring back. */}
+            {benched.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setBenched(new Set())}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3.5 py-1.5 text-[12.5px] font-bold text-navy-mid transition hover:border-navy-mid"
+              >
+                <Icon name="done_all" size={15} /> {fmt(t.workspace.selectAll, { n: String(benched.size) })}
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={shown.length === 0}
+              onClick={() => setExportOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3.5 py-1.5 text-[12.5px] font-bold text-navy-mid transition hover:border-navy-mid disabled:opacity-40"
+            >
+              {t.workspace.download} <Icon name="download" size={15} />
+            </button>
+          </div>
         </div>
 
         <div className="rounded-b-[14px] rounded-tr-[14px] border border-border bg-surface">
@@ -353,11 +396,15 @@ export function RequestsWorkspace() {
             />
           ) : (
             <CompareMatrix
-              bids={shown}
+              // Everything the source filter allows, benched or not — the matrix draws the bench
+              // itself, so it needs the bids it is not currently comparing.
+              bids={shownAll}
               selectedId={resolved.bidId}
               durationDays={item?.durationDays ?? null}
               startDate={item?.startDate ?? null}
               onSelect={pickBid}
+              benched={benched}
+              onBench={benchBid}
             />
           )}
         </div>

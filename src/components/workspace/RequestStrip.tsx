@@ -1,10 +1,11 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { useLocale, useT } from "@/lib/i18n";
+import { fmt, useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { publicTaxonomyUrl, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
-import type { BidCard } from "@/lib/contract/bids";
+import { CERT_LABEL, type BidCard } from "@/lib/contract/bids";
 
 /**
  * The dark strip under the rail. Two halves, and they answer different questions.
@@ -54,6 +55,13 @@ export function RequestStrip({
     : null;
   const offeredYear = bid?.equipment?.year ?? null;
   const photo = publicTaxonomyUrl(item?.item?.imageUrl ?? null);
+
+  /** The request's own terms, for the chip row below the item name. */
+  const startsOn = item?.startDate
+    ? new Date(item.startDate).toLocaleDateString(ar ? "ar" : "en-GB", { day: "numeric", month: "short" })
+    : null;
+  const certs = item?.requiredCerts ?? [];
+  const unitCount = item?.item?.qty ?? 1;
 
   return (
     <div className="mx-3 mt-3 overflow-hidden rounded-[16px] bg-navy text-white sm:mx-5">
@@ -122,6 +130,29 @@ export function RequestStrip({
 
           <div className="min-w-0 flex-1">
             <div className="truncate text-[15px] font-extrabold">{itemLabel}</div>
+
+            {/* ── What the REQUEST asks for, on the strip (owner, 2026-08-25: "match prototype") ────
+                These facts were drawer-only, which meant the renter had to open a panel to recall
+                what he had asked for while comparing what he was being offered. They belong beside
+                the item they qualify.
+
+                Only what the list payload actually carries. The prototype also shows «With operator»,
+                and `RequestListItem` has no operator field — inventing one from `rentalType` would be
+                a guess printed as a requirement, so it is left out until the projection carries it. */}
+            {(startsOn || item?.durationDays || certs.length > 0 || unitCount > 1) && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                {startsOn && <Chip>{fmt(t.workspace.chipStarts, { date: startsOn })}</Chip>}
+                {item?.durationDays ? (
+                  <Chip>{fmt(t.workspace.chipDuration, { n: String(item.durationDays) })}</Chip>
+                ) : null}
+                {unitCount > 1 && <Chip>{fmt(t.workspace.unitsCount, { n: String(unitCount) })}</Chip>}
+                {certs.slice(0, 2).map((c) => (
+                  <Chip key={c} tone="cert">{ar ? CERT_LABEL[c].ar : CERT_LABEL[c].en}</Chip>
+                ))}
+                {certs.length > 2 && <Chip>{fmt(t.workspace.chipMore, { n: String(certs.length - 2) })}</Chip>}
+              </div>
+            )}
+
             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px]">
               {bid ? (
                 <>
@@ -131,9 +162,13 @@ export function RequestStrip({
                     {offeredYear ? ` · ${offeredYear}` : ""}
                   </b>
                 </>
-              ) : (
-                <span className="text-white/55">{bidCount === 0 ? t.workspace.noBidsYet : t.workspace.noBidSelected}</span>
-              )}
+              ) : bidCount === 0 ? (
+                <span className="text-white/55">{t.workspace.noBidsYet}</span>
+              ) : null}
+              {/* ── Nothing at all when a bid is simply not picked yet (owner, 2026-08-25) ──────────
+                  It said «No bid selected», which is the surface narrating its own state back at the
+                  renter: he can see that nothing is picked, because nothing is picked. «No bids yet»
+                  stays, because THAT is a fact about the offer he cannot see from here. */}
             </div>
           </div>
 
@@ -163,4 +198,16 @@ export function RequestStrip({
       </div>
     </div>
   );
+}
+
+/**
+ * One fact about the request, on the dark strip.
+ *
+ * Two tones and no more: the neutral one for a plain fact — when it starts, how long, how many — and
+ * `cert` for a certificate, which is the only chip on this row naming something a supplier can FAIL
+ * to hold. Colouring the others would make a start date look like a requirement to meet.
+ */
+function Chip({ children, tone = "plain" }: { children: ReactNode; tone?: "plain" | "cert" }) {
+  const skin = tone === "cert" ? "bg-brand/20 text-brand" : "bg-white/10 text-white/75";
+  return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ${skin}`}>{children}</span>;
 }

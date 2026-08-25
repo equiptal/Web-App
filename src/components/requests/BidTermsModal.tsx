@@ -69,21 +69,29 @@ export function BidTermsModal({
     <div
       dir={ar ? "rtl" : "ltr"}
       onClick={onClose}
-      style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(16,38,63,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-navy-deep/50 p-4"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ width: "100%", maxWidth: 560, maxHeight: "90vh", display: "flex", flexDirection: "column", background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 60px rgba(16,38,63,.35)" }}
+        className="flex max-h-[90vh] w-full max-w-[560px] flex-col overflow-hidden rounded-[20px] bg-surface shadow-[0_24px_60px_rgba(16,38,63,.35)]"
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "20px 22px 14px" }}>
-          <h3 style={{ fontSize: 18, fontWeight: 900, color: "#1c3550", margin: 0 }}>{L("Terms", "الشروط")} — {supplier}</h3>
-          <button onClick={onClose} aria-label={L("Close", "إغلاق")} style={{ width: 36, height: 36, borderRadius: 10, border: "none", background: "#eff4f9", color: "#6b8fa8", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <div className="flex items-center justify-between gap-3 px-[22px] pb-3.5 pt-5">
+          <h3 className="m-0 text-[18px] font-black text-navy">{L("Terms", "الشروط")} — {supplier}</h3>
+          <button onClick={onClose} aria-label={L("Close", "إغلاق")} className="flex h-9 w-9 flex-none items-center justify-center rounded-[10px] bg-surface2 text-muted transition hover:bg-surface3">
             <span className="material-icons-outlined" style={{ fontSize: 20 }}>close</span>
           </button>
         </div>
 
         {/* 3 state tabs (Conflict / Pending review / Matched) with counts */}
-        <div style={{ display: "flex", gap: 8, padding: "0 22px 4px" }}>
+        {/* ── Restyled onto the workspace's tokens (owner, 2026-08-25) ────────────────────────────
+            This sheet opens from a card built on `bg-surface` / `border-border` / `text-navy`, and
+            arrived in hard-coded hex — `#fff`, `#1c3550`, `rgba(16,38,63,.5)` — that reads as another
+            product and cannot follow a theme. Its BEHAVIOUR is untouched: the same three state
+            buckets, the same tab that opens on the first non-empty one, the same deal-room footer.
+
+            The tab below and the verdict beside each row keep their INLINE colour, and deliberately:
+            each carries its own state's hue, which is data rather than a class. */}
+        <div className="flex gap-2 px-[22px] pb-1">
           {tabs.map((t) => {
             const on = active === t.key;
             const n = byBucket[t.key].length;
@@ -93,15 +101,15 @@ export function BidTermsModal({
                 onClick={() => setActive(t.key)}
                 style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 8px", borderRadius: 11, border: `1.5px solid ${on ? t.c : "#e6ebf2"}`, background: on ? t.bg : "#fff", color: on ? t.c : "#6b8fa8", fontFamily: "inherit", fontWeight: 800, fontSize: 12.5, cursor: "pointer", whiteSpace: "nowrap" }}
               >
-                {t.label} <span style={{ fontWeight: 900 }}>{n}</span>
+                {t.label} <span className="font-black">{n}</span>
               </button>
             );
           })}
         </div>
 
-        <div style={{ overflowY: "auto", padding: "10px 22px 18px" }}>
+        <div className="overflow-y-auto px-[22px] pb-[18px] pt-2.5">
           {rows.length === 0 ? (
-            <div style={{ padding: "26px 0", textAlign: "center", fontSize: 13.5, fontWeight: 600, color: "#9AA7B8" }}>
+            <div className="py-[26px] text-center text-[13.5px] font-semibold text-muted">
               {active === "conflict" ? L("No conflicts.", "لا تعارضات.") : active === "pending" ? L("Nothing pending review.", "لا شيء بانتظار المراجعة.") : L("Nothing matched yet.", "لا مطابقات بعد.")}
             </div>
           ) : (
@@ -110,10 +118,10 @@ export function BidTermsModal({
               const okWord = active === "matched" ? L("Matched", "مطابق") : st.word("");
               const word = ar ? st.ar : st.word(active === "matched" ? "Matched" : "");
               return (
-                <div key={`${r.key}-${i}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "13px 0", borderBottom: "1px solid #EFF2F6" }}>
-                  <span style={{ fontSize: 15, fontWeight: 600, color: "#1c3550" }}>
+                <div key={`${r.key}-${i}`} className="flex items-center justify-between gap-3 border-b border-border py-[13px]">
+                  <span className="text-[15px] font-semibold text-navy">
                     {ar ? r.labelAr : r.labelEn}
-                    {r.detail && (r.state === "conflict" || r.state === "negotiating") && <span style={{ color: "#6b8fa8", fontWeight: 500 }}> · {ar ? r.detail.ar : r.detail.en}</span>}
+                    {r.detail && (r.state === "conflict" || r.state === "negotiating") && <span className="font-medium text-muted"> · {ar ? r.detail.ar : r.detail.en}</span>}
                   </span>
                   <span style={{ fontSize: 14.5, fontWeight: 800, color: st.c, whiteSpace: "nowrap" }}>{st.mark} {word || okWord}</span>
                 </div>
@@ -122,11 +130,11 @@ export function BidTermsModal({
           )}
         </div>
 
-        <div style={{ padding: "14px 22px 20px", borderTop: "1px solid #EFF2F6" }}>
+        <div className="border-t border-border px-[22px] pb-5 pt-3.5">
           <button
             onClick={onNegotiate}
             disabled={busy}
-            style={{ width: "100%", padding: "14px", borderRadius: 14, border: "none", background: "#1c3550", color: "#fff", fontWeight: 800, fontSize: 15, cursor: busy ? "default" : "pointer", fontFamily: "inherit", opacity: busy ? 0.7 : 1 }}
+            className="w-full rounded-[14px] bg-navy p-3.5 text-[15px] font-extrabold text-white transition hover:brightness-110 disabled:cursor-default disabled:opacity-70"
           >
             {negotiateLabel ?? L("Negotiate terms", "التفاوض على الشروط")}
           </button>

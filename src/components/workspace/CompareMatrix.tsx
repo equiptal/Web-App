@@ -26,12 +26,18 @@ import type { TermRow } from "@/lib/contract/bids";
 /** The four column groups, in the order the matrix reads. */
 type GroupKey = "cycle" | "totals" | "asked" | "offered";
 
+/** The money columns the table can be ordered by. Terms are not among them: they are answers, not
+ *  amounts, and there is no order to put "didn't say" in. */
+type SortKey = "rate" | "mob" | "demob" | "firstCycle" | "everyCycle" | "duration";
+
 export function CompareMatrix({
   bids,
   selectedId,
   durationDays,
   startDate,
   onSelect,
+  benched,
+  onBench,
 }: {
   bids: WorkspaceBid[];
   selectedId: string | null;
@@ -41,20 +47,46 @@ export function CompareMatrix({
    *  falls back to the bare rate and says so rather than claiming a day count. */
   startDate: string | null;
   onSelect: (bidId: string) => void;
+  /**
+   * Bids taken off the comparison, owned by the WORKSPACE (owner, 2026-08-25).
+   *
+   * It was local state here, which meant the export beside the tabs covered every bid the source
+   * filter allowed — including ones the renter had just taken off the table in front of him. The
+   * bench is also what «Select all» clears, so it has to live where the export can read it.
+   */
+  benched: Set<string>;
+  onBench: (bidId: string, off: boolean) => void;
 }) {
   const t = useT();
   const { locale } = useLocale();
   const ar = locale === "ar";
 
-  // Bids taken off the matrix sit on the bench below it and can be put back. Removing is a reading
-  // convenience — it never withdraws anything.
-  const [benched, setBenched] = useState<Set<string>>(new Set());
+  // Bids on the bench sit below the table and can be put back. Removing is a reading convenience —
+  // it never withdraws anything; the set itself is the workspace's, so the export honours it too.
   const [collapsed, setCollapsed] = useState<Set<GroupKey>>(new Set());
   const [popover, setPopover] = useState<string | null>(null);
   const [ranking, setRanking] = useState<{ bidId: string | null; note: string | null } | null>(null);
   const [ranking_busy, setRankingBusy] = useState(false);
 
-  const rows = useMemo(() => bids.filter((b) => !benched.has(b.card.id)), [bids, benched]);
+  /**
+   * ── Which money column orders the table (owner, 2026-08-25) ──────────────────────────────────
+   *
+   * The default is FIRST CYCLE ascending, which is the prototype's own: every money header there
+   * carries «↕» except that one, which carries «▲», and its rows follow it. It is also the honest
+   * default — cheapest to start is the figure a renter reads first, and the fact that cheapest to
+   * FINISH is often a different supplier is exactly what one press on another column reveals.
+   *
+   * Ordering is a reading convenience and nothing more: it awards nothing, moves no selection and
+   * touches no bid. The bench below the table is unsorted, because a benched bid is not in the
+   * comparison being ordered.
+   */
+  const [sortKey, setSortKey] = useState<SortKey>("firstCycle");
+  const [sortDir, setSortDir] = useState<1 | -1>(1);
+  const sortBy = (k: SortKey) => {
+    if (k === sortKey) setSortDir((d) => (d === 1 ? -1 : 1));
+    else { setSortKey(k); setSortDir(1); }
+  };
+
   const bench = useMemo(() => bids.filter((b) => benched.has(b.card.id)), [bids, benched]);
 
   const totals = useMemo(() => {
@@ -75,6 +107,38 @@ export function CompareMatrix({
     }
     return map;
   }, [bids, durationDays, startDate]);
+
+  /**
+   * The rows, ordered by the chosen column.
+   *
+   * A bid that did not quote the sorted figure sorts LAST in both directions — it has not made an
+   * offer on that line, and floating it to the top of an ascending sort would read as the cheapest
+   * answer to a question it never answered.
+   */
+  const rows = useMemo(() => {
+    const live = bids.filter((b) => !benched.has(b.card.id));
+    const value = (b: WorkspaceBid): number | null => {
+      const tt = totals.get(b.card.id);
+      switch (sortKey) {
+        case "rate": return b.card.price ?? null;
+        // The two legs are read off the BID rather than the cycle: `oneOff` folds them together, and
+        // sorting by "delivery" has to mean delivery, not delivery-plus-return.
+        case "mob": return b.card.mobExcluded ? 0 : b.card.mobPrice ?? null;
+        case "demob": return b.card.demobExcluded ? 0 : b.card.demobPrice ?? null;
+        case "firstCycle": return tt?.firstCycle.total ?? null;
+        case "everyCycle": return tt?.everyCycleAfter?.total ?? null;
+        case "duration": return tt?.duration?.total ?? null;
+      }
+    };
+    return live.slice().sort((a, b) => {
+      const av = value(a);
+      const bv = value(b);
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return (av - bv) * sortDir;
+    });
+  }, [bids, benched, totals, sortKey, sortDir]);
 
   const lowRate = useMemo(() => cheapest(rows, (b) => b.card.price), [rows]);
   const lowFirst = useMemo(() => cheapest(rows, (b) => totals.get(b.card.id)?.firstCycle.total ?? null), [rows, totals]);
@@ -160,20 +224,24 @@ export function CompareMatrix({
               </th>
               {!collapsed.has("cycle") && (
                 <>
-                  <Col label={t.workspace.colRate} />
-                  <Col label={t.priceFooter.mobilisation} />
-                  <Col label={t.priceFooter.demobilisation} />
+                  <Col label={t.workspace.colRate} sort="rate" sortKey={sortKey} sortDir={sortDir} onSort={sortBy} />
+                  <Col label={t.priceFooter.mobilisation} sort="mob" sortKey={sortKey} sortDir={sortDir} onSort={sortBy} />
+                  <Col label={t.priceFooter.demobilisation} sort="demob" sortKey={sortKey} sortDir={sortDir} onSort={sortBy} />
                 </>
               )}
               {!collapsed.has("totals") && (
                 <>
-                  <Col label={t.workspace.firstCycle} info onInfo={() => setPopover(popover === "first" ? null : "first")} />
-                  <Col label={t.workspace.everyCycleAfter} info onInfo={() => setPopover(popover === "after" ? null : "after")} />
+                  <Col label={t.workspace.firstCycle} info onInfo={() => setPopover(popover === "first" ? null : "first")} sort="firstCycle" sortKey={sortKey} sortDir={sortDir} onSort={sortBy} />
+                  <Col label={t.workspace.everyCycleAfter} info onInfo={() => setPopover(popover === "after" ? null : "after")} sort="everyCycle" sortKey={sortKey} sortDir={sortDir} onSort={sortBy} />
                   {durationDays ? (
                     <Col
                       label={t.workspace.overDays.replace("{n}", String(durationDays))}
                       info
                       onInfo={() => setPopover(popover === "duration" ? null : "duration")}
+                      sort="duration"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={sortBy}
                     />
                   ) : null}
                 </>
@@ -231,7 +299,7 @@ export function CompareMatrix({
                       </span>
                       <button
                         type="button"
-                        onClick={() => setBenched((s) => new Set(s).add(b.card.id))}
+                        onClick={() => onBench(b.card.id, true)}
                         aria-label={t.workspace.removeColumn}
                         title={t.workspace.removeColumn}
                         className="grid h-5 w-5 flex-none place-items-center rounded-full text-muted transition hover:bg-surface2 hover:text-navy"
@@ -293,13 +361,7 @@ export function CompareMatrix({
             <button
               key={b.card.id}
               type="button"
-              onClick={() =>
-                setBenched((s) => {
-                  const next = new Set(s);
-                  next.delete(b.card.id);
-                  return next;
-                })
-              }
+              onClick={() => onBench(b.card.id, false)}
               className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-[12px] font-bold text-navy-mid transition hover:border-navy-mid"
             >
               {b.card.supplierName} <Icon name="add" size={14} />
@@ -349,11 +411,52 @@ function Group({
   );
 }
 
-function Col({ label, info, onInfo }: { label: string; info?: boolean; onInfo?: () => void }) {
+/**
+ * One money column's header.
+ *
+ * `sort` makes the LABEL the control — the whole word is the target, not a 13px glyph beside it,
+ * which is the difference between a sortable table and a table with arrows on it. The arrow states
+ * the current direction on the sorted column and sits neutral on the others, so a reader can see at
+ * a glance both that the table is ordered and what it is ordered by.
+ */
+function Col({
+  label,
+  info,
+  onInfo,
+  sort,
+  sortKey,
+  sortDir,
+  onSort,
+}: {
+  label: string;
+  info?: boolean;
+  onInfo?: () => void;
+  sort?: SortKey;
+  sortKey?: SortKey;
+  sortDir?: 1 | -1;
+  onSort?: (k: SortKey) => void;
+}) {
+  const on = sort != null && sort === sortKey;
   return (
-    <th className="min-w-[104px] border-b border-border bg-surface px-2 py-2 text-start align-bottom">
+    <th
+      className="min-w-[104px] border-b border-border bg-surface px-2 py-2 text-start align-bottom"
+      aria-sort={on ? (sortDir === 1 ? "ascending" : "descending") : undefined}
+    >
       <span className="inline-flex items-center gap-1">
-        {label}
+        {sort && onSort ? (
+          <button
+            type="button"
+            onClick={() => onSort(sort)}
+            className={`inline-flex items-center gap-1 ${on ? "text-navy" : "hover:text-navy"}`}
+          >
+            {label}
+            <span aria-hidden="true" className={on ? "text-brand" : "text-muted/60"}>
+              {on ? (sortDir === 1 ? "▲" : "▼") : "↕"}
+            </span>
+          </button>
+        ) : (
+          label
+        )}
         {info && (
           <button type="button" onClick={onInfo} aria-label={label} className="text-brand">
             <Icon name="info" size={13} />

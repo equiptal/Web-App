@@ -2,8 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useLocale, useT } from "@/lib/i18n";
+import { fmt, useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
+// Both were written and tested for the bid list this workspace retired, and have had no caller since
+// (owner, 2026-08-25). The rules did not stop being true when their surface went away.
+import { bidCounterDelta } from "@/lib/contract/bid-counter-delta";
+import { distinctMachinesOffered, unitCountNotes } from "@/lib/contract/unit-count-notes";
 import { computeQuoteTotals, computeRentalTotal, divisorNote, formatSar, headlineAmount, legDisplay } from "@/lib/pricing/rental";
 import { startDealRoom } from "@/lib/api/client";
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
@@ -97,15 +101,49 @@ function BidCardTile({
   const [termsOpen, setTermsOpen] = useState(false);
   const [subOpen, setSubOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  /** Local, like «Provide it for me?»'s own acknowledgement: WhatsApp opening is all we can observe,
+   *  so the button reports that the renter was handed the message, never that it was sent. */
+  const [invited, setInvited] = useState(false);
 
   const card = bid.card;
   const offline = bid.source === "offline";
   const dial = termsDial(card, bid.source);
 
+  /** Digits only — `wa.me` refuses a number carrying spaces, dashes or a leading `+`. */
+  const invitePhone = (card.supplierPhone ?? "").replace(/\D/g, "") || null;
+
+  /**
+   * The counter's round, or null on a bid nobody has moved. `viewerRole` is the renter's: this whole
+   * surface is his, and the rule uses it to decide whose figure is being struck through.
+   */
+  const delta = bidCounterDelta({
+    originalPrice: card.openingPrice,
+    currentPrice: card.price,
+    lastCounterBy: card.lastCounterBy,
+    viewerRole: "rentee",
+    status: card.status,
+  });
+
   // ── The price block, built the way the app builds it ───────────────────────────────────────────
   // Mirrors `v3_bid_card.dart` + `price_expanded_breakdown.dart`, checked against the source on
   // 2026-08-12. Every row here is PER UNIT; a multi-unit offer adds an all-units row at the foot.
   const units = card.unitsOffered > 0 ? card.unitsOffered : card.numberOfUnits > 0 ? card.numberOfUnits : 1;
+
+
+  /**
+   * What this bid owes the reader when its counts disagree — machines actually NAMED against units
+   * OFFERED against units PRICED. Silence where they agree, which is most bids.
+   *
+   * The three are genuinely different questions, and only the last one costs money: `offered` is what
+   * the bid claims (padded with repeats when a supplier commits to more units than he holds machines
+   * for), `machinesNamed` is how many distinct machines are actually behind it, and `priced` is what
+   * the money was built on. A bid offering five and naming three said nothing at all until now.
+   */
+  const countNotes = unitCountNotes({
+    priced: card.agreedUnits ?? card.currentRentalUnits ?? units,
+    offered: units,
+    machinesNamed: distinctMachinesOffered(card.offeredUnitsDetail),
+  });
   // The rental is prorated: (rate ÷ 26 or ÷ 6) × billable days, Fridays excluded. With no duration
   // it stays the bare rate — never a fabricated single day, which would read as near-zero on a
   // monthly bid.
@@ -287,21 +325,76 @@ function BidCardTile({
             </div>
           )}
         </div>
+
+        {/* ── What the counts do not agree about (owner, 2026-08-25) ────────────────────────────────
+            `unitCountNotes` is the app's rule, ported and tested and — until now — called by nothing.
+            Most bids say nothing here, which is the point: it speaks only where the three counts
+            genuinely diverge, and a bid that offers five units while naming three machines has been
+            silent about it on every surface this workspace replaced.
+
+            Placed UNDER the totals rather than beside the headline: it qualifies what the money was
+            built on, and a reader who has not reached the total has no use for it yet. */}
+        {!countNotes.isEmpty && (
+          <div className="mt-2 flex flex-col gap-1 text-[11.5px] font-semibold leading-snug text-muted">
+            {countNotes.hasPricedNote && (
+              <span>
+                {fmt(
+                  countNotes.relation === "above" ? t.workspace.countPricedAbove : t.workspace.countPricedBelow,
+                  { priced: String(countNotes.priced), offered: String(countNotes.offered) },
+                )}
+              </span>
+            )}
+            {countNotes.hasClaimedNote && (
+              <span className="text-brand">
+                {fmt(t.workspace.countClaimed, {
+                  n: String(countNotes.claimedUnits),
+                  named: String(countNotes.machinesNamed),
+                })}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* The way on. */}
       <div className="mt-auto flex gap-2 px-3 pb-3">
         {offline ? (
           <>
-            <button
-              type="button"
-              disabled
-              title={t.workspace.notBuiltYet}
-              onClick={(e) => e.stopPropagation()}
-              className="flex-1 rounded-[12px] bg-navy px-3 py-2.5 text-[13px] font-extrabold text-white disabled:opacity-40"
-            >
-              {t.workspace.inviteToApp}
-            </button>
+            {/* ── Invite him onto the app (owner, 2026-08-25) ────────────────────────────────────
+                Off-platform only, by decision: a supplier who bid THROUGH the app already has it.
+
+                The mechanism is «Provide it for me?»'s, not a new one (`MachineCard.tsx:327`) — fill a
+                template, open WhatsApp at the number, and let the renter press send. It reaches the
+                supplier from the renter's OWN account, which is what the owner asked for, and it
+                needs no endpoint and no projection: `supplierPhone` is already on the bid.
+
+                Where we hold no number the control still renders, disabled, saying why — a button
+                that vanished would read as «this supplier cannot be invited», when the truth is only
+                that this bid arrived without a way to reach him. */}
+            {invitePhone ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const msg = fmt(t.workspace.inviteMessage, { supplier: card.supplierName });
+                  window.open(`https://wa.me/${invitePhone}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
+                  setInvited(true);
+                }}
+                className="flex-1 rounded-[12px] bg-navy px-3 py-2.5 text-[13px] font-extrabold text-white transition hover:brightness-110"
+              >
+                {invited ? t.workspace.inviteSent : t.workspace.inviteToApp}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled
+                title={t.workspace.inviteNoContact}
+                onClick={(e) => e.stopPropagation()}
+                className="flex-1 rounded-[12px] bg-navy px-3 py-2.5 text-[13px] font-extrabold text-white disabled:opacity-40"
+              >
+                {t.workspace.inviteToApp}
+              </button>
+            )}
             <button
               type="button"
               onClick={(e) => {
@@ -323,7 +416,25 @@ function BidCardTile({
             }}
             className="flex-1 rounded-[12px] bg-navy px-3 py-2.5 text-[13px] font-extrabold text-white transition hover:brightness-110"
           >
-            {t.priceFooter.counterPrice}
+            {/* ── The button carries the ROUND, once there has been one (owner, 2026-08-25) ────────
+                `bidCounterDelta` is the app's rule and was already written and tested; its only
+                caller was the bid list this workspace retired, so it has been deciding nothing.
+                It returns null on an unmoved bid — the backend defaults `currentPrice` to
+                `priceAmount`, so an untouched offer arrives as two equal numbers — which is exactly
+                «after the first round» without a second rule to keep in step.
+
+                The old figure is struck through and the live one follows it, so the button says what
+                pressing it continues rather than starting the conversation over. */}
+            {delta ? (
+              <span className="inline-flex items-baseline gap-1.5">
+                {t.priceFooter.counterPrice}
+                <span className="text-[11.5px] font-bold text-white/55 line-through">{formatSar(delta.from)}</span>
+                <span aria-hidden="true" className="text-[11.5px] font-bold text-white/55">→</span>
+                <span className="text-[12.5px] font-black">{formatSar(delta.to)}</span>
+              </span>
+            ) : (
+              t.priceFooter.counterPrice
+            )}
           </button>
         )}
       </div>
