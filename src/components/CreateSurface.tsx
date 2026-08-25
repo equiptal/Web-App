@@ -32,20 +32,16 @@ export function CreateSurface() {
       // Ready-to-send review is a mode of it rather than a fifth step.
       case "wizard":
         /**
-         * The canvas steps OUT of the shell's reading gutter.
+         * The canvas asks for the WORKING gutter, and gets it from the shell.
          *
-         * `AppShell` pads its main column to `xl:px-28` — 112px a side — which is right for a page
-         * of prose and wrong for one that is three columns of controls: that gutter was the
-         * difference between the machine card, the operator rail and the schedule fitting one row
-         * and wrapping. Negative margins cancel the shell's padding at each breakpoint and a
-         * tighter one goes back on. Done here rather than in AppShell so no other page can be
-         * affected by it.
+         * It used to cancel the shell's reading gutter with negative margins at every breakpoint and
+         * put a tighter one back on, because 112px a side was the difference between the machine
+         * card, the operator rail and the schedule sharing a row and wrapping. The reason still
+         * holds; the mechanism does not. `/create` passes `wide`, and `wide` now means exactly those
+         * numbers (see `PAGE_X_WORKING`), so the page has the gutter it needs without a component
+         * inside it undoing its own container.
          */
-        return (
-          <div className="-mx-6 px-4 sm:-mx-12 sm:px-6 lg:-mx-20 lg:px-8 xl:-mx-28 xl:px-10">
-            {state.readyToSend ? <ReadyToSend /> : <Canvas />}
-          </div>
-        );
+        return state.readyToSend ? <ReadyToSend /> : <Canvas />;
       case "confirmation":
         return <Confirmation />;
     }

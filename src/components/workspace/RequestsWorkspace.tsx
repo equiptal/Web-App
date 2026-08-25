@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
+import { PAGE_MX_BLEED } from "@/components/AppShell";
 import { SignInPrompt } from "@/components/common/SignInPrompt";
 import { fetchAllMyRequests, fetchBids, fetchReceivedBids, fetchRequestSubmissions, recommendBids } from "@/lib/api/client";
 import { groupRequests, type RequestGroup } from "@/lib/contract/requests";
@@ -372,7 +373,7 @@ export function RequestsWorkspace() {
         onOpenRequest={() => { setDrawerShare(false); setDrawerOpen(true); }}
       />
 
-      <div className="mx-3 mt-3 flex min-h-0 flex-1 flex-col pb-3 sm:mx-5">
+      <div className={`${PAGE_MX_BLEED} mt-3 flex min-h-0 flex-1 flex-col pb-3`}>
         {/* Tabs, and the export beside them. The open tab is part of the panel below it — it carries
             the panel's own border and covers the hairline between them, which is why the panel's
             top-start corner is square. */}

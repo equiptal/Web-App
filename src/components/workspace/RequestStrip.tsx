@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
+import { PAGE_MX_BLEED } from "@/components/AppShell";
 import { publicTaxonomyUrl, shortRef, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
 import { CERT_LABEL, type BidCard } from "@/lib/contract/bids";
 import { unitAvailability } from "@/lib/contract/bid-map";
@@ -97,7 +98,7 @@ export function RequestStrip({
   };
 
   return (
-    <div className="mx-3 mt-2.5 flex flex-none items-stretch gap-4 sm:mx-5">
+    <div className={`${PAGE_MX_BLEED} mt-2.5 flex flex-none items-stretch gap-4`}>
       {/* Thinner (owner, 2026-08-25). `py-3` became `py-2` and the site name 18px → 16px: on a page
           that must end at the fold, the strip's job is to NAME the request, and a name does not need
           a display size to do it. The white card inside keeps its own padding — squeezing that would

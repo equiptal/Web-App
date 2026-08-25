@@ -4,6 +4,7 @@ import { useRef } from "react";
 import Link from "next/link";
 import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
+import { PAGE_X_BLEED } from "@/components/AppShell";
 import { publicTaxonomyUrl } from "@/lib/contract/requests";
 import type { RailTile } from "@/lib/contract/workspace";
 
@@ -43,7 +44,7 @@ export function RequestRail({
   // caption under its name, so the row is sized for the tallest tile it can hold (48 + 6 + 14 + 10),
   // not the common one.
   return (
-    <div className="flex h-[80px] flex-none items-center gap-4 overflow-hidden border-b border-border bg-surface3/60 px-4 sm:px-[26px]">
+    <div className={`flex h-[80px] flex-none items-center gap-4 overflow-hidden border-b border-border bg-surface3/60 ${PAGE_X_BLEED}`}>
       <Link href="/create" className="group flex flex-none flex-col items-center gap-1.5">
         <span className="grid h-12 w-12 place-items-center rounded-full border-2 border-dashed border-border text-muted transition group-hover:border-brand group-hover:text-brand">
           <Icon name="add" size={20} />

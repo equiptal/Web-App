@@ -36,6 +36,38 @@ import { ArrowBackIcon, MailIcon, CountBadge } from "@/components/HeaderIcons";
  */
 type AppShellProps = { children: ReactNode; title?: string; fullBleed?: boolean; wide?: boolean };
 
+/**
+ * ── The page gutters, defined once (owner, 2026-08-25: "unify the margin - paddings for all
+ * screens") ─────────────────────────────────────────────────────────────────────────────────────
+ *
+ * There were FOUR scales before this, and two of them did not line up with each other:
+ *
+ *   page container   24 / 48 / 80 / 112     <- every ordinary screen
+ *   create canvas    16 / 24 / 32 / 40      <- reached by cancelling the above with negative margins
+ *   workspace rail   16 / 26                <- a full-bleed band
+ *   workspace rows   12 / 20                <- the bands directly under that rail
+ *
+ * Now there are two, and they are roles rather than accidents.
+ *
+ * READING is the default: a generous edge for a column of prose, a form, a list. Unchanged from what
+ * every ordinary screen already had, so nothing on those screens moves.
+ *
+ * WORKING is for a screen that is CONTROLS rather than reading. The create canvas is three columns of
+ * them, and at 112px a side the machine card, the operator rail and the schedule wrapped instead of
+ * sharing a row. It is what `wide` now means — the prop already existed and only /create passes it,
+ * so this replaces that page's negative-margin escape with the same numbers, declared.
+ *
+ * BLEED is for surfaces that own the whole viewport (`fullBleed`), whose bands set their own edges.
+ * It is the working gutter's first two steps, which is why the requests rail and the strip beneath it
+ * now line up — at 16/26 against 12/20 they never did.
+ */
+export const PAGE_X_READING = "px-6 sm:px-12 lg:px-20 xl:px-28";
+export const PAGE_X_WORKING = "px-4 sm:px-6 lg:px-8 xl:px-10";
+export const PAGE_X_BLEED = "px-4 sm:px-6";
+/** The same bleed step as a margin, for a band that insets a card rather than padding a row. */
+export const PAGE_MX_BLEED = "mx-4 sm:mx-6";
+
+
 /** A page can show a Back arrow in the top bar (beside the title) by registering a handler. */
 const BackContext = createContext<(fn: (() => void) | null) => void>(() => {});
 export function useHeaderBack(handler: (() => void) | null) {
@@ -398,7 +430,11 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
           className={
             fullBleed
               ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-              : `mx-auto w-full px-6 py-6 pb-16 sm:px-12 sm:pt-7 md:py-7 lg:px-20 xl:px-28 ${wide ? "max-w-none" : "max-w-[1440px]"}`
+              : // Vertical is ONE rule now: 24, then 28 from `sm` up. It read
+                // `py-6 pb-16 sm:pt-7 md:py-7`, where `md:py-7` silently overrode `pb-16` — so the
+                // foot of a page was 64px on a phone and 28px on a desktop, the opposite way round
+                // from what either wants. The 64 was `AppDock` clearance, and the dock is gone.
+                `mx-auto w-full py-6 sm:py-7 ${wide ? `max-w-none ${PAGE_X_WORKING}` : `max-w-[1440px] ${PAGE_X_READING}`}`
           }
         >
           {children}
