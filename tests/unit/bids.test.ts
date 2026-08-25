@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mapBidList, bidSuppliers, mapOfferedUnit, type BidCard } from "@/lib/contract/bids";
+import { mapBidList, bidSuppliers, mapOfferedUnit, offeredFrontPhotoUrl, type BidCard } from "@/lib/contract/bids";
 import { matchGrid } from "@/components/map/panel/machine-panel-model";
 import { equipmentFilters } from "@/lib/contract/equipment-list";
 import { mapFleet } from "@/lib/contract/fleet";
@@ -283,5 +283,56 @@ describe("mapBidList — the request's attachments ask (RM3-AC-37)", () => {
       { equipmentId: "eq-2", year: 2005, inBid: true },
     ]);
     expect(equipmentFilters(fleet, bid).map((g) => g.kind)).not.toContain("attachments");
+  });
+});
+
+/**
+ * The supplier's own photograph, on surfaces that show one machine.
+ *
+ * Taxonomy artwork answers "what kind of machine is this"; a renter reading a bid is asking what he
+ * is being SENT, and a stock drawing cannot answer that — least of all under a «CONFIRMED» ribbon,
+ * where it comes close to claiming it has. The uploads were always on the offered units; nothing
+ * read them (owner, 2026-08-26).
+ */
+describe("offeredFrontPhotoUrl", () => {
+  const unit = (photos: { slot: string; url: string | null }[]) => ({
+    photoKeys: photos.map((p) => ({ slot: p.slot, key: "k", url: p.url })),
+  });
+
+  it("prefers the front shot — the view a machine is recognised by", () => {
+    const u = unit([
+      { slot: "serial", url: "https://x/serial.jpg" },
+      { slot: "front", url: "https://x/front.jpg" },
+    ]);
+    expect(offeredFrontPhotoUrl([u])).toBe("https://x/front.jpg");
+  });
+
+  it("matches the slot loosely, because the backend has spelled it three ways", () => {
+    for (const slot of ["front", "FRONT_VIEW", "front_photo"]) {
+      expect(offeredFrontPhotoUrl([unit([{ slot, url: "https://x/f.jpg" }])])).toBe("https://x/f.jpg");
+    }
+  });
+
+  it("takes any photograph over none", () => {
+    expect(offeredFrontPhotoUrl([unit([{ slot: "meter", url: "https://x/m.jpg" }])])).toBe("https://x/m.jpg");
+  });
+
+  it("ignores a photo with no presigned url rather than rendering a broken image", () => {
+    const u = unit([
+      { slot: "front", url: null },
+      { slot: "side", url: "https://x/s.jpg" },
+    ]);
+    expect(offeredFrontPhotoUrl([u])).toBe("https://x/s.jpg");
+  });
+
+  it("reads across every offered unit, not only the first", () => {
+    expect(offeredFrontPhotoUrl([unit([]), unit([{ slot: "front", url: "https://x/2.jpg" }])])).toBe("https://x/2.jpg");
+  });
+
+  it("answers null on no units, no photos, or nothing openable — the caller then falls back", () => {
+    expect(offeredFrontPhotoUrl(null)).toBeNull();
+    expect(offeredFrontPhotoUrl([])).toBeNull();
+    expect(offeredFrontPhotoUrl([unit([])])).toBeNull();
+    expect(offeredFrontPhotoUrl([unit([{ slot: "front", url: null }])])).toBeNull();
   });
 });

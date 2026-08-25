@@ -6,7 +6,7 @@ import { fmt, useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { PAGE_MX_BLEED } from "@/components/AppShell";
 import { publicTaxonomyUrl, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
-import { CERT_LABEL, type BidCard } from "@/lib/contract/bids";
+import { CERT_LABEL, offeredFrontPhotoUrl, type BidCard } from "@/lib/contract/bids";
 import { unitAvailability } from "@/lib/contract/bid-map";
 
 /**
@@ -64,7 +64,19 @@ export function RequestStrip({
     ? new Date(group.createdAt).toLocaleDateString(ar ? "ar" : "en-GB", { day: "numeric", month: "short", year: "numeric" })
     : null;
   const itemLabel = item?.item ? (ar ? item.item.nameAr || item.item.name : item.item.name) : "—";
-  const photo = publicTaxonomyUrl(item?.item?.imageUrl ?? null);
+  /**
+   * The supplier's own photograph of the machine, not a drawing of its category (owner, 2026-08-26).
+   *
+   * Four sources in falling order of how much they actually say about THIS machine: the front shot
+   * the supplier uploaded against the offered unit, the equipment record's primary photo, the
+   * taxonomy artwork for the item's type, and — inside the tile — an icon. A renter reading a bid is
+   * asking what he is being sent, and a stock excavator cannot answer that; a stock excavator under
+   * a «CONFIRMED» ribbon comes close to claiming it has.
+   */
+  const photo =
+    offeredFrontPhotoUrl(bid?.offeredUnitsDetail) ??
+    bid?.equipment?.imageUrl ??
+    publicTaxonomyUrl(item?.item?.imageUrl ?? null);
 
   // What the supplier put against this item: make and model, as the renter would name it.
   const offered = bid?.equipment ? [bid.equipment.make, bid.equipment.model].filter(Boolean).join(" ") || null : null;
@@ -266,41 +278,44 @@ export function RequestStrip({
             )}
           </div>
 
-        </div>
+          {/* ── The two ways into the picked bid (owner's reference, 2026-08-26) ───────────────────
+              «Review equipment» opens the machines on the map, where availability is answered in
+              full; «View documents» opens that same surface on the papers — and nothing else stands
+              here. A five-control cluster was tried and is not what the reference draws: the
+              request's own details and its share link belong to the drawer the site name and the id
+              already open, and crowding them onto the strip made the row about the controls rather
+              than the request.
 
-        {/* ── The two ways into the picked bid (owner's reference, 2026-08-25) ─────────────────────
-            «Review equipment» opens the machines on the map, where availability is answered in full;
-            «View documents» opens that same surface on the papers — and nothing else stands here. A
-            five-control cluster was tried and is not what the reference draws: the request's own
-            details and its share link belong to the drawer the site name and the id already open, and
-            crowding them onto the strip made the row about the controls rather than the request.
+              They used to sit out on the NAVY, beside the card rather than in it, on the reasoning
+              that a fixed place outside kept them steady whatever the card was saying. The owner's
+              newer reference puts them INSIDE, at the card's trailing edge, and it reads better for
+              a plain reason: they act on the machine the card is describing, so they belong to it.
+              Being on white, «Review equipment» takes the solid navy it could not take on navy, and
+              «View documents» becomes the outlined one.
 
-            They sit on the NAVY, outside the white card: the card states facts, and out here the
-            pair holds the same place whatever it is saying. Both need a bid to point at, so they read
-            as inert until one is picked. */}
-        <div className="flex w-[152px] flex-none flex-col justify-center gap-1.5">
-          <button
-            type="button"
-            disabled={!bid}
-            onClick={() => goEquipment()}
-            className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-bold transition ${
-              bid
-                ? "border-white/15 bg-black/30 text-white hover:bg-black/40"
-                : "cursor-default border-white/10 bg-black/10 text-white/45"
-            }`}
-          >
-            {t.workspace.reviewEquipment}
-          </button>
-          <button
-            type="button"
-            disabled={!bid}
-            onClick={() => goEquipment("documents")}
-            className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
-              bid ? "bg-surface text-navy hover:bg-surface2" : "cursor-default bg-surface/40 text-navy/40"
-            }`}
-          >
-            <Icon name="visibility" size={13} /> {t.workspace.viewDocuments}
-          </button>
+              Both need a bid to point at, so they read as inert until one is picked. */}
+          <div className="flex w-[152px] flex-none flex-col justify-center gap-1.5 sm:ms-auto">
+            <button
+              type="button"
+              disabled={!bid}
+              onClick={() => goEquipment()}
+              className={`whitespace-nowrap rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
+                bid ? "bg-navy text-white hover:bg-navy-mid" : "cursor-default bg-navy/25 text-white/70"
+              }`}
+            >
+              {t.workspace.reviewEquipment}
+            </button>
+            <button
+              type="button"
+              disabled={!bid}
+              onClick={() => goEquipment("documents")}
+              className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-bold transition ${
+                bid ? "border-border bg-surface text-navy hover:bg-surface2" : "cursor-default border-border/60 bg-surface text-navy/35"
+              }`}
+            >
+              <Icon name="visibility" size={13} /> {t.workspace.viewDocuments}
+            </button>
+          </div>
         </div>
       </div>
     </div>

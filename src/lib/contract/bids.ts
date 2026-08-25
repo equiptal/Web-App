@@ -96,6 +96,28 @@ export type UnitLocationSource = "unit_yard" | "bid_pin" | "bid_yard" | "listing
 export interface OfferedUnitDoc { type: string; key: string; url: string | null; verifyStatus: string | null; expiryDate: string | null; }
 /** A photo on an offered unit — `slot` ∈ {front, serial, hours, …}. `url` is presigned. */
 export interface OfferedUnitPhoto { slot: string; key: string; url: string | null; }
+
+/**
+ * The supplier's own photograph of what he is offering — his FRONT shot, first for preference.
+ *
+ * Taxonomy artwork answers "what kind of machine is this"; a renter looking at a bid is asking "what
+ * am I being sent", and a stock drawing of an excavator cannot answer that. Every offered unit
+ * carries the supplier's uploads, so the picture exists — it was simply never read on the surfaces
+ * that show one machine.
+ *
+ * The front slot is the one a machine is recognised by, which is why the equipment detail's own
+ * `heroPhotoUrl` prefers it too. Any other photograph beats none, so a unit with only a serial
+ * plate still shows something real. Null when the supplier uploaded nothing, and the caller then
+ * falls back — the equipment record's primary photo, then the taxonomy drawing, then an icon. Never
+ * a broken image.
+ *
+ * Slots are matched loosely (`/front/i`) because the backend has spelled it `front`,
+ * `FRONT_VIEW` and `front_photo` at different times, and `bid-readiness` already reads it that way.
+ */
+export function offeredFrontPhotoUrl(units: { photoKeys: OfferedUnitPhoto[] }[] | null | undefined): string | null {
+  const all = (units ?? []).flatMap((u) => u.photoKeys ?? []).filter((p) => p.url);
+  return all.find((p) => /front/i.test(p.slot))?.url ?? all[0]?.url ?? null;
+}
 /** One equipment unit a supplier offered on a NATIVE app bid (bid-readiness — `offeredUnitsDetail`).
  *  Ownership docs are stripped server-side for the renter. Absent on off-platform shared-link bids. */
 export interface OfferedUnitDetail {
