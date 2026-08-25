@@ -181,11 +181,32 @@ export function RequestRail({
                       <Icon name="ios_share" size={11} />
                     </span>
                   )}
-                  {tile.units > 1 && (
-                    <span className="absolute -bottom-px -end-px min-w-[19px] rounded-full border-2 border-surface bg-navy px-1 text-[10px] font-extrabold leading-[15px] text-white">
+                  {/* ── Several MACHINES, or several of ONE (owner, 2026-08-26) ──────────────────
+                      «×3» answered only the second, and answered it for both: a request for an
+                      excavator, a loader and a crane summed to «×3» and read as three of something.
+                      They are different facts and the tile now draws them differently — a stack for
+                      a request carrying more than one line item, «×N» for one machine asked for
+                      more than once.
+
+                      The stack wins where a request is both, because its unit total is a sum across
+                      unlike machines and «×5» would then describe a request nobody made. The tooltip
+                      carries the words, since neither badge is large enough to say them. */}
+                  {tile.items > 1 ? (
+                    <span
+                      className="absolute -bottom-px -end-px flex items-center gap-[2px] rounded-full border-2 border-surface bg-brand px-1 py-[1px] text-[10px] font-extrabold leading-[13px] text-brand-fg"
+                      title={t.workspace.itemsBadge.replace("{n}", String(tile.items))}
+                    >
+                      <Icon name="layers" size={9} />
+                      {tile.items}
+                    </span>
+                  ) : tile.units > 1 ? (
+                    <span
+                      className="absolute -bottom-px -end-px min-w-[19px] rounded-full border-2 border-surface bg-navy px-1 text-[10px] font-extrabold leading-[15px] text-white"
+                      title={t.workspace.unitsTitle.replace("{n}", String(tile.units))}
+                    >
                       {t.workspace.unitsBadge.replace("{n}", String(tile.units))}
                     </span>
-                  )}
+                  ) : null}
                 </span>
               </span>
               <span className="flex h-[22px] flex-col items-center">

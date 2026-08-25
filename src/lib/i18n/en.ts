@@ -1254,6 +1254,10 @@ export const en = {
     closed: "Closed",
     // The units a request asked for, on the rail tile. Rendered only when it is more than one.
     unitsBadge: "×{n}",
+    // The rail's two counts, as words, on the tile's tooltip — the badges themselves are too small to
+    // carry the distinction and a renter should not have to infer it from a glyph.
+    itemsBadge: "{n} different machines",
+    unitsTitle: "×{n} of one machine",
     railScrollNext: "More requests",
     railScrollPrev: "Earlier requests",
     // The dark strip, left half — the request itself.

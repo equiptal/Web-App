@@ -30,6 +30,14 @@ export interface RailTile {
   key: string;
   /** `RFQ-NNNNN` for a multi-item submission, `REQ-NNNNN` for a lone request. */
   label: string;
+  /**
+   * Distinct LINE ITEMS in the group — different machines asked for, not copies of one.
+   *
+   * Kept apart from `units` because they answer different questions and the rail badges them
+   * differently. Three excavators is one item at three units; an excavator, a loader and a crane is
+   * three items — and summing THAT into «×3» would describe a request nobody made.
+   */
+  items: number;
   /** Total units asked for across the group. Rendered only when it is more than one. */
   units: number;
   /** Bids that have arrived on the group — the badge on the tile. Zero draws no badge. */
@@ -70,6 +78,7 @@ export function railTiles(groups: RequestGroup[]): RailTile[] {
     key: g.id,
     // The RFQ code is the group's own name; a lone request has none and answers to its REQ id.
     label: g.groupRef ?? g.items[0]?.displayId ?? g.id,
+    items: g.items.length,
     units: g.totalUnits,
     bids: g.totalBids,
     imageUrl: g.items.find((i) => i.item?.imageUrl)?.item?.imageUrl ?? null,

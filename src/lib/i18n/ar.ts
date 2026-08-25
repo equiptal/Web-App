@@ -1102,6 +1102,8 @@ export const ar: Dictionary = {
     newRequest: "جديد",
     closed: "مغلق",
     unitsBadge: "×{n}",
+    itemsBadge: "{n} معدات مختلفة",
+    unitsTitle: "×{n} من معدة واحدة",
     railScrollNext: "طلبات أخرى",
     railScrollPrev: "طلبات سابقة",
     bidsCount: "{n} عروض",

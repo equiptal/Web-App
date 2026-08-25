@@ -105,6 +105,24 @@ describe("railTiles", () => {
     expect(tiles[0].units).toBe(5);
     expect(tiles[0].imageUrl).toBe("pic.png");
   });
+
+  /**
+   * Several MACHINES is not several of ONE (owner, 2026-08-26).
+   *
+   * The rail badged both as «xN», so an excavator + a loader + a crane read as three of something.
+   * The two counts are now separate fields and the tile draws a stack for one and «xN» for the other.
+   */
+  it("counts line items apart from units", () => {
+    const multiItem = railTiles([group("g1", [item("a", "OPEN", 2), item("b", "OPEN", 3)])])[0];
+    expect(multiItem.items).toBe(2);
+    expect(multiItem.units).toBe(5);
+  });
+
+  it("reports one item for a lone request however many units it asks for", () => {
+    const multiUnit = railTiles([group("g1", [item("a", "OPEN", 4)])])[0];
+    expect(multiUnit.items).toBe(1);
+    expect(multiUnit.units).toBe(4);
+  });
 });
 
 describe("resolveSelection", () => {
