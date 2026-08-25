@@ -38,18 +38,28 @@ export function RequestRail({
   // Roughly three tiles a press — far enough to feel like progress, short enough to keep your place.
   const scrollBy = (dir: 1 | -1) => scroller.current?.scrollBy({ left: dir * 300, behavior: "smooth" });
 
-  // ── 80px, down from 96 (owner, 2026-08-25: fit /requests without scrolling) ────────────────────
-  // The circles carry a photo and a state ring, and neither needs 62px to read — 48 keeps the machine
-  // recognisable and the badges legible. The height is not 48 + label: a CLOSED tile carries a second
-  // caption under its name, so the row is sized for the tallest tile it can hold (48 + 6 + 14 + 10),
-  // not the common one.
+  // ── 88px, and every pixel of it is spoken for (owner, 2026-08-25) ──────────────────────────────
+  // It was 96, then 80, and 80 CLIPPED: this row is `overflow-hidden`, and a tile draws taller than
+  // its circle, so the tops of the circles disappeared behind the header's rule. Counted honestly,
+  // the tallest tile needs
+  //
+  //     4  badge overhang above the ring (`-top-1` on the share control)
+  //   +48  the circle
+  //   + 6  the gap under it
+  //   +16  the name, now at the same 12.5px as the rest of the page
+  //   + 2  the gap under that
+  //   +11  «CLOSED», on the tiles that carry it
+  //   = 87
+  //
+  // 88, so nothing touches that rule. Sizing this by eye is what broke it; the arithmetic is written
+  // out so the next change to a tile has something to add to.
   return (
-    <div className={`flex h-[80px] flex-none items-center gap-4 overflow-hidden border-b border-border bg-surface3/60 ${PAGE_X_BLEED}`}>
+    <div className={`flex h-[88px] flex-none items-center gap-4 overflow-hidden border-b border-border bg-surface3/60 ${PAGE_X_BLEED}`}>
       <Link href="/create" className="group flex flex-none flex-col items-center gap-1.5">
         <span className="grid h-12 w-12 place-items-center rounded-full border-2 border-dashed border-border text-muted transition group-hover:border-brand group-hover:text-brand">
           <Icon name="add" size={20} />
         </span>
-        <span className="text-[10.5px] font-semibold text-muted">{t.workspace.newRequest}</span>
+        <span className="text-[12.5px] font-semibold text-muted">{t.workspace.newRequest}</span>
       </Link>
 
       <div className="h-10 w-px flex-none bg-border/70" />
@@ -71,14 +81,25 @@ export function RequestRail({
               onClick={() => onPick(tile.key)}
               aria-current={active ? "true" : undefined}
               title={tile.label}
-              className={`flex max-w-[86px] flex-none flex-col items-center gap-1.5 text-center transition ${dim} hover:opacity-100`}
+              className={`flex max-w-[104px] flex-none flex-col items-center gap-1.5 text-center transition ${dim} hover:opacity-100`}
             >
               <span className={`grid h-12 w-12 place-items-center rounded-full p-[2px] ${ring}`}>
                 <span className="relative h-full w-full rounded-full border-2 border-surface">
                   <span className={`grid h-full w-full place-items-center overflow-hidden rounded-full bg-surface3 ${tile.closed ? "grayscale" : ""}`}>
                     {img ? (
+                      /* ── `contain`, not `cover` (owner, 2026-08-25: "the circles must fit any icon
+                         + why some have floating icons") ──────────────────────────────────────────
+                         The taxonomy artwork is not one kind of picture. Some files are photographs
+                         that reach their own edges; others are drawings with transparent margins
+                         built in. `cover` filled the circle with the first kind by cropping it and
+                         left the second kind floating in the middle — one rule producing two
+                         different results, which is exactly what the rail looked like.
+
+                         `contain` shows every machine whole and inset the same way, so the circles
+                         read as one set. A photograph gives up a little size for that; a drawing
+                         stops rattling around inside its ring. */
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={img} alt="" className="h-full w-full object-cover" />
+                      <img src={img} alt="" className="h-full w-full object-contain p-[3px]" />
                     ) : (
                       <Icon name="precision_manufacturing" size={20} className="text-muted" />
                     )}
@@ -117,11 +138,11 @@ export function RequestRail({
                 </span>
               </span>
               <span className="flex flex-col items-center gap-0.5">
-                <span className={`max-w-[86px] truncate text-[10.5px] ${active ? "font-bold text-navy" : "font-semibold text-navy-mid"}`}>
+                <span className={`max-w-[104px] truncate text-[12.5px] leading-[16px] ${active ? "font-bold text-navy" : "font-semibold text-navy-mid"}`}>
                   {tile.label}
                 </span>
                 {tile.closed && (
-                  <span className="text-[7.5px] font-bold uppercase tracking-[.07em] text-muted">{t.workspace.closed}</span>
+                  <span className="text-[9px] font-bold uppercase leading-[11px] tracking-[.07em] text-muted">{t.workspace.closed}</span>
                 )}
               </span>
             </button>
