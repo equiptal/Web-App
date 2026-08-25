@@ -613,6 +613,11 @@ describe("the chat dock's tab strip touches no map state (RM3-AC-49)", () => {
       "draftBusy",
       "fleet",
       "groupKey",
+      // `initialOpen` joined on 2026-08-26, when the chat icon on a bid card stopped opening the deal
+      // room and started opening THIS dock (`?chat=1`). It travels down as an INITIAL state and
+      // carries nothing back: the renter closing the dock must stay closed, and a tab press still
+      // moves nothing on the surface.
+      "initialOpen",
       "onCancelDraft",
       "onConfirmDraft",
       // `onOpenCompanyDocs` joined on 2026-08-19 with the dock's ⋮ kebab. It is a REPORT, not a

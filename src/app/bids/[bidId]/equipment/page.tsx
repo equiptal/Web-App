@@ -98,6 +98,10 @@ function BidEquipment({ bidId }: { bidId: string }) {
   /** `?company=1` — see the note at the workspace below. Read once, as an INITIAL state rather than a
    *  live one: the renter closing the panel must not have it reopened by a URL that has not changed. */
   const openCompanyDocs = useSearchParams().get("company") === "1";
+  /** `?chat=1` — the renter pressed the chat icon somewhere else (a bid card, the inbox) and arrives
+   *  wanting the conversation, not the map. Read ONCE, as an initial state: closing the dock must not
+   *  be undone by a URL that has not changed. */
+  const openChat = useSearchParams().get("chat") === "1";
   const [bid, setBid] = useState<BidCard | null>(null);
   const [request, setRequest] = useState<RequestRecord | null>(null);
   const [failed, setFailed] = useState(false);
@@ -168,6 +172,9 @@ function BidEquipment({ bidId }: { bidId: string }) {
       // documents modal is withdrawn, so the one surface for a company's papers is V9's panel here.
       // Any other value is simply not the flag; a hand-edited URL opens the map as it always does.
       openCompanyDocs={openCompanyDocs}
+      // `?chat=1` — the chat icon on a bid card lands here now: the conversation lives in this dock,
+      // and the deal room is no longer somewhere a renter is sent to talk (owner, 2026-08-26).
+      openChat={openChat}
       // The surface owns its own writes now (V11/V12): the four requests, the chat dock's first
       // message and the footer's hand-off each create the deal room themselves, and none of them
       // needs a handler from here. V9's company panel still lands with the ticket that owns it, so

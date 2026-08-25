@@ -9,7 +9,6 @@ import { Icon } from "@/components/ui";
 import { bidCounterDelta } from "@/lib/contract/bid-counter-delta";
 import { distinctMachinesOffered, unitCountNotes } from "@/lib/contract/unit-count-notes";
 import { computeQuoteTotals, computeRentalTotal, divisorNote, formatSar, headlineAmount, legDisplay } from "@/lib/pricing/rental";
-import { startDealRoom } from "@/lib/api/client";
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
 import type { LinkBidSubmission } from "@/lib/contract/link-bids";
@@ -103,7 +102,6 @@ function BidCardTile({
   const [open, setOpen] = useState(true);
   const [termsOpen, setTermsOpen] = useState(false);
   const [subOpen, setSubOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
   /** Local, like «Provide it for me?»'s own acknowledgement: WhatsApp opening is all we can observe,
    *  so the button reports that the renter was handed the message, never that it was sent. */
   const [invited, setInvited] = useState(false);
@@ -196,20 +194,19 @@ function BidCardTile({
     ? new Date(card.submittedAt).toLocaleString(ar ? "ar" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
     : null;
 
-  /** The chat: an existing room is opened, a first message creates one. */
-  const openRoom = async () => {
-    if (busy) return;
-    if (card.dealRoomId) {
-      router.push(`/deal-room/${encodeURIComponent(card.dealRoomId)}`);
-      return;
-    }
-    setBusy(true);
-    try {
-      const room = await startDealRoom(card.id);
-      router.push(`/deal-room/${encodeURIComponent(room.id)}`);
-    } catch {
-      setBusy(false);
-    }
+  /**
+   * ── The chat is the MAP's dock now, not the deal room (owner, 2026-08-26) ─────────────────────
+   *
+   * Chat is chat; negotiating is the three-step sheet. So the icon opens the conversation where the
+   * conversation lives — the dock on the equipment map, with a tab per item of this supplier's bid —
+   * instead of the deal-room page, which wrapped the same messages in a negotiation header.
+   *
+   * It also stops MINTING a room to read one. `startDealRoom` ran on every press, and a `DealRoom`
+   * row freezes the supplier's offered count; the dock's own rule is that opening a tab creates
+   * nothing and the first SEND creates the room (RM3-AC-47). Pressing chat is no longer an act.
+   */
+  const openRoom = () => {
+    router.push(`/bids/${encodeURIComponent(card.id)}/equipment?chat=1`);
   };
 
   return (
@@ -260,7 +257,6 @@ function BidCardTile({
               e.stopPropagation();
               void openRoom();
             }}
-            disabled={busy}
             aria-label={t.workspace.openChat}
             title={t.workspace.openChat}
             className={`relative grid h-[34px] w-[34px] flex-none place-items-center rounded-full border transition disabled:opacity-50 ${
@@ -497,7 +493,7 @@ function BidCardTile({
           // "pending review" state to show and no room to take them to.
           allTerms={offline}
           hidePending={offline}
-          busy={busy}
+          busy={false}
           negotiateLabel={offline ? t.workspace.viewQuote : t.priceFooter.counterPrice}
           onNegotiate={() => {
             setTermsOpen(false);

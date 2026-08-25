@@ -127,6 +127,8 @@ type ChatMsg = {
 export interface ChatDockProps {
   /** The bid this surface is scoped to — the dock's anchor tab, and the counterparty it groups by. */
   bid: BidCard;
+  /** Open the dock on arrival — the renter came here FOR the conversation (`?chat=1`), not the map. */
+  initialOpen?: boolean;
   /** The bid's RFQ group, when the route resolved one. Only used when the received-bids feed does not
    *  contain the anchor bid (paging), so the tab strip degrades to "no siblings" rather than to a
    *  wrong group. */
@@ -212,6 +214,7 @@ export interface ChatDockProps {
 
 export function ChatDock({
   bid,
+  initialOpen = false,
   groupKey = null,
   dealRoomId = null,
   typeWord = null,
@@ -231,7 +234,9 @@ export function ChatDock({
   const ar = locale === "ar";
   const L = useCallback((en: string, arr: string) => (ar ? arr : en), [ar]);
 
-  const [open, setOpen] = useState(false);
+  /** Open on arrival when the renter came here FOR the conversation (`?chat=1`); closed otherwise, as
+   *  a floating control should be. Initial state only — closing it must stick. */
+  const [open, setOpen] = useState(!!initialOpen);
   /**
    * WHERE the conversation sits (`rDrawer`'s `chatPlace`, prototype 1573). `fill` is the prototype's
    * default and its stated intent — the conversation *replaces* the map rather than floating over it,

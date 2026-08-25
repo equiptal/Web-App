@@ -131,6 +131,8 @@ export interface BidMapWorkspaceProps {
    * INITIAL state: a renter who closes it must not have it reopened by a URL that has not changed.
    */
   openCompanyDocs?: boolean;
+  /** Arriving from a chat icon: the dock opens with the surface (owner, 2026-08-26). */
+  openChat?: boolean;
 }
 
 export function BidMapWorkspace({
@@ -141,6 +143,7 @@ export function BidMapWorkspace({
   onRequestSent,
   onOpenCompanyDocs,
   openCompanyDocs = false,
+  openChat = false,
 }: BidMapWorkspaceProps) {
   const t = useT();
   const { locale } = useLocale();
@@ -1187,6 +1190,7 @@ export function BidMapWorkspace({
       {bid && !offPlatform && (
         <ChatDock
           bid={bid}
+          initialOpen={openChat}
           groupKey={requestGroupKey}
           // The room as the SENDER knows it — the bid's own, or the one the first ask created. The
           // dock otherwise waits for `GET /received-bids` to mention a room that already exists, and
