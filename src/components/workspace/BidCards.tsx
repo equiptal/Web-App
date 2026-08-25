@@ -62,7 +62,7 @@ export function BidCards({
     // `items-stretch`, not `items-start`: the pane now has a definite height, so every card takes
     // all of it and they end on one line instead of stepping down with their content. The footer was
     // already `mt-auto`, waiting for exactly this — the way on sits at the bottom of every card.
-    <div className="flex h-full snap-x items-stretch gap-3 overflow-x-auto p-2.5">
+    <div className="flex h-full snap-x items-stretch gap-[18px] overflow-x-auto p-3">
       {bids.map((b) => (
         <BidCardTile
           key={b.card.id}
@@ -227,7 +227,7 @@ function BidCardTile({
   return (
     <article
       onClick={onSelect}
-      className={`flex max-h-full w-[380px] max-w-full flex-none snap-start cursor-pointer flex-col overflow-hidden rounded-[12px] border bg-surface transition ${
+      className={`flex max-h-full w-[344px] max-w-full flex-none snap-start cursor-pointer flex-col overflow-hidden rounded-[12px] border bg-surface transition ${
         selected
           ? "border-brand shadow-[0_0_0_1px_var(--brand),0_6px_18px_rgba(247,144,9,.2)]"
           : "border-border shadow-[0_2px_8px_rgba(19,44,74,.06)] hover:border-navy-mid/40"
@@ -235,7 +235,7 @@ function BidCardTile({
     >
       {/* Where it came from, and when. */}
       <header
-        className={`flex items-center justify-between gap-2 border-b px-3 py-1 text-[11px] font-semibold ${
+        className={`flex flex-none items-center justify-between gap-2 border-b px-3.5 py-1.5 text-[11px] font-semibold ${
           offline ? "border-border bg-surface2 text-navy-mid" : "border-info/20 bg-info-soft text-info"
         }`}
       >
@@ -246,8 +246,8 @@ function BidCardTile({
         {submitted && <span className="font-semibold text-muted">{submitted}</span>}
       </header>
 
-      <div className="flex items-center gap-2.5 px-3 py-2">
-        <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-navy text-[12px] font-bold text-white">
+      <div className="flex flex-none items-center gap-3 px-3.5 py-2.5">
+        <span className="grid h-10 w-10 flex-none place-items-center rounded-full bg-navy text-[14px] font-bold text-white">
           {card.supplierName.trim().charAt(0).toUpperCase() || "?"}
         </span>
         <div className="min-w-0 flex-1">
@@ -292,7 +292,7 @@ function BidCardTile({
           e.stopPropagation();
           setTermsOpen(true);
         }}
-        className="flex items-center gap-2.5 border-t border-border px-3 py-1.5 text-start transition hover:bg-surface2/40"
+        className="flex flex-none items-center gap-3 border-t border-border px-3.5 py-2 text-start transition hover:bg-surface2/40"
       >
         <TermsDialGlyph met={dial.met} against={dial.against} unanswered={dial.unanswered} />
         <span className="flex-1 text-[13px] font-bold text-navy">{L("Terms", "الشروط")}</span>
@@ -300,7 +300,7 @@ function BidCardTile({
       </button>
 
       {/* The money. */}
-      <div className="flex flex-col gap-2 border-t border-border p-2.5">
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto border-t border-border px-3.5 py-2.5">
         {/* The headline: the rental type, and the rate or the total depending on the unit. An
             accepted bid is the only status that touches this block — green, and a tick. */}
         <button
@@ -329,7 +329,7 @@ function BidCardTile({
         </button>
 
         {open && (
-          <div className="flex flex-col gap-2 rounded-[10px] border border-info/15 bg-info-soft/40 px-2.5 py-2">
+          <div className="flex flex-none flex-col gap-2 rounded-[8px] border border-info/15 bg-info-soft/40 px-3 py-2.5">
             {/* The rental, prorated across the billable days — what the headline's rate adds up to
                 over this request. Dropped when the headline already is the total. */}
             {showRentalRow && <Row label={rentalRowLabel} value={totals.perUnit.rental} />}
@@ -342,7 +342,7 @@ function BidCardTile({
           </div>
         )}
 
-        <div className="flex flex-col gap-1.5 rounded-[10px] border border-border px-2.5 py-2">
+        <div className="flex flex-none flex-col gap-2 rounded-[8px] border border-border px-3 py-2.5">
           {/* ── Both grand totals, as the prototype reads them (owner, 2026-08-25) ─────────────────
               One cycle, then the whole request. They come from `computeCycleTotals` — the comparison's
               own engine — so a figure on a card and the same figure in the table cannot differ. Both
@@ -424,7 +424,7 @@ function BidCardTile({
       </div>
 
       {/* The way on. */}
-      <div className="mt-auto flex gap-2 px-2.5 pb-2.5">
+      <div className="mt-auto flex flex-none gap-2 px-3.5 pb-3.5 pt-0.5">
         {offline ? (
           <>
             {/* ── Invite him onto the app (owner, 2026-08-25) ────────────────────────────────────
