@@ -9,6 +9,7 @@ import { Icon } from "@/components/ui";
 import { bidCounterDelta } from "@/lib/contract/bid-counter-delta";
 import { distinctMachinesOffered, unitCountNotes } from "@/lib/contract/unit-count-notes";
 import { computeQuoteTotals, computeRentalTotal, divisorNote, formatSar, headlineAmount, legDisplay } from "@/lib/pricing/rental";
+import { computeCycleTotals } from "@/lib/contract/cycle-totals";
 import { startDealRoom } from "@/lib/api/client";
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
 import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
@@ -58,7 +59,7 @@ export function BidCards({
   }
 
   return (
-    <div className="flex snap-x gap-3 overflow-x-auto p-3 sm:p-4">
+    <div className="flex snap-x items-start gap-[18px] overflow-x-auto p-3.5 sm:p-4">
       {bids.map((b) => (
         <BidCardTile
           key={b.card.id}
@@ -177,6 +178,28 @@ function BidCardTile({
       ? t.workspace.rentalRowDays.replace("{n}", String(rental.billable))
       : t.workspace.rentalRowCustom;
   const basis = divisorNote(card.priceUnit, L);
+  /**
+   * The two grand totals in the box at the foot of the money — one cycle, then the whole request.
+   *
+   * The SAME engine the comparison's own columns use, at `units: 1`, because every row on this card
+   * is per unit and the all-units figure has its own line. A second calculation here is how a card
+   * and a table come to print two different totals for one bid.
+   */
+  const cycle = computeCycleTotals({
+    rate: card.price,
+    priceUnit: card.priceUnit,
+    mob: { amount: card.mobPrice, excluded: card.mobExcluded },
+    demob: { amount: card.demobPrice, excluded: card.demobExcluded },
+    durationDays,
+    startDate,
+    units: 1,
+  });
+  /** What one cycle is called on this bid — the period the supplier quoted in. */
+  const cycleWord =
+    card.priceUnit === "PER_MONTH" ? L("monthly", "شهريًا")
+    : card.priceUnit === "PER_WEEK" ? L("weekly", "أسبوعيًا")
+    : card.priceUnit === "PER_JOB" ? L("the job", "المهمة")
+    : L("daily", "يوميًا");
   const accepted = card.status === "ACCEPTED" || card.wonViaSurvey === true;
   const submitted = card.submittedAt
     ? new Date(card.submittedAt).toLocaleString(ar ? "ar" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
@@ -201,25 +224,31 @@ function BidCardTile({
   return (
     <article
       onClick={onSelect}
-      className={`flex w-[330px] flex-none snap-start cursor-pointer flex-col overflow-hidden rounded-[14px] border bg-surface transition ${
-        selected ? "border-brand shadow-[0_0_0_1px_var(--brand)]" : "border-border hover:border-navy-mid/40"
+      className={`flex w-[380px] max-w-full flex-none snap-start cursor-pointer flex-col overflow-hidden rounded-[12px] border bg-surface transition ${
+        selected
+          ? "border-brand shadow-[0_0_0_1px_var(--brand),0_6px_18px_rgba(247,144,9,.2)]"
+          : "border-border shadow-[0_2px_8px_rgba(19,44,74,.06)] hover:border-navy-mid/40"
       }`}
     >
       {/* Where it came from, and when. */}
-      <header className="flex items-center justify-between gap-2 border-b border-border bg-surface2 px-3 py-2 text-[11.5px] font-bold">
-        <span className="inline-flex items-center gap-1.5 text-navy-mid">
-          <Icon name={offline ? "drive_file_move" : "verified_user"} size={14} className={offline ? "text-muted" : "text-ok"} />
+      <header
+        className={`flex items-center justify-between gap-2 border-b px-3.5 py-2 text-[11.5px] font-semibold ${
+          offline ? "border-border bg-surface2 text-navy-mid" : "border-info/20 bg-info-soft text-info"
+        }`}
+      >
+        <span className="inline-flex items-center gap-2">
+          <Icon name={offline ? "drive_file_move" : "verified_user"} size={14} />
           {offline ? t.workspace.sourceOfflineLong : t.workspace.sourceAppLong}
         </span>
         {submitted && <span className="font-semibold text-muted">{submitted}</span>}
       </header>
 
-      <div className="flex items-center gap-2.5 px-3 py-3">
-        <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-navy text-[13px] font-extrabold text-white">
+      <div className="flex items-center gap-3 px-3.5 pb-3 pt-4">
+        <span className="grid h-[42px] w-[42px] flex-none place-items-center rounded-full bg-navy text-[14px] font-bold text-white">
           {card.supplierName.trim().charAt(0).toUpperCase() || "?"}
         </span>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[14px] font-extrabold text-navy">{card.supplierName}</div>
+          <div className="truncate text-[15px] font-extrabold leading-[1.15] text-navy">{card.supplierName}</div>
           {/* «Supplier · Riyadh», as the app's own card reads (owner, 2026-08-25). The city was on the
               wire the whole time — the bid-list `supplierProfile` carries it, and `mapBid` was already
               reading it into the composed national address. The distance keeps its place after it. */}
@@ -232,6 +261,8 @@ function BidCardTile({
         {offline ? (
           <span className="flex-none rounded-full border border-border px-2 py-1 text-[10.5px] font-bold text-muted">{t.workspace.notOnApp}</span>
         ) : (
+          /* The conversation, as one round control: filled while there is something unread on it,
+             quiet while there is not. */
           <button
             type="button"
             onClick={(e) => {
@@ -241,84 +272,113 @@ function BidCardTile({
             disabled={busy}
             aria-label={t.workspace.openChat}
             title={t.workspace.openChat}
-            className="relative grid h-9 w-9 flex-none place-items-center rounded-full bg-surface2 text-navy-mid transition hover:bg-surface3 disabled:opacity-50"
+            className={`relative grid h-[34px] w-[34px] flex-none place-items-center rounded-full border transition disabled:opacity-50 ${
+              unread > 0 ? "border-navy bg-navy text-white hover:brightness-110" : "border-border bg-surface2 text-muted hover:bg-surface3"
+            }`}
           >
-            <Icon name="chat_bubble_outline" size={17} />
-            {unread > 0 && <span className="absolute -end-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-brand ring-2 ring-surface" />}
+            <Icon name="chat_bubble_outline" size={16} />
+            {unread > 0 && <span className="absolute -end-px -top-px h-[9px] w-[9px] rounded-full bg-brand ring-2 ring-surface" />}
           </button>
         )}
       </div>
 
       {/* Terms: the dial says how much of them this supplier answered — never how good the offer is. */}
-      <div className="flex items-center gap-2 border-y border-border px-3 py-2">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setTermsOpen(true);
+        }}
+        className="flex items-center gap-3.5 border-t border-border px-3.5 py-3 text-start transition hover:bg-surface2/40"
+      >
         <TermsDialGlyph met={dial.met} against={dial.against} unanswered={dial.unanswered} />
-        <span className="flex-1 text-[13px] font-extrabold text-navy">{L("Terms", "الشروط")}</span>
+        <span className="flex-1 text-[13px] font-bold text-navy">{L("Terms", "الشروط")}</span>
+        <span className="text-[11.5px] font-bold text-info">{L("View", "عرض")} ›</span>
+      </button>
+
+      {/* The money. */}
+      <div className="flex flex-col gap-3 border-t border-border p-3.5">
+        {/* The headline: the rental type, and the rate or the total depending on the unit. An
+            accepted bid is the only status that touches this block — green, and a tick. */}
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            setTermsOpen(true);
+            setOpen((o) => !o);
           }}
-          className="text-[12.5px] font-bold text-info"
+          aria-expanded={open}
+          className={`flex items-start gap-2.5 text-start ${
+            accepted ? "-mx-3.5 -mt-3.5 rounded-t-[11px] border-b-2 border-ok bg-ok-soft px-3.5 pb-2 pt-3.5" : ""
+          }`}
         >
-          {L("View", "عرض")} ›
-        </button>
-      </div>
-
-      {/* The money. */}
-      <div className="px-3 py-3">
-        {/* The headline: the rental type, and the rate or the total depending on the unit. An
-            accepted bid is the only status that touches this block — green, and a tick. */}
-        <div className={`flex items-start gap-2 ${accepted ? "-mx-3 -mt-3 mb-2.5 rounded-t-[13px] border-b-2 border-ok bg-ok-soft px-3 pb-2 pt-3" : ""}`}>
           <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-extrabold text-navy">{headlineLabel}</div>
-            {basis && <div className="text-[11px] font-semibold text-muted">{basis}</div>}
+            <div className="text-[14px] font-extrabold leading-none text-navy">{headlineLabel}</div>
+            {basis && <div className="mt-1.5 text-[11px] font-medium leading-none text-muted">{basis}</div>}
           </div>
-          <div className="flex flex-none items-center gap-1">
-            <b className="text-[17px] font-black text-navy">{formatSar(headline)}</b>
-            <span className="text-[10.5px] font-bold text-muted">{t.priceFooter.currency}</span>
-            {accepted && <Icon name="check_circle" size={16} className="text-ok" />}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setOpen((o) => !o);
-              }}
-              aria-expanded={open}
-              aria-label={open ? t.priceFooter.hideDetails : t.priceFooter.showDetails}
-              className="grid h-6 w-6 place-items-center rounded-full text-muted transition hover:bg-surface2"
-            >
-              <Icon name={open ? "expand_less" : "expand_more"} size={18} />
-            </button>
+          <div className="flex flex-none items-baseline gap-1.5">
+            <b className="text-[15px] font-extrabold leading-none text-navy">{formatSar(headline)}</b>
+            <span className="text-[10.5px] font-semibold leading-none text-muted">{t.priceFooter.currency}</span>
+            {accepted && <Icon name="check_circle" size={15} className="self-center text-ok" />}
+            <span aria-hidden="true" className={`text-[10px] leading-none ${open ? "text-info" : "rotate-180 text-muted"}`}>
+              ⌃
+            </span>
           </div>
-        </div>
+        </button>
 
         {open && (
-          <div className="mt-2.5 rounded-[10px] bg-surface2 px-3 py-2.5">
+          <div className="flex flex-col gap-3 rounded-[10px] border border-info/15 bg-info-soft/40 px-3.5 py-3">
             {/* The rental, prorated across the billable days — what the headline's rate adds up to
                 over this request. Dropped when the headline already is the total. */}
             {showRentalRow && <Row label={rentalRowLabel} value={totals.perUnit.rental} />}
             <LegRow label={t.workspace.deliveryToSite} amount={card.mobPrice} excluded={card.mobExcluded} />
             <LegRow label={t.workspace.returnFromSite} amount={card.demobPrice} excluded={card.demobExcluded} />
-            <div className="my-2 border-t border-border" />
-            <Row label={t.priceFooter.subtotal} value={totals.perUnit.subtotal} muted />
-            <Row label={t.priceFooter.vat} value={totals.perUnit.vat} muted />
+            <div className="flex flex-col gap-3 border-t border-border/70 pt-3">
+              <Row label={t.priceFooter.subtotal} value={totals.perUnit.subtotal} muted />
+              <Row label={t.priceFooter.vat} value={totals.perUnit.vat} muted />
+            </div>
           </div>
         )}
 
-        <div className="mt-2.5 rounded-[10px] border border-border px-3 py-2.5">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[12.5px] font-extrabold text-navy">{t.workspace.grandTotalInclVat}</span>
-            <span className="flex-none">
-              <b className="text-[16px] font-black text-navy">{formatSar(totals.perUnit.total)}</b>{" "}
-              <span className="text-[10.5px] font-bold text-muted">{t.priceFooter.currency}</span>
+        <div className="flex flex-col gap-2.5 rounded-[10px] border border-border px-3.5 py-3">
+          {/* ── Both grand totals, as the prototype reads them (owner, 2026-08-25) ─────────────────
+              One cycle, then the whole request. They come from `computeCycleTotals` — the comparison's
+              own engine — so a figure on a card and the same figure in the table cannot differ. Both
+              are PER UNIT, like every row above them; the all-units figure keeps its own row below. */}
+          <div className="flex items-baseline justify-between gap-2.5">
+            <span className="text-[12.5px] font-extrabold text-navy">
+              {t.workspace.grandTotal} · {cycleWord}
+            </span>
+            <span className="flex-none whitespace-nowrap">
+              <b className="text-[16px] font-extrabold text-navy">{formatSar(cycle.firstCycle.total)}</b>{" "}
+              <span className="text-[10.5px] font-semibold text-muted">{t.priceFooter.currency}</span>
             </span>
           </div>
+
+          {cycle.duration && durationDays ? (
+            <div className="flex flex-col gap-1 border-t border-border/70 pt-2.5">
+              <div className="flex items-baseline justify-between gap-2.5">
+                <span className="text-[12.5px] font-extrabold text-navy">
+                  {t.workspace.grandTotal} · {t.workspace.overDays.replace("{n}", String(durationDays))}
+                </span>
+                <span className="flex-none whitespace-nowrap">
+                  <b className="text-[16px] font-extrabold text-navy">{formatSar(cycle.duration.total)}</b>{" "}
+                  <span className="text-[10.5px] font-semibold text-muted">{t.priceFooter.currency}</span>
+                </span>
+              </div>
+              {!cycle.duration.raw && (
+                <span className="text-[10.5px] font-medium text-muted">
+                  {t.workspace.fridaysNote
+                    .replace("{days}", String(cycle.duration.days))
+                    .replace("{billable}", String(cycle.duration.billableDays))}
+                </span>
+              )}
+            </div>
+          ) : null}
 
           {/* Multi-unit: a second row in the SAME box, carrying the real all-units figure. It is not
               the per-unit total × units — each transport leg carries its own count. */}
           {units > 1 && (
-            <div className="mt-2 flex items-center justify-between gap-2 border-t border-border pt-2">
+            <div className="flex items-baseline justify-between gap-2 border-t border-border/70 pt-2.5">
               <span className="text-[12px] font-extrabold text-brand">
                 {t.workspace.overallTotal} <span className="font-bold text-muted">· {units}</span>
               </span>
@@ -361,7 +421,7 @@ function BidCardTile({
       </div>
 
       {/* The way on. */}
-      <div className="mt-auto flex gap-2 px-3 pb-3">
+      <div className="mt-auto flex gap-2 px-3.5 pb-3.5">
         {offline ? (
           <>
             {/* ── Invite him onto the app (owner, 2026-08-25) ────────────────────────────────────
@@ -384,7 +444,7 @@ function BidCardTile({
                   window.open(`https://wa.me/${invitePhone}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
                   setInvited(true);
                 }}
-                className="flex-1 rounded-[12px] bg-navy px-3 py-2.5 text-[13px] font-extrabold text-white transition hover:brightness-110"
+                className="flex-1 rounded-[9px] bg-navy py-3 text-[12.5px] font-extrabold text-white shadow-[0_4px_12px_rgba(19,44,74,.24)] transition hover:-translate-y-px hover:brightness-110"
               >
                 {invited ? t.workspace.inviteSent : t.workspace.inviteToApp}
               </button>
@@ -394,7 +454,7 @@ function BidCardTile({
                 disabled
                 title={t.workspace.inviteNoContact}
                 onClick={(e) => e.stopPropagation()}
-                className="flex-1 rounded-[12px] bg-navy px-3 py-2.5 text-[13px] font-extrabold text-white disabled:opacity-40"
+                className="flex-1 rounded-[9px] bg-navy py-3 text-[12.5px] font-extrabold text-white disabled:opacity-40"
               >
                 {t.workspace.inviteToApp}
               </button>
@@ -405,7 +465,7 @@ function BidCardTile({
                 e.stopPropagation();
                 setSubOpen(true);
               }}
-              className="rounded-[12px] border border-border px-3 py-2.5 text-[13px] font-bold text-navy"
+              className="rounded-[9px] border border-border px-3.5 py-3 text-[12.5px] font-bold text-navy transition hover:bg-surface2"
             >
               {t.workspace.viewQuote}
             </button>
@@ -418,7 +478,7 @@ function BidCardTile({
               if (card.dealRoomId) router.push(`/deal-room/${encodeURIComponent(card.dealRoomId)}?act=counter`);
               else void openRoom();
             }}
-            className="flex-1 rounded-[12px] bg-navy px-3 py-2.5 text-[13px] font-extrabold text-white transition hover:brightness-110"
+            className="flex-1 rounded-[9px] bg-navy py-3 text-[12.5px] font-extrabold text-white shadow-[0_4px_12px_rgba(19,44,74,.24)] transition hover:-translate-y-px hover:brightness-110"
           >
             {/* ── The button carries the ROUND, once there has been one (owner, 2026-08-25) ────────
                 `bidCounterDelta` is the app's rule and was already written and tested; its only
@@ -475,10 +535,10 @@ function BidCardTile({
 function Row({ label, value, muted }: { label: string; value: number; muted?: boolean }) {
   const t = useT();
   return (
-    <div className={`flex items-center justify-between gap-2 py-0.5 text-[12.5px] ${muted ? "text-muted" : "text-navy"}`}>
-      <span className="font-semibold">{label}</span>
-      <span className="flex-none font-bold">
-        {formatSar(value)} <span className="text-[10px] font-bold text-muted">{t.priceFooter.currency}</span>
+    <div className="flex items-baseline justify-between gap-2">
+      <span className={`text-[12px] ${muted ? "font-medium text-muted" : "font-bold text-navy"}`}>{label}</span>
+      <span className={`flex-none whitespace-nowrap text-[12.5px] ${muted ? "font-medium text-muted" : "font-bold text-navy"}`}>
+        {formatSar(value)} <span className="text-[10px] font-semibold text-muted">{t.priceFooter.currency}</span>
       </span>
     </div>
   );
@@ -493,12 +553,12 @@ function LegRow({ label, amount, excluded }: { label: string; amount: number | n
   const t = useT();
   const leg = legDisplay({ amount, excluded });
   return (
-    <div className="flex items-center justify-between gap-2 py-0.5 text-[12.5px] text-navy">
-      <span className="font-semibold">{label}</span>
-      <span className={`flex-none font-bold ${leg.kind === "amount" ? "" : "text-muted"}`}>
+    <div className="flex items-baseline justify-between gap-2 text-navy">
+      <span className="text-[12px] font-bold">{label}</span>
+      <span className={`flex-none whitespace-nowrap text-[12.5px] font-bold ${leg.kind === "amount" ? "" : "text-muted"}`}>
         {leg.kind === "amount" ? (
           <>
-            {formatSar(leg.amount)} <span className="text-[10px] font-bold text-muted">{t.priceFooter.currency}</span>
+            {formatSar(leg.amount)} <span className="text-[10px] font-semibold text-muted">{t.priceFooter.currency}</span>
           </>
         ) : leg.kind === "excluded" ? (
           t.priceFooter.excluded
@@ -514,13 +574,13 @@ function LegRow({ label, amount, excluded }: { label: string; amount: number | n
  *  rather than a full circle of any colour, which would claim an answer that was never given. */
 function TermsDialGlyph({ met, against, unanswered }: { met: number; against: number; unanswered: number }) {
   const total = met + against + unanswered;
-  if (total === 0) return <span className="h-4 w-4 flex-none rounded-full border-2 border-border" />;
+  if (total === 0) return <span className="h-[46px] w-[46px] flex-none rounded-full border-2 border-border" />;
   const pct = (n: number) => (n / total) * 360;
   const a = pct(met);
   const b = a + pct(against);
   return (
     <span
-      className="h-4 w-4 flex-none rounded-full"
+      className="h-[46px] w-[46px] flex-none rounded-full shadow-[inset_0_0_0_1px_rgba(19,44,74,.08)]"
       style={{
         background: `conic-gradient(var(--ok) 0deg ${a}deg, var(--danger) ${a}deg ${b}deg, var(--border) ${b}deg 360deg)`,
       }}

@@ -5,7 +5,7 @@ import { fmt, useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import { SignInPrompt } from "@/components/common/SignInPrompt";
-import { fetchAllMyRequests, fetchBids, fetchReceivedBids, fetchRequestSubmissions } from "@/lib/api/client";
+import { fetchAllMyRequests, fetchBids, fetchReceivedBids, fetchRequestSubmissions, recommendBids } from "@/lib/api/client";
 import { groupRequests, type RequestGroup } from "@/lib/contract/requests";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import {
@@ -28,6 +28,7 @@ import { RequestDrawer, type ShareLinkMeta } from "@/components/workspace/Reques
 import { ExportTemplateDialog } from "@/components/compare/ExportTemplateDialog";
 import { buildExportPayload, type ExportPayload } from "@/lib/contract/export-templates";
 import { buildItemComparison } from "@/lib/contract/comparison";
+import { bidColumnToComputed } from "@/lib/contract/agent-bids";
 import { orderColumnsForExport, workspaceExportTotals } from "@/lib/contract/workspace-export";
 import { formatSar } from "@/lib/pricing/rental";
 
@@ -65,10 +66,22 @@ export function RequestsWorkspace() {
   const [source, setSource] = useState<SourceFilter>("all");
   const [reloads, setReloads] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // «Share» on the strip is the same drawer, entered at its share sheet.
+  const [drawerShare, setDrawerShare] = useState(false);
   // The public bid link's own settings, which the share sheet edits.
   const [link, setLink] = useState<ShareLinkMeta | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  /**
+   * The agent's read of the comparison, held HERE rather than inside the matrix (owner, 2026-08-25).
+   *
+   * Two surfaces show it — the ★ beside the supplier's name in the table, and the suggestion bar
+   * under the card — and the bar sits outside the matrix's own border, so one of them would have been
+   * reading the other's local state.
+   */
+  const [ranking, setRanking] = useState<{ bidId: string | null; note: string | null } | null>(null);
+  const [rankBusy, setRankBusy] = useState(false);
+  const [tipOpen, setTipOpen] = useState(false);
 
   // ── The renter's requests ──
   useEffect(() => {
@@ -168,6 +181,28 @@ export function RequestsWorkspace() {
   }, []);
   // A bench is about the comparison being read, and the next item is a different comparison.
   useEffect(() => { setBenched(new Set()); }, [itemId]);
+  // So is a ranking: it ranked THIS item's bids, and the next item's are other bids entirely.
+  useEffect(() => { setRanking(null); setTipOpen(false); }, [itemId]);
+
+  /** Ask the agent to rank what is on the comparison. The web owns every figure it sends. */
+  const rank = useCallback(async (list: WorkspaceBid[]) => {
+    if (rankBusy || list.length === 0) return;
+    setRankBusy(true);
+    try {
+      const { columns } = buildItemComparison(list.map((r) => r.card), { requestDurationDays: item?.durationDays ?? undefined });
+      const res = await recommendBids({ bids: columns.map(bidColumnToComputed) });
+      const rec = res.result?.recommendation ?? null;
+      // The agent's own pick, and its first reason in its own words — not a paraphrase.
+      setRanking({
+        bidId: rec?.pick_bid_id ?? res.result?.ranking?.[0]?.bid_id ?? null,
+        note: rec?.reasons?.[0]?.text ?? res.result?.interpretation ?? null,
+      });
+    } catch {
+      setRanking(null);
+    } finally {
+      setRankBusy(false);
+    }
+  }, [rankBusy, item]);
 
   /** What the source filter allows, minus what the renter benched. Both panes and the export read it. */
   const shown = useMemo(
@@ -305,31 +340,70 @@ export function RequestsWorkspace() {
         bid={bid}
         bidCount={bids.length}
         onPickItem={pickItem}
-        onOpenRequest={() => setDrawerOpen(true)}
+        onOpenRequest={() => { setDrawerShare(false); setDrawerOpen(true); }}
+        onShare={() => { setDrawerShare(true); setDrawerOpen(true); }}
       />
 
       <div className="mx-3 mt-4 sm:mx-5">
-        {/* Tabs, and the export beside them. */}
-        <div className="flex items-end justify-between gap-3">
-          <div className="flex gap-1">
-            {(["cards", "compare"] as Tab[]).map((k) => (
-              <button
-                key={k}
-                type="button"
-                onClick={() => setTab(k)}
-                aria-current={tab === k ? "page" : undefined}
-                className={`rounded-t-[10px] border border-b-0 px-5 py-2 text-[13px] font-extrabold transition ${
-                  tab === k ? "border-border bg-surface text-navy" : "border-transparent bg-surface2 text-muted hover:text-navy-mid"
-                }`}
-              >
-                {k === "cards" ? t.workspace.tabCards : t.workspace.tabCompare}
-              </button>
-            ))}
+        {/* Tabs, and the export beside them. The open tab is part of the panel below it — it carries
+            the panel's own border and covers the hairline between them, which is why the panel's
+            top-start corner is square. */}
+        <div className="flex items-end gap-3 ps-3.5">
+          <div className="flex items-end gap-0.5">
+            {(["cards", "compare"] as Tab[]).map((k) => {
+              const on = tab === k;
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setTab(k)}
+                  aria-current={on ? "page" : undefined}
+                  className={`relative -mb-px rounded-t-[10px] border border-border text-[12px] font-bold transition ${
+                    on
+                      ? "z-[2] border-b-surface bg-surface px-5 pb-3 pt-[11px] text-navy shadow-[0_-2px_6px_rgba(19,44,74,.05)]"
+                      : "z-[1] bg-surface3/70 px-[18px] pb-[11px] pt-[9px] text-muted hover:text-navy-mid"
+                  }`}
+                >
+                  {k === "cards" ? t.workspace.tabCards : t.workspace.tabCompare}
+                </button>
+              );
+            })}
           </div>
+          <span className="flex-1" />
           {/* The same export the comparison workspace had: the renter's own templates, with the
               built-in sheet as the fallback whenever a template cannot be used. Nothing is rebuilt —
               `buildExportPayload` and the dialog are the originals. */}
-          <div className="mb-1 flex items-center gap-2">
+          {/* ── The source filter, beside the tabs (owner, 2026-08-25) ────────────────────────────
+              It was a full-width row inside the panel, which pushed the comparison down and put a
+              second horizontal rule above a table that already has two header rows. It narrows both
+              panes, so it belongs to neither — and up here it sits with the other controls that act
+              on the whole pane. It appears only when there is a mix to narrow: with every bid from
+              one source, three buttons offer a choice that changes nothing. */}
+          {counts.app > 0 && counts.offline > 0 && (
+            <div className="mb-[7px] flex items-center gap-0.5 rounded-lg border border-border bg-surface p-0.5">
+              {(
+                [
+                  ["all", t.workspace.sourceAll],
+                  ["app", t.workspace.sourceApp],
+                  ["offline", t.workspace.sourceOffline],
+                ] as [SourceFilter, string][]
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSource(key)}
+                  aria-current={source === key ? "true" : undefined}
+                  className={`rounded-md px-2.5 py-1 text-[10.5px] font-bold transition ${
+                    source === key ? "bg-navy text-white" : "text-navy-mid hover:bg-surface2"
+                  }`}
+                >
+                  {label}
+                  <span className={source === key ? "text-white/60" : "text-muted"}> {counts[key]}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="mb-[7px] flex items-center gap-2">
             {/* ── «Select all» puts the whole comparison back (owner, 2026-08-25) ─────────────────
                 The export covers what the comparison covers, so putting a bid back on the table is
                 the same act as putting it back in the sheet — one concept, not two. It appears only
@@ -339,51 +413,23 @@ export function RequestsWorkspace() {
               <button
                 type="button"
                 onClick={() => setBenched(new Set())}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3.5 py-1.5 text-[12.5px] font-bold text-navy-mid transition hover:border-navy-mid"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-[7px] text-[10.5px] font-bold text-navy-mid transition hover:border-navy-mid"
               >
-                <Icon name="done_all" size={15} /> {fmt(t.workspace.selectAll, { n: String(benched.size) })}
+                <Icon name="done_all" size={14} /> {fmt(t.workspace.selectAll, { n: String(benched.size) })}
               </button>
             )}
             <button
               type="button"
               disabled={shown.length === 0}
               onClick={() => setExportOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3.5 py-1.5 text-[12.5px] font-bold text-navy-mid transition hover:border-navy-mid disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border bg-surface px-3 py-[7px] text-[10.5px] font-bold text-navy-mid transition hover:border-navy-mid hover:bg-surface2/60 disabled:opacity-40"
             >
-              {t.workspace.download} <Icon name="download" size={15} />
+              {tab === "compare" ? t.workspace.exportComparison : t.workspace.exportAllBids} <Icon name="download" size={14} />
             </button>
           </div>
         </div>
 
-        <div className="rounded-b-[14px] rounded-tr-[14px] border border-border bg-surface">
-          {/* The source filter sits inside the panel, above whichever pane is showing — it narrows
-              both of them, so it belongs to neither. */}
-          <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
-            <span className="inline-flex items-center gap-1 text-[10.5px] font-extrabold uppercase tracking-wide text-muted">
-              <Icon name="filter_list" size={14} /> {t.workspace.source}
-            </span>
-            {(
-              [
-                ["all", t.workspace.sourceAll],
-                ["app", t.workspace.sourceApp],
-                ["offline", t.workspace.sourceOffline],
-              ] as [SourceFilter, string][]
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setSource(key)}
-                aria-current={source === key ? "true" : undefined}
-                className={`rounded-full px-2.5 py-1 text-[12px] font-bold transition ${
-                  source === key ? "bg-navy text-white" : "text-navy-mid hover:bg-surface2"
-                }`}
-              >
-                {label}
-                <span className={source === key ? "text-white/60" : "text-muted"}> {counts[key]}</span>
-              </button>
-            ))}
-          </div>
-
+        <div className="overflow-hidden rounded-b-[14px] rounded-tr-[14px] border border-border bg-surface shadow-[0_2px_10px_rgba(19,44,74,.07)]">
           {tab === "cards" ? (
             <BidCards
               bids={shown}
@@ -405,9 +451,66 @@ export function RequestsWorkspace() {
               onSelect={pickBid}
               benched={benched}
               onBench={benchBid}
+              ranking={ranking}
+              rankBusy={rankBusy}
+              onRank={rank}
             />
           )}
         </div>
+
+        {/* ── The suggestion bar (owner, 2026-08-25) ────────────────────────────────────────────────
+            Under the card, not in it: it is the agent's reading OF the comparison, and a panel inside
+            the table's border would read as another one of its rows. Collapsed it is a single line —
+            the agent's own words, unpadded — and it opens into the full note. Nothing appears until
+            the renter has asked for a ranking, because an empty assistant is furniture. */}
+        {tab === "compare" && shown.length > 0 && (
+          <div className="mt-3.5">
+            {ranking?.note && !tipOpen ? (
+              <button
+                type="button"
+                onClick={() => setTipOpen(true)}
+                className="inline-flex max-w-full items-center gap-2.5 rounded-full border border-border bg-surface py-2 pe-4 ps-[9px] shadow-[0_2px_8px_rgba(19,44,74,.06)] transition hover:border-navy-mid/40"
+              >
+                <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-surface2 text-[11px] font-bold text-muted">✦</span>
+                <span className="flex-none text-[11.5px] font-bold text-navy-mid">{t.workspace.aiSuggestion}</span>
+                <span className="min-w-0 truncate text-[11.5px] font-medium text-muted">{ranking.note}</span>
+                <span className="flex-none text-[10px] font-semibold text-muted/70">⌄</span>
+              </button>
+            ) : ranking?.note && tipOpen ? (
+              <div className="flex items-start gap-3 rounded-[14px] border border-border bg-surface px-4 py-3.5 shadow-[0_2px_10px_rgba(19,44,74,.06)]">
+                <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-surface2 text-[11px] font-bold text-muted">✦</span>
+                <div className="flex min-w-0 flex-1 flex-col gap-2.5">
+                  <div className="flex items-baseline gap-2.5">
+                    <span className="text-[11px] font-bold text-muted">{t.workspace.aiWhatIdDo}</span>
+                    <span className="font-mono text-[7.5px] font-bold tracking-[.09em] text-muted/70">{t.workspace.aiBrand}</span>
+                  </div>
+                  <p className="text-[12px] font-medium leading-[1.5] text-navy-mid">{ranking.note}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setTipOpen(false)}
+                  aria-label={t.common.cancel}
+                  className="flex-none self-start rounded-md px-[7px] py-[5px] text-[11px] font-semibold text-muted/70 transition hover:bg-surface2 hover:text-navy-mid"
+                >
+                  ⌃
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void rank(shown)}
+                disabled={rankBusy}
+                className="inline-flex items-center gap-2.5 rounded-full border border-border bg-surface py-2 pe-4 ps-[9px] shadow-[0_2px_8px_rgba(19,44,74,.06)] transition hover:border-navy-mid/40 disabled:opacity-60"
+              >
+                <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-surface2 text-[11px] font-bold text-muted">✦</span>
+                <span className="text-[11.5px] font-bold text-navy-mid">{t.workspace.aiSuggestion}</span>
+                <span className="text-[11.5px] font-medium text-muted">
+                  {rankBusy ? t.workspace.aiRanking : t.workspace.aiRankPrompt}
+                </span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <ExportTemplateDialog
@@ -431,6 +534,7 @@ export function RequestsWorkspace() {
           item={item}
           bids={bids}
           link={link}
+          openShare={drawerShare}
           onClose={() => setDrawerOpen(false)}
           // An edit or a cancellation changes the rail and the bids under it, so both are re-read
           // rather than patched in place — the page has one source for its data and keeps it.

@@ -1292,6 +1292,9 @@ export const en = {
     tabCards: "Cards",
     tabCompare: "Compare",
     download: "Download",
+    // The export names what it will contain, which is whichever pane is open.
+    exportComparison: "Export comparison",
+    exportAllBids: "Export all bids",
     // Puts every benched bid back on the comparison — and therefore back in the export, which covers
     // what the comparison covers. Named with its count so the renter knows what he is bringing back.
     selectAll: "Select all ({n} off)",

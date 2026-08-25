@@ -45,6 +45,7 @@ export function RequestDrawer({
   link,
   onClose,
   onChanged,
+  openShare,
 }: {
   group: RequestGroup;
   /** The item in focus — the drawer lists every item and marks this one. */
@@ -54,13 +55,15 @@ export function RequestDrawer({
   onClose: () => void;
   /** The request changed underneath the page: reload the rail and the bids. */
   onChanged: () => void;
+  /** Open straight onto the share sheet — the strip’s «Share» enters the drawer there. */
+  openShare?: boolean;
 }) {
   const t = useT();
   const { locale } = useLocale();
   const ar = locale === "ar";
   const L = (en: string, arr: string) => (ar ? arr : en);
 
-  const [shareOpen, setShareOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(!!openShare);
   const [confirmEdit, setConfirmEdit] = useState(false);
   const [editing, setEditing] = useState<RequestRecord | null>(null);
   const [loadingEdit, setLoadingEdit] = useState(false);
