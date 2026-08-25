@@ -14,6 +14,7 @@ import { PUBLIC_WEB_ENABLED } from "@/lib/flags";
 import { fetchDealRoomUnread } from "@/lib/api/client";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { AppNav, AppNavMobile, type NavItem } from "@/components/AppNav";
+import { MailIcon, CountBadge } from "@/components/HeaderIcons";
 
 /**
  * App shell for the renter web app (web-app/004, AC-01/02/03/09/25). One bar across the top holding
@@ -186,18 +187,15 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
             </button>
           )}
 
-          {/* The LOGOMARK on its navy disc — the mark the navigation has carried since the dock, not
-              the wordmark (owner, 2026-08-25). It is Home.
+          {/* The FULL LOGO, 36px tall and bare — the header prototype's, and the same artwork
+              (owner, 2026-08-25: "keep the moedatech logo not this watermark"). It replaced the
+              logomark on its navy disc, which is what the dock carried when navigation was a pill.
 
               No active ring on it, though it points at `/`: Dashboard names that destination in the
               row beside it and already carries the state. Two marks for one place is one too many. */}
-          <Link
-            href="/"
-            aria-label={t.shell.home}
-            className="grid h-9 w-9 flex-none place-items-center rounded-full bg-navy transition hover:brightness-110"
-          >
+          <Link href="/" aria-label={t.shell.home} className="flex-none transition hover:opacity-80">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/moedatech-logomark.svg" alt="Moedatech" className="h-5 w-5 [filter:brightness(0)_invert(1)]" />
+            <img src="/moedatech-logo.svg" alt="Moedatech" className="block h-9 w-auto" />
           </Link>
 
           {/* ── The nav sits DEAD CENTRE of the bar, not after the title ────────────────────────────
@@ -224,7 +222,9 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
 
               `title` is still taken, and still used — see the document-title effect above. */}
 
-          <div className="ms-auto flex flex-none items-center gap-2 text-[13px] font-semibold text-navy-mid sm:gap-3">
+          {/* 22px between the groups of this cluster is the prototype's spacing; a phone cannot spend
+              it, so it opens up at `sm` where the language control also returns. */}
+          <div className="ms-auto flex flex-none items-center gap-3 text-[13px] font-semibold text-navy-mid sm:gap-[22px]">
             {/* ── The language toggle steps out of the bar on a phone (owner, 2026-08-25) ──────────
                 It is ~70px of a 360px row and it is pressed roughly never — a reader picks a language
                 once. Below `sm` it moves into the nav sheet, under the three places, which is room
@@ -243,30 +243,40 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
               </button>
             )}
 
-            {/* ── The INBOX is an icon here, not a word in the nav (owner, 2026-08-25) ─────────────
-                It carries a count, and a count is the one thing a text link cannot show. It sits with
-                the account controls because a conversation is personal, where Dashboard, Requests and
-                My Organization are places in the product. */}
+            {/* ── The INBOX and the BELL, as the prototype draws them (owner, 2026-08-25) ──────────
+                The inbox is an icon rather than a word in the nav because it carries a count, and a
+                count is the one thing a text link cannot show. It sits with the account controls
+                because a conversation is personal, where Dashboard, Requests and My Organization are
+                places in the product.
+
+                14px apart and grouped, then a hairline rule, then the account — the prototype's own
+                rhythm. The pair reads as one thing that way, which is what they are: the two places
+                the app talks to this reader.
+
+                No pill behind the active inbox any more. The prototype gives these icons no active
+                treatment at all, and a filled lozenge under a 1.7px hairline outline was the loudest
+                thing in the bar; the ink darkening to the prototype's own `#1f2d3a` says it instead. */}
             {status === "authed" && (
-              <Link
-                href="/inbox"
-                aria-label={t.shell.inbox}
-                title={t.shell.inbox}
-                aria-current={pathname.startsWith("/inbox") ? "page" : undefined}
-                className={`relative grid h-9 w-9 place-items-center rounded-full transition ${
-                  pathname.startsWith("/inbox") ? "bg-brand-soft text-brand" : "text-navy-mid hover:bg-surface2"
-                }`}
-              >
-                <Icon name="inbox" size={21} />
-                {unread > 0 && (
-                  <span className="absolute -end-0.5 -top-0.5 grid h-[17px] min-w-[17px] place-items-center rounded-full bg-brand px-1 text-[10px] font-extrabold text-white ring-2 ring-surface">
-                    {unread > 99 ? "99+" : unread}
-                  </span>
-                )}
-              </Link>
+              <div className="flex items-center gap-3.5 text-[#5b6672]">
+                <Link
+                  href="/inbox"
+                  aria-label={t.shell.inbox}
+                  title={t.shell.inbox}
+                  aria-current={pathname.startsWith("/inbox") ? "page" : undefined}
+                  className={`relative inline-flex items-center justify-center transition hover:text-[#1f2d3a] ${
+                    pathname.startsWith("/inbox") ? "text-[#1f2d3a]" : ""
+                  }`}
+                >
+                  <MailIcon />
+                  <CountBadge count={unread} />
+                </Link>
+                <NotificationsBell />
+              </div>
             )}
 
-            {status === "authed" && <NotificationsBell />}
+            {/* The prototype's separator: 1px by 24px, between what the app says to you and who you
+                are signed in as. */}
+            {status === "authed" && <span aria-hidden="true" className="h-6 w-px flex-none bg-[#eceef0]" />}
 
             {status === "authed" && (
               <div className="relative">
@@ -278,16 +288,19 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
                     where the tier nudge that explains them already lives. */}
                 <button
                   onClick={() => setMenuOpen((o) => !o)}
-                  className="relative grid h-9 w-9 place-items-center rounded-full bg-surface3 text-[13px] font-bold text-navy"
+                  className="relative grid h-[34px] w-[34px] place-items-center rounded-full border border-[#dfe3e7] bg-[#eef1f3] text-[13px] font-bold text-[#1f2d3a]"
                   aria-haspopup="menu"
                   aria-expanded={menuOpen}
                   aria-label={tier === "verified" ? `${t.shell.account} · ${t.shell.tierVerified}` : t.shell.account}
                   title={badge.label}
                 >
                   {initials || <Icon name="account_circle" size={22} />}
+                  {/* The prototype puts a plain green dot here. It stays a TICK: the owner asked for
+                      one by name, and a bare dot on an avatar is the presence convention — online,
+                      not vetted. The prototype's green (#3fbf6f) and its 2px white ring are taken. */}
                   {tier === "verified" && (
-                    <span className="absolute -end-0.5 -bottom-0.5 grid h-[15px] w-[15px] place-items-center rounded-full bg-ok text-white ring-2 ring-surface">
-                      <Icon name="check" size={11} />
+                    <span className="absolute -end-0.5 -bottom-0.5 grid h-[15px] w-[15px] place-items-center rounded-full border-2 border-white bg-[#3fbf6f] text-white">
+                      <Icon name="check" size={9} />
                     </span>
                   )}
                 </button>
@@ -405,9 +418,13 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
  * knob's rest position mirrors with it and stays under EN. The Arabic state then moves it toward the
  * LAST child, which is why the translate is signed per direction rather than shared.
  *
- * Colours are ours, not the prototype's: its neutrals are cool grey (#1f2d3a / #9aa2ab / #e5e8eb)
- * where the app's are blue-tinted, and a single control in the other family would read as a patch.
- * The geometry — 40×22 track, 18px knob, 2px inset, 13px labels — is the prototype's exactly.
+ * ── The colours are the prototype's too ────────────────────────────────────────────────────────
+ * This first shipped on the app's own tokens, on the reasoning that one control in a second palette
+ * would read as a patch. It did read as a patch — the wrong way round: `--surface3` is blue-tinted
+ * and next to the prototype's grey track it looked like a different control (owner, 2026-08-25).
+ * So the hexes are literal and exact: `#e5e8eb` track, `#1f2d3a` knob and active label, `#9aa2ab`
+ * for the resting one. Geometry likewise — 40×22 track, 18px knob, 2px inset, 13px labels, 700 on
+ * the active side and 600 on the other.
  *
  * Lifted out of the bar so the identical control renders in two places — the header on a tablet and
  * up, the nav sheet on a phone — without the markup being written twice and drifting apart.
@@ -422,15 +439,15 @@ function LocaleToggle({ locale, setLocale }: { locale: Locale; setLocale: (l: Lo
       aria-label={t.shell.switchLang}
       className="inline-flex flex-none items-center gap-2 rounded-full text-[13px] leading-none"
     >
-      <span className={ar ? "font-semibold text-muted" : "font-bold text-navy"}>EN</span>
-      <span className="relative h-[22px] w-10 flex-none rounded-full bg-surface3">
+      <span className={ar ? "font-semibold text-[#9aa2ab]" : "font-bold text-[#1f2d3a]"}>EN</span>
+      <span className="relative h-[22px] w-10 flex-none rounded-full bg-[#e5e8eb]">
         <span
-          className={`absolute top-0.5 start-0.5 h-[18px] w-[18px] rounded-full bg-navy shadow-[0_1px_2px_rgba(28,53,80,.3)] transition-transform duration-200 ${
+          className={`absolute top-0.5 start-0.5 h-[18px] w-[18px] rounded-full bg-[#1f2d3a] shadow-[0_1px_2px_rgba(31,45,58,.3)] transition-transform duration-200 ${
             ar ? "ltr:translate-x-[18px] rtl:-translate-x-[18px]" : ""
           }`}
         />
       </span>
-      <span className={ar ? "font-bold text-navy" : "font-semibold text-muted"}>عربي</span>
+      <span className={ar ? "font-bold text-[#1f2d3a]" : "font-semibold text-[#9aa2ab]"}>عربي</span>
     </button>
   );
 }

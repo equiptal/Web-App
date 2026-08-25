@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useT, useLocale } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
+import { BellIcon, CountBadge } from "@/components/HeaderIcons";
 import {
   fetchNotifications,
   fetchNotificationsUnreadCount,
@@ -138,20 +139,19 @@ export function NotificationsBell() {
 
   return (
     <div className="relative">
+      {/* The bell is the header prototype's outline, not Material's glyph, and it inherits the bar's
+          `#5b6672` rather than setting its own colour — it and the inbox are one pair, and the pair
+          is coloured by the group that holds them (owner, 2026-08-25). */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="relative grid h-9 w-9 place-items-center rounded-full text-navy-mid transition hover:bg-surface2"
+        className="relative inline-flex items-center justify-center transition hover:text-[#1f2d3a]"
         aria-label={t.notifications.title}
         aria-haspopup="menu"
         aria-expanded={open}
         title={t.notifications.title}
       >
-        <Icon name="notifications" size={20} />
-        {unread > 0 && (
-          <span className="absolute -end-0.5 -top-0.5 grid h-[17px] min-w-[17px] place-items-center rounded-full bg-brand px-1 text-[10px] font-extrabold text-white ring-2 ring-surface">
-            {unread > 99 ? "99+" : unread}
-          </span>
-        )}
+        <BellIcon />
+        <CountBadge count={unread} />
       </button>
 
       {open && (
