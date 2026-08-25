@@ -92,7 +92,7 @@ export function MachineCard({
       </div>
 
       {/* The prototype's 2fr / 3fr split, 20px gutter, columns aligned to the top. */}
-      <div className="grid gap-5 lg:grid-cols-[1fr_2fr] lg:items-stretch">
+      <div className="grid gap-5 lg:grid-cols-[2fr_3fr] lg:items-stretch">
         {/* ---------------- The 450px panel, and the four controls on its corners ---------------- */}
         <div className="relative h-full min-h-[450px] w-full min-w-0 overflow-hidden rounded-xl bg-[#f0f1f3]">
           <div className="grid h-full place-content-center justify-items-center gap-2 px-6 text-center">
@@ -201,7 +201,6 @@ export function MachineCard({
                   here to open. */}
               <CanvasField
                 label={t.create.machineCard.category}
-                amber
                 source={prov.itemSource("category", item.ref.categoryId, "ref")}
               >
                 <div className="truncate rounded-lg border border-border bg-surface px-3 py-2.5 text-[13px] text-navy">
@@ -210,7 +209,6 @@ export function MachineCard({
               </CanvasField>
               <CanvasField
                 label={t.create.machineCard.type}
-                amber
                 missing={gapFor("subtype") || gapFor("category")}
                 shake={shake("subtype") || shake("category")}
                 source={prov.itemSource("subtype", item.ref.subcategoryId)}
@@ -235,7 +233,6 @@ export function MachineCard({
               </CanvasField>
               <CanvasField
                 label={t.create.machineCard.size}
-                amber
                 missing={gapFor("capacity")}
                 shake={shake("capacity")}
                 source={prov.itemSource("capacity", item.ref.measurementId)}
@@ -266,11 +263,8 @@ export function MachineCard({
               the prototype's layout AND the wording that says what the choice means. */}
           <div className="grid items-start gap-3.5 sm:grid-cols-[2fr_1fr]">
             <div className="grid min-w-0 gap-3.5 rounded-[10px] bg-surface2 p-3.5 sm:grid-cols-2">
-              {/* Delivery is the amber-highlighted one in the prototype, with its note beneath. */}
-              <div className="-mx-2 -my-1 min-w-0 rounded-lg border border-[#f5c98f] bg-[#fff9f0] px-1.5 py-2.5">
-                <CanvasField
+              <CanvasField
                   label={t.create.machineCard.delivery}
-                  amber
                   missing={gapFor("delivery")}
                   shake={shake("delivery")}
                   source={prov.itemSource("delivery", overrides.delivery, "deliveryOverride", true)}
@@ -289,7 +283,6 @@ export function MachineCard({
                     options={partyOptions(t.create.party.weCollect)}
                   />
                 </CanvasField>
-              </div>
               <CanvasField
                 label={t.create.machineCard.returnFromSite}
                 missing={gapFor("return")}

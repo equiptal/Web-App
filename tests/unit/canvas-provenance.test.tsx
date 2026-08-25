@@ -34,29 +34,31 @@ const card = (opts: Parameters<typeof renderCanvas>[1] = {}) =>
   );
 
 describe("provenance badges (MREQ-AC-57/58/59)", () => {
+  // One label for both: from the renter's side, "the agent read this" and "we filled this in" are
+  // the same fact — nobody asked them.
   it("marks what we defaulted, and says so on delivery and return", async () => {
     await card();
     // `defaultProjectDetails` seeds both transport legs to "me" — visible, and labelled as ours.
     expect(screen.getByText("We collect")).toBeTruthy();
-    expect(screen.getAllByText("AI default").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("AI selected").length).toBeGreaterThan(0);
   });
 
   it("marks what the agent chose", async () => {
     // The agent supplied the haulage legs, so they still equal the snapshot and read as its choice.
     await card({ draft: makeAgentDraft({ items: [makeItem({ deliveryOverride: "supplier", returnOverride: "supplier" })] }) });
-    expect(screen.getAllByText("AI detected").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("AI selected").length).toBeGreaterThan(0);
   });
 
   it("clears the mark once the renter answers, and records the field", async () => {
     const handle = await card({ draft: makeAgentDraft({ items: [makeItem({ deliveryOverride: "supplier" })] }) });
-    const before = screen.getAllByText("AI detected").length;
+    const before = screen.getAllByText("AI selected").length;
 
     await handle.run(() => {
       handle.store().actions.touchField("line_items[a0].delivery");
     });
 
     // queryAll, not getAll: the whole point is that the count can reach zero.
-    expect(screen.queryAllByText("AI detected").length).toBe(before - 1);
+    expect(screen.queryAllByText("AI selected").length).toBe(before - 1);
     expect(handle.store().state.draft!.touchedFields).toContain("line_items[a0].delivery");
   });
 
@@ -87,7 +89,7 @@ describe("provenance badges (MREQ-AC-57/58/59)", () => {
       },
     });
     // Delivery and return are still ours (badged "Default") — and nothing is blocking.
-    expect(screen.getAllByText("AI default").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("AI selected").length).toBeGreaterThan(0);
     expect(screen.queryByText(/things need you|thing needs you/)).toBeNull();
   });
 });
@@ -137,7 +139,7 @@ describe("Arabic (MREQ-AC-51)", () => {
       locale: "ar",
       draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
     });
-    for (const english of ["YOU WROTE", "The machine", "Where it goes", "When it runs", "We collect", "AI default"]) {
+    for (const english of ["YOU WROTE", "The machine", "Where it goes", "When it runs", "We collect", "AI selected"]) {
       expect(view.container.textContent).not.toContain(english);
     }
   });

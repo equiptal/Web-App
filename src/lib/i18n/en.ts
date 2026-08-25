@@ -1349,6 +1349,9 @@ export const en = {
     // ── The comparison matrix ──
     // "Pick one" focuses the row — it drives the strip above. It never awards; that is the deal room.
     supplierPickOne: "Supplier · pick one",
+    // The same header, in the two halves the 180px column has room for.
+    supplier: "Supplier",
+    pickOne: "· pick one",
     removeColumn: "Take off the comparison",
     recommended: "Recommended",
     awaitingReply: "Awaiting reply",
@@ -1384,6 +1387,25 @@ export const en = {
     // A term the supplier never answered. Said out loud, because a blank cell reads as "nothing to pay".
     didntSay: "Didn't say",
     rankWithAi: "Rank with AI",
+    aiRanked: "AI ranked",
+    // Under the three grand totals, so a figure is never read as a pre-tax one.
+    withVat: "with VAT",
+    // On a term the RENTER set: what he asked for, beside the column's name.
+    youAsked: "you asked",
+    // A term every supplier answered the same way. The column says it once, then says nobody differs.
+    sameFromAll: "same from all {n}",
+    // The two closed column groups, standing on their edge.
+    groupCost: "Cost",
+    groupTerms: "Terms",
+    // The equipment rail is a door, not a group: availability is a machine-by-machine question and
+    // the map already answers it in full, so pressing it opens the picked bid's machines there.
+    checkAvailability: "Check availability",
+    // ── The suggestion bar under the comparison ──
+    aiSuggestion: "AI suggestion",
+    aiWhatIdDo: "What I'd do",
+    aiBrand: "MOEDATECH AI",
+    aiRankPrompt: "Rank these bids for me",
+    aiRanking: "Reading the bids…",
     // The equipment group. Its cell states how many of the bid's machines the supplier has named a
     // yard for, in the MAP's words — one vocabulary for availability across the product.
     groupEquipment: "Equipment",
@@ -1461,8 +1483,8 @@ export const en = {
     reviewAndSend: "Review & send",
     itemOfCount: "Equipment #{n} of {total}",
     provenance: {
-      agent: "AI detected",
-      default: "AI default",
+      agent: "AI selected",
+      default: "AI selected",
       renter: "changed by you",
     },
     /**

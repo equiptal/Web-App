@@ -178,7 +178,7 @@ export function Canvas() {
 
       {/* ---------------- Equipment ---------------- */}
       {item && (
-        <div ref={equipmentRef} className="mb-3.5 flex flex-col gap-4 lg:flex-row lg:items-start">
+        <div ref={equipmentRef} className="mb-3.5 flex flex-col gap-4 lg:flex-row lg:items-stretch">
           <MachineCard
             item={item}
             gaps={equipmentGaps}

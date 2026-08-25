@@ -1173,6 +1173,8 @@ export const ar: Dictionary = {
     countPricedBelow: "سُعّر على {priced} من {offered} وحدة معروضة.",
     countClaimed: "{n} من هذه الوحدات بلا معدّة مسمّاة — أُدرجت {named} معدّة.",
     supplierPickOne: "المؤجّر · اختر واحدًا",
+    supplier: "المؤجّر",
+    pickOne: "· اختر واحدًا",
     removeColumn: "إزالة من المقارنة",
     recommended: "موصى به",
     awaitingReply: "بانتظار الرد",
@@ -1200,6 +1202,18 @@ export const ar: Dictionary = {
     termNationality: "الجنسية",
     didntSay: "لم يذكر",
     rankWithAi: "ترتيب بالذكاء الاصطناعي",
+    aiRanked: "تم الترتيب",
+    withVat: "شامل الضريبة",
+    youAsked: "طلبتَ",
+    sameFromAll: "نفس الإجابة من {n}",
+    groupCost: "التكلفة",
+    groupTerms: "الشروط",
+    checkAvailability: "تحقّق من التوفّر",
+    aiSuggestion: "اقتراح الذكاء الاصطناعي",
+    aiWhatIdDo: "ما أنصح به",
+    aiBrand: "معداتك AI",
+    aiRankPrompt: "رتّب لي هذه العروض",
+    aiRanking: "جارٍ قراءة العروض…",
     // مجموعة المعدّات. تذكر خليّتها كم من معدّات العرض حدّد المورد ساحتها، بألفاظ الخريطة نفسها —
     // مفردات واحدة للتوفّر في المنتج كلّه.
     groupEquipment: "المعدّات",
@@ -1267,8 +1281,8 @@ export const ar: Dictionary = {
     reviewAndSend: "المراجعة والإرسال",
     itemOfCount: "المعدة رقم {n} من {total}",
     provenance: {
-      agent: "اكتشفه الذكاء الاصطناعي",
-      default: "افتراضي بالذكاء الاصطناعي",
+      agent: "اختاره الذكاء الاصطناعي",
+      default: "اختاره الذكاء الاصطناعي",
       renter: "غيّرته بنفسك",
     },
     party: {

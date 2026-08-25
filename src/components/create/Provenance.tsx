@@ -38,13 +38,15 @@ function Sparkle() {
 export function ProvenanceNote({ source }: { source: FieldSource }) {
   const t = useT();
   if (!isSystemChosen(source)) return null;
-  const isAgent = source === "agent";
+  /**
+   * One label for both sources. From the renter's side "the agent read this from your words" and "we
+   * filled this in for you" are the same fact — nobody asked them — and splitting the wording made
+   * them look like two different states worth telling apart. The sparkle carries it either way.
+   */
   return (
     <div className="mt-1.5 flex items-center gap-1">
-      {isAgent && <Sparkle />}
-      <span className="whitespace-nowrap text-[10px] font-bold text-warn">
-        {isAgent ? t.create.provenance.agent : t.create.provenance.default}
-      </span>
+      <Sparkle />
+      <span className="whitespace-nowrap text-[10px] font-bold text-warn">{t.create.provenance.agent}</span>
     </div>
   );
 }
@@ -69,7 +71,6 @@ export function CanvasField({
   missing = false,
   shake = false,
   optional = false,
-  amber = false,
   icon,
   hint,
   children,
@@ -81,8 +82,6 @@ export function CanvasField({
   /** True for the duration of a refused move. */
   shake?: boolean;
   optional?: boolean;
-  /** Amber label colour, for the fields the prototype renders inside an amber-tinted box. */
-  amber?: boolean;
   icon?: ReactNode;
   /** A quiet line under the control — the prototype's "KSA STANDARD", "Suppliers quote you a …". */
   hint?: ReactNode;
@@ -93,7 +92,7 @@ export function CanvasField({
     <div className={`min-w-0 ${shake ? "shake-error" : ""}`}>
       <div
         className={`mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase leading-tight tracking-[0.05em] ${
-          amber ? "text-[#c9660f]" : "text-muted"
+          missing ? "text-brand" : isSystemChosen(source) ? "text-[#c9660f]" : "text-muted"
         }`}
       >
         {icon}
@@ -101,7 +100,19 @@ export function CanvasField({
         {optional && <span className="font-normal normal-case tracking-normal text-muted/70">{t.create.machineCard.notesOptional}</span>}
         <RequiredDot show={missing} />
       </div>
-      {children}
+      {/**
+        * The amber highlight wraps the CONTROL, not the whole field.
+        *
+        * The prototype tints an entire card amber, which reads as "this group is special" and, being a
+        * box with its own padding, pushed the delivery leg's chips a few pixels below the other two —
+        * three choices that should sit on one line did not. Ringing just the options keeps the marker
+        * on the thing it describes and leaves every leg on the same baseline.
+        */}
+      <div
+        className={isSystemChosen(source) ? "rounded-[10px] bg-warn/[0.07] ring-1 ring-warn/45 ring-offset-2 ring-offset-surface2" : undefined}
+      >
+        {children}
+      </div>
       {hint && <p className="mt-1.5 text-[11.5px] leading-snug text-muted">{hint}</p>}
       <ProvenanceNote source={source} />
     </div>

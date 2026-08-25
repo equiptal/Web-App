@@ -51,7 +51,7 @@ export function OperatorRail({ item }: { item: EquipmentItem }) {
       <button
         type="button"
         onClick={() => actions.patchItem(item.id, { operatorNeeded: "yes" })}
-        className="flex min-h-[380px] w-[72px] flex-none flex-col items-center gap-3.5 rounded-2xl border-[1.5px] border-[#f5c98f] bg-[#fff6ea] py-4 shadow-[0_1px_2px_rgba(20,25,35,.04)] transition hover:shadow-[0_4px_14px_rgba(245,135,31,.2)]"
+        className="flex w-[72px] flex-none flex-col items-center gap-3.5 self-stretch rounded-2xl border-[1.5px] border-[#f5c98f] bg-[#fff6ea] py-4 shadow-[0_1px_2px_rgba(20,25,35,.04)] transition hover:shadow-[0_4px_14px_rgba(245,135,31,.2)]"
         aria-label={t.create.operator}
       >
         <span className="grid h-[34px] w-[34px] flex-none place-items-center rounded-full bg-brand text-white">
@@ -66,7 +66,7 @@ export function OperatorRail({ item }: { item: EquipmentItem }) {
   }
 
   return (
-    <div className="flex w-full flex-none flex-col gap-4 rounded-[14px] border border-border bg-surface p-3.5 lg:min-h-[530px] lg:w-[380px]">
+    <div className="flex w-full flex-none flex-col gap-4 self-stretch rounded-[14px] border border-border bg-surface p-3.5 lg:min-h-[530px] lg:w-[380px]">
       <div className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-2">
           <PanelDot complete={complete} />
