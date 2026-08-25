@@ -149,13 +149,13 @@ export function Intake() {
       <p className="mb-7 mt-2 text-[15px] leading-relaxed text-muted">{t.intake.subheading}</p>
 
       {/* ── Describe ── */}
-      <div className="rounded-[22px] border border-border bg-surface shadow-[0_1px_3px_rgba(15,23,31,.06),0_16px_40px_-20px_rgba(31,45,58,.12)]">
-        <div className="flex items-center gap-2.5 px-7 pb-1 pt-5">
+      <div className="rounded-[16px] border border-border bg-surface shadow-[0_1px_3px_rgba(15,23,31,.06),0_16px_40px_-20px_rgba(31,45,58,.12)]">
+        <div className="flex items-center gap-2.5 px-5 pb-1 pt-4">
           <span className="grid h-8 w-8 flex-none place-items-center rounded-[10px] bg-gradient-to-br from-[#f7c675] to-brand text-white">
             <Icon name="auto_awesome" size={16} />
           </span>
           <b className="whitespace-nowrap text-[15px] font-extrabold text-navy">{t.intake.pasteLabel}</b>
-          <span className="whitespace-nowrap rounded-full bg-brand-soft px-2.5 py-[3px] text-[10.5px] font-extrabold uppercase tracking-[.03em] text-[#b5761a]">
+          <span className="whitespace-nowrap rounded-full bg-brand-soft px-2.5 py-[3px] text-[11px] font-extrabold uppercase tracking-[.03em] text-warn">
             {t.intake.beta}
           </span>
           <span className="min-w-0 flex-1" />
@@ -168,7 +168,7 @@ export function Intake() {
           onChange={(e) => actions.setText(e.target.value)}
           placeholder={typed}
           rows={4}
-          className="w-full resize-none border-0 bg-transparent px-7 pb-6 pt-3 text-[15.5px] leading-relaxed text-navy outline-none placeholder:text-muted/70"
+          className="w-full resize-none border-0 bg-transparent px-5 pb-5 pt-2.5 text-[15px] leading-relaxed text-navy outline-none placeholder:text-muted/70"
         />
       </div>
 
@@ -184,11 +184,11 @@ export function Intake() {
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={(e) => { e.preventDefault(); setDragging(false); }}
         onDrop={(e) => { e.preventDefault(); setDragging(false); onFiles(e.dataTransfer.files); }}
-        className={`rounded-[22px] border bg-surface shadow-[0_1px_3px_rgba(15,23,31,.06),0_16px_40px_-20px_rgba(31,45,58,.12)] transition ${
+        className={`rounded-[16px] border bg-surface shadow-[0_1px_3px_rgba(15,23,31,.06),0_16px_40px_-20px_rgba(31,45,58,.12)] transition ${
           dragging ? "border-[1.5px] border-brand" : "border-border"
         }`}
       >
-        <div className="flex items-center gap-2.5 px-7 pb-4 pt-5">
+        <div className="flex items-center gap-2.5 px-5 pb-3.5 pt-4">
           <span className="grid h-8 w-8 flex-none place-items-center rounded-[10px] bg-navy text-white">
             <Icon name="upload" size={16} />
           </span>
@@ -196,14 +196,14 @@ export function Intake() {
         </div>
 
         <div
-          className={`mx-6 mb-5 rounded-[16px] border-[1.5px] border-dashed px-5 py-6 text-center transition ${
+          className={`mx-5 mb-4 rounded-[16px] border-[1.5px] border-dashed px-5 py-6 text-center transition ${
             dragging ? "border-brand bg-brand-soft" : "border-brand/40 bg-brand-soft/45"
           }`}
         >
           <span className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-[12px] border border-border bg-surface text-brand shadow-[0_2px_6px_rgba(31,45,58,.06)]">
             <Icon name="upload" size={19} />
           </span>
-          <div className="text-[14.5px] text-navy">
+          <div className="text-[14px] text-navy">
             <b className="font-bold">{t.intake.dropTitleNew}</b>{" "}
             <button
               type="button"
@@ -225,10 +225,10 @@ export function Intake() {
 
         <input ref={fileInput} type="file" multiple accept={ACCEPT_ATTR} className="hidden" onChange={(e) => onFiles(e.target.files)} />
 
-        {rejected && <p className="px-7 pb-4 text-[12.5px] font-semibold text-danger">{t.intake.fileRejected}</p>}
+        {rejected && <p className="px-5 pb-3.5 text-[12.5px] font-semibold text-danger">{t.intake.fileRejected}</p>}
 
         {state.files.length > 0 && (
-          <div className="flex flex-col gap-2 px-6 pb-5">
+          <div className="flex flex-col gap-2 px-5 pb-4">
             {state.files.map((f, i) => (
               <div key={`${f.name}-${i}`} className="flex items-center gap-2.5 rounded-[12px] border border-border bg-surface2/50 px-3.5 py-2.5">
                 <Icon name="description" size={16} className="flex-none text-muted" />
@@ -256,7 +256,7 @@ export function Intake() {
         ) : (
           <span className="text-[13px] text-muted">{canStart ? t.intake.readyToReview : t.intake.addSomething}</span>
         )}
-        <Button disabled={!canStart} onClick={runAgent} className="px-6 py-3 text-[14.5px]">
+        <Button disabled={!canStart} onClick={runAgent} className="px-6 py-3 text-[14px]">
           {hasDraft ? t.intake.reAnalyze : t.intake.continueLabel}{" "}
           <Icon name="arrow_forward" size={17} className="rtl:scale-x-[-1]" />
         </Button>

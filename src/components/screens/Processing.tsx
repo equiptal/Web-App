@@ -158,7 +158,7 @@ export function Processing() {
         aria-labelledby="proc-err-title"
         onClick={(e) => { if (e.target === e.currentTarget) actions.goIntake(); }}
       >
-        <div className="relative w-full max-w-sm rounded-2xl bg-surface p-7 text-center shadow-[0_24px_60px_rgba(16,32,58,.35)]">
+        <div className="relative w-full max-w-sm rounded-2xl bg-surface p-6 text-center shadow-[0_24px_60px_rgba(16,32,58,.35)]">
           <button
             onClick={() => actions.goIntake()}
             aria-label={t.common.close}
@@ -192,7 +192,7 @@ export function Processing() {
 
   return (
     <div className="flex min-h-[70vh] items-center justify-center">
-      <div className="w-full max-w-[520px] rounded-[22px] border border-border bg-surface p-7 text-center shadow-[0_1px_3px_rgba(15,23,31,.06),0_30px_70px_-20px_rgba(31,45,58,.2)]">
+      <div className="w-full max-w-[520px] rounded-[16px] border border-border bg-surface p-6 text-center shadow-[0_1px_3px_rgba(15,23,31,.06),0_30px_70px_-20px_rgba(31,45,58,.2)]">
         {/* The agent, and that it is live. The dot pulses; it is the only thing on this card that moves
             without a reason, and it is the reason. */}
         <div className="mb-5 flex items-center justify-center gap-2.5">
