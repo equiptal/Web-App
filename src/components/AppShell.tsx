@@ -170,11 +170,18 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
             </button>
           )}
 
-          {/* The wordmark, not the round logomark: the reference leads with the brand written out,
-              and at 62px there is room for it. It is Home. */}
-          <Link href="/" aria-label={t.shell.home} className="flex-none">
+          {/* The LOGOMARK on its navy disc — the mark the navigation has carried since the dock, not
+              the wordmark (owner, 2026-08-25). It is Home.
+
+              No active ring on it, though it points at `/`: Dashboard names that destination in the
+              row beside it and already carries the state. Two marks for one place is one too many. */}
+          <Link
+            href="/"
+            aria-label={t.shell.home}
+            className="grid h-9 w-9 flex-none place-items-center rounded-full bg-navy transition hover:brightness-110"
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/moedatech-logo.svg" alt="Moedatech" className="h-7 w-auto" />
+            <img src="/moedatech-logomark.svg" alt="Moedatech" className="h-5 w-5 [filter:brightness(0)_invert(1)]" />
           </Link>
 
           {/* ── The nav sits DEAD CENTRE of the bar, not after the title ────────────────────────────
