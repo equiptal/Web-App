@@ -41,8 +41,8 @@ export function OperatorRail({ item }: { item: EquipmentItem }) {
   };
 
   const partyOptions: { value: Party; label: string }[] = [
-    { value: "supplier", label: t.create.party.supplier },
-    { value: "me", label: t.create.party.weCover },
+    { value: "supplier", label: t.options.party.supplier },
+    { value: "me", label: t.options.party.me },
   ];
 
   // ---- Collapsed: the prototype's 72px strip. ----

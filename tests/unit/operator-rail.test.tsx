@@ -46,16 +46,20 @@ describe("food, accommodation and transport (MREQ-AC-26)", () => {
     const handle = await rail();
     const field = screen.getByText("ACCOM. & TRANSPORT").closest("div")!.parentElement!;
 
-    await handle.run(() => within(field).getByRole("button", { name: "We cover" }).click());
+    await handle.run(() => within(field).getByRole("button", { name: "Me" }).click());
 
     const op = handle.store().state.draft!.items[0].operator;
     expect(op.fatAccommodationTransport).toBe("me");
   });
 
-  it("names the obligation rather than the party (MREQ-AC-62)", async () => {
+  it("offers Supplier then Me on both, in that order (MREQ-AC-62)", async () => {
     await rail();
-    expect(screen.getAllByRole("button", { name: "We cover" }).length).toBe(2); // food + accommodation
-    expect(screen.queryByRole("button", { name: "Me" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: "Supplier" }).length).toBe(2); // food + accommodation
+    expect(screen.getAllByRole("button", { name: "Me" }).length).toBe(2);
+    for (const label of ["FOOD", "ACCOM. & TRANSPORT"]) {
+      const field = screen.getByText(label).closest("div")!.parentElement!;
+      expect(within(field).getAllByRole("button").map((x) => x.textContent!.trim())).toEqual(["Supplier", "Me"]);
+    }
   });
 
   it("does not block — food and accommodation are optional in the app (MREQ-AC-11)", async () => {

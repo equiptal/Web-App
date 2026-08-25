@@ -69,12 +69,12 @@ export function MachineCard({
 
   const notAvailable = item.verdict === "no-match";
   /**
-   * Supplier first, the renter's own obligation second — the order the prototype uses on every one of
-   * these. `PARTIES` is ["me","supplier"], so reading it in array order put ours back to front.
+   * Supplier first, the renter second — the order the prototype uses on every one of these, and the
+   * reason it is written out rather than mapped from `PARTIES`, which is ["me","supplier"].
    */
-  const partyOptions = (renterLabel: string): { value: Party; label: string }[] => [
-    { value: "supplier", label: t.create.party.supplier },
-    { value: "me", label: renterLabel },
+  const partyOptions: { value: Party; label: string }[] = [
+    { value: "supplier", label: t.options.party.supplier },
+    { value: "me", label: t.options.party.me },
   ];
 
   return (
@@ -280,7 +280,7 @@ export function MachineCard({
                   <ChoiceRow<Party>
                     value={overrides.delivery}
                     onChange={(v) => set("delivery", { deliveryOverride: v })}
-                    options={partyOptions(t.create.party.weCollect)}
+                    options={partyOptions}
                   />
                 </CanvasField>
               <CanvasField
@@ -297,7 +297,7 @@ export function MachineCard({
                 <ChoiceRow<Party>
                   value={overrides.returnFromSite}
                   onChange={(v) => set("return", { returnOverride: v })}
-                  options={partyOptions(t.create.party.weReturn)}
+                  options={partyOptions}
                 />
               </CanvasField>
             </div>
@@ -315,7 +315,7 @@ export function MachineCard({
                 <ChoiceRow<Party>
                   value={overrides.fuelResponsibility}
                   onChange={(v) => set("fuel_responsibility", { fuelResponsibilityOverride: v })}
-                  options={partyOptions(t.create.party.wePay)}
+                  options={partyOptions}
                 />
               </CanvasField>
             </div>

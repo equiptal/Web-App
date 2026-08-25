@@ -25,7 +25,7 @@ export default function CreatePage() {
       <Suspense fallback={null}>
         <FirstRequestGate />
       </Suspense>
-      <AppShell title={t.shell.request}>
+      <AppShell title={t.shell.request} wide>
         <CreateSurface />
       </AppShell>
     </RfqProvider>

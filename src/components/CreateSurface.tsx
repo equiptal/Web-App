@@ -31,7 +31,21 @@ export function CreateSurface() {
       // MREQ — the four-step wizard is gone. The same phase now renders one canvas, and the
       // Ready-to-send review is a mode of it rather than a fifth step.
       case "wizard":
-        return state.readyToSend ? <ReadyToSend /> : <Canvas />;
+        /**
+         * The canvas steps OUT of the shell's reading gutter.
+         *
+         * `AppShell` pads its main column to `xl:px-28` — 112px a side — which is right for a page
+         * of prose and wrong for one that is three columns of controls: that gutter was the
+         * difference between the machine card, the operator rail and the schedule fitting one row
+         * and wrapping. Negative margins cancel the shell's padding at each breakpoint and a
+         * tighter one goes back on. Done here rather than in AppShell so no other page can be
+         * affected by it.
+         */
+        return (
+          <div className="-mx-6 px-4 sm:-mx-12 sm:px-6 lg:-mx-20 lg:px-8 xl:-mx-28 xl:px-10">
+            {state.readyToSend ? <ReadyToSend /> : <Canvas />}
+          </div>
+        );
       case "confirmation":
         return <Confirmation />;
     }

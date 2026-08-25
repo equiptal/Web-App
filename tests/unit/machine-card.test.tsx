@@ -222,34 +222,37 @@ describe("crane-only work type (MREQ-AC-23)", () => {
   });
 });
 
-describe("logistics terms name the obligation (MREQ-AC-62/63)", () => {
-  // The prototype's own labels, since the row layout is the prototype's — but our option wording,
-  // which names the act rather than the party.
-  it("uses the prototype's labels and our obligation wording", async () => {
+describe("logistics — the prototype's labels and options (MREQ-AC-62/63)", () => {
+  it("uses the prototype's wording throughout", async () => {
     await card();
     expect(screen.getByText("DELIVERY TO SITE")).toBeTruthy();
     expect(screen.getByText("RETURN FROM SITE")).toBeTruthy();
     expect(screen.getByText("FUEL RESPONSIBILITY")).toBeTruthy();
-    expect(screen.getByText("We collect")).toBeTruthy();
-    expect(screen.getByText("We return")).toBeTruthy();
-    expect(screen.getByText("We pay")).toBeTruthy();
-    // The bare "Me" is what these replaced.
-    expect(screen.queryByText("Me")).toBeNull();
+    // Three choices, each Supplier then Me — never the other way round.
+    expect(screen.getAllByRole("button", { name: "Supplier" }).length).toBe(3);
+    expect(screen.getAllByRole("button", { name: "Me" }).length).toBe(3);
   });
 
-  // All three sit on ONE row, which is what the smaller chip type buys: the two haulage legs share
-  // a box as a 2-column grid, and fuel has its own beside it.
+  // `PARTIES` is ["me","supplier"], so mapping it in array order silently reversed every pair.
+  it("puts Supplier before Me in every pair", async () => {
+    await card();
+    for (const label of ["DELIVERY TO SITE", "RETURN FROM SITE", "FUEL RESPONSIBILITY"]) {
+      const field = screen.getByText(label).closest("div")!.parentElement!;
+      const names = within(field)
+        .getAllByRole("button")
+        .map((b) => b.textContent!.trim());
+      expect(names).toEqual(["Supplier", "Me"]);
+    }
+  });
+
+  // All three sit on ONE row: the two haulage legs share a box, fuel has its own beside it.
   it("keeps all three choices on one row", async () => {
     const { view } = await card();
-    const delivery = screen.getByText("DELIVERY TO SITE").closest("div")!.parentElement!;
-    const ret = screen.getByText("RETURN FROM SITE").closest("div")!.parentElement!;
-    const fuel = screen.getByText("FUEL RESPONSIBILITY").closest("div")!.parentElement!;
-    // Delivery and return share a grid; fuel is a sibling box in the same row container.
-    // Attribute match rather than a class selector: Tailwind arbitrary values contain brackets
-    // that querySelector parses as pseudo-class syntax.
     const row = view.container.querySelector('[class*="2fr_1fr"]');
     expect(row).toBeTruthy();
-    for (const el of [delivery, ret, fuel]) expect(row!.contains(el)).toBe(true);
+    for (const label of ["DELIVERY TO SITE", "RETURN FROM SITE", "FUEL RESPONSIBILITY"]) {
+      expect(row!.contains(screen.getByText(label))).toBe(true);
+    }
   });
 });
 

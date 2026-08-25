@@ -1260,6 +1260,20 @@ export const en = {
     bidsCount: "{n} bids",
     oneBid: "1 bid",
     openRequest: "Open the request",
+    // The bid count on the navy, said as three parts so the number can carry its own weight.
+    bidsWord: "bids",
+    bidWord: "bid",
+    // The thumbnail's ribbon: what this picture IS at this moment.
+    ribbonPickBid: "Pick a bid",
+    ribbonConfirmed: "Confirmed ✓",
+    ribbonUnconfirmed: "Unconfirmed",
+    papersNotChecked: "papers not checked",
+    // The primary control acts on the picked bid, so it says why it is inert.
+    selectBidFirst: "Select a bid first",
+    fullDetails: "Full details",
+    share: "Share",
+    quotation: "Quotation",
+    quotationNeedsRoom: "The quotation is issued in the deal room — open the conversation with this supplier first.",
     // The dark strip, right half — the item, and what the selected supplier offers against it.
     offers: "{supplier} offers",
     noBidSelected: "No bid selected",
@@ -1486,22 +1500,6 @@ export const en = {
       agent: "AI selected",
       default: "AI selected",
       renter: "changed by you",
-    },
-    /**
-     * Who does what, said as the thing they'd actually do.
-     *
-     * The shared `options.party` pair is "Supplier / Me", which is fine in a table column and poor on
-     * a control: "Me" next to FUEL RESPONSIBILITY does not tell a renter whether they are supplying
-     * the diesel or paying for it. Each choice names the obligation instead, so the answer is legible
-     * without the label. `options.party` is untouched — the bid form, deal room and the review table
-     * still read it, and their columns want the short form.
-     */
-    party: {
-      supplier: "Supplier",
-      weCollect: "We collect",
-      weReturn: "We return",
-      wePay: "We pay",
-      weCover: "We cover",
     },
     machineCard: {
       category: "CATEGORY",

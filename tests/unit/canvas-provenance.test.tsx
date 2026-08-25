@@ -39,7 +39,7 @@ describe("provenance badges (MREQ-AC-57/58/59)", () => {
   it("marks what we defaulted, and says so on delivery and return", async () => {
     await card();
     // `defaultProjectDetails` seeds both transport legs to "me" — visible, and labelled as ours.
-    expect(screen.getByText("We collect")).toBeTruthy();
+    expect(screen.getAllByText("Supplier").length).toBeGreaterThan(0);
     expect(screen.getAllByText("AI selected").length).toBeGreaterThan(0);
   });
 
@@ -139,7 +139,7 @@ describe("Arabic (MREQ-AC-51)", () => {
       locale: "ar",
       draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
     });
-    for (const english of ["YOU WROTE", "The machine", "Where it goes", "When it runs", "We collect", "AI selected"]) {
+    for (const english of ["YOU WROTE", "The machine", "Where it goes", "When it runs", "AI selected"]) {
       expect(view.container.textContent).not.toContain(english);
     }
   });
