@@ -309,7 +309,10 @@ export function CompareMatrix({
   );
 
   return (
-    <div>
+    // The pane no longer scrolls the page for anyone, so a table that outgrows it scrolls itself
+    // (owner, 2026-08-25). That is a table's own business: a comparison with twenty rows has to stay
+    // readable, and clipping its tail would hide the very figures it exists to line up.
+    <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="flex items-stretch overflow-x-auto">
         {/* ── The suppliers, on the inline-start edge ── */}
         <div className="w-[185px] flex-none border-e border-border">

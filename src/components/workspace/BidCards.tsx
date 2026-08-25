@@ -59,7 +59,10 @@ export function BidCards({
   }
 
   return (
-    <div className="flex snap-x items-start gap-[18px] overflow-x-auto p-3.5 sm:p-4">
+    // `items-stretch`, not `items-start`: the pane now has a definite height, so every card takes
+    // all of it and they end on one line instead of stepping down with their content. The footer was
+    // already `mt-auto`, waiting for exactly this — the way on sits at the bottom of every card.
+    <div className="flex h-full snap-x items-stretch gap-[18px] overflow-x-auto p-3.5 sm:p-4">
       {bids.map((b) => (
         <BidCardTile
           key={b.card.id}
@@ -224,7 +227,7 @@ function BidCardTile({
   return (
     <article
       onClick={onSelect}
-      className={`flex w-[380px] max-w-full flex-none snap-start cursor-pointer flex-col overflow-hidden rounded-[12px] border bg-surface transition ${
+      className={`flex max-h-full w-[380px] max-w-full flex-none snap-start cursor-pointer flex-col overflow-hidden rounded-[12px] border bg-surface transition ${
         selected
           ? "border-brand shadow-[0_0_0_1px_var(--brand),0_6px_18px_rgba(247,144,9,.2)]"
           : "border-border shadow-[0_2px_8px_rgba(19,44,74,.06)] hover:border-navy-mid/40"

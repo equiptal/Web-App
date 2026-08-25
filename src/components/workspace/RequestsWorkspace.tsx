@@ -460,10 +460,17 @@ export function RequestsWorkspace() {
             ))}
           </div>
 
-          {/* THE one scrolling region on the page. The bids are the only band whose height the
-              renter's data decides, so they are the only band allowed to overflow — and it scrolls
-              inside the card, which keeps the tabs, the filter and the strip above it in place. */}
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          {/* ── Nothing on this page scrolls DOWNWARDS (owner, 2026-08-25: "i dont want scroll
+              inside the cards even") ──────────────────────────────────────────────────────────────
+              This was `overflow-y-auto`, which put a second scrollbar inside the white card the
+              moment a bid ran tall. The reference has no such thing: the bids are a ROW that runs
+              sideways, each card the full height of the pane, and the way to the fifth bid is to
+              travel right.
+
+              So the pane is `overflow-hidden` and hands its height to whichever tab is open. The
+              cards stretch to it; the comparison table keeps its own horizontal scroll, which is a
+              table's business and not a page's. */}
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {tab === "cards" ? (
             <BidCards
               bids={shown}
