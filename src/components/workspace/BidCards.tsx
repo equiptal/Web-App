@@ -289,7 +289,7 @@ function BidCardTile({
           e.stopPropagation();
           setTermsOpen(true);
         }}
-        className="flex items-center gap-3.5 border-t border-border px-3.5 py-3 text-start transition hover:bg-surface2/40"
+        className="flex items-center gap-2.5 border-t border-border px-3.5 py-2.5 text-start transition hover:bg-surface2/40"
       >
         <TermsDialGlyph met={dial.met} against={dial.against} unanswered={dial.unanswered} />
         <span className="flex-1 text-[13px] font-bold text-navy">{L("Terms", "الشروط")}</span>
@@ -467,7 +467,7 @@ function BidCardTile({
               }}
               className="rounded-[9px] border border-border px-3.5 py-3 text-[12.5px] font-bold text-navy transition hover:bg-surface2"
             >
-              {t.workspace.viewQuote}
+              {t.workspace.editQuote}
             </button>
           </>
         ) : (
@@ -574,13 +574,13 @@ function LegRow({ label, amount, excluded }: { label: string; amount: number | n
  *  rather than a full circle of any colour, which would claim an answer that was never given. */
 function TermsDialGlyph({ met, against, unanswered }: { met: number; against: number; unanswered: number }) {
   const total = met + against + unanswered;
-  if (total === 0) return <span className="h-[46px] w-[46px] flex-none rounded-full border-2 border-border" />;
+  if (total === 0) return <span className="h-[18px] w-[18px] flex-none rounded-full border-2 border-border" />;
   const pct = (n: number) => (n / total) * 360;
   const a = pct(met);
   const b = a + pct(against);
   return (
     <span
-      className="h-[46px] w-[46px] flex-none rounded-full shadow-[inset_0_0_0_1px_rgba(19,44,74,.08)]"
+      className="h-[18px] w-[18px] flex-none rounded-full shadow-[inset_0_0_0_1px_rgba(19,44,74,.08)]"
       style={{
         background: `conic-gradient(var(--ok) 0deg ${a}deg, var(--danger) ${a}deg ${b}deg, var(--border) ${b}deg 360deg)`,
       }}

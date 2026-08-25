@@ -222,9 +222,28 @@ export function CompareMatrix({
     router.push(`/bids/${encodeURIComponent(equipmentTarget.card.id)}/equipment`);
   };
 
+  /**
+   * What the rate column is CALLED — «Monthly», «Weekly», «Daily» — rather than the bare word
+   * «Rental» (owner's reference, 2026-08-25). The period is the unit the figure is in, and a column of
+   * amounts whose unit is not stated is a column a renter has to guess at. Read off the bids
+   * themselves; where they disagree, or none says, it falls back to the neutral word rather than
+   * naming a period only some of them quoted in.
+   */
+  const rateLabel = (() => {
+    const units = new Set(rows.map((b) => b.card.priceUnit ?? "").filter(Boolean));
+    if (units.size !== 1) return t.workspace.colRate;
+    switch ([...units][0]) {
+      case "PER_MONTH": return t.workspace.rentalMonthly;
+      case "PER_WEEK": return t.workspace.rentalWeekly;
+      case "PER_DAY": return t.workspace.rentalDaily;
+      case "PER_JOB": return t.workspace.rentalJob;
+      default: return t.workspace.colRate;
+    }
+  })();
+
   /** The money columns, in the order they read. The duration one exists only if the request has one. */
   const cycleCols: MoneyCol[] = [
-    { key: "rate", label: t.workspace.colRate, value: (b) => b.card.price, win: lowRate },
+    { key: "rate", label: rateLabel, value: (b) => b.card.price, win: lowRate },
     { key: "mob", label: t.priceFooter.mobilisation, value: (b) => (b.card.mobExcluded ? null : b.card.mobPrice), excluded: (b) => !!b.card.mobExcluded },
     { key: "demob", label: t.priceFooter.demobilisation, value: (b) => (b.card.demobExcluded ? null : b.card.demobPrice), excluded: (b) => !!b.card.demobExcluded },
   ];
@@ -328,7 +347,7 @@ export function CompareMatrix({
                     {recommended
                       ? `★ ${t.workspace.recommended}`
                       : b.source === "offline"
-                        ? t.workspace.sourceOfflineShort
+                        ? t.workspace.offlineInvite
                         : b.card.dealRoomId
                           ? t.workspace.inNegotiation
                           : t.workspace.awaitingReply}

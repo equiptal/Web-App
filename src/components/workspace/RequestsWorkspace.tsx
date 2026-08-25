@@ -331,7 +331,12 @@ export function RequestsWorkspace() {
 
   return (
     <div className="-mx-6 -my-6 flex min-h-0 flex-col sm:-mx-12 sm:-mt-7 lg:-mx-20 xl:-mx-28">
-      <RequestRail tiles={tiles} activeKey={resolved.groupId} onPick={pickGroup} />
+      <RequestRail
+        tiles={tiles}
+        activeKey={resolved.groupId}
+        onPick={pickGroup}
+        onShare={() => { setDrawerShare(true); setDrawerOpen(true); }}
+      />
 
       <RequestStrip
         group={group}
@@ -404,8 +409,7 @@ export function RequestsWorkspace() {
               rather than a row of pills, because it is a filter over the table, not an action on it.
               It appears only when there is a mix to narrow: with every bid from one source, three
               choices that change nothing are furniture. */}
-          {counts.app > 0 && counts.offline > 0 && (
-            <div className="flex flex-wrap items-center gap-4 border-b border-border px-4 py-2.5">
+          <div className="flex flex-wrap items-center gap-4 border-b border-border px-4 py-2.5">
               <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wide text-muted">
                 <Icon name="filter_list" size={14} /> {t.workspace.source}
               </span>
@@ -428,9 +432,9 @@ export function RequestsWorkspace() {
                   {label}
                   <span className={source === key ? "text-muted" : "text-muted/70"}> {counts[key]}</span>
                 </button>
-              ))}
-            </div>
-          )}
+            ))}
+          </div>
+
           {tab === "cards" ? (
             <BidCards
               bids={shown}

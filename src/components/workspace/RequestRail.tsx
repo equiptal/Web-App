@@ -23,10 +23,13 @@ export function RequestRail({
   tiles,
   activeKey,
   onPick,
+  onShare,
 }: {
   tiles: RailTile[];
   activeKey: string | null;
   onPick: (key: string) => void;
+  /** Share the request the rail is showing — the badge on its own tile (owner's reference). */
+  onShare?: (() => void) | null;
 }) {
   const t = useT();
   const scroller = useRef<HTMLDivElement>(null);
@@ -76,6 +79,25 @@ export function RequestRail({
                   </span>
                   {/* One badge, and which one depends on what the tile has to say: bids that have
                       arrived outrank a unit count, because a bid is news and a count is not. */}
+                  {/* ── Share, on the tile the page is showing (owner's reference, 2026-08-25) ──
+                      One request is being read at a time, and the link that invites bids onto it is
+                      about THAT request — so it rides its own circle rather than waiting inside the
+                      drawer. It appears on the active tile only, for the same reason. */}
+                  {active && onShare && (
+                    <span
+                      role="button"
+                      tabIndex={-1}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onShare();
+                      }}
+                      aria-label={t.workspace.shareRequest}
+                      title={t.workspace.shareRequest}
+                      className="absolute -end-1 -top-1 grid h-5 w-5 place-items-center rounded-full border-2 border-surface bg-navy text-white transition hover:bg-navy-mid"
+                    >
+                      <Icon name="ios_share" size={11} />
+                    </span>
+                  )}
                   {tile.bids > 0 ? (
                     <span className="absolute -bottom-0.5 -end-0.5 flex items-center gap-[3px] rounded-full border-2 border-surface bg-navy px-1.5 py-[3px]">
                       <Icon name="description" size={8} className="text-white" />

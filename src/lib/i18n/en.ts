@@ -1352,6 +1352,10 @@ export const en = {
     inviteMessage:
       "Hello {supplier} — I received your bid through Moedatech. If you install the Moedatech app you'll see my requests directly and can bid on more of them. https://moedatech.net",
     viewQuote: "View quote",
+    // The renter typed an off-platform quote in himself, so it is his to correct.
+    editQuote: "Edit quote",
+    // The next move on an off-platform row: get that supplier onto the app.
+    offlineInvite: "Offline · invite ↗",
     notBuiltYet: "Not available yet.",
     // ── When a bid's three counts disagree (`unit-count-notes`) ──────────────────────────────────
     // Said only where they genuinely diverge. `priced` is what the money was built on, `offered` is
