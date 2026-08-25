@@ -1,6 +1,7 @@
 "use client";
 
 import { useLocale, useT } from "@/lib/i18n";
+import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
 
 /** mobile/016 — the renter's choice on the first-request "Start Your Request" pop-up. */
@@ -31,17 +32,10 @@ export function StartYourRequestModal({
   if (!open) return null;
 
   return (
-    <div
-      dir={locale === "ar" ? "rtl" : "ltr"}
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/45 p-4 sm:items-center"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label={t.startRequest.title}
-    >
+    <Dialog open onClose={onClose} size="md" padded={false}>
       <div
-        className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-surface p-5 shadow-xl sm:p-6"
-        onClick={(e) => e.stopPropagation()}
+        dir={locale === "ar" ? "rtl" : "ltr"}
+        className="p-5 sm:p-6"
       >
         {/* Header: title + × */}
         <div className="flex items-start gap-3">
@@ -83,7 +77,7 @@ export function StartYourRequestModal({
           {t.startRequest.cancel}
         </button>
       </div>
-    </div>
+    </Dialog>
   );
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Dialog } from "@/components/Dialog";
 import { useRouter } from "next/navigation";
 import { useT, useLocale } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
@@ -756,18 +757,8 @@ function ConfirmDialog({
   const c = t.company;
   const { locale } = useLocale();
   return (
-    <div
-      dir={locale === "ar" ? "rtl" : "ltr"}
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/45 p-4 sm:items-center"
-      onClick={onCancel}
-      role="dialog"
-      aria-modal="true"
-      aria-label={spec.title}
-    >
-      <div
-        className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 text-center shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Dialog open onClose={onCancel} size="md" padded={false}>
+      <div dir={locale === "ar" ? "rtl" : "ltr"} className="p-6 text-center">
         <span
           className={`mx-auto grid h-[52px] w-[52px] place-items-center rounded-full ${spec.danger ? "bg-danger-soft text-danger" : "bg-brand-soft text-brand"}`}
         >
@@ -795,6 +786,6 @@ function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

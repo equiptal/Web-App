@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
-import { DialogDrawer } from "@/components/Dialog";
+import { Dialog, DialogDrawer } from "@/components/Dialog";
 import { CloseIcon } from "@/components/HeaderIcons";
 import {
   bidShareUrl,
@@ -340,9 +340,8 @@ function Confirm({
 }) {
   const t = useT();
   return (
-    <>
-      <div className="fixed inset-0 z-[60] bg-navy/50" onClick={onClose} />
-      <div role="alertdialog" aria-modal="true" className="fixed inset-x-4 top-1/2 z-[61] mx-auto max-w-[380px] -translate-y-1/2 rounded-[16px] bg-surface p-5 shadow-2xl">
+    <Dialog open onClose={onClose} size="sm" padded={false}>
+      <div className="p-5">
         <h3 className="text-[16px] font-extrabold text-navy">{title}</h3>
         <p className="mt-1.5 text-[13px] font-semibold leading-relaxed text-navy-mid">{body}</p>
         <div className="mt-4 flex justify-end gap-2">
@@ -354,6 +353,6 @@ function Confirm({
           </button>
         </div>
       </div>
-    </>
+    </Dialog>
   );
 }

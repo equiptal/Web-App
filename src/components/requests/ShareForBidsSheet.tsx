@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/ui";
 import { copyBidLink } from "@/lib/bidCardHtml";
 
@@ -135,8 +136,8 @@ export function ShareForBidsSheet({
   const lbl = "mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4" dir={ar ? "rtl" : "ltr"} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="flex max-h-[92vh] w-full max-w-[460px] flex-col overflow-hidden rounded-t-2xl bg-surface text-start shadow-xl sm:rounded-2xl">
+    <Dialog open onClose={onClose} size="md" padded={false}>
+      <div className="flex min-h-0 flex-1 flex-col text-start" dir={ar ? "rtl" : "ltr"}>
         {/* header */}
         <div className="flex items-start gap-3 border-b border-border px-5 py-4">
           <span className="grid h-10 w-10 flex-none place-items-center rounded-[10px] bg-brand text-white"><Icon name="ios_share" size={20} /></span>
@@ -236,6 +237,6 @@ export function ShareForBidsSheet({
           <button onClick={onClose} className="rounded-[10px] border border-border bg-surface px-4 py-2.5 text-[13.5px] font-semibold text-navy-mid hover:bg-surface2">{L("Done", "تم")}</button>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

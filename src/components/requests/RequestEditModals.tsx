@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { Dialog } from "@/components/Dialog";
 import { updateRequest } from "@/lib/api/client";
 import { type RequestRecord } from "@/lib/contract/requests";
 import "@/components/requests/requests-proto.css";
@@ -52,8 +53,8 @@ export function ConfirmCancelModal({ ar, L, busy, scope, error, onClose, onConfi
     : L("Cancel request", "إلغاء الطلب");
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" dir={ar ? "rtl" : "ltr"} onClick={onClose}>
-      <div className="w-full max-w-sm rounded-2xl bg-[var(--surface1)] p-5 text-center shadow-xl" onClick={(e) => e.stopPropagation()}>
+    <Dialog open onClose={onClose} size="sm" padded={false}>
+      <div className="p-5 text-center" dir={ar ? "rtl" : "ltr"}>
         <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#fdecec]">
           <span className="material-icons-outlined" style={{ color: "#d64545", fontSize: 26 }}>report_problem</span>
         </div>
@@ -69,7 +70,7 @@ export function ConfirmCancelModal({ ar, L, busy, scope, error, onClose, onConfi
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }
 
@@ -216,14 +217,9 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" dir={ar ? "rtl" : "ltr"} onClick={onClose}>
-      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-[var(--surface1)] shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
-          <h3 className="text-[17px] font-extrabold text-[var(--navy)]">{L("Edit request", "تعديل الطلب")}</h3>
-          <button onClick={onClose} className="text-[var(--muted)]"><span className="material-icons-outlined">close</span></button>
-        </div>
-
-        <div className="overflow-y-auto px-5 py-4">
+    <Dialog open onClose={onClose} size="lg" title={L("Edit request", "تعديل الطلب")} padded={false}>
+      <div dir={ar ? "rtl" : "ltr"}>
+        <div className="px-5 py-4">
           <SecH icon="event">{L("Project & timing", "المشروع والتوقيت")}</SecH>
           <div className="grid grid-cols-2 gap-3">
             <Sel label={L("Rental basis", "أساس الإيجار")} value={rentalType} onChange={setRentalType} opts={RENTAL_OPTS} />
@@ -279,6 +275,6 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
           <button className="rounded-[10px] bg-[var(--action)] px-5 py-2.5 text-[13px] font-bold text-white disabled:opacity-50" disabled={busy || datesReversed} onClick={save}>{busy ? L("Saving…", "جارٍ الحفظ…") : L("Save changes", "حفظ التغييرات")}</button>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

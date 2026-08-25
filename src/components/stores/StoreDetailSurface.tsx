@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Dialog } from "@/components/Dialog";
 import { useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
@@ -192,8 +193,8 @@ function StoreDocsModal({ isVerified, onClose }: { isVerified: boolean; onClose:
   const t = useT();
   const rows = [t.store.docCR, t.store.docVAT, t.store.docNationalAddress];
   return (
-    <div className="fixed inset-0 z-50 grid place-items-end overflow-y-auto bg-black/50 sm:place-items-center sm:p-4" onClick={onClose}>
-      <div className="w-full max-w-lg overflow-hidden rounded-t-[18px] bg-surface sm:rounded-[16px]" onClick={(e) => e.stopPropagation()}>
+    <Dialog open onClose={onClose} size="lg" padded={false}>
+      <div>
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <span className="text-[15px] font-extrabold text-navy">{t.store.documents}</span>
           <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface2" aria-label={t.store.close}>
@@ -216,7 +217,7 @@ function StoreDocsModal({ isVerified, onClose }: { isVerified: boolean; onClose:
           ))}
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }
 
