@@ -1409,6 +1409,12 @@ export const en = {
     // The two closed column groups, standing on their edge.
     groupCost: "Cost",
     groupTerms: "Terms",
+    // The rails say what pressing them does; the rail itself carries one word.
+    openCost: "Show the cost columns",
+    openTerms: "Show the terms columns",
+    // A yes/no term, said as a word rather than the wire's own YES / NO.
+    termYes: "Yes",
+    termNo: "No",
     // The equipment rail is a door, not a group: availability is a machine-by-machine question and
     // the map already answers it in full, so pressing it opens the picked bid's machines there.
     checkAvailability: "Check availability",

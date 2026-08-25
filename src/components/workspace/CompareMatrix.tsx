@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui";
 import { formatSar } from "@/lib/pricing/rental";
 import { computeCycleTotals, type CycleTotals } from "@/lib/contract/cycle-totals";
 import { cheapest, findTerm, type WorkspaceBid } from "@/lib/contract/workspace";
+import { termValueLabel } from "@/lib/contract/labels";
 import type { TermRow } from "@/lib/contract/bids";
 
 /**
@@ -22,17 +23,23 @@ import type { TermRow } from "@/lib/contract/bids";
  *
  * ── The shape is the prototype's (owner, 2026-08-25: "match the prototype exactly") ──────────────
  * A fixed 180px supplier column on the inline-start edge, then ONE group of columns open at a time;
- * the others stand as 52px vertical rails you press to swap to. It replaced a single wide HTML table
+ * the others stand as 44px vertical rails you press to swap to. It replaced a single wide HTML table
  * whose fourteen columns had to be scrolled past each other — the rails are what let a renter read
- * the money and the terms at the same width, and a rail can carry a full-height merged cell and a
- * lock, neither of which a `<table>` can span across its own header.
+ * the money and the terms at the same width, and a rail can carry a full-height merged cell, which a
+ * `<table>` cannot span across its own header.
  *
- * Geometry is fixed and shared: the supplier header and every group header are 70px, every data row
- * is 49px including its hairline. That is what keeps a row's name in line with its figures when the
- * groups have different numbers of header rows.
+ * Geometry is fixed and shared: every header block is 72px and every data row is 52px including its
+ * hairline. That is what keeps a row's name in line with its figures when the groups have different
+ * numbers of header rows.
+ *
+ * ── One type scale, the app's own (owner, 2026-08-25: "same font size, style, colours") ───────────
+ * 11px uppercase for every label, 13px for a term's answer, 15px for a figure, 10px for its currency
+ * — and nothing below 9px. The first cut had eight sizes between 6.5px and 16px, and a table whose
+ * labels are smaller than any other label in the product reads as a different product.
  */
 
-/** The three column groups. Exactly one of the first two is open; equipment is always a locked rail. */
+/** The three column groups. Exactly one of the first two is open; availability is always a rail — it
+ *  opens the map rather than a group of columns. */
 type GroupKey = "cost" | "terms" | "equipment";
 
 /** The money columns the table can be ordered by. Terms are not among them: they are answers, not
@@ -54,8 +61,8 @@ const THEY_OFFERED: { label: (t: Dict) => string; keys: string[] }[] = [
 type Dict = ReturnType<typeof useT>;
 
 /** Row height, and the header block above it. Both are shared by every group, so the rows line up. */
-const ROW = "h-[49px] flex-none box-border border-b border-border/70";
-const HEAD = "h-[35px] flex-none box-border border-b border-border/70";
+const ROW = "h-[52px] flex-none box-border border-b border-border";
+const HEAD = "h-[36px] flex-none box-border border-b border-border";
 
 export function CompareMatrix({
   bids,
@@ -206,12 +213,12 @@ export function CompareMatrix({
       <div className="flex items-stretch">
         {/* ── The suppliers, fixed on the inline-start edge ── */}
         <div className="w-[180px] flex-none border-e border-border/70">
-          <div className="box-border flex h-[70px] items-end border-b border-border/70 bg-surface2/60 px-3 pb-2.5">
+          <div className="box-border flex h-[72px] items-end border-b border-border bg-surface2/60 px-3 pb-2">
             <span className="flex min-w-0 items-baseline gap-1.5">
-              <span className="flex-none text-[9px] font-bold uppercase tracking-[.06em] text-muted">
+              <span className="flex-none text-[11px] font-extrabold uppercase tracking-wide text-muted">
                 {t.workspace.supplier}
               </span>
-              <span className="min-w-0 truncate text-[8px] font-bold uppercase tracking-[.04em] text-brand">
+              <span className="min-w-0 truncate text-[11px] font-bold uppercase tracking-wide text-brand">
                 {t.workspace.pickOne}
               </span>
             </span>
@@ -231,12 +238,12 @@ export function CompareMatrix({
                 }`}
               >
                 {picked && <span className="absolute inset-y-0 start-0 w-[3px] bg-brand" />}
-                <span className="grid h-[26px] w-[26px] flex-none place-items-center rounded-full bg-navy text-[9.5px] font-bold text-white">
+                <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-navy text-[11px] font-bold text-white">
                   {initials(b.card.supplierName)}
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
-                  <span className="truncate text-[12.5px] font-extrabold leading-[1.15] text-navy">{b.card.supplierName}</span>
-                  <span className={`truncate text-[9px] font-semibold leading-none ${recommended ? "text-ok" : "text-muted"}`}>
+                  <span className="truncate text-[13px] font-extrabold leading-tight text-navy">{b.card.supplierName}</span>
+                  <span className={`truncate text-[11px] font-semibold leading-none ${recommended ? "text-ok" : "text-muted"}`}>
                     {recommended
                       ? `★ ${t.workspace.recommended}`
                       : b.source === "offline"
@@ -255,7 +262,7 @@ export function CompareMatrix({
                   }}
                   aria-label={t.workspace.removeColumn}
                   title={t.workspace.removeColumn}
-                  className="flex-none rounded px-[3px] py-[2px] text-[11px] font-semibold text-border transition hover:bg-danger-soft hover:text-danger"
+                  className="flex-none rounded px-1 py-0.5 text-[13px] font-semibold text-muted/50 transition hover:bg-danger-soft hover:text-danger"
                 >
                   ✕
                 </span>
@@ -337,7 +344,7 @@ export function CompareMatrix({
             })}
           </div>
         ) : (
-          <Rail label={t.workspace.groupCost} onClick={() => setSection("cost")} />
+          <Rail label={t.workspace.groupCost} hint={t.workspace.openCost} onClick={() => setSection("cost")} />
         )}
 
         {/* ── The terms: what the renter asked for, then what suppliers volunteered ── */}
@@ -345,19 +352,19 @@ export function CompareMatrix({
           <div className="flex min-w-0 flex-[6_1_0] flex-col overflow-hidden">
             <div className={`${HEAD} flex items-stretch bg-surface2/60`}>
               <div className="flex min-w-0 flex-[2] items-center px-3">
-                <span className="truncate text-[9.5px] font-extrabold uppercase tracking-[.1em] text-navy">
+                <span className="truncate text-[11px] font-extrabold uppercase tracking-wide text-navy-mid">
                   {t.workspace.termsYouSet}
                 </span>
               </div>
               <div className="flex min-w-0 flex-[4] items-center justify-center gap-2.5 border-s border-border/70 bg-surface3/50 px-3">
-                <span className="flex-none text-[9.5px] font-extrabold uppercase tracking-[.1em] text-navy">
+                <span className="flex-none text-[11px] font-extrabold uppercase tracking-wide text-navy-mid">
                   {t.workspace.theyOffered}
                 </span>
                 <button
                   type="button"
                   onClick={() => onRank(rows)}
                   disabled={rankBusy || rows.length === 0}
-                  className={`flex-none whitespace-nowrap rounded-full border px-2 py-1 text-[8.5px] font-bold tracking-[.03em] transition disabled:opacity-50 ${
+                  className={`flex-none whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-bold transition disabled:opacity-50 ${
                     ranking ? "border-ok/40 bg-ok-soft text-ok" : "border-border bg-surface text-navy-mid"
                   }`}
                 >
@@ -375,24 +382,20 @@ export function CompareMatrix({
             </div>
           </div>
         ) : (
-          <Rail label={t.workspace.groupTerms} onClick={() => setSection("terms")} />
+          <Rail label={t.workspace.groupTerms} hint={t.workspace.openTerms} onClick={() => setSection("terms")} />
         )}
 
-        {/* ── Equipment: a door to the map, not a column (owner, 2026-08-25) ── */}
-        <button
-          type="button"
+        {/* ── Availability: a door to the map, not a column (owner, 2026-08-25) ──────────────────
+            No padlock. The rail is not guarding anything — it opens the picked bid's machines on the
+            map, where availability is answered in full — and a lock says «you may not», which is the
+            one thing it does not mean. */}
+        <Rail
+          label={t.workspace.colAvailability}
+          hint={t.workspace.checkAvailability}
           onClick={openEquipment}
           disabled={!equipmentTarget}
-          title={t.workspace.checkAvailability}
-          className="flex w-[52px] flex-none flex-col items-center justify-center gap-3 border-s-2 border-brand/30 bg-brand-soft transition hover:brightness-[.97] disabled:opacity-50"
-        >
-          <span className="grid h-[22px] w-[22px] flex-none place-items-center rounded-full border border-brand/30 bg-surface text-brand">
-            <Icon name="lock" size={11} />
-          </span>
-          <span className="rotate-180 text-[10px] font-extrabold uppercase tracking-[.18em] text-brand [writing-mode:vertical-rl]">
-            {t.workspace.groupEquipment} · {t.workspace.checkAvailability} →
-          </span>
-        </button>
+          leaves
+        />
       </div>
 
       {/* The bench: bids that are on this item but not on the comparison. */}
@@ -405,7 +408,7 @@ export function CompareMatrix({
               onClick={() => onBench(b.card.id, false)}
               className="flex flex-none items-center gap-2 rounded-full border border-dashed border-border bg-surface py-[5px] pe-3 ps-[5px] transition hover:border-navy-mid hover:bg-surface2/60"
             >
-              <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-surface3 text-[8.5px] font-bold text-muted">
+              <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-surface3 text-[10px] font-bold text-muted">
                 {initials(b.card.supplierName)}
               </span>
               <span className="text-[11.5px] font-bold text-navy-mid">{b.card.supplierName}</span>
@@ -438,7 +441,7 @@ function Band({ label, grow, tinted }: { label: string; grow: number; tinted?: b
       style={{ flexGrow: grow, flexBasis: 0 }}
       className={`flex min-w-0 items-center justify-center px-3 ${tinted ? "border-s border-border/70 bg-surface3/50" : ""}`}
     >
-      <span className="truncate text-[9.5px] font-extrabold uppercase tracking-[.1em] text-navy">{label}</span>
+      <span className="truncate text-[11px] font-extrabold uppercase tracking-wide text-navy-mid">{label}</span>
     </div>
   );
 }
@@ -482,11 +485,11 @@ function MoneyHead({
         className="flex min-w-0 items-center justify-center gap-1.5"
       >
         <span
-          className={`truncate text-[9px] font-bold uppercase leading-[1.2] tracking-[.06em] ${on ? "text-navy" : "text-muted"}`}
+          className={`truncate text-[11px] font-bold uppercase leading-tight tracking-wide ${on ? "text-navy" : "text-muted"}`}
         >
           {label}
         </span>
-        <span aria-hidden="true" className={`flex-none text-[7px] font-bold ${on ? "text-brand" : "text-border"}`}>
+        <span aria-hidden="true" className={`flex-none text-[9px] font-bold ${on ? "text-brand" : "text-muted/50"}`}>
           {on ? (sortDir === 1 ? "▲" : "▼") : "↕"}
         </span>
       </button>
@@ -495,7 +498,7 @@ function MoneyHead({
           type="button"
           onClick={onInfo}
           aria-label={label}
-          className="grid h-[15px] w-[15px] flex-none place-items-center rounded-full border border-brand/40 bg-brand-soft text-[9px] font-extrabold text-brand"
+          className="grid h-4 w-4 flex-none place-items-center rounded-full border border-brand/40 bg-brand-soft text-[10px] font-extrabold text-brand"
         >
           i
         </button>
@@ -515,23 +518,23 @@ function Money({ v, win, vat, excluded }: { v: number | null | undefined; win: b
       }`}
     >
       {v == null ? (
-        <span className="truncate text-[11.5px] font-semibold text-muted">
+        <span className="truncate text-[13px] font-semibold text-muted">
           {excluded ? t.priceFooter.excluded : t.workspace.didntSay}
         </span>
       ) : (
         <span className="flex min-w-0 items-baseline gap-1.5">
-          <span className={`truncate text-[16px] font-extrabold leading-none ${win ? "text-ok" : "text-navy"}`}>
+          <span className={`truncate text-[15px] font-extrabold leading-none ${win ? "text-ok" : "text-navy"}`}>
             {formatSar(v)}
           </span>
-          <span className={`flex-none text-[9px] font-bold leading-none ${win ? "text-ok/80" : "text-muted"}`}>
+          <span className={`flex-none text-[10px] font-bold leading-none ${win ? "text-ok/80" : "text-muted"}`}>
             {t.priceFooter.currency}
           </span>
         </span>
       )}
       {vat && v != null && (
         <span
-          className={`absolute bottom-[5px] end-2 text-[6.5px] font-semibold uppercase tracking-[.06em] ${
-            win ? "text-ok/60" : "text-muted/60"
+          className={`absolute bottom-1 end-2 text-[9px] font-bold uppercase tracking-wide ${
+            win ? "text-ok/70" : "text-muted/70"
           }`}
         >
           {t.workspace.withVat}
@@ -568,9 +571,10 @@ function TermColumn({
   asked?: boolean;
 }) {
   const t = useT();
-  const answers = rows.map((b) => read(findTerm(b.card, keys), ar));
+  const L = (en: string, arr: string) => (ar ? arr : en);
+  const answers = rows.map((b) => readTerm(findTerm(b.card, keys), keys[0], ar, t, L));
   const askedFor = asked
-    ? rows.map((b) => findTerm(b.card, keys)?.renteeValue ?? null).find((v): v is string => !!v) ?? null
+    ? rows.map((b) => humanTerm(findTerm(b.card, keys)?.renteeValue ?? null, keys[0], t, L)).find((v): v is string => !!v) ?? null
     : null;
   const first = answers[0];
   const merged =
@@ -578,10 +582,10 @@ function TermColumn({
 
   return (
     <div className="flex min-w-0 flex-1 flex-col border-e border-border/70 last:border-e-0">
-      <div className={`${HEAD} flex items-baseline gap-1.5 bg-surface/60 px-3`}>
-        <span className="flex-none text-[9px] font-bold uppercase leading-[1.2] tracking-[.06em] text-muted">{label}</span>
+      <div className={`${HEAD} flex items-center gap-1.5 bg-surface/60 px-3`}>
+        <span className="flex-none text-[11px] font-bold uppercase leading-tight tracking-wide text-muted">{label}</span>
         {askedFor && (
-          <span className="min-w-0 truncate text-[8.5px] font-semibold leading-[1.2] text-muted/70">
+          <span className="min-w-0 truncate text-[10px] font-semibold leading-tight text-muted/80">
             {t.workspace.youAsked} · {askedFor}
           </span>
         )}
@@ -589,11 +593,11 @@ function TermColumn({
 
       {merged ? (
         <div
-          style={{ height: rows.length * 49 }}
+          style={{ height: rows.length * 52 }}
           className="flex flex-none flex-col items-center justify-center gap-1 bg-surface/40 px-3"
         >
-          <span className="text-center text-[12.5px] font-semibold leading-[1.3] text-muted">{first.text}</span>
-          <span className="text-center text-[10px] font-medium leading-[1.3] text-muted/70">
+          <span className="text-center text-[13px] font-semibold leading-snug text-muted">{first.text}</span>
+          <span className="text-center text-[11px] font-medium leading-snug text-muted/80">
             {t.workspace.sameFromAll.replace("{n}", String(rows.length))}
           </span>
         </div>
@@ -609,7 +613,7 @@ function TermColumn({
               }`}
             >
               <span
-                className={`truncate text-[12.5px] leading-[1.3] ${
+                className={`truncate text-[13px] leading-snug ${
                   a.against ? "font-bold text-danger" : a.text ? "font-semibold text-navy" : "font-semibold text-muted"
                 }`}
               >
@@ -623,21 +627,86 @@ function TermColumn({
   );
 }
 
-/** A term as the supplier answered it, and whether it goes against what the renter asked. */
-function read(row: TermRow | null, ar: boolean): { text: string | null; against: boolean } {
-  const text = row?.value ?? (row?.detail ? (ar ? row.detail.ar : row.detail.en) : null) ?? row?.renteeValue ?? null;
-  return { text: text || null, against: !!row && row.state === "conflict" };
+/**
+ * A term as the supplier answered it, and whether it goes against what the renter asked.
+ *
+ * ── The value is READ, never printed raw (owner, 2026-08-25) ────────────────────────────────────
+ * The wire says `NO`, `supplier`, `net_0`; the table was printing exactly that, so a renter
+ * comparing offers was reading the database. Three passes, in order:
+ *
+ * 1. `termValueLabel` — the app's own vocabularies (responsibility, SLA, rental type …), keyed by the
+ *    term key, so «supplier» becomes «Supplier» in the same words the deal room uses;
+ * 2. the create flow's own option labels for payment (`net_30` → «Net 30»), matched on the hyphenated
+ *    spelling the picker uses;
+ * 3. a last tidy — YES/NO become Yes/No, and anything left has its underscores opened and its first
+ *    letter raised, which is right for the free text and the numbers that make up the rest.
+ *
+ * Nothing is invented: a value this cannot name comes back tidied, not translated.
+ */
+function readTerm(row: TermRow | null, key: string, ar: boolean, t: Dict, L: (en: string, arr: string) => string): { text: string | null; against: boolean } {
+  const raw = row?.value ?? (row?.detail ? (ar ? row.detail.ar : row.detail.en) : null) ?? row?.renteeValue ?? null;
+  return { text: humanTerm(raw, row?.key ?? key, t, L), against: !!row && row.state === "conflict" };
 }
 
-/** A closed group, standing on its edge. Pressing it swaps the open group for this one. */
-function Rail({ label, onClick }: { label: string; onClick: () => void }) {
+function humanTerm(raw: string | null, key: string, t: Dict, L: (en: string, arr: string) => string): string | null {
+  const v = (raw ?? "").trim();
+  if (!v) return null;
+
+  const known = termValueLabel(key, v, L);
+  if (known && known !== v) return known;
+
+  const token = v.toLowerCase().replace(/[_\s]+/g, "-");
+  if (/payment/.test(key)) {
+    const pay = (t.options.paymentTerm as Record<string, string | undefined>)[token];
+    if (pay) return pay;
+  }
+  if (token === "yes" || token === "true") return t.workspace.termYes;
+  if (token === "no" || token === "false") return t.workspace.termNo;
+
+  // Nothing named it: open the separators and raise the first letter. «net_0» → «Net 0».
+  const opened = v.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+  return opened.charAt(0).toUpperCase() + opened.slice(1);
+}
+
+/**
+ * A closed group, standing on its edge — press it to swap it for the open one.
+ *
+ * **Every rail looks the same and reads as a control** (owner, 2026-08-25): the brand-soft ground the
+ * availability rail already had, a chevron so the press is visible before you hover, and a hover that
+ * moves. A grey rail beside an orange one read as furniture beside a button when both do the same
+ * thing.
+ *
+ * The label is ONE word and the sentence lives in `title`. A long vertical label is what forced the
+ * table taller than its own rows — the rail cannot fit «EQUIPMENT · CHECK AVAILABILITY» in the height
+ * of two bids, so it stretched the whole card and left a field of empty white under the last row.
+ */
+function Rail({
+  label,
+  hint,
+  onClick,
+  disabled,
+  leaves,
+}: {
+  label: string;
+  hint: string;
+  onClick: () => void;
+  disabled?: boolean;
+  /** This rail goes somewhere else rather than opening in place — it says so with an arrow. */
+  leaves?: boolean;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex w-[52px] flex-none items-center justify-center border-s-2 border-border bg-surface2/70 transition hover:bg-surface3/70"
+      disabled={disabled}
+      title={hint}
+      aria-label={hint}
+      className="group flex w-11 flex-none flex-col items-center justify-center gap-2 overflow-hidden border-s border-brand/20 bg-brand-soft transition hover:bg-brand/15 disabled:cursor-default disabled:opacity-50"
     >
-      <span className="rotate-180 text-[10px] font-extrabold uppercase tracking-[.18em] text-navy-mid [writing-mode:vertical-rl]">
+      <span aria-hidden="true" className="flex-none text-[11px] font-bold leading-none text-brand rtl:scale-x-[-1]">
+        {leaves ? "→" : "‹"}
+      </span>
+      <span className="rotate-180 truncate text-[11px] font-extrabold uppercase tracking-wide text-brand [writing-mode:vertical-rl]">
         {label}
       </span>
     </button>
@@ -667,7 +736,7 @@ function BuildPopover({ which, totals, onClose }: { which: "first" | "after" | "
       <div className="fixed inset-0 z-30" onClick={onClose} />
       <div className="absolute end-0 top-[34px] z-40 flex w-[246px] flex-col gap-2 rounded-[11px] border border-border bg-surface px-3.5 py-3 text-start shadow-[0_14px_34px_rgba(19,44,74,.16)]">
         <div className="flex items-baseline gap-2.5">
-          <span className="flex-1 text-[9px] font-extrabold uppercase tracking-[.09em] text-muted">{heading}</span>
+          <span className="flex-1 text-[11px] font-extrabold uppercase tracking-wide text-muted">{heading}</span>
           <button type="button" onClick={onClose} aria-label={t.common.cancel} className="text-[11px] font-bold text-border">
             ✕
           </button>
@@ -682,10 +751,10 @@ function BuildPopover({ which, totals, onClose }: { which: "first" | "after" | "
         <Line label={t.priceFooter.subtotal} v={part.subtotal} />
         <Line label={t.priceFooter.vat} v={part.vat} />
         <div className="mt-0.5 flex items-baseline justify-between gap-3 border-t border-border pt-2">
-          <span className="text-[11px] font-extrabold text-navy">{t.priceFooter.total}</span>
-          <span className="text-[13px] font-extrabold text-navy">{formatSar(part.total)}</span>
+          <span className="text-[12px] font-extrabold text-navy">{t.priceFooter.total}</span>
+          <span className="text-[14px] font-extrabold text-navy">{formatSar(part.total)}</span>
         </div>
-        <p className="text-[9.5px] font-semibold leading-snug text-muted">
+        <p className="text-[11px] font-medium leading-snug text-muted">
           {t.workspace.vatNote}
           {which === "duration" && dur && !dur.raw && (
             <> {t.workspace.fridaysNote.replace("{days}", String(dur.days)).replace("{billable}", String(dur.billableDays))}</>
@@ -699,8 +768,8 @@ function BuildPopover({ which, totals, onClose }: { which: "first" | "after" | "
 function Line({ label, v, note }: { label: string; v: number; note?: string }) {
   return (
     <div className="flex items-baseline gap-3">
-      <span className="flex-1 text-[11px] font-medium leading-[1.3] text-navy-mid">{label}</span>
-      <span className="flex-none whitespace-nowrap text-[11.5px] font-semibold leading-[1.3] text-navy">
+      <span className="flex-1 text-[12px] font-medium leading-snug text-navy-mid">{label}</span>
+      <span className="flex-none whitespace-nowrap text-[12.5px] font-semibold leading-snug text-navy">
         {note ?? formatSar(v)}
       </span>
     </div>
