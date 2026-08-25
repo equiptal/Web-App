@@ -109,7 +109,7 @@ export function WherePanel({
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                 <p className="min-w-0 flex-1 text-[13px] leading-snug text-navy-mid">
                   <Icon name="location_on" size={15} className="me-1 align-[-3px] text-brand" />
-                  {loc.label ?? t.create.wherePanel.dragHint}
+                  {hasLocation ? loc.label : t.create.wherePanel.dragHint}
                 </p>
                 {loc.confirmed ? (
                   <span className="flex items-center gap-1.5 rounded-[10px] border border-ok/30 bg-ok-soft px-3.5 py-2.5 text-[13px] font-bold text-ok">

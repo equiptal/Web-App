@@ -92,7 +92,7 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
                   placeholder={t.create.machineCard.noCert}
                   searchPlaceholder={t.create.machineCard.cert}
                   label={t.create.machineCard.cert}
-                  tone={overrides.safetyCerts.length ? "overlay" : "brand"}
+                  tone={gapFor("safety_certificates") ? "brand" : "overlay"}
                   options={[
                     { value: NO_CERT, label: t.create.machineCard.noCert },
                     ...SAFETY_CERTIFICATES.map((c) => ({ value: c, label: t.options.safetyCert[c] })),
@@ -159,7 +159,7 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
                 placeholder={t.create.machineCard.anyYear}
                 searchPlaceholder={t.create.machineCard.minYear}
                 label={t.create.machineCard.minYear}
-                tone={overrides.equipmentYear ? "overlay" : "brand"}
+                tone={gapFor("equipment_year") ? "brand" : "overlay"}
                 options={EQUIPMENT_YEARS.map((y) => ({ value: y, label: y === "any" ? t.create.machineCard.anyYear : y }))}
                 onChange={(v) => set("equipment_year", { equipmentYear: v })}
               />
