@@ -37,20 +37,25 @@ export function RequestRail({
   // Roughly three tiles a press — far enough to feel like progress, short enough to keep your place.
   const scrollBy = (dir: 1 | -1) => scroller.current?.scrollBy({ left: dir * 300, behavior: "smooth" });
 
+  // ── 80px, down from 96 (owner, 2026-08-25: fit /requests without scrolling) ────────────────────
+  // The circles carry a photo and a state ring, and neither needs 62px to read — 48 keeps the machine
+  // recognisable and the badges legible. The height is not 48 + label: a CLOSED tile carries a second
+  // caption under its name, so the row is sized for the tallest tile it can hold (48 + 6 + 14 + 10),
+  // not the common one.
   return (
-    <div className="flex h-24 flex-none items-center gap-5 overflow-hidden border-b border-border bg-surface3/60 px-4 sm:px-[26px]">
+    <div className="flex h-[80px] flex-none items-center gap-4 overflow-hidden border-b border-border bg-surface3/60 px-4 sm:px-[26px]">
       <Link href="/create" className="group flex flex-none flex-col items-center gap-1.5">
-        <span className="grid h-[62px] w-[62px] place-items-center rounded-full border-2 border-dashed border-border text-muted transition group-hover:border-brand group-hover:text-brand">
-          <Icon name="add" size={24} />
+        <span className="grid h-12 w-12 place-items-center rounded-full border-2 border-dashed border-border text-muted transition group-hover:border-brand group-hover:text-brand">
+          <Icon name="add" size={20} />
         </span>
         <span className="text-[10.5px] font-semibold text-muted">{t.workspace.newRequest}</span>
       </Link>
 
-      <div className="h-[60px] w-px flex-none bg-border/70" />
+      <div className="h-10 w-px flex-none bg-border/70" />
 
       <div
         ref={scroller}
-        className="flex min-w-0 flex-1 items-start gap-[26px] overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex min-w-0 flex-1 items-start gap-5 overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {tiles.map((tile) => {
           const active = tile.key === activeKey;
@@ -67,14 +72,14 @@ export function RequestRail({
               title={tile.label}
               className={`flex max-w-[86px] flex-none flex-col items-center gap-1.5 text-center transition ${dim} hover:opacity-100`}
             >
-              <span className={`grid h-[62px] w-[62px] place-items-center rounded-full p-[2px] ${ring}`}>
+              <span className={`grid h-12 w-12 place-items-center rounded-full p-[2px] ${ring}`}>
                 <span className="relative h-full w-full rounded-full border-2 border-surface">
                   <span className={`grid h-full w-full place-items-center overflow-hidden rounded-full bg-surface3 ${tile.closed ? "grayscale" : ""}`}>
                     {img ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img src={img} alt="" className="h-full w-full object-cover" />
                     ) : (
-                      <Icon name="precision_manufacturing" size={24} className="text-muted" />
+                      <Icon name="precision_manufacturing" size={20} className="text-muted" />
                     )}
                   </span>
                   {/* One badge, and which one depends on what the tile has to say: bids that have
@@ -130,7 +135,7 @@ export function RequestRail({
         onClick={() => scrollBy(1)}
         aria-label={t.workspace.railScrollNext}
         title={t.workspace.railScrollNext}
-        className="-mt-3 grid h-[30px] w-[30px] flex-none place-items-center self-center rounded-full border border-border bg-surface/60 text-muted transition hover:bg-surface"
+        className="-mt-2 grid h-7 w-7 flex-none place-items-center self-center rounded-full border border-border bg-surface/60 text-muted transition hover:bg-surface"
       >
         <Icon name="chevron_right" size={16} className="rtl:scale-x-[-1]" />
       </button>

@@ -286,51 +286,75 @@ export function RequestsWorkspace() {
     w.print();
   }, [ar, group, item, shown, t]);
 
-  // ── The states before there is a workspace to show ──
+  /**
+   * ── The states before there is a workspace to show ──
+   *
+   * These used to inherit the page padding `wide` supplied. `fullBleed` supplies none — the surface
+   * owns its own edges now — so each one is centred in the viewport it was handed instead of sitting
+   * flush against the top-start corner.
+   */
+  const Standalone = ({ children }: { children: React.ReactNode }) => (
+    <div className="mx-auto flex h-full w-full max-w-[560px] flex-col justify-center px-6 py-8">{children}</div>
+  );
   if (status === "anon") {
     return (
-      <SignInPrompt
-        icon="assignment"
-        title={t.workspace.signedOutTitle}
-        body={t.workspace.signedOutBody}
-        ctaLabel={t.workspace.signedOutCta}
-      />
+      <Standalone>
+        <SignInPrompt
+          icon="assignment"
+          title={t.workspace.signedOutTitle}
+          body={t.workspace.signedOutBody}
+          ctaLabel={t.workspace.signedOutCta}
+        />
+      </Standalone>
     );
   }
   if (groups === null) {
-    return <div className="p-10 text-center text-[13px] font-semibold text-muted">{t.workspace.loading}</div>;
+    return (
+      <Standalone>
+        <div className="text-center text-[13px] font-semibold text-muted">{t.workspace.loading}</div>
+      </Standalone>
+    );
   }
   if (failed) {
     return (
-      <div className="p-10 text-center">
-        <p className="text-[13px] font-semibold text-muted">{t.workspace.loadFailed}</p>
-        <button
-          type="button"
-          onClick={() => {
-            setGroups(null);
-            setReloads((n) => n + 1);
-          }}
-          className="mt-3 rounded-full bg-brand px-4 py-2 text-[12.5px] font-bold text-white"
-        >
-          {t.workspace.retry}
-        </button>
-      </div>
+      <Standalone>
+        <div className="text-center">
+          <p className="text-[13px] font-semibold text-muted">{t.workspace.loadFailed}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setGroups(null);
+              setReloads((n) => n + 1);
+            }}
+            className="mt-3 rounded-full bg-brand px-4 py-2 text-[12.5px] font-bold text-white"
+          >
+            {t.workspace.retry}
+          </button>
+        </div>
+      </Standalone>
     );
   }
   if (groups.length === 0 || !group) {
     return (
-      <SignInPrompt
-        icon="assignment"
-        title={t.workspace.emptyTitle}
-        body={t.workspace.emptyBody}
-        ctaLabel={t.workspace.emptyCta}
-        ctaHref="/create"
-      />
+      <Standalone>
+        <SignInPrompt
+          icon="assignment"
+          title={t.workspace.emptyTitle}
+          body={t.workspace.emptyBody}
+          ctaLabel={t.workspace.emptyCta}
+          ctaHref="/create"
+        />
+      </Standalone>
     );
   }
 
   return (
-    <div className="-mx-6 -my-6 flex min-h-0 flex-col sm:-mx-12 sm:-mt-7 lg:-mx-20 xl:-mx-28">
+    // ── The page ends at the fold (owner, 2026-08-25) ──────────────────────────────────────────
+    // The negative margins are gone with them: they existed to cancel the padding `wide` put around
+    // this surface, and `fullBleed` gives it none to cancel. Every band below is `flex-none`; the one
+    // that grows is the tab panel, and the only thing that scrolls is the list inside it — so the
+    // rail and the strip cannot be pushed off the top by a long column of bids.
+    <div className="flex h-full min-h-0 flex-col">
       <RequestRail
         tiles={tiles}
         activeKey={resolved.groupId}
@@ -348,11 +372,11 @@ export function RequestsWorkspace() {
         onOpenRequest={() => { setDrawerShare(false); setDrawerOpen(true); }}
       />
 
-      <div className="mx-3 mt-4 sm:mx-5">
+      <div className="mx-3 mt-3 flex min-h-0 flex-1 flex-col pb-3 sm:mx-5">
         {/* Tabs, and the export beside them. The open tab is part of the panel below it — it carries
             the panel's own border and covers the hairline between them, which is why the panel's
             top-start corner is square. */}
-        <div className="flex items-end gap-3 ps-3.5">
+        <div className="flex flex-none items-end gap-3 ps-3.5">
           <div className="flex items-end gap-0.5">
             {(["cards", "compare"] as Tab[]).map((k) => {
               const on = tab === k;
@@ -403,13 +427,13 @@ export function RequestsWorkspace() {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-b-[14px] rounded-tr-[14px] border border-border bg-surface shadow-[0_2px_10px_rgba(19,44,74,.07)]">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-b-[14px] rounded-tr-[14px] border border-border bg-surface shadow-[0_2px_10px_rgba(19,44,74,.07)]">
           {/* ── Source, above whichever pane is showing (owner's reference, 2026-08-25) ───────────
               It narrows both panes, so it belongs to neither — and it reads as a quiet row of words
               rather than a row of pills, because it is a filter over the table, not an action on it.
               It appears only when there is a mix to narrow: with every bid from one source, three
               choices that change nothing are furniture. */}
-          <div className="flex flex-wrap items-center gap-4 border-b border-border px-4 py-2.5">
+          <div className="flex flex-none flex-wrap items-center gap-4 border-b border-border px-4 py-2.5">
               <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wide text-muted">
                 <Icon name="filter_list" size={14} /> {t.workspace.source}
               </span>
@@ -435,6 +459,10 @@ export function RequestsWorkspace() {
             ))}
           </div>
 
+          {/* THE one scrolling region on the page. The bids are the only band whose height the
+              renter's data decides, so they are the only band allowed to overflow — and it scrolls
+              inside the card, which keeps the tabs, the filter and the strip above it in place. */}
+          <div className="min-h-0 flex-1 overflow-y-auto">
           {tab === "cards" ? (
             <BidCards
               bids={shown}
@@ -461,6 +489,7 @@ export function RequestsWorkspace() {
               onRank={rank}
             />
           )}
+          </div>
         </div>
 
         {/* ── The suggestion bar (owner, 2026-08-25) ────────────────────────────────────────────────
@@ -469,7 +498,7 @@ export function RequestsWorkspace() {
             the agent's own words, unpadded — and it opens into the full note. Nothing appears until
             the renter has asked for a ranking, because an empty assistant is furniture. */}
         {tab === "compare" && shown.length > 0 && (
-          <div className="mt-3.5">
+          <div className="mt-3.5 flex-none">
             {ranking?.note && !tipOpen ? (
               <button
                 type="button"

@@ -89,15 +89,19 @@ export function RequestStrip({
   };
 
   return (
-    <div className="mx-3 mt-3.5 flex items-stretch gap-4 sm:mx-5">
-      <div className="flex min-w-0 flex-1 flex-col gap-4 rounded-[16px] bg-navy px-4 py-3 text-white lg:flex-row lg:items-center lg:gap-5 lg:px-[18px]">
+    <div className="mx-3 mt-2.5 flex flex-none items-stretch gap-4 sm:mx-5">
+      {/* Thinner (owner, 2026-08-25). `py-3` became `py-2` and the site name 18px → 16px: on a page
+          that must end at the fold, the strip's job is to NAME the request, and a name does not need
+          a display size to do it. The white card inside keeps its own padding — squeezing that would
+          crowd the thumbnail rather than the row. */}
+      <div className="flex min-w-0 flex-1 flex-col gap-3 rounded-[14px] bg-navy px-4 py-2 text-white lg:flex-row lg:items-center lg:gap-5 lg:px-[18px]">
         {/* ── The request ── */}
         <div className="flex flex-none flex-col gap-1.5">
           <button
             type="button"
             onClick={onOpenRequest ?? undefined}
             disabled={!onOpenRequest}
-            className="flex items-center gap-1.5 text-start text-[18px] font-extrabold leading-[1.15] tracking-[-.01em] underline-offset-4 hover:underline disabled:no-underline"
+            className="flex items-center gap-1.5 text-start text-[16px] font-extrabold leading-[1.15] tracking-[-.01em] underline-offset-4 hover:underline disabled:no-underline"
             title={group.address ?? group.locationLabel}
           >
             {group.locationLabel}

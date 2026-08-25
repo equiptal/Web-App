@@ -11,7 +11,12 @@ import { RequestsWorkspace } from "@/components/workspace/RequestsWorkspace";
 export default function RequestsPage() {
   const t = useT();
   return (
-    <AppShell title={t.workspace.title} wide>
+    // `fullBleed`, not `wide` (owner, 2026-08-25: "make the /requests page appear fully without
+    // scrolling"). `wide` lets the page grow past the fold and hands the whole document to the
+    // browser's scrollbar, which takes the rail and the request strip off screen with it. Full-bleed
+    // pins the shell to exactly the viewport; the workspace then owns its own scrolling region, so
+    // the chrome stays put and only the bids move. It is the same treatment the bid map already has.
+    <AppShell title={t.workspace.title} fullBleed>
       <RequestsWorkspace />
     </AppShell>
   );
