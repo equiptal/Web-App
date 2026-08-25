@@ -48,6 +48,8 @@ export const en = {
     // The phone menu button, which opens the nav sheet — the three places the centred row holds
     // on a wider bar.
     menu: "Menu",
+    // The language switch names its DESTINATION, not its state — the control is a two-way choice.
+    switchLang: "Switch to Arabic",
     // The account menu's entry to . The route and its content are unchanged; «Settings» is
     // what a reader looks for beside Sign out, and it keeps the header to four tabs.
     settings: "Settings",

@@ -387,22 +387,51 @@ function AppShellInner({ children, title, fullBleed, wide }: AppShellProps) {
   );
 }
 
-/** The EN/AR pair. Lifted out of the bar so the identical control can be rendered in two places —
- *  the header on a tablet and up, the nav sheet on a phone — without the markup being written twice
- *  and drifting apart. */
+/**
+ * The language control: EN · switch · عربي, drawn from the header prototype (owner, 2026-08-25).
+ *
+ * It replaced a segmented EN/ع pair. The owner took the prototype's form here having been told the
+ * objection — a switch reads as on/off, and a language is not off — and that call stands; the note
+ * survives so the next reader knows it was weighed rather than missed.
+ *
+ * ── One button, not three ───────────────────────────────────────────────────────────────────────
+ * The prototype draws both words as inert spans. Making the WHOLE control one button costs nothing,
+ * gives the labels a hit area they did not have, and keeps the bar to one tab stop. It is labelled
+ * by its DESTINATION («Switch to Arabic») because that is what pressing it does — `aria-pressed`
+ * would claim an on/off state the control does not have.
+ *
+ * ── The knob travels the right way in both directions ───────────────────────────────────────────
+ * `start-0.5` is where EN sits, and EN is the FIRST child — so in Arabic, where the row mirrors, the
+ * knob's rest position mirrors with it and stays under EN. The Arabic state then moves it toward the
+ * LAST child, which is why the translate is signed per direction rather than shared.
+ *
+ * Colours are ours, not the prototype's: its neutrals are cool grey (#1f2d3a / #9aa2ab / #e5e8eb)
+ * where the app's are blue-tinted, and a single control in the other family would read as a patch.
+ * The geometry — 40×22 track, 18px knob, 2px inset, 13px labels — is the prototype's exactly.
+ *
+ * Lifted out of the bar so the identical control renders in two places — the header on a tablet and
+ * up, the nav sheet on a phone — without the markup being written twice and drifting apart.
+ */
 function LocaleToggle({ locale, setLocale }: { locale: Locale; setLocale: (l: Locale) => void }) {
+  const t = useT();
+  const ar = locale === "ar";
   return (
-    <span className="inline-flex overflow-hidden rounded-md border border-border">
-      {(["en", "ar"] as Locale[]).map((l) => (
-        <button
-          key={l}
-          onClick={() => setLocale(l)}
-          className={`px-2.5 py-1 text-xs font-bold ${locale === l ? "bg-navy text-white" : "bg-surface text-muted"}`}
-        >
-          {l === "en" ? "EN" : "ع"}
-        </button>
-      ))}
-    </span>
+    <button
+      type="button"
+      onClick={() => setLocale(ar ? "en" : "ar")}
+      aria-label={t.shell.switchLang}
+      className="inline-flex flex-none items-center gap-2 rounded-full text-[13px] leading-none"
+    >
+      <span className={ar ? "font-semibold text-muted" : "font-bold text-navy"}>EN</span>
+      <span className="relative h-[22px] w-10 flex-none rounded-full bg-surface3">
+        <span
+          className={`absolute top-0.5 start-0.5 h-[18px] w-[18px] rounded-full bg-navy shadow-[0_1px_2px_rgba(28,53,80,.3)] transition-transform duration-200 ${
+            ar ? "ltr:translate-x-[18px] rtl:-translate-x-[18px]" : ""
+          }`}
+        />
+      </span>
+      <span className={ar ? "font-bold text-navy" : "font-semibold text-muted"}>عربي</span>
+    </button>
   );
 }
 
