@@ -6,7 +6,6 @@ import {
   defaultProjectDetails,
   defaultPreferences,
   defaultOperatorDetails,
-  defaultOperatorNeeded,
   computeSummary,
   SAFETY_CERTIFICATES,
   splitSafetyCerts,
@@ -334,7 +333,26 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
     subcategoryId: li.subtype_id ?? null,
     measurementId: li.capacity_id ?? null,
   };
-  const operatorNeeded = li.operator_included == null ? defaultOperatorNeeded(ref.subcategoryId) : li.operator_included ? "yes" : "no";
+  /**
+   * The agent's silence is an answer, and it is not "yes".
+   *
+   * `defaultOperatorNeeded` is the APP's default for a line a human adds by hand — operator on for
+   * everything except generators / compressors / light towers (AC-24). Applying it to an
+   * agent-parsed line overwrote a considered non-answer: the normalization agent returns
+   * `operator_included: null` on purpose and says why — "never auto-fill — operator demand is a
+   * commercial choice, unlike fuel" — and raises a missing_required_fields entry with a suggestion
+   * instead. We were turning that into a demand for an operator on almost every item, which is a
+   * priced line the renter never asked for, and it opened the operator rail as though they had.
+   *
+   * So an agent line with nothing stated starts with the operator OFF. That is still a default, and
+   * neither side of this is truly neutral — off claims the renter drives the machine themselves. It
+   * is the cheaper wrong answer of the two, it is visible (the rail is collapsed, not quietly
+   * populated), and it carries its provenance mark like any other value we chose.
+   *
+   * The app's default still applies where it belongs: {@link newManualItem} and SET_ITEM_SUBCATEGORY,
+   * i.e. lines the renter built themselves.
+   */
+  const operatorNeeded = li.operator_included == null ? "no" : li.operator_included ? "yes" : "no";
   const safety = safetySplit(li.safety_certifications); // chips + free-text "Other" (app parity)
   const agentCert = toOperatorCert(li); // AC-50: operator cert(s) the agent set from the RFQ (empty if none)
   return {

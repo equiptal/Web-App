@@ -155,3 +155,38 @@ describe("an explicit 'nothing' answer is the same payload as unset (MREQ-AC-55)
     expect(explicit.equipmentItems[0].safetyCertifications).toEqual(unset.equipmentItems[0].safetyCertifications);
   });
 });
+
+describe("the agent's silence on the operator is not a yes", () => {
+  const parse = (line: Record<string, unknown>) =>
+    agentOutputToDraft({
+      rfq_header: {} as never,
+      line_items: [line] as never,
+      missing_required_fields: [],
+      justifications: [],
+      field_notes: [],
+    });
+
+  /**
+   * The normalization agent returns `operator_included: null` deliberately — its prompt says "never
+   * auto-fill — operator demand is a commercial choice, unlike fuel". The web used to overwrite that
+   * with the app's hand-built-line default, which is "yes" for everything but generators, compressors
+   * and light towers. That turned a non-answer into a demand for an operator, which is a priced line,
+   * and opened the operator rail as though the renter had asked for one.
+   */
+  it("leaves the operator off when the RFQ said nothing", () => {
+    const draft = parse({ input_equipment: "4 forklifts" });
+    expect(draft.items[0].operatorNeeded).toBe("no");
+  });
+
+  it("still honours an operator the RFQ did ask for", () => {
+    expect(parse({ input_equipment: "digger with operator", operator_included: true }).items[0].operatorNeeded).toBe("yes");
+    expect(parse({ input_equipment: "digger, we drive it", operator_included: false }).items[0].operatorNeeded).toBe("no");
+  });
+
+  it("does not send an operator the renter never asked for", () => {
+    // Real taxonomy ids, or the mapper has no line to emit.
+    const draft = parse({ input_equipment: "4 forklifts", category_id: "cat", subtype_id: "sub", capacity_id: "cap" });
+    const p = draftToCreateRequest({ project: defaultProjectDetails(), items: draft.items, preferences: defaultPreferences() }, "user-1");
+    expect(p.equipmentItems[0].operatorIncluded).toBe("NO");
+  });
+});
