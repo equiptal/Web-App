@@ -9,7 +9,7 @@ import { PUBLIC_WEB_ENABLED } from "@/lib/flags";
 import { Icon } from "@/components/ui";
 import type { RenterProfile, VerificationStatus } from "@/lib/contract/onboarding";
 import { updateLanguage } from "@/lib/api/profile-client";
-import { MyCompanyCard } from "@/components/company/MyCompanyCard";
+import { Field, FieldGrid, MastheadPill, PageMasthead, Row, RowList, Section } from "@/components/PageSection";
 import { EditProfileForm } from "./EditProfileForm";
 import { ChangePhoneModal } from "./ChangePhoneModal";
 import { DeleteAccountModal } from "./DeleteAccountModal";
@@ -42,7 +42,6 @@ export function ProfileView() {
   const [showDelete, setShowDelete] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
   const [langBusy, setLangBusy] = useState(false);
-  const [company, setCompany] = useState<CompanyInfo | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -55,36 +54,6 @@ export function ProfileView() {
       })
       .catch(() => active && setLoadError(true))
       .finally(() => active && setLoading(false));
-    // Company details for the company card (fields are under `submission`; the /me payload lacks the
-    // presigned logo URL). Merge with the doc-URLs fetch below.
-    fetch("/api/verification", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { submission?: { companyLogoUrl?: string | null; companyName?: string | null; authorityRole?: string | null; nationalId?: string | null; companyCity?: string | null; companyAddress?: string | null } } | null) => {
-        if (!active || !d?.submission) return;
-        const s = d.submission;
-        setCompany((c) => ({
-          logoUrl: s.companyLogoUrl ?? null,
-          legalName: s.companyName ?? null,
-          authorityRole: s.authorityRole ?? null,
-          nationalId: s.nationalId ?? null,
-          companyCity: s.companyCity ?? null,
-          companyAddress: s.companyAddress ?? null,
-          docs: c?.docs ?? null,
-        }));
-      })
-      .catch(() => {});
-    // Presigned document URLs (verified-only; a non-verified caller 403s → we just skip the View links).
-    fetch("/api/verification/docs", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { crDocUrl?: string | null; vatDocUrl?: string | null; nationalAddressDocUrl?: string | null } | null) => {
-        if (!active || !d) return;
-        setCompany((c) => ({
-          logoUrl: c?.logoUrl ?? null, legalName: c?.legalName ?? null, authorityRole: c?.authorityRole ?? null,
-          nationalId: c?.nationalId ?? null, companyCity: c?.companyCity ?? null, companyAddress: c?.companyAddress ?? null,
-          docs: { crDocUrl: d.crDocUrl ?? null, vatDocUrl: d.vatDocUrl ?? null, nationalAddressDocUrl: d.nationalAddressDocUrl ?? null },
-        }));
-      })
-      .catch(() => {});
     return () => {
       active = false;
     };
@@ -121,27 +90,21 @@ export function ProfileView() {
   const fullName = [profile?.firstName, profile?.lastName].filter(Boolean).join(" ").trim();
   const tierLabel = tier === "verified" ? t.shell.tierVerified : tier === "basic" ? t.shell.tierBasic : t.shell.tierGuest;
 
-  const card = "rounded-[14px] border border-border bg-surface";
-  const rowCls = "flex w-full items-center gap-3 px-4 py-3.5 text-start transition hover:bg-surface2";
 
   return (
     <div className="pb-10" dir={ar ? "rtl" : "ltr"}>
-      {/* Navy header */}
-      <div className="flex items-center gap-4 rounded-[16px] bg-navy p-5 text-white">
-        <span className="grid h-16 w-16 flex-none place-items-center rounded-full bg-white/12 text-white">
-          <Icon name="account_circle" size={38} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[17px] font-extrabold">
-            {p.greeting.replace("{name}", fullName ? (ar ? `، ${fullName}` : `, ${fullName}`) : "")}
-          </p>
-          <p className="mt-0.5 truncate text-[13px] text-white/70" dir="ltr">{user?.phone ?? profile?.phone ?? "—"}</p>
-          <span className="mt-2 inline-flex items-center gap-1 rounded-md bg-white/12 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+      {/* One masthead shape across the account pages — see `PageMasthead`. */}
+      <PageMasthead
+        icon={<Icon name="account_circle" size={34} className="text-white" />}
+        title={p.greeting.replace("{name}", fullName ? (ar ? `، ${fullName}` : `, ${fullName}`) : "")}
+        subtitle={<span dir="ltr">{user?.phone ?? profile?.phone ?? "—"}</span>}
+        badge={
+          <MastheadPill tone={tier === "verified" ? "ok" : "neutral"}>
             {tier === "verified" && <Icon name="verified" size={13} />}
             {tierLabel}
-          </span>
-        </div>
-      </div>
+          </MastheadPill>
+        }
+      />
 
       {loading && <p className="mt-6 text-center text-[13px] text-muted">…</p>}
       {loadError && !loading && (
@@ -167,115 +130,103 @@ export function ProfileView() {
         </button>
       )}
 
-      {/* Profile card — read-only summary + edit toggle. */}
       {!loading && profile && (
-        <div className={`mt-4 ${card} p-5`}>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[14px] font-extrabold text-navy">{p.editProfile}</h2>
-            {!editing && (
+        <Section
+          title={p.editProfile}
+          action={
+            !editing && (
               <button
                 onClick={() => setEditing(true)}
-                className="inline-flex items-center gap-1.5 rounded-[9px] border border-border bg-surface px-3 py-1.5 text-[12.5px] font-bold text-navy-mid hover:bg-surface2"
+                className="inline-flex h-8 items-center gap-1.5 rounded-[9px] border border-border bg-surface px-3 text-[12.5px] font-bold text-navy-mid hover:bg-surface2"
               >
                 <Icon name="edit" size={15} /> {p.editProfile}
               </button>
-            )}
-          </div>
-
+            )
+          }
+        >
           {savedToast && (
-            <p className="mb-3 flex items-center gap-1.5 rounded-[10px] border border-ok/30 bg-ok-soft px-3 py-2 text-[12.5px] font-semibold text-ok">
+            <p className="mx-4 mt-4 flex items-center gap-1.5 rounded-[10px] border border-ok/30 bg-ok-soft px-3 py-2 text-[12.5px] font-semibold text-ok">
               <Icon name="check_circle" size={15} /> {p.saved}
             </p>
           )}
-
           {editing ? (
-            <EditProfileForm profile={profile} onSaved={onSaved} onCancel={() => setEditing(false)} />
+            <div className="p-4">
+              <EditProfileForm profile={profile} onSaved={onSaved} onCancel={() => setEditing(false)} />
+            </div>
           ) : (
-            <dl className="grid grid-cols-1 gap-y-3 sm:grid-cols-2 sm:gap-x-5">
+            <FieldGrid>
               <Field label={`${p.firstName} / ${p.lastName}`} value={fullName || "—"} />
               <Field label={p.city} value={profile.city || "—"} />
               <Field label={p.jobTitle} value={profile.jobTitle || "—"} />
               <Field label={p.companyName} value={profile.companyName || "—"} />
               <Field label={p.email} value={profile.email || "—"} ltr />
               <Field label={p.whatsapp} value={profile.whatsapp || "—"} ltr />
-            </dl>
+            </FieldGrid>
           )}
-        </div>
+        </Section>
       )}
 
-      {/* Company / verification card. */}
+      {/* ── The company lives on ITS OWN PAGE now (owner, 2026-08-26) ─────────────────────────────
+          Two cards used to sit here — one for verification state, one for the firm this account
+          belongs to — while /company carried the same facts a third time. A reader had to know which
+          of two pages held which half of one subject. This is a DOOR, not a summary: the state in a
+          line, and the page that owns it one tap away. */}
       {!loading && profile && (
-        <CompanyCard status={verification} profile={profile} company={company} onGo={(href) => router.push(href)} />
+        <Section title={t.shell.company}>
+          <Row
+            icon={verification === "verified" ? "verified" : "business_center"}
+            label={profile.companyName ?? p.companyNoneTitle}
+            hint={
+              verification === "verified"
+                ? p.companyVerifiedTitle
+                : verification === "pending"
+                  ? p.companyPendingTitle
+                  : verification === "rejected"
+                    ? p.companyRejectedTitle
+                    : p.companyNoneBody
+            }
+            onClick={() => router.push(verification === "rejected" ? "/verify" : "/company")}
+          />
+        </Section>
       )}
-
-      {/* "My Company" — the multi-user firm this account belongs to (separate concern from the
-          verification card above): join by invite code, or manage the team. Links to /company. */}
-      {!loading && profile && <MyCompanyCard />}
 
       {/* Rewards — coming soon (grayed, app parity). */}
       {!loading && (
-        <div className={`mt-4 ${card} flex items-center gap-3 p-4 opacity-70`}>
-          <span className="grid h-10 w-10 flex-none place-items-center rounded-[10px] bg-surface2 text-muted">
-            <Icon name="star" size={20} />
-          </span>
-          <div className="flex-1">
-            <p className="text-[13.5px] font-bold text-navy">{p.rewards}</p>
-            <p className="text-[12px] text-muted">{p.comingSoon}</p>
+        <Section>
+          <div className="opacity-70">
+            <Row icon="star" label={p.rewards} hint={p.comingSoon} chevron={false} />
           </div>
-        </div>
+        </Section>
       )}
 
-      {/* Settings section. */}
+      {/* SETTINGS is what the account menu calls this page, so it is a titled section OF it rather
+          than a separate destination (owner, 2026-08-26). */}
       {!loading && (
-        <div className="mt-6">
-          <p className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wide text-muted">{p.settings}</p>
-          <div className={`${card} divide-y divide-border overflow-hidden`}>
-            {/* Language */}
-            <div className="flex items-center gap-3 px-4 py-3.5">
-              <Icon name="language" size={20} className="flex-none text-navy-mid" />
-              <div className="flex-1">
-                <p className="text-[13.5px] font-bold text-navy">{p.language}</p>
-                <p className="text-[12px] text-muted">{ar ? p.arabic : p.english}</p>
-              </div>
-              <div className="flex flex-none overflow-hidden rounded-[9px] border border-border">
-                <LangBtn active={!ar} disabled={langBusy} onClick={() => switchLang("en")}>EN</LangBtn>
-                <LangBtn active={ar} disabled={langBusy} onClick={() => switchLang("ar")}>عر</LangBtn>
-              </div>
-            </div>
+        <>
+          <Section title={p.settings}>
+            <RowList>
+              <Row icon="language" label={p.language} hint={ar ? p.arabic : p.english} chevron={false}>
+                <span className="flex flex-none overflow-hidden rounded-[9px] border border-border">
+                  <LangBtn active={!ar} disabled={langBusy} onClick={() => switchLang("en")}>EN</LangBtn>
+                  <LangBtn active={ar} disabled={langBusy} onClick={() => switchLang("ar")}>عر</LangBtn>
+                </span>
+              </Row>
+              <Row icon="smartphone" label={p.changePhone} hint={p.changePhoneSub} onClick={() => setShowChangePhone(true)} />
+              <Row icon="shield" label={p.privacy} href={PRIVACY_URL} />
+              <Row icon="description" label={p.terms} href={TERMS_URL} />
+              <Row icon="support_agent" label={p.support} href={SUPPORT_URL} />
+            </RowList>
+          </Section>
 
-            {/* Change phone */}
-            <button className={rowCls} onClick={() => setShowChangePhone(true)}>
-              <Icon name="smartphone" size={20} className="flex-none text-navy-mid" />
-              <div className="flex-1">
-                <p className="text-[13.5px] font-bold text-navy">{p.changePhone}</p>
-                <p className="text-[12px] text-muted">{p.changePhoneSub}</p>
-              </div>
-              <Icon name="chevron_right" size={18} className="flex-none text-muted rtl:scale-x-[-1]" />
-            </button>
-
-            <LinkRow icon="shield" label={p.privacy} href={PRIVACY_URL} />
-            <LinkRow icon="description" label={p.terms} href={TERMS_URL} />
-            <LinkRow icon="support_agent" label={p.support} href={SUPPORT_URL} />
-
-            {/* Logout */}
-            <button className={rowCls} onClick={doLogout}>
-              <Icon name="logout" size={20} className="flex-none text-navy-mid rtl:scale-x-[-1]" />
-              <p className="flex-1 text-[13.5px] font-bold text-navy">{p.logout}</p>
-            </button>
-          </div>
-
-          {/* Delete account — destructive, set apart. */}
-          <button
-            onClick={() => setShowDelete(true)}
-            className="mt-4 flex w-full items-center gap-3 rounded-[14px] border border-danger/30 bg-surface px-4 py-3.5 text-start transition hover:bg-danger-soft"
-          >
-            <Icon name="delete" size={20} className="flex-none text-danger" />
-            <div className="flex-1">
-              <p className="text-[13.5px] font-bold text-danger">{p.deleteAccount}</p>
-              <p className="text-[12px] text-muted">{p.deleteAccountSub}</p>
-            </div>
-          </button>
-        </div>
+          {/* Leaving and deleting, together and last. Sign out sat among the links to privacy and
+              support, where it read as another page to visit rather than the end of a session. */}
+          <Section title={p.logout}>
+            <RowList>
+              <Row icon="logout" label={p.logout} onClick={doLogout} chevron={false} />
+              <Row icon="delete" label={p.deleteAccount} hint={p.deleteAccountSub} danger onClick={() => setShowDelete(true)} chevron={false} />
+            </RowList>
+          </Section>
+        </>
       )}
 
       {showChangePhone && <ChangePhoneModal onClose={() => setShowChangePhone(false)} onReLogin={onReLogin} />}
@@ -288,15 +239,6 @@ export function ProfileView() {
           }}
         />
       )}
-    </div>
-  );
-}
-
-function Field({ label, value, ltr }: { label: string; value: string; ltr?: boolean }) {
-  return (
-    <div>
-      <dt className="text-[11.5px] font-bold text-navy-mid">{label}</dt>
-      <dd className="mt-0.5 truncate text-[13.5px] text-navy" dir={ltr ? "ltr" : undefined}>{value}</dd>
     </div>
   );
 }
@@ -314,125 +256,3 @@ function LangBtn({ active, disabled, onClick, children }: { active: boolean; dis
   );
 }
 
-function LinkRow({ icon, label, href }: { icon: string; label: string; href: string }) {
-  return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="flex w-full items-center gap-3 px-4 py-3.5 transition hover:bg-surface2">
-      <Icon name={icon} size={20} className="flex-none text-navy-mid" />
-      <p className="flex-1 text-[13.5px] font-bold text-navy">{label}</p>
-      <Icon name="open_in_new" size={16} className="flex-none text-muted" />
-    </a>
-  );
-}
-
-type CompanyInfo = {
-  logoUrl: string | null;
-  legalName: string | null;
-  authorityRole: string | null;
-  nationalId: string | null;
-  companyCity: string | null;
-  companyAddress: string | null;
-  docs: { crDocUrl: string | null; vatDocUrl: string | null; nationalAddressDocUrl: string | null } | null;
-};
-
-function CompanyCard({
-  status,
-  profile,
-  company,
-  onGo,
-}: {
-  status: VerificationStatus;
-  profile: RenterProfile;
-  company: CompanyInfo | null;
-  /** Destination differs by state — see the CTA below. */
-  onGo: (href: string) => void;
-}) {
-  const t = useT();
-  const { locale } = useLocale();
-  const ar = locale === "ar";
-  const L = (e: string, a: string) => (ar ? a : e);
-  const p = t.profile;
-  const base = "mt-4 rounded-[14px] border p-4";
-
-  if (status === "verified") {
-    const name = company?.legalName || profile.companyName || L("Your company", "شركتك");
-    const roleLabel = (r: string | null | undefined) => { const u = (r ?? "").toLowerCase(); return u === "owner" ? L("Owner", "المالك") : u === "manager" ? L("Manager", "مدير") : u === "employee" ? L("Employee", "موظف") : (r || null); };
-    const docs = company?.docs;
-    // Real text values (app parity: authority role, national ID, city, full national address).
-    const valRows: { label: string; value: string | null }[] = [
-      { label: L("Authority role", "الصفة"), value: roleLabel(company?.authorityRole) },
-      { label: L("National ID", "رقم الهوية"), value: company?.nationalId ?? null },
-      { label: L("City", "المدينة"), value: company?.companyCity ?? null },
-      { label: L("National Address", "العنوان الوطني"), value: company?.companyAddress ?? profile.nationalAddress ?? null },
-    ];
-    // CR / VAT / National-Address are DOCUMENTS (no number) — show a "View" link to the presigned file
-    // (app's doc-preview tiles); fall back to the green "Verified" pill when the URL isn't available.
-    const docRows: { label: string; url: string | null }[] = [
-      { label: L("CR document", "وثيقة السجل التجاري"), url: docs?.crDocUrl ?? null },
-      { label: L("VAT document", "وثيقة الرقم الضريبي"), url: docs?.vatDocUrl ?? null },
-      { label: L("National Address certificate", "شهادة العنوان الوطني"), url: docs?.nationalAddressDocUrl ?? null },
-    ];
-    const verifiedPill = <span className="inline-flex items-center gap-1 text-ok"><Icon name="verified" size={13} />{L("Verified", "موثَّق")}</span>;
-    return (
-      <div className={`${base} border-ok/30 bg-ok-soft`}>
-        <div className="flex items-center gap-3">
-          {company?.logoUrl ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img src={company.logoUrl} alt="" className="h-12 w-12 flex-none rounded-[10px] border border-ok/25 bg-white object-contain p-1" />
-          ) : (
-            <span className="grid h-12 w-12 flex-none place-items-center rounded-[10px] border border-ok/25 bg-white text-ok"><Icon name="verified" size={24} /></span>
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[14px] font-extrabold text-navy">{name}</p>
-            <p className="mt-0.5 inline-flex items-center gap-1 text-[12px] font-bold text-ok"><Icon name="verified" size={14} />{p.companyVerifiedTitle}</p>
-          </div>
-        </div>
-        <dl className="mt-3 grid grid-cols-1 gap-y-2.5 border-t border-ok/20 pt-3 sm:grid-cols-2 sm:gap-x-5">
-          {valRows.filter((r) => r.value).map((r) => (
-            <div key={r.label} className="min-w-0">
-              <dt className="text-[11px] font-bold uppercase tracking-wide text-muted">{r.label}</dt>
-              <dd className="mt-0.5 text-[13px] font-semibold text-navy">{r.value}</dd>
-            </div>
-          ))}
-          {docRows.map((r) => (
-            <div key={r.label} className="min-w-0">
-              <dt className="text-[11px] font-bold uppercase tracking-wide text-muted">{r.label}</dt>
-              <dd className="mt-0.5 text-[13px] font-semibold text-navy">
-                {r.url ? <a href={r.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-brand hover:underline"><Icon name="visibility" size={14} />{L("View", "عرض")}</a> : verifiedPill}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </div>
-    );
-  }
-  if (status === "pending") {
-    return (
-      <div className={`${base} flex items-center gap-3 border-warn/30 bg-warn-soft`}>
-        <Icon name="schedule" size={22} className="flex-none text-warn" />
-        <div>
-          <p className="text-[13.5px] font-bold text-navy">{p.companyPendingTitle}</p>
-          <p className="text-[12.5px] text-muted">{p.companyPendingBody}</p>
-        </div>
-      </div>
-    );
-  }
-  const rejected = status === "rejected";
-  return (
-    <button
-      // "Start verification" → /company, the hub where they can verify into their OWN company or
-      // join an existing one with an invite code. A REJECTED submission is different: they already
-      // have a company to fix, so "Resubmit" goes straight back to the form.
-      onClick={() => onGo(rejected ? "/verify" : "/company")}
-      className={`${base} flex w-full items-center justify-between gap-3 text-start ${rejected ? "border-danger/30 bg-danger-soft hover:border-danger" : "border-brand/30 bg-brand-soft hover:border-brand"}`}
-    >
-      <div>
-        <p className="text-[13.5px] font-bold text-navy">{rejected ? p.companyRejectedTitle : p.companyNoneTitle}</p>
-        <p className="text-[12.5px] text-muted">{rejected ? p.companyRejectedBody : p.companyNoneBody}</p>
-      </div>
-      <span className={`inline-flex flex-none items-center gap-1 rounded-[9px] px-3 py-2 text-[12px] font-bold ${rejected ? "bg-danger text-white" : "bg-brand text-brand-fg"}`}>
-        {rejected ? p.companyResubmit : p.companyCta}
-        <Icon name="arrow_forward" size={15} className="rtl:scale-x-[-1]" />
-      </span>
-    </button>
-  );
-}

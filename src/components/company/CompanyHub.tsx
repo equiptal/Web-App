@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Dialog } from "@/components/Dialog";
+import { CompanyDetails } from "@/components/company/CompanyDetails";
+import { MastheadPill, PageMasthead, RowList, Section } from "@/components/PageSection";
 import { useRouter } from "next/navigation";
 import { useT, useLocale } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
@@ -450,33 +452,42 @@ function ActiveCompany({
   const c = t.company;
   const card = "rounded-[14px] border border-border bg-surface";
 
+  /**
+   * ── One organization page (owner, 2026-08-26) ─────────────────────────────────────────────────
+   * The company's PARTICULARS used to live on `/profile` in a green card, while this page carried
+   * the same firm's name, roster and invite code. One subject, two pages, split by nothing but which
+   * fetch each happened to make. `CompanyDetails` brings that half over, and the order below is the
+   * order a reader wants it in: who we are, what proves it, how to bring someone in, who is already
+   * here, and — last and set apart — how to leave.
+   */
   return (
-    <div className="flex flex-col gap-5">
-      {/* Identity */}
-      <div className={`${card} flex items-center gap-3.5 p-5`}>
-        <span className="grid h-12 w-12 flex-none place-items-center rounded-[12px] bg-brand-soft text-brand">
-          <Icon name="business_center" size={24} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[17px] font-extrabold text-navy">{company.name}</p>
-          <p className="mt-0.5 text-[12.5px] text-muted">{company.isOwner ? c.roleOwner : c.roleMember}</p>
-        </div>
-        {company.isVerified && (
-          <span className="inline-flex flex-none items-center gap-1 rounded-full bg-ok-soft px-2.5 py-1 text-[11.5px] font-bold text-ok">
-            <Icon name="verified" size={14} /> {c.verified}
-          </span>
-        )}
-      </div>
+    <div>
+      <PageMasthead
+        icon={<Icon name="business_center" size={26} className="text-white" />}
+        title={company.name}
+        subtitle={company.isOwner ? c.roleOwner : c.roleMember}
+        badge={
+          company.isVerified ? (
+            <MastheadPill tone="ok">
+              <Icon name="verified" size={13} /> {c.verified}
+            </MastheadPill>
+          ) : undefined
+        }
+      />
+
+      {/* The papers. Renders nothing at all until the company is verified. */}
+      <CompanyDetails />
 
       {/* Invite code — active owners of a verified company only (the backend decides). */}
       {company.isOwner && company.inviteCode && (
-        <InviteCodeCard code={company.inviteCode} onCopied={onCopied} />
+        <Section title={c.members} boxed={false}>
+          <InviteCodeCard code={company.inviteCode} onCopied={onCopied} />
+        </Section>
       )}
 
       {/* Pending join requests — owners approve or reject. */}
       {company.isOwner && company.pendingMembers.length > 0 && (
-        <section>
-          <h3 className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wide text-muted">{c.pendingJoiners}</h3>
+        <Section title={c.pendingJoiners} boxed={false}>
           <div className="flex flex-col gap-2.5">
             {company.pendingMembers.map((m) => (
               <div key={m.userId} className={`${card} p-4`}>
@@ -505,13 +516,12 @@ function ActiveCompany({
               </div>
             ))}
           </div>
-        </section>
+        </Section>
       )}
 
       {/* Roster */}
-      <section>
-        <h3 className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wide text-muted">{c.members}</h3>
-        <div className={`${card} divide-y divide-border overflow-hidden`}>
+      <Section title={c.members}>
+        <RowList>
           {company.activeMembers.map((m) => (
             <MemberRow
               key={m.userId}
@@ -523,18 +533,21 @@ function ActiveCompany({
               onDemote={onDemote}
             />
           ))}
-        </div>
-      </section>
+        </RowList>
+      </Section>
 
-      {/* The way out — leave, or dissolve when they're the last one standing. */}
-      <button
-        onClick={onExit}
-        disabled={busy}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-[12px] border border-danger px-5 py-3 text-[13.5px] font-bold text-danger transition hover:bg-danger-soft disabled:opacity-55"
-      >
-        <Icon name="logout" size={17} className="rtl:scale-x-[-1]" />
-        {company.activeMembers.length <= 1 ? c.dissolve : c.leave}
-      </button>
+      {/* The way out — leave, or dissolve when they are the last one standing. Set apart at the foot,
+          for the same reason cancelling a request is: it ends the thing the page is about. */}
+      <div className="mt-5">
+        <button
+          onClick={onExit}
+          disabled={busy}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-[12px] border border-danger px-5 py-3 text-[13.5px] font-bold text-danger transition hover:bg-danger-soft disabled:opacity-55"
+        >
+          <Icon name="logout" size={17} className="rtl:scale-x-[-1]" />
+          {company.activeMembers.length <= 1 ? c.dissolve : c.leave}
+        </button>
+      </div>
     </div>
   );
 }
