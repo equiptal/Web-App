@@ -1294,6 +1294,9 @@ export const en = {
     tabCards: "Cards",
     tabCompare: "Compare",
     download: "Download",
+    // The one download beside the tabs, named for what the tab it stands over exports.
+    downloadQuotation: "Download quotation",
+    exportComparison: "Export comparison",
     // Puts every benched bid back on the comparison — and therefore back in the export, which covers
     // what the comparison covers. Named with its count so the renter knows what he is bringing back.
     selectAll: "Select all ({n} off)",

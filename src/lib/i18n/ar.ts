@@ -1134,6 +1134,8 @@ export const ar: Dictionary = {
     tabCards: "البطاقات",
     tabCompare: "المقارنة",
     download: "تنزيل",
+    downloadQuotation: "تنزيل عرض السعر",
+    exportComparison: "تصدير المقارنة",
     // يعيد كل عرض مُنحّى إلى المقارنة — وبالتالي إلى التصدير، فالتصدير يغطّي ما تغطّيه المقارنة.
     selectAll: "تحديد الكل ({n} خارجها)",
     source: "المصدر",

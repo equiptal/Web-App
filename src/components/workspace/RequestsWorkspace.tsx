@@ -26,12 +26,13 @@ import { RequestStrip } from "@/components/workspace/RequestStrip";
 import { BidCards } from "@/components/workspace/BidCards";
 import { CompareMatrix } from "@/components/workspace/CompareMatrix";
 import { RequestDrawer, type ShareLinkMeta } from "@/components/workspace/RequestDrawer";
-import { ExportTemplateDialog } from "@/components/compare/ExportTemplateDialog";
-import { buildExportPayload, type ExportPayload } from "@/lib/contract/export-templates";
 import { buildItemComparison } from "@/lib/contract/comparison";
 import { bidColumnToComputed } from "@/lib/contract/agent-bids";
-import { orderColumnsForExport, workspaceExportTotals } from "@/lib/contract/workspace-export";
+import { workspaceExportTotals } from "@/lib/contract/workspace-export";
 import { formatSar } from "@/lib/pricing/rental";
+import { buildBidQuotationDoc, quotationSupplierInitials, quotationSupplierKey } from "@/lib/quotation/bid-quotation";
+import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/render";
+import { quotationDownloadName } from "@/lib/compare/quotation-token";
 
 type Tab = "cards" | "compare";
 
@@ -51,8 +52,7 @@ export function RequestsWorkspace() {
   const t = useT();
   const { locale } = useLocale();
   const ar = locale === "ar";
-  const L = (en: string, arr: string) => (ar ? arr : en);
-  const { status } = useSession();
+  const { status, tier } = useSession();
 
   const [groups, setGroups] = useState<RequestGroup[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -71,7 +71,6 @@ export function RequestsWorkspace() {
   const [drawerShare, setDrawerShare] = useState(false);
   // The public bid link's own settings, which the share sheet edits.
   const [link, setLink] = useState<ShareLinkMeta | null>(null);
-  const [exportOpen, setExportOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   /**
    * The agent's read of the comparison, held HERE rather than inside the matrix (owner, 2026-08-25).
@@ -240,43 +239,102 @@ export function RequestsWorkspace() {
   const counts = useMemo(() => sourceCounts(bids), [bids]);
   const bid = useMemo(() => bids.find((b) => b.card.id === resolved.bidId)?.card ?? null, [bids, resolved.bidId]);
 
+  /** The export: the browser's own print dialog over the plain Moedatech sheet. */
   /**
-   * The export payload, built from what the Compare tab is showing.
+   * ── The Cards tab's download: the formal QUOTATION (owner, 2026-08-26) ─────────────────────────
    *
-   * `buildItemComparison` supplies the columns — the same engine the matrix and `Rank with AI` use —
-   * and the totals come from `workspaceExportTotals`, which reads the matrix's own figures rather
-   * than recomputing them. A sheet that recomputes independently is how the old export came to print
-   * "no data" under rows the renter could see filled in.
+   * One button, two jobs, because the two tabs hold two different things: the comparison exports the
+   * TABLE, and the cards export the OFFER — the quotation paper a renter sends on to his own people.
+   *
+   * It is the app's own document, not a second one: `buildBidQuotationDoc` + `renderQuotationSection`
+   * + `wrapQuotationPage`, the same three the deal room and the grouped bid view issue, so the same
+   * deal downloaded from any of them is the same paper. One section per SUPPLIER (`quotationSupplierKey`
+   * — two colleagues of one firm are one counterparty), for the bid picked, or for every bid on the
+   * table when none is.
+   *
+   * The identity block is best-effort on purpose: `/api/me` for the renter, the request record for the
+   * window and the transport assignment. A refused call costs the letterhead, not the quotation.
    */
-  const buildExport = useCallback((): ExportPayload | null => {
-    if (!item || shown.length === 0) return null;
-    const { columns } = buildItemComparison(
-      shown.map((b) => b.card),
-      { requestDurationDays: item.durationDays ?? undefined },
-    );
-    if (columns.length === 0) return null;
-    return buildExportPayload({
-      requestId: item.id,
-      itemId: item.id,
-      columns: orderColumnsForExport(columns, shown.map((b) => b.card.id)),
-      totals: workspaceExportTotals({ bids: shown, durationDays: item.durationDays, startDate: item.startDate }),
-      header: {
-        requestDisplayId: group?.groupRef ?? item.displayId,
-        itemName: item.item ? (ar ? item.item.nameAr || item.item.name : item.item.name) : null,
-        location: group?.locationLabel ?? null,
-        durationDays: item.durationDays,
-        units: item.item?.qty ?? null,
-      },
-      // The sheet carries the order on screen, which the matrix builds from the figures it shows.
-      // `RankingSource` has no "manual" member, and claiming "agent" would credit a ranking nobody
-      // ran — so it reports the preset whose ordering this actually is.
-      rankingSource: "preset:lowest",
-      agentLive: false,
-      lang: ar ? "ar" : "en",
-    });
-  }, [ar, group, item, shown]);
+  const downloadQuotation = useCallback(async () => {
+    if (typeof window === "undefined" || !item || shown.length === 0) return;
+    const chosen = resolved.bidId ? shown.filter((b) => b.card.id === resolved.bidId) : shown;
+    if (chosen.length === 0) return;
 
-  /** The fallback the dialog falls back TO: the browser's own print dialog over a plain sheet. */
+    const [rec, me] = await Promise.all([
+      fetchRequestDetail(item.id).catch(() => null),
+      fetch("/api/me", { cache: "no-store" })
+        .then((r) => (r.ok ? (r.json() as Promise<{ user?: Record<string, string | null | undefined> }>) : null))
+        .catch(() => null),
+    ]);
+    const u = me?.user ?? {};
+    const reqItem = (rec as unknown as { equipmentItems?: { mobilizationByRentee?: boolean | null; demobilizationByRentee?: boolean | null }[] } | null)?.equipmentItems?.[0] ?? null;
+    const code = item.code ?? fetchedCode ?? item.displayId;
+    const reqCode = code.replace(/[^A-Za-z0-9-]/g, "");
+    const itemName = item.item ? (ar ? item.item.nameAr || item.item.name : item.item.name) : code;
+
+    // One quotation per supplier, cut by the key the grouped download uses.
+    const bySupplier = new Map<string, typeof chosen>();
+    for (const b of chosen) {
+      const key = quotationSupplierKey(b.card);
+      const list = bySupplier.get(key);
+      if (list) list.push(b);
+      else bySupplier.set(key, [b]);
+    }
+
+    const sections = [...bySupplier.values()]
+      .map((supBids, si) =>
+        renderQuotationSection(
+          buildBidQuotationDoc({
+            lang: ar ? "ar" : "en",
+            quotationNumber: `Q-${reqCode}-${quotationSupplierInitials(supBids[0].card.supplierName)}${si + 1}`,
+            reference: code,
+            entries: supBids.map((b) => ({
+              bid: b.card,
+              itemLabel: itemName,
+              requestCode: code,
+              startDate: item.startDate,
+              endDate: item.endDate,
+              durationDays: item.durationDays,
+              rentalType: item.rentalType,
+              mobByRentee: reqItem?.mobilizationByRentee ?? item.mobByRentee,
+              demobByRentee: reqItem?.demobilizationByRentee ?? item.demobByRentee,
+            })),
+            rentee: {
+              companyName: u.companyName ?? "",
+              personName: [u.firstName, u.lastName].filter(Boolean).join(" "),
+              crNumber: u.crNumber ?? null,
+              vatNumber: u.vatNumber ?? null,
+              nationalAddress: u.nationalAddress ?? null,
+              phone: u.phone ?? null,
+              email: u.email ?? null,
+              verified: tier === "verified",
+            },
+          }),
+        ),
+      )
+      .join("");
+
+    const dlName = quotationDownloadName(code, [code]);
+    const html = wrapQuotationPage(sections, { lang: ar ? "ar" : "en", title: dlName });
+    // A popup-blocked `window.open` returns null and used to fail silently — a dead click. Fall back
+    // to downloading the self-printing file so the quotation is never a no-op.
+    const w = window.open("", "_blank");
+    if (w) {
+      w.document.write(html);
+      w.document.close();
+      return;
+    }
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${dlName.replace(/[^\w.-]+/g, "_")}.html`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  }, [ar, item, shown, resolved.bidId, fetchedCode, tier]);
+
   const printComparison = useCallback(() => {
     if (typeof window === "undefined" || !item || shown.length === 0) return;
     const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch] as string);
@@ -425,9 +483,6 @@ export function RequestsWorkspace() {
             })}
           </div>
           <span className="flex-1" />
-          {/* The same export the comparison workspace had: the renter's own templates, with the
-              built-in sheet as the fallback whenever a template cannot be used. Nothing is rebuilt —
-              `buildExportPayload` and the dialog are the originals. */}
           <div className="mb-[7px] flex items-center gap-2">
             {/* ── «Select all» puts the whole comparison back (owner, 2026-08-25) ─────────────────
                 The export covers what the comparison covers, so putting a bid back on the table is
@@ -443,13 +498,17 @@ export function RequestsWorkspace() {
                 <Icon name="done_all" size={14} /> {fmt(t.workspace.selectAll, { n: String(benched.size) })}
               </button>
             )}
+            {/* One control, named for what THIS tab exports (owner, 2026-08-26): the cards issue the
+                quotation paper, the comparison issues the table. Both are the exports the app already
+                had; only which one the button reaches changes with the tab. */}
             <button
               type="button"
               disabled={shown.length === 0}
-              onClick={() => setExportOpen(true)}
+              onClick={() => (tab === "compare" ? printComparison() : void downloadQuotation())}
               className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border bg-surface px-3 py-[7px] text-[10.5px] font-bold text-navy-mid transition hover:border-navy-mid hover:bg-surface2/60 disabled:opacity-40"
             >
-              {t.workspace.download} <Icon name="download" size={14} />
+              {tab === "compare" ? t.workspace.exportComparison : t.workspace.downloadQuotation}{" "}
+              <Icon name="download" size={14} />
             </button>
           </div>
         </div>
@@ -581,15 +640,6 @@ export function RequestsWorkspace() {
         )}
       </div>
 
-      <ExportTemplateDialog
-        open={exportOpen}
-        onClose={() => setExportOpen(false)}
-        ar={ar}
-        L={L}
-        buildPayload={buildExport}
-        onBuiltinExport={printComparison}
-        toast={(m) => setToast(m)}
-      />
       {toast && (
         <div className="fixed inset-x-0 bottom-28 z-[70] mx-auto w-fit rounded-full bg-navy px-4 py-2 text-[12.5px] font-bold text-white shadow-lg">
           {toast}
