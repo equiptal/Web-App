@@ -6,8 +6,8 @@ import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import { PAGE_MX_BLEED } from "@/components/AppShell";
 import { SignInPrompt } from "@/components/common/SignInPrompt";
-import { fetchAllMyRequests, fetchBids, fetchReceivedBids, fetchRequestSubmissions, recommendBids } from "@/lib/api/client";
-import { groupRequests, type RequestGroup } from "@/lib/contract/requests";
+import { fetchAllMyRequests, fetchBids, fetchReceivedBids, fetchRequestSubmissions, fetchRequestDetail, recommendBids } from "@/lib/api/client";
+import { groupRequests, requestCodeOf, type RequestGroup } from "@/lib/contract/requests";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import {
   EMPTY_SELECTION,
@@ -83,6 +83,15 @@ export function RequestsWorkspace() {
   const [ranking, setRanking] = useState<{ bidId: string | null; note: string | null } | null>(null);
   const [rankBusy, setRankBusy] = useState(false);
   const [tipOpen, setTipOpen] = useState(false);
+  /**
+   * The selected request's own code, when the LIST row arrived without one.
+   *
+   * `GET /marketplace/my-requests` returns neither `displayId` nor `shortCode`, though creation
+   * mints the code and answers with it — so the strip had nothing human to name the request by and was
+   * printing the head of a cuid. The detail record is the next place to ask, and the drawer already
+   * fetches it for Edit; this asks for the code alone, once per item, and only when it is missing.
+   */
+  const [fetchedCode, setFetchedCode] = useState<string | null>(null);
 
   // ── The renter's requests ──
   useEffect(() => {
@@ -142,6 +151,22 @@ export function RequestsWorkspace() {
       live = false;
     };
   }, [status, itemId]);
+
+  // The code the list row lacked. One call, keyed on the item, dropped the moment the item changes so
+  // a stale code can never sit over the wrong request.
+  useEffect(() => {
+    setFetchedCode(null);
+    if (status !== "authed" || !itemId) return;
+    const row = (groups ?? []).flatMap((g) => g.items).find((i) => i.id === itemId);
+    if (!row || row.code) return; // the list already carried it
+    let live = true;
+    fetchRequestDetail(itemId)
+      .then((rec) => live && setFetchedCode(requestCodeOf(rec as unknown as Record<string, unknown>)))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [status, itemId, groups]);
 
   // Unread is per bid across every request, so it is fetched once for the session rather than per
   // item — switching item does not change anyone's unread count.
@@ -371,6 +396,7 @@ export function RequestsWorkspace() {
         bidCount={bids.length}
         onPickItem={pickItem}
         onOpenRequest={() => { setDrawerShare(false); setDrawerOpen(true); }}
+        fetchedCode={fetchedCode}
       />
 
       <div className={`${PAGE_MX_BLEED} mt-2 flex min-h-0 flex-1 flex-col pb-2`}>

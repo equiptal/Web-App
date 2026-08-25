@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   parseAddress, groupRequests, mapRequestListItem, publicTaxonomyUrl, cappedFilled,
   isCancellable, cancellableItems, statusCounts, statusSummary, representativeStatus, cancelBlockedReason,
-  REQUEST_STATUS, mapRequestDetail, type RequestListItem, type RequestRecord,
+  REQUEST_STATUS, mapRequestDetail, requestCodeOf, type RequestListItem, type RequestRecord,
 } from "@/lib/contract/requests";
 
 /* ------------------------------- cappedFilled (fulfillment math) ------------------------------- */
@@ -77,6 +77,45 @@ describe("parseAddress", () => {
   });
 });
 
+/* ------------------------------------ requestCodeOf ------------------------------------ */
+
+describe("requestCodeOf", () => {
+  it("reads the code under every name the two backends have used for it", () => {
+    expect(requestCodeOf({ displayId: "REQ-00346" })).toBe("REQ-00346");
+    expect(requestCodeOf({ shortCode: "REQ-00347" })).toBe("REQ-00347");
+    expect(requestCodeOf({ requestShortCode: "REQ-00348" })).toBe("REQ-00348");
+    expect(requestCodeOf({ requestNumber: "REQ-00349" })).toBe("REQ-00349");
+    expect(requestCodeOf({ requestCode: "REQ-00350" })).toBe("REQ-00350");
+    expect(requestCodeOf({ reference: "REQ-00351" })).toBe("REQ-00351");
+    expect(requestCodeOf({ code: "REQ-00352" })).toBe("REQ-00352");
+  });
+
+  it("prefers displayId over the aliases, so one payload cannot read two ways", () => {
+    expect(requestCodeOf({ displayId: "REQ-1", shortCode: "REQ-2", code: "REQ-3" })).toBe("REQ-1");
+  });
+
+  // The whole point of the null: the caller then asks the detail endpoint instead of printing an id.
+  it("returns null rather than inventing one, and ignores blanks", () => {
+    expect(requestCodeOf({ id: "cexg7k2p9q0001abcd" })).toBeNull();
+    expect(requestCodeOf({ displayId: "", shortCode: "   " })).toBeNull();
+    expect(requestCodeOf({})).toBeNull();
+  });
+});
+
+describe("mapRequestListItem — the request's code", () => {
+  it("keeps the code apart from what it prints, so «no code» stays legible to a caller", () => {
+    const withCode = mapRequestListItem({ id: "a", shortCode: "REQ-00346", type: "BROADCAST", status: "OPEN" } as unknown as RequestRecord);
+    expect(withCode.code).toBe("REQ-00346");
+    expect(withCode.displayId).toBe("REQ-00346");
+
+    // `my-requests` returns neither field today: the row admits it has no code, and only the
+    // printable label falls back to a stub of the id.
+    const none = mapRequestListItem({ id: "cexg7k2p9q0001abcd", type: "BROADCAST", status: "OPEN" } as unknown as RequestRecord);
+    expect(none.code).toBeNull();
+    expect(none.displayId).toBe("CEXG7K2P");
+  });
+});
+
 /* ---------------------------------- groupRequests ---------------------------------- */
 
 const li = (p: Partial<RequestListItem>): RequestListItem => ({
@@ -84,6 +123,7 @@ const li = (p: Partial<RequestListItem>): RequestListItem => ({
   requestGroupId: null,
   groupRef: null,
   displayId: "REQ-1",
+  code: "REQ-1",
   type: "BROADCAST",
   status: "OPEN",
   urgency: null,

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { PAGE_MX_BLEED } from "@/components/AppShell";
-import { publicTaxonomyUrl, shortRef, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
+import { publicTaxonomyUrl, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
 import { CERT_LABEL, type BidCard } from "@/lib/contract/bids";
 import { unitAvailability } from "@/lib/contract/bid-map";
 
@@ -31,6 +31,7 @@ export function RequestStrip({
   bidCount,
   onPickItem,
   onOpenRequest,
+  fetchedCode,
 }: {
   group: RequestGroup;
   item: RequestListItem | null;
@@ -41,6 +42,8 @@ export function RequestStrip({
   onPickItem: (itemId: string) => void;
   /** Opens the request drawer, which is also where sharing lives. */
   onOpenRequest: (() => void) | null;
+  /** The request's own code, fetched from its detail record when the list row arrived without one. */
+  fetchedCode?: string | null;
 }) {
   const t = useT();
   const { locale } = useLocale();
@@ -48,14 +51,15 @@ export function RequestStrip({
   const router = useRouter();
 
   /**
-   * What the renter calls this request.
+   * What the renter calls this request: the submission's RFQ code, else the request's own REQ code —
+   * and NOTHING at all where neither exists.
    *
-   * The RFQ code where the submission has one, else the request's own REQ id — and where the record
-   * carries NEITHER (older rows predate both), a short uppercase stub of the internal id rather than
-   * the id itself. It used to fall through to `group.id` raw, which printed a cuid on the strip:
-   * «cex…» is a database key, not a reference a renter can quote down the phone.
+   * It used to fall through to the internal id and print «CEXG7K2P», the head of a cuid: a string
+   * every request begins the same way and nobody can quote down the phone. Silence is the honest
+   * state, and the workspace goes and asks the detail record for the real code first (`fetchedCode`),
+   * because `GET /marketplace/my-requests` does not carry it while creation does.
    */
-  const requestRef = group.groupRef ?? item?.displayId ?? shortRef(group.id);
+  const requestRef = group.groupRef ?? item?.code ?? fetchedCode ?? null;
   const raised = group.createdAt
     ? new Date(group.createdAt).toLocaleDateString(ar ? "ar" : "en-GB", { day: "numeric", month: "short", year: "numeric" })
     : null;
@@ -117,14 +121,16 @@ export function RequestStrip({
             <Icon name="north_east" size={15} className="text-white/50 rtl:scale-x-[-1]" />
           </button>
           <div className="flex flex-wrap items-baseline gap-2">
-            <button
-              type="button"
-              onClick={onOpenRequest ?? undefined}
-              disabled={!onOpenRequest}
-              className="text-[12.5px] font-semibold text-white/60 underline decoration-white/30 underline-offset-4 hover:decoration-white disabled:no-underline"
-            >
-              {requestRef} ·
-            </button>
+            {requestRef && (
+              <button
+                type="button"
+                onClick={onOpenRequest ?? undefined}
+                disabled={!onOpenRequest}
+                className="text-[12.5px] font-semibold text-white/60 underline decoration-white/30 underline-offset-4 hover:decoration-white disabled:no-underline"
+              >
+                {requestRef} ·
+              </button>
+            )}
             <span className="text-[14px] font-extrabold text-brand">{bidCount}</span>
             <span className="text-[12.5px] font-semibold text-white/60">
               {bidCount === 1 ? t.workspace.bidWord : t.workspace.bidsWord}

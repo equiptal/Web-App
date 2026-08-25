@@ -197,7 +197,12 @@ export interface RequestListItem {
   id: string;
   /** Multi-item submission group — all fanned-out requests from one submit share this (null = solo). */
   requestGroupId: string | null;
+  /** What to PRINT wherever a label is required: the human code where the payload carries one, else a
+   *  short stub of the id, so a list row is never blank. */
   displayId: string;
+  /** The human code ALONE — null when the payload carried none. A surface that needs a real reference
+   *  (the strip, an export header) reads this and asks elsewhere rather than quoting a cuid's head. */
+  code: string | null;
   /** RFQ group short code (`RFQ-NNNNN`) from my-requests once the backend returns it (T19); null until then. */
   groupRef: string | null;
   type: RequestType;
@@ -297,6 +302,33 @@ export function shortRef(id: string | null | undefined): string {
   return (id ?? "").replace(/-/g, "").slice(0, 8).toUpperCase() || "—";
 }
 
+/**
+ * The request's OWN human code (`REQ-NNNNN`) off a raw record — null when the payload carries none.
+ *
+ * Defensive on the field name, as `groupRefOf` already is below (owner, 2026-08-25). The code IS
+ * minted at creation — `POST /agents/requests` answers with `requests[].shortCode`, and the
+ * confirmation screen prints it — but the list projection the workspace reads,
+ * `GET /marketplace/my-requests`, returns neither `displayId` nor `shortCode`. The strip then fell
+ * through to `shortRef(id)` and printed «CEXG7K2P»: the head of a cuid, which every request shares
+ * the start of and nobody can quote down the phone.
+ *
+ * So this tries every spelling the two services have used. A name we do not know is a code discarded
+ * for no reason; a null, on the other hand, is worth returning honestly, so the caller can ask the
+ * detail endpoint rather than dress an id up as a reference.
+ */
+export function requestCodeOf(r: Record<string, unknown>): string | null {
+  return (
+    str(r.displayId) ??
+    str(r.shortCode) ??
+    str(r.requestShortCode) ??
+    str(r.requestNumber) ??
+    str(r.requestCode) ??
+    str(r.reference) ??
+    str(r.code) ??
+    null
+  );
+}
+
 /** The RFQ group short code (`RFQ-NNNNN`) off a raw record — defensive on the field name the backend
  *  uses (T19). Null for an old record that predates it; callers fall back to the REQ id. */
 export function groupRefOf(r: RequestRecord): string | null {
@@ -308,7 +340,8 @@ export function mapRequestListItem(r: RequestRecord): RequestListItem {
   return {
     id: r.id,
     requestGroupId: str(r.requestGroupId),
-    displayId: str(r.displayId) ?? str(r.shortCode) ?? shortRef(r.id),
+    displayId: requestCodeOf(r as unknown as Record<string, unknown>) ?? shortRef(r.id),
+    code: requestCodeOf(r as unknown as Record<string, unknown>),
     groupRef: groupRefOf(r),
     type: r.type,
     status: r.status,

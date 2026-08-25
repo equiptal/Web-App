@@ -22,6 +22,7 @@ function item(id: string, status: RequestStatus = "OPEN", qty = 1, imageUrl: str
     id,
     requestGroupId: null,
     displayId: `REQ-${id}`,
+    code: `REQ-${id}`,
     groupRef: null,
     type: "BROADCAST",
     status,
