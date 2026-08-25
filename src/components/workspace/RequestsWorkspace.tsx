@@ -389,8 +389,8 @@ export function RequestsWorkspace() {
                   aria-current={on ? "page" : undefined}
                   className={`relative -mb-px rounded-t-[10px] border border-border text-[12px] font-bold transition ${
                     on
-                      ? "z-[2] border-b-surface bg-surface px-5 pb-3 pt-[11px] text-navy shadow-[0_-2px_6px_rgba(19,44,74,.05)]"
-                      : "z-[1] bg-surface3/70 px-[18px] pb-[11px] pt-[9px] text-muted hover:text-navy-mid"
+                      ? "z-[2] border-b-surface bg-surface px-4 pb-2 pt-2 text-navy shadow-[0_-2px_6px_rgba(19,44,74,.05)]"
+                      : "z-[1] bg-surface3/70 px-3.5 pb-2 pt-1.5 text-muted hover:text-navy-mid"
                   }`}
                 >
                   {k === "cards" ? t.workspace.tabCards : t.workspace.tabCompare}
@@ -434,7 +434,7 @@ export function RequestsWorkspace() {
               rather than a row of pills, because it is a filter over the table, not an action on it.
               It appears only when there is a mix to narrow: with every bid from one source, three
               choices that change nothing are furniture. */}
-          <div className="flex flex-none flex-wrap items-center gap-4 border-b border-border px-4 py-2">
+          <div className="flex flex-none flex-wrap items-center gap-4 border-b border-border px-3.5 py-1.5">
               <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wide text-muted">
                 <Icon name="filter_list" size={14} /> {t.workspace.source}
               </span>

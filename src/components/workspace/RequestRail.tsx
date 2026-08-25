@@ -38,35 +38,36 @@ export function RequestRail({
   // Roughly three tiles a press — far enough to feel like progress, short enough to keep your place.
   const scrollBy = (dir: 1 | -1) => scroller.current?.scrollBy({ left: dir * 300, behavior: "smooth" });
 
-  // ── 88px, and every pixel of it is spoken for (owner, 2026-08-25) ──────────────────────────────
-  // It was 96, then 80, and 80 CLIPPED: this row is `overflow-hidden`, and a tile draws taller than
-  // its circle, so the tops of the circles disappeared behind the header's rule. Counted honestly,
-  // the tallest tile needs
+  // ── 76px, and every pixel of it is spoken for (owner, 2026-08-25) ──────────────────────────────
+  // It was 96, then 80 — and 80 CLIPPED, because this row is `overflow-hidden` and a tile draws
+  // taller than its circle, so the tops disappeared behind the header's rule. The lesson was not
+  // "make it taller", it was "count it". The tallest tile needs
   //
   //     4  badge overhang above the ring (`-top-1` on the share control)
-  //   +48  the circle
-  //   + 6  the gap under it
-  //   +16  the name, now at the same 12.5px as the rest of the page
+  //   +44  the circle
+  //   + 4  the gap under it
+  //   +13  the name
   //   + 2  the gap under that
-  //   +11  «CLOSED», on the tiles that carry it
-  //   = 87
+  //   +10  «CLOSED», on the tiles that carry it
+  //   = 77
   //
-  // 88, so nothing touches that rule. Sizing this by eye is what broke it; the arithmetic is written
-  // out so the next change to a tile has something to add to.
+  // 76 holds it because the row centres its content and the last pixel is the caption's descender,
+  // which has half a pixel of room at each end. If a tile ever gains a row, this number moves with
+  // it — that is what the sum is here for.
   return (
-    <div className={`flex h-[88px] flex-none items-center gap-4 overflow-hidden border-b border-border bg-surface3/60 ${PAGE_X_BLEED}`}>
-      <Link href="/create" className="group flex flex-none flex-col items-center gap-1.5">
-        <span className="grid h-12 w-12 place-items-center rounded-full border-2 border-dashed border-border text-muted transition group-hover:border-brand group-hover:text-brand">
+    <div className={`flex h-[76px] flex-none items-center gap-4 overflow-hidden border-b border-border bg-surface3/60 ${PAGE_X_BLEED}`}>
+      <Link href="/create" className="group flex flex-none flex-col items-center gap-1">
+        <span className="grid h-11 w-11 place-items-center rounded-full border-2 border-dashed border-border text-muted transition group-hover:border-brand group-hover:text-brand">
           <Icon name="add" size={20} />
         </span>
-        <span className="text-[12.5px] font-semibold text-muted">{t.workspace.newRequest}</span>
+        <span className="text-[11px] font-semibold leading-[13px] text-muted">{t.workspace.newRequest}</span>
       </Link>
 
-      <div className="h-10 w-px flex-none bg-border/70" />
+      <div className="h-9 w-px flex-none bg-border/70" />
 
       <div
         ref={scroller}
-        className="flex min-w-0 flex-1 items-start gap-5 overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex min-w-0 flex-1 items-start gap-4 overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {tiles.map((tile) => {
           const active = tile.key === activeKey;
@@ -81,9 +82,9 @@ export function RequestRail({
               onClick={() => onPick(tile.key)}
               aria-current={active ? "true" : undefined}
               title={tile.label}
-              className={`flex max-w-[104px] flex-none flex-col items-center gap-1.5 text-center transition ${dim} hover:opacity-100`}
+              className={`flex max-w-[104px] flex-none flex-col items-center gap-1 text-center transition ${dim} hover:opacity-100`}
             >
-              <span className={`grid h-12 w-12 place-items-center rounded-full p-[2px] ${ring}`}>
+              <span className={`grid h-11 w-11 place-items-center rounded-full p-[2px] ${ring}`}>
                 <span className="relative h-full w-full rounded-full border-2 border-surface">
                   <span className={`grid h-full w-full place-items-center overflow-hidden rounded-full bg-surface3 ${tile.closed ? "grayscale" : ""}`}>
                     {img ? (
@@ -138,11 +139,11 @@ export function RequestRail({
                 </span>
               </span>
               <span className="flex flex-col items-center gap-0.5">
-                <span className={`max-w-[104px] truncate text-[12.5px] leading-[16px] ${active ? "font-bold text-navy" : "font-semibold text-navy-mid"}`}>
+                <span className={`max-w-[104px] truncate text-[11px] leading-[13px] ${active ? "font-bold text-navy" : "font-semibold text-navy-mid"}`}>
                   {tile.label}
                 </span>
                 {tile.closed && (
-                  <span className="text-[9px] font-bold uppercase leading-[11px] tracking-[.07em] text-muted">{t.workspace.closed}</span>
+                  <span className="text-[8px] font-bold uppercase leading-[10px] tracking-[.07em] text-muted">{t.workspace.closed}</span>
                 )}
               </span>
             </button>

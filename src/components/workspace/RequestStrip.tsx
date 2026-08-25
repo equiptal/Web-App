@@ -98,12 +98,12 @@ export function RequestStrip({
   };
 
   return (
-    <div className={`${PAGE_MX_BLEED} mt-2.5 flex flex-none items-stretch gap-4`}>
+    <div className={`${PAGE_MX_BLEED} mt-2 flex flex-none items-stretch gap-3`}>
       {/* Thinner (owner, 2026-08-25). `py-3` became `py-2` and the site name 18px → 16px: on a page
           that must end at the fold, the strip's job is to NAME the request, and a name does not need
           a display size to do it. The white card inside keeps its own padding — squeezing that would
           crowd the thumbnail rather than the row. */}
-      <div className="flex min-w-0 flex-1 flex-col gap-3 rounded-[14px] bg-navy px-4 py-2 text-white lg:flex-row lg:items-center lg:gap-5 lg:px-[18px]">
+      <div className="flex min-w-0 flex-1 flex-col gap-2 rounded-[14px] bg-navy px-4 py-1.5 text-white lg:flex-row lg:items-center lg:gap-4 lg:px-4">
         {/* ── The request ── */}
         <div className="flex flex-none flex-col gap-1.5">
           <button
@@ -163,10 +163,10 @@ export function RequestStrip({
             machine offered and whether a yard has been confirmed for it. With nothing picked it
             states what the REQUEST asks instead — start, duration, units, operator, certificates —
             so the line is never empty and never mixes an ask with an answer. */}
-        <div className="flex min-w-0 flex-1 flex-col gap-3 rounded-[10px] bg-surface p-2 sm:flex-row sm:items-center sm:gap-3 sm:pe-3">
+        <div className="flex min-w-0 flex-1 flex-col gap-2 rounded-[10px] bg-surface p-1.5 sm:flex-row sm:items-center sm:gap-2.5 sm:pe-2.5">
           {/* The thumbnail carries the state of the picked machine: a ribbon naming it, and a tick
               once the supplier has put it in a yard he confirmed. Nothing picked, nothing claimed. */}
-          <span className="relative grid h-[46px] w-16 flex-none place-items-center overflow-hidden rounded-[7px] border border-border bg-surface2">
+          <span className="relative grid h-10 w-14 flex-none place-items-center overflow-hidden rounded-[7px] border border-border bg-surface2">
             {photo ? (
               /* eslint-disable-next-line @next/next/no-img-element */
               <img src={photo} alt="" className="h-full w-full object-cover" />
