@@ -156,8 +156,12 @@ export function RequestRail({
                       <Icon name="precision_manufacturing" size={20} className="text-muted" />
                     )}
                   </span>
-                  {/* One badge, and which one depends on what the tile has to say: bids that have
-                      arrived outrank a unit count, because a bid is news and a count is not. */}
+                  {/* ── The unit count, and nothing else (owner, 2026-08-25) ─────────────────────
+                      A bid count used to sit here and outrank the units, on the reasoning that a
+                      bid is news and a count is not. The ring already carries that news: green
+                      means bids are waiting. Printing the number as well spent the tile's one badge
+                      slot on something said twice, and it hid the count of machines — which the
+                      ring cannot say and nothing else on the rail does. */}
                   {/* ── Share, on the tile the page is showing (owner's reference, 2026-08-25) ──
                       One request is being read at a time, and the link that invites bids onto it is
                       about THAT request — so it rides its own circle rather than waiting inside the
@@ -177,16 +181,11 @@ export function RequestRail({
                       <Icon name="ios_share" size={11} />
                     </span>
                   )}
-                  {tile.bids > 0 ? (
-                    <span className="absolute -bottom-0.5 -end-0.5 flex items-center gap-[3px] rounded-full border-2 border-surface bg-navy px-1.5 py-[3px]">
-                      <Icon name="description" size={8} className="text-white" />
-                      <span className="text-[9.5px] font-extrabold leading-none text-white">{tile.bids}</span>
-                    </span>
-                  ) : tile.units > 1 ? (
+                  {tile.units > 1 && (
                     <span className="absolute -bottom-px -end-px min-w-[19px] rounded-full border-2 border-surface bg-navy px-1 text-[10px] font-extrabold leading-[15px] text-white">
                       {t.workspace.unitsBadge.replace("{n}", String(tile.units))}
                     </span>
-                  ) : null}
+                  )}
                 </span>
               </span>
               <span className="flex h-[22px] flex-col items-center">
