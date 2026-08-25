@@ -107,10 +107,18 @@ export function WherePanel({
               />
 
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                <p className="min-w-0 flex-1 text-[13px] leading-snug text-navy-mid">
-                  <Icon name="location_on" size={15} className="me-1 align-[-3px] text-brand" />
-                  {hasLocation ? loc.label : t.create.wherePanel.dragHint}
-                </p>
+                {/* The picker prints the resolved address and its coordinates itself, so repeating the
+                    label here showed the same street twice, one line apart. This line now exists only
+                    for the case the picker cannot cover: no pin yet, and a disabled confirm button
+                    that would otherwise sit there with nothing saying what to do. */}
+                {hasLocation ? (
+                  <span className="min-w-0 flex-1" />
+                ) : (
+                  <p className="min-w-0 flex-1 text-[13px] leading-snug text-navy-mid">
+                    <Icon name="location_on" size={15} className="me-1 align-[-3px] text-brand" />
+                    {t.create.wherePanel.dragHint}
+                  </p>
+                )}
                 {loc.confirmed ? (
                   <span className="flex items-center gap-1.5 rounded-[10px] border border-ok/30 bg-ok-soft px-3.5 py-2.5 text-[13px] font-bold text-ok">
                     <Icon name="check_circle" size={17} /> {t.step1.location.confirmed}
