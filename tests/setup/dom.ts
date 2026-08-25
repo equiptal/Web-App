@@ -54,4 +54,10 @@ if (hasDom) {
   if (!window.scrollTo) {
     window.scrollTo = (() => {}) as typeof window.scrollTo;
   }
+  // jsdom has no layout, so it implements no scrolling at all — `scrollIntoView` is simply absent and
+  // calling it throws. The canvas uses it to bring a refused move's shake on screen, so without this
+  // the shake tests fail for a reason that has nothing to do with the shake.
+  if (!Element.prototype.scrollIntoView) {
+    Element.prototype.scrollIntoView = function scrollIntoView() {};
+  }
 }

@@ -34,6 +34,8 @@ export function Canvas() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [carryTo, setCarryTo] = useState<number | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  /** The equipment block, so a refused move can bring its shake into view. */
+  const equipmentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const t0 = timers.current;
@@ -74,8 +76,17 @@ export function Canvas() {
   const equipmentGaps = item ? [...itemGaps(item, draft), ...transportGaps([item], draft.project)] : [];
   const whenOk = gateWhen(draft.project, state.chargedDaysUnderstood).ok;
 
+  /**
+   * Refuse a move, visibly.
+   *
+   * The shake IS the explanation — the canvas says nothing else about why a panel would not open. So
+   * it has to be on screen when it fires: a renter who has scrolled down to the panel headers is
+   * looking hundreds of pixels below the fields that are blocking them, and a shake up there is a
+   * click that appears to do nothing at all. Scroll first, then shake.
+   */
   const shakeNow = (which: "fields" | "where") => {
     const set = which === "where" ? setShakingWhere : setShaking;
+    if (which === "fields") equipmentRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
     set(true);
     timers.current.push(setTimeout(() => set(false), SHAKE_MS));
   };
@@ -167,7 +178,7 @@ export function Canvas() {
 
       {/* ---------------- Equipment ---------------- */}
       {item && (
-        <div className="mb-3.5 flex flex-col gap-4 lg:flex-row lg:items-start">
+        <div ref={equipmentRef} className="mb-3.5 flex flex-col gap-4 lg:flex-row lg:items-start">
           <MachineCard item={item} gaps={equipmentGaps} shaking={shaking} />
           <OperatorRail item={item} />
         </div>

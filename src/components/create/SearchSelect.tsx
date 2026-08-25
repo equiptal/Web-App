@@ -77,6 +77,12 @@ export function SearchSelect({
   }, [open]);
 
   const selected = options.find((o) => o.value === value);
+  /**
+   * The filter box earns its place only on a long list. Fuel has two options and the year bands
+   * five — there a search field is pure furniture, and in a narrow overlay popup it clipped its own
+   * placeholder to "MINIMUM YEA". The taxonomy lists, which run to dozens, keep it.
+   */
+  const searchable = options.length > 7;
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return q ? options.filter((o) => o.label.toLowerCase().includes(q)) : options;
@@ -110,16 +116,18 @@ export function SearchSelect({
       </button>
 
       {open && (
-        <div className="absolute inset-x-0 top-[calc(100%+4px)] z-20 overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
-          <div className="border-b border-border p-2">
-            <input
-              autoFocus
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={searchPlaceholder}
-              className="w-full rounded-md border border-border px-2.5 py-1.5 text-[13px] outline-none"
-            />
-          </div>
+        <div className="absolute start-0 top-[calc(100%+4px)] z-20 min-w-[max(100%,190px)] overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+          {searchable && (
+            <div className="border-b border-border p-2">
+              <input
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="w-full rounded-md border border-border px-2.5 py-1.5 text-[13px] outline-none"
+              />
+            </div>
+          )}
           <div id={listId} className="max-h-48 overflow-auto" role="listbox" aria-label={label}>
             {filtered.map((o) => (
               <button
@@ -136,7 +144,7 @@ export function SearchSelect({
                 }`}
               >
                 {o.value === value && <Icon name="check" size={14} className="flex-none text-brand" />}
-                <span className="truncate">{o.label}</span>
+                <span className="whitespace-nowrap">{o.label}</span>
               </button>
             ))}
             {filtered.length === 0 && <p className="px-3.5 py-3 text-[13px] text-muted">—</p>}

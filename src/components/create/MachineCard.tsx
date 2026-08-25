@@ -73,8 +73,13 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
       <div className="grid gap-5 lg:grid-cols-[2fr_3fr] lg:items-stretch">
         {/* ---------------- The 450px panel, and the four controls on its corners ---------------- */}
         <div className="relative h-full min-h-[450px] w-full min-w-0 overflow-hidden rounded-xl bg-[#f0f1f3]">
-          <div className="grid h-full place-items-center text-navy/20">
-            <Icon name={equipmentIcon(tax.subtypeName || tax.categoryName)} size={150} />
+          <div className="grid h-full place-content-center justify-items-center gap-2 px-6 text-center">
+            <Icon name={equipmentIcon(tax.subtypeName || tax.categoryName)} size={132} className="text-navy/20" />
+            {(tax.subtypeName || tax.categoryName) && (
+              <p className="text-[13px] font-bold leading-snug text-navy/45">
+                {[tax.subtypeName || tax.categoryName, tax.sizeName].filter(Boolean).join(" · ")}
+              </p>
+            )}
           </div>
 
           {/* Top-left the certificate, top-right the quantity. Amber while the certificate is
@@ -168,7 +173,7 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
             <UnavailableCard item={item} label={item.rawLabel ?? tax.subtypeName ?? ""} />
           ) : (
             /* The amber-tinted taxonomy trio, at the prototype's minmax columns. */
-            <div className="grid gap-2.5 rounded-[10px] border border-[#f5c98f] bg-[#fff9f0] p-3 sm:grid-cols-[minmax(116px,0.8fr)_minmax(150px,1.7fr)_minmax(112px,1fr)]">
+            <div className="grid gap-2.5 rounded-[10px] border border-[#f5c98f] bg-[#fff9f0] p-3 sm:grid-cols-[minmax(132px,1fr)_minmax(150px,1.5fr)_minmax(104px,0.9fr)]">
               <CanvasField
                 label={t.create.machineCard.category}
                 amber
@@ -232,7 +237,7 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
           )}
 
           {/* Logistics: the prototype's 2fr / 1fr — the two haulage legs together, fuel on its own. */}
-          <div className="grid gap-3.5 sm:grid-cols-[2fr_1fr]">
+          <div className="grid items-start gap-3.5 sm:grid-cols-2">
             <div className="min-w-0 rounded-[10px] bg-surface2 p-3.5">
               <div className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.05em] text-muted">{t.create.machineCard.logistics}</div>
               <div className="flex flex-col gap-3.5">
