@@ -1112,6 +1112,8 @@ export const ar: Dictionary = {
     chipStarts: "يبدأ {date}",
     chipDuration: "{n} يوم",
     chipMore: "+{n} أخرى",
+    // تُقرأ من نسخة شروط الطلب المحمولة على العرض، لا تُشتقّ من نوع الإيجار.
+    chipOperator: "مع مشغّل",
     tabCards: "البطاقات",
     tabCompare: "المقارنة",
     download: "تنزيل",

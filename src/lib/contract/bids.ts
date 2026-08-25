@@ -338,6 +338,17 @@ export interface BidCard {
    *  email is null until the bid-list projection adds it (backend), then the Email row lights up. */
   supplierPhone?: string | null;
   supplierEmail?: string | null;
+  /**
+   * The supplier's own city, from the bid-list `supplierProfile` (owner, 2026-08-25).
+   *
+   * It was already on the wire and already being READ — one of the parts `supplierNationalAddress`
+   * composes a Saudi address from when no single address field is present. Surfacing it needs no
+   * projection change; the earlier note that this required backend work was wrong.
+   *
+   * What it is NOT is an offered unit's `yardCity`. That is where a machine sits, which is a
+   * different fact and wrong for any supplier shipping from outside his own city.
+   */
+  supplierCity?: string | null;
   matchCount: number;
   conflictCount: number;
   dealRoomId: string | null;
@@ -763,6 +774,9 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
   const profVal = (...keys: string[]): string | null => { for (const o of profSources) for (const k of keys) { const v = s(o[k]); if (v) return v; } return null; };
   const supplierCrNumber = profVal("crNumber", "commercialRegistrationNumber", "commercial_registration_number");
   const supplierVatNumber = profVal("vatNumber", "taxNumber", "tax_number");
+  // Read through the same `profVal` scan as the rest — the field is already there, and the composed
+  // national address below has been using it all along.
+  const supplierCity = profVal("companyCity", "company_city", "city");
   // National address: a single field if present, else composed from its Saudi-address parts (app parity).
   const supplierNationalAddress =
     profVal("nationalAddress", "national_address", "companyAddress", "company_address") ||
@@ -967,6 +981,7 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
     supplierCrNumber,
     supplierVatNumber,
     supplierNationalAddress,
+    supplierCity,
     supplierPhone: s(sup.phone),
     supplierEmail: s(sup.email), // not in the bid-list projection yet → null until the backend adds it
     matchCount: n(raw.matchCount) ?? 0,

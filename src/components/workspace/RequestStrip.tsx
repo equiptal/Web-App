@@ -62,6 +62,17 @@ export function RequestStrip({
     : null;
   const certs = item?.requiredCerts ?? [];
   const unitCount = item?.item?.qty ?? 1;
+  /**
+   * Did the request ask for an operator?
+   *
+   * Read off the BID's `requestTerms`, which every bid carries a copy of — the earlier note that this
+   * needed a projection change was wrong: `RequestListItem` has no operator field, but the bid does,
+   * and the strip always has a bid in hand when there is one to read.
+   *
+   * Absent rather than «no operator» when nothing is selected or the request never said: a request
+   * that did not ask is not a request that refused.
+   */
+  const withOperator = (bid?.requestTerms?.operatorIncluded ?? "").toUpperCase() === "YES";
 
   return (
     <div className="mx-3 mt-3 overflow-hidden rounded-[16px] bg-navy text-white sm:mx-5">
@@ -136,16 +147,18 @@ export function RequestStrip({
                 what he had asked for while comparing what he was being offered. They belong beside
                 the item they qualify.
 
-                Only what the list payload actually carries. The prototype also shows «With operator»,
-                and `RequestListItem` has no operator field — inventing one from `rentalType` would be
-                a guess printed as a requirement, so it is left out until the projection carries it. */}
-            {(startsOn || item?.durationDays || certs.length > 0 || unitCount > 1) && (
+                «With operator» comes off the BID rather than the item: every bid carries a copy of the
+                request's terms, and that is where the flag lives. Nothing on this row is derived — a
+                chip here is a requirement, and one invented from `rentalType` would be a claim the
+                request never made. */}
+            {(startsOn || item?.durationDays || certs.length > 0 || unitCount > 1 || withOperator) && (
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 {startsOn && <Chip>{fmt(t.workspace.chipStarts, { date: startsOn })}</Chip>}
                 {item?.durationDays ? (
                   <Chip>{fmt(t.workspace.chipDuration, { n: String(item.durationDays) })}</Chip>
                 ) : null}
                 {unitCount > 1 && <Chip>{fmt(t.workspace.unitsCount, { n: String(unitCount) })}</Chip>}
+                {withOperator && <Chip>{t.workspace.chipOperator}</Chip>}
                 {certs.slice(0, 2).map((c) => (
                   <Chip key={c} tone="cert">{ar ? CERT_LABEL[c].ar : CERT_LABEL[c].en}</Chip>
                 ))}

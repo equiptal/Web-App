@@ -220,8 +220,12 @@ function BidCardTile({
         </span>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[14px] font-extrabold text-navy">{card.supplierName}</div>
+          {/* «Supplier · Riyadh», as the app's own card reads (owner, 2026-08-25). The city was on the
+              wire the whole time — the bid-list `supplierProfile` carries it, and `mapBid` was already
+              reading it into the composed national address. The distance keeps its place after it. */}
           <div className="truncate text-[11.5px] font-semibold text-muted">
             {L("Supplier", "مؤجّر")}
+            {card.supplierCity ? ` · ${card.supplierCity}` : ""}
             {card.distanceKm != null ? ` · ${Math.round(card.distanceKm)} ${L("km", "كم")}` : ""}
           </div>
         </div>

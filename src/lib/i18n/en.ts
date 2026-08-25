@@ -1264,6 +1264,8 @@ export const en = {
     chipStarts: "Starts {date}",
     chipDuration: "{n} days",
     chipMore: "+{n} more",
+    // Read off the bid's copy of the request terms, not derived from the rental type.
+    chipOperator: "With operator",
     // The two tabs and the export beside them.
     tabCards: "Cards",
     tabCompare: "Compare",
