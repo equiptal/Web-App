@@ -1,33 +1,143 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useT, fmt } from "@/lib/i18n";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useT, useLocale, fmt } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
-import { Button, Badge, Icon } from "@/components/ui";
+import { Button, Icon } from "@/components/ui";
+import type { EquipmentItem } from "@/lib/contract/draft";
+
+/**
+ * The agent at work (owner, 2026-08-26 — the Processing prototype).
+ *
+ * ── What is real here, and what cannot be ───────────────────────────────────────────────────────
+ * `processRfq` is ONE request. The server answers once, with everything; there is no stream, so
+ * there is no progress to report while it is in flight. Pretending otherwise — a bar that creeps to
+ * 90% on a timer — is the thing this screen used to do, and it lies in the renter's favour right up
+ * until it stalls.
+ *
+ * So the four stages are split honestly:
+ *
+ *   SCAN, EXTRACT   paced, and they say what was SENT — the document is being read, the details are
+ *                   being pulled. Neither claims a finding, because none has arrived.
+ *   MATCH           begins the moment the draft lands, and every line after it is REAL: each item's
+ *                   own label and quantity, then the canonical name the agent matched it to. This is
+ *                   the equipment the renter is about to see on the canvas, named the same way.
+ *   ANALYZE         the last beat before the canvas opens.
+ *
+ * The reveal is also what the wait is FOR. The old screen sat on a flat 1,400ms pause after the
+ * response so the counts could be read; that time now shows what was actually found, item by item.
+ *
+ * `agentNames` is the source for «matched to» — the contract marks it display-only for exactly this,
+ * and it carries Arabic. Ids are never shown; they are not what a renter recognises.
+ */
+
+type Feed = { id: number; text: string };
+
+/** How long each revealed item holds the feed. Fast enough not to delay the canvas, slow enough to read. */
+const CHECK_MS = 320;
+const MATCH_MS = 560;
 
 export function Processing() {
   const t = useT();
+  const { locale } = useLocale();
+  const ar = locale === "ar";
   const { state, actions } = useRfq();
   const { busy, error, draft, errorDetail } = state;
 
-  const stages = [t.processing.stage1, t.processing.stage2, t.processing.stage3, t.processing.stage4];
+  const stages = [
+    { label: t.processing.stageScan, title: t.processing.stage1, icon: "radio_button_checked" },
+    { label: t.processing.stageExtract, title: t.processing.stage2, icon: "edit_note" },
+    { label: t.processing.stageMatch, title: t.processing.stage3, icon: "swap_horiz" },
+    { label: t.processing.stageAnalyze, title: t.processing.stage4, icon: "target" },
+  ];
 
-  // Walk the 4 stages while parsing (the real call is async; this paces the loader, AC-04).
-  const [stage, setStage] = useState(0);
+  const [step, setStep] = useState(0);
+  const [revealed, setRevealed] = useState(0);
+  const [matched, setMatched] = useState(0);
+  const [feed, setFeed] = useState<Feed[]>([]);
+  const feedId = useRef(0);
+  const push = (text: string) => setFeed((f) => [...f, { id: ++feedId.current, text }].slice(-4));
+
+  /** The items the agent actually returned, in the order the canvas will list them. */
+  const items: EquipmentItem[] = useMemo(
+    () => (draft ? draft.items.filter((i) => !i.removed) : []),
+    [draft],
+  );
+
+  /** One item, named as the renter will see it named. */
+  const itemLabel = (it: EquipmentItem) => {
+    const name =
+      it.rawLabel ||
+      (ar ? it.agentNames?.subtypeAr || it.agentNames?.subtype : it.agentNames?.subtype) ||
+      (ar ? it.agentNames?.categoryAr || it.agentNames?.category : it.agentNames?.category) ||
+      "—";
+    const size = it.rawSize ? ` · ${it.rawSize}` : "";
+    const qty = it.quantity > 1 ? ` × ${it.quantity}` : "";
+    return `${name}${size}${qty}`;
+  };
+
+  /** What the agent resolved it to. Falls back to the item's own name rather than inventing one. */
+  const matchLabel = (it: EquipmentItem) => {
+    const a = it.agentNames;
+    if (!a) return itemLabel(it);
+    const sub = ar ? a.subtypeAr || a.subtype : a.subtype;
+    const cap = ar ? a.capacityAr || a.capacity : a.capacity;
+    return [sub, cap].filter(Boolean).join(" ") || itemLabel(it);
+  };
+
+  // ── Stages 0 and 1: paced, while the one request is in flight. ──
   useEffect(() => {
     if (!busy) return;
-    setStage(0);
-    const id = setInterval(() => setStage((n) => Math.min(n + 1, stages.length - 1)), 2200);
-    return () => clearInterval(id);
-  }, [busy, stages.length]);
+    setStep(0);
+    setRevealed(0);
+    setMatched(0);
+    setFeed([]);
+    push(t.processing.feedReading);
+    const a = setTimeout(() => {
+      push(fmt(t.processing.feedRead, { n: "1" }));
+      setStep(1);
+    }, 1100);
+    const b = setTimeout(() => {
+      push(t.processing.feedExtracted);
+      setStep(2);
+    }, 2300);
+    return () => {
+      clearTimeout(a);
+      clearTimeout(b);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busy]);
 
-  // Auto-advance to the wizard once parsing completes — no manual "Next" (brief pause to show counts).
   const done = !busy && !!draft && !error;
+
+  // ── Stage 2: the real items, one at a time. ──
   useEffect(() => {
     if (!done) return;
-    const id = setTimeout(() => actions.enterWizard(), 1400);
+    if (step < 2) setStep(2);
+    if (revealed < items.length && matched === revealed) {
+      const id = setTimeout(() => {
+        push(fmt(t.processing.feedChecking, { item: itemLabel(items[revealed]) }));
+        setRevealed((n) => n + 1);
+      }, CHECK_MS);
+      return () => clearTimeout(id);
+    }
+    if (matched < revealed) {
+      const id = setTimeout(() => {
+        const it = items[matched];
+        push(fmt(t.processing.feedMatched, { item: itemLabel(it), match: matchLabel(it) }));
+        setMatched((n) => n + 1);
+      }, MATCH_MS);
+      return () => clearTimeout(id);
+    }
+    // Everything named — one last beat, then the canvas.
+    const id = setTimeout(() => {
+      push(t.processing.feedAllMatched);
+      setStep(3);
+      setTimeout(() => actions.enterWizard(), 700);
+    }, 400);
     return () => clearTimeout(id);
-  }, [done, actions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [done, revealed, matched, items.length]);
 
   /* ----------------------------- Error (AC-09 / AC-10) — clear modal ----------------------------- */
   if (error) {
@@ -72,59 +182,93 @@ export function Processing() {
     );
   }
 
-  // Once the result is in, mark everything complete.
-  const effectiveStage = done ? stages.length : stage;
-  const barPct = done ? 100 : Math.round(((stage + 1) / stages.length) * 100);
+  /**
+   * The bar is anchored to what has actually happened, not to a clock: 12% on send, 30% once the
+   * request has been described, then 45→80% across the real items as they are named, and 92% while
+   * the canvas is built. It never reaches 100 before the canvas does.
+   */
+  const pct =
+    step === 0 ? 12 : step === 1 ? 30 : step === 2 ? Math.round(45 + (items.length ? (revealed + matched) / (items.length * 2) : 0) * 35) : 92;
 
   return (
-    <div className="mx-auto mt-9 max-w-[460px] text-center">
-      {/* loadicon: the AI agent glyph (our agent mark) + spinning ring; check when done */}
-      <div className="relative mx-auto mb-[22px] grid h-[84px] w-[84px] place-items-center rounded-full border border-border bg-surface shadow-[0_6px_20px_rgba(28,53,80,.06)]">
-        {!done && <span className="absolute -inset-px rounded-full border-[3px] border-transparent border-r-brand border-t-brand motion-safe:animate-spin" />}
-        <Icon name={done ? "task_alt" : "smart_toy"} size={34} className={done ? "text-ok" : "text-warn"} />
-      </div>
+    <div className="flex min-h-[70vh] items-center justify-center">
+      <div className="w-full max-w-[520px] rounded-[22px] border border-border bg-surface p-7 text-center shadow-[0_1px_3px_rgba(15,23,31,.06),0_30px_70px_-20px_rgba(31,45,58,.2)]">
+        {/* The agent, and that it is live. The dot pulses; it is the only thing on this card that moves
+            without a reason, and it is the reason. */}
+        <div className="mb-5 flex items-center justify-center gap-2.5">
+          <span className="grid h-[30px] w-[30px] flex-none place-items-center rounded-[9px] bg-gradient-to-br from-[#f7c675] to-brand text-white shadow-[0_4px_10px_rgba(237,161,83,.35)]">
+            <Icon name="auto_awesome" size={16} />
+          </span>
+          <span className="h-2 w-2 flex-none rounded-full bg-ok motion-safe:animate-pulse" />
+          <span className="text-[12px] font-extrabold uppercase tracking-[.04em] text-ok">{t.processing.agentWorking}</span>
+        </div>
 
-      <h2 className="text-[21px] font-extrabold tracking-tight">{t.processing.title}</h2>
-      <p className="mb-[26px] mt-1.5 text-[13.5px] text-muted">{t.processing.sub}</p>
+        <h2 className="text-[21px] font-extrabold tracking-tight text-navy">
+          {stages[Math.min(step, 3)].title}
+          <span className="motion-safe:animate-pulse">…</span>
+        </h2>
+        <p className="mb-5 mt-1 text-[13.5px] text-muted">{t.processing.sub}</p>
 
-      {/* stages */}
-      <div className="mx-auto mb-6 flex max-w-full sm:max-w-[330px] flex-col gap-[13px] text-start">
-        {stages.map((label, i) => {
-          const s = i < effectiveStage ? "done" : i === effectiveStage ? "active" : "todo";
-          return (
-            <div key={i} className={`flex items-center gap-[11px] text-[13.5px] font-semibold ${s === "todo" ? "text-muted/50" : s === "active" ? "text-navy" : "text-navy-mid"}`}>
-              <span
-                className={`grid h-[22px] w-[22px] flex-none place-items-center rounded-full text-[11px] font-extrabold ${
-                  s === "done"
-                    ? "bg-ok text-white"
-                    : s === "active"
-                      ? "border-2 border-brand border-t-transparent motion-safe:animate-spin"
-                      : "border-2 border-border"
-                }`}
-              >
-                {s === "done" ? "✓" : ""}
-              </span>
-              {label}
-            </div>
-          );
-        })}
-      </div>
+        {/* The four stages, with the rule between them filling as each is passed. */}
+        <div className="mx-auto mb-5 flex max-w-[400px] items-start">
+          {stages.map((s, i) => {
+            const isDone = i < step;
+            const active = i === step;
+            return (
+              <div key={s.label} className="flex flex-1 items-center">
+                <div className="flex flex-col items-center gap-2">
+                  <span
+                    className={`grid h-9 w-9 flex-none place-items-center rounded-full ${
+                      isDone
+                        ? "bg-ok text-white"
+                        : active
+                          ? "bg-gradient-to-br from-[#f7c675] to-brand text-white motion-safe:animate-pulse"
+                          : "bg-surface2 text-muted"
+                    }`}
+                  >
+                    <Icon name={isDone ? "check" : s.icon} size={17} />
+                  </span>
+                  <span className={`whitespace-nowrap text-[11px] font-bold ${isDone ? "text-ok" : active ? "text-navy" : "text-muted"}`}>
+                    {s.label}
+                  </span>
+                </div>
+                {i < stages.length - 1 && (
+                  <span className={`mt-[-18px] h-0.5 flex-1 ${i < step ? "bg-ok" : "bg-border"}`} />
+                )}
+              </div>
+            );
+          })}
+        </div>
 
-      {/* progress bar */}
-      <div className="mx-auto h-1.5 max-w-full sm:max-w-[330px] overflow-hidden rounded-full bg-surface3">
-        <div className="h-full rounded-full bg-brand transition-[width] duration-500" style={{ width: `${barPct}%` }} />
-      </div>
-
-      {/* When done: AC-56 summary counts + continue. */}
-      {done && draft && (
-        <div className="mt-7">
-          <div className="flex flex-wrap justify-center gap-2">
-            <Badge tone="brand">{fmt(t.processing.summaryItems, { count: draft.summary.totalItems })}</Badge>
-            {draft.summary.needsValidation > 0 && <Badge tone="warn">{fmt(t.processing.summaryNeedCheck, { count: draft.summary.needsValidation })}</Badge>}
-            {draft.summary.notAvailable > 0 && <Badge tone="danger">{fmt(t.processing.summaryNotAvailable, { count: draft.summary.notAvailable })}</Badge>}
+        {/* What the agent has said so far. Four lines: enough to follow, short enough not to scroll. */}
+        <div className="min-h-[110px] rounded-[14px] border border-border bg-surface2/40 px-4 py-3.5">
+          <div className="mb-2.5 text-[11px] font-extrabold uppercase tracking-[.03em] text-muted">{t.processing.liveActivity}</div>
+          <div className="flex flex-col items-stretch gap-2.5">
+            {feed.map((entry, i) => (
+              <div key={entry.id} className="flex items-center gap-2.5 text-start">
+                <span className={`h-1.5 w-1.5 flex-none rounded-full ${i === feed.length - 1 ? "bg-brand" : "bg-ok"}`} />
+                <span className="min-w-0 flex-1 truncate text-[13px] text-navy-mid">{entry.text}</span>
+              </div>
+            ))}
           </div>
         </div>
-      )}
+
+        <div className="mt-4 flex items-center gap-3">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface3">
+            <div className="h-full rounded-full bg-gradient-to-r from-brand to-[#f7c675] transition-[width] duration-500" style={{ width: `${pct}%` }} />
+          </div>
+          <span className="w-9 text-end text-[12.5px] font-bold text-brand">{pct}%</span>
+        </div>
+
+        {/* The counts the canvas will open on, once there are any. */}
+        {done && draft && (
+          <p className="mt-3 text-[12.5px] font-semibold text-muted">
+            {fmt(t.processing.summaryItems, { count: draft.summary.totalItems })}
+            {draft.summary.needsValidation > 0 && ` · ${fmt(t.processing.summaryNeedCheck, { count: draft.summary.needsValidation })}`}
+            {draft.summary.notAvailable > 0 && ` · ${fmt(t.processing.summaryNotAvailable, { count: draft.summary.notAvailable })}`}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

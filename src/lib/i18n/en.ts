@@ -194,7 +194,20 @@ export const en = {
     tabManual: "Manual", // AC-01 tentative
     tabLater: "LATER",
     manualNote: "Manual entry is coming in a later release.",
-    pasteLabel: "Write your RFQ",
+    pasteLabel: "Describe your request",
+    // The placeholder types itself through these in turn — the prototype's own examples. Short on
+    // purpose: a placeholder that runs to two lines reads as content rather than as an invitation.
+    placeholderExamples: [
+      "I want 30 forklifts delivered to Site B by Friday…",
+      "I need a 20-ton crane rental in Riyadh for 2 weeks…",
+      "Looking for 5 concrete mixers with operators included…",
+      "3 excavators, diesel included, starting next Sunday…",
+    ],
+    attachTitle: "Attach RFQ files",
+    dropTitleNew: "Drop your RFQ files here",
+    readyToReview: "Ready to review",
+    addSomething: "Add a description or a file",
+    continueLabel: "Continue",
     pastePlaceholder: "Write your request in plain words — e.g. “I need a 30-ton forklift at King Khalid Airport, Riyadh, for 3 weeks starting next Sunday, with an operator and diesel included, delivered to site.”\n\nYou can also paste an email, or an equipment list.",
     uploadLabel: "Attach files too",
     uploadOptional: "optional — add as many as you like",
@@ -230,6 +243,20 @@ export const en = {
     summaryItems: "{count} items found",
     summaryNeedCheck: "{count} need a quick check",
     summaryNotAvailable: "{count} not available",
+    // The live feed. The first two lines are said while the request is still in flight, so they
+    // report what was SENT rather than what was found; everything after names real extracted items.
+    agentWorking: "AGENT WORKING",
+    liveActivity: "LIVE ACTIVITY",
+    feedReading: "Reading your document/text…",
+    feedRead: "Found readable text — {n} request block",
+    feedExtracted: "Extracted site, duration and quantities",
+    feedChecking: "Checking: {item}",
+    feedMatched: "{item} → matched to {match}",
+    feedAllMatched: "All equipment matched — preparing your request",
+    stageScan: "Scan",
+    stageExtract: "Extract",
+    stageMatch: "Match",
+    stageAnalyze: "Analyze",
   },
   step1: {
     title: "Project details",
