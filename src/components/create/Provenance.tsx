@@ -134,7 +134,13 @@ export function ChoiceRow<T extends string>({
             key={o.value}
             type="button"
             onClick={() => onChange(o.value)}
-            className={`truncate rounded-lg border px-1 py-2 text-center text-[13px] transition ${
+            /**
+             * Wraps rather than truncating. The prototype's `pillFull` clips with an ellipsis, which
+             * is fine for "Supplier" / "Me" but turned "We collect" into "We col..." — and a choice
+             * whose label is cut off has lost the only thing that says what it means. A wrapped chip
+             * is ugly; a clipped one is wrong.
+             */
+            className={`rounded-lg border px-1.5 py-2 text-center text-[13px] leading-tight transition ${
               on ? "border-navy bg-navy font-bold text-white shadow-[0_0_0_2px_#dbe6f1]" : "border-border bg-surface font-semibold text-navy-mid"
             }`}
           >

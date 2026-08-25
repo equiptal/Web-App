@@ -62,14 +62,6 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
   const partyOptions = (renterLabel: string) =>
     PARTIES.map((p) => ({ value: p, label: p === "supplier" ? t.create.party.supplier : renterLabel }));
 
-  /** The amber bullet used beside an overlay control, where a CanvasField label would not fit. */
-  const overlayDot = (field: string) =>
-    gapFor(field) ? (
-      <span aria-hidden className={`text-[8px] leading-none text-brand ${shake(field) ? "shake-error" : ""}`}>
-        ●
-      </span>
-    ) : null;
-
   return (
     <div className="min-w-0 flex-1 rounded-[14px] border border-border bg-surface p-3.5">
       <div className="mb-4 flex items-center gap-2">
@@ -78,18 +70,18 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
       </div>
 
       {/* The prototype's 2fr / 3fr split, 20px gutter, columns aligned to the top. */}
-      <div className="grid gap-5 lg:grid-cols-[2fr_3fr] lg:items-start">
+      <div className="grid gap-5 lg:grid-cols-[2fr_3fr] lg:items-stretch">
         {/* ---------------- The 450px panel, and the four controls on its corners ---------------- */}
-        <div className="relative h-[450px] w-full min-w-0 overflow-hidden rounded-xl bg-[#f0f1f3]">
-          <div className="grid h-full place-items-center text-navy/10">
-            <Icon name={equipmentIcon(tax.subtypeName || tax.categoryName)} size={160} />
+        <div className="relative h-full min-h-[450px] w-full min-w-0 overflow-hidden rounded-xl bg-[#f0f1f3]">
+          <div className="grid h-full place-items-center text-navy/20">
+            <Icon name={equipmentIcon(tax.subtypeName || tax.categoryName)} size={150} />
           </div>
 
           {/* Top-left the certificate, top-right the quantity. Amber while the certificate is
               unanswered — an unasked certificate silently narrows the renter's own bidder pool. */}
           <div className="absolute inset-x-2.5 top-2.5 flex items-start justify-between gap-2">
             <div className="min-w-0 max-w-[58%]">
-              <div className="flex items-center gap-1.5">
+              <div className={shake("safety_certificates") ? "shake-error" : undefined}>
                 <SearchSelect
                   value={overrides.safetyCerts.length ? overrides.safetyCerts[0] : NO_CERT}
                   placeholder={t.create.machineCard.noCert}
@@ -107,7 +99,6 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
                     })
                   }
                 />
-                {overlayDot("safety_certificates")}
               </div>
               {overrides.safetyCerts.includes("other") && (
                 <TextInput
@@ -157,8 +148,7 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
                 onChange={(v) => set("fuel_type", { fuelType: v as FuelType })}
               />
             </div>
-            <div className="flex min-w-0 max-w-[48%] items-center gap-1.5">
-              {overlayDot("equipment_year")}
+            <div className={`min-w-0 max-w-[48%] ${shake("equipment_year") ? "shake-error" : ""}`}>
               <SearchSelect
                 value={overrides.equipmentYear ?? "any"}
                 placeholder={t.create.machineCard.anyYear}
@@ -178,7 +168,7 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
             <UnavailableCard item={item} label={item.rawLabel ?? tax.subtypeName ?? ""} />
           ) : (
             /* The amber-tinted taxonomy trio, at the prototype's minmax columns. */
-            <div className="grid gap-2.5 rounded-[10px] border border-[#f5c98f] bg-[#fff9f0] p-3 sm:grid-cols-[minmax(88px,0.7fr)_minmax(140px,2fr)_minmax(104px,1.1fr)]">
+            <div className="grid gap-2.5 rounded-[10px] border border-[#f5c98f] bg-[#fff9f0] p-3 sm:grid-cols-[minmax(116px,0.8fr)_minmax(150px,1.7fr)_minmax(112px,1fr)]">
               <CanvasField
                 label={t.create.machineCard.category}
                 amber
@@ -245,7 +235,7 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
           <div className="grid gap-3.5 sm:grid-cols-[2fr_1fr]">
             <div className="min-w-0 rounded-[10px] bg-surface2 p-3.5">
               <div className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.05em] text-muted">{t.create.machineCard.logistics}</div>
-              <div className="grid gap-3.5 sm:grid-cols-2">
+              <div className="flex flex-col gap-3.5">
                 <CanvasField
                   label={t.create.machineCard.delivery}
                   missing={gapFor("delivery")}
@@ -315,7 +305,7 @@ export function MachineCard({ item, gaps, shaking }: { item: EquipmentItem; gaps
             <CanvasField label={t.create.machineCard.notes} optional>
               <TextArea
                 value={item.additionalNotes}
-                rows={4}
+                rows={3}
                 placeholder={t.create.machineCard.notesPlaceholder}
                 onChange={(e) => actions.patchItem(item.id, { additionalNotes: e.target.value })}
               />
