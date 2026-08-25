@@ -280,3 +280,50 @@ describe("an item the marketplace cannot supply (MREQ-AC-24)", () => {
     expect(screen.getByText(/We're looking for this one/)).toBeTruthy();
   });
 });
+
+/**
+ * MREQ — which way a dropdown opens.
+ *
+ * jsdom has no layout engine, so `getBoundingClientRect` returns zeros and every control looks like
+ * it has the whole viewport beneath it. The geometry is stubbed here to exercise the decision, which
+ * is the only part that can be tested without a renderer — that the list actually lands on screen is
+ * a thing only a real browser can confirm.
+ */
+describe("the option list opens where it can be read", () => {
+  const atViewportY = (top: number) => {
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+      top,
+      bottom: top + 34,
+      left: 0,
+      right: 120,
+      width: 120,
+      height: 34,
+      x: 0,
+      y: top,
+      toJSON: () => ({}),
+    } as DOMRect);
+  };
+
+  it("opens upward when the control sits near the bottom of the viewport", async () => {
+    // 768-tall jsdom viewport; a control at 700 has ~34px below it and 700 above.
+    atViewportY(700);
+    const handle = await card();
+    const listbox = await open(handle, "MINIMUM YEAR");
+    expect(listbox.parentElement!.className).toContain("bottom-[calc(100%+4px)]");
+  });
+
+  it("opens downward when there is room", async () => {
+    atViewportY(80);
+    const handle = await card();
+    const listbox = await open(handle, "MINIMUM YEAR");
+    expect(listbox.parentElement!.className).toContain("top-[calc(100%+4px)]");
+  });
+
+  // A cramped viewport must not send the list somewhere even worse than below.
+  it("stays downward when neither side has room", async () => {
+    atViewportY(20);
+    const handle = await card();
+    const listbox = await open(handle, "MINIMUM YEAR");
+    expect(listbox.parentElement!.className).toContain("top-[calc(100%+4px)]");
+  });
+});

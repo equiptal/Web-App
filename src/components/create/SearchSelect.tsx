@@ -54,6 +54,15 @@ export function SearchSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  /**
+   * Which way the list opens.
+   *
+   * Two of these controls are anchored to the BOTTOM edge of the machine panel, so opening downward
+   * put their options below the fold — the renter had to scroll the page to read a list they had just
+   * opened. Measured on each open rather than fixed per call site: the taxonomy dropdowns hit the
+   * same problem whenever the card sits low in the viewport.
+   */
+  const [dropUp, setDropUp] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
   // A combobox has to name the popup it controls, or assistive tech cannot follow the relationship.
   const listId = useId();
@@ -76,6 +85,21 @@ export function SearchSelect({
     };
   }, [open]);
 
+  /** Enough room for the filter box plus a few rows; below this it is better to flip. */
+  const ESTIMATED_LIST_HEIGHT = 240;
+
+  const openList = () => {
+    const rect = boxRef.current?.getBoundingClientRect();
+    if (rect) {
+      const below = window.innerHeight - rect.bottom;
+      // Flip only when there is genuinely more room the other way, so a cramped viewport does not
+      // send the list somewhere even worse.
+      setDropUp(below < ESTIMATED_LIST_HEIGHT && rect.top > below);
+    }
+    setQuery("");
+    setOpen(true);
+  };
+
   const selected = options.find((o) => o.value === value);
   /**
    * The filter box earns its place only on a long list. Fuel has two options and the year bands
@@ -93,10 +117,7 @@ export function SearchSelect({
       <button
         type="button"
         disabled={disabled || options.length === 0}
-        onClick={() => {
-          setQuery("");
-          setOpen((v) => !v);
-        }}
+        onClick={() => (open ? setOpen(false) : openList())}
         aria-expanded={open}
         role="combobox"
         aria-haspopup="listbox"
@@ -116,7 +137,11 @@ export function SearchSelect({
       </button>
 
       {open && (
-        <div className="absolute start-0 top-[calc(100%+4px)] z-20 min-w-[max(100%,190px)] overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+        <div
+          className={`absolute start-0 z-20 min-w-[max(100%,190px)] overflow-hidden rounded-lg border border-border bg-surface shadow-lg ${
+            dropUp ? "bottom-[calc(100%+4px)]" : "top-[calc(100%+4px)]"
+          }`}
+        >
           {searchable && (
             <div className="border-b border-border p-2">
               <input
